@@ -145,8 +145,9 @@ describe("T9-C1 route split & chrome", () => {
     // price read, the landing's lowest paid price, and nothing else, so no
     // library work can slip in front of the landing.
     // P21: that one read now answers the price line AND the footer's billing facts.
+    // Terms §12: the same read names the tax added to that price before tax.
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+footerBilling=\{plans\.footer\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+tax=\{plans\.tax\}\s+taxName=\{plans\.taxName\}\s+footerBilling=\{plans\.footer\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;
@@ -217,9 +218,9 @@ describe("T9-C2 chrome labels & CTAs", () => {
       .find((candidate) => (candidate.textContent ?? "").replace("→", "").trim() === "Start a round");
 
     expect(primary).toBeDefined();
-    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
     expect(primary?.getAttribute("href")).not.toBe("#");
-    expect(primary?.getAttribute("href")).not.toBe("/new");
+    expect(primary?.getAttribute("href")).not.toBe("/v4");
   });
 
   it("keeps every stub navigation link safe to click", async () => {
@@ -388,31 +389,65 @@ describe("T9-C4 landing content", () => {
     expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();
   });
 
-  it("names the lowest paid price from the published plans and links to the pricing page", async () => {
-    routeMocks.getBillingPlans.mockResolvedValueOnce({
-      currency: "USD",
-      plans: [
-        { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
-        { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, allowance_vs_plus: "30" },
-        { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }
-      ]
-    });
-    const document = await renderRoute(null);
-    const pricing = document.querySelector('[data-landing-section="pricing"]');
-    expect(pricing?.textContent).toContain("Start free. Paid plans start at $20.00 a month plus tax. Cancel whenever.");
-    expect(pricing?.querySelector('a[href="/pricing"]')?.textContent).toBe("See the plans");
-  });
-
-  it("names the lowest paid price in the currency the visitor's connection pays in (spec 2026-10-05 §2.16.1)", async () => {
+  it("names the lowest paid price before tax, as price + the visitor's tax, and links to the pricing page (Terms §12)", async () => {
     routeMocks.getBillingPlans.mockResolvedValueOnce({
       currency: "EUR",
+      place: { country: "DE", postal_code: null, status: "PRICED" },
+      tax: { country: "DE", tax_name: "MwSt.", tax_rate_bp: 1_900, tax_status: "TAXABLE" },
       plans: [
-        { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, allowance_vs_plus: "0.04" },
-        { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "19.00", RON: "100.00" }, allowance_vs_plus: "1" }
+        { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: "0.00", allowance_vs_plus: "0.05" },
+        { plan_id: "MAX", net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "33" },
+        { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: "23.80", allowance_vs_plus: "1" }
       ]
     });
     const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
-    expect(pricing?.textContent).toContain("Paid plans start at €19.00 a month plus tax.");
+    // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
+    expect(pricing?.textContent).toContain("Start free. Paid plans start at €20.00 + MwSt. a month. Cancel whenever.");
+    expect(pricing?.querySelector('a[href="/pricing"]')?.textContent).toBe("See the plans");
+    expect(pricing?.textContent).not.toMatch(/tax included|€23\.80/u);
+  });
+
+  it("says no tax is added, never \"tax included\", where the visitor's country adds none", async () => {
+    routeMocks.getBillingPlans.mockResolvedValueOnce({
+      currency: "USD",
+      place: { country: "CH", postal_code: null, status: "PRICED" },
+      tax: { country: "CH", tax_name: "VAT", tax_rate_bp: 0, tax_status: "NOT_REGISTERED" },
+      plans: [
+        { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: "0.00", allowance_vs_plus: "0.05" },
+        { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: "20.00", allowance_vs_plus: "1" }
+      ]
+    });
+    const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
+    expect(pricing?.textContent).toContain("Start free. Paid plans start at $20.00 a month, no tax added. Cancel whenever.");
+    expect(pricing?.textContent).not.toMatch(/tax included|where it applies/u);
+  });
+
+  it("names the lowest price before tax, plus tax where it applies, when the visitor's tax is not known yet", async () => {
+    const unpriced = [
+      { country: null, postal_code: null, status: "COUNTRY_NEEDED" },
+      { country: "US", postal_code: null, status: "POSTAL_CODE_NEEDED" },
+      { country: "DE", postal_code: null, status: "TAX_UNAVAILABLE" }
+    ];
+    for (const place of unpriced) {
+      routeMocks.getBillingPlans.mockResolvedValueOnce({
+        currency: "USD", place, tax: null,
+        plans: [
+          { plan_id: "FREE", net_prices: { USD: "0.00", EUR: "0.00", RON: "0.00" }, total_price: null, allowance_vs_plus: "0.05" },
+          { plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, total_price: null, allowance_vs_plus: "1" }
+        ]
+      });
+      const pricing = (await renderRoute(null)).querySelector('[data-landing-section="pricing"]');
+      expect(pricing?.textContent, place.status).toContain("Start free. Paid plans start at $20.00 a month, plus tax where it applies. Cancel whenever.");
+      expect(pricing?.textContent, place.status).not.toMatch(/tax included|no tax added/u);
+      expect(pricing?.querySelector('a[href="/pricing"]')?.textContent).toBe("See the plans");
+    }
+    // A hand-made answer without the fields (the contract client always parses them in) names no tax either.
+    routeMocks.getBillingPlans.mockResolvedValueOnce({
+      currency: "USD",
+      plans: [{ plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }]
+    });
+    expect((await renderRoute(null)).querySelector('[data-landing-section="pricing"]')?.textContent)
+      .toContain("Start free. Paid plans start at $20.00 a month, plus tax where it applies. Cancel whenever.");
   });
 
   it("renders every binding landing paragraph verbatim in its owning subtree", async () => {
@@ -447,14 +482,18 @@ describe("T9-C4 landing content", () => {
       "Scores, condition marks, and replay handles — every number traces to its source."
     );
     expect(pricing?.textContent).toContain("Your argument is only as strong as its weakest joint.");
+    // Owner's answer to question 9 (5 Nov 2026, A): the closing line names no time. The English words are the answer's own;
+    // as a new line (section 2c) it is still shown at the click-test, and the other 34 languages are drafts for a native
+    // speaker's check.
     expect(pricing?.textContent).toContain(
-      "Take one round. Four turns, about nine minutes, and a transcript that tells you exactly where you stopped answering."
+      "Take one round. Four turns, and a transcript that tells you exactly where you stopped answering."
     );
+    expect(pricing?.textContent).not.toMatch(/minute/iu);
   });
 
   it("renders both hero CTAs and sends the primary through the safe auth entry", async () => {
     // PROPERTY: the hero owns both CTA labels and its primary enters auth with
-    // the exact encoded /new return path rather than a dead or unsafe target.
+    // the exact encoded /v4 return path (V4 review ask-f1) rather than a dead or unsafe target.
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
     const links = [...(hero?.querySelectorAll("a") ?? [])];
@@ -465,20 +504,20 @@ describe("T9-C4 landing content", () => {
     const secondary = links.find((link) => label(link) === "Read a scored transcript");
 
     expect(primary).toBeDefined();
-    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
     expect(secondary).toBeDefined();
   });
 
   it("renders the closing CTA with the safe auth entry", async () => {
     // PROPERTY: the tertiary Start action belongs to the closing subtree (the
     // document moved it out of the method split) and uses the same encoded
-    // /new auth-entry contract as the other primaries.
+    // /v4 auth-entry contract as the other primaries.
     const document = await renderRoute(null);
     const closing = document.querySelector('[data-landing-section="pricing"]');
     const primary = [...(closing?.querySelectorAll("a") ?? [])]
       .find((link) => (link.textContent ?? "").replace("→", "").trim() === "Start a round");
 
     expect(primary).toBeDefined();
-    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fnew");
+    expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
   });
 });

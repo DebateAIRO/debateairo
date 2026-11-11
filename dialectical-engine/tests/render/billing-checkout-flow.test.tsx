@@ -226,7 +226,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(client.startBillingCheckout).toHaveBeenCalledWith(expect.objectContaining({ country_confirmed: true }));
   });
 
-  it("keeps Continue to payment focusable while locked, says why, and takes focus to what is missing (a11y 2026-10-17)", async () => {
+  it("keeps Subscribe and pay focusable while locked, says why, and takes focus to what is missing (a11y 2026-10-17)", async () => {
     client.createBillingQuote.mockResolvedValue(quote());
     await render();
     await fillDetails();
@@ -340,6 +340,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
       ["AGE_CHECK_UNAVAILABLE", 503, "billing.checkout.genericError"],
       // Payment region blocks (2026-10-20): checkout start re-checks the full address.
       ["REGION_PAYMENT_UNAVAILABLE", 403, "billing.checkout.regionUnavailable"],
+      ["REGION_TERMS_EXCLUDED", 403, "billing.checkout.regionTermsExcluded"],
       ["BILLING_POSTCODE_INVALID", 422, "billing.checkout.postalCodeInvalid"]
     ] as const) {
       client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", status, "x", code));
@@ -353,6 +354,7 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     // The quote refuses a closed region, or a postal code that does not fit its country, before any price.
     for (const [code, status, key] of [
       ["REGION_PAYMENT_UNAVAILABLE", 403, "billing.checkout.regionUnavailable"],
+      ["REGION_TERMS_EXCLUDED", 403, "billing.checkout.regionTermsExcluded"],
       ["BILLING_POSTCODE_INVALID", 422, "billing.checkout.postalCodeInvalid"]
     ] as const) {
       client.createBillingQuote.mockRejectedValueOnce(new ContractHttpError(status === 403 ? "FORBIDDEN" : "UNPROCESSABLE", status, "x", code));

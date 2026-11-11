@@ -1,0 +1,18 @@
+{
+  "version": "dig-tree-settled-forward0153-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0152_report_export_and_check_usage.sql",
+    "manifestSha256": "9e3106844392c6108cc224a48742af8d4f7ab55bec288974adcf53f86800c2cf",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0153_dig_tree_settled.sql",
+    "sha256": "d8f4123a7103d1d0871aaba4acf3a4c76bd56cec45bff147c8ddc8479e6780a5"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

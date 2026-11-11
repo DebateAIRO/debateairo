@@ -3578,6 +3578,8 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
     // re-acceptance inside a request carries the account's context (C4's request scope, SPEC-v4 R23).
     expect(await outcome("api-runtime", forgeCheckout)).toBe("42501");
     expect(await outcome("api-runtime", readAcceptances)).toBe("ok");
+    // 0171: the retention purge is the cross-account marker's, so the API's request login may not run it; its timer runs it on api-system.
+    expect(await outcome("api-runtime", purge)).toBe("42501");
     for (const principalId of ["runner-runtime", "scheduler-liveness", "api-authorization"]) {
       for (const statement of [forgeCheckout, readAcceptances, purge, signUpWithConsent, regionWriter, countryGate]) {
         expect(`${principalId}: ${statement.slice(0, 60)}: ${await outcome(principalId, statement)}`)
@@ -3587,7 +3589,9 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
 
     // The census, one privilege at a time (has_*_privilege counts what a principal inherits and what PUBLIC holds):
     // among the principals the provisioner manages, only api-runtime may use the legal schema, touch legal.acceptance
-    // or run the three functions, and nobody may touch legal.account_closure.
+    // or run the three functions, and nobody may touch legal.account_closure. Since 0171 the purge's EXECUTE is the
+    // cross-account marker's, so api-runtime lacks it and the marker's other holders have it without the schema's USAGE,
+    // so only api-system can run it.
     const holders = (await adminPool.query<{ principal: string; what: string }>(`
       SELECT principal.rolname AS principal, held.what
       FROM pg_catalog.pg_roles AS principal
@@ -3624,9 +3628,13 @@ describe("P3-02 production database LOGIN principal provisioning", () => {
       "SELECT legal.acceptance",
       "USAGE legal"
     ];
+    const markerHeld = { what: "EXECUTE legal.purge_expired_acceptance(timestamptz)" };
     expect(holders).toEqual([
-      ...apiHeld.map((what) => ({ principal: "debateai_prod_api_runtime", what })),
-      ...apiHeld.map((what) => ({ principal: "debateai_prod_api_system", what }))
+      { principal: "debateai_prod_api_authorization_system", ...markerHeld },
+      ...apiHeld.filter((what) => what !== markerHeld.what).map((what) => ({ principal: "debateai_prod_api_runtime", what })),
+      ...apiHeld.map((what) => ({ principal: "debateai_prod_api_system", what })),
+      { principal: "debateai_prod_runner_runtime", ...markerHeld },
+      { principal: "debateai_prod_scheduler_liveness", ...markerHeld }
     ]);
 
     // The API's own code paths outside a signed-in request, logged in as api-system (Ruling R-12 F-C2-1; D29, D48): sign-up

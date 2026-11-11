@@ -56,8 +56,11 @@ describe("the runner passes a shaped run's lock to every call site", async () =>
   });
 
   it("the writer, the checker, both readings and the story carry it", () => {
-    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage);");
-    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);");
+    // V4 reading level (owner N6, 2026-10-29): the run's level follows the lock as the sixth argument.
+    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage, readingLevel);");
+    expect(source).toContain("buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,\n          readingLevel);");
+    expect(source).toContain("const readingLevel: ReadingLevel | null = readingLevelOf(run.depthParams);");
+    expect(source).toContain("languageLocked: shapeLanguage !== null,\n              // V4 reading level (owner N6): the story is written for the person's level; null, today's story.\n              readingLevel,");
     expect(source).toContain("questionLine: run.questionLine,\n          ...shapeLanguageInput\n        }, reply));");
     expect(source).toContain("classifyEvaluatorContent(content, reply, run.questionLine, shapeLanguage)");
     expect(source).toContain("languageLocked: shapeLanguage !== null,");
@@ -92,7 +95,9 @@ describe("runQuestionLanguageLock: the receipt's shape decides the lock", () => 
     // P2d Task 7c (controller ruling D-CATCHUP): the definition, the run's own call, and the review catch-up's.
     expect(source.match(/runQuestionLanguageLock\(/gu)).toHaveLength(3);
     expect(source).toContain("const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);");
-    expect(source).toContain("runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {");
+    // V4 start step, Task 53: a path debate's receipt (shape receipt v2) locks the catch-up's language as a v1 shape's does.
+    expect(source).toContain("const catchUpBasis = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis);");
+    expect(source).toContain("runQuestionLanguageLock(catchUpBasis.shape ?? catchUpBasis.shapeV2 ?? null, {");
     expect(source).not.toContain("shapeRun === null ? null\n      : questionLanguageFromRun(");
   });
 });

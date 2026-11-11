@@ -208,7 +208,7 @@ describe("side-by-side C8: at most 8 debates across releases", () => {
     expect(await latestReasonOf(waiting.run_ref)).toBe("SITE_BUSY");
   });
 
-  it("the room decision pool's login (debateai_runtime) may make both reads", async () => {
+  it("the room decision pool's login (the system login: debateai_runtime and the cross-account marker) may make both reads; debateai_runtime alone is refused the count", async () => {
     // Row-level security (0126, D29): the room decision pool is a system login, so the file's login is the system twin
     // of debateai_runtime (the role and the cross-account marker); BARE holds the role alone, with no account context.
     const runtime: Pool = createPool(await createSystemTwin(database, LOGIN, ["debateai_runtime"]), { max: 1 });
@@ -230,12 +230,14 @@ describe("side-by-side C8: at most 8 debates across releases", () => {
       } finally {
         client.release();
       }
-      // The bare role counts none of the site's debates: the cap needs the system login.
+      // The bare role counts none of the site's debates: the cap needs the system login. Since 0171 (the security review, F5) it may not even ask
+      // whether a debate's work is parked, which is the cross-account marker's.
       const bareClient = await bare.connect();
       try {
         await bareClient.query("BEGIN");
-        expect(await new PostgresAskAdmissionGate({ releaseKey: R17, hosted: false }).activeDebates(bareClient)).toBe(0);
-        await bareClient.query("COMMIT");
+        await expect(new PostgresAskAdmissionGate({ releaseKey: R17, hosted: false }).activeDebates(bareClient)).rejects
+          .toMatchObject({ code: "42501", message: "permission denied for function run_work_is_parked" });
+        await bareClient.query("ROLLBACK");
       } finally {
         bareClient.release();
       }

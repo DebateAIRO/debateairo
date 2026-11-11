@@ -151,7 +151,7 @@ export function installSubscriptionRoutes(
       agreement: parsed.data.renewal_terms
     }))));
   });
-  // P12d: the step-up grant (WITHDRAW_SUBSCRIPTION) rides in the body and is spent under the owner lock.
+  // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up.
   api.post("/v1/billing/subscription/withdraw", policy("POST /v1/billing/subscription/withdraw"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;
@@ -160,7 +160,7 @@ export function installSubscriptionRoutes(
     if (!parsed.success) return malformed(reply);
     const mailLocale = mailLocaleOf(request);
     return answer(reply, async () => {
-      const result = await withdraw(deps, { authenticated, grantToken: parsed.data.step_up_grant, mailLocale });
+      const result = await withdraw(deps, { authenticated, mailLocale });
       return reply.send(BillingWithdrawResponseSchema.parse({
         refund: result.refundMicros === null ? null : microsToDecimal(result.refundMicros), currency: result.currency
       }));

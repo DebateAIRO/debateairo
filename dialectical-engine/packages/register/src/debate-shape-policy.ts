@@ -1,8 +1,8 @@
 import type { Pool } from "pg";
 import { z } from "zod";
-import { exhaustive, LENGTH_GUIDANCE_START } from "@debateai/kernel";
+import { exhaustive, LENGTH_GUIDANCE_START, START_STEP_LIMITS } from "@debateai/kernel";
 import {
-  debateShapeSettingsOf, type AnswerLength, type DebateShapeSettings, type DepthMode, type DepthParams, type PlanTier, type Scrutiny
+  debateShapeSettingsOf, readingLevelOf, type AnswerLength, type DebateShapeSettings, type DepthMode, type DepthParams, type PlanTier, type Scrutiny
 } from "@debateai/contract";
 import type { PlanId } from "./billing-plans.js";
 import type { LengthGuidancePolicy } from "./length-guidance-policy.js";
@@ -44,6 +44,10 @@ export type DebateShapePlan = Readonly<{
 export type DebateShapeLength = Readonly<{ words: number; writerBound: number }>;
 /** Controller ruling X1 (P2b ruling R-2): the max_tokens of the map's merge and choose calls, two long structured lists. */
 export type DebateShapeMapStepBounds = Readonly<{ merge: number; choose: number }>;
+/** V4 start step, Task 11: How wide's choices for one plan (1 to 3 path counts, rising, 1..7) and the one it starts on. */
+export type DebateShapeWidths = Readonly<{ options: readonly number[]; default: number }>;
+/** V4 start step, Task 11: the start step's switch: present (and the row not switched off) = on, with each plan's widths. */
+export type DebateShapeStartStep = Readonly<{ widths: Readonly<Record<DebateShapePlanKey, DebateShapeWidths>> }>;
 export type DebateShapePolicy = Readonly<{
   kind: "DEBATE_SHAPE_POLICY";
   version: 1;
@@ -56,6 +60,11 @@ export type DebateShapePolicy = Readonly<{
    * `false` = no shape for the ASK side (`debateShapeInForce`). Never written by the start values.
    */
   readonly enabled?: boolean;
+  /**
+   * V4 start step, Task 11 (spec 2026-11-03 §9): the step before Start, ON when present. Optional with NO default, and
+   * never written by the start values, so every row without it keeps its exact bytes and today's (R22's) behaviour.
+   */
+  readonly startStep?: DebateShapeStartStep;
 }>;
 
 /**
@@ -119,6 +128,21 @@ const lengthSchema = z.object({ words: whole(50, 5000), writerBound: whole(1024,
 const mapStepBoundsSchema = z.object({ merge: whole(8192, 32768), choose: whole(8192, 32768) }).strict();
 /** The start values of mapStepBounds, and what a row written without the member reads. */
 const mapStepBoundsStartValues = (): DebateShapeMapStepBounds => ({ merge: 32768, choose: 32768 });
+/** V4 start step, Task 11: one plan's widths; any defect is reported at `options` or `default`. */
+const widthsSchema = z.object({
+  options: z.array(z.number()).superRefine((options, ctx) => {
+    const rising = options.every((value, index) => index === 0 || value > options[index - 1]!);
+    if (options.length < 1 || options.length > 3 || !options.every((value) => Number.isInteger(value) && value >= 1 && value <= 7) || !rising) {
+      ctx.addIssue({ code: "custom", message: "1 to 3 widths, whole numbers 1 to 7, rising" });
+    }
+  }),
+  default: z.number()
+}).strict().superRefine((widths, ctx) => {
+  if (!widths.options.includes(widths.default)) ctx.addIssue({ code: "custom", path: ["default"], message: "the default is one of the widths" });
+});
+const startStepSchema = z.object({
+  widths: z.object({ free: widthsSchema, plus: widthsSchema, pro: widthsSchema, max: widthsSchema, premium: widthsSchema }).strict()
+}).strict();
 const policySchema = z.object({
   kind: z.literal("DEBATE_SHAPE_POLICY"),
   version: z.literal(1),
@@ -126,7 +150,9 @@ const policySchema = z.object({
   answerLength: z.object({ short: lengthSchema, standard: lengthSchema, detailed: lengthSchema }).strict(),
   mapStepBounds: mapStepBoundsSchema.default(mapStepBoundsStartValues),
   // Amendment 2026-10-13: optional with NO default, so a row written without it keeps its exact bytes and reads as on.
-  enabled: z.boolean().optional()
+  enabled: z.boolean().optional(),
+  // V4 start step, Task 11: optional with NO default, as `enabled`.
+  startStep: startStepSchema.optional()
 }).strict().superRefine((policy, ctx) => {
   const { short, standard, detailed } = policy.answerLength;
   if (!(short.words < standard.words && standard.words < detailed.words)) {
@@ -209,6 +235,8 @@ export function debateShapeWriterCeiling(sealedWriterBound: number, policyInForc
 function shapeAst(value: unknown): CanonicalJsonAst {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;
   if (typeof value === "number") return canonicalDecimal(String(value));
+  // V4 start step, Task 11: the widths' options are the row's first list; a list stays a list.
+  if (Array.isArray(value)) return Object.freeze(value.map(shapeAst));
   return Object.freeze(Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, inner]) => [key, shapeAst(inner)])
   ));
@@ -262,6 +290,31 @@ export function debateShapePolicyStartValues(opening: DebateShapeOpening = "ANGL
   });
 }
 
+/**
+ * V4 start step, Task 11 (spec 2026-11-03 §9): the owners' widths for How wide: Free 3 only (How wide hidden), every
+ * paid plan 3, 5 or 7, starting on 5. Never part of debateShapePolicyStartValues(): a switched-on row is written
+ * `{ ...debateShapePolicyStartValues(), startStep: debateShapeStartStepStartValues() }`.
+ */
+export function debateShapeStartStepStartValues(): DebateShapeStartStep {
+  const paid = { options: [3, 5, 7], default: 5 };
+  return deepFreeze({ widths: { free: { options: [3], default: 3 }, plus: { ...paid, options: [...paid.options] },
+    pro: { ...paid, options: [...paid.options] }, max: { ...paid, options: [...paid.options] }, premium: { ...paid, options: [...paid.options] } } });
+}
+
+/**
+ * V4 start step, Task 11: a plan's widths when the start step is on (a row in force carrying the member), else null.
+ * Free is capped at 3 paths in code whatever the row says (spec §2.6; owner 29 and 31 Oct): its widths keep only those
+ * of at most 3 (none left: [3]), and its default stays when kept, else the largest kept.
+ */
+export function debateShapeStartStepOf(policy: DebateShapePolicy | null, plan: DebateShapePlanKey): DebateShapeWidths | null {
+  if (policy === null || policy.enabled === false || policy.startStep === undefined) return null;
+  const widths = policy.startStep.widths[plan];
+  if (plan !== "free") return Object.freeze({ options: Object.freeze([...widths.options]), default: widths.default });
+  const kept = widths.options.filter((width) => width <= START_STEP_LIMITS.freePathsMax);
+  const options = kept.length === 0 ? [START_STEP_LIMITS.freePathsMax] : kept;
+  return Object.freeze({ options: Object.freeze(options), default: options.includes(widths.default) ? widths.default : Math.max(...options) });
+}
+
 /** INTERFACE §1: the run's plan id when billing is on, else the tier (free -> free, premium -> premium). */
 export function debateShapePlanKeyOf(planId: PlanId | null, planTier: PlanTier): DebateShapePlanKey {
   if (planId !== null) {
@@ -280,7 +333,8 @@ export function debateShapePlanKeyOf(planId: PlanId | null, planTier: PlanTier):
   }
 }
 
-function scrutinyBudgetOf(plan: DebateShapePlan, scrutiny: Scrutiny): DebateShapeScrutinyBudget | null {
+/** A plan's budget for an asked scrutiny (null: the plan has none); shared with shape v2 (debate-shape-v2.ts). */
+export function scrutinyBudgetOf(plan: DebateShapePlan, scrutiny: Scrutiny): DebateShapeScrutinyBudget | null {
   switch (scrutiny) {
     case "standard": return Object.freeze({ roundsPerPoint: 0, pointsPerDebate: 0 });
     case "deep": return plan.scrutiny.deep;
@@ -299,24 +353,30 @@ const FREE_SHAPE_DEPTH_CEILING = 2;
  * today's stored bytes and the depth is untouched. Length guidance (spec 2026-10-15 §3.1): with the shape row absent and
  * the length row in force, `{ depth, answerLength }` exactly, in that order (the answer length is the one setting the
  * length row reads). With billing on, billing's Free gauge sets the depth first; this ceiling can only lower it.
+ * V4 reading level (owner N6, 2026-10-29): an asked `readingLevel` is kept, last, in every branch; it is no shape setting
+ * and no row changes it. An ask without one is normalised exactly as before (the same object for `{ depth }`).
  */
 export function normaliseDepthParamsForShape(depthParams: DepthParams, policy: DebateShapePolicy | null, plan: DebateShapePlanKey,
   lengthPolicy: LengthGuidancePolicy | null = null): DepthParams {
+  const readingLevel = readingLevelOf(depthParams);
+  const level = readingLevel === null ? {} : { readingLevel };
   if (policy === null) {
     if (lengthPolicy !== null) {
-      return Object.freeze({ depth: depthParams.depth, answerLength: debateShapeSettingsOf(depthParams).answerLength });
+      return Object.freeze({ depth: depthParams.depth, answerLength: debateShapeSettingsOf(depthParams).answerLength, ...level });
     }
-    return Object.keys(depthParams).length === 1 ? depthParams : Object.freeze({ depth: depthParams.depth });
+    return Object.keys(depthParams).length === 1 + Object.keys(level).length
+      ? depthParams : Object.freeze({ depth: depthParams.depth, ...level });
   }
   const rules = policy.plans[plan];
   const asked = debateShapeSettingsOf(depthParams);
   const depth = plan === "free" ? Math.min(depthParams.depth, FREE_SHAPE_DEPTH_CEILING) : depthParams.depth;
   const depthMode: DepthMode = asked.depthMode === "fixed" && !rules.fixedDepthAllowed ? "adaptive" : asked.depthMode;
   const scrutiny: Scrutiny = scrutinyBudgetOf(rules, asked.scrutiny) === null ? "standard" : asked.scrutiny;
-  return Object.freeze({ depth, depthMode, scrutiny, answerLength: asked.answerLength });
+  return Object.freeze({ depth, depthMode, scrutiny, answerLength: asked.answerLength, ...level });
 }
 
-const notNormalised = (key: string): never => { throw new TypeError(`DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:${key}`); };
+/** An un-normalised setting is an engine fault, never a silent fix; shared with shape v2. */
+export const notNormalised = (key: string): never => { throw new TypeError(`DEBATE_SHAPE_SETTINGS_NOT_NORMALISED:${key}`); };
 
 /**
  * The sizes for `makers` distinct makers (INTERFACE §1): answers <= makers, map AIs <= makers, graders <= makers - 1 and

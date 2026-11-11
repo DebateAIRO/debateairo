@@ -102,9 +102,11 @@ describe("side-by-side C7 the API's background loops run only on the current rel
       "gatedInterval(releaseWatcher,triggerErasureReconciliation,30_000)",
       "gatedInterval(releaseWatcher,triggerAuthenticationRiskCleanup,60_000)",
       "gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000)",
+      "gatedInterval(releaseWatcher,triggerAskClarifyReservationSweep,ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS)",
       "gatedInterval(releaseWatcher,triggerDataExportWork,DATA_EXPORT_TICK_MS)",
       "gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000)",
-      "gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000)"
+      "gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000)",
+      "gatedInterval(releaseWatcher,triggerPublicPage,PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs)"
     ]) {
       expect(mainCode.replace(/\s+/gu, ""), loop).toContain(loop);
     }
@@ -114,6 +116,10 @@ describe("side-by-side C7 the API's background loops run only on the current rel
     // The ask waker plus its stalled-start re-send: the whole-minute tick is gated, the waker itself is unchanged.
     expect(main).toContain("everyWholeMinute(gatedTrigger(");
     expect(main).toContain("askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));");
+    // V4 start step, Task 56: the carry-on's whole-minute tick, single flight and gated the same way, stopped on close.
+    expect(main).toContain("carryOnLoop = everyWholeMinute(gatedTrigger(releaseWatcher, triggerCarryOn));");
+    expect(main).toContain("const triggerCarryOn = createSingleFlightErasureReconciler(async () => { await api.carryOnTick(); }, () => console.error(\"[CARRY_ON_TICK_PENDING]\"));");
+    expect(main).toContain("api.addHook(\"onClose\",async () => carryOnLoop?.stop());");
   });
 
   it("hands each runtime's start the watcher as its `when`", () => {
@@ -142,6 +148,7 @@ describe("side-by-side C7 the API's background loops run only on the current rel
       "triggerDataExportWork();",
       "triggerAuthenticationRiskCleanup();",
       "triggerRetentionPurge();",
+      "triggerAskClarifyReservationSweep();",
       "billingRuntime?.start(",
       "providerOnlyJobs?.start(",
       "netopiaIntake.recheckQuarantine(new Date())",
@@ -183,7 +190,12 @@ describe("side-by-side C7 the API's background loops run only on the current rel
     expect(exportService).toContain("const timer = setInterval(renew, DATA_EXPORT_RENEW_MS);");
     // The support relay's durable drain serves this process's own waiters.
     expect(read("support/queue.ts")).toContain("#scheduleDurableDrain(");
-    for (const file of ["data-export/service.ts", "support/queue.ts"]) {
+    // V4 start step, Task 30: the pre-Start stream's heartbeat and drain poll belong to one open answer, and stop with it.
+    const startStream = read("start-step/stream.ts");
+    for (const timer of ["heartbeat = setInterval(", "drainPoll = setInterval(", "clearInterval(heartbeat);", "clearInterval(drainPoll);"]) {
+      expect(startStream, timer).toContain(timer);
+    }
+    for (const file of ["data-export/service.ts", "support/queue.ts", "start-step/stream.ts"]) {
       expect(read(file), file).not.toMatch(/ownIsCurrent\(\)|release-loops|gatedInterval|gatedTrigger/u);
     }
     // The watcher's own poll chain is never gated: it is the gate.
@@ -200,7 +212,8 @@ describe("side-by-side C7 the API's background loops run only on the current rel
       "billing/runtime.ts",
       "data-export/service.ts",
       "release-loops.ts",
-      "staff/runtime.ts"
+      "staff/runtime.ts",
+      "start-step/stream.ts"
     ]);
   });
 });

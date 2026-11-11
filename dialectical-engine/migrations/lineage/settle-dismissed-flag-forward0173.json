@@ -1,0 +1,26 @@
+{
+  "version": "settle-dismissed-flag-forward0173-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0172_moderation_notice_fixes.sql",
+    "manifestSha256": "16ff1904b932993d95824d74dac34bc3f14565e407b5ae741537ebee247f65fe",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0173_settle_dismissed_flag.sql",
+    "sha256": "f8de94454835165949829191e12da0cb6db334b5cef13e1c2c1885938ecd04b3"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0151_public_flag.sql",
+      "functions": [
+        "identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)"
+      ],
+      "field": "function_definition"
+    }
+  ]
+}

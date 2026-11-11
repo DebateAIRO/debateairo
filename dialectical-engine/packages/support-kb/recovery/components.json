@@ -116,16 +116,16 @@
     {
       "id": "delete-a-private-debate",
       "lang": "en",
-      "articleSha256": "7c37881f26d875f87a0177bc35593d9f52a1739b25a848df98ad2d478c7bdb26",
-      "modelProjection": "Deleting a private debate requires signing in, ownership, the debate page's delete control, and fresh authentication when requested. A published debate must be unpublished before deletion.",
-      "fallback": "Sign in and open a debate you own. Choose its delete control and complete fresh authentication when the page asks. If the debate is published, unpublish it before deletion."
+      "articleSha256": "ecb340c8a317b82fbaa060c1d1b8840ef03b57f28fd2d78864bfd348371afce0",
+      "modelProjection": "Deleting a private debate requires signing in, ownership, the debate page's delete control, and fresh authentication when requested. A published debate cannot be unpublished or deleted: it stays public.",
+      "fallback": "Sign in and open a debate you own. Choose its delete control and complete fresh authentication when the page asks. A published debate cannot be unpublished or deleted: it stays public."
     },
     {
       "id": "delete-a-private-debate",
       "lang": "ro",
-      "articleSha256": "afc631bec586e463df1b217d79fc9ea694f873f5690b028c7b79aa65d83cfaa9",
-      "modelProjection": "Ștergerea unei dezbateri private cere autentificare, proprietatea dezbaterii, controlul de ștergere din pagina ei și autentificare recentă când este solicitată. O dezbatere publicată trebuie retrasă de la publicare înainte de ștergere.",
-      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de ștergere și finalizează autentificarea recentă când pagina o cere. Dacă dezbaterea este publicată, retrage mai întâi publicarea."
+      "articleSha256": "77a76700d6e7dddc43505d46d1eb292f84621e8b9f70306fc108dfe1061adfc8",
+      "modelProjection": "Ștergerea unei dezbateri private cere autentificare, proprietatea dezbaterii, controlul de ștergere din pagina ei și autentificare recentă atunci când este solicitată. O dezbatere publicată nu poate fi retrasă de la publicare și nici ștearsă: rămâne publică.",
+      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de ștergere și finalizează autentificarea recentă când pagina o cere. O dezbatere publicată nu poate fi retrasă de la publicare și nici ștearsă: rămâne publică."
     },
     {
       "id": "export-json",
@@ -200,30 +200,30 @@
     {
       "id": "public-answer-disclosure",
       "lang": "en",
-      "articleSha256": "e67c271558e6bb5b4100fa735059e781e453c268808d555c6e85af36e3e678ea",
-      "modelProjection": "Published debates may be indexed by search engines, and copies can remain after unpublishing. The public page shows answer status and the time reflected by its evidence, and states when a verdict is unavailable. Publications created before argument-tree publishing contain only the answer summary.",
-      "fallback": "Before reading a published debate, remember that search engines may index it and copies can remain after unpublishing. The public page shows answer status, the evidence time, and whether a verdict is unavailable. Older publications from before argument-tree publishing contain only the answer summary."
+      "articleSha256": "61d56f01ff035362e1f914c60421fe1c782a3056ade12614b149f05ee76a13af",
+      "modelProjection": "Published debates cannot be unpublished and may be indexed by search engines, and copies can remain elsewhere. The public page shows answer status and the time reflected by its evidence, and states when a verdict is unavailable. Publications created before argument-tree publishing contain only the answer summary.",
+      "fallback": "Before reading a published debate, remember that it cannot be unpublished, search engines may index it and copies can remain elsewhere. The public page shows answer status, the evidence time, and whether a verdict is unavailable. Older publications from before argument-tree publishing contain only the answer summary."
     },
     {
       "id": "public-answer-disclosure",
       "lang": "ro",
-      "articleSha256": "6e845c95414ae5b9190cf5917136776d7af931eaf626b2da4a0540b3bf7925f1",
-      "modelProjection": "Dezbaterile publicate pot fi indexate de motoarele de căutare, iar copiile pot rămâne după retragerea publicării. Pagina publică arată starea răspunsului și momentul reflectat de dovezi și precizează când verdictul nu este disponibil. Publicările create înainte de publicarea arborilor de argumente conțin numai rezumatul răspunsului.",
-      "fallback": "Înainte să citești o dezbatere publicată, reține că motoarele de căutare o pot indexa și că unele copii pot rămâne după retragerea publicării. Pagina publică arată starea răspunsului, momentul dovezilor și indisponibilitatea verdictului. Publicările mai vechi decât arborii publicați conțin numai rezumatul răspunsului."
+      "articleSha256": "30008ba74a9957ef8ae51bd1fdf9c9e42b556dfd3d6ef21e0fbf02326304cca4",
+      "modelProjection": "Dezbaterile publicate nu pot fi retrase de la publicare și pot fi indexate de motoarele de căutare, iar copiile pot rămâne în alte locuri. Pagina publică afișează starea răspunsului și momentul la care se referă dovezile și arată când verdictul nu este disponibil. Publicările create înainte de publicarea arborilor de argumente conțin doar rezumatul răspunsului.",
+      "fallback": "Înainte de a citi o dezbatere publicată, reține că nu poate fi retrasă de la publicare, că motoarele de căutare o pot indexa și că unele copii pot rămâne în alte locuri. Pagina publică afișează starea răspunsului, momentul dovezilor și dacă verdictul este indisponibil. Publicările mai vechi, de dinainte de publicarea arborilor de argumente, conțin doar rezumatul răspunsului."
     },
     {
       "id": "publish-a-debate",
       "lang": "en",
-      "articleSha256": "9385f0dd00f8014e3445d1ee4c8c5230dc12d0379766d35c9c7845814f288e29",
-      "modelProjection": "Publishing requires signing in, ownership of the debate, the publish control on its page, and fresh authentication when requested.",
-      "fallback": "Sign in and open a debate you own. Choose its publish control, then complete fresh authentication when the page asks."
+      "articleSha256": "de9b228a97db85a2d698261244fd673b59f901e528353e48b3d7f517b20cec72",
+      "modelProjection": "Publishing requires signing in, ownership of the debate, the publish control on its page, and fresh authentication when requested. Publishing is for good: a published debate cannot be taken back.",
+      "fallback": "Sign in and open a debate you own. Choose its publish control, then complete fresh authentication when the page asks. Publishing is for good: a published debate cannot be taken back."
     },
     {
       "id": "publish-a-debate",
       "lang": "ro",
-      "articleSha256": "41858b13ebb6bcec19430b6a63cae6f5854b25ad02e8ac74617d83b087355c3c",
-      "modelProjection": "Publicarea cere autentificare, proprietatea dezbaterii, controlul de publicare din pagina ei și autentificare recentă atunci când este solicitată.",
-      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de publicare, apoi finalizează autentificarea recentă când pagina o cere."
+      "articleSha256": "f84f19deb5e5465871020b36370ed37b4c932ff6e896eec6354d5e13748bad28",
+      "modelProjection": "Publicarea cere autentificare, proprietatea dezbaterii, controlul de publicare din pagina ei și autentificare recentă atunci când este solicitată. Publicarea este definitivă: o dezbatere publicată nu poate fi retrasă.",
+      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de publicare, apoi finalizează autentificarea recentă când pagina o cere. Publicarea este definitivă: o dezbatere publicată nu poate fi retrasă."
     },
     {
       "id": "risk-tier-choice",
@@ -284,16 +284,16 @@
     {
       "id": "unpublish-a-debate",
       "lang": "en",
-      "articleSha256": "70e53322f323778974e50ca4f4342a4e8cba5c41d5139d51452530a40c7563a2",
-      "modelProjection": "Unpublishing requires signing in, ownership of the debate, the unpublish control on its page, and fresh authentication when requested. Copies indexed elsewhere can remain afterward.",
-      "fallback": "Sign in and open a debate you own. Choose its unpublish control and complete fresh authentication when the page asks. Copies indexed elsewhere may remain after unpublishing."
+      "articleSha256": "5d66f53b182dd9831fe2668fe79220e27983465e9562cfbf95f121a971eb2882",
+      "modelProjection": "A published debate cannot be taken back or made private again; there is no unpublish control, and anyone with credit can add to it. Erasing an account takes the person's name off and it shows \"a contributor\". If a public debate contains personal details about someone or breaks the Terms, a person with an account can use the Report button and anyone can write to us: we can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere can remain.",
+      "fallback": "A published debate cannot be taken back or made private again. If you erase your account your name comes off it and it shows \"a contributor\". If a public debate contains personal details about you or breaks our Terms, use the Report button if you have an account; anyone can write to us. We can hide it while we review it, and remove or correct the passage concerned. Copies indexed elsewhere may remain."
     },
     {
       "id": "unpublish-a-debate",
       "lang": "ro",
-      "articleSha256": "a741f94571245aadbb6f25d6da5c3c5b87bdf5bf72fa4c5aaf8e03980abce9d0",
-      "modelProjection": "Retragerea publicării cere autentificare, proprietatea dezbaterii, controlul corespunzător din pagina ei și autentificare recentă atunci când este solicitată. Copiile indexate în alte locuri pot rămâne ulterior.",
-      "fallback": "Autentifică-te și deschide o dezbatere care îți aparține. Alege controlul de retragere a publicării și finalizează autentificarea recentă când pagina o cere. Copiile indexate în alte locuri pot rămâne după retragerea publicării."
+      "articleSha256": "d1024fe5f2fcc05831717b25c8506ecf00bf894454055a18fbd3ea990ab16e70",
+      "modelProjection": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată; nu există control de retragere a publicării, iar oricine are credit poate contribui la ea. Ștergerea contului elimină numele persoanei și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre cineva sau încalcă Termenii, cine are cont poate folosi butonul Raportare și oricine ne poate scrie: o putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne.",
+      "fallback": "O dezbatere publicată nu poate fi retrasă și nu mai poate deveni privată. Dacă îți ștergi contul, numele tău este eliminat și în locul lui apare „un contribuitor”. Dacă o dezbatere publică conține date personale despre tine sau încalcă Termenii noștri, folosește butonul Raportare dacă ai cont; oricine ne poate scrie. O putem ascunde cât timp o verificăm și putem elimina sau corecta partea respectivă. Copiile indexate în alte locuri pot rămâne."
     },
     {
       "id": "unsupported-capabilities",

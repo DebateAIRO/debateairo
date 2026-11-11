@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Tartışma oluşturulamadı",
   "newDebate.sessionReadFailed": "Oturum okunamadı",
   "newDebate.planRosterFailed": "Plan kademesi listesi okunamadı",
-  "newDebate.checkingSession": "Oturum denetleniyor…",
+  "newDebate.checkingSession": "Bir saniye…",
   "newDebate.redirectingToSignIn": "Oturum açma sayfasına yönlendiriliyorsunuz…",
   "newDebate.continueToSignIn": "Oturum açmaya devam et",
   "newDebate.defaultUnavailable": "Dağıtımda geçerli bir riskTier satırı yok; Risk kademesi girdi bekliyor.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Planınızın bugünkü sınırına ulaştınız. Yine de soru sorabilirsiniz: tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
   "newDebate.room.personWeekFullTopPlan": "Planınızın bu haftaki sınırına ulaştınız. Yine de soru sorabilirsiniz: tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
   "newDebate.room.personMonthFullTopPlan": "Planınızın bu ayki sınırına ulaştınız. Yine de soru sorabilirsiniz: tartışmanız {time} itibarıyla kendiliğinden başlayacak.",
-  "newDebate.room.freeMonthFull": "Bu ayki ücretsiz tartışma hakkınızı kullandınız. Sonraki tartışmanız {time} itibarıyla başlayabilir veya hemen devam etmek için bir plan seçin.",
+  "newDebate.room.freeMonthFull": "Bu ayki ücretsiz kotanızı kullandınız. Sonraki tartışmanız {time} itibarıyla başlayabilir veya hemen devam etmek için bir plan seçin.",
   "newDebate.room.personClose": "Planınızın sınırına yaklaştınız. Bu tartışma yine de eksiksiz yürütülecek.",
   "newDebate.room.ownDebatesFull": "Diğer tartışmalarınız şimdilik sınırınızın kalanını kullanıyor. Bu tartışma, bunlardan biri biter bitmez kendiliğinden başlayacak.",
   "newDebate.room.upgradeLink": "Planları görün",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Planınız: Ücretsiz",
   "newDebate.plan.current.PLUS": "Planınız: Plus",
   "newDebate.plan.current.PRO": "Planınız: Pro",
-  "newDebate.plan.current.MAX": "Planınız: Max"
+  "newDebate.plan.current.MAX": "Planınız: Max",
+  "newDebate.askText.otherAnswer": "Başka bir cevap…",
+  "newDebate.askText.otherLabel": "Kendi ek açıklamanız",
+  "newDebate.askText.matters": "Cevaplar farklı yönlere işaret ederse, benim için en çok önemli olan şey: {matters}",
+  "newDebate.freePublicNotice": "Ücretsiz planda sorunuz ve tartışması herkese açıktır. Kişisel bilgi eklemeyin."
 }

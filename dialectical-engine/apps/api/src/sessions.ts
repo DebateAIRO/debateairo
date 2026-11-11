@@ -121,9 +121,10 @@ export interface SessionApplication {
   ): Promise<"passed" | "refused" | "SESSION_NOT_FOUND">;
   /**
    * Sensitive-data consent (V, 2026-09-29): "required" until the account agrees, once, to
-   * the processing of sensitive information in its own questions. No debate starts before.
+   * the processing of sensitive information in its own questions. No debate starts before. V4 start step, Task 56: only the
+   * account is read, so the carry-on asks it for a person with no live sign-in, as POST /v1/asks asks it.
    */
-  readSensitiveDataConsent?(session: AuthenticatedSession): Promise<"required" | "given">;
+  readSensitiveDataConsent?(session: Pick<AuthenticatedSession, "userId">): Promise<"required" | "given">;
   /** Records that agreement; `SESSION_NOT_FOUND` means this session was not live. */
   recordSensitiveDataConsent?(
     session: AuthenticatedSession,
@@ -135,7 +136,7 @@ export interface SessionApplication {
     code: string;
     authorization?:
       | Readonly<{
-        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        action: "PUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
       | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "EXPORT_DATA" }>
@@ -668,7 +669,7 @@ export class SessionService implements SessionApplication {
     });
   }
 
-  async readSensitiveDataConsent(session: AuthenticatedSession): Promise<"required" | "given"> {
+  async readSensitiveDataConsent(session: Pick<AuthenticatedSession, "userId">): Promise<"required" | "given"> {
     return await this.dependencies.repository.readSensitiveDataConsent(session.userId) ? "given" : "required";
   }
 
@@ -690,7 +691,7 @@ export class SessionService implements SessionApplication {
     code: string;
     authorization?:
       | Readonly<{
-        action: "PUBLISH" | "UNPUBLISH" | "DELETE_PRIVATE_DEBATE";
+        action: "PUBLISH" | "DELETE_PRIVATE_DEBATE";
         targetRunId: string;
       }>
       | Readonly<{ action: "DELETE_ACCOUNT" | "CHANGE_EMAIL" | "WITHDRAW_SUBSCRIPTION" | "READ_PHONE_PROFILE" | "CHANGE_PHONE_PROFILE" | "CHANGE_RECOVERY_EMAIL" | "ADD_PASSKEY" | "ADD_TOTP" | "REGENERATE_RECOVERY_CODES" | "EXPORT_DATA" }>

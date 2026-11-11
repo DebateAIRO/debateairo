@@ -26,6 +26,8 @@ import { createSupportModelReferenceFactory } from "../../apps/api/src/support/m
 const GOLDEN = resolve(process.cwd(), "tests/support/fixtures/support-routing-33.json");
 const INTEGRATION = resolve(process.cwd(), "tests/support/fixtures/support-routing-auth-dev-overlay.json");
 const V131 = resolve(process.cwd(), "tests/support/fixtures/support-routing-v131-overlay.json");
+// R22 decision 13: the help articles no longer describe an Unpublish control. The same three articles answer; only their order moved on 18 rows.
+const R22_PUBLIC = resolve(process.cwd(), "tests/support/fixtures/support-routing-r22-public-overlay.json");
 const QUERY_KEYS = [
   "chrome:chrome.aiTransparency", "chrome:chrome.legal.notice", "chrome:chrome.legal.terms", "chrome:chrome.legal.versions",
   "chrome:chrome.legal.privacy", "chrome:chrome.legal.health", "chrome:chrome.legal.cookies", "chrome:chrome.legal.providers",
@@ -103,6 +105,15 @@ describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
       expect(current.slice(1), key).toEqual(prior.slice(1));
       if (prior[0] !== "") expect(current[0], key).not.toBe("");
     }
-    expect(now).toEqual({...golden,...overlay,...v131});
+    const r22Public = JSON.parse(readFileSync(R22_PUBLIC, "utf8")) as Record<string,string>;
+    const beforeR22 = {...golden,...overlay,...v131};
+    expect(Object.keys(r22Public)).toHaveLength(18);
+    for (const [key,value] of Object.entries(r22Public)) {
+      const prior = beforeR22[key]!.split("|");
+      const current = value.split("|");
+      expect(current.slice(1), key).toEqual(prior.slice(1));
+      expect(current[0]!.split(",").sort(), key).toEqual(prior[0]!.split(",").sort());
+    }
+    expect(now).toEqual({...beforeR22,...r22Public});
   });
 });

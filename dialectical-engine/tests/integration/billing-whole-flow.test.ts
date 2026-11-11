@@ -121,12 +121,12 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     );
     expect(succeeded.rows[0]!.count).toBe("1");
 
-    // Usage: 0.50 of Plus's 1.00 day, 2.50 week and 5.00 month.
-    await stack.spend(person, 500_000);
+    // Usage: half of Plus's made-up day of 726,000; its week is 2,904,000 and its month 6,600,000.
+    await stack.spend(person, 363_000);
     const usage = await stack.get(person, "/v1/billing/usage");
     expect(usage.status).toBe(200);
     const percent = Object.fromEntries((usage.body.windows as Array<{ scope: string; percent: number }>).map((w) => [w.scope, w.percent]));
-    expect(percent).toEqual({ PERSON_DAY: 50, PERSON_WEEK: 20, PERSON_MONTH: 10 });
+    expect(percent).toEqual({ PERSON_DAY: 50, PERSON_WEEK: 12, PERSON_MONTH: 5 });
     expect(usage.text).not.toMatch(/micros|\$|"0\.5/u);
 
     // Renewal: the period ends, the saved card is charged again, the plan stays. C-18: the tax service is watched
@@ -194,15 +194,10 @@ describe("P23 paid plans, end to end on the fake stack", () => {
       "SELECT total_micros::text FROM billing.charge WHERE charge_id = $1", [chargeRef]
     );
     const paidCents = Number(paid.rows[0]!.total_micros) / 10_000;
-    await stack.spend(person, 2_000_000);              // 10% of Pro's 20.00 month (testBillingPlans)
+    await stack.spend(person, 3_300_000);              // 10% of Pro's made-up month (testBillingPlans)
     stack.advanceDays(2);                               // 2 days of a 28–31-day period: under 10%
-    const stepped = await stack.post(person, "/v1/auth/step-up", {
-      password: "not-checked-by-the-stack", code: "000000", authorization: { action: "WITHDRAW_SUBSCRIPTION" }
-    });
-    expect(stepped.status).toBe(200);
-    expect(stepped.body.step_up_grant).toMatchObject({ action: "WITHDRAW_SUBSCRIPTION" });
-    const grant = (stepped.body.step_up_grant as { token: string }).token;
-    const withdrawn = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
+    // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in person withdraws with no step-up.
+    const withdrawn = await stack.post(person, "/v1/billing/subscription/withdraw", {});
     expect(withdrawn.status).toBe(200);
     const expectedCents = Math.floor(paidCents * 0.9);
     expect(withdrawn.body.refund).toBe((expectedCents / 100).toFixed(2));
@@ -225,15 +220,9 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(ids(stack.mailsTo(person.email)).filter((id) => id === "M8_RECEIVED" || id === "M8")).toEqual(["M8_RECEIVED", "M8"]);
     const m8 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M8")!;
     expect(m8.params.refundAmount).toBe((expectedCents / 100).toFixed(2));
-    // The plan is already withdrawn, so a replay is refused before its grant is read. The grant itself was spent
-    // inside the withdrawal's own transaction by billing.consume_withdrawal_grant (P12a).
-    const replay = await stack.post(person, "/v1/billing/subscription/withdraw", { step_up_grant: grant });
+    // The plan is already withdrawn, so a replay is refused and nothing is written twice.
+    const replay = await stack.post(person, "/v1/billing/subscription/withdraw", {});
     expect([replay.status, replay.body.error]).toEqual([409, "NOT_SUBSCRIBED"]);
-    const spent = await stack.database.pool.query<{ spent: boolean }>(
-      "SELECT consumed_at IS NOT NULL AS spent FROM identity.step_up_grant WHERE session_id = $1 AND action = 'WITHDRAW_SUBSCRIPTION'",
-      [person.identity.authenticated.session.session_id]
-    );
-    expect(spent.rows.map((row) => row.spent)).toEqual([true]);
   });
 
   it("the emailed cancel link cancels only on its button, once, and the plan ends at the period end", async () => {
@@ -435,11 +424,11 @@ describe("P2-M39 four more journeys on the fake stack", () => {
       announcedTotalMicros: 59_500_000
     });
     const credit = upgradeMonthCreditOverrideMicros({
-      currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 20_000_000,
+      currentMonthCreditMicros: 6_600_000, oldPlanCreditMicros: 6_600_000, newPlanCreditMicros: 33_000_000,
       periodStart: before.currentPeriodStart!, periodEnd: before.currentPeriodEnd!, at: quote.createdAt
     });
-    expect(credit).toBeGreaterThan(5_000_000);
-    expect(credit).toBeLessThan(20_000_000);
+    expect(credit).toBeGreaterThan(6_600_000);
+    expect(credit).toBeLessThan(33_000_000);
     expect(await new EntitlementRepository(stack.database.pool).current(person.ownerRef, stack.now())).toMatchObject({
       planId: "PRO", cause: "UPGRADED", paidThrough: before.currentPeriodEnd, monthCreditOverrideMicros: credit
     });

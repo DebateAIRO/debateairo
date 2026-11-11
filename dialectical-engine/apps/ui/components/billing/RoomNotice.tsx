@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { PlanIdSchema } from "@debateai/contract";
 import { exhaustive } from "@debateai/kernel";
 import type { AskRoom } from "@/lib/billing/room";
@@ -40,6 +41,8 @@ function fullSentence(room: AskRoom): RoomSentence | null {
   if (room.waits_for === "OWN_DEBATES") {
     return Object.freeze({ key: "newDebate.room.ownDebatesFull", at: null, upgrade: false, waitingRunRef: null });
   }
+  // Decisions 14 and 24: the team's month has no time to name. An owner can raise it at any moment, and the sentence says so itself.
+  if ("funding" in room && room.scope === "TEAM_MONTH") return Object.freeze({key:"newDebate.room.internalTeamFull",at:null,upgrade:false,waitingRunRef:null});
   if ("funding" in room) return Object.freeze({key:room.scope === "PERSON_GRANT" ? "newDebate.room.internalGrantFull" : "newDebate.room.internalWindowFull",at:room.scope === "PERSON_GRANT" ? room.funding.expires_at : room.resets_at,upgrade:false,waitingRunRef:null});
   const scope = room.scope;
   switch (scope) {
@@ -97,6 +100,41 @@ export function roomSentence(room: AskRoom | null): RoomSentence | null {
   }
 }
 
+/**
+ * V4 start step, Task 70b (read-f17): whether the notice shows sentence D (one question already waits, with its start). A
+ * page then adds no refusal line of its own beside it, and its buttons wait, described by it: one line, never both.
+ */
+export function alreadyWaitingShown(room: AskRoom | null): boolean {
+  return roomSentence(room)?.key === "newDebate.room.alreadyWaiting";
+}
+
+/**
+ * Where "Open the waiting debate" leads (V4 review ask-f11, read-f4, public-f21). The notice is shared by the classic
+ * pages (/new, the home composer) and the V4 pages, so it reads the address it sits on: on a V4 page (/v4 and below) the
+ * link opens the waiting debate's V4 map; anywhere else, the classic debate page as before. V4 start step, Task 75d (owner,
+ * 5 Nov): the map shows the waiting debate at the level it was asked at, so the link carries no `?level=`, whatever the address
+ * says. `address` is the path with its query ("" while it is unknown, e.g. on the server).
+ */
+export function waitingDebateHref(runRef: string, address: string): string {
+  const run = encodeURIComponent(runRef);
+  const queryAt = address.indexOf("?");
+  const path = queryAt === -1 ? address : address.slice(0, queryAt);
+  return path === "/v4" || path.startsWith("/v4/") ? `/v4/debate/${run}` : `/debate/${run}`;
+}
+
+/** The address, read from window.location (as lib/v4/useReadingLevel.ts does) and re-read on Back/Forward. */
+function onTraversal(changed: () => void): () => void {
+  window.addEventListener("popstate", changed);
+  return () => window.removeEventListener("popstate", changed);
+}
+const readAddress = (): string => `${window.location.pathname}${window.location.search}`;
+const noAddress = (): string => "";
+
+function WaitingDebateLink({ runRef, label }: Readonly<{ runRef: string; label: string }>) {
+  const address = useSyncExternalStore(onTraversal, readAddress, noAddress);
+  return <Link className="roomNoticeLink" href={waitingDebateHref(runRef, address)}>{label}</Link>;
+}
+
 export function RoomNotice({ room, catalog, locale }: { room: AskRoom | null; catalog: MessageCatalog; locale: string }) {
   const sentence = roomSentence(room);
   if (sentence === null) return null;
@@ -116,9 +154,7 @@ export function RoomNotice({ room, catalog, locale }: { room: AskRoom | null; ca
         <Link className="roomNoticeLink" href="/pricing">{t(catalog, "newDebate.room.upgradeLink")}</Link>
       ) : null}
       {sentence.waitingRunRef === null ? null : (
-        <Link className="roomNoticeLink" href={`/debate/${encodeURIComponent(sentence.waitingRunRef)}`}>
-          {t(catalog, "newDebate.room.openWaiting")}
-        </Link>
+        <WaitingDebateLink runRef={sentence.waitingRunRef} label={t(catalog, "newDebate.room.openWaiting")} />
       )}
     </div>
   );

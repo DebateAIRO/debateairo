@@ -14,46 +14,31 @@ const scheduled = {
   cancellation_ref: "55555555-5555-4555-8555-555555555555"
 };
 
-describe("DPD S01 contract", () => {
-  it('R9 schedule body: absent, true and false parse; "true", 1, null and an unknown key are refused', () => {
-    // Property: only a boolean or absence may select the public-debate choice.
-    for (const body of [scheduleBody, { ...scheduleBody, delete_public_debates: true },
-      { ...scheduleBody, delete_public_debates: false }]) {
-      expect(AccountErasureScheduleRequestSchema.safeParse(body).success).toBe(true);
-    }
-    for (const value of ["true", 1, null]) {
+describe("R22 decision 21: erasing an account has no public-debate choice", () => {
+  it("the schedule body refuses the old option, whatever its value", () => {
+    expect(AccountErasureScheduleRequestSchema.safeParse(scheduleBody).success).toBe(true);
+    for (const value of [true, false, "true", 1, null]) {
       expect(AccountErasureScheduleRequestSchema.safeParse({ ...scheduleBody, delete_public_debates: value }).success).toBe(false);
     }
-    expect(AccountErasureScheduleRequestSchema.safeParse({ ...scheduleBody, delete_public_debates: true, extra: 1 }).success).toBe(false);
+    expect(AccountErasureScheduleRequestSchema.safeParse({ ...scheduleBody, extra: 1 }).success).toBe(false);
   });
 
-  it("R11 status: SCHEDULED, DUE and PROCESSING require a boolean delete_public_debates; NONE refuses it; the cancel response is unchanged", () => {
-    // Property: active status always exposes the persisted choice; NONE and cancellation do not.
-    expect(AccountErasureStatusSchema.safeParse(scheduled).success).toBe(false);
+  it("the status names no choice; NONE and the cancel response are unchanged", () => {
     for (const status of ["SCHEDULED", "DUE", "PROCESSING"] as const) {
-      expect(AccountErasureStatusSchema.safeParse({ ...scheduled, status, delete_public_debates: true }).success).toBe(true);
+      expect(AccountErasureStatusSchema.safeParse({ ...scheduled, status }).success).toBe(true);
+      expect(AccountErasureStatusSchema.safeParse({ ...scheduled, status, delete_public_debates: false }).success).toBe(false);
     }
     expect(AccountErasureStatusSchema.safeParse({ status: "NONE" }).success).toBe(true);
-    expect(AccountErasureStatusSchema.safeParse({ status: "NONE", delete_public_debates: false }).success).toBe(false);
     expect(AccountErasureCancelledSchema.safeParse({ status: "CANCELLED" }).success).toBe(true);
   });
 
-  it("R10 client body carries delete_public_debates false for the one-argument call and true for (grant, true)", async () => {
-    // Property: either client call sends the explicit choice with the exact request key order.
+  it("the client sends the confirmation and the grant, nothing else", async () => {
     const bodies: string[] = [];
     const fakeFetch: typeof fetch = async (_input, init) => {
       bodies.push(String(init?.body));
-      return new Response(JSON.stringify({ ...scheduled, delete_public_debates: false }), {
-        status: 202,
-        headers: { "content-type": "application/json" }
-      });
+      return new Response(JSON.stringify(scheduled), { status: 202, headers: { "content-type": "application/json" } });
     };
-    const client = createContractClient("http://api.test", fakeFetch);
-    await client.scheduleAccountErasure(grant);
-    await client.scheduleAccountErasure(grant, true);
-    expect(bodies).toEqual([
-      `{"confirmation":"DELETE MY ACCOUNT","step_up_grant":"${grant}","delete_public_debates":false}`,
-      `{"confirmation":"DELETE MY ACCOUNT","step_up_grant":"${grant}","delete_public_debates":true}`
-    ]);
+    await createContractClient("http://api.test", fakeFetch).scheduleAccountErasure(grant);
+    expect(bodies).toEqual([`{"confirmation":"DELETE MY ACCOUNT","step_up_grant":"${grant}"}`]);
   });
 });

@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildFramedPrompt, readPromptFrame } from "@debateai/providers";
-import { Judge, askComparingJudge } from "@debateai/judgement";
+import { ASK_CLARIFY_INSTRUCTION, Judge, askComparingJudge, framedAskClarify, framedPublicContributionCheck, framedPublicReportCheck } from "@debateai/judgement";
 import { buildSynthesisRolePrompt } from "@debateai/runner";
 import { LENGTH_GUIDANCE_START, argumentLanguageDirective } from "@debateai/kernel";
 import {
@@ -231,7 +231,8 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       .filter((entry) => entry.endsWith(".ts"))
       .map((entry) => readFileSync(`${JUDGEMENT_SRC}/${entry}`, "utf8"))
       .join("\n");
-    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length);
+    // Plus step 2's small call, framed before any debate exists, the check on a contribution to a public debate and the check on a report of one: their own rows below.
+    expect(source.split(/\bbuildFramedPrompt\(\{/u).length - 1).toBe(BUILDERS.length + 3);
     // ...and no builder may go back to assembling a packet by hand.
     expect(source.split(/\brole: "system"/u).length - 1).toBe(0);
     expect(source).toContain("argumentLanguageDirective");
@@ -243,6 +244,81 @@ describe("V-BLIND-CONTEXT — the judgement prompt surface withholds authorship"
       BUILDERS.flatMap(({ name }) => [`${name}:initial`, `${name}:repair`])
     );
     expect(captures.every(({ packet }) => packet.messages.length > 0)).toBe(true);
+  });
+
+  it("step 2's small call takes the question and nothing else, so it can name no author (decision 29)", () => {
+    // Its one input is the question's own line: there is no parameter a maker, a seat or a provider could come in by.
+    expect(framedAskClarify).toHaveLength(1);
+    const packet = framedAskClarify(QUESTION_LINE);
+    const frame = readPromptFrame(packet);
+    expect(frame.contractId).toBe("ask.clarify.v1");
+    expect(packet.messages.filter((message) => message.role === "system")).toHaveLength(1);
+    const contents = packet.messages.map((message) => message.content);
+    expect(contents.some((content) => content.includes(QUESTION_LINE))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    expect(ASK_CLARIFY_INSTRUCTION).not.toMatch(/\bmaker\b|\bauthor\b|\bprovider\b/iu);
+  });
+
+  it("the check on a contribution to a public debate reads the text it judges and names no one (decision 13)", () => {
+    const { packet } = framedPublicContributionCheck({ question: QUESTION_LINE, pathBefore: STATEMENT, personWrote: ["A view the person wrote."],
+      line: TARGET_STATEMENT, summary: "A summary.", whatChanged: ["What changed."], digPaths: [] });
+    expect(readPromptFrame(packet).contractId).toBe("public.contribution-check.v1");
+    expect(packet.messages.filter((message) => message.role === "system")).toHaveLength(1);
+    const contents = packet.messages.map((message) => message.content);
+    for (const text of [QUESTION_LINE, STATEMENT, TARGET_STATEMENT, "A view the person wrote."]) expect(contents.some((content) => content.includes(text))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+  });
+
+  it("the check on a report of a public debate reads the text and the report inside the fence, and names no one (decision 35)", () => {
+    const { packet } = framedPublicReportCheck({ question: QUESTION_LINE, publicText: [STATEMENT, TARGET_STATEMENT], where: "The second paragraph.", claim: "This line gives a home address." });
+    expect(readPromptFrame(packet).contractId).toBe("public.report-check.v1");
+    expect(packet.messages.filter((message) => message.role === "system")).toHaveLength(1);
+    const contents = packet.messages.map((message) => message.content);
+    for (const text of [QUESTION_LINE, "The second paragraph.", "This line gives a home address."]) expect(contents.some((content) => content.includes(text))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    // The report's words stay in the material: the system message carries none of them.
+    expect(packet.messages.find((message) => message.role === "system")!.content).not.toContain("This line gives a home address.");
+  });
+
+  it("the panel's sources variant reads the cited extract as code built it, and names no author (decision 10)", async () => {
+    const captures: Capture[] = [];
+    const gateway = capturingGateway("panel-sources", captures);
+    await expect(new Judge(gateway).assess({ ...SUBJECT,
+      citedExtract: JSON.stringify({ id: "S1-1", quote: "A quoted line.", title: "A page", site: "example.org", date: null, note: "It counts riders." }),
+      length: { words: 60, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord } })).rejects.toBeDefined();
+    const contents = captures.flatMap((capture) => capture.packet.messages.map((message) => message.content));
+    expect(contents.join("\n")).toContain("judge.panel.length.sources.v1");
+    expect(contents.some((content) => content.includes("A quoted line."))).toBe(true);
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    expect(contents.join("\n")).not.toMatch(/different maker|another maker/u);
+  });
+
+  // V4 start step, Task 46: a path's root rides Judge.judge's one framing (no new builder); its path words, the person's own
+  // among them, are material only, and no author, seat or company reaches the model.
+  it("the path root writer reads the path's words as code built them, and names no author (V4 start step)", async () => {
+    const captures: Capture[] = [];
+    const gateway = capturingGateway("path-root", captures);
+    const OWN_WORDS = "The old pier is enough if it is repaired.";
+    await expect(new Judge(gateway).judge({ runId: SUBJECT.runId, subjectItemId: SUBJECT.subjectItemId, callSiteKey: SUBJECT.callSiteKey,
+      questionLine: QUESTION_LINE, argumentLanguageName: ARGUMENT_LANGUAGE_NAME,
+      leg: { kind: "path-root", pathTitle: "Whole-system costs", pathQuestion: TARGET_STATEMENT, viewpoints: `Costs: ${STATEMENT}\n${OWN_WORDS}`,
+        pointsRaised: "What about winter storms?", readingLevel: "plain" },
+      providerRef: SUBJECT.providerRef, contractHash: SUBJECT.contractHash, bound: BOUND,
+      length: { words: 120, languageCode: "en", charactersPerWord: LENGTH_GUIDANCE_START.charactersPerWord } })).rejects.toBeDefined();
+    expect(captures.map((capture) => capture.stage)).toEqual(["initial", "repair"]);
+    const contents = captures.flatMap((capture) => capture.packet.messages.map((message) => message.content));
+    expect(contents.join("\n")).toMatch(/judge\.path-root\.(unknown|resolved)\.v1/u);
+    for (const text of [QUESTION_LINE, STATEMENT, TARGET_STATEMENT, OWN_WORDS, "Whole-system costs", "What about winter storms?"]) {
+      expect(contents.some((content) => content.includes(text)), text).toBe(true);
+    }
+    expect(Object.entries(WITHHELD).filter(([, sentinel]) => contents.some((content) => content.includes(sentinel)))).toEqual([]);
+    for (const capture of captures) {
+      const system = capture.packet.messages.filter((message) => message.role === "system");
+      expect(system).toHaveLength(1);
+      expect(system[0]!.content).toContain(argumentLanguageDirective(ARGUMENT_LANGUAGE_NAME));
+      expect(system[0]!.content).not.toContain(OWN_WORDS);
+      expect(system[0]!.content).not.toMatch(/different maker|another maker/u);
+    }
   });
 
   it.each(BUILDERS.map(({ name }) => name))(
@@ -554,10 +630,16 @@ describe("V-MINIMUM-PAYLOAD — the synthesis prompt surface withholds the machi
     // keeps guarding the moved text (tests-that-are-not-testing control 1). Length guidance (LG-C Task 13): the checker's
     // fourth argument is the run's `checkerLength` (the writer's words and its own, with the receipt's `length`, else null).
     expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName")).toBe(SYNTHESIS_CALL_SITES);
-    expect(occurrences(runner, "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage)")).toBe(1);
+    // V4 reading level (owner N6, 2026-10-29): both pass the run's level as the sixth (null on every V3 ask: today's
+    // packet), and the reader field joins after the length fields, inside the language wrapper (`withReaderField`).
     expect(occurrences(runner,
-      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage)")).toBe(1);
-    expect(occurrences(runner, "toSynthesisPromptMaterial(request)")).toBe(1);
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,\n          readingLevel)")).toBe(1);
+    expect(occurrences(runner,
+      "buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,\n          shapeLanguage, readingLevel)")).toBe(1);
+    expect(occurrences(runner, "material: withQuestionLanguageField(withReaderField(")).toBe(1);
+    // W4-7: the one projection is told whether the checker reads the cited extracts (its sources variant), nothing else.
+    expect(occurrences(runner, "toSynthesisPromptMaterial(request, { checkerReadsExtracts: checkerSourced })")).toBe(1);
+    expect(occurrences(runner, "toSynthesisPromptMaterial(")).toBe(1);
     // Debate shape (040ddb9fd): the answer-length variant adds ONE field after that one projection, nothing else.
     // Question language (P2L Task 13, PF-L40): a shaped run's lock adds ONE code-owned field after those, last; the
     // wrapper returns the same array without a lock, so today's material is that one projection still.

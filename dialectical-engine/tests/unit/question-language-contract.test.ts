@@ -31,11 +31,24 @@ describe("the ask's question-language fields (question-language spec 2026-10-13)
       "decision_scope", "as_of", "steering_presets", "plan_tier", "model_strength", "steering_annotations",
       "site_language", "question_language_choice",
       // Side-by-side spec §13 (Task S12): the room read's settings version, a later optional key of its own.
-      "settings_version"
+      "settings_version",
+      // Plan 2026-10-30 W1-6: a dig's parent, a later optional key of its own.
+      "parent",
+      // The owner's changes of 31 Oct: a dig on a public debate, the purpose lines and the Free notice, later optional keys.
+      "public_parent",
+      "purpose_lines",
+      "free_public_notice",
+      // V4 start step, Task 14: the checked question, the chosen paths and the carry-on box, later optional keys.
+      "start_check",
+      "start_paths",
+      "carry_on_to_report",
+      // V4 start step, Task 39c: the question not started yet this ask starts from, a later optional key (Task 57f removed 57e's again_of).
+      "saved_question_id"
     ]);
     expect(AskRequestSchema.shape.site_language.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.question_language_choice.safeParse(undefined).success).toBe(true);
     expect(AskRequestSchema.shape.settings_version.safeParse(undefined).success).toBe(true);
+    expect(AskRequestSchema.shape.parent.safeParse(undefined).success).toBe(true);
     // Still strict: an unknown key is refused exactly as before.
     expect(AskRequestSchema.safeParse({ ...ASK, question_language: "ro" }).success).toBe(false);
   });

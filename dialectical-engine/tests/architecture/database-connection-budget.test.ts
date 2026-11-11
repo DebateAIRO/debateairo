@@ -44,9 +44,12 @@ const OPERATOR_COMMANDS = 10; // billing, support and owner commands, run by han
 // so a burst of page reads on the runtime pool can never make /readyz DATABASE_UNREACHABLE) makes it 2 × (80 + 34) = 228
 // and 291, so 26 stay free. Row-level security S01 (DECISIONS D50): the API's two system pools (api-system 6,
 // api-authorization-system 2; every statement outside a request runs on them) and the support relay lease pool's removal
-// (synthesis-flag S05, 18) make one API 70 and two releases 2 × (70 + 34) = 208, 271 in all, so 46 stay free.
-// max_connections stays 320.
-const SPARE = 46;
+// (synthesis-flag S05, 18) make one API 70 and two releases 2 × (70 + 34) = 208, 271 in all, so 46 stayed free. The security
+// review's 0171 runs each paid call's record of the site's day and the room's count of the site's holds on api-system inside
+// requests too (X30 to X33, X23), so api-system is 8, and a passkey's sign-in, a recovery's proof and the recovery mail's lease,
+// held through its send, on api-authorization-system (X36), so that is 4: one API 74, two releases 2 × (74 + 34) = 216, 279 in
+// all, so 38 stay free. max_connections stays 320.
+const SPARE = 38;
 // Two releases live at once during the side-by-side transition (spec §9): the old one keeps its drained debates while
 // the new one takes new work, and each release has its own API and its own runner.
 const LIVE_RELEASES = 2;
@@ -121,8 +124,9 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       // (packages/db/src/index.ts withRunContentLease): 8 overlapping reads.
       runtime: 8 * 2 + 1,
       // Every signed-in request and a check every 250 ms per open debate page
-      // (apps/api/src/staff/access.ts), plus recovery mail holding one across
-      // a send of up to 5 s (packages/db/src/consumer-security-mail.ts).
+      // (apps/api/src/staff/access.ts). The recovery mail's lease, which holds
+      // one across a send of up to 5 s, is api:authorization-system's since
+      // 0171 (X36, below).
       authorization: 8,
       // The 30 s timer runs both cleanups at once, each a lease plus a query.
       publicationCleanup: 2 * 2,
@@ -141,9 +145,13 @@ describe("no pool is smaller than what one of its flows holds at once", () => {
       dataExport: 1,
       // The release watcher's reads chain (one at a time, never overlapping; apps/api/src/release-state.ts).
       releaseWatch: 1,
-      // Row-level security S01 (DECISIONS D50): no flow audit exists for the two system pools yet, so the floor is the size.
-      system: 6,
-      authorizationSystem: 2
+      // Row-level security S01 (DECISIONS D50): no flow audit exists for api-system yet, so its floor is its size.
+      system: 8,
+      // The security review's 0171 (X36) runs inside requests on this login what hands out a sign-in's secret: one for the
+      // consumer security notice loop's lease held across a send (packages/db/src/consumer-security-mail.ts), one for a
+      // recovery mail's lease held across a send of up to 5 s (packages/db/src/consumer-recovery.ts withDeliveryLease), one
+      // for a passkey's credential read and sign-in and a recovery's proof read and proof, plus 1 free.
+      authorizationSystem: 1 + 1 + 1 + 1
     };
     for (const [key, floor] of Object.entries(floors)) {
       expect(API_DATABASE_POOLS[key as keyof typeof API_DATABASE_POOLS].max, key).toBeGreaterThanOrEqual(floor);
@@ -207,21 +215,21 @@ describe("the whole server stays under Postgres's limit", () => {
   it("fits two live releases, Hatchet, the migrator and the operator with room to spare", () => {
     const api = sum(API_DATABASE_POOLS, ["evaluatorDevMenu"]) + SUPPORT_CONTROL_PLANE_POOL.max;
     const runner = sum(RUNNER_DATABASE_POOLS);
-    expect(api).toBeLessThanOrEqual(70);
+    expect(api).toBeLessThanOrEqual(74);
     expect(runner).toBe(34);
     const ceiling = LIVE_RELEASES * (api + runner) + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
     expect(ceiling + SPARE).toBeLessThanOrEqual(POSTGRES_MAX_CONNECTIONS - SUPERUSER_RESERVED);
   });
 
-  it("S2.6-a one API holds at most 70 connections and two releases 271 of 317", () => {
+  it("S2.6-a one API holds at most 74 connections and two releases 279 of 317", () => {
     const api = sum(API_DATABASE_POOLS, ["evaluatorDevMenu"]) + SUPPORT_CONTROL_PLANE_POOL.max;
-    expect(api).toBe(70);
-    expect(API_DATABASE_POOLS.system).toEqual({ name: "api:system", max: 6, connectionTimeoutMillis: 5_000 });
+    expect(api).toBe(74);
+    expect(API_DATABASE_POOLS.system).toEqual({ name: "api:system", max: 8, connectionTimeoutMillis: 5_000 });
     expect(API_DATABASE_POOLS.authorizationSystem)
-      .toEqual({ name: "api:authorization-system", max: 2, connectionTimeoutMillis: 5_000 });
+      .toEqual({ name: "api:authorization-system", max: 4, connectionTimeoutMillis: 5_000 });
     const ceiling = LIVE_RELEASES * (api + sum(RUNNER_DATABASE_POOLS))
       + HATCHET_ROLE_LIMIT + MIGRATOR_ROLE_LIMIT + OPERATOR_COMMANDS;
-    expect(ceiling).toBe(271);
+    expect(ceiling).toBe(279);
     expect(ceiling + SPARE).toBe(POSTGRES_MAX_CONNECTIONS - SUPERUSER_RESERVED);
   });
 

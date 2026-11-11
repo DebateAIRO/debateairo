@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Väittelyä ei voitu luoda",
   "newDebate.sessionReadFailed": "Istunnon lukeminen epäonnistui",
   "newDebate.planRosterFailed": "Tilaustasojen luettelon lukeminen epäonnistui",
-  "newDebate.checkingSession": "Istuntoa tarkistetaan…",
+  "newDebate.checkingSession": "Hetkinen…",
   "newDebate.redirectingToSignIn": "Siirrytään kirjautumiseen…",
   "newDebate.continueToSignIn": "Jatka kirjautumiseen",
   "newDebate.defaultUnavailable": "Käyttöönotossa ei ole kelvollista riskTier-riviä; riskitaso odottaa syötettä.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Olet saavuttanut tilauksesi tämän päivän rajan. Voit silti kysyä: väittelysi alkaa itsestään klo {time}.",
   "newDebate.room.personWeekFullTopPlan": "Olet saavuttanut tilauksesi tämän viikon rajan. Voit silti kysyä: väittelysi alkaa itsestään {time}.",
   "newDebate.room.personMonthFullTopPlan": "Olet saavuttanut tilauksesi tämän kuun rajan. Voit silti kysyä: väittelysi alkaa itsestään {time}.",
-  "newDebate.room.freeMonthFull": "Olet käyttänyt tämän kuun maksuttomat väittelyt. Seuraava väittelysi voi alkaa {time}, tai valitse tilaus jatkaaksesi nyt.",
+  "newDebate.room.freeMonthFull": "Olet käyttänyt tämän kuun maksuttoman kiintiön. Seuraava väittelysi voi alkaa {time}, tai valitse tilaus jatkaaksesi nyt.",
   "newDebate.room.personClose": "Olet lähellä tilauksesi rajaa. Tämä väittely käydään silti loppuun.",
   "newDebate.room.ownDebatesFull": "Muut väittelysi käyttävät toistaiseksi loput rajastasi. Tämä väittely alkaa itsestään heti, kun yksi niistä päättyy.",
   "newDebate.room.upgradeLink": "Katso tilaukset",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Tilauksesi: Maksuton",
   "newDebate.plan.current.PLUS": "Tilauksesi: Plus",
   "newDebate.plan.current.PRO": "Tilauksesi: Pro",
-  "newDebate.plan.current.MAX": "Tilauksesi: Max"
+  "newDebate.plan.current.MAX": "Tilauksesi: Max",
+  "newDebate.askText.otherAnswer": "Toinen vastaus…",
+  "newDebate.askText.otherLabel": "Oma lisätarkennus",
+  "newDebate.askText.matters": "Jos vastaukset vetävät eri suuntiin, minulle tärkeintä on: {matters}",
+  "newDebate.freePublicNotice": "Maksuttomalla tasolla kysymyksesi ja sen väittely ovat julkisia. Älä sisällytä henkilötietoja."
 }

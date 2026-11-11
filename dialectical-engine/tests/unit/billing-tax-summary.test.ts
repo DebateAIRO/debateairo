@@ -385,9 +385,10 @@ describe("P16b the summary", () => {
 
   it("prints the fallback for a country the row does not cover, and says when there is nothing to list", () => {
     const text = renderTaxSummary(buildTaxSummary({
-      quarter: Q4, rows: [row({ taxCountry: "CH" })], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
+      // South Africa: no line, and not served. Switzerland was the example until CH_VAT (10 November 2026).
+      quarter: Q4, rows: [row({ taxCountry: "ZA" })], authorities, invoiceUnknown: [], efactura: [], paymentsToCheck: [], deadEmails: []
     }));
-    expect(text).toContain("Switzerland");
+    expect(text).toContain("South Africa");
     expect(text).toContain("No entry for this place yet: ask the accountant before paying anything.");
     expect(text).toContain("  Registration: unknown; ask the accountant.");
     expect(text).toContain("Charges with conflicting location evidence: none.");

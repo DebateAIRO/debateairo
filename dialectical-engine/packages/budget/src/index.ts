@@ -12,9 +12,20 @@ import {
   engineSettingsOfReceipt,
   lengthGuidanceOfReceipt,
   lengthGuidanceReceiptSchema,
+  webSitesOfReceipt,
+  // V4 start step, Task 13: shape receipt v2 and web receipt v2 beside v1.
+  DEBATE_SHAPE_V2_FORMULA_VERSION,
+  debateShapeReceiptV2Schema,
+  debateShapeSiteCountsV2,
+  debateShapeV2OfReceipt,
+  webReceiptAnySchema,
+  // V4 start step, Task 54e: a paid path debate's investigations, one per path at least.
+  investigationSitesOf,
   type DebateShapeCeilingInput,
+  type DebateShapeV2Input,
   type EngineSettings,
-  type LengthGuidance
+  type LengthGuidance,
+  type WebSites
 } from "@debateai/register";
 import type { Pool } from "pg";
 import { allocateSequence, withWriteTransaction } from "@debateai/db";
@@ -39,6 +50,8 @@ export {
   RUN_COST_ENVELOPE_MONEY_REACHED,
   RUN_COST_ENVELOPE_ROOM_KEPT,
   STORY_COST_ENVELOPE_REACHED,
+  MonthWallReachedError,
+  isMonthWallReached,
   chargeMicrosForUsage,
   chargeableUsage,
   costEnvelopeDay,
@@ -56,7 +69,9 @@ export {
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
   type DailyCostEnvelopeDecision,
+  type ProviderCachePrices,
   type ProviderTargetPrice,
+  type ProviderVendorPrices,
   type ReportedUsage,
   type RunCostEnvelopeDecision,
   type UsageCounterRead
@@ -69,7 +84,27 @@ export {
 export {
   CostEnvelopeGuard,
   DEFAULT_RESERVATION_TTL_MS,
+  ASK_CLARIFY_CHARGE_RESERVATION,
+  ASK_CLARIFY_CHARGE_WRITER,
   LANGUAGE_CHECK_SPEND_WRITER,
+  askClarifyChargeWriterPresent,
+  askClarifyReservationPresent,
+  deleteAskClarifyReservationsDue,
+  recordAskClarifyCharge,
+  reserveAskClarifyCharge,
+  type AskClarifyChargeEntry,
+  PRE_START_CHARGE_KINDS,
+  PRE_START_CHARGE_WRITER,
+  preStartChargeWriterPresent,
+  preStartSpendRef,
+  recordPreStartCharge,
+  type PreStartChargeEntry,
+  type PreStartChargeKind,
+  // V4 start step, Task 57c (0165): a charge's try, its link at Start, and a failed debate's quota read.
+  PRE_START_TRY_CHARGE_WRITER,
+  linkPreStartTry,
+  readRunQuotaUsed,
+  type RunQuotaUsed,
   QUESTION_CHECK_SPEND_WRITER,
   PostgresModelSpendStore,
   assertRunCeilingCoversOneCall,
@@ -92,8 +127,29 @@ export {
   type RunProviderSeamInput,
   type RunOwnerSpendReader,
   type SharedWallApplication,
-  type SharedWallInput
+  type SharedWallInput,
+  type WebSearchCostSeam
 } from "./model-spend.js";
+
+/** Web search (plan 2026-10-30, W2-2): one search's price and ledger name, and the web part's estimate. */
+export {
+  WEB_SEARCH_MODEL,
+  WEB_SEARCH_PROVIDER_REF,
+  WEB_SEARCH_PROVIDER_REF_PREFIX,
+  WEB_SEARCH_REQUEST_MICROS,
+  isWebSearchProviderRef,
+  webSearchChargeMicros,
+  type WebSearchOutcome
+} from "./web-charge.js";
+export {
+  DIG_UPDATE_CALL_ALLOWANCES,
+  WEB_CALL_ALLOWANCES,
+  estimateDigUpdatesMicros,
+  estimateWebPartMicros,
+  webCallTokens,
+  type WebPartEstimate,
+  type WebRolePrices
+} from "./web-estimate.js";
 
 /**
  * Budget spec 2026-09-28 §2.3 with the paid-plans spec §2.4.1 (B1): the room for
@@ -111,6 +167,17 @@ export {
   type ScopeRoom,
   type WaitsFor,
   type Wall
+} from "./room.js";
+/** The money rule (owner, 31 Oct 2026): derived borrowing, the month wall, the reserve and the one cross-month switch. */
+export {
+  BORROW_CARRIES_ACROSS_MONTH,
+  BORROW_WINDOW_SPANS_MS,
+  borrowPercent,
+  decideMonthWall,
+  deriveBorrows,
+  startLimitMicros,
+  tiledWindows,
+  type BorrowWindow
 } from "./room.js";
 export {
   NO_PERSON_ALLOWANCE,
@@ -221,15 +288,23 @@ const costEnvelopeBasisSchema = z.object({
   final_retry_attempts: z.number().int().positive(),
   formula_version: z.string().trim().min(1),
   bounds_source_ref: z.string().trim().min(1),
-  /** Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt. */
-  shape: debateShapeReceiptSchema.optional(),
+  /**
+   * Debate shape (spec 2026-10-12 §3.6): the run's frozen sizes; present exactly on a DR-185-shape-v1 receipt (version 1)
+   * or a DR-185-shape-v2 one (version 2, V4 start step Task 13: a path debate's sizes).
+   */
+  shape: z.discriminatedUnion("version", [debateShapeReceiptSchema, debateShapeReceiptV2Schema]).optional(),
   /** Length guidance (spec 2026-10-15 §3.1): the run's frozen numbers; present exactly when the row was in force at admission. */
   length: lengthGuidanceReceiptSchema.optional(),
   /**
    * Engine redesign (INTERFACE §3.2): the run's engine-2 values and extra sites; present exactly when the engine row was
    * in force at admission. Absent: engine 1. Not tied to `formula_version` (unlike `shape`).
    */
-  engine: engineReceiptSchema.optional()
+  engine: engineReceiptSchema.optional(),
+  /**
+   * Web search (plan 2026-10-30, W2-2): the run's web part (searches, reader calls, pick calls, readers 2-3 calls);
+   * present exactly when the run was admitted with web search on. Absent: no web part, today's receipt.
+   */
+  web: webReceiptAnySchema.optional()
 }).strict().superRefine((basis, ctx) => {
   /**
    * S09B: the serve leg is disclosed TWICE — once as the billed site count
@@ -310,10 +385,56 @@ const costEnvelopeBasisSchema = z.object({
    * its own sizes give (`debateShapeSiteCounts`, the constructor's rule, READ here, never restated), so a receipt can
    * never bill a shape its own numbers do not support, nor carry sizes the debaters cannot fill.
    */
-  const shape = basis.shape;
-  if ((basis.formula_version === DEBATE_SHAPE_FORMULA_VERSION) !== (shape !== undefined)) {
+  const anyShape = basis.shape;
+  const shapeFormula = anyShape === undefined ? null : anyShape.version === 1 ? DEBATE_SHAPE_FORMULA_VERSION : DEBATE_SHAPE_V2_FORMULA_VERSION;
+  if (shapeFormula !== null ? basis.formula_version !== shapeFormula
+    : basis.formula_version === DEBATE_SHAPE_FORMULA_VERSION || basis.formula_version === DEBATE_SHAPE_V2_FORMULA_VERSION) {
     ctx.addIssue({ code: "custom", path: ["shape"], message: `formula ${basis.formula_version} and its shape member disagree` });
   }
+  /**
+   * V4 start step, Task 13: a path debate's legs are the ones its own sizes give (`debateShapeSiteCountsV2`, the
+   * constructor's rule, READ here): author sites = map + nodes + every path's answer so far; no cross exchange (so no
+   * backup); graders and reviewers on every node.
+   */
+  if (anyShape !== undefined && anyShape.version === 2) {
+    const shape = anyShape;
+    let counts: ReturnType<typeof debateShapeSiteCountsV2> | null = null;
+    try {
+      counts = debateShapeSiteCountsV2(debateShapeV2OfReceipt(shape), basis.depth);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["shape", "nodes"],
+        message: `shape sites cannot be counted at ${basis.depth} rounds (${error instanceof Error ? error.message : String(error)})` });
+    }
+    if (counts !== null && (counts.mapSites !== shape.map_sites || counts.nodes !== shape.nodes
+      || counts.pathOutcomeSites !== shape.path_outcome_sites)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "nodes"],
+        message: `shape sites ${shape.map_sites}/${shape.nodes}/${shape.path_outcome_sites} disagree with its sizes` });
+    }
+    const noScrutiny = shape.scrutiny === "standard";
+    if (noScrutiny !== (shape.scrutiny_rounds_per_point === 0) || noScrutiny !== (shape.scrutiny_points_per_debate === 0)) {
+      ctx.addIssue({ code: "custom", path: ["shape", "scrutiny"],
+        message: `scrutiny ${shape.scrutiny} with ${shape.scrutiny_rounds_per_point} rounds and ${shape.scrutiny_points_per_debate} points`
+          + " disagrees: standard scrutiny means 0 rounds and 0 points" });
+    }
+    if (basis.call_sites.author !== shape.map_sites + shape.nodes + shape.path_outcome_sites) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "author"],
+        message: `author sites ${basis.call_sites.author} are not map plus nodes plus path outcomes` });
+    }
+    if (basis.call_sites.panel !== (shape.graders + shape.close_call_extra_graders) * shape.nodes) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "panel"], message: `panel sites ${basis.call_sites.panel} are not graders per node` });
+    }
+    if (basis.call_sites.reviewer < shape.nodes || basis.call_sites.reviewer % shape.nodes !== 0) {
+      ctx.addIssue({ code: "custom", path: ["call_sites", "reviewer"],
+        message: `reviewer sites ${basis.call_sites.reviewer} are not whole reviews per node (${shape.nodes} nodes)` });
+    }
+    if (shape.graders + shape.close_call_extra_graders > basis.panel_size - 1) {
+      ctx.addIssue({ code: "custom", path: ["shape", "graders"], message: `the shape's graders exceed ${basis.panel_size} debaters` });
+    }
+    if (basis.per_site_attempts.cross_exchange_site !== undefined) {
+      ctx.addIssue({ code: "custom", path: ["shape", "backup_sequences"], message: "a path debate provisions no backup sequence" });
+    }
+  }
+  const shape = anyShape !== undefined && anyShape.version === 1 ? anyShape : undefined;
   if (shape !== undefined) {
     /**
      * T4-ABSORB (c): this refinement also runs on a receipt that already failed a non-aborting check (a depth of 0),
@@ -375,6 +496,22 @@ const costEnvelopeBasisSchema = z.object({
       ctx.addIssue({ code: "custom", path: ["engine", "sites", "added_model_attempts"],
         message: `engine added attempts ${String(engine.sites.added_model_attempts)} disagree with its sites' ${String(added)}` });
     }
+    // V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): the investigation sites are the row's cap, and on a
+    // paid path debate (shape receipt v2) one per path at least: the ceiling's rule (`investigationSitesOf`), READ here.
+    // Review of Task 54e: as T4-ABSORB (c)'s site count above, a receipt that already failed a range check (paths or a cap below
+    // 0) reaches here, and the rule throws a plain TypeError there: an ISSUE, never a TypeError escaping the parser.
+    const pathDebate = anyShape !== undefined && anyShape.version === 2 ? { plan: anyShape.plan, paths: anyShape.paths } : null;
+    let investigations: number | null = null;
+    try {
+      investigations = investigationSitesOf(engine.investigate.max_per_debate, pathDebate);
+    } catch (error) {
+      ctx.addIssue({ code: "custom", path: ["engine", "sites", "investigations"],
+        message: `investigation sites cannot be counted (${error instanceof Error ? error.message : String(error)})` });
+    }
+    if (investigations !== null && engine.sites.investigations !== investigations) {
+      ctx.addIssue({ code: "custom", path: ["engine", "sites", "investigations"],
+        message: `investigation sites ${String(engine.sites.investigations)} are not ${String(investigations)}` });
+    }
   }
 });
 
@@ -397,6 +534,8 @@ export interface CostEnvelopeBasis {
    * reader of a shaped receipt (PF7): later readers take the sizes from here, never from `wire.shape`.
    */
   readonly shape?: DebateShapeCeilingInput;
+  /** V4 start step, Task 13: a path debate's sizes (shape receipt v2); absent on every other receipt, never with `shape`. */
+  readonly shapeV2?: DebateShapeV2Input;
   /** Length guidance: the numbers the run was admitted with; absent on every run admitted without the row. */
   readonly length?: LengthGuidance;
   /**
@@ -404,6 +543,8 @@ export interface CostEnvelopeBasis {
    * `engineOfRun(basis)` (`@debateai/register`), never from `wire.engine`.
    */
   readonly engine?: EngineSettings;
+  /** Web search (W2-2): the web part the run was admitted with; absent on every run admitted without web search. */
+  readonly web?: WebSites;
   readonly wire: Readonly<Record<string, unknown>>;
 }
 
@@ -452,9 +593,11 @@ export function parseCostEnvelopeBasis(value: unknown): CostEnvelopeBasis {
       selected: parsed.data.serve_leg.selected
     }),
     serveReserveAttempts: parsed.data.serve_reserve_attempts ?? 0,
-    ...(parsed.data.shape === undefined ? {} : { shape: debateShapeOfReceipt(parsed.data.shape) }),
+    ...(parsed.data.shape === undefined ? {}
+      : parsed.data.shape.version === 1 ? { shape: debateShapeOfReceipt(parsed.data.shape) } : { shapeV2: debateShapeV2OfReceipt(parsed.data.shape) }),
     ...(parsed.data.length === undefined ? {} : { length: lengthGuidanceOfReceipt(parsed.data.length) }),
     ...(parsed.data.engine === undefined ? {} : { engine: engineSettingsOfReceipt(parsed.data.engine) }),
+    ...(parsed.data.web === undefined ? {} : { web: webSitesOfReceipt(parsed.data.web) }),
     wire: Object.freeze(parsed.data)
   });
 }

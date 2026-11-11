@@ -36,7 +36,7 @@ guard that keeps the code and the numbers in step is
 | Pool (name in `pg_stat_activity`) | Before | Now | Wait limit | Why this size (from the code audit) |
 |---|---|---|---|---|
 | `api:runtime`: almost every read and write | 10 | 20 | 5 s | A content lease holds one connection while its body takes a second, so 8 overlapping reads need 17; billing timers and other loops use up to about 7 more at once |
-| `api:authorization`: sign-in, sessions, account pages | 10 | 12 | 5 s | Every signed-in request, plus a check every 250 ms for each open debate page, plus recovery mail that holds one connection for up to 5 s while it sends |
+| `api:authorization`: sign-in, sessions, account pages | 10 | 12 | 5 s | Every signed-in request, plus a check every 250 ms for each open debate page (the recovery mail that holds one connection for up to 5 s while it sends is `api:authorization-system`'s since 2026-11-06, below) |
 | `api:publication-cleanup` (only when publishing is on) | 10 | 4 | 5 s | The 30 s cleanup timer runs two cleanups at once, each using 2 connections |
 | `api:content-provision` | 10 | 2 | 5 s | Only the single-flight erasure cycle uses it at run time |
 | `api:ask-admission-server` | 10 | 4 | 10 s | One per ask in flight; asks are meant to wait their turn, so the limit is longer |
@@ -49,9 +49,9 @@ guard that keeps the code and the numbers in step is
 | `support:control` | 2 | 2 | 0.2 s | Unchanged; the support settings reader |
 | `api:data-export` (only when the export store is set; mission data-export S01) | — | 1 | 15 s | One export build at a time on one connection: its lease renewal (every 15 s) waits for the snapshot read to free it, so a read of up to about 30 s keeps its lease |
 | `api:release-watch` (since 2026-10-22, side by side; section 8) | — | 1 | 1 s | The release watcher's read of the current release, once a second, never two at once. Its own pool, so a burst of page reads on `api:runtime` can never make `/readyz` say the database is unreachable |
-| `api:system` (since 2026-10-23, row-level security; section 9) | — | 6 | 5 s | The `api-system` login: every statement the API makes outside a signed-in request (background loops, billing jobs, boot checks) |
-| `api:authorization-system` (since 2026-10-23, row-level security; section 9) | — | 2 | 5 s | The `api-authorization-system` login: the same for the authorization pool |
-| **Total on the server** (dev menu off) | **104** | **70** (88 before the relay lease pool's removal on 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) | | |
+| `api:system` (since 2026-10-23, row-level security; section 9) | — | 8 (6 until 2026-11-03) | 5 s | The `api-system` login: every statement the API makes outside a signed-in request (background loops, billing jobs, boot checks), and since the security review (0171) inside one too, each paid call's record of the site's day, the room's count of the site's holds and the ask-time discovery's record of each provider probe it makes |
+| `api:authorization-system` (since 2026-10-23, row-level security; section 9) | — | 4 (2 until 2026-11-06) | 5 s | The `api-authorization-system` login: the same for the authorization pool (the consumer security notice loop, whose lease holds one connection through each notice's send), and since the security review (0171, X36) inside a signed-in request too, a passkey's credential read and its sign-in, a recovery's proof read and its proof, and the recovery mail's lease, held through its send of up to 5 s: one for each lease, one for the sign-in statements and one free |
+| **Total on the server** (dev menu off) | **104** | **74** (72 before 2026-11-06, 70 before the security review on 2026-11-03, 88 before the relay lease pool's removal on 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) | | |
 
 ### Debate runner
 
@@ -65,17 +65,17 @@ guard that keeps the code and the numbers in step is
 
 | Who | Connections at most |
 |---|---|
-| Website (API), one process | 70 (88 before 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) |
+| Website (API), one process | 74 (72 before 2026-11-06, 70 before 2026-11-03, 88 before 2026-10-25, 80 before 2026-10-23, 79 before 2026-10-22) |
 | Debate runner (32 + 2 for claim renewal) | 34 |
 | Hatchet (its role's limit, `deploy/postgres/bootstrap.sql`) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands (billing, support, owner CLI; by hand, one at a time) | about 10 |
-| **Sum of ceilings** | **167 of 197** (185 before 2026-10-25, 177 before 2026-10-23, 176 before 2026-10-22, 162 before 2026-10-12) |
-| Left free | 30 (12 before 2026-10-25, 20 before 2026-10-23, 21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
+| **Sum of ceilings** | **171 of 197** (169 before 2026-11-06, 167 before 2026-11-03, 185 before 2026-10-25, 177 before 2026-10-23, 176 before 2026-10-22, 162 before 2026-10-12) |
+| Left free | 26 (28 before 2026-11-06, 30 before 2026-11-03, 12 before 2026-10-25, 20 before 2026-10-23, 21 before 2026-10-22, 35 before 2026-10-12): room for cancellation connections (a cancelled query briefly opens one more, up to 4 per pool), the owner logging in during an incident, and slack |
 
 Backups (`pg_dump` as the `postgres` user) use the 3 administrator slots.
 
-A second API process does **not** fit at 200: 167 + 70 is more than 197. Two releases, each with its own API, do fit at
+A second API process does **not** fit at 200: 171 + 74 is more than 197. Two releases, each with its own API, do fit at
 the transition's 320 (section 8). Before running a further API process (for example to restart without a gap, or to
 grow), put PgBouncer in front (section 4) or raise `max_connections` together with the memory settings (section 3).
 
@@ -227,9 +227,11 @@ a freeze), but each still deserves its own fix:
    occupy the whole main pool for a moment. Fix: a small concurrency limit or one set-based query.
 4. **The run-key lookup inside every content lease takes a second connection** (the owner resolver in
    `apps/api/src/main.ts`, `FileRunContentKeyStore`). Fix: resolve on the lease's connection, or cache it.
-5. **Recovery mail holds a sign-in connection and the account's row locks while it sends** (up to 5 s;
-   `packages/db/src/consumer-security-mail.ts`), with up to 32 sends at once. A slow mail server can starve sign-ins.
-   Fix: cap those sends below the pool size, or send after the commit.
+5. **Recovery mail holds a connection and the account's row locks while it sends** (up to 5 s;
+   `packages/db/src/consumer-security-mail.ts`), with up to 32 sends at once. Since the security review (0171, X36) that
+   connection is `api:authorization-system`'s (4), beside the passkey sign-ins and recovery proofs that run there; it was
+   `api:authorization`'s before. A slow mail server can starve that pool, and with it those sign-ins. Fix: cap those sends
+   below the pool size, or send after the commit.
 6. **Deleting a debate that is still running** waits, holding an erasure connection, for the runner's AI call to finish
    (`packages/db/src/account-erasure.ts` `withErasureContentLeases`, a blocking lock with no time limit). Fix: a lock
    timeout or try-lock on the delete request.
@@ -302,18 +304,30 @@ so every statement the API makes outside a signed-in request (background loops, 
 runs on one of two new logins instead, each on a pool of its own: `api:system` (6, the `api-system` login) and
 `api:authorization-system` (2, the `api-authorization-system` login). The room-decision pool keeps its 4 and connects as
 `api-system`. One API is 70 at most (62 without row-level security, now that synthesis-flag S05 removed the
-18-connection `api:support-relay-lease` pool).
+18-connection `api:support-relay-lease` pool). Since the security review of 3 Nov 2026 (migration 0171) the writes of the
+site's day a signed-in request pays for (each language and question check, each small AI's clarify charge and each
+synthesis check: the cross-account sites X30 to X33) and the room's count of the site's holds run on `api:system` inside
+the request too, as only the system logins may write the day, so `api:system` is 8; and what hands out a sign-in's
+secret (a passkey's credential read and its sign-in, a recovery's proof read and its proof: the cross-account site X36)
+and the recovery mail's lease, which holds its connection through the send, run on `api:authorization-system` inside the
+request too, beside the consumer security notice loop, so `api:authorization-system` is 4 and one API 74. The ask-time
+discovery's record of each provider probe it makes (the cross-account site X37) runs on `api:system` inside the request
+too since the same review, and takes no more: one short statement per provider probed, in a round that runs one at a
+time, and a recorded probe keeps its provider fresh for the asks after. Nor do the Report button's settlement after its
+judge (X38, one short statement for each press that opened a report, inside the flag limits) and the V4 merge's seal of
+a stranger's report under the public debate's own run (X29, one content lease and one statement beside it, only on the
+press that opens the report); the merge's moderation and flag mail timer runs one statement at a time outside any request.
 
 | Who | Connections at most |
 |---|---|
-| Website program (API), two releases at 70 each | 140 |
+| Website program (API), two releases at 74 each | 148 (144 before X36's pool, 140 before the security review) |
 | Debate runner, two releases at 34 each | 68 |
 | Hatchet (its role's limit) | 50 |
 | Migrator (its role's limit) | 3 |
 | Owner's commands | about 10 |
-| **Sum of ceilings** | **271** (255 without row-level security) |
-| Left free | 46 (317 = 320 less the administrator's 3; 62 without row-level security) |
+| **Sum of ceilings** | **279** (275 before X36's pool, 271 before the security review, 255 without row-level security) |
+| Left free | 38 (317 = 320 less the administrator's 3; 42 before X36's pool, 46 before the security review, 62 without row-level security) |
 
-`max_connections` stays 320. One release at the old 200 is 167 of 197, 30 free (section 1). One API and one runner are
-now 15 pools that can cancel (13 API pools with the dev menu off, plus the runner's 2), 30 for two releases, and the 46
+`max_connections` stays 320. One release at the old 200 is 171 of 197, 26 free (section 1). One API and one runner are
+now 15 pools that can cancel (13 API pools with the dev menu off, plus the runner's 2), 30 for two releases, and the 38
 free connections cover one cancellation for each of them at the same moment. No other pool size changed.

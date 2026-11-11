@@ -16,6 +16,7 @@ import { ChargeStatusReader } from "./charge-status.js";
 import { CheckoutService } from "./checkout.js";
 import type { BillingConnectors } from "./connectors.js";
 import { createDeadJobAlert } from "./dead-jobs.js";
+import { DisplayedTaxReader } from "./displayed-tax.js";
 import { createEmailJobHandler, type AttachmentResolver, type BillingAttachmentKind, type BillingMailPort } from "./email-job.js";
 import { BillingErasureHook, erasurePendingOf, reconcileWork } from "./erasure-hook.js";
 import type { BillingLegalGate, BillingRouteOptions } from "./index.js";
@@ -74,6 +75,8 @@ export type BillingRuntimeDeps = Readonly<{
    */
   ownerSpend?: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
   blindIndexKey?: Uint8Array;
+  /** The register's abuseLimits row (R22 decision 18). */
+  cancelLinksPerDay?: number;
   identities?: Readonly<{ ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> }>;
   /** P16a/P16c (R-35): where and when each tax is paid (the O1 text). Billing does not start without it. */
   taxAuthorities?: TaxAuthorities;
@@ -252,6 +255,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     identities: required(deps.identities, "identities"),
     blindIndexKey: required(deps.blindIndexKey, "blindIndexKey"),
     recordsKey: deps.connectors.recordsKey, recipients, mail: deps.mail?.sender,
+    linksPerDay: required(deps.cancelLinksPerDay, "cancelLinksPerDay"),
     // R-7/A22: the one origin, P6a's `BillingConnectors.publicAppUrl`.
     publicAppUrl: deps.connectors.publicAppUrl,
     audit: deps.audit, clock: deps.clock
@@ -294,6 +298,10 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
     plans: deps.plans, geo: deps.geo, legal: deps.legal, clock: deps.clock,
+    // Terms §12: the plans list shows each country's price with its tax, from the tax engine the quote asks.
+    displayedTax: new DisplayedTaxReader({
+      tax: deps.connectors.tax, plans: deps.plans, policy: deps.policy, audit: deps.audit, clock: deps.clock
+    }),
     quotes: new QuoteService({
       repository, tax: deps.connectors.tax, geo: deps.geo, countryPolicy: deps.countryPolicy, policy: deps.policy,
       plans: deps.plans, recordsKey: deps.connectors.recordsKey, audit: deps.audit

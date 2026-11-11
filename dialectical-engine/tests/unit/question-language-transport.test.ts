@@ -108,6 +108,43 @@ describe("the fast check's transport", () => {
     expect(usage.at(-1)).toEqual(projectedFor(sent.at(-1)!));
   });
 
+  // 2026-11-02 review: on the preview a reply the gate cannot deliver halts it (preview_budget_authority.py, stop_gate with
+  // ipc_or_delivery_failure), and the guarded fetch hands the signal to the gate's socket, which an abort closes. So a time
+  // limit there is raced, never sent on: the call is let go, the gate delivers and settles it, and its late answer is dropped.
+  it("preview: a time limit never reaches the gate's socket; the call is let go, settled by the gate, and its late answer records nothing", async () => {
+    const seen: (AbortSignal | undefined)[] = [];
+    let answer: (value: { status: number; body: string }) => void = () => undefined;
+    const guarded = createPreviewGuardedFetch({ anthropic: { execute: (_input, signal) => {
+      seen.push(signal);
+      return new Promise((resolve) => { answer = resolve; });
+    } } });
+    const usage: FastCheckUsage[] = [];
+    const controller = new AbortController();
+    const pending = anthropicFastCheckTransport({ fetch: guarded, url: PREVIEW_ANTHROPIC_MESSAGES_URL, credential: undefined, settings,
+      onUsage: (u) => { if (!u.projected) usage.push(u); } })({ packet, signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(seen).toHaveLength(1);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_ABORTED" });
+    expect(seen[0]?.aborted ?? false).toBe(false);
+    answer({ status: 200, body: message('{"main_language":"en"}') });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(seen[0]?.aborted ?? false).toBe(false);
+    expect(usage).toEqual([]);
+  });
+
+  it("hosted: the time limit still cancels the vendor call itself (no gate to halt)", async () => {
+    let got: AbortSignal | undefined;
+    const hanging = (async (_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      got = init?.signal ?? undefined;
+      init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)); })) as typeof fetch;
+    const controller = new AbortController();
+    const pending = anthropicFastCheckTransport({ fetch: hanging, url: HOSTED_URL, credential: "sk-ant-test", settings })({ packet, signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: "QUESTION_LANGUAGE_FAST_CHECK_ABORTED" });
+    expect(got?.aborted).toBe(true);
+  });
+
   it("money law: a send that fails records the projected maximum; a signal aborted before sending sends and records nothing", async () => {
     const usage: FastCheckUsage[] = [];
     const sent: string[] = [];

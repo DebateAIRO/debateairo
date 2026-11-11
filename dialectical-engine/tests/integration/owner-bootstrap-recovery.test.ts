@@ -4,9 +4,12 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, type Pool } from '@debateai/db';
 import { ownerCandidate, ownerNativeReceipts } from '../support/ownerRecoveryFixtures.js';
+import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 
 let database: TestDatabase, jit: Pool, runtime: Pool;
+// 0171: the owned ceremony is the cross-account marker's; the owner's possession receipts go through a login shaped as the API's system login (X14).
+let staff: Pool;
 const digest=(value:string)=>`sha256:${createHash('sha256').update(value).digest('hex')}`;
 const firstGeneration=randomUUID(),firstVerifier=digest('task6-offline-proof');
 async function candidate() {
@@ -22,8 +25,9 @@ beforeAll(async()=>{
  await database.pool.query(`ALTER ROLE debateai_prod_staff_recovery PASSWORD 'task6-synthetic-jit-only' VALID UNTIL '${new Date(Date.now()+240000).toISOString()}'`);
  await database.pool.query(`CREATE ROLE task6_runtime LOGIN PASSWORD 'task6-synthetic-runtime-only' IN ROLE debateai_runtime`);
  const url=new URL(database.connectionString);url.username='debateai_prod_staff_recovery';url.password='task6-synthetic-jit-only';jit=createPool(url.toString());url.username='task6_runtime';url.password='task6-synthetic-runtime-only';runtime=createPool(url.toString());
+ staff=createPool(await createSystemTwin(database,'task6_system',['debateai_runtime']));
 },120000);
-afterAll(async()=>{await jit?.end();await runtime?.end();await database?.stop();});
+afterAll(async()=>{await jit?.end();await runtime?.end();await staff?.end();await database?.stop();});
 describe('independent Owner authority on disposable PostgreSQL',()=>{
  it('refuses legacy JIT prepare without independent recovery generation proof',async()=>{
   const target=await candidate();await expect(jit.query('SELECT staff.prepare_owner_command($1,$2,$3,$4::text[],$5,$6)', ['BOOTSTRAP',target.userId,null,target.credentialIds,randomUUID(),digest('synthetic-command-nonce')])).rejects.toThrow('OWNER_RECOVERY_GENERATION_REQUIRED');
@@ -44,7 +48,7 @@ describe('independent Owner authority on disposable PostgreSQL',()=>{
    await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'BOOTSTRAP',target.userId,null,null,false,target.credentialIds,operationId,digest(nonce),firstGeneration,firstVerifier]);
    expect((await database.pool.query('SELECT count(*)::int AS n FROM staff.owner_designation WHERE active')).rows[0].n).toBe(0);
    await expect(jit.query('SELECT staff.commit_owner_command($1,$2::uuid[],$3,$4,$5,$6,$7,$8,$9,$10::jsonb)',[commandId,[randomUUID(),randomUUID()],operationId,'BOOTSTRAP',firstGeneration,firstVerifier,randomUUID(),digest('next'),randomUUID(),{}])).rejects.toThrow('STAFF_OWNER_RECEIPTS_INVALID');
-   const receiptIds=await ownerNativeReceipts(runtime,target,commandId,nonce),nextGeneration=randomUUID(),nextVerifier=digest('next'+nextGeneration),nextLineage=randomUUID();
+   const receiptIds=await ownerNativeReceipts(runtime,target,commandId,nonce,staff),nextGeneration=randomUUID(),nextVerifier=digest('next'+nextGeneration),nextLineage=randomUUID();
    await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),randomUUID(),'fixture-only',randomUUID(),new Date(Date.now()+60000)]);
    const ready=(await database.pool.query('SELECT generation FROM staff.independent_alert_readiness')).rows[0].generation as string;
    await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[commandId,operationId,'f'.repeat(64),ready]);
@@ -72,9 +76,26 @@ describe('independent Owner authority on disposable PostgreSQL',()=>{
   const replacement=await ownerCandidate(database.pool),op=randomUUID(),command=randomUUID(),nonce=Buffer.alloc(32,8).toString('base64url');
   await expect(jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[command,'RECOVER_OWNER',replacement.userId,randomUUID(),winner.target.userId,false,replacement.credentialIds,op,digest(nonce),winner.nextGeneration,winner.nextVerifier])).rejects.toThrow('STAFF_OWNER_PREDECESSOR_INVALID');
   await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[command,'RECOVER_OWNER',replacement.userId,winner.nextLineage,winner.target.userId,false,replacement.credentialIds,op,digest(nonce),winner.nextGeneration,winner.nextVerifier]);
-  const receipts=await ownerNativeReceipts(runtime,replacement,command,nonce),next=randomUUID(),verifier=digest('third'+next),lineage=randomUUID();
+  const receipts=await ownerNativeReceipts(runtime,replacement,command,nonce,staff),next=randomUUID(),verifier=digest('third'+next),lineage=randomUUID();
   const ready2=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),ready2,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[command,op,'f'.repeat(64),ready2]);
+  // Decision 24: the old Owner's pick for the team limit ends with the recovery (0142's trigger); the new Owner picks again.
+  const partner=await ownerCandidate(database.pool),partnerStaff=randomUUID();
+  await database.pool.query("INSERT INTO staff.subject(staff_id,user_id,capabilities) VALUES($1,$2,ARRAY['TEAM_READ'])",[partnerStaff,partner.userId]);
+  await database.pool.query("INSERT INTO staff.team_limit_holder(staff_id,granted_by_staff_id,granted_operation_id) SELECT $1,staff_id,$2 FROM staff.owner_designation WHERE active",[partnerStaff,randomUUID()]);
+  // Decision 32: every allowance the old Owner gave ends with the recovery too (0146's trigger). Seeded as a row with no ceremony: the giving has its own file (team-allowance-database.test.ts).
+  const allowance=randomUUID(),allowanceEvent=randomUUID(),seed=await database.pool.connect();
+  try{await seed.query('BEGIN');await seed.query("SET LOCAL session_replication_role=replica");
+   await seed.query(`INSERT INTO billing.internal_grant(grant_id,owner_ref,configured_event_id,revision,amount_micros,day_micros,week_micros,starts_at,expires_at,funding_approval_ref,policy_register_version)
+    SELECT $1,u.owner_ref,$2,1,1000,100,500,now()-interval '1 minute',now()+interval '1 day','SYNTHETIC-APPROVAL',1 FROM identity."user" u WHERE u.user_id=$3`,[allowance,allowanceEvent,partner.userId]);
+   await seed.query("INSERT INTO billing.internal_grant_event(event_id,grant_id,event_type,operation_id,revision) VALUES($1,$2,'CONFIGURED',$3,1)",[allowanceEvent,allowance,allowance]);
+   await seed.query('INSERT INTO staff.internal_grant_holder(grant_id,staff_id,given_by_staff_id) SELECT $1,$2,staff_id FROM staff.owner_designation WHERE active',[allowance,partnerStaff]);await seed.query('COMMIT');
+  }finally{seed.release();}
   await jit.query('SELECT staff.commit_owner_command($1,$2::uuid[],$3,$4,$5,$6,$7,$8,$9,$10::jsonb)',[command,receipts,op,'RECOVER_OWNER',winner.nextGeneration,winner.nextVerifier,next,verifier,lineage,{schema:'staff-alert-v1',event:'RECOVER_OWNER',operationId:op,envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}}]);
+  expect((await database.pool.query('SELECT active,revoked_cause FROM staff.team_limit_holder WHERE staff_id=$1',[partnerStaff])).rows[0]).toEqual({active:false,revoked_cause:'OWNER_CHANGED'});
+  expect((await database.pool.query('SELECT g.revoked_at IS NOT NULL AS ended,e.cause FROM billing.internal_grant g JOIN staff.internal_grant_end e USING(grant_id) WHERE g.grant_id=$1',[allowance])).rows).toEqual([{ended:true,cause:'OWNER_CHANGED'}]);
+  expect((await database.pool.query('SELECT staff.team_limit_authority($1) AS ok',[partnerStaff])).rows[0].ok).toBe(false);
+  expect((await database.pool.query("SELECT staff.team_limit_authority(s.staff_id) AS ok FROM staff.subject s WHERE s.user_id=$1",[replacement.userId])).rows[0].ok).toBe(true);
+  expect((await database.pool.query("SELECT staff.team_limit_authority(s.staff_id) AS ok FROM staff.subject s WHERE s.user_id=$1",[winner.target.userId])).rows[0].ok).toBe(false);
   expect((await database.pool.query('SELECT held FROM identity.account_security_hold WHERE user_id=$1',[winner.target.userId])).rows[0].held).toBe(true);
   expect((await database.pool.query('SELECT owner_ref FROM identity."user" WHERE user_id=$1',[winner.target.userId])).rows[0].owner_ref).toBe(winner.target.ownerRef);
   expect((await database.pool.query('SELECT owner_ref FROM core.run_ownership_event WHERE run_id=$1 ORDER BY at_seq DESC LIMIT 1',[privateRunId])).rows[0].owner_ref).toBe(winner.target.ownerRef);expect((await database.pool.query('SELECT content_ciphertext FROM core.run WHERE run_id=$1',[privateRunId])).rows[0].content_ciphertext).toEqual(privateEnvelope);expect(createHash('sha256').update(await readFile(privateKeyFile)).digest('hex')).toBe(privateKeyHash);expect(decrypt(privateDek,privateEnvelope,privateAad).toString()).toBe('synthetic-held-private-question');const replacementDek=randomBytes(32);expect(()=>decrypt(replacementDek,privateEnvelope,privateAad)).toThrow();replacementDek.fill(0);privateDek.fill(0);await rm(privateRoot,{recursive:true,force:true});
@@ -84,7 +105,7 @@ describe('independent Owner authority on disposable PostgreSQL',()=>{
   const final=await ownerCandidate(database.pool),finalOp=randomUUID(),finalCommand=randomUUID(),finalNonce=Buffer.alloc(32,9).toString('base64url');
   await expect(jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[finalCommand,'RECOVER_OWNER',final.userId,winner.nextLineage,null,true,final.credentialIds,finalOp,digest(finalNonce),next,verifier])).rejects.toThrow('STAFF_OWNER_PREDECESSOR_INVALID');
   await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[finalCommand,'RECOVER_OWNER',final.userId,lineage,null,true,final.credentialIds,finalOp,digest(finalNonce),next,verifier]);
-  const finalReceipts=await ownerNativeReceipts(runtime,final,finalCommand,finalNonce),finalReady=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),finalReady,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[finalCommand,finalOp,'f'.repeat(64),finalReady]);
+  const finalReceipts=await ownerNativeReceipts(runtime,final,finalCommand,finalNonce,staff),finalReady=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),finalReady,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[finalCommand,finalOp,'f'.repeat(64),finalReady]);
   await jit.query('SELECT staff.commit_owner_command($1,$2::uuid[],$3,$4,$5,$6,$7,$8,$9,$10::jsonb)',[finalCommand,finalReceipts,finalOp,'RECOVER_OWNER',next,verifier,randomUUID(),digest('final'),randomUUID(),{schema:'staff-alert-v1',event:'RECOVER_OWNER',operationId:finalOp,envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}}]);
   expect((await database.pool.query('SELECT s.user_id FROM staff.owner_designation d JOIN staff.subject s USING(staff_id) WHERE d.active')).rows[0].user_id).toBe(final.userId);
   expect((await database.pool.query('SELECT count(*)::int AS n FROM identity."user" WHERE user_id=$1',[replacement.userId])).rows[0].n).toBe(0);
@@ -93,7 +114,7 @@ describe('independent Owner authority on disposable PostgreSQL',()=>{
  it('rechecks legitimate clipped command/receipt expiry after the final blocking COMMIT readiness lock',async()=>{
   const current=(await database.pool.query('SELECT l.lineage_id,s.user_id,g.generation,g.verifier FROM staff.owner_lineage l JOIN staff.subject s USING(staff_id) CROSS JOIN staff.owner_recovery_generation g')).rows[0],target=await ownerCandidate(database.pool),commandId=randomUUID(),operationId=randomUUID(),nonce=Buffer.alloc(32,11).toString('base64url');
   await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'RECOVER_OWNER',target.userId,current.lineage_id,current.user_id,false,target.credentialIds,operationId,digest(nonce),current.generation,current.verifier]);
-  const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce),ready=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),ready,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[commandId,operationId,'f'.repeat(64),ready]);
+  const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,staff),ready=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),ready,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[commandId,operationId,'f'.repeat(64),ready]);
   const expiry=(await database.pool.query("SELECT clock_timestamp()+interval '1200 milliseconds' AS expiry")).rows[0].expiry;await database.pool.query('UPDATE staff.owner_command SET expires_at=$2 WHERE command_id=$1',[commandId,expiry]);await database.pool.query('UPDATE staff.owner_possession_receipt SET expires_at=$2 WHERE command_id=$1',[commandId,expiry]);
   const committing=await jit.connect(),barrier=await database.pool.connect();
   try{
@@ -105,7 +126,7 @@ describe('independent Owner authority on disposable PostgreSQL',()=>{
  });
  it('orders concurrent recovery after predecessor erasure and cancels the stale live command without consuming generation or receipts',async()=>{
   const current=(await database.pool.query('SELECT l.lineage_id,s.user_id,g.generation,g.verifier FROM staff.owner_lineage l JOIN staff.subject s USING(staff_id) CROSS JOIN staff.owner_recovery_generation g')).rows[0],target=await ownerCandidate(database.pool),commandId=randomUUID(),operationId=randomUUID(),nonce=Buffer.alloc(32,12).toString('base64url');
-  await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'RECOVER_OWNER',target.userId,current.lineage_id,current.user_id,false,target.credentialIds,operationId,digest(nonce),current.generation,current.verifier]);const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce),ready=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),ready,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[commandId,operationId,'f'.repeat(64),ready]);
+  await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'RECOVER_OWNER',target.userId,current.lineage_id,current.user_id,false,target.credentialIds,operationId,digest(nonce),current.generation,current.verifier]);const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,staff),ready=randomUUID();await jit.query('SELECT staff.publish_independent_alert_readiness($1,$2,$3,$4,$5)',['f'.repeat(64),ready,'fixture-only',randomUUID(),new Date(Date.now()+60000)]);await jit.query('SELECT staff.authorize_owner_alert_operation($1,$2,$3,$4)',[commandId,operationId,'f'.repeat(64),ready]);
   const erasing=await database.pool.connect(),committing=await jit.connect();try{
    await erasing.query('BEGIN');await erasing.query('SELECT identity.lock_security_subjects($1::uuid[])',[[current.user_id]]);const pid=(await committing.query('SELECT pg_backend_pid() AS pid')).rows[0].pid as number;
    const commit=committing.query('SELECT staff.commit_owner_command($1,$2::uuid[],$3,$4,$5,$6,$7,$8,$9,$10::jsonb)',[commandId,receipts,operationId,'RECOVER_OWNER',current.generation,current.verifier,randomUUID(),digest('erasure-next'),randomUUID(),{schema:'staff-alert-v1',event:'RECOVER_OWNER',operationId,envelope:{v:1,keyId:'fixture',nonce:'AAAAAAAAAAAAAAAA',tag:'AAAAAAAAAAAAAAAAAAAAAA==',ct:'YQ=='}}]),refusal=expect(commit).rejects.toThrow('STAFF_OWNER_COMMAND_INVALID');let blocked=false;for(let i=0;i<100;i++){if((await database.pool.query('SELECT wait_event_type FROM pg_stat_activity WHERE pid=$1',[pid])).rows[0]?.wait_event_type==='Lock'){blocked=true;break;}await new Promise(r=>setTimeout(r,10));}expect(blocked).toBe(true);
@@ -133,13 +154,15 @@ describe('root-private file/SQL interruption protocol with actual native receipt
   const {prepareOwnerCommand,bootstrapOwner,recoverOwner,validateOwnerReceipts}=await import('../../apps/runner/src/owner-command.js');
   const {PostgresOwnerCommandRepository,PostgresStaffIndependentReadinessPublisher}=await import('@debateai/db');
   const {RootStaffAlertConfiguration}=await import('../../apps/api/src/staff/alerts.js');
-  const db=await startTestDatabase(),root=await realpath(await mkdtemp(join(tmpdir(),'task6-crash-')));let closed:Pool|undefined,web:Pool|undefined;
+  const db=await startTestDatabase(),root=await realpath(await mkdtemp(join(tmpdir(),'task6-crash-')));let closed:Pool|undefined,web:Pool|undefined,webSystem:Pool|undefined;
   try{
    await migrate(db.pool);await db.pool.query(`ALTER ROLE debateai_prod_staff_recovery PASSWORD 'task6-private-crash-only' VALID UNTIL '${new Date(Date.now()+240000).toISOString()}'`);await db.pool.query(`CREATE ROLE task6_crash_runtime LOGIN PASSWORD 'task6-private-runtime-only' IN ROLE debateai_runtime`);
-   const url=new URL(db.connectionString);url.username='debateai_prod_staff_recovery';url.password='task6-private-crash-only';closed=createPool(url.toString());url.username='task6_crash_runtime';url.password='task6-private-runtime-only';web=createPool(url.toString());
+   const url=new URL(db.connectionString);url.username='debateai_prod_staff_recovery';url.password='task6-private-crash-only';closed=createPool(url.toString());url.username='task6_crash_runtime';url.password='task6-private-runtime-only';web=createPool(url.toString());webSystem=createPool(await createSystemTwin(db,'task6_crash_system',['debateai_runtime']));
    const custody=syntheticOwnerCustody(root),lock=new PosixOwnerRecoveryLock(custody,{pythonPath:systemPython3(),helperPath:realpathSync(resolve('apps/runner/src/owner-recovery-lock.py'))}),materialFile=join(root,'material'),verifierFile=join(root,'verifier'),lockFile=join(root,'lock');
    const initial=await createOwnerRecoveryMaterial({materialFile,verifierFile,lockFile,custody,lock}),initialBundle=JSON.parse(await readFile(materialFile,'utf8')),base=new PostgresOwnerCommandRepository(closed),publisher=new PostgresStaffIndependentReadinessPublisher(closed);await base.install({generation:initialBundle.generation,verifier:initial.verifier,operationId:initial.receiptId});
-   const alertConfigPath=join(root,'alert-config'),configGeneration=randomUUID();await writeFile(alertConfigPath,JSON.stringify({schema:'staff-independent-alert-config-v1',generation:configGeneration,executable:'/usr/bin/true',from:'root@example.invalid',recipient:'independent@example.invalid',ackAdapterId:'synthetic-only'}),{mode:0o600});
+   // The alert executable is the test's own file under the custodied root, not the system's /usr/bin/true: that one stopped
+   // passing the custody check (a plain root-owned file, no symlink) when the CI runner moved to Ubuntu 26.04 on 5 Nov 2026.
+   const alertConfigPath=join(root,'alert-config'),alertExecutable=join(root,'alert-executable'),configGeneration=randomUUID();await writeFile(alertExecutable,'#!/bin/sh\nexit 0\n',{mode:0o755});await writeFile(alertConfigPath,JSON.stringify({schema:'staff-independent-alert-config-v1',generation:configGeneration,executable:alertExecutable,from:'root@example.invalid',recipient:'independent@example.invalid',ackAdapterId:'synthetic-only'}),{mode:0o600});
    const configHash=ownerDigest(await readFile(alertConfigPath)),configuration=new RootStaffAlertConfiguration({path:alertConfigPath,files:syntheticAlertFiles(root),acknowledgements:new Map([['synthetic-only',{evidence:async()=>({configSha256:configHash,generation:configGeneration,rehearsalId:randomUUID(),expiresAt:new Date(Date.now()+60000)}),acknowledge:async()=> 'ACK' as const}]])});
    let prior:{userId:string;lineageId:string}|undefined;
    const windows=['next-material','next-verifier','journal','sql-before','sql-after','sql-kill','material-published','verifier-published','receipt','nonce-removed'] as const;
@@ -148,7 +171,7 @@ describe('root-private file/SQL interruption protocol with actual native receipt
     const paths={materialFile,verifierFile,lockFile,nonceFile:join(root,stage+'-nonce'),journalFile:join(root,stage+'-journal'),nextMaterialFile:join(root,stage+'-next-material'),nextVerifierFile:join(root,stage+'-next-verifier')},receiptFile=join(root,stage+'-receipt');
     const current=JSON.parse(await readFile(materialFile,'utf8')),proof=Buffer.from(current.proof,'base64url'),privateInput={repository:base,publisher,custody,lock,paths,proof,configuration,keys:{load:async()=>Buffer.alloc(32,17)}};
     const command=prior===undefined?{purpose:'BOOTSTRAP' as const,commandId,operationId,targetUserId:target.userId,credentialIds:target.credentialIds}:{purpose:'RECOVER_OWNER' as const,commandId,operationId,targetUserId:target.userId,credentialIds:target.credentialIds,predecessor:{kind:'LIVE' as const,lineageId:prior.lineageId,userId:prior.userId}};
-    await prepareOwnerCommand(command,privateInput);const nonce=JSON.parse(await readFile(paths.nonceFile,'utf8')).nonce as string,receiptIds=await ownerNativeReceipts(web,target,commandId,nonce),selection={commandId,receiptIds,receiptFile},run=purpose==='BOOTSTRAP'?bootstrapOwner:recoverOwner;
+    await prepareOwnerCommand(command,privateInput);const nonce=JSON.parse(await readFile(paths.nonceFile,'utf8')).nonce as string,receiptIds=await ownerNativeReceipts(web,target,commandId,nonce,webSystem),selection={commandId,receiptIds,receiptFile},run=purpose==='BOOTSTRAP'?bootstrapOwner:recoverOwner;
     if(stage==='next-material'){
      const storedCommand=(await base.read(commandId))!,storedReceipts=await base.readReceipts(commandId,receiptIds),bound={commandId,receiptIds,operationId,purpose};
      for(const patch of [{receiptId:randomUUID()},{commandId:randomUUID()},{purpose:'RECOVER_OWNER'},{targetUserId:randomUUID()},{ordinarySessionId:randomUUID()},{targetAccountSecurityEpoch:storedCommand.targetAccountSecurityEpoch+1},{credentialId:'unselected-key'},{nonceSha256:digest('forged-nonce')},{verifiedAt:new Date(NaN)},{verifiedAt:new Date(Date.now()+60000)},{expiresAt:new Date(0)},{consumedAt:new Date()}]){
@@ -179,6 +202,6 @@ describe('root-private file/SQL interruption protocol with actual native receipt
     const next=JSON.parse(await readFile(materialFile,'utf8'));expect(next.generation).not.toBe(current.generation);expect(next.proof).not.toBe(current.proof);expect((await db.pool.query('SELECT generation FROM staff.owner_recovery_generation')).rows[0].generation).toBe(next.generation);
     const currentOwner=(await db.pool.query('SELECT l.lineage_id,s.user_id FROM staff.owner_lineage l JOIN staff.subject s USING(staff_id)')).rows[0];prior={userId:currentOwner.user_id,lineageId:currentOwner.lineage_id};proof.fill(0);
    }
-  }finally{await closed?.end();await web?.end();await db.stop();await rm(root,{recursive:true,force:true});}
+  }finally{await closed?.end();await web?.end();await webSystem?.end();await db.stop();await rm(root,{recursive:true,force:true});}
  });
 });

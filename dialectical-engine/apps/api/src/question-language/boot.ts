@@ -128,8 +128,9 @@ function spendFailureCode(error: unknown): string {
 /**
  * The route with no preview configuration (P2L Task 19). Local mode has no paid AI. Hosted turns the fast check on only
  * when BOTH hold, else NONE with the reason:
- *  · `ledger.record_language_check_spend` exists AND the API's role may EXECUTE it (`spend.writerPresent`, the 0118
- *    probe): without either the API keeps the check off (HOSTED_BEFORE_SPEND_RECORD) — never spend unrecorded;
+ *  · `ledger.record_language_check_spend` exists AND the login the record runs on may EXECUTE it (`spend.writerPresent`,
+ *    the 0118 probe; since 0171 the writer is the cross-account marker's alone, so main.ts probes and records on its site
+ *    X30, the system login): without either the API keeps the check off (HOSTED_BEFORE_SPEND_RECORD) — never spend unrecorded;
  *  · and, before either, the fast-check model is on the reviewed provider price table, else the boot refuses
  *    (QUESTION_LANGUAGE_FAST_CHECK_MODEL_UNPRICED: a price is never guessed);
  *  · the support model target (apps/api/src/support/model.ts, parsed ABOVE the question-language boot step, pre-flight

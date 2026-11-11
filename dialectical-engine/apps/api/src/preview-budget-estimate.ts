@@ -39,21 +39,27 @@ import {
   createPreviewRemainingRpcPort,
   lengthRetryTokenCeiling,
   PREVIEW_CALL_TIER_LIMITS,
+  PREVIEW_FINAL_WRITER_LIMITS,
   PREVIEW_MODEL_ROWS_BY_PROVIDER,
   PREVIEW_PROVIDER_NAMES,
   PREVIEW_GLM_GENERATION_TOKEN_FLOOR,
   PREVIEW_REQUEST_BODY_MAX_BYTES,
   PREVIEW_REVIEWED_PROVIDER_REFS,
   PREVIEW_STRUCTURE_REPAIR_MODEL,
+  PREVIEW_V2_FINAL_SEATS,
   previewCallBound,
   previewChargedInputTokens,
+  previewFinalWriterAsk,
   previewModelRow,
   previewModelRowForRef,
   previewProviderSocket,
   previewStorytellerOutputCap,
   previewStorytellerTokenCeiling,
   previewTierOutputBound,
+  previewVendorPrices,
   type PreviewCallTier,
+  type PreviewFinalWriterPlan,
+  type PreviewFinalWriterRole,
   type PreviewGateRemaining,
   type PreviewGateSettings,
   type PreviewModelRow,
@@ -61,11 +67,15 @@ import {
   type PreviewProviderTestConfig
 } from "@debateai/providers";
 import {
-  lengthGuidanceAllowanceTokens, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs,
-  readSynthesisRoleControls, type DebateShapeCeilingInput, type EngineSettings
+  lengthGuidanceAllowanceTokens, PATH_REWRITE_POLICY, readStoryPolicyFromRegister, readStructuralCeilingPolicyInputs,
+  readSynthesisRoleControls, webReceiptAnySchema, webSitesOfReceipt, type DebateShapeCeilingInput, type DebateShapeV2Input,
+  type DebateShapeV2SiteCounts, type EngineSettings, type WebSites
 } from "@debateai/register";
+import { WEB_CALL_ALLOWANCES, WEB_SEARCH_REQUEST_MICROS, webCallTokens, type ProviderTargetPrice, type WebRolePrices } from "@debateai/budget";
 import type { Pool, PoolClient } from "pg";
-import { admittedEngineOf, admittedLengthOf, admittedShapeOf, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens } from "./ask-model-picker.js";
+import {
+  admittedEngineOf, admittedLengthOf, admittedShapeOf, admittedShapeV2Of, expectedCallsByRoleFromBasis, mapLengthAllowanceTokens
+} from "./ask-model-picker.js";
 
 /**
  * The next midnight in Europe/Bucharest after `now` (DST-aware): the instant the gate's day, and so
@@ -168,6 +178,42 @@ export function previewEstimateInputTokens(requestBytes: number): bigint {
   return (previewChargedInputTokens(requestBytes) + perToken - 1n) / perToken;
 }
 /**
+ * V4 start step, Task 4 (spec 2026-11-03 §5): a v2 run's final writer's body is at most the end-of-debate line
+ * (PREVIEW_FINAL_WRITER_LIMITS.inputBodyMaxBytes, 195,904 bytes), so (195,904 + 2,048) / 3 = 65,984 tokens.
+ */
+export const PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS = previewEstimateInputTokens(PREVIEW_FINAL_WRITER_LIMITS.inputBodyMaxBytes);
+/** V4 start step, Task 4: a v2 run's final-writer terms (its plan); absent or null = a v1 run, priced on R22.1's own terms. */
+export type PreviewFinalWriterPricing = Readonly<{ plan: PreviewFinalWriterPlan }>;
+/**
+ * V4 start step, Task 40: a run's final-writer terms, from its OWN receipt (read only through the shared strict reader,
+ * `admittedShapeV2Of`): a path debate (shape receipt v2) is free on Free and paid on every other plan; every other
+ * receipt is null, so it keeps R22.1's own terms. A receipt naming v2 that the reader refuses is refused, never priced.
+ */
+export function previewFinalWriterPricingOf(basis: Readonly<Record<string, unknown>>): PreviewFinalWriterPricing | null {
+  const shapeV2 = previewShapeV2Of(basis);
+  return shapeV2 === null ? null : Object.freeze({ plan: shapeV2.shape.plan === "free" ? "free" : "paid" });
+}
+/**
+ * V4 start step, Task 40: the max_tokens a path's answer-so-far writer and checker send on the preview: the path
+ * rewrite's bounds (PATH_REWRITE_POLICY, the runner's), raised to the generation floor as `previewCallBound` raises every
+ * preview call, so 8,192 each.
+ */
+const PREVIEW_PATH_OUTCOME_OUTPUT_TOKENS = Object.freeze({
+  writer: Math.max(PATH_REWRITE_POLICY.writerBound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR),
+  checker: Math.max(PATH_REWRITE_POLICY.checkerBound.tokenCeiling, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
+});
+/** The final writers' call types, each with its role and its attempt (a `*_RETRY` type is attempt 2). */
+type PreviewFinalWriterCallType = "ANSWER_WRITER" | "ANSWER_CHECKER" | "STORYTELLER" | "STORYTELLER_RETRY" | "STORY_CHECKER" | "STORY_CHECKER_RETRY";
+const FINAL_WRITER_CALLS: Readonly<Record<PreviewFinalWriterCallType, readonly [PreviewFinalWriterRole, 1 | 2]>> = Object.freeze({
+  ANSWER_WRITER: ["ANSWER_WRITER", 1], ANSWER_CHECKER: ["ANSWER_CHECKER", 1], STORYTELLER: ["STORYTELLER", 1],
+  STORYTELLER_RETRY: ["STORYTELLER", 2], STORY_CHECKER: ["STORY_CHECKER", 1], STORY_CHECKER_RETRY: ["STORY_CHECKER", 2]
+});
+/** V4 start step, Task 4: the max_tokens a v2 final writer asks: the same function the call policy sends (Task 3). */
+export function previewFinalWriterOutputTokens(row: PreviewModelRow, type: PreviewFinalWriterCallType, finalWriters: PreviewFinalWriterPricing): number {
+  const [role, attempt] = FINAL_WRITER_CALLS[type];
+  return previewFinalWriterAsk(row, role, attempt, finalWriters.plan).maxTokens;
+}
+/**
  * The realistic worst case's ordinary prompt (owner ruling, 2026-10-10): 64 KiB, so (65,536 + 2,048) / 3
  * = 22,528 tokens. The largest ordinary request seen on the preview was about 51 KB; the hard cap the
  * guarded fetch and the gate enforce is 256 KiB.
@@ -205,6 +251,8 @@ const PREVIEW_UNFINISHED_RUNS_MAX = 64;
  * spending (the story runs after the work item is DONE). It is held while its latest model call
  * finished within this window: longer than any gap between two calls of a live story (one call's
  * deadline plus the unbilled retry's cooldown), so a story that died without a row stops holding.
+ * A dig writes no story: its rewrite, climb and any main-answer update take the story's place and its hold, until 0153's
+ * mark says they have ended (identity.dig_is_settled), so a finished dig stops holding at once.
  */
 const PREVIEW_STORY_HOLD_WINDOW_SECONDS = 3600;
 
@@ -244,6 +292,12 @@ export type PreviewCallOutputTokens = Readonly<{
   /** Debate shape (controller ruling X1): the map's merge and choose max_tokens when the run's map step bounds raise them. */
   mapMerge?: number;
   mapChoose?: number;
+  /**
+   * V4 start step, Task 40: a path debate's answer so far, its writer's and its checker's max_tokens (8,192 each on the
+   * preview, `previewOutputTokensForBasis`); absent on every other receipt (a debate call's then).
+   */
+  pathOutcomeWriter?: number;
+  pathOutcomeChecker?: number;
 }>;
 
 /** The register's four roles as model ids; the story pair is null when the register has no story. */
@@ -284,9 +338,11 @@ export type PreviewVersionTerms = Readonly<{
  * structure-repair call on the repair model, priced at that call's own ceiling (`structureRepairNanoUsd`).
  * Length guidance LG-B (L26): ANSWER_WRITER (every receipt) and ANSWER_CHECKER are final writers, priced at the row's own
  * maximum output, like the story's four kinds.
+ * V4 start step, Task 40: PATH_OUTCOME_WRITER and PATH_OUTCOME_CHECKER are a path debate's answer so far (one writer and
+ * one checker call per path and round, on the fixed final seats): STANDARD calls, measured with the debate's (DEBATE).
  */
 export type PreviewCallType = "DEBATE" | "ANSWER_WRITER" | "ANSWER_CHECKER" | "MAP_MERGE" | "MAP_CHOOSE" | "STORYTELLER" | "STORYTELLER_RETRY"
-  | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "STRUCTURE_REPAIR" | "PROBE" | "UNBILLED_RETRY";
+  | "STORY_CHECKER" | "STORY_CHECKER_RETRY" | "STRUCTURE_REPAIR" | "PATH_OUTCOME_WRITER" | "PATH_OUTCOME_CHECKER" | "PROBE" | "UNBILLED_RETRY";
 export type PreviewBilledCallType = Exclude<PreviewCallType, "UNBILLED_RETRY">;
 
 /**
@@ -385,7 +441,8 @@ export function previewCallAverage(model: string, type: PreviewBilledCallType, m
 /** Where a call's measured usage is recorded: the debate's (the writer and the map are debate calls), the story's, or none. */
 function previewMeasuredBucketOf(type: PreviewBilledCallType): PreviewMeasuredBucket | null {
   switch (type) {
-    case "DEBATE": case "ANSWER_WRITER": case "ANSWER_CHECKER": case "MAP_MERGE": case "MAP_CHOOSE": return "DEBATE";
+    case "DEBATE": case "ANSWER_WRITER": case "ANSWER_CHECKER": case "MAP_MERGE": case "MAP_CHOOSE":
+    case "PATH_OUTCOME_WRITER": case "PATH_OUTCOME_CHECKER": return "DEBATE";
     case "STORYTELLER": case "STORYTELLER_RETRY": case "STORY_CHECKER": case "STORY_CHECKER_RETRY": return "STORY";
     // A repair is never averaged: every pricer prices it at its ceiling (`structureRepairNanoUsd`).
     case "STRUCTURE_REPAIR": case "PROBE": return null;
@@ -427,18 +484,20 @@ export function calibratedEstimatePricer(measured: PreviewMeasuredCallUsage): Pr
  * the storyteller its row's allowance (a fast row's own maximum, a slow row's 16,384) and its length retry twice that,
  * held to previewStorytellerOutputCap. A register without a story prices no story output, as before. LG-A's
  * structure-repair call keeps its own ceiling (structureRepairNanoUsd, STANDARD tier: controller ruling PF-B4.15).
- * Final review (2026-10-16, Important 3): on a slow row (GLM, MiMo, Qwen) the call policy now has the answer writer,
- * answer checker and story checker ask 16,384 with their retry held to `outputBound`, as the slow storyteller; this
- * estimate keeps pricing them at the row's own maximum on purpose, a safe over-count (it never prices a call below what
- * it may send).
+ * V4 start step, Task 4: a v1 run is priced on R22.1's own terms, as above; a v2 run's six final-writer types
+ * (`finalWriters` given) by the one function the call policy sends (previewFinalWriterAsk), at that ask's tier.
+ * V4 start step, Task 40: a path's answer-so-far writer and checker (STANDARD) at their own max_tokens, a debate call's
+ * when the receipt sets none.
  */
 function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCallType, "PROBE">, bigint>>,
-  output: PreviewCallOutputTokens): PreviewCallPricer {
+  output: PreviewCallOutputTokens, finalWriters: PreviewFinalWriterPricing | null = null): PreviewCallPricer {
   const outputOf = (row: PreviewModelRow, type: Exclude<PreviewBilledCallType, "PROBE" | "STRUCTURE_REPAIR">): number => {
     switch (type) {
       case "DEBATE": return output.debate;
       case "MAP_MERGE": return output.mapMerge ?? output.debate;
       case "MAP_CHOOSE": return output.mapChoose ?? output.debate;
+      case "PATH_OUTCOME_WRITER": return output.pathOutcomeWriter ?? output.debate;
+      case "PATH_OUTCOME_CHECKER": return output.pathOutcomeChecker ?? output.debate;
       case "ANSWER_WRITER": case "ANSWER_CHECKER": return row.finalWriterOutputBound;
       case "STORYTELLER": return output.storyteller === 0 ? 0 : previewStorytellerTokenCeiling(row);
       case "STORYTELLER_RETRY": return output.storyteller === 0 ? 0
@@ -447,40 +506,56 @@ function sentOutputPricer(inputTokens: Readonly<Record<Exclude<PreviewBilledCall
       default: return exhaustive(type);
     }
   };
+  // V4 start step, Task 4: a v2 final writer at the rule's ask and tier; a register without a story still prices none.
+  const v2FinalWriter = (row: PreviewModelRow, type: PreviewFinalWriterCallType, terms: PreviewFinalWriterPricing): bigint => {
+    const [role, attempt] = FINAL_WRITER_CALLS[type];
+    const ask = previewFinalWriterAsk(row, role, attempt, terms.plan);
+    const noStory = (role === "STORYTELLER" && output.storyteller === 0) || (role === "STORY_CHECKER" && output.storyChecker === 0);
+    return previewCallNanoUsd(row, inputTokens[type], noStory ? 0 : ask.maxTokens, ask.tier);
+  };
   return (row, type) => type === "PROBE"
     ? previewCallNanoUsd(row, PREVIEW_STRICT_PROBE_INPUT_TOKENS, PREVIEW_GLM_GENERATION_TOKEN_FLOOR)
     : type === "STRUCTURE_REPAIR" ? structureRepairNanoUsd(row, inputTokens.STRUCTURE_REPAIR)
-    : previewCallNanoUsd(row, inputTokens[type], outputOf(row, type), previewCallTypeTier(type));
+    : finalWriters !== null && Object.hasOwn(FINAL_WRITER_CALLS, type)
+      ? v2FinalWriter(row, type as PreviewFinalWriterCallType, finalWriters)
+      : previewCallNanoUsd(row, inputTokens[type], outputOf(row, type), previewCallTypeTier(type));
 }
 const everyCallAt = (tokens: bigint) => ({ DEBATE: tokens, ANSWER_WRITER: tokens, ANSWER_CHECKER: tokens, MAP_MERGE: tokens, MAP_CHOOSE: tokens,
-  STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens, STRUCTURE_REPAIR: tokens });
+  STORYTELLER: tokens, STORYTELLER_RETRY: tokens, STORY_CHECKER: tokens, STORY_CHECKER_RETRY: tokens, STRUCTURE_REPAIR: tokens,
+  PATH_OUTCOME_WRITER: tokens, PATH_OUTCOME_CHECKER: tokens });
 /**
  * STRICT_BOUND (6f62b6ba3): every call at its most, input at the largest body the gate accepts,
  * output at the max_tokens that call sends, clamped to the row; a health check at its fixed body and
- * the generation floor. LG-B: a final writer's input at the final-writer request cap (1 MiB).
+ * the generation floor. LG-B: a final writer's input at the final-writer request cap (1 MiB). V4 start step, Task 4: a v2
+ * run's final writers' output by the shared rule (`finalWriters`), their input still at that cap. Task 40: a path's
+ * answer-so-far calls are STANDARD, so their input at the standard cap, as every debate call's.
  */
-export function strictUpperBoundPricer(output: PreviewCallOutputTokens): PreviewCallPricer {
+export function strictUpperBoundPricer(output: PreviewCallOutputTokens, finalWriters: PreviewFinalWriterPricing | null = null): PreviewCallPricer {
   // LG-B (L29): a final writer's body may be up to the final-writer request cap.
   const finalWriter = previewChargedInputTokens(PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes);
   return sentOutputPricer({ ...everyCallAt(PREVIEW_STRICT_INPUT_TOKENS_PER_CALL), ANSWER_WRITER: finalWriter, ANSWER_CHECKER: finalWriter,
-    STORYTELLER: finalWriter, STORYTELLER_RETRY: finalWriter, STORY_CHECKER: finalWriter, STORY_CHECKER_RETRY: finalWriter }, output);
+    STORYTELLER: finalWriter, STORYTELLER_RETRY: finalWriter, STORY_CHECKER: finalWriter, STORY_CHECKER_RETRY: finalWriter }, output, finalWriters);
 }
 /**
  * REALISTIC_WORST_CASE (owner rulings, 2026-10-10): a debate call's input at a realistic 64 KiB, a
  * story call's (the storyteller, its repair, the story check) at the largest measured request of the
  * ask's story size (PREVIEW_STORY_REQUEST_BYTES), both at 3 bytes per token; its output at the
  * max_tokens that call asks for (clamped to the row); a health check at its fixed body and the
- * generation floor, as in the strict bound.
+ * generation floor, as in the strict bound. V4 start step, Task 4: a v2 run's final writers (`finalWriters` given) at
+ * the end-of-debate line in (PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS) and the shared rule's ask out. Task 40: a path's
+ * answer-so-far calls take their body at that line too (the runner holds them under it, as the final writers).
  */
-export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyTier: PreviewStoryTier = PREVIEW_STORY_TIER_FALLBACK): PreviewCallPricer {
+export function realisticWorstCasePricer(output: PreviewCallOutputTokens, storyTier: PreviewStoryTier = PREVIEW_STORY_TIER_FALLBACK,
+  finalWriters: PreviewFinalWriterPricing | null = null): PreviewCallPricer {
   const story = PREVIEW_STORY_REQUEST_BYTES[previewStoryTierOf(storyTier)];
-  const storyteller = previewEstimateInputTokens(story.storyteller);
-  const storyChecker = previewEstimateInputTokens(story.storyChecker);
-  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
-    ANSWER_CHECKER: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
+  const storyteller = finalWriters === null ? previewEstimateInputTokens(story.storyteller) : PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS;
+  const storyChecker = finalWriters === null ? previewEstimateInputTokens(story.storyChecker) : PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS;
+  const answer = finalWriters === null ? PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL : PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS;
+  return sentOutputPricer({ DEBATE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, ANSWER_WRITER: answer, ANSWER_CHECKER: answer,
     MAP_MERGE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL, MAP_CHOOSE: PREVIEW_REALISTIC_INPUT_TOKENS_PER_CALL,
     STORYTELLER: storyteller, STORYTELLER_RETRY: storyteller,
-    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker, STRUCTURE_REPAIR: PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS }, output);
+    STORY_CHECKER: storyChecker, STORY_CHECKER_RETRY: storyChecker, STRUCTURE_REPAIR: PREVIEW_REALISTIC_REPAIR_INPUT_TOKENS,
+    PATH_OUTCOME_WRITER: PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS, PATH_OUTCOME_CHECKER: PREVIEW_V2_FINAL_WRITER_INPUT_TOKENS }, output, finalWriters);
 }
 
 export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" | "STRICT_BOUND";
@@ -488,7 +563,7 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
  * THE ACTIVE PRICING MODE: REALISTIC_WORST_CASE (owner ruling, 2026-10-10, replacing the calibrated
  * average of option 2). Why, in one sentence: an average could let a debate start that then runs out
  * of money half-way, while a realistic worst case per step (64 KiB in, the full answer out) still fits
- * a whole debate in the $10.00 day, so a started debate is not cut off for money.
+ * a whole debate in the day, so a started debate is not cut off for money.
  * To switch (back to CALIBRATED_ESTIMATE, to STRICT_BOUND, or to a mode added beside these), change
  * this one constant; previewEstimatePricer and previewDebateCallCount follow it, nothing else reads it.
  * The calibrated average ignores a shaped run's writer and map step bounds, and a length receipt's guided allowance
@@ -497,11 +572,14 @@ export type PreviewPricingMode = "REALISTIC_WORST_CASE" | "CALIBRATED_ESTIMATE" 
 export const PREVIEW_ESTIMATE_PRICING_MODE: PreviewPricingMode = "REALISTIC_WORST_CASE";
 /** THE ONE PRICING SWITCH: the pricer for `mode` (default: the active mode above). */
 export function previewEstimatePricer(context: Readonly<{ measured: PreviewMeasuredCallUsage; callOutputTokens: PreviewCallOutputTokens;
-  storyTier?: PreviewStoryTier }>, mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
+  storyTier?: PreviewStoryTier;
+  /** V4 start step, Task 4: a v2 run's final-writer terms; absent or null = a v1 run (R22.1's own terms). */
+  finalWriters?: PreviewFinalWriterPricing | null }>, mode: PreviewPricingMode = PREVIEW_ESTIMATE_PRICING_MODE): PreviewCallPricer {
+  const finalWriters = context.finalWriters ?? null;
   switch (mode) {
-    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier);
+    case "REALISTIC_WORST_CASE": return realisticWorstCasePricer(context.callOutputTokens, context.storyTier, finalWriters);
     case "CALIBRATED_ESTIMATE": return calibratedEstimatePricer(context.measured);
-    case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens);
+    case "STRICT_BOUND": return strictUpperBoundPricer(context.callOutputTokens, finalWriters);
     default: return exhaustive(mode);
   }
 }
@@ -591,25 +669,30 @@ export function previewExpectedCalls(input: Readonly<{
   return Object.freeze({ debate, story, probes, askProbes, unbilledRetries, total: debate + story + probes + askProbes + unbilledRetries });
 }
 
-/** The basis's one-call-per-site split: the panel's calls and the answer writer's and checker's; null without a split. */
-function debateSitesByRole(basis: Readonly<Record<string, unknown>>):
-  Readonly<{ panel: number; reviewer: number; authored: number; judge: number; answerWriter: number; answerChecker: number; total: number }> | null {
+/**
+ * The basis's one-call-per-site split: the panel's calls and the answer writer's and checker's; null without a split.
+ * V4 start step, Task 40: a path debate's answer so far (`pathOutcomes`, its receipt's `path_outcome_sites`) is out of the
+ * role split (Task 34) but still the debate's own calls, so it is in `total` and nowhere else (0 on every other receipt).
+ */
+function debateSitesByRole(basis: Readonly<Record<string, unknown>>): Readonly<{ panel: number; reviewer: number; authored: number;
+  judge: number; answerWriter: number; answerChecker: number; pathOutcomes: number; total: number }> | null {
   let byRole: ReturnType<typeof expectedCallsByRoleFromBasis>;
   try {
     byRole = expectedCallsByRoleFromBasis(basis);
   } catch (error) {
     // I1: a debate-shape receipt is never priced as today's (never-under-count): its split must read. Engine redesign
-    // R2: nor is an engine-2 receipt (its member present), whatever made its split refuse.
-    if (previewShapeOf(basis) !== null || basis.engine !== undefined) throw error;
+    // R2: nor is an engine-2 receipt (its member present), whatever made its split refuse. Task 40: nor a path debate's.
+    if (previewShapeOf(basis) !== null || previewShapeV2Of(basis) !== null || basis.engine !== undefined) throw error;
     return null;
   }
-  const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0);
+  const pathOutcomes = previewShapeV2Of(basis)?.counts.pathOutcomeSites ?? 0;
+  const total = Object.values(byRole).reduce((sum, calls) => sum + calls, 0) + pathOutcomes;
   if (total < 1) return null;
-  return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER, reviewer: byRole.REVIEWER,
+  return Object.freeze({ panel: total - byRole.ANSWER_WRITER - byRole.ANSWER_CHECKER - pathOutcomes, reviewer: byRole.REVIEWER,
     // The two parts of the non-review panel sites (panel − reviewer = authored + judge). On a shaped receipt POSITION
     // holds every map site too (answers + map sites) and JUDGE is (J + E) × nodes.
     authored: byRole.POSITION + byRole.SUPPORT_ATTACK + byRole.CROSS_EXCHANGE, judge: byRole.JUDGE,
-    answerWriter: byRole.ANSWER_WRITER, answerChecker: byRole.ANSWER_CHECKER, total });
+    answerWriter: byRole.ANSWER_WRITER, answerChecker: byRole.ANSWER_CHECKER, pathOutcomes, total });
 }
 
 /**
@@ -704,6 +787,15 @@ export type PreviewCallShares = Readonly<{ denominator: bigint; shares: readonly
  * (`dearestFor` at that call's price; a shaped receipt requires it): whichever member holds that seat, its gate
  * is never under-charged. Every other map site (the angles, the lists, a list asked again, the gap rounds) stays an
  * evenly shared debate call. Today's receipt: today's shares exactly.
+ * V4 start step, Task 40 (spec 2026-11-03 §4.3, §5): a path debate (shape receipt v2, read only through the shared strict
+ * reader `admittedShapeV2Of`) is priced on its own terms: its authored sites (each path's root, points and replies, the
+ * gap rounds, the run's own lists and choose on RUN_BUILT) from the v2 role split, in full at each gate's dearest member,
+ * and its grading at `previewShapedGradingShare`, as a shaped run's; no choose priced apart (a v2 receipt has no choose
+ * bound) and the one merge, as MAP_MERGE on every gate, only when the run builds its own list (RUN_BUILT); the main
+ * answer and the story's first loop on the fixed final seats (PREVIEW_V2_FINAL_SEATS: the writer writes, the checker
+ * checks) whatever the register's roles or a rotation pin, and engine 2's second story loop (the backup storyteller's)
+ * on every gate at its dearest member; every path's answer so far (`path_outcome_sites`), half on each seat as
+ * PATH_OUTCOME_WRITER / PATH_OUTCOME_CHECKER, each with its unbilled retry.
  * Fractions are kept exact: every numerator is over the one `denominator`.
  */
 export function previewCallShares(input: Readonly<{
@@ -730,7 +822,10 @@ export function previewCallShares(input: Readonly<{
   const rotated = input.rotated === true;
   // Debate shape: the writer's sites are priced at the run's writer bound, and the map's merge and choose (one site
   // each, X1) at its map step bounds; today's receipt keeps them all as DEBATE and has no map.
-  const shaped = previewShapeOf(input.basis) !== null;
+  const shapeV1 = previewShapeOf(input.basis);
+  // V4 start step, Task 40: a path debate (shape receipt v2) is shaped too, on its own terms (see above).
+  const pathDebate = previewShapeV2Of(input.basis);
+  const shaped = shapeV1 !== null || pathDebate !== null;
   // Engine redesign R2 (INTERFACE §3.4; spec §10: the estimate stays a ceiling that never under-counts): an engine-2
   // receipt's comparing judges, investigations (at their cap) and answer check are taken out of the even and grading
   // shares below and charged per gate at its dearest panel member: min(g, judges) judge calls (never two judges of one
@@ -744,7 +839,9 @@ export function previewCallShares(input: Readonly<{
   const askProbeModelIds = input.askProbeModelIds ?? [];
   const expected = previewExpectedCalls({ ...input, roleProviderRefs: rotated ? [] : input.roleProviderRefs,
     askProbeTargets: askProbeModelIds.length });
-  if (!rotated && input.storyRounds > 0 && (input.roleModels.storyteller === null || input.roleModels.storyChecker === null)) {
+  // Task 40: a path debate's story never sits on the register's story roles (the seats, then each gate's dearest member).
+  if (!rotated && pathDebate === null && input.storyRounds > 0
+    && (input.roleModels.storyteller === null || input.roleModels.storyChecker === null)) {
     throw new TypeError("PREVIEW_STORY_ROLE_MISSING");
   }
   const sites = debateSitesByRole(input.basis);
@@ -772,7 +869,11 @@ export function previewCallShares(input: Readonly<{
   };
   // LG-B (L26): the writer is a final writer on every receipt.
   const writerType: PreviewCallType = "ANSWER_WRITER";
-  const mapLongSites = shaped ? 2n : 0n;
+  // X1: a shaped run's merge and choose, priced apart below. Task 40: a path debate's merge only, and only on RUN_BUILT
+  // (a menu's lists and merge, and a dig's picks, came before Start); its choose stays an authored debate call.
+  const mapLongTypes: readonly ("MAP_MERGE" | "MAP_CHOOSE")[] = shapeV1 !== null ? ["MAP_MERGE", "MAP_CHOOSE"]
+    : pathDebate?.shape.pathsSource === "RUN_BUILT" ? ["MAP_MERGE"] : [];
+  const mapLongSites = BigInt(mapLongTypes.length);
   if (input.storyOnly !== true) {
     if (sites === null) {
       for (const model of panelModels) addDebate(model, debate);
@@ -783,7 +884,8 @@ export function previewCallShares(input: Readonly<{
         // author or grade far more than 1/M. Each gate, at its dearest panel member: the authored sites (positions,
         // points, replies, cross-replies, every map site but the merge and the choose, priced below) IN FULL, the review
         // leg's rule; and min(1, g / (J + E)) of the grading sites (`previewShapedGradingShare`), rounded up.
-        const shape = previewShapeOf(input.basis)!;
+        // Task 40: a path debate the same, from its own split (its roots and points; no cross replies).
+        const shape = shapeV1 ?? pathDebate!.shape;
         for (const { model, gateMembers } of dearestPanelMemberPerGate(panelModels)) {
           addDebate(model, (BigInt(sites.authored) - mapLongSites - checkSites) * debate * members);
           const grading = previewShapedGradingShare({ gateMembers, graders: shape.graders, closeCallExtraGraders: shape.closeCallExtraGraders });
@@ -813,11 +915,18 @@ export function previewCallShares(input: Readonly<{
           addDebate(model, (seats + investigationSites + checkSites) * debate * members);
         }
       }
-      if (shaped) {
-        // X1: one merge and one choose per run; any member may hold the seat, so every gate carries each whole call.
-        for (const type of ["MAP_MERGE", "MAP_CHOOSE"] as const) for (const model of perGate(type)) addDebate(model, debate * members, type);
-      }
-      if (rotated) {
+      // X1: one merge and one choose per run; any member may hold the seat, so every gate carries each whole call.
+      for (const type of mapLongTypes) for (const model of perGate(type)) addDebate(model, debate * members, type);
+      if (pathDebate !== null) {
+        // Task 40: a path debate's main answer and every path's answer so far on the fixed final seats, whatever the
+        // register's roles or a rotation pin; the outcome sites are half written and half checked, each with its retry.
+        const { writer, checker } = PREVIEW_V2_FINAL_SEATS;
+        addDebate(writer, BigInt(sites.answerWriter) * debate * members, writerType);
+        addDebate(checker, BigInt(sites.answerChecker) * debate * members, "ANSWER_CHECKER");
+        const outcomesPerSeat = BigInt(sites.pathOutcomes / 2);
+        addDebate(writer, outcomesPerSeat * debate * members, "PATH_OUTCOME_WRITER");
+        addDebate(checker, outcomesPerSeat * debate * members, "PATH_OUTCOME_CHECKER");
+      } else if (rotated) {
         // The careful side: every gate carries the writer's and checker's sites at its dearest member (spec Part 5); the
         // writer's member at the writer's own price (PF5), the checker's at the checker's (both final writers, LG-B).
         for (const models of panelGates.values()) {
@@ -837,27 +946,39 @@ export function previewCallShares(input: Readonly<{
     for (const model of askProbeModelIds) add(model, "PROBE", denominator);
   }
   // Engine redesign (R1d decision 7): an engine-2 receipt's story rounds count twice (the backup storyteller's worst case).
-  const rounds = BigInt(previewStoryRoundsOf(input.basis, input.storyRounds)) * denominator;
-  if (rounds > 0n) {
-    const tellers = rotated ? perGate("STORYTELLER") : [input.roleModels.storyteller!];
-    const checkers = rotated ? perGate("STORY_CHECKER") : [input.roleModels.storyChecker!];
+  // Task 40: a path debate's first loop on the fixed seats; engine 2's second loop (another maker's backup storyteller)
+  // on every gate at its dearest member, its checker likewise.
+  const loops: { rounds: bigint; tellers: () => readonly string[]; checkers: () => readonly string[] }[] = pathDebate === null
+    ? [{ rounds: BigInt(previewStoryRoundsOf(input.basis, input.storyRounds)) * denominator,
+      tellers: () => rotated ? perGate("STORYTELLER") : [input.roleModels.storyteller!],
+      checkers: () => rotated ? perGate("STORY_CHECKER") : [input.roleModels.storyChecker!] }]
+    : [{ rounds: BigInt(input.storyRounds) * denominator,
+      tellers: () => [PREVIEW_V2_FINAL_SEATS.writer], checkers: () => [PREVIEW_V2_FINAL_SEATS.checker] },
+    ...(engineSites === null ? [] : [{ rounds: BigInt(input.storyRounds) * denominator,
+      tellers: () => perGate("STORYTELLER"), checkers: () => perGate("STORY_CHECKER") }])];
+  let repairs = 0n;
+  for (const loop of loops) {
+    if (loop.rounds <= 0n) continue;
+    const tellers = loop.tellers();
+    const checkers = loop.checkers();
     for (const model of tellers) {
-      add(model, "STORYTELLER", rounds);
-      add(model, "STORYTELLER_RETRY", rounds);
+      add(model, "STORYTELLER", loop.rounds);
+      add(model, "STORYTELLER_RETRY", loop.rounds);
     }
     for (const model of checkers) {
-      add(model, "STORY_CHECKER", rounds);
-      add(model, "STORY_CHECKER_RETRY", rounds);
+      add(model, "STORY_CHECKER", loop.rounds);
+      add(model, "STORY_CHECKER_RETRY", loop.rounds);
     }
-    // LG-A (L32): a story try's second POST may instead be the structure-repair call on the repair model; it is counted
-    // there too, per round and story role, so the repair model's gate is never under-counted (the step's own gate keeps
-    // its count: the estimate stays a ceiling). Task 14 controller ruling: as STRUCTURE_REPAIR, at the repair call's own
-    // ceiling, never as a story retry (a checker's retry asks half the repair's answer cap). The repair call carries no
-    // repair packet of its own, so the preview policy gives it owner ruling 5's one resend after an unbilled refusal: that
-    // UNBILLED_RETRY is counted with it, as for every debate call (Task 14 review).
-    const repairModel = input.structureRepairModel ?? null;
-    if (repairModel !== null) addDebate(repairModel, rounds * BigInt(tellers.length + checkers.length), "STRUCTURE_REPAIR");
+    repairs += loop.rounds * BigInt(tellers.length + checkers.length);
   }
+  // LG-A (L32): a story try's second POST may instead be the structure-repair call on the repair model; it is counted
+  // there too, per round and story role, so the repair model's gate is never under-counted (the step's own gate keeps
+  // its count: the estimate stays a ceiling). Task 14 controller ruling: as STRUCTURE_REPAIR, at the repair call's own
+  // ceiling, never as a story retry (a checker's retry asks half the repair's answer cap). The repair call carries no
+  // repair packet of its own, so the preview policy gives it owner ruling 5's one resend after an unbilled refusal: that
+  // UNBILLED_RETRY is counted with it, as for every debate call (Task 14 review).
+  const repairModel = input.structureRepairModel ?? null;
+  if (repairModel !== null) addDebate(repairModel, repairs, "STRUCTURE_REPAIR");
   return Object.freeze({ denominator, shares: Object.freeze(shares) });
 }
 
@@ -912,10 +1033,18 @@ export type PreviewEstimateSettings = Readonly<{
 }>;
 
 /**
+ * V4 start step, Task 40: the models a path debate's final writers sit on whatever the roles (PREVIEW_V2_FINAL_SEATS:
+ * the writer, then the checker); none for every other receipt. Their gates must serve them, so they join the model lists.
+ */
+function previewFinalSeatsOf(basis: Readonly<Record<string, unknown>>): readonly string[] {
+  return previewShapeV2Of(basis) === null ? [] : [PREVIEW_V2_FINAL_SEATS.writer, PREVIEW_V2_FINAL_SEATS.checker];
+}
+
+/**
  * Pure: what a NEW debate needs of each gate, at `pricer` and `debateCallCount` (defaults: the active
  * mode, with no measured usage). Throws for a model the preview does not review. `rotated` (spec
  * 2026-10-11, Part 5): the roles are panel members, priced on each gate at its dearest member, and the
- * register's role models are not on any gate's model list.
+ * register's role models are not on any gate's model list. Task 40: a path debate's final seats always are.
  */
 export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readonly<{
   basis: Readonly<Record<string, unknown>>;
@@ -932,13 +1061,16 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
   };
   const rotated = input.rotated === true;
   const byGate = new Map<PreviewGateKey, string[]>();
-  for (const model of new Set([...input.panel.map((member) => member.model_id), ...(rotated ? [] : roleModelList(input.roleModels))])) {
+  for (const model of new Set([...input.panel.map((member) => member.model_id), ...(rotated ? [] : roleModelList(input.roleModels)),
+    ...previewFinalSeatsOf(input.basis)])) {
     const gate = previewGateKeyOf(reviewedRow(model).model)!;
     byGate.set(gate, [...(byGate.get(gate) ?? []), model]);
   }
   const pricer = input.pricer
-    ?? previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(input.callOutputTokens, input.basis) });
-  return gateNeeds(byGate, previewCallShares({ ...input, dearestFor: dearestByPricer(pricer, reviewedRow) }), reviewedRow, pricer);
+    ?? previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(input.callOutputTokens, input.basis),
+      finalWriters: previewFinalWriterPricingOf(input.basis) });
+  return withPreviewWebNeeds(gateNeeds(byGate, previewCallShares({ ...input, dearestFor: dearestByPricer(pricer, reviewedRow) }), reviewedRow, pricer),
+    input.basis, input.panel.map((member) => reviewedRow(member.model_id)));
 }
 
 /**
@@ -949,21 +1081,165 @@ export function estimatePreviewGateNeeds(input: PreviewEstimateSettings & Readon
  * existed) is priced at the DeepInfra row whose average debate call is dearest, on the DeepInfra gate.
  */
 export function estimateUnfinishedRunHolds(run: PreviewUnfinishedRun, settings: PreviewEstimateSettings,
-  pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(settings.callOutputTokens, run.basis) }),
+  pricer: PreviewCallPricer = previewEstimatePricer({ measured: [], callOutputTokens: previewOutputTokensForBasis(settings.callOutputTokens, run.basis),
+    finalWriters: previewFinalWriterPricingOf(run.basis) }),
   debateCallCount: PreviewDebateCallCount = previewDebateCallCount()): readonly PreviewGateNeed[] {
   const dearestRow = PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.reduce((best, row) => pricer(row, "DEBATE") > pricer(best, "DEBATE") ? row : best);
   const rowOf = (model: string): PreviewModelRow => previewModelRow(model) ?? dearestRow;
   // Spec 2026-10-11 Part 5: a rotated debate is held with the rotated pricing (its roles are panel members).
   const rotated = run.rotated === true;
   const byGate = new Map<PreviewGateKey, string[]>();
-  for (const model of new Set([...run.panel.map((member) => member.model_id), ...(rotated ? [] : roleModelList(settings.roleModels))])) {
+  // Task 40: a path debate is held on its final seats' gates too.
+  for (const model of new Set([...run.panel.map((member) => member.model_id), ...(rotated ? [] : roleModelList(settings.roleModels)),
+    ...previewFinalSeatsOf(run.basis)])) {
     const gate = previewGateKeyOf(rowOf(model).model) ?? "deepinfra";
     byGate.set(gate, [...(byGate.get(gate) ?? []), model]);
   }
   const calls = previewCallShares({ ...settings, askProbeModelIds: [], basis: run.basis, panel: run.panel,
     roleModelOfRef: (ref) => previewModelRowForRef(ref)?.model ?? dearestRow.model, storyOnly: run.phase === "STORY", debateCallCount,
     dearestFor: dearestByPricer(pricer, rowOf), ...(rotated ? { rotated: true } : {}) });
-  return gateNeeds(byGate, calls, rowOf, pricer);
+  const needs = gateNeeds(byGate, calls, rowOf, pricer);
+  // W2-2: a debate still writing its story has done its web part.
+  return run.phase === "STORY" ? needs : withPreviewWebNeeds(needs, run.basis, run.panel.map((member) => rowOf(member.model_id)));
+}
+
+/**
+ * Web search (plan 2026-10-30, W2-2): the preview's web roles. Reader 1 and the pick are Claude Haiku (Anthropic gate);
+ * readers 2 and 3 are two other companies (DeepSeek and GLM, Qwen as the other choice), priced at the dearest of the
+ * three; the planner is an open owner choice (Q11: Haiku, DeepSeek or Qwen), priced at the dearest of them on EACH of
+ * their gates (one of the two is over-counted, never under).
+ */
+export const PREVIEW_WEB_ROLE_MODELS = Object.freeze({
+  readerOne: "claude-haiku-5-5",
+  pick: "claude-haiku-5-5",
+  topReaders: Object.freeze(["deepseek-ai/DeepSeek-V4.1-Flash", "zai-org/GLM-5.3-Flash", "Qwen/Qwen3.8-Flash"]),
+  planner: Object.freeze(["claude-haiku-5-5", "deepseek-ai/DeepSeek-V4.1-Flash", "Qwen/Qwen3.8-Flash"])
+});
+
+/**
+ * W2-2: the web part a receipt carries (its `web` member), or null for a run admitted without web search. V4 start step,
+ * Task 40: either version, each by its own strict schema (version 2: a path debate's PATHS part).
+ */
+export function previewWebSitesOf(basis: Readonly<Record<string, unknown>>): WebSites | null {
+  if (basis.web === undefined) return null;
+  const parsed = webReceiptAnySchema.safeParse(basis.web);
+  if (!parsed.success) throw new TypeError("PREVIEW_WEB_RECEIPT_INVALID");
+  return webSitesOfReceipt(parsed.data);
+}
+
+const previewRowOrThrow = (model: string): PreviewModelRow => {
+  const row = previewModelRow(model);
+  if (row === undefined) throw new TypeError("PREVIEW_MODEL_UNREVIEWED");
+  return row;
+};
+const dearestRow = (models: readonly string[], tokens: Readonly<{ inputTokens: number; outputTokens: number }>): PreviewModelRow =>
+  models.map(previewRowOrThrow).reduce((best, row) =>
+    previewCallNanoUsd(row, BigInt(tokens.inputTokens), tokens.outputTokens) > previewCallNanoUsd(best, BigInt(tokens.inputTokens), tokens.outputTokens) ? row : best);
+
+/**
+ * One web call on a row, in nano-USD: its input at the row's price, its instruction part at the row's 5-minute
+ * cache-write price when the row caches (the dearest way the gate settles it), its output at the full max_tokens.
+ */
+function previewWebCallNanoUsd(row: PreviewModelRow, tokens: Readonly<{ inputTokens: number; outputTokens: number }>, cached: boolean): bigint {
+  const plain = previewCallNanoUsd(row, BigInt(tokens.inputTokens), tokens.outputTokens);
+  const write = row.cacheWriteInputNanoUsdPerToken;
+  if (!cached || write === undefined) return plain;
+  const instruction = BigInt(Math.min(WEB_CALL_ALLOWANCES.instructionTokens, tokens.inputTokens));
+  return plain + instruction * (write - row.inputNanoUsdPerToken);
+}
+
+/**
+ * W2-2: the web part's calls and money on each gate, at the caps (`webCallTokens`), with the estimate's 15%. The
+ * searches are NOT here: they go through the Perplexity gate, and a search it refuses costs nothing while the debate
+ * goes on without it (`previewWebSearchNeed` gives their figure for that gate). The pack's reading inside the arguing
+ * is priced on every gate the panel uses, at that gate's dearest panel row (over-counted, never under).
+ */
+export function previewWebGateShares(sites: WebSites, panelRows: readonly PreviewModelRow[]):
+  ReadonlyMap<PreviewGateKey, Readonly<{ calls: number; nanoUsd: bigint }>> {
+  const tokens = webCallTokens(sites);
+  const shares = new Map<PreviewGateKey, { calls: number; nanoUsd: bigint }>();
+  const add = (row: PreviewModelRow, calls: number, nanoUsdEach: bigint, countsAsCalls = true): void => {
+    const gate = previewGateKeyOf(row.model) ?? "deepinfra";
+    const entry = shares.get(gate) ?? { calls: 0, nanoUsd: 0n };
+    shares.set(gate, { calls: entry.calls + (countsAsCalls ? calls : 0), nanoUsd: entry.nanoUsd + BigInt(calls) * nanoUsdEach });
+  };
+  const readerOne = previewRowOrThrow(PREVIEW_WEB_ROLE_MODELS.readerOne);
+  add(readerOne, tokens.readerOne.calls, previewWebCallNanoUsd(readerOne, tokens.readerOne, true));
+  const pick = previewRowOrThrow(PREVIEW_WEB_ROLE_MODELS.pick);
+  add(pick, tokens.pick.calls, previewWebCallNanoUsd(pick, tokens.pick, true));
+  const top = dearestRow(PREVIEW_WEB_ROLE_MODELS.topReaders, tokens.topReaders);
+  add(top, tokens.topReaders.calls, previewWebCallNanoUsd(top, tokens.topReaders, true));
+  const plannerGates = new Map<PreviewGateKey, PreviewModelRow>();
+  for (const model of PREVIEW_WEB_ROLE_MODELS.planner) {
+    const row = previewRowOrThrow(model);
+    const gate = previewGateKeyOf(row.model) ?? "deepinfra";
+    const held = plannerGates.get(gate);
+    if (held === undefined || previewWebCallNanoUsd(row, tokens.planner, true) > previewWebCallNanoUsd(held, tokens.planner, true)) plannerGates.set(gate, row);
+  }
+  for (const row of plannerGates.values()) add(row, tokens.planner.calls, previewWebCallNanoUsd(row, tokens.planner, true));
+  const packGates = new Map<PreviewGateKey, PreviewModelRow>();
+  for (const row of panelRows) {
+    const gate = previewGateKeyOf(row.model) ?? "deepinfra";
+    const held = packGates.get(gate);
+    if (held === undefined || row.inputNanoUsdPerToken > held.inputNanoUsdPerToken) packGates.set(gate, row);
+  }
+  // The pack is read inside calls the debate already counts: money only, no extra calls.
+  for (const row of packGates.values()) add(row, tokens.pack.calls, BigInt(tokens.pack.inputTokens) * row.inputNanoUsdPerToken, false);
+  return new Map([...shares].map(([gate, share]) => [gate, Object.freeze({
+    calls: Number(withMargin(BigInt(share.calls))), nanoUsd: withMargin(share.nanoUsd) })]));
+}
+
+/** W2-2: what the Perplexity gate must allow for this web part: every search the cap allows, at its price. */
+export function previewWebSearchNeed(sites: WebSites): Readonly<{ searches: number; nanoUsd: bigint }> {
+  return Object.freeze({ searches: sites.searches, nanoUsd: BigInt(sites.searches) * BigInt(WEB_SEARCH_REQUEST_MICROS) * 1000n });
+}
+
+/**
+ * W2-2: the gate needs with the web part added (a run without a `web` member: unchanged). A gate the debate did not
+ * otherwise use gets its own need; the web models are NOT added to any gate's required models, because a web call a
+ * gate cannot serve fails the web step only, never the debate.
+ */
+function withPreviewWebNeeds(needs: readonly PreviewGateNeed[], basis: Readonly<Record<string, unknown>>,
+  panelRows: readonly PreviewModelRow[]): readonly PreviewGateNeed[] {
+  const sites = previewWebSitesOf(basis);
+  if (sites === null) return needs;
+  const shares = previewWebGateShares(sites, panelRows);
+  const merged = needs.map((need) => {
+    const share = shares.get(need.gate);
+    return share === undefined ? need : Object.freeze({ ...need, expectedCalls: need.expectedCalls + share.calls,
+      callsWithMargin: need.callsWithMargin + share.calls, callsNanoUsd: need.callsNanoUsd + share.nanoUsd });
+  });
+  for (const [gate, share] of shares) {
+    if (needs.some((need) => need.gate === gate)) continue;
+    merged.push(Object.freeze({ gate, modelIds: Object.freeze([]), expectedCalls: share.calls, callsWithMargin: share.calls,
+      callsNanoUsd: share.nanoUsd }));
+  }
+  return Object.freeze(merged);
+}
+
+/**
+ * W2-2: the hosted room's web role prices (`RecentRunsCostEstimator`'s `webPrices`) from the site's priced targets:
+ * each role at the dearest of its preview models the site prices; the pack at the dearest priced target. Null when the
+ * site prices no Claude Haiku (reader 1 cannot run, so there is no web part to price: a web class answers the maximum).
+ */
+export function previewWebRolePrices(prices: ReadonlyMap<string, ProviderTargetPrice>): WebRolePrices | null {
+  const priced = (model: string): ProviderTargetPrice | null => {
+    for (const [ref, price] of prices) if (previewModelRowForRef(ref)?.model === model) return price;
+    return null;
+  };
+  const dearest = (list: readonly (ProviderTargetPrice | null)[]): ProviderTargetPrice | null => list.reduce<ProviderTargetPrice | null>(
+    (best, price) => price === null ? best : best === null ? price : Object.freeze({
+      inputMicrosPerMillionTokens: Math.max(best.inputMicrosPerMillionTokens, price.inputMicrosPerMillionTokens),
+      outputMicrosPerMillionTokens: Math.max(best.outputMicrosPerMillionTokens, price.outputMicrosPerMillionTokens) }), null);
+  const haiku = priced(PREVIEW_WEB_ROLE_MODELS.readerOne);
+  const top = dearest(PREVIEW_WEB_ROLE_MODELS.topReaders.map(priced));
+  const planner = dearest(PREVIEW_WEB_ROLE_MODELS.planner.map(priced));
+  const pack = dearest([...prices.values()]);
+  if (haiku === null || top === null || planner === null || pack === null) return null;
+  // Reader 1 and the pick carry their cached instruction part at Haiku's 5-minute cache-write price (F4's real prices).
+  const vendorPrices = previewVendorPrices(previewRowOrThrow(PREVIEW_WEB_ROLE_MODELS.readerOne));
+  const cachedHaiku = vendorPrices === undefined ? haiku : Object.freeze({ ...haiku, vendorPrices });
+  return Object.freeze({ readerOne: cachedHaiku, pick: cachedHaiku, topReaders: top, planner, pack });
 }
 
 /**
@@ -1184,11 +1460,12 @@ export async function assertPreviewBudgetAdmits(
     // the same pricing and count hold back every unfinished debate, so a new debate and a running
     // one are counted alike.
     const measured = previewModeReadsMeasuredUsage() ? await gate!.readMeasuredCallUsage?.() ?? [] : [];
-    // Debate shape: each debate, new or unfinished, is priced at ITS OWN receipt's writer and map step bounds.
+    // Debate shape: each debate, new or unfinished, is priced at ITS OWN receipt's writer and map step bounds. V4 start
+    // step, Task 40: and at its own final-writer terms (a path debate's plan; every other receipt R22.1's).
     const pricerFor = (storyTier: PreviewStoryTier | undefined, basis: Readonly<Record<string, unknown>>,
       callOutputTokens: PreviewCallOutputTokens) =>
       previewEstimatePricer({ measured, callOutputTokens: previewOutputTokensForBasis(callOutputTokens, basis),
-        storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK });
+        storyTier: storyTier ?? PREVIEW_STORY_TIER_FALLBACK, finalWriters: previewFinalWriterPricingOf(basis) });
     const debateCallCount = previewDebateCallCount();
     needs = estimatePreviewGateNeeds({ basis: input.basis, panel: input.panel, ...gate!,
       pricer: pricerFor(input.storyTier, input.basis, gate!.callOutputTokens), debateCallCount,
@@ -1251,6 +1528,7 @@ export const PREVIEW_UNFINISHED_RUNS_SQL = `SELECT run.envelope_basis, run.disco
               OR ($1::boolean
                   AND EXISTS (SELECT 1 FROM serve.answer AS answer WHERE answer.run_id = run.run_id)
                   AND NOT EXISTS (SELECT 1 FROM serve.answer_story AS story WHERE story.run_id = run.run_id)
+                  AND NOT identity.dig_is_settled(run.run_id)
                   AND EXISTS (SELECT 1 FROM ledger.ledger_entry AS entry
                               WHERE entry.run_id = run.run_id AND entry.action_kind = 'MODEL_CALL'
                                 AND entry.finished_at > clock_timestamp() - make_interval(secs => $2::integer))))
@@ -1370,6 +1648,15 @@ function previewShapeOf(basis: Readonly<Record<string, unknown>>): DebateShapeCe
 }
 
 /**
+ * V4 start step, Task 40: a path debate's frozen sizes and sites (shape receipt v2), read ONLY through the shared strict
+ * reader (`admittedShapeV2Of`, as `previewShapeOf` reads v1, PF7); null for every other receipt, a refusal for a
+ * malformed one (a receipt naming v2 is never priced as v1 or as today's).
+ */
+function previewShapeV2Of(basis: Readonly<Record<string, unknown>>): Readonly<{ shape: DebateShapeV2Input; counts: DebateShapeV2SiteCounts }> | null {
+  return admittedShapeV2Of(basis);
+}
+
+/**
  * Engine redesign (R1d; R2 B10, INTERFACE §3.4): the run's engine-2 settings from its receipt, read ONLY through the one
  * shared strict reader (`admittedEngineOf`, as `previewShapeOf` reads `admittedShapeOf`); null for a receipt without the
  * member (engine 1). A malformed member, or one without the length member, is refused ("malformed engine member"),
@@ -1408,15 +1695,23 @@ const PREVIEW_ENGINE_DEBATE_STEPS = Object.freeze(["comparing_judge", "investiga
  * 2026-10-15 §3.3, §3.10): with the receipt's `length`, every debate call at the largest guided allowance of its steps, as
  * the runner sends them (the writer and checker need no raise: LG-B prices them at the row's own maximum), and on a
  * shaped run at least a map call's guided allowance (a map runs only with the shape). Today's receipt: `output` itself.
+ * V4 start step, Task 40: a path debate (shape receipt v2) raises its writer and its merge from its own receipt (it has
+ * no choose bound) and adds its answer-so-far writer and checker (PREVIEW_PATH_OUTCOME_OUTPUT_TOKENS: 8,192 each); its
+ * map (the gap rounds, a run's own lists) counts as a shaped run's.
  */
 export function previewOutputTokensForBasis(output: PreviewCallOutputTokens, basis: Readonly<Record<string, unknown>>): PreviewCallOutputTokens {
   const shape = previewShapeOf(basis);
-  const shaped: PreviewCallOutputTokens = shape === null ? output : Object.freeze({ ...output,
+  const pathDebate = previewShapeV2Of(basis);
+  const shaped: PreviewCallOutputTokens = shape !== null ? Object.freeze({ ...output,
     answerWriter: Math.max(output.debate, shape.writerBound),
-    mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) });
+    mapMerge: Math.max(output.debate, shape.mapMergeBound), mapChoose: Math.max(output.debate, shape.mapChooseBound) })
+    : pathDebate !== null ? Object.freeze({ ...output,
+      answerWriter: Math.max(output.debate, pathDebate.shape.writerBound), mapMerge: Math.max(output.debate, pathDebate.shape.mapMergeBound),
+      pathOutcomeWriter: PREVIEW_PATH_OUTCOME_OUTPUT_TOKENS.writer, pathOutcomeChecker: PREVIEW_PATH_OUTCOME_OUTPUT_TOKENS.checker })
+    : output;
   const length = admittedLengthOf(basis);
   if (length === null) return shaped;
-  const mapTokens = shape === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate, previewEngineOf(basis) !== null)];
+  const mapTokens = shape === null && pathDebate === null ? [] : [mapLengthAllowanceTokens(length, shaped.debate, previewEngineOf(basis) !== null)];
   return Object.freeze({ ...shaped,
     // R2 B10: an engine-2 receipt's judge and investigator calls ask their own steps' allowance (engine 1: none added).
     debate: Math.max(...[...PREVIEW_LENGTH_DEBATE_STEPS, ...(previewEngineOf(basis) === null ? [] : PREVIEW_ENGINE_DEBATE_STEPS)]

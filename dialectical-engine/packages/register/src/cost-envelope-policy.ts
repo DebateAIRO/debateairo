@@ -342,15 +342,9 @@ export function storyEnvelopeCeilings(terms: StoryEnvelopeCeilingTerms): StoryEn
  * So these two numbers are chosen to be SMALL ENOUGH TO STOP THINGS, not to let
  * a debate through:
  *
- *  - per run, 250 000 micro-units = 0.25 USD. A normal full run measured 114
- *    model calls on 2026-09-17; at mid-range API prices that is dollars, not
- *    cents, so this ceiling stops the owner's first paid run partway through ON
- *    PURPOSE. That stop is the measurement: it produces a real spend figure
- *    against a real vendor for the price of a quarter.
- *  - per day, 2 000 000 micro-units = 2.00 USD, eight such runs. Low enough that
- *    a mistake in the first days of the hosted deployment costs the price of a
- *    coffee, and high enough that the per-run ceiling, not the daily one, is
- *    what the first measurement exercises.
+ *  - per run: small enough that the run stops partway through ON PURPOSE.
+ *  - per day: a few such runs, so a mistake costs little, and high enough that
+ *    the per-run ceiling, not the daily one, is what a measurement exercises.
  *
  * SEALING THE REAL VALUES IS A NEW VERSION OF THIS ROW, NEVER AN EDIT OF IT
  * (constraint 5): the deployment publishes a superseding `costEnvelopePolicy`
@@ -358,20 +352,17 @@ export function storyEnvelopeCeilings(terms: StoryEnvelopeCeilingTerms): StoryEn
  * paid run was run under.
  *
  * ENGINE MONEY RULE (spec 2026-09-26 §14.4.1, Task M1). This constant now also
- * carries the answer's reserve (3000 basis points: 30% of the per-run ceiling
- * held back for writing the answer) and its overrun (2000: the answer may go
- * 20% over). Changing this constant is itself a NEW version: the development
+ * carries the answer's reserve (a share of the per-run ceiling held back for
+ * writing the answer) and its overrun (how far the answer may go over). Changing this constant is itself a NEW version: the development
  * seeder publishes it as a new register version, and every version already
  * sealed keeps the row it sealed — those rows carry neither member and read as
- * 0. The daily ceiling is unchanged, so it now holds six runs at their new
- * maximum of 300 000 each where it held eight at 250 000: the day is a money
- * ceiling, not a count of runs. HOSTED is different: there the operator
+ * 0. The day is a money ceiling, not a count of runs. HOSTED is different: there the operator
  * supplies `costEnvelopePolicy` (`deploy/vps/register/hosted-register.example.json`),
  * and until the operator publishes a version carrying these members they are 0
  * and the margin is off.
  *
- * Budget spec 2026-09-28 §2.4: this constant also carries the band — close at
- * 9500, the site's day may finish up to 11500, one waiting question per person.
+ * Budget spec 2026-09-28 §2.4: this constant also carries the band: when asks
+ * close, how far the site's day may finish, one waiting question per person.
  * Changing it is a NEW version; hosted operators publish the band in their own
  * next version.
  */

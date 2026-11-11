@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { canonicalMailAddress, isMailAddress, mailAddressDomain } from "@debateai/kernel";
 import { RegisterRequestFieldsSchema, ResendVerificationRequestSchema } from "@debateai/contract";
 import { isSingleDeliverableRecipient, SendmailMailSender } from "../../apps/api/src/mail-channel.js";
@@ -153,13 +154,13 @@ describe("registration refuses exactly what mail refuses", () => {
     });
 
   it.each(BAD.filter(([, address]) => typeof address === "string"))("the verification sender refuses %s before any spawn", async (_name, recipient) => {
-    const sender = new SendmailMailSender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
+    const sender = new SendmailMailSender({ gate: testOutboundMailGate(), executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
     await expect(sender.sendVerification({ attemptId: "opaque", recipient: recipient as string, token: "Z".repeat(43), expiresAt: new Date("2026-10-09T00:00:00Z") }))
       .rejects.toMatchObject({ operatorCode: "MAIL_INPUT_INVALID" });
   });
 
   it("a good address does reach the transport (control: the refusals above are the rule's)", async () => {
-    const sender = new SendmailMailSender({ executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
+    const sender = new SendmailMailSender({ gate: testOutboundMailGate(), executable: "/definitely/no/spawn", from: "noreply@dezbatere.ro", publicAppUrl: "https://dezbatere.ro", timeoutMs: 1000 });
     await expect(sender.sendVerification({ attemptId: "opaque", recipient: "success+x@simulator.amazonses.com", token: "Z".repeat(43), expiresAt: new Date("2026-10-09T00:00:00Z") }))
       .rejects.toMatchObject({ operatorCode: "SENDMAIL_EXEC_FAILED" });
   });
@@ -287,8 +288,8 @@ describe("the DNS question at the entry points (fails open)", () => {
     expect(asked).toBe(0);
     expect(await check("example.com")).toBe("DELIVERABLE");
     // The running API's check, by deployment mode: decided before any DNS, so no network is touched here.
-    expect(await mailDomainRefused(systemMailDomainCheck("hosted"), "person@example.test")).toBe(true);
-    expect(await mailDomainRefused(systemMailDomainCheck("local"), "person@example.test")).toBe(false);
+    expect(await mailDomainRefused(systemMailDomainCheck("hosted", 110), "person@example.test")).toBe(true);
+    expect(await mailDomainRefused(systemMailDomainCheck("local", 110), "person@example.test")).toBe(false);
   });
   it("is asked about the lower-cased domain, never the address", async () => {
     const asked: string[] = [];

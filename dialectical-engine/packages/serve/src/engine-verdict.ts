@@ -13,14 +13,27 @@
  * final strengths decide and the label is at most "Close call". Pure: it never calls an AI, reads a row or invents a
  * judgment; the judges decide, code only counts. Engine 1 never reaches it (`deriveVerdictLabel` stays engine 1's).
  */
-import { TypedDomainError, type EngineAnswerLetter, type EngineQuestionKind } from "@debateai/kernel";
+import type { TrustWord } from "@debateai/contract";
+import { TypedDomainError, exhaustive, type EngineAnswerLetter, type EngineQuestionKind } from "@debateai/kernel";
 import type { EngineLabel } from "@debateai/register";
 import type { VerdictLabelDerivation } from "./index.js";
 
+/** The comparing judges' six triggers (the judges' verdict gives only these). */
 export const ENGINE_VERDICT_TRIGGERS = Object.freeze([
   "JUDGES_UNANIMOUS", "JUDGES_CONDITIONAL", "JUDGES_MAJORITY", "JUDGES_NO_MAJORITY", "JUDGES_UNAVAILABLE", "JUDGES_VOTES_IGNORED"
 ] as const);
-export type EngineVerdictTrigger = typeof ENGINE_VERDICT_TRIGGERS[number];
+export type JudgesVerdictTrigger = typeof ENGINE_VERDICT_TRIGGERS[number];
+/**
+ * V4 start step, Task 44 (spec 2026-11-03 §4.3 "After Start", the main answer): a debate with chosen paths has no judge
+ * picking a winner; its label comes from the main answer's trust word (`verdictDerivationOfPaths`), one trigger per word
+ * and one for no word.
+ */
+export const PATHS_VERDICT_TRIGGERS = Object.freeze([
+  "PATHS_MAIN_SURE", "PATHS_MAIN_SURE_FOR_CASE", "PATHS_MAIN_STILL_ARGUED", "PATHS_MAIN_DIDNT_HOLD", "PATHS_MAIN_UNSETTLED"
+] as const);
+export type PathsVerdictTrigger = typeof PATHS_VERDICT_TRIGGERS[number];
+/** Every rung-5 trigger engine 2 records: the judges' six and, on a path run, the five path triggers. */
+export type EngineVerdictTrigger = JudgesVerdictTrigger | PathsVerdictTrigger;
 
 type JudgesVerdictMark = "VERDICT-JUDGE-MISSING" | "VERDICT-JUDGES-UNAVAILABLE" | "VERDICT-VOTES-IGNORED";
 /** The marks in one fixed order, whatever order the rules found them in. */
@@ -53,7 +66,7 @@ export type JudgesVerdict = Readonly<{
   winnerRootNodeId: string;
   /** Clear answer / Close call / Contested. */
   label: "SUPPORTED" | "CONTESTED" | "SPLIT";
-  trigger: EngineVerdictTrigger;
+  trigger: JudgesVerdictTrigger;
   judgesSeated: number;
   judgesAnswered: number;
   counted: readonly Readonly<{ seat: number; counted: boolean; notCountedReason: "OWN_MAKER" | "JUDGE_FAILED" | null }>[];
@@ -196,7 +209,7 @@ export function deriveJudgesVerdict(input: JudgesVerdictInput): JudgesVerdict {
   // Rules 4 and 5: the label, and the marks that disclose a missing, unavailable or ignored judge.
   const marks = new Set<JudgesVerdictMark>();
   let label: JudgesVerdict["label"];
-  let trigger: EngineVerdictTrigger;
+  let trigger: JudgesVerdictTrigger;
   if (judgesAnswered === 0 || !judged) {
     label = "CONTESTED";
     trigger = "JUDGES_UNAVAILABLE";
@@ -255,4 +268,29 @@ export function verdictDerivationOfJudges(verdict: JudgesVerdict): VerdictLabelD
     basisAbsence: Object.freeze([]),
     marks: Object.freeze([])
   });
+}
+
+/**
+ * V4 start step, Task 44 (spec 2026-11-03 §4.3 "After Start", the main answer): the label record of a debate with
+ * chosen paths, from its main answer's trust word (code sets it from the evidence: `mainAnswerTrustWordOf`). Sure, or
+ * sure for the case: "Clear answer" (SUPPORTED); still argued: "Close call" (CONTESTED); didn't hold: UNSUPPORTED; no
+ * word could be set: "Close call" (PATHS_MAIN_UNSETTLED). Never SPLIT: no judge counted anything. Rung 5 like the
+ * judges' record, with no basis absence and no mark. No new served-root rule (0121 untouched).
+ */
+export function verdictDerivationOfPaths(mainTrust: TrustWord | null): VerdictLabelDerivation {
+  const derived = (label: VerdictLabelDerivation["label"], trigger: PathsVerdictTrigger): VerdictLabelDerivation => Object.freeze({
+    label,
+    rung: 5,
+    trigger,
+    basisAbsence: Object.freeze([]),
+    marks: Object.freeze([])
+  });
+  if (mainTrust === null) return derived("CONTESTED", "PATHS_MAIN_UNSETTLED");
+  switch (mainTrust) {
+    case "SURE": return derived("SUPPORTED", "PATHS_MAIN_SURE");
+    case "SURE_FOR_CASE": return derived("SUPPORTED", "PATHS_MAIN_SURE_FOR_CASE");
+    case "STILL_ARGUED": return derived("CONTESTED", "PATHS_MAIN_STILL_ARGUED");
+    case "DIDNT_HOLD": return derived("UNSUPPORTED", "PATHS_MAIN_DIDNT_HOLD");
+    default: return exhaustive(mainTrust);
+  }
 }

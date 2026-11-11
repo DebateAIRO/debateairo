@@ -42,7 +42,7 @@ const APPLICATION_SCHEMAS = [
 const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   // Work queue and allocator: rows are updated in place by the runtime.
   "core.work_item": "runtime holds UPDATE (0000): claimed/leased in place",
-  "ledger.sequence_allocator": "runtime/evaluator/settlement hold UPDATE: the counter row",
+  "ledger.sequence_allocator": "evaluator/settlement hold UPDATE, runtime draws through 0171's definer: the counter row",
   // Provisioning intents and per-run secrets: consumed and cleared by design.
   "core.run_content_attestation_secret": "0040 erasure deletes the secret on account erasure",
   "core.run_key_provision_intent": "0038 intent row is consumed by the provisioner",
@@ -113,8 +113,10 @@ const STAFF_OWNER = "debateai_staff_security_owner";
 const RECOVERY_READERS = ["debateai_password_recovery_owner", "debateai_password_reset_owner", "debateai_backup_email_owner", "debateai_mfa_recovery_owner"];
 const PRIVATE_READERS = [STAFF_OWNER, ...RECOVERY_READERS];
 const PRIVATE_TABLE_OWNERS: Readonly<Record<string, string>> = Object.fromEntries([
-  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "publication_review_event", "subject", "threat_report", "threat_report_alert", "threat_report_event", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
+  ...["action_proof", "alert_delivery_receipt", "alert_dispatch_state", "alert_operation_readiness", "alert_outbox", "audit_event", "bootstrap_marker", "funding_policy_selection", "grant_event", "independent_alert_readiness", "invitation", "invitation_proof", "owner_command", "owner_designation", "owner_lineage", "owner_possession_receipt", "owner_recovery_generation", "owner_recovery_operation", "password_totp_rotation_receipt", "prerequisite_receipt", "privilege_session", "public_flag_notice", "public_review_notice", "publication_review_event", "subject", "team_limit_event", "team_limit_holder", "team_limit_notice", "internal_grant_holder", "internal_grant_end", "allowance_notice", "team_practice_spend", "team_public_report_spend", "threat_report", "threat_report_alert", "threat_report_event", "webauthn_challenge"].map((name) => [`staff.${name}`, STAFF_OWNER]),
   ...["internal_grant", "internal_grant_event", "internal_provider_admission"].map((name) => [`billing.${name}`, STAFF_OWNER]),
+  // 0171 (the security review, F5): a clarify call's charge reserved for its person until the charge takes it; 0144's charge writer's own, so no role's.
+  ["identity.ask_clarify_reservation", STAFF_OWNER],
   ...["password_reset_control", "password_reset_notice_binding", "password_reset_notice", "password_reset_source_window"].map((name) => [`identity.${name}`, "debateai_password_reset_owner"]),
   ...["backup_email_control", "backup_email_notice_binding", "backup_email_notice", "backup_email_source_window", "backup_email_proof_window"].map((name) => [`identity.${name}`, "debateai_backup_email_owner"]),
   ...["mfa_recovery_control", "mfa_recovery_staged_code", "mfa_recovery_notice_binding", "mfa_recovery_notice", "mfa_recovery_source_window", "mfa_recovery_legacy_cohort"].map((name) => [`identity.${name}`, "debateai_mfa_recovery_owner"]),
@@ -345,12 +347,16 @@ describe("0065 TRUNCATE and mutation guards discovered from the catalog (DL5-F2)
 
     // 3. Definer path: no SECURITY DEFINER function an application role can call carries TRUNCATE or switches the
     //    guard off (DISABLE TRIGGER, session_replication_role) — the only way to act as a NOLOGIN owner.
+    //    The one named exception, decision 36 (0151), kept by the coordinator's decision of 1 Nov and on the go-live list: the law says a sealed original must really be deleted after six
+    //    months, and those rows are append-only by trigger, so its two definers switch reject_mutation off and on again inside the call's own transaction. It's allowed because it's bounded:
+    //    the purge refuses anything not six months old (NOT_DUE, in the database), so a compromised API can only rewrite a piece already due to go.
+    //    tests/architecture/public-flag-0151-contract.test.ts pins the four tables they touch. A third definer is a failure here.
     const definers = await database.pool.query<{ fn: string }>(`
       SELECT p.oid::regprocedure::text AS fn FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
       WHERE n.nspname=ANY($1::text[]) AND p.prosecdef
         AND p.prosrc ~* '(\\mtruncate\\M|disable\\s+trigger|session_replication_role)'
       ORDER BY 1`, [[...APPLICATION_SCHEMAS]]);
-    expect(definers.rows).toEqual([]);
+    expect(definers.rows).toEqual([{ fn: "core.public_review_replace_snapshot(uuid,jsonb)" }, { fn: "identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)" }]);
 
     // 4. Behaviour: acting AS each owner (the strongest holder of the implicit grant), TRUNCATE is refused —
     //    55000 is the table's own guard; 42501 means the cascade reached a table that role may not truncate at all.
@@ -655,7 +661,22 @@ describe("0065 migration-ledger hygiene (DL5-F9)", () => {
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     expect(plan.forwardChain[1]!.name).toBe(AUTH_DB_BATCH_MIGRATION);
   });

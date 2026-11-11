@@ -1,6 +1,7 @@
 import { withMailLocale } from "../../packages/db/src/mail-locale.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { PoolClient } from "pg";
 import { createPool, migrate, PostgresIdentityRepository, type PendingAccountInput, type Pool, type SignUpAcceptanceRow } from "@debateai/db";
 import { createEmailBlindIndex, encrypt, generateDek, sealRecord, type AuditContextHasher } from "@debateai/crypto";
 import { AGE_RULE_VERSION, ITALY_APPROVAL_CLAUSES, ITALY_APPROVAL_KIND, MIN_AGE, type ItalyApprovalLeg } from "@debateai/kernel";
@@ -63,11 +64,34 @@ function pendingInput(acceptances?: readonly SignUpAcceptanceRow[]): PendingAcco
     declaredRegion: { country: "IT", usState: null }, ...(acceptances === undefined ? {} : { acceptances })
   };
 }
-/** A pending account created through identity.create_pending_account_reserved_with_consent (its three rows), or _with_audit (none). */
-async function pendingAccount(withConsent = true): Promise<PendingAccountInput> {
+/**
+ * A pending account created through identity.create_pending_account_reserved_with_consent (its three rows), or _with_audit (none), on `pool`'s
+ * login (the API's role unless a test names another), as the sign-up creates it. `then` runs on that same connection before the commit, as the
+ * sign-up writes the Italy approval: since 0171 the writer writes only for an account its own transaction created (the row's xmin).
+ */
+async function pendingAccount(withConsent = true, then?: (client: PoolClient, input: PendingAccountInput) => Promise<void>,
+  pool: Pool = signup): Promise<PendingAccountInput> {
   const input = pendingInput(withConsent ? signUpRows() : undefined);
-  expect((await repository.createPendingAccount(input, async () => undefined)).status).toBe("created");
+  const client = await pool.connect();
+  try {
+    // The repository's own transaction, on this one connection (its release is ours, after the commit).
+    const pinned = { connect: async () => new Proxy(client, { get: (target, key) => key === "release" ? () => undefined : Reflect.get(target, key, target) }) };
+    expect((await new PostgresIdentityRepository(pinned as unknown as Pool, hasher).createPendingAccount(input, async () => { await then?.(client, input); })).status)
+      .toBe("created");
+  } finally { client.release(); }
   return input;
+}
+/** `work` in a savepoint of the sign-up's transaction, so a refusal rolls back alone and the transaction goes on. */
+async function step<T>(client: PoolClient, work: () => Promise<T>): Promise<T> {
+  await client.query("SAVEPOINT italy_step");
+  try {
+    const value = await work();
+    await client.query("RELEASE SAVEPOINT italy_step");
+    return value;
+  } catch (error) {
+    await client.query("ROLLBACK TO SAVEPOINT italy_step");
+    throw error;
+  }
 }
 async function activeAccount(): Promise<string> {
   const userId = randomUUID();
@@ -81,7 +105,7 @@ function approvalRow(leg: string, clauses: readonly number[] = CLAUSES) {
   const evidence = sealed(acceptanceId);
   return { acceptance_id: acceptanceId, clauses, leg, evidence_ciphertext: evidence.ciphertext.toString("base64"), key_id: evidence.keyId };
 }
-const record = (pool: Pool, userId: string | null, row: unknown) =>
+const record = (pool: Pick<PoolClient, "query">, userId: string | null, row: unknown) =>
   pool.query("SELECT identity.record_signup_italy_approval($1,$2::jsonb)", [userId, row === null ? null : JSON.stringify(row)]);
 type AcceptanceRow = { acceptance_id: string; kind: string; document_version: string; document_sha256: string; locale: string; surface: string;
   accepted_at: Date; evidence_ciphertext: Buffer; key_id: string; clauses: number[] | null; leg: string | null };
@@ -154,12 +178,11 @@ describe("0125: the Italy-specific approval on real PostgreSQL", () => {
       .toMatchObject({ code: "23514", constraint: "acceptance_document_version_shape" });
   });
 
-  it("D5 writes one Italy row from the account's TERMS row, through the API's role", async () => {
-    d5 = await pendingAccount();
-    expect((await acceptances(d5.userId)).map((row) => row.kind)).toEqual(["ADULT", "PRIVACY_SHOWN", "TERMS"]);
+  it("D5 writes one Italy row from the account's TERMS row, through the API's role, in the sign-up's own transaction", async () => {
+    expect((await acceptances((await pendingAccount()).userId)).map((row) => row.kind)).toEqual(["ADULT", "PRIVACY_SHOWN", "TERMS"]);
     d5Leg = "PICKED";
     d5Row = approvalRow(d5Leg);
-    await record(signup, d5.userId, d5Row);
+    d5 = await pendingAccount(true, async (client, input) => { await record(client, input.userId, d5Row); });
     const rows = await acceptances(d5.userId);
     expect(rows.map((row) => row.kind)).toEqual(["ADULT", ITALY_APPROVAL_KIND, "PRIVACY_SHOWN", "TERMS"]);
     const terms = rows.find((row) => row.kind === "TERMS")!;
@@ -175,25 +198,40 @@ describe("0125: the Italy-specific approval on real PostgreSQL", () => {
     expect(rows.filter((row) => row.kind !== ITALY_APPROVAL_KIND).map((row) => [row.clauses, row.leg])).toEqual([[null, null], [null, null], [null, null]]);
   });
 
-  it("D6 refuses, in order: no user or no object, an account not pending, no TERMS row, a second approval", async () => {
+  it("D6 refuses, in order: no user or no object, an account not pending or not its own transaction's, no TERMS row, a second approval", async () => {
     for (const [user, row] of [[null, approvalRow("PICKED")], [d5.userId, null], [d5.userId, [approvalRow("PICKED")]], [d5.userId, "PICKED"]] as const) {
       expect(await sqlError(() => record(signup, user, row))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_INVALID" });
     }
     const active = await activeAccount();
     expect(await sqlError(() => record(signup, active, approvalRow("PICKED")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
     expect(await sqlError(() => record(signup, randomUUID(), approvalRow("PICKED")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
-    const noTerms = await pendingAccount(false);
+    // 0171: an account its sign-up already committed, still pending, is refused as one not pending: the approval is the sign-up's own.
+    const committed = await pendingAccount();
+    expect(await sqlError(() => record(signup, committed.userId, approvalRow("PICKED")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
+    const noTerms = await pendingAccount(false, async (client, input) => {
+      expect(await sqlError(() => step(client, () => record(client, input.userId, approvalRow("IP"))))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_TERMS_MISSING" });
+    });
     expect(await acceptances(noTerms.userId)).toEqual([]);
-    expect(await sqlError(() => record(signup, noTerms.userId, approvalRow("IP")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_TERMS_MISSING" });
-    expect(await sqlError(() => record(signup, d5.userId, approvalRow("BOTH")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_DUPLICATE" });
-    expect(await acceptances(noTerms.userId)).toEqual([]);
+    const twice = await pendingAccount(true, async (client, input) => {
+      await record(client, input.userId, approvalRow("PICKED"));
+      expect(await sqlError(() => step(client, () => record(client, input.userId, approvalRow("BOTH"))))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_DUPLICATE" });
+    });
+    expect((await acceptances(twice.userId)).filter((row) => row.kind === ITALY_APPROVAL_KIND).map((row) => row.leg)).toEqual(["PICKED"]);
+    expect(await sqlError(() => record(signup, d5.userId, approvalRow("BOTH")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
     expect((await acceptances(d5.userId)).filter((row) => row.kind === ITALY_APPROVAL_KIND).map((row) => row.acceptance_id)).toEqual([d5Row.acceptance_id]);
-    // pending_mfa is still a sign-up state: an account whose email is verified passes the account guard.
+    // pending_mfa is still a sign-up state: a social sign-up whose provider asserted the address verifies it in the transaction that creates the
+    // account (0112), and the approval it writes after passes the account guard. A verification a later request made is no sign-up's.
+    const social = await pendingAccount(true, async (client, input) => {
+      await client.query('UPDATE identity."user" SET state=\'pending_mfa\' WHERE user_id=$1', [input.userId]);
+      await client.query("SET LOCAL ROLE italy_signup");
+      await record(client, input.userId, approvalRow("BOTH"));
+      await client.query("RESET ROLE");
+    }, database.pool);
+    expect((await acceptances(social.userId)).map((row) => [row.kind, row.leg])).toEqual([["ADULT", null], [ITALY_APPROVAL_KIND, "BOTH"], ["PRIVACY_SHOWN", null], ["TERMS", null]]);
     const verified = await pendingAccount();
     expect(await repository.consumeVerification({ tokenHash: verified.verificationTokenHash, occurredAt: new Date(), source: verified.source })).toBe(true);
     expect((await database.pool.query('SELECT state FROM identity."user" WHERE user_id=$1', [verified.userId])).rows[0].state).toBe("pending_mfa");
-    await record(signup, verified.userId, approvalRow("BOTH"));
-    expect((await acceptances(verified.userId)).map((row) => [row.kind, row.leg])).toEqual([["ADULT", null], [ITALY_APPROVAL_KIND, "BOTH"], ["PRIVACY_SHOWN", null], ["TERMS", null]]);
+    expect(await sqlError(() => record(signup, verified.userId, approvalRow("BOTH")))).toMatchObject({ code: "22023", message: "ITALY_APPROVAL_ACCOUNT_INVALID" });
   });
 
   it("D7 lets only the API's role run the writer and only the export worker run v2", async () => {
@@ -213,10 +251,11 @@ describe("0125: the Italy-specific approval on real PostgreSQL", () => {
   });
 
   it("D8 refuses a wrong list or leg through the writer at acceptance_italy_fields and leaves the three rows", async () => {
-    const fresh = await pendingAccount();
-    expect(await sqlError(() => record(signup, fresh.userId, approvalRow("PICKED", [11, 12])))).toMatchObject({ code: "23514", constraint: "acceptance_italy_fields" });
-    expect(await sqlError(() => record(signup, fresh.userId, approvalRow("PICKED", [18, 15, 14, 12, 11])))).toMatchObject({ code: "23514", constraint: "acceptance_italy_fields" });
-    expect(await sqlError(() => record(signup, fresh.userId, approvalRow("X")))).toMatchObject({ code: "23514", constraint: "acceptance_italy_fields" });
+    const fresh = await pendingAccount(true, async (client, input) => {
+      for (const row of [approvalRow("PICKED", [11, 12]), approvalRow("PICKED", [18, 15, 14, 12, 11]), approvalRow("X")]) {
+        expect(await sqlError(() => step(client, () => record(client, input.userId, row)))).toMatchObject({ code: "23514", constraint: "acceptance_italy_fields" });
+      }
+    });
     expect(await acceptances(fresh.userId)).toHaveLength(3);
   });
 

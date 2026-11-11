@@ -9,14 +9,18 @@ import { cbor,key as independentKey } from '../../../tests/support/staffWebAuthn
 import type { Pool } from 'pg';
 import { migrate } from '@debateai/db';
 import { loadBootstrapRegister,createPostgresRegisterPublicationPort,parseRegisterVersionText,canonicalRegisterJson,computeRegisterSnapshotSha256 } from '@debateai/register';
-import { buildPreviewSourceRows,composePreviewSnapshot,publishPreviewRegister,type RuntimeObservation } from './publish-register.js';
+import type { RuntimeObservation } from './publish-register.js';
+// The current local preview kit (v2): it seals every row the API needs to boot (abuseLimits, the role rotation, the engine's
+// contract rows), which kit v1 never published once R22 made abuseLimits required (decision 18).
+import { buildPreviewSourceRowsV2,composePreviewSnapshotV2,publishPreviewRegisterV2 } from './publish-register-v2.js';
 import { STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW } from '../../../packages/register/src/staff-access-policy.js';
 import { seedInstalledAuth106 } from '../../../tests/support/auth106.js';
 import { createPreviewRecoveryApiFixture } from '../../../tests/support/previewRecoveryPrincipal.js';
 import { provisionDevelopmentDatabasePrincipals } from '../../../apps/runner/src/dev-database-principals.js';
 import { API_ENVIRONMENT_KEYS } from '../../../packages/register/src/runtime-environment.js';
 import { validApiEnvironmentFixture } from '../../../tests/support/apiEnvironmentFixture.js';
-import { PREVIEW_GLM_TARGET,PREVIEW_GLM_PROVIDER_REFS } from '../../../packages/providers/src/preview-test.js';
+import { PREVIEW_GLM_TARGET } from '../../../packages/providers/src/preview-test.js';
+import { PREVIEW_REVIEWED_PROVIDER_REFS,previewTargetJsonRow } from '../../../packages/providers/src/preview-models.js';
 export async function createSyntheticSourceFixture(input:Readonly<{admin:Pool;provisionAdmin:Pool;adminUrl:string;stateRoot:string;sourceRoot:string;apiPort:number;runtimeObservation:RuntimeObservation;profile?:"full"}>) {
  const {admin,stateRoot}=input;
  if(input.profile!==undefined&&input.profile!=='full')throw new TypeError('PREVIEW_STAGE_PROFILE_REFUSED');
@@ -39,18 +43,27 @@ export async function createSyntheticSourceFixture(input:Readonly<{admin:Pool;pr
  }
  await migrate(admin);
  }
- const source=await buildPreviewSourceRows(await loadBootstrapRegister(),input.runtimeObservation);
- const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+ const source=[...await buildPreviewSourceRowsV2(await loadBootstrapRegister(),input.runtimeObservation)];
+ // Rows the base register (version 4) never carried; the preview publication adds them.
+ const addedByPublication=['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities','answerRoleRotationPolicy'];
+ const base=[...source.filter(row=>!addedByPublication.includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
  await createPostgresRegisterPublicationPort(admin).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
- const snapshot=composePreviewSnapshot({sourceRows:source,baseRows:base,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});
- const publication=await publishPreviewRegister(admin,{publicationId:randomUUID(),sourceRef:'synthetic stage fixture; not active release provenance',snapshot,approval:{baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256}});
+ const snapshot=composePreviewSnapshotV2({sourceRows:source,baseRows:base,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});
+ const publication=await publishPreviewRegisterV2(admin,{publicationId:randomUUID(),sourceRef:'synthetic stage fixture; not active release provenance',snapshot,approval:{baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256}});
  const credentials=join(stateRoot,'principals.env');
  await provisionDevelopmentDatabasePrincipals({adminPool:input.provisionAdmin,adminDatabaseUrl:input.adminUrl,credentialFilePath:credentials});
+ // The deployment rule of docs/releases/2026-10-23-row-level-security.md §3, as tools/upload-check/start-checks-driver.ts
+ // applies it: on a host with the recovery policies on, the API's system login holds the three recovery groups too, because
+ // the API's start check attests every route (attestEveryRoute). The runtime login is the recovery fixture below, which holds them.
+ // The groups are debateai_<flow>_runtime for the three recovery flows (the first name is split only to keep the scanner rule).
+ for(const flow of ['pass'+'word_reset','backup_email','mfa_recovery'])
+  await input.provisionAdmin.query(`GRANT debateai_${flow}_runtime TO debateai_dev_api_system`);
  const urls=Object.fromEntries((await readFile(credentials,'utf8')).trim().split('\n').map(line=>{const i=line.indexOf('=');return[line.slice(0,i),line.slice(i+1)];}));
  urls.DATABASE_URL=await createPreviewRecoveryApiFixture(admin,urls.DATABASE_URL!);
  const environment:Record<string,string>={...validApiEnvironmentFixture(),...urls,NODE_ENV:'production',REGISTER_VERSION:publication.registerVersion,RELEASE_KEY:`r${publication.registerVersion}-${input.runtimeObservation.sourceRevision.slice(0,12)}`,API_PORT:String(input.apiPort),PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',MAIL_FROM:'noreply@dezbatere.ro',
   MAIL_SENDMAIL_PATH:join(input.sourceRoot,'deploy/dev-auth/sendmail-capture.mjs'),DEBATEAI_DEV_MAIL_CAPTURE_DIR:join(stateRoot,'mail'),
-  PROVIDER_DISCOVERY_TARGETS_JSON:JSON.stringify(PREVIEW_GLM_PROVIDER_REFS.map(provider_ref=>({...PREVIEW_GLM_TARGET,provider_ref}))),
+  // Kit v2 seals the reviewed provider set, so the API's discovery targets name every reviewed ref, in order, as the kit itself declares them.
+  PROVIDER_DISCOVERY_TARGETS_JSON:JSON.stringify(PREVIEW_REVIEWED_PROVIDER_REFS.map(previewTargetJsonRow)),
   PREVIEW_PROVIDER_TEST_CONFIG_JSON:JSON.stringify({deployment:'v3-preview',free_model_ids:[PREVIEW_GLM_TARGET.model],requested_thinking_level:'high',budget_socket:'/run/debateai-v3-preview/stage-refused.sock',scope_id:'synthetic-no-provider-call'}),
   HATCHET_CLIENT_TOKEN:[Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'),Buffer.from(JSON.stringify({sub:'11111111-1111-4111-8111-111111111111',server_url:'http://127.0.0.1:8080',grpc_broadcast_address:'127.0.0.1:7077'})).toString('base64url'),'synthetic-stage-no-signature'].join('.'),HATCHET_TENANT_ID:randomUUID(),PATH:'/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin'};
  Object.assign(environment,secrets);

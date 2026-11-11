@@ -768,11 +768,11 @@ describe("P22 the Billing runbook", () => {
     expect(registerReadme).not.toMatch(/the site does not show\s+it yet/u);
   });
 
-  it("the go-live checklist carries the billing rows 14–75 after B11b's row 13, each with a way to prove it", () => {
+  it("the go-live checklist carries the billing rows 14–77 after B11b's row 13, each with a way to prove it", () => {
     const checklist = read("docs/missions/2026-09-01-security-hardening/GO-LIVE-CHECKLIST.md");
     const rows = [...checklist.matchAll(/^\| (\d+) \|/gmu)].map((match) => Number(match[1]));
     // Numbered in order with no gap: a void row keeps its number so the later lines keep theirs.
-    expect(rows).toEqual(Array.from({ length: 75 }, (_unused, index) => index + 1));
+    expect(rows).toEqual(Array.from({ length: 77 }, (_unused, index) => index + 1));
     // The needles must be in the table itself: the dated notes under it repeat some of these words (P16a's note names
     // the One-Stop Shop), and a note never stands in for a row.
     const table = checklist.split("\n").filter((line) => /^\| \d+ \|/u.test(line)).join("\n");
@@ -1048,7 +1048,7 @@ describe("P22 the Billing runbook", () => {
       // C5a fix round 1 (go-live row 74): Quaderno's RON calculation is one unpaid Romanian quote on this server, and
       // the server is kept, or built again, for step 7's RON and EUR payments.
       "ask once for a quote as a Romanian buyer and do not pay",
-      "leave without pressing **Continue to payment**",
+      "leave without pressing **Subscribe and pay**",
       "Keep the server until step 7's RON and EUR runs (`start --currency RON` and `start --currency EUR`) are done",
       "build a sandbox server again as above for those runs (go-live row 74)",
       "pay for Plus first: a cancel link is sent only for a plan that is paid",
@@ -1265,7 +1265,7 @@ describe("CF1 (Part C's final review): the runbook speaks the charge's currency 
       // ops-3 (ruling PR-65): steps 1–5 as a USD buyer; EUR and RON once NETOPIA's sandbox accepts them.
       "**Every purchase in steps 1–5 is made as a buyer in the United States (US)**",
       "whose `pay` is on in `deploy/vps/register/country-policy.example.json`",
-      "pays in USD", "add `\"US\"` to `withdrawal_countries`",
+      "pays in USD", "the code-owned list already names `\"US\"`: change nothing",
       "**Once NETOPIA's sandbox accepts EUR and RON**",
       "If NETOPIA's sandbox refuses them before the settlement form is signed, wait for the form",
       "buy Plus once as a German buyer",
@@ -1277,15 +1277,16 @@ describe("CF1 (Part C's final review): the runbook speaks the charge's currency 
     ]) {
       expect(sandbox, needle).toContain(needle);
     }
-    // CF1 fix round 1: "US" is added where the sandbox server's version is written, before the check command and step 1.
+    // CF1 fix round 1, then the owner's decision of 10 November 2026: the register bullet, before the check command and
+    // step 1, says the US withdrawal right is already in the code-owned list, so nothing is added on either host.
     const bulletAt = sandbox.indexOf("**Register version with `countryPolicy`**");
     const checkAt = sandbox.indexOf("Run the check command (§14.2) before step 1");
     expect(bulletAt, "the register bullet in §14.9").toBeGreaterThanOrEqual(0);
     expect(checkAt, "the check command comes after the register bullet").toBeGreaterThan(bulletAt);
     const registerBullet = sandbox.slice(bulletAt, checkAt);
-    expect(registerBullet).toContain("add `\"US\"` to `withdrawal_countries`");
-    expect(registerBullet).toContain("in the version you publish on this server only");
-    expect(registerBullet).toContain("never on the live host");
+    expect(registerBullet).toContain("the code-owned list already names `\"US\"`: change nothing, on this");
+    expect(registerBullet).toContain("must name");
+    expect(registerBullet).not.toContain("add `\"US\"` to `withdrawal_countries`");
     expect(sandbox).not.toContain("every line must show a tick.");
     expect(sandbox).not.toContain("Choose a country whose `pay` is on, for example Germany (DE)");
     // The claims stay true of the example files and the tool.
@@ -1296,7 +1297,7 @@ describe("CF1 (Part C's final review): the runbook speaks the charge's currency 
     const byCountry = BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value.currency_by_country;
     expect(byCountry.countries.US ?? byCountry.default).toBe("USD");
     expect(byCountry.countries.DE).toBe("EUR");
-    expect(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries).not.toContain("US");
+    expect(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries).toContain("US");
     expect(read("tools/billing/netopia-sandbox.ts")).toContain('${read.currency ?? "NO_CURRENCY"}');
   });
 

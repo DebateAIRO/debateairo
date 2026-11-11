@@ -918,7 +918,7 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
     await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })));
   });
 
-  async function gate(answer: (response: ServerResponse) => void, timeoutMs?: number) {
+  async function gate(answer: (response: ServerResponse) => void, timeoutMs?: number, options?: Readonly<{ dailyPot?: true }>) {
     const directory = await mkdtemp(join(tmpdir(), "pvr-"));
     directories.push(directory);
     const socket = join(directory, "gate.sock");
@@ -933,7 +933,7 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
     });
     servers.push(server);
     await new Promise<void>((done) => server.listen(socket, done));
-    return { port: createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: "fixture-scope" }, timeoutMs), received, socket };
+    return { port: createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: "fixture-scope" }, timeoutMs, options), received, socket };
   }
   const reply = (status: number, body: unknown) => (response: ServerResponse) => {
     response.writeHead(status, { "content-type": "application/json" });
@@ -951,6 +951,13 @@ describe("the /remaining port reads the gate's reply strictly over a real unix s
       maxConcurrentCalls: 4, largestReservationNanoUsd: 72_499_200n, enabledModels: [GLM, DEEPSEEK]
     });
     expect(received).toEqual(["POST /remaining {\"scope_id\":\"fixture-scope\"}"]);
+  });
+
+  // V4 start step, Task 5: the day's pot is asked for only by name, and read only when it was.
+  it("asks for the day's pot only when told to, and reads it", async () => {
+    const { port, received } = await gate(reply(200, { ...GOOD, daily_pot_usd: "7.25" }), undefined, { dailyPot: true });
+    await expect(port.remaining()).resolves.toMatchObject({ remainingNanoUsd: 2_879_512_000n, dailyPotNanoUsd: 7_250_000_000n });
+    expect(received).toEqual(['POST /remaining {"scope_id":"fixture-scope","daily_pot":true}']);
   });
 
   it("accepts whole-dollar and zero figures", async () => {
@@ -1109,7 +1116,7 @@ describe("what one debate is estimated at with today's register (realistic worst
     }
   });
 
-  it("depth 1-3 (the preview's most) x free, premium and all five fit DeepInfra's $12.00 / 2,000 and Anthropic's $4.00 / 600 (owner answer M1)", () => {
+  it("depth 1-3 (the preview's most) x free, premium and all five fit made-up room for each gate (the real pots live only on the server)", () => {
     // The new debate alone, through the real estimate: free GLM + DeepSeek, depth 2, largest story size.
     const [free] = estimatePreviewGateNeeds({ basis: basisFor(2, 2), panel: FREE, roleModels, roleProviderRefs, storyRounds: 2,
       callOutputTokens: sent, askProbeModelIds: ASK_PROBE_MODELS, maxCooldownHoldsPerRun: 2 });
@@ -1135,7 +1142,7 @@ describe("what one debate is estimated at with today's register (realistic worst
     // Slow answer (owner ruling 2026-10-12): GLM's storyteller asks 16,384, not 32,768: 2 rounds x 16,384 x $0.50/M x 1.15
     // = $0.0188416 less on each DeepInfra column; calls and the Anthropic column do not move.
     // Before: [2.05, 3.42, 4.14], [2.29, 4.46, 5.43], [2.77, 6.53, 8.01].
-    // LG-B (L26, 2026-10-15): final writers at each model's own maximum; owner answer M1's GO budgets $12 (DeepInfra) / $4 (Anthropic). Before: [[2.03, 112], [3.41, 344], [4.12, 470], [0.98, 154]], [[2.27, 167], [4.44, 528], [5.41, 700], [1.25, 237]], [[2.75, 277], [6.51, 896], [7.99, 1160], [1.77, 403]].
+    // LG-B (L26, 2026-10-15): final writers at each model's own maximum. Before: [[2.03, 112], [3.41, 344], [4.12, 470], [0.98, 154]], [[2.27, 167], [4.44, 528], [5.41, 700], [1.25, 237]], [[2.75, 277], [6.51, 896], [7.99, 1160], [1.77, 403]].
     expect(table).toEqual([
       [[2.77, 112], [4.15, 344], [4.86, 470], [0.98, 154]],
       [[3.01, 167], [5.18, 528], [6.15, 700], [1.25, 237]],
@@ -1153,12 +1160,12 @@ describe("what one debate is estimated at with today's register (realistic worst
     }
     for (const [freeFigure, premiumFigure, fiveDeepinfra, fiveAnthropic] of table) {
       for (const [dollars, calls] of [freeFigure!, premiumFigure!, fiveDeepinfra!]) {
-        expect(dollars).toBeLessThanOrEqual(12);
-        expect(calls).toBeLessThanOrEqual(2000);
+        expect(dollars).toBeLessThanOrEqual(11);
+        expect(calls).toBeLessThanOrEqual(1320);
       }
-      expect(fiveAnthropic![0]).toBeLessThanOrEqual(4);
-      // Owner ruling 2026-10-10: the Anthropic gate allows 600 calls a day (all five at depth 3 needs 403).
-      expect(fiveAnthropic![1]).toBeLessThanOrEqual(600);
+      expect(fiveAnthropic![0]).toBeLessThanOrEqual(3.3);
+      // Made-up room (all five at depth 3 needs 403).
+      expect(fiveAnthropic![1]).toBeLessThanOrEqual(440);
     }
   });
 });
@@ -1219,7 +1226,7 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     await expect(assertPreviewBudgetAdmits(gate, { basis: basis(2), panel: PANEL, rotated: true })).resolves.toBeUndefined();
   });
 
-  it("re-pins the depth 1-3 room table; every combination still fits DeepInfra's $12.00 / 2,000 and Anthropic's $4.00 / 600 (owner answer M1)", () => {
+  it("re-pins the depth 1-3 room table; every combination still fits made-up room for each gate (the real pots live only on the server)", () => {
     const usd = (nano: bigint) => Math.round(Number(nano) / 1e7) / 100;
     const table = [1, 2, 3].map((depth) => {
       const five = needs(ALL_FIVE, depth, true);
@@ -1233,9 +1240,9 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     // robustness: the storyteller at its row's cap, the checker's repair priced). Calls unchanged; before:
     // [1.98, 3.56, 4.27, 1.07], [2.22, 4.59, 5.56, 1.33], [2.71, 6.66, 8.15, 1.85].
     // Prompt caching (2026-10-12): the Anthropic gate's hold is 2 x $0.24704 now (+$0.066048 on its column: 1.14 / 1.4 /
-    // 1.93 before). Depth 3 still fits its $2.00 by under a cent, which is why the estimate keeps Haiku's input at its
+    // 1.93 before). Depth 3 stays just under the figure then, which is why the estimate keeps Haiku's input at its
     // plain price: priced at the 5-minute write price as well, all five rotated at depth 3 would need $2.12.
-    // LG-B: with the final writers at Haiku's own 128,000 the rotated all-five column needs about $2.89 at depth 3, inside owner answer M1's $4.00; on a $2.00 Anthropic GO every rotated all-five ask is refused at the start, so the M1 GO goes on the gates before the R1b app runs.
+    // LG-B: with the final writers at Haiku's own 128,000 the rotated all-five column needs about $2.89 at depth 3; an Anthropic GO with less room refuses every rotated all-five ask at the start, so the raised GO goes on the gates before the R1b app runs.
     // Slow answer (owner ruling 2026-10-12): the rotated storyteller on premium and all five is MiMo, which now asks
     // 16,384: 2 rounds x 16,384 x $0.87/M x 1.15 = $0.0327844 less on those DeepInfra columns. Free's dearest storyteller
     // is DeepSeek (still 32,768) and Anthropic's is Haiku (still 32,768): unchanged. Before: premium 3.73 / 4.77 / 6.83,
@@ -1244,16 +1251,16 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     // 16,384 (its repair 32,768) instead of 8,192 (16,384): 2 rounds x 24,576 x $0.87/M x 1.15 = $0.0491789 more on those
     // DeepInfra columns. Free's checker is not MiMo and Anthropic's is Haiku (still 8,192): unchanged; calls unchanged.
     // Before: premium 3.7 / 4.73 / 6.8, all five 4.41 / 5.7 / 8.29.
-    // LG-B (L26, 2026-10-15): final writers at each model's own maximum; owner answer M1's GO budgets $12 (DeepInfra) / $4 (Anthropic). Before: [[2.08, 106], [3.75, 338], [4.46, 465], [1.2, 177]], [[2.33, 161], [4.78, 522], [5.75, 695], [1.47, 260]], [[2.81, 272], [6.85, 890], [8.34, 1155], [1.99, 426]].
+    // LG-B (L26, 2026-10-15): final writers at each model's own maximum. Before: [[2.08, 106], [3.75, 338], [4.46, 465], [1.2, 177]], [[2.33, 161], [4.78, 522], [5.75, 695], [1.47, 260]], [[2.81, 272], [6.85, 890], [8.34, 1155], [1.99, 426]].
     expect(table).toEqual([
       [[3.19, 106], [4.57, 338], [5.28, 465], [2.1, 177]],
       [[3.43, 161], [5.6, 522], [6.57, 695], [2.36, 260]],
       [[3.92, 272], [7.67, 890], [9.16, 1155], [2.89, 426]]
     ]);
     for (const [free, premium, fiveDeepinfra, fiveAnthropic] of table) {
-      for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(12); expect(calls).toBeLessThanOrEqual(2000); }
-      expect(fiveAnthropic![0]).toBeLessThanOrEqual(4);
-      expect(fiveAnthropic![1]).toBeLessThanOrEqual(600);
+      for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(11); expect(calls).toBeLessThanOrEqual(1320); }
+      expect(fiveAnthropic![0]).toBeLessThanOrEqual(3.3);
+      expect(fiveAnthropic![1]).toBeLessThanOrEqual(440);
     }
   });
 

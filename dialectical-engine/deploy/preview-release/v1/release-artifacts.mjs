@@ -22,7 +22,7 @@
 //       --source-manifest <candidate api source manifest> [--proposal <plan output> --approved-delta-sha256 <owner's yes>]
 //       [--publication <publish output>] [--checker glm|deepseek --deepseek-enabled-on-gate yes] --out <file>
 //       [--role-rotation on|off] [--call-concurrency '<JSON object>'] [--debate-shape off|'<JSON object>'] [--question-language '<JSON object>']
-//       [--length-guidance '<JSON object>'] [--line-up <line-up file>] [--answer-seats '<JSON object>']
+//       [--length-guidance '<JSON object>'] [--engine-version off|'<JSON object>'] [--line-up <line-up file>] [--answer-seats '<JSON object>']
 //       [--hosted-billing '<JSON object>']
 //       (--checker, --role-rotation, --call-concurrency and --hosted-billing only with --operation plan; publish carries the plan's choices;
 //        defaults glm, on and the base's call-concurrency row kept as it is (or none); --role-rotation off publishes the rotation row disabled: the preview's rollback;
@@ -36,6 +36,8 @@
 //        policy switches the fast language check off)
 //       (--length-guidance only with --operation plan; publish carries the plan's choice; default: the base's length-guidance row
 //        kept as it is, or none)
+//       (--engine-version only with --operation plan; publish carries the plan's choice; default: the base's engine row kept as it is,
+//        or none (engine 1); --engine-version off publishes the row disabled, the rollback. The row needs the length row beside it)
 //       (--line-up and --answer-seats only with --operation plan; publish carries the plan's choices (side-by-side spec §13
 //        addition D23): --line-up names a root-owned 0644 JSON file in the artifacts folder holding the plan member that
 //        check-thinking-levels.ts --print-line-up prints ({"lineUp":{…}}) or the bare line-up; default: the base's
@@ -52,7 +54,7 @@
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
 import { randomUUID } from 'node:crypto';
 import { constants } from 'node:fs';
-import { lstat, open, realpath, unlink } from 'node:fs/promises';
+import { lstat, open, readFile, realpath, unlink } from 'node:fs/promises';
 import { dirname, isAbsolute, join, normalize } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { protectedPath, sha256, strictJson, withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
@@ -112,6 +114,32 @@ export const UI_BUILD_ENVIRONMENT = Object.freeze({
  * (as prestart.mjs nativeVerifyArgv does), so the build runs on the Node the manifest records.
  */
 export const buildEnvironment = (releaseKey, execPath = process.execPath, models = DEFAULT_MODEL_ROSTER) => ({ ...UI_BUILD_ENVIRONMENT, ...uiPublicBuildValues(releaseKey, models), PATH: `${dirname(execPath)}:${UI_BUILD_ENVIRONMENT.PATH}` });
+/**
+ * The owner's early use (tools/source-map-hotfix.mjs, approved 2026-11-01): the release root was installed through that
+ * helper, so pnpm recorded its exemption; the build's own `pnpm` re-checks the install, and without the same exemption it
+ * recreates node_modules and refuses the young versions (R22 staging, 2026-11-02). The helper decides from the root's own
+ * workspace and lockfile: the same exact versions, each only until its seven days are up, and nothing once all are.
+ */
+async function readPackagePolicy(sourceRoot) {
+  const root = join(sourceRoot, 'dialectical-engine');
+  return { workspace: await readFile(join(root, 'pnpm-workspace.yaml'), 'utf8'), lock: await readFile(join(root, 'pnpm-lock.yaml'), 'utf8') };
+}
+/**
+ * The whole environment of the website build for the release root <sourceRoot>: buildEnvironment plus the owner's early
+ * use, as the helper decides it from the root's own package rules. ui-build uses it, and so does the pre-upload checker
+ * (tools/upload-check/website-build.mjs), so the Mac builds with exactly what the server will. A missing or tampered
+ * package rule refuses UI_BUILD_PACKAGE_POLICY_REFUSED. <now> and <readPackagePolicy> are there for tests.
+ */
+export async function uiBuildEnvironment(sourceRoot, releaseKey, execPath = process.execPath, { models = DEFAULT_MODEL_ROSTER, now = Date.now(), readPackagePolicy: read = readPackagePolicy } = {}) {
+  const base = buildEnvironment(releaseKey, execPath, models);
+  const policy = await read(sourceRoot).catch(() => refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'));
+  // Loaded here only: the shared server-tools folder (operator/lifecycle-v1) holds deploy/ alone, and caddy-slots.mjs
+  // imports this file, so a top-level import of tools/ stopped release-switch.mjs there (R22 staging, 2026-11-02).
+  try {
+    const { childEnvironment } = await import('../../../tools/source-map-hotfix.mjs');
+    return childEnvironment({ environment: base, now, workspace: policy.workspace, lock: policy.lock });
+  } catch { return refuse('UI_BUILD_PACKAGE_POLICY_REFUSED'); }
+}
 
 const MAX_PUBLIC_ARTIFACT_BYTES = 16_777_216; // readPublicArtifact's bound
 const MAX_PLAN_BYTES = 32_768; // prepareLaunch, prestart and native-operator read plans up to this size
@@ -124,7 +152,7 @@ const COMMANDS = Object.freeze({
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
-  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--line-up', '--answer-seats', '--hosted-billing'] },
+  'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--engine-version', '--line-up', '--answer-seats', '--hosted-billing'] },
   'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] }
 });
 
@@ -276,7 +304,8 @@ async function uiBuildCommand(options, { layout, deps }) {
   const verifySource = deps.verifySourceManifest ?? verifySourceManifest;
   // Before: the root is exactly what the manifest inventoried. After: the build changed none of it.
   await verifySource(source.value, sourceBinding(source));
-  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, buildEnvironment(releaseKey, deps.execPath, models));
+  const environment = await uiBuildEnvironment(source.value.sourceRoot, releaseKey, deps.execPath, { models, now: deps.now ?? Date.now(), readPackagePolicy: deps.readPackagePolicy ?? readPackagePolicy });
+  const build = await (deps.buildUiArtifact ?? buildUiArtifact)(source.value, environment);
   await verifySource(source.value, sourceBinding(source));
   await (deps.verifyUiBuildManifest ?? verifyUiBuildManifest)(JSON.parse(JSON.stringify(build)), source.value);
   return writeArtifact(options['--out'], build, { layout });
@@ -499,6 +528,12 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (lengthText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--length-guidance']);
   let lengthValue;
   if (lengthText !== undefined) try { lengthValue = strictJson(Buffer.from(lengthText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
+  // The engine row (owner E5: engine 2 goes on with R22): for a new `plan` only, the word off or one JSON object (validateEngineVersionChoice below).
+  const engineText = options['--engine-version'];
+  if (engineText !== undefined && operation !== 'plan') refuse('ARGUMENTS_REFUSED', ['--engine-version']);
+  let engineValue;
+  if (engineText === 'off') engineValue = 'off';
+  else if (engineText !== undefined) try { engineValue = strictJson(Buffer.from(engineText, 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--engine-version']); }
   // Line-up and answer seats (side-by-side spec §13, addition D23): for a new `plan` only. --line-up names a JSON file (read
   // below); --answer-seats is one JSON object, one way to set the checker (never beside --checker). native-operator.mjs
   // validateLineUpChoice / validateAnswerSeatsChoice below; the kit's parsers check the values again before any row is built.
@@ -537,6 +572,11 @@ async function nativePlanCommand(options, { layout, deps }) {
   if (lengthText !== undefined) {
     const check = deps.validateLengthGuidanceChoice ?? (await nativeOperator()).validateLengthGuidanceChoice;
     try { lengthChoice = check(lengthValue); } catch { refuse('ARGUMENTS_REFUSED', ['--length-guidance']); }
+  }
+  let engineChoice;
+  if (engineText !== undefined) {
+    const check = deps.validateEngineVersionChoice ?? (await nativeOperator()).validateEngineVersionChoice;
+    try { engineChoice = check(engineValue); } catch { refuse('ARGUMENTS_REFUSED', ['--engine-version']); }
   }
   let lineUpChoice;
   if (lineUpPath !== undefined) {
@@ -617,6 +657,8 @@ async function nativePlanCommand(options, { layout, deps }) {
   const questionLanguage = operation === 'plan' ? languageChoice : operation === 'publish' ? from.value.questionLanguage : undefined;
   // The same for the length-guidance policy (LG-C): the policy object the plan's operator gave.
   const lengthGuidance = operation === 'plan' ? lengthChoice : operation === 'publish' ? from.value.lengthGuidance : undefined;
+  // The same for the engine row (owner E5): the word off or the policy object the plan's operator gave.
+  const engineVersion = operation === 'plan' ? engineChoice : operation === 'publish' ? from.value.engineVersion : undefined;
   // The same for the line-up and the answer seats (addition D23): the values the plan's operator gave.
   const lineUp = operation === 'plan' ? lineUpChoice : operation === 'publish' ? from.value.lineUp : undefined;
   const answerSeats = operation === 'plan' ? seatsChoice : operation === 'publish' ? from.value.answerSeats : undefined;
@@ -633,6 +675,7 @@ async function nativePlanCommand(options, { layout, deps }) {
     ...(debateShape === undefined ? {} : { debateShape }),
     ...(questionLanguage === undefined ? {} : { questionLanguage }),
     ...(lengthGuidance === undefined ? {} : { lengthGuidance }),
+    ...(engineVersion === undefined ? {} : { engineVersion }),
     ...(lineUp === undefined ? {} : { lineUp }),
     ...(answerSeats === undefined ? {} : { answerSeats }),
     ...(hostedBilling === undefined ? {} : { hostedBilling })

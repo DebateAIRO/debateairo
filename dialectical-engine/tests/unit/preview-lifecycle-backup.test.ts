@@ -195,7 +195,8 @@ describe('online backup before side-by-side migrations', () => {
         [...AS_POSTGRES, `${PG}/pg_restore`, '--list']
       ]),
       [...AS_POSTGRES, `${PG}/pg_dumpall`, '--globals-only', '--no-password', '--host=/run/debateai-v3-preview/postgresql', '--port=5434'],
-      ['/usr/bin/tar', '-C', '/', '-cf', '-', rel(t.keys.KEK_PATH), rel(t.keys.SUPPORT_KEK_PATH), rel(t.keys.USER_DEK_STORE_PATH)],
+      // S8 A (Task 39f): exactly one exclude, the user-key store's saved-questions folder.
+      ['/usr/bin/tar', '-C', '/', '-cf', '-', `--exclude=${rel(t.keys.USER_DEK_STORE_PATH)}/saved-questions`, rel(t.keys.KEK_PATH), rel(t.keys.SUPPORT_KEK_PATH), rel(t.keys.USER_DEK_STORE_PATH)],
       ['/usr/bin/tar', '-tvf', '-']
     ]);
     // Each check reads the file just written, from its stdin.
@@ -235,7 +236,7 @@ describe('online backup before side-by-side migrations', () => {
     const inside = envFile(t.base, 'api-v1.env', [`KEK_PATH=${join(t.etc, 'keys', 'kek-current')}`, `USER_DEK_STORE_PATH=${t.keys.USER_DEK_STORE_PATH}`]);
     const server = fakeServer(t, { realTar: true });
     const event = await backup.runOnlineBackup({ out: t.out, envPaths: [inside], layout: t.layout, deps: { run: server.run } });
-    expect(server.calls.find(call => call.argv.includes('-cf'))!.argv.slice(5)).toEqual([rel(t.keys.KEK_PATH), rel(t.keys.USER_DEK_STORE_PATH)]);
+    expect(server.calls.find(call => call.argv.includes('-cf'))!.argv.slice(5)).toEqual([`--exclude=${rel(t.keys.USER_DEK_STORE_PATH)}/saved-questions`, rel(t.keys.KEK_PATH), rel(t.keys.USER_DEK_STORE_PATH)]);
     const archive = join(t.out, 'online-keys.tar');
     expect(spawnSync('/usr/bin/tar', ['-xOf', archive, rel(t.keys.KEK_PATH)], { encoding: 'utf8' }).stdout).toBe('KEK-bytes');
     const listed = spawnSync('/usr/bin/tar', ['-tvf', archive], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
@@ -257,6 +258,42 @@ describe('online backup before side-by-side migrations', () => {
     const missing = fakeServer(v);
     await expect(backup.runOnlineBackup({ out: v.out, envPaths: [gone], layout: v.layout, deps: { run: missing.run } })).rejects.toMatchObject({ code: 'KEY_PATH_UNREADABLE' });
     expect(missing.calls).toEqual([]);
+  });
+
+  /**
+   * Task 39f, owner answer S8 A (5 Nov 2026): the keys of questions not started yet (the user-key store's own
+   * saved-questions/ folder) never enter the online backup, so a question deleted or started after it can never be read
+   * from it. Every other key-store path is archived as before.
+   */
+  it("S8 A: the key archive leaves out the user-key store's saved-questions folder, and only that folder", async () => {
+    const t = outFolder();
+    const store = t.keys.USER_DEK_STORE_PATH, publication = join(t.lib, 'publication-key-store');
+    // The user-key store as the API lays it out (users/, runs/, saved-questions/), and another store with a folder of that name.
+    const files = [join(store, 'users', 'u1', 'dek.v1.json'), join(store, 'runs', 'r1', 'content-key.v1.json'), join(store, 'saved-questions', 'q1', 'question-key.v1.json'),
+      join(publication, 'saved-questions', 'p1.json')];
+    for (const file of files) { mkdirSync(join(file, '..'), { recursive: true }); writeFileSync(file, '{}'); }
+    // The env names the store through a link: the exclude names the real path tar is handed (D13).
+    symlinkSync(store, join(t.lib, 'user-dek-current'));
+    const env = envFile(t.base, 'api-v1.env', [`KEK_PATH=${t.keys.KEK_PATH}`, `USER_DEK_STORE_PATH=${join(t.lib, 'user-dek-current')}`, `PUBLICATION_KEY_STORE_PATH=${publication}`]);
+    const server = fakeServer(t, { realTar: true });
+    const event = await backup.runOnlineBackup({ out: t.out, envPaths: [env], layout: t.layout, deps: { run: server.run } });
+    expect(event.keys).toEqual(['USER_DEK_STORE_PATH', 'PUBLICATION_KEY_STORE_PATH', 'KEK_PATH']);
+    const argv = server.calls.find(call => call.argv.includes('-cf'))!.argv;
+    expect(argv.filter(part => part.startsWith('--exclude'))).toEqual([`--exclude=${rel(store)}/saved-questions`]);
+    const listed = spawnSync('/usr/bin/tar', ['-tf', join(t.out, 'online-keys.tar')], { encoding: 'utf8' }).stdout.split('\n').filter(Boolean).map(entry => entry.replace(/\/$/, ''));
+    expect(listed.filter(entry => entry.startsWith(`${rel(store)}/saved-questions`))).toEqual([]);
+    for (const path of [t.keys.KEK_PATH, store, join(store, 'a.json'), files[0]!, files[1]!, publication, join(publication, 'saved-questions'), files[3]!]) expect(listed, path).toContain(rel(path));
+    // No user-key store named: nothing is left out.
+    const u = outFolder();
+    const keysOnly = envFile(u.base, 'runner-v1.env', [`KEK_PATH=${u.keys.KEK_PATH}`]);
+    const plain = fakeServer(u, { realTar: true });
+    await backup.runOnlineBackup({ out: u.out, envPaths: [keysOnly], layout: u.layout, deps: { run: plain.run } });
+    expect(plain.calls.find(call => call.argv.includes('-cf'))!.argv.filter(part => part.startsWith('--exclude'))).toEqual([]);
+  });
+
+  it('S8 A: the folder left out is the one the API keeps the question keys in (packages/crypto)', () => {
+    expect(backup.SAVED_QUESTION_KEY_FOLDER).toBe('saved-questions');
+    expect(readFileSync(new URL('../../packages/crypto/src/index.ts', import.meta.url), 'utf8')).toContain('const SAVED_QUESTION_KEY_FOLDER = "saved-questions";');
   });
 
   it('refuses a key archive in which any entry is a link (a link inside a store folder stores no content)', async () => {
@@ -320,6 +357,9 @@ describe('online backup before side-by-side migrations', () => {
     ['a key archive that lacks a key store', (t: Tree) => ({ tarList: `-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}\n` }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
     ['a key archive whose key file is listed as a link', (t: Tree) => ({ tarList: verbose(t).replace(`-rw------- root/root 9 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)}`, `lrwxrwxrwx root/root 0 2026-10-22 01:00 ${rel(t.keys.KEK_PATH)} -> x`) }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
     ['a key archive that lists the store folder as a file', (t: Tree) => ({ tarList: verbose(t).replace(`drwx------ root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/`, `-rw------- root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}`) }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
+    // S8 A (Task 39f): an archive that holds the user-key store's saved-questions folder, or any file in it, is refused.
+    ["a key archive that holds the user-key store's saved-questions folder", (t: Tree) => ({ tarList: `${verbose(t)}drwx------ root/root 0 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/saved-questions/\n` }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
+    ['a key archive that holds a question key without its folder line', (t: Tree) => ({ tarList: `${verbose(t)}-rw------- root/root 17 2026-10-22 01:00 ${rel(t.keys.USER_DEK_STORE_PATH)}/saved-questions/q1/question-key.v1.json\n` }), 'VERIFY_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],
     ['a failing pg_dumpall', () => ({ fail: '/pg_dumpall' }), 'DUMP_FAILED', [...DUMPS, 'online-globals.sql']],
     // Live key stores: GNU tar exits 1 on "file changed as we read it"; the run refuses and the retry takes a new folder.
     ['a key store changing while tar reads it', () => ({ fail: '/usr/bin/tar' }), 'KEYS_FAILED', [...DUMPS, 'online-globals.sql', 'online-keys.tar']],

@@ -1,5 +1,4 @@
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
-import { AsyncResource } from 'node:async_hooks';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, vi, expect, it } from 'vitest';
 import { buildApi } from '@debateai/api';
@@ -13,6 +12,7 @@ import { StaffWebAuthnService } from '../../apps/api/src/staff/webauthn.js';
 import { StaffAlertDispatcher, StaffAlertIntentProducer, VerifiedStaffTargetInvitationTransport } from '../../apps/api/src/staff/alerts.js';
 import type { StaffHttpApplication } from '../../apps/api/src/staff/routes.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
+import { runFixtureStepOutsideRequest } from '../support/master-key-guard.js';
 import { STAFF_PRIVATE_SENTINELS, seedStaffPrivateObject } from '../support/staffPrivateObjectFixture.js';
 import { staffHttpAskApplication } from '../support/staffHttpApplication.js';
 import { authorizeStaffAlertFixture } from '../support/staffAlertReadiness.js';
@@ -25,7 +25,6 @@ import { apiTestPools, provisionRlsLogins } from '../support/rls-logins.js';
  * runs in this file's own async context, outside the request scope the API opened — the harness superuser never
  * answers a statement of a request (R21_SUPERUSER_POOL_IN_REQUEST in API-login mode).
  */
-const outsideRequest = AsyncResource.bind(<T,>(work: () => Promise<T>): Promise<T> => work());
 
 let database: TestDatabase, runtime: Pool, authorization: Pool, argon2: Argon2WorkerPool, sessions: SessionService;
 let passwordHash: string;
@@ -84,10 +83,10 @@ const applicationLogs: unknown[][] = [];
 let errorLog: ReturnType<typeof vi.spyOn>;
 const captured: {deliveryId: string;recipient: string;invitationUrl: string}[] = [];
 function composition() {
-    // As apps/api/src/main.ts composes staff HTTP: the staff repository reads across accounts (X14), the alert mappings
-    // are the runtime pool's (createStaffRuntime).
-    const repository = new PostgresStaffRepository(crossAccountPool(runtime,'X14')), alertRepository = new PostgresStaffAlertRepository(runtime), access = new StaffAccessService(repository,sessions);
-    const intents = new StaffAlertIntentProducer({keys: users,mappings: alertRepository,readiness: {require: operationId => outsideRequest(() => authorizeStaffAlertFixture(database.pool,operationId))}});
+    // As apps/api/src/main.ts composes staff HTTP: the staff repository reads across accounts (X14), and since 0171 so do the
+    // alert mappings, 0088's mapping now the cross-account marker's (createStaffRuntime's mappingPool).
+    const repository = new PostgresStaffRepository(crossAccountPool(runtime,'X14')), alertRepository = new PostgresStaffAlertRepository(crossAccountPool(runtime,'X14')), access = new StaffAccessService(repository,sessions);
+    const intents = new StaffAlertIntentProducer({keys: users,mappings: alertRepository,readiness: {require: operationId => runFixtureStepOutsideRequest(() => authorizeStaffAlertFixture(database.pool,operationId))}});
     const targetInvitationTransport = new VerifiedStaffTargetInvitationTransport({channels: repository,keys: users,publicAppUrl: origin,
         delivery: {send: async mail => {captured.push(mail);return 'ACK';}}});
     const staff: StaffHttpApplication = {access,sessions,repository,intents,targetInvitationTransport,webauthn: new StaffWebAuthnService(repository,{publicAppUrl: origin})};

@@ -8,7 +8,7 @@ import {
 } from "@debateai/register";
 import type { StoryBackupCandidate, StoryCostFallback, StoryStepLease } from "@debateai/story";
 import {
-  buildStoryRunSnapshot, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
+  CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker, type StorySnapshotSource
 } from "../../apps/runner/src/story-snapshot.js";
 
 /**
@@ -156,6 +156,13 @@ describe("buildStoryRunSnapshot", () => {
     expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), languageLocked: false }), "languageLocked")).toBe(false);
   });
 
+  it("hands the story the person's reading level only when the run has one (V4, owner N6)", () => {
+    expect(buildStoryRunSnapshot({ ...source(), readingLevel: "plain" }).readingLevel).toBe("plain");
+    // Today's run (every V3 ask): no member at all, so the writer builds today's bytes.
+    expect(Object.hasOwn(buildStoryRunSnapshot(source()), "readingLevel")).toBe(false);
+    expect(Object.hasOwn(buildStoryRunSnapshot({ ...source(), readingLevel: null }), "readingLevel")).toBe(false);
+  });
+
   it("hands the story the run's engine, its length table and its backup storytellers only when given (engine redesign R1d)", () => {
     const engine = engineSettingsOf(engineVersionPolicyStartValues(), { makers: 3, mapOpening: false });
     const guidance = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "premium", answerLength: "standard" });
@@ -299,6 +306,29 @@ describe("buildStoryRunSnapshot", () => {
     const snapshot = buildStoryRunSnapshot(source());
     expect(snapshot.setAside).toEqual([{ nodeId: FROZEN, reason: FROZEN_REASON }]);
     expect(snapshot.sensitivity).toEqual([{ removedNodeId: ROOT, leverage: 0.5 }]);
+  });
+
+  // R22 (owner ruling 2026-10-29): a reply or cross-exchange given up because its author's reply was refused after its
+  // repairs carries a coded reason until the owner approves its words; the story writer never reads that code. The
+  // answer still carries the mark, which the story already sees by name, and a transport halt is handed on as today.
+  it("never hands the story a halted branch's coded content-refusal reason", () => {
+    const halted = {
+      mark: "UNAUTHORED-BRANCH-HALTED", scope: "node" as const, subjectRef: ROOT, affectedNodeIds: [ROOT]
+    };
+    const snapshot = buildStoryRunSnapshot({
+      ...source(),
+      answerMarks: ["UNAUTHORED-BRANCH-HALTED"],
+      conditionMarkRecords: [...source().conditionMarkRecords, { ...halted, reason: CONTENT_REFUSED_HALT_REASON }]
+    });
+    expect(snapshot.setAside).toEqual([{ nodeId: FROZEN, reason: FROZEN_REASON }]);
+    expect(snapshot.nodes.find((node) => node.nodeId === ROOT)?.excludedReason).toBeNull();
+    expect(JSON.stringify([snapshot.nodes, snapshot.setAside])).not.toContain(CONTENT_REFUSED_HALT_REASON);
+    expect(snapshot.verdictBasis.marks).toEqual(["UNAUTHORED-BRANCH-HALTED"]);
+    const transport = buildStoryRunSnapshot({
+      ...source(),
+      conditionMarkRecords: [...source().conditionMarkRecords, { ...halted, reason: "Expansion halted after transport exhaustion" }]
+    });
+    expect(transport.setAside).toContainEqual({ nodeId: ROOT, reason: "UNAUTHORED-BRANCH-HALTED: Expansion halted after transport exhaustion" });
   });
 
   it("carries each node's judge artifact, the run's own role resolver and its step lease", () => {

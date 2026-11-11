@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   buildLegalDocument,
+  inlineText,
   LEGAL_DOCUMENT_SOURCES,
   renderLegalModule
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
@@ -69,12 +70,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.9 · EFFECTIVE 12 OCTOBER 2026");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.9");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v2.18");
       expect(TERMS_OF_SERVICE.contact).toBe("support@dezbatere.ro");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -292,11 +293,25 @@ describe("legal documents — generated data", () => {
       expect(support).toContain("the model receives anything else you type in the chat");
     });
 
-    it("decodes the HTML-entity bracket and preserves every placeholder verbatim", () => {
+    it("opens section 12 with the free plan and the three paid plans, no drafting note", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
-        "[Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.]"
+        "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, will be available; each unlocks the full model roster and lets you set the debate gauges yourself."
       );
       expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed"))).toBe(true);
+    });
+
+    it("decodes the HTML-entity bracket of a placeholder verbatim", () => {
+      expect(inlineText("&#91;x\\]")).toBe("[x]");
+    });
+
+    it("carries no bracketed drafting note in any locale's current draft", () => {
+      // Locale folders only: the sealed files under archive/ keep the notes they were published with.
+      const locales = readdirSync(resolve(process.cwd(), "apps/ui/legal")).filter((name) => /^[a-z]{2}$/.test(name));
+      expect(locales).toContain("en");
+      for (const locale of locales) {
+        const draft = readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, "terms-of-service.md"), "utf8");
+        for (const mark of ["&#91;", "&#93;", "\\["]) expect(draft.includes(mark), `${locale}: ${mark}`).toBe(false);
+      }
     });
 
     it("leaves no markdown syntax in any string a reader sees", () => {
@@ -340,12 +355,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.8 · EFFECTIVE 12 OCTOBER 2026");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.8");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.12");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");
@@ -373,14 +388,20 @@ describe("legal documents — generated data", () => {
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
-    // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen.
-    it("turns the collection table into thirteen rows joined with em dashes", () => {
+    // V, 2026-10-28: the "Refused questions we keep" row went with the keeping, leaving thirteen; R22 item 15
+    // (2026-10-29) adds "Page settings and visits" after "Debate content": fourteen. Privacy 3.12 (plan Task 83c) adds
+    // "Questions not started yet" after "Page settings and visits": sixteen.
+    it("turns the collection table into sixteen rows joined with em dashes", () => {
       const collect = section(PRIVACY_POLICY, "02");
-      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p"]);
+      expect(collect.blocks.map((block) => block.kind)).toEqual(["p", "list", "p", "p", "p"]);
       const table = collect.blocks[1]!;
       if (table.kind !== "list") throw new Error("unreachable");
-      expect(table.items).toHaveLength(13);
+      // 0157: the moderation notices row.
+      expect(table.items).toHaveLength(17);
+      expect(table.items[9]!.startsWith("Questions not started yet — When you press Next, agree that the AIs may read your question")).toBe(true);
+      expect(table.items.some((item) => item.startsWith("Moderation notices — "))).toBe(true);
       expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
+      expect(table.items[8]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
       expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
     });

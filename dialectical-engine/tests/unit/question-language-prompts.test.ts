@@ -60,8 +60,9 @@ describe("judge-side and answer calls in the locked language (question-language 
     expect(createHash("sha256").update(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT_V2).digest("hex")).toBe(JUDGE_HASH_AFTER_P2B);
     expect(createHash("sha256").update(JUDGEMENT_PROMPT_CONTRACT_FINGERPRINT_TEXT).digest("hex")).toBe(JUDGE_HASH_AFTER_LG_C2);
     // The composer's fingerprint after P2b (9a46af29…), and since answer writer v4 + length.v2 (owner-approved
-    // wording, 2026-10-15) 879d2c5d…: the named sentence is added at call time, never sealed.
-    expect(createHash("sha256").update(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).digest("hex").slice(0, 8)).toBe("879d2c5d");
+    // wording, 2026-10-15) 879d2c5d…, and since the V4 reading level + length.v3 (owner N6 and 17 Oct #5, 2026-10-29)
+    // 6fb174d4…: the named sentence is added at call time, never sealed.
+    expect(createHash("sha256").update(SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT).digest("hex").slice(0, 8)).toBe("6fb174d4");
   });
 
   it("a judge leg without a lock is today's packet; with one it carries the sentence and the field, last", () => {

@@ -141,7 +141,7 @@ describe("the wiring (source pins)", () => {
 
   it("both admission paths freeze the engine with the same expression, and the planned basis is reused only without the row", () => {
     const api = read("apps/api/src/index.ts");
-    expect(api.split("engine: engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })")).toHaveLength(3);
+    expect(api.split("const engine = engineForAsk({ policy: settings.engineVersionPolicy, length, makers, mapOpening: shape !== null })")).toHaveLength(3);
     expect(api).toContain("&& settings.debateShapePolicy === undefined && settings.engineVersionPolicy === undefined");
     expect(api).toContain("readonly engineVersionPolicy?: EngineVersionPolicy;");
     expect(api).toContain("readonly engine: EngineSettings | null;");

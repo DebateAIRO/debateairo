@@ -20,7 +20,10 @@ const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 
 /**
  * PLAN S3.6, verbatim as a map: reader id → `<file>#<method or function>` that opens its frame, one entry per call site
- * (16 sites: X10 3, X23 2, every other id 1; measured at b6a70bc0c).
+ * (23 sites: X10 3, X23 3, X36 6, every other id 1; measured at b6a70bc0c, and since the security review's 0171 X23 also frames the room's
+ * count of the holds on the site's day, which a request login's row rule had counted for the requester alone, and X36 frames the sign-in and
+ * recovery steps that hand out a stored secret or open a session on the API's word: a passkey's credential and its sign-in, a recovery's
+ * proof, its proof and its mail's lease, and a saved code's use, each the marker's alone).
  */
 const EXPECTED: Readonly<Record<string, readonly string[]>> = Object.freeze({
   X10: [
@@ -40,9 +43,18 @@ const EXPECTED: Readonly<Record<string, readonly string[]>> = Object.freeze({
   X22: ["packages/db/src/run-wait.ts#siteLineBlocking"],
   X23: [
     "packages/budget/src/model-spend.ts#admitNewRun",
-    "packages/budget/src/model-spend.ts#readDaySpentMicros"
+    "packages/budget/src/model-spend.ts#readDaySpentMicros",
+    "packages/budget/src/model-spend.ts#readSiteCountedHoldsMicros"
   ],
-  X24: ["packages/db/src/index.ts#readRoleRotationCounts"]
+  X24: ["packages/db/src/index.ts#readRoleRotationCounts"],
+  X36: [
+    "packages/db/src/consumer-auth.ts#completeLogin",
+    "packages/db/src/consumer-auth.ts#readCredential",
+    "packages/db/src/consumer-recovery.ts#prove",
+    "packages/db/src/consumer-recovery.ts#readProof",
+    "packages/db/src/consumer-recovery.ts#withDeliveryLease",
+    "packages/db/src/identity.ts#consumeRecoveryCode"
+  ]
 });
 
 async function sourceFiles(directory: string): Promise<string[]> {
@@ -165,13 +177,14 @@ async function migrateCallers(): Promise<string[]> {
 
 describe("row-level security S01 FIX p1b: migrate()'s pool has no cross-account target (SEC-N4)", () => {
   /**
-   * Seven callers (measured at fce5c2d4c). The two UNRESOLVED ones take a harness's pool, traced by hand: runPesS01-
+   * Seven callers (measured at fce5c2d4c), and the upload check's driver (tools/upload-check, 2026-11-02), which migrates
+   * its own throwaway cluster on a createPool pool with no target: eight. The two UNRESOLVED ones take a harness's pool, traced by hand: runPesS01-
    * PublishSetAcceptance hands `seedVersion4` the pool of `startTestDatabase` (tests/support/testDatabase.ts:71,
    * `createPool(connectionString)`), and `startPracticeDatabase` builds its pools as `createPool(url)`
    * (tools/preview-practice/practice-throwaway-db.ts:61) — neither with a target. A new caller, or a caller whose pool
    * changes shape, changes this list.
    */
-  it("SEC-N4 every product call of migrate(<pool>) in apps, packages, tools and acceptance receives a pool built by createPool with no crossAccount option and never given a target — 7 callers, 2 through a harness pool", async () => {
+  it("SEC-N4 every product call of migrate(<pool>) in apps, packages, tools and acceptance receives a pool built by createPool with no crossAccount option and never given a target — 8 callers, 2 through a harness pool", async () => {
     expect(await migrateCallers()).toEqual([
       "acceptance/pes-accept-publish-set.ts migrate(pool as Pool) UNRESOLVED (parameter pool)",
       "acceptance/standing-db.ts migrate(existingPool) <- createPool no target",
@@ -179,7 +192,8 @@ describe("row-level security S01 FIX p1b: migrate()'s pool has no cross-account 
       "apps/runner/src/migrate-cli.ts migrate(pool) <- createPool no target",
       "tools/preview-practice/practice-debate.ts migrate(pool) UNRESOLVED (database.pool)",
       "tools/rls/proof.ts migrate(adminPool) <- createPool no target",
-      "tools/rls/proof.ts migrate(superuser) <- createPool no target"
+      "tools/rls/proof.ts migrate(superuser) <- createPool no target",
+      "tools/upload-check/start-checks-driver.ts migrate(adminPool) <- createPool no target"
     ]);
   });
 });

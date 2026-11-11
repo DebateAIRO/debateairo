@@ -27,12 +27,39 @@ const HOST_REFUND_DONE = "systemd-run --pipe --wait --collect --uid=debateai-api
   + " /usr/bin/pnpm billing:refund-done --charge 0123456789abcdef0123456789abcdef --amount 12.10";
 
 const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
+  day: "2026-11-01",
+  total: "1000",
+  limit: "2000",
   plan: "PLUS",
   totalAmount: "24.20",
   refundAmount: "12.10",
   renewDate: "2026-10-29",
   chargeDate: "2026-10-29T10:00:00.000Z",
   requested: "2026-10-08T10:00:00.000Z",
+  happened: "2026-11-05T09:30:00.000Z",
+  // 0157: the statement of reasons links the item and the full statement in the account.
+  itemUrl: "https://dezbatere.ro/public/debate/11111111-1111-4111-8111-111111111111",
+  statementUrl: "https://dezbatere.ro/settings/notices#22222222-2222-4222-8222-222222222222",
+  // Its flags all "true" here, each sentence of a chain shown in turn by the variant ("false") and the cases below.
+  sourceReport: "true",
+  sourceEmail: "true",
+  sourceAuthority: "true",
+  sourceOwn: "true",
+  automatedDecision: "true",
+  automatedDetection: "true",
+  // M1: the reporter's mails say an automatic check read the report first.
+  aiReadFirst: "true",
+  groundNone: "true",
+  groundHold: "true",
+  groundUnlawful: "true",
+  groundHate: "true",
+  groundWeapons: "true",
+  groundSuicide: "true",
+  groundReligious: "true",
+  groundPersonal: "true",
+  groundIllegal: "true",
+  // Final review (0172): the statement link that promises no facts; the variant (false) renders the one that does.
+  noFacts: "true",
   expires: "2026-10-09T10:02:00.000Z",
   retryDate: "2026-10-30",
   endDate: "2026-11-06T10:00:00.000Z",
@@ -143,7 +170,7 @@ describe("P17 renderMail", () => {
       }
     }
     const expiryByLocale = {
-      en: "October 10, 2026, 15:43 UTC",
+      en: "10 October 2026, 15:43 UTC",
       ar: "10 أكتوبر 2026 في 15:43 UTC",
       ja: "2026年10月10日 15:43 UTC",
       zh: "2026年10月10日 15:43 UTC",
@@ -163,7 +190,7 @@ describe("P17 renderMail", () => {
     const mail = renderMail("M1", "en", paramsFor("M1"));
     expect(mail.subject).toBe("Your Plus plan is active");
     expect(mail.text).toContain(
-      "You pay $24.20 a month, tax included. The plan renews on October 29, 2026 and then every month until you cancel."
+      "You pay $24.20 a month, tax included. The plan renews on 29 October 2026 and then every month until you cancel."
     );
     expect(mail.text).toContain("https://dezbatere.ro/cancel");
     expect(mail.text).toContain("you may withdraw within 14 days");
@@ -196,10 +223,10 @@ describe("P17 renderMail", () => {
     // A plan that is not paused: M7 as it was before P2-W10's optional flag (an M7 queued before it carries none).
     const { paused: _paused, ...notPaused } = paramsFor("M7");
     const running = renderMail("M7", "en", notPaused).text;
-    expect(running).toContain("You keep your Plus plan until October 29, 2026. You will not be charged again.");
+    expect(running).toContain("You keep your Plus plan until 29 October 2026. You will not be charged again.");
     expect(running).toContain("Changed your mind? You can undo this in Settings before that date: https://dezbatere.ro/settings");
     const ended = renderMail("M7", "en", { ...notPaused, canUndo: "false" }).text;
-    expect(ended).toContain("Your Plus plan ended on October 29, 2026. You will not be charged again.");
+    expect(ended).toContain("Your Plus plan ended on 29 October 2026. You will not be charged again.");
     expect(ended).toContain("You can choose a plan again at any time in Settings: https://dezbatere.ro/settings");
     expect(ended).not.toContain("undo");
     expect(ended).not.toContain("You keep your");
@@ -217,7 +244,7 @@ describe("P17 renderMail", () => {
     const english = renderMail("M7", "en", paused).text;
     expect(english).toContain(
       "Your Plus plan won't renew, and you won't be charged again. Its paid features stay paused while the payment"
-      + " dispute is open. If the dispute ends in your favour, you can use them until October 29, 2026."
+      + " dispute is open. If the dispute ends in your favour, you can use them until 29 October 2026."
     );
     expect(english).not.toContain("undo");
     expect(english).not.toContain("You keep your");
@@ -274,20 +301,20 @@ describe("P17 renderMail", () => {
     const bank = "\n\nYour bank refused the payment.\n\n";
     // NETOPIA answers 2026-10-21 (Q15): a refusal other than code 20 is never retried by itself, so no sentence promises it.
     const noRetry: Readonly<Record<"M5A" | "M5B" | "M5C", string>> = {
-      M5A: `${opening}, and we won't try this card again.${bank}You keep your plan until November 6, 2026. To keep it after`
+      M5A: `${opening}, and we won't try this card again.${bank}You keep your plan until 6 November 2026. To keep it after`
         + ` that, add a card, and we'll take the payment from it straight away: ${card}\n\n`,
-      M5B: `${opening}, and we won't try this card again.${bank}You keep your plan until November 6, 2026. To keep it after`
+      M5B: `${opening}, and we won't try this card again.${bank}You keep your plan until 6 November 2026. To keep it after`
         + ` that, add a card, and we'll take the payment from it straight away: ${card}\n\n`,
       M5C: `${opening}, and we won't try this card again.${bank}This is our last reminder. If you don't add a card by`
-        + ` November 6, 2026, your account moves to the Free plan, and your debates are kept. To add a card, open: ${card}\n\n`
+        + ` 6 November 2026, your account moves to the Free plan, and your debates are kept. To add a card, open: ${card}\n\n`
     };
     // Without endDate, today's email to the byte (the body up to the signature).
     const retried: Readonly<Record<"M5A" | "M5B" | "M5C", string>> = {
-      M5A: `${opening}. You keep your plan while we try again.${bank}We will try again on October 30, 2026. To use a`
+      M5A: `${opening}. You keep your plan while we try again.${bank}We will try again on 30 October 2026. To use a`
         + ` different card, open: ${card}\n\n`,
       M5B: `${opening}. You keep your plan while we try again.${bank}Our second try did not work either. We will try again`
-        + ` on October 30, 2026. To use a different card, open: ${card}\n\n`,
-      M5C: `${opening}. You keep your plan while we try again.${bank}We will make one last try on October 30, 2026. If it`
+        + ` on 30 October 2026. To use a different card, open: ${card}\n\n`,
+      M5C: `${opening}. You keep your plan while we try again.${bank}We will make one last try on 30 October 2026. If it`
         + ` fails, your account moves to the Free plan, and your debates are kept. To use a different card, open: ${card}\n\n`
     };
     const catalogues = loadMailCatalogues();
@@ -323,14 +350,14 @@ describe("P17 renderMail", () => {
     // AUTHENTICATION_REQUIRED not retried by itself: no "we'll try again" after "we won't try this card again".
     const asked = renderMail("M5A", "en", { ...today, bankDeclined: "false", bankAsked: "true", endDate: SAMPLE.endDate! }).text;
     const askedText = `${opening}, and we won't try this card again.\n\nYour bank asked you to confirm this payment.\n\n`
-      + `You keep your plan until November 6, 2026. To keep it after that, add a card, and we'll take the payment from it`
+      + `You keep your plan until 6 November 2026. To keep it after that, add a card, and we'll take the payment from it`
       + ` straight away: ${card}\n\n`;
     expect(asked.slice(0, askedText.length)).toBe(askedText);
     expect(asked).not.toContain("we'll try again");
     expect(asked).not.toContain("Your bank refused the payment.");
     // Without endDate and with confirmCard: today's email to the byte (the body up to the signature).
     const confirmText = `${opening}. You keep your plan while we try again.\n\nYour bank asked you to confirm this payment.`
-      + ` Please confirm your card in Settings, and we'll try again.\n\nWe will try again on October 30, 2026. To use a`
+      + ` Please confirm your card in Settings, and we'll try again.\n\nWe will try again on 30 October 2026. To use a`
       + ` different card, open: ${card}\n\n`;
     const confirm = renderMail("M5A", "en", { ...today, bankDeclined: "false", confirmCard: "true" }).text;
     expect(confirm.slice(0, confirmText.length)).toBe(confirmText);
@@ -497,7 +524,7 @@ describe("P17 renderMail", () => {
     const dead = renderMail("O2", "en", { ...paramsFor("O2"), notRequested: "false", otherSystem: "false" });
     expect(dead.text).toContain("Reason code: PAYMENT_CONFIGURATION_REFUSED\n\nRefund reason: WITHDRAWAL\n\n");
     expect(dead.text).toContain(
-      "This is a withdrawal refund: the law requires it to be made by October 26, 2026 at the latest (14 days after"
+      "This is a withdrawal refund: the law requires it to be made by 26 October 2026 at the latest (14 days after"
       + " the withdrawal). First look at this payment in NETOPIA's admin. If it already shows a refund of $12.10, an"
       + " earlier attempt went through: do not refund again. If it shows none, refund exactly $12.10 on this payment, in"
       + " one refund. A refund of the whole payment is recorded by the site itself; for part of a payment, record it"
@@ -529,7 +556,7 @@ describe("P17 renderMail", () => {
         + " due. Nothing has been refunded for this withdrawal yet.",
       "Owner reference: 0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
       "Reason code: WITHDRAWAL_BY_OWNER",
-      "Withdrawn on October 12, 2026. The law requires the refund to be made by October 26, 2026 at the latest (14"
+      "Withdrawn on 12 October 2026. The law requires the refund to be made by 26 October 2026 at the latest (14"
         + " days after the withdrawal).",
       "Work out what is still due as the runbook describes (\"A withdrawal sent by email or on the model form\"),"
         + " refund in NETOPIA's admin what the site cannot, then record the settlement with the command below, run as"
@@ -582,13 +609,13 @@ describe("P17 renderMail", () => {
   it("acknowledges a withdrawal at once, saying only what has happened (W9, P2-I11's M8_RECEIVED)", () => {
     const refunding = renderMail("M8_RECEIVED", "en", paramsFor("M8_RECEIVED"));
     expect(refunding.subject).toBe("We've received your withdrawal");
-    expect(refunding.text).toContain("We received your withdrawal from your Plus plan on October 12, 2026. Your plan has ended.");
+    expect(refunding.text).toContain("We received your withdrawal from your Plus plan on 12 October 2026. Your plan has ended.");
     expect(refunding.text).toContain("We're refunding $12.10 to your card and will email you again when it's done.");
     // Never "refunded" before the money moved: M8 says that, after the refund.
     expect(refunding.text).not.toMatch(/refunded|confirmed/u);
     const { refundAmount: _amount, ...byOwner } = paramsFor("M8_RECEIVED");
     const review = renderMail("M8_RECEIVED", "en", byOwner).text;
-    expect(review).toContain("We received your withdrawal from your Plus plan on October 12, 2026. Your plan has ended.");
+    expect(review).toContain("We received your withdrawal from your Plus plan on 12 October 2026. Your plan has ended.");
     expect(review).toContain(
       "A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days."
     );
@@ -767,5 +794,49 @@ describe("P17 renderMail", () => {
     expect(expiring.text).not.toContain("We couldn't keep your card");
     const missing = renderMail("M12", "ro", { ...paramsFor("M12"), cardExpiring: "false" });
     expect(missing.text).toContain("Nu am putut păstra cardul de la ultima dumneavoastră plată.");
+  });
+
+  it("M1: the receipt says an automatic check read the report first only when the flag is true, and a receipt queued without it reads as before", () => {
+    const base = { happened: SAMPLE.happened!, itemUrl: SAMPLE.itemUrl! };
+    const sentence = "An automatic check read your report first and passed it to a person.";
+    const off = renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", base).text;
+    expect(off).not.toContain(sentence);
+    expect(renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", { ...base, aiReadFirst: "false" }).text).toBe(off);
+    const on = renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", { ...base, aiReadFirst: "true" }).text;
+    expect(on).toContain(sentence);
+    expect(on.replace(`\n\n${sentence}`, "")).toBe(off);
+    expect(MAIL_TEMPLATES.PUBLIC_FLAG_ANSWER_RECEIPT.optional).toEqual({ aiReadFirst: "flag" });
+    expect(codeOf(() => renderMail("PUBLIC_FLAG_ANSWER_RECEIPT", "en", { ...base, aiReadFirst: "yes" }))).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+  });
+
+  it("M1: a decision a person made reuses the statements' sentence, before the routes, only when the flag is true", () => {
+    const sentence = "An AI read the report first. A person made this decision.";
+    for (const id of ["PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED"] as const) {
+      const base = { happened: SAMPLE.happened!, itemUrl: SAMPLE.itemUrl! };
+      const off = renderMail(id, "en", base).text;
+      expect(off, id).not.toContain(sentence);
+      expect(renderMail(id, "en", { ...base, aiReadFirst: "false" }).text, id).toBe(off);
+      const on = renderMail(id, "en", { ...base, aiReadFirst: "true" }).text;
+      expect(on, id).toContain(sentence);
+      expect(on.indexOf(sentence), id).toBeLessThan(on.indexOf("To challenge our decision"));
+      expect(on.replace(`${sentence}\n\n`, ""), id).toBe(off);
+      expect(MAIL_TEMPLATES[id].optional, id).toEqual({ aiReadFirst: "flag" });
+    }
+  });
+
+  it("M1: the two automatic mails are unchanged: the same two paragraphs, no optional flag, and a flag given to them is refused", () => {
+    const base = { happened: SAMPLE.happened!, itemUrl: SAMPLE.itemUrl! };
+    for (const [id, own] of [["PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "mail.flagAnswer.autoHidden"], ["PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "mail.flagAnswer.autoNotFound"]] as const) {
+      expect(MAIL_TEMPLATES[id].paragraphs, id).toEqual([own, "mail.flagAnswer.routes"]);
+      expect(MAIL_TEMPLATES[id].optional, id).toBeUndefined();
+      expect(MAIL_TEMPLATES[id].params, id).toEqual({ happened: "date", itemUrl: "url" });
+      const text = renderMail(id, "en", base).text;
+      expect(text, id).not.toContain("An AI read the report first");
+      expect(text, id).not.toContain("passed it to a person");
+      expect(codeOf(() => renderMail(id, "en", { ...base, aiReadFirst: "true" })), id).toBe("MAIL_TEMPLATE_PARAM_UNKNOWN");
+    }
+    // Byte for byte as 0157 shipped them (the English catalogue's own two sentences, joined by a blank line).
+    expect(renderMail("PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "en", { happened: "2026-11-01T10:00:00.000Z", itemUrl: "https://dezbatere.ro/public/debate/x" }).text).toContain(
+      "an automatic check read your report about this public debate and hid the debate, with no person involved: https://dezbatere.ro/public/debate/x. A person will now review it, and we will tell you what we decide.\n\nTo challenge our decision on your report");
   });
 });

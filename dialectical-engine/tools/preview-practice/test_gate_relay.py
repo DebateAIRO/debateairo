@@ -229,6 +229,24 @@ class RelayTestCase(unittest.TestCase):
         self.assertEqual(self.dgate.accepted, 1)
         self.assertEqual(self.agate.accepted, 1)
 
+    def test_the_search_gate_is_relayed_only_when_named(self):
+        # Plan 2026-10-30, task W1-1: the Perplexity gate gets its own perplexity.sock when --perplexity-gate names it.
+        self.start_relay()
+        self.assertFalse(os.path.lexists(self.relay_path("perplexity")))
+        self._stop_servers()
+        self._servers.clear()
+        pgate_path = os.path.join(self.tmp, "pg.sock")
+        pgate = FakeGate(pgate_path)
+        self.addCleanup(pgate.close)
+        self.start_relay(perplexity_gate=pgate_path)
+        self.assertEqual(exchange(self.relay_path("perplexity"), b"hello-search"), b"ECHO:hello-search")
+        self.assertEqual(exchange(self.relay_path("deepinfra"), b"hello-deepinfra"), b"ECHO:hello-deepinfra")
+        self.assertTrue(self.has_event("open", socket="perplexity"))
+        self.assertEqual(pgate.accepted, 1)
+        code, text = self.run_main(self.main_argv() + ["--perplexity-gate", os.path.join(self.tmp, "missing.sock")])
+        self.assertEqual(code, 2)
+        self.assertIn("GATE_RELAY_GATE_MISSING:perplexity", text)
+
     def test_one_mebibyte_body_is_byte_exact_and_counted(self):
         self.start_relay()
         self.assertEqual(len(MIB_BODY), 1 << 20)

@@ -36,7 +36,7 @@ These are copied from the specs. Every task includes them implicitly.
 
 **Plans and limits (unchanged from the 29 September design)**
 
-- Plans FREE / PLUS / PRO / MAX; net prices 0 / 20.00 / 50.00 / 200.00 USD, and from Part C a price in each of RON, EUR and USD per plan, set by the owner in the register (spec §2.16); monthly AI credit 0.20 / 5.00 / 20.00 / 150.00 USD, always in USD.
+- Plans FREE / PLUS / PRO / MAX; net prices the public ones, and from Part C a price in each of RON, EUR and USD per plan, set by the owner in the register (spec §2.16); monthly AI credit is the plan's limit, always in USD.
 - Day 2000 bp, week 5000 bp, finish edge 11000 bp; retries at +1, +3, +7 days; the Q-1 72-hour hold; A7's 7-business-day notice; withdrawal within 14 days for EU/EEA/UK tax countries with the per-payment formula of A29 (i).
 
 **Code laws**
@@ -3928,8 +3928,8 @@ describe("N5 — status reads, refunds and disputes (spec §2.12, §2.13, §2.14
     const [whole, part, disputed] = [await paidWithCard(), await paidWithCard(), await paidWithCard()];
     fake.refundInAdmin(whole!.orderId, "WHOLE");
     expect([await stateOf(whole!.orderId), fake.orders.get(whole!.orderId)!.refundedMicros]).toEqual(["REFUNDED", 24_200_000]);
-    fake.refundInAdmin(part!.orderId, 10_000_000);
-    expect([await stateOf(part!.orderId), fake.orders.get(part!.orderId)!.refundedMicros]).toEqual(["REFUNDED", 10_000_000]);
+    fake.refundInAdmin(part!.orderId, <amount>);
+    expect([await stateOf(part!.orderId), fake.orders.get(part!.orderId)!.refundedMicros]).toEqual(["REFUNDED", <amount>]);
     const states: string[] = [];
     for (const status of [9, 10, 16] as const) {
       fake.chargeback(disputed!.orderId, status);
@@ -4021,9 +4021,9 @@ describe("N5 — StubCardPayments, the port-level stub", () => {
   it("has refund only when asked, and records it", async () => {
     const stub = new StubCardPayments({ environment: "live", withRefund: true });
     expect(stub.environment).toBe("live");
-    const refunded = await stub.refund!({ orderId: "ab".repeat(16), providerPaymentId: "7654321", amountMicros: 10_000_000 });
+    const refunded = await stub.refund!({ orderId: "ab".repeat(16), providerPaymentId: "7654321", amountMicros: <amount> });
     expect(refunded).toMatchObject({ state: "REFUNDED", providerStatus: "8", providerPaymentId: "7654321" });
-    expect(stub.refundCalls).toEqual([{ orderId: "ab".repeat(16), providerPaymentId: "7654321", amountMicros: 10_000_000 }]);
+    expect(stub.refundCalls).toEqual([{ orderId: "ab".repeat(16), providerPaymentId: "7654321", amountMicros: <amount> }]);
   });
 });
 
@@ -4971,7 +4971,7 @@ describe("N6 — 0096 over an xMoney-era database (spec §2.5, §2.5.4)", () => 
   it("records a NETOPIA refund in parts, each part under the sum guard (ruling PR-20, spec §2.12.2 item 4)", async () => {
     const parts = await charge("netopia", "sandbox");
     await chargeEvent(parts, "SUCCEEDED", "3101", 24_200_000);
-    expect((await chargeEvent(parts, "REFUND_REQUESTED", "3101", 10_000_000)).rowCount).toBe(1);
+    expect((await chargeEvent(parts, "REFUND_REQUESTED", "3101", <amount>)).rowCount).toBe(1);
     // Two REFUNDED parts on the same NETOPIA payment are two rows, not a duplicate.
     expect((await chargeEvent(parts, "REFUNDED", "3101", 4_000_000)).rowCount).toBe(1);
     expect((await chargeEvent(parts, "REFUNDED", "3101", 6_000_000)).rowCount).toBe(1);
@@ -16743,11 +16743,11 @@ describe("N14 the refund-done command (spec §2.12.2 item 4)", () => {
     expect(preview).toContain("Open before: 12.10 USD. Still open after: 7.10 USD.");
     expect(preview).toContain("No email yet: the customer's email and the credit note follow when the rest is recorded.");
     expect(preview).toContain("Nothing was recorded. Run the same command with --confirm to record it.");
-    const closing = renderRefundDonePlan(plan({ amountMicros: 12_100_000, restMicros: 0, mail: { template: "M8", text: "Your Plus plan has ended, and we refunded $12.10 to your card." } }), true);
-    expect(closing).toContain("The customer's email (M8) will say:\n  Your Plus plan has ended, and we refunded $12.10 to your card.");
+    const closing = renderRefundDonePlan(plan({ amountMicros: 12_100_000, restMicros: 0, mail: { template: "M8", text: "Your Plus plan has ended, and we refunded <amount>.10 to your card." } }), true);
+    expect(closing).toContain("The customer's email (M8) will say:\n  Your Plus plan has ended, and we refunded <amount>.10 to your card.");
     expect(closing).not.toContain("Nothing was recorded");
     expect(renderRefundDoneResult("RECORDED", plan({ restMicros: 0 }))).toBe(`Recorded. The refund on charge ${REF} is complete; the customer's email and the credit note follow.\n`);
-    expect(renderRefundDoneResult("PART_RECORDED", plan())).toBe(`Recorded 5.00 USD on charge ${REF}. 7.10 USD is still open and stays in the owner's reminders.\n`);
+    expect(renderRefundDoneResult("PART_RECORDED", plan())).toBe(`Recorded <amount> on charge ${REF}. 7.10 USD is still open and stays in the owner's reminders.\n`);
     expect(renderRefundDoneResult("ALREADY_RECORDED", plan())).toBe(`The refund on charge ${REF} was already recorded; nothing was written.\n`);
 
     const record = vi.fn(async () => "PART_RECORDED" as const);
@@ -16818,7 +16818,7 @@ describe("N14 the owner's refund reminders (spec §2.12.2 item 3)", () => {
       `- charge ${"b".repeat(32)}, NETOPIA payment ntp-2: refund 24.20 USD (the whole payment), reason SUBSCRIPTION_ENDED, open since 2026-10-01`,
       `  pnpm billing:refund-done --charge ${"b".repeat(32)} --amount 24.20 --confirm`
     ].join("\n"));
-    expect(refundDoneCommand(REF, 5_000_000)).toBe(`pnpm billing:refund-done --charge ${REF} --amount 5.00 --confirm`);
+    expect(refundDoneCommand(REF, <amount>)).toBe(`pnpm billing:refund-done --charge ${REF} --amount 5.00 --confirm`);
   });
 
   it("names the customer's follow-up email of each reason, and none for a card check", () => {
@@ -17346,10 +17346,10 @@ describe("N14 refunds on NETOPIA: the owner mode", () => {
     const [due] = await emails("O2_REFUND_DUE", seeded.initialChargeId);
     expect(due).toMatchObject({ "param.whole": "false", "param.refundDeadline": new Date(withdrewAt.getTime() + 14 * DAY).toISOString() });
 
-    const first = await refunds.planOwnerRefund(seeded.initialChargeId, 5_000_000);
+    const first = await refunds.planOwnerRefund(seeded.initialChargeId, <amount>);
     expect(first).toMatchObject({ openMicros: 12_100_000, restMicros: 7_100_000, mail: null, reason: "WITHDRAWAL" });
     expect(await refunds.recordOwnerRefund(first, clock.now)).toBe("PART_RECORDED");
-    expect(await refundedRows(seeded.initialChargeId)).toEqual([5_000_000]);
+    expect(await refundedRows(seeded.initialChargeId)).toEqual([<amount>]);
     expect(await emails("M8", seeded.customerId)).toHaveLength(0);
     await expect(refunds.planOwnerRefund(seeded.initialChargeId, 7_200_000)).rejects.toThrow("BILLING_REFUND_DONE_EXCEEDS_REQUEST");
 
@@ -18637,7 +18637,7 @@ describe("N16 what a status read decides (spec §2.14)", () => {
       ["refunded and recorded", charge("INITIAL", [...PAID, event("REFUND_REQUESTED", "WITHDRAWAL", 24_200_000),
         event("REFUNDED", null, 24_200_000)]), "REFUNDED", false],
       ["refunded, owner refund still open", charge("INITIAL", [...PAID, event("REFUND_REQUESTED", "WITHDRAWAL", 20_000_000),
-        event("REFUNDED", null, 10_000_000)]), "REFUNDED", true],
+        event("REFUNDED", null, <amount>)]), "REFUNDED", true],
       ["charge-back opened", charge("INITIAL", PAID), "CHARGEBACK_OPENED", true],
       ["charge-back recorded", charge("INITIAL", [...PAID, event("CHARGEBACK", null, 24_200_000)]), "CHARGEBACK_OPENED", false],
       ["dispute lost, not decided", charge("INITIAL", [...PAID, event("CHARGEBACK", null, 24_200_000)]), "CHARGEBACK_LOST", true],
@@ -25624,7 +25624,7 @@ export const NETOPIA_SANDBOX_USAGE =
   "usage: billing:netopia-sandbox check | start|zero|status|charge|fixture --capture-dir <0700 folder> [options] (see the file header)";
 
 const TOOL_ORDER = /^t-[0-9a-f]{30}$/u;
-const MAX_TOOL_AMOUNT_MICROS = 5_000_000;
+const MAX_TOOL_AMOUNT_MICROS = <the plan's limit>;
 const MIN_TOOL_AMOUNT_MICROS = 10_000;
 const RECORDING_DESCRIPTION = "DebateAI NETOPIA recording";
 const SANDBOX_PAYER_IP = "192.0.2.10";

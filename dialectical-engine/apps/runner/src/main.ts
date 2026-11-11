@@ -8,12 +8,27 @@ import {
   loadKekRing,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { configureContentEncryption, createPool, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository } from "@debateai/db";
+import {
+  configureContentEncryption, createPool, PostgresDigModelRunnerRepository, PostgresPathProgressRepository, PostgresPathResultsRepository,
+  PostgresStartPathsStore, RUNNER_CAPACITY, RUNNER_DATABASE_POOLS, RunRepository
+} from "@debateai/db";
+import { MonthPause, monthPaused } from "./month-pause.js";
+import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "./path-rewrite-composition.js";
+import { composeInvestigationClose } from "./investigation-close-sources.js";
+import { targetTokenCounter } from "./token-line.js";
+import { startInvestigationCloseSweep } from "./investigation-close.js";
+import { startPathRewriteSweep } from "./path-rewrite-sweep.js";
+import { startTreeSweep } from "./path-climb.js";
+import { composePublicReport, startPublicTreeSweep } from "./public-contribution.js";
+import { startPassageSweep, wipeInvestigationPassages } from "./passage-sweep.js";
+import { composeWebResearched, startWebResearchedSweep } from "./web-researched.js";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { releaseTaskName, TypedDomainError } from "@debateai/kernel";
 import {
   assertHostedCostEnvelopesSealed,
+  closingReservesOf,
   loadRunnerEnvironment,
+  readBillingPlans,
   effectiveCallConcurrency,
   readCallConcurrencyPolicy
 } from "@debateai/register";
@@ -24,7 +39,7 @@ import {
 // ONE line on purpose: `tests/architecture/dev-runner-provider-set.test.ts` pins this
 // import line so `probeTarget` — the persisting probe — cannot enter this module under
 // any local name (codex r2 B1). A multi-line import hides the specifiers from that pin.
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, createPreviewBusyCoordinator, previewRunResilience, withPreviewProviderCallPolicy, previewProbeControls, previewSealedRoleFallbackCovered, previewTargetGatewayControls, PREVIEW_GLM_DEADLINE_MS, observeClaimTimeTarget, providerTargetGatewayControls, providerTargetPrice, previewTargetChargePrice, resolveProviderTargetCredentials, previewStructureRepairRoute, previewStructureRepairCeiling, withStructureRepair, previewFinalWriterTierUnreadLine, type PreviewFinalWriterTierUnread, type ProviderGateway } from "@debateai/providers";
 import {
   STORY_SHAPES_DIR_ENV_KEY,
   StoryWriter,
@@ -36,7 +51,7 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsLine, runnerSettingsOfVersion, runPreviewThinkingLevelsOf } from "./run-settings.js";
+import { createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, readRunSettingsVersionNow, createSwitchedOnSettingsReader, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, runVersionMapper } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
@@ -143,6 +158,8 @@ try {
  * twice against the ceiling (run-in-flight.ts).
  */
 const gatewayInFlight = createRunInFlight();
+// The money rule (owner, 31 Oct; W3-2, durable since W3-8): at the month wall a debate pauses until the person continues.
+const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });
 const moneyInFlight = createRunInFlight();
 /**
  * R1 (final review): EVERY model call of this process in flight — the debate's, the story's, a structure repair, a
@@ -187,6 +204,18 @@ const siteVersionSettings = await runnerSettings.requireSettings(environment.REG
  */
 const runSettingsVersions = createRunSettingsVersions();
 const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+/**
+ * V4 start step, Task 57p (0169; the owner's answer of 8 Nov, "On each piece's record"): each piece's record notes the settings version of
+ * the run its calls were charged to, read from this same map (a claim's version, or a lane's mapping: its own, or today's, Task 57o). A run
+ * this process holds no version for notes none (NULL): local mode's background lanes, which map nothing.
+ */
+const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);
+/**
+ * V4 start step, Task 53 (plan Review Focus 2): each claimed run's final-writer terms, by run id, set by the runner at the claim from
+ * the run's own receipt, before any call: a v2 run's plan (Free or paid), a v1 run none. The preview call policy below reads it, so a
+ * v2 run's four final writers ask the shared rule (Task 3), and a v1 run's R22's asks.
+ */
+const runFinalWriterTerms = createRunFinalWriterTerms();
 // V-9(2): each vendor's credential file, read once under the custody contract: after the settings checks above, so a
 // boot they refuse (the preview's scorecard conflict among them) never reads a credential.
 const providerTargets = resolveProviderTargetCredentials(
@@ -230,15 +259,20 @@ const previewBusy = createPreviewBusyCoordinator();
  * anyway, because a control that depends on another control having run is one edit away from being none.
  */
 function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
-  const price = providerTargetPrice(target);
+  // Owner answer F4 (2026-10-30): on the preview, a reviewed Anthropic row's calls are charged at the vendor's real
+  // prices (cache writes and reads, the 100,000-token step), the same steps its gate settles at.
+  const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
   if (runnerSite.money !== null && price === null) {
     throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
   }
+  // R22 decision 28: Anthropic's free token count, near the 100K line. A count that fails is logged and the byte guard stands.
+  const tokenCount = targetTokenCounter(target, previewGate === undefined ? undefined : previewFetch, storyLog);
   const gateway = createPostgresProviderGateway(pool, {
     ...(previewGate === undefined ? {} : { fetchImplementation: previewFetch }),
     endpoint: target.baseUrl,
     model: target.model,
     maker: target.maker,
+    ...(tokenCount === undefined ? {} : { countInputTokens: tokenCount }),
     // Model scorecard §2.2/§2.10: the levels this target can set and its window.
     ...providerTargetGatewayControls(target),
     // Contract A §2: on the preview only, max_tokens never exceeds the target's reviewed row bound.
@@ -255,11 +289,23 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
       // call is held to the answer's ceiling and every other call to the body's.
       // B9: and whether the call is walled (`providerCallSharedWall`).
       // Side-by-side spec §13 (S6): every call is charged to its OWN run's version's guard (`runCostEnvelopeGuard`).
-      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
+      // W3-2 (the money rule): a walled call (BODY, not the first position's) pauses the debate at the month wall
+      // (`monthPaused`); W3-8: the pause records the run's body room left as the planned work's estimate.
+      buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause, plannedMicros: () => runCostEnvelopeGuard(runId).bodyMicrosLeft(runId) }),
       // Verdict story (spec §8): the story's calls spend its OWN envelope, its run's version's story ceiling. A
       // version that sealed no story ceiling refuses inside the guard (STORY_ENVELOPE_MISSING), the code the gateway
       // used to raise without a seam; the story writer refuses before that anyway (no story rows, no story).
-      buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
+      buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
+      // W3-2: a dig's path rewrite (the story lane's PATH_REWRITE: sites) spends its own seam, never walled.
+      buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }),
+      // W5-1: "Write my report"'s calls (the INVESTIGATION_REPORT: sites, the root run) spend the report seam, never walled.
+      buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }),
+      // R22 decisions 2 and 3: the climb's and the main-answer update's calls, each on its own never-walled seam, on the dig's run.
+      buildPathClimbCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathClimbSeam({ runId, price, requireReportedUsage: true }),
+      buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true }),
+      // Decision 13: the AI check on a contribution and a report on a public debate, each on its own never-walled seam.
+      buildContributionCheckCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).contributionCheckSeam({ runId, price, requireReportedUsage: true }),
+      buildPublicReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).publicReportSeam({ runId, price, requireReportedUsage: true })
     })
   });
   // Spec §3.4: the policy marks the gate unhealthy on its FIRST unsent refusal, before the minute's resend wait.
@@ -273,7 +319,9 @@ function targetGateway(target: (typeof providerTargets)[number]): ProviderGatewa
     onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },
     gateRemaining: previewGateRemaining,
     onFinalWriterTierUnread: previewFinalWriterTierUnread,
-    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)
+    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),
+    // V4 start step, Task 53: a v2 run's terms (its plan); a v1 run and a call of no run, none (R22's asks).
+    finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms)
   });
 }
 /**
@@ -329,6 +377,49 @@ const storyWriter = new StoryWriter({
   charts: true
 });
 /**
+ * Dig-model revision W3-7: THE PATH REWRITE, switched on. A settled dig writes no story; the path it was dug from is
+ * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
+ * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
+ */
+const writerTokenCount = (() => {
+  const haiku = providerTargets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL);
+  return haiku === undefined ? undefined : targetTokenCounter(haiku, previewGate === undefined ? undefined : previewFetch, storyLog);
+})();
+const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
+/**
+ * W5-1: "WRITE MY REPORT", switched on: the closing (apps/runner/src/investigation-close.ts) on the runner's own pool,
+ * Haiku writing and GLM checking, each call admitted against its plan's reserve at its target's price (hosted; local mode
+ * counts its free models at zero), and charged on the never-walled report seam above. Undefined without Haiku or GLM.
+ */
+const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
+// R22 decision 18: the reserves are the plans row's, on the server. A version with none refuses every closing's call.
+const closingReserves = closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 };
+/**
+ * V4 start step, Task 57l (S6): only a claim fills the run → version map, so a background lane charging a run this process never claimed (after a
+ * restart, or another process's claim) maps it first (`runVersionMapper`): "Write my report" (sweep and poke), the path-rewrite, tree and
+ * public tree sweeps, a public report's carrier (Task 56h) and "Add to researched". Today's rule (owner, 8 Nov; Task 57o-fix): the version the
+ * run owns now (after a Continue moved it, the one it was moved to); if this runner refuses that, the owners' switched-on version (0124's
+ * pointer, which 0169 lets the runner read, at most once a second); if that is refused too, this release's own (REGISTER_VERSION); with one
+ * DEBATEAI_RUNNER_RUN_SETTINGS_TODAY line. Hosted (the money seams) and on the preview (each call's thinking table) only; local mode reads no
+ * map, and maps nothing, as before.
+ */
+const runVersionMap = runnerSite.money === null && previewGate === undefined ? undefined
+  : runVersionMapper({ readVersion: (runId) => readRunSettingsVersionNow(pool, runId), requireSettings: (version) => runnerSettings.requireSettings(version),
+    versions: runSettingsVersions, switchedOnVersion: createSwitchedOnSettingsReader({ pool, siteVersion: environment.REGISTER_VERSION }),
+    siteVersion: environment.REGISTER_VERSION, log: (line) => { console.warn(JSON.stringify(line)); } });
+const mapRunOf = runVersionMap === undefined ? {} : { mapRun: runVersionMap };
+const investigationCloseComposed = composeInvestigationClose({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
+  // R22 decision 7: a written report takes its investigation's page texts and passages with it. A FAILED one may be written
+  // again; the sweep takes them once nothing runs either way.
+  onReportSettled: (settled) => settled.outcome === "FAILED" ? undefined : wipeInvestigationPassages(pool, settled.rootRunId),
+  settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
+// Task 57l: the sweep's and the poke's closings map their root first.
+const investigationClose = investigationCloseComposed === undefined ? undefined : Object.freeze({ ...investigationCloseComposed, ...mapRunOf });
+/**
  * The claim-time probe of one target (both claim probes below). Spec 2026-10-11 busy model §2: on the
  * preview, a gate-proven unbilled refusal gets the one 60-second resend, as at ask time, and the claim
  * keeps the LAST observation (the runner records it). Off the preview: one probe, exactly as before.
@@ -365,6 +456,9 @@ const runnerSettingsPreload = await preloadRunnerSettings({
 // retirement stops (claims, then new model calls), both off until this release retires.
 const executions = createTaskExecutionCounter();
 const retirementSignal = createRunnerRetirementSignal();
+// V4 start step, Tasks 53 and 56: the one chosen paths store on the runner's pool, read by a path debate and marking a ticked first
+// debate DUE for the API's carry-on tick.
+const startPaths = new PostgresStartPathsStore(pool);
 const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
   workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
   // Side-by-side spec §3: the runner runs only this release's debates; another release's is NO_WORK.
@@ -377,6 +471,15 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // its run → version map (the money seams above read it).
   settingsForVersion: (version) => runnerSettings.settingsFor(version),
   runSettingsVersions,
+  // V4 start step, Task 53: the run → final-writer terms map the call policy reads, set at each claim.
+  runFinalWriterTerms,
+  // V4 start step, Task 53: a path debate's stores on the runner's pool: the paths sealed at Start (0159), each path's root and the gap
+  // round (0160), each path's step and points (0161).
+  startPaths,
+  pathResults: new PostgresPathResultsRepository(pool),
+  pathProgress: new PostgresPathProgressRepository(pool),
+  // V4 start step, Task 56: the same store marks a ticked first debate DUE at its story stage ("Let the AIs carry on to the report").
+  carryOn: startPaths,
   providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
   ...(providerTopology.critique === undefined
     ? {} : { critique: providerTopology.critique }),
@@ -414,6 +517,10 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   },
   // Verdict story (spec §3): written after each settled debate; never inside it.
   story: storyWriter,
+  // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
+  ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
+  // W5-1: the closing, poked from the story stage when a member of a closing investigation settles.
+  ...(investigationClose === undefined ? {} : { investigationClose }),
   // Engine money rule, Task M3 (spec §14.4.2): each target's price, so an
   // answer-writing call refused for money tries the cheaper claim-eligible
   // makers first. Hosted only (local mode's map is empty); never sealed.
@@ -460,6 +567,11 @@ const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider
   // Parallel AI calls (spec 2026-10-12 §3.2, §3.6): every debate's calls through its lane of the one scheduler above,
   // each provider ref's model, vendor and (preview) gate, and the claim renewals on their own pool.
   callScheduler: runnerCallScheduler,
+  // Perplexity plan W3-1: the web step after the map's answer check, where this server has a search gate (else every
+  // path is SWITCHED_OFF, no call). Searches are charged to their run's own version's guard, hosted only, and pause at
+  // the month wall as the AI calls do (W4-2, the same month pause).
+  webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
+    guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }),
   callSubjects: previewGate === undefined ? targetCallSubjects(providerTargets) : previewCallSubjects(previewGate),
   // Ruling R31 (preview only): a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
   ...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),
@@ -542,6 +654,35 @@ const startupReconciliation = retireRequestStanding
       }
     }
   });
+// Dig-model revision W3-7: a dig whose runner stopped mid-rewrite is rewritten again from the store (0135), at boot and
+// every five minutes, its answered calls replayed free; none while this release retires (claims stopped, §4).
+const pathRewriteSweep = pathRewrite === undefined || retireRequestStanding ? null
+  : startPathRewriteSweep({ ...pathRewrite.sweep, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
+// W5-1: an unreported closing ("Write my report" pressed) is written at boot and every minute, once its running digs and
+// their rewrites have settled (owner F7 A); none while this release retires.
+// R22 decisions 2 and 3: a climb or an answer update whose runner stopped goes on from the rows already there.
+const treeSweep = pathRewrite === undefined || retireRequestStanding ? null
+  : startTreeSweep({ ...pathRewrite.treeSweep, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
+// Decision 13: a contribution to a public debate that stopped goes on, an allowed one climbs, and a report on a public debate is written. None while retiring.
+const publicReports = composePublicReport({ pool, targets: providerTargets, reserveMicros: closingReserves, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  priceOf: (providerRef) => closingPrices.get(providerRef) ?? null, log: storyLog, settingsVersionOf: pieceSettingsVersionOf,
+  // Task 56h: a report's carrier is charged to its own run's version's guard, as a claimed run is (S6); Task 57l: the one mapper above.
+  ...(runVersionMap === undefined ? {} : { mapCarrier: runVersionMap }) });
+const publicTreeSweep = pathRewrite === undefined || retireRequestStanding ? null
+  : startPublicTreeSweep({ ...pathRewrite.publicTree, reports: publicReports, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
+const investigationCloseSweep = investigationClose === undefined || retireRequestStanding ? null
+  : startInvestigationCloseSweep({ ...investigationClose, paused: () => retirementSignal.claimsStopped() });
+// R22 decision 7: whole page texts and passages go when nothing runs on a debate; other pages 30 days after last activity.
+const passageSweep = retireRequestStanding ? null : startPassageSweep(pool, { paused: () => retirementSignal.claimsStopped() });
+// W4-4: "Add to researched": the pages people added are read every few seconds, and after a stop; its calls are charged on the climb's
+// never-walled seam, its one search (a page whose text has gone) on the search's. No month pause here: this is not a debate.
+const webResearchedSearch = runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard });
+const webResearched = composeWebResearched({ pool, targets: providerTargets,
+  members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+  search: webResearchedSearch.search, searchSeamOf: webResearchedSearch.searchSeamOf, settingsVersionOf: pieceSettingsVersionOf });
+const webResearchedSweep = webResearched === undefined || retireRequestStanding ? null
+  : startWebResearchedSweep({ ...webResearched, ...mapRunOf, paused: () => retirementSignal.claimsStopped() });
 announceRunnerReady({
   kind: "DEBATEAI_RUNNER_READY",
   worker: environment.HATCHET_WORKER_NAME,
@@ -589,6 +730,12 @@ const retirement = startRunnerRetirement({
   // are the SDK's; a live-handle check needs Hatchet and Postgres running, so the unit test pins this wiring instead.
   stopWorker: async () => {
     lapsedResend.stop();
+    pathRewriteSweep?.stop();
+    treeSweep?.stop();
+    publicTreeSweep?.stop();
+    investigationCloseSweep?.stop();
+    passageSweep?.stop();
+    webResearchedSweep?.stop();
     await worker.stop();
     await Promise.allSettled([pool.end(), keepAlivePool.end()]);
   },
@@ -597,6 +744,12 @@ const retirement = startRunnerRetirement({
   emit: (payload) => (process as NodeJS.EventEmitter).emit(RUNNER_RETIRED_PROCESS_EVENT, payload)
 });
 await started;
-// The worker ended (retired, or stopped by a signal): no further re-send pass or retirement read.
+// The worker ended (retired, or stopped by a signal): no further re-send pass, rewrite sweep or retirement read.
 lapsedResend.stop();
+pathRewriteSweep?.stop();
+treeSweep?.stop();
+publicTreeSweep?.stop();
+investigationCloseSweep?.stop();
+passageSweep?.stop();
+webResearchedSweep?.stop();
 retirement.stop();

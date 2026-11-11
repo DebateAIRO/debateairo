@@ -106,7 +106,8 @@ async function fixture() {
   const activation = {
     environment: { policyVersion: 2 as const, origin, rpId: "admin.example.test", independentAlertConfigPath: configPath, operatorModulePath: operatorPath,
       operatorModuleSha256: createHash("sha256").update(operatorSource).digest("hex") },
-    registerVersion: 2, publicAppUrl: origin, pool: database(state), keys,
+    // The mapping pool is main.ts's X14 site, the system login; here the same fake answers both.
+    registerVersion: 2, publicAppUrl: origin, pool: database(state), mappingPool: database(state), keys,
     operatorFiles: syntheticAlertFiles(root), configurationFiles: syntheticAlertFiles(root), logEvent: (line: string) => { lines.push(line); }
   };
   const unlock = async () => { await writeFile(ackState, "FRESH"); state.published = true; };

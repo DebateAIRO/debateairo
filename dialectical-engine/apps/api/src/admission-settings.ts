@@ -67,7 +67,7 @@ import {
 import { journalSettingsCode } from "./admission-alarm.js";
 import { composeAskModelPicker, type AskModelPickerBoot, type AskModelPickerSettings, type CallTokenCeilings } from "./ask-model-picker.js";
 import { assertEngineHasLengthPolicy } from "./engine-ask.js";
-import { previewVersionTermsOf, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
+import { previewVersionTermsOf, previewWebRolePrices, readPreviewBudgetGateSettings, type PreviewBudgetGateSettings, type PreviewVersionTerms } from "./preview-budget-estimate.js";
 import { composeQuestionLanguage, type QuestionLanguagePaidRoute } from "./question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock, QuestionLanguagePort } from "./question-language/decider.js";
 import type { QuestionLanguageReferenceKey } from "./question-language/reference.js";
@@ -353,7 +353,9 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
         prices: site.prices,
         maximumMicros: mostOneRunMaySpendMicros(guardPolicy),
         // Fresh-site estimate: the site's starting figures (a SITE row, read once from the site version).
-        start: site.costEstimateStart
+        start: site.costEstimateStart,
+        // Web search (W2-2): a web class short of samples starts at its depth's figure plus its web part at the caps.
+        webPrices: previewWebRolePrices(site.prices)
       })
     });
   });
@@ -512,10 +514,14 @@ export async function loadAdmissionSettings(pool: Pool, version: number, site: A
       backupSequencesProvisioned: input.backupSequencesProvisioned,
       // Debate shape (spec 2026-10-12 §3.6): the sizes admission resolved for this panel, or today's shape.
       ...(input.shape === null ? {} : { shape: input.shape }),
+      // V4 start step, Task 34: a path debate's sizes (shape receipt v2), never with `shape`; absent = today's receipt.
+      ...(input.shapeV2 == null ? {} : { shapeV2: input.shapeV2 }),
       // Length guidance (spec 2026-10-15 §3.1): the numbers admission resolved, or none (today's receipt).
       ...(input.length === null ? {} : { length: input.length }),
       // Engine redesign (R1d): engine 2's settings admission resolved for this panel, or none (today's receipt).
-      ...(input.engine === null ? {} : { engine: input.engine })
+      ...(input.engine === null ? {} : { engine: input.engine }),
+      // W2-2 (R22): the web part admission counted, or none (today's receipt).
+      ...(input.web === null ? {} : { web: input.web })
     }),
     resolveRisk(askerRiskTier: RiskTier, askerTierSource: AskRequest["tier_source"], askerProvenanceRef: string) {
       const resolved = resolveEffectiveRiskTier({
@@ -626,13 +632,14 @@ export function createAdmissionSettingsCache(input: Readonly<{
 /**
  * Side-by-side spec §13 (Task S10): what one version says to the pages (`AdmissionView`, buildApi's `admissionView`):
  * its number, its shape and length rows in force, whether its picker's scorecard is VALID, and (addition D16) its
- * composed preview configuration.
+ * composed preview configuration. V4 start step, Task 34: its engine-2 row in force too (the start step runs only under it).
  */
 export function admissionViewOf(version: AdmissionVersionSettings): AdmissionView {
   return Object.freeze({
     registerVersion: version.registerVersion,
     ...(version.debateShapePolicy === null ? {} : { debateShapePolicy: version.debateShapePolicy }),
     ...(version.lengthGuidancePolicy === null ? {} : { lengthGuidancePolicy: version.lengthGuidancePolicy }),
+    ...(version.engineVersionPolicy == null ? {} : { engineVersionPolicy: version.engineVersionPolicy }),
     modelScorecardInForce: version.modelPicker.scorecard.state === "VALID",
     ...(version.previewConfig === undefined ? {} : { previewProviderTestConfig: version.previewConfig })
   });

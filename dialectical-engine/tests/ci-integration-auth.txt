@@ -76,6 +76,55 @@ tests/integration/auth-dev-lineage.test.ts
 tests/integration/auth-dev-migration.test.ts
 tests/integration/preview-auth-preservation.test.ts
 tests/integration/preview-auth-dev-fallback.test.ts
+# The V4 account memory (0131): account-owned rows, removed with the account, read by the export behind its lease.
+tests/integration/v4-account-memory-database.test.ts
+# The Perplexity plan's stores (0132, 0133): a debate's encrypted web evidence and the investigations with the one reserve.
+tests/integration/web-evidence-database.test.ts
+tests/integration/investigations-database.test.ts
+# The dig model and the month pause (0134): dig levels, the encrypted path rewrites in order, the month pause, deletions.
+tests/integration/dig-model-database.test.ts
+# A dig's picks and its path rewrite's material (0135): the picks written once, the material, the sweep's list, deletions.
+tests/integration/path-rewrite-database.test.ts
+# The investigation's final report (0136): the report written once per closing, the waiting digs, the readers, deletions.
+tests/integration/investigation-report-database.test.ts
+# The owner's changes of 31 Oct (0137 to 0140): public digs, tree and answer updates, the deletion keeping the quote and notes, the funded spend kinds.
+tests/integration/r22-foundation-database.test.ts
+# A path's suggestions (0141): insert-once, the newest per path, deletion both ways, export, no request role reads them.
+tests/integration/path-suggestions-database.test.ts
+# The team's one limit (0142, R22 decisions 14 and 24): the limit's log and holders, the practices, the notices, the functions the runtime calls.
+tests/integration/team-limit-database.test.ts
+tests/integration/team-limit-http.test.ts
+# The team's one limit (0142): the passkey-bound change, the notices and admission (R22 decisions 14 and 24).
+tests/integration/team-limit-admission.test.ts
+# Step 2's small AI in the person's quota (0144): both rows, every spending reader, erasure, export, no request role reads them.
+tests/integration/ask-clarify-charge-database.test.ts
+# The small AIs before Start in the person's quota (0158): both rows, the kind check, every spending reader, erasure, export, no request role reads them.
+tests/integration/pre-start-charge-database.test.ts
+# The questions not started yet (0162): at most 20 per account, both parts naming the row's own key, revisions, the cascade, export, no request role reads them.
+tests/integration/saved-questions-database.test.ts
+# "Add to researched" (0145): the page read and charged once, its note and quote kept through the wipe, a stranger refused, 30 days later.
+tests/integration/web-researched-database.test.ts
+# The Owner's allowance for a member (0146): only the Owner, the proof bound to the member and the amounts, the ends, a member's debate charged and counted.
+tests/integration/team-allowance-database.test.ts
+tests/integration/team-allowance-http.test.ts
+# The public tree (0147, 0148, 0149, 0150, 0151, 0152): strangers' digs, the check, the page's copies, reports and the first author leaving, through the real gateway on scripted vendors.
+tests/integration/public-tree-flow.test.ts
+# A public debate under review (0150): the four staff routes over HTTP on fake data ports; the database's own refusals are public-tree-flow.test.ts's.
+tests/integration/public-review-http.test.ts
+# The security review's fixes in the database (0171): each fix's hole closed on the real logins, and the legitimate path beside it still open.
+tests/integration/security-review-hardening-database.test.ts
 
 # NOT listed: preview-auth-dev-startup.test.ts — red on dev at d1ac3641b (2 of 17: PREVIEW_STAGE_PROCESS_EXITED; it
 # starts the real API/UI stage processes, so it is a deployment rehearsal, not a self-contained suite).
+# The hand-over (0143): a paused debate moves to the current release once, under the pause's own lock.
+tests/integration/run-handover-database.test.ts
+# The daily outbound mail limit (0170): the shared count, its atomicity and the API logins' rights on a real database.
+tests/integration/outbound-mail-limit.test.ts
+# The moderation notice fixes (0172): M5, one bad source row is set aside and retried hourly while every other statement is queued, on the API's runtime login.
+tests/integration/moderation-notice-fixes-0172.test.ts
+# The check's answer on a report a person already closed (0173): the verdict is recorded, and no staff notice or automatic hide follows.
+tests/integration/settle-dismissed-flag-0173.test.ts
+# 0150's staff review door without a ground (0174): the runtime role gets 42501 on it, keeps the door with the law, and a grant back is refused as drift.
+tests/integration/public-review-ungrounded-door-0174.test.ts
+# The statement to a debate's author says an AI read the report first only for a verdict given by its moment (0175): never for UNAVAILABLE.
+tests/integration/statement-ai-read-verdict-0175.test.ts

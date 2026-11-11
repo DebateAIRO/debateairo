@@ -168,11 +168,12 @@ describe("rls:test-accounts — the seam on a throwaway database (PLAN S8.2)", (
         .toEqual([{ outcome: "passed" }]);
       expect(await superuser("SELECT factor_type,state FROM identity.mfa_factor WHERE user_id=$1", [record.userId]),
         record.label).toEqual([{ factor_type: "totp", state: "active" }]);
-      expect(await services.sessions.readSensitiveDataConsent({
+      // V4 start step, Task 56: the read takes only the account (Pick<AuthenticatedSession, "userId">); a whole session still goes.
+      expect(await services.sessions.readSensitiveDataConsent(Object.freeze({
         session: { asker_id: `owner:${user!.owner_ref}`, session_id: "unused", caller_scope: "ASKER",
           ownership_provenance: "server_session", provisional_identity_model: false },
         userId: record.userId, ownerRef: user!.owner_ref, tokenHash: "unused", csrfTokenHash: "unused", authKind: "cookie"
-      }), record.label).toBe("given");
+      })), record.label).toBe("given");
     }
   });
 

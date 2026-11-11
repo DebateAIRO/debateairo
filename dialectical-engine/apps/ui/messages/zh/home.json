@@ -13,7 +13,7 @@
   "home.publicDebates": "公开辩论",
   "home.total": "共 {count} 个",
   "home.signInHint": "请在上方登录或创建账户，以查看您的辩论。",
-  "home.publicIndexingNotice": "已发布的辩论可能被搜索引擎编入索引。取消发布后，副本仍可能留存。",
+  "home.publicIndexingNotice": "已发布的辩论可能被搜索引擎编入索引，副本也可能留存在其他地方。",
   "home.debateClaim": "辩论主张",
   "home.claimPlaceholder": "输入一个可辩论的主张或问题…",
   "home.composerHint": "模型辩论 · 您来评判",
@@ -72,8 +72,10 @@
   "home.turn": "第 {turn} 回合",
   "home.sampleCoda": "本轮到此结束。不宣布胜负。您将获得文字记录、每回合的两项评分，以及您让步的薄弱环节。",
   "home.closingTitle": "您的论证强度取决于其中最薄弱的一环。",
-  "home.closingLede": "进行一轮辩论。四个回合，约九分钟，再加一份准确指出您从何处开始回避问题的文字记录。",
-  "home.pricingCopy": "免费开始。付费方案每月 {price} 起，另加税费。可随时取消。",
+  "home.closingLede": "进行一轮辩论。四个回合，再加一份准确指出您从何处开始回避问题的文字记录。",
+  "home.pricingCopyPlusTax": "免费开始。付费方案每月 {price} + {taxName} 起。可随时取消。",
+  "home.pricingCopyNoTax": "免费开始。付费方案每月 {price} 起（不另加税费）。可随时取消。",
+  "home.pricingCopyChoose": "免费开始。付费方案每月 {price} 起（如适用，另加税费）。可随时取消。",
   "home.pricingCopyFree": "免费开始。无需银行卡。",
   "home.pricingLink": "查看方案",
   "home.card1Text": "以远程办公为主的公司通常应为从事同等工作的工程师采用不受地点影响的薪资区间，同时允许针对法律规定的成本、稀缺技能和职责范围进行透明调整。",
@@ -144,6 +146,5 @@
   "home.removal.close": "关闭",
   "home.flag.underReview": "已标记 · 审核中",
   "home.flag.approved": "已批准",
-  "home.flag.refused": "未获批准",
-  "home.takeDown.button": "撤下"
+  "home.flag.refused": "未获批准"
 }

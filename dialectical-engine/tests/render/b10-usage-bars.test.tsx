@@ -69,7 +69,7 @@ describe("UsageBars", () => {
     expect(container.querySelectorAll('[role="meter"]')).toHaveLength(1);
   });
 
-  it("shows a debate's finish leeway as 110%, with the bar full, not overflowing", async () => {
+  it("shows a window past its limit at the top of the scale, with the bar full, not overflowing", async () => {
     const container = await mount({ getBillingUsage: async () => ({
       plan_id: "FREE", windows: [{ scope: "PERSON_MONTH", percent: 110, resets_at: RESET }]
     }) });

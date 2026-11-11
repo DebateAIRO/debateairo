@@ -4,7 +4,8 @@ import { LENGTH_GUIDANCE_START, LENGTH_SENTENCE_ANSWER_CHECKER } from "@debateai
 import { promptContractFingerprintText, readPromptFrame } from "@debateai/providers";
 import { buildEvaluatorRequest, buildSynthesisDigest, toSynthesisPromptMaterial, type SynthesisDigest } from "@debateai/serve";
 import {
-  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_LENGTH_PROMPT_CONTRACT, EVALUATOR_PROMPT_CONTRACT, buildSynthesisRolePrompt,
+  EVALUATOR_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT, EVALUATOR_LENGTH_PROMPT_CONTRACT,
+  EVALUATOR_PROMPT_CONTRACT, buildSynthesisRolePrompt,
   codePromptContractHashes
 } from "../../apps/runner/src/index.js";
 
@@ -35,9 +36,10 @@ describe("serve.evaluator.length.v1 (spec §3.2)", () => {
       instruction: `${EVALUATOR_PROMPT_CONTRACT.instruction} ${LENGTH_SENTENCE_ANSWER_CHECKER}`, answerForm: EVALUATOR_PROMPT_CONTRACT.answerForm });
   });
 
-  it("the conformance seal is v2 then the variant", () => {
-    expect(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT).toBe([promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
+  it("the conformance seal is v2 then the variant (then, since the V4 reading level, the two reader variants)", () => {
+    expect(EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT).toBe([promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
       promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT)].join("\n---\n"));
+    expect(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT.startsWith(`${EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT}\n---\n`)).toBe(true);
     expect(codePromptContractHashes().conformance)
       .toBe(createHash("sha256").update(EVALUATOR_CONTRACTS_FINGERPRINT_TEXT).digest("hex"));
   });

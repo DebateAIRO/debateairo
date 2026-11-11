@@ -1,7 +1,7 @@
 {
   "schema": "debateai-n1-baseline-v1",
-  "commit": "368d578bbf3597a1df4e3b9f9f2f69110e6631ee",
-  "reason": "368d578bb-r21-v1",
+  "commit": "af7e457b5f5d336a782d7dcdcb7969da8c9a9fd8",
+  "reason": "af7e457b5-r22-v1",
   "suites": [
     "tests/integration/b3-holds-waiting-line.test.ts",
     "tests/integration/b7b-waiting-line.test.ts",
@@ -23,6 +23,10 @@
     {
       "name": "tests/integration/session-database.test.ts > S5 sessions on real PostgreSQL > preserves the exact 29 function identities/owners/ACLs/security while clamping only ordinary sessions",
       "reason": "measures migration 0099 while the suite's own migrate() applies it; on a database HEAD already migrated 0099 never runs there, so there is nothing to measure"
+    },
+    {
+      "name": "tests/integration/identity-database.test.ts > S2 identity schema on real PostgreSQL > creates the exact identity table inventory with the required contact, audit, and erasure column types",
+      "reason": "pins the exact list of identity tables its own migration chain creates; a database migrated ahead holds the tables later expand steps add (0156 and 0157: 11; the start step's 0158, 0162 and 0165: 3; 0170, the daily mail limit: 2), which the released code never reads"
     }
   ],
   "knownRed": []

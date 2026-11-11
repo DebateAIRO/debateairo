@@ -38,6 +38,17 @@ import {
   registerAccountContextPool
 } from "./account-context.js";
 export { PostgresDataExportRepository, PostgresDataExportSource } from "./data-export.js";
+// The Perplexity plan's stores (migrations 0132 and 0133, task W1-3): a debate's web evidence and the investigations.
+export * from "./web-evidence.js";
+export * from "./investigations.js";
+// The new dig model and the month pause (migration 0134, dig-model revision task W2-8).
+export * from "./dig-model.js";
+// The paths a person chose at Start and the carry-on marks (migration 0159, V4 start step Task 20).
+export * from "./start-paths.js";
+// A path debate's results per path (migration 0160, V4 start step Task 21).
+export * from "./path-results.js";
+// Each path's step and points, the carry-on mark and a public debate's report counts (migration 0161, V4 start step Task 53a).
+export * from "./path-progress.js";
 export * from "./pool-budget.js";
 export * from "./release-state.js";
 export { recordRunSupersession, resolveRunRef } from "./run-supersession.js";
@@ -276,7 +287,9 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   "core.claim_run_key_provision_cleanup(integer)",
   "core.complete_run_key_provision_cleanup(uuid,uuid)",
   // Side-by-side spec §4 (0123 §4, plan C11): a waiting owner's run re-admitted under the current release.
-  "core.prepare_readmitted_run_key_provision(uuid,uuid)"
+  "core.prepare_readmitted_run_key_provision(uuid,uuid)",
+  // V4 start step (0163, plan 2026-11-03 Task 56a): a carry-on dig of a debate's chosen path, without a live sign-in.
+  "core.prepare_carry_on_run_key_provision(uuid,uuid,text)"
 ] as const);
 const CONTENT_PROVISION_FORBIDDEN_ROLES = Object.freeze([
   "public",
@@ -596,6 +609,51 @@ export async function withRunContentLease<T>(
   } finally {
     await lease.release();
   }
+}
+
+/** V4 start step, Task 55d: how long a read of another run waits for that run's own lease (`withOwnRunContentLease`). */
+const OWN_RUN_CONTENT_LEASE_WAIT_MS = 2_000;
+
+/**
+ * V4 start step, Task 55d: `use` reads `runId`'s content under a lease that covers it, never by widening another. A lease this
+ * context already holds that covers `runId` (on the same pool) is borrowed, as withRunContentLease borrows it. Otherwise `use` runs
+ * OUTSIDE the held lease's scope, under a short lease of `runId` alone on a client of its own: the held lease keeps its runs, and
+ * nothing of `runId` is read under it. How a debate that holds its own lease reads ANOTHER debate (a dig's investigation: what it
+ * already looked into, the pages it already read), one short lease each.
+ * The wait for that lease is bounded (OWN_RUN_CONTENT_LEASE_WAIT_MS): the only exclusive holder is an erasure, which may hold `runId`
+ * while it waits on the held lease, so waiting for ever here would wait on ourselves. Past the bound this throws, and the caller leaves
+ * that run out.
+ */
+export async function withOwnRunContentLease<T>(
+  pool: Pool,
+  runId: string,
+  use: (lease: RunContentLease) => Promise<T>
+): Promise<T> {
+  const current = contentLeaseScope.getStore();
+  if (current?.pool === pool && current.lease.runIds.includes(runId)) {
+    return withRunContentLease(pool, [runId], use);
+  }
+  return contentLeaseScope.exit(async () => {
+    const waited = new AbortController();
+    const timer = setTimeout(() => { waited.abort(); }, OWN_RUN_CONTENT_LEASE_WAIT_MS);
+    let lease: RunContentLease;
+    try {
+      lease = await acquireRunContentLease(pool, [runId], waited.signal);
+    } finally {
+      clearTimeout(timer);
+    }
+    try {
+      await lease.assertLive();
+      const value = await contentLeaseScope.run(
+        Object.freeze({ pool, lease }),
+        () => use(lease)
+      );
+      await lease.assertLive();
+      return value;
+    } finally {
+      await lease.release();
+    }
+  });
 }
 
 export {
@@ -1801,6 +1859,16 @@ export interface StartRunInput {
    * so a forgotten admission path fails loudly downstream.
    */
   readonly releaseKey?: string;
+  /**
+   * Security review F2 (migration 0171): this run is a dig, a debate dug from another (an ask with a parent or a public
+   * parent). Sent as the `digRun` key of 0123's core.create_encrypted_run document, which 0171 patched to write the
+   * dig's own row (identity.dig_run) right after the run's ownership event, in the same statement as the run, so no
+   * sign-out, failure or crash between the start and the join can leave a dig unmarked. Only an owner's run can carry
+   * it: a legacy asker's run owns no account, and is refused RUN_DIG_REQUIRES_OWNER before any SQL. A database
+   * without 0171 refuses the document (its closed key list), surfaced as RUN_OWNER_INVALID, so a dig never starts
+   * unmarked there either. A re-admission needs none: 0171 marks the new run of a dig from the run it re-admits.
+   */
+  readonly digRun?: true;
 }
 
 /**
@@ -1832,8 +1900,16 @@ export type StoredAsk = Readonly<{
   contentEncrypted: boolean;
 }>;
 
+/**
+ * Whose new run `startRun` writes. A server principal's `carryOn` (V4 start step, 0163, plan 2026-11-03 Task 56a) makes the run a carry-on
+ * dig of `parentRunId`'s chosen path `pathId`: its key is provisioned from the debate's own binding (the same user and identity session,
+ * signed out or not), so no live session is needed and `sessionId` is not read; the debate must be the principal's own.
+ */
 export type RunCreationPrincipal =
-  | Readonly<{ readonly kind: "server"; readonly userId: string; readonly ownerRef: string }>
+  | Readonly<{
+      readonly kind: "server"; readonly userId: string; readonly ownerRef: string;
+      readonly carryOn?: Readonly<{ parentRunId: string; pathId: string }>;
+    }>
   | Readonly<{ readonly kind: "legacy"; readonly legacyAskerId: string }>;
 
 /**
@@ -1852,6 +1928,11 @@ export type StartReadmittedRunInput = Omit<StartRunInput, "principal" | "session
 /** The codes 0123's re-admission key provision refuses with (55000, MESSAGE = code), surfaced typed. */
 const READMISSION_REFUSALS: ReadonlySet<string> = new Set([
   "RUN_READMISSION_INVALID", "RUN_READMISSION_OWNER_GONE", "RUN_READMISSION_TAKEN"
+]);
+
+/** The codes 0163's carry-on dig key provision refuses with (55000, MESSAGE = code), surfaced typed as the re-admission's are. */
+const CARRY_ON_DIG_REFUSALS: ReadonlySet<string> = new Set([
+  "CARRY_ON_DIG_INVALID", "CARRY_ON_DIG_OWNER_GONE", "CARRY_ON_DIG_TAKEN"
 ]);
 
 /**
@@ -2114,12 +2195,14 @@ export interface RunBackupSwitchLifecycleValue {
   readonly from_provider_ref: string;
   readonly to_provider_ref: string;
   /**
-   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). ABSENT_AT_CLAIM: the main
+   * TRANSPORT_FAILURE / USAGE_CAP: during a call (R4). CONTENT_REFUSED: during a
+   * root position's call, its answer refused after every repair (R22, owner ruling
+   * 2026-10-29). ABSENT_AT_CLAIM: the main
    * was not claim-eligible, so its runner-up sits in the seat. SPENT_ON_EARLIER_PASS:
    * a resumed pass found the planned member's key at this site already at its
    * allowance (A16c, carry 8c) — the ledger rows under `call_site_key` say why.
    */
-  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
+  readonly cause: "TRANSPORT_FAILURE" | "USAGE_CAP" | "CONTENT_REFUSED" | "ABSENT_AT_CLAIM" | "SPENT_ON_EARLIER_PASS";
   /** The planned member's key at the site; null for a switch made at claim. */
   readonly call_site_key: string | null;
 }
@@ -2285,11 +2368,45 @@ export class RunRepository {
     admissionClient?: PoolClient
   ): Promise<string> {
     const principal = input.principal;
+    const carryOn = principal.kind === "server" ? principal.carryOn : undefined;
+    if (principal.kind === "server" && carryOn !== undefined) {
+      // 0163 (V4 start step, Task 56a): the debate a carry-on digs is the principal's own encrypted run, read before anything is
+      // provisioned, as startReadmittedRun reads the run it re-admits. 0163's prepare checks the rest under the account's lock.
+      const parent = UUID_V4.test(carryOn.parentRunId) ? (await this.pool.query<{ asker_id: string; encrypted: boolean }>(
+        `SELECT asker_id, content_encryption_version IS NOT DISTINCT FROM 1 AS encrypted
+         FROM core.run WHERE run_id = $1`,
+        [carryOn.parentRunId]
+      )).rows[0] : undefined;
+      if (parent === undefined || !parent.encrypted || parent.asker_id !== `owner:${principal.ownerRef}`) {
+        throw new TypedDomainError("CARRY_ON_DIG_INVALID", "The debate to dig is not this principal's own encrypted run");
+      }
+    }
     const identity: RunRowIdentity = principal.kind === "legacy"
       ? Object.freeze({ kind: "plain", askerId: principal.legacyAskerId, sessionId: input.sessionId, callerScope: input.callerScope })
       : Object.freeze({
           kind: "encrypted", ownerRef: principal.ownerRef, callerScope: input.callerScope,
           prepare: async (executor: Pick<Pool, "query"> | PoolClient, runId: string) => {
+            if (carryOn !== undefined) {
+              // 0163: the key is provisioned from the debate's own binding (its user and identity session, signed out or not), so
+              // no live session is needed and the session id is not read. Refused typed, as the re-admission's provision is.
+              let rows: ReadonlyArray<{ execution_ref: string | null; user_id: string | null }>;
+              try {
+                rows = (await executor.query<{ execution_ref: string | null; user_id: string | null }>(
+                  "SELECT execution_ref::text AS execution_ref, user_id::text AS user_id FROM core.prepare_carry_on_run_key_provision($1,$2,$3)",
+                  [carryOn.parentRunId, runId, carryOn.pathId]
+                )).rows;
+              } catch (error) {
+                const code = error instanceof Error ? error.message : undefined;
+                if (code !== undefined && CARRY_ON_DIG_REFUSALS.has(code)) throw new TypedDomainError(code, code);
+                throw error;
+              }
+              const executionRef = rows[0]?.execution_ref ?? "";
+              const userId = rows[0]?.user_id ?? "";
+              if (!UUID_V4.test(executionRef) || userId.toLowerCase() !== principal.userId.toLowerCase()) {
+                throw new TypedDomainError("RUN_OWNER_INVALID", "The carry-on dig's key provision answered no binding of this user");
+              }
+              return Object.freeze({ executionRef, userId });
+            }
             if (!UUID_V4.test(input.sessionId)) {
               throw new TypedDomainError(
                 "RUN_OWNER_INVALID",
@@ -2392,6 +2509,11 @@ export class RunRepository {
     identity: RunRowIdentity,
     admissionClient?: PoolClient
   ): Promise<string> {
+    // Security review F2 (0171): a dig's mark is written by the owner's run creation alone; a legacy asker owns no
+    // account to mark it under, so its dig is refused before anything is written (no intent, no key, no row).
+    if (input.digRun === true && identity.kind === "plain") {
+      throw new TypedDomainError("RUN_DIG_REQUIRES_OWNER", "A dig is started only by an authenticated owner");
+    }
     // Side-by-side spec §1: the stamp is checked before anything is written (no intent, no key, no row).
     const releaseKey = input.releaseKey === undefined ? undefined : parseReleaseKey(input.releaseKey).releaseKey;
     const runId = randomUUID();
@@ -2468,6 +2590,7 @@ export class RunRepository {
         const provisionExecutor=admissionClient ?? this.provisionPool;
         // `releaseKey` is sent only when given, and the capability probe below never strips it (unlike planTier and the
         // argument language): a database without 0123 refuses a stamped document rather than run it unstamped (O1).
+        // `digRun` likewise (0171, F2): a database without 0171 refuses a dig's document rather than start it unmarked.
         const created = await provisionExecutor.query<{
           created: boolean;
           plan_tier_supported: boolean;
@@ -2523,7 +2646,8 @@ export class RunRepository {
             contentCiphertext: contentEnvelope,
             contentAttestation: contentAttestation!.toString("base64"),
             contentAttestationSecret: contentAttestationSecret!.toString("base64"),
-            ...(releaseKey === undefined ? {} : { releaseKey })
+            ...(releaseKey === undefined ? {} : { releaseKey }),
+            ...(input.digRun === true ? { digRun: true } : {})
           }),contentUserId,identity.ownerRef,
           JSON.stringify(input.batteryRows.map((row)=>({
             batteryRowId:row.batteryRowId,
@@ -3112,4 +3236,7 @@ export * from "./consumer-recovery.js";
 export * from "./onboarding-evidence.js";
 
 export {PostgresConsumerSecurityNoticeRepository,type ConsumerSecurityNotice,type ConsumerSecurityNoticeClaim} from "./consumer-security-mail.js";
+export * from "./moderation-notice.js";
+// 0157: the statements of reasons repository.
+export * from "./moderation-statement.js";
 export * from './social-identity.js';

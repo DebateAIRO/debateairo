@@ -13,6 +13,7 @@ import {
   PostgresAuthenticationRiskSignalRepository
 } from "@debateai/db";
 import { RECOVERY_POLICY_REGISTER_ROW } from "@debateai/register";
+import { createSystemTwin } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database:TestDatabase;
@@ -95,15 +96,14 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
       source:{ip:"203.0.113.2",userAgent:"beta",requestId:randomUUID()}
     })).resolves.toBe("recorded");
 
-    const alphaSummary=await repository.evaluateForRecovery(alpha.publicHandle);
-    expect(alphaSummary).toMatchObject({signalCount:1,counts:{RECOVERY_STARTED:1}});
+    // Nothing reads the signals back since 0171 took 0046's recovery reader back from every role: each handle's own row says what it recorded.
     const rows=await database.pool.query<{
-      user_id:string;context_ciphertext:Record<string,unknown>;
+      user_id:string;signal_kind:string;context_ciphertext:Record<string,unknown>;
       observed_at:Date;expires_at:Date;
-    }>(`SELECT user_id,context_ciphertext,observed_at,expires_at
+    }>(`SELECT user_id,signal_kind,context_ciphertext,observed_at,expires_at
         FROM identity.authentication_risk_signal ORDER BY user_id`);
     expect(rows.rows).toHaveLength(2);
-    expect(rows.rows.map(row=>row.user_id).sort()).toEqual([alpha.userId,beta.userId].sort());
+    expect(rows.rows.map(row=>[row.user_id,row.signal_kind]).sort()).toEqual([[alpha.userId,"RECOVERY_STARTED"],[beta.userId,"RECOVERY_PROOF_FAILED"]].sort());
     for(const row of rows.rows){
       expect(Object.keys(row.context_ciphertext).sort()).toEqual(["ct","keyId","nonce","tag","v"]);
       expect(JSON.stringify(row.context_ciphertext)).not.toContain("198.51.100");
@@ -146,7 +146,7 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
     expect(rows.rows).toEqual([{signal_kind:"LOGIN_SUCCESS",user_id:subject.userId}]);
   });
 
-  it("rejects poisoned/cross-account envelopes and saturates before key load",async()=>{
+  it("rejects poisoned/cross-account envelopes",async()=>{
     const alpha=await account(`poison-a-${randomUUID()}`);
     const beta=await account(`poison-b-${randomUUID()}`);
     const betaKey=await users.load(beta.userId);
@@ -164,29 +164,7 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
       VALUES($1,'ACCOUNT_CONTENT_MATCH',$2::jsonb,clock_timestamp(),clock_timestamp()+interval '7776000 seconds')
     `,[alpha.userId,JSON.stringify({...wrong,debateText:"private"})])).rejects.toBeDefined();
 
-    const alphaKey=await users.load(alpha.userId);
-    const envelope=encrypt(alphaKey,Buffer.from(JSON.stringify({
-      v:1,networkRef:`argon2id-audit:v1:${"1".repeat(64)}`,
-      clientRef:`argon2id-audit:v1:${"3".repeat(64)}`
-    })),authenticationRiskSignalAad(alpha.userId));
-    alphaKey.fill(0);
-    await database.pool.query(`
-      INSERT INTO identity.authentication_risk_signal(
-        user_id,signal_kind,context_ciphertext,observed_at,expires_at
-      )
-      SELECT $1,'LOGIN_SUCCESS',$2::jsonb,instant.observed_at,
-        instant.observed_at+interval '7776000 seconds'
-      FROM generate_series(1,129)
-      CROSS JOIN LATERAL (SELECT clock_timestamp() AS observed_at) AS instant
-    `,[alpha.userId,JSON.stringify(envelope)]);
-    const before=loadedUsers.filter(id=>id===alpha.userId).length;
-    const repository=new PostgresAuthenticationRiskSignalRepository(
-      database.pool,auditContext,users,AUTHENTICATION_RISK_SIGNAL_RETENTION_MS,
-      MAX_AUTHENTICATION_RISK_SIGNAL_SCAN
-    );
-    await expect(repository.evaluateForRecovery(alpha.publicHandle))
-      .rejects.toThrow("AUTH_RISK_SIGNAL_SCAN_SATURATED");
-    expect(loadedUsers.filter(id=>id===alpha.userId)).toHaveLength(before);
+    // The scan bound's saturation before a key load was evaluateForRecovery's, which went with 0046's recovery reader (0171).
   });
 
   it("purges only expired rows in bounded batches and denies direct runtime DML",async()=>{
@@ -230,8 +208,10 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
     const privileges=await database.pool.query(`SELECT
       has_table_privilege('debateai_runtime','identity.authentication_risk_signal','SELECT') AS runtime_select,
       has_table_privilege('debateai_runtime','identity.authentication_risk_signal','INSERT') AS runtime_insert,
-      has_function_privilege('debateai_runtime','identity.purge_expired_authentication_risk_signals(integer)','EXECUTE') AS runtime_purge`);
-    expect(privileges.rows[0]).toEqual({runtime_select:false,runtime_insert:false,runtime_purge:true});
+      has_function_privilege('debateai_runtime','identity.purge_expired_authentication_risk_signals(integer)','EXECUTE') AS runtime_purge,
+      has_function_privilege('debateai_rls_all_accounts','identity.purge_expired_authentication_risk_signals(integer)','EXECUTE') AS marker_purge`);
+    // 0171: the purge is the cross-account marker's, which the API's system login holds and runs it on from its timer; no request login holds it.
+    expect(privileges.rows[0]).toEqual({runtime_select:false,runtime_insert:false,runtime_purge:false,marker_purge:true});
   });
 
   it("enforces risk capabilities through actual isolated login principals",async()=>{
@@ -250,6 +230,8 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
     erasureUrl.username=erasureLogin;erasureUrl.password=erasurePassword;
     const runtime=createPool(runtimeUrl.toString());
     const erasure=createPool(erasureUrl.toString());
+    // The API's system login, as main.ts's timer reaches it: the runtime role and the cross-account marker.
+    const system=createPool(await createSystemTwin(database,`p208_system_${suffix}`,["debateai_runtime"]));
     try{
       await expect(runtime.query(
         "SELECT risk_signal_id FROM identity.authentication_risk_signal LIMIT 1"
@@ -261,6 +243,9 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
       `)).rejects.toMatchObject({code:"42501"});
       await expect(runtime.query(
         "SELECT identity.purge_expired_authentication_risk_signals(1) AS purged"
+      )).rejects.toMatchObject({code:"42501",message:"permission denied for function purge_expired_authentication_risk_signals"});
+      await expect(system.query(
+        "SELECT identity.purge_expired_authentication_risk_signals(1) AS purged"
       )).resolves.toMatchObject({rows:[{purged:0}]});
       await expect(erasure.query(
         "SELECT risk_signal_id FROM identity.authentication_risk_signal LIMIT 1"
@@ -269,7 +254,7 @@ describe("P2-08 authentication risk persistence on real PostgreSQL",()=>{
         "SELECT identity.purge_expired_authentication_risk_signals(1)"
       )).rejects.toMatchObject({code:"42501"});
     }finally{
-      await Promise.all([runtime.end(),erasure.end()]);
+      await Promise.all([runtime.end(),erasure.end(),system.end()]);
     }
   });
 });

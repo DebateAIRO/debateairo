@@ -16,7 +16,7 @@ function fixture(beforeKeyDestruction: (input: { erasureId: string; userId: stri
   const order: string[] = [];
   let userKeyExists = true;
   const manifest = { userId, ownerRef, runIds: [], legacyRunIds: [], publishedRunIds: [],
-    currentPublicationRefs: [], cleanupPublicationRefs: [], deletePublicDebates: false };
+    currentPublicationRefs: [], cleanupPublicationRefs: [] };
   const repository = {
     preview: async () => manifest, withNotificationLease: async (_user: string, run: () => Promise<unknown>) => run(),
     prepare: async () => "PREPARED", cleanupManifest: async () => manifest,
@@ -57,7 +57,7 @@ describe("S04 threat report account erasure", () => {
     // Mutant: load the absent key on every retry; changing the report-erasure timer is a neighbour.
     const calls: string[] = [];
     const manifest = { userId, ownerRef, runIds: [], legacyRunIds: [], publishedRunIds: [],
-      currentPublicationRefs: [], cleanupPublicationRefs: [], deletePublicDebates: false };
+      currentPublicationRefs: [], cleanupPublicationRefs: [] };
     const repository = {
       preview: async () => null,
       status: async () => calls.includes("finalize") ? "CLEANED" : "PREPARED",
@@ -91,6 +91,7 @@ describe("S04 threat report account erasure", () => {
 describe("S04 threat report erasure database gates", () => {
   let database: TestDatabase;
   let repository: PostgresThreatReportRepository;
+  let sweep: PostgresThreatReportRepository;
   const hash = (value: string) => `sha256:${createHash("sha256").update(value).digest("hex")}`;
   async function listHolder() {
     const userId = randomUUID(), sessionId = randomUUID(), staffId = randomUUID();
@@ -122,12 +123,12 @@ describe("S04 threat report erasure database gates", () => {
   }
   let reader: Awaited<ReturnType<typeof listHolder>>;
   async function asRuntime<T extends Record<string, unknown> = Record<string, unknown>>(
-    statement: string, values: unknown[] = []
+    statement: string, values: unknown[] = [], role = "debateai_runtime"
   ): Promise<T[]> {
     const client = await database.pool.connect();
     try {
       await client.query("BEGIN");
-      await client.query("SET LOCAL ROLE debateai_runtime");
+      await client.query(`SET LOCAL ROLE ${role}`);
       const rows = (await client.query<T>(statement, values)).rows;
       await client.query("COMMIT");
       return rows;
@@ -142,6 +143,11 @@ describe("S04 threat report erasure database gates", () => {
     await migrate(database.pool);
     repository = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) =>
       ({ rows: await asRuntime(sql, values) }) } as never);
+    // The erasure sweep runs on the API's gated hourly timer, outside any request, so on its system login: the API's capability role and the
+    // cross-account marker (apps/runner/src/dev-database-principals.ts), which holds the sweep since 0171.
+    await database.pool.query("CREATE ROLE threat_erasure_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
+    sweep = new PostgresThreatReportRepository({ query: async (sql: string, values?: unknown[]) =>
+      ({ rows: await asRuntime(sql, values, "threat_erasure_api_system") }) } as never);
     reader = await listHolder();
   }, 600_000);
   afterAll(async () => database?.stop());
@@ -160,9 +166,12 @@ describe("S04 threat report erasure database gates", () => {
        prepared_cleanup_publication_refs)
       VALUES($1,$2,now(),now(),now(),'{}','{}','{}','{}','{}')`, [erasure,target]);
     await closure.threatReportEmailHold(repository)({ erasureId: erasure, userId: target, email: "held@example.test" });
-    await expect(repository.keep("Question kept during erasure", target))
+    // No product code keeps a report since 0171 took 0128's keepers back from the runtime role; the test's own connection keeps one as a seed would.
+    await expect(database.pool.query("SELECT staff.keep_threat_report($1::text,$2::uuid)", ["Question kept during erasure", target]))
       .rejects.toMatchObject({ message: "THREAT_REPORT_ACCOUNT_ERASING" });
-    const ref = await repository.keepWithHeldEmail("Question kept during erasure", target, "held@example.test");
+    const ref = (await database.pool.query<{ report_ref: string }>(
+      "SELECT staff.keep_threat_report_with_email($1::text,$2::uuid,$3::text) report_ref",
+      ["Question kept during erasure", target, "held@example.test"])).rows[0]!.report_ref;
     const rows = (await database.pool.query(`SELECT report_ref,account_user_id,held_email FROM staff.threat_report
       WHERE report_ref=$1 ORDER BY kept_at`, [ref])).rows;
     expect(rows).toEqual([{ report_ref: ref, account_user_id: null, held_email: "held@example.test" }]);
@@ -184,9 +193,11 @@ describe("S04 threat report erasure database gates", () => {
     let complete!: () => void;
     const completed = new Promise<void>(resolve => { complete = resolve; });
     const calls: unknown[][] = [];
+    // A request login's runtime role is refused the sweep (0171); the system login runs it.
+    await expect(repository.eraseDue()).rejects.toMatchObject({ code: "42501" });
     const workerRepository = { eraseDue: async (...args: unknown[]) => {
       calls.push(args);
-      try { return await repository.eraseDue(); }
+      try { return await sweep.eraseDue(); }
       finally { complete(); }
     } };
     vi.useFakeTimers();

@@ -1149,8 +1149,8 @@ those rows. The operator record is
 
 | Row member | Value | In dollars |
 |---|---|---|
-| `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
-| `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
+| `per_run_ceiling_micros` | `250000` | <amount> per debate |
+| `daily_ceiling_micros` | `2000000` | <amount> per UTC day |
 
 The `costEnvelopePolicy` row says so about itself: it carries `provisional: true` and a
 `provisional_reason` naming V-28. They are meant to stop things — a normal debate costs dollars,

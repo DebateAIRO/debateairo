@@ -10,7 +10,8 @@ const RUNNER = new URL("../../apps/runner/src/index.ts", import.meta.url);
 const SERVE_DISCLOSURE = new URL("../../packages/db/src/serve-disclosure.ts", import.meta.url);
 
 const judgesBlock = (source: string): string => {
-  const start = source.indexOf("const comparingJudges = engineTwo === null ? null : await (async () => {");
+  // V4 start step, Task 53: a path debate's paths are not rivals, so no comparing judge runs on one.
+  const start = source.indexOf("const comparingJudges = engineTwo === null || pathsRunPaths !== null ? null : await (async () => {");
   return source.slice(start, source.indexOf("const makerPositionServe = decideMakerPositionServe({", start));
 };
 
@@ -20,14 +21,15 @@ describe("R2b: the comparing judges in the run body", () => {
     const anchors = [
       "const serveDecisionInput = Object.freeze({",
       "const engineTwo = engine.engine === 2 ? engine : null;",
-      "const comparingJudges = engineTwo === null ? null : await (async () => {",
+      "const comparingJudges = engineTwo === null || pathsRunPaths !== null ? null : await (async () => {",
       "const strengthDecision = decideMakerPositionServe(serveDecisionInput);",
       "const makerPositionServe = decideMakerPositionServe({",
       // A14's investigation rows are written only after the serve decision (Ruling PF-R2a8.10), so the judges read
       // this copy's outcomes from memory (pre-flight PF-R2b3.6).
       "await recordPointInvestigationRows({",
       "const ladderLabel = deriveVerdictLabel(verdictLabelBasis);",
-      "const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);"
+      // V4 start step, Task 54: a path debate's label is its main trust word's (it has no comparing judge); every other run's as before.
+      "const verdictLabel = pathOutcomes !== null ? verdictDerivationOfPaths(pathsMainTrust)\n      : comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);"
     ].map((anchor) => [anchor, source.indexOf(anchor)] as const);
     for (const [anchor, index] of anchors) expect([anchor, index >= 0]).toEqual([anchor, true]);
     const indices = anchors.map(([, index]) => index);
@@ -67,6 +69,20 @@ describe("R2b: the comparing judges in the run body", () => {
     expect(sitOutAt).toBeGreaterThan(0);
     expect(source.slice(sitOutAt, sitOutAt + 400)).toContain("throughCallLane(maker.providerRef, sittingOut)");
     expect(source).toContain("const provider = throughCallLane(ref, maker.provider);");
+  });
+
+  // Owner ruling 2026-10-29 (MORNING-2026-10-17 item 6, "prefer neutral judges"): each judge seat offers its other member,
+  // up and not sitting out, and a judge asked as that member resolves to the same run seat (its own gateway and checks).
+  it("offer each judge seat's other member to the pick, resolved to the same run seat", async () => {
+    const body = judgesBlock(await readFile(RUNNER, "utf8"));
+    for (const needle of [
+      "const other = seatCaller.plan(seat, planKey, { eligible: (candidate) => candidate.pinnedAs !== member.pinnedAs });",
+      "(sitOut !== null && sitOut.sitsOut(other.providerRef))",
+      "...(alternate === null ? [] : [[alternate.providerRef, seat] as const])",
+      "maker: alternate.maker, providerRef: alternate.providerRef, modelId: modelIdOf(alternate)"
+    ]) expect([needle, body.includes(needle)]).toEqual([needle, true]);
+    // The judges' run seats stay the JUDGE seats: no member of another role is borrowed.
+    expect(body).toContain("const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {");
   });
 
   it("put the judges' records on the answer and their label on the persisted answer", async () => {

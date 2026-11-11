@@ -1,4 +1,4 @@
-import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow } from "@debateai/providers";
+import { createPreviewGuardedFetch, createPreviewBudgetRpcPorts, previewProbeControls, PREVIEW_GLM_DEADLINE_MS, providerCompaniesOfTargets, previewModelRow, previewProviderSocket, previewTargetChargePrice, providerTargetPrice } from "@debateai/providers";
 import { type QuestionLanguagePolicy } from "@debateai/register";
 import { questionLanguageSiteRoute } from "./question-language/boot.js";
 import { questionLanguageReferenceKeyFrom } from "./question-language/reference.js";
@@ -6,7 +6,7 @@ import { questionLanguageReferenceKeyFrom } from "./question-language/reference.
 import {
   admissionSettingsOfVersion, buildAdmissionSiteContext, createAdmissionSettingsCache, decideAskRoomReadiness, createAdmissionView, loadAdmissionSettings, type AdmissionSiteContext
 } from "./admission-settings.js";
-import { createActiveSettingsVersionReader } from "./active-settings-version.js";
+import { createActiveSettingsVersionReader, readActiveSettingsVersionOn } from "./active-settings-version.js";
 import { activeVersionAlarm, checkActiveSettingsVersionAtBoot } from "./admission-alarm.js";
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
@@ -23,10 +23,32 @@ import {ConsumerRecoveryService} from "./consumer-recovery.js";
 import {OnboardingEvidenceService} from "./onboarding-evidence.js";
 import {ConsumerSecurityNoticeReconciler} from "./consumer-security-notices.js";
 import {PostgresConsumerRecoveryRepository,PostgresOnboardingEvidenceRepository,PostgresConsumerSecurityNoticeRepository} from "@debateai/db";
+import { PostgresModerationStatementRepository, PostgresPublicFlagMailRepository } from "@debateai/db";
+import { ModerationStatementReconciler, PublicFlagAnswerReconciler } from "./moderation-statements.js";
 import {readConsumerRecoveryPolicy} from "@debateai/register";
 import {SendmailConsumerAccountSender} from "./mail-channel.js";
 import { ConsumerSecurityService } from "./consumer-security.js";
 import { PostgresConsumerSecurityRepository } from "@debateai/db";
+import { PostgresPublicDebateRepository, PostgresPublicDebateRunnerRepository, PostgresPublicPageRepository, PostgresPublicTreeRepository, PostgresWebResearchedRepository, PostgresDigModelRepository, PostgresDigPicksRepository, PostgresInvestigationReportRepository, PostgresInvestigationRepository } from "@debateai/db";
+import { investigationReportContentOpener } from "./investigation-report.js";
+import { postgresPurposeLines, readPurposeLinesOf } from "./purpose-lines.js";
+import {
+  ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS, ASK_CLARIFY_ROUTE_POLICY, askClarifyTransportFor, createAskClarify, sweepAskClarifyReservations
+} from "./ask-clarify.js";
+// V4 start step, Task 31: the step before Start (Tasks 26–30), composed below on the preview route.
+import { createStartCharges } from "./start-step/charge.js";
+import { startStepKeyFrom } from "./start-step/signing.js";
+import { createStartStep, startStepRouteOf } from "./start-step/step.js";
+// V4 start step, Task 36: the one chosen paths store, for the AskApplication and the API.
+import { PostgresStartPathsStore } from "@debateai/db";
+// V4 start step, Task 56b: Task 53a's counts of a public debate's report versions, for the person's own closings of it.
+import { PostgresOwnClosingsReader } from "@debateai/db";
+import { RunRepository as ReportRunRepository, withOwnerAskAdmissionLease as withReportRunAdmissionLease } from "@debateai/db";
+import { createStartTransport } from "./start-step/transport.js";
+import { continuedRunWake, runHandoverOf } from "./month-pause.js";
+// V4 start step, Task 57f: Continue on a failed debate, and the room for the rest.
+import { continueRoomOf } from "./run-continue.js";
+import { PostgresOutboundMailStore } from "../../../packages/db/src/outbound-mail.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
@@ -38,6 +60,7 @@ import { randomUUID } from "node:crypto";
 import { DataExportApplication } from "./data-export/service.js";
 import { FileDataExportStore } from "./data-export/store.js";
 import { collectSnapshot } from "./data-export/snapshot.js";
+import { runContentOpener } from "./data-export/run-content.js";
 import { loadArchiveCatalog } from "./data-export/archive-catalog.js";
 import { OwnerViewAdapter } from "./data-export/owner-view-adapter.js";
 import { TemplatedDataExportMail } from "./data-export/mail.js";
@@ -56,13 +79,15 @@ import {
   openRecord,
   FilePublicationKeyStore,
   FileRunContentKeyStore,
+  FileSavedQuestionKeyStore,
   FileUserDekStore,
   loadKekRing,
   loadSecretKey,
   PublicationCipher,
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
-import { AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import type { PreparedPublicationCipher } from "@debateai/crypto";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -91,7 +116,9 @@ import {
   readAuthPolicy,
   readMfaPolicy,
   readProductRolePolicy,
+  readOutboundMailPolicy,
   readPublicationCheckPolicy,
+  readAbuseLimits,
   readQuestionCheckPolicy,
   readSupportNoSourceCheckPolicy,
   supportNoSourceCheckPolicyStartValues,
@@ -104,10 +131,17 @@ import {
 import {
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
+  askClarifyChargeWriterPresent,
+  askClarifyReservationPresent,
+  deleteAskClarifyReservationsDue,
   languageCheckSpendWriterPresent,
+  recordAskClarifyCharge,
   questionCheckSpendWriterPresent,
   recordLanguageCheckSpend,
-  recordQuestionCheckSpend
+  recordQuestionCheckSpend,
+  reserveAskClarifyCharge,
+  preStartChargeWriterPresent,
+  recordPreStartCharge
 } from "@debateai/budget";
 import { BillingPersonAllowanceSource } from "@debateai/billing-core";
 import { FundingAwarePersonAllowanceSource } from "@debateai/billing-core";
@@ -153,11 +187,14 @@ import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
 import { createStaffRuntime } from "./staff/runtime.js";
 import { PostgresPublicationApplication, buildPublicDebateBody } from "./publications.js";
+import { PUBLIC_REVIEW_PURGE_EVERY_MS, sweepPublicReviewPurge } from "./public-flag.js";
+import { FREE_PUBLICATION_STORY_WAIT_MS, PUBLIC_PAGE_SWEEP_DEFAULTS, backedOffContentCheck, publicReportCarrierMaker, sweepFreePublications, sweepPublicPage } from "./public-tree.js";
 import { createPublicationReviewStaffService } from "./publication-review/staff.js";
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
 import { readQuestionSubjects } from "./question-check/subjects.js";
 import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
+import { startTeamLimitNotices } from "./staff/team-limit.js";
 import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
 import { threatReportEmailReader } from "./staff/threat-reports.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
@@ -173,10 +210,15 @@ import { RepositoryAnswerStoryApplication, RepositoryPublicationStoryReader } fr
 import { RepositoryAnswerDisclosureApplication } from "./disclosures.js";
 import { MapChoiceRepository } from "@debateai/map";
 import { RepositoryAnswerMapViewApplication, runOwnerCheckFrom } from "./map-views.js";
+import { accountMemoryStoreFrom } from "./account-memory.js";
+// V4 start step, Task 39e: the questions not started yet, 0162's store of rows and the service over it and the question keys.
+import { savedQuestionStoreFrom } from "./saved-questions/store.js";
+import { createSavedQuestionService, savedQuestionOpener } from "./saved-questions/service.js";
 import { StoryRepository } from "@debateai/story";
 import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { systemMailDomainCheck } from "./mail-domain-check.js";
+import { OutboundMailGate, outboundMailReport } from "./outbound-mail-gate.js";
 import { EmailChangeService } from "./email-change.js";
 import { billingMailAttachmentResolvers } from "./mail-attachments.js";
 import {
@@ -193,7 +235,8 @@ import { RecoveryStartService } from "./recovery.js";
 import {
   createProviderDiscoveryResolver,
   parseDeclaredProviderTargets,
-  resolveProviderTargetCredentials
+  resolveProviderTargetCredentials,
+  type ProviderDiscoveryProbeStore
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
 import { createSupportKeyPort } from "./support/keys.js";
@@ -519,7 +562,15 @@ const providerTargetsJson = boot.runSync("provider-discovery-targets", () => {
   }
   return environment.PROVIDER_DISCOVERY_TARGETS_JSON;
 });
-const probes = new ProviderProbeRepository(pool);
+// The security review's 0171: 0048's writer of a provider's probe is the cross-account marker's alone, as the discovery below takes a provider's
+// latest probe for healthy while it is fresh and probes only the others. So each probe it makes, inside the asking request, is recorded on this
+// pool's system login (the cross-account site X37); it reads the latest probes on the request login, as before.
+const probeReader = new ProviderProbeRepository(pool);
+const probeRecorder = new ProviderProbeRepository(crossAccountPool(pool, "X37"));
+const probes: ProviderDiscoveryProbeStore = Object.freeze({
+  readLatest: (providerRefs) => probeReader.readLatest(providerRefs),
+  record: (observation) => probeRecorder.record(observation)
+});
 // V-9(c) and V-28, the one decision (parseDeclaredProviderTargets, provider-discovery.ts; side-by-side §13, S14, shared
 // with the practice and check-version): the register's configured set, the runner's mode decision over the DECLARED
 // targets (before any credential file is resolved), and a hosted debate target's price.
@@ -651,9 +702,10 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
       previewFetch,
       readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
       spend: {
-        // COR-B1: the writes run inside the ask's request, as the T1 login: the probe asks that login, not the target.
-        writerPresent: () => onOwnConnections(() => languageCheckSpendWriterPresent(pool)),
-        record: (entry) => recordLanguageCheckSpend(pool, entry)
+        // 0171: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X30),
+        // the system login, and the probe asks that login.
+        writerPresent: () => languageCheckSpendWriterPresent(crossAccountPool(pool, "X30")),
+        record: (entry) => recordLanguageCheckSpend(crossAccountPool(pool, "X30"), entry)
       },
       daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
       report: (line) => console.error(JSON.stringify(line))
@@ -672,6 +724,47 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
  * main.ts's own stage names; a refusal names its stage and refuses the boot with the loader's own typed code, as before.
  */
 const siteAdmission = await loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite, (name, run) => boot.run(name, async () => run()));
+/**
+ * Decisions 29 and 31 (dynamic step 2): the small call before a debate exists takes the language check's one route decision (preview: the gate; hosted:
+ * the support target's key; local: none, so no questions) and counts in the person's quota through 0144's writer: without the writer, or without 0171's
+ * reservation that names the person before each call while the request's session is live, no call (never spend unrecorded). The reservation runs on
+ * the request pool, so inside a request it carries its session, and is probed on that login; the writer is the cross-account marker's alone since
+ * 0171, so the record after the call runs on its site (X32), the system login, and is probed there. Above the support adapter, which clears the key
+ * this process keeps. A hosted site with no day ceiling makes no call: nothing here may stop a boot.
+ */
+const askClarifyDayCeiling = siteAdmission.costEnvelope?.guardPolicy.dailyCeilingMicros ?? null;
+const askClarifyWriter = await boot.run("ask-clarify-writer", async () => await askClarifyChargeWriterPresent(crossAccountPool(pool, "X32"))
+  && await onOwnConnections(() => askClarifyReservationPresent(pool)));
+// R22 decision 18: the abuse limits are the register's, on the server's own row; a version without it refuses here (ABUSE_LIMITS_UNRESOLVED).
+const abuseLimits = await boot.run("abuse-limits", () => readAbuseLimits(pool, environment.REGISTER_VERSION));
+const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
+  limits: abuseLimits.askClarify,
+  transportFor: !askClarifyWriter || (previewGate === undefined && askClarifyDayCeiling === null) ? null : askClarifyTransportFor(await questionLanguageSiteRoute({
+    mode: environment.DEPLOYMENT_MODE,
+    policy: ASK_CLARIFY_ROUTE_POLICY,
+    dayCeilingMicros: askClarifyDayCeiling,
+    previewGate,
+    previewFetch,
+    readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
+    // The route's own recorder goes unused: each call's charge is the person's (`record`, below). The probe above stands for this one.
+    spend: { writerPresent: async () => askClarifyWriter, record: async () => undefined },
+    daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
+    report: (line) => console.error(JSON.stringify(line))
+  })),
+  record: (entry) => recordAskClarifyCharge(crossAccountPool(pool, "X32"), entry),
+  reserve: (entry) => reserveAskClarifyCharge(pool, entry),
+  clock: () => new Date(),
+  report: (line) => console.error(JSON.stringify(line))
+}));
+/**
+ * V4 start step, Task 31 (spec 2026-11-03 §3 and §4.1): the calls before Start go out only on the preview, and only where every
+ * one of them can be charged to the person: a preview gate AND 0158's writer, asked of this login as step 2's writer is above
+ * (never keyed on the deployment mode: the test site runs in hosted mode). The references are signed with a key derived from
+ * the blind-index key, as the question-language key is, so every API process of this deployment verifies the others'.
+ */
+const preStartWriter = await boot.run("pre-start-writer", () => onOwnConnections(() => preStartChargeWriterPresent(pool)));
+const startStepKey = startStepKeyFrom(blindIndexKey);
+const startStepRoute = startStepRouteOf({ previewGate, writerPresent: preStartWriter });
 // Side-by-side spec §13 API point 2: every other version is loaded once, on first use, and kept (sealed versions never
 // change); the site version is served from the boot's load.
 const admissionCache = createAdmissionSettingsCache({
@@ -728,7 +821,8 @@ const askRoomComposition = askRoomReadiness === undefined ? undefined : boot.run
     // Side-by-side spec §9, §13 (plan C8): at most SITE_CONCURRENT_DEBATES debates across releases, and an ask
     // admitted while this release is not current waits in line; both read inside the room's spend-decision lock.
     // Side-by-side spec §13 (C14, Task S13): with the site version, the gate reads the activation pointer on a waiting
-    // debate's START transaction (this pool's login is the API's runtime login, which may: D8).
+    // debate's START transaction (this pool's login is the API's system login, which may read the pointer, D8, and
+    // holds the cross-account marker the site count's run_work_is_parked needs since 0171).
     gate: new PostgresAskAdmissionGate({
       releaseKey: environment.RELEASE_KEY, hosted: environment.DEPLOYMENT_MODE === "hosted", siteVersion: environment.REGISTER_VERSION
     })
@@ -914,6 +1008,11 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
       return userId;
     }
   ));
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answer S4 A): each question not started yet has a key of its own,
+// wrapped by the person's user key exactly as a debate's run key is, in its own saved-questions/ folder under the same root. It opens a
+// key only with the caller's own { userId, ownerRef } (the session's, or the export claim's), so it looks no owner up: no cross-account
+// site. The account closing, the saved-question service and the data export all use this one store.
+const savedQuestionKeys = boot.runSync("saved-question-key-store", () => new FileSavedQuestionKeyStore(environment.USER_DEK_STORE_PATH, dekStore));
 if (environment.CONTENT_ENCRYPTION_ENABLED === "true") {
   configureContentEncryption(pool, new ContentCipher(runKeyStore));
 }
@@ -921,7 +1020,32 @@ const socialProviders = (()=>{try{return new SocialProviders(socialConfiguration
 const socialRepository = new PostgresSocialIdentityRepository(authorizationPool,auditContextHasher,pool);
 // Open sign-up mail (owner decision G5, 2026-10-09): the DNS question at the three entry points, 2 s, fail open.
 // Ruling 2026-10-09: outside local mode the special-use endings (.test .example .invalid .localhost) are refused.
-const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE);
+const mailDomainCheck = systemMailDomainCheck(environment.DEPLOYMENT_MODE, abuseLimits.mailDomainChecksPerMinute);
+// The daily outbound mail limit (owner's rulings of 2026-11-01): every account-mail sender below asks this one gate just
+// before it starts MAIL_SENDMAIL_PATH (address rule, suppression, the day's count). The limits are the register's
+// outboundMailPolicy row (a version without it refuses here, OUTBOUND_MAIL_POLICY_UNRESOLVED). The count is in the
+// database (migration 0170), so it survives restarts and uploads and every API copy shares it.
+const outboundMailPolicy = await boot.run("outbound-mail-policy", () => readOutboundMailPolicy(pool, environment.REGISTER_VERSION));
+const outboundMailStore = new PostgresOutboundMailStore(pool);
+// A login that cannot read the count would refuse every mail at run time; say so at the start instead.
+await boot.run("outbound-mail-store", () => attestEveryRoute(() => outboundMailStore.today()));
+const outboundMailGate: OutboundMailGate = new OutboundMailGate({
+  policy: outboundMailPolicy,
+  blindIndexKey,
+  ledger: outboundMailStore,
+  suppression: outboundMailStore,
+  report: (event) => { reportOutboundMail(event); }
+});
+// The owner's alert goes to the billing owner's address when the site has one; otherwise the journal line is the alert.
+const reportOutboundMail = outboundMailReport({
+  ownerAddress: billingConnectors?.ownerReportEmail,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  })
+});
 const registration = new RegistrationService({
   repository: identityRepository,
   socialRepository,
@@ -929,7 +1053,8 @@ const registration = new RegistrationService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   dekStore,
   blindIndexKey,
@@ -942,7 +1067,9 @@ const registration = new RegistrationService({
   argon2: argon2Pool,
   // Paid plans L3b: the acceptance record's evidence is sealed under the records key (L1).
   legalAcceptance: { recordsKey },
-  mailDomainCheck
+  mailDomainCheck,
+  // At the limit, sign-up and resend answer MAIL_DAILY_LIMIT ("try later") before any account work.
+  outboundMail: outboundMailGate
 });
 // Paid plans L4: re-acceptance of the Terms and the Privacy Policy, over the acceptance record.
 // Hosted: an account with no record owes both documents (it must accept before it can pay).
@@ -969,7 +1096,7 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   blindIndexKey
 }));
 const socialAuth = new SocialAuthService(socialRepository,socialProviders,sessions.consumerProducer(),{registration,security:new PostgresConsumerSecurityRepository(authorizationPool,auditContextHasher),authPolicy,blindIndexKey});
-const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL});
+const consumerAccountMail=new SendmailConsumerAccountSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,timeoutMs:authPolicy.channel.transportTimeoutMs,publicAppUrl:environment.PUBLIC_APP_URL,gate:outboundMailGate});
 const consumerRecovery=new ConsumerRecoveryService(new PostgresConsumerRecoveryRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),{publicAppUrl:environment.PUBLIC_APP_URL,users:dekStore,argon2:argon2Pool,mfaPolicy,authPolicy,policy:consumerRecoveryPolicy,blindIndexKey,mail:consumerAccountMail,onMailFailure:()=>console.error('[CONSUMER_RECOVERY_MAIL_FAILED]')});
 const onboardingEvidence=new OnboardingEvidenceService(new PostgresOnboardingEvidenceRepository(authorizationPool,auditContextHasher),sessions.consumerProducer(),recordsKey);
 const consumerSecurityNotices=new ConsumerSecurityNoticeReconciler(new PostgresConsumerSecurityNoticeRepository(authorizationPool),dekStore,consumerAccountMail);
@@ -977,7 +1104,7 @@ const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepos
 // COR-B1, V-12: the request path runs on the T1 login, the notification worker on the target: both are attested.
 if(passwordResetRepository)await boot.run("password-reset-role",()=>attestEveryRoute(()=>passwordResetRepository.assertRole()));
 const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
-const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
 let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
 const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
@@ -986,7 +1113,7 @@ if(backupEmailRepository)await boot.run("backup-email-role",()=>attestEveryRoute
 if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>attestEveryRoute(()=>mfaRecoveryRepository.assertRole()));
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
-const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs});
+const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate});
 const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
 const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
 let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
@@ -1006,14 +1133,19 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
   ? new StaffAccessService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), sessions) : undefined;
 // Explicit protected adapters, config custody, installation and policy are startup-only gates. A stale ACK
 // proof or readiness publication never blocks boot: Team tools start locked (one api.staff.tools_locked line)
-// and each staff action re-checks readiness, so an operator unlock needs no restart.
+// and each staff action re-checks readiness, so an operator unlock needs no restart. A staff change's alert maps its
+// key user on the system login (X14, 0171); the dispatcher drains on `pool`, outside any request, so on it too.
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
-  ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
+  ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,mappingPool:crossAccountPool(pool, "X14"),keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
 const threatReportRepository = new PostgresThreatReportRepository(pool);
 // Row-level security (X27, merge onto synthesis-flag S04): a staff request reads the reported account's address, another
 // account's identity row, so the reader runs on the cross-account target.
 const readThreatReportRecipientEmail = threatReportEmailReader(crossAccountPool(pool, "X27"), dekStore);
+// Decision 24: 0142's definers only, and the notices open the named account's address through the same reader.
+const teamLimitRepository = new PostgresTeamLimitRepository(pool);
+const publicReviewRepository = new PostgresPublicReviewRepository(pool);
+const publicFlagRepository = new PostgresPublicFlagRepository(pool);
 const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
@@ -1021,6 +1153,15 @@ const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undef
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
   threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
+  teamLimit: { repository: teamLimitRepository },
+  publicFlags: { repository: publicFlagRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
+    if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return publications.withReviewKey(publicationRef, runId, use);
+  } },
+  publicReview: { repository: publicReviewRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
+    if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
+    return publications.withReviewKey(publicationRef, runId, use);
+  } },
   ...(staffAlerts.funding === undefined ? {} : { funding: staffAlerts.funding })
 };
 // Self-service profile/recovery capabilities use the existing authorization
@@ -1037,7 +1178,8 @@ const recoveryEmail = new RecoveryEmailService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
@@ -1049,13 +1191,20 @@ const emailChange = new EmailChangeService({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
     publicAppUrl: environment.PUBLIC_APP_URL,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   mailDomainCheck
 });
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
   new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
 );
+/**
+ * V4 start step, Task 36: THE ONE chosen paths store, on the runtime pool (its login holds debateai_runtime, the only role granted
+ * core.record_start_paths and core.read_start_paths, 0159): the AskApplication seals a run's chosen paths through it (the START_PATHS
+ * setup step) and reads them when a waiting debate is let in again; buildApi gets the same object.
+ */
+const startPaths = new PostgresStartPathsStore(pool);
 const application = new PostgresAskApplication(pool, dispatcher, {
   /**
    * Side-by-side spec §13: the members a settings version decides (its preview line-up and gate terms, the daily guard
@@ -1081,7 +1230,11 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   admissionSettings: {
     activeSettingsVersion: () => activeSettings.current(),
     admissionSettingsFor: async (version) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version))
-  }
+  },
+  // V4 start step, Task 36: the chosen paths (sealed at the START_PATHS setup step, read at re-admission) and a debate's purpose
+  // lines, which the setup step records with them; without the store a v2 ask with chosen paths fails START_PATHS_STORE_UNAVAILABLE.
+  startPaths,
+  purposeLines: postgresPurposeLines(pool)
 },undefined,contentProvisionPool,Object.freeze({
   server:serverAskAdmissionPool,legacy:legacyAskAdmissionPool
 }));
@@ -1110,7 +1263,15 @@ const publications = publicationCipher === undefined
       new RepositoryPublicationStoryReader(storyRepository),
       mapViews,
       // Final fix wave P5: an unparsable public snapshot is a newer release's only when its run is stamped by one.
-      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }
+      { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) },
+      // Decision 13: what contributions and reports added to the page since its first snapshot.
+      {
+        readUpdates: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).readPageUpdates(publicationRef),
+        readReports: (publicationRef) => new PostgresPublicPageRepository(pool).readReports(publicationRef),
+        authorNameGone: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).isAuthorNameGone(publicationRef),
+        readOverlay: (publicationRef) => new PostgresPublicReviewRepository(pool).readOverlay(publicationRef),
+        isHeld: (publicationRef) => new PostgresPublicReviewRepository(pool).isHeld(publicationRef)
+      }
     );
 // Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
 await boot.run("release-watcher", () => releaseWatcher.start());
@@ -1129,6 +1290,8 @@ await boot.run("active-settings-version-check", () => checkActiveSettingsVersion
   log: (line) => { console.error(line); }
 }));
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
+let publicPageTimer: ReturnType<typeof setInterval> | undefined;
+let publicReviewPurgeTimer: ReturnType<typeof setInterval> | undefined;
 if (publications !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
   // can accept traffic. Both bounded outboxes continue reconciling while the
@@ -1163,7 +1326,10 @@ const accountErasure = new AccountErasureCoordinator(
     readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
       'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
     )).rows[0]?.email_ciphertext ?? null,
-    beforeKeyDestruction: threatReportEmailHold(threatReportRepository)
+    beforeKeyDestruction: threatReportEmailHold(threatReportRepository),
+    // V4 start step, Task 39e (owner answer S4 A): closing the account destroys every question key it finds by the owner_ref, then the
+    // account key (Task 39d's step); the same store the service and the export use.
+    savedQuestionKeys
   }
 );
 const threatReportAlertsTimer = startThreatReportAlerts({
@@ -1171,10 +1337,78 @@ const threatReportAlertsTimer = startThreatReportAlerts({
   mail: new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }),
   readRecipientEmail: readThreatReportStaffEmail
 }, releaseWatcher);
+const teamLimitNoticesTimer = startTeamLimitNotices({
+  repository: teamLimitRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 32: the Owner's and the member's notices about an allowance, through the same loop and mail.
+const allowanceNoticesTimer = startTeamLimitNotices({
+  repository: new PostgresInternalAllowanceRepository(pool),
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 33: both accounts hear of every review step, content-free, through the same loop.
+const publicReviewNoticesTimer = startTeamLimitNotices({
+  repository: publicReviewRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// Decision 35: both accounts hear that a debate was hidden automatically or a report waits, content-free.
+const publicFlagNoticesTimer = startTeamLimitNotices({
+  repository: publicFlagRepository,
+  mail: new TemplatedMailSender({
+    executable: environment.MAIL_SENDMAIL_PATH,
+    from: environment.MAIL_FROM,
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
+  }),
+  readEmail: readThreatReportRecipientEmail
+}, releaseWatcher);
+// 0157: every person a review step affects gets a statement of reasons (DSA Art 17). It replaces 0156's content-free notice: this release no longer
+// claims 0156's queue, so nobody gets both from it; twelve months on, the typed facts and the quote go.
+const moderationStatementRepository = new PostgresModerationStatementRepository(pool);
+const moderationStatements = new ModerationStatementReconciler(moderationStatementRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs,
+  gate: outboundMailGate
+}), environment.PUBLIC_APP_URL);
+// 0157 (D4): the answers to people who report, and the sweep of a report left CHECKING (it goes to a person after five minutes).
+const publicFlagMailRepository = new PostgresPublicFlagMailRepository(pool);
+const publicFlagAnswers = new PublicFlagAnswerReconciler(publicFlagMailRepository, dekStore, new TemplatedMailSender({
+  executable: environment.MAIL_SENDMAIL_PATH,
+  from: environment.MAIL_FROM,
+  timeoutMs: authPolicy.channel.transportTimeoutMs,
+  gate: outboundMailGate
+}), environment.PUBLIC_APP_URL);
+// M5 (owner, 10 Nov 2026): the statements and the reporters' answers each in their own try, so one failing (its claim, a settle) never skips the other.
+const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightErasureReconciler(async () => {
+  try { await moderationStatements.reconcile(100); } catch { console.error("[MODERATION_STATEMENT_PENDING]"); }
+  try { await publicFlagAnswers.reconcile(100); } catch { console.error("[PUBLIC_FLAG_ANSWER_PENDING]"); }
+  await publicFlagMailRepository.settleStuck();
+  await moderationStatementRepository.deleteWordsDue();
+}, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
 const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
@@ -1190,7 +1424,8 @@ const erasureNotifications = new AccountErasureNotificationReconciler(
   accountErasureRepository,dekStore,new SendmailSecurityNotificationSender({
     executable:environment.MAIL_SENDMAIL_PATH,
     from:environment.MAIL_FROM,
-    timeoutMs:authPolicy.channel.transportTimeoutMs
+    timeoutMs:authPolicy.channel.transportTimeoutMs,
+    gate:outboundMailGate
   })
 );
 const reconciliationSource = () => Object.freeze({
@@ -1233,6 +1468,14 @@ const triggerRetentionPurge=createSingleFlightErasureReconciler(
   ()=>console.error("[RETENTION_PURGE_PENDING]")
 );
 const retentionPurgeTimer=gatedInterval(releaseWatcher,triggerRetentionPurge,86_400_000);
+// The security review's 0171 (F5): the clarify reservations no charge took (a refused, skipped or abandoned call) go hourly, and once each time this
+// release becomes current (below), whether or not anyone reserves again, so none outlives about two hours. Outside any request, so `pool` sends it to
+// the API's system login, which holds the cross-account marker the sweep is granted to. Whatever the route: rows may predate a change of it.
+const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
+  async ()=>{ await sweepAskClarifyReservations((limit)=>deleteAskClarifyReservationsDue(pool,limit)); },
+  ()=>console.error("[ASK_CLARIFY_RESERVATION_SWEEP_PENDING]")
+);
+const askClarifyReservationSweepTimer=gatedInterval(releaseWatcher,triggerAskClarifyReservationSweep,ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS);
 /**
  * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
  * here; once right after listen (a raised site limit arrives as a restart, and
@@ -1324,10 +1567,20 @@ const publicationJudgeSwitch = createPublicationJudgeSwitch(supportModelTarget =
   }), { offFlagPath: publicationJudgeOffFlag });
 const publicationContentCheck = createPublicationContentCheck({
   judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
   recorder: new PostgresPublicationCheckRecordRepository(pool),
   clock: () => new Date(),
   deadlineMs: publicationCheckPolicy.deadlineMs
 });
+// Decision 13: the same judge on a report on a public debate; its record names the report (0149).
+const publicReportContentCheck = createPublicationContentCheck({
+  judge: publicationJudgeSwitch.current,
+  recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id, attemptedAt: row.attempted_at, calls: row.judge_call_count, inputTokens: row.input_tokens, outputTokens: row.output_tokens, costUsd: row.cost_usd }),
+  recorder: { record: (row) => new PostgresPublicPageRepository(pool).recordReportCheck({ reportId: row.run_id, attemptedAt: row.attempted_at, outcome: row.outcome, failureCause: row.failure_cause, rules: row.rules, partKinds: row.part_kinds, ground: row.ground, judgeProviderRef: row.judge_provider_ref, judgeModelId: row.judge_model_id, policyVersion: row.policy_version, judgeCallCount: row.judge_call_count }) },
+  clock: () => new Date(),
+  deadlineMs: publicationCheckPolicy.deadlineMs
+});
+const REPORT_CHECK_PREFIX = "report:";
 const questionCheckPolicy = await boot.run("question-check-policy", () =>
   readQuestionCheckPolicy(pool, environment.REGISTER_VERSION));
 // V, 2026-10-28: the question check's subjects come from one file; a bad file stops the boot.
@@ -1340,16 +1593,19 @@ const questionCheck = await boot.run("question-check", () => composeQuestionChec
   reportDiagnostic: reportSupportDiagnostic,
   policy: questionCheckPolicy,
   subjects: questionSubjects,
+  // 0171: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X31), the
+  // system login, and the probe asks that login.
   spend: {
-    writerPresent: () => questionCheckSpendWriterPresent(pool),
-    record: entry => recordQuestionCheckSpend(pool, entry)
+    writerPresent: () => questionCheckSpendWriterPresent(crossAccountPool(pool, "X31")),
+    record: entry => recordQuestionCheckSpend(crossAccountPool(pool, "X31"), entry)
   },
   dayPot: siteAdmission.costEnvelope === null ? null : {
     ceilingMicros: siteAdmission.costEnvelope.guardPolicy.dailyCeilingMicros,
     spentMicros: day => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   },
   clock: () => new Date(),
-  report: line => console.error(JSON.stringify(line))
+  report: line => console.error(JSON.stringify(line)),
+  preview: previewGate === undefined ? null : { fetch: previewFetch, anthropicSocket: previewProviderSocket(previewGate, "anthropic") }
 }));
 const synthesisCheckOffFlag = environment.DEPLOYMENT_MODE === "hosted" ? null : synthesisCheckOffFlagPath(environment.API_PORT);
 const synthesisCheckSwitch = createLocalOffFlagSwitch(supportModelTarget === undefined ? null
@@ -1368,8 +1624,10 @@ const synthesisCheckDeps: SynthesisCheckDeps = {
     ceilingMicros: siteAdmission.costEnvelope.guardPolicy.dailyCeilingMicros,
     spentMicros: (day: string) => new PostgresModelSpendStore(pool).readDaySpentMicros(day)
   } }),
+  // 0171: a charge's INSERT is the cross-account marker's alone, so the check's record, inside the request that asked for it, runs on its
+  // site (X33), the system login.
   recordSpend: (entry) =>
-    new PostgresModelSpendStore(pool).recordSpend({ ...entry, spendId: randomUUID() }),
+    new PostgresModelSpendStore(crossAccountPool(pool, "X33")).recordSpend({ ...entry, spendId: randomUUID() }),
   priceOf: (model: string) => {
     const row = previewModelRow(model);
     return row === undefined ? null : { inputUsdPerM: row.inputUsdPerM, outputUsdPerM: row.outputUsdPerM };
@@ -1545,6 +1803,7 @@ const billingRuntime = billingConnectors === null
         payments: new TimeShiftedCardPayments(billingConnectors.payments, stageOffsetDays)
       });
     return createBillingRuntime({
+      cancelLinksPerDay: abuseLimits.cancelLinksPerDay,
       pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
@@ -1552,7 +1811,8 @@ const billingRuntime = billingConnectors === null
         sender: new TemplatedMailSender({
           executable: environment.MAIL_SENDMAIL_PATH,
           from: environment.MAIL_FROM,
-          timeoutMs: authPolicy.channel.transportTimeoutMs
+          timeoutMs: authPolicy.channel.transportTimeoutMs,
+          gate: outboundMailGate
         }),
         attachments: billingMailAttachmentResolvers({ audit: consoleBillingAudit })
       },
@@ -1606,7 +1866,8 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   const mail = new TemplatedDataExportMail(new TemplatedMailSender({
     executable: environment.MAIL_SENDMAIL_PATH,
     from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs
+    timeoutMs: authPolicy.channel.transportTimeoutMs,
+    gate: outboundMailGate
   }));
   const ownerDeps = { application, stories: ownerStories, disclosures: ownerDisclosures, synthesisAnswerAccess };
   dataExport = new DataExportApplication({
@@ -1616,6 +1877,10 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
       claim, workerId, source,
       ownerView: new OwnerViewAdapter(ownerDeps, runKeyStore, publicationReviewRepository, claim.sessionId),
       decrypt: {
+        openPublicFlag: async (publicationRef, runId, envelope) => {
+          if (publications === undefined) throw new Error("DATA_EXPORT_PUBLICATION_KEY_UNAVAILABLE");
+          return publications.withReviewKey(publicationRef, runId, (cipher) => cipher.decrypt(envelope as never));
+        },
         openUserField: async (userId, field, envelope) => {
           const dek = await dekStore.load(userId);
           let plain: Buffer | undefined;
@@ -1625,6 +1890,8 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
             return plain.toString("utf8");
           } finally { plain?.fill(0); dek.fill(0); }
         },
+        // V4 start step, Task 39e: a question not started yet, opened with its own key under the claim's account (null: its key is gone).
+        openSavedQuestion: savedQuestionOpener(savedQuestionKeys),
         openRecord: (aad, ciphertext) => {
           const plain = openRecord(recordsKey, aad, ciphertext);
           try { return plain.toString("utf8"); } finally { plain.fill(0); }
@@ -1636,7 +1903,9 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
             plain = supportKeys.openContent(context as Parameters<typeof supportKeys.openContent>[0], key, ciphertext);
             return plain.toString("utf8");
           } finally { plain?.fill(0); key.fill(0); }
-        }
+        },
+        // 0132's web values, under each debate's run key on the pool that carries the content cipher.
+        openRunContent: runContentOpener(pool)
       },
       now: () => new Date()
     })
@@ -1647,6 +1916,46 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
   dataExportTimer = gatedInterval(releaseWatcher, triggerDataExportWork, DATA_EXPORT_TICK_MS);
 }
 const admission = new AdmissionLimiter(admissionPolicy);
+// V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
+// principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
+const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
+// V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answers S3 A, S4 A): the questions not started yet, through 0162's
+// five functions on the same runtime pool (EXECUTE for debateai_billing_runtime only), each sealed and opened with its own key from the
+// one question-key store, and kept only for a reading the start step's key signed (Task 31's, the same the step signs with).
+const savedQuestionStore = savedQuestionStoreFrom((text, values) => pool.query(text, values));
+const savedQuestions = createSavedQuestionService({
+  store: savedQuestionStore,
+  keys: savedQuestionKeys,
+  key: startStepKey,
+  report: (code, id) => { console.error(JSON.stringify({ event: code, ...(id === undefined ? {} : { saved_question_id: id }) })); }
+});
+const investigations = new PostgresInvestigationRepository(pool);
+/**
+ * V4 start step, Task 31 (spec 2026-11-03 §4.1; owner answers Q2 and Q8 of 4 Nov): THE STEP BEFORE START, behind POST
+ * /v1/asks/paths/lists, …/merge, …/combine and …/fit. Each call runs on the settings of the version it is asked under, from the
+ * one admission cache (the switch, the line-up, the language port); the question check is Start's own. On the preview route it
+ * sends through the gate's guarded fetch, which settles the money there, and each call is the person's charge through 0158's
+ * writer, at the price the runner charges the same target at (F4). Off the preview route there is no transport, and every
+ * call answers none OFF. Nothing it logs carries the question, a list or a person.
+ */
+const startStep = createStartStep({
+  route: startStepRoute,
+  key: startStepKey,
+  settingsFor: (version) => admissionCache.admissionSettingsFor(version),
+  questionCheck,
+  transport: startStepRoute === "PREVIEW" && previewFetch !== undefined
+    ? createStartTransport({ fetch: previewFetch, targets: declaredProviderTargets }) : null,
+  charges: createStartCharges({
+    record: (entry) => recordPreStartCharge(pool, entry),
+    priceOf: (providerRef) => {
+      const target = declaredProviderTargets.find((declared) => declared.providerRef === providerRef);
+      return target === undefined ? null : previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
+    },
+    clock: () => new Date(),
+    report: (line) => console.error(JSON.stringify(line))
+  }),
+  report: (line) => console.error(JSON.stringify(line))
+});
 const api = buildApi({
   questionCheck,
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
@@ -1658,6 +1967,105 @@ const api = buildApi({
   // the content-free disclosure record, on the same runtime pool.
   disclosures: ownerDisclosures,
   mapViews,
+  accountMemory,
+  // Plan 2026-10-30 dig-model revision W3-2 (0133, 0134): dig levels and the month pause, and the dig's join at start,
+  // through 0134's and 0133's definers on the same runtime pool (debateai_billing_runtime); the month's room again after
+  // a pause is the ask room's (with billing on).
+  digModel: new PostgresDigModelRepository(pool),
+  investigations,
+  // R22 W5-1: the final report over an investigation, through 0136's and 0133's definers on the same runtime pool; a
+  // debate in no investigation is told from another account's by 0131's ownership rule (the last-visit read answers null
+  // only for a debate that is not this account's); what the runner sealed under the ROOT's run key opens on this pool.
+  investigationReports: {
+    reports: new PostgresInvestigationReportRepository(pool),
+    investigations,
+    owns: async (ownerRef, runId) => (await accountMemory.readLastVisit(ownerRef, runId)) !== null,
+    openRootContent: investigationReportContentOpener(pool)
+  },
+  // W4-4: "Add to researched" through 0132's and 0133's definers on the same runtime pool; adding counts as activity for the 30 days (owner F12).
+  webResearched: {
+    record: (ownerRef, runId, pageId) => new PostgresWebResearchedRepository(pool).record(ownerRef, runId, pageId),
+    markActivity: async (ownerRef, runId) => {
+      if (await investigations.open(ownerRef, runId) !== null) await investigations.touch(ownerRef, runId);
+    }
+  },
+  // W3-7 (0135): a dig's picks, kept at start for its path rewrite, each text sealed under the dig's run key on this pool.
+  digPicks: new PostgresDigPicksRepository(pool),
+  // Decision 5 of 31 Oct (0138): a debate's place, time and purpose lines, sealed under its run key on this pool.
+  purposeLines: postgresPurposeLines(pool),
+  // Decision 13 (0147): digs and reports on a public debate, by anyone with credit, read from the public copy.
+  ...(publications === undefined ? {} : { publicFlags: {
+    limits: abuseLimits.publicFlag,
+    repository: publicFlagRepository, judge: publicationJudgeSwitch.current,
+    // Row-level security (X38, the security review's F5): the report's settlement, after the judge, on the API's system login: the cross-account
+    // marker's alone since 0171, so no request login records a verdict of its own choosing or hides a debate.
+    settlement: new PostgresPublicFlagRepository(crossAccountPool(pool, "X38")),
+    seal: (publicationRef: string, runId: string, value: unknown) => publications.withReviewKey(publicationRef, runId, (cipher) => cipher.encrypt(value)),
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
+    log: (event: string, detail: Record<string, unknown>) => { console.error(JSON.stringify({ event, ...detail })); }
+  } }),
+  // 0157 (D1): the person's own statements of reasons, their facts opened under the debate's key as the two accounts' review opens them.
+  ...(publications === undefined ? {} : { moderationStatements: { repository: moderationStatementRepository,
+    withKey: <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => publications.withReviewKey(publicationRef, runId, use) } }),
+  ...(publications === undefined ? {} : { publicTree: {
+    pool, tree: new PostgresPublicTreeRepository(pool), contributions: new PostgresPublicDebateRepository(pool),
+    readPublicDebate: (publicationRef: string) => publications.readPublicDebate(publicationRef),
+    // Task 56h-port (owner, 7 Nov; coordinator, 8 Nov option A): a report nothing else can carry goes on a run of the presser's own, made for it as an
+    // ask's run is made (the content provision login, under the owner's ask admission lease on the server ask admission login), never a debate of theirs.
+    ownReportCarrier: publicReportCarrierMaker({
+      readOwn: (ownerRef, publicationRef) => new PostgresPublicTreeRepository(pool).readOwnReportCarrier(ownerRef, publicationRef),
+      startRun: (input, admissionClient) => new ReportRunRepository(pool, contentProvisionPool).startRun(input, admissionClient),
+      withAdmissionLease: (ownerRef, use) => withReportRunAdmissionLease(serverAskAdmissionPool, { ownerRef, legacyAskerId: null }, (lease) => use(lease.client)),
+      site: { releaseKey: environment.RELEASE_KEY, batteryVersion: environment.BATTERY_VERSION }
+    })
+  } }),
+  askClarify,
+  // V4 start step, Task 31: the step and the key it signs with, together (Task 30: the merge verifies with this key before its
+  // stream opens; without it the four calls answer none OFF). The streams keep START_STEP_TIMING's heartbeat and longest life.
+  startStep,
+  startStepKey,
+  // V4 start step, Task 36: the same chosen paths store the AskApplication holds.
+  startPaths,
+  // V4 start step, Task 56b (owner answer Q20 B): a public debate's report counts, on this pool (0161 grants them to its billing role),
+  // so the owner's first report of their own public debate uses the kept reserve and a further one waits for the reset.
+  ownClosings: new PostgresOwnClosingsReader(pool),
+  // V4 start step, Task 39e: the questions not started yet, their five routes and the removal at Start.
+  savedQuestions,
+  // V4 start step, Task 56 ("Let the AIs carry on to the report"): the carry-on marks on the same chosen paths store, and the one room
+  // (the same object as `askRoom` below) for the look before each dig; the tick below drives them.
+  carryOn: startPaths,
+  ...(askRoom === undefined ? {} : { carryOnRoom: askRoom }),
+  ...(askRoom === undefined ? {} : { monthRoom: askRoom }),
+  // R22 W3-8: after Continue, the paused debate's released work item goes back to its own release's runner through the
+  // routed dispatcher (a failed send is only logged: the runner's lapsed re-send takes it within five minutes anyway).
+  continuedRunWake: continuedRunWake({
+    claimableWorkItemOf: (runId) => new WorkItemRepository(pool).claimableWorkItemOfRun(runId),
+    dispatch: (job) => dispatcher.dispatch(job)
+  }),
+  // Decision 12: Continue on a debate of an older release moves it here first (0143), keeping everything it found.
+  runHandover: runHandoverOf({
+    ownReleaseKey: environment.RELEASE_KEY,
+    readRunReleaseNow: (runId) => new PostgresDigModelRepository(pool).readRunReleaseNow(runId),
+    versionPassed: (version) => settingsVersionPassed(pool, environment.RELEASE_KEY, version),
+    activeVersion: () => readActiveSettingsVersionOn(pool, environment.REGISTER_VERSION),
+    resumeInRelease: (ownerRef, runId, releaseKey, registerVersion) =>
+      new PostgresDigModelRepository(pool).resumeInRelease(ownerRef, runId, releaseKey, registerVersion)
+  }),
+  // V4 start step, Task 57f (the owner's 7 Nov answers): the same Continue on the person's own FAILED debate, through 0165's read and re-open on
+  // this pool (the API's role); hosted, only while the person's pool (the ask room's) and the site's day have room for the rest. The wake and the
+  // hand-over are the two above.
+  failedRunContinue: {
+    store: {
+      readContinue: (ownerRef, runId) => new PostgresDigModelRepository(pool).readRunContinue(ownerRef, runId),
+      reopen: (ownerRef, runId, destination) => new PostgresDigModelRepository(pool)
+        .continueFailedRun(ownerRef, runId, destination?.releaseKey ?? null, destination?.registerVersion ?? null)
+    },
+    ...(askRoom === undefined || askRoomComposition === undefined || askRoomReadiness === undefined ? {} : { room: continueRoomOf({
+      personPool: (ownerRef, now) => askRoom.readPersonPool(ownerRef, now),
+      daySpentMicros: (day) => askRoomComposition.spend.readDaySpentMicros(day),
+      dailyCeilingMicros: askRoomReadiness.runPolicy.dailyCeilingMicros
+    }) })
+  },
   ...(dataExport === undefined ? {} : { dataExport }),
   /**
    * Side-by-side spec §13 (S10): what the ACTIVE settings version says to the pages, per request — the room read's shape
@@ -1763,10 +2171,17 @@ const api = buildApi({
     evaluatorDevMenuRegisterVersion: environment.REGISTER_VERSION
   })
 });
+// V4 start step, Task 56 ("Let the AIs carry on to the report"): one carry-on pass at a time (single flight: an overlapping tick is
+// only said, content-free), every whole minute while this release is current (below, beside the ask waker); stopped on close.
+const triggerCarryOn = createSingleFlightErasureReconciler(async () => { await api.carryOnTick(); }, () => console.error("[CARRY_ON_TICK_PENDING]"));
+let carryOnLoop: Readonly<{ stop(): void }> | undefined;
 // Side-by-side spec §4 (plan C7 review): the release listener unsubscribes FIRST on close. Fastify runs onClose hooks
 // last-in-first-out, so an onClose here would run after every stop below; preClose runs before all of them, so no
 // one-shot pass can start a runtime the hooks below have already stopped.
 api.addHook("preClose",async () => endBecameCurrent?.());
+// Assigned once listening; clearing an unset timer does nothing.
+api.addHook("onClose",async () => clearInterval(publicPageTimer));
+api.addHook("onClose",async () => clearInterval(publicReviewPurgeTimer));
 if (publicationCleanupTimer !== undefined) {
   api.addHook("onClose",async () => clearInterval(publicationCleanupTimer));
 }
@@ -1780,6 +2195,11 @@ const supportSweepTimer = gatedInterval(releaseWatcher, () => {
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
+api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
+api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
+api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
+api.addHook("onClose",async () => clearInterval(moderationNoticesTimer));
+api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
 api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
@@ -1787,7 +2207,9 @@ api.addHook("onClose",async () => billingRuntime?.stop());
 api.addHook("onClose",async () => providerOnlyJobs?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
+api.addHook("onClose",async () => clearInterval(askClarifyReservationSweepTimer));
 api.addHook("onClose",async () => askWaker?.stop());
+api.addHook("onClose",async () => carryOnLoop?.stop());
 api.addHook("onClose",async () => staffAlerts?.close());
 api.addHook("onClose",async()=>{
  if(passwordResetTimer)clearInterval(passwordResetTimer);
@@ -1825,6 +2247,12 @@ const startup = installStartupResourceOwner({
     ...(evaluatorDevMenuPool === undefined ? [] : [evaluatorDevMenuPool]),
     ...(dataExportPool === undefined ? [] : [dataExportPool]),
     supportPool,
+    // Row-level security S01: the two system pools close last among the pools, after every pool that routes to them as
+    // its cross-account target (pool and legacyAskAdmissionPool to systemPool, authorizationPool to
+    // authorizationSystemPool; setCrossAccountTarget above). Left open, their idle connections kept the process alive
+    // after SIGTERM until a supervisor killed it (preview-auth-dev-startup, 2026-11-08).
+    systemPool,
+    ...(authorizationSystemPool === systemPool ? [] : [authorizationSystemPool]),
     { end: () => supportKeys.close() },
     { end: () => supportConfiguration.close() },
     // Paid plans G3a: the country lookup is closed with the process (close only sets a flag, so twice is harmless).
@@ -1872,6 +2300,47 @@ console.info(`DEBATEAI_API_READY ${JSON.stringify({ releaseKey: environment.RELE
 // Side-by-side spec §4 (plan C7): the timers started here, like every timer above, run their work only while this
 // release is current; the ask waker's whole-minute tick (with its stalled-start re-send) is gated the same way.
 if (askRoom !== undefined) askWaker = everyWholeMinute(gatedTrigger(releaseWatcher, triggerAskWake));
+// V4 start step, Task 56: the carry-on's whole-minute tick, gated the same way (its claims and DONE marks are single in the database).
+carryOnLoop = everyWholeMinute(gatedTrigger(releaseWatcher, triggerCarryOn));
+// Decision 13: what allowed contributions wrote goes on the public page, and a finished Free debate goes public. Single-flight, gated: rows are claimed by what they already say, so an overlap at a
+// switch copies nothing twice.
+if (publications !== undefined) {
+  const publicPage = new PostgresPublicPageRepository(pool);
+  const publicContributions = new PostgresPublicDebateRunnerRepository(pool);
+  const publicTreeRepository = new PostgresPublicTreeRepository(pool);
+  // One wait for all three: they ask the same judge.
+  const judgeGate = backedOffContentCheck({ check: async (request) => request.runId.startsWith(REPORT_CHECK_PREFIX)
+    ? publicReportContentCheck.check({ runId: request.runId.slice(REPORT_CHECK_PREFIX.length), snapshot: request.snapshot }) : publicationContentCheck.check(request) });
+  const sweepContentCheck = judgeGate;
+  const sweepReportCheck = { check: (request: Parameters<typeof judgeGate.check>[0]) => judgeGate.check({ runId: `${REPORT_CHECK_PREFIX}${request.runId}`, snapshot: request.snapshot }) };
+  const triggerPublicPage = createSingleFlightErasureReconciler(async () => {
+    await sweepPublicPage({ pool, page: publicPage, contributions: publicContributions, tree: publicTreeRepository, contentCheck: sweepContentCheck, reportContentCheck: sweepReportCheck,
+      withPublicationKey: (publicationRef, use) => publications.withPublicationKey(publicationRef, use) });
+    await sweepFreePublications({ contributions: publicContributions, publishOne: async (waiting) => {
+      const owner = await publicPage.readFreeOwner(waiting.run_id);
+      if (owner === null) return "NOT_WAITING";
+      const session = ownerSession(owner.owner_ref, "00000000-0000-0000-0000-000000000000");
+      const ownership = { ownerRef: owner.owner_ref, legacyAskerId: null };
+      const lease = { run: <T>(use: () => Promise<T>) => application.withContentLease(waiting.run_id, use),
+        readAnswer: () => application.readRunAnswer(waiting.run_id, session, ownership) };
+      const answer = await lease.run(lease.readAnswer);
+      if (answer === null) return "NO_ANSWER_YET";
+      // Wait a while for the story, so the page goes out with its short answer.
+      const story = await lease.run(() => new RepositoryPublicationStoryReader(storyRepository).readStoryShort({ answerId: answer.answer_id, answerVersion: answer.answer_version, ownerRef: owner.owner_ref }));
+      if (story === null && Date.now() - Date.parse(waiting.notice_at) < FREE_PUBLICATION_STORY_WAIT_MS) return "WAITING_FOR_STORY";
+      const lines = await readPurposeLinesOf(pool, owner.owner_ref, waiting.run_id);
+      return publications.publishFreeDebate({ runId: waiting.run_id, answer, owner: { userId: owner.user_id, ownerRef: owner.owner_ref }, purposeLines: lines, contentCheck: sweepContentCheck,
+        source: { ip: "", userAgent: "", requestId: "free-publication-sweep" }, lease,
+        store: { prepare: (runId, ref) => publicContributions.prepareFreePublication(runId, ref),
+          publish: (input) => publicContributions.publishFree({ runId: input.runId, publicationRef: input.publicationRef, grantTokenHash: input.grantTokenHash, content: input.content, presentedAt: input.presentedAt }),
+          refuse: (runId) => publicContributions.refuseFree(runId) } });
+    } });
+  }, () => console.error("[PUBLIC_PAGE_WORK_PENDING]"));
+  publicPageTimer = gatedInterval(releaseWatcher, triggerPublicPage, PUBLIC_PAGE_SWEEP_DEFAULTS.everyMs);
+  // Decision 36: sealed originals and reports' words past their six months.
+  publicReviewPurgeTimer = gatedInterval(releaseWatcher, () => { void sweepPublicReviewPurge({ repository: publicFlagRepository, withKey: (publicationRef, runId, use) => publications.withReviewKey(publicationRef, runId, use),
+    log: (event, detail) => { console.error(JSON.stringify({ event, ...detail })); } }).catch(() => undefined); }, PUBLIC_REVIEW_PURGE_EVERY_MS);
+}
 if(triggerPasswordResetReconciliation)passwordResetTimer=gatedInterval(releaseWatcher,triggerPasswordResetReconciliation,30_000);
 if(triggerEmailRecoveryReconciliation)emailRecoveryTimer=gatedInterval(releaseWatcher,triggerEmailRecoveryReconciliation,30_000);
 // Side-by-side spec §4 (plan C7): the post-listen one-shots, in their order, run each time this release BECOMES current
@@ -1887,6 +2356,7 @@ endBecameCurrent = releaseWatcher.onBecameCurrent(() => {
   triggerDataExportWork();
   triggerAuthenticationRiskCleanup();
   triggerRetentionPurge();
+  triggerAskClarifyReservationSweep();
   billingRuntime?.start({ when: () => releaseWatcher.ownIsCurrent() });
   providerOnlyJobs?.start({ when: () => releaseWatcher.ownIsCurrent() });
   // N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message

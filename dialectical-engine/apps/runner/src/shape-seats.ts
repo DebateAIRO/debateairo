@@ -27,6 +27,60 @@ export function shapeHandOverRoot(input: Readonly<{ makers: readonly string[]; r
   return Object.freeze({ kind: "NONE" });
 }
 
+/**
+ * R22 (owner ruling 2026-10-30, "Yes, use the spare debater") — THE SPARE DEBATER A POSITION IS HANDED TO WHEN ITS
+ * ANSWER WAS REFUSED AFTER EVERY REPAIR: the SWAP `shapeHandOverRoot` makes for a position whose maker sits out, among
+ * the seats no position uses that may take it (`takes`: up, not sitting out, never refused a position, arguing no other
+ * position) and whose maker is none of the refused seat's (`refusedMakers`). Never a SHARE: a seat that already argues
+ * a position is no spare. Null when no spare is left (today's opening has none: every seat argues), so the refusal
+ * fails the debate as today.
+ */
+export function shapeSpareForRefusedRoot(input: Readonly<{ makers: readonly string[]; rootCount: number; rootIndex: number;
+  sitsOut: (index: number) => boolean; refusedMakers: readonly string[]; takes: (index: number) => boolean }>): number | null {
+  const handOver = shapeHandOverRoot({ makers: input.makers, rootCount: input.rootCount, rootIndex: input.rootIndex,
+    sitsOut: (index) => index < input.rootCount ? input.sitsOut(index)
+      : !input.takes(index) || input.refusedMakers.includes(input.makers[index]!) });
+  return handOver.kind === "SWAP" ? handOver.withIndex : null;
+}
+
+/**
+ * V4 start step, Task 45 (spec 2026-11-03 §4.3; Review Focus 3) — WHO TAKES A PATH'S ROOT WHEN ITS ANSWER WAS REFUSED: the
+ * first seat, scanning the seats no root uses (rootCount onwards), then the other roots' seats in turn after this one,
+ * that does not sit out, may take it (`takes`), and whose maker is neither a refused one's (`refusedMakers`) nor the
+ * root's own seat's. Unlike `shapeSpareForRefusedRoot`, a seat arguing another root may take it: a run can have more
+ * paths than makers. Null when none may: the path then ends without its root.
+ */
+export function pathsRootHandOver(input: Readonly<{ makers: readonly string[]; rootCount: number; rootIndex: number;
+  sitsOut: (index: number) => boolean; refusedMakers: readonly string[]; takes: (index: number) => boolean }>): number | null {
+  const ownMaker = input.makers[input.rootIndex];
+  const open = (index: number): boolean => !input.sitsOut(index) && input.takes(index)
+    && !input.refusedMakers.includes(input.makers[index]!) && input.makers[index] !== ownMaker;
+  for (let index = input.rootCount; index < input.makers.length; index += 1) {
+    if (open(index)) return index;
+  }
+  for (let step = 1; step < input.rootCount; step += 1) {
+    const index = (input.rootIndex + step) % input.rootCount;
+    if (open(index)) return index;
+  }
+  return null;
+}
+
+/**
+ * R22 (owner ruling 2026-10-30) — A RESUMED RUN KEEPS ITS SPARE: the seat no position uses whose member answered root
+ * `rootIndex`'s site on an earlier pass (`answeredBy`, the replay book's routes), when no member of the root's own seat
+ * did; null otherwise. The root is handed to it before any call, so the refused member is never asked again and the
+ * spare's answer is replayed from the record, not bought twice.
+ */
+export function shapeSpareThatAnswered(input: Readonly<{ seatRefs: readonly (readonly string[])[]; rootCount: number;
+  rootIndex: number; answeredBy: readonly string[]; sitsOut: (index: number) => boolean }>): number | null {
+  const answered = (index: number): boolean => input.seatRefs[index]!.some((ref) => input.answeredBy.includes(ref));
+  if (input.seatRefs[input.rootIndex] === undefined || answered(input.rootIndex)) return null;
+  for (let index = input.rootCount; index < input.seatRefs.length; index += 1) {
+    if (answered(index) && !input.sitsOut(index)) return index;
+  }
+  return null;
+}
+
 export function shapeWriterSeat(input: Readonly<{ seatMakers: readonly string[]; avoidMakers: readonly string[];
   preferMaker: string | null; offset: number; sitsOut: (index: number) => boolean }>): number | null {
   const count = input.seatMakers.length;

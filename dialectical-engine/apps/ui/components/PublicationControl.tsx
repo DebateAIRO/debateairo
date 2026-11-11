@@ -16,11 +16,13 @@ import { PublicationReviewPanel } from "@/components/PublicationReviewPanel";
 type Visibility = Readonly<{
   state: "PRIVATE" | "PUBLISHED";
   public_ref: string | null;
+  /** Security review F2: a dig, which is never published (the owner's decision); absent from an API before it. */
+  dig?: boolean | undefined;
 }>;
 
 export type PrivateDeletionStatus="PENDING"|"CLEANED";
 type PublicationControlClient=Pick<ContractClient,
-  "readRunVisibility"|"readPublicationReview"|"requestPublicationReview"|"publishRun"|"unpublishRun"|"deletePrivateDebate"
+  "readRunVisibility"|"readPublicationReview"|"requestPublicationReview"|"publishRun"|"deletePrivateDebate"
 > & SecurityConfirmationClient;
 
 export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,client=contractClient,catalog=publicEnglish }: {
@@ -32,7 +34,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
 }) {
   const [visibility, setVisibility] = useState<Visibility | null>(null);
   const [review, setReview] = useState<PublicationReviewState | null | undefined>(undefined);
-  const [action, setAction] = useState<"PUBLISH" | "UNPUBLISH" | null>(null);
+  const [action, setAction] = useState<"PUBLISH" | null>(null);
   const {locale}=useChromeI18n(),authCatalog=useSelectedAuthCatalog(locale),[confirming,setConfirming]=useState<"publication"|"delete"|null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -47,7 +49,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
   // scrolls (globals.css, D-S02-24), and the owner scrolled it down to reach the button that produced the answer.
   const [answered, setAnswered] = useState(0);
   const cardRef = useRef<HTMLElement>(null);
-  // Every control here swaps itself out (Publish… → its form → Unpublish…, Delete… → its form, the security check's
+  // Every control here swaps itself out (Publish… → its form → the public status, Delete… → its form, the security check's
   // Cancel): after the swap, focus moves to what `focusNext` names, else to the card's heading — never to <body>.
   const heading = useRef<HTMLHeadingElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
@@ -114,17 +116,13 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     setBusy(true);setMessage(null);setStatement(null);
     try {
       const grant=result.step_up_grant;
-      const changed = action === "PUBLISH"
-        ? await client.publishRun(runId, grant.token)
-        : await client.unpublishRun(runId, grant.token);
+      const changed = await client.publishRun(runId, grant.token);
       setVisibility(changed);
       setAction(null);
       setConfirming(null);
       setAcknowledged(false);
       focusNext.current = () => toggle.current;
-      setMessage(action === "PUBLISH"
-        ? t(catalog, "public.publication.publishedSuccess")
-        : t(catalog, "public.publication.unpublishedSuccess"));
+      setMessage(t(catalog, "public.publication.publishedSuccess"));
     } catch (failure) {
       if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_REMOVED_BY_CHECK") {
         onRemovedByCheck?.();
@@ -190,11 +188,10 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     else setMessage(t(catalog,"public.publication.statusUnavailable"));
     setAnswered(count=>count+1);
   }
-  const selected = action ?? (visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
-  const warning = selected === "PUBLISH"
-    ? t(catalog, "public.publication.publishWarning")
-    : t(catalog, "public.publication.unpublishWarning");
   const pendingReview = review?.flagged === true && review.state !== "APPROVED" ? review : null;
+  // Security review F2: a dig is never published, so it is offered neither Publish… nor the review a flagged debate asks for before it; the
+  // server refuses one anyway (409 DIG_NOT_PUBLISHABLE). Deleting it stays.
+  const publishable = visibility !== null && visibility.dig !== true;
 
 
   if (deleted) {
@@ -224,27 +221,24 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
       {statement !== null ? (
         <PublicationStatement statement={statement} catalog={catalog}/>
       ) : message ? <p role="status">{message}</p> : null}
-      {visibility !== null && pendingReview !== null ? <PublicationReviewPanel runId={runId} state={pendingReview} client={client} catalog={catalog} onAsked={() => setReview((current) => current === null || current === undefined ? current : { ...current, state: "UNDER_REVIEW", may_ask: false, asks_used: current.asks_used === 0 ? 1 : 2 })} /> : visibility === null || review === undefined ? null : action === null ? (
+      {!publishable ? null : pendingReview !== null ? <PublicationReviewPanel runId={runId} state={pendingReview} client={client} catalog={catalog} onAsked={() => setReview((current) => current === null || current === undefined ? current : { ...current, state: "UNDER_REVIEW", may_ask: false, asks_used: current.asks_used === 0 ? 1 : 2 })} /> : review === undefined || visibility?.state !== "PRIVATE" ? null : action === null ? (
         <button
           ref={toggle}
           type="button"
           className="button"
-          disabled={visibility === null}
           onClick={() => {
             setStatement(null);
             setDeleteOpen(false);
             setConfirming(null);
-            setAction(visibility?.state === "PUBLISHED" ? "UNPUBLISH" : "PUBLISH");
+            setAction("PUBLISH");
             focusNext.current = () => acknowledge.current;
           }}
         >
-          {visibility?.state === "PUBLISHED"
-            ? t(catalog, "public.publication.unpublishEllipsis")
-            : t(catalog, "public.publication.publishEllipsis")}
+          {t(catalog, "public.publication.publishEllipsis")}
         </button>
       ) : (
         <form noValidate onSubmit={(event) => void submit(event)}>
-          <p><strong>{warning}</strong></p>
+          <p><strong>{t(catalog, "public.publication.publishWarning")}</strong></p>
           <label>
             <input
               ref={acknowledge}
@@ -253,19 +247,13 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
               onChange={(event) => setAcknowledged(event.target.checked)}
               required aria-invalid="false"
             />
-            {selected === "PUBLISH"
-              ? t(catalog, "public.publication.acknowledgePublish")
-              : t(catalog, "public.publication.acknowledgeUnpublish")}
+            {t(catalog, "public.publication.acknowledgePublish")}
           </label>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <button className="button" disabled={!acknowledged || busy}>
               {busy
-                ? selected === "PUBLISH"
-                  ? t(catalog, "public.publication.checkingDebate")
-                  : t(catalog, "public.publication.authorizing")
-                : selected === "PUBLISH"
-                  ? t(catalog, "public.publication.publishPublicly")
-                  : t(catalog, "public.publication.unpublish")}
+                ? t(catalog, "public.publication.checkingDebate")
+                : t(catalog, "public.publication.publishPublicly")}
             </button>
             <button type="button" className="button" disabled={busy} onClick={() => { setStatement(null); setAction(null); setConfirming(null); focusNext.current = () => toggle.current; }}>{t(catalog, "public.publication.cancel")}</button>
           </div>

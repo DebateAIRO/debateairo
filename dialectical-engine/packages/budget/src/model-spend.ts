@@ -44,6 +44,7 @@ import {
   readReportedUsage,
   runCostEnvelopeReached,
   runCostEnvelopeRoomKept,
+  MonthWallReachedError,
   sharedWallReached,
   storyCostEnvelopeReached,
   type CostEnvelopePhase,
@@ -53,7 +54,14 @@ import {
 import type { FundingBasis, ProviderCallAdmission } from "@debateai/kernel";
 import type { SpendScope } from "./person-allowance.js";
 import type { PersonAllowanceSource } from "./person-allowance.js";
-import { decideSharedWall } from "./room.js";
+import { decideMonthWall, decideSharedWall } from "./room.js";
+import {
+  WEB_SEARCH_PROVIDER_REF,
+  WEB_SEARCH_REQUEST_MICROS,
+  isWebSearchProviderRef,
+  webSearchChargeMicros,
+  type WebSearchOutcome
+} from "./web-charge.js";
 
 /**
  * Where a charge came from. `RUN` is a debate; `SUPPORT` is the help chat;
@@ -70,14 +78,52 @@ export type ModelSpendSource =
   /** the fast language check before a debate: a run-less site cost (0118), written only by ledger.record_language_check_spend */
   | "LANGUAGE_CHECK"
   /** the pre-start question check: a run-less site cost (0128), written only by ledger.record_question_check_spend */
-  | "QUESTION_CHECK";
+  | "QUESTION_CHECK"
+  /** step 2's small AI before a debate: run-less, in the site's day and in the person's windows through its own row (0144), written only by identity.record_ask_clarify_charge */
+  | "ASK_CLARIFY"
+  /**
+   * V4 start step (0158; spec 2026-11-03 §5.2): the small AIs before Start (the angle planner, the list writers, the merges,
+   * the combine and the fit check). Run-less like ASK_CLARIFY, in the site's day and in the person's windows through its own
+   * row, written only by identity.record_pre_start_charge.
+   */
+  | "PRE_START"
+  /**
+   * A dig's path rewrite (0134; plan 2026-10-30 dig-model revision W3-2/W3-5): written after the dig settled, in the
+   * story's place (a dig has no story). It names the DIG's run, is inside the dig's estimate, counts in the person's
+   * windows like RUN and STORY, and is never walled: a dig that started always gets its rewrite.
+   */
+  | "PATH_REWRITE"
+  /**
+   * The final report over an investigation (0136; plan 2026-10-30 task W5-1): "Write my report"'s answer, story and their
+   * checks, written after the person closed the investigation. It names the investigation's ROOT run, counts in the
+   * person's windows like RUN and STORY, and is never walled: it is paid from the reserve the money rule always keeps.
+   */
+  | "INVESTIGATION_REPORT"
+  /**
+   * The owner's changes of 31 Oct (0137): a rewrite of a path above the first (the tree climbs while a level really changed), the main
+   * answer's automatic version and the AI check on a contribution each name the DIG that caused them, count in the person's windows
+   * like PATH_REWRITE, and are never walled: the person who dug pays. No seam charges them yet: the Tree and Public lanes add theirs.
+   */
+  | "PATH_CLIMB"
+  | "ANSWER_UPDATE"
+  | "CONTRIBUTION_CHECK"
+  /**
+   * A report on a public debate written by someone other than its owner (0137): it names the ROOT's run, whose scope is its owner's, so
+   * it is never counted through that scope; its payer is identity.public_report_charge's, whose reader their window adds.
+   */
+  | "PUBLIC_REPORT";
+
+/** R22 decision 2: a climb rewrites at most one path per level above, so its safety net is that many rewrites' ceilings. */
+export const PATH_CLIMB_SEAM_LEVELS = 10 as const;
 
 /**
  * Question language, P2L Task 19 (migration 0118): the ONE writer of a LANGUAGE_CHECK row, a SECURITY DEFINER
- * function the API's runtime role may execute (pre-flight PF-L58, option (a)). Its signature, as `to_regprocedure`
+ * function (pre-flight PF-L58, option (a)). Since the security review's 0171 it is the cross-account marker's alone,
+ * so the API calls it, and probes it, on its system login (main.ts's site X30). Its signature, as `to_regprocedure`
  * reads it: the hosted API's boot probe asks only whether it exists, and keeps the fast check off until it does.
  */
 export const LANGUAGE_CHECK_SPEND_WRITER = "ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
+/** The question check's one writer (0128), the cross-account marker's alone since 0171: the API calls and probes it on its system login (X31). */
 export const QUESTION_CHECK_SPEND_WRITER = "ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)" as const;
 
 /** One fast language check's site cost, as the writer takes it: no run, no phase, no attempt. */
@@ -125,6 +171,136 @@ export async function questionCheckSpendWriterPresent(pool: Pick<Pool, "query">)
 export async function recordQuestionCheckSpend(pool: Pick<Pool, "query">, entry: QuestionCheckSpendEntry): Promise<void> {
   await pool.query("SELECT ledger.record_question_check_spend($1::uuid,$2::text,$3::date,$4::bigint,$5::bigint,$6::bigint)",
     [entry.spendId, entry.providerRef, entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+/** The writer of step 2's small AI (decisions 29 and 31): the ledger's row and the person's, in one transaction. */
+export const ASK_CLARIFY_CHARGE_WRITER = "identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)" as const;
+
+export type AskClarifyChargeEntry = LanguageCheckSpendEntry & Readonly<{
+  ownerRef: string;
+  /** A team member's call names its grant, so the grant's windows and the team's limit count it; null: the person's own plan. */
+  grant: Readonly<{ grantId: string; grantEventId: string }> | null;
+}>;
+
+/**
+ * The security review's 0171: before each paid call, while the request's session is live, its charge id is reserved for the person, so the record
+ * after the call names them whatever became of the session meanwhile (a sign-out, a step-up's new token). It refuses (42501 REQUEST_OWNER_MISMATCH)
+ * an owner that is not the account of the live session the connection presents (a login holding the cross-account marker may name any): then no call
+ * is made.
+ */
+export const ASK_CLARIFY_CHARGE_RESERVATION = "identity.reserve_ask_clarify_charge(uuid,uuid)" as const;
+
+/** Whether this login may call the identity function `signature` (false when it may not even name the schema). Read-only. */
+async function identityFunctionPresent(pool: Pick<Pool, "query">, signature: string): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>(
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'identity', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [signature]);
+  return result.rows[0]?.present === true;
+}
+
+/**
+ * The boot probe of the writer: may this login call it? Since 0171 the writer is the cross-account marker's alone, so the API asks it of its
+ * system login (main.ts's site X32), where it records each call. Missing is false, and the site makes no call. Read-only.
+ */
+export async function askClarifyChargeWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  return identityFunctionPresent(pool, ASK_CLARIFY_CHARGE_WRITER);
+}
+
+/**
+ * The boot probe of the reservation (0171): may this login call it? The API reserves each call on the request's own login, so it asks this of
+ * that login. Missing is false, and the site makes no call. Read-only.
+ */
+export async function askClarifyReservationPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  return identityFunctionPresent(pool, ASK_CLARIFY_CHARGE_RESERVATION);
+}
+
+/**
+ * One paid call's charge id, reserved for the person before the call is sent, on the request's own connection. An id already reserved for another
+ * owner is refused (23505 ASK_CLARIFY_CHARGE_TAKEN); the same owner's repeat reserves nothing new.
+ */
+export async function reserveAskClarifyCharge(pool: Pick<Pool, "query">, entry: Readonly<{ spendId: string; ownerRef: string }>): Promise<void> {
+  await pool.query("SELECT identity.reserve_ask_clarify_charge($1::uuid,$2::uuid)", [entry.spendId, entry.ownerRef]);
+}
+
+/**
+ * The API's sweep of the reservations no charge took (0171): up to `limit` (1 to 1000) of every owner's, an hour old or older, the oldest first, and
+ * how many went. The cross-account marker's alone, so it is called outside any request, where the API's pools reach its system login.
+ */
+export async function deleteAskClarifyReservationsDue(pool: Pick<Pool, "query">, limit: number): Promise<number> {
+  return (await pool.query<{ gone: number }>("SELECT identity.delete_ask_clarify_reservations_due($1::integer) AS gone", [limit])).rows[0]!.gone;
+}
+
+/**
+ * One paid call's charge, after the call: the site's ledger row and its person's. Since 0171 the writer is the cross-account marker's alone, so the
+ * API calls it on its system login (main.ts's site X32), inside the request that reserved the call; the reservation names the person.
+ */
+export async function recordAskClarifyCharge(pool: Pick<Pool, "query">, entry: AskClarifyChargeEntry): Promise<void> {
+  await pool.query("SELECT identity.record_ask_clarify_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::date,$7::bigint,$8::bigint,$9::bigint)",
+    [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.providerRef, entry.chargedOn,
+      entry.chargeMicros, entry.inputTokens, entry.outputTokens]);
+}
+
+/** V4 start step (0158): which small AI before Start a charge paid for. */
+export const PRE_START_CHARGE_KINDS = Object.freeze(["ANGLES", "LIST", "MERGE", "MERGE_LATE", "COMBINE", "FIT"] as const);
+export type PreStartChargeKind = typeof PRE_START_CHARGE_KINDS[number];
+
+/** The writer of the small AIs before Start: the ledger's row and the person's, in one transaction, as ASK_CLARIFY's. */
+export const PRE_START_CHARGE_WRITER = "identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)" as const;
+
+/**
+ * Task 57c (owner, 5 Nov: a failed question gives back its path-list charge): `tryRef`, the try the call was made for (Task 57d: a random
+ * id the API mints once per reading, never made from the question's words; 64 lower-case hex characters), when it has one: written with the
+ * charge by 0165's writer.
+ */
+export type PreStartChargeEntry = AskClarifyChargeEntry & Readonly<{ kind: PreStartChargeKind; tryRef?: string }>;
+
+/** 0165's writer: 0158's, and the call's try in the same transaction. */
+export const PRE_START_TRY_CHARGE_WRITER = "identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)" as const;
+
+/** A pre-Start call's provider reference: pre-start:<kind, lower case, _ as ->:<provider>:<model>. 0158's writer checks the kind matches. */
+export function preStartSpendRef(kind: PreStartChargeKind, provider: string, model: string): string {
+  return `pre-start:${kind.toLowerCase().replaceAll("_", "-")}:${provider}:${model}`;
+}
+
+export async function preStartChargeWriterPresent(pool: Pick<Pool, "query">): Promise<boolean> {
+  const result = await pool.query<{ present: unknown }>(
+    `SELECT CASE WHEN NOT has_schema_privilege(current_user, 'identity', 'USAGE') THEN false
+       ELSE coalesce(to_regprocedure($1) IS NOT NULL AND has_function_privilege(current_user, to_regprocedure($1), 'EXECUTE'), false) END AS present`,
+    [PRE_START_CHARGE_WRITER]);
+  return result.rows[0]?.present === true;
+}
+
+export async function recordPreStartCharge(pool: Pick<Pool, "query">, entry: PreStartChargeEntry): Promise<void> {
+  const values = [entry.spendId, entry.ownerRef, entry.grant?.grantId ?? null, entry.grant?.grantEventId ?? null, entry.kind, entry.providerRef,
+    entry.chargedOn, entry.chargeMicros, entry.inputTokens, entry.outputTokens];
+  if (entry.tryRef !== undefined) {
+    await pool.query("SELECT identity.record_pre_start_try_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::date,$8::bigint,$9::bigint,$10::bigint,$11::text)",
+      [...values, entry.tryRef]);
+    return;
+  }
+  await pool.query("SELECT identity.record_pre_start_charge($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::date,$8::bigint,$9::bigint,$10::bigint)",
+    values);
+}
+
+/**
+ * Task 57c (0165): at Start, the person's charges of that try not yet given to a debate are given to their new debate, once; how many.
+ * Another person's debate, or none, takes nothing (0).
+ */
+export async function linkPreStartTry(pool: Pick<Pool, "query">, input: Readonly<{ ownerRef: string; tryRef: string; runId: string }>): Promise<number> {
+  const result = await pool.query<{ given: number | string }>("SELECT identity.link_pre_start_try($1::uuid,$2::text,$3::uuid) AS given",
+    [input.ownerRef, input.tryRef, input.runId]);
+  return Number(result.rows[0]?.given ?? 0);
+}
+
+/** Task 57c (0165): whether a person's debate used any of their quota (its own counted spend, or a charge before Start not given back). */
+export type RunQuotaUsed = "NONE" | "SOME";
+
+/** Task 57c (0165): the answer for the person's own debate; null for another's, or for any answer that is not one of the two. */
+export async function readRunQuotaUsed(pool: Pick<Pool, "query">, input: Readonly<{ ownerRef: string; runId: string }>): Promise<RunQuotaUsed | null> {
+  const result = await pool.query<{ used: unknown }>("SELECT identity.read_run_quota_used($1::uuid,$2::uuid) AS used", [input.ownerRef, input.runId]);
+  const used = result.rows[0]?.used;
+  return used === "NONE" || used === "SOME" ? used : null;
 }
 
 const wholeCount = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
@@ -182,7 +358,7 @@ export interface ModelSpendEntry {
  */
 export interface ModelSpendStore {
   recordSpend(entry: ModelSpendEntry): Promise<void>;
-  reserveInternalCall?(input: Readonly<{ callId: string; runId: string; projectedMicros: number; spendSource: "RUN" | "STORY"; spendPhase: CostEnvelopePhase | null }>): Promise<boolean>;
+  reserveInternalCall?(input: Readonly<{ callId: string; runId: string; projectedMicros: number; spendSource: MeteredSpendSource; spendPhase: CostEnvelopePhase | null }>): Promise<boolean>;
   settleInternalCall?(callId: string, entry: ModelSpendEntry): Promise<void>;
   /**
    * Everything this ONE run's DEBATE has been charged, across every vendor it
@@ -191,6 +367,25 @@ export interface ModelSpendStore {
   readRunSpentMicros(runId: string): Promise<number>;
   /** Everything this run's verdict STORY has been charged (spend source STORY only). */
   readRunStorySpentMicros(runId: string): Promise<number>;
+  /**
+   * Everything this dig's path rewrite has been charged (spend source PATH_REWRITE only). Optional: a store without it
+   * has no path-rewrite seam (STORY_ENVELOPE_MISSING, the story lane's own refusal), as a version without a story
+   * ceiling has no story seam.
+   */
+  readRunPathRewriteSpentMicros?(runId: string): Promise<number>;
+  /**
+   * W5-1: what the closing now being written has been charged (spend source INVESTIGATION_REPORT on the root run since
+   * that closing began, 0136's identity.read_closing_since_of_root). Optional: without it there is no report seam.
+   */
+  readRunInvestigationReportSpentMicros?(runId: string): Promise<number>;
+  /** R22 decision 2: everything this dig's climb has been charged (spend source PATH_CLIMB only). Optional: without it, no climb seam. */
+  readRunPathClimbSpentMicros?(runId: string): Promise<number>;
+  /** R22 decision 3: every main-answer update this dig has paid for (spend source ANSWER_UPDATE only). Optional: without it, no seam. */
+  readRunAnswerUpdateSpentMicros?(runId: string): Promise<number>;
+  /** Decision 13: every contribution check this dig has paid for (spend source CONTRIBUTION_CHECK only). Optional: without it, no seam. */
+  readRunContributionCheckSpentMicros?(runId: string): Promise<number>;
+  /** Decision 13: what the report being written on this carrier has been charged (spend source PUBLIC_REPORT since the newest report paid for). Optional: without it, no seam. */
+  readRunPublicReportSpentMicros?(runId: string): Promise<number>;
   /** Everything the WHOLE application has been charged on that UTC day. */
   readDaySpentMicros(day: string): Promise<number>;
   /**
@@ -253,6 +448,18 @@ export interface ProviderCostSeam {
 }
 
 /**
+ * Web search (W2-2): the money seam of one debate's searches (`CostEnvelopeGuard.searchSeam`). The web step asks
+ * `assertSearchAllowed` before each search is sent (a refusal: the search is not sent, nothing is charged), then
+ * `recordSearch` once it has ended, with the admission it was given.
+ */
+export interface WebSearchCostSeam {
+  assertSearchAllowed(options?: Readonly<{ keepRoomMicros?: number }>): Promise<ProviderCallAdmission | undefined>;
+  recordSearch(observed: Readonly<{ outcome: WebSearchOutcome; admission?: ProviderCallAdmission }>): Promise<void>;
+  /** Releases the search still counted in flight (idempotent), for a search that never reached `recordSearch`. */
+  releaseInFlight(): void;
+}
+
+/**
  * Parallel AI calls (spec 2026-10-12 §3.5) — THE CALLS IN FLIGHT, as the money
  * seam asks them (`apps/runner/src/run-in-flight.ts` is the shipped one). A
  * charge is written only after its call, so with several calls of one debate in
@@ -295,7 +502,10 @@ export interface SharedWallInput {
    * is never read, and the person half still applies.
    */
   readonly finishBasisPoints: number | null;
-  /** The run owner's windows, each carrying its own finish edge (11 000); `NO_PERSON_ALLOWANCE` supplies none. */
+  /**
+   * The run owner's windows, each carrying its own finish edge (v3: 11 000; billingPlans v4: 10 000 plus a fixed
+   * overflow); `NO_PERSON_ALLOWANCE` supplies none.
+   */
   readonly persons: PersonAllowanceSource;
   readonly owners: RunOwnerSpendReader;
 }
@@ -324,6 +534,12 @@ export interface CostEnvelopeGuardInput {
      * today's cap. Meaningless, and ignored, without a story ceiling.
      */
     perStoryOverrunBasisPoints?: number;
+    /**
+     * W5-1, R22 decision 18: the report seam's safety net per closing, the largest plan's reserve (billingPlans,
+     * `closingReservesOf`). The closing itself admits each call against its own plan's reserve before it is sent.
+     * Absent means no closing's seam can be built: STORY_ENVELOPE_MISSING, as a story without its row.
+     */
+    closingCeilingMicros?: number;
     /**
      * Engine money rule, Task M1: the `costEnvelopePolicy` row's reserve and
      * overrun (`serve_reserve_basis_points`, `serve_overrun_basis_points`).
@@ -453,7 +669,8 @@ export function mostOneRunMaySpendMicros(policy: Readonly<{
 export function costEnvelopeGuardPolicy(
   run: Pick<CostEnvelopePolicy,
     "perRunCeilingMicros" | "dailyCeilingMicros" | "serveReserveBasisPoints" | "serveOverrunBasisPoints">,
-  story: Pick<StoryPolicy, "perStoryCeilingMicros" | "perStoryOverrunBasisPoints"> | null
+  story: Pick<StoryPolicy, "perStoryCeilingMicros" | "perStoryOverrunBasisPoints"> | null,
+  closingCeilingMicros?: number
 ): CostEnvelopeGuardInput["policy"] {
   const policy: CostEnvelopeGuardInput["policy"] = Object.freeze({
     perRunCeilingMicros: run.perRunCeilingMicros,
@@ -463,7 +680,8 @@ export function costEnvelopeGuardPolicy(
     ...(story === null || story.perStoryCeilingMicros === null ? {} : {
       perStoryCeilingMicros: story.perStoryCeilingMicros,
       perStoryOverrunBasisPoints: story.perStoryOverrunBasisPoints
-    })
+    }),
+    ...(closingCeilingMicros === undefined ? {} : { closingCeilingMicros })
   });
   if (policy.dailyCeilingMicros < mostOneRunMaySpendMicros(policy)) {
     throw new TypedDomainError(
@@ -514,8 +732,8 @@ export function assertRunCeilingCoversOneCall(input: Readonly<{
   }
 }
 
-/** The two spend sources a gateway money seam charges (the support chat keeps its own accounting). */
-type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY">;
+/** The spend sources a gateway money seam charges (the support chat keeps its own accounting). */
+type MeteredSpendSource = Extract<ModelSpendSource, "RUN" | "STORY" | "PATH_REWRITE" | "INVESTIGATION_REPORT" | "PATH_CLIMB" | "ANSWER_UPDATE" | "CONTRIBUTION_CHECK" | "PUBLIC_REPORT">;
 
 /** What a metered seam spends against: see `CostEnvelopeGuard.#envelopeFor`. */
 interface MeteredEnvelope {
@@ -562,6 +780,7 @@ export class CostEnvelopeGuard {
   readonly #ceilings: CostEnvelopeCeilings;
   /** Task M7: the story's ceiling with its overrun; null without a story ceiling (no story seam). */
   readonly #storyCeilingMicros: number | null;
+  readonly #closingCeilingMicros: number | null;
   readonly #clock: () => Date;
   readonly #reservationTtlMs: number;
   readonly #sharedWall: SharedWallInput | null;
@@ -591,6 +810,11 @@ export class CostEnvelopeGuard {
       ...(input.policy.perStoryOverrunBasisPoints === undefined
         ? {} : { perStoryOverrunBasisPoints: input.policy.perStoryOverrunBasisPoints })
     }).storyMicros;
+    const closingCeiling = input.policy.closingCeilingMicros;
+    if (closingCeiling !== undefined && (!Number.isSafeInteger(closingCeiling) || closingCeiling < 1)) {
+      throw new TypeError("STORY_ENVELOPE_POLICY_INVALID");
+    }
+    this.#closingCeilingMicros = closingCeiling ?? null;
     this.#clock = input.clock ?? (() => new Date());
     const ttl = input.reservationTtlMs ?? DEFAULT_RESERVATION_TTL_MS;
     if (!Number.isInteger(ttl) || ttl < 1) throw new TypeError("COST_ENVELOPE_RESERVATION_TTL_INVALID");
@@ -655,6 +879,17 @@ export class CostEnvelopeGuard {
   }
 
   /**
+   * The money rule (owner, 31 Oct 2026; R22 W3-8): what the run's arguing may still spend — its body ceiling less what
+   * the run has spent — read when the month wall pauses the debate, as the estimate of the planned work left (0134's
+   * `planned_micros`). Never below zero; nothing is reserved or written.
+   */
+  async bodyMicrosLeft(runId: string): Promise<number> {
+    if (typeof runId !== "string" || runId.trim() === "") throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
+    const envelope = this.#envelopeFor("RUN", "BODY");
+    return Math.max(0, envelope.ceilingMicros - await envelope.readSpentMicros(runId));
+  }
+
+  /**
    * VERDICT STORY — THE STORY'S OWN MONEY SEAM (spec §8), in the shape the
    * gateway consumes. The per-run seam's rules, built by the same body, with
    * the four differences `#envelopeFor` names and no others: it sums STORY
@@ -667,6 +902,70 @@ export class CostEnvelopeGuard {
    */
   storySeam(input: ProviderSeamInput): ProviderCostSeam {
     return this.#meteredSeam(input, "STORY", null, false);
+  }
+
+  /**
+   * A DIG'S PATH REWRITE — its money seam (plan 2026-10-30 dig-model revision, W3-2 for W3-5). A dig writes no story;
+   * the one writer call (and its checker) that rewrites the parent path takes the story's place, so it is held to the
+   * story's ceiling, summed over PATH_REWRITE charges only, refused with the story's own code, and charges PATH_REWRITE
+   * rows on the dig's run. Like the story it is NEVER walled (the money rule: a dig that started always gets its
+   * rewrite), so neither the person's windows nor the month wall can stop it.
+   */
+  pathRewriteSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "PATH_REWRITE", null, false);
+  }
+
+  /** The safety net of the seams a closing pays through, or a plain refusal: nothing in the code stands in for the plans' reserve. */
+  #closingCeiling(): number {
+    if (this.#closingCeilingMicros === null) {
+      throw new TypedDomainError("STORY_ENVELOPE_MISSING", "A metered closing seam needs the plans' reserve");
+    }
+    return this.#closingCeilingMicros;
+  }
+
+  /**
+   * THE FINAL REPORT — its money seam (plan 2026-10-30 task W5-1; the money rule of 31 Oct, point 6). "Write my report"'s
+   * calls name the investigation's root run and are paid from the reserve the money rule always keeps, so they are NEVER
+   * walled (no day, week or month stops them). Held to `closingCeilingMicros` per closing (summed over
+   * that closing's INVESTIGATION_REPORT charges only), refused with the story's own code (the step keeps its last
+   * checked draft), and charged as INVESTIGATION_REPORT rows.
+   */
+  investigationReportSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "INVESTIGATION_REPORT", null, false);
+  }
+
+  /**
+   * R22 decision 2: THE CLIMB'S money seam. A rewrite that really changed a path rewrites the path above, up to the first debate; those
+   * calls name the run of the dig that started the climb, whoever that person is, and are NEVER walled (the money rule: a dig that started
+   * always gets its rewrites). Its safety net is one rewrite's ceiling per level, summed over PATH_CLIMB charges only, and it refuses
+   * with the story's own code, so that level ends FAILED.
+   */
+  pathClimbSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "PATH_CLIMB", null, false);
+  }
+
+  /**
+   * R22 decision 3: THE MAIN-ANSWER UPDATE'S money seam. When a first-debate path changes, the answer is rewritten and checked on the run
+   * of the dig that triggered it, NEVER walled, held to the report's safety net summed over ANSWER_UPDATE charges only.
+   */
+  answerUpdateSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "ANSWER_UPDATE", null, false);
+  }
+
+  /**
+   * Decision 13: THE CONTRIBUTION CHECK'S money seam: the AI check on a dig made on a public debate, on that dig's run, NEVER walled (a dig that started always gets its check),
+   * held to the report's safety net summed over CONTRIBUTION_CHECK charges only.
+   */
+  contributionCheckSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "CONTRIBUTION_CHECK", null, false);
+  }
+
+  /**
+   * Decision 13: A REPORT ON A PUBLIC DEBATE'S money seam: on its carrier run, whose scope never counts these charges (identity.public_report_charge names the writer who
+   * pays), NEVER walled, held to the report's safety net summed over the report being written.
+   */
+  publicReportSeam(input: ProviderSeamInput): ProviderCostSeam {
+    return this.#meteredSeam(input, "PUBLIC_REPORT", null, false);
   }
 
   /**
@@ -724,46 +1023,9 @@ export class CostEnvelopeGuard {
       assertCallAllowed: async (projection) => {
         releaseInFlight();
         const projectedMicros = projectedCallCeilingMicros(input.price, projection);
-        // Counted FIRST, synchronously, then the others are read before the
-        // ledger is: of two calls racing for the last room, the later reader
-        // sees the earlier one, still in flight here or already charged.
-        let othersOfRun = 0;
-        let othersOfRunner = 0;
-        if (inFlight !== null) {
-          const own = BigInt(projectedMicros);
-          releaseCurrent = inFlight.begin(input.runId, own);
-          othersOfRun = Number(inFlight.projectedMicros(input.runId) - own);
-          othersOfRunner = Number(inFlight.projectedMicrosAll() - own);
-        }
         try {
-          const keepRoomMicros = projection.keepRoomMicros ?? 0;
-          if (!Number.isSafeInteger(keepRoomMicros) || keepRoomMicros < 0) throw new TypeError("COST_ENVELOPE_KEEP_ROOM_INVALID");
-          const spentMicros = await envelope.readSpentMicros(input.runId) + othersOfRun;
-          const decision = decideRunCostEnvelope({ spentMicros, projectedMicros, ceilingMicros: envelope.ceilingMicros });
-          if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
-          // T12-R0 / T12-R1: a call that fits but would leave less than the room it names (root 0's worst-case call,
-          // named only by the map's calls) is refused with its OWN code: the run's money is not spent, so only the map
-          // stops, never the arguing.
-          if (keepRoomMicros > 0) {
-            const withRoom = decideRunCostEnvelope({ spentMicros, projectedMicros: projectedMicros + keepRoomMicros,
-              ceilingMicros: envelope.ceilingMicros });
-            if (withRoom.kind === "WOULD_CROSS") throw runCostEnvelopeRoomKept(withRoom, keepRoomMicros);
-          }
-          // B9: then the shared wall, for a walled BODY call on a guard that has one.
-          if (walled && this.#sharedWall !== null) {
-            await this.#assertSharedWall(this.#sharedWall, input.runId, projectedMicros, {
-              siteDay: othersOfRunner,
-              person: othersOfRun
-            });
-          }
-          await this.#fundingAdmission?.assertProviderFundingAdmission(input.runId, this.#clock());
-          const callId = randomUUID();
-          if (this.#store.reserveInternalCall === undefined) return;
-          const internal = await this.#store.reserveInternalCall({ callId, runId: input.runId, projectedMicros, spendSource, spendPhase: phase });
-          if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
-          const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
-          admissions.add(admission);
-          return admission;
+          return await this.#admit({ runId: input.runId, projectedMicros, keepRoomMicros: projection.keepRoomMicros ?? 0,
+            envelope, walled, spendSource, phase, inFlight, admissions, hold: (release) => { releaseCurrent = release; } });
         } catch (error) {
           // Refused, or the admission failed: nothing will be sent for it.
           releaseInFlight();
@@ -843,6 +1105,131 @@ export class CostEnvelopeGuard {
   }
 
   /**
+   * THE ONE ADMISSION of a metered call and of a search (W2-2): counted in flight FIRST, synchronously (`hold` gets the
+   * release), then the others are read before the ledger is: of two calls racing for the last room, the later reader
+   * sees the earlier one, still in flight here or already charged. Then the run's own ceiling, the room a call names
+   * (T12-R0/R1), the shared wall for a walled BODY call (B9), the funding admission and the internal reservation.
+   */
+  async #admit(args: Readonly<{
+    runId: string;
+    projectedMicros: number;
+    keepRoomMicros: number;
+    envelope: MeteredEnvelope;
+    walled: boolean;
+    spendSource: MeteredSpendSource;
+    phase: CostEnvelopePhase | null;
+    inFlight: InFlightSpend | null;
+    admissions: WeakSet<ProviderCallAdmission>;
+    hold: (release: () => void) => void;
+  }>): Promise<ProviderCallAdmission | undefined> {
+    const { runId, projectedMicros, keepRoomMicros, envelope, inFlight } = args;
+    let othersOfRun = 0;
+    let othersOfRunner = 0;
+    if (inFlight !== null) {
+      const own = BigInt(projectedMicros);
+      args.hold(inFlight.begin(runId, own));
+      othersOfRun = Number(inFlight.projectedMicros(runId) - own);
+      othersOfRunner = Number(inFlight.projectedMicrosAll() - own);
+    }
+    if (!Number.isSafeInteger(keepRoomMicros) || keepRoomMicros < 0) throw new TypeError("COST_ENVELOPE_KEEP_ROOM_INVALID");
+    const spentMicros = await envelope.readSpentMicros(runId) + othersOfRun;
+    const decision = decideRunCostEnvelope({ spentMicros, projectedMicros, ceilingMicros: envelope.ceilingMicros });
+    if (decision.kind === "WOULD_CROSS") throw envelope.refusal(decision);
+    // T12-R0 / T12-R1: a call that fits but would leave less than the room it names (root 0's worst-case call,
+    // named only by the map's calls) is refused with its OWN code: the run's money is not spent, so only the map
+    // stops, never the arguing.
+    if (keepRoomMicros > 0) {
+      const withRoom = decideRunCostEnvelope({ spentMicros, projectedMicros: projectedMicros + keepRoomMicros,
+        ceilingMicros: envelope.ceilingMicros });
+      if (withRoom.kind === "WOULD_CROSS") throw runCostEnvelopeRoomKept(withRoom, keepRoomMicros);
+    }
+    // B9: then the shared wall, for a walled BODY call on a guard that has one.
+    if (args.walled && this.#sharedWall !== null) {
+      await this.#assertSharedWall(this.#sharedWall, runId, projectedMicros, {
+        siteDay: othersOfRunner,
+        person: othersOfRun
+      });
+    }
+    await this.#fundingAdmission?.assertProviderFundingAdmission(runId, this.#clock());
+    const callId = randomUUID();
+    if (this.#store.reserveInternalCall === undefined) return undefined;
+    const internal = await this.#store.reserveInternalCall({ callId, runId, projectedMicros, spendSource: args.spendSource, spendPhase: args.phase });
+    if (typeof internal !== "boolean") throw new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE","Provider funding admission returned no decision");
+    const admission: ProviderCallAdmission = Object.freeze({kind:internal ? "INTERNAL" : "ORDINARY",callId});
+    args.admissions.add(admission);
+    return admission;
+  }
+
+  /**
+   * Web search (plan 2026-10-30, W2-2) — ONE DEBATE'S SEARCH SEAM. A search is money only (a flat price per request,
+   * no tokens), so it is admitted like a call made while the debate is argued (BODY): against the run's body ceiling,
+   * the room a call names (`keepRoomMicros`: the web step keeps root 0's worst-case call, as every map call does), the
+   * shared wall (the site's day and the run owner's windows, at their finish edges) and the calls in flight, all at the
+   * search's price. `recordSearch` then writes ONE RUN row of the run, phase BODY, 0 tokens, the price as its charge,
+   * for a search that SUCCEEDED, and nothing for one that FAILED, so every window reader counts it unchanged.
+   * A refused search is never sent: the web step goes on without it (the debate never stops for a search).
+   */
+  searchSeam(input: Readonly<{ runId: string; providerRef?: string; requestMicros?: number }>): WebSearchCostSeam {
+    if (typeof input?.runId !== "string" || input.runId.trim() === "") throw new TypeError("COST_ENVELOPE_RUN_REQUIRED");
+    const providerRef = input.providerRef ?? WEB_SEARCH_PROVIDER_REF;
+    if (!isWebSearchProviderRef(providerRef)) throw new TypeError("WEB_SEARCH_PROVIDER_REF_INVALID");
+    const requestMicros = input.requestMicros ?? WEB_SEARCH_REQUEST_MICROS;
+    webSearchChargeMicros("SUCCEEDED", requestMicros);
+    const envelope = this.#envelopeFor("RUN", "BODY");
+    const admissions = new WeakSet<ProviderCallAdmission>();
+    const inFlight = this.#inFlight;
+    let releaseCurrent: (() => void) | null = null;
+    const releaseInFlight = (): void => {
+      const release = releaseCurrent;
+      releaseCurrent = null;
+      release?.();
+    };
+    return {
+      assertSearchAllowed: async (options = {}) => {
+        releaseInFlight();
+        try {
+          return await this.#admit({ runId: input.runId, projectedMicros: requestMicros, keepRoomMicros: options.keepRoomMicros ?? 0,
+            envelope, walled: true, spendSource: "RUN", phase: "BODY", inFlight, admissions,
+            hold: (release) => { releaseCurrent = release; } });
+        } catch (error) {
+          releaseInFlight();
+          throw error;
+        }
+      },
+      recordSearch: async (observed) => {
+        try {
+          const chargeMicros = webSearchChargeMicros(observed.outcome, requestMicros);
+          if (chargeMicros === 0) return;
+          const admission = observed.admission;
+          if (this.#store.reserveInternalCall !== undefined && (admission === undefined || !admissions.has(admission)))
+            throw new TypedDomainError("INTERNAL_PROVIDER_FRAME_INVALID","Settlement requires this seam's immutable admitted frame");
+          const entry: ModelSpendEntry = Object.freeze({
+            spendId: admission?.kind === "INTERNAL" ? admission.callId : randomUUID(),
+            spendSource: "RUN" as const,
+            runId: input.runId,
+            providerRef,
+            chargedOn: costEnvelopeDay(this.#clock()),
+            chargeMicros,
+            inputTokens: 0,
+            outputTokens: 0,
+            spendPhase: "BODY" as const,
+            attemptId: null
+          });
+          if (admission?.kind === "INTERNAL") {
+            try { await this.#store.settleInternalCall!(admission.callId, entry); }
+            catch {
+              throw new TypedDomainError("INTERNAL_PROVIDER_SETTLEMENT_UNCERTAIN","The admitted internal provider settlement needs reconciliation");
+            }
+          } else await this.#store.recordSpend(entry);
+        } finally {
+          releaseInFlight();
+        }
+      },
+      releaseInFlight
+    };
+  }
+
+  /**
    * Which envelope a metered seam spends — the ONLY four things the run's seam
    * and the story's seam do differently: the spent total they read, the
    * ceiling they compare it with, the refusal they raise, and the spend source
@@ -882,6 +1269,92 @@ export class CostEnvelopeGuard {
           refusal: storyCostEnvelopeReached
         });
       }
+      case "PATH_REWRITE": {
+        const ceilingMicros = this.#storyCeilingMicros;
+        const read = this.#store.readRunPathRewriteSpentMicros;
+        if (ceilingMicros === null || read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered path-rewrite seam needs the sealed storyCostEnvelopePolicy row and the rewrite's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "PATH_REWRITE",
+          ceilingMicros,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "INVESTIGATION_REPORT": {
+        const read = this.#store.readRunInvestigationReportSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered report seam needs the closing's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "INVESTIGATION_REPORT",
+          ceilingMicros: this.#closingCeiling(),
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "PATH_CLIMB": {
+        const ceilingMicros = this.#storyCeilingMicros;
+        const read = this.#store.readRunPathClimbSpentMicros;
+        if (ceilingMicros === null || read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered climb seam needs the sealed storyCostEnvelopePolicy row and the climb's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "PATH_CLIMB",
+          ceilingMicros: ceilingMicros * PATH_CLIMB_SEAM_LEVELS,
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "ANSWER_UPDATE": {
+        const read = this.#store.readRunAnswerUpdateSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError(
+            "STORY_ENVELOPE_MISSING",
+            "A metered answer-update seam needs the update's spent total"
+          );
+        }
+        return Object.freeze({
+          spendSource: "ANSWER_UPDATE",
+          ceilingMicros: this.#closingCeiling(),
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "CONTRIBUTION_CHECK": {
+        const read = this.#store.readRunContributionCheckSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError("STORY_ENVELOPE_MISSING", "A metered contribution check needs its spent total");
+        }
+        return Object.freeze({
+          spendSource: "CONTRIBUTION_CHECK",
+          ceilingMicros: this.#closingCeiling(),
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
+      case "PUBLIC_REPORT": {
+        const read = this.#store.readRunPublicReportSpentMicros;
+        if (read === undefined) {
+          throw new TypedDomainError("STORY_ENVELOPE_MISSING", "A metered public report needs its spent total");
+        }
+        return Object.freeze({
+          spendSource: "PUBLIC_REPORT",
+          ceilingMicros: this.#closingCeiling(),
+          readSpentMicros: (runId: string) => read.call(this.#store, runId),
+          refusal: storyCostEnvelopeReached
+        });
+      }
       default:
         return exhaustive(spendSource);
     }
@@ -897,7 +1370,8 @@ export class CostEnvelopeGuard {
    *    `finishBasisPoints: null` there is no site-day wall and the day is not
    *    read.
    *  · each of the run owner's windows: the owner's RUN + STORY spend inside the
-   *    window plus this call, against that window's own finish edge (110%),
+   *    window plus this call, against that window's own finish edge (v3: a share of it;
+   *    billingPlans v4: the limit plus its fixed overflow),
    *    with or without the band (ruling R-19: the person wall applies iff the
    *    run has a charge scope).
    *
@@ -929,12 +1403,31 @@ export class CostEnvelopeGuard {
     const ownerRef = await wall.owners.readRunChargeOwnerRef(runId);
     if (ownerRef === null) return;
     for (const window of await wall.persons.read(ownerRef, now, { runId })) {
+      // The money rule (owner, 31 Oct): a billingPlans v4 day or week never stops running work; what it uses past
+      // the limit is borrowed from the next one (derived by the room code, never stored), so it is not asked here.
+      if (window.borrows === true) continue;
+      // The month is the wall: below its edge (the limit less the reserve kept inside it) with this call's maximum
+      // inside the in-flight tolerance, or the debate's planned work pauses (MonthWallReachedError).
+      if (window.finishOverflowMicros !== undefined && window.scope === "PERSON_MONTH") {
+        if (decideMonthWall({
+          spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)
+            + inFlight.person,
+          projectedMicros,
+          limitMicros: window.limitMicros,
+          ...(window.keepsReserveMicros === undefined ? {} : { keepsReserveMicros: window.keepsReserveMicros }),
+          toleranceMicros: window.finishOverflowMicros
+        }) === "WOULD_CROSS") {
+          throw new MonthWallReachedError(window.resetsAt);
+        }
+        continue;
+      }
       if (decideSharedWall({
         spentMicros: await wall.owners.readOwnerSpentMicros(ownerRef, window.periodStart, window.resetsAt, window.funding, window.scope)
           + inFlight.person,
         projectedMicros,
         limitMicros: window.limitMicros,
-        finishBasisPoints: window.finishBasisPoints
+        finishBasisPoints: window.finishBasisPoints,
+        ...(window.finishOverflowMicros === undefined ? {} : { finishOverflowMicros: window.finishOverflowMicros })
       }) === "WOULD_CROSS") {
         throw sharedWallReached(window.scope);
       }
@@ -998,6 +1491,10 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       [callId,entry.runId,entry.spendSource,entry.spendPhase ?? null,entry.providerRef,entry.chargeMicros,entry.inputTokens,entry.outputTokens,entry.attemptId ?? null]);
   }
 
+  /**
+   * One charge, by a direct INSERT, which since the security review's 0171 only a login that holds the cross-account
+   * marker may make: the runner's, and inside a request the API's system login (main.ts's site X33, the synthesis check).
+   */
   async recordSpend(entry: ModelSpendEntry): Promise<void> {
     // P2L Task 19, pre-flight PF-L58 option (a): a language check's site cost has ONE writer, the 0118 function
     // (recordLanguageCheckSpend). This direct INSERT refuses the source before any query.
@@ -1009,6 +1506,12 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     }
     if (entry.spendSource === "QUESTION_CHECK") {
       throw new TypedDomainError("MODEL_SPEND_QUESTION_CHECK_FUNCTION_ONLY", "A question check's site cost is written only by ledger.record_question_check_spend");
+    }
+    if (entry.spendSource === "ASK_CLARIFY") {
+      throw new TypedDomainError("MODEL_SPEND_ASK_CLARIFY_FUNCTION_ONLY", "Step 2's small AI is written only by identity.record_ask_clarify_charge");
+    }
+    if (entry.spendSource === "PRE_START") {
+      throw new TypedDomainError("MODEL_SPEND_PRE_START_FUNCTION_ONLY", "The small AIs before Start are written only by identity.record_pre_start_charge");
     }
     if ((entry.spendSource === "RUN" || entry.spendSource === "STORY" || entry.spendSource === "SYNTHESIS_CHECK") && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
@@ -1052,6 +1555,63 @@ export class PostgresModelSpendStore implements ModelSpendStore {
     return this.#total(result.rows[0]?.total);
   }
 
+  async readRunPathRewriteSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'PATH_REWRITE'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunPathClimbSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'PATH_CLIMB'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunAnswerUpdateSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'ANSWER_UPDATE'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunContributionCheckSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend
+       WHERE run_id = $1 AND spend_source = 'CONTRIBUTION_CHECK'`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /** Reports on one carrier are written one at a time, so what is not yet charged to a writer is the report being written. */
+  async readRunPublicReportSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend AS spend
+       WHERE spend.run_id = $1 AND spend.spend_source = 'PUBLIC_REPORT'
+         AND spend.recorded_at > coalesce(identity.read_public_report_charged_until($1), '-infinity'::timestamptz)`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  async readRunInvestigationReportSpentMicros(runId: string): Promise<number> {
+    const result = await this.pool.query<{ total: string }>(
+      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total FROM ledger.model_spend AS spend
+       WHERE spend.run_id = $1 AND spend.spend_source = 'INVESTIGATION_REPORT'
+         AND spend.recorded_at >= coalesce(identity.read_closing_since_of_root($1), 'infinity'::timestamptz)`,
+      [runId]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
   async readDaySpentMicros(day: string): Promise<number> {
     return crossAccount("X23", async () => {
       const result = await this.pool.query<{ total: string }>(
@@ -1068,7 +1628,9 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * The caller then queues the run's first job on the SAME transaction
    * (`WorkItemRepository.enqueueOn`), so the hold and its job commit together:
    * a committed hold always has its job, and a READY job always has its hold.
-   * Nothing ever releases it.
+   * Nothing ever releases it. The transaction is a login's that holds the
+   * cross-account marker (the room's decision pool, the API's system login): since
+   * 0171 no request login may write a hold.
    */
   async openHold(
     client: Pick<PoolClient, "query">,
@@ -1092,23 +1654,27 @@ export class PostgresModelSpendStore implements ModelSpendStore {
    * still has a READY or CLAIMED job and whose hold was opened no later than that
    * UTC day, the part of its hold it has not yet spent (RUN + STORY), never less
    * than zero. Read from the live jobs outward (`work_item_live_run_idx`).
+   * Every account's (X23, as `readDaySpentMicros`): inside a request the request
+   * login's row rule would count the requester's own holds alone (0171).
    */
   async readSiteCountedHoldsMicros(day: string): Promise<number> {
-    const result = await this.pool.query<{ total: string }>(
-      `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
-       FROM (
-         SELECT DISTINCT work.run_id FROM core.work_item AS work
-         WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
-       ) AS live
-       JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
-       LEFT JOIN LATERAL (
-         SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
-         WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
-       ) AS spent ON true
-       WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
-      [day]
-    );
-    return this.#total(result.rows[0]?.total);
+    return crossAccount("X23", async () => {
+      const result = await this.pool.query<{ total: string }>(
+        `SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total
+         FROM (
+           SELECT DISTINCT work.run_id FROM core.work_item AS work
+           WHERE work.run_id IS NOT NULL AND work.state IN ('READY','CLAIMED')
+         ) AS live
+         JOIN ledger.model_spend_hold AS hold ON hold.run_id = live.run_id
+         LEFT JOIN LATERAL (
+           SELECT sum(spend.charge_micros) AS total FROM ledger.model_spend AS spend
+           WHERE spend.run_id = hold.run_id AND spend.spend_source IN ('RUN','STORY')
+         ) AS spent ON true
+         WHERE hold.opened_at < (($1::date + 1)::timestamp AT TIME ZONE 'UTC')`,
+        [day]
+      );
+      return this.#total(result.rows[0]?.total);
+    });
   }
 
   /**
@@ -1122,14 +1688,34 @@ export class PostgresModelSpendStore implements ModelSpendStore {
   async readOwnerSpentMicros(ownerRef: string, from: Date, to: Date, funding?: FundingBasis, scope?: SpendScope): Promise<number> {
     if (funding?.kind === "INTERNAL") {
       const result = await this.pool.query<{ total: string }>(
-        "SELECT billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean)::text AS total",
+        // Decision 13: a report a funded person wrote on someone else's public debate has no grant to name (0140), so it counts here, in their own windows.
+        "SELECT (billing.read_internal_grant_spent($1::uuid,$4::uuid,$5::uuid,$2::timestamptz,$3::timestamptz,$6::boolean) + identity.read_public_report_spent_by_funding($1::uuid,$2::timestamptz,$3::timestamptz,true))::text AS total",
         [ownerRef,from,to,funding.grantId,funding.grantEventId,scope === "PERSON_GRANT"]);
       return this.#total(result.rows[0]?.total);
     }
     // Most runs have no synthesis check. CASE keeps the definer lookup off their spend path.
+    // Decisions 29 and 31: plus step 2's small AI, which has no run (0144); the V4 start step: plus the small AIs before Start (0158).
     const result = await this.pool.query<{ total: string }>(
-      `SELECT coalesce(sum(spend.charge_micros),0)::text AS total
-       FROM billing.run_charge_scope AS scope
+      `SELECT ((SELECT coalesce(sum(spend.charge_micros),0) ${PostgresModelSpendStore.#ownerSpendFrom})
+         + identity.read_ask_clarify_spent($1::uuid, $2::timestamptz, $3::timestamptz)
+         + identity.read_pre_start_spent($1::uuid, $2::timestamptz, $3::timestamptz)
+         + identity.read_public_report_spent_by_funding($1::uuid, $2::timestamptz, $3::timestamptz, false))::text AS total`,
+      [ownerRef, from, to]
+    );
+    return this.#total(result.rows[0]?.total);
+  }
+
+  /**
+   * Paid-plans spec §2.4.2 (B6), with the money rule's PATH_REWRITE (W3-2): the FROM and WHERE of one person's
+   * subscription spend in [$2, $3): the RUN, STORY and PATH_REWRITE charges of the runs `billing.run_charge_scope` pins to
+   * owner $1 on a subscription, admitted before $3, a premium run removed by its synthesis check excepted, no waiver
+   * (side-by-side C10), nor a call the site took over (V4 start step, Task 57f: an earlier copy's charge for a call a continued debate had to
+   * buy again, 0165's call waiver, read through its one definer). `readOwnerSpentMicros` and the money rule's two batch readers below share it. 0123's
+   * `billing.read_internal_grant_spent` (the internal branch) counts the same kinds since the drained step 0140. Task 57j (0168): a waived
+   * debate's charge is left out only when recorded before its bound (`ledger.spend_waived_until`): what ran before a set-aside is the site's,
+   * what a Continue of it buys is the person's, as 0168's SQL readers read it.
+   */
+  static readonly #ownerSpendFrom = `FROM billing.run_charge_scope AS scope
        JOIN ledger.model_spend AS spend ON spend.run_id = scope.run_id
        WHERE scope.owner_ref = $1::uuid AND scope.funding_kind='SUBSCRIPTION'
          AND NOT EXISTS (
@@ -1141,12 +1727,53 @@ export class PostgresModelSpendStore implements ModelSpendStore {
              ) THEN serve.run_removed_by_synthesis_check(run.run_id) ELSE false END
          )
          AND scope.admitted_at < $3
-         AND spend.spend_source IN ('RUN','STORY')
+         AND spend.spend_source IN ('RUN','STORY','PATH_REWRITE','INVESTIGATION_REPORT','PATH_CLIMB','ANSWER_UPDATE','CONTRIBUTION_CHECK')
          AND spend.recorded_at >= $2 AND spend.recorded_at < $3
-         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)`,
+         AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id
+           AND spend.recorded_at < ledger.spend_waived_until(spend.run_id))
+         AND NOT EXISTS (SELECT 1 FROM unnest(ledger.call_waived_attempts($1::uuid)) AS waived(attempt_id) WHERE waived.attempt_id = spend.attempt_id)`;
+
+  /**
+   * The money rule (owner, 31 Oct): the person's spend in each of several windows of one month, in ONE query, for the
+   * borrow chain (`deriveBorrows`). Exactly `readOwnerSpentMicros` per window (the same rows: RUN, STORY and
+   * PATH_REWRITE of the runs pinned to the owner on a subscription, recorded in [from, to), no waiver), in the order
+   * given. An internal grant has no borrowing windows; its ranges are read one by one through its own reader.
+   */
+  async readOwnerSpentInRangesMicros(ownerRef: string, ranges: ReadonlyArray<Readonly<{ from: Date; to: Date }>>,
+    funding?: FundingBasis): Promise<readonly number[]> {
+    if (funding?.kind === "INTERNAL" || ranges.length === 0) {
+      const totals: number[] = [];
+      for (const range of ranges) totals.push(await this.readOwnerSpentMicros(ownerRef, range.from, range.to, funding));
+      return Object.freeze(totals);
+    }
+    const result = await this.pool.query<{ ordinal: string; total: string }>(
+      `SELECT window_range.ordinal::text AS ordinal, ((
+         SELECT coalesce(sum(spend.charge_micros),0)
+         ${PostgresModelSpendStore.#ownerSpendFrom.replaceAll("$2", "window_range.from_at").replaceAll("$3", "window_range.to_at")}
+       ) + identity.read_ask_clarify_spent($1::uuid, window_range.from_at, window_range.to_at)
+         + identity.read_pre_start_spent($1::uuid, window_range.from_at, window_range.to_at)
+         + identity.read_public_report_spent_by_funding($1::uuid, window_range.from_at, window_range.to_at, false))::text AS total
+       FROM unnest($2::timestamptz[], $3::timestamptz[]) WITH ORDINALITY AS window_range(from_at, to_at, ordinal)
+       ORDER BY window_range.ordinal`,
+      [ownerRef, ranges.map((range) => range.from), ranges.map((range) => range.to)]
+    );
+    if (result.rows.length !== ranges.length) throw new TypeError("MODEL_SPEND_RANGES_INCONSISTENT");
+    return Object.freeze(result.rows.map((row) => this.#total(row.total)));
+  }
+
+  /**
+   * The money rule's notice: the person's charges in [from, to), oldest first (recorded time, then id), with the run
+   * each belongs to, so the part past a window's limit can be named by the runs that spent it. The same rows as
+   * `readOwnerSpentMicros`, less step 2's small AI, which has no run to name; a subscription's only (an internal grant never borrows).
+   */
+  async readOwnerChargesMicros(ownerRef: string, from: Date, to: Date): Promise<ReadonlyArray<Readonly<{
+    runId: string; chargeMicros: number }>>> {
+    const result = await this.pool.query<{ run_id: string; charge: string }>(
+      `SELECT spend.run_id::text AS run_id, spend.charge_micros::text AS charge ${PostgresModelSpendStore.#ownerSpendFrom}
+       ORDER BY spend.recorded_at, spend.spend_id`,
       [ownerRef, from, to]
     );
-    return this.#total(result.rows[0]?.total);
+    return Object.freeze(result.rows.map((row) => Object.freeze({ runId: row.run_id, chargeMicros: this.#total(row.charge) })));
   }
 
   /**

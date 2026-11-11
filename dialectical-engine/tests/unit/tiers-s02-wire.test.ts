@@ -150,10 +150,12 @@ describe("S02 plan-tier run wiring", () => {
     expect(capturedInputs.map((input) => input.planTier)).toEqual(["free", "premium"]);
   });
 
-  // Property: exactly two production startRun callers exist (submit's and
-  // #submitWithRoom's, budget spec §2.7), and each of them supplies planTier.
-  // Production break: remove planTier from either call, or add a third production .startRun call.
-  it("keeps two production startRun callers and wires planTier at each call", () => {
+  // Property: exactly two production startRun callers of an ask exist (submit's and
+  // #submitWithRoom's, budget spec §2.7), and each of them supplies planTier. V4 start step, Task 56h-port: a
+  // third, the run made only to carry a visitor's report of a public debate (apps/api/src/public-tree.ts
+  // publicReportCarrierMaker), supplies the presser's plan too; main.ts only hands the maker's input on.
+  // Production break: remove planTier from any of the three calls, or add another production .startRun call.
+  it("keeps the production startRun callers (two asks, one report run) and wires planTier at each call", () => {
     const repoRoot = process.cwd();
     const calls = productionSourceFiles(repoRoot).flatMap((file) => {
       const source = readFileSync(file, "utf8");
@@ -164,10 +166,14 @@ describe("S02 plan-tier run wiring", () => {
       }));
     });
 
-    expect(calls.map((call) => call.file)).toEqual(["apps/api/src/index.ts", "apps/api/src/index.ts"]);
+    expect(calls.map((call) => call.file)).toEqual([
+      "apps/api/src/index.ts", "apps/api/src/index.ts", "apps/api/src/main.ts", "apps/api/src/public-tree.ts"
+    ]);
     for (const call of calls) {
       const callSite = call.source.slice(call.offset, call.offset + 1_200);
-      expect(callSite).toMatch(/\.startRun\(\{[\s\S]*?\bplanTier\s*:/u);
+      // main.ts's one call hands on the input publicReportCarrierMaker built, word for word.
+      if (call.file === "apps/api/src/main.ts") expect(callSite).toMatch(/^\.startRun\(input, admissionClient\)/u);
+      else expect(callSite).toMatch(/\.startRun\(\{[\s\S]*?\bplanTier\s*:/u);
     }
   });
 });

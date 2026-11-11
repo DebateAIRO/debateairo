@@ -4,14 +4,12 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { readFileSync } from "node:fs";
 import { PublicationControl } from "../../apps/ui/components/PublicationControl.js";
-import { TakeDownControl } from "../../apps/ui/components/TakeDownControl.js";
 import { SecurityActionResume } from "../../apps/ui/components/auth/SecurityActionResume.js";
 import { mount, unmount, click } from "./task11-harness.js";
 import auth from "../../apps/ui/messages/en/auth.json";
 import settings from "../../apps/ui/messages/en/settings.json";
 import pub from "../../apps/ui/messages/en/public.json";
 import ro from "../../apps/ui/messages/ro/public.json";
-import home from "../../apps/ui/messages/en/home.json";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
 vi.mock("@/lib/i18n/I18nProvider", () => ({ useChromeI18n: () => ({ locale: "en" }) }));
@@ -57,7 +55,7 @@ function client(state: object = flagged) {
     readPublicationReview: vi.fn().mockResolvedValue(state),
     requestPublicationReview: vi.fn().mockResolvedValue({ state: "UNDER_REVIEW" }),
     publishRun: vi.fn().mockResolvedValue({ state: "PUBLISHED", public_ref: "ref" }),
-    unpublishRun: vi.fn(), deletePrivateDebate: vi.fn(), authMethods: vi.fn()
+    deletePrivateDebate: vi.fn(), authMethods: vi.fn()
   };
 }
 async function mounted(state: object = flagged, words: Record<string, string> = catalog) {
@@ -188,12 +186,27 @@ it("resumed PUBLISH asks on FLAGGED, publishes on CLEAR, waits for the read and 
   try { expect(host.textContent).toContain(pub["public.publication.statusUnavailable"]); expect(host.textContent).not.toContain("Complete proof"); }
   finally { await unmount(root, host); }
 });
-it("no element the panel or take-down control renders has an inline colour", async () => {
+// Security review F2 (0171): a dig is never published, nor asked about; a resumed proof for one (a page left open from before) is told so in words
+// the page already has, never that the proof failed: the review's own "not allowed" for an ask, the plain unavailable line for a publish.
+it("a resumed PUBLISH or ask for a dig refused 409 DIG_NOT_PUBLISHABLE shows a plain line, never the proof's failure", async () => {
+  const resumeProof = { status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action: "PUBLISH", target_run_id: run, token: "g".repeat(43), expires_at: new Date(Date.now() + 300000).toISOString() } };
+  for (const [state, message] of [[flagged, reviewWords["public.publicationReview.notAllowed"]], [clear, pub["public.publication.statusUnavailable"]]] as const) {
+    const api = client(state);
+    const refusal = new ContractHttpError("DIG_NOT_PUBLISHABLE", 409, "DIG_NOT_PUBLISHABLE", "DIG_NOT_PUBLISHABLE");
+    api.requestPublicationReview.mockRejectedValue(refusal);
+    api.publishRun.mockRejectedValue(refusal);
+    const { host, root } = await mount(<SecurityActionResume catalog={auth} settingsCatalog={settings} publicCatalog={catalog} locale="en" client={api as never} takeProof={() => resumeProof as never} />);
+    try {
+      await act(async () => check(host).click());
+      await click(host, "Complete proof");
+      expect(host.textContent).toContain(message);
+      expect(host.textContent).not.toContain(pub["public.publication.changeUnauthorized"]);
+    } finally { await unmount(root, host); }
+  }
+});
+it("no element the panel renders has an inline colour", async () => {
   const { host, root } = await mounted();
-  const takeDown = await mount(<TakeDownControl runRef={run} homeCatalog={home} publicCatalog={catalog} client={client() as never} />);
   try {
-    for (const container of [host, takeDown.host]) {
-      expect([...container.querySelectorAll<HTMLElement>("*")].some((element) => /(?:^|;)\s*(?:color|background|border-color)\s*:/.test(element.getAttribute("style") ?? ""))).toBe(false);
-    }
-  } finally { await unmount(root, host); await unmount(takeDown.root, takeDown.host); }
+    expect([...host.querySelectorAll<HTMLElement>("*")].some((element) => /(?:^|;)\s*(?:color|background|border-color)\s*:/.test(element.getAttribute("style") ?? ""))).toBe(false);
+  } finally { await unmount(root, host); }
 });

@@ -9,7 +9,11 @@
 #                         --format=custom dump of one database contains neither)
 #   2. the debateai database
 #   3. the custody tree  (user-DEK store incl. runs/<run>/content-key.v1.json, the publication
-#                         key store, the audit key store)
+#                         key store, the audit key store), without the user-DEK store's own
+#                         saved-questions/ folder: the keys of questions not started yet are in no
+#                         backup (owner answer S8 A, 2026-11-05), so a question deleted or started
+#                         after a backup can never be read from it, and a restore brings back no
+#                         question not started yet. The debates' keys stay in the backup.
 # in that order: DB first, then keys. A content key referenced by a row at dump time is present
 # in the later key snapshot; a key erased between the two corresponds to a row that was already
 # erased. The reverse order can produce a row whose key no longer exists.
@@ -108,7 +112,10 @@ if [ "$dek_name" = "$publication_name" ] || [ "$dek_name" = "$audit_name" ] \
   REPORTED=1
   exit 1
 fi
-tar -cf "$WORK/custody.tar" -C "$(dirname "$USER_DEK_STORE_PATH")" "$dek_name"
+# The keys of questions not started yet stay out (header, item 3). The exclude is given to the user-DEK
+# store's tar only, which archives nothing but "$dek_name", so it names that store's own saved-questions/
+# folder: a deeper folder of that name, and the publication and audit stores, are archived as before.
+tar -cf "$WORK/custody.tar" --exclude="$dek_name/saved-questions" -C "$(dirname "$USER_DEK_STORE_PATH")" "$dek_name"
 tar -rf "$WORK/custody.tar" -C "$(dirname "$PUBLICATION_KEY_STORE_PATH")" "$publication_name"
 tar -rf "$WORK/custody.tar" -C "$(dirname "$AUDIT_KEY_STORE_PATH")" "$audit_name"
 

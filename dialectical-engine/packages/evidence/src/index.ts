@@ -17,6 +17,13 @@ import {
   type LedgerOutcome
 } from "@debateai/kernel";
 
+export * from "./query-guard.js";
+export * from "./host-filter.js";
+export * from "./window.js";
+export * from "./web-query-set.js";
+export * from "./web-dig-query-set.js";
+export * from "./verbatim.js";
+
 const nonBlank = (value: string, code: string): string => {
   const trimmed = value.trim();
   if (trimmed.length === 0) throw new TypedDomainError(code, "A required evidence-domain label is blank");

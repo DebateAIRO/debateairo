@@ -48,13 +48,16 @@ async function expectedContractHashes(): Promise<Record<string, string>> {
     // serve.synthesizer.v4 (2026-10-15, owner-approved plain-words wording) + its
     // answer-length variant length.v2; v1's d96e7cc9…c866, v2's 340e11a6…8b70,
     // v3's 4b141d3a…f90f and v3 + length.v1's 9a46af29…5662 (debate shape,
-    // 2026-10-13) are history.
-    composerContractHash: "879d2c5d0213832fe466537603e5171e53248cce41188473550616d2dd5b4a47",
+    // 2026-10-13) are history. Since the V4 reading level and the language-neutral
+    // length sentence (owner N6 and 17 Oct #5, 2026-10-29): v4 + length.v3 +
+    // reader.v1 + length.reader.v1; v4 + length.v2's 879d2c5d…4a47 is history.
+    composerContractHash: "6fb174d4d75ad1d39bf8246f741a7ab0ee60fc2b6d117aa228de83cfca29324d",
     // F-SEALEDROWS-A · V RULING 2026-09-04: the conformance slot fingerprints
     // the EVALUATOR prompt alone; its answer form is still the 2026-09-04 text.
     // serve.evaluator.v2 + its length variant length.v1 (LG-C Task 13); v2 alone, 660ec7cb…e22f (2026-10-12), and v1's
-    // f205421c…9dcc are history.
-    conformanceContractHash: "108f1b29fb3c4739568a083c806ef5abdb9289e8b621bc9d895d52e5fcad22f6",
+    // f205421c…9dcc are history. Since the V4 reading level (owner N6, 2026-10-29): + reader.v1 + length.reader.v1;
+    // v2 + length.v1's 108f1b29…22f6 is history.
+    conformanceContractHash: "02e01cbfebf1eeb96e61eb9a56cdbccb7ca1f8fae32186ef7a8c72ab9834c2bd",
     propagationContractHash: sha256(propagation),
     serveContractHash: sha256(serve)
   };

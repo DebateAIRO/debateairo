@@ -21,6 +21,7 @@ import { describe, expect, it } from "vitest";
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const MAIN = "apps/api/src/main.ts";
 const PREVIEW_BUDGET = "apps/api/src/preview-budget-estimate.ts";
+const PUBLIC_TREE = "apps/api/src/public-tree.ts";
 
 /** PLAN S4.5, verbatim as a map: reader id → the apps/api/src files where its sites are. */
 const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
@@ -29,17 +30,29 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
   X18h: [MAIN],
   X21: [PREVIEW_BUDGET],
   X27: [MAIN],
-  X28: [MAIN]
+  X28: [MAIN],
+  X29: [PUBLIC_TREE],
+  X30: [MAIN],
+  X31: [MAIN],
+  X32: [MAIN],
+  X33: [MAIN],
+  X37: [MAIN],
+  X38: [MAIN]
 });
 
 /**
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
- * X14 the three PostgresStaffRepository constructions; X18h the key store's owner lookup; X21 the gate's two reads; since
+ * X14 the three PostgresStaffRepository constructions and, since the security review (0171), the staff runtime's alert mapping pool; X18h the key store's owner lookup; X21 the gate's two reads; since
  * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
- * review's repository and its two readers. The file-level map alone cannot see a site added under an id already mapped to
- * that file.
+ * review's repository and its two readers; since upload check Task 9, X29 the report press's seal under the public
+ * debate's own run; since the security review (0171), X38 the Report button's settlement, after its
+ * judge, and the writers of the site's day a request pays for, each the marker's alone: X30 the language check's probe and record,
+ * X31 the question check's, X32 the clarify charge's (its reservation stays the request login's) and X33 the synthesis check's
+ * record; and X37 the ask-time discovery's writer of a provider's probe, the marker's alone too (its reader stays the request pool's).
+ * The file-level map alone cannot see a site added under an id already mapped to that file.
  */
-const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 3, X18h: 1, X21: 2, X27: 1, X28: 3 });
+const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1, X30: 2,
+  X31: 2, X32: 2, X33: 1, X37: 1, X38: 1 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
 const EXPECTED_TARGETS = Object.freeze([
@@ -159,7 +172,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27 and X28 in main.ts and X21 in preview-budget-estimate.ts, each id a literal, with 3, 3, 1, 1, 3 and 2 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37 and X38 in main.ts, X21 in preview-budget-estimate.ts and X29 in public-tree.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1, 2 and 1 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);
@@ -181,6 +194,77 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     for (const name of ["readVerdictCategories", "readReviewBody"]) {
       expect(property(name), name).toMatch(/^\([^)]*\) => crossAccount\("X28", \(\) =>\s*application\.withContentLease\(/u);
     }
+  });
+
+  /**
+   * Upload check Task 9 (R22 path 9): a stranger's report on a public debate is sealed under the debate's own run key, so
+   * the runner can read it; that run is the author's, which the runtime login does not see inside the stranger's request.
+   * The public check is identity.open_public_report's. So the frame is that one seal and nothing else: the press
+   * decision and the material's record stay on the runtime login.
+   */
+  it("S4.3 (upload check Task 9) X29 is the report press's seal under the carrier open_public_report named, in pressPublicReport's OPENED case, and nothing else", async () => {
+    const tree = await parse(PUBLIC_TREE);
+    const x29 = callsOf(tree, "crossAccount").filter((call) => call.arguments[0]?.getText() === '"X29"');
+    expect(x29.map((call) => enclosingFunctionName(call))).toEqual(["pressPublicReport"]);
+    const frame = x29[0]!;
+    let clause: ts.Node | undefined = frame.parent;
+    while (clause !== undefined && !ts.isCaseClause(clause)) clause = clause.parent;
+    expect(clause !== undefined && ts.isCaseClause(clause) ? clause.expression.getText() : null).toBe('"OPENED"');
+    // The frame's whole body is the one seal, under the carrier and bound to the report's id: anchored at both ends, so
+    // anything chained after the seal (a `.then(...)`, a second call) fails here.
+    expect(frame.arguments[1]?.getText()).toMatch(
+      /^\(\) => sealFor\(input\.pool, opened\.carrierRunId!, PUBLIC_MATERIAL_CARRIER, opened\.reportId!, publicMaterialOf\(debate, \{ now: input\.now \}\)\)$/u);
+    const press = descendants(tree).find((node): node is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(node) && node.name?.text === "pressPublicReport")!;
+    const calls = (name: string) => descendants(press).filter((node): node is ts.CallExpression => ts.isCallExpression(node)
+      && ts.isPropertyAccessExpression(node.expression) && node.expression.name.text === name);
+    for (const name of ["readPublicDebate", "openReport", "recordMaterial"]) {
+      expect({ name, found: calls(name).length, framed: calls(name).filter((call) => enclosedBy(call, frame)).length })
+        .toEqual({ name, found: 1, framed: 0 });
+    }
+  });
+
+  /**
+   * The security review (0171, F5): the Report button's settlement records the judge's verdict and hides a public debate on AGREE, so it is the
+   * cross-account marker's alone. The press calls it inside the reporter's request, after the judge, through its own port on the request pool's
+   * system target; the target read and the opening stay on the request pool, under the reporter's session.
+   */
+  it("S4.3 (the security review) X38 is the Report button's settlement port, the press's one other repository is the request pool's", async () => {
+    const main = await parse(MAIN);
+    const objects = descendants(main).filter((node): node is ts.PropertyAssignment => ts.isPropertyAssignment(node) && node.name.getText() === "publicFlags")
+      .map((assignment) => assignment.initializer).filter((value): value is ts.ObjectLiteralExpression => ts.isObjectLiteralExpression(value))
+      .filter((value) => value.properties.some((member) => member.name?.getText() === "settlement"));
+    expect(objects).toHaveLength(1);
+    const property = (name: string): string | undefined => objects[0]!.properties
+      .filter((member): member is ts.PropertyAssignment => ts.isPropertyAssignment(member))
+      .find((member) => member.name.getText() === name)?.initializer.getText();
+    expect(property("settlement")).toBe('new PostgresPublicFlagRepository(crossAccountPool(pool, "X38"))');
+    expect(property("repository")).toBe("publicFlagRepository");
+    const repository = descendants(main).filter((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && node.name.getText() === "publicFlagRepository");
+    expect(repository.map((declaration) => declaration.initializer?.getText())).toEqual(["new PostgresPublicFlagRepository(pool)"]);
+  });
+
+  /**
+   * The security review (0171, F5): 0048's writer of a provider's probe is the cross-account marker's alone, as the API's ask-time discovery takes a
+   * provider's latest row for healthy and probes only a stale one, so a request login dated rows as it liked. The discovery records each probe it makes,
+   * inside the asking request, through the request pool's system target; it reads the latest rows on the request pool, as before.
+   */
+  it("S4.3 (the security review) X37 is the ask-time discovery's probe writer, and the discovery reads the latest probes on the request pool", async () => {
+    const main = await parse(MAIN);
+    const declared = (name: string): string[] => descendants(main)
+      .filter((node): node is ts.VariableDeclaration => ts.isVariableDeclaration(node) && node.name.getText() === name)
+      .map((declaration) => declaration.initializer?.getText() ?? "");
+    // The two repositories main.ts builds: the reader on the request pool, the writer on its X37 site, and no other.
+    expect(newsOf(main, "ProviderProbeRepository").map((construction) => (construction.arguments ?? []).map((argument) => argument.getText())))
+      .toEqual([["pool"], ['crossAccountPool(pool, "X37")']]);
+    expect([declared("probeReader"), declared("probeRecorder")]).toEqual([["new ProviderProbeRepository(pool)"], ['new ProviderProbeRepository(crossAccountPool(pool, "X37"))']]);
+    // The one store the discovery is handed reads through the reader and records through the writer.
+    expect(declared("probes")).toEqual([
+      "Object.freeze({\n  readLatest: (providerRefs) => probeReader.readLatest(providerRefs),\n  record: (observation) => probeRecorder.record(observation)\n})"]);
+    const resolvers = callsOf(main, "createProviderDiscoveryResolver");
+    expect(resolvers).toHaveLength(1);
+    const options = resolvers[0]!.arguments[0] as ts.ObjectLiteralExpression;
+    expect(options.properties.filter((member) => member.name?.getText() === "probes").map((member) => member.getText())).toEqual(["probes"]);
   });
 
   it("S4.5 main.ts's setCrossAccountTarget( calls are exactly pool→systemPool, legacyAskAdmissionPool→systemPool, authorizationPool→authorizationSystemPool, in that order, after the pool block's last createPool( and before any later statement that uses those pools", async () => {
@@ -222,17 +306,19 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
    * FIX-S01-p1b, COR-B1 (t_25f52da5): a boot read that answers for the connection's OWN principal (a role check, a
    * capability probe) made on a T1 pool after its target is set reads the system login's catalog — outside a scope every
    * statement goes to the target. Derived, not listed: every call in main.ts of an `assert…DatabaseRole…` function,
-   * every `.assertRole()` and the language-check writer probe. Each runs inside attestEveryRoute (the pool's own login,
-   * then its target — V-12: the recovery workers' background work runs on the target) or, for the writer probe whose
-   * writes run inside requests only, onOwnConnections.
+   * every `.assertRole()` and the probes of the writers a request's paid calls use. Each runs inside attestEveryRoute (the
+   * pool's own login, then its target — V-12: the recovery workers' background work runs on the target) or, for the
+   * clarify charge's reservation, whose calls run inside requests only, onOwnConnections. The security review's 0171 made
+   * the language check's, the question check's and the clarify charge's writers the cross-account marker's alone, so each
+   * is probed on its site's pool (X30, X31, X32), the system login its record runs on, unwrapped.
    */
-  it("COR-B1 every main.ts boot read that answers for the connection's own principal runs through attestEveryRoute — the writer probe through onOwnConnections — 13 calls, 12 on a T1 pool", async () => {
+  it("COR-B1 every main.ts boot read that answers for the connection's own principal runs through attestEveryRoute — the reservation probe through onOwnConnections, the writer probes on their sites — 15 calls, 11 on a T1 pool", async () => {
     const source = await parse(MAIN);
     const found = descendants(source).filter((node): node is ts.CallExpression => ts.isCallExpression(node)).flatMap((call) => {
       const callee = call.expression;
       const name = ts.isIdentifier(callee) ? callee.text : ts.isPropertyAccessExpression(callee) ? callee.name.text : "";
-      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || name === "languageCheckSpendWriterPresent"
-        ? [`${call.getText()} @ ${wrapperOf(call) ?? "UNWRAPPED"}`] : [];
+      return /^assert\w*DatabaseRole\w*$/u.test(name) || name === "assertRole" || /^(?:languageCheckSpend|questionCheckSpend|askClarifyCharge)WriterPresent$/u.test(name)
+        || name === "askClarifyReservationPresent" ? [`${call.getText()} @ ${wrapperOf(call) ?? "UNWRAPPED"}`] : [];
     });
     expect(found).toEqual([
       "assertAccountErasureDatabaseRole(pool,erasurePool) @ attestEveryRoute",
@@ -242,10 +328,16 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       "assertContentProvisionDatabaseRole(pool,contentProvisionPool) @ attestEveryRoute",
       "assertContentProvisionDatabaseRole(pool,serverAskAdmissionPool) @ attestEveryRoute",
       "assertDataExportDatabaseRoles(authorizationPool, dataExportPool) @ attestEveryRoute",
-      "languageCheckSpendWriterPresent(pool) @ onOwnConnections",
+      // 0171: the language check's writer is the marker's, asked of its site's login (X30), where each check's record runs.
+      'languageCheckSpendWriterPresent(crossAccountPool(pool, "X30")) @ UNWRAPPED',
+      // Decisions 29 and 31: dynamic step 2 asks after 0144's writer on its site's login (X32), and after 0171's reservation on the request login.
+      'askClarifyChargeWriterPresent(crossAccountPool(pool, "X32")) @ UNWRAPPED',
+      "askClarifyReservationPresent(pool) @ onOwnConnections",
       "passwordResetRepository.assertRole() @ attestEveryRoute",
       "backupEmailRepository.assertRole() @ attestEveryRoute",
       "mfaRecoveryRepository.assertRole() @ attestEveryRoute",
+      // 0171: the question check's writer is the marker's, asked of its site's login (X31), where each check's record runs.
+      'questionCheckSpendWriterPresent(crossAccountPool(pool, "X31")) @ UNWRAPPED',
       "assertSupportDatabaseRole(pool, supportPool) @ attestEveryRoute"
     ]);
   });
@@ -290,7 +382,7 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
       .toEqual(['crossAccountPool(pool, "X11")']);
   });
 
-  it("S4.3 each pinned site is routed where PLAN S4.3 names it: the NETOPIA intake's repository and jobs (X11), every PostgresStaffRepository (X14), the run-content key store's owner lookup (X18h), the preview gate's two unfinished-run and usage reads (X21)", async () => {
+  it("S4.3 each pinned site is routed where PLAN S4.3 names it: the NETOPIA intake's repository and jobs (X11), every PostgresStaffRepository and the staff runtime's alert mapping pool (X14), the run-content key store's owner lookup (X18h), the preview gate's two unfinished-run and usage reads (X21)", async () => {
     const main = await parse(MAIN);
     const intake = newsOf(main, "NetopiaNoticeIntake").filter((construction) => {
       const declaration = construction.parent?.parent;
@@ -308,6 +400,16 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     const staff = newsOf(main, "PostgresStaffRepository").map((construction) =>
       (construction.arguments ?? []).map((argument) => argument.getText()));
     expect(staff).toEqual([['crossAccountPool(pool, "X14")'], ['crossAccountPool(pool, "X14")'], ['crossAccountPool(pool, "X14")']]);
+    // The security review (0171): a staff change's alert maps its key user, 0088's mapping now the marker's, on the same site; the dispatcher's
+    // own pool stays `pool`, whose statements outside any request go to its system login.
+    const runtimes = callsOf(main, "createStaffRuntime");
+    expect(runtimes).toHaveLength(1);
+    const runtimeOptions = runtimes[0]!.arguments[0] as ts.ObjectLiteralExpression;
+    const runtimeProperty = (name: string): string | undefined => runtimeOptions.properties
+      .filter((member): member is ts.PropertyAssignment | ts.ShorthandPropertyAssignment => ts.isPropertyAssignment(member) || ts.isShorthandPropertyAssignment(member))
+      .map((member) => [member.name.getText(), ts.isPropertyAssignment(member) ? member.initializer.getText() : member.name.getText()] as const)
+      .find(([key]) => key === name)?.[1];
+    expect([runtimeProperty("pool"), runtimeProperty("mappingPool")]).toEqual(["pool", 'crossAccountPool(pool, "X14")']);
     const keyStore = bootCalls(main).get("run-content-key-store") ?? [];
     expect(keyStore).toHaveLength(1);
     const x18h = callsOf(main, "crossAccount").filter((call) => call.arguments[0]?.getText() === '"X18h"');

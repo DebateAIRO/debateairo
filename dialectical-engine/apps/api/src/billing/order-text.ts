@@ -52,7 +52,10 @@ export const englishOrderText: BillingOrderText = (kind, _locale, params) => {
   }
 };
 
-/** A date as the locale writes it (UTC, the billing calendar's zone), never an ISO string on a legal document. */
+/**
+ * A date as the locale writes it (UTC, the billing calendar's zone), never an ISO string on a legal document. English is
+ * day first ("1 October 2026"), as the pages write it (owner's answer to question 5, 5 Nov 2026).
+ */
 export function invoiceDate(value: Date, locale: string): string {
-  return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(value);
+  return new Intl.DateTimeFormat(/^en(?:-|$)/i.test(locale) ? "en-GB" : locale, { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" }).format(value);
 }

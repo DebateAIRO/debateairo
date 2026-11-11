@@ -3837,7 +3837,7 @@ with:
 (a) In "## What this is, in plain words", change "Three modes:" (README:20) to "Four modes:" (pre-flight PF-D28), and add a bullet after **openings**:
 
 ```markdown
-- **language**: the question-language practice (no debate, under $0.05). Nine fixed questions are each read the way the
+- **language**: the question-language practice (no debate, under <amount>). Nine fixed questions are each read the way the
   site will read them before a debate, and the report says which language each would be locked to. See "The question
   language".
 ```
@@ -3952,7 +3952,7 @@ echo "exit: $?"
 Then:
 - in item 4 (the old item 2), change "Then run the first pair on `ro-euro`" to "Day 2: run the first pair on `ro-euro`";
 - in the "**One pair a day after that:**" table, change the days 2, 3, 4 to 3, 4, 5;
-- in S-8's **Cost per debate** bullet, change "spread over at least four days" to "spread over at least five days" and add the sentence "The language mode costs under $0.05 and the `lang-ro-en-mix` debate about $0.30, on day 1 after formats.";
+- in S-8's **Cost per debate** bullet, change "spread over at least four days" to "spread over at least five days" and add the sentence "The language mode costs under <amount> and the `lang-ro-en-mix` debate about $0.30, on day 1 after formats.";
 - in "## Money and time (rough)", change Task 7's "eight depth-1 debates over at least four days" to "eight depth-1 debates over at least five days, after day 1's language mode and `lang-ro-en-mix` debate".
 
 (d) In "Optional flags", at the end of the plain `- debate:` bullet (README ~445, after its `--register-next` sentences), add: `` `--site-language <code>`, `--language-choice use|keep` (default `keep`; see "The question language"; debate only, with a debate-shape row). `` Right after that bullet, add:

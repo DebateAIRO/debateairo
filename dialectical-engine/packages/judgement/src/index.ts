@@ -11,12 +11,15 @@ import {
   lengthGuideForBounds,
   questionLanguageForBounds,
   questionLanguageSentence,
+  READER_FIELD,
+  readerField,
   replyLanguageCheckFor,
   withQuestionLanguageField,
   type DebateRole,
   type LengthGuide,
   type PointInvestigationMaterial,
   type QuestionLanguage,
+  type ReadingLevel,
   type ReviewOutcome,
   type WayOfKnowing
 } from "@debateai/kernel";
@@ -50,10 +53,26 @@ import {
   judgeAssignedRootV2PromptContract,
   judgeConsiderationPromptContract,
   judgePromptContract,
+  REVIEW_SOURCES_MATERIAL_FIELDS,
   reviewPromptContract,
   type JudgeClaimedWayOfKnowing,
   type JudgeLegKind
 } from "./prompts.js";
+import {
+  judgeAssignedRootSourcesPromptContract,
+  judgeConsiderationSourcesPromptContract,
+  judgeSourcesMaterialFields,
+  judgeSourcesPromptContract,
+  reviewSourcesPromptContract,
+  PANEL_SOURCES_PROMPT_CONTRACT
+} from "./web-prompts.js";
+import {
+  JUDGE_PATH_ROOT_MATERIAL_FIELDS,
+  JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS,
+  judgePathRootContractForReader,
+  judgePathRootPromptContract,
+  judgePathRootSourcesPromptContract
+} from "./path-root-prompts.js";
 import type { Pool, PoolClient } from "pg";
 import {
   CONTENT_CIPHERTEXT_SENTINEL,
@@ -88,6 +107,12 @@ import {
 
 export * from "./s04.js";
 export * from "./prompts.js";
+export * from "./web-prompts.js";
+// V4 start step, Task 46: the path root writer's drafts.
+export * from "./path-root-prompts.js";
+export * from "./ask-clarify-prompt.js";
+export * from "./public-contribution-prompt.js";
+export * from "./public-report-check-prompt.js";
 export * from "./investigation.js";
 export * from "./comparing-judges.js";
 export * from "./engine-repository.js";
@@ -277,6 +302,12 @@ export type JudgeLeg =
        * the unsided points raised and the answer's assumptions, each a JSON text. Absent = today's leg, byte for byte.
        */
       readonly engine?: Readonly<{ pointsRaised: string; assumptions: string }> | undefined;
+      /**
+       * Web search (plan 2026-10-30 task W4-1): the path's sources pack (its checked extracts, with their ids), one JSON
+       * text. Present only with `engine`: the sources variant (`judge.assigned-root.*.sources.v1`, item 5 in place of the
+       * locator sentence) and its table. Absent: the v2 leg, byte for byte.
+       */
+      readonly sources?: string | undefined;
     }
   /**
    * `consideration` (debate shape) is the one map point the reply is built on.
@@ -288,11 +319,31 @@ export type JudgeLeg =
       readonly kind: "support" | "attack";
       readonly positionUnderDebate: string;
       readonly consideration?: string | undefined;
+      /** W4-1: the path's sources pack (lengthed legs only); absent = today's leg, byte for byte. */
+      readonly sources?: string | undefined;
     }
   | {
       readonly kind: "cross-root";
       readonly ownPosition: string;
       readonly otherMakersPosition: string;
+      /** W4-1: the own path's pack, then the rival's (lengthed legs only); absent = today's leg, byte for byte. */
+      readonly sources?: string | undefined;
+    }
+  /**
+   * V4 start step, Task 46 (spec 2026-11-03 §4.3): a path debate's root — what the path's angle shows about the question
+   * and where it comes out (`judge.path-root.*`, drafts, always lengthed). Its title, question, viewpoint lines and the
+   * gap round's points raised for it are material, fenced like every other statement. `sources`: the path's pack (the
+   * sources variant). `readingLevel`: the person's level (the story's rule: with a level, the reader sentence and the
+   * `reader` field; null, neither).
+   */
+  | {
+      readonly kind: "path-root";
+      readonly pathTitle: string;
+      readonly pathQuestion: string;
+      readonly viewpoints: string;
+      readonly pointsRaised: string;
+      readonly sources?: string | undefined;
+      readonly readingLevel: ReadingLevel | null;
     };
 
 /**
@@ -333,9 +384,30 @@ export interface JudgeInput {
   readonly length?: LengthGuide;
   /** Which authoring leg this is. Selects the code-owned directive. */
   readonly leg: JudgeLeg;
+  /**
+   * Web search (plan 2026-10-30 task W4-1; design §3.5 "Sure" 1): every extract id of THIS debate's packs, on a debate
+   * that kept at least one pack. Present: a LOOKED_UP claim keeps its label only when its locator is exactly one of
+   * them; any other locator (a remembered report, another debate's id) is REASONING, with the downgrade note. Absent (no
+   * packs: Free, the web off, an old run): today's rule, any locator keeps it.
+   */
+  readonly debateExtractIds?: ReadonlySet<string>;
   readonly providerRef: string;
   readonly contractHash: string;
   readonly bound: CallBound;
+}
+
+/**
+ * W4-1 — THE LOCATOR CHECK, the one rule `Judge.judge` resolves a way of knowing by. LOOKED_UP stays only with a locator;
+ * on a debate with packs (`debateExtractIds`), only with a locator that is exactly one of its extract ids (as the answer's
+ * `looked_up_checked` reads it, packages/serve/src/web-sources.ts). Everything else is REASONING, and the locator goes.
+ */
+export function resolveWayOfKnowing(
+  claimed: JudgeClaimedWayOfKnowing,
+  locator: string | null,
+  debateExtractIds?: ReadonlySet<string>
+): Readonly<{ wayOfKnowing: WayOfKnowing; locator: string | null }> {
+  const kept = claimed === "LOOKED_UP" && locator !== null && (debateExtractIds === undefined || debateExtractIds.has(locator));
+  return Object.freeze({ wayOfKnowing: kept ? "LOOKED_UP" : "REASONING", locator: kept ? locator : null });
 }
 
 export interface JudgedNode {
@@ -389,6 +461,12 @@ export interface ReviewedEdgeSubject {
 
 export interface NodeReviewInput extends JudgeSubjectInput {
   /**
+   * Web search (plan 2026-10-30 task W4-1; design §7.1 item 6): the extract the reviewed point names, one JSON text, on a
+   * lengthed review only. Present: the sources variant (`judge.review.length.sources.v1`) with `cited_extract` right after
+   * the statement. Absent: today's review, byte for byte.
+   */
+  readonly citedExtract?: string;
+  /**
    * Every edge this node sources. REQUIRED, never optional: an absent list and
    * an empty list must not look alike, or a caller that forgets to pass its
    * edges silently reproduces the all-UNKNOWN skeleton T5 repeals.
@@ -430,7 +508,13 @@ export interface InvestigatedPoint {
  * separate (S4-1). It carries no edges: measurement is the reviewer's seat,
  * and the panel never sees an edge.
  */
-export type PanelAssessmentInput = JudgeSubjectInput;
+export type PanelAssessmentInput = JudgeSubjectInput & Readonly<{
+  /**
+   * Decision 10 (R22): the extract the graded point names, as one JSON text, on a lengthed panel call only. Present: the
+   * sources variant (`judge.panel.length.sources.v1`) with `cited_extract` right after the statement.
+   */
+  citedExtract?: string;
+}>;
 
 export interface PanelAssessment {
   readonly judgementRef: string;
@@ -470,6 +554,33 @@ export function judgeLegFrameSpec(
   claim: keyof typeof JUDGE_CLAIM_TYPE_INSTRUCTIONS,
   lengthed = false
 ): Readonly<{ contract: PromptContract; materialFields: readonly string[] }> {
+  // V4 start step, Task 46: a path's root is always lengthed; with its pack, the sources variant. The person's reading
+  // level adds the reader sentence and the `reader` field (the story's rule); without one the table has no `reader`.
+  if (leg.kind === "path-root") {
+    if (!lengthed) throw new TypedDomainError("JUDGE_PATH_ROOT_UNLENGTHED", "A path's root is always told its length");
+    const sourced = leg.sources !== undefined;
+    const table: readonly string[] = sourced ? JUDGE_PATH_ROOT_SOURCES_MATERIAL_FIELDS : JUDGE_PATH_ROOT_MATERIAL_FIELDS;
+    return Object.freeze({
+      contract: judgePathRootContractForReader(sourced ? judgePathRootSourcesPromptContract(claim) : judgePathRootPromptContract(claim),
+        leg.readingLevel),
+      materialFields: leg.readingLevel === null ? Object.freeze(table.filter((name) => name !== READER_FIELD)) : table
+    });
+  }
+  // W4-1: a leg that reads a sources pack takes its sources variant (web-prompts.ts), which is lengthed only, as engine 2's
+  // legs are; an assigned root only with engine 2's fixed words. Anything else is a wiring defect, never sent.
+  if ((leg.kind === "assigned-root" || leg.kind === "support" || leg.kind === "attack" || leg.kind === "cross-root")
+    && leg.sources !== undefined) {
+    if (!lengthed) throw new TypedDomainError("JUDGE_SOURCES_UNLENGTHED", "A leg that reads sources is always told its length");
+    if (leg.kind === "assigned-root") {
+      if (leg.engine === undefined) throw new TypedDomainError("JUDGE_SOURCES_LEG_INVALID", "Only engine 2's position reads sources");
+      return Object.freeze({ contract: judgeAssignedRootSourcesPromptContract(claim), materialFields: judgeSourcesMaterialFields("assigned-root") });
+    }
+    if (leg.kind !== "cross-root" && leg.consideration !== undefined) {
+      return Object.freeze({ contract: judgeConsiderationSourcesPromptContract(leg.kind, claim),
+        materialFields: judgeSourcesMaterialFields(leg.kind, true) });
+    }
+    return Object.freeze({ contract: judgeSourcesPromptContract(leg.kind, claim), materialFields: judgeSourcesMaterialFields(leg.kind) });
+  }
   if (leg.kind === "assigned-root" && leg.engine !== undefined) {
     // Engine-2 contracts are always lengthed (engine INTERFACE §0): an untold length is a wiring defect, never sent.
     if (!lengthed) throw new TypedDomainError("JUDGE_ASSIGNED_ROOT_V2_UNLENGTHED", "An engine-2 position is always told its length");
@@ -525,11 +636,24 @@ function judgeLegMaterial(
             { name: "position_under_debate", content: leg.positionUnderDebate },
             ...(leg.consideration === undefined ? [] : [{ name: "consideration", content: leg.consideration }])
           ]
-        : [{ name: "question_line", content: questionLine }];
+        : leg.kind === "path-root"
+          ? [
+              { name: "question_line", content: questionLine },
+              { name: "path_title", content: leg.pathTitle },
+              { name: "path_question", content: leg.pathQuestion },
+              { name: "viewpoints", content: leg.viewpoints },
+              { name: "points_raised", content: leg.pointsRaised }
+            ]
+          : [{ name: "question_line", content: questionLine }];
+  // W4-1: a leg's sources pack rides right before `length` (its variant's table says so); none, today's fields.
+  const sources = "sources" in leg && leg.sources !== undefined ? [{ name: "sources", content: leg.sources }] : [];
+  // V4 start step, Task 46: a path's root with the person's reading level is told its reader right after `length`
+  // (withReaderField's rule: no level, no field).
+  const reader = leg.kind === "path-root" && leg.readingLevel !== null ? [readerField(leg.readingLevel)] : [];
   // Length guidance (spec 2026-10-15 §3.2): the variant's table ends with `length`, the call's target.
   const all = length === null
-    ? fields
-    : [...fields, lengthGuidanceField(length.words, length.languageCode, length.charactersPerWord)];
+    ? [...fields, ...sources, ...reader]
+    : [...fields, ...sources, lengthGuidanceField(length.words, length.languageCode, length.charactersPerWord), ...reader];
   if (all.length !== declared.length || all.some((field, index) => field.name !== declared[index])) {
     throw new TypedDomainError(
       "JUDGE_LEG_MATERIAL_UNDECLARED",
@@ -559,6 +683,14 @@ function framedJudgePrompt(
     contract: promptContractInArgumentLanguage(spec.contract, argumentLanguageName, questionLanguage),
     material: judgeLegMaterial(leg, questionLine, spec.materialFields, questionLanguage, length)
   });
+}
+
+/** W4-1: the sources review sends exactly its closed table (REVIEW_SOURCES_MATERIAL_FIELDS); today's review is unchecked, as before. */
+function reviewMaterialChecked<T extends Readonly<{ name: string }>>(fields: readonly T[], declared: readonly string[] | null): readonly T[] {
+  if (declared !== null && (fields.length !== declared.length || fields.some((field, index) => field.name !== declared[index]))) {
+    throw new TypedDomainError("JUDGE_REVIEW_MATERIAL_UNDECLARED", `The sources review may send exactly ${declared.join(",")}`);
+  }
+  return fields;
 }
 
 /** Test seam: the same function `Judge.judge` frames with, so a test reads the exact packet a leg sends. */
@@ -667,7 +799,13 @@ type RootPositionBoundInput = Readonly<{
    * `pointsRaised` is the ONE room its sided `map_points` and its `points_raised` list share (Ruling PF-R35.4 (a)): the
    * two together hold at most `pointsRaised + 2` characters, which the runner's shaping keeps (`shapeEngineRootMaterial`).
    */
-  assignedMaterialChars: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number }>;
+  assignedMaterialChars: Readonly<{ answer: number; points: number; pointsRaised?: number; assumptions?: number;
+    /**
+     * Web search (W4-1): the most bytes the case writer's `sources` text can hold (one pack, cut by code). Present, with
+     * `pointsRaised` and `assumptions`: the engine-2 leg is also framed under its sources variant with that many
+     * characters of sources. Absent: today's bound, byte for byte.
+     */
+    sources?: number }>;
   questionLanguage?: QuestionLanguage | null;
   /** Length guidance (spec 2026-10-15 §3.2): frame the lengthed variant with this target; absent or null, today's bytes. */
   length?: LengthGuide | null;
@@ -690,9 +828,10 @@ function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (fr
     || !Number.isSafeInteger(answer) || answer < 1 || !Number.isSafeInteger(points) || points < 1) {
     throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
   }
-  const { pointsRaised, assumptions } = input.assignedMaterialChars;
+  const { pointsRaised, assumptions, sources } = input.assignedMaterialChars;
   const validSize = (size: number | undefined): boolean => size === undefined || (Number.isSafeInteger(size) && size >= 1);
-  if ((pointsRaised === undefined) !== (assumptions === undefined) || !validSize(pointsRaised) || !validSize(assumptions)) {
+  if ((pointsRaised === undefined) !== (assumptions === undefined) || !validSize(pointsRaised) || !validSize(assumptions)
+    || !validSize(sources) || (sources !== undefined && pointsRaised === undefined)) {
     throw new TypeError("ROOT_POSITION_BOUND_INPUT_INVALID");
   }
   const legs: readonly JudgeLeg[] = [
@@ -707,8 +846,12 @@ function rootPositionBodyBytesBound(input: RootPositionBoundInput, packetOf: (fr
   const fill = (chars: number): string => "\u0001".repeat(chars);
   const engineLeg = (sided: number, raised: number, assumed: number): JudgeLeg => Object.freeze({ kind: "assigned-root",
     assignedAnswer: fill(answer), mapPoints: fill(sided), engine: Object.freeze({ pointsRaised: fill(raised), assumptions: fill(assumed) }) });
+  // W4-1: with `sources`, each engine leg is framed a second time under its sources variant, its pack at the bound (every
+  // character of it framed at the 7 bytes no real character exceeds), so the room covers a case writer that reads a pack.
+  const withSources = (leg: JudgeLeg): readonly JudgeLeg[] => sources === undefined ? [leg]
+    : [leg, Object.freeze({ ...leg, sources: fill(sources) }) as JudgeLeg];
   const engineLegs: readonly JudgeLeg[] = pointsRaised === undefined || assumptions === undefined ? []
-    : [engineLeg(pointsRaised, 2, assumptions), engineLeg(2, pointsRaised, assumptions)];
+    : [engineLeg(pointsRaised, 2, assumptions), engineLeg(2, pointsRaised, assumptions)].flatMap(withSources);
   return Math.max(...[...legs, ...engineLegs].flatMap((leg) => (["unknown", "resolved"] as const).map((claim) => Buffer.byteLength(JSON.stringify({
     model: "",
     max_tokens: input.completionTokenCeiling,
@@ -753,6 +896,7 @@ export function judgeLegModelRole(leg: JudgeLeg): DebateRole {
     case "primary-root":
     case "independent-root":
     case "assigned-root":
+    case "path-root":
       return "POSITION";
     case "support":
     case "attack":
@@ -770,6 +914,7 @@ export function judgeLegLengthStep(leg: JudgeLeg): "opening" | "pros_cons" | "cr
     case "primary-root":
     case "independent-root":
     case "assigned-root":
+    case "path-root":
       return "opening";
     case "support":
     case "attack":
@@ -778,6 +923,18 @@ export function judgeLegLengthStep(leg: JudgeLeg): "opening" | "pros_cons" | "cr
       return "cross_exchange";
     default:
       return exhaustive(leg);
+  }
+}
+
+/**
+ * R22 (owner ruling 2026-10-29, slip-recovery step 4): an author leg's reply refused after the gateway's whole repair
+ * chain (code salvage, the patch follow-up, the full re-ask its allowance leaves). To every reader of the code it is
+ * today's JUDGE_SCHEMA_FAILURE, with the same message and name; it also carries the gateway's refusal, so the runner can
+ * give up a reply or a cross-exchange on it — naming the refused attempt's ledger row — instead of failing the debate.
+ */
+export class JudgeContentRefusedError extends TypedDomainError {
+  constructor(readonly refusal: ProviderContentUnacceptedError) {
+    super("JUDGE_SCHEMA_FAILURE", refusal.lastParseError);
   }
 }
 
@@ -831,9 +988,7 @@ export class Judge {
         classifyContent: reading.classifyContent
       });
     } catch (error) {
-      if (error instanceof ProviderContentUnacceptedError) {
-        throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", error.lastParseError);
-      }
+      if (error instanceof ProviderContentUnacceptedError) throw new JudgeContentRefusedError(error);
       throw error;
     }
     const parsed = parseStructuredArtifact(response.content, judgeArtifactSchema, reading.acceptedAs(response.content).reply, JUDGE_ARTIFACT_READING);
@@ -849,12 +1004,13 @@ export class Judge {
       throw new TypedDomainError("JUDGE_SCHEMA_FAILURE", error instanceof Error ? error.message : String(error));
     }
     const claimedWayOfKnowing = parsed.value.way_of_knowing;
-    const pinnedLookup = claimedWayOfKnowing === "LOOKED_UP" && parsed.value.locator !== null;
-    const resolvedWayOfKnowing: WayOfKnowing = pinnedLookup ? "LOOKED_UP" : "REASONING";
+    // W4-1: on a debate with packs, only an extract id of THIS debate keeps "looked up" (`resolveWayOfKnowing`).
+    const resolved = resolveWayOfKnowing(claimedWayOfKnowing, parsed.value.locator, input.debateExtractIds);
+    const resolvedWayOfKnowing: WayOfKnowing = resolved.wayOfKnowing;
     return {
       statement: parsed.value.statement,
       wayOfKnowing: resolvedWayOfKnowing,
-      locator: pinnedLookup ? parsed.value.locator : null,
+      locator: resolved.locator,
       // S2-3: normalization never absorbs a claim it overrode. The condition is
       // derived from the PROPERTY — resolved differs from claimed — not from
       // the one case that satisfies it today. The NODE is bound by the caller
@@ -888,16 +1044,23 @@ export class Judge {
    */
   async review(input: NodeReviewInput): Promise<ReviewedNode> {
     const schema = nodeReviewArtifactSchema(input.edges.length);
+    // W4-1 (design §7.1 item 6): a point that names one of this debate's extracts is reviewed with it, under the sources
+    // variant (lengthed only); every other review is today's, byte for byte.
+    const cited = input.citedExtract;
+    if (cited !== undefined && input.length === undefined) {
+      throw new TypedDomainError("JUDGE_SOURCES_UNLENGTHED", "A review that reads an extract is always told its length");
+    }
     const framed = buildFramedPrompt({
       contract: promptContractInArgumentLanguage(
-        reviewPromptContract(input.edges.length, input.length !== undefined),
+        cited === undefined ? reviewPromptContract(input.edges.length, input.length !== undefined) : reviewSourcesPromptContract(input.edges.length),
         input.argumentLanguageName,
         input.questionLanguage
       ),
       // The run's lock rides LAST (code-owned, never model or user text); without one, today's three fields.
-      material: withQuestionLanguageField([
+      material: withQuestionLanguageField(reviewMaterialChecked([
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement },
+        ...(cited === undefined ? [] : [{ name: "cited_extract", content: cited }]),
         {
           name: "edges_sourced_by_this_node",
           content: JSON.stringify(input.edges.map((edge, ordinal) => ({
@@ -910,7 +1073,7 @@ export class Judge {
         ...(input.length === undefined
           ? []
           : [lengthGuidanceField(input.length.words, input.length.languageCode, input.length.charactersPerWord)])
-      ], input.questionLanguage)
+      ], cited === undefined ? null : REVIEW_SOURCES_MATERIAL_FIELDS), input.questionLanguage)
     });
     const packet = framed.packet;
     // All-steps format robustness (2026-10-12): the tolerant reading, remembered so the accepted reply is read again
@@ -1036,9 +1199,13 @@ export class Judge {
    * records WHICH way the member fell over instead of collapsing the panel.
    */
   async assess(input: PanelAssessmentInput): Promise<PanelAssessment> {
+    const panelCited = input.citedExtract;
+    if (panelCited !== undefined && input.length === undefined) {
+      throw new TypedDomainError("JUDGE_SOURCES_UNLENGTHED", "A panel call that reads an extract is always told its length");
+    }
     const framed = buildFramedPrompt({
       contract: promptContractInArgumentLanguage(
-        input.length === undefined ? PANEL_PROMPT_CONTRACT : PANEL_LENGTH_PROMPT_CONTRACT,
+        input.length === undefined ? PANEL_PROMPT_CONTRACT : panelCited === undefined ? PANEL_LENGTH_PROMPT_CONTRACT : PANEL_SOURCES_PROMPT_CONTRACT,
         input.argumentLanguageName,
         input.questionLanguage
       ),
@@ -1046,6 +1213,7 @@ export class Judge {
       material: withQuestionLanguageField([
         { name: "question_line", content: input.questionLine },
         { name: "statement", content: input.statement },
+        ...(panelCited === undefined ? [] : [{ name: "cited_extract", content: panelCited }]),
         // Length guidance (spec 2026-10-15 §3.2): the variant's target, right before the lock.
         ...(input.length === undefined
           ? []

@@ -6,9 +6,23 @@ import {
   decrypt,
   type PublicationCipher,
   type ReadableUserDekStore,
-  type RunContentKeyStore
+  type RunContentKeyStore,
+  type SavedQuestionKeyStore
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
+import {
+  FORGET_ERASED_DEBATE_DIG_MODEL,
+  FORGET_ERASED_DEBATE_DIG_PICKS,
+  FORGET_ERASED_DEBATE_PUBLIC,
+  FORGET_ERASED_DEBATE_TREE_UPDATES,
+  FORGET_ERASED_DEBATE_PASSAGES,
+  FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,
+  FORGET_ERASED_DEBATE_PUBLIC_TREE,
+  FORGET_ERASED_DEBATE_INVESTIGATION,
+  FORGET_ERASED_DEBATE_PAGE_MEMORY,
+  FORGET_ERASED_DEBATE_WEB_EVIDENCE,
+  finalizeWithPageMemory
+} from "./erasure-page-memory.js";
 import { MAIL_LOCALE_SETTING, withMailLocale } from "./mail-locale.js";
 import { withPublicationContentLease } from "./publication-lease.js";
 
@@ -40,7 +54,24 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "core.finalize_private_run_erasure(uuid,timestamptz,timestamptz,integer,integer)",
   "core.prepare_synthesis_check_erasures(integer)",
   "core.pending_synthesis_check_erasure_cleanup(integer)",
-  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)"
+  "core.finalize_synthesis_check_erasure(uuid,timestamptz,timestamptz,integer,integer)",
+  // 0131 §4b (R22 item 16): a deleted debate's page memory goes in its finalize transaction.
+  FORGET_ERASED_DEBATE_PAGE_MEMORY,
+  // 0132 §12 and 0133 §9: its web evidence and its investigation rows too.
+  FORGET_ERASED_DEBATE_WEB_EVIDENCE,
+  FORGET_ERASED_DEBATE_INVESTIGATION,
+  // 0134 §9: its month pauses and path rewrites.
+  FORGET_ERASED_DEBATE_DIG_MODEL,
+  // 0135 §6: its dig picks and its path rewrite's material.
+  FORGET_ERASED_DEBATE_DIG_PICKS,
+  // The owner's changes of 31 Oct (0137 to 0139).
+  FORGET_ERASED_DEBATE_PUBLIC,
+  FORGET_ERASED_DEBATE_TREE_UPDATES,
+  FORGET_ERASED_DEBATE_PASSAGES,
+  // 0141: its path suggestions.
+  FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,
+  // 0147: its copy of the public page, its check's pass, its climb's mark and an answer version under its key.
+  FORGET_ERASED_DEBATE_PUBLIC_TREE
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",
@@ -66,7 +97,6 @@ export type CurrentAccountErasure = Readonly<{
   status: "SCHEDULED" | "DUE" | "PROCESSING";
   executeAt: Date;
   cancellationRef: string;
-  deletePublicDebates: boolean;
 }>;
 
 export type AccountErasurePreview = Readonly<{
@@ -80,7 +110,6 @@ export type AccountErasurePreview = Readonly<{
 type AccountErasureCleanupManifest = AccountErasurePreview & Readonly<{
   currentPublicationRefs: readonly string[];
   cleanupPublicationRefs: readonly string[];
-  deletePublicDebates: boolean;
 }>;
 
 export type RunKeyProvisionCleanup = Readonly<{
@@ -398,22 +427,21 @@ export class PostgresAccountErasureRepository {
     ownerRef: string;
     sessionId: string;
     grantTokenHash: string;
-    deletePublicDebates?: boolean;
     source?: AuthSourceContext;
   }>): Promise<CurrentAccountErasure | null> {
     // C11.1 (R-16, D-3 row 10): the SCHEDULED row takes the schedule request's language; a request with no value writes en (V-23).
     const result = await withMailLocale(this.pool, input.source?.mailLocale ?? "en", (client) => client.query<{
       erasure_id:string;status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:Date;
-      cancellation_ref:string;delete_public_debates:boolean;
+      cancellation_ref:string;
     }>(
-      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4,$5)",
-      [input.userId,input.ownerRef,input.sessionId,input.grantTokenHash,
-        input.deletePublicDebates === true]
+      // R22 decision 21: erasing an account never removes a public debate. 0110's parameter stays (migrations are frozen); it is always false.
+      "SELECT * FROM identity.schedule_account_erasure($1,$2,$3,$4,false)",
+      [input.userId,input.ownerRef,input.sessionId,input.grantTokenHash]
     ));
     const row=result.rows[0];
     return row===undefined ? null : Object.freeze({
       erasureId:row.erasure_id,status:row.status,executeAt:row.execute_at,
-      cancellationRef:row.cancellation_ref,deletePublicDebates:row.delete_public_debates
+      cancellationRef:row.cancellation_ref
     });
   }
 
@@ -427,7 +455,6 @@ export class PostgresAccountErasureRepository {
       status: "SCHEDULED" | "DUE" | "PROCESSING";
       execute_at: Date;
       cancellation_ref: string;
-      delete_public_debates: boolean;
     }>("SELECT * FROM identity.current_account_erasure_with_choice($1,$2,$3)", [
       input.userId,input.ownerRef,input.sessionId
     ]);
@@ -436,8 +463,7 @@ export class PostgresAccountErasureRepository {
       erasureId: row.erasure_id,
       status: row.status,
       executeAt: row.execute_at,
-      cancellationRef: row.cancellation_ref,
-      deletePublicDebates: row.delete_public_debates
+      cancellationRef: row.cancellation_ref
     });
   }
 
@@ -507,7 +533,6 @@ export class PostgresAccountErasureRepository {
       published_run_ids: string[];
       current_publication_refs: string[];
       cleanup_publication_refs: string[];
-      delete_public_debates: boolean;
     }>("SELECT * FROM identity.account_erasure_cleanup_manifest_with_choice($1)", [erasureId]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
@@ -517,8 +542,7 @@ export class PostgresAccountErasureRepository {
       legacyRunIds: Object.freeze([...row.legacy_run_ids]),
       publishedRunIds: Object.freeze([...row.published_run_ids]),
       currentPublicationRefs: Object.freeze([...row.current_publication_refs]),
-      cleanupPublicationRefs: Object.freeze([...row.cleanup_publication_refs]),
-      deletePublicDebates: row.delete_public_debates
+      cleanupPublicationRefs: Object.freeze([...row.cleanup_publication_refs])
     });
   }
 
@@ -668,6 +692,8 @@ export class AccountErasureCoordinator {
     private readonly options: Readonly<{
       readEmailCiphertext?: (userId: string) => Promise<CryptoEnvelope | null>;
       beforeKeyDestruction?: (input: Readonly<{ erasureId: string; userId: string; email: string }>) => Promise<void>;
+      // V4 start step, saved questions (Task 39d; owner answer S4 A): each question not started yet has its own key, which closing the account destroys.
+      savedQuestionKeys?: Pick<SavedQuestionKeyStore, "listByOwner" | "destroy">;
     }> = {}
   ) {}
 
@@ -749,15 +775,10 @@ export class AccountErasureCoordinator {
         || cleanup.cleanupPublicationRefs.length > 0)
       && this.publications === undefined) return "INVALID_EVIDENCE";
     for (const publicationRef of cleanup.currentPublicationRefs) {
-      const ok = await this.repository.withPublicationLease(publicationRef,async () => {
-        if (!cleanup.deletePublicDebates) {
-          return await this.publications!.exists(publicationRef)
-            && await this.publications!.keyReadable(publicationRef);
-        }
-        await this.publications!.destroy(publicationRef);
-        return !await this.publications!.exists(publicationRef)
-          && !await this.publications!.keyReadable(publicationRef);
-      });
+      // R22 decision 21: a current public debate outlives its account; its key is only checked, never destroyed here.
+      const ok = await this.repository.withPublicationLease(publicationRef,async () =>
+        await this.publications!.exists(publicationRef)
+          && await this.publications!.keyReadable(publicationRef));
       if (!ok) return "INVALID_EVIDENCE";
     }
     for (const publicationRef of cleanup.cleanupPublicationRefs) {
@@ -784,6 +805,13 @@ export class AccountErasureCoordinator {
       if (result === "DESTROYED") destroyedRunKeyCount += 1;
       else alreadyAbsentRunKeyCount += 1;
     }
+    // Owner answer S4 A: every saved question's own key goes too, before the user key that locks it. They are found by the
+    // owner_ref in the key files (a key whose row never landed goes too), and destroyed and checked, never counted: 0110's
+    // finalize counts the debates' keys only.
+    const savedQuestionKeys = this.options.savedQuestionKeys;
+    if (savedQuestionKeys !== undefined) {
+      for (const id of await savedQuestionKeys.listByOwner(cleanup.ownerRef)) await savedQuestionKeys.destroy(id);
+    }
     const userDekResult = await this.users.destroy(cleanup.userId);
 
     // Non-vacuous durable-store readback: absence must hold for every physical
@@ -793,6 +821,9 @@ export class AccountErasureCoordinator {
       if (await this.runs.exists(runId)) return "INVALID_EVIDENCE";
     }
     if ((await this.runs.listByOwner(cleanup.ownerRef)).length !== 0) return "INVALID_EVIDENCE";
+    // A question key left (or made after the listing) stops the closing here; the next cycle destroys it, without the user key.
+    if (savedQuestionKeys !== undefined
+      && (await savedQuestionKeys.listByOwner(cleanup.ownerRef)).length !== 0) return "INVALID_EVIDENCE";
 
     const completedAt = new Date();
     let finalized: AccountErasureTransitionOutcome;
@@ -995,12 +1026,13 @@ export class PostgresPrivateRunErasureRepository {
     // only pre-account-erasure forensic mapping.
     void input.source;
     void this.auditContext;
-    const result = await this.pool.query<{ outcome: PrivateRunErasureOutcome }>(
+    // R22 item 16: the run's page memory (0131) goes in this same transaction (erasure-page-memory.ts).
+    const outcome = await finalizeWithPageMemory<PrivateRunErasureOutcome>(this.pool, input.erasureId,
       `SELECT core.finalize_private_run_erasure($1,$2,$3,$4,$5) AS outcome`,
       [input.erasureId,input.keyCleanupCompletedAt,input.occurredAt,
         input.destroyedKeyCount,input.alreadyAbsentKeyCount]
     );
-    return result.rows[0]?.outcome ?? "NOT_FOUND";
+    return outcome ?? "NOT_FOUND";
   }
 }
 

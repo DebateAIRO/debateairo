@@ -16,6 +16,9 @@
 // switch, not a restore). It writes only new files and deletes nothing.
 // The key stores are live: GNU tar exits 1 when a file changed while it was read ("file changed as we read it"), which
 // refuses KEYS_FAILED; then run it again into a NEW, empty out folder (the old one keeps what it wrote).
+// The user-key store's own saved-questions/ folder (the keys of questions not started yet) is left out of the key tar,
+// and an archive that holds it is refused (owner answer S8 A, 2026-11-05): a question deleted or started after this
+// backup can never be read from it, and a restore brings back no question not started yet. Every other key stays in.
 import { constants, createReadStream } from 'node:fs';
 import { lstat, open, readdir, realpath, rename, unlink } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
@@ -153,6 +156,11 @@ export async function runBackup({ layout = LAYOUT, deps = {}, keep = KEEP }) {
 export const KEY_STORE_KEYS = Object.freeze(['USER_DEK_STORE_PATH', 'PUBLICATION_KEY_STORE_PATH', 'AUDIT_KEY_STORE_PATH', 'KEK_PATH', 'CORPUS_KEK_PATH', 'BLIND_INDEX_KEY_PATH', 'AUDIT_SOURCE_IP_SALT_PATH', 'SUPPORT_KEK_PATH', 'RECORDS_KEY_PATH']);
 /** The preview's own folders; a key path, or its real path, anywhere else (or one of these folders itself) refuses KEY_PATH_REFUSED. */
 export const KEY_ROOTS = Object.freeze(['/etc/debateai-v3-preview/', '/var/lib/debateai-v3-preview/']);
+/**
+ * The folder of the user-key store (USER_DEK_STORE_PATH) that holds one key per question not started yet, named as
+ * packages/crypto's FileSavedQuestionKeyStore names it. Owner answer S8 A: it is never in the online backup.
+ */
+export const SAVED_QUESTION_KEY_FOLDER = 'saved-questions';
 const TAR = '/usr/bin/tar';
 /** A plain PostgreSQL database name: safe as a file name part and never read as a connection string by pg_dump. */
 const DATABASE_NAME = /^[a-z_][a-z0-9_]{0,62}$/;
@@ -197,10 +205,11 @@ const PLAIN_PATH = /^(?:\/[A-Za-z0-9._@+-]+)+$/;
 /**
  * The KEY_STORE_KEYS values of the env files, each a clean absolute path strictly below one of `roots`; sorted, once
  * each. `names`: the KEY_STORE_KEYS found, in that list's order (names only: the event may carry them, never a path).
+ * `userStores`: the USER_DEK_STORE_PATH values among `paths`, sorted, once each.
  */
 async function keyStorePaths(envPaths, uid, roots) {
   if (!Array.isArray(envPaths) || envPaths.length < 1) refuse('ENV_FILE_REFUSED');
-  const paths = new Set(), names = new Set();
+  const paths = new Set(), names = new Set(), userStores = new Set();
   for (const envPath of envPaths) {
     for (const line of (await readEnvFile(envPath, uid)).split('\n')) {
       const at = line.indexOf('=');
@@ -212,38 +221,53 @@ async function keyStorePaths(envPaths, uid, roots) {
       if (!below(value, roots)) refuse('KEY_PATH_REFUSED');
       paths.add(value);
       names.add(line.slice(0, at));
+      if (line.slice(0, at) === 'USER_DEK_STORE_PATH') userStores.add(value);
     }
   }
   if (paths.size < 1) refuse('KEY_PATHS_NOT_FOUND');
-  return { paths: [...paths].sort(), names: KEY_STORE_KEYS.filter(name => names.has(name)) };
+  return { paths: [...paths].sort(), names: KEY_STORE_KEYS.filter(name => names.has(name)), userStores: [...userStores].sort() };
 }
 
 /**
  * D13 ruling: each key path is resolved to its real path first, and that REAL path must also lie below `roots`, so a
  * link can never lead this root-run backup out of the preview's folders. The real path must be a regular file or a
  * folder (a store); tar is handed the real paths, so the archive holds content, never just a link. A path that does
- * not resolve refuses KEY_PATH_UNREADABLE. Sorted, once each, with what each one is.
+ * not resolve refuses KEY_PATH_UNREADABLE. `keys`: sorted, once each, with what each one is; `realOf`: each given path's
+ * real path.
  */
 async function realKeyPaths(paths, roots) {
-  const real = new Map();
+  const real = new Map(), realOf = new Map();
   for (const path of paths) {
     let resolved, stat;
     try { resolved = await realpath(path); stat = await lstat(resolved); } catch { refuse('KEY_PATH_UNREADABLE'); }
     if (!below(resolved, roots) || !PLAIN_PATH.test(resolved) || !(stat.isFile() || stat.isDirectory())) refuse('KEY_PATH_REFUSED');
     real.set(resolved, stat.isDirectory() ? 'd' : '-');
+    realOf.set(path, resolved);
   }
-  return [...real.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([path, type]) => ({ path, type }));
+  return { keys: [...real.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([path, type]) => ({ path, type })), realOf };
+}
+
+/**
+ * Owner answer S8 A: the folders the key tar leaves out, relative to / as tar names them: each user-key store's own
+ * SAVED_QUESTION_KEY_FOLDER (the real path, as tar is handed; a store that is a file holds no such folder). Sorted, once each.
+ */
+function leftOutFolders(userStores, keys, realOf) {
+  const stores = new Set(userStores.map(path => realOf.get(path)));
+  return keys.filter(({ path, type }) => type === 'd' && stores.has(path)).map(({ path }) => `${path.slice(1)}/${SAVED_QUESTION_KEY_FOLDER}`);
 }
 
 /**
  * `tar -tvf -` lines: the first character is the entry type and, for our plain key paths, the last field is the name
  * (a folder may end in `/`). Every key must be there with its own type (`-` a regular file, `d` a folder), and no entry
- * at all may be a link (`l` symbolic, `h` hard): a link inside a store folder would also store no content.
+ * at all may be a link (`l` symbolic, `h` hard): a link inside a store folder would also store no content. Owner answer
+ * S8 A: no line may name a `leftOut` folder or anything in it (matched on the line, so a later name with a space in it
+ * cannot hide a question key).
  */
-function keyListingValid(text, keys) {
+function keyListingValid(text, keys, leftOut) {
   if (typeof text !== 'string') return false;
   const lines = text.split('\n').filter(Boolean);
   if (lines.some(line => line[0] !== '-' && line[0] !== 'd')) return false;
+  if (lines.some(line => leftOut.some(folder => line.endsWith(` ${folder}`) || line.includes(` ${folder}/`)))) return false;
   const entries = lines.map(line => [line[0], line.split(/\s+/).at(-1).replace(/\/$/, '')]);
   return keys.every(({ path, type }) => entries.some(([kind, name]) => kind === type && name === path.slice(1)));
 }
@@ -299,7 +323,8 @@ export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {
   const roots = layout.keyRoots ?? KEY_ROOTS;
   await requireRootOnlyFolder(out, uid);
   const declared = await keyStorePaths(envPaths, uid, roots);
-  const keys = await realKeyPaths(declared.paths, roots);
+  const { keys, realOf } = await realKeyPaths(declared.paths, roots);
+  const leftOut = leftOutFolders(declared.userStores, keys, realOf);
   const listed = await run(psqlArgv(layout), { env: {}, stdin: Buffer.from(LIST_DATABASES, 'utf8'), timeoutMs: 15_000, maxOutputBytes: 64 * 1024 });
   if (!ok(listed)) refuse('DATABASE_LIST_FAILED');
   const databases = String(listed.stdout).split('\n').filter(Boolean);
@@ -322,11 +347,13 @@ export async function runOnlineBackup({ out, envPaths, layout = LAYOUT, deps = {
     check: async () => true
   }));
   // tar runs as root (the key stores are root's) from /, with paths relative to it, so the archive restores in place.
+  // Each exclude (S8 A) comes before the names and is the full path from /, so it matches only that store's own folder.
   const relative = keys.map(({ path }) => path.slice(1));
+  const excludes = leftOut.map(folder => `--exclude=${folder}`);
   files.push(await writeChecked(out, KEYS_FILE, {
     uid, gid, failCode: 'KEYS_FAILED',
-    fill: fd => run([TAR, '-C', '/', '-cf', '-', ...relative], { env: {}, stdoutFd: fd, timeoutMs: 10 * 60 * 1000, maxOutputBytes: 65536 }),
-    check: async path => keyListingValid(await readBack(path, [TAR, '-tvf', '-'], run, 10 * 60 * 1000), keys)
+    fill: fd => run([TAR, '-C', '/', '-cf', '-', ...excludes, ...relative], { env: {}, stdoutFd: fd, timeoutMs: 10 * 60 * 1000, maxOutputBytes: 65536 }),
+    check: async path => keyListingValid(await readBack(path, [TAR, '-tvf', '-'], run, 10 * 60 * 1000), keys, leftOut)
   }));
   const sums = Buffer.from(files.map(file => `${file.sha256}  ${file.name}\n`).join(''), 'utf8');
   await writeChecked(out, SUMS_FILE, {

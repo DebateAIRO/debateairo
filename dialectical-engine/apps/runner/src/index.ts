@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes as cryptoRandomBytes, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { Pool } from "pg";
 import {
@@ -18,9 +18,15 @@ import {
   type RunCostSubstitutionReason,
   type RunRoleRotationRecord,
   type ServeDisclosureFloorState,
-  type ServeDisclosureRecord
+  type ServeDisclosureRecord,
+  type PathProgressStore,
+  type PathResultsStore,
+  type StartPathsStore,
+  type StoredStartPathSet
 } from "@debateai/db";
 import {
+  RUN_PATH_SET_REFUSALS,
+  RUN_STOPS_NOT_OURS,
   WorkItemRepository,
   assertClaimCoversCall,
   type TerminalCompletionDeclaration
@@ -28,6 +34,7 @@ import {
 import { GraphRepository, recordEdgeMeasurementsOnClient } from "@debateai/graph";
 import {
   Judge,
+  JudgeContentRefusedError,
   JudgementRepository,
   insertPreparedNodeReview,
   translateNodeReviewFailure,
@@ -56,7 +63,9 @@ import {
   VerdictVoteRepository,
   askComparingJudge,
   type PointInvestigationSeat,
-  type StoredVerdictVote
+  type StoredVerdictVote,
+  WEB_RESEARCHED_CALL_SITE_PREFIX,
+  webResearchedCallSiteRole
 } from "@debateai/judgement";
 import { LedgerRepository, type AppendLedgerInput } from "@debateai/ledger";
 import {
@@ -71,7 +80,9 @@ import {
   type AdaptiveStoppingControls,
   type EngineSettings,
   type LengthGuidance,
-  type StoryPolicy
+  type StoryPolicy,
+  type DebateShapeV2Input,
+  webSearchCapForPaths
 } from "@debateai/register";
 import {
   BudgetRepository,
@@ -168,6 +179,11 @@ import {
   SYNTHESIZER_PROMPT_CONTRACT,
   SYNTHESIZER_CONTRACTS_FINGERPRINT_TEXT,
   SYNTHESIZER_LENGTH_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT,
+  SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT,
+  SYNTHESIZER_READER_PROMPT_CONTRACT,
+  digestCitesExtracts,
   EVALUATOR_INSTRUCTIONS,
   EVALUATOR_V1_INSTRUCTIONS,
   type BandCeilingRegisterRow,
@@ -192,9 +208,29 @@ import {
   type VerdictLabelDerivation,
   verdictDerivationOfJudges
 } from "@debateai/serve";
-import { EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, debateShapeSettingsOf } from "@debateai/contract";
 import {
-  MapChoiceRepository, mapAnswersArgued, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapLimitsFor, type MapResult
+  EXPANSION_DEPTH_MAX, EXPANSION_DEPTH_MIN, START_STEP_LIMITS, debateShapeSettingsOf, purposeLinesUnsaid, questionWithPurposeLines, readingLevelOf,
+  type PathId, type PathGapRound, type PurposeLines
+} from "@debateai/contract";
+// V4 start step, Task 54: each path's answer so far, the main answer's trust word and label, and the points' trust words.
+import {
+  cutQuoteAtWordEdge, mainAnswerTrustWordOf, purposeLinesMaterial, trustOfPoint, type PathOutcome, type TrustWord
+} from "@debateai/contract";
+import { LivenessRepository, verdictDerivationOfPaths } from "@debateai/serve";
+import { storyLengthField, withoutStoryNodeIds } from "@debateai/story";
+import {
+  PATH_OUTCOME_FAILED, pathCopyStops, pathInvestigationShares, pathOutcomesJobFor, pathReviewFactsOf, pathRunInvestigationsOf, pathsFinalSeatsOf,
+  runPathChains, runPathOutcomeFor, type PathOutcomesJob, type PathOutcomesPath, type PathOutcomesSeat
+} from "./path-outcomes.js";
+import { pathsGoalStated, runPathsMainAnswer, type PathsDossierPath } from "./paths-main-answer.js";
+import { fitStoryPathsToTokenLine } from "./token-line.js";
+import { closingRandomBytes } from "./investigation-close.js";
+// (Named for the paths here: the debate's own body never names the dig's rewrite, tests/unit/dig-no-story.test.ts.)
+import type { PathRewritePoint as PathPoint, PathRewriteQuestion as PathQuestion } from "./path-rewrite-material.js";
+import type { DossierSource } from "./investigation-dossier.js";
+import {
+  MapChoiceRepository, START_STEP_HAIKU_MODEL, mapAnswersArgued, mapCheckFailedMergedAnswerIds, mapCheckFailedStatements, mapLimitsFor,
+  mapRunPathGapRounds, type MapResult, type MapSeat
 } from "@debateai/map";
 import {
   argumentLanguageDirective,
@@ -208,6 +244,9 @@ import {
   lengthGuidanceText,
   lengthGuidanceField,
   LENGTH_SENTENCE_ANSWER_CHECKER,
+  READER_SENTENCE_ANSWER_CHECKER,
+  withReaderField,
+  type ReadingLevel,
   type CharactersPerWord,
   type LengthCallStep,
   type LengthGuide,
@@ -215,6 +254,7 @@ import {
   ENGINE2_REDUCER_VERSION,
   comparingJudgeCallSiteKey,
   engineMaterialOf,
+  pointInvestigationCallSiteKey,
   pointInvestigationMaterialOf,
   SERVED_ROOT_SELECTION_RULE,
   SERVED_ROOT_SELECTION_RULE_JUDGES,
@@ -256,10 +296,12 @@ import {
   type SeatSlot
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
-import { buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyPathsInputOf, storyPathsPointsOfRun, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
+import { runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
-  shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny, shapeSelectChains,
-  type ScrutinyCandidate
+  pathsSelectChains, shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny,
+  shapeSelectChains, type ScrutinyCandidate
 } from "./shape-select.js";
 import {
   createRunnerMapCaller, engineMapCheckUnbudgeted, mapConditionRecords, mapStageSeats, resolveShapeMap, rootZeroEngineMaterialCharsFor, rootZeroKeepRoomMicros,
@@ -270,20 +312,49 @@ import {
   type ShapeLeg, type ShapePlan, type ShapePositionPlan
 } from "./shape-plan.js";
 import {
-  shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeWriterSeat
+  postgresWebPlanStatusRecorder, postgresWebStepPorts, runRunnerWebStep, webModeOfDepth, type WebStepRunnerSettings
+} from "./web-step.js";
+import { pathChosenText } from "./web-planner.js";
+import {
+  WEB_DIG_ROOT_SOURCES_MAX_BYTES, WEB_ROOT_SOURCES_MAX_BYTES, engineSourceWithCitedExtracts, legWithWebSources, pathsPackShares, readDebateWebPacks,
+  webCitedExtractsOf, webPanelInput, webReviewInput, type DebateWebPacks
+} from "./web-packs.js";
+import { EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT, EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT } from "./answer-checker-sources.js";
+import {
+  pathsRootHandOver, shapeDistinctMakers, shapeHandOverRoot, shapeMakerBar, shapeRootMakerBar, shapeSeatOrder, shapeSpareForRefusedRoot,
+  shapeSpareThatAnswered, shapeWriterSeat
 } from "./shape-seats.js";
+// V4 start step, Task 53: a path debate's set, plan, roots and progress marks.
+import {
+  PATHS_RUN_CODES, carryOnToReportOf, gapAlreadyRaised, resolvePathsRunSet, runBuiltListSeats, runBuiltMenu, runBuiltStartPathSet
+} from "./paths-run.js";
+import { pathProgressMarksOf, type PathProgressMarks } from "./path-progress.js";
+import {
+  pathConsiderationsOf, pathPlanFitsReceipt, pathRootLegMaterial, pathRootSeats, pathsRunPathsOf, shapePositionsFromPaths, shapeViewOfV2,
+  type PathsRunPath
+} from "./path-plan.js";
+import { purposeLinesOf } from "./path-rewrite-sources.js";
 import { keepAliveProviderGateway, runKeepAliveScope, startRunKeepAlive, type RunnerTaskControl } from "./run-keep-alive.js";
 import type { RunnerRetirementSignal, TaskExecutionCounter } from "./runner-retirement.js";
-import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, type ReplayBook } from "./run-replay.js";
+import { EMPTY_REPLAY_BOOK, readReplayBook, replayingGateway, RUN_HANDOVER_IMPOSSIBLE, waiveRedoneCalls, type ReplayBook } from "./run-replay.js";
+import { holdRunPassages, passageRecordedRequest, releaseRunPassages } from "./passage-record.js";
+import { isMonthPausedStop, RUN_MONTH_PAUSED } from "./month-pause.js";
 import type { RunInFlight } from "./run-in-flight.js";
+import {
+  ANSWER_UPDATE_CALL_SITE_PREFIX, CONTRIBUTION_CHECK_CALL_SITE_PREFIX, PATH_CLIMB_CALL_SITE_PREFIX, PATH_REWRITE_CALL_SITE_PREFIX, PUBLIC_REPORT_CALL_SITE_PREFIX,
+  answerUpdateCallSiteRole, contributionCheckCallSiteRole, publicReportCallSiteRole, isPathRewriteCallSite,
+  pathClimbCallSiteRole, pathRewriteCallSiteRole
+} from "./path-rewrite-scope.js";
+// V4 start step, Task 49: PATH_OUTCOME_CALL_SITE_PREFIX, each path's answer so far, booked on the debate's attempts and never walled.
+import { INVESTIGATION_REPORT_CALL_SITE_PREFIX, PATH_OUTCOME_CALL_SITE_PREFIX, investigationReportCallSiteRole } from "@debateai/story";
 // Side-by-side spec §13 (S6): the per-version settings types (type-only: run-settings.ts imports this module) and the one
 // debate-member mapping, from its own module so this one never loads the loader.
-import type { RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
+import type { RunFinalWriterTerms, RunnerSettingsResolution, RunSettingsVersions } from "./run-settings.js";
 import { runnerSettingsOfVersion, type RunnerDebateMembers } from "./run-debate-members.js";
 import type { DebateShapeRunnerSettings } from "./debate-shape-boot.js";
 import type { EngineRunnerSettings } from "./engine-boot.js";
 import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED, type CallScheduler, type CallSubject, type CallTicket } from "./call-scheduler.js";
-import { createOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
+import { createOrderedRecorder, createPartedOrderedRecorder, type OrderedRecorder } from "./ordered-recorder.js";
 import { laneGateway, type CallSubjectResolver } from "./call-lane-gateway.js";
 import {
   assertFairInvestigator, engineFactsWithInvestigations, engineInvestigatedStatuses, engineInvestigationCandidates,
@@ -382,7 +453,7 @@ export const ENVELOPE_STOP_CODES = Object.freeze({
   DAILY_COST_ENVELOPE_REACHED: "DAILY",
   /**
    * B9 (budget spec §2.9, paid-plans spec §2.4.1): one of the run owner's
-   * allowance windows would be crossed at its finish edge (110%). Its OWN
+   * allowance windows would be crossed at its finish edge. Its OWN
    * kind, for ruling R-C's reason: it is lifted by the person's window
    * resetting or a larger plan, not by the site's day or the run's ceiling.
    */
@@ -535,6 +606,10 @@ const REVIEW_RETHROWN_CODES: readonly string[] = Object.freeze([
   "RUNNER_CLAIM_LOST",
   "RUNNER_TIME_LIMIT_REACHED",
   "RUNNER_RETIRING",
+  // W3-8 (the money rule): the month wall's planned stop ends this copy as a lost claim does.
+  RUN_MONTH_PAUSED,
+  // Decision 12: a step that could only go on mixed two wordings ends this copy too; `execute` sets the debate aside.
+  RUN_HANDOVER_IMPOSSIBLE,
   CALL_LANE_STOPPED,
   CALL_LANE_HELD_BACK
 ]);
@@ -546,11 +621,13 @@ function callHeldBack(error: unknown): boolean {
 
 /**
  * L4-F9: the keep-alive's refusal — the debate must make no further model call (its claim taken, or its time up; and,
- * side-by-side spec §4, its release retiring).
+ * side-by-side spec §4, its release retiring). R22 W3-8 (the money rule): and the month wall's planned stop
+ * (RUN_MONTH_PAUSED, ./month-pause.ts): this copy ends the same way, nothing more is saved, and `execute` releases the
+ * claim instead of failing the debate, which stays paused in the database until the person continues.
  */
 function keepAliveStop(error: unknown): boolean {
   return error instanceof TypedDomainError && (error.code === "RUNNER_CLAIM_LOST" || error.code === "RUNNER_TIME_LIMIT_REACHED"
-    || error.code === "RUNNER_RETIRING");
+    || error.code === "RUNNER_RETIRING" || error.code === RUN_MONTH_PAUSED || error.code === RUN_HANDOVER_IMPOSSIBLE);
 }
 
 export function reviewFailureOutcome(error: unknown): ReviewFailureOutcome {
@@ -619,6 +696,24 @@ export function logPointInvestigation(event: string, detail: Readonly<Record<str
  */
 export function logComparingJudge(event: string, detail: Readonly<Record<string, unknown>>): void {
   console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_COMPARING_JUDGE", event }));
+}
+
+/**
+ * V4 start step, Task 56 ("Let the AIs carry on to the report"): the story stage of a first debate marks it DUE for the API's
+ * carry-on tick (0159's core.record_carry_on_due: NOT_ASKED for a run with no chosen paths, with the box not ticked or with a dig's
+ * set). NONE without a store. It never rejects: a failure is FAILED with one line holding its code only (no id, no words).
+ */
+export async function recordCarryOnDueSafely(store: Pick<StartPathsStore, "recordCarryOnDue"> | undefined, runId: string,
+  log: (line: string) => void): Promise<"RECORDED" | "ALREADY" | "NOT_ASKED" | "NONE" | "FAILED"> {
+  if (store === undefined) return "NONE";
+  try {
+    return await store.recordCarryOnDue(runId);
+  } catch (error) {
+    const code = error instanceof TypedDomainError ? error.code
+      : error instanceof Error && /^[A-Z][A-Z0-9_]{2,63}$/u.test(error.message) ? error.message : "UNTYPED";
+    log(JSON.stringify({ event: "runner.carry_on.due_failed", code }));
+    return "FAILED";
+  }
 }
 
 /**
@@ -838,10 +933,39 @@ export const EVALUATOR_LENGTH_PROMPT_CONTRACT: PromptContract = Object.freeze({
   instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER}`,
   answerForm: EVALUATOR_CONTRACT_TEXT
 });
-/** What `conformanceContractHash` seals from length guidance on: v2, then its length variant (as the writer's seal). */
-export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the checker told the level the writer wrote for, so it never objects to
+ * plain wording or to precise terms that suit that reader. Two VARIANTS — v2's instruction, then (with its own target)
+ * the length sentence, then the kernel's one reader sentence (READER_SENTENCE_ANSWER_CHECKER); v2's answer form, so the
+ * verdict schema is unchanged. The level arrives as the material field `reader`. A debate asked without a level never
+ * sends them: v2 or length.v1, byte for byte. OWNER WORDING — pending approval.
+ */
+export const EVALUATOR_READER_CONTRACT_ID = "serve.evaluator.reader.v1" as const;
+export const EVALUATOR_LENGTH_READER_CONTRACT_ID = "serve.evaluator.length.reader.v1" as const;
+export const EVALUATOR_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_READER_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${READER_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+export const EVALUATOR_LENGTH_READER_PROMPT_CONTRACT: PromptContract = Object.freeze({
+  contractId: EVALUATOR_LENGTH_READER_CONTRACT_ID,
+  instruction: `${EVALUATOR_INSTRUCTIONS} ${LENGTH_SENTENCE_ANSWER_CHECKER} ${READER_SENTENCE_ANSWER_CHECKER}`,
+  answerForm: EVALUATOR_CONTRACT_TEXT
+});
+/** Shipped history: what `conformanceContractHash` sealed from length guidance until the reading level — v2, then length.v1 (108f1b29...). */
+export const EVALUATOR_LENGTH_CONTRACTS_FINGERPRINT_TEXT: string = [
   promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
   promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT)
+].join("\n---\n");
+/**
+ * What `conformanceContractHash` seals from the reading level (2026-10-29) on: every checker contract the runner sends —
+ * v2, length.v1, reader.v1, then length.reader.v1 (as the writer's seal).
+ */
+export const EVALUATOR_CONTRACTS_FINGERPRINT_TEXT: string = [
+  promptContractFingerprintText(EVALUATOR_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_READER_PROMPT_CONTRACT),
+  promptContractFingerprintText(EVALUATOR_LENGTH_READER_PROMPT_CONTRACT)
 ].join("\n---\n");
 
 /**
@@ -964,35 +1088,63 @@ export const evaluatorVerdictSchema = z.object({
  * Question language (spec 2026-10-13 L6): with a shaped run's lock, the named
  * sentence replaces the directive and the `question_language` field rides LAST
  * (after `answer_length`); without one (null), the packet is today's, byte for byte.
+ * V4 reading level (owner N6, 2026-10-29): with the run's level, the writer and the checker take their reader variant
+ * and the `reader` field rides after the length fields, before `question_language`; without one (null, every V3 ask),
+ * the packet is today's, byte for byte.
  */
 export function buildSynthesisRolePrompt(
   request: SynthesizerRequest | EvaluatorRequest,
   argumentLanguageName: string,
   randomBytes?: (size: number) => Buffer,
   length: RoleLength | null = null,
-  questionLanguage: QuestionLanguage | null = null
+  questionLanguage: QuestionLanguage | null = null,
+  readingLevel: ReadingLevel | null = null
 ): FramedPrompt {
   // Length guidance (spec 2026-10-15 §3.2): the writer with a target takes its length variant; the checker takes its own
   // only with its own target (`ownWords`, a run admitted with the length row). Every other call: today's packet.
   const writerLengthed = request.role === "SYNTHESIZER" && length !== null;
   const checkerLengthed = request.role === "EVALUATOR" && length !== null && length.ownWords !== null;
+  const told = readingLevel !== null;
+  // Web search (W4-1; design §7.1 item 7): a lengthed writer whose digest carries a cited extract takes its sources variant
+  // (the extract rides on its node). Without one (no packs, nothing cited), today's contract, byte for byte.
+  const sourced = writerLengthed && digestCitesExtracts(request.digest);
+  // W4-7: the checker reads the very extracts the writer read (the same digest), under its own sources variant: the
+  // checker's instruction unchanged, so it never objects to a source it was not shown. None cited: today's packet.
+  const checkerSourced = checkerLengthed && digestCitesExtracts(request.digest);
+  if (request.role === "SYNTHESIZER" && !writerLengthed && digestCitesExtracts(request.digest)) {
+    // Engine 2, the only engine that reads packs, always tells the length: an unlengthed writer with extracts is a defect.
+    throw new TypedDomainError("SYNTHESIZER_SOURCES_UNLENGTHED", "A writer that reads extracts is always told its length");
+  }
+  if (request.role === "EVALUATOR" && !checkerLengthed && digestCitesExtracts(request.digest)) {
+    // The same for its checker: engine 2 always tells it its own length; one sent the extracts blind would be a defect.
+    throw new TypedDomainError("EVALUATOR_SOURCES_UNLENGTHED", "A checker that reads extracts is always told its length");
+  }
   // V-MINIMUM-PAYLOAD: the one projection, applied once; a length variant only appends its own fields after it.
-  const material = toSynthesisPromptMaterial(request);
+  const material = toSynthesisPromptMaterial(request, { checkerReadsExtracts: checkerSourced });
   return buildFramedPrompt({
     contract: promptContractInArgumentLanguage(
       request.role === "SYNTHESIZER"
-        ? (writerLengthed ? SYNTHESIZER_LENGTH_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT)
-        : (checkerLengthed ? EVALUATOR_LENGTH_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT),
+        ? (sourced
+          ? (told ? SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT)
+          : writerLengthed
+          ? (told ? SYNTHESIZER_LENGTH_READER_PROMPT_CONTRACT : SYNTHESIZER_LENGTH_PROMPT_CONTRACT)
+          : (told ? SYNTHESIZER_READER_PROMPT_CONTRACT : SYNTHESIZER_PROMPT_CONTRACT))
+        : (checkerSourced
+          ? (told ? EVALUATOR_LENGTH_READER_SOURCES_PROMPT_CONTRACT : EVALUATOR_LENGTH_SOURCES_PROMPT_CONTRACT)
+          : checkerLengthed
+          ? (told ? EVALUATOR_LENGTH_READER_PROMPT_CONTRACT : EVALUATOR_LENGTH_PROMPT_CONTRACT)
+          : (told ? EVALUATOR_READER_PROMPT_CONTRACT : EVALUATOR_PROMPT_CONTRACT)),
       argumentLanguageName,
       questionLanguage
     ),
-    // The language field wraps the ONE projection (and the length fields after it): it rides LAST; with no lock
-    // `withQuestionLanguageField` returns the same array, today's bytes.
-    material: withQuestionLanguageField(
+    // The language field wraps the ONE projection (and the length and reader fields after it): it rides LAST; with no
+    // lock `withQuestionLanguageField` returns the same array, and with no level `withReaderField` does: today's bytes.
+    material: withQuestionLanguageField(withReaderField(
       writerLengthed ? [...material, answerLengthField(length)]
         : checkerLengthed ? [...material, answerLengthField(length),
           lengthGuidanceField(length.ownWords!, length.languageCode, length.charactersPerWord)]
           : material,
+      readingLevel),
       questionLanguage),
     ...(randomBytes === undefined ? {} : { randomBytes })
   });
@@ -1426,6 +1578,38 @@ export interface HaltedExpansionRecord {
   readonly plannedLegCount: number;
   readonly terminalTransportOutcome: "TIMED_OUT" | "FAILED";
   readonly lastLedgerEntryRef: string;
+  /**
+   * R22 (owner ruling 2026-10-29): present when the leg was given up because its author's reply was refused after the
+   * gateway's repairs (`JudgeContentRefusedError`), not because its transport died; the outcome is then the refused
+   * attempt's FAILED row. Absent on every transport halt, whose record is today's to the byte.
+   */
+  readonly haltedBy?: "CONTENT_REFUSED";
+}
+
+/**
+ * The answer's class-N record for one halted leg: the branch under `parentNodeId` was never authored. A transport halt
+ * keeps today's reason; a leg given up for its refused content (R22) never claims a transport failure, and carries the
+ * coded reason the story is never handed (`CONTENT_REFUSED_HALT_REASON`) until the owner approves its words.
+ */
+export function haltedExpansionConditionRecord(record: HaltedExpansionRecord): ConditionMarkRecord {
+  return Object.freeze({
+    mark: "UNAUTHORED-BRANCH-HALTED",
+    scope: "node",
+    subjectRef: record.parentNodeId!,
+    reason: record.haltedBy === "CONTENT_REFUSED"
+      ? CONTENT_REFUSED_HALT_REASON
+      : "Expansion halted after transport exhaustion; no node was authored to hide or reveal",
+    liftPath: "Retry the halted authoring call in a new run",
+    servedRootRule: null,
+    affectedNodeIds: Object.freeze([record.parentNodeId!]),
+    callSiteKey: record.callSiteKey,
+    plannedLegCount: record.plannedLegCount,
+    terminalTransportOutcome: record.terminalTransportOutcome,
+    hiddenStrength: null,
+    hiddenScoreThreshold: null,
+    hiddenScoreThresholdSourceRef: null,
+    excludedFromServedNumber: null
+  });
 }
 
 export function remainingProviderAttempts(maxAttempts: number, consumed: number): number {
@@ -1470,19 +1654,37 @@ export async function withCooldownRetry<T>(input: {
    * today's path.
    */
   readonly haltsAtOnce?: (error: ProviderCallFailedError) => boolean;
+  /**
+   * R22 (owner ruling 2026-10-29, slip-recovery step 4): a leg whose author's reply was refused after the gateway's
+   * whole repair chain (`JudgeContentRefusedError`: code salvage, the patch follow-up, the full re-ask its allowance
+   * leaves) HALTS like a dead transport, so one author's format slip never fails the debate. No hold and no final
+   * retry: asking again is what that chain already did. The runner sets it for a reply or a cross-exchange only (a leg
+   * with a parent); absent (a root, a review, every direct caller), a refusal travels unchanged, as today.
+   */
+  readonly haltsOnContentRefusal?: boolean;
 }): Promise<
   | { readonly kind: "AUTHORED"; readonly value: T }
   | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
 > {
   const spent = async (fromErrors: number): Promise<number> =>
     input.siteAttemptsSpent === undefined ? fromErrors : await input.siteAttemptsSpent();
-  const halted = async (error: ProviderCallFailedError, attemptsSpent: number) => {
-    const record = Object.freeze({
+  /** The refusal this site may be given up on, or null when the failure must travel (R22). */
+  const contentRefusal = (error: unknown): JudgeContentRefusedError | null =>
+    input.haltsOnContentRefusal === true && error instanceof JudgeContentRefusedError ? error : null;
+  /** A refused reply ends as its refused attempt's FAILED row, which the gateway's refusal names (R22). */
+  const refusedAs = (error: JudgeContentRefusedError) => Object.freeze({
+    lastOutcome: "FAILED" as const, lastLedgerEntryRef: error.refusal.lastLedgerEntryRef, haltedBy: "CONTENT_REFUSED" as const
+  });
+  const halted = async (error: Readonly<{
+    lastOutcome: "TIMED_OUT" | "FAILED"; lastLedgerEntryRef: string; haltedBy?: "CONTENT_REFUSED";
+  }>, attemptsSpent: number) => {
+    const record: HaltedExpansionRecord = Object.freeze({
       callSiteKey: input.callSiteKey,
       parentNodeId: input.parentNodeId,
       plannedLegCount: input.plannedLegCount,
       terminalTransportOutcome: error.lastOutcome,
-      lastLedgerEntryRef: error.lastLedgerEntryRef
+      lastLedgerEntryRef: error.lastLedgerEntryRef,
+      ...(error.haltedBy === undefined ? {} : { haltedBy: error.haltedBy })
     });
     await input.hold.record({
       kind: "ledger.could_not_do",
@@ -1507,6 +1709,8 @@ export async function withCooldownRetry<T>(input: {
         value: await input.attempt(input.baseMaxAttempts + input.policy.finalRetryAttempts)
       };
     } catch (retryError) {
+      const refused = contentRefusal(retryError);
+      if (refused !== null) return halted(refusedAs(refused), error.attempts + refused.refusal.attempts);
       if (!(retryError instanceof ProviderCallFailedError)) throw retryError;
       return halted(retryError, error.attempts + retryError.attempts);
     }
@@ -1514,6 +1718,8 @@ export async function withCooldownRetry<T>(input: {
   try {
     return { kind: "AUTHORED", value: await input.attempt(input.baseMaxAttempts) };
   } catch (error) {
+    const refused = contentRefusal(error);
+    if (refused !== null) return halted(refusedAs(refused), refused.refusal.attempts);
     if (!(error instanceof ProviderCallFailedError)) throw error;
     if (input.haltsAtOnce?.(error) === true) return halted(error, error.attempts);
     if (input.finalRetryPermitted !== undefined && !(await input.finalRetryPermitted())) {
@@ -2008,8 +2214,10 @@ export async function runReviewCatchUp(input: {
   // reader above has already parsed this same receipt, so one that does not parse is refused there, as today.
   // The run's stored tag, as the lock and the length target both read it ("und" when none was given).
   const catchUpTag = input.argumentLanguageTag ?? "und";
-  const catchUpLanguage: QuestionLanguage | null = input.envelopeBasis === undefined ? null
-    : runQuestionLanguageLock(parseCostEnvelopeBasis(input.envelopeBasis).shape ?? null, {
+  // V4 start step, Task 53: a path debate's receipt (shape receipt v2) locks the question's language as a v1 shape's does.
+  const catchUpBasis = input.envelopeBasis === undefined ? null : parseCostEnvelopeBasis(input.envelopeBasis);
+  const catchUpLanguage: QuestionLanguage | null = catchUpBasis === null ? null
+    : runQuestionLanguageLock(catchUpBasis.shape ?? catchUpBasis.shapeV2 ?? null, {
       argumentLanguageTag: catchUpTag,
       argumentLanguageName: input.argumentLanguageName ?? "the same language as the question"
     });
@@ -2605,6 +2813,15 @@ export interface WalkingSkeletonSettings {
     reportSnapshotFailure(failure: StorySnapshotFailure): void;
   };
   /**
+   * Dig-model revision task W3-5: the path rewrite (path-rewrite.ts). Set, a settled run that is a dig (an ask with a
+   * parent) keeps its points and its answer text and writes NO story: the path it was dug from is rewritten in the
+   * story's place, from the same snapshot (owner Q-D13). Absent (fixtures, local mode's acceptance root), or for a first
+   * debate: the story, as today.
+   */
+  readonly pathRewrite?: PathRewriteRunnerSettings;
+  /** W5-1: "Write my report"'s closing, poked when a member of a closing investigation settles (the story stage). */
+  readonly investigationClose?: InvestigationCloseSettings;
+  /**
    * ENGINE MONEY RULE (spec 2026-09-26 §14.4.2), TASK M3: each provider
    * target's price (`buildProviderPriceMap`), so a MONEY refusal of an
    * answer-writing call tries the cheaper claim-eligible makers first. Never
@@ -2731,6 +2948,12 @@ export interface WalkingSkeletonSettings {
    */
   readonly engine?: EngineRunnerSettings | null;
   /**
+   * Perplexity plan 2026-10-30, task W3-1: the web step's settings (run-settings.ts `runnerWebSearchSettings`), a process
+   * member. Set, every shaped run whose map argues its own answers runs the web step after the map's answer check (Free
+   * and the off switch make no call). Absent (fixtures, local mode's acceptance root): no web step, nothing recorded.
+   */
+  readonly webSearch?: WebStepRunnerSettings;
+  /**
    * Side-by-side spec §13 (S5 adds them, S6 reads them): the debate's own version's story policy (null: the version
    * sealed no story rows) and its call-lane limits (`perDebate`, `perModelPerDebate`, from its callConcurrencyPolicy
    * row; absent: one call at a time). Both come from `runnerSettingsOfVersion` (apps/runner/src/run-debate-members.ts).
@@ -2748,6 +2971,27 @@ export interface WalkingSkeletonSettings {
    */
   readonly settingsForVersion?: (registerVersion: number) => Promise<RunnerSettingsResolution>;
   readonly runSettingsVersions?: RunSettingsVersions;
+  /**
+   * V4 start step, Task 53 (plan Review Focus 2), a process member: the run → final-writer terms map the preview call policy reads
+   * by run id (`finalWriterTermsOf`, Task 3). Set at the claim from the claimed run's own receipt, before any call: a v2 run's plan
+   * (Free or paid), a v1 run none. Absent (fixtures, hosted without the preview policy): nothing is told.
+   */
+  readonly runFinalWriterTerms?: RunFinalWriterTerms;
+  /**
+   * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate's stores, on the runner's pool: the paths sealed at Start (0159), each
+   * path's root and the gap round (0160), and each path's step and points (0161). A run admitted with shape receipt v2 needs the first
+   * two (PATHS_RUNNER_UNCONFIGURED otherwise, before any call); without `pathProgress` nothing of the progress is written. A v1 run
+   * never reads them.
+   */
+  readonly startPaths?: StartPathsStore;
+  readonly pathResults?: PathResultsStore;
+  readonly pathProgress?: PathProgressStore;
+  /**
+   * V4 start step, Task 56 ("Let the AIs carry on to the report"), a process member: where the story stage of a settled first
+   * debate records it DUE for the API's carry-on tick (`recordCarryOnDueSafely`; main.ts hands it the paths store above). Absent:
+   * nothing is marked, so nothing carries on.
+   */
+  readonly carryOn?: Pick<StartPathsStore, "recordCarryOnDue">;
   /**
    * The model, vendor and preview gate each provider ref's calls use (`previewCallSubjects` on the preview,
    * `targetCallSubjects` elsewhere). Read only with `callScheduler`; absent, each ref is its own model behind no gate.
@@ -4461,6 +4705,12 @@ export function buildMakerPositionDisclosure(input: Readonly<{
   monoMakerConditionMarks: readonly ConditionMarkRecord["mark"][];
   monoMakerRecords: readonly ConditionMarkRecord[];
   membersSatOut?: string | null;
+  /**
+   * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate, whose roots are the paths chosen at Start, never rival
+   * positions. When its one authored root is served (one path chosen, or one path left after the others ended without a root,
+   * which their own path results say) and nothing stopped it, no lineage was lost: no lineage mark. Absent: today's rule.
+   */
+  pathsRun?: boolean;
 }>): Readonly<{
   conditionMarks: readonly ConditionMarkRecord["mark"][];
   records: readonly ConditionMarkRecord[];
@@ -4487,6 +4737,9 @@ export function buildMakerPositionDisclosure(input: Readonly<{
           affectedNodeIds: Object.freeze([input.servedRoot.nodeId])
         } satisfies ConditionMarkRecord)])
       });
+    }
+    if (input.runBodyBudgetStop === null && input.pathsRun === true) {
+      return Object.freeze({ conditionMarks: Object.freeze([]), records: Object.freeze([]) });
     }
     if (input.runBodyBudgetStop === null) {
       throw new TypedDomainError(
@@ -4602,6 +4855,8 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
    * selection by strength, byte for byte.
    */
   judgesVerdict?: JudgesVerdict | null;
+  /** V4 start step, Task 53: a path debate (`buildMakerPositionDisclosure`'s `pathsRun`); absent, today's decision. */
+  pathsRun?: boolean;
 }>): MakerPositionServeDecision<T> {
   const membersSatOut = input.membersSatOut ?? null;
   const footing: MakerPositionServeFooting = input.effectiveMakerCount <= 1
@@ -4653,7 +4908,8 @@ export function decideMakerPositionServe<T extends MakerPositionDisclosureRoot>(
     ...(judgesVerdict === null ? {} : { judgesChose: judgesVerdict.winnerVotes > 0 }),
     monoMakerConditionMarks: input.monoMakerConditionMarks,
     monoMakerRecords: input.monoMakerRecords(servedRoot),
-    ...(membersSatOut === null ? {} : { membersSatOut })
+    ...(membersSatOut === null ? {} : { membersSatOut }),
+    ...(input.pathsRun === true ? { pathsRun: true } : {})
   });
   return Object.freeze({
     footing,
@@ -5480,7 +5736,9 @@ export class WalkingSkeletonRunner {
   }>> {
     const claimed = await this.#work.claimNext({ workerId: this.settings.workerId, claimSeconds: this.settings.claimMs / 1000 });
     if (claimed === null || claimed.runId === null) return Object.freeze({ claimed, resolution: null });
-    const version = await this.#runs.readRunRegisterVersion(claimed.runId);
+    // Decision 12: the version that owns the debate now (after a hand-over, the one it was handed to; else its stamp).
+    const version = (await this.#work.peekRunSettingsVersion(claimed.workItemId))?.registerVersion
+      ?? await this.#runs.readRunRegisterVersion(claimed.runId);
     return Object.freeze({ claimed, resolution: await this.#runSettingsFor(version, settingsForVersion) });
   }
 
@@ -5584,7 +5842,9 @@ export class WalkingSkeletonRunner {
     /**
      * Side-by-side spec §13 (S6): the run's version, recorded right after the claim and before the keep-alive, the lane
      * or any call, so every money seam and (addition D17) every preview call finds this run's own version by its run
-     * id. Kept for the life of the process; a second, different value is refused (RUN_SETTINGS_VERSION_DRIFT).
+     * id. Kept for the life of the process; a second claim at a different value is refused (RUN_SETTINGS_VERSION_DRIFT).
+     * V4 start step, Task 57o-fix2 (owner, 8 Nov: "we shouldn't wait or stop anything"): a claim wins over any mapping a
+     * background lane set first (its own version or today's settings), with one content-free line; it never fails the debate.
      */
     if (resolution !== null) settings.runSettingsVersions?.set(claimedRunId, resolution.version);
     /**
@@ -5658,7 +5918,15 @@ export class WalkingSkeletonRunner {
         | { readonly kind: "SNAPSHOT"; readonly input: StoryWriteInput }
         | ({ readonly kind: "SNAPSHOT_FAILED" } & StorySnapshotFailure)
         | null;
-    } = { story: null };
+      /** V4 start step, Task 54: a path debate's roots in force (b<n> → its root), read in the lease for its suggestions; null otherwise. */
+      pathRoots: readonly Readonly<{ ref: string; rootNodeId: string }>[] | null;
+    } = { story: null, pathRoots: null };
+    /**
+     * V4 start step, Task 54: the Haiku target's free token count near the 100K line (R22 decision 28, as the closing's: the counter the
+     * runner's Haiku seat was composed with), for a path debate's answers so far, its main answer and its story's fit; none: the byte
+     * guard alone.
+     */
+    const pathsTokenCount = settings.pathRewrite?.tokenCount;
     /** Reclaim resume: the replay book read inside the lease, closed when the lease ends (nothing replays after it). */
     let replayBookInLease: ReplayBook = EMPTY_REPLAY_BOOK;
     let executed: RunnerExecutionResult;
@@ -5675,12 +5943,13 @@ export class WalkingSkeletonRunner {
         "The frozen run could not be read through its required content lease"
       );
     }
-    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only), refused by name if it ever did: the run's
-    // stamp is the version this debate's settings came from.
-    if (resolution !== null && run.registerVersion !== resolution.version) {
+    // Side-by-side spec §13 (S6): never happens (`core.run` is insert-only, a hand-over moves a debate only while no copy holds
+    // it), refused by name if it ever did: the version that owns the debate is the one its settings came from.
+    const ownedVersion = resolution === null ? null : (await this.#work.peekRunSettingsVersion(claimed.workItemId))?.registerVersion ?? run.registerVersion;
+    if (resolution !== null && ownedVersion !== resolution.version) {
       throw new TypedDomainError(
         "RUN_SETTINGS_VERSION_DRIFT",
-        `RUN_SETTINGS_VERSION_DRIFT:${String(resolution.version)}:${String(run.registerVersion)}`
+        `RUN_SETTINGS_VERSION_DRIFT:${String(resolution.version)}:${String(ownedVersion)}`
       );
     }
     const preflightHaltedSites = new Map<string, {
@@ -5727,6 +5996,8 @@ export class WalkingSkeletonRunner {
        * member that ACTUALLY retries. Absent, `seatMember` is taken.
        */
       readonly retrySeatMember?: () => SeatMember | null;
+      /** R22: a reply's or a cross-exchange's refused content halts the leg (`withCooldownRetry`), never the debate. */
+      readonly haltsOnContentRefusal?: boolean;
     }): Promise<
       | { readonly kind: "AUTHORED"; readonly value: T }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
@@ -5805,6 +6076,7 @@ export class WalkingSkeletonRunner {
         policy,
         hold: laterParent === null ? hold : laterParentHold(hold, laterParent),
         attempt: input.attempt,
+        ...(input.haltsOnContentRefusal === true ? { haltsOnContentRefusal: true } : {}),
         ...(siteAttemptsSpent === undefined ? {} : { siteAttemptsSpent }),
         // Run resilience (spec 2026-10-12, ruling R-a): on the preview a busy member, an unavailable gate or a member
         // that already sits out halts the site at once — no ten-minute hold for a model that will not be asked again.
@@ -5853,7 +6125,15 @@ export class WalkingSkeletonRunner {
      * today's run, byte for byte. A shaped run needs the runner's shape settings (the sealed map hash) and a call
      * scheduler (its chains run through the lane; with no concurrency row the lane holds one call at a time).
      */
-    const shapeShape = envelopeBasis.shape ?? null;
+    /**
+     * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate's frozen sizes (shape receipt v2, `DR-185-shape-v2`), or null — every
+     * other run, byte for byte. Its sizes are read as a shape (`shapeViewOfV2`), so the shape's language lock, settings, seats and chains
+     * hold for it as for a v1 shape. Its final-writer terms are told to the call policy here, at the claim, before any call (Review
+     * Focus 2): a v2 run's plan, Free or paid; any other run none.
+     */
+    const shapeV2: DebateShapeV2Input | null = envelopeBasis.shapeV2 ?? null;
+    settings.runFinalWriterTerms?.set(run.runId, shapeV2 === null ? null : Object.freeze({ plan: shapeV2.plan === "free" ? "free" as const : "paid" as const }));
+    const shapeShape = envelopeBasis.shape ?? (shapeV2 === null ? null : shapeViewOfV2(shapeV2));
     /**
      * Length guidance (spec 2026-10-15 §3.1): the numbers this run was admitted with (its receipt's `length`), or null —
      * today's prompts and bounds, byte for byte. The runner never reads the register row: a register change never
@@ -5865,7 +6145,7 @@ export class WalkingSkeletonRunner {
      * no trims), today's limits without. Root 0's kept room and every root's framing read this one value (Task 14 review 6).
      */
     const rootMaterialChars = rootZeroMapMaterialCharsFor(mapLimitsFor(lengthGuidance !== null));
-    if (shapeShape !== null && (settings.debateShape == null || callScheduler === undefined)) {
+    if (envelopeBasis.shape !== undefined && envelopeBasis.shape !== null && (settings.debateShape == null || callScheduler === undefined)) {
       throw new TypedDomainError("DEBATE_SHAPE_RUNNER_UNCONFIGURED",
         "This run was admitted with the debate shape, and this runner has no sealed map contracts or no call scheduler");
     }
@@ -5879,6 +6159,16 @@ export class WalkingSkeletonRunner {
     if (engine.engine === 2 && settings.engine == null) {
       throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED",
         "This run was admitted with engine 2, and this runner has no sealed engine contracts");
+    }
+    /**
+     * V4 start step, Task 53: a path debate needs the shape settings (the sealed map hash its start steps and gap round carry), a call
+     * scheduler, engine 2 on its receipt with the runner's engine seal (its web step, its roots), and the stores of its paths and their
+     * roots; without any of them it is refused before any call.
+     */
+    if (shapeV2 !== null && (settings.debateShape == null || callScheduler === undefined || engine.engine !== 2 || settings.engine == null
+      || settings.startPaths === undefined || settings.pathResults === undefined)) {
+      throw new TypedDomainError(PATHS_RUN_CODES.unconfigured,
+        "This run was admitted as a path debate, and this runner lacks its shape settings, a call scheduler, engine 2 or its path stores");
     }
     /**
      * Engine redesign R3 (Ruling PF-R35.4 (a), pre-flight PF-R35.5): engine 2's root-0 material bound, computed ONCE, as
@@ -5966,9 +6256,12 @@ export class WalkingSkeletonRunner {
       workItemId: claimed.workItemId, workerId: settings.workerId,
       heldUntil: keepAlive.heldUntil(), claimMs: settings.claimMs
     });
+    // V4 start step, Task 57f (the owner's 7 Nov answers: "Only if we can't re-use, then we need to pay for this ourselves"): a call an earlier
+    // copy paid for that this copy must buy again (no answer, or one that no longer answers it) is the site's: its earlier charge is waived.
+    const waiveCalls = (runId: string, attemptIds: readonly string[]) => waiveRedoneCalls(this.pool, runId, attemptIds).then(() => undefined);
     const replayedMaker = <T extends ConfiguredSeatMaker>(maker: T): T => {
-      if (replayBook.pending === 0) return maker;
-      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay);
+      if (replayBook.pending === 0 && (replayBook.redoCredits ?? 0) === 0) return maker;
+      const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay, waiveCalls);
       return Object.freeze({ ...maker, provider, judge: new Judge(provider) });
     };
     const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));
@@ -6465,13 +6758,21 @@ export class WalkingSkeletonRunner {
       ? Object.freeze({ shape: shapeShape, settings: shapeSettings, mapContractHash: settings.debateShape.mapContractHash })
       : null;
     /**
+     * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate argued as paths — its v2 sizes, when the shape is argued at all (two
+     * makers or more; one maker left at claim keeps today's single position, as a v1 shape does). Null on every other run.
+     */
+    const pathsShape: DebateShapeV2Input | null = shapeV2 !== null && shapeRun !== null ? shapeV2 : null;
+    /**
      * Engine redesign R3 (spec 2026-10-15 §5): engine 2's map answer step — new shape only. The receipt's engine (never
      * the row) decides; the receipt counted ONE answer check (R1d `sites.answerCheck`). A receipt that did not count it
-     * never sends it: the run stops before the map (deviation 10).
+     * never sends it: the run stops before the map (deviation 10). V4 start step, Task 53: a path debate has no map (its paths were
+     * chosen before Start), so no answer check and none counted.
      */
-    const engineMap = engine.engine === 2 && shapeRun !== null;
-    if (engineMapCheckUnbudgeted(engine, shapeRun !== null)) {
-      throw new TypedDomainError("ENGINE_MAP_CHECK_UNBUDGETED", "The run's receipt does not count the map's answer check");
+    const engineMap = engine.engine === 2 && shapeRun !== null && pathsShape === null;
+    if (pathsShape === null) {
+      if (engineMapCheckUnbudgeted(engine, shapeRun !== null)) {
+        throw new TypedDomainError("ENGINE_MAP_CHECK_UNBUDGETED", "The run's receipt does not count the map's answer check");
+      }
     }
     /**
      * The answer writer's target (spec 2026-10-15 §3.2 notes): the length row's words for every debate with it (they win
@@ -6505,6 +6806,12 @@ export class WalkingSkeletonRunner {
      */
     const shapeLanguage: QuestionLanguage | null = runQuestionLanguageLock(shapeShape, run);
     const shapeLanguageInput = shapeLanguage === null ? {} : { questionLanguage: shapeLanguage };
+    /**
+     * V4 reading level (owner N6, 2026-10-29): the person's level, stored with the run's depth_params by the API, or null
+     * (every V3 ask, every older run). Only the final writers read it: the answer writer and checker, the storyteller and
+     * the story checker. Null: every one of their packets is today's, byte for byte.
+     */
+    const readingLevel: ReadingLevel | null = readingLevelOf(run.depthParams);
     /**
      * A15 (R5) and controller ruling A14 (carry 1): debaters come from distinct
      * makers. On an assigned run a POSITION member may answer only when no OTHER
@@ -6727,6 +7034,16 @@ export class WalkingSkeletonRunner {
     // ledger rule (`seatCallPlan`'s `prefer`), no longer a filter, so its seat
     // keeps its backup; the ledger read still seeds `positionAnswerers`.
     const positionRule = (seat: RunSeat) => (member: SeatIdentity): boolean => positionMakerIsFree(seat, member);
+    /**
+     * R22 (owner ruling 2026-10-29, "Backup AI takes the seat") — WHO MAY WRITE A ROOT POSITION WHOSE ANSWER WAS REFUSED
+     * AFTER EVERY REPAIR: the seat's other member (its backup, which the root's own fairness rule already allows), when it
+     * is of another maker and does not sit out the rest of the run (the preview's sit-out book). The member that answers
+     * is the root's author for every later step (`positionAnswerers`, the node's maker), and the answer discloses it with
+     * BACKUP-MODEL-USED. A seat with no such member (every legacy book: no runner-up) keeps today's rule: the refusal
+     * fails the debate.
+     */
+    const positionBackup = (backup: SeatMember, refused: SeatMember): boolean =>
+      backup.maker !== refused.maker && sitOut?.sitsOut(backup.providerRef) !== true;
     /** Final review M-1: a shaped root's maker bar narrows its POSITION rule (main and backup); none is today's rule. */
     const positionSeatRule = (seat: RunSeat, bar?: (member: Readonly<{ maker: string }>) => boolean) => bar === undefined
       ? positionRule(seat) : (member: SeatIdentity): boolean => positionRule(seat)(member) && bar(member);
@@ -6810,6 +7127,8 @@ export class WalkingSkeletonRunner {
       readonly authorTau: number;
       readonly claimType: ClaimType;
       readonly statement: string;
+      /** Decision 10: the graded point's way of knowing and locator, so the panel reads the extract it cites. */
+      readonly cites?: Readonly<{ wayOfKnowing: string; locator: string | null }>;
       readonly callSiteKey: string;
       readonly questionLine: string;
       /**
@@ -6990,6 +7309,7 @@ export class WalkingSkeletonRunner {
               ...shapeLanguageInput,
               ...lengthGuideOf("judge_panel"),
               statement: input.statement,
+              ...(input.cites === undefined ? {} : webPanelInput(webPacks, { nodeId: input.callSiteKey, ...input.cites }, lengthGuidance !== null)),
               authorMaker: input.authorMaker,
               providerRef: member.providerRef,
               contractHash: judgeContractHash,
@@ -7029,6 +7349,10 @@ export class WalkingSkeletonRunner {
           ? null
           : { ownMaker: planned.maker, taken: new Set([input.authorMaker, ...calledMakers]) }), planned)];
       });
+      // Decision 12 (run-replay.ts, THE HAND-OVER RULE): one panel is one step, so it never weighs two releases' wording.
+      replayBook.openStep(plannedSeats.flatMap((entry, seatPosition) => calledSeats[seatPosition] === true && entry.planned !== null
+        ? [{ callSiteKey: `${input.callSiteKey}:${entry.planned.providerRef}`, providerRef: entry.planned.providerRef }] : []),
+      judgeContractHash);
       const panel = await runJudgePanel({
         artifactProducerRef: input.authorProviderRef,
         primary: {
@@ -7550,9 +7874,12 @@ export class WalkingSkeletonRunner {
     const rootSeats: RunSeat[] = [...seatBook.position];
     // Debate shape (spec §3.3 step 2): positions go to different makers first, the opener (seat 0) staying first.
     if (shapeRun !== null) rootSeats.splice(0, rootSeats.length, ...shapeSeatOrder(rootSeats));
-    if (shapeRun !== null) {
-      // Pre-flight PF-B42: a shaped run's root i is rootSeats[i] (shapeSeatOrder), not position seat i, so who answered
-      // each root is restored in root order, from the same ledger read as today's restore above.
+    /**
+     * Pre-flight PF-B42: a shaped run's root i is rootSeats[i] (shapeSeatOrder), not position seat i, so who answered each root is
+     * restored in root order, from the same ledger read as today's restore above. V4 start step, Task 53: a path debate restores
+     * again once its roots are seated by path (`pathRootSeats`, below).
+     */
+    const restoreRootAnswerers = (): void => {
       positionAnswerers.clear();
       rootSeats.forEach((seat, rootIndex) => {
         const siteKey = rootIndex === 0 ? "JUDGE" : rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
@@ -7561,7 +7888,8 @@ export class WalkingSkeletonRunner {
           && member.pinnedAs === slot && spentSeatSlots.get(siteKey) !== slot);
         if (restored !== undefined) positionAnswerers.set(rootIndex, restored);
       });
-    }
+    };
+    if (shapeRun !== null) restoreRootAnswerers();
     /**
      * Debate shape, Stage 1 (spec §1, §3.3 step 1, §3.5): the map, before root 0. A re-claimed run finds its stored map
      * and asks nothing again; a spend stop that map met is restored (`resolveShapeMap`). A copy of the run that loses the
@@ -7571,31 +7899,44 @@ export class WalkingSkeletonRunner {
      * debate can always pay its first position. A keep-alive refusal abandons the run, as today. Never on today's run
      * (`shapeRun === null`): no map, no call, no storage.
      */
+    /**
+     * T12-R0 / T12-R2 / T12-R3: root 0's room (see below), worked out when asked: by the map's calls and, after the map, by
+     * the web step (Perplexity plan W3-1), which keeps the same room. W4-1: the web step keeps it `withPack`: room for a
+     * case writer that reads its path's pack (engine 2's fixed-words leg under its sources variant, the pack at its cut),
+     * so a debate whose web step ran can still pay its first position; the map (before any pack exists) keeps today's.
+     */
+    const rootZeroRoomMicros = (withPack = false, sourcesChars: number = WEB_ROOT_SOURCES_MAX_BYTES): number => {
+      // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
+      // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
+      // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
+      // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
+      const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
+      const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
+        .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
+      // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
+      const repairCeiling = settings.structureRepairCeiling ?? null;
+      const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
+      return rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
+        questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
+        tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
+        lengthed: lengthGuidance !== null,
+        // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
+        // W4-1: kept by the web step, engine 2's case writer with its path's pack at the cut.
+        ...(withPack && rootEngineMaterialChars !== null ? { sourcesChars } : {}),
+        materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
+        structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
+          attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
+    };
     let debateShapeMap: MapResult | null = null;
     let shapeMapResult: MapResult | null = null;
     let mapSpendStop: EnvelopeStopKind | null = null;
-    if (shapeRun !== null) {
+    // V4 start step, Task 53: a path debate has no map (its paths were chosen before Start, or are built below).
+    if (shapeRun !== null && pathsShape === null) {
       const runMap = async (): Promise<Readonly<{ result: MapResult; spendStop: EnvelopeStopKind | null }>> => {
         /** PF-B40: map seats outside the claim-eligible list, wrapped once each. */
         const mapOnlyMembers = new Map<string, ConfiguredSeatMaker>();
-        // T12-R0 / T12-R2 / T12-R3: root 0's room, at the dearest member of root 0's OWN seat (and the seat it is handed
-        // to when its member sits out); hosted prices only. It covers root 0's first attempt + one retry, the larger of a
-        // length retry and a format repair (`rootZeroRoomAttempts`, `rootZeroKeepRoomMicros`), plus, on a routed run, the
-        // structure-repair call (the sum: refused-repair salvage B is root 0's own second POST after it).
-        const providerPrices = settings.providerPrices ?? EMPTY_PROVIDER_PRICES;
-        const rootZeroPrices = rootZeroRoomRefs({ seats: rootSeats, membersOf, canHandOver: sitOut !== null, sitsOut: seatSitsOut })
-          .flatMap((providerRef) => { const price = providerPrices.get(providerRef); return price === undefined ? [] : [price]; });
-        // LG-A (Task 14 carry): on a routed run root 0 may also send the structure-repair call, at the repair target's price.
-        const repairCeiling = settings.structureRepairCeiling ?? null;
-        const repairPrice = repairCeiling === null ? undefined : providerPrices.get(repairCeiling.providerRef);
-        const keepRoomMicros = rootZeroKeepRoomMicros({ prices: rootZeroPrices, ...rootZeroRoomAttempts({
-          questionLine: run.questionLine, argumentLanguageName: run.argumentLanguageName, questionLanguage: shapeLanguage,
-          tokenCeiling: guidedCallBound(settings.judgeBound, "opening", lengthGuidance).tokenCeiling,
-          lengthed: lengthGuidance !== null,
-          // Ruling "PF-C5 root-0 bound" (a): with the row, root 0's map material is bounded by the runaway limits (L19).
-          materialChars: rootEngineMaterialChars ?? rootMaterialChars }),
-          structureRepair: repairCeiling === null || repairPrice === undefined ? null : { price: repairPrice,
-            attempt: { requestBytes: repairCeiling.requestBytes, completionTokenCeiling: repairCeiling.completionTokenCeiling } } });
+        // T12-R0 / T12-R2 / T12-R3: root 0's room (`rootZeroRoomMicros`, above).
+        const keepRoomMicros = rootZeroRoomMicros();
         const mapCaller = createRunnerMapCaller({
           runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash,
           judgeBound: settings.judgeBound,
@@ -7720,20 +8061,266 @@ export class WalkingSkeletonRunner {
      * (`shapePositionCount`, pre-flight PF-B31); a map that hands back fewer than two answers argues today's opening.
      * Null on today's run: today's plan, value for value.
      */
-    const shapeAnswerCount = shapeRun === null ? 0
+    // V4 start step, Task 53: a path debate's roots are its paths, never this count (it would clamp 5 to 7 paths to 4, and refuse 1).
+    const shapeAnswerCount = shapeRun === null || pathsShape !== null ? 0
       : shapePositionCount(shapeRun.shape.answers, shapeDistinctMakers(rootSeats, seatSitsOut));
     const shapeMapPositions = shapeRun === null || debateShapeMap === null || debateShapeMap.choice === null ? null
       : shapePositionsFromMap({ choice: debateShapeMap.choice, keyPoints: debateShapeMap.keyPoints,
         answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2, engineMap });
     /** Ruling C-TWO: the map's own answers are argued (two or more); the story and the debate page share this rule. */
     const shapeMapArgued = shapeMapPositions !== null && mapAnswersArgued(shapeMapPositions.length);
+    /**
+     * Perplexity plan W3-1 — THE WEB STEP, after the map's answer check and before root 0 (web-step.ts), on an engine-2
+     * run whose map argues its own answers (the web contracts are under the engine seal): every argued path at once,
+     * through this debate's lane, keeping root 0's room. Free and the off switch make no call. It never stops the debate;
+     * only a keep-alive stop passes through. Its packs are stored for the arguing calls (W4-1).
+     */
+    /**
+     * Perplexity plan W4-1 — THE DEBATE'S PACKS, read back from the web store once the web step has settled (web-packs.ts):
+     * the arguing legs read them, and the locator check, the reviewer, the judges, the writer and the storyteller read the
+     * one extract a point cites. Null (Free, the web off, no pack kept, an old run): every call is today's, byte for byte.
+     * Root i argues path `shapeMapPositions[i].answerId`, the ref the web step keyed its pack by.
+     */
+    let webPacks: DebateWebPacks | null = null;
+    /**
+     * V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate's paths in their order (root i argues path b<i+1>), each with the gap
+     * round's points raised for it; null on every other run. Set below, before root 0.
+     */
+    let pathsRunPaths: readonly PathsRunPath[] | null = null;
+    // V4 start step, Task 53: a path debate's root i argues path b<i+1>, the ref its web step keyed its pack by.
+    const webPathOfRoot = (rootIndex: number | null): string | null => webPacks === null || rootIndex === null ? null
+      : pathsRunPaths?.[rootIndex]?.pathId ?? shapeMapPositions?.[rootIndex]?.answerId ?? null;
+    /** The locator check's list, on a debate with packs (`Judge.judge`'s `debateExtractIds`); nothing otherwise. */
+    const webLocatorInput = (): Readonly<{ debateExtractIds?: ReadonlySet<string> }> =>
+      webPacks === null ? {} : { debateExtractIds: webPacks.extractIds };
+    if (settings.webSearch !== undefined && settings.engine != null && engine.engine === 2 && shapeMapArgued
+      && shapeMapPositions !== null && debateShapeMap !== null && debateShapeMap.choice !== null) {
+      const claimOf = new Map(debateShapeMap.keyPoints.map((keyPoint) => [keyPoint.keyPointId, keyPoint] as const));
+      const pointsOf = (ids: readonly string[]) => ids.flatMap((id) => { const keyPoint = claimOf.get(id);
+        return keyPoint === undefined ? [] : [{ text: keyPoint.claim, restsOn: keyPoint.restsOn ?? "assumption" as const }]; });
+      const webStep = await runRunnerWebStep({
+        pool: this.pool, settings: settings.webSearch,
+        lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
+        runId: run.runId, subjectItemId: claimed.workItemId, mode: webModeOfDepth(expansionDepth), question: run.questionLine,
+        // Task 57p (0169): each reading notes the claimed run's settings version (its calls are charged under it).
+        settingsVersion: settings.runSettingsVersions?.versionOf(run.runId) ?? null,
+        questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
+        siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
+        paths: debateShapeMap.choice.answers.slice(0, shapeMapPositions.length).map((answer) => ({ pathRef: answer.answerId,
+          answer: answer.statement, forPoints: pointsOf(answer.forKeyPointIds), againstPoints: pointsOf(answer.againstKeyPointIds) })),
+        members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
+          providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
+        contractHash: settings.engine.engineContractHash, openReplayStep: (members, contractHash) => replayBook.openStep(members, contractHash), bound: settings.judgeBound,
+        keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop, stopsHere: (error) => expansionPhaseStop(error) !== null,
+        // Task 91k: reader 1's reserve is the run's own receipt's (a debate started before the rise keeps its 7 a pack).
+        readerOneCallsReserved: envelopeBasis.web?.readerOneCallsPerPack ?? null
+      });
+      // W4-1: only a step that kept a pack opens the store again; a re-claimed run reads the same packs, so its prompts
+      // are the same bytes. No web search happens inside the debate: the legs read what was stored here. W4-7: with the
+      // step's outcomes, so every path of a dig reads the one pack kept under its first path.
+      if (webStep.paths.some((path) => path.packId !== null)) {
+        webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, paths: webStep.paths, abandon: keepAliveStop });
+        // R22: from here on every prompt of this run records a passage by its name (passage-record.ts).
+        if (webPacks !== null) holdRunPassages(run.runId, webPacks.passages);
+      }
+    }
+    /**
+     * V4 start step, Task 53 (spec 2026-11-03 §4.2-§4.3; plan Task 53) — A PATH DEBATE'S PATHS, BEFORE ROOT 0. The run's own stored
+     * step-2 lines are read once (null: it has none). Its set is read (a menu's or a dig's missing refuses the run, PATHS_SET_MISSING);
+     * a run that builds its own list writes its lists and their merge first (the START: calls; a menu the contract refuses refuses the
+     * run, START_MENU_INVALID), both before any root and both TERMINAL: a new copy would meet the same. More paths than the receipt
+     * priced, or more than 3 on Free, is refused PATHS_OVER_RECEIPT. Its roots are then seated by path (`pathRootSeats`: paths may
+     * outnumber companies), and beside each other run its web step (every v2 run whose runner has web settings: Free, no gate or the web
+     * off record NOT_ON_PLAN or SWITCHED_OFF per path and make no call; it searches only on paid plans with a gate) and its gap round
+     * (paid plans, read first). The web planners read the question with the stored lines (Task 48); every judge call (one claim frame)
+     * and the gap round read it with the lines the question line does not already say, the answers counted as said (read-d3).
+     */
+    const pathMarks: PathProgressMarks = pathProgressMarksOf(pathsShape === null ? undefined : settings.pathProgress, run.runId,
+      (line) => { console.warn(line); });
+    /**
+     * The question line every judge call and the gap round read: on a path debate, the question with the step-2 lines it does not
+     * already say; on every other run, the run's question line, byte for byte.
+     */
+    let pathsQuestionLine = run.questionLine;
+    let pathsPurposeLines: PurposeLines | null = null;
+    let pathsSetStored: StoredStartPathSet | null = null;
+    /** V4 start step, Task 54: the gap round kept (paid plans), read for the story's "also raised"; null without one. */
+    let pathsGapRound: PathGapRound | null = null;
+    if (pathsShape !== null && shapeRun !== null) {
+      const startPaths = settings.startPaths!;
+      const pathResults = settings.pathResults!;
+      const engineSeal = settings.engine!.engineContractHash;
+      /** A refusal no other copy could get past: the work item fails terminally with the code, before any root. */
+      const refusedForGood = async (error: TypedDomainError): Promise<TypedDomainError> => {
+        await this.#work.recordTerminalFailure({ runId: run.runId, workItemId: claimed.workItemId, reason: error.code });
+        return error;
+      };
+      const terminalCodes: readonly string[] = [PATHS_RUN_CODES.noSet, PATHS_RUN_CODES.menuInvalid];
+      pathsPurposeLines = await purposeLinesOf(this.pool, run.runId);
+      const lines = pathsPurposeLines;
+      pathsQuestionLine = questionWithPurposeLines(run.questionLine, lines, { answersSaid: true });
+      /** The seats in the shape's root order (distinct companies first): the list writers, the planner and the gap round sit here. */
+      const orderedSeats = [...rootSeats];
+      const mapSeats: readonly MapSeat[] = mapStageSeats(orderedSeats, orderedSeats.length);
+      /** PF-B40, as the map: a seat outside the claim-eligible list calls through the same wrappers, wrapped once. */
+      const pathsMapOnly = new Map<string, ConfiguredSeatMaker>();
+      const pathsMapCaller = () => createRunnerMapCaller({
+        runId: run.runId, subjectItemId: claimed.workItemId, mapContractHash: shapeRun.mapContractHash, judgeBound: settings.judgeBound,
+        longBounds: { merge: pathsShape.mapMergeBound, choose: pathsShape.mapMergeBound },
+        memberOf: (aiRef) => {
+          const eligible = configuredMakers.find((maker) => maker.providerRef === aiRef);
+          if (eligible !== undefined) return eligible;
+          const configured = configuredByProviderRef.get(aiRef);
+          if (configured === undefined) return null;
+          const wrapped = pathsMapOnly.get(aiRef) ?? sitOutMaker(configured);
+          pathsMapOnly.set(aiRef, wrapped);
+          return wrapped;
+        },
+        sitsOut: (aiRef) => sitOut !== null && sitOut.sitsOut(aiRef),
+        satOutBy: (error) => sitOut !== null && sitOut.haltsAtOnce(error),
+        spendStopOf: expansionPhaseStop,
+        laneStopped: (error) => callHeldBack(error) || (error instanceof TypedDomainError && error.code === CALL_LANE_STOPPED),
+        abandon: keepAliveStop,
+        serial: !callsRunTogether,
+        keepRoomMicros: rootZeroRoomMicros(),
+        roomKept: (error) => error instanceof TypedDomainError && error.code === RUN_COST_ENVELOPE_ROOM_KEPT,
+        lengthGuidance,
+        engineContractHash: engineSeal
+      });
+      let set: StoredStartPathSet;
+      try {
+        set = await resolvePathsRunSet({
+          store: startPaths, runId: run.runId, source: pathsShape.pathsSource,
+          build: async () => {
+            // The merge runs on the panel's Haiku member only (the estimate priced MAP_MERGE on the panel's gates, Task 40); with none
+            // in the panel, or sitting out, the first list's code menu (no call).
+            const haikuMember = configuredMakers.find((maker) => panelModelIds.get(maker.providerRef) === START_STEP_HAIKU_MODEL
+              && !(sitOut?.sitsOut(maker.providerRef) ?? false));
+            const startCaller = pathsMapCaller();
+            // Spec §2.3 (O6), as the map's own guard: once the start steps have stopped, none of theirs still waiting starts.
+            callLane?.guardStarts(() => !startCaller.stopped());
+            try {
+              const menu = await runBuiltMenu({ runId: run.runId, questionLine: run.questionLine, languageName: run.argumentLanguageName,
+                languageTag: run.argumentLanguageTag, readingLevel, clarifyLines: purposeLinesUnsaid(run.questionLine, lines, { answersSaid: true }),
+                seats: runBuiltListSeats(mapSeats, pathsShape.runListWriters),
+                haiku: haikuMember === undefined ? null : Object.freeze({ aiRef: haikuMember.providerRef, maker: haikuMember.maker }), caller: startCaller,
+                // Review of Task 88: a stop met by the start steps (the month wall's pause, a lost claim) leaves here, sealing nothing.
+                abandoned: startCaller.abandoned });
+              const startStop = startCaller.spendStop();
+              if (startStop !== null) mapSpendStop ??= startStop;
+              const ask = await this.#runs.readStoredAsk(run.runId);
+              return runBuiltStartPathSet({ runId: run.runId, menu, width: pathsShape.paths, free: pathsShape.plan === "free",
+                carryOnToReport: carryOnToReportOf(ask?.askContract ?? null), questionLine: run.questionLine });
+            } catch (error) {
+              // As the map: the calls already sent land their receipts before the refusal leaves.
+              callLane?.stop();
+              await startCaller.settled();
+              throw error;
+            } finally {
+              callLane?.guardStarts(null);
+            }
+          }
+        });
+      } catch (error) {
+        if (error instanceof TypedDomainError && terminalCodes.includes(error.code)) throw await refusedForGood(error);
+        throw error;
+      }
+      if (set.paths.length > pathsShape.paths || (pathsShape.plan === "free" && set.paths.length > START_STEP_LIMITS.freePathsMax)) {
+        throw await refusedForGood(new TypedDomainError(PATHS_RUN_CODES.overReceipt,
+          "A path debate's paths outnumber what its receipt priced"));
+      }
+      pathsSetStored = set;
+      // Spec §4.3: a company writes roots in more than one path when paths outnumber companies; the seats no root uses stay spares.
+      rootSeats.splice(0, rootSeats.length, ...pathRootSeats(orderedSeats, set.paths.length), ...orderedSeats.slice(set.paths.length));
+      restoreRootAnswerers();
+      const plannerPaths = pathsRunPathsOf(set, null);
+      const webMode = webModeOfDepth(expansionDepth);
+      const webSearch = settings.webSearch;
+      const webStep = webSearch === undefined ? Promise.resolve(null) : runRunnerWebStep({
+        pool: this.pool, settings: webSearch,
+        lane: callScheduler === undefined || callLane === undefined ? null : { lane: callLane, scheduler: callScheduler },
+        runId: run.runId, subjectItemId: claimed.workItemId, mode: webMode, question: run.questionLine,
+        // Task 57p (0169): each reading notes the claimed run's settings version (its calls are charged under it).
+        settingsVersion: settings.runSettingsVersions?.versionOf(run.runId) ?? null,
+        questionLanguage: shapeLanguage, placeCountry: null, asOf: new Date(),
+        siteLanguage: shapeLanguage === null ? { code: "en", name: "English" } : { code: shapeLanguage.code, name: shapeLanguage.name },
+        paths: [],
+        pathsMode: Object.freeze({
+          origin: pathsShape.pathsSource === "DIG_PICKS" ? "DIG" as const : "START" as const,
+          cap: webSearchCapForPaths(plannerPaths.length, webMode === "thorough" ? "THOROUGH" : "QUICK"),
+          paths: plannerPaths.map((path) => Object.freeze({ pathNo: path.pathNo, pathRef: path.pathId, chosen: pathChosenText(path) })),
+          alreadyInvestigated: "", reuse: null, purposeLines: lines
+        }),
+        members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,
+          providerRef: maker.providerRef, maker: maker.maker, model: callSubjects?.subjectOf(maker.providerRef).model ?? maker.providerRef })),
+        contractHash: engineSeal, openReplayStep: (members, contractHash) => replayBook.openStep(members, contractHash), bound: settings.judgeBound,
+        keepRoomMicros: rootZeroRoomMicros(true), digKeepRoomMicros: rootZeroRoomMicros(true, WEB_DIG_ROOT_SOURCES_MAX_BYTES), abandon: keepAliveStop,
+        stopsHere: (error) => expansionPhaseStop(error) !== null,
+        // Task 91k: reader 1's reserve is the run's own receipt's (a debate started before the rise keeps its 7 a pack).
+        readerOneCallsReserved: envelopeBasis.web?.readerOneCallsPerPack ?? null,
+        // Item wait-d1: each path whose planner planned a search is FINDING_SOURCES once its decision is kept (0134), before any search.
+        stepPorts: {
+          prepare: () => postgresWebStepPorts(this.pool, run.runId),
+          recordPlanPathStatuses: async (runId, statuses, cipher) => {
+            await postgresWebPlanStatusRecorder(this.pool)(runId, statuses, cipher);
+            for (const entry of statuses) if (entry.status === "PLANNED") pathMarks.step(entry.pathId as PathId, "FINDING_SOURCES");
+          }
+        }
+      });
+      const gapRound = (async (): Promise<PathGapRound | null> => {
+        if (pathsShape.gapRounds <= 0 || pathsShape.plan === "free") return null;
+        const stored = await pathResults.readPathGapRound(run.runId);
+        if (stored !== null) return stored.round;
+        const gapCaller = pathsMapCaller();
+        let asked: Awaited<ReturnType<typeof mapRunPathGapRounds>>;
+        try {
+          asked = await mapRunPathGapRounds({ questionLine: pathsQuestionLine, languageName: run.argumentLanguageName,
+            languageTag: run.argumentLanguageTag, readingLevel,
+            paths: plannerPaths.map((path) => ({ pathId: path.pathId, title: path.title, question: path.question, viewpoints: pathConsiderationsOf(path) })),
+            alreadyRaised: gapAlreadyRaised(set), rounds: pathsShape.gapRounds, seats: mapSeats, caller: gapCaller });
+        } catch (error) {
+          await gapCaller.settled();
+          throw error;
+        }
+        const gapStop = gapCaller.spendStop();
+        if (gapStop !== null) mapSpendStop ??= gapStop;
+        const written = await pathResults.recordPathGapRound({ runId: run.runId, roundCount: asked.roundCount, round: asked.round });
+        if (written === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+        return written === "ALREADY" ? (await pathResults.readPathGapRound(run.runId))?.round ?? asked.round : asked.round;
+      })();
+      const [webSettled, gapSettled] = await Promise.allSettled([webStep, gapRound]);
+      if (webSettled.status === "rejected") throw webSettled.reason;
+      if (gapSettled.status === "rejected") throw gapSettled.reason;
+      pathsRunPaths = pathsRunPathsOf(set, gapSettled.value);
+      pathsGapRound = gapSettled.value;
+      const stepped = webSettled.value;
+      // W4-1 (Task 48): every path reads every path's pack, each under its path's title (`pathsPackShares`), when any kept one.
+      if (stepped !== null && stepped.paths.some((path) => path.packId !== null)) {
+        const packIdOf = new Map(stepped.paths.map((path) => [path.pathRef, path.packId] as const));
+        const shares = pathsPackShares(pathsRunPaths.map((path) => ({ pathRef: path.pathId, label: path.title })));
+        webPacks = await readDebateWebPacks({ pool: this.pool, runId: run.runId, abandon: keepAliveStop,
+          paths: shares.map((share) => ({ pathRef: share.pathRef, packId: packIdOf.get(share.pathRef) ?? null,
+            digPacks: share.reads.flatMap((read) => { const packId = packIdOf.get(read.keptUnder) ?? null;
+              return packId === null ? [] : [{ packId, chosen: read.chosen }]; }) })) });
+        if (webPacks !== null) holdRunPassages(run.runId, webPacks.passages);
+      }
+    }
     const shapePositions: readonly ShapePositionPlan[] | null = shapeRun === null ? null
-      : shapeMapArgued ? shapeMapPositions
-        : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
+      : pathsRunPaths !== null && pathsShape !== null ? shapePositionsFromPaths(pathsRunPaths, pathsShape.pointsPerPath)
+        : shapeMapArgued ? shapeMapPositions
+          : shapePositionsForTodaysOpening({ answers: shapeAnswerCount, pointsPerAnswer: shapeRun.shape.pointsPerAnswer, ring: engine.engine === 2 });
     const shapePlan: ShapePlan | null = shapeRun === null || shapePositions === null ? null : buildShapePlan({
       positions: shapePositions, depth: expansionDepth,
-      scrutiny: { roundsPerPoint: shapeRun.shape.scrutinyRoundsPerPoint, pointsPerDebate: shapeRun.shape.scrutinyPointsPerDebate }
+      scrutiny: { roundsPerPoint: shapeRun.shape.scrutinyRoundsPerPoint, pointsPerDebate: shapeRun.shape.scrutinyPointsPerDebate },
+      // V4 start step, Task 53: paths are not rivals, so a path debate's plan has no cross-reply.
+      ...(pathsShape === null ? {} : { cross: false })
     });
+    // V4 start step, Task 53: the plan must stay inside what the receipt priced, for the paths it argues (fewer paths price fewer sites).
+    if (pathsShape !== null && shapePlan !== null && pathsSetStored !== null
+      && !pathPlanFitsReceipt(shapePlan, { ...pathsShape, paths: pathsSetStored.paths.length }, expansionDepth)) {
+      await this.#work.recordTerminalFailure({ runId: run.runId, workItemId: claimed.workItemId, reason: PATHS_RUN_CODES.overReceipt });
+      throw new TypedDomainError(PATHS_RUN_CODES.overReceipt, "A path debate's plan does not fit what its receipt priced");
+    }
     /** THE NUMBER OF ROOTS: the shape's P, or today's one root per maker. */
     const rootCount = shapePlan?.rootCount ?? effectiveMakerCount;
     const expansionPlan: readonly MultiMakerExpansionLeg[] = shapePlan !== null ? shapePlan.legs
@@ -7772,10 +8359,12 @@ export class WalkingSkeletonRunner {
      * An ordered recorder (ordered-recorder.ts) whose positions are each claimed once: committed, or given up by a
      * chain that has nothing (more) to write there (`skip`, harmless for a position already claimed), so no later
      * position ever waits on a chain that stopped, was dropped or failed. `skipBelow` gives up every unclaimed
-     * earlier position — for the serial phases, where none of them can be claimed any more.
+     * earlier position — for the serial phases, where none of them can be claimed any more. V4 start step, Task 53b: with
+     * `partOf` (a path debate), one ordered recorder per path over that path's own positions (`createPartedOrderedRecorder`), so
+     * no path's saves wait on another's; without it (every other run), the one plan order, as before.
      */
-    const positionRecorder = (size: number) => {
-      const recorder: OrderedRecorder = createOrderedRecorder(size);
+    const positionRecorder = (size: number, partOf: ((position: number) => number | null) | null = null) => {
+      const recorder: OrderedRecorder = partOf === null ? createOrderedRecorder(size) : createPartedOrderedRecorder(size, partOf);
       const claimed = new Set<number>();
       /** Each position's turn, over: its write has settled, or it was given up. */
       const settled = Array.from({ length: size }, () => settable<void>());
@@ -7801,17 +8390,28 @@ export class WalkingSkeletonRunner {
         through: async (end: number): Promise<void> => {
           await Promise.all(settled.slice(0, end).map((turn) => turn.promise));
         },
+        /** V4 start step, Task 53: resolves once position `position` has been written or given up (never rejects). */
+        at: (position: number): Promise<void> => settled[position]?.promise ?? Promise.resolve(),
         /** Resolves once every position has been written or given up. */
         done: (): Promise<void> => recorder.done()
       });
     };
     type PositionRecorder = ReturnType<typeof positionRecorder>;
-    /** Nodes, in plan order. */
-    const nodeRecorder = positionRecorder(totalPlannedNodes);
+    /**
+     * V4 start step, Task 53b (the coordinator's ruling of 5 Nov; spec §4.3, chat-first-round: a path "does not wait for the other
+     * paths") — ON A PATH DEBATE, THE PATH EACH PLAN POSITION ARGUES UNDER, by its root's index: root i itself, a leg its root's, a
+     * scrutiny slot its leg's root once scrutiny chose it (null for a slot no leg uses). The recorders below then keep each path's
+     * own plan order and no other: a slow path never holds back another path's saves, reviews or "over" signals. Null on every
+     * other run, which keeps the one plan order (parallel-calls spec §2.1).
+     */
+    const pathPartOf = pathsRunPaths === null || shapePlan === null ? null
+      : (position: number): number | null => position < rootCount ? position : shapeLegAt(position)?.rootIndex ?? null;
+    /** Nodes, in plan order (on a path debate, each path's in its own). */
+    const nodeRecorder = positionRecorder(totalPlannedNodes, pathPartOf);
     /** Each node's reviewer choice, in review order (spec §2.2: the reviewer turn never depends on who finished first). */
-    const reviewChoices = positionRecorder(totalPlannedNodes);
+    const reviewChoices = positionRecorder(totalPlannedNodes, pathPartOf);
     /** Each node's review, recorded in review order. */
-    const reviewRecorder = positionRecorder(totalPlannedNodes);
+    const reviewRecorder = positionRecorder(totalPlannedNodes, pathPartOf);
     /**
      * Spec §2.3 — A FAILURE THAT ENDS THE DEBATE, WITH CALLS IN FLIGHT. The chain that meets it records it with its
      * place in today's serial order (`rank`) and stops the lane: no new call starts, and a call still waiting for a
@@ -7878,6 +8478,13 @@ export class WalkingSkeletonRunner {
      * ceiling; every root is framed by the same rule.
      */
     const rootLegOf = (rootIndex: number): JudgeLeg => {
+      // V4 start step, Task 53 (Task 46's leg): a path's root writes what its angle shows and where it comes out, from its title, question,
+      // viewpoints and the gap round's points for it, told the person's reading level (none: no reader field) and reading every path's
+      // pack (Task 48's shares); no pack, the leg alone.
+      const path = pathsRunPaths?.[rootIndex];
+      if (path !== undefined) {
+        return legWithWebSources({ kind: "path-root", ...pathRootLegMaterial(path), readingLevel }, webPacks, { own: path.pathId });
+      }
       const position = shapePositions?.[rootIndex];
       if (position === undefined || position.statement === null || position.mapPoints === null) {
         return rootIndex === 0 ? { kind: "primary-root" } : { kind: "independent-root" };
@@ -7888,8 +8495,10 @@ export class WalkingSkeletonRunner {
         const material = shapeEngineRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints,
           pointsRaised: JSON.stringify((position.pointsRaised ?? []).map((point) => ({ text: point.text, rests_on: point.restsOn }))),
           assumptions: JSON.stringify(position.assumptions ?? []) }, rootEngineMaterialChars!);
-        return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
+        const engineLeg: JudgeLeg = { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints,
           engine: { pointsRaised: material.pointsRaised, assumptions: material.assumptions } };
+        // W4-1: the case writer reads its path's pack (the sources variant); a path with none, the v2 leg to the byte.
+        return legWithWebSources(engineLeg, webPacks, { own: webPathOfRoot(rootIndex) });
       }
       const material = shapeRootMaterial({ assignedAnswer: position.statement, mapPoints: position.mapPoints }, rootMaterialChars);
       return { kind: "assigned-root", assignedAnswer: material.assignedAnswer, mapPoints: material.mapPoints };
@@ -7907,17 +8516,21 @@ export class WalkingSkeletonRunner {
           seat: primarySeat,
           callSiteKey: "JUDGE",
           ...primaryPlan.options,
+          contentRefusalBackup: positionBackup,
           call: (member, callSiteKey) => member.judge.judge({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
             callSiteKey,
             // DL4-F4: the question travels as the question, in its own fenced
             // field; the leg's directive is code's and rides the system message.
-            questionLine: run.questionLine,
+            // V4 start step, Task 53: on a path debate, the question with the step-2 lines it does not already say (read-d3), on every
+            // leg alike, so the debate keeps ONE claim frame (FAIR-01); the run's question line on every other run.
+            questionLine: pathsQuestionLine,
             argumentLanguageName: run.argumentLanguageName,
             ...shapeLanguageInput,
             ...lengthGuideOf(judgeLegLengthStep(leg)),
             leg,
+            ...webLocatorInput(),
             providerRef: member.providerRef,
             contractHash: settings.judgeContractHash,
             bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(leg), lengthGuidance), maxAttempts }
@@ -7932,13 +8545,121 @@ export class WalkingSkeletonRunner {
       });
       return primaryAttempt;
     };
-    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+    /**
+     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
+     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
+     * Declared before root 0, whose refused answer reads it (R22, `handRefusedRootToSpare`).
+     */
+    const answeredMakers: (string | undefined)[] = [];
+    const rootCallSiteKey = (rootIndex: number): string =>
+      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
+    /**
+     * R22 (owner ruling 2026-10-30, "Yes, use the spare debater") — A POSITION WHOSE ANSWER WAS REFUSED AFTER EVERY
+     * REPAIR GOES TO A SPARE DEBATER. 379ad0c99 hands it to the seat's backup; a seat with no usable backup (every seat
+     * on the test site, whose legacy book has none) let the refusal fail the debate. A shaped run now hands the position
+     * over the way a position whose maker sits out is handed over before its first call (`shapeHandOverRoot`'s SWAP): to
+     * a seat no position uses, of a maker that is none of the refused seat's, up, not sitting out, never refused a
+     * position and arguing no other one (`shapeSpareForRefusedRoot`). From then on the spare is the position's author for
+     * every later step (`rootSeats`, `positionAnswerers`, `answeredMakers`, the node's maker), so its cross-replies, the
+     * judges' own-maker rule and the neutral seating all see its maker. It is asked at the position's own site, for the
+     * same leg, so every spending gate binds its call as it binds any other (the run's money and attempt ceilings, root
+     * 0's first-call phase, the step's allowance, which the preview counts per maker), and its ledger rows sit beside the
+     * refused ones under its own route. The switch is told on the progress stream (cause CONTENT_REFUSED), and the answer
+     * discloses the stand-in with BACKUP-MODEL-USED (`spareAnswers`). No spare (today's opening: every seat argues a
+     * position; a shape that argues every seat), and today's rule stands: the refusal fails the debate.
+     */
+    const refusedRootSeats = new Set<RunSeat>();
+    /** The roots a spare took over: on this pass after a refusal, or on a resumed pass after an earlier one's. */
+    const spareRoots = new Set<number>();
+    /** How many of those roots a spare answered on this pass; each is a stand-in the answer discloses. */
+    let spareAnswers = 0;
+    const rootSiteKey = (rootIndex: number): string => rootIndex === 0 ? FIRST_POSITION_CALL_SITE_KEY : rootCallSiteKey(rootIndex);
+    /** Hands root `rootIndex` to a spare after its refused answer; false when the failure must travel as today. */
+    const handRefusedRootToSpare = async (rootIndex: number, error: unknown): Promise<boolean> => {
+      if (shapePlan === null || !(error instanceof JudgeContentRefusedError)) return false;
+      const refused = rootSeats[rootIndex]!;
+      refusedRootSeats.add(refused);
+      const siteKey = rootSiteKey(rootIndex);
+      const otherRootMakers = answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex);
+      // V4 start step, Task 53 (Review Focus 3): a path's root may go to a seat arguing another path (paths may outnumber companies),
+      // never to the refused seat's company nor the root's own (`pathsRootHandOver`).
+      const spare = pathsRunPaths !== null
+        ? pathsRootHandOver({
+          makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut,
+          refusedMakers: membersOf(refused).map((member) => member.maker),
+          takes: (index) => {
+            const seat = rootSeats[index]!;
+            return !refusedRootSeats.has(seat) && !seatSitsOut(seat) && seatCaller.plan(seat, siteKey) !== null;
+          }
+        })
+        : shapeSpareForRefusedRoot({
+          makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut,
+          refusedMakers: membersOf(refused).map((member) => member.maker),
+          takes: (index) => {
+            const seat = rootSeats[index]!;
+            return !refusedRootSeats.has(seat) && !seatSitsOut(seat) && seatCaller.plan(seat, siteKey) !== null
+              && !otherRootMakers.includes(seat.main.maker);
+          }
+        });
+      if (spare === null) return false;
+      const to = rootSeats[spare]!;
+      // A path debate's seat that argues another path keeps it, and takes this root too; a seat no root uses trades places.
+      if (pathsRunPaths !== null && spare < rootCount) rootSeats[rootIndex] = to;
+      else [rootSeats[rootIndex], rootSeats[spare]] = [to, refused];
+      spareRoots.add(rootIndex);
+      await announceSwitch(backupSwitchEventValue({
+        role: "POSITION", seatIndex: refused.pinnedSeatIndex,
+        fromProviderRef: refused.main.providerRef, fromCandidateId: refused.main.candidate?.candidateId ?? null,
+        toProviderRef: to.main.providerRef, toCandidateId: to.main.candidate?.candidateId ?? null,
+        cause: "CONTENT_REFUSED", callSiteKey: siteKey
+      }));
+      return true;
+    };
+    /**
+     * R22 — A RESUMED PASS KEEPS THE SPARE. Before root `rootIndex`'s first call: a spare whose member answered the root's
+     * site on an earlier pass, when no member of the root's own seat did (`shapeSpareThatAnswered`, from the replay
+     * book), takes the root again at once. So the refused member is never asked again, and the spare's answer is
+     * replayed from the record rather than bought twice; its switch was told on that pass.
+     */
+    const resumeSpareHandOver = (rootIndex: number): void => {
+      if (shapePlan === null || spareRoots.has(rootIndex)) return;
+      const siteKey = rootSiteKey(rootIndex);
+      const spare = shapeSpareThatAnswered({
+        seatRefs: rootSeats.map((seat) => membersOf(seat).map((member) => member.providerRef)), rootCount, rootIndex,
+        answeredBy: replayBook.answeredBy((key) => seatBaseCallSiteKey(key) === siteKey), sitsOut: rootSitsOut
+      });
+      if (spare === null) return;
+      refusedRootSeats.add(rootSeats[rootIndex]!);
+      [rootSeats[rootIndex], rootSeats[spare]] = [rootSeats[spare]!, rootSeats[rootIndex]!];
+      spareRoots.add(rootIndex);
+    };
+    /**
+     * R22: root 0's refused answer goes to a spare, asked at once for the same leg (`handRefusedRootToSpare`); a spare
+     * refused in turn goes on to the next one. None left, the refusal travels as today.
+     */
+    const openRootZeroBySpare = async (refusal: unknown): ReturnType<typeof openFirstPosition> => {
+      let refused = refusal;
+      for (;;) {
+        if (!(await handRefusedRootToSpare(0, refused))) throw refused;
+        try {
+          return await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+        } catch (next) {
+          // The spare's own call refused for money spent nothing on it: the debate ends on the refusal, as today.
+          if (next instanceof TypedDomainError && next.code === "RUN_CEILING_BELOW_FIRST_CALL") throw refusal;
+          refused = next;
+        }
+      }
+    };
+    resumeSpareHandOver(0);
+    // V4 start step, Task 53 (item wait-d1): a path is ARGUING when its root's author call starts.
+    if (pathsRunPaths !== null) pathMarks.step(pathsRunPaths[0]!.pathId, "ARGUING");
+    let primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0)).catch(openRootZeroBySpare);
     // Fix (d): root 0 cannot be dropped — nothing would exist to answer from — so when its member sat out, the next
     // member that does not sit out opens instead (the two seats trade roots, above).
     for (let next = 1; primaryAttempt.kind === "HALTED" && rootSitsOut(0) && next < rootSeats.length; next += 1) {
       if (rootSitsOut(next)) continue;
       [rootSeats[0], rootSeats[next]] = [rootSeats[next]!, rootSeats[0]!];
-      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0));
+      primaryAttempt = await openFirstPosition(rootSeats[0]!, rootLegOf(0)).catch(openRootZeroBySpare);
     }
     if (primaryAttempt.kind === "HALTED") {
       throw new TypedDomainError(
@@ -7946,6 +8667,7 @@ export class WalkingSkeletonRunner {
         "The primary maker position failed after the full cooldown and final-retry courtesy"
       );
     }
+    if (spareRoots.has(0)) spareAnswers += 1;
     const judged = primaryAttempt.value.value;
     // A15: the member that ANSWERED root 0 — its lineage, its panel's author
     // (controller carry 8), and the writer of its cross-exchanges.
@@ -7954,11 +8676,6 @@ export class WalkingSkeletonRunner {
     // B9: the node's author is the model that actually wrote it — the member
     // that answered root 0, or the cheaper maker its refused first call moved to.
     const rootAuthor = actualAuthor(FIRST_POSITION_CALL_SITE_KEY, primaryMaker);
-    /**
-     * Pre-flight PF-B45: per plan position, the maker that REALLY wrote it (the runner-up, or a cheaper maker a refused
-     * call moved to), recorded before its statement is told — the shape's writer rule reads it, never the planned maker.
-     */
-    const answeredMakers: (string | undefined)[] = [];
     answeredMakers[0] = rootAuthor.maker;
     const reduced = reduceAssessment({
       claimType: judged.normalizedClaim.claimType,
@@ -8096,6 +8813,11 @@ export class WalkingSkeletonRunner {
        * its seat (main and backup) and on a call moved to a cheaper maker. Absent on today's legs.
        */
       readonly makerBar?: (member: Readonly<{ maker: string }>) => boolean;
+      /**
+       * R22 (owner ruling 2026-10-30): the leg's JUDGEMENT_SCHEDULED receipt was already written, for the call whose
+       * refused answer this one takes over (a spare debater's), so this call writes none of its own. Absent: today's.
+       */
+      readonly receiptWritten?: true;
       readonly role: string;
       readonly parentNodeId: string | null;
       readonly childKind: "support" | "defeater" | null;
@@ -8148,7 +8870,7 @@ export class WalkingSkeletonRunner {
       | { readonly kind: "AUTHORED"; readonly value: AuthoredPosition }
       | { readonly kind: "HALTED"; readonly record: HaltedExpansionRecord }
     > => {
-      const scheduled = this.#ledger.append({
+      const scheduled: Promise<unknown> = input.receiptWritten === true ? Promise.resolve() : this.#ledger.append({
         runId: run.runId,
         attemptId: runnerAttemptId,
         actionKind: "JUDGEMENT_SCHEDULED",
@@ -8176,21 +8898,28 @@ export class WalkingSkeletonRunner {
         parentNodeId: input.parentNodeId,
         plannedLegCount: input.plannedLegCount,
         failureScope: input.parentNodeId === null ? "MAKER_POSITION" : "EXPANSION",
+        haltsOnContentRefusal: input.parentNodeId !== null,
         seatMember: childPlan.seatMember,
         retrySeatMember: childPlan.retryMember,
         attempt: (maxAttempts) => seatCaller.callSeat({
           seat: input.seat,
           callSiteKey: input.callSiteKey,
           ...childPlan.options,
+          // R22: a root's refused answer goes to its seat's backup; a reply's or a cross-exchange's halts its leg.
+          ...(input.parentNodeId === null && input.seat.role === "POSITION" ? { contentRefusalBackup: positionBackup } : {}),
           call: (member, callSiteKey) => member.judge.judge({
             runId: run.runId,
             subjectItemId: claimed.workItemId,
             callSiteKey,
-            questionLine: run.questionLine,
+            // V4 start step, Task 53: on a path debate, the question with the step-2 lines it does not already say (read-d3), on every
+            // leg alike, so the debate keeps ONE claim frame (FAIR-01); the run's question line on every other run.
+            questionLine: pathsQuestionLine,
             argumentLanguageName: run.argumentLanguageName,
             ...shapeLanguageInput,
             ...lengthGuideOf(judgeLegLengthStep(input.leg)),
             leg: input.leg,
+            // W4-1: on a debate with packs, "looked up" stays only for one of its extract ids.
+            ...webLocatorInput(),
             providerRef: member.providerRef,
             contractHash: settings.judgeContractHash,
             bound: { ...guidedCallBound(settings.judgeBound, judgeLegLengthStep(input.leg), lengthGuidance), maxAttempts }
@@ -8232,6 +8961,7 @@ export class WalkingSkeletonRunner {
         authorTau: childReduced.tau,
         claimType: childJudged.normalizedClaim.claimType,
         statement: childJudged.statement,
+        cites: { wayOfKnowing: childJudged.wayOfKnowing, locator: childJudged.locator },
         callSiteKey: `PANEL:${input.callSiteKey}`,
         // The PANEL assesses a node against THE DEBATE'S QUESTION. It used to
         // receive the leg's concatenated instruction string, so a parent's
@@ -8251,6 +8981,16 @@ export class WalkingSkeletonRunner {
      * panel-degradation records, its reduced judgement, and its place in `authoredNodes`. Only the node recorder
      * calls it, so nodes are saved in today's serial order whatever order their calls finished in.
      */
+    /**
+     * V4 start step, Task 53 (item wait-d1): the path each saved point is under (its leg's root's path), by node id; a root is not a
+     * point and is not here. Its marks follow it: PUT_FORWARD when saved, CHECKING when its review is sent, CHECKED when recorded.
+     */
+    const pointPathIds = new Map<string, PathId>();
+    const pathOfPosition = (position: number): PathId | null => {
+      if (pathsRunPaths === null) return null;
+      const rootIndex = position < rootCount ? position : shapeLegAt(position)?.rootIndex;
+      return rootIndex === undefined ? null : pathsRunPaths[rootIndex]?.pathId ?? null;
+    };
     const saveAuthored = async (position: number, input: SaveInput, authored: AuthoredPosition): Promise<AuthoredDebateNode> => {
       const { judged: childJudged, reduced: childReduced, selection: childSelection, author } = authored;
       const { created: childNodeId, minted: childSourcedEdges } = await this.#graph.withGraphWrite(run.runId, async (writer) => {
@@ -8348,6 +9088,11 @@ export class WalkingSkeletonRunner {
         member: authored.member
       });
       authoredNodes.set(position, node);
+      const pointPath = position < rootCount ? null : pathOfPosition(position);
+      if (pointPath !== null) {
+        pointPathIds.set(childNodeId, pointPath);
+        pathMarks.point(pointPath, childNodeId, "PUT_FORWARD");
+      }
       return node;
     };
 
@@ -8374,7 +9119,17 @@ export class WalkingSkeletonRunner {
      */
     const dropSatOutRoot = (rootIndex: number, beforeCall: boolean): boolean => {
       if (!rootSitsOut(rootIndex)) return false;
-      if (shapePlan !== null && beforeCall) {
+      if (shapePlan !== null && beforeCall && pathsRunPaths !== null) {
+        // V4 start step, Task 53 (Review Focus 3): a busy company's path root goes to another company's seat, a spare first, else one
+        // arguing another path (which keeps its own); none left, the root drops as today.
+        const to = pathsRootHandOver({ makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut,
+          refusedMakers: [], takes: (index) => seatCaller.plan(rootSeats[index]!, rootCallSiteKey(rootIndex)) !== null });
+        if (to !== null) {
+          if (to >= rootCount) [rootSeats[rootIndex], rootSeats[to]] = [rootSeats[to]!, rootSeats[rootIndex]!];
+          else rootSeats[rootIndex] = rootSeats[to]!;
+          return false;
+        }
+      } else if (shapePlan !== null && beforeCall) {
         const handOver = shapeHandOverRoot({ makers: rootSeats.map((seat) => seat.main.maker), rootCount, rootIndex, sitsOut: rootSitsOut });
         if (handOver.kind === "SWAP") {
           [rootSeats[rootIndex], rootSeats[handOver.withIndex]] = [rootSeats[handOver.withIndex]!, rootSeats[rootIndex]!];
@@ -8446,7 +9201,8 @@ export class WalkingSkeletonRunner {
     };
     /** How one node's review call ended (nothing recorded yet): `recordReviewOutcome` records it in review order. */
     type ReviewCallOutcome =
-      | { readonly kind: "REVIEWED"; readonly review: Awaited<ReturnType<Judge["review"]>>; readonly callSiteKey: string }
+      // V4 start step, Task 53b: `reviewerMaker` is the maker of the member that ANSWERED (the one the ledger names as its reviewer).
+      | { readonly kind: "REVIEWED"; readonly review: Awaited<ReturnType<Judge["review"]>>; readonly callSiteKey: string; readonly reviewerMaker: string }
       | { readonly kind: "HIDDEN"; readonly record: HaltedExpansionRecord }
       /** Fix (d): the reviewer itself sat out during the call; the node is offered to another reviewer after this pass. */
       | { readonly kind: "GIVEN_BACK" }
@@ -8455,6 +9211,9 @@ export class WalkingSkeletonRunner {
     /** One node's review call, through the reviewer chosen for it. Nothing is written here but the call's own receipts. */
     const callReview = async (authoredNode: AuthoredDebateNode, reviewer: ReviewerChoice): Promise<ReviewCallOutcome> => {
       const callSiteKey = `JUDGE:review:${replayBook.siteNodeId(authoredNode.nodeId)}`;
+      // V4 start step, Task 53 (item wait-d1): a path's point is CHECKING once its review is sent.
+      const pointPath = pointPathIds.get(authoredNode.nodeId);
+      if (pointPath !== undefined) pathMarks.point(pointPath, authoredNode.nodeId, "CHECKING");
       try {
         // B9: a review that has to move never moves onto the node's ACTUAL author.
         reviewAuthorMakers.set(callSiteKey, authoredNode.maker);
@@ -8478,6 +9237,8 @@ export class WalkingSkeletonRunner {
               ...shapeLanguageInput,
               ...lengthGuideOf("reviewer"),
               statement: authoredNode.statement,
+              // W4-1 (item 6): a looked-up point is reviewed with the extract it names; it does not support it: a dispute.
+              ...webReviewInput(webPacks, authoredNode, lengthGuidance !== null),
               authorMaker: authoredNode.maker,
               providerRef: member.providerRef,
               contractHash: settings.judgeContractHash,
@@ -8495,7 +9256,8 @@ export class WalkingSkeletonRunner {
           return { kind: "HIDDEN", record: reviewAttempt.record };
         }
         // A15: the key the ledger holds for this review, seat marker included.
-        return { kind: "REVIEWED", review: reviewAttempt.value.value, callSiteKey: reviewAttempt.value.callSiteKey };
+        return { kind: "REVIEWED", review: reviewAttempt.value.value, callSiteKey: reviewAttempt.value.callSiteKey,
+          reviewerMaker: reviewAttempt.value.member.maker };
       } catch (error) {
         const outcome = reviewFailureOutcome(error);
         if (outcome.kind === "RETHROW") throw error;
@@ -8545,6 +9307,9 @@ export class WalkingSkeletonRunner {
           `No valid cross-maker review was recorded for node ${authoredNode.nodeId}`
         );
       }
+      // V4 start step, Task 53 (item wait-d1): a path's point is CHECKED once its review is recorded.
+      const pointPath = pointPathIds.get(authoredNode.nodeId);
+      if (pointPath !== undefined) pathMarks.point(pointPath, authoredNode.nodeId, "CHECKED");
       // T6/J14: recorded only AFTER the review commits, so the disclosure
       // can never name an outcome the ledger does not hold.
       if (review.outcome === "cannot-assess") {
@@ -8638,7 +9403,20 @@ export class WalkingSkeletonRunner {
       readonly ready: Promise<void>;
       /** Fix (d): the nodes whose reviewer sat out during the call, in review order, offered again after the batch. */
       readonly givenBack: AuthoredDebateNode[];
+      /**
+       * V4 start step, Task 53b: on a path debate, the path (its root's index) whose batch this is; its turn book reads that path's
+       * own recorded reviews (`pathLatestReviewers`), never the ledger, which other paths write to at their own pace. Null: the
+       * ledger, as today.
+       */
+      readonly path: number | null;
     }
+    /**
+     * V4 start step, Task 53b — EACH PATH'S OWN TURN LEDGER: per path, the latest reviewer maker of each author maker's nodes in that
+     * path, set as each of its reviews is recorded (in that path's review order). It is what `readLatestReviewerMaker` reads, kept to
+     * the path's own nodes: this copy's nodes are written during this arguing, so before it the path has none. So a path's reviewer
+     * turn never depends on how far another path got.
+     */
+    const pathLatestReviewers = (pathsRunPaths ?? []).map(() => new Map<string, string>());
     /** Where one node's review chain stands: its position, its pass's two recorders, its batch. */
     interface ReviewSlot {
       readonly position: number;
@@ -8650,13 +9428,25 @@ export class WalkingSkeletonRunner {
     }
     /** One node's review chain: the ordered choice, the call (spec §2.3: never started once the arguing stopped), the ordered record. */
     const reviewInChain = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode): Promise<void> => {
+      // V4 start step, Task 53: the node's review is over once recorded or given up; a node given back is over once offered again.
+      let givenBack = false;
+      try {
+        await reviewInChainOnce(slot, authoredNode, () => { givenBack = true; });
+      } finally {
+        if (!givenBack) reviewOverOf(authoredNode.nodeId).resolve();
+      }
+    };
+    const reviewInChainOnce = async (slot: ReviewSlot, authoredNode: AuthoredDebateNode, gaveBack: () => void): Promise<void> => {
       if (effectiveMakerCount <= 1) return;
       const reviewer = await slot.choices.commit(slot.position, async (): Promise<ReviewerChoice | null> => {
         await slot.batch.ready;
         if (arguingStopped()) return null;
         const latest = slot.batch.latest;
         if (!latest.has(authoredNode.maker)) {
-          latest.set(authoredNode.maker, await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker));
+          // V4 start step, Task 53b: a path's batch reads its own path's recorded reviews, never the run's ledger.
+          latest.set(authoredNode.maker, slot.batch.path === null
+            ? await this.#judgements.readLatestReviewerMaker(run.runId, authoredNode.maker)
+            : pathLatestReviewers[slot.batch.path]!.get(authoredNode.maker) ?? null);
         }
         const chosen = chooseReviewer(authoredNode, latest.get(authoredNode.maker) ?? null);
         if (chosen.kind === "MEMBERS_SAT_OUT") {
@@ -8680,24 +9470,28 @@ export class WalkingSkeletonRunner {
         if (outcome.kind === "GIVEN_BACK") {
           reviewScheduledNodeIds.delete(authoredNode.nodeId);
           slot.batch.givenBack.push(authoredNode);
+          gaveBack();
           return;
         }
         await recordReviewOutcome(authoredNode, outcome);
+        // V4 start step, Task 53b: the path's own turn ledger, in its review order: who reviewed this author's node, as the ledger says.
+        if (slot.batch.path !== null && outcome.kind === "REVIEWED") pathLatestReviewers[slot.batch.path]!.set(authoredNode.maker, outcome.reviewerMaker);
       });
     };
     /**
      * Fix (d), kept: the nodes a batch gave back are offered again — together, each to a reviewer chosen in review
      * order — once that batch is over; each pass that gives one back marks one more member as sitting out, so this
      * ends. Each pass is a batch of its own, read off the ledger again, as today's recursion reads it. `rank` places a
-     * failure here after everything the batch itself did; it is thrown once every chain has settled.
+     * failure here after everything the batch itself did; it is thrown once every chain has settled. V4 start step, Task 53b:
+     * on a path debate a pass is one path's (`path`), read off that path's own turn ledger.
      */
-    const reviewGivenBack = async (givenBack: readonly AuthoredDebateNode[], rank: ChainRank): Promise<void> => {
+    const reviewGivenBack = async (givenBack: readonly AuthoredDebateNode[], rank: ChainRank, path: number | null = null): Promise<void> => {
       let pending = givenBack;
       for (let pass = 1; pending.length > 0 && !arguingStopped(); pass += 1) {
         const choices = positionRecorder(pending.length);
         const reviews = positionRecorder(pending.length);
         const batch: ReviewBatch = Object.freeze({
-          latest: new Map<string, string | null>(), ready: Promise.resolve(), givenBack: [] as AuthoredDebateNode[]
+          latest: new Map<string, string | null>(), ready: Promise.resolve(), givenBack: [] as AuthoredDebateNode[], path
         });
         await Promise.allSettled(pending.map((authoredNode, position) => runChain(
           () => reviewInChain({ position, choices, reviews, batch, rank: [...rank, pass, position] }, authoredNode),
@@ -8706,6 +9500,8 @@ export class WalkingSkeletonRunner {
         )));
         pending = batch.givenBack;
       }
+      // V4 start step, Task 53: every node given back has been offered again (or the arguing stopped): its review is over.
+      for (const authoredNode of givenBack) reviewOverOf(authoredNode.nodeId).resolve();
     };
 
     /**
@@ -8719,10 +9515,17 @@ export class WalkingSkeletonRunner {
     /** A reply's parent at `position`, saved later: its node id once saved, or null if it never is. */
     const laterParentAt = (position: number): LaterParentNode =>
       Object.freeze({ saved: savedNodes[position]!.promise.then((node) => node?.nodeId ?? null) });
-    /** The review batches, set up when the arguing runs together (`argueTogether`); a node's review slot is in one. */
-    let reviewBatches: readonly { readonly batch: ReviewBatch; readonly done: Promise<void> }[] = [];
+    /**
+     * The review batches, set up when the arguing runs together (`argueTogether`); a node's review slot is in one. V4 start step,
+     * Task 53b: on a path debate, each batch here only says when EVERY path's own batch of that stretch is over (a round boundary
+     * and scrutiny wait for that); its `batch` is null and no slot's.
+     */
+    let reviewBatches: readonly { readonly batch: ReviewBatch | null; readonly done: Promise<void> }[] = [];
+    /** V4 start step, Task 53b: on a path debate, each path's own review batches (by its root's index); a node's slot is in its path's. */
+    let pathReviewBatches: readonly (readonly { readonly batch: ReviewBatch; readonly done: Promise<void> }[])[] = [];
     const reviewSlot = (position: number): ReviewSlot => Object.freeze({
-      position, choices: reviewChoices, reviews: reviewRecorder, batch: reviewBatches[reviewBatchOf(position)]!.batch,
+      position, choices: reviewChoices, reviews: reviewRecorder,
+      batch: (pathPartOf === null ? reviewBatches : pathReviewBatches[pathPartOf(position)!]!)[reviewBatchOf(position)]!.batch!,
       rank: reviewRank(position)
     });
     /** A chain gives up whatever it did not commit at its position, so no later position waits on it. */
@@ -8732,6 +9535,62 @@ export class WalkingSkeletonRunner {
       reviewRecorder.skip(position);
       statements[position]!.resolve(null);
       savedNodes[position]!.resolve(null);
+    };
+    /**
+     * V4 start step, Task 53 (chat-first-round, wait-d1; used by Task 54) — WHEN A PATH'S OWN ARGUING, THEN ITS OWN CHECKS, ARE OVER, on a
+     * path debate (root i argues path b<i+1>). Neither waits for another path (Task 53b: each path saves and records in its own
+     * order); only a deeper round still waits for the global round's decision before it, as the plan ties them.
+     *  · `pathArguingOver(b<n>)`: every node of that root's chains is saved, given up or will never be asked (halted, frozen, dropped,
+     *    after the adaptive stop or a spend stop); a leg after a round boundary settles only once that boundary decided. Task 53b: the
+     *    LAST boundary (after the last planned round; at depth 1 the only one) is not waited for: it comes after every path's nodes
+     *    and reviews and changes none of them (nothing planned is left to freeze or stop), so waiting would tie each path to the
+     *    slowest. With a scrutiny budget, once scrutiny chose (after every boundary) and its legs under that root settled too. Then
+     *    CHECKING is written for that path. A root that dropped resolves it at once (and writes nothing).
+     *  · `pathChecksOver(b<n>)`: after that, once every saved node under that root (the root's own included) has its review recorded or
+     *    given up, a node given back once offered again (the review batches' rule).
+     */
+    const reviewsOver = new Map<string, ReturnType<typeof settable<void>>>();
+    const reviewOverOf = (nodeId: string): ReturnType<typeof settable<void>> => {
+      const known = reviewsOver.get(nodeId);
+      if (known !== undefined) return known;
+      const made = settable<void>();
+      reviewsOver.set(nodeId, made);
+      return made;
+    };
+    const pathRootIndexOf = (pathId: PathId): number => pathsRunPaths?.findIndex((path) => path.pathId === pathId) ?? -1;
+    /** A root's plan positions: itself and every leg of its chains (scrutiny legs, once chosen, beside). */
+    const pathPlanPositionsOf = (rootIndex: number): readonly number[] =>
+      [rootIndex, ...(shapePlan?.legs ?? []).filter((leg) => leg.rootIndex === rootIndex).map((leg) => leg.childIndex)];
+    const pathScrutinyPositionsOf = (rootIndex: number): readonly number[] =>
+      [...scrutinyLegs.values()].filter((leg) => leg.rootIndex === rootIndex).map((leg) => leg.childIndex);
+    /** Per path, once: whether its root was argued (false: it dropped, or the run is no path debate), when its arguing is over. */
+    const pathsArgued = new Map<PathId, Promise<boolean>>();
+    const pathArguedOf = (pathId: PathId): Promise<boolean> => {
+      const known = pathsArgued.get(pathId);
+      if (known !== undefined) return known;
+      const argued = (async (): Promise<boolean> => {
+        const rootIndex = pathRootIndexOf(pathId);
+        if (rootIndex < 0 || shapePlan === null) return false;
+        if (await savedNodes[rootIndex]!.promise === null) return false;
+        await Promise.all(pathPlanPositionsOf(rootIndex).map((position) => nodeRecorder.at(position)));
+        if (shapePlan.scrutiny.count > 0) {
+          await scrutinyChosen.promise;
+          await Promise.all(pathScrutinyPositionsOf(rootIndex).map((position) => nodeRecorder.at(position)));
+        }
+        pathMarks.step(pathId, "CHECKING");
+        return true;
+      })();
+      pathsArgued.set(pathId, argued);
+      return argued;
+    };
+    const pathArguingOver = async (pathId: PathId): Promise<void> => { await pathArguedOf(pathId); };
+    const pathChecksOver = async (pathId: PathId): Promise<void> => {
+      if (!(await pathArguedOf(pathId))) return;
+      const rootIndex = pathRootIndexOf(pathId);
+      await Promise.all([...pathPlanPositionsOf(rootIndex), ...pathScrutinyPositionsOf(rootIndex)].flatMap((position) => {
+        const saved = authoredNodes.get(position);
+        return saved === undefined ? [] : [reviewOverOf(saved.nodeId).promise];
+      }));
     };
 
     /**
@@ -8754,8 +9613,6 @@ export class WalkingSkeletonRunner {
     const ROOT_SAVE: Omit<SaveInput, "authorIndex"> = Object.freeze({
       parentNodeId: null, childKind: null, siblingOrdinal: 0, explorationDecision: "continue", edges: Object.freeze([])
     });
-    const rootCallSiteKey = (rootIndex: number): string =>
-      rootIndex === 1 ? "JUDGE:root:secondary" : `JUDGE:root:${String(rootIndex)}`;
     /** Root 0's panel result: its selection rule is recorded on the propagation receipt (below). */
     const rootZeroPanel: { selection: Awaited<ReturnType<typeof runNodePanel>> | null } = { selection: null };
     /**
@@ -8765,6 +9622,14 @@ export class WalkingSkeletonRunner {
      * is the same stop. Nothing on today's run, or on a root that argues no map answer.
      */
     const writeMapPosition = async (rootIndex: number, node: AuthoredDebateNode): Promise<void> => {
+      // V4 start step, Task 53: a path debate's root is written as its path's root (0160), in the same save turn; an erased run stops.
+      const path = pathsRunPaths?.[rootIndex];
+      if (path !== undefined) {
+        const rooted = await settings.pathResults!.writePathRoot({ runId: run.runId, pathId: path.pathId, rootIndex, rootNodeId: node.nodeId,
+          maker: node.maker });
+        if (rooted === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+        return;
+      }
       const answerId = shapePositions?.[rootIndex]?.answerId;
       if (typeof answerId !== "string") return;
       const written = await this.#mapChoices.writeMapPosition({ runId: run.runId, answerId, rootIndex, rootNodeId: node.nodeId, maker: node.maker });
@@ -8779,6 +9644,7 @@ export class WalkingSkeletonRunner {
         authorTau: reduced.tau,
         claimType: judged.normalizedClaim.claimType,
         statement: judged.statement,
+        cites: { wayOfKnowing: judged.wayOfKnowing, locator: judged.locator },
         callSiteKey: "PANEL:root",
         questionLine: run.questionLine,
         onSpendStop: "AUTHOR_ONLY"
@@ -8809,26 +9675,63 @@ export class WalkingSkeletonRunner {
       // Spec §2.3 (O6): right before the author call. Fix (d): too few members left ends the arguing, and a root
       // whose member sits out is dropped without a call.
       if (arguingStopped()) return;
+      // R22: a resumed pass keeps the spare an earlier pass handed this position to, before any call.
+      resumeSpareHandOver(rootIndex);
       if (dropSatOutRoot(rootIndex, true)) return;
+      // V4 start step, Task 53 (item wait-d1): a path is ARGUING when its root's author call starts.
+      const rootPath = pathsRunPaths?.[rootIndex];
+      if (rootPath !== undefined) pathMarks.step(rootPath.pathId, "ARGUING");
       const input: AuthorPositionInput = {
         authorIndex: rootIndex,
         seat: rootSeats[rootIndex]!,
         leg: rootLegOf(rootIndex),
         callSiteKey: rootCallSiteKey(rootIndex),
         role: rootIndex === 1 ? "secondary root author" : "additional maker root author",
-        // Final review M-1 (shaped only): this root's backup or moved call never lands on a maker arguing another root.
-        ...(shapePlan === null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
+        // Final review M-1 (shaped only): this root's backup or moved call never lands on a maker arguing another root. V4 start step,
+        // Task 53: a path debate's roots have no such bar (a company may write roots in more than one path).
+        ...(shapePlan === null || pathsRunPaths !== null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
           () => answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex)) }),
         ...ROOT_SAVE,
         plannedLegCount: 1
       };
       let authoredRoot: Awaited<ReturnType<typeof authorAndPanel>>;
       try {
-        // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
-        authoredRoot = await authorAndPanel(input, (statement, maker) => {
-          answeredMakers[rootIndex] = maker;
-          statements[rootIndex]!.resolve(statement);
-        });
+        try {
+          // Spec §2.1: the root's statement is told as soon as its author call returned — its replies start from it.
+          authoredRoot = await authorAndPanel(input, (statement, maker) => {
+            answeredMakers[rootIndex] = maker;
+            statements[rootIndex]!.resolve(statement);
+          });
+        } catch (refusal) {
+          // R22 (owner ruling 2026-10-30): a position refused after every repair goes to a spare debater, asked at once
+          // for the same leg at the same site (`handRefusedRootToSpare`); a spare refused in turn goes on to the next.
+          // None left, the refusal travels to the catch below as today.
+          const told = (statement: string, maker: string): void => {
+            answeredMakers[rootIndex] = maker;
+            statements[rootIndex]!.resolve(statement);
+          };
+          let refused: unknown = refusal;
+          for (;;) {
+            if (!(await handRefusedRootToSpare(rootIndex, refused))) {
+              // V4 start step, Task 53: a path's root no other company may take drops, as a root whose member sat out does; its path
+              // ends without a root (Task 54: FAILED), and the debate goes on.
+              if (pathsRunPaths !== null && refused instanceof JudgeContentRefusedError) {
+                satOutDuringRun.add(rootIndex);
+                return;
+              }
+              throw refused;
+            }
+            try {
+              authoredRoot = await authorAndPanel({ ...input, seat: rootSeats[rootIndex]!,
+                ...(pathsRunPaths !== null ? {} : { makerBar: shapeRootMakerBar(rootSeats[rootIndex]!.main.maker,
+                  () => answeredMakers.slice(0, rootCount).filter((_maker, index) => index !== rootIndex)) }),
+                receiptWritten: true }, told);
+              break;
+            } catch (next) {
+              refused = next;
+            }
+          }
+        }
       } catch (error) {
         const stop = expansionPhaseStop(error);
         if (stop === null) throw error;
@@ -8849,6 +9752,7 @@ export class WalkingSkeletonRunner {
             : `Maker position ${String(rootIndex)} failed after the full cooldown and final-retry courtesy`
         );
       }
+      if (spareRoots.has(rootIndex)) spareAnswers += 1;
       const authoredValue = authoredRoot.value;
       const saved = await nodeRecorder.commit(rootIndex, async () => {
         if (bodyFailed) return null;
@@ -8919,7 +9823,9 @@ export class WalkingSkeletonRunner {
       for (const leg of shapePlan.legs) {
         if (leg.kind === "POINT") chainsByRoot.set(leg.rootIndex, [...(chainsByRoot.get(leg.rootIndex) ?? []), leg.childIndex]);
       }
-      const kept = shapeSelectChains({ chainsByRoot, leverageOf, frozen: frozenIndices, perRoot: shapeRun.shape.deeperTopPoints });
+      // V4 start step, Task 53: a path debate keeps at least one chain on every path (`pathsSelectChains`).
+      const kept = (pathsRunPaths === null ? shapeSelectChains : pathsSelectChains)({ chainsByRoot, leverageOf, frozen: frozenIndices,
+        perRoot: shapeRun.shape.deeperTopPoints });
       for (const leg of shapePlan.legs) {
         if (leg.kind !== "REPLY" && leg.kind !== "DEFENCE") continue;
         if (leg.chain !== null && !kept.has(leg.chain)) deselectedIndices.add(leg.childIndex);
@@ -9082,17 +9988,47 @@ export class WalkingSkeletonRunner {
       // The review batches: each is over once every earlier one is, its own reviews are recorded, and the nodes it
       // gave back were offered again.
       let earlierBatches: Promise<void> = Promise.resolve();
-      reviewBatches = Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
-        const batch: ReviewBatch = Object.freeze({
-          latest: new Map<string, string | null>(), ready: earlierBatches, givenBack: [] as AuthoredDebateNode[]
-        });
-        earlierBatches = runChain(async () => {
-          await batch.ready;
-          await reviewRecorder.through(end);
-          await reviewGivenBack(batch.givenBack, [batchIndex, 2]);
-        }, [batchIndex, 2], () => undefined);
-        return Object.freeze({ batch, done: earlierBatches });
-      }));
+      if (pathPartOf === null) {
+        reviewBatches = Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
+          const batch: ReviewBatch = Object.freeze({
+            latest: new Map<string, string | null>(), ready: earlierBatches, givenBack: [] as AuthoredDebateNode[], path: null
+          });
+          earlierBatches = runChain(async () => {
+            await batch.ready;
+            await reviewRecorder.through(end);
+            await reviewGivenBack(batch.givenBack, [batchIndex, 2]);
+          }, [batchIndex, 2], () => undefined);
+          return Object.freeze({ batch, done: earlierBatches });
+        }));
+      } else {
+        // V4 start step, Task 53b: on a path debate the same batches, one set per path over that path's own positions: a path's batch
+        // is over once that path's earlier ones are, its own reviews in that stretch are recorded (a scrutiny slot's path known once
+        // scrutiny chose) and the nodes it gave back were offered again; it never waits on another path. A stretch is over for the
+        // debate (a round boundary, scrutiny) once every path's is.
+        const pathReviewsThrough = async (path: number, end: number): Promise<void> => {
+          if (shapePlan !== null && end > shapePlan.scrutiny.start) await scrutinyChosen.promise;
+          await Promise.all(Array.from({ length: end }, (_, position) => position)
+            .filter((position) => pathPartOf(position) === path).map((position) => reviewRecorder.at(position)));
+        };
+        pathReviewBatches = Object.freeze((pathsRunPaths ?? []).map((_path, path) => {
+          let earlierOfPath: Promise<void> = Promise.resolve();
+          return Object.freeze(reviewBatchEnds.map((end, batchIndex) => {
+            const batch: ReviewBatch = Object.freeze({
+              latest: new Map<string, string | null>(), ready: earlierOfPath, givenBack: [] as AuthoredDebateNode[], path
+            });
+            earlierOfPath = runChain(async () => {
+              await batch.ready;
+              await pathReviewsThrough(path, end);
+              await reviewGivenBack(batch.givenBack, [batchIndex, 2], path);
+            }, [batchIndex, 2], () => undefined);
+            return Object.freeze({ batch, done: earlierOfPath });
+          }));
+        }));
+        reviewBatches = Object.freeze(reviewBatchEnds.map((_end, batchIndex) => Object.freeze({
+          batch: null, done: Promise.all(pathReviewBatches.map((batches) => batches[batchIndex]!.done)).then(() => undefined)
+        })));
+        earlierBatches = reviewBatches[reviewBatches.length - 1]?.done ?? Promise.resolve();
+      }
       /** Ruling R26: every spend stop raised so far comes at or after `rank` in today's order. */
       const spendStoppedFrom = (rank: ChainRank): boolean =>
         spendStopRanks.length > 0 && spendStopRanks.every((stopRank) => compareRanks(stopRank, rank) >= 0);
@@ -9122,6 +10058,9 @@ export class WalkingSkeletonRunner {
         boundaryDecisions.push([boundaryLegIndex, earlierDecisions] as const);
       }
       const everyBoundaryDecided = earlierDecisions;
+      // V4 start step, Task 53: each path's CHECKING is written as soon as its own arguing is over (never rejects); Task 53b: never
+      // after the last boundary's decision, which waits for every path.
+      if (pathsRunPaths !== null) for (const path of pathsRunPaths) void pathArguedOf(path.pathId);
       /** The decision a reply waits for: the last boundary before it in the plan (which waits for the ones before). */
       const decisionBefore = (legIndex: number): Promise<void> | undefined =>
         boundaryDecisions.filter(([boundaryLegIndex]) => boundaryLegIndex < legIndex).pop()?.[1];
@@ -9177,10 +10116,12 @@ export class WalkingSkeletonRunner {
           authorIndex: shapeLeg === null ? leg.authorIndex : seat.seatIndex,
           seat,
           // DL4-F4: the parent's statement is material, in its own fenced field; a shape point's chosen point too.
-          leg: shapeLeg?.consideration != null
+          // W4-1: a defender or critic reads the pack of the path its chain is under; none, today's leg to the byte.
+          leg: legWithWebSources(shapeLeg?.consideration != null
             ? { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement,
               consideration: shapeLeg.consideration }
             : { kind: leg.polarity === "support" ? "support" as const : "attack" as const, positionUnderDebate: parentStatement },
+          webPacks, { own: webPathOfRoot(leg.rootIndex) }),
           callSiteKey: shapeLeg?.callSiteKey ?? `JUDGE:${role}:root${leg.rootIndex}:r${leg.round}:p${leg.parentIndex}`,
           ...(makerBar === undefined ? {} : { makerBar }),
           role,
@@ -9272,7 +10213,9 @@ export class WalkingSkeletonRunner {
             diversityShare: 0,
             pinned: null
           }),
-          leg: { kind: "cross-root" as const, ownPosition, otherMakersPosition },
+          // W4-1: a reply to a rival reads its own path's pack, then the rival's.
+          leg: legWithWebSources({ kind: "cross-root" as const, ownPosition, otherMakersPosition }, webPacks,
+            { own: webPathOfRoot(shapeLeg.rootIndex), rival: webPathOfRoot(target) }),
           ...(crossBar === undefined ? {} : { makerBar: crossBar }),
           callSiteKey: shapeLeg.callSiteKey,
           role: "cross-root response",
@@ -9471,6 +10414,349 @@ export class WalkingSkeletonRunner {
       }
       throwBodyFailure();
     };
+    /**
+     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the investigations of "cannot assess" points, after every review and
+     * before the final propagation. Each qualifying point gets one row; its outcome is read as the review it lacked.
+     * It returns the statuses for `engineInvestigated` and keeps the facts and rows for the record, which is written
+     * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this. V4 start step, Task 54: over the points of
+     * `scope` only (a path's own nodes, its root left out), and with a path's `share` of the debate's cap; the debate's
+     * own step, after the arguing (below), is the whole debate with the cap whole, as before.
+     */
+    const investigatePointsIn = async (
+      engineSettings: EngineSettings,
+      facts: ReadonlyMap<string, EngineNodeFacts>,
+      materialisedSnapshot: EvaluationSnapshot,
+      scope: Readonly<{
+        rootIds: ReadonlySet<string>;
+        ownNodeIds: ReadonlySet<string>;
+        arguingMakers: ReadonlySet<string>;
+        share?: Readonly<{ first: number; slots: number }>;
+      }>
+    ): Promise<Readonly<{
+      statuses: ReadonlyMap<string, EngineReviewStatus>;
+      facts: ReadonlyMap<string, EngineNodeFacts>;
+      rows: readonly PointInvestigationRow[];
+    }>> => {
+      const { rootIds, ownNodeIds, share } = scope;
+      /** Task 54: a path's k-th investigation is the debate's `VERDICT:investigate:<first + k>`; without a share, the key as planned. */
+      const debateKey = (callSiteKey: string): string => share === undefined ? callSiteKey
+        : pointInvestigationCallSiteKey(share.first + Number(callSiteKey.slice(callSiteKey.lastIndexOf(":") + 1)));
+      const cannotAssess = [...facts.values()]
+        .filter((entry) => entry.status === "CANNOT_ASSESS" && ownNodeIds.has(entry.nodeId) && !rootIds.has(entry.nodeId))
+        .map((entry) => entry.nodeId);
+      if (cannotAssess.length === 0) return Object.freeze({ statuses: new Map(), facts, rows: Object.freeze([]) });
+      if (lengthGuidance === null) {
+        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
+      }
+      const engineSeal = settings.engine?.engineContractHash;
+      if (engineSeal === undefined) {
+        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
+      }
+      // Before the final propagation the points' honest scores (their base strengths) stand in for final strengths:
+      // they order the candidates; the investigator's material carries no number.
+      const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
+      const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
+      const source = engineSourceWithMap(engineMaterialSourceOf(engineMaterialGraphOf({
+        question: run.questionLine,
+        rootCount,
+        authored: authoredNodes,
+        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
+        snapshot: materialisedSnapshot,
+        facts,
+        honestFinalStrength: honestScores
+      }), reviews, new Map()), engineMapFactsNow());
+      const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
+        charactersPerWord: lengthGuidance.charactersPerWord });
+      /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
+      const investigatorSeat = new Map<PointInvestigationSeat, RunSeat>();
+      const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
+        member.maker !== authorMaker && member.maker !== reviewerMaker;
+      const investigated = await runPointInvestigations({
+        engine: share === undefined ? engineSettings
+          : Object.freeze({ ...engineSettings, investigate: Object.freeze({ maxPerDebate: share.slots }) }),
+        facts,
+        candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
+        spendStopped: runBodyBudgetStop !== null,
+        arguingMakers: scope.arguingMakers,
+        seatsFor: (candidate, callSiteKey) => {
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          return seatBook.reviewer.flatMap((seat) => {
+            if (seatSitsOut(seat)) return [];
+            const first = seatCaller.plan(seat, debateKey(callSiteKey), { eligible: fair });
+            if (first === null) return [];
+            const identity: PointInvestigationSeat = Object.freeze({ maker: first.maker, providerRef: first.providerRef });
+            investigatorSeat.set(identity, seat);
+            return [identity];
+          });
+        },
+        rotationOffsetOf: (callSiteKey) => seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey: debateKey(callSiteKey) }),
+        materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
+        call: async ({ callSiteKey: plannedKey, investigator, candidate, material }) => {
+          const callSiteKey = debateKey(plannedKey);
+          const seat = investigatorSeat.get(investigator);
+          if (seat === undefined) {
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: "INVESTIGATOR_SEAT_UNPLANNED" });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
+          // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
+          movedCallBars.set(callSiteKey, fair);
+          try {
+            const answered = await seatCaller.callSeat({
+              seat,
+              callSiteKey,
+              eligible: fair,
+              fair,
+              call: (member, memberCallSiteKey) => member.judge.investigatePoint({
+                runId: run.runId,
+                subjectItemId: claimed.workItemId,
+                callSiteKey: memberCallSiteKey,
+                providerRef: member.providerRef,
+                contractHash: engineSeal,
+                bound: guidedCallBound(settings.judgeBound, "investigator", lengthGuidance),
+                material,
+                length: lengthGuide,
+                argumentLanguageName: run.argumentLanguageName,
+                ...shapeLanguageInput,
+              })
+            });
+            // R2a W3: the maker that answered is neither the author's nor the reviewer's (a breach is a code defect).
+            assertFairInvestigator(answered.value.maker, candidate);
+            return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
+              reply: answered.value.reply,
+              rawArtifactRef: answered.value.provenanceRef,
+              maker: answered.value.maker,
+              providerRef: actualAuthor(callSiteKey, answered.member).providerRef,
+              modelId: answered.value.model
+            }) });
+          } catch (error) {
+            if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
+            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });
+            return Object.freeze({ kind: "UNAVAILABLE" as const });
+          }
+        }
+      });
+      // A HOLDS or FAILS outcome is the review the point lacked (AGREE / DISPUTE); a dead end stays cannot-assess. A
+      // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
+      // weight on its score (pre-flight PF-R2a8.11).
+      return Object.freeze({
+        statuses: engineInvestigatedStatuses(investigated.rows),
+        facts: investigated.facts,
+        rows: investigated.rows
+      });
+    };
+    /**
+     * V4 start step, Task 54 (spec 2026-11-03 §4.3, the owner's "First round" answer; items chat-first-round, journey-f1, wait-d1,
+     * map-d2) — EACH PATH'S ANSWER SO FAR AS SOON AS ITS OWN CHECKS END. Beside the arguing, one chain per path, all at once
+     * (`runPathChains`; their calls go through the run's lane like any other call): it waits for its own path's checks
+     * (`pathChecksOver`); investigates the cannot-assess points under its root only, with its share of the debate's investigations
+     * (`pathInvestigationShares`: the keys and the cap never depend on which path ends first; each point once in the run); reads its
+     * points' trust words (the review, how fresh, how known, and a looked-up point's locator in the packs: `trustOfPoint`); writes its
+     * answer so far on a one-path job (Task 49; Haiku writes and GLM checks, else the run's answer seats), stored at once, so the run
+     * read shows it filled in; then one FOUND mark per point with a trust word. A path whose root dropped is FAILED with no call. A
+     * chain never waits for another path; a step that fails is FAILED for that path only; a re-claimed run's stored answer so far is
+     * read back with no investigation and no call, and its marks written again. The main answer waits for every chain (below).
+     * Nothing of this on every other run.
+     */
+    let pathsArguingFailed = false;
+    const PATHS_ARGUING_ENDED = "PATHS_ARGUING_ENDED";
+    /** Each path's investigations (its rows and the facts they settled), for the debate's record after the serve decision. */
+    const pathInvestigations = new Map<PathId, Awaited<ReturnType<typeof investigatePointsIn>>>();
+    /** Each path as its answer so far read it (its points with their trust words, its pages), for the main answer. */
+    const pathJobPaths = new Map<PathId, PathOutcomesPath>();
+    /** Each path's answer so far, once every chain has ended (null on every other run). */
+    let pathOutcomes: ReadonlyMap<PathId, PathOutcome> | null = null;
+    const pathsFree = pathsShape?.plan === "free";
+    /** The run's members a path's final calls may sit in (each with its model), and the gateway that routes by their refs. */
+    const pathsFinalMembers = (() => {
+      const listed = new Map<string, Readonly<{ providerRef: string; maker: string; model: string; provider: ProviderGateway }>>();
+      const add = (member: Readonly<{ providerRef: string; maker: string; provider: ProviderGateway }>): void => {
+        if (listed.has(member.providerRef) || (sitOut !== null && sitOut.sitsOut(member.providerRef))) return;
+        const model = panelModelIds.get(member.providerRef) ?? callSubjects?.subjectOf(member.providerRef).model ?? member.providerRef;
+        listed.set(member.providerRef, Object.freeze({ providerRef: member.providerRef, maker: member.maker, model, provider: member.provider }));
+      };
+      for (const maker of synthesisMakers) add(maker);
+      if (seatBook.answerWriter !== null) add(seatBook.answerWriter.main);
+      if (seatBook.answerChecker !== null) add(seatBook.answerChecker.main);
+      return [...listed.values()];
+    })();
+    /**
+     * Review of Task 54: a stop that ends this copy (a lost claim, the time limit, a retiring release, a stopped lane), met inside a
+     * path's answer so far or the main answer, is kept (`pathCopyStops`): nothing more is stored after it and it ends this copy, as
+     * R22's answer calls let it leave as it came; the writers' loop alone would have read it as a failed round, stored FAILED.
+     */
+    const pathsStops = pathCopyStops(Object.freeze({
+      call: (request: ProviderCallRequest): Promise<ProviderCallResult> => {
+        const member = pathsFinalMembers.find((candidate) => candidate.providerRef === request.providerRef);
+        return member === undefined
+          ? Promise.reject(new TypedDomainError("PATHS_FINAL_SEAT_UNRESOLVED", "A path's final call names a member the run does not hold"))
+          : member.provider.call(request);
+      }
+    }), settings.pathResults!, (error) => endsThisCopy(error) || keepAliveStop(error));
+    const pathsGateway: ProviderGateway = pathsStops.gateway;
+    /** Haiku writes and GLM checks (two makers); else the run's own answer writer and checker, when they are two makers. */
+    const pathsFinalSeats = ((): PathOutcomesJob["seats"] | null => {
+      const seat = (member: (typeof pathsFinalMembers)[number]): PathOutcomesSeat =>
+        Object.freeze({ providerRef: member.providerRef, model: member.model, maker: member.maker });
+      const final = pathsFinalSeatsOf(pathsFinalMembers);
+      if (final !== null) return Object.freeze({ writer: seat(final.writer), checker: seat(final.checker) });
+      const writer = pathsFinalMembers.find((member) => member.providerRef
+        === (seatBook.answerWriter?.main.providerRef ?? synthesisRolePolicy.synthesizerRoleRef));
+      const checker = pathsFinalMembers.find((member) => member.providerRef
+        === (seatBook.answerChecker?.main.providerRef ?? synthesisRolePolicy.evaluatorRoleRef));
+      return writer === undefined || checker === undefined || writer.maker === checker.maker ? null
+        : Object.freeze({ writer: seat(writer), checker: seat(checker) });
+    })();
+    /**
+     * The question the paths' answers so far and the main answer read (Task 53 (a)): the run's line as the person asked it, the step-2
+     * place, time and purpose in their own fields, the reading level and the question's language lock.
+     */
+    const pathsQuestion: PathQuestion = (() => {
+      const lines = purposeLinesMaterial(run.questionLine, pathsPurposeLines);
+      return Object.freeze({ line: run.questionLine, place: lines.place, time: lines.time, purpose: lines.purpose, readingLevel, language: shapeLanguage });
+    })();
+    const pathsLog = (event: string, detail: Record<string, unknown>): void => {
+      console.warn(JSON.stringify({ ...detail, kind: "DEBATEAI_PATH_OUTCOME", event }));
+    };
+    const pathOutcomesBase: Omit<PathOutcomesJob, "paths"> | null = pathsFinalSeats === null ? null : Object.freeze({
+      runId: run.runId, free: pathsFree, question: pathsQuestion, readingLevel,
+      language: Object.freeze({ name: run.argumentLanguageName, tag: shapeLanguage === null ? "und" : run.argumentLanguageTag }),
+      seats: pathsFinalSeats, gateway: pathsGateway, store: pathsStops.store,
+      // R22 decision 28, as the closing's: the Haiku target's free count near the line (`pathsTokenCount`); none: the byte guard alone.
+      tokenCount: pathsTokenCount, log: pathsLog
+    });
+    /** A path's saved nodes: its root, then each saved leg of its chains (scrutiny legs too), in plan order. */
+    const pathNodesOf = (rootIndex: number): readonly AuthoredDebateNode[] => {
+      const legs = [...(shapePlan?.legs ?? []), ...[...scrutinyLegs.values()].sort((left, right) => left.childIndex - right.childIndex)]
+        .filter((leg) => leg.rootIndex === rootIndex);
+      return [rootIndex, ...legs.map((leg) => leg.childIndex)].flatMap((position) => {
+        const node = authoredNodes.get(position);
+        return node === undefined ? [] : [node];
+      });
+    };
+    /** The points' facts as the page reads them: each node's newest review, its trust word (code's rule), and nothing for none. */
+    const pathPointFactsOf = async (nodes: readonly AuthoredDebateNode[]): Promise<Readonly<{
+      words: ReadonlyMap<string, TrustWord>; outcomes: ReadonlyMap<string, string | null> }>> => {
+      const words = new Map<string, TrustWord>();
+      const outcomes = new Map<string, string | null>();
+      if (nodes.length === 0) return Object.freeze({ words, outcomes });
+      const rows = (await this.pool.query<{ node_id: string; relevant_as_of: Date; outcome: string | null }>(
+        `SELECT node.node_id::text AS node_id, node.relevant_as_of, review.outcome
+           FROM core.node AS node
+           LEFT JOIN LATERAL (SELECT outcome FROM ledger.node_review WHERE node_id = node.node_id ORDER BY at_seq DESC LIMIT 1) AS review ON true
+          WHERE node.run_id = $1 AND node.node_id = ANY($2::uuid[])`, [run.runId, nodes.map((node) => node.nodeId)])).rows;
+      const byId = new Map(nodes.map((node) => [node.nodeId.toLowerCase(), node] as const));
+      const cited = webCitedExtractsOf(webPacks, nodes);
+      const liveness = new LivenessRepository(this.pool);
+      for (const row of rows) {
+        const node = byId.get(row.node_id.toLowerCase());
+        if (node === undefined) continue;
+        outcomes.set(node.nodeId, row.outcome);
+        const staleness = await liveness.readSubjectStaleness({ runId: run.runId, subjectKind: "NODE", subjectRef: row.node_id,
+          relevantAsOf: row.relevant_as_of });
+        const placed = trustOfPoint({ review: row.outcome === null ? null : { outcome: row.outcome }, staleness_state: staleness.state,
+          way_of_knowing: node.wayOfKnowing, looked_up_checked: node.wayOfKnowing === "LOOKED_UP" && cited.has(node.nodeId) }, { free: pathsFree, fell: false });
+        if (placed.trust !== null) words.set(node.nodeId, placed.trust);
+      }
+      return Object.freeze({ words, outcomes });
+    };
+    /** The path as its answer so far reads it: its menu text, its root, its points (each right after the one it argues), its pages. */
+    const pathJobPathOf = async (path: PathsRunPath, rootIndex: number): Promise<PathOutcomesPath> => {
+      const root = rootIndex < 0 ? null : await savedNodes[rootIndex]!.promise;
+      const nodes = root === null ? [] : pathNodesOf(rootIndex);
+      const facts = await pathPointFactsOf(nodes.slice(1));
+      const legs = [...(shapePlan?.legs ?? []), ...[...scrutinyLegs.values()].sort((left, right) => left.childIndex - right.childIndex)]
+        .filter((leg) => leg.rootIndex === rootIndex);
+      const points: PathPoint[] = [];
+      const visit = (parentIndex: number): void => {
+        for (const leg of legs) {
+          if (leg.parentIndex !== parentIndex) continue;
+          const node = authoredNodes.get(leg.childIndex);
+          if (node === undefined) continue;
+          points.push(Object.freeze({ id: node.nodeId, text: withoutStoryNodeIds(node.statement),
+            onId: parentIndex === rootIndex ? null : authoredNodes.get(parentIndex)?.nodeId ?? null,
+            side: leg.polarity === "support" ? "for" as const : "against" as const,
+            trust: facts.words.get(node.nodeId) ?? null, disputed: facts.outcomes.get(node.nodeId) === "dispute" }));
+          visit(leg.childIndex);
+        }
+      };
+      if (root !== null) visit(rootIndex);
+      const pointIds = new Set(points.map((point) => point.id));
+      const sources: DossierSource[] = [...webCitedExtractsOf(webPacks, nodes.slice(1))].flatMap(([pointId, extract]) => pointIds.has(pointId)
+        ? [Object.freeze({ pointId, site: extract.site, link: null, title: extract.title, quote: cutQuoteAtWordEdge(extract.quote), line: extract.note ?? null })]
+        : []);
+      return Object.freeze({
+        pathId: path.pathId, pathNo: path.pathNo, title: path.title, question: path.question,
+        statement: root === null ? path.question : withoutStoryNodeIds(root.statement),
+        viewpoints: pathConsiderationsOf({ ...path, gapPoints: [] }), ownWords: path.ownWords, rootNodeId: root?.nodeId ?? null,
+        points: Object.freeze(points), sources: Object.freeze(sources)
+      });
+    };
+    /**
+     * Each path's share of the debate's investigations, in the person's order. Task 54e (the owner's answer of 5 Nov, "One per path"):
+     * on a paid path debate every path holds at least one, as its receipt priced (`pathRunInvestigationsOf`); Free keeps the cap.
+     */
+    const pathShares = pathsRunPaths === null ? []
+      : pathInvestigationShares(engine.engine === 2 ? pathRunInvestigationsOf(engine, pathsRunPaths.length) : 0, pathsRunPaths.length);
+    const pathChains = pathsRunPaths === null || pathsSetStored === null ? null : runPathChains(pathsRunPaths.map((path) => path.pathId), (pathId) => {
+      const rootIndex = pathRootIndexOf(pathId);
+      const path = pathsRunPaths!.find((candidate) => candidate.pathId === pathId)!;
+      return Object.freeze({
+        checksOver: async () => {
+          await pathChecksOver(pathId);
+          if (pathsArguingFailed) throw new TypedDomainError(PATHS_ARGUING_ENDED, "The arguing ended in a failure: no path goes on");
+        },
+        stored: async () => (await settings.pathResults!.readPathOutcomes(run.runId)).get(pathId) ?? null,
+        investigate: async () => {
+          if (engine.engine !== 2 || effectiveMakerCount <= 1 || rootIndex < 0) return;
+          const root = await savedNodes[rootIndex]!.promise;
+          if (root === null) return;
+          // Every root is saved or dropped before any path's checks end: the debate's arguing makers, whichever path ends first.
+          const roots = (await Promise.all(Array.from({ length: rootCount }, (_unused, index) => savedNodes[index]!.promise)))
+            .filter((node): node is AuthoredDebateNode => node !== null);
+          // Review of Task 54: the facts of this path's own nodes only (the brief's "restricted to its nodes"): other paths still
+          // record their reviews while these lists are read one after another, so the run's whole lists can disagree.
+          const ownNodeIds = new Set(pathNodesOf(rootIndex).map((node) => node.nodeId));
+          const facts = engineNodeFactsOf({
+            ...pathReviewFactsOf({
+              reviewedNodeIds: await this.#judgements.readReviewedNodeIds(run.runId),
+              disputedNodeIds: await this.#judgements.readDisputedNodeIds(run.runId),
+              cannotAssessNodeIds: await this.#judgements.readCannotAssessNodeIds(run.runId)
+            }, ownNodeIds),
+            ownReplyEdgeIds
+          });
+          const { snapshot: pathSnapshot } = await this.#resolveOperatorResolvedSnapshot(run.runId, settings.scoringOperator);
+          const share = pathShares[pathsRunPaths!.indexOf(path)]!;
+          pathInvestigations.set(pathId, await investigatePointsIn(engine, facts, pathSnapshot, {
+            rootIds: new Set([root.nodeId]), ownNodeIds,
+            arguingMakers: new Set(roots.map((node) => node.maker)), share
+          }));
+        },
+        pathOf: async () => {
+          const jobPath = await pathJobPathOf(path, rootIndex);
+          pathJobPaths.set(pathId, jobPath);
+          return jobPath;
+        },
+        outcomeOf: async (jobPath: PathOutcomesPath) => {
+          if (pathOutcomesBase === null) {
+            throw new TypedDomainError("PATHS_FINAL_SEATS_UNRESOLVED", "A path's answer so far needs a writer and a checker of two makers");
+          }
+          return runPathOutcomeFor(pathOutcomesJobFor({ base: pathOutcomesBase, path: jobPath }), pathId);
+        },
+        found: (foundPath: PathId, nodeId: string, trust: TrustWord) => { pathMarks.found(foundPath, nodeId, trust); },
+        failed: async () => {
+          const recorded = await pathsStops.store.recordPathOutcome({ runId: run.runId, pathId, outcome: PATH_OUTCOME_FAILED });
+          if (recorded === "RUN_ERASED") throw new TypedDomainError("PRIVATE_CONTENT_ERASED", "Private content is no longer available");
+          return recorded === "ALREADY" ? (await settings.pathResults!.readPathOutcomes(run.runId)).get(pathId) ?? PATH_OUTCOME_FAILED : PATH_OUTCOME_FAILED;
+        },
+        endsRun: (error: unknown) => endsThisCopy(error) || keepAliveStop(error) || isMonthPausedStop(error) || namedCodeDefect(error)
+          || (error instanceof TypedDomainError && [PATHS_ARGUING_ENDED, CALL_LANE_STOPPED, "PRIVATE_CONTENT_ERASED"].includes(error.code)),
+        log: pathsLog
+      });
+    });
+    // Review of Task 54: a chain that ends this copy rejects, and the chains are awaited only after the arguing, so they are handled
+    // from the start: never an unhandled rejection meanwhile (awaiting `pathChains` below still throws).
+    void pathChains?.catch(() => undefined);
     if (chainsRun) {
       /**
        * Spec §2.3 (O6; Task 10 review carry, ruled) — NO AUTHOR OR REVIEW CALL STARTS ONCE THE ARGUING HAS STOPPED, not
@@ -9503,10 +10789,39 @@ export class WalkingSkeletonRunner {
         (ticket.priority !== "AUTHOR" && ticket.priority !== "REVIEW") || !(spendRefusalSeen || arguingStopped()));
       try {
         await argueTogether();
+      } catch (error) {
+        // V4 start step, Task 54: the arguing failed, so no path's chain goes on to its calls, and none is left to reject unhandled.
+        pathsArguingFailed = true;
+        pathChains?.catch(() => undefined);
+        throw error;
       } finally {
         // The answer's own calls follow: they are never held back.
         callLane?.guardStarts(null);
         laneCallFailed = null;
+        // V4 start step, Task 53: the arguing is over, whatever ended it: nothing a path waits on is still to come.
+        for (const saved of authoredNodes.values()) reviewOverOf(saved.nodeId).resolve();
+      }
+      // V4 start step, Task 53 (item wait-d1): every path's CHECKING and every point's marks are written before the answer. Task 54:
+      // and every path's chain has ended (its answer so far stored, its FOUND marks sent).
+      if (pathsRunPaths !== null) {
+        await Promise.all(pathsRunPaths.map((path) => pathArguingOver(path.pathId)));
+        pathOutcomes = pathChains === null ? null : await pathChains;
+        await pathMarks.settled();
+      }
+      // V4 start step, Task 53b: on a path debate the paths saved and recorded side by side, so what their saves and reviews kept came
+      // in the order the paths happened to move. Each list is put back in plan order (by its node's position; a stable sort, so one
+      // node's entries keep theirs), so the answer reads the same whichever path ended first.
+      if (pathPartOf !== null) {
+        const positionOfNode = new Map([...authoredNodes].map(([position, node]) => [node.nodeId, position] as const));
+        const at = (nodeId: string | null): number => nodeId === null ? -1 : positionOfNode.get(nodeId) ?? -1;
+        panelDegradations.sort((left, right) => at(left.subjectRef) - at(right.subjectRef));
+        closeCallExtensions.sort((left, right) => at(left.nodeId) - at(right.nodeId));
+        wayOfKnowingDowngrades.sort((left, right) => at(left.subjectRef) - at(right.subjectRef));
+        hiddenReviewRecords.sort((left, right) => at(left.nodeId) - at(right.nodeId));
+        unassessedReviewRecords.sort((left, right) => at(left.nodeId) - at(right.nodeId));
+        // A halted leg has no node: by the node it answers, then its own call site (one per plan leg).
+        haltedExpansionRecords.sort((left, right) => at(left.parentNodeId) - at(right.parentNodeId)
+          || (left.callSiteKey < right.callSiteKey ? -1 : left.callSiteKey > right.callSiteKey ? 1 : 0));
       }
     } else {
       let activeExpansionRound = expansionPlan[0]?.round ?? null;
@@ -9649,6 +10964,11 @@ export class WalkingSkeletonRunner {
     const authoredNodeList = [...authoredNodes.entries()]
       .sort(([left], [right]) => left - right)
       .map(([, authored]) => authored);
+    /**
+     * W4-1: the extract each looked-up node cites, by node id (after the locator check, only this debate's): the comparing
+     * judges, the answer writer and the storyteller read it with the point (item 7). Empty without packs: today's bytes.
+     */
+    const webCited = webCitedExtractsOf(webPacks, authoredNodeList);
     const authoredMakerPositions = Array.from({ length: rootCount }, (_, index) => authoredNodes.get(index))
       .filter((candidate): candidate is AuthoredDebateNode => candidate !== undefined);
     // Reclaim resume: a node of this run that THIS copy did not save (a copy that lost the run, still writing) is set
@@ -9746,124 +11066,18 @@ export class WalkingSkeletonRunner {
       return stored === undefined ? undefined : Object.freeze({ ...pointInvestigationRowOfStored(stored), nodeId: row.nodeId });
     };
     /**
-     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the investigations of "cannot assess" points, after every review and
-     * before the final propagation. Each qualifying point gets one row; its outcome is read as the review it lacked.
-     * It returns the statuses for `engineInvestigated` and keeps the facts and rows for the record, which is written
-     * after the serve decision (Ruling PF-R2a8.10). Engine 1 never reaches this.
+     * Engine 2 (spec §4.2b, E13; INTERFACE §8): the debate's investigations of "cannot assess" points, after every review and
+     * before the final propagation, over every node this copy saved (the roots left out), the cap whole (`investigatePointsIn`).
      */
-    const investigateCannotAssessPoints = async (
+    const investigateCannotAssessPoints = (
       engineSettings: EngineSettings,
       facts: ReadonlyMap<string, EngineNodeFacts>,
       materialisedSnapshot: EvaluationSnapshot
-    ): Promise<Readonly<{
-      statuses: ReadonlyMap<string, EngineReviewStatus>;
-      facts: ReadonlyMap<string, EngineNodeFacts>;
-      rows: readonly PointInvestigationRow[];
-    }>> => {
-      const rootIds = new Set(authoredMakerPositions.map((root) => root.nodeId));
-      const ownNodeIds = new Set(authoredNodeList.map((node) => node.nodeId));
-      const cannotAssess = [...facts.values()]
-        .filter((entry) => entry.status === "CANNOT_ASSESS" && ownNodeIds.has(entry.nodeId) && !rootIds.has(entry.nodeId))
-        .map((entry) => entry.nodeId);
-      if (cannotAssess.length === 0) return Object.freeze({ statuses: new Map(), facts, rows: Object.freeze([]) });
-      if (lengthGuidance === null) {
-        throw new TypedDomainError("ENGINE_REQUIRES_LENGTH_POLICY", "Engine 2 runs only with the length row frozen on its receipt");
-      }
-      const engineSeal = settings.engine?.engineContractHash;
-      if (engineSeal === undefined) {
-        throw new TypedDomainError("ENGINE_RUNNER_UNCONFIGURED", "Engine 2's calls carry the engine seal this runner was not given");
-      }
-      // Before the final propagation the points' honest scores (their base strengths) stand in for final strengths:
-      // they order the candidates; the investigator's material carries no number.
-      const honestScores = new Map(materialisedSnapshot.nodes.map((node) => [node.nodeId, node.baseStrength ?? 0] as const));
-      const reviews = await readEngineReviews(this.pool, run.runId, cannotAssess);
-      const source = engineSourceWithMap(engineMaterialSourceOf(engineMaterialGraphOf({
-        question: run.questionLine,
-        rootCount,
-        authored: authoredNodes,
-        mapWords: Array.from({ length: rootCount }, (_unused, rootIndex) => shapePositions?.[rootIndex]?.statement ?? null),
-        snapshot: materialisedSnapshot,
-        facts,
-        honestFinalStrength: honestScores
-      }), reviews, new Map()), engineMapFactsNow());
-      const lengthGuide = Object.freeze({ words: lengthGuidance.steps.investigator, languageCode: run.argumentLanguageTag,
-        charactersPerWord: lengthGuidance.charactersPerWord });
-      /** The seat each offered investigator came from (the identity object `pickPointInvestigator` hands back). */
-      const investigatorSeat = new Map<PointInvestigationSeat, RunSeat>();
-      const fairFor = (authorMaker: string, reviewerMaker: string) => (member: Readonly<{ maker: string }>): boolean =>
-        member.maker !== authorMaker && member.maker !== reviewerMaker;
-      const investigated = await runPointInvestigations({
-        engine: engineSettings,
-        facts,
-        candidates: engineInvestigationCandidates({ source, cannotAssess, reviews, honestScores }),
-        spendStopped: runBodyBudgetStop !== null,
-        arguingMakers: new Set(authoredMakerPositions.map((root) => root.maker)),
-        seatsFor: (candidate, callSiteKey) => {
-          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
-          return seatBook.reviewer.flatMap((seat) => {
-            if (seatSitsOut(seat)) return [];
-            const first = seatCaller.plan(seat, callSiteKey, { eligible: fair });
-            if (first === null) return [];
-            const identity: PointInvestigationSeat = Object.freeze({ maker: first.maker, providerRef: first.providerRef });
-            investigatorSeat.set(identity, seat);
-            return [identity];
-          });
-        },
-        rotationOffsetOf: (callSiteKey) => seatRotationOffset({ runId: run.runId, role: "REVIEWER", callSiteKey }),
-        materialOf: (nodeId) => pointInvestigationMaterialOf(source, nodeId),
-        call: async ({ callSiteKey, investigator, candidate, material }) => {
-          const seat = investigatorSeat.get(investigator);
-          if (seat === undefined) {
-            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: "INVESTIGATOR_SEAT_UNPLANNED" });
-            return Object.freeze({ kind: "UNAVAILABLE" as const });
-          }
-          const fair = fairFor(candidate.authorMaker, candidate.reviewerMaker);
-          // B9: a call moved to a cheaper maker never lands on the point's author or its reviewer either.
-          movedCallBars.set(callSiteKey, fair);
-          try {
-            const answered = await seatCaller.callSeat({
-              seat,
-              callSiteKey,
-              eligible: fair,
-              fair,
-              call: (member, memberCallSiteKey) => member.judge.investigatePoint({
-                runId: run.runId,
-                subjectItemId: claimed.workItemId,
-                callSiteKey: memberCallSiteKey,
-                providerRef: member.providerRef,
-                contractHash: engineSeal,
-                bound: guidedCallBound(settings.judgeBound, "investigator", lengthGuidance),
-                material,
-                length: lengthGuide,
-                argumentLanguageName: run.argumentLanguageName,
-                ...shapeLanguageInput,
-              })
-            });
-            // R2a W3: the maker that answered is neither the author's nor the reviewer's (a breach is a code defect).
-            assertFairInvestigator(answered.value.maker, candidate);
-            return Object.freeze({ kind: "ANSWERED" as const, answer: Object.freeze({
-              reply: answered.value.reply,
-              rawArtifactRef: answered.value.provenanceRef,
-              maker: answered.value.maker,
-              providerRef: actualAuthor(callSiteKey, answered.member).providerRef,
-              modelId: answered.value.model
-            }) });
-          } catch (error) {
-            if (pointInvestigationFailureOutcome(error) === "RETHROW") throw error;
-            logPointInvestigation("INVESTIGATION_UNAVAILABLE", { runId: run.runId, callSiteKey, code: pointInvestigationFailureCode(error) });
-            return Object.freeze({ kind: "UNAVAILABLE" as const });
-          }
-        }
-      });
-      // A HOLDS or FAILS outcome is the review the point lacked (AGREE / DISPUTE); a dead end stays cannot-assess. A
-      // FAILS point keeps `cannotAssessReview`, so A6 keeps its links at the cannot-assess weight and puts the dispute
-      // weight on its score (pre-flight PF-R2a8.11).
-      return Object.freeze({
-        statuses: engineInvestigatedStatuses(investigated.rows),
-        facts: investigated.facts,
-        rows: investigated.rows
-      });
-    };
+    ) => investigatePointsIn(engineSettings, facts, materialisedSnapshot, {
+      rootIds: new Set(authoredMakerPositions.map((root) => root.nodeId)),
+      ownNodeIds: new Set(authoredNodeList.map((node) => node.nodeId)),
+      arguingMakers: new Set(authoredMakerPositions.map((root) => root.maker))
+    });
     /** A14: the investigations' facts and rows, kept for the record after the serve decision (null: none ran). */
     let engineInvestigation: Readonly<{
       statuses: ReadonlyMap<string, EngineReviewStatus>;
@@ -9877,7 +11091,24 @@ export class WalkingSkeletonRunner {
         cannotAssessNodeIds: await this.#judgements.readCannotAssessNodeIds(run.runId),
         ownReplyEdgeIds
       });
-      engineInvestigation = await investigateCannotAssessPoints(engine, investigationFacts, snapshot);
+      if (pathsRunPaths === null) {
+        engineInvestigation = await investigateCannotAssessPoints(engine, investigationFacts, snapshot);
+      } else {
+        // V4 start step, Task 54: a path debate's points were investigated by their paths' chains (each once, each path its share);
+        // this step reads what they found and makes no call: their rows in the person's path order, numbered on, each settled fact.
+        const facts = new Map(investigationFacts);
+        const rows: PointInvestigationRow[] = [];
+        for (const path of pathsRunPaths) {
+          const found = pathInvestigations.get(path.pathId);
+          if (found === undefined) continue;
+          for (const row of found.rows) {
+            const fact = found.facts.get(row.nodeId);
+            if (fact !== undefined) facts.set(row.nodeId, fact);
+            rows.push(Object.freeze({ ...row, investigationOrder: rows.length + 1 }));
+          }
+        }
+        engineInvestigation = Object.freeze({ statuses: engineInvestigatedStatuses(rows), facts, rows: Object.freeze(rows) });
+      }
       for (const [nodeId, status] of engineInvestigation.statuses) engineInvestigated.set(nodeId, status);
     }
     /**
@@ -9890,8 +11121,9 @@ export class WalkingSkeletonRunner {
       ? await engineLinkedGraphNow(snapshot, effectiveMakerCount <= 1 ? [] : await this.#judgements.readReviewedNodeIds(run.runId))
       : null;
     const serveDecisionInput = Object.freeze({
-      // It counts the servable roots: the shape's P (always at least two, never the mono-maker footing) or today's M.
-      effectiveMakerCount: rootCount,
+      // It counts the servable roots: the shape's P (always at least two, never the mono-maker footing) or today's M. V4 start step,
+      // Task 53: a path debate may argue one path, cross-reviewed by its makers: its footing is its makers', never the mono-maker one.
+      effectiveMakerCount: pathsRunPaths === null ? rootCount : effectiveMakerCount,
       runBodyBudgetStop,
       authoredMakerPositions,
       snapshot: engineServeLinked === null ? snapshot : engineServeLinked.snapshot,
@@ -9906,7 +11138,9 @@ export class WalkingSkeletonRunner {
       monoMakerConditionMarks,
       monoMakerRecords,
       // Fix (d): the arguing that ended because too few members were left is not money, and says why.
-      ...(tooFewLeftToArgue() ? { membersSatOut: panelRevisedDuringRun } : {})
+      ...(tooFewLeftToArgue() ? { membersSatOut: panelRevisedDuringRun } : {}),
+      // V4 start step, Task 53: a path debate's one served root (one path) is no lost lineage.
+      ...(pathsRunPaths === null ? {} : { pathsRun: true })
     });
     /**
      * Engine 2 (spec 2026-10-15 §4.3-§4.4, §4.7; R2b) — THE COMPARING JUDGES, after the arguing, the reviews, the
@@ -9917,7 +11151,8 @@ export class WalkingSkeletonRunner {
      * copy (`runComparingJudges`). Engine 1: null, and the decision is today's, taken once.
      */
     const engineTwo = engine.engine === 2 ? engine : null;
-    const comparingJudges = engineTwo === null ? null : await (async () => {
+    // V4 start step, Task 53 (spec 2026-11-03 §4.3): a path debate's paths are not rivals, so no comparing judge picks one of them.
+    const comparingJudges = engineTwo === null || pathsRunPaths !== null ? null : await (async () => {
       const strengthDecision = decideMakerPositionServe(serveDecisionInput);
       const strengthOf = new Map(strengthDecision.propagation.strengths.map((row) => [row.nodeId, row.strength] as const));
       const servable = new Set(strengthDecision.servableMakerPositions.map((root) => root.nodeId));
@@ -9950,7 +11185,8 @@ export class WalkingSkeletonRunner {
       // pre-flight consistency; Ruling PF-R43.1): the servable source keeps its name, so R4's final writers' bundle reads
       // the very source the judges read (returned below as `materialSource`).
       const servableSource = comparingJudgesSourceOf({
-        source,
+        // W4-1 (item 7): a case or point that cites one of this debate's extracts carries it; none, the same source.
+        source: engineSourceWithCitedExtracts(source, webCited),
         servableRootIds: servable,
         honestFinalStrength: strengthOf,
         propagatableNodeIds: new Set(strengthDecision.standing.snapshot.nodes
@@ -9974,9 +11210,17 @@ export class WalkingSkeletonRunner {
       const planKey = comparingJudgeCallSiteKey(1);
       const judgeSeats = seatBook.judge.filter((seat) => !seatSitsOut(seat)).flatMap((seat) => {
         const member = seatCaller.plan(seat, planKey);
-        return member === null ? [] : [Object.freeze({ seat, member })];
+        if (member === null) return [];
+        // Owner ruling 2026-10-29 ("prefer neutral judges"): the seat's other member, up and not sitting out, which judges
+        // in the planned member's place only when its maker argued no answer and the planned member's did
+        // (`pickComparingJudges`). Same seat, so its thinking level, gateway, lane and money checks are the seat's own.
+        const other = seatCaller.plan(seat, planKey, { eligible: (candidate) => candidate.pinnedAs !== member.pinnedAs });
+        const alternate = other === null || other.maker === member.maker || (sitOut !== null && sitOut.sitsOut(other.providerRef))
+          ? null : other;
+        return [Object.freeze({ seat, member, alternate })];
       });
-      const runSeatOf = new Map(judgeSeats.map(({ seat, member }) => [member.providerRef, seat] as const));
+      const runSeatOf = new Map(judgeSeats.flatMap(({ seat, member, alternate }) => [[member.providerRef, seat] as const,
+        ...(alternate === null ? [] : [[alternate.providerRef, seat] as const])]));
       const modelIdOf = (member: Readonly<{ providerRef: string; candidate: SeatCandidate | null }>): string =>
         member.candidate?.modelId ?? panelModelIds.get(member.providerRef) ?? member.providerRef;
       const verdictVotes = new VerdictVoteRepository(this.pool);
@@ -9994,8 +11238,11 @@ export class WalkingSkeletonRunner {
         material,
         arguedByMaker: new Map(authoredMakerPositions.map((root) => [root.nodeId, root.maker] as const)),
         honestFinalStrength: new Map([...strengthOf].filter(([nodeId]) => servable.has(nodeId))),
-        candidates: judgeSeats.map(({ member }) => Object.freeze({
-          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member)
+        candidates: judgeSeats.map(({ member, alternate }) => Object.freeze({
+          maker: member.maker, providerRef: member.providerRef, modelId: modelIdOf(member),
+          ...(alternate === null ? {} : { alternate: Object.freeze({
+            maker: alternate.maker, providerRef: alternate.providerRef, modelId: modelIdOf(alternate)
+          }) })
         })),
         rotationOffset: seatRotationOffset({ runId: run.runId, role: "JUDGE", callSiteKey: planKey }),
         moneyStopped: runBodyBudgetStop !== null,
@@ -10186,7 +11433,12 @@ export class WalkingSkeletonRunner {
     // T11 / engine 1: the sealed ladder. Engine 2 (spec 2026-10-15 §4.4; R2b): the comparing judges' label, rung 5; the
     // ladder is still derived from the same numbers but never served.
     const ladderLabel = deriveVerdictLabel(verdictLabelBasis);
-    const verdictLabel = comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);
+    // V4 start step, Task 54 (spec §4.3): a path debate's label is code's, from its main answer's trust word, the weakest its paths'
+    // words hold, in the person's path order (`mainAnswerTrustWordOf`); no judge and no ladder chose it. It rides the receipt below.
+    const pathsMainTrust = pathOutcomes === null || pathsRunPaths === null ? null
+      : mainAnswerTrustWordOf(pathsRunPaths.map((path) => pathOutcomes!.get(path.pathId)?.trust ?? null));
+    const verdictLabel = pathOutcomes !== null ? verdictDerivationOfPaths(pathsMainTrust)
+      : comparingJudges === null ? ladderLabel : verdictDerivationOfJudges(comparingJudges.verdict);
     // R2 B11 (record only): today's ladder over the same honest final strengths, for the practice report's comparison.
     const engine1Ladder = engineTwo === null ? null
       : engine1LadderOf(servableMakerPositions, propagation.strengths, Object.freeze({
@@ -10511,22 +11763,7 @@ export class WalkingSkeletonRunner {
         hiddenScoreThresholdSourceRef: threshold!.sourceRef,
         excludedFromServedNumber: false
       })),
-      ...haltedExpansionRecords.map((record): ConditionMarkRecord => Object.freeze({
-        mark: "UNAUTHORED-BRANCH-HALTED",
-        scope: "node",
-        subjectRef: record.parentNodeId!,
-        reason: "Expansion halted after transport exhaustion; no node was authored to hide or reveal",
-        liftPath: "Retry the halted authoring call in a new run",
-        servedRootRule: null,
-        affectedNodeIds: Object.freeze([record.parentNodeId!]),
-        callSiteKey: record.callSiteKey,
-        plannedLegCount: record.plannedLegCount,
-        terminalTransportOutcome: record.terminalTransportOutcome,
-        hiddenStrength: null,
-        hiddenScoreThreshold: null,
-        hiddenScoreThresholdSourceRef: null,
-        excludedFromServedNumber: null
-      })),
+      ...haltedExpansionRecords.map(haltedExpansionConditionRecord),
       // S2-3 / J5: one typed record per downgraded node, projected onto that
       // node through `affectedNodeIds` so the disclosure is visible where the
       // override happened — not only on the answer.
@@ -10633,7 +11870,9 @@ export class WalkingSkeletonRunner {
      * looks like an internal id — every such token in the person's question
      * and in each node's full statement (not the digest's clipped summaries).
      */
-    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement)]);
+    // W4-1: a cited extract is material the writer may quote and name (item 7), so its words count as the person's here.
+    const personTexts = Object.freeze([run.questionLine, ...authoredNodeList.map((node) => node.statement),
+      ...[...webCited.values()].flatMap((extract) => [extract.quote, extract.site, ...(extract.title === null ? [] : [extract.title])])]);
     const personIdTokens = idShapedTokensIn(personTexts);
     const digestNodes: readonly DigestSourceNode[] = Object.freeze(authoredNodeList.map((node) => Object.freeze({
       nodeId: node.nodeId,
@@ -10653,7 +11892,9 @@ export class WalkingSkeletonRunner {
       // propagated number at the end of the debate.
       isSurvivingObjection: strengthByNodeId.has(node.nodeId)
         && materialised.arrows.some((arrow) => arrow.sourceNodeId === node.nodeId && arrow.polarity === "attack"),
-      leverage: digestLeverage.get(node.nodeId) ?? null
+      leverage: digestLeverage.get(node.nodeId) ?? null,
+      // W4-1 (item 7): the writer reads a looked-up node with the extract it rests on; none, today's digest.
+      ...(webCited.has(node.nodeId) ? { citedExtract: webCited.get(node.nodeId)! } : {})
     })));
     const serveStartedAt = new Date();
     /**
@@ -10855,8 +12096,95 @@ export class WalkingSkeletonRunner {
     } else {
       await recordEnvelope(initialEnvelopeDecision);
       const candidateConfidenceBand = await servedCandidateConfidenceBand();
+      /**
+       * V4 start step, Task 54 (spec 2026-11-03 §4.3) — A PATH DEBATE'S MAIN ANSWER, in the synthesis chain's place, once every path's
+       * chain has ended: Task 50's writer (report.answer.v4) and checker over the paths' answers so far (Haiku writes and GLM checks,
+       * else the run's answer seats; the dossier's question is the person's whole line, their care sentence inside it), on the served
+       * lane at the first debate's own answer keys (the answer's own money, never walled; no serve.synthesizer.v4). Its segments are
+       * served as written. When it FAILED: one segment per path's line, on that path's root, in path order (composed by code from the
+       * paths' own answers so far); with no line at all, today's floor (components-only, NO_ARTIFACT). The label is the main trust
+       * word's (above); the band is the serve chain's own rule over the nodes the segments rest on (`deriveBandCeiling`).
+       */
+      type PathsServed = Readonly<{ segments: readonly ComposedSegment[]; artifactRef: string | null; attempt: number; checkRefs: readonly string[] }>;
+      let pathsServed: PathsServed | null = null;
+      const pathsServe = pathOutcomes === null || pathsRunPaths === null ? null : async (): Promise<ServeGateResult> => {
+        const outcomes = pathOutcomes!;
+        const paths: readonly PathsDossierPath[] = pathsRunPaths!.map((path) => {
+          const jobPath = pathJobPaths.get(path.pathId);
+          return Object.freeze({ pathId: path.pathId, rootNodeId: jobPath?.rootNodeId ?? null, title: path.title, question: path.question,
+            ownWords: path.ownWords, outcome: outcomes.get(path.pathId) ?? null, points: jobPath?.points ?? [], sources: jobPath?.sources ?? [] });
+        });
+        let main: Awaited<ReturnType<typeof runPathsMainAnswer>> | null = null;
+        if (pathsFinalSeats !== null) {
+          try {
+            main = await runPathsMainAnswer({ runId: run.runId, free: pathsFree,
+              answerWords: lengthGuidance?.steps.answer_writer ?? pathsShape!.answerWords,
+              // Task 50's note: the main answer reads the language lock and the reading level from its question.
+              question: pathsQuestion, paths, seats: pathsFinalSeats, gateway: pathsGateway, tokenCount: pathsTokenCount, log: pathsLog,
+              // Task 50b: the person said what they care about (the purpose lines' marked answer): the answer says how that goal fares.
+              goalStated: pathsGoalStated(pathsPurposeLines) });
+            // Review of Task 54: its loop ends FAILED on a stop that ends this copy too; that stop ends the copy (no fallback served).
+            pathsStops.throwIfStopped();
+          } catch (error) {
+            // Task 50: bad input throws rather than ending FAILED; a stop that ends the run still ends it.
+            if (endsThisCopy(error) || keepAliveStop(error) || isMonthPausedStop(error)) throw error;
+            pathsLog("PATHS_MAIN_ANSWER_UNEXPECTED_ERROR", { runId: run.runId, code: pointInvestigationFailureCode(error) });
+          }
+        }
+        const written = main?.written.outcome ?? null;
+        const servedRoundOf = written !== null && written.outcome !== "FAILED" ? main!.written.rounds.find((round) => round.round === written.servedRound) : undefined;
+        if (main !== null && servedRoundOf !== undefined && main.segments.length > 0) {
+          pathsServed = Object.freeze({ segments: main.segments, artifactRef: servedRoundOf.writer.artifactRef, attempt: servedRoundOf.round,
+            checkRefs: Object.freeze(main.written.rounds.filter((round) => round.round <= servedRoundOf.round)
+              .flatMap((round) => round.checker === null ? [] : [round.checker.artifactRef])) });
+        } else {
+          const lines = paths.flatMap((path) => {
+            const line = path.outcome?.text?.line ?? null;
+            const root = path.rootNodeId === null ? undefined : authoredNodeList.find((node) => node.nodeId === path.rootNodeId);
+            return line === null || root === undefined ? [] : [{ line, root }];
+          });
+          pathsServed = Object.freeze({
+            segments: Object.freeze(lines.map(({ line, root }, at) => Object.freeze({ segmentId: `s${String(at + 1)}`, text: line, loadBearing: at === 0,
+              assertedNodeRefs: Object.freeze([root.nodeId]), servedNumberRefs: Object.freeze([]) }))),
+            // The paths' own lines: the composition's artifact is the writer's last reply when one came back, else the first line's root's.
+            artifactRef: main?.written.rounds.at(-1)?.writer.artifactRef ?? lines[0]?.root.provenanceRef ?? null, attempt: 1, checkRefs: Object.freeze([])
+          });
+        }
+        const projections = Object.freeze({ reversalPoint: factBundle.reversalPoint, buildsOnPrevious: factBundle.buildsOnPrevious,
+          memoryDisclosure: factBundle.memoryDisclosure });
+        const compositionBudget = servePolicy.compositionBudgets[run.compositionBudgetTier];
+        if (pathsServed.segments.length === 0) {
+          // Today's floor: nothing to serve, the components only, with its sealed cause (the persist then carries no composition).
+          pathsServed = null;
+          return Object.freeze({ terminal: "COMPONENTS_ONLY" as const, answerForm: null, factBundle,
+            gateTrace: Object.freeze(["COMPONENTS_ONLY_DEFECT" as const]),
+            conditionMarks: Object.freeze(factBundle.conditionMarks.includes("DEFECT") ? [...factBundle.conditionMarks] : [...factBundle.conditionMarks, "DEFECT"]),
+            conformance: Object.freeze([]), coverageMode: "NOT_RUN" as const, segments: Object.freeze([]), compositionBudget, confidenceBand: null,
+            bandCeiling: null, digest: null, loopRounds: Object.freeze([]), standingObjection: null, degradedDiversity: null, crashClass: "NO_ARTIFACT" as const,
+            projections });
+        }
+        const segments = pathsServed.segments;
+        const cited = new Set(segments.flatMap((segment) => [...segment.assertedNodeRefs]));
+        const citedNodes = authoredNodeList.filter((node) => cited.has(node.nodeId));
+        const ceiling = deriveBandCeiling({
+          basis: { LOOKED_UP: citedNodes.filter((node) => node.wayOfKnowing === "LOOKED_UP").length,
+            RAN: citedNodes.filter((node) => node.wayOfKnowing === "RAN").length,
+            REASONING: citedNodes.filter((node) => node.wayOfKnowing === "REASONING").length },
+          candidateConfidenceBand, row: servePolicy.bandCeiling
+        });
+        const checked = written !== null && written.outcome === "READY";
+        return Object.freeze({ terminal: "SERVED" as const, answerForm: Object.freeze({ kind: "VERDICT" as const, text: segments.map((segment) => segment.text).join("\n") }),
+          factBundle,
+          gateTrace: Object.freeze([pathsServed.attempt > 1 ? "RECOMPOSED_ONCE" as const : "COMPOSED" as const,
+            ceiling.kind === "CAPPED" ? "BAND_CEILING_CAPPED" as const : "BAND_CEILING_PASS" as const, "SERVE" as const]),
+          conditionMarks: Object.freeze([...factBundle.conditionMarks]),
+          conformance: Object.freeze(segments.map((segment) => Object.freeze({ segmentId: segment.segmentId, state: "JUDGED" as const, conforms: checked }))),
+          coverageMode: "EXHAUSTIVE" as const, segments, compositionBudget, confidenceBand: ceiling.confidenceBand, bandCeiling: ceiling.ceiling,
+          digest: null, loopRounds: Object.freeze([]), standingObjection: null, degradedDiversity: null, crashClass: null, projections });
+      };
       try {
-        result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
+        if (pathsServe !== null) result = await runnerStage("SERVE_GATE_CHAIN_FAILED", pathsServe);
+        else result = await runnerStage("SERVE_GATE_CHAIN_FAILED", () => runServeGateChain({
       nodes: servedNodes,
       factBundle,
       compositionBudget: servePolicy.compositionBudgets[run.compositionBudgetTier],
@@ -10934,7 +12262,7 @@ export class WalkingSkeletonRunner {
         // step 8; Task 5 binding note): a shaped run's writer is asked for about the row's answer length — every writer
         // call, first try and retries (each is a request through here); the checker's packet is never lengthed.
         const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, synthesisLength,
-          shapeLanguage);
+          shapeLanguage, readingLevel);
         const packet = framed.packet;
         /**
          * The draft as the engine reads it. Final review I-1: it is read INSIDE
@@ -11116,7 +12444,8 @@ export class WalkingSkeletonRunner {
         const checkerOptions = synthesisSeatOptions("EVALUATOR", checkerSeat, checkerSiteKey);
         const planned: ServeRoleMaker = seatCaller.plan(checkerSeat, checkerSiteKey, checkerOptions) ?? checkerSeat.main;
         checkerPlannedByRound.set(request.round, planned.providerRef);
-        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage);
+        const framed = buildSynthesisRolePrompt(request, run.argumentLanguageName, undefined, checkerLength, shapeLanguage,
+          readingLevel);
         const packet = framed.packet;
         /**
          * The verdict as the engine reads it, its coherence included (the loop
@@ -11255,7 +12584,16 @@ export class WalkingSkeletonRunner {
       // ('EXHAUSTIVE','SAMPLED')`, 23514): ANSWER_PERSIST_FAILED, and the whole
       // run failed instead of ending components-only / DEFECT.
       const servedRound = result.loopRounds.at(-1);
-      if (servedRound === undefined) {
+      // V4 start step, Task 54: a path debate's main answer (or its paths' lines) is served as composed above, its writer's reply the
+      // composition's artifact and its checker's replies the conformance's; the floor and the envelope's stop serve none.
+      // (Set inside `pathsServe`, which control flow does not follow.)
+      const pathsComposed = pathsServed as PathsServed | null;
+      if (pathsComposed !== null && result.terminal === "SERVED") {
+        finalSegments = pathsComposed.segments;
+        compositionRawArtifactRef = pathsComposed.artifactRef;
+        compositionAttempt = pathsComposed.attempt;
+        conformanceRawArtifactRefs.splice(0, conformanceRawArtifactRefs.length, ...pathsComposed.checkRefs);
+      } else if (servedRound === undefined) {
         finalSegments = [];
         compositionRawArtifactRef = null;
         compositionAttempt = 0;
@@ -11430,7 +12768,9 @@ export class WalkingSkeletonRunner {
      */
     const backupRecords = backupModelUsedRecords({
       answers: seatCaller.backupAnswers(),
-      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0)
+      fallbackRoles: fellBackRoles.filter((role) => seatCaller.answered(role).length > 0),
+      // R22 (owner ruling 2026-10-30): every position a spare debater wrote after its seat's answer was refused.
+      spareAnswers
     }, servedRoot.nodeId);
     if (backupRecords.length > 0) {
       conditionMarkRecords = Object.freeze([...conditionMarkRecords, ...backupRecords]);
@@ -11509,7 +12849,9 @@ export class WalkingSkeletonRunner {
       verdictLabelBasis: answerCarriesLabel && comparingJudges === null ? verdictLabelBasis : null,
       // Engine 2 (R2b): the judges' label record instead of a ladder basis (serve takes at most one of the two; an answer
       // that carries no label passes neither).
-      ...(answerCarriesLabel && comparingJudges !== null ? { judgesDerivation: verdictLabel } : {})
+      ...(answerCarriesLabel && comparingJudges !== null ? { judgesDerivation: verdictLabel } : {}),
+      // V4 start step, Task 54: a path debate's label record (its main trust word's) rides the same way, with no ladder basis.
+      ...(pathOutcomes === null ? {} : { verdictLabelBasis: null, ...(answerCarriesLabel ? { judgesDerivation: verdictLabel } : {}) })
     }));
     // Task M3 (spec §14.4.5): the owner-side disclosure row, once, after the
     // sealed persist, for every answer. It can never change the answer: the
@@ -11593,6 +12935,45 @@ export class WalkingSkeletonRunner {
        */
       const storyWriter = settings.story;
       const floorRecorded = floor !== null && disclosureRecorded;
+      /**
+       * V4 start step, Task 54 (Task 51's story v5): a path debate's story is told from its paths (each with its answer so far), the
+       * main answer and its trust word, and the gap round's points no path took up; Haiku tells it and GLM checks it (else the run's
+       * own story roles). Its material starts at the ladder step the Haiku target's real count lets through (`pathsFromStep`), and
+       * every round reads one fence. Its suggestions are its paths' (the roots in force, read here, in the lease). None on any other run.
+       */
+      let pathsStory: Readonly<{ paths: StoryWriteInput["paths"]; fromStep: number; randomBytes: (size: number) => Buffer }> | null = null;
+      if (pathOutcomes !== null && pathsSetStored !== null) {
+        try {
+          afterSettle.pathRoots = Object.freeze((await settings.pathResults!.readPathRoots(run.runId))
+            .map((root) => Object.freeze({ ref: root.pathId, rootNodeId: root.rootNodeId })));
+        } catch {
+          // No roots read: no suggestions, never the answer.
+        }
+      }
+      if (pathOutcomes !== null && pathsSetStored !== null && storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
+        try {
+          const storyPaths = storyPathsInputOf({ set: pathsSetStored, outcomes: pathOutcomes, mainAnswer: finalSegments.map((segment) => segment.text),
+            mainTrust: pathsMainTrust, gap: pathsGapRound });
+          const disputed = new Set(await this.#judgements.readDisputedNodeIds(run.runId));
+          const fitted = await fitStoryPathsToTokenLine({ ...storyPaths,
+            // Task 54c (W1-5): the points the writer will send, each looked-up point with the extract it cites, so the extracts count in the fit.
+            points: storyPathsPointsOfRun(authoredNodeList, disputed, webCited),
+            questionLine: pathsQuestionLine,
+            length: lengthGuidance === null ? null : storyLengthField(lengthGuidance.story, run.argumentLanguageTag, lengthGuidance.charactersPerWord),
+            readingLevel, language: shapeLanguage }, pathsTokenCount, pathsLog);
+          pathsStory = Object.freeze({ paths: storyPaths, fromStep: fitted.ladderStep, randomBytes: closingRandomBytes(cryptoRandomBytes(32)) });
+        } catch (error) {
+          pathsLog("PATHS_STORY_INPUT_FAILED", { runId: run.runId, code: pointInvestigationFailureCode(error) });
+        }
+      }
+      /** Haiku tells a path debate's story and GLM checks it (the main answer's seats), when the run holds both. */
+      const pathsStoryRoles = pathsStory === null ? null : (() => {
+        const final = pathsFinalSeatsOf(pathsFinalMembers);
+        return final === null ? null : Object.freeze({
+          storyteller: Object.freeze({ provider: final.writer.provider, providerRef: final.writer.providerRef }),
+          checker: Object.freeze({ provider: final.checker.provider, providerRef: final.checker.providerRef })
+        });
+      })();
       if (storyWriter !== undefined && (answerCarriesLabel || floorRecorded)) {
         try {
           afterSettle.story = {
@@ -11602,12 +12983,18 @@ export class WalkingSkeletonRunner {
               workItemId: claimed.workItemId,
               answerId: persisted.answerId,
               answerVersion: persisted.answerVersion,
-              questionLine: run.questionLine,
+              // V4 start step, Task 54 (Task 53 (b)): a path debate's story reads the question with the step-2 lines it does not
+              // already say, as its legs did; every other run's line, byte for byte.
+              questionLine: pathsQuestionLine,
+              // V4 start step, Task 54: a path debate's story is v5, told from its paths, at the runner's ladder step, one fence.
+              ...(pathsStory === null ? {} : { paths: pathsStory.paths, pathsFromStep: pathsStory.fromStep, randomBytes: pathsStory.randomBytes }),
               // The same language the debate's own prompts were told to write in
               // (argumentLanguageDirective), and the tag the story is stored with.
               argumentLanguage: { tag: run.argumentLanguageTag, name: run.argumentLanguageName },
               // P2L Task 17: the story writes in the lock only when the run's shape receipt locked it.
               languageLocked: shapeLanguage !== null,
+              // V4 reading level (owner N6): the story is written for the person's level; null, today's story.
+              readingLevel,
               ...(lengthGuidance === null ? {} : { lengthGuidance }),
               // Engine redesign R1d (spec 2026-10-15 §7; INTERFACE §5.1): the receipt's engine, never the row, so an
               // engine-2 debate's story is told v4 (with the length table above); engine 1: null, today's story. The
@@ -11651,6 +13038,8 @@ export class WalkingSkeletonRunner {
               // own statement (the node the label's servedNodeId names).
               servedSegments: floor === null ? finalSegments : [{ text: servedRootJudgement.statement }],
               authored: authoredNodeList,
+              // W4-1 (item 7): the storyteller reads a looked-up point with the extract it rests on; none, today's story.
+              ...(webCited.size === 0 ? {} : { citedExtracts: webCited }),
               positionNodeIds: makerPositionNodeIds,
               ...(engineMap ? enginePositionWordsOf(engineMapFactsNow()) : {}),
               // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map's unchosen points, for the story's "also
@@ -11715,6 +13104,8 @@ export class WalkingSkeletonRunner {
                       storytellerRef: rotationPin.storyteller.providerRef,
                       storyCheckerRef: rotationPin.storyChecker.providerRef
                     }),
+              // V4 start step, Task 54: a path debate's story sits where its main answer did, Haiku and GLM, when the run holds both.
+              ...(pathsStoryRoles === null ? {} : { roleMakers: pathsStoryRoles }),
               // Each story step re-takes the SAME disclosure lease the debate held
               // (this run and its memory-linked prior run), briefly, on this
               // runner's pool: every store and gateway inside it borrows it, and
@@ -11756,9 +13147,30 @@ export class WalkingSkeletonRunner {
     if (storyWriter !== undefined && settled !== null) {
       try {
         if (settled.kind === "SNAPSHOT") {
-          // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
-          // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
-          await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
+          // Dig-model revision W3-5 (owner Q-D13): a dig keeps its points and its answer text, both stored above, and
+          // writes NO story: the path it was dug from is rewritten in the story's place (path-rewrite.ts, which never
+          // rejects). A first debate, or a runner without the rewrite's settings, gets its story as today.
+          // V4 start step, Task 56: whether this is a first debate (the rewrite ran for no dig), for the carry-on's DUE mark below.
+          let firstDebate = false;
+          if (!(await runDigPathRewrite(settings.pathRewrite, settled.input))) {
+            firstDebate = true;
+            // Side-by-side spec §13 (S3, ruling R36): every write carries this debate's own version's story policy (null
+            // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
+            await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
+          }
+          // W4-3: what the AI offers to dig into on a debate that got its story, now that it is written. Never rejects.
+          // V4 start step, Task 54: a path debate's suggestions are its paths', each read from its root and keyed b<n>.
+          await runFirstDebateSuggestions(settings.pathRewrite, settled.input, afterSettle.pathRoots ?? undefined);
+          // V4 start step, Task 55e (spec §4.4): a run that got its story and is a dig under the main question of a path debate (a path
+          // left out before Start) is a new first-level path, so the main answer updates (path-climb.ts); a first debate and an R22 dig
+          // do nothing. Outside the run's lease, as the rewrite's climb; never rejects.
+          if (firstDebate) await settings.pathRewrite?.afterStory?.(settled.input.runId, settled.input.stepLease ?? ((use) => use()));
+          // V4 start step, Task 56: a first debate whose ask ticked "Let the AIs carry on to the report" is now settled with its
+          // suggestions written, so the API's carry-on tick may dig into them (DUE). Before the closing poke; never rejects.
+          if (firstDebate) await recordCarryOnDueSafely(settings.carryOn, settled.input.runId, (line) => { console.error(line); });
+          // W5-1 (owner F7 A): a closing waits for its running digs and their rewrites; this member is now settled, so a
+          // closing of its investigation may start at once rather than at the next sweep. Never rejects.
+          await pokeInvestigationClosing(settings.investigationClose, settled.input.runId);
         } else {
           storyWriter.reportSnapshotFailure(settled);
         }
@@ -11768,9 +13180,39 @@ export class WalkingSkeletonRunner {
     }
     return executed;
     });
+    } catch (error) {
+      if (error instanceof TypedDomainError && error.code === RUN_HANDOVER_IMPOSSIBLE) {
+        /**
+         * Decision 12 — THE ONE THING THAT CANNOT HAND OVER: a recorded answer this release cannot read, in a step whose other
+         * answers already stand, so asking it again would mix the step. As a version this release cannot run (spec §13 S7):
+         * set aside FAILED with the waiver, none of the person's allowance used, the site's plain sentence. What the AIs
+         * found stays where it is: links, quotes and notes stay on the record after the passage sweep.
+         */
+        keepAlive.stop();
+        const setAside = await this.#work.setAsideWorkItem({ runId: claimedRunId, workItemId: claimed.workItemId,
+          reason: "SETTINGS_VERSION_UNSUPPORTED", readyOnly: false });
+        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_HANDOVER", event: "IMPOSSIBLE", runId: claimedRunId, setAside }));
+        throw new TypedDomainError("SETTINGS_VERSION_UNSUPPORTED", "SETTINGS_VERSION_UNSUPPORTED");
+      }
+      if (!isMonthPausedStop(error)) throw error;
+      /**
+       * R22 W3-8 (the money rule) — THE MONTH WALL'S PLANNED STOP. The pause is recorded (./month-pause.ts), the arguing
+       * ended as at a lost claim, nothing more was saved and no answer written. The keep-alive stops renewing, the claim
+       * is given up now, fenced on the deadline this copy last set, and the task ends without a failure: no FAILED row,
+       * no Hatchet retry. While the debate is paused no runner claims or re-sends it (packages/battery
+       * `NOT_MONTH_PAUSED`); after Continue the next copy replays every call already answered and goes on. A release
+       * that finds another copy's claim changes nothing.
+       */
+      keepAlive.stop();
+      const released = await this.#work.releaseClaim({
+        workItemId: claimed.workItemId, workerId: claimInput.workerId, heldUntil: keepAlive.heldUntil()
+      });
+      console.warn(JSON.stringify({ kind: "DEBATEAI_RUNNER_CLAIM", event: "MONTH_PAUSED", workItemId: claimed.workItemId, released }));
+      return { kind: "MONTH_PAUSED" };
     } finally {
       callLane?.close();
       keepAlive.stop();
+      releaseRunPassages(claimedRunId);
     }
   }
 }
@@ -11803,7 +13245,12 @@ export function settingsJournalCode(code: string): string {
 export type RunnerExecutionResult =
   | { readonly kind: "NO_WORK" }
   | { readonly kind: "COMPLETED"; readonly answerId: string }
-  | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null };
+  | { readonly kind: "TERMINAL_FAILED"; readonly artifactRef: string | null }
+  /**
+   * R22 W3-8 (the money rule): the debate reached the month wall. Its pause is recorded, its claim released, nothing is
+   * FAILED and no answer written: it stays paused in the database until the person continues (./month-pause.ts).
+   */
+  | { readonly kind: "MONTH_PAUSED" };
 
 export interface RunnerFailureRecorder {
   recordTerminalFailure(input: {
@@ -11811,6 +13258,12 @@ export interface RunnerFailureRecorder {
     readonly workItemId: string;
     readonly reason: string;
   }): Promise<boolean>;
+  /**
+   * V4 start step, Task 57e: the one automatic retry (packages/battery WorkItemRepository.parkForRetry, main.ts's recorder): this copy's
+   * claim kept until a few minutes from now and the work item's one retry recorded (PARKED), or nothing written (RETRIED: it had its retry;
+   * NOT_HELD: not this copy's claim). Absent (fixtures, an older wiring): no retry, today's FAILED at once.
+   */
+  parkForRetry?(input: Readonly<{ runId: string; workItemId: string }>): Promise<"PARKED" | "RETRIED" | "NOT_HELD">;
 }
 
 // ─── BEGIN OPERATIONAL DIAGNOSTIC ALPHABET ─────────────────────────────────────
@@ -12283,9 +13736,11 @@ const KNOWN_DOMAIN_CODES: readonly string[] = Object.freeze([
   "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM",
   "RUN_ENVELOPE_BASIS_INVALID",
   "RUN_FROZEN_HEAD_READ_FAILED",
+  "RUN_HANDOVER_IMPOSSIBLE",
   "RUN_HOLD_RECORDER_UNRESOLVED",
   "RUN_LEGACY_ASKER_INVALID",
   "RUN_MAKER_COUNT_INVALID",
+  "RUN_MONTH_PAUSED",
   "RUN_NOT_FOUND",
   "RUN_OWNER_INVALID",
   "RUN_OWNER_RAW_ID_FORBIDDEN",
@@ -12936,10 +14391,63 @@ export const RUNNER_EXECUTION_LIMIT = "3600s" as const;
  */
 const LEAVES_WORK_ITEM_ALONE: ReadonlySet<string> = new Set([
   "RUNNER_CLAIM_LOST",
+  // R22 W3-8: a month pause `execute` did not get to answer itself (MONTH_PAUSED) is never FAILED either.
+  RUN_MONTH_PAUSED,
   "RUNNER_RELEASE_MISMATCH",
   "RUNNER_RETIRING",
   "SETTINGS_VERSION_UNSUPPORTED"
 ]);
+
+/**
+ * V4 start step, Task 57e (the owner's 6 Nov rule: "either we fix the code that produced the error, we should re-use what we already paid
+ * for"; confirmed plan: one automatic retry after a few minutes, from the last saved step) — THE STOPS THAT ARE NOT OURS, never retried: the
+ * person's own act (a debate or account they erased while it ran: PRIVATE_CONTENT_ERASED), a limit the debate reached (its own ceiling, a
+ * step's tries used up), and every spending wall (the person's quota, the site's day, the debate's money ceiling, a team grant that is gone).
+ * A crisis stop and a refused question never reach a runner (the asks route answers them before any debate exists); the month wall's planned
+ * stop and the other stops that leave the work item alone are never recorded at all (LEAVES_WORK_ITEM_ALONE).
+ * Task 57f: the list is the work package's RUN_STOPS_NOT_OURS, which Continue reads too (a failed debate continues only on a stop of ours).
+ */
+const NEVER_RETRIED: ReadonlySet<string> = RUN_STOPS_NOT_OURS;
+
+/**
+ * V4 start step, Task 57e: whether a debate's stop is ours and earns its one automatic retry: a provider out (PROVIDER_CALL_FAILED), an AI's
+ * reply that could not be read, a time limit (RUNNER_TIME_LIMIT_REACHED), any fault of our code or database (an untyped throw, or a typed
+ * one). Never a stop the person caused or a wall (NEVER_RETRIED), nor one that leaves the work item alone. The retry resumes from what the
+ * debate saved (0119's true resume replays every call already answered, so nothing is bought twice) and seats the debate as any copy does:
+ * a member that sits out hands its seat to the debate's backup where one exists (run resilience). Claim-time refusals that record their own
+ * FAILED before they throw (a pinned role or model gone) stay terminal: the park finds the item no longer CLAIMED.
+ */
+export function runFailureRetriesOnce(error: unknown): boolean {
+  if (!(error instanceof TypedDomainError)) return true;
+  return !LEAVES_WORK_ITEM_ALONE.has(error.code) && !NEVER_RETRIED.has(error.code);
+}
+
+/**
+ * Review of Task 57h: a path debate's claim-time refusal that its stored set makes final (packages/battery RUN_PATH_SET_REFUSALS) is recorded
+ * FAILED by the run itself, with its plain code, before it throws (refusedForGood), and the task's catch below re-writes an already FAILED
+ * item's reason (WorkItemRepository.recordTerminalFailure, D2). So the catch writes that same code, one of the set's three literals, never the
+ * wrapped diagnostic: the codes are outside the alphabet (UNRECOGNIZED_DOMAIN_ERROR), and Continue and 0165 read the plain code. Null otherwise.
+ */
+function pathSetRefusalOf(error: unknown): string | null {
+  return error instanceof TypedDomainError && RUN_PATH_SET_REFUSALS.has(error.code) ? error.code : null;
+}
+
+/**
+ * Task 57e: parks a debate that stopped on our side for its one retry; true when parked. A park that does not take (it had its retry, the
+ * claim is not this copy's) or that fails leaves today's path: the caller records FAILED. Its line names ids and an outcome only.
+ */
+async function parkedForRetry(failures: RunnerFailureRecorder, dispatch: Readonly<{ runId: string; workItemId: string }>,
+  error: unknown): Promise<boolean> {
+  if (failures.parkForRetry === undefined || !runFailureRetriesOnce(error)) return false;
+  let parked: "PARKED" | "RETRIED" | "NOT_HELD" | "FAILED";
+  try {
+    parked = await failures.parkForRetry({ runId: dispatch.runId, workItemId: dispatch.workItemId });
+  } catch {
+    parked = "FAILED";
+  }
+  console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_RETRY", event: parked, runId: dispatch.runId, workItemId: dispatch.workItemId }));
+  return parked === "PARKED";
+}
 
 export function declareHatchetWalkingSkeletonTask(input: {
   readonly client: Pick<Hatchet, "task">;
@@ -13056,10 +14564,14 @@ export function declareHatchetWalkingSkeletonTask(input: {
             if (error instanceof TypedDomainError && LEAVES_WORK_ITEM_ALONE.has(error.code)) {
               throw scrubbedTaskFailure(error);
             }
+            // V4 start step, Task 57e: a stop on our side is not FAILED the first time. The copy keeps its claim a few minutes and the
+            // retry is recorded; the lapsed re-send then hands the debate to a runner again, which resumes it from what it saved. The task
+            // ends without a failure (no Hatchet retry: an early one would find the claim still held). A second stop is FAILED as today.
+            if (await parkedForRetry(input.failures, dispatch, error)) return { kind: "RETRY_PARKED" };
             const recorded = await input.failures.recordTerminalFailure({
               runId: dispatch.runId,
               workItemId: dispatch.workItemId,
-              reason: runnerTerminalFailureReason(error)
+              reason: pathSetRefusalOf(error) ?? runnerTerminalFailureReason(error)
             });
             if (!recorded) {
               // OBS-R064: a handler that cannot record the failure must still
@@ -13115,9 +14627,23 @@ const STORY_CALL_SITE_PREFIX = "STORY:";
 const STORY_CALL_SITE = /^STORY:(STORYTELLER|CHECKER):[1-8]$/u;
 const STORY_CHARTS_CALL_SITE = "STORY:CHARTS:1";
 
-/** The role a well-formed story call site must carry, or null for any other key. */
+/** The role a well-formed story call site must carry, or null for any other key. W3-2: a dig's path rewrite's too. */
 function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | null {
   if (callSiteKey === STORY_CHARTS_CALL_SITE) return "SYNTHESIZER";
+  const rewrite = pathRewriteCallSiteRole(callSiteKey);
+  if (rewrite !== null) return rewrite;
+  // W5-1: the final report's four sites (packages/story INVESTIGATION_REPORT_CALL_SITE), each with its one role.
+  const report = investigationReportCallSiteRole(callSiteKey);
+  if (report !== null) return report;
+  // R22 decisions 2 and 3: the climb's two sites and the main-answer update's two, each with its one role.
+  const climbed = pathClimbCallSiteRole(callSiteKey) ?? answerUpdateCallSiteRole(callSiteKey);
+  if (climbed !== null) return climbed;
+  // Decision 13: the AI check on a contribution, and a report on a public debate.
+  const publicTree = contributionCheckCallSiteRole(callSiteKey) ?? publicReportCallSiteRole(callSiteKey);
+  if (publicTree !== null) return publicTree;
+  // W4-4: "Add to researched"'s readers.
+  const researched = webResearchedCallSiteRole(callSiteKey);
+  if (researched !== null) return researched;
   const site = STORY_CALL_SITE.exec(callSiteKey);
   if (site === null) return null;
   return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
@@ -13132,7 +14658,11 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
 export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" | "callSiteKey" | "role">): boolean {
   const key = structureRepairOriginalKey(request.callSiteKey);
   const storyScope = request.lane === "story";
-  return !((storyScope || key.startsWith(STORY_CALL_SITE_PREFIX)) && (!storyScope || storyCallSiteRole(key) !== request.role));
+  const storyKey = key.startsWith(STORY_CALL_SITE_PREFIX) || key.startsWith(PATH_REWRITE_CALL_SITE_PREFIX)
+    || key.startsWith(INVESTIGATION_REPORT_CALL_SITE_PREFIX) || key.startsWith(PATH_CLIMB_CALL_SITE_PREFIX)
+    || key.startsWith(ANSWER_UPDATE_CALL_SITE_PREFIX) || key.startsWith(WEB_RESEARCHED_CALL_SITE_PREFIX)
+    || key.startsWith(CONTRIBUTION_CHECK_CALL_SITE_PREFIX) || key.startsWith(PUBLIC_REPORT_CALL_SITE_PREFIX);
+  return !((storyScope || storyKey) && (!storyScope || storyCallSiteRole(key) !== request.role));
 }
 
 /**
@@ -13146,8 +14676,12 @@ export function storyCallScopeAgrees(request: Pick<ProviderCallRequest, "lane" |
  * refusal's code.
  */
 export function providerCallCostEnvelopePhase(
-  request: Pick<ProviderCallRequest, "role" | "lane">
+  request: Pick<ProviderCallRequest, "role" | "lane"> & Partial<Pick<ProviderCallRequest, "callSiteKey">>
 ): CostEnvelopePhase {
+  // V4 start step, Task 49 (decided 3 Nov): a path's answer so far is the writer and the checker on the served lane, but it draws on
+  // the debate's attempts (the receipt counts it among the author sites), so the answer's reserve stays whole for the main answer.
+  // LG-A: a structure-repair call is its original's. A request without a key keeps today's answer.
+  if (structureRepairOriginalKey(request.callSiteKey ?? "").startsWith(PATH_OUTCOME_CALL_SITE_PREFIX)) return "BODY";
   return (request.role === "SYNTHESIZER" || request.role === "EVALUATOR") && request.lane === "served"
     ? "SERVE"
     : "BODY";
@@ -13170,6 +14704,10 @@ export const FIRST_POSITION_CALL_SITE_KEY = "JUDGE" as const;
 export function providerCallSharedWall(
   request: Pick<ProviderCallRequest, "role" | "lane" | "callSiteKey">
 ): SharedWallApplication {
+  // V4 start step, Task 49 (decided 3 Nov): a path's answer so far is answer writing, never the debate's arguing, so neither the
+  // shared wall nor the person's month ever refuses it mid-debate, while its phase stays BODY (the owner's rule that the budget never
+  // hard-stops a debate), as the dig rewrite's never-walled seam is.
+  if (structureRepairOriginalKey(request.callSiteKey).startsWith(PATH_OUTCOME_CALL_SITE_PREFIX)) return "EXEMPT";
   if (request.lane !== "served" || providerCallCostEnvelopePhase(request) !== "BODY") return "EXEMPT";
   // Paid plans S1a: an assigned run's first call carries its seat marker. LG-A: a structure-repair call is its original's.
   return seatBaseCallSiteKey(structureRepairOriginalKey(request.callSiteKey)) === FIRST_POSITION_CALL_SITE_KEY ? "EXEMPT" : "APPLY";
@@ -13230,6 +14768,18 @@ export function createPostgresProviderGateway(
        * refused, so a story can never spend unbounded where the debate cannot.
        */
       readonly buildStoryCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** W3-2: a dig's path rewrite (story lane, `PATH_REWRITE:` sites) spends its own never-walled seam. */
+      readonly buildPathRewriteCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** W5-1: the final report (story lane, `INVESTIGATION_REPORT:` sites, the root run) spends its own never-walled seam. */
+      readonly buildInvestigationReportCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** R22 decision 2: the climb (story lane, `PATH_CLIMB:` sites, the run of the dig that started it) spends its own never-walled seam. */
+      readonly buildPathClimbCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** R22 decision 3: the main-answer update (story lane, `ANSWER_UPDATE:` sites, the triggering dig's run) spends its own never-walled seam. */
+      readonly buildAnswerUpdateCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** Decision 13: the AI check on a contribution (story lane, `CONTRIBUTION_CHECK:` sites, the dig's run) spends its own never-walled seam. */
+      readonly buildContributionCheckCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
+      /** Decision 13: a report on a public debate (story lane, `PUBLIC_REPORT:` sites, its carrier run) spends its own never-walled seam. */
+      readonly buildPublicReportCostEnvelopeSeam?: (runId: string) => InFlightReleasingSeam;
       /**
        * Parallel AI calls (spec 2026-10-12 §3.5): this process's calls in
        * flight, for the run-wide attempt ceiling. A call bounded by that ceiling
@@ -13242,7 +14792,9 @@ export function createPostgresProviderGateway(
     }
 ): ProviderGateway {
   const { buildCostEnvelopeSeam, ...gatewayOptions } = options;
-  const { buildStoryCostEnvelopeSeam, inFlight, ...httpOptions } = gatewayOptions;
+  const { buildStoryCostEnvelopeSeam, buildPathRewriteCostEnvelopeSeam, buildInvestigationReportCostEnvelopeSeam,
+    buildPathClimbCostEnvelopeSeam, buildAnswerUpdateCostEnvelopeSeam, buildContributionCheckCostEnvelopeSeam, buildPublicReportCostEnvelopeSeam, inFlight,
+    ...httpOptions } = gatewayOptions;
   const ledger = new LedgerRepository(pool);
   const budget = new BudgetRepository(pool);
   const http = new OpenAICompatibleProviderGateway({
@@ -13262,7 +14814,9 @@ export function createPostgresProviderGateway(
     })
   });
   return {
-    async call(request: ProviderCallRequest): Promise<ProviderCallResult> {
+    async call(incoming: ProviderCallRequest): Promise<ProviderCallResult> {
+      // R22: whatever built this prompt, a passage goes on record only by its name (passage-record.ts).
+      const request = passageRecordedRequest(incoming);
       if (request.runId === null) {
         throw new TypedDomainError(
           "PROVIDER_RUN_REQUIRED",
@@ -13288,7 +14842,22 @@ export function createPostgresProviderGateway(
       // Final fix wave S1: a defence for a composition that meters debate calls but gives no story seam. main.ts and the
       // practice always give both, so in production a version without a story ceiling is refused by its guard's story
       // seam instead (the same STORY_ENVELOPE_MISSING, built below before the provider-failure capture).
-      if (storyScope && buildStoryCostEnvelopeSeam === undefined && buildCostEnvelopeSeam !== undefined) {
+      const pathRewrite = storyScope && isPathRewriteCallSite(structureRepairOriginalKey(request.callSiteKey));
+      // W5-1: the final report's sites spend the report seam (never walled), on the investigation's root run.
+      const reportCall = storyScope && investigationReportCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      // W4-4: "Add to researched" is charged like a climb: a small follow-up on the page's own run, counted for its owner, never walled
+      // (PATH_CLIMB rows: a kind of its own would mean redefining 0140's team readers for so small a call).
+      const climbCall = storyScope && (pathClimbCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null
+        || webResearchedCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null);
+      const answerUpdateCall = storyScope && answerUpdateCallSiteRole(structureRepairOriginalKey(request.callSiteKey)) !== null;
+      const originalKey = structureRepairOriginalKey(request.callSiteKey);
+      const storyLaneSeam = storyScope && contributionCheckCallSiteRole(originalKey) !== null ? buildContributionCheckCostEnvelopeSeam
+        : storyScope && publicReportCallSiteRole(originalKey) !== null ? buildPublicReportCostEnvelopeSeam
+        : answerUpdateCall ? buildAnswerUpdateCostEnvelopeSeam : climbCall ? buildPathClimbCostEnvelopeSeam
+        : reportCall ? buildInvestigationReportCostEnvelopeSeam
+        : pathRewrite ? buildPathRewriteCostEnvelopeSeam : buildStoryCostEnvelopeSeam;
+      if (storyScope && storyLaneSeam === undefined
+        && buildCostEnvelopeSeam !== undefined) {
         throw new TypedDomainError(
           "STORY_ENVELOPE_MISSING",
           "A metered deployment makes no story call without the story's own money bound"
@@ -13387,7 +14956,7 @@ export function createPostgresProviderGateway(
        * it ends the call before anything is sent, with its own code, uncaptured.
        */
       costEnvelope = storyScope
-        ? buildStoryCostEnvelopeSeam?.(leasedRunId)
+        ? storyLaneSeam?.(leasedRunId)
         : buildCostEnvelopeSeam?.(leasedRunId, costEnvelopePhase, providerCallSharedWall(request));
       try {
         return await http.call({

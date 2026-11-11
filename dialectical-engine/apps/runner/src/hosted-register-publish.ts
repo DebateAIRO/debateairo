@@ -32,7 +32,9 @@
  *    sealed as it is. Likewise optional, the `questionCheckPolicy` (the pre-start question
  *    check's deadline, synthesis-flag S04-R8, checked by the register's own parser); without
  *    the member the seeder's code-owned row is sealed as it is. Likewise optional, the
- *    `answerRoleRotation` (spec 2026-10-11, role rotation):
+ *    `outboundMailPolicy` (the daily mail limit, owner's rulings of 2026-11-01; the live site carries
+ *    10000 a day); without the member the seeder's code-owned row (2000 a day) is sealed as it is.
+ *    Likewise optional, the `answerRoleRotation` (spec 2026-10-11, role rotation):
  *    `{ "enabled": true | false }`, sealed as the ADDITIVE `answerRoleRotationPolicy` row under the
  *    file's sourceRef; left out, no such row is sealed and the engine keeps its fixed roles. Likewise optional,
  *    the `callConcurrencyPolicy` (spec 2026-10-12, parallel calls): `{ "perDebate", "perModelPerDebate",
@@ -105,7 +107,11 @@ import {
   ADMISSION_POLICY_ROW_KEY,
   ALGORITHM_REGISTER_ROW_KEYS,
   ANSWER_ROLE_ROTATION_POLICY_ROW_KEY,
+  ABUSE_LIMITS_ROW_KEY,
   BILLING_PLANS_ROW_KEY,
+  billingPlansAreMadeUp,
+  abuseLimitsFromValue,
+  readAbuseLimits,
   BILLING_POLICY_ROW_KEY,
   CALL_CONCURRENCY_POLICY_ROW_KEY,
   CONFIGURED_PROVIDER_SET_ROW_KEY,
@@ -115,6 +121,7 @@ import {
   MODEL_SCORECARD_MAX_BYTES,
   MODEL_SCORECARD_ROW_KEY,
   PUBLICATION_CHECK_POLICY_ROW_KEY,
+  OUTBOUND_MAIL_POLICY_ROW_KEY,
   QUESTION_CHECK_POLICY_ROW_KEY,
   STORY_ROW_KEYS,
   TAX_AUTHORITIES_ROW_KEY,
@@ -171,6 +178,7 @@ import {
   persistBootstrapRegister,
   planCapMicros,
   publicationCheckPolicyFromValue,
+  outboundMailPolicyFromValue,
   questionCheckPolicyFromValue,
   readAdmissionPolicy,
   readAnswerRoleRotationPolicy,
@@ -188,6 +196,7 @@ import {
   readModelScorecard,
   readPanelDiscoveryPolicy,
   readProductRolePolicy,
+  readOutboundMailPolicy,
   readPublicationCheckPolicy,
   readRecoveryPolicy,
   readSessionPolicy,
@@ -229,8 +238,8 @@ export const HOSTED_REGISTER_DEPLOYMENT_REF = "hosted-register-publication" as c
  * is deliberately one no operator would write for a real review.
  */
 export const HOSTED_REGISTER_EXAMPLE_SOURCE_REF =
-  "V-28 provisional cost envelopes and V-9 vetted vendors: first hosted register"
-  + " (EXAMPLE vendors, replace before publishing)";
+  "EXAMPLE: every limit and vendor here is MADE UP. The real file stays on the server;"
+  + " replace all of them before publishing";
 export const HOSTED_REGISTER_EXAMPLE_VETTING_DATE = "2000-01-01" as const;
 const EXAMPLE_PROVIDER_REF_PREFIX = "vendor:example-";
 const EXAMPLE_MAKER_PREFIX = "Example";
@@ -244,9 +253,10 @@ const MAX_SOURCE_REF_LENGTH = 512;
 const TOP_LEVEL_KEYS = Object.freeze([
   "format", "sourceRef", "configuredProviderSet", "costEnvelopePolicy", "countryPolicy",
   "providerTargets", "synthesisRoles",
-  // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own
-  // rows are sealed (billing OFF); supplied, they supersede them.
-  "billingPlans", "billingPolicy",
+  // R22 decision 18: billingPlans and abuseLimits are REQUIRED (OPERATOR_ROW_KEYS): the code holds only made-up values.
+  "billingPlans", "abuseLimits",
+  // Paid plans (spec 2026-09-29 §2.5.1): OPTIONAL. Left out, the engine's own row is sealed (billing OFF).
+  "billingPolicy",
   // Paid plans P16a: OPTIONAL. Left out, the code-owned taxAuthorities row is sealed as it is.
   "taxAuthorities",
   // Paid plans P4-G (go-live row 31): OPTIONAL, the room read's admission budget. Left out, the
@@ -255,6 +265,9 @@ const TOP_LEVEL_KEYS = Object.freeze([
   // hate-speech S02 (owner, 2026-10-04): OPTIONAL. Left out, the code-owned publicationCheckPolicy row is sealed as it is.
   "publicationCheckPolicy",
   "questionCheckPolicy",
+  // The daily outbound mail limit (owner's rulings of 2026-11-01): OPTIONAL. Left out, the code-owned row (the preview's
+  // 2000 a day) is sealed as it is; the live site's file carries its own (10000 a day).
+  "outboundMailPolicy",
   // Role rotation (spec 2026-10-11): OPTIONAL. Left out, no row is sealed and the engine keeps its fixed roles.
   "answerRoleRotation",
   // Parallel calls (spec 2026-10-12): OPTIONAL. Left out, no row is sealed and the runner makes one call at a time per debate.
@@ -269,7 +282,7 @@ const TOP_LEVEL_KEYS = Object.freeze([
   "engineVersionPolicy",
   "supportNoSourceCheckPolicy"
 ] as const);
-const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY] as const);
+const OPERATOR_ROW_KEYS = Object.freeze([CONFIGURED_PROVIDER_SET_ROW_KEY, COST_ENVELOPE_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY, ABUSE_LIMITS_ROW_KEY] as const);
 
 /** A refusal this command owns. `code` is also the message, and it never carries a value from the file. */
 export class HostedRegisterPublicationError extends TypeError {
@@ -447,6 +460,8 @@ export type HostedRegisterFile = Readonly<{
   synthesisRoles: z.infer<typeof synthesisRolesSchema> | null;
   /** Paid plans: OPTIONAL operator rows, checked in the plan by the register's own parsers. */
   billingPlans: Readonly<{ value: unknown }> | null;
+  /** R22 decision 18: required; validated in the plan by the register's own parser (ABUSE_LIMITS_INVALID). */
+  abuseLimits: unknown;
   billingPolicy: Readonly<{ value: unknown }> | null;
   /** Optional (P16a): the operator's own where-and-when text; absent = the code-owned row. */
   taxAuthorities?: unknown;
@@ -459,6 +474,8 @@ export type HostedRegisterFile = Readonly<{
   publicationCheckPolicy?: unknown;
   /** Optional S04 question-check deadline; absent = the code-owned row. */
   questionCheckPolicy?: unknown;
+  /** Optional (2026-11-01): the daily mail limit; absent = the code-owned row. */
+  outboundMailPolicy?: unknown;
   /** Optional (spec 2026-10-11): `{ "enabled": boolean }`; absent = no answerRoleRotationPolicy row. */
   answerRoleRotation?: unknown;
   /** Optional (spec 2026-10-12): the policy without its `kind`; absent = no callConcurrencyPolicy row. */
@@ -528,12 +545,14 @@ export function parseHostedRegisterFile(bytes: Uint8Array): HostedRegisterFile {
     countryPolicy: Object.hasOwn(record, "countryPolicy") ? record.countryPolicy : null,
     providerTargets: record.providerTargets,
     synthesisRoles,
-    billingPlans: Object.hasOwn(record, BILLING_PLANS_ROW_KEY) ? Object.freeze({ value: record.billingPlans }) : null,
+    billingPlans: Object.freeze({ value: record.billingPlans }),
+    abuseLimits: record.abuseLimits,
     billingPolicy: Object.hasOwn(record, BILLING_POLICY_ROW_KEY) ? Object.freeze({ value: record.billingPolicy }) : null,
     ...(Object.hasOwn(record, "taxAuthorities") ? { taxAuthorities: record.taxAuthorities } : {}),
     ...(Object.hasOwn(record, "askRoomReads") ? { askRoomReads: record.askRoomReads } : {}),
     ...(Object.hasOwn(record, "publicationCheckPolicy") ? { publicationCheckPolicy: record.publicationCheckPolicy } : {}),
     ...(Object.hasOwn(record, "questionCheckPolicy") ? { questionCheckPolicy: record.questionCheckPolicy } : {}),
+    ...(Object.hasOwn(record, "outboundMailPolicy") ? { outboundMailPolicy: record.outboundMailPolicy } : {}),
     ...(Object.hasOwn(record, "answerRoleRotation") ? { answerRoleRotation: record.answerRoleRotation } : {}),
     ...(Object.hasOwn(record, "callConcurrencyPolicy") ? { callConcurrencyPolicy: record.callConcurrencyPolicy } : {}),
     ...(Object.hasOwn(record, "debateShapePolicy") ? { debateShapePolicy: record.debateShapePolicy } : {}),
@@ -1007,6 +1026,8 @@ export async function planHostedRegisterPublication(
   }
   // V-28: the register's own strict schema (integers, daily >= per-run).
   const costEnvelope = costEnvelopePolicyFromValue(file.costEnvelopePolicy, file.sourceRef);
+  // R22 decision 18: the operator's abuse limits, by the register's own parser (ABUSE_LIMITS_INVALID). No code-owned fallback.
+  abuseLimitsFromValue(file.abuseLimits, file.sourceRef);
   // Paid plans P16a: the operator's where-and-when text, by the register's own parser
   // (TAX_AUTHORITIES_INVALID). Absent member = the code-owned row, sealed as it is.
   if (file.taxAuthorities !== undefined) taxAuthoritiesFromValue(file.taxAuthorities, file.sourceRef);
@@ -1014,6 +1035,7 @@ export async function planHostedRegisterPublication(
   // Absent member = the code-owned row, sealed as it is.
   if (file.publicationCheckPolicy !== undefined) publicationCheckPolicyFromValue(file.publicationCheckPolicy, file.sourceRef);
   if (file.questionCheckPolicy !== undefined) questionCheckPolicyFromValue(file.questionCheckPolicy, file.sourceRef);
+  if (file.outboundMailPolicy !== undefined) outboundMailPolicyFromValue(file.outboundMailPolicy, file.sourceRef);
   // Role rotation (spec 2026-10-11): the member is the file's own shape, exactly `{ "enabled": boolean }`, so it is
   // checked here, before anything is sealed. Absent = no row (the fixed roles, as before).
   const roleRotationRow = file.answerRoleRotation === undefined ? null
@@ -1094,6 +1116,11 @@ export async function planHostedRegisterPublication(
       sourceRef: file.sourceRef
     })]
   ]);
+  operatorRows.set(ABUSE_LIMITS_ROW_KEY, Object.freeze({
+    rowKey: ABUSE_LIMITS_ROW_KEY,
+    valueJsonText: canonicalRowValue(file.abuseLimits),
+    sourceRef: file.sourceRef
+  }));
   if (file.countryPolicy !== null) {
     operatorRows.set(COUNTRY_POLICY_ROW_KEY, Object.freeze({
       rowKey: COUNTRY_POLICY_ROW_KEY,
@@ -1149,6 +1176,13 @@ export async function planHostedRegisterPublication(
     operatorRows.set(QUESTION_CHECK_POLICY_ROW_KEY, Object.freeze({
       rowKey: QUESTION_CHECK_POLICY_ROW_KEY,
       valueJsonText: canonicalRowValue(file.questionCheckPolicy),
+      sourceRef: file.sourceRef
+    }));
+  }
+  if (file.outboundMailPolicy !== undefined) {
+    operatorRows.set(OUTBOUND_MAIL_POLICY_ROW_KEY, Object.freeze({
+      rowKey: OUTBOUND_MAIL_POLICY_ROW_KEY,
+      valueJsonText: canonicalRowValue(file.outboundMailPolicy),
       sourceRef: file.sourceRef
     }));
   }
@@ -1314,6 +1348,8 @@ export async function planHostedRegisterPublication(
   // R1 A22: billing may be switched on only with its plans and the three budget
   // members, asked here of the version about to be sealed, so a dry run says so.
   assertBillingReady({ policy: billingPolicy, plans: billingPlans, envelope: costEnvelope });
+  // R22 decision 18: a site that sells plans never runs on the example's made-up limits.
+  if (billingPolicy?.enabled === true && billingPlans !== null && billingPlansAreMadeUp(billingPlans)) refuse("HOSTED_REGISTER_BILLING_PLANS_MADE_UP");
   // Paid plans S2 (spec §2.6 item 6): a version that sells plans seals only a
   // scorecard that follows the owners' plan-cap rule — a sealed row is never edited.
   if (billingPolicy?.enabled === true && scorecard !== null && !planCapsFollowPaidSiteRule(scorecard.planStrengthCaps)) {
@@ -1597,6 +1633,10 @@ export async function verifyHostedRegisterBootReadiness(
   await readDeploymentRiskTier(pool, version);
   // hate-speech S02: main.ts's publication-check-policy stage (the pre-publish check's deadline).
   await readPublicationCheckPolicy(pool, version);
+  // R22 decision 18: main.ts's abuse-limits stage.
+  await readAbuseLimits(pool, version);
+  // main.ts's outbound-mail-policy stage (the daily mail limit).
+  await readOutboundMailPolicy(pool, version);
   // Role rotation (spec 2026-10-11): optional (ABSENT keeps the fixed roles), but a malformed row would refuse the API's boot.
   await readAnswerRoleRotationPolicy(pool, version);
   // Parallel calls (spec 2026-10-12): optional (ABSENT = one call at a time), but a malformed row would refuse the runner's boot.

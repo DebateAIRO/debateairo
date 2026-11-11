@@ -75,9 +75,10 @@ export const ELD_SITE_ALIASES: Readonly<Record<string, readonly string[]>> = Obj
  * Ruling CR-2: our sites eld confidently named for another locale's sentence on the legal-page prose at the chosen
  * configuration (measured, sorted). The counts, by the sentence's locale: bg ru 1; cs ga 2, mt 2; en ga 4; es ga 2;
  * hr mt 1, sl 1; it mt 21; lt mt 1; pt es 1, ga 2; ro de 1, et 1, ga 1, hu 1, it 1, mt 3; ru uk 1.
+ * Privacy 3.12 (2026-11-04) added pl ga 1: the Irish "Áirítear na glaonna seo i do liúntas." reads as Polish.
  * On these sites the fast AI always checks (decide.ts FAST_CHECK_ALWAYS_SITES), even when eld names the site language.
  */
-export const ELD_CONFUSED_SITES: readonly string[] = Object.freeze(["bg", "cs", "en", "es", "hr", "it", "lt", "pt", "ro", "ru"]);
+export const ELD_CONFUSED_SITES: readonly string[] = Object.freeze(["bg", "cs", "en", "es", "hr", "it", "lt", "pl", "pt", "ro", "ru"]);
 
 export function eldConfident(reading: EldReading): boolean {
   return reading.code !== null && reading.reliable && reading.letters >= ELD_TUNING.minLetters;

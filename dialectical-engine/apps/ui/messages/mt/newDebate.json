@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Ma setax jinħoloq id-dibattitu",
   "newDebate.sessionReadFailed": "Il-qari tas-sessjoni falla",
   "newDebate.planRosterFailed": "Il-qari tal-lista tal-livell tal-pjan falla",
-  "newDebate.checkingSession": "Qed tiġi vverifikata s-sessjoni…",
+  "newDebate.checkingSession": "Mument wieħed…",
   "newDebate.redirectingToSignIn": "Qed tittieħed għad-dħul fil-kont…",
   "newDebate.continueToSignIn": "Kompli għad-dħul fil-kont",
   "newDebate.defaultUnavailable": "L-implimentazzjoni ma għandha l-ebda ringiela riskTier valida; il-livell tar-riskju għadu qed jistenna li tiddaħħal id-data.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Laħaqt il-limitu tal-lum tal-pjan tiegħek. Xorta tista’ tistaqsi: id-dibattitu tiegħek jibda waħdu fi {time}.",
   "newDebate.room.personWeekFullTopPlan": "Laħaqt il-limitu ta’ din il-ġimgħa tal-pjan tiegħek. Xorta tista’ tistaqsi: id-dibattitu tiegħek jibda waħdu fi {time}.",
   "newDebate.room.personMonthFullTopPlan": "Laħaqt il-limitu ta’ dan ix-xahar tal-pjan tiegħek. Xorta tista’ tistaqsi: id-dibattitu tiegħek jibda waħdu fi {time}.",
-  "newDebate.room.freeMonthFull": "Użajt id-dibattiti b’xejn ta’ dan ix-xahar. Id-dibattitu li jmiss tiegħek jista’ jibda fi {time}, jew agħżel pjan biex tkompli issa.",
+  "newDebate.room.freeMonthFull": "Użajt il-kwota b’xejn ta’ dan ix-xahar. Id-dibattitu li jmiss tiegħek jista’ jibda fi {time}, jew agħżel pjan biex tkompli issa.",
   "newDebate.room.personClose": "Qed toqrob il-limitu tal-pjan tiegħek. Dan id-dibattitu xorta jsir kollu.",
   "newDebate.room.ownDebatesFull": "Id-dibattiti l-oħra tiegħek qed jużaw il-bqija tal-limitu tiegħek għalissa. Dan id-dibattitu jibda waħdu hekk kif jispiċċa wieħed minnhom.",
   "newDebate.room.upgradeLink": "Ara l-pjanijiet",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Il-pjan tiegħek: B’xejn",
   "newDebate.plan.current.PLUS": "Il-pjan tiegħek: Plus",
   "newDebate.plan.current.PRO": "Il-pjan tiegħek: Pro",
-  "newDebate.plan.current.MAX": "Il-pjan tiegħek: Max"
+  "newDebate.plan.current.MAX": "Il-pjan tiegħek: Max",
+  "newDebate.askText.otherAnswer": "Tweġiba oħra…",
+  "newDebate.askText.otherLabel": "Spjegazzjoni addizzjonali tagħkom",
+  "newDebate.askText.matters": "Jekk it-tweġibiet imorru f'direzzjonijiet differenti, l-aktar ħaġa importanti għalija hi: {matters}",
+  "newDebate.freePublicNotice": "Fuq il-pjan B’xejn, il-mistoqsija tiegħek u d-dibattitu tagħha huma pubbliċi. Tinkludix dettalji personali."
 }

@@ -45,6 +45,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * T1-T16 are PLAN S1.2's; every title starts with its id. CI skips this directory; run it alone (two embedded clusters).
  */
 const HEAD = "0130_row_level_security.sql";
+/** The chain's last step since the statement to a debate's author says an AI read the report first only for a verdict (0175, 2026-11-11): the V4
+ *  account memory and the later V4 steps follow 0130, then 0170 to 0175, so a migrate() that reaches 0130 ends at 0175. */
+const CHAIN_END = "0175_statement_ai_read_verdict.sql";
 const PREVIOUS = "0129_support_answer_scope.sql";
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const MANIFEST = "lineage/row-level-security-forward0130.json";
@@ -152,7 +155,7 @@ describe("S1.2 migration 0130 on an empty database", () => {
 
   it("S1.2-T1 (R30) migrate() reaches 0130 on an empty database, and a second migrate() resolves", async () => {
     expect(first).toEqual({ ok: true });
-    expect(await lastApplied(db)).toBe(HEAD);
+    expect(await lastApplied(db)).toBe(CHAIN_END);
     expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
   }, 600_000);
 
@@ -380,7 +383,7 @@ describe("S1.2 migration 0130 on an empty database", () => {
 
   it("S1.2-T11 (R28) 0130 records one amendment per earlier step whose postcondition pinned the flag; a disagreeing manifest, an amendment of a later step, a row of an unapplied step and a shared amendment table are refused", async () => {
     const rows = (await db.pool.query(
-      `SELECT source_name,amended_by,amendment FROM public.debateai_schema_migration_step_amendment ORDER BY source_name COLLATE "C"`)).rows;
+      `SELECT source_name,amended_by,amendment FROM public.debateai_schema_migration_step_amendment WHERE amended_by=$1 ORDER BY source_name COLLATE "C"`, [HEAD])).rows;
     expect(rows).toEqual(AMENDMENTS.map((amendment) => ({ source_name: amendment.step, amended_by: HEAD, amendment })));
     const step = await step0130();
     expect(step.amendsPostconditionsOf).toEqual(AMENDMENTS);
@@ -525,7 +528,7 @@ describe("S1.2 migration 0130 on an empty database", () => {
       await db.pool.query("DELETE FROM public.debateai_schema_migration WHERE name=$1", [PROBE]);
     }
     expect(await outcome(migrate(db.pool))).toEqual({ ok: true });
-    expect(await lastApplied(db)).toBe(HEAD);
+    expect(await lastApplied(db)).toBe(CHAIN_END);
   }, 600_000);
 });
 
@@ -562,7 +565,7 @@ describe("S1.2 migration 0130 on a database the release before migrated", () => 
 
   it("S1.2-T2 (R30) migrate() takes a database at 0129 to 0130", async () => {
     expect(head).toEqual({ ok: true });
-    expect(await lastApplied(db)).toBe(HEAD);
+    expect(await lastApplied(db)).toBe(CHAIN_END);
   });
 
   it("S1.2-T13 (R28) on the twenty-three amended tables 0130 changes only the flag and adds the two policies", () => {

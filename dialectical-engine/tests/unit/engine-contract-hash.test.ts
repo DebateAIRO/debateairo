@@ -1,7 +1,9 @@
 // Engine redesign R1d, Task 4 (INTERFACE §2.1, §2.2, §2.4, §2.5): the engineContractHash seal. The register side reads and
 // parses the row; the code side folds engine 2's sealed contracts into one fingerprint text and its sha256. R1d seals no
 // contract (deviation 2), so the hash is the sha256 of the header alone. A phase that appends a contract (R2a: verdict.investigate.v1;
-// R2b: verdict.judge.v1; R3: the map's eight engine-2 contracts, then judge.assigned-root.unknown.v2 and .resolved.v2)
+// R2b: verdict.judge.v1; R3: the map's eight engine-2 contracts, then judge.assigned-root.unknown.v2 and .resolved.v2;
+// W1-5: the web wording's 20; W1-5b: web.plan.v2, web.pick.v2, web.read-top.v2, web.suggest.v1; W3-5: path-rewrite.writer.v1,
+// path-rewrite.checker.v1; W4-2: web.plan-dig.v1; W4-7: serve.evaluator.length.sources.v1, serve.evaluator.length.reader.sources.v1)
 // moves ENGINE_SEALED_IDS and ENGINE_CONTRACT_HASH_SEALED and says why in its commit (INTERFACE §2.5); R1D_ENGINE_CONTRACT_HASH
 // stays the empty list's seal.
 import { createHash } from "node:crypto";
@@ -25,7 +27,49 @@ import { buildPreviewSourceRowsV2, PREVIEW_SOURCE_ROW_KEYS_V2 } from "../../depl
 // R3 (engine redesign spec §9): the map's eight engine-2 contracts, then the fixed-words position writer's two, after R2's.
 const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict.judge.v1", "map.angles.v2", "map.list.angle.v2",
   "map.list.open.v2", "map.list.snowball.v2", "map.merge.v2", "map.gap.v2", "map.choose.v2", "map.check.v1",
-  "judge.assigned-root.unknown.v2", "judge.assigned-root.resolved.v2"];
+  "judge.assigned-root.unknown.v2", "judge.assigned-root.resolved.v2",
+  // W1-5 (web search, plan 2026-10-30; design §7.1 items 1-7, approved 2026-10-30): the web step's four, the arguing legs'
+  // and the review's sources variants, the comparing judges' and the answer writer's (tests/unit/web-prompts.test.ts).
+  "web.plan.v1", "web.read-all.v1", "web.pick.v1", "web.read-top.v1",
+  "judge.assigned-root.unknown.sources.v1", "judge.assigned-root.resolved.sources.v1",
+  "judge.support.unknown.length.sources.v1", "judge.support.resolved.length.sources.v1",
+  "judge.attack.unknown.length.sources.v1", "judge.attack.resolved.length.sources.v1",
+  "judge.support.consideration.unknown.length.sources.v1", "judge.support.consideration.resolved.length.sources.v1",
+  "judge.attack.consideration.unknown.length.sources.v1", "judge.attack.consideration.resolved.length.sources.v1",
+  "judge.cross-root.unknown.length.sources.v1", "judge.cross-root.resolved.length.sources.v1",
+  "judge.review.length.sources.v1", "verdict.judge.sources.v1",
+  "serve.synthesizer.length.sources.v1", "serve.synthesizer.length.reader.sources.v1",
+  // W1-5b (owner approvals of 2026-10-30): the second web wording as new ids; web.plan.v1, web.pick.v1 and
+  // web.read-top.v1 stay sealed above, unused (tests/unit/web-prompts.test.ts).
+  "web.plan.v2", "web.pick.v2", "web.read-top.v2", "web.suggest.v1",
+  // W3-5 (dig-model revision 2026-10-30; drafts 5.1 and 5.2, approved as written): the path rewrite's writer and checker.
+  "path-rewrite.writer.v1", "path-rewrite.checker.v1",
+  // W4-2 (plan 2026-10-30; owner Q9): the dig's planner, one search per pick (a draft wording, approve before switch-on).
+  "web.plan-dig.v1",
+  // W4-7 (plan 2026-10-30; design §7.1 item 7): the answer checker's two sources variants, the instruction unchanged.
+  "serve.evaluator.length.sources.v1", "serve.evaluator.length.reader.sources.v1",
+  // W5-1 (the final report over an investigation): the answer, the later version's answer, the answer check (R4's wording
+  // with W0-1 §2.6 and draft 5.6, approved), the story and the story check (OWNER WORDING drafts).
+  "report.answer.v1", "report.answer.later.v1", "report.answer-check.v1", "report.story.v1", "report.story-check.v1",
+  // R22 decision 9 and W4-3 (DRAFT wordings): a dig's planner per chosen path (web.plan-dig.v1 above stays sealed, withdrawn), and
+  // the suggestions on a dig's own paths.
+  "web.plan-dig.v2", "web.suggest-dig.v1",
+  // The owner's "always a pair" (31 Oct): v2 stays sealed, unused.
+  "web.plan-dig.v3",
+  // R22 report lane (plan 2026-10-31 decision 4, approved): the overall writer, the later version's and the checker.
+  "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
+  // R22 retention lane (decisions 8, 10, 11): reader 1's page note, the graders' cited passage, the rewrite without "search words".
+  "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2",
+  // R22 clarify lane (decision 29; the instruction approved word for word, the answer form a draft): dynamic step 2's small call.
+  "ask.clarify.v1",
+  // R22 report 2 (decision 26): the writer who may ask once, the later version's, the checker of "every path in the material".
+  "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3",
+  // The owner put back the v3 writer's lost first sentence.
+  "report.answer.v4", "report.answer.later.v4",
+  // R22 public lane (decision 13; a draft wording, the owner's before switch-on): the AI check on a contribution to a public debate.
+  "public.contribution-check.v1",
+  // R22 decision 35: the AI check on a report of a public debate.
+  "public.report-check.v1"];
 /**
  * R1d's seal: sha256 of the header text alone, no trailing newline. Printed once with
  * `printf '%s' debateai.engine-contracts.v1 | shasum -a 256` and pasted here; the test also recomputes it.
@@ -36,7 +80,24 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
  * own output (never typed). A phase that appends sets it aside to zeros for its red run, then writes the code's new seal.
  */
 // R3 (2026-10-17): + the map's eight engine-2 contracts and judge.assigned-root.*.v2 (option-1 drafts, approve before switch-on)
-const ENGINE_CONTRACT_HASH_SEALED = "ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d";
+// (ba2f15d5d89b2f7b4c3168e2f7908f5d3130aa55fc4929ad0825b15028500a4d, history). W1-5 (2026-10-30): + the web wording's 20
+// (a5a988393472a0e5a86d01c2a194e4aacb247c4d4407b6d8ad88fe06a818af5c, history). W1-5b (2026-10-30): + the second web wording's 4
+// (64ec9ef0258010b8b63f9a5e270a2c734b7311650c47281eda1fe2fc7b61057a, history). W3-5 (2026-10-31): + the path rewrite's 2
+// (e87152961c68939de279dec08e8c50423e758936db4bc8e7d785a61455151123, history). W4-2 (2026-11-01): + the dig's planner
+// (85278722824f1cde050e290bbb7ec507af08a8e7ae8087526aee27b45f1b66aa, history). W4-7 (2026-11-01): + the answer checker's two
+// sources variants (b34eac03a16c921a6a360a4405e38eea8e1c0dbd521d8de4e53a379198f6e716, history). W5-1 (2026-11-01): + the
+// final report's 5 (2c8c3139511ddf6d58aa977e418931b3185ebfe4707282367754e4ffbe6ef41b, history). R22 decision 9 and W4-3
+// (2026-10-31): + a dig's planner per chosen path and the suggestions on a dig's own paths
+// (5e91084b2392f6aafd4a6cd9e0ff4ed59295cdda3b9b95760c7e392916dd12eb, history). The owner's "always a pair": + web.plan-dig.v3
+// (25e7845643f503581c7da98aa7015209155a90647e1283fd8d59e38c93bd009a, history). R22 report lane (2026-10-31): + the overall writer,
+// the later version's and the checker. R22 retention lane: + web.read-all.v2, judge.panel.length.sources.v1 and the path rewrite's
+// v2 pair (848092c2fff40b49b15dcaefd4b26a7689b2ec5e8b8e56d2ef0ff41c748d6850 without web.plan-dig.v3, history). The lanes met before
+// anything shipped: this order is engineSealedContracts()'s own
+// (60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20, history). R22 clarify lane (decision 29): + dynamic step 2's small call.
+// R22 report 2 (decision 26): + the writer who may ask, its later version and the checker of "every path in the material"; then the
+// writer's v4 with the first sentence the owner put back. R22 public lane (decision 13): + the AI check on a contribution to a public debate
+// (e1e6168de89965c88917259fab98914b372dac6a4fe16c907ad9d9797aad613c, history). R22 decision 35: + the AI check on a report of a public debate (public.report-check.v1).
+const ENGINE_CONTRACT_HASH_SEALED = "24b33806d0e18b665bb530aa6a01e3e4c2af479b0004762cbdaefd237f70ada3";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };
@@ -145,11 +206,11 @@ describe("where the seal row is written (INTERFACE §2.4: code-owned, as mapCont
     expect(rows.find((row) => row.rowKey === "mapContractHash")?.sourceRef).toBe(DEVELOPMENT_RUNNER_SOURCE_REF);
   });
 
-  it("kit v1 filters it out (its reviewed closure is the 66 keys it was written for plus S04's questionCheckPolicy); kit v2 carries it as a required key", async () => {
+  it("kit v1 filters it out (its reviewed closure is the 66 keys it was written for plus S04's questionCheckPolicy and the mail limit's outboundMailPolicy); kit v2 carries it as a required key", async () => {
     const bootstrap = await loadBootstrapRegister();
     const v1 = await buildPreviewSourceRows(bootstrap, runtime);
     expect(v1.map((row) => row.rowKey)).not.toContain("engineContractHash");
-    expect(v1).toHaveLength(67);
+    expect(v1).toHaveLength(68);
     const v2 = await buildPreviewSourceRowsV2(bootstrap, runtime);
     expect(PREVIEW_SOURCE_ROW_KEYS_V2).toContain("engineContractHash");
     expect(JSON.parse(v2.find((row) => row.rowKey === "engineContractHash")!.valueJsonText)).toBe(engineContractHash());

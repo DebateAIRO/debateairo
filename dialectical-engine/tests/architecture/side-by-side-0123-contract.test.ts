@@ -28,8 +28,8 @@ const shape = (value: unknown): unknown => typeof value === "object" && value !=
   : typeof value;
 
 describe("0123: the side-by-side releases step", () => {
-  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124, the Italy-specific approval 0125, synthesis-flag's 0126-0129 and row-level security 0130 follow it)", () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]");
+  it("is appended to the chain's STEPS after the engine's map answer step (the settings activation 0124, the Italy-specific approval 0125, synthesis-flag's 0126-0129, row-level security 0130 and the V4 account memory 0131 follow it)", () => {
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]");
     const loader = read("packages/db/src/migration-forward0123.ts");
     expect(loader).toContain("const NAME='0123_side_by_side_releases.sql';");
     expect(loader).toContain("const VERSION='side-by-side-releases-forward0123-v1';");
@@ -293,7 +293,9 @@ describe("0123: the side-by-side releases step", () => {
     expect(sql).toContain("SIDE_BY_SIDE_SPEND_WAIVER_CONTRACT_INCOMPLETE");
     const store = read("packages/budget/src/model-spend.ts");
     const owner = store.slice(store.indexOf("async readOwnerSpentMicros("), store.indexOf("async readOwnerCountedHoldsMicros("));
-    expect(owner).toContain("AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id)");
+    // V4 start step, Task 57j (0168): bounded since, a waived debate's charge left out when recorded before ledger.spend_waived_until.
+    expect(owner).toContain("AND NOT EXISTS (SELECT 1 FROM ledger.model_spend_waiver AS waiver WHERE waiver.run_id = spend.run_id\n"
+      + "           AND spend.recorded_at < ledger.spend_waived_until(spend.run_id))");
     expect(store.split("model_spend_waiver")).toHaveLength(2); // the subscription reader alone: no site-day reader names it
     // The loader digests the table whole; the redefinition is checked by the closing block and these tests.
     const loader = read("packages/db/src/migration-forward0123.ts");

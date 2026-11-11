@@ -16,7 +16,9 @@ import { listRunnerSettingsPreload } from "../../apps/runner/src/run-settings.js
  * connected as the live runner's own login: debateai_runtime and, since row-level security S01, the marker role
  * debateai_rls_all_accounts (a system twin, as deploy/postgres/hardening.sql and the dev runner login grant it), so
  * every read and write below is one a runner may really make. The bare debateai_runtime login, with no account
- * context, sees none of these items (the last case). The superuser pool only arranges rows (claims, lapsed deadlines).
+ * context, sees none of these items, and since 0171 (the security review, F5) may not even ask the claims' and lists'
+ * pause and hand-over questions, which are the marker's (the last case). The superuser pool only arranges rows (claims,
+ * lapsed deadlines).
  * CI skips this directory; run it before merging.
  */
 let database: TestDatabase;
@@ -339,15 +341,19 @@ describe("work items are fenced by release (side-by-side §3)", () => {
     expect(await jobRow(bClaimed.workItemId)).toEqual({ state: "FAILED", terminal_reason: "RUN_SET_ASIDE:BACKSTOP", claimed_by: null });
   });
 
-  it("the bare runtime login, with no account context, reads and writes none of its own release's items (row-level security, 0126)", async () => {
+  it("the bare runtime login, with no account context, reads and writes none of its own release's items (row-level security, 0126), and claims and lists nothing (0171)", async () => {
     const a = await runWithJob(KEY_A), runless = await runlessJob();
     const bare = new WorkItemRepository(bareRuntime, { releaseKey: KEY_A, workerId: "worker:a" });
-    expect(await bare.listDispatchable(10)).toEqual([]);
+    // Since 0171 (F5) a claim and a list ask the debate's month pause and the set-aside asks whether its work is parked, both the marker's: a login
+    // without it is refused them before any row is read.
+    const pause = { code: "42501", message: "permission denied for function read_run_pause_of_run" };
+    await expect(bare.listDispatchable(10)).rejects.toMatchObject(pause);
     expect(await bare.releaseKeyOf(a.workItemId)).toBeNull();
-    expect(await bare.claimById({ workItemId: a.workItemId, workerId: "worker:a", claimSeconds })).toBeNull();
-    expect(await bare.claimNext({ workerId: "worker:a", claimSeconds })).toBeNull();
+    await expect(bare.claimById({ workItemId: a.workItemId, workerId: "worker:a", claimSeconds })).rejects.toMatchObject(pause);
+    await expect(bare.claimNext({ workerId: "worker:a", claimSeconds })).rejects.toMatchObject(pause);
     expect(await bare.recordTerminalFailure({ ...a, reason: "TEST_LAYER:BARE" })).toBe(false);
-    expect(await bare.setAsideOpenWork({ reason: "BACKSTOP", limit: 10 })).toEqual([]);
+    await expect(bare.setAsideOpenWork({ reason: "BACKSTOP", limit: 10 })).rejects
+      .toMatchObject({ code: "42501", message: "permission denied for function run_work_is_parked" });
     for (const job of [a, runless]) expect(await jobRow(job.workItemId)).toEqual({ state: "READY", terminal_reason: null, claimed_by: null });
     // Not vacuous: the runner's own login claims the same item.
     expect(await fenceA().claimById({ workItemId: a.workItemId, workerId: "worker:a", claimSeconds }))

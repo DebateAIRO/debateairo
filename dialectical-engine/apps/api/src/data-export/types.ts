@@ -36,6 +36,8 @@ export type DebateEntry = Readonly<{
   state: unknown;
   visibility_history: Readonly<{ state: string; at: string }>[];
   role_rotation: RoleRotation | null;
+  /** V4 start step, Task 56h-port: present only on a run made to carry the person's report of a public debate (never a debate of theirs). */
+  kind?: "PUBLIC_REPORT_RUN";
   question?: string;
   run?: unknown;
   run_answer?: unknown | null;
@@ -53,6 +55,22 @@ export type DebateEntry = Readonly<{
       nodes: Readonly<Record<string, unknown>>;
     }>[];
   }>[];
+}>;
+
+/**
+ * The Perplexity plan's web step (migration 0132), one debate's: its searches, the pages found (a page with no top_rank is
+ * one of its path's other pages), the readers' lines, the checked short quotes and the pages added to "researched". The
+ * sealed values (words, about, line, quote) are opened under the debate's key, null when the debate is UNRECOVERABLE or
+ * the row keeps none; a page's text is never among them (README W1).
+ */
+export type WebSourceEntry = Readonly<{
+  debate_reference: string;
+  content_status: ContentStatus;
+  searches: Readonly<Record<string, unknown> & { words: unknown }>[];
+  pages: Readonly<Record<string, unknown> & { page_id: unknown; about: unknown }>[];
+  readings: Readonly<Record<string, unknown> & { line: unknown }>[];
+  quotes: Readonly<Record<string, unknown> & { quote: unknown }>[];
+  added_to_researched: Row[];
 }>;
 
 export type SupportSessionEntry = Readonly<{
@@ -75,10 +93,15 @@ export type ExportSnapshot = Readonly<{
   locale: string;
   requestedAt: Date;
   generatedAt: Date;
-  account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[]; kept_questions: Row[] }>;
+  account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[]; kept_questions: Row[];
+    reading_level: Row | null; debate_visits: Row[]; dig_links: Row[]; investigations: Row[]; reserve_events: Row[]; question_readings: Row[]; before_start_readings: Row[]; reports_you_made: Row[];
+    /** 0157: the statements of reasons, and 0156's earlier notices. */
+    moderation_notices: Row[]; earlier_moderation_notices: Row[];
+    /** V4 start step, Task 39e: the questions not started yet, each opened with its own key (saved questions spec 2026-11-04 §3.9). */
+    questions_not_started: Row[] }>;
   security: Readonly<{ mfa_factors: Row[]; passkeys: Row[]; recovery_codes: Row | null; sessions: Row[]; social_identities: Row[]; email_changes: Row[]; recovery_email_changes: Row[]; recovery_requests: Row[] }>;
   consents: Readonly<{ legal_acceptances: Row[]; sensitive_data_consents: Row[] }>;
-  debates: Readonly<{ debates: DebateEntry[] }>;
+  debates: Readonly<{ debates: DebateEntry[]; web_sources: WebSourceEntry[] }>;
   billing: Readonly<{ customers: Row[]; customer_xmoney: Row[]; customer_profile_events: Row[]; quotes: Row[]; subscription_events: Row[]; entitlement_events: Row[]; run_charge_scopes: Row[]; charges: Row[]; internal_grants: Row[]; withdrawal_owner_settlements: Row[]; charge_events: Row[]; quote_uses: Row[]; invoice_intents: Row[]; invoices: Row[]; location_evidence: Row[] }>;
   support: Readonly<{ sessions: SupportSessionEntry[]; cases: SupportCaseEntry[] }>;
   activity: Readonly<{ events: Readonly<{ type: string; at: string }>[] }>;

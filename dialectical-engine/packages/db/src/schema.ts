@@ -1528,6 +1528,8 @@ export const STAFF_WEBAUTHN_SCHEMA_MANIFEST = Object.freeze({
   identityMetadataRelation: "identity.staff_webauthn_metadata",
   identityOwnership: "EXISTING_MFA_FACTOR_OWNER",
   staffOwnershipRole: "debateai_staff_security_owner",
+  // 0086 granted these to debateai_runtime; since 0171 they are the cross-account marker's, which the API's staff repository reaches on its
+  // system login (apps/api/src/main.ts, the site X14) and no request login holds.
   runtimeFunctions: Object.freeze([
     "staff.begin_owned_webauthn", "staff.read_owned_webauthn_challenge",
     "staff.fail_owned_webauthn", "staff.complete_owned_webauthn_registration",

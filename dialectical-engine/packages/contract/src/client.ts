@@ -1,4 +1,24 @@
 import { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
+import { AskClarifyResponseSchema, RunContinueRefusedSchema, RunContinueRequestSchema, RunContinuedSchema, type AskClarifyRequest, type AskClarifyResponse, type RunContinued, type RunContinueRefused } from "./web.js";
+// V4 start step, Task 57f: Continue on a failed debate: its two refusals, answered as data.
+import { RunNotContinuedSchema, type RunNotContinued } from "./web.js";
+import { ModerationStatementsSchema, type ModerationStatements, InvestigationCloseRequestSchema, PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicFlagAnswerSchema, PublicFlagRequestSchema, type PublicFlagAnswer, type PublicFlagRequest, PublicReportRequestSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, type PublicDebateRefused, type PublicReportAccepted, type ResearchedAddRequest, type ResearchedAdded, type ResearchedRefused } from "./web.js";
+import {
+  InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
+  InvestigationReportWritingSchema, type InvestigationReopened, type InvestigationReportAccepted, type InvestigationReports,
+  type InvestigationReportWriting
+} from "./investigation-report.js";
+import {
+  ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+  DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
+  type AccountReadingLevel, type ReadingLevelState, type LastVisit, type LastVisitRecorded, type VisitItems,
+  type DigLinks, type DigLinkRecordRequest, type DigLinkRecorded, type DigLinkMode
+} from "./account-memory.js";
+// V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04 §3.14).
+import {
+  SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema,
+  type SavedQuestionDoc, type SavedQuestionList, type SavedQuestionRead, type SavedQuestionWritten
+} from "./saved-questions.js";
 import type { VerdictState } from "./verdict-state.js";
 import { PublicationReviewAskRequestSchema, PublicationReviewAskResponseSchema, PublicationReviewStateSchema,
   type PublicationReviewState } from "./publication-review.js";
@@ -95,6 +115,8 @@ import {
   PrivateDebateErasureStatusSchema,
   PublicationTransitionSchema,
   PublicationContentRefusalSchema,
+  RunVisibilitySchema,
+  type RunVisibility,
   type PublicationRefusalStatement,
   PublicDebateListSchema,
   PublicDebateSchema,
@@ -148,6 +170,38 @@ import {
   type SessionList
 } from "./index.js";
 import type { DeclaredRegion } from "@debateai/kernel";
+import {
+  StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema, StartListsEventSchema,
+  StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, type StartCombineRequest, type StartCombineResponse,
+  type StartFitRequest, type StartFitResponse, type StartListsEvent, type StartListsRequest, type StartMergeRequest,
+  type StartMergeResponse
+} from "./start-paths.js";
+
+/**
+ * V4 start step, Task 10: the step before Start's live-event frames, read as `streamEvents` reads a run's: frames end at
+ * a blank line (LF or CRLF), comment lines (":") are ignored, a frame without data is dropped, and the text after the
+ * last blank line is handed back as `rest` (a frame cut across chunks). A frame's name is its `event:` line
+ * ("message" without one); its data is the `data:` lines joined, read as JSON (anything else is an invalid response).
+ */
+export function parseStartStepFrames(text: string): Readonly<{ events: readonly Readonly<{ event: string; data: unknown }>[]; rest: string }> {
+  const frames = text.split(/\r?\n\r?\n/u);
+  const rest = frames.pop() ?? "";
+  const events: Readonly<{ event: string; data: unknown }>[] = [];
+  for (const frame of frames) {
+    const lines = frame.split(/\r?\n/u).filter((line) => !line.startsWith(":"));
+    const data = lines.filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+    if (data.length === 0) continue;
+    const named = lines.find((line) => line.startsWith("event:"));
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(data);
+    } catch (error) {
+      throw new ContractHttpError("INVALID_RESPONSE", 200, error instanceof Error ? error.message : "Invalid event response");
+    }
+    events.push(Object.freeze({ event: named === undefined ? "message" : named.slice(6).trim(), data: parsed }));
+  }
+  return Object.freeze({ events: Object.freeze(events), rest });
+}
 
 export { ContractHttpError, type ContractErrorCode, type ContractWaitingRefusal } from "./http-error.js";
 
@@ -355,6 +409,10 @@ function exactPublicMessageSchema<const Message extends string>(message: Message
 
 const RecoveryStartPublicResponseSchema = exactPublicMessageSchema(RECOVERY_START_PUBLIC_MESSAGE);
 
+/** R22 W5-1: "Write my report" refused because a finished report version stands (the page offers "Keep digging"). */
+export const INVESTIGATION_CLOSED = "INVESTIGATION_CLOSED" as const;
+export type InvestigationClosedRefusal = Readonly<{ error: typeof INVESTIGATION_CLOSED; message: typeof INVESTIGATION_CLOSED }>;
+
 export interface ContractClient {
   /** Age gate: answers `refused` (and sets the lockout cookie) for anyone under the minimum age. */
   checkAge(dateOfBirth: string): Promise<AgeCheckResult>;
@@ -427,17 +485,17 @@ export interface ContractClient {
     total: number;
   }>>;
   readPublicDebate(publicationRef: string): Promise<PublicDebate>;
-  readRunVisibility(runId: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
+  /** Security review F2: `dig` is true for a dig, which is never published (absent from an API before 0171). */
+  readRunVisibility(runId: string): Promise<RunVisibility>;
   publishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
-  unpublishRun(runId: string, stepUpGrant: string): Promise<{ state: "PRIVATE" | "PUBLISHED"; public_ref: string | null }>;
   requestPublicationReview(runId: string, stepUpGrant: string): Promise<{ state: "UNDER_REVIEW" }>;
   readPublicationReview(runId: string): Promise<PublicationReviewState>;
-  scheduleAccountErasure(stepUpGrant:string,deletePublicDebates?:boolean):Promise<{
-    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean;
+  scheduleAccountErasure(stepUpGrant:string):Promise<{
+    status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;
   }>;
   readAccountErasure():Promise<
     | { status:"NONE" }
-    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string;delete_public_debates:boolean }
+    | { status:"SCHEDULED"|"DUE"|"PROCESSING";execute_at:string;cancellation_ref:string }
   >;
   cancelAccountErasure(cancellationRef:string):Promise<{ status:"CANCELLED" }>;
   deletePrivateDebate(runId:string,stepUpGrant:string):Promise<{
@@ -469,6 +527,8 @@ export interface ContractClient {
   submitAsk(input: AskRequest): Promise<AskAccepted>;
   /** Question language (spec 2026-10-13, D1): the same POST /v1/asks, with a valid real-mix offer (409) read as data. */
   submitAskOrLanguageChoice(input: AskRequest): Promise<AskSubmitOutcome>;
+  /** Decision 29: the clarifying questions for step 2. `signal` lets the page stop waiting. */
+  clarifyAsk(input: AskClarifyRequest, signal?: AbortSignal): Promise<AskClarifyResponse>;
   /**
    * Budget spec §2.7: the room this ask would find — a word, never a figure. Debate shape (M4): the three shape
    * fields go on the query only when given, so today's query is unchanged.
@@ -480,11 +540,16 @@ export interface ContractClient {
     depth_mode?: DepthMode;
     scrutiny?: Scrutiny;
     answer_length?: AnswerLength;
+    /** Plan 2026-10-30 W1-6 (Q14): a dig's room read, so the answer says the dig's share of today; only when given. */
+    dig_parent?: string;
+    dig_mode?: DigLinkMode;
+    dig_picks?: number;
   }>): Promise<AskRoomResponse>;
   /** Paid-plans spec §1.2 (U1): the person's windows as whole percentages; 404 when billing is off. */
   getBillingUsage(): Promise<BillingUsageResponse>;
   /** Paid-plans spec §2.5.3: the public plans list; 404 when billing is off. */
-  getBillingPlans(): Promise<BillingPlansResponse>;
+  /** With no place, the connection's country; `postalCode` counts only in the US and Canada. */
+  getBillingPlans(place?: Readonly<{ country?: string; postalCode?: string }>): Promise<BillingPlansResponse>;
   createBillingQuote(input: BillingQuoteRequest): Promise<BillingQuoteResponse>;
   /** A payment already on its way for the open checkout resolves as `{state: "PENDING", charge_ref}` (409 CHECKOUT_PENDING). */
   startBillingCheckout(input: BillingCheckoutRequest): Promise<BillingCheckoutResponse | BillingCheckoutPendingResponse>;
@@ -501,8 +566,8 @@ export interface ContractClient {
     planId: "PRO" | "MAX", quoteRef: string,
     agreement: Readonly<{ locale: string; renewal_terms: Readonly<{ version: string; sha256: string }> }>
   ): Promise<BillingUpgradeResponse | BillingUpgradePendingResponse>;
-  /** P12d: withdraw within the 14 days with a WITHDRAW_SUBSCRIPTION step-up grant; `refund` null = the owner settles it. */
-  withdrawSubscription(stepUpGrant: string): Promise<BillingWithdrawResponse>;
+  /** P12d: withdraw within the 14 days, as the signed-in session (no step-up); `refund` null = the owner settles it. */
+  withdrawSubscription(): Promise<BillingWithdrawResponse>;
   /** N13 (spec §2.11): the stored billing details the card page pre-fills (country and region read-only). */
   getBillingCardDetails(): Promise<BillingCardDetailsResponse>;
   /** N13: NETOPIA's 0 check for the corrected details and the agreement; the browser goes to `redirect_url`. */
@@ -520,6 +585,48 @@ export interface ContractClient {
   readAnswer(answerId: string, version?: number): Promise<Answer>;
   readRunAnswer(runId: string): Promise<Answer>;
   takeRemovalNotice(): Promise<RemovalNoticeTake>;
+  /** V4 account memory (N7): the reading level kept in the account (null until first chosen). */
+  readReadingLevel(): Promise<ReadingLevelState>;
+  saveReadingLevel(level: AccountReadingLevel): Promise<ReadingLevelState>;
+  /**
+   * V4 start step, Task 39e: the questions not started yet, the newest first (at most 20), with their titles and the day each was saved.
+   * The first and later saves send the document exactly as given (checked with SavedQuestionDocSchema.safeParse, never replaced by the
+   * parse, whose words() would trim signed text); Pick up answers the stored document as is. Delete answers nothing (204).
+   */
+  listSavedQuestions(): Promise<SavedQuestionList>;
+  createSavedQuestion(doc: SavedQuestionDoc): Promise<SavedQuestionWritten>;
+  saveSavedQuestion(id: string, revision: number, doc: SavedQuestionDoc): Promise<SavedQuestionWritten>;
+  readSavedQuestion(id: string): Promise<SavedQuestionRead>;
+  deleteSavedQuestion(id: string): Promise<void>;
+  /** V4 account memory (N7): what this debate's map showed when the person last looked (both null before a first visit). */
+  readLastVisit(runId: string): Promise<LastVisit>;
+  recordLastVisit(runId: string, items: VisitItems): Promise<LastVisitRecorded>;
+  /** V4 account memory (N11): the dig this debate came from, and the digs made from it. */
+  readDigLinks(runId: string): Promise<DigLinks>;
+  recordDigLink(parentRunId: string, link: DigLinkRecordRequest): Promise<DigLinkRecorded>;
+  /**
+   * R22 W3-8 (the money rule): Continue on a debate paused at the month wall. Pressed before the month reset it is
+   * refused and nothing changes: the 409 RUN_PAUSED_UNTIL_RESET body is answered as data, with its `until`. V4 start step, Task 57f: the
+   * same route continues the person's own FAILED debate where it stopped; a failed debate it cannot continue (409 RUN_NOT_CONTINUABLE) and
+   * one with no room left for the rest (409 RUN_CONTINUE_NO_ROOM) are answered as data too, nothing changed.
+   */
+  continueRun(runId: string): Promise<RunContinued | RunContinueRefused | RunNotContinued>;
+  /** R22 W5-1: the investigation the debate is in and its report versions, oldest first. */
+  readInvestigation(runId: string): Promise<InvestigationReports>;
+  /**
+   * R22 W5-1: "Write my report" (202, the version being written). Once a finished version stands the 409
+   * INVESTIGATION_CLOSED is answered as data: the page then offers "Keep digging".
+   */
+  writeReport(runId: string): Promise<InvestigationReportAccepted | InvestigationClosedRefusal>;
+  /** R22 W5-1: "Keep digging". While a version is being written the 409 INVESTIGATION_REPORT_WRITING is answered as data. */
+  reopenInvestigation(runId: string): Promise<InvestigationReopened | InvestigationReportWriting>;
+  /** W4-4: "Add to researched" (202, READING; the same page again: the same). Its refusals (409) are answered as data. */
+  addToResearched(runId: string, request: ResearchedAddRequest): Promise<ResearchedAdded | ResearchedRefused>;
+  /** Decision 13: "Write a report" on a public page. A 409 comes back as data (nothing started); a 404 and the rest throw. */
+  writePublicReport(publicationRef: string): Promise<PublicReportAccepted | PublicDebateRefused>;
+  flagPublicDebate(publicationRef: string, body: PublicFlagRequest): Promise<PublicFlagAnswer>;
+  /** 0157 (D1): the signed-in person's own statements of reasons, newest first. */
+  readModerationStatements(): Promise<ModerationStatements>;
   readRun(runId: string): Promise<RunProjection>;
   readInspection(answerId: string, version?: number): Promise<Inspection>;
   readLedgerDigest(answerId: string): Promise<ExecutionLedgerDigest>;
@@ -532,6 +639,14 @@ export interface ContractClient {
   unlinkMemory(answerId: string): Promise<{ memory_link_id: string; state: "UNLINKED" }>;
   readEvents(runId: string): Promise<readonly RunEvent[]>;
   streamEvents(runId: string, consume: (event: RunEvent) => void, signal?: AbortSignal): Promise<void>;
+  /** V4 start step, Task 10: the lists before Start, as a stream of events (POST /v1/asks/paths/lists). */
+  startPathLists(input: StartListsRequest, onEvent: (event: StartListsEvent) => void, signal: AbortSignal): Promise<void>;
+  /** The merge of the lists into a menu (POST /v1/asks/paths/merge): its menu, or why there is none. */
+  startPathMerge(input: StartMergeRequest, signal?: AbortSignal): Promise<StartMergeResponse>;
+  /** One question for several points (POST /v1/asks/paths/combine). */
+  startPathCombine(input: StartCombineRequest, signal?: AbortSignal): Promise<StartCombineResponse>;
+  /** Which chosen path the person's own point of view fits inside (POST /v1/asks/paths/fit). */
+  startPathFit(input: StartFitRequest, signal?: AbortSignal): Promise<StartFitResponse>;
 }
 
 const UnlinkSchema = { parse(value: unknown) {
@@ -582,6 +697,52 @@ export function createContractClient(
     if (!response.ok) throw await contractErrorForResponse(response);
     return response;
   };
+  /**
+   * V4 start step, Task 10: POST `body` to `path` as an event stream (with the CSRF pair, as every POST), reading each
+   * frame as it arrives and handing its parsed event to `consume`; a refusal is the contract's error for its status.
+   */
+  const startStepStream = async <E>(path: string, body: unknown, schema: { parse(value: unknown): E }, consume: (event: E) => void,
+    signal?: AbortSignal): Promise<void> => {
+    let response: Response;
+    try {
+      const headers = new Headers({ accept: "text/event-stream", "content-type": "application/json" });
+      if (auth.cookieHeader !== undefined) headers.set("cookie", auth.cookieHeader);
+      if (auth.userAgent !== undefined) headers.set("user-agent", auth.userAgent);
+      if (auth.forwardedFor !== undefined) headers.set("x-forwarded-for", auth.forwardedFor);
+      const csrf = auth.csrfToken?.() ?? browserCsrfToken();
+      if (csrf !== null) headers.set("x-csrf-token", csrf);
+      response = await fetchImplementation(new URL(path, root), { method: "POST", body: JSON.stringify(body), headers,
+        cache: "no-store", credentials: "same-origin" as const, ...(signal === undefined ? {} : { signal }) });
+    } catch (error) {
+      if (signal?.aborted === true) throw error;
+      throw new ContractHttpError("NETWORK_FAILURE", 0, error instanceof Error ? error.message : "Network failure");
+    }
+    if (!response.ok) throw await contractErrorForResponse(response);
+    if (response.body === null) throw new ContractHttpError("INVALID_RESPONSE", response.status, "Event stream has no body");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    const hand = (events: readonly Readonly<{ event: string; data: unknown }>[]) => {
+      for (const one of events) {
+        let parsed: E;
+        try {
+          parsed = schema.parse(one);
+        } catch (error) {
+          throw new ContractHttpError("INVALID_RESPONSE", 200, error instanceof Error ? error.message : "Invalid event response");
+        }
+        consume(parsed);
+      }
+    };
+    while (true) {
+      const chunk = await reader.read();
+      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
+      const read = parseStartStepFrames(buffer);
+      buffer = read.rest;
+      hand(read.events);
+      if (chunk.done) break;
+    }
+    hand(parseStartStepFrames(`${buffer}\n\n`).events);
+  };
   const parseFrame = (frame: string): RunEvent | null => {
     const data = frame.split(/\r?\n/)
       .filter((line) => line.startsWith("data:"))
@@ -595,6 +756,22 @@ export function createContractClient(
     }
   };
   return Object.freeze({
+    startPathLists: (input: StartListsRequest, onEvent: (event: StartListsEvent) => void, signal: AbortSignal) =>
+      startStepStream("/v1/asks/paths/lists", StartListsRequestSchema.parse(input), StartListsEventSchema, onEvent, signal),
+    async startPathMerge(input: StartMergeRequest, signal?: AbortSignal): Promise<StartMergeResponse> {
+      let answer: StartMergeResponse | null = null;
+      await startStepStream("/v1/asks/paths/merge", StartMergeRequestSchema.parse(input), StartMergeEventSchema, (event) => {
+        if (answer !== null) return;
+        if (event.event === "menu") answer = { source: event.data.source, menu: event.data.menu };
+        else if (event.event === "none") answer = { source: "NONE", reason: event.data.reason };
+      }, signal);
+      if (answer === null) throw new ContractHttpError("INVALID_RESPONSE", 200, "The merge stream ended without a menu or a reason");
+      return answer;
+    },
+    startPathCombine: (input: StartCombineRequest, signal?: AbortSignal) => request("/v1/asks/paths/combine", StartCombineResponseSchema,
+      { method: "POST", body: JSON.stringify(StartCombineRequestSchema.parse(input)), ...(signal === undefined ? {} : { signal }) }),
+    startPathFit: (input: StartFitRequest, signal?: AbortSignal) => request("/v1/asks/paths/fit", StartFitResponseSchema,
+      { method: "POST", body: JSON.stringify(StartFitRequestSchema.parse(input)), ...(signal === undefined ? {} : { signal }) }),
     checkAge: (dateOfBirth: string) => request(
       "/v1/auth/age-check",
       AgeCheckResultSchema,
@@ -736,7 +913,7 @@ export function createContractClient(
     ),
     readRunVisibility: (runId: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/visibility`,
-      PublicationTransitionSchema
+      RunVisibilitySchema
     ),
     publishRun: (runId: string, stepUpGrant: string) => request(
       `/v1/runs/${encodeURIComponent(runId)}/publish`,
@@ -744,14 +921,6 @@ export function createContractClient(
       { method: "POST", body: JSON.stringify({
           step_up_grant: stepUpGrant,
           warning_acknowledged: true
-        }) }
-    ),
-    unpublishRun: (runId: string, stepUpGrant: string) => request(
-      `/v1/runs/${encodeURIComponent(runId)}/unpublish`,
-      PublicationTransitionSchema,
-      { method: "POST", body: JSON.stringify({
-          step_up_grant: stepUpGrant,
-          copies_may_persist_acknowledged: true
         }) }
     ),
     requestPublicationReview: (runId: string, stepUpGrant: string) => request(
@@ -765,11 +934,10 @@ export function createContractClient(
       `/v1/runs/${encodeURIComponent(runId)}/publication-review`,
       PublicationReviewStateSchema
     ),
-    scheduleAccountErasure:(stepUpGrant:string,deletePublicDebates?:boolean)=>request(
+    scheduleAccountErasure:(stepUpGrant:string)=>request(
       "/v1/account",AccountErasureStatusSchema,
       { method:"DELETE",body:JSON.stringify({
-          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant,
-          delete_public_debates:deletePublicDebates===true
+          confirmation:"DELETE MY ACCOUNT",step_up_grant:stepUpGrant
         }) }
     ).then((status)=>{
       if (status.status==="NONE") throw new ContractHttpError(
@@ -835,6 +1003,8 @@ export function createContractClient(
     getGeoAvailability: () => request("/v1/geo/availability", GeoAvailabilityResponseSchema),
     readPublicAiProviders: () => request("/v1/public/ai-providers", PublicAiProvidersResponseSchema),
     submitAsk: (input: AskRequest) => request("/v1/asks", AskAcceptedSchema, { method: "POST", body: JSON.stringify(input) }),
+    clarifyAsk: (input: AskClarifyRequest, signal?: AbortSignal) => request("/v1/asks/clarify", AskClarifyResponseSchema,
+      { method: "POST", body: JSON.stringify(input), ...(signal === undefined ? {} : { signal }) }),
     submitAskOrLanguageChoice: (input: AskRequest) => requestJson<AskSubmitOutcome>(
       root.href, fetchImplementation, "/v1/asks",
       AskAcceptedSchema.transform((accepted): AskSubmitOutcome => Object.freeze({ kind: "ACCEPTED" as const, accepted })),
@@ -852,16 +1022,28 @@ export function createContractClient(
       depth_mode?: DepthMode;
       scrutiny?: Scrutiny;
       answer_length?: AnswerLength;
+      dig_parent?: string;
+      dig_mode?: DigLinkMode;
+      dig_picks?: number;
     }>) => request(`/v1/asks/room?${new URLSearchParams({
       plan_tier: input.plan_tier,
       composition_budget_tier: input.composition_budget_tier,
       depth: String(input.depth),
       ...(input.depth_mode === undefined ? {} : { depth_mode: input.depth_mode }),
       ...(input.scrutiny === undefined ? {} : { scrutiny: input.scrutiny }),
-      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length })
+      ...(input.answer_length === undefined ? {} : { answer_length: input.answer_length }),
+      ...(input.dig_parent === undefined ? {} : { dig_parent: input.dig_parent }),
+      ...(input.dig_mode === undefined ? {} : { dig_mode: input.dig_mode }),
+      ...(input.dig_picks === undefined ? {} : { dig_picks: String(input.dig_picks) })
     }).toString()}`, AskRoomResponseSchema),
     getBillingUsage: () => request("/v1/billing/usage", BillingUsageResponseSchema),
-    getBillingPlans: () => request("/v1/billing/plans", BillingPlansResponseSchema),
+    getBillingPlans: (place?: Readonly<{ country?: string; postalCode?: string }>) => {
+      const query = new URLSearchParams();
+      if (place?.country !== undefined) query.set("country", place.country);
+      if (place?.postalCode !== undefined) query.set("postal_code", place.postalCode);
+      const search = query.toString();
+      return request(`/v1/billing/plans${search === "" ? "" : `?${search}`}`, BillingPlansResponseSchema);
+    },
     createBillingQuote: (input: BillingQuoteRequest) => request(
       "/v1/billing/quote", BillingQuoteResponseSchema,
       { method: "POST", body: JSON.stringify(BillingQuoteRequestSchema.parse(input)) }
@@ -912,9 +1094,9 @@ export function createContractClient(
         return pending.success ? Object.freeze({ state: "PENDING" as const, charge_ref: pending.data.charge_ref }) : null;
       }
     ),
-    withdrawSubscription: (stepUpGrant: string) => request(
+    withdrawSubscription: () => request(
       "/v1/billing/subscription/withdraw", BillingWithdrawResponseSchema,
-      { method: "POST", body: JSON.stringify({ step_up_grant: stepUpGrant }) }
+      { method: "POST", body: JSON.stringify({}) }
     ),
     getBillingCardDetails: () => request("/v1/billing/subscription/card", BillingCardDetailsResponseSchema),
     startCardChange: (input: BillingCardChangeRequest) => request(
@@ -935,6 +1117,82 @@ export function createContractClient(
     readAnswer: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}${versionQuery(version)}`, AnswerSchema),
     readRunAnswer: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/answer`, AnswerSchema),
     takeRemovalNotice: () => request("/v1/account/removal-notice/take", RemovalNoticeTakeSchema, { method: "POST" }),
+    readReadingLevel: () => request("/v1/account/reading-level", ReadingLevelStateSchema),
+    saveReadingLevel: (level: AccountReadingLevel) => request("/v1/account/reading-level", ReadingLevelStateSchema,
+      { method: "POST", body: JSON.stringify(ReadingLevelSaveRequestSchema.parse({ reading_level: level })) }),
+    // V4 start step, Task 39e: the raw document goes out as given; the parse is a check only.
+    listSavedQuestions: () => request("/v1/account/saved-questions", SavedQuestionListSchema),
+    createSavedQuestion: (doc: SavedQuestionDoc) => {
+      const checked = SavedQuestionCreateSchema.safeParse({ doc });
+      if (!checked.success) return Promise.reject(checked.error);
+      return request("/v1/account/saved-questions", SavedQuestionWrittenSchema, { method: "POST", body: JSON.stringify({ doc }) }, 201);
+    },
+    saveSavedQuestion: (id: string, revision: number, doc: SavedQuestionDoc) => {
+      const checked = SavedQuestionSaveSchema.safeParse({ revision, doc });
+      if (!checked.success) return Promise.reject(checked.error);
+      return request(`/v1/account/saved-questions/${encodeURIComponent(id)}`, SavedQuestionWrittenSchema,
+        { method: "PUT", body: JSON.stringify({ revision, doc }) });
+    },
+    readSavedQuestion: (id: string) => request(`/v1/account/saved-questions/${encodeURIComponent(id)}`, SavedQuestionReadSchema),
+    deleteSavedQuestion: (id: string) => requestNoContent(root.href, fetchImplementation, `/v1/account/saved-questions/${encodeURIComponent(id)}`,
+      { method: "DELETE" }, auth),
+    readLastVisit: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitSchema),
+    recordLastVisit: (runId: string, items: VisitItems) => request(`/v1/runs/${encodeURIComponent(runId)}/last-visit`, LastVisitRecordedSchema,
+      { method: "POST", body: JSON.stringify(LastVisitRecordRequestSchema.parse({ items })) }),
+    readDigLinks: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/dig-links`, DigLinksSchema),
+    recordDigLink: (parentRunId: string, link: DigLinkRecordRequest) => request(`/v1/runs/${encodeURIComponent(parentRunId)}/dig-links`, DigLinkRecordedSchema,
+      { method: "POST", body: JSON.stringify(DigLinkRecordRequestSchema.parse(link)) }),
+    continueRun: (runId: string) => requestJson<RunContinued | RunContinueRefused | RunNotContinued>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/continue`, RunContinuedSchema,
+      { method: "POST", body: JSON.stringify(RunContinueRequestSchema.parse({})) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = RunContinueRefusedSchema.safeParse(body);
+        if (refused.success) return refused.data;
+        const notContinued = RunNotContinuedSchema.safeParse(body);
+        return notContinued.success ? notContinued.data : null;
+      }
+    ),
+    readInvestigation: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}/investigation`, InvestigationReportsSchema),
+    writeReport: (runId: string) => requestJson<InvestigationReportAccepted | InvestigationClosedRefusal>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/report`, InvestigationReportAcceptedSchema,
+      { method: "POST", body: JSON.stringify(InvestigationCloseRequestSchema.parse({})) }, auth, 202,
+      (status, body) => status === 409 && typeof body === "object" && body !== null
+        && (body as { error?: unknown }).error === INVESTIGATION_CLOSED
+        ? Object.freeze({ error: INVESTIGATION_CLOSED, message: INVESTIGATION_CLOSED }) : null
+    ),
+    addToResearched: (runId: string, request: ResearchedAddRequest) => requestJson<ResearchedAdded | ResearchedRefused>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/researched`, ResearchedAddedSchema,
+      { method: "POST", body: JSON.stringify(ResearchedAddRequestSchema.parse(request)) }, auth, 202,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = ResearchedRefusedSchema.safeParse(body);
+        return refused.success ? refused.data : null;
+      }
+    ),
+    flagPublicDebate: (publicationRef: string, body: PublicFlagRequest) => requestJson<PublicFlagAnswer>(
+      root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/flag`, PublicFlagAnswerSchema,
+      { method: "POST", body: JSON.stringify(PublicFlagRequestSchema.parse(body)) }, auth
+    ),
+    readModerationStatements: () => request("/v1/account/moderation-statements", ModerationStatementsSchema),
+    writePublicReport: (publicationRef: string) => requestJson<PublicReportAccepted | PublicDebateRefused>(
+      root.href, fetchImplementation, `/v1/public/debates/${encodeURIComponent(publicationRef)}/report`, PublicReportAcceptedSchema,
+      { method: "POST", body: JSON.stringify(PublicReportRequestSchema.parse({})) }, auth, 202,
+      (status, body) => {
+        if (status !== 409) return null;
+        const refused = PublicDebateRefusedSchema.safeParse(body);
+        return refused.success ? refused.data : null;
+      }
+    ),
+    reopenInvestigation: (runId: string) => requestJson<InvestigationReopened | InvestigationReportWriting>(
+      root.href, fetchImplementation, `/v1/runs/${encodeURIComponent(runId)}/reopen`, InvestigationReopenedSchema,
+      { method: "POST", body: JSON.stringify(InvestigationReopenRequestSchema.parse({})) }, auth, undefined,
+      (status, body) => {
+        if (status !== 409) return null;
+        const writing = InvestigationReportWritingSchema.safeParse(body);
+        return writing.success ? writing.data : null;
+      }
+    ),
     readRun: (runId: string) => request(`/v1/runs/${encodeURIComponent(runId)}`, RunProjectionSchema),
     readInspection: (answerId: string, version?: number) => request(`/v1/answers/${encodeURIComponent(answerId)}/inspection${versionQuery(version)}`, InspectionSchema),
     readLedgerDigest: (answerId: string) => request(`/v1/answers/${encodeURIComponent(answerId)}/ledger-digest`, ExecutionLedgerDigestSchema),

@@ -3,6 +3,7 @@
  *
  * Plain words: before a practice spends a cent it refuses unless
  *  - both forwarded gate sockets exist on this computer (PRACTICE_DEEPINFRA_SOCKET, PRACTICE_ANTHROPIC_SOCKET),
+ *    and, for a debate that searches the web (Task 91f), the web-search gate's too (PRACTICE_PERPLEXITY_SOCKET),
  *  - the operator has written PRACTICE_ACK=spends-real-money,
  *  - the live settings file holds only the allowed, non-secret runner/API settings and nothing key-shaped (a hosted
  *    preview's billing and country-file settings are set aside unread: see PRACTICE_HOSTED_SET_ASIDE_KEYS),
@@ -47,17 +48,34 @@ export function practiceSocketsFromEnvironment(env: Readonly<Record<string, stri
   if (env.PRACTICE_ACK !== PRACTICE_ACK_VALUE) {
     throw new PracticeRefusal("PRACTICE_ACK_REQUIRED", `set PRACTICE_ACK=${PRACTICE_ACK_VALUE}`);
   }
-  const socket = (name: "PRACTICE_DEEPINFRA_SOCKET" | "PRACTICE_ANTHROPIC_SOCKET"): string => {
-    const path = env[name];
-    if (path === undefined || path.trim() === "") throw new PracticeRefusal("PRACTICE_SOCKET_MISSING", name);
-    if (!isAbsolute(path)) throw new PracticeRefusal("PRACTICE_SOCKET_NOT_ABSOLUTE", name);
-    if (!isSocket(path)) throw new PracticeRefusal("PRACTICE_SOCKET_NOT_FOUND", name);
-    return path;
-  };
-  const deepinfra = socket("PRACTICE_DEEPINFRA_SOCKET");
-  const anthropic = socket("PRACTICE_ANTHROPIC_SOCKET");
+  const deepinfra = forwardedSocket(env, "PRACTICE_DEEPINFRA_SOCKET", isSocket);
+  const anthropic = forwardedSocket(env, "PRACTICE_ANTHROPIC_SOCKET", isSocket);
   if (deepinfra === anthropic) throw new PracticeRefusal("PRACTICE_SOCKETS_SAME");
   return Object.freeze({ deepinfra, anthropic });
+}
+
+/** One forwarded gate socket named by its env key: given, absolute, and a socket on this computer (else refused, naming the key). */
+function forwardedSocket(env: Readonly<Record<string, string | undefined>>,
+  name: "PRACTICE_DEEPINFRA_SOCKET" | "PRACTICE_ANTHROPIC_SOCKET" | "PRACTICE_PERPLEXITY_SOCKET", isSocket: (path: string) => boolean): string {
+  const path = env[name];
+  if (path === undefined || path.trim() === "") throw new PracticeRefusal("PRACTICE_SOCKET_MISSING", name);
+  if (!isAbsolute(path)) throw new PracticeRefusal("PRACTICE_SOCKET_NOT_ABSOLUTE", name);
+  if (!isSocket(path)) throw new PracticeRefusal("PRACTICE_SOCKET_NOT_FOUND", name);
+  return path;
+}
+
+/**
+ * V4 start step, Task 91f (owner 9 Nov: "It also needs the search connection on the relay"): the forwarded web-search gate's socket
+ * (the relay's perplexity.sock, README S-4 and S-5), read only for a debate that searches: `--start-step premium:N` where the settings
+ * name a search gate. Checked as the other two (given, absolute, a socket), and never one of them.
+ */
+export function practiceSearchSocketFromEnvironment(env: Readonly<Record<string, string | undefined>>, sockets: PracticeSockets,
+  isSocket: (path: string) => boolean = (path) => {
+    try { return lstatSync(path).isSocket(); } catch { return false; }
+  }): string {
+  const perplexity = forwardedSocket(env, "PRACTICE_PERPLEXITY_SOCKET", isSocket);
+  if (perplexity === sockets.deepinfra || perplexity === sockets.anthropic) throw new PracticeRefusal("PRACTICE_SOCKETS_SAME");
+  return perplexity;
 }
 
 /** The only keys a settings file may hold: non-secret settings of the live runner.env and api.env. */

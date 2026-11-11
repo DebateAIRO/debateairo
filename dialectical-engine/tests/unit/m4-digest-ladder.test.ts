@@ -411,11 +411,14 @@ describe("M4 · the spine uses its room (review fix I-2)", () => {
 
   it("walks the fixed schedule, members and content alternately, and sizes only grow", () => {
     expect(DIGEST_LADDER.spineWidenings.map((step) => [step.decisiveCount, step.summaryCap])).toEqual([
-      [20, 60], [30, 60], [30, 120], [40, 120], [60, 120], [60, 240], [80, 240], [80, 480], [120, 480], [null, null]
+      [20, 60], [30, 60], [30, 120], [40, 120], [60, 120], [60, 240], [80, 240], [80, 480], [120, 480],
+      // Owner ruling 2026-10-29: the in-between rungs above 120.
+      [160, 480], [200, 480], [240, 480], [280, 480], [320, 480], [360, 480], [400, 480], [440, 480], [480, 480], [null, null]
     ]);
     const walk = [...synthesisDigestSpineWidenings(input, spineAt(20))];
     expect(walk.map((attempt) => [attempt.spineDecisiveCount, attempt.digest.summaryCharacterCap])).toEqual([
-      [20, 60], [30, 60], [30, 120], [40, 120], [60, 120], [60, 240], [80, 240], [80, 480], [120, 480]
+      // Owner ruling 2026-10-29: 160 of the 192 ranked points still leaves points out, so it is a step; 200 would not.
+      [20, 60], [30, 60], [30, 120], [40, 120], [60, 120], [60, 240], [80, 240], [80, 480], [120, 480], [160, 480]
     ]);
     let previous = spineAt(20).digest;
     for (const attempt of walk) {
@@ -478,6 +481,76 @@ describe("M4 · the spine uses its room (review fix I-2)", () => {
     expect(fitted(buildSynthesisDigest({ ...input, budgetBound: third.byteSize })).byteSize).toBe(third.byteSize);
     // One byte under it serves the second.
     expect(fitted(buildSynthesisDigest({ ...input, budgetBound: third.byteSize - 1 })).byteSize).toBe(walk[1]!.digest.byteSize);
+  });
+});
+
+/*
+ * Owner ruling 2026-10-29 (MORNING-2026-10-17 item 9, "finer steps in between"): above 120 points the spine no longer
+ * jumps from the 120 most decisive points to every point. In-between rungs (160, 200, ... 480, every 40) give the writer
+ * the largest rung that fits, so as many points as fit are kept; every left-out point is still counted exactly. The
+ * whole-statement ladder (R4, LG-E) reads its decisive counts from this same schedule.
+ */
+describe("finer steps above 120 points (owner ruling 2026-10-29)", () => {
+  // 2,003 nodes: three positions and 2,000 points, the most decisive ones nearest the positions (leverage falls with
+  // the index), so each spine is about its decisive count, and the compact rung (every node, about 430 KB) is over
+  // every budget below.
+  const nodes = measuredTree(2_003, { leverage: (index) => 1 - index / 10_000 });
+  const input = { nodes, servedRootNodeId: uuid(0) };
+  let walked: readonly SynthesisDigestAttempt[] | null = null;
+  const walk = (): readonly SynthesisDigestAttempt[] => {
+    if (walked === null) {
+      const first = ladderOf(nodes).find((attempt) => attempt.spineDecisiveCount === 20 && attempt.digest.compressionLevel === SPINE)!;
+      walked = [...synthesisDigestSpineWidenings(input, first)];
+    }
+    return walked;
+  };
+  const rung = (decisive: number): SynthesisDigest => walk().find((attempt) =>
+    attempt.spineDecisiveCount === decisive && attempt.digest.summaryCharacterCap === 480)!.digest;
+
+  it("schedules a rung every 40 points from 120 to 480, before every point", () => {
+    expect(DIGEST_LADDER.spineWidenings.slice(-11).map((step) => [step.decisiveCount, step.summaryCap])).toEqual([
+      [120, 480], [160, 480], [200, 480], [240, 480], [280, 480], [320, 480], [360, 480], [400, 480], [440, 480], [480, 480],
+      [null, null]
+    ]);
+    expect(walk().filter((attempt) => attempt.digest.summaryCharacterCap === 480).map((attempt) => attempt.spineDecisiveCount))
+      .toEqual([80, 120, 160, 200, 240, 280, 320, 360, 400, 440, 480]);
+  });
+
+  it("each in-between rung keeps the one below it and more, and sizes only grow", () => {
+    const counts = [120, 160, 200, 240, 280, 320, 360, 400, 440, 480];
+    for (const [index, count] of counts.slice(1).entries()) {
+      const below = rung(counts[index]!);
+      const above = rung(count);
+      expect(above.byteSize).toBeGreaterThan(below.byteSize);
+      const members = new Set(memberIds(above));
+      for (const nodeId of memberIds(below)) expect(members.has(nodeId)).toBe(true);
+      expect(members.size).toBeGreaterThan(below.nodes.length);
+    }
+  });
+
+  it.each([160, 200, 280, 480])("serves the %i rung at its exact size, and the rung below one byte under it", (count) => {
+    const at = rung(count);
+    const below = rung(count - 40);
+    expect(at.byteSize).toBeGreaterThan(TIERS.high);
+    const served = fitted(buildSynthesisDigest({ ...input, budgetBound: at.byteSize }));
+    expect(JSON.stringify(served)).toBe(JSON.stringify(at));
+    const under = fitted(buildSynthesisDigest({ ...input, budgetBound: at.byteSize - 1 }));
+    expect(JSON.stringify(under)).toBe(JSON.stringify(below));
+  });
+
+  it("discloses every left-out point exactly at each rung, counted under its position", () => {
+    for (const count of [120, 160, 200, 240, 480]) {
+      const digest = rung(count);
+      expect(digestPointsOmitted(digest)).toBe(nodes.length - digest.nodes.length);
+      for (const entry of digest.omittedPoints ?? []) expect(entry.positionNodeId).not.toBeNull();
+    }
+  });
+
+  it("a budget above the top rung but under every point still serves the 480 rung, never a spine of 120", () => {
+    const top = rung(480);
+    const served = fitted(buildSynthesisDigest({ ...input, budgetBound: top.byteSize + 10_000 }));
+    expect(JSON.stringify(served)).toBe(JSON.stringify(top));
+    expect(digestPointsOmitted(served)).toBe(nodes.length - top.nodes.length);
   });
 });
 

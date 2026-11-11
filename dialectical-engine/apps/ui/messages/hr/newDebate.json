@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Nije moguće pokrenuti raspravu",
   "newDebate.sessionReadFailed": "Čitanje sesije nije uspjelo",
   "newDebate.planRosterFailed": "Čitanje popisa razine plana nije uspjelo",
-  "newDebate.checkingSession": "Provjera sesije…",
+  "newDebate.checkingSession": "Trenutak…",
   "newDebate.redirectingToSignIn": "Preusmjeravamo vas na prijavu…",
   "newDebate.continueToSignIn": "Nastavite s prijavom",
   "newDebate.defaultUnavailable": "Implementacija nema valjan redak za riskTier; razina rizika čeka unos.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Dosegnuli ste današnje ograničenje svog plana. I dalje možete postaviti pitanje: vaša će rasprava započeti sama u {time}.",
   "newDebate.room.personWeekFullTopPlan": "Dosegnuli ste ograničenje svog plana za ovaj tjedan. I dalje možete postaviti pitanje: vaša će rasprava započeti sama u {time}.",
   "newDebate.room.personMonthFullTopPlan": "Dosegnuli ste ograničenje svog plana za ovaj mjesec. I dalje možete postaviti pitanje: vaša će rasprava započeti sama u {time}.",
-  "newDebate.room.freeMonthFull": "Iskoristili ste besplatne rasprave za ovaj mjesec. Vaša sljedeća rasprava može započeti u {time} ili odaberite plan i nastavite odmah.",
+  "newDebate.room.freeMonthFull": "Iskoristili ste besplatnu kvotu za ovaj mjesec. Vaša sljedeća rasprava može započeti u {time} ili odaberite plan i nastavite odmah.",
   "newDebate.room.personClose": "Blizu ste ograničenja svog plana. Ova će se rasprava ipak odvijati u cijelosti.",
   "newDebate.room.ownDebatesFull": "Vaše ostale rasprave zasad koriste ostatak vašeg ograničenja. Ova će rasprava započeti sama čim jedna od njih završi.",
   "newDebate.room.upgradeLink": "Pogledajte planove",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Vaš plan: Besplatno",
   "newDebate.plan.current.PLUS": "Vaš plan: Plus",
   "newDebate.plan.current.PRO": "Vaš plan: Pro",
-  "newDebate.plan.current.MAX": "Vaš plan: Max"
+  "newDebate.plan.current.MAX": "Vaš plan: Max",
+  "newDebate.askText.otherAnswer": "Drugi odgovor…",
+  "newDebate.askText.otherLabel": "Vaše vlastito dodatno pojašnjenje",
+  "newDebate.askText.matters": "Ako odgovori vode u različitim smjerovima, što mi je najvažnije: {matters}",
+  "newDebate.freePublicNotice": "U besplatnom planu vaše pitanje i rasprava o njemu javni su. Nemojte navoditi osobne podatke."
 }

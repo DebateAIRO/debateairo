@@ -53,6 +53,25 @@ const METADATA_MARKER = Buffer.from("abcdef4d61784d696e642e636f6d", "hex");
 const ISO_COUNTRY = /^[A-Z]{2}$/u;
 const DBIP_UNKNOWN_COUNTRY = "ZZ";
 
+/**
+ * C1 — THE EU'S OVERSEAS PARTS ARE THEIR MEMBER STATE. DB-IP gives each of these its own ISO 3166-1
+ * code, but they are France and Finland (TFEU art. 349/355: outermost regions, and Åland), and the
+ * country policy keys only FR and FI — so their own code fell to the closed default rule and refused
+ * sign-up AND sign-in (the gate's `service` uses the sign-up rule) to people who live in France or
+ * Finland. Payment stays exact: the billing postcode still picks out each place (kernel
+ * payment-regions.ts). A place outside the EU (Saint-Barthélemy BL, Saint-Pierre-et-Miquelon PM, New
+ * Caledonia NC, …) is not folded and keeps its own rule.
+ */
+const MEMBER_STATE_OF_TERRITORY: Readonly<Record<string, string>> = Object.freeze({
+  GP: "FR", // Guadeloupe
+  MQ: "FR", // Martinique
+  GF: "FR", // French Guiana
+  RE: "FR", // Réunion
+  YT: "FR", // Mayotte
+  MF: "FR", // Saint-Martin
+  AX: "FI"  // Åland
+});
+
 function refuse(code: GeoReloadFailureCode | "GEO_LOOKUP_CLOSED"): never {
   throw new TypedDomainError(code, code);
 }
@@ -176,8 +195,8 @@ export function openGeoLookup(options: GeoLookupOptions): GeoLookup & RegionLook
       }
       return UNKNOWN_COUNTRY;
     }
-    return typeof iso === "string" && ISO_COUNTRY.test(iso) && iso !== DBIP_UNKNOWN_COUNTRY
-      ? iso : UNKNOWN_COUNTRY;
+    if (typeof iso !== "string" || !ISO_COUNTRY.test(iso) || iso === DBIP_UNKNOWN_COUNTRY) return UNKNOWN_COUNTRY;
+    return Object.hasOwn(MEMBER_STATE_OF_TERRITORY, iso) ? MEMBER_STATE_OF_TERRITORY[iso]! : iso;
   };
 
   const lookup = (ip: string): GeoLookupResult => {

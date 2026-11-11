@@ -39,15 +39,19 @@
  *    site's day holds only this practice's spend; no waker is started (a practice ask that would WAIT is reported as
  *    not admitted, ASK_WAITING_IN_LINE); the staff settings are not exported, and with billing off no funding source is
  *    built, so an internal-funding selection is neither read nor refused (side-by-side spec §9, C17, as main.ts).
+ *  - V4 start step (Task 91b): the step before Start signs with a per-process key and reads a question check that passes
+ *    every line (the practice's fixed questions; POST /v1/asks's own check is not run by the practice either).
  */
 import type { Pool } from "pg";
 import { PostgresAskApplication, type Dispatcher, type RunCreationSettings } from "@debateai/api";
-import { ProviderProbeRepository, RunWaitRepository } from "@debateai/db";
+import { PostgresStartPathsStore, ProviderProbeRepository, RunWaitRepository } from "@debateai/db";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   NO_PERSON_ALLOWANCE,
   PostgresModelSpendStore,
+  preStartChargeWriterPresent,
+  recordPreStartCharge,
   type CostEstimator
 } from "@debateai/budget";
 import {
@@ -55,6 +59,8 @@ import {
   createPreviewRemainingRpcPort,
   PREVIEW_GLM_DEADLINE_MS,
   previewProbeControls,
+  previewTargetChargePrice,
+  providerTargetPrice,
   resolveProviderTargetCredentials,
   type PreviewBudgetPorts,
   type PreviewGateRemaining
@@ -77,6 +83,7 @@ import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
 import { createProviderDiscoveryResolver, parseDeclaredProviderTargets } from "../../apps/api/src/provider-discovery.js";
 import {
   admissionSettingsOfVersion,
+  admissionViewOf,
   buildAdmissionSiteContext,
   createAdmissionSettingsCache,
   decideAskRoomReadiness,
@@ -85,9 +92,15 @@ import {
   type AdmissionSiteContext
 } from "../../apps/api/src/admission-settings.js";
 import { createActiveSettingsVersionReader } from "../../apps/api/src/active-settings-version.js";
+import { postgresPurposeLines } from "../../apps/api/src/purpose-lines.js";
 import { questionLanguageRouteFor } from "../../apps/api/src/question-language/boot.js";
 import type { QuestionLanguageChoiceNeeded, QuestionLanguageLock } from "../../apps/api/src/question-language/decider.js";
 import { newQuestionLanguageReferenceKey } from "../../apps/api/src/question-language/reference.js";
+import type { AskQuestionCheck } from "../../apps/api/src/question-check/ask-gate.js";
+import { createStartCharges } from "../../apps/api/src/start-step/charge.js";
+import { newStartStepKey } from "../../apps/api/src/start-step/signing.js";
+import { createStartStep, startStepRouteOf } from "../../apps/api/src/start-step/step.js";
+import { createStartTransport } from "../../apps/api/src/start-step/transport.js";
 import { practicePinsRequireRotation, practiceRotationCountsWithPins, type PracticeWriterPins } from "./practice-pins.js";
 import type { PracticeSettings, PracticeSockets } from "./practice-settings.js";
 
@@ -100,6 +113,15 @@ export function practiceRemainingPorts(settings: PracticeSettings, sockets: Prac
     deepinfra: (signal?: AbortSignal): Promise<PreviewGateRemaining> => deepinfra.remaining(signal),
     anthropic: (signal?: AbortSignal): Promise<PreviewGateRemaining> => anthropic.remaining(signal)
   });
+}
+
+/**
+ * V4 start step, Task 91f: the web-search gate's read-only "what is left today", over its forwarded socket (the same scope), for a
+ * debate that searches (practice.ts checks it is open before anything paid is sent, as the other two).
+ */
+export function practiceSearchRemainingPort(settings: PracticeSettings, socket: string) {
+  const search = createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: settings.runner.PREVIEW_GATE_SETTINGS.scope_id });
+  return (signal?: AbortSignal): Promise<PreviewGateRemaining> => search.remaining(signal);
 }
 
 /**
@@ -338,12 +360,52 @@ export async function composePracticeAsk(input: Readonly<{
       activeSettingsVersion: () => activeSettings.current(),
       admissionSettingsFor: async (version: number) =>
         practiceMembersOf(admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)))
-    }
+    },
+    // V4 start step, Task 36, as main.ts: the chosen paths store and the purpose lines the START_PATHS setup step records.
+    startPaths: new PostgresStartPathsStore(pool),
+    purposeLines: postgresPurposeLines(pool)
   } as RunCreationSettings;
   const application = new PostgresAskApplication(pool, input.dispatcher, runSettings, undefined, input.provisionPool,
     Object.freeze({ server: input.serverAdmissionPool, legacy: input.legacyAdmissionPool }));
+  /**
+   * V4 start step, Task 91b, as main.ts (Task 31): THE STEP BEFORE START and the key it signs with, for `--start-step`
+   * (practice-start-step.ts). The route is the preview's only with a gate part AND 0158's writer (the throwaway database's own); each
+   * call goes through the practice's guarded fetch, so the gates settle it, and is the person's charge through 0158's writer at the
+   * price the runner charges the same target at. Differences, on purpose: the key is per process (`newStartStepKey`: one process, no
+   * blind-index key); the question check passes every line (`PRACTICE_QUESTION_CHECK`); the step's content-free lines go to the log.
+   */
+  const preStartWriter = await preStartChargeWriterPresent(pool);
+  const startStepKey = newStartStepKey();
+  const startStepRoute = startStepRouteOf({ previewGate, writerPresent: preStartWriter });
+  const startStep = createStartStep({
+    route: startStepRoute,
+    key: startStepKey,
+    settingsFor: (version) => admissionCache.admissionSettingsFor(version),
+    questionCheck: PRACTICE_QUESTION_CHECK,
+    transport: startStepRoute === "PREVIEW"
+      ? createStartTransport({ fetch: previewFetch, targets: declaredProviderTargets }) : null,
+    charges: createStartCharges({
+      record: (entry) => recordPreStartCharge(pool, entry),
+      priceOf: (providerRef) => {
+        const target = declaredProviderTargets.find((declared) => declared.providerRef === providerRef);
+        return target === undefined ? null : previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
+      },
+      clock: () => new Date(),
+      report: (line) => input.log?.(JSON.stringify(line))
+    }),
+    report: (line) => input.log?.(JSON.stringify(line))
+  });
   return Object.freeze({ application, rotationOn: siteAdmission.roleRotation !== null, declaredProviderTargets,
     configuredProviders: deploymentMakers.configuredProviders,
     hosted: money === null ? null : Object.freeze({ room: askRoom !== undefined, billingInRegister: money.billingInRegister,
-      billingInPractice: "off" as const }) });
+      billingInPractice: "off" as const }),
+    // V4 start step, Task 91b: the step, its key, and the site version's view the hand-over reads (its switch and engine row).
+    startStep, startStepKey, startView: admissionViewOf(siteAdmission) });
 }
+
+/**
+ * V4 start step, Task 91b: the question check the step before Start reads at Next, in the practice. The practice asks only its own
+ * fixed questions and never runs POST /v1/asks's check (it hands the ask to `submit` itself); main.ts's check is a site call on the
+ * Anthropic gate, charged to the site and never to the person, so it is outside the month's lines either way.
+ */
+export const PRACTICE_QUESTION_CHECK: AskQuestionCheck = Object.freeze({ check: async () => Object.freeze({ outcome: "PASS" as const }) });

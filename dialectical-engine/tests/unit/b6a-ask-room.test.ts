@@ -44,7 +44,7 @@ function lockPool() {
 function window(scope: PersonWindow["scope"], limitMicros: number, resetsAt: Date): PersonWindow {
   return Object.freeze({
     scope, limitMicros, periodStart: new Date("2026-09-29T09:00:00.000Z"), resetsAt,
-    finishBasisPoints: 11_000, closeBasisPoints: 9_500
+    finishBasisPoints: 12_100, closeBasisPoints: 9_500
   });
 }
 
@@ -276,7 +276,7 @@ describe("B6a the person's windows (paid-plans spec §2.4.1)", () => {
 
   it("A5: Free, whose cold-start estimate is above its whole month, still STARTS as CLOSE", async () => {
     const { room } = arrange({
-      windows: { [OWNER]: [window("PERSON_MONTH", 200_000, MONTH_RESET)] },
+      windows: { [OWNER]: [window("PERSON_MONTH", 330_000, MONTH_RESET)] },
       estimate: 360_000
     });
     await expect(decisionOf(room)).resolves.toMatchObject({

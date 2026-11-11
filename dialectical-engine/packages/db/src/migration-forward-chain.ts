@@ -22,6 +22,51 @@ import { loadForward0127 } from './migration-forward0127.js';
 import { loadForward0128 } from './migration-forward0128.js';
 import { loadForward0129 } from './migration-forward0129.js';
 import { loadForward0130 } from './migration-forward0130.js';
+import { loadForward0131 } from './migration-forward0131.js';
+import { loadForward0132 } from './migration-forward0132.js';
+import { loadForward0133 } from './migration-forward0133.js';
+import { loadForward0134 } from './migration-forward0134.js';
+import { loadForward0135 } from './migration-forward0135.js';
+import { loadForward0136 } from './migration-forward0136.js';
+import { loadForward0137 } from './migration-forward0137.js';
+import { loadForward0138 } from './migration-forward0138.js';
+import { loadForward0139 } from './migration-forward0139.js';
+import { loadForward0140 } from './migration-forward0140.js';
+import { loadForward0141 } from './migration-forward0141.js';
+import { loadForward0142 } from './migration-forward0142.js';
+import { loadForward0143 } from './migration-forward0143.js';
+import { loadForward0144 } from './migration-forward0144.js';
+import { loadForward0145 } from './migration-forward0145.js';
+import { loadForward0146 } from './migration-forward0146.js';
+import { loadForward0147 } from './migration-forward0147.js';
+import { loadForward0148 } from './migration-forward0148.js';
+import { loadForward0149 } from './migration-forward0149.js';
+import { loadForward0150 } from './migration-forward0150.js';
+import { loadForward0151 } from './migration-forward0151.js';
+import { loadForward0152 } from './migration-forward0152.js';
+import { loadForward0153 } from './migration-forward0153.js';
+import { loadForward0154 } from './migration-forward0154.js';
+import { loadForward0155 } from './migration-forward0155.js';
+import { loadForward0156 } from './migration-forward0156.js';
+import { loadForward0157 } from './migration-forward0157.js';
+import { loadForward0158 } from './migration-forward0158.js';
+import { loadForward0159 } from './migration-forward0159.js';
+import { loadForward0160 } from './migration-forward0160.js';
+import { loadForward0161 } from './migration-forward0161.js';
+import { loadForward0162 } from './migration-forward0162.js';
+import { loadForward0163 } from './migration-forward0163.js';
+import { loadForward0164 } from './migration-forward0164.js';
+import { loadForward0165 } from './migration-forward0165.js';
+import { loadForward0166 } from './migration-forward0166.js';
+import { loadForward0167 } from './migration-forward0167.js';
+import { loadForward0168 } from './migration-forward0168.js';
+import { loadForward0169 } from './migration-forward0169.js';
+import { loadForward0170 } from './migration-forward0170.js';
+import { loadForward0171 } from './migration-forward0171.js';
+import { loadForward0172 } from './migration-forward0172.js';
+import { loadForward0173 } from './migration-forward0173.js';
+import { loadForward0174 } from './migration-forward0174.js';
+import { loadForward0175 } from './migration-forward0175.js';
 
 /**
  * The forward steps after dev's sealed lineage, its 0108 and its 0110 (PR-54, PR-58, migrations/lineage/README.md): an
@@ -39,8 +84,20 @@ import { loadForward0130 } from './migration-forward0130.js';
  * every later migrate() compares that step against its latest amendment instead of its receipt.
  */
 export type ForwardStepAnchor=Readonly<{baseRecipeSha256:string;previousName:string;previousManifestSha256:string;previousVerifierSha256:string}>;
-/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added. */
-export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>;
+/** One recorded amendment of an earlier step's postcondition: which step, which relations, which field, its new value, the policies added; or which functions it redefined; or which CHECKs it replaced; or which functions' grants it widened, to whom, or took back; or which columns it added to which tables. */
+export type PostconditionAmendment=Readonly<{step:string;relations:readonly string[];field:'relrowsecurity';value:true;policies:readonly string[]}>
+ // 0144: a step that redefines functions an earlier step's digest pins names them.
+ // 0172 (M2): a step that redefines functions of a step and adds columns to that step's tables (one amendment per step, so one entry) names both.
+ // 0172 (M3, M7): and the CHECKs it adds or swaps on those tables, and the grants it takes back from a function that step granted (a drained step's).
+ |Readonly<{step:string;functions:readonly string[];field:'function_definition';relations?:readonly string[];columns?:readonly string[];constraints?:readonly string[];revokes?:readonly string[]}>
+ // 0169: a step that grants a role EXECUTE on a function an earlier step's digest pins (0124's pointer reader) names the function and the roles.
+ |Readonly<{step:string;functions:readonly string[];grantees:readonly string[];field:'function_acl'}>
+ // 0174: a drained step that only takes back a role's grant on a function an earlier step's digest pins (0150's door without a ground) names the function and the revoke.
+ |Readonly<{step:string;functions:readonly string[];revokes:readonly string[];field:'function_acl_revoked'}>
+ // 0169 (Task 57p): a step that adds a column (and its CHECK) to tables an earlier step's digest pins names the tables and the columns.
+ |Readonly<{step:string;relations:readonly string[];columns:readonly string[];field:'column_added'}>
+ // 0164: a step that replaces a CHECK an earlier step's digest pins (0138's on identity.main_answer_update) names its table and the CHECK.
+ |Readonly<{step:string;relations:readonly string[];constraints:readonly string[];field:'constraint_definition'}>;
 export type ForwardStepPlan=Readonly<{
  name:string; version:string; manifestSha256:string; sourceSha256:string; sql:string;
  previousName:string; previousManifestSha256:string; previousVerifierSha256:string;
@@ -76,9 +133,34 @@ export type ChainStep=ForwardStepPlan&Readonly<{n1:N1Declaration}>;
  * 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13: settings changes without
  * an upload), then the Italy-specific approval (0125, mission italy-clause-approval), then mission synthesis-flag's
  * synthesis check (0126, S01), publication review (0127, S02), threat reports (0128, S04) and support answer scope
- * (0129, S05), then row-level security (0130, mission row-level-security S01). A new step appends its loader here (README).
+ * (0129, S05), then row-level security (0130, mission row-level-security S01), then the V4 account memory (0131, owner
+ * rulings N7 and N11), then the web evidence store (0132) and investigations (0133) of the Perplexity plan (2026-10-30,
+ * task W1-3), then the new dig model and the month pause (0134, dig-model revision task W2-8), then a dig's picks and its
+ * path rewrite's material (0135, task W3-7), then the final report over an investigation (0136, task W5-1), then the owner's changes of
+ * 31 Oct: public debates (0137), tree updates (0138), passage retention (0139) and the drained spend kinds (0140), then a path's suggestions (0141), the team's one limit (0142, drained), then the hand-over of a paused debate (0143), then the drained step that puts step 2's small AI in the person's quota (0144), then the runner's list of pages added to researched (0145), then the Owner's allowances for team members (0146), then the steps of
+ * 0147-0161 the README lists, then the V4 start step's saved questions (0162, plan 2026-11-03 Task 39d: a person's questions not started
+ * yet, each under its own key), then the carry-on digs without a live sign-in (0163, plan 2026-11-03 Task 56a, drained: it redefines
+ * 0123's core.create_encrypted_run and declares that amendment), then a dig under the main question of a path debate updating the main
+ * answer (0164, plan 2026-11-03 Task 55e, drained: it widens 0138's CHECK on what made a main-answer version and declares that
+ * amendment), then a failed question giving back its path-list charge (0165, plan 2026-11-03 Task 57c, drained: it redefines 0158's
+ * three readers and declares those amendments), then a later main-answer version revising the newest one, whichever table holds it
+ * (0166, plan 2026-11-03 Task 56g, expand: one runner definer), then a visitor's report of a public debate carried by a run of their own
+ * (0167, plan 2026-11-03 Task 56h, expand: one API definer), then a debate an update set aside continuing where it stopped, the person
+ * paying only for what runs after Continue (0168, plan 2026-11-03 Task 57j, drained: it redefines 0165's four person readers and its
+ * re-open and declares those amendments), then the runner reading which settings are switched on, for a new piece of an older debate whose
+ * own version it refuses (0169, plan 2026-11-03 Task 57o-fix, expand: one grant on 0124's pointer reader, declared as an amendment of 0124's
+ * postcondition; and, Task 57p, each piece's record noting which settings wrote it: a nullable column on eight tables of five steps, declared
+ * as their amendments, and ten new writers), then the daily outbound mail limit (0170, owner's rulings of 2026-11-01; built as 0153 on
+ * dev, #234, renumbered onto the V4 line and re-chained after 0169 at the merge of 2026-11-09), then the security review's
+ * drained step (0171, built as 0154 and renumbered at the merge of the V4 line; it stays last after the second merge of 2026-11-09), then the moderation
+ * notices' seven gaps after 0157 (0172, the owner's list of 10 November 2026, drained: 0157's queue restated, 0151's alert kind CHECK widened, both
+ * declared as amendments), then the check's answer on a report a person already closed (0173, the follow-up to 0172's M6, drained: 0151's settle
+ * restated so it queues no staff notice for a closed report, declared as an amendment), then 0150's staff review door without a ground closed to the
+ * runtime (0174, the final review of 0172, drained: one revoke, declared as an amendment of 0150), then the statement to a debate's author saying
+ * an AI read the report first only for a verdict (0175, Q3 of 0172's final review, drained: 0157's statement ground restated, declared as an amendment).
+ * A new step appends its loader here (README).
  */
-const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130]);
+const STEPS:readonly StepLoader[]=Object.freeze([loadForward111,loadForwardAuthDbBatch,loadForward0113,loadForward0114,loadForward115,loadForward0116,loadForward0117,loadForward0118,loadForward0119,loadForward0120,loadForward0121,loadForward0122,loadForward0123,loadForward0124,loadForward0125,loadForward0126,loadForward0127,loadForward0128,loadForward0129,loadForward0130,loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]);
 
 /** A forward step's file name; the receipt and declaration tables CHECK the same shape. */
 export const FORWARD_STEP_NAME=/^\d{4}_[a-z0-9_]+\.sql$/;

@@ -611,7 +611,45 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // Row-level security S01 merged onto origin/dev 76b76f4ba (2026-10-28): the module carries the synthesis-flag lines and
 // row security's lines above. migrate() is byte-identical (its 13,114-byte slice, sha256 d1495dbe4bbf…, at ca61cbe00,
 // b1005606c, 76b76f4ba and 20808ee31).
-const NATIVE_MIGRATE_MODULE_SHA256 = "6a957bde3c9b8e1664ccd5a6bb233fdf06991411bd60112848b8d21de4bb4a87";
+// R22 engine follow-ups (2026-10-29, owner ruling "Backup AI takes the seat"): the reviewed module after
+// RunBackupSwitchLifecycleValue's cause admitted CONTENT_REFUSED (a type and its comment only). migrate() is byte-identical.
+// Merge of origin/dev 64ef40c21 (row-level security, #226) into the V4 branch (2026-10-30): the module carries both the
+// row-security lines and the R22 CONTENT_REFUSED cause above. migrate() is byte-identical.
+// Perplexity plan W1-3 (2026-10-30): two export lines for the web evidence and investigation repositories (0132, 0133).
+// Dig-model revision W2-8 (2026-10-31): one comment and one export line for the dig model repositories (0134).
+// Moderation notice (2026-11-05): one export line for the moderation notice repository (0156).
+// migrate() is byte-identical.
+// V4 start step Task 20 (2026-11-03): one comment and one export line for the start paths store (0159). migrate() is
+// byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+// V4 start step Task 21 (2026-11-03): one comment and one export line for the path results repository (0160). migrate() is byte-identical.
+// Merge of origin V4 bbd16f888 (2026-11-04): V4 took 0154, so the two comments above name 0156 and 0157 (the start step's three
+// migrations moved up one). Comments only; migrate() is byte-identical.
+// Merge of origin V4 5cef1764d (2026-11-04): V4 took 0155 (the owner's two writes on their own answer), so the Task 20 and
+// Task 21 comments above now name 0157 and 0158 (the start step's three migrations moved up one again). Comments only;
+// migrate() is byte-identical.
+// V4 start step Task 53a (2026-11-04): one comment and one export line for the path progress repository (0161). migrate() is byte-identical.
+// V4 start step Task 56a (2026-11-05): startRun's carry-on dig (0163: RunCreationPrincipal's carryOn, CARRY_ON_DIG_REFUSALS, the
+// content-provision list's new prepare). migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+// V4 start step Task 55d (2026-11-05): withOwnRunContentLease (another run's content under a short lease of its own). migrate() is byte-identical.
+// Renumber before merging origin V4 16f621dc7 (2026-11-06): V4 took 0156 (the moderation notice), so the start step's eight
+// migrations moved up one (0156-0163 → 0157-0164) and the module's comments, like the Task 20, 21, 53a and 56a lines above,
+// now name 0158, 0159, 0160 and 0162. Comments only; migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+// Merge of origin V4 16f621dc7 (2026-11-06): the module carries V4's moderation-notice export line (0156) and the start
+// step's comments above. migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+// Renumber before merging origin V4 957e3d9d7 (2026-11-07): V4 took 0157 (the moderation statements), so the start step's eight
+// migrations moved up one again (0157-0164 → 0158-0165) and the module's comments, like the Task 20, 21, 53a and 56a lines above,
+// now name 0159, 0160, 0161 and 0163. Comments only; migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+// Moderation statements (2026-11-06): one export line for the statements of reasons repository (0157); migrate() is byte-identical.
+// Merge of origin V4 957e3d9d7 (2026-11-07): the module carries V4's moderation-statements export line (0157) and the start
+// step's comments above. migrate() is byte-identical (its slice, sha256 d1495dbe4bbf…, as before).
+// Security review F2 (2026-11-04, migration 0171): StartRunInput gained `digRun` and #insertRun sends it to
+// core.create_encrypted_run, refusing a legacy asker's dig before any SQL. migrate() is byte-identical (its 13,114-byte
+// slice, sha256 d1495dbe4bbf…).
+// The security review's step takes the number 0171 ahead of the merge of feat/2026-10-28-v4-initial (2026-11-09): the number
+// in the module's comments is all that moved. migrate() is byte-identical.
+// The merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' comments and export lines. migrate() is byte-identical.
+// The second merge of feat/2026-10-28-v4-initial into the security review's branch (2026-11-09): both sides' export lines. migrate() is byte-identical.
+const NATIVE_MIGRATE_MODULE_SHA256 = "a58622edc223784d038c0595e91d910f2fcb374353e50c853e8a06180d643a01";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each
@@ -758,10 +796,12 @@ export function auditNumericSourceLiteralExports(name: string, source: string): 
 /** The deployed preview-test module is a finite production budget/config boundary.
  * Only its reviewed direct runtime imports are exceptional; mixed fixture imports still block.
  * Side-by-side addition D14-D16 (owner 2026-10-22): preview-line-up.ts, the env's gate part and the line-up composed back
- * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there). */
+ * into that module's config shape, is one more reviewed direct caller (it reuses the one env key check there).
+ * Perplexity plan 2026-10-30, task W2-1: perplexity-search.ts, the web search adapter, is one more: it reads that module's
+ * gate refusal classes to name why a search failed (halted, busy, unsent, not served), never a fixture. */
 export function auditProductionFixtureImports(where:string,source:string):readonly string[]{
  const runtimeCaller=where==="packages/providers/src/index.ts"||where==="packages/providers/src/provider-probe.ts"
-  ||where==="packages/providers/src/preview-line-up.ts";
+  ||where==="packages/providers/src/preview-line-up.ts"||where==="packages/providers/src/perplexity-search.ts";
  for(const match of source.matchAll(/from\s+["']([^"']+)["']/g)){
   const specifier=match[1]!;
   if(!/(?:tests?|fixtures?)/.test(specifier))continue;
@@ -770,6 +810,15 @@ export function auditProductionFixtureImports(where:string,source:string):readon
  }
  return [];
 }
+
+/**
+ * Perplexity plan 2026-10-30, task W1-7: the V4 mock API (tools/v4-mock-api) is a local stand-in for the API that the
+ * website is click-tested against on a developer's computer. It is never deployed and holds no engine policy: its
+ * switches (port, room, plan) come from the environment of the person who starts it, and its self-check hands the
+ * website's proxy the mock's address the way the website itself is started (DIALECTICAL_API_BASE). By name, these two
+ * files only; every other rule still applies to them, and the law is unchanged everywhere else.
+ */
+const LOCAL_MOCK_ENVIRONMENT_READERS: ReadonlySet<string> = new Set(["tools/v4-mock-api/server.ts", "tools/v4-mock-api/check.ts"]);
 
 export async function auditSourceRules(): Promise<{ readonly blocking: readonly string[] }> {
   const blocking: string[] = [];
@@ -783,7 +832,8 @@ export async function auditSourceRules(): Promise<{ readonly blocking: readonly 
     const source = await readFile(path, "utf8");
     const where = relative(root, path);
     gatewayDeclarations += source.match(/interface\s+ProviderGateway\b/g)?.length ?? 0;
-    if (source.includes(["process", "env"].join(".")) && where !== "packages/register/src/runtime-environment.ts") {
+    if (source.includes(["process", "env"].join(".")) && where !== "packages/register/src/runtime-environment.ts"
+      && !LOCAL_MOCK_ENVIRONMENT_READERS.has(where)) {
       blocking.push(`${where} reads the process environment outside the register loader`);
     }
     if ((where.startsWith("packages/propagation/") || where.startsWith("packages/battery/decision/")) && /from\s+["'](?:node:|pg|drizzle|@debateai\/db)/.test(source)) {

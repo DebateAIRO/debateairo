@@ -59,7 +59,6 @@ function arrange(input: { resolve?: boolean } = {}) {
     auditPreflightDenial: async () => true,
     readOwnedVisibility: async ({ runId }) => { seen.push(`readOwnedVisibility:${runId}`); return null; },
     publish: async () => null,
-    unpublish: async () => null,
     readPublicDebate: async () => null,
     list: async () => ({ items: [], total: 0 })
   };
@@ -94,7 +93,7 @@ const read = testSessionHeaders(OWNER);
 const write = testSessionHeaders(OWNER, true);
 
 describe("side-by-side C9: every run-id route follows the old id to its newest run", () => {
-  it("each of the seven routes, called with the old id, reaches its first downstream call with the new one", async () => {
+  it("each of the six routes, called with the old id, reaches its first downstream call with the new one", async () => {
     const { api, seen } = arrange();
     try {
       const cases = [
@@ -104,9 +103,7 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
         { method: "GET", url: `/v1/runs/${OLD}/visibility`, headers: read, first: `readOwnedVisibility:${NEW}` },
         { method: "GET", url: `/v1/runs/${OLD}/answer`, headers: read, first: `readRunAnswer:${NEW}` },
         { method: "POST", url: `/v1/runs/${OLD}/publish`, headers: write,
-          payload: { step_up_grant: GRANT, warning_acknowledged: true }, first: `preflightGrant:PUBLISH:${NEW}` },
-        { method: "POST", url: `/v1/runs/${OLD}/unpublish`, headers: write,
-          payload: { step_up_grant: GRANT, copies_may_persist_acknowledged: true }, first: `preflightGrant:UNPUBLISH:${NEW}` }
+          payload: { step_up_grant: GRANT, warning_acknowledged: true }, first: `preflightGrant:PUBLISH:${NEW}` }
       ] as const;
       for (const entry of cases) {
         seen.length = 0;
@@ -167,10 +164,10 @@ describe("side-by-side C9: every run-id route follows the old id to its newest r
 
       const social = await api.inject({
         method: "POST", url: "/v1/account/social/google/step-up/begin", headers: write,
-        payload: { authorization: { action: "UNPUBLISH", target_run_id: OLD }, next: "/settings/security" }
+        payload: { authorization: { action: "PUBLISH", target_run_id: OLD }, next: "/settings/security" }
       });
       expect(social.statusCode).toBe(200);
-      expect(beginStepUp.mock.calls[0]?.[1]).toEqual({ authorization: { action: "UNPUBLISH", target_run_id: OLD }, next: "/settings/security" });
+      expect(beginStepUp.mock.calls[0]?.[1]).toEqual({ authorization: { action: "PUBLISH", target_run_id: OLD }, next: "/settings/security" });
     } finally {
       await api.close();
     }

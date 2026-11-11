@@ -84,7 +84,16 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/account/export", auth: "user", resource: "identity", action: "request-data-export" },
   { route: "POST /v1/account/export/download", auth: "user", resource: "identity", action: "download-data-export" },
   { route: "POST /v1/account/removal-notice/take", auth: "user", resource: "identity", action: "take-removal-notice" },
+  { route: "GET /v1/account/reading-level", auth: "user", resource: "identity", action: "read-reading-level" },
+  { route: "POST /v1/account/reading-level", auth: "user", resource: "identity", action: "save-reading-level" },
+  // V4 start step, Task 39e: the questions not started yet (saved questions spec 2026-11-04 §3.14).
+  { route: "GET /v1/account/saved-questions", auth: "user", resource: "identity", action: "list-saved-questions" },
+  { route: "POST /v1/account/saved-questions", auth: "user", resource: "identity", action: "create-saved-question" },
+  { route: "PUT /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "save-saved-question" },
+  { route: "GET /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "read-saved-question" },
+  { route: "DELETE /v1/account/saved-questions/{id}", auth: "user", resource: "identity", action: "delete-saved-question" },
   { route: "GET /v1/account/legal-status", auth: "user", resource: "identity", action: "read-legal-status" },
+  { route: "GET /v1/account/moderation-statements", auth: "user", resource: "identity", action: "read-moderation-statements" },
   { route: "POST /v1/account/legal-accept", auth: "user", resource: "identity", action: "accept-legal" },
   { route: "POST /v1/account/legacy-runs/claim", auth: "user", resource: "identity", action: "claim-legacy-runs" },
   { route: "GET /v1/account/profile", auth: "user", resource: "identity", action: "profile-self" },
@@ -105,6 +114,8 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/public/debates/{id}", auth: "public", resource: "public-debate", action: "read" },
   // Side-by-side §13 addition D24 (owner 2026-10-22): the companies the declared provider targets reach, public.
   { route: "GET /v1/public/ai-providers", auth: "public", resource: "deployment", action: "read-ai-providers" },
+  { route: "POST /v1/public/debates/{id}/report", auth: "user", resource: "public-debate", action: "write-report" },
+  { route: "POST /v1/public/debates/{id}/flag", auth: "user", resource: "public-debate", action: "flag" },
   { route: "GET /v1/geo/availability", auth: "public", resource: "geo", action: "read-availability" },
   // One stateless message door. The removed session and case doors have no policy.
   { route: "POST /v1/support/messages", auth: "public", origin: "trusted", session: "optional", resource: "support-message", action: "create" },
@@ -133,9 +144,23 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "GET /v1/runs/{id}/events", auth: "user", resource: "run-owner", action: "read-events" },
   { route: "GET /v1/runs/{id}/answer", auth: "user", resource: "run-owner", action: "read-run-answer" },
   { route: "POST /v1/runs/{id}/publish", auth: "user", resource: "run-owner", action: "publish" },
-  { route: "POST /v1/runs/{id}/unpublish", auth: "user", resource: "run-owner", action: "unpublish" },
   { route: "POST /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "request-review" },
   { route: "GET /v1/runs/{id}/publication-review", auth: "user", resource: "run-owner", action: "read-review" },
+  { route: "GET /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "read-last-visit" },
+  { route: "POST /v1/runs/{id}/last-visit", auth: "user", resource: "run-owner", action: "record-last-visit" },
+  { route: "GET /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "read-dig-links" },
+  { route: "POST /v1/runs/{id}/dig-links", auth: "user", resource: "run-owner", action: "record-dig-link" },
+  { route: "POST /v1/runs/{id}/continue", auth: "user", resource: "run-owner", action: "continue-run" },
+  { route: "GET /v1/runs/{id}/investigation", auth: "user", resource: "run-owner", action: "read-investigation" },
+  { route: "POST /v1/runs/{id}/report", auth: "user", resource: "run-owner", action: "write-report" },
+  { route: "POST /v1/runs/{id}/reopen", auth: "user", resource: "run-owner", action: "reopen-investigation" },
+  { route: "POST /v1/runs/{id}/researched", auth: "user", resource: "run-owner", action: "add-researched" },
+  { route: "POST /v1/asks/clarify", auth: "user", resource: "run-owner", action: "read-clarifying-questions" },
+  // V4 start step, Task 30: the four calls before Start.
+  { route: "POST /v1/asks/paths/lists", auth: "user", resource: "run-owner", action: "read-start-lists" },
+  { route: "POST /v1/asks/paths/merge", auth: "user", resource: "run-owner", action: "read-start-menu" },
+  { route: "POST /v1/asks/paths/combine", auth: "user", resource: "run-owner", action: "read-start-combine" },
+  { route: "POST /v1/asks/paths/fit", auth: "user", resource: "run-owner", action: "read-start-fit" },
   { route: "GET /v1/billing/usage", auth: "user", resource: "billing", action: "read-usage" },
   { route: "GET /v1/billing/plans", auth: "public", resource: "billing", action: "read-plans" },
   { route: "POST /v1/billing/quote", auth: "user", resource: "billing", action: "quote" },
@@ -186,6 +211,23 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/admin/publication-reviews/{reviewRef}/refuse", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "refuse" },
   { route: "POST /v1/admin/internal-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-configure" },
   { route: "DELETE /v1/admin/internal-allowances/{grantId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-self", action: "allowance-revoke" },
+  // R22 decision 24 (0142): the team-limit authority is no static capability; each handler asks the database itself.
+  { route: "GET /v1/admin/team-limit", auth: "staff", resource: "staff-team", action: "read" },
+  { route: "POST /v1/admin/team-limit", auth: "staff", resource: "staff-team", action: "set" },
+  { route: "POST /v1/admin/team-limit/partner/{staffId}", auth: "staff", resource: "staff-team", action: "partner-grant" },
+  { route: "DELETE /v1/admin/team-limit/partner/{staffId}", auth: "staff", resource: "staff-team", action: "partner-revoke" },
+  { route: "POST /v1/admin/team-limit/practice", auth: "staff", resource: "staff-team", action: "practice-record" },
+  // R22 decision 33 (0150): the same two accounts; each handler asks the database itself.
+  { route: "GET /v1/admin/public-review", auth: "staff", resource: "staff-team", action: "public-review-list" },
+  { route: "GET /v1/admin/public-review/{id}", auth: "staff", resource: "staff-team", action: "public-review-read" },
+  { route: "POST /v1/admin/public-review/{id}/hide", auth: "staff", resource: "staff-team", action: "public-review-hide" },
+  { route: "POST /v1/admin/public-review/{id}/step", auth: "staff", resource: "staff-team", action: "public-review-step" },
+  { route: "GET /v1/admin/public-reports", auth: "staff", resource: "staff-team", action: "public-report-queue" },
+  { route: "POST /v1/admin/public-reports/{id}/dismiss", auth: "staff", resource: "staff-team", action: "public-report-dismiss" },
+  // R22 decision 32 (0146): the Owner's allowance for a member.
+  { route: "GET /v1/admin/team-allowances", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-read" },
+  { route: "POST /v1/admin/team-allowances/{staffId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-give" },
+  { route: "DELETE /v1/admin/team-allowances/{staffId}/{grantId}", auth: "staff", staffCapability: "ALLOWANCE_WRITE", resource: "staff-team", action: "allowance-take-back" },
 ] as const);
 
 const validAskPayload = () => ({
@@ -327,23 +369,35 @@ describe("S7 deny-by-default authorization", () => {
     await api.ready();
     for (const route of contractInventory.routes) {
       const [method, path] = route.split(" ");
-      expect(api.hasRoute({method: method as "GET" | "POST" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
+      expect(api.hasRoute({method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE", url: path!.replace(/\{([^}]+)\}/g, ":$1")}), route).toBe(true);
     }
     await api.close();
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 26 staff contract routes + the two internal-allowance routes.
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(28);
-    expect(staffContractInventory.routes).toHaveLength(26);
+    // 37 staff contract routes (five of them the team limit's, four decision 33's public review, two decision 35's report queue) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(42);
+    expect(staffContractInventory.routes).toHaveLength(37);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
     // data-export S01's 3 routes.
     // Debate shape P2c adds GET /v1/answers/{id}/map. Side-by-side C5 adds GET /livez and GET /readyz. Side-by-side §13
     // addition D24 adds GET /v1/public/ai-providers.
-    // The synthesis check adds the once-only removal notice route.
-    expect(contractInventory.routes).toHaveLength(174);
+    // The synthesis check adds the once-only removal notice route. The V4 account memory (0131) adds six: the reading level
+    // (read, save), a debate's last visit (read, record) and its dig links (read, record). R22 W3-8 adds Continue on a
+    // month-paused debate (POST /v1/runs/{id}/continue). R22 W5-1 adds the final report's three: its versions
+    // (GET /v1/runs/{id}/investigation), "Write my report" (POST /v1/runs/{id}/report) and "Keep digging" (POST /v1/runs/{id}/reopen).
+    // R22 owner decision 13 removed the Unpublish route (POST /v1/runs/{id}/unpublish): 183. Decision 24 adds the team limit's five.
+    // W4-4: "Add to researched" (POST /v1/runs/{id}/researched), and decision 29's step 2 (POST /v1/asks/clarify).
+    // R22 decision 32 adds the three of the Owner's allowance for a member: 193.
+    // Decision 13: a report on a public debate (POST /v1/public/debates/{id}/report).
+    // Decision 33 adds the four staff routes of a public debate under review. Decision 35 adds the Report button's three.
+    // V4 start step, Task 30 adds the four calls before Start (POST /v1/asks/paths/lists, …/merge, …/combine and …/fit): 205.
+    // V4 start step, Task 39e adds the five of the questions not started yet (GET and POST /v1/account/saved-questions, PUT, GET and
+    // DELETE …/{id}): 210.
+    // 0157 adds the statements of reasons (GET /v1/account/moderation-statements): 211 with the union.
+    expect(contractInventory.routes).toHaveLength(211);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 
@@ -366,7 +420,8 @@ describe("S7 deny-by-default authorization", () => {
     });
     for (const policy of EXPECTED_AUTHORIZATION_MATRIX) {
       const [method, template] = policy.route.split(" ") as [string, string];
-      const httpMethod = method as "GET" | "POST" | "PATCH" | "DELETE";
+      // V4 start step, Task 39e: the API's first PUT routes (a later save of a question not started yet).
+      const httpMethod = method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
       const registeredUrl = template.replace(/\{([^}]+)\}/g, ":$1");
       expect(api.hasRoute({ method: httpMethod, url: registeredUrl }), policy.route).toBe(true);
       if (policy.auth === "public") continue;

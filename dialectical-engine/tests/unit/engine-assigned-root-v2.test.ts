@@ -52,6 +52,23 @@ describe("engine 2: the fixed-words position contract", () => {
     }
   });
 
+  // Web search W4-1 (plan 2026-10-30): the case writer that reads its path's pack takes the sources variant, its `sources`
+  // right before `length`; without one, the v2 leg above, untouched. Only engine 2's leg reads sources, always lengthed.
+  it("W4-1: with a pack, the sources variant and its table; a pack on today's assigned root or unlengthed is refused", () => {
+    const sourced = { ...leg("Yes, where buses run full."), sources: "[{\"for\":\"assigned_answer\",\"pages\":[],\"extracts\":[]}]" } as JudgeLeg;
+    for (const claim of ["unknown", "resolved"] as const) {
+      const frame = readPromptFrame(framedJudgePromptForTest(sourced, Q, "English", claim, null, GUIDE).packet);
+      expect(frame.contractId).toBe(`judge.assigned-root.${claim}.sources.v1`);
+      expect(frame.fields.map((field) => field.name)).toEqual(["question_line", "assigned_answer", "map_points", "points_raised",
+        "assumptions", "sources", "length"]);
+    }
+    expect(() => framedJudgePromptForTest(sourced, Q, "English", "resolved", null, null))
+      .toThrowError(expect.objectContaining({ code: "JUDGE_SOURCES_UNLENGTHED" }));
+    const today: JudgeLeg = { kind: "assigned-root", assignedAnswer: "Yes.", mapPoints: "{}", sources: "[]" };
+    expect(() => framedJudgePromptForTest(today, Q, "English", "resolved", null, GUIDE))
+      .toThrowError(expect.objectContaining({ code: "JUDGE_SOURCES_LEG_INVALID" }));
+  });
+
   it("refuses an unlengthed v2 position; today's assigned root (no engine) keeps its contracts", () => {
     expect(() => framedJudgePromptForTest(leg("Yes."), Q, "English", "resolved", null, null))
       .toThrowError(expect.objectContaining({ code: "JUDGE_ASSIGNED_ROOT_V2_UNLENGTHED" }));

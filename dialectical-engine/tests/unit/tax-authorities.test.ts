@@ -5,7 +5,9 @@ import {
   TAX_AUTHORITIES_ROW_KEY,
   readTaxAuthorities,
   taxAuthoritiesFromValue,
-  taxAuthorityFor
+  taxAuthorityFor,
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  countryPolicyFromValue
 } from "../../packages/register/src/index.js";
 import {
   hostedRegisterRefusalCode,
@@ -16,7 +18,7 @@ import {
 const EXAMPLE = new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url);
 const EU = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU",
   "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
-const PAYABLE_LATER_OR_NOW = [...EU, "NO", "IS", "US", "CA", "AU", "NZ", "SG", "JP",
+const PAYABLE_LATER_OR_NOW = [...EU, "NO", "IS", "CH", "LI", "US", "CA", "AU", "NZ", "SG", "JP", "TW",
   "GB", "KR", "IN", "AE", "SA", "MX", "AR", "CO", "CL", "TH", "PH"];
 
 const dev = () => taxAuthoritiesFromValue(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef);
@@ -35,8 +37,8 @@ describe("P16a taxAuthorities v1", () => {
     expect(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.rowKey).toBe("taxAuthorities");
     const authorities = dev();
     expect(authorities.entries.map((entry) => entry.scheme)).toEqual([
-      "RO_D300", "EU_REVERSE_CHARGE_D390", "EU_OSS", "NO_VOEC", "IS_VOES", "GB_HMRC", "US_STATE", "CA_GST", "AU_GST",
-      "NZ_GST", "SG_GST", "JP_CONSUMPTION_TAX", "KR_VAT", "IN_GST", "AE_VAT", "SA_VAT", "MX_IVA", "AR_IVA", "CO_IVA",
+      "RO_D300", "EU_REVERSE_CHARGE_D390", "EU_OSS", "NO_VOEC", "IS_VOES", "CH_VAT", "GB_HMRC", "US_STATE", "CA_GST", "AU_GST",
+      "NZ_GST", "SG_GST", "JP_CONSUMPTION_TAX", "TW_BUSINESS_TAX", "KR_VAT", "IN_GST", "AE_VAT", "SA_VAT", "MX_IVA", "AR_IVA", "CO_IVA",
       "CL_IVA", "TH_VAT", "PH_VAT"
     ]);
     expect(Object.isFrozen(authorities)).toBe(true);
@@ -51,6 +53,11 @@ describe("P16a taxAuthorities v1", () => {
     expect(taxAuthorityFor(authorities, "US", "NOT_REGISTERED")?.scheme).toBe("US_STATE");
     expect(taxAuthorityFor(authorities, "GB", "TAXABLE")).toMatchObject({ scheme: "GB_HMRC", registration: "FROM_FIRST_SALE" });
     expect(taxAuthorityFor(authorities, "ZZ", "TAXABLE")).toBeNull();
+    // Switzerland and Liechtenstein are one VAT territory: one Swiss registration, past a worldwide threshold.
+    for (const country of ["CH", "LI"]) {
+      expect(taxAuthorityFor(authorities, country, "TAXABLE"), country)
+        .toMatchObject({ scheme: "CH_VAT", registration: "AFTER_THRESHOLD" });
+    }
     for (const country of PAYABLE_LATER_OR_NOW) {
       expect(taxAuthorityFor(authorities, country, "TAXABLE"), country).not.toBeNull();
     }
@@ -72,7 +79,7 @@ describe("P16a taxAuthorities v1", () => {
       query: async () => ({ rows: row === null ? [] : [{ value_json: row, source_ref: "v1" }] })
     }) as never;
     expect(await readTaxAuthorities(pool(null), 3)).toBeNull();
-    expect((await readTaxAuthorities(pool(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value), 3))?.entries).toHaveLength(22);
+    expect((await readTaxAuthorities(pool(TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value), 3))?.entries).toHaveLength(24);
   });
 
   it("ships the same value in the hosted example, and lets the operator publish a corrected one", async () => {
@@ -118,5 +125,24 @@ describe("P16a taxAuthorities v1", () => {
     expect(checklist).toContain("the accountant has read the `taxAuthorities` text of the register version to be pinned");
     expect(checklist).toContain("before `billingPolicy.enabled` is set to `true`");
     expect(checklist).toContain("the accountant's written confirmation names that register version");
+  });
+
+  it("has a line for every country the code's rules and the hosted example open for payment", async () => {
+    // Switzerland and Liechtenstein opened for payment on 4 November 2026 with no line here; this catches the next one.
+    const example = JSON.parse(await readFile(EXAMPLE, "utf8")) as { countryPolicy: unknown; taxAuthorities: unknown };
+    const exampleCountries = JSON.parse(await readFile(new URL("../../deploy/vps/register/country-policy.example.json",
+      import.meta.url), "utf8")) as { countryPolicy: unknown };
+    const policies = [
+      countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),
+      countryPolicyFromValue(exampleCountries.countryPolicy, "country-policy.example.json")
+    ];
+    const lines = [dev(), taxAuthoritiesFromValue(example.taxAuthorities, "hosted-register.example.json")];
+    for (const policy of policies) {
+      const payable = Object.entries(policy.countries).filter(([, rule]) => rule.pay).map(([code]) => code);
+      expect(payable).toEqual(expect.arrayContaining(["CH", "LI", "TW"]));
+      for (const authorities of lines) {
+        expect(payable.filter((country) => taxAuthorityFor(authorities, country, "TAXABLE") === null)).toEqual([]);
+      }
+    }
   });
 });

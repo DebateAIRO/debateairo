@@ -81,7 +81,22 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
@@ -142,7 +157,22 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
@@ -197,7 +227,22 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
@@ -248,7 +293,22 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
@@ -299,7 +359,22 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
@@ -350,7 +425,22 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "0127_publication_review.sql",
       "0128_threat_reports.sql",
       "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql"
+      "0130_row_level_security.sql",
+      "0131_v4_account_memory.sql",
+      "0132_web_evidence.sql",
+      "0133_investigations.sql",
+      "0134_dig_model_and_month_pause.sql",
+      "0135_dig_picks.sql",
+      "0136_investigation_reports.sql",
+      "0137_public_debates.sql",
+      "0138_tree_updates.sql",
+      "0139_passage_retention.sql",
+      "0140_internal_spend_kinds.sql",
+      "0141_path_suggestions.sql",
+      "0142_team_limit.sql",
+      "0143_run_handover.sql",
+      "0144_ask_clarify_charge.sql",
+      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
     ]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
@@ -627,8 +717,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the synthesis check 0126 after 0125: the recipe, 0125's manifest and the effective verifier 0125 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-5);
-    const prior = plan.forwardChain.at(-6);
+    const step = plan.forwardChain.at(-50);
+    const prior = plan.forwardChain.at(-51);
     expect(step?.name).toBe("0126_synthesis_check.sql");
     expect(prior?.name).toBe("0125_italy_specific_approval.sql");
     const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0126.json")).toString("utf8"));
@@ -661,20 +751,20 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "synthesis_check_removal_notice", "synthesis_check_erasure_binding", "SYNTHESIS_CHECK",
       "debateai_erasure_runtime", "renumber", "`STEPS`"
     ]) expect(own, needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth and row-level security (0130, below) the twentieth");
+    expect(readme.replace(/\s+/gu, " ")).toContain("the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after \"Add to researched\" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second");
   });
 
   it("0127 is followed by 0128 and its previous is 0126", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-4);
+    const step = plan.forwardChain.at(-49);
     expect(step?.name).toBe("0127_publication_review.sql");
     expect(step?.previousName).toBe("0126_synthesis_check.sql");
   });
 
   it("0127's manifest binds 0126's manifest and effective verifier SHA-256", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-4);
-    const prior = plan.forwardChain.at(-5);
+    const step = plan.forwardChain.at(-49);
+    const prior = plan.forwardChain.at(-50);
     expect(step?.name).toBe("0127_publication_review.sql");
     const manifest = JSON.parse((await bytesOf("lineage/publication-review-forward0127.json")).toString("utf8"));
     expect(manifest.previous).toEqual({
@@ -897,8 +987,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   }, 120_000);
   it("chains the threat reports 0128 after 0127 with 0127's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-3);
-    const previous = plan.forwardChain.at(-4);
+    const step = plan.forwardChain.at(-48);
+    const previous = plan.forwardChain.at(-49);
     const manifest = JSON.parse((await bytesOf("lineage/threat-reports-forward0128.json")).toString("utf8"));
     expect(step?.name).toBe("0128_threat_reports.sql");
     expect(previous?.name).toBe("0127_publication_review.sql");
@@ -922,8 +1012,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains support deletion 0129 after 0128 and records its source digest", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-2);
-    const previous = plan.forwardChain.at(-3);
+    const step = plan.forwardChain.at(-47);
+    const previous = plan.forwardChain.at(-48);
     const manifest = JSON.parse((await bytesOf("lineage/support-answer-scope-forward0129.json")).toString("utf8"));
     expect(step?.name).toBe("0129_support_answer_scope.sql");
     expect(previous?.name).toBe("0128_threat_reports.sql");
@@ -932,6 +1022,230 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       verifierSha256: previous?.verifierSha256 });
     expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0129_support_answer_scope.sql")));
     expect(step?.replayVerifierSql).toBeUndefined();
+  });
+
+  it("chains the daily outbound mail limit 0170 after 0169 with 0169's manifest and effective verifier", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-6);
+    const previous = plan.forwardChain.at(-7);
+    const manifest = JSON.parse((await bytesOf("lineage/outbound-mail-limit-forward0170.json")).toString("utf8"));
+    expect(step?.name).toBe("0170_outbound_mail_limit.sql");
+    expect(previous?.name).toBe("0169_piece_settings_version.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/piece-settings-version-forward0169.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0170_outbound_mail_limit.sql")));
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: true, drained: false, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+  });
+
+  it("documents the daily outbound mail limit 0170 as the sixtieth chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## The daily outbound mail limit (0170)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0169", "0170_outbound_mail_limit.sql", "outbound-mail-limit-forward0170.json",
+      "verify-effective-capabilities-130.sql", "packages/db/src/migration-forward0170.ts", "`STEPS`", "#234", "still owed"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth");
+  });
+
+  it("chains the moderation notice fixes 0172 after 0171 with 0171's manifest and effective verifier (0173 comes after it), drained, declaring 0151's CHECK and 0157's queue", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-4);
+    const previous = plan.forwardChain.at(-5);
+    const manifest = JSON.parse((await bytesOf("lineage/moderation-notice-fixes-forward0172.json")).toString("utf8"));
+    expect(step?.name).toBe("0172_moderation_notice_fixes.sql");
+    expect(previous?.name).toBe("0171_security_review_hardening.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/security-review-hardening-forward0171.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0172_moderation_notice_fixes.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf).toEqual(manifest.amendsPostconditionsOf);
+    expect(step?.amendsPostconditionsOf?.map(({ step: amended }) => amended)).toEqual(["0151_public_flag.sql", "0157_moderation_statements.sql"]);
+  });
+
+  it("documents the moderation notice fixes 0172 as the sixty-second chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## The moderation notice fixes (0172)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0171", "0172_moderation_notice_fixes.sql", "moderation-notice-fixes-forward0172.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0172.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "M5", "public_flag_notice_kind_check"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second");
+  });
+
+  it("chains the settle on a closed report 0173 after 0172 with 0172's manifest and effective verifier, drained, declaring 0151's settle", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-3);
+    const previous = plan.forwardChain.at(-4);
+    const manifest = JSON.parse((await bytesOf("lineage/settle-dismissed-flag-forward0173.json")).toString("utf8"));
+    expect(step?.name).toBe("0173_settle_dismissed_flag.sql");
+    expect(previous?.name).toBe("0172_moderation_notice_fixes.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/moderation-notice-fixes-forward0172.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0173_settle_dismissed_flag.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf).toEqual(manifest.amendsPostconditionsOf);
+    expect(step?.amendsPostconditionsOf).toEqual([
+      { step: "0151_public_flag.sql", functions: ["identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)"], field: "function_definition" }]);
+  });
+
+  it("documents the settle on a closed report 0173 as the sixty-third chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## The check's answer on a report a person already closed (0173)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0172", "0173_settle_dismissed_flag.sql", "settle-dismissed-flag-forward0173.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0173.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "identity.settle_public_flag", "PUBLIC_FLAG_WAITING"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third");
+  });
+
+  it("chains 0150's ungrounded door closed (0174) after 0173 with 0173's manifest and effective verifier, drained, declaring 0150's grant", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-2);
+    const previous = plan.forwardChain.at(-3);
+    const manifest = JSON.parse((await bytesOf("lineage/public-review-ungrounded-door-forward0174.json")).toString("utf8"));
+    expect(step?.name).toBe("0174_public_review_ungrounded_door.sql");
+    expect(previous?.name).toBe("0173_settle_dismissed_flag.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/settle-dismissed-flag-forward0173.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0174_public_review_ungrounded_door.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf).toEqual(manifest.amendsPostconditionsOf);
+    expect(step?.amendsPostconditionsOf).toEqual([{ step: "0150_public_review.sql", functions: ["staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"],
+      revokes: ["EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime"], field: "function_acl_revoked" }]);
+  });
+
+  it("documents 0150's ungrounded door closed (0174) as the sixty-fourth chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## 0150's staff review door without a ground (0174)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0173", "0174_public_review_ungrounded_door.sql", "public-review-ungrounded-door-forward0174.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0174.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "`function_acl_revoked`", "privilegeRevocations"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth");
+  });
+
+  it("chains the statement's AI line (0175) after 0174 with 0174's manifest and effective verifier, last, drained, declaring 0157's statement ground", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-1);
+    const previous = plan.forwardChain.at(-2);
+    const manifest = JSON.parse((await bytesOf("lineage/statement-ai-read-verdict-forward0175.json")).toString("utf8"));
+    expect(step?.name).toBe("0175_statement_ai_read_verdict.sql");
+    expect(previous?.name).toBe("0174_public_review_ungrounded_door.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/public-review-ungrounded-door-forward0174.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0175_statement_ai_read_verdict.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf).toEqual(manifest.amendsPostconditionsOf);
+    expect(step?.amendsPostconditionsOf).toEqual([
+      { step: "0157_moderation_statements.sql", functions: ["identity.moderation_statement_ground(uuid)"], field: "function_definition" }]);
+  });
+
+  it("documents the statement's AI line (0175) as the sixty-fifth chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## The statement to a debate's author says an AI read the report first only for a verdict (0175)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0174", "0175_statement_ai_read_verdict.sql", "statement-ai-read-verdict-forward0175.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0175.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "identity.moderation_statement_ground(uuid)", "`UNAVAILABLE`"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain("0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth and the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth");
+  });
+
+  it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {
+    const plan = await loadMigrationPlan();
+    const step = plan.forwardChain.at(-45);
+    const previous = plan.forwardChain.at(-46);
+    const manifest = JSON.parse((await bytesOf("lineage/v4-account-memory-forward0131.json")).toString("utf8"));
+    expect(step?.name).toBe("0131_v4_account_memory.sql");
+    expect(previous?.name).toBe("0130_row_level_security.sql");
+    expect(manifest.previous).toEqual({ name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/row-level-security-forward0130.json")),
+      verifierSha256: previous?.verifierSha256 });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0131_v4_account_memory.sql")));
+    expect(step?.replayVerifierSql).toBeUndefined();
+  });
+
+  it("chains the web evidence store 0132 after 0131, the investigations 0133, the dig model 0134, the dig picks 0135, the investigation reports 0136, the public debates 0137, the tree updates 0138, the passage retention 0139, the funded spend kinds 0140, the path suggestions 0141 and the team's one limit 0142 last, each keeping 0130's effective verifier", async () => {
+    const plan = await loadMigrationPlan();
+    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team, handover, askClarifyCharge, researched, teamAllowances, publicTree, erasureKeepsPublic, publicReportTeamMonth, publicReview, publicFlag, reportExport, digTreeSettled, regionWiden, ownerAnswerWrites, moderationNotice, moderationStatements, preStartCharge, startPaths, pathResults, pathProgress, savedQuestions, carryOnDigs, pathAdded, preStartRelease, mainAnswerTimes, publicReportOwnCarrier, setAsideContinue, pieceSettingsVersion, outboundMail, securityReview] = [
+      plan.forwardChain.at(-45), plan.forwardChain.at(-44), plan.forwardChain.at(-43),plan.forwardChain.at(-42), plan.forwardChain.at(-41), plan.forwardChain.at(-40), plan.forwardChain.at(-39), plan.forwardChain.at(-38), plan.forwardChain.at(-37), plan.forwardChain.at(-36), plan.forwardChain.at(-35), plan.forwardChain.at(-34), plan.forwardChain.at(-33), plan.forwardChain.at(-32), plan.forwardChain.at(-31), plan.forwardChain.at(-30), plan.forwardChain.at(-29), plan.forwardChain.at(-28), plan.forwardChain.at(-27), plan.forwardChain.at(-26), plan.forwardChain.at(-25), plan.forwardChain.at(-24), plan.forwardChain.at(-23), plan.forwardChain.at(-22), plan.forwardChain.at(-21), plan.forwardChain.at(-20), plan.forwardChain.at(-19), plan.forwardChain.at(-18), plan.forwardChain.at(-17), plan.forwardChain.at(-16), plan.forwardChain.at(-15), plan.forwardChain.at(-14), plan.forwardChain.at(-13), plan.forwardChain.at(-12), plan.forwardChain.at(-11), plan.forwardChain.at(-10), plan.forwardChain.at(-9), plan.forwardChain.at(-8), plan.forwardChain.at(-7), plan.forwardChain.at(-6), plan.forwardChain.at(-5)];
+    expect([account?.name, web?.name, investigations?.name, digModel?.name, digPicks?.name, reports?.name, publicDebates?.name,
+      treeUpdates?.name, passages?.name, spendKinds?.name, suggestions?.name, team?.name, handover?.name, askClarifyCharge?.name, researched?.name, teamAllowances?.name, publicTree?.name, erasureKeepsPublic?.name, publicReportTeamMonth?.name, publicReview?.name, publicFlag?.name, reportExport?.name, digTreeSettled?.name, regionWiden?.name, ownerAnswerWrites?.name, moderationNotice?.name, moderationStatements?.name, preStartCharge?.name, startPaths?.name, pathResults?.name, pathProgress?.name, savedQuestions?.name, carryOnDigs?.name, pathAdded?.name, preStartRelease?.name, mainAnswerTimes?.name, publicReportOwnCarrier?.name, setAsideContinue?.name, pieceSettingsVersion?.name, outboundMail?.name, securityReview?.name])
+      .toEqual(["0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql",
+        "0135_dig_picks.sql", "0136_investigation_reports.sql", "0137_public_debates.sql", "0138_tree_updates.sql",
+        "0139_passage_retention.sql", "0140_internal_spend_kinds.sql", "0141_path_suggestions.sql", "0142_team_limit.sql", "0143_run_handover.sql", "0144_ask_clarify_charge.sql", "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql"]);
+    for (const [step, previous, manifestPath, previousManifestPath] of [
+      [web, account, "lineage/web-evidence-forward0132.json", "lineage/v4-account-memory-forward0131.json"],
+      [investigations, web, "lineage/investigations-forward0133.json", "lineage/web-evidence-forward0132.json"],
+      [digModel, investigations, "lineage/dig-model-forward0134.json", "lineage/investigations-forward0133.json"],
+      [digPicks, digModel, "lineage/dig-picks-forward0135.json", "lineage/dig-model-forward0134.json"],
+      [reports, digPicks, "lineage/investigation-reports-forward0136.json", "lineage/dig-picks-forward0135.json"],
+      [publicDebates, reports, "lineage/public-debates-forward0137.json", "lineage/investigation-reports-forward0136.json"],
+      [treeUpdates, publicDebates, "lineage/tree-updates-forward0138.json", "lineage/public-debates-forward0137.json"],
+      [passages, treeUpdates, "lineage/passage-retention-forward0139.json", "lineage/tree-updates-forward0138.json"],
+      [spendKinds, passages, "lineage/internal-spend-kinds-forward0140.json", "lineage/passage-retention-forward0139.json"],
+      [suggestions, spendKinds, "lineage/path-suggestions-forward0141.json", "lineage/internal-spend-kinds-forward0140.json"],
+      [team, suggestions, "lineage/team-limit-forward0142.json", "lineage/path-suggestions-forward0141.json"],
+      [handover, team, "lineage/run-handover-forward0143.json", "lineage/team-limit-forward0142.json"],
+      [askClarifyCharge, handover, "lineage/ask-clarify-charge-forward0144.json", "lineage/run-handover-forward0143.json"],
+      [researched, askClarifyCharge, "lineage/web-researched-unsettled-forward0145.json", "lineage/ask-clarify-charge-forward0144.json"],
+      [teamAllowances, researched, "lineage/team-allowances-forward0146.json", "lineage/web-researched-unsettled-forward0145.json"],
+      [publicTree, teamAllowances, "lineage/public-tree-forward0147.json", "lineage/team-allowances-forward0146.json"],
+      [erasureKeepsPublic, publicTree, "lineage/erasure-keeps-public-forward0148.json", "lineage/public-tree-forward0147.json"],
+      [publicReportTeamMonth, erasureKeepsPublic, "lineage/public-report-team-month-forward0149.json", "lineage/erasure-keeps-public-forward0148.json"],
+      [publicReview, publicReportTeamMonth, "lineage/public-review-forward0150.json", "lineage/public-report-team-month-forward0149.json"],
+      [publicFlag, publicReview, "lineage/public-flag-forward0151.json", "lineage/public-review-forward0150.json"],
+      [reportExport, publicFlag, "lineage/report-export-forward0152.json", "lineage/public-flag-forward0151.json"],
+      [digTreeSettled, reportExport, "lineage/dig-tree-settled-forward0153.json", "lineage/report-export-forward0152.json"],
+      [regionWiden, digTreeSettled, "lineage/region-iceland-liechtenstein-forward0154.json", "lineage/dig-tree-settled-forward0153.json"],
+      [ownerAnswerWrites, regionWiden, "lineage/owner-answer-writes-forward0155.json", "lineage/region-iceland-liechtenstein-forward0154.json"],
+      [moderationNotice, ownerAnswerWrites, "lineage/moderation-notice-forward0156.json", "lineage/owner-answer-writes-forward0155.json"],
+      [moderationStatements, moderationNotice, "lineage/moderation-statement-forward0157.json", "lineage/moderation-notice-forward0156.json"],
+      [preStartCharge, moderationStatements, "lineage/pre-start-charge-forward0158.json", "lineage/moderation-statement-forward0157.json"],
+      [startPaths, preStartCharge, "lineage/start-paths-forward0159.json", "lineage/pre-start-charge-forward0158.json"],
+      [pathResults, startPaths, "lineage/path-results-forward0160.json", "lineage/start-paths-forward0159.json"],
+      [pathProgress, pathResults, "lineage/path-progress-forward0161.json", "lineage/path-results-forward0160.json"],
+      [savedQuestions, pathProgress, "lineage/saved-questions-forward0162.json", "lineage/path-progress-forward0161.json"],
+      [carryOnDigs, savedQuestions, "lineage/carry-on-forward0163.json", "lineage/saved-questions-forward0162.json"],
+      [pathAdded, carryOnDigs, "lineage/main-answer-path-added-forward0164.json", "lineage/carry-on-forward0163.json"],
+      [preStartRelease, pathAdded, "lineage/pre-start-release-forward0165.json", "lineage/main-answer-path-added-forward0164.json"],
+      [mainAnswerTimes, preStartRelease, "lineage/main-answer-times-forward0166.json", "lineage/pre-start-release-forward0165.json"],
+      [publicReportOwnCarrier, mainAnswerTimes, "lineage/public-report-own-carrier-forward0167.json", "lineage/main-answer-times-forward0166.json"],
+      [setAsideContinue, publicReportOwnCarrier, "lineage/set-aside-continue-forward0168.json", "lineage/public-report-own-carrier-forward0167.json"],
+      [pieceSettingsVersion, setAsideContinue, "lineage/piece-settings-version-forward0169.json", "lineage/set-aside-continue-forward0168.json"],
+      [outboundMail, pieceSettingsVersion, "lineage/outbound-mail-limit-forward0170.json", "lineage/piece-settings-version-forward0169.json"],
+      [securityReview, outboundMail, "lineage/security-review-hardening-forward0171.json", "lineage/outbound-mail-limit-forward0170.json"]
+    ] as const) {
+      const manifest = JSON.parse((await bytesOf(manifestPath)).toString("utf8"));
+      expect(manifest.previous).toEqual({ name: previous?.name, manifestSha256: sha256(await bytesOf(previousManifestPath)),
+        verifierSha256: previous?.verifierSha256 });
+      expect(manifest.migration.sha256).toBe(sha256(await bytesOf(step!.name)));
+      expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+      expect(step?.replayVerifierSql).toBeUndefined();
+    }
   });
 
   it("keeps loadMigrationPlan's import closure self-contained: node built-ins and ./migration-*.js only (A6 ruling B)", async () => {

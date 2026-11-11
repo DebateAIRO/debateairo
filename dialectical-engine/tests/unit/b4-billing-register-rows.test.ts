@@ -15,7 +15,9 @@ import {
   planNetPrice,
   readBillingPlans,
   readBillingPolicy,
-  type PlanId
+  type PlanId,
+  COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW,
+  countryPolicyFromValue
 } from "../../packages/register/src/index.js";
 import { buildDevelopmentDeploymentRegisterPublicationRows } from "../../apps/runner/src/dev-deployment-register.js";
 import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderPanel.js";
@@ -23,8 +25,10 @@ import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderP
 /**
  * PAID PLANS (spec 2026-09-29 §2.5.1, §1.2; amendments R1 A22). The two rows are
  * sealed register settings, never code: prices, credits and caps change only as
- * a NEW register version. These tests pin the owner's 29 September values and
- * every refusal the parser owes, so a malformed hosted row is refused by name.
+ * a NEW register version. R22 decision 18: the row in the code holds MADE-UP limits
+ * (multiples of eleven) and the real ones live only on the server, so these tests
+ * pin the made-up values, the public prices and every refusal the parser owes, so
+ * a malformed hosted row is refused by name.
  */
 const plansRow = () => structuredClone(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value) as unknown as {
   plans: Array<Record<string, unknown> & { net_prices: Record<string, number> }>;
@@ -33,7 +37,7 @@ const policyRow = () => structuredClone(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.v
 const plansOf = (value: unknown) => billingPlansFromValue(value, "b4 test");
 const policyOf = (value: unknown) => billingPolicyFromValue(value, "b4 test");
 
-describe("billingPlans v2 carries exactly the owner's plans", () => {
+describe("billingPlans v4 carries the four plans, with made-up limits and the public prices", () => {
   const plans = plansOf(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value);
 
   it("names the row and the four plans in price order", () => {
@@ -45,39 +49,58 @@ describe("billingPlans v2 carries exactly the owner's plans", () => {
   });
 
   it.each([
-    ["FREE", "free", 0, 0, 0, 200_000, null, null],
-    ["PLUS", "premium", 20_000_000, 20_000_000, 100_000_000, 5_000_000, 2_000, 5_000],
-    ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 20_000_000, 2_000, 5_000],
-    ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 150_000_000, 2_000, 5_000]
-  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, finish 11000", (id, tier, usd, eur, ron, credit, day, week) => {
+    ["FREE", "free", 0, 0, 0, 330_000, null, null],
+    ["PLUS", "premium", 20_000_000, 20_000_000, 100_000_000, 6_600_000, 1_100, 4_400],
+    ["PRO", "premium", 50_000_000, 50_000_000, 250_000_000, 33_000_000, 1_100, 4_400],
+    ["MAX", "premium", 200_000_000, 200_000_000, 1_000_000_000, 220_000_000, 1_100, 4_400]
+  ] as const)("%s: tier %s, price USD %d EUR %d RON %d, credit %d, day %s, week %s, edge 100% + the overflow", (id, tier, usd, eur, ron, credit, day, week) => {
     const plan = planById(plans, id);
+    // v4 (owner 2026-10-30, Q1 and Q3): every limit may be passed by a FIXED amount, Free included, never a share.
     expect(plan).toMatchObject({
-      planId: id, tier, monthlyCreditMicros: credit, dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 11_000
+      planId: id, tier, monthlyCreditMicros: credit, dayBasisPoints: day, weekBasisPoints: week, finishBasisPoints: 10_000,
+      finishOverflowMicros: 220_000
     });
     expect([planNetPrice(plan, "USD"), planNetPrice(plan, "EUR"), planNetPrice(plan, "RON")]).toEqual([usd, eur, ron]);
   });
 
-  it("gives Free, and only Free, fixed gauges: the values /new sends for Free today", async () => {
-    expect(planById(plans, "FREE").fixedGauges).toEqual({ riskTier: "standard", compositionBudgetTier: "low", depth: 2 });
+  // v4 (owner 2026-10-30, Q2 and the Free ruling): paid plans keep their reserve back inside their day, week and month;
+  // Free's sits beyond its credit, so a Free closing never takes from the month.
+  it.each([
+    ["FREE", 88_000, "ON_TOP_OF_CREDIT"],
+    ["PLUS", 440_000, "INSIDE_LIMITS"],
+    ["PRO", 440_000, "INSIDE_LIMITS"],
+    ["MAX", 440_000, "INSIDE_LIMITS"]
+  ] as const)("%s: the closing reserve is %d micro-units, held %s", (id, reserve, held) => {
+    expect(planById(plans, id)).toMatchObject({ reserveMicros: reserve, reserveHeld: held });
+  });
+
+  it("gives Free, and only Free, fixed gauges: depth 1 (owner 2026-10-29), the depth V4 sends for every Free ask", async () => {
+    expect(planById(plans, "FREE").fixedGauges).toEqual({ riskTier: "standard", compositionBudgetTier: "low", depth: 1 });
     for (const id of ["PLUS", "PRO", "MAX"] as const) expect(planById(plans, id).fixedGauges).toBeNull();
-    // The UI's Free reset (choosePlanTier) is the source these values were copied from (spec §2.3.4).
+    // R22 decision 18: the row says what it is, for anyone reading a development register.
+    expect(BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef).toContain("MADE-UP limits");
+    // The UI's Free reset (choosePlanTier) is the source the risk and composition gauges were copied from (spec §2.3.4).
     const page = await readFile(new URL("../../apps/ui/app/new/NewDebatePageClient.tsx", import.meta.url), "utf8");
     const reset = page.slice(page.indexOf("function choosePlanTier("), page.indexOf("const askAsOf"));
     expect(reset).toContain('setRiskTier("standard")');
     expect(reset).toContain("setBudgetTier(PROVISIONAL_COMPOSITION_BUDGET_DEFAULT)");
-    expect(reset).toContain("setDepth(2)");
+    // Free's depth is the owner's 29 Oct ruling ("question with depth 1"): V4 sends every Free question and dig as a
+    // quick look, depth 1 (owner N13), and the server lowers an older page's Free depth to the gauge (B8).
+    const v4 = await readFile(new URL("../../apps/ui/lib/v4/askConfig.ts", import.meta.url), "utf8");
+    expect(v4).toContain("quick: 1,");
+    expect(v4).toContain('return planTier === "free" ? "quick" : mode;');
   });
 
   it("computes each cap as credit x basis points / 10000, rounded down", () => {
-    expect(planCapMicros(planById(plans, "PLUS"), "DAY")).toBe(1_000_000);
-    expect(planCapMicros(planById(plans, "PLUS"), "WEEK")).toBe(2_500_000);
-    expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(30_000_000);
-    expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(150_000_000);
+    expect(planCapMicros(planById(plans, "PLUS"), "DAY")).toBe(726_000);
+    expect(planCapMicros(planById(plans, "PLUS"), "WEEK")).toBe(2_904_000);
+    expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(24_200_000);
+    expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(220_000_000);
     expect(planCapMicros(planById(plans, "FREE"), "DAY")).toBeNull();
-    expect(planCapMicros(planById(plans, "FREE"), "MONTH")).toBe(200_000);
+    expect(planCapMicros(planById(plans, "FREE"), "MONTH")).toBe(330_000);
     const odd = plansRow();
-    odd.plans[1]!.monthly_credit_micros = 1_000_001;
-    expect(planCapMicros(planById(plansOf(odd), "PLUS"), "DAY")).toBe(200_000);
+    odd.plans[1]!.monthly_credit_micros = 1_000_009; // x 1,100 / 10,000 = 110,000.99: rounded down
+    expect(planCapMicros(planById(plansOf(odd), "PLUS"), "DAY")).toBe(110_000);
   });
 
   it("refuses an unknown plan id by name", () => {
@@ -87,7 +110,7 @@ describe("billingPlans v2 carries exactly the owner's plans", () => {
 
   it.each([
     ["a price that is not whole cents", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.net_prices.USD = 20_000_001; }],
-    ["Free with a day cap", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.day_bp = 2_000; }],
+    ["Free with a day cap", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.day_bp = 1_100; }],
     ["a paid plan without a week cap", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.week_bp = null; }],
     ["a paid plan whose day cap exceeds its week cap", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.day_bp = 6_000; }],
     ["a paid plan with fixed gauges", (row: ReturnType<typeof plansRow>) => {
@@ -103,11 +126,34 @@ describe("billingPlans v2 carries exactly the owner's plans", () => {
     ["a missing plan", (row: ReturnType<typeof plansRow>) => { row.plans.pop(); }],
     ["a finish edge under 100%", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 9_999; }],
     ["a finish edge over 200%", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 20_001; }],
+    ["a fixed overflow on top of a share edge", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_bp = 12_100; }],
+    ["a negative overflow", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_overflow_micros = -1; }],
+    ["an overflow that is not whole micro-units", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.finish_overflow_micros = 0.5; }],
+    ["an overflow larger than the monthly credit", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.finish_overflow_micros = 330_001; }],
+    ["a reserve of nothing", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.reserve_micros = 0; }],
+    ["a reserve larger than the monthly credit", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.reserve_micros = 330_001; }],
+    ["an overflow without a reserve", (row: ReturnType<typeof plansRow>) => { delete row.plans[1]!.reserve_micros; }],
+    ["a reserve without an overflow", (row: ReturnType<typeof plansRow>) => { delete row.plans[1]!.finish_overflow_micros; }],
+    ["a reserve without saying where it is held", (row: ReturnType<typeof plansRow>) => { delete row.plans[0]!.reserve_held; }],
+    ["a place to hold it without a reserve", (row: ReturnType<typeof plansRow>) => { delete row.plans[2]!.reserve_micros; }],
+    ["an unknown place to hold the reserve", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.reserve_held = "SOMEWHERE"; }],
+    ["a paid plan's reserve on top of its credit", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.reserve_held = "ON_TOP_OF_CREDIT"; }],
+    ["v4 members on some plans only", (row: ReturnType<typeof plansRow>) => {
+      delete row.plans[3]!.finish_overflow_micros;
+      delete row.plans[3]!.reserve_micros;
+      delete row.plans[3]!.reserve_held;
+      row.plans[3]!.finish_bp = 12_100;
+    }],
     ["Free with a price", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.net_prices.RON = 10_000; }],
-    // 4 micros x 2000 bp / 10000 rounds down to a 0-micro day cap, and a 0-micro
+    // 4 micros x 1100 bp / 10000 rounds down to a 0-micro day cap, and a 0-micro
     // limit breaks every admission and wall check on that plan. (A week cap can
-    // only round to nothing when the day cap, never larger, already has.)
-    ["a day cap that rounds down to nothing", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.monthly_credit_micros = 4; }],
+    // only round to nothing when the day cap, never larger, already has.) The
+    // overflow and the reserve shrink with it, so only the day cap can be the refusal.
+    ["a day cap that rounds down to nothing", (row: ReturnType<typeof plansRow>) => {
+      row.plans[1]!.monthly_credit_micros = 4;
+      row.plans[1]!.finish_overflow_micros = 0;
+      row.plans[1]!.reserve_micros = 1;
+    }],
     ["an unknown member", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.discount = 0; }],
     ["a credit currency other than USD", (row: ReturnType<typeof plansRow>) => { row.credit_currency = "EUR"; }]
   ])("refuses %s (BILLING_PLANS_INVALID)", (_name, mutate) => {
@@ -125,6 +171,33 @@ describe("billingPlans v2 carries exactly the owner's plans", () => {
       value_json: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, source_ref: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef
     }] }) } as never;
     await expect(readBillingPlans(sealedPool, 7)).resolves.toMatchObject({ sourceRef: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.sourceRef });
+  });
+
+  it("still reads a sealed v3 row (no v4 members): a share edge, no fixed overflow and no reserve", () => {
+    const v3 = plansRow();
+    for (const plan of v3.plans) {
+      delete plan.finish_overflow_micros;
+      delete plan.reserve_micros;
+      delete plan.reserve_held;
+      plan.finish_bp = 12_100;
+    }
+    const sealed = plansOf(v3);
+    for (const id of PLAN_IDS) {
+      expect(planById(sealed, id), id).toMatchObject({
+        finishBasisPoints: 12_100, finishOverflowMicros: null, reserveMicros: null, reserveHeld: null
+      });
+    }
+  });
+
+  it("accepts an overflow of 0 and one as large as the month's credit; a reserve of the whole credit; Free's held inside", () => {
+    const edges = plansRow();
+    edges.plans[1]!.finish_overflow_micros = 0;
+    edges.plans[0]!.finish_overflow_micros = 330_000;
+    edges.plans[0]!.reserve_micros = 330_000;
+    edges.plans[0]!.reserve_held = "INSIDE_LIMITS";
+    expect(planById(plansOf(edges), "PLUS").finishOverflowMicros).toBe(0);
+    expect(planById(plansOf(edges), "FREE"))
+      .toMatchObject({ finishOverflowMicros: 330_000, reserveMicros: 330_000, reserveHeld: "INSIDE_LIMITS" });
   });
 });
 
@@ -148,11 +221,28 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     expect(Object.keys(BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value)).not.toContain("owner_report_email_ref");
   });
 
-  it("lists the EU 27 plus Iceland, Liechtenstein, Norway and the UK for withdrawal, and nothing else", () => {
+  it("lists the EU 27, Iceland, Liechtenstein, Norway, the UK and every other country the site serves, nothing else", () => {
     expect([...policy.withdrawalCountries].sort()).toEqual([
-      "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU", "IE",
-      "IS", "IT", "LI", "LT", "LU", "LV", "MT", "NL", "NO", "PL", "PT", "RO", "SE", "SI", "SK"
+      "AT", "AU", "BE", "BG", "CA", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU",
+      "IE", "IS", "IT", "JP", "KR", "LI", "LT", "LU", "LV", "MD", "MT", "NL", "NO", "NZ", "PL", "PT", "RO", "SE",
+      "SG", "SI", "SK", "TW", "US"
     ]);
+  });
+
+  it("gives every country whose sign-up is on the 14 days, in the code's rows and the hosted examples (owner, 10 November 2026)", async () => {
+    // Sign-up, not only payment: a country that can sign up is opened for payment by one switch, never without its right.
+    const read = async (path: string) => JSON.parse(await readFile(new URL(path, import.meta.url), "utf8")) as Record<string, unknown>;
+    const hosted = await read("../../deploy/vps/register/hosted-register.example.json");
+    const countryExample = await read("../../deploy/vps/register/country-policy.example.json");
+    const served = [
+      countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),
+      countryPolicyFromValue(countryExample.countryPolicy, "country-policy.example.json")
+    ].flatMap((rules) => Object.entries(rules.countries).filter(([, rule]) => rule.signup || rule.pay).map(([code]) => code));
+    expect(served).toEqual(expect.arrayContaining(["US", "JP", "CH", "TW", "MD", "KR"]));
+    for (const lists of [policy.withdrawalCountries, policyOf(hosted.billingPolicy).withdrawalCountries]) {
+      expect([...new Set(served)].filter((country) => !lists.includes(country))).toEqual([]);
+    }
+    expect(policy.withdrawalDays).toBe(14);
   });
 
   it("accepts a renewal notice of exactly 7 business days and a longer one: 7 is a floor, not a ceiling", () => {
@@ -166,9 +256,9 @@ describe("billingPolicy v1 keeps billing switched off", () => {
   it("accepts a longer withdrawal period and an extra country: the law sets a floor, not a ceiling", () => {
     const row = policyRow();
     row.withdrawal_days = 30;
-    row.withdrawal_countries = [...(row.withdrawal_countries as string[]), "CH"];
+    row.withdrawal_countries = [...(row.withdrawal_countries as string[]), "UA"];
     expect(policyOf(row)).toMatchObject({ withdrawalDays: 30 });
-    expect(policyOf(row).withdrawalCountries).toContain("CH");
+    expect(policyOf(row).withdrawalCountries).toContain("UA");
   });
 
   it.each([
@@ -200,6 +290,25 @@ describe("billingPolicy v1 keeps billing switched off", () => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "GB");
     }],
     ["a withdrawal list of one country", (row: Record<string, unknown>) => { row.withdrawal_countries = ["RO"]; }],
+    // Every country the site serves (owner, 10 November 2026), kept whether or not it can pay yet.
+    ["a withdrawal list without the US", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "US");
+    }],
+    ["a withdrawal list without Japan", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "JP");
+    }],
+    ["a withdrawal list without Switzerland", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "CH");
+    }],
+    ["a withdrawal list without Moldova", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "MD");
+    }],
+    ["a withdrawal list without South Korea", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "KR");
+    }],
+    ["a withdrawal list without Taiwan", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "TW");
+    }],
     ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }],
     // Final review Part 1b, Minor 6: a changed renewal needs at least 7 business days' notice (M3; A7's notice rule,
     // kept for NETOPIA until N-23 is answered).

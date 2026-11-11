@@ -82,7 +82,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `operator-digest --source <file>` | prints `operatorManifestSha256` (the shared function the launchers use) and the operator file count |
 | `launch-plan --service api\|ui\|runner --slot A\|B --from <existing plan> --root <release root> --source-manifest <file> [--ui-build <file>] --native-attestation <file> --out <dir>/<service>-launch.json` | new launch plan: release fields from the manifests, the ports from the slot (A: website 3100, API 3101; B: 3200, 3201; never from `--from`), the env file `/etc/debateai-v3-preview/auth-dev-v1/<service>-<label>.env` of the release the root names (`--root` ends in `-<label>-<service>`), everything else from `--from`; for `--service runner` the API plan may be `--from` (identity from the runner OS account, `runner-<label>.env` custody); `validateLaunchPlan` before writing |
 | `native-plan --operation apply-and-plan\|verify --from <existing native plan> --source-manifest <candidate api manifest> --out <file>` | new native plan for a candidate API root; `verify` carries the `approval` of `--from` over unchanged; the reviewed `validateNativePlan` before writing |
-| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] [--debate-shape off\|'<JSON object>'] [--question-language '<JSON object>'] [--length-guidance '<JSON object>'] [--line-up <file>] [--answer-seats '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `--hosted-billing '<JSON object>'` composes a HOSTED version with publish kit v3 from the owner's billing switch, ceilings and room-read budget (see "Hosted preview with NETOPIA sandbox billing" below); a plan from a hosted base needs it (`HOSTED_BILLING_REQUIRED`). `publish` carries the plan's choices; `verify` and `apply-and-plan` carry `--from`'s hosted inputs. `--debate-shape` sets the debate shape row. `off` publishes it disabled: the start values with `enabled: false`, so the API asks today's shape, and a runner on that version still finishes the debates admitted with the shape. A JSON object (the whole policy, with its kind) publishes that policy; the register's own parser checks it on the server before any row is built. Without the option the current row is kept, or there is none. `--question-language` sets the optional `questionLanguagePolicy` row (the policy without its `kind`; `deploy/vps/register/README.md`); `"fastCheck": null` in it switches the fast language check off. Before anything is sealed the kit asks the API's own question-language boot refusals while the debate shape is in force (a reserved prompt-frame token in the instruction, a fast-check model the preview gate does not list). Without the option the base's row is kept, or there is none (the code's start values). Length guidance (LG-C) is optional: `--length-guidance '<JSON object>'` carries the whole policy, with its `kind`; use `"$(cat dialectical-engine/tools/preview-practice/length-policy-start.json)"` for the owners' start values (the preview practice's start file). The policy is about 4-5 KB, inside the native plan's 32 KiB limit. There is no `off` word: a version without the row is the rollback. Left out, the base's length-guidance row is kept as it is, or none. Only `plan` takes the flag; `publish` carries the plan's choice. The line-up and the answer seats (side-by-side spec §13 addition D23) are optional too. `--line-up <file>` names a root-owned 0644 JSON file in the artifacts folder holding the plan member that `dialectical-engine/tools/preview-practice/check-thinking-levels.ts --print-line-up --settings <api.env>` prints (`{"lineUp":{…}}`), or the bare line-up (`free_model_ids`, `premium_model_ids`, `thinking_levels`); it seals the `previewLineUpPolicy` row. Left out, the base's line-up row is kept as it is, or none (the env's line-up). `--answer-seats '{"writer":"preview:…","checker":"preview:…"}'` (optional `storyteller` and `storyChecker`, which otherwise follow the writer and the checker) chooses the four answer seats from the reviewed preview refs; never beside `--checker` (one way to set the checker), never with the writer as its own checker, and never with the storyteller as its own story checker (a seat left out counts as the seat it follows: storyteller → writer, story checker → checker). Left out, the seats are today's. Only `plan` takes these two flags; `publish` carries the plan's choices. |
+| `native-plan --operation plan --from <live verify plan> --source-manifest <candidate api manifest> [--checker glm\|deepseek --deepseek-enabled-on-gate yes] [--role-rotation on\|off] [--call-concurrency '<JSON object>'] [--debate-shape off\|'<JSON object>'] [--question-language '<JSON object>'] [--length-guidance '<JSON object>'] [--engine-version off\|'<JSON object>'] [--line-up <file>] [--answer-seats '<JSON object>'] --out <file>` | register publication, step 1: the base is the publication the preview runs now (`approval.publication` of the live verify plan: its version and snapshot hash, never typed); no approval. The answer checker stays GLM unless `--checker deepseek` is given together with `--deepseek-enabled-on-gate yes` (your statement that the gate's GO switches DeepSeek on). Role rotation stays on unless `--role-rotation off` is given: the rotation row is then published disabled (the preview's rollback for rotation; a later plan without the flag switches it back on, and its delta shows that row changing). `--call-concurrency` sets the call-concurrency row as one JSON object; without it the current value is kept, or there is no row if the base has none (see "Publishing the call-concurrency row" below). `--hosted-billing '<JSON object>'` composes a HOSTED version with publish kit v3 from the owner's billing switch, ceilings and room-read budget (see "Hosted preview with NETOPIA sandbox billing" below); a plan from a hosted base needs it (`HOSTED_BILLING_REQUIRED`). `publish` carries the plan's choices; `verify` and `apply-and-plan` carry `--from`'s hosted inputs. `--debate-shape` sets the debate shape row. `off` publishes it disabled: the start values with `enabled: false`, so the API asks today's shape, and a runner on that version still finishes the debates admitted with the shape. A JSON object (the whole policy, with its kind) publishes that policy; the register's own parser checks it on the server before any row is built. Without the option the current row is kept, or there is none. `--question-language` sets the optional `questionLanguagePolicy` row (the policy without its `kind`; `deploy/vps/register/README.md`); `"fastCheck": null` in it switches the fast language check off. Before anything is sealed the kit asks the API's own question-language boot refusals while the debate shape is in force (a reserved prompt-frame token in the instruction, a fast-check model the preview gate does not list). Without the option the base's row is kept, or there is none (the code's start values). Length guidance (LG-C) is optional: `--length-guidance '<JSON object>'` carries the whole policy, with its `kind`; use `"$(tr -d '\n\r\t' < dialectical-engine/tools/preview-practice/length-policy-start.json)"` for the owners' start values (the preview practice's start file). Every option value must be one line: the tool refuses a value with any control character, a line break or a tab included (`ARGUMENTS_REFUSED` naming the flag; R22, 2 November 2026: the start files are written over many lines, so `cat` alone is refused). The policy is about 4-5 KB, inside the native plan's 32 KiB limit. There is no `off` word: a version without the row is the rollback. Left out, the base's length-guidance row is kept as it is, or none. Only `plan` takes the flag; `publish` carries the plan's choice. `--engine-version` sets the optional `engineVersionPolicy` row, which switches new debates to engine 2: `"$(tr -d '\n\r\t' < dialectical-engine/tools/preview-practice/engine-policy-start.json)"` for the owners' start values, `off` for the row published disabled (the rollback; debates admitted under engine 2 still finish). The row needs the length row beside it, and the debate shape on. Left out, the base's engine row is kept as it is, or none (engine 1). Only `plan` takes the flag; `publish` carries the plan's choice. The line-up and the answer seats (side-by-side spec §13 addition D23) are optional too. `--line-up <file>` names a root-owned 0644 JSON file in the artifacts folder holding the plan member that `dialectical-engine/tools/preview-practice/check-thinking-levels.ts --print-line-up --settings <api.env>` prints (`{"lineUp":{…}}`), or the bare line-up (`free_model_ids`, `premium_model_ids`, `thinking_levels`); it seals the `previewLineUpPolicy` row. Left out, the base's line-up row is kept as it is, or none (the env's line-up). `--answer-seats '{"writer":"preview:…","checker":"preview:…"}'` (optional `storyteller` and `storyChecker`, which otherwise follow the writer and the checker) chooses the four answer seats from the reviewed preview refs; never beside `--checker` (one way to set the checker), never with the writer as its own checker, and never with the storyteller as its own story checker (a seat left out counts as the seat it follows: storyteller → writer, story checker → checker). Left out, the seats are today's. Only `plan` takes these two flags; `publish` carries the plan's choices. |
 | `native-plan --operation publish --from <the plan above> --proposal <what the native operator printed for it> --source-manifest <same manifest> --out <file>` | step 2, after the owner reviewed the proposal: re-hashes every value the proposal shows and its `deltaSha256`, checks it belongs to that plan (release, operator digest, base), copies the approval from it, picks a fresh `publicationId`, and prints the approval it wrote |
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
@@ -327,7 +327,7 @@ a changed value (e.g. dev b75e4c294: `composerContractHash` moved to the answer-
 `countryPolicy` closed Tennessee) or a new key (e.g. `outboundMailPolicy`, which must also be added
 to `PREVIEW_SOURCE_ROW_KEYS_V2` in `deploy/preview-auth-dev/v1/publish-register-v2.ts`).
 
-**What changed from v1.** The v1 composer (`publish-register.ts`, unchanged but for S04's questionCheckPolicy, which the API reads at start-up) could make only one
+**What changed from v1.** The v1 composer (`publish-register.ts`, unchanged but for S04's questionCheckPolicy and the mail limit's outboundMailPolicy, which the API reads at start-up) could make only one
 publication: 67 source rows on a 65-row base, adding four fixed keys. It refuses the live 68-row
 version. Kit v2 (`publish-register-v2.ts`) composes from the version the preview runs now. The
 proposal it prints lists every added or changed row with its old and new value in full. A base row
@@ -371,7 +371,7 @@ printed line. In a script, test it: `OUT=$(nat …); [ "$OUT" = "exit 0" ] || { 
    billing off:
 
    ```sh
-   HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+   HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
    rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB_ON" --out "$ART/native-plan-plan.json"
    ```
 
@@ -552,6 +552,11 @@ echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/an
 
 Anything else means stop: do not publish the row until both gates run the new code.
 
+Since R22 the gate code holds no money caps: every gate reads them from the root-only caps file
+`/etc/debateai-v3-preview/provider-budget-caps-v1.json` (`deploy/preview-gate/v3/README.md`, "Money: DeepInfra's share of the
+team total"), so that file must be on the server BEFORE any gate restarts on the R22 files. Old gate code ignores it, so
+writing it first is safe. Without it the restarted gates refuse (`ROOT_CAPS_REQUIRED`) and every call stops.
+
 Then add one option to step 1's `plan` command and follow the same steps 1 to 6: the plan carries the policy, the owner
 sees `callConcurrencyPolicy` in the delta (`added` the first time, `changed` for a new value),
 `publish` copies it from the plan. The runner is the only reader of this row, so do not skip
@@ -650,13 +655,21 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
 - Moving the billing clock (`BILLING_STAGE_CLOCK_OFFSET_DAYS`) stays refused (the owner is still
   deciding), so a renewal cannot be tested on this host yet.
 
-**The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`.
+**Since R22, two more inputs, always required, and a new file on the server.** `billingPlans` and `abuseLimits` hold real
+limits, so the code's rows are made up and a plan without them is refused (`PREVIEW_NATIVE_PLAN_REFUSED`). A hosted plan with
+billing on and a credit of the code's made-up row refuses too (`hosted-billing-plans-made-up`).
 
-| Input | Where it goes | The preview's value (the owner, 14 October 2026) |
+**The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`. Since R22 they live only in a
+root-owned file on the server, `/etc/debateai-v3-preview/hosted-billing-v1.json` (mode `0600`), never in this repository. It is
+the JSON object the table below describes, with `billing` set to anything: the steps set it. Every `HB` line below reads it.
+
+| Input | Where it goes | Its value |
 |---|---|---|
-| Ceiling per debate | `perRunCeilingMicros` in `--hosted-billing` | `3000000` ($3) |
-| Ceiling per day, for the whole site | `dailyCeilingMicros` in `--hosted-billing` | `10000000` ($10) |
-| The room read's budget (`GET /v1/asks/room`) | `askRoomReads` in `--hosted-billing` | `{"limit":60,"windowMs":60000,"capacity":65536}` (the hosted kit's example) |
+| Ceiling per debate | `perRunCeilingMicros` in `--hosted-billing` | your value, in the private file below |
+| Ceiling per day, for the whole site | `dailyCeilingMicros` in `--hosted-billing` | your value, in the private file below |
+| The room read's budget (`GET /v1/asks/room`) | `askRoomReads` in `--hosted-billing` | your value, in the private file below |
+| The plans, with their real limits | `billingPlans` in `--hosted-billing` | the whole `billingPlans` value; see `deploy/vps/register/hosted-register.example.json` for its shape (the example's limits are made up) |
+| The abuse limits | `abuseLimits` in `--hosted-billing` | the whole `abuseLimits` value; same shape as that example |
 | NETOPIA sandbox POS signature, API key, public key | step H6, step H5 | from NETOPIA's sandbox admin |
 | Quaderno sandbox account (its label) and API key | steps H3 and H7, step H5 | the label in `https://<label>.sandbox-quadernoapp.com/api` |
 | SmartBill series | step H7 | `DBAI` (the dummy never receives it) |
@@ -664,7 +677,7 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
 
 The kit refuses a debate ceiling above the day's and, as a typing guard only, above $50 per debate or
 $200 per day (`ARGUMENTS_REFUSED` naming `--hosted-billing`). The day must also hold one full debate
-plus its story: with $3 per debate that is at least $3.66, and the plan refuses a smaller day
+plus its story, and the plan refuses a smaller day
 (`STORY_DAILY_CEILING_INSUFFICIENT`, from the API's own boot rule).
 
 ### H0. Server work this section only names
@@ -1017,12 +1030,12 @@ R18's plans), so both hosted plans carried it. The call-concurrency row is carri
 always:
 
 ```sh
-HB='{"billing":"off","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB="$(jq -c '.billing="off"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" --out "$ART1/native-plan-plan.json"
 ```
 
 **Step 2, the owner's review.** Besides what the release itself changes, expect exactly:
-- `storyCostEnvelopePolicy` added (the story's money row: $0.05 per story, 20% over at most);
+- `storyCostEnvelopePolicy` added (the story's money row);
 - `costEnvelopePolicy` changed, reason `owner-hosted-billing-input`: the two ceilings become the
   owner's values and `provisional_reason` names them as the preview's sandbox ceilings (`provisional`
   stays `true`); every other member (the band 9500 / 11500 / 1 among them) stays;
@@ -1072,7 +1085,11 @@ refuses a database proof (native attestation) older than 180 seconds (`native-at
 launch plans carry the proof made in step 4, and building them takes longer than that, so the check
 always prints `PREVIEW_RUNNER_PREPARATION_REFUSED` at this point. The running release's own plan
 refuses too, for the same reason (measured 19 October 2026). The real start makes a fresh proof first
-(prestart) and checks `runner.env` there, refusing a wrong one with `PREVIEW_RUNNER_STARTUP_REFUSED`.
+(prestart) and checks `runner.env` there, refusing a wrong one with `PREVIEW_RUNNER_STARTUP_REFUSED`. The start (and
+the prepare-only check, from R22's follow-ups) also checks the runner login's database roles: from migration 0130 on,
+exactly `debateai_rls_all_accounts` (0130's row security reads across accounts through it) and `debateai_runtime`, as
+the production principals manifest's `runner-runtime` row says. R22's first start, on 2 November 2026, refused there
+with the site down because the check still expected `debateai_runtime` alone (fixed in `6d0eb4362`).
 
 Then step 6 (pin all three, restart the API and the website, then the runner when no debate is
 running, as step 3's note says).
@@ -1118,7 +1135,7 @@ Start a short debate as usual: it must finish as it did in local mode.
    ART2="$ART-billing-on"; ( set -euo pipefail; [ ! -e "$ART2" ]; install -d -o root -g root -m 0755 "$ART2"; echo "created $ART2" )
    ( set -euo pipefail; for F in api.env.before-billing-on runner.env.before-billing-on release-lock.before-billing-on.json; do [ ! -e "$S/$F" ]; done
      cp -a "$E/api.env" "$S/api.env.before-billing-on"; cp -a "$E/runner.env" "$S/runner.env.before-billing-on"; cp -a /etc/debateai-v3-preview/lifecycle/release-lock.json "$S/release-lock.before-billing-on.json"; echo "billing-off state kept" )
-   HB='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+   HB="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
    rel native-plan --operation plan --from "$S/native-plan.before.json" --source-manifest "$ART/candidate-api-source.json" --checker deepseek --deepseek-enabled-on-gate yes --hosted-billing "$HB" --out "$ART2/native-plan-plan.json"
    ```
 
@@ -1170,7 +1187,7 @@ Start a short debate as usual: it must finish as it did in local mode.
 
 As in `deploy/vps/README.md` §14.9 step 1, without the clock move. On an account whose address is
 allow-listed: open the pricing page, choose Plus, pick the United States as the country, answer the
-"Do you live in …" question with yes, give a state, press **Continue to payment**, and on NETOPIA's
+"Do you live in …" question with yes, give a state, press **Subscribe and pay**, and on NETOPIA's
 sandbox page pay with the test card 9900 0048 1022 5098 (any future expiry, CVV 111). Expect: back on
 the site, the plan active within seconds; the confirmation (M1, with the Terms attached) and the
 receipt (M2) at that allow-listed inbox; Settings shows the saved card; the invoice in Quaderno's
@@ -1340,6 +1357,67 @@ so a release does not touch them and needs no step for them. Setup, the test sit
 meaning of each email: `deploy/notify-alarm/README.md`. Each knock writes one harmless
 `billing.notice.unverified` line with `NOTICE_HEADER_MISSING` in the API's journal.
 
+## Before an upload: the Mac check (when the owner asks)
+
+**In plain words.** One command on the Mac tries three things the server does during an upload, on the exact commit
+about to be uploaded, the way the server does them. It was built after R22's upload (2 November 2026), which stopped
+six times on faults no test had seen. It runs only when the owner asks. It is never a required step: no step of any
+recipe below waits for it, and an upload may go without it. It never touches the server, reads no secret and spends
+no money.
+
+The command, run on the Mac from the `dialectical-engine/` folder of a checkout that holds the commit (here R22's
+commit; put the release's own `REV` in its place):
+
+```sh
+node tools/upload-check/run.mjs --rev af7e457b5
+```
+
+It needs Node v26.8.2 and pnpm 11.20.0 exactly (anything else is refused, `UPLOAD_CHECK_RUNTIME_REFUSED`), the
+internet for one package download, and port 5434 free. It first waits, up to an hour, until no other test run is going
+and at least 40% of the Mac's memory is free, because this Mac has frozen under parallel heavy work. Everything it
+makes goes into one temporary folder, apart from two files of a few bytes that a stopped check 3 can leave in the
+Mac's own temporary folder (named in `tools/upload-check/README.md`). That folder is deleted at the end: when the run
+finishes, on Ctrl-C, on a stop (`kill`) and when its terminal is closed. A folder that still cannot be deleted is named in one line that starts
+`UPLOAD_CHECK_WORK_FOLDER_LEFT`. A forced kill (`kill -9`) cannot be caught and leaves the folder behind; when no upload
+check is running, `find "${TMPDIR%/}" -maxdepth 1 -name 'upload-check-*' -print -exec rm -rf {} +` prints and deletes
+every leftover.
+
+**What each check covers.** Each one does one thing the way the server does it:
+
+| Check | What it does | The 2 November fault it would have caught |
+|---|---|---|
+| 1. `tools-folder` | Builds the server's shared tools folder from the three `deploy/` folders alone, as they are at the commit (by `git archive`, so nothing else on the Mac can help), and loads every tool in it. Seven tools that always run from a release folder, where the packages are installed, are loaded in check 2 instead. | Fault 3: a tool that reached for a folder the shared tools folder does not have. |
+| 2. `website-build` | Installs a release the way step A3 does (one online package download, then installs that must download nothing), then builds the website with the settings the release tool itself gives the build, and loads the seven release-folder tools there. | Fault 2, but only while one of the owner's early allowances is in force (an early allowance lets a package version be used before it is 7 days old, which the package rule otherwise refuses). The report says how many are in force; with none, this check has nothing of that kind to catch. |
+| 3. `start-checks` | Starts a throwaway database (PostgreSQL) shaped like the server's to the start checks: the same name, port and cluster name. It applies every database step (migration) of the commit and makes the production logins (their names and roles) with the product's own tool. Then it runs the API's and the runner's own start checks as those logins, not as the database's all-powerful administrator. | Fault 5: the runner's start check expected one database role, and row security gives its login two. |
+
+- **A commit that is too old for a check** gets `not checked` for that check, with the reason. Check 2 says `not checked`
+  for any commit from before the release tool shared its build settings (`uiBuildEnvironment`), R22's included.
+- **`not checked` never counts as passed.**
+- **Check 3 gives the API's logins the three recovery roles** (password reset, backup email, two-step-login recovery),
+  as section 3 of the row-security release note (`docs/releases/2026-10-23-row-level-security.md`) says the server's
+  deployment does, and its report says so in a line.
+- **Its known gap:** on the server, the logins were made by hand, in step B4 of R22's own upload guide (outside this
+  repository). So check 3 trusts the product's list of production logins to match the server's, and its report says
+  that too.
+
+**What none of the checks covers.** Faults 1, 4 and 6 of 2 November lived in the guide's own steps, on the server's own
+folders, and the checker does not run the guide's steps or copy the server. It also does not test the AIs' answers, and
+it leaves out the server-only checks that folders belong to root (the server's administrator account). The three
+house rules in "A normal release on a hosted base" ("How each step runs") are there for those faults.
+
+**How to read the result.** The report ends with `ALL PASSED` (exit code 0: the number a command hands back when it
+ends), or `NOT PASSED` (1). Exit code 2 means the run could not happen at all (a wrong version, a busy Mac, an unknown
+commit), with one line saying why. A `NOT PASSED` is a reason to bring the report to the owner before the upload.
+`tools/upload-check/README.md` explains each line.
+
+**The proof (2 November 2026).** The checker was run on three commits:
+
+| Commit | What it is | Result |
+|---|---|---|
+| `f8d39fc26` | the code on the morning of 2 November | `NOT PASSED`: check 1 names the four tools that failed that day (fault 3), and check 3 says `runner login: refused` (fault 5) |
+| `af7e457b5` | R22 as uploaded | `NOT PASSED` only because check 2 says `not checked` (too old); checks 1 and 3 pass |
+| the checker's own branch tip | the code with the R22 fixes and the checker | `ALL PASSED`: all three checks pass, the website build included, with the early allowances in force that day listed |
+
 ## A normal release on a hosted base (since R19, 21 October 2026)
 
 **Since the transition release T, this is the drained recipe of the old layout.** It ran on one fixed unit per
@@ -1377,11 +1455,34 @@ section is that recipe, written so that any later release can follow it.
   `install -d -o root -g root -m 0700 "$S/jobs"`), start it with `nohup bash "$S/jobs/<step>.sh" > "$S/jobs/<step>.log"
   2>&1 < /dev/null &`, and read the log with `tail`.
 
+**Three house rules (from R22's upload, 2 November 2026).** They hold for every recipe in this guide and for every new
+upload guide. Each one answers a fault the Mac check ("Before an upload: the Mac check" above) cannot see, because it
+lived in a guide's own step on the server's own folders. The blocks R22 stopped on already follow them; the rules are
+for every step written from now on.
+1. **An option's value goes on one line.** When a step hands a file's contents to a tool as an option's value, it takes
+   the line breaks and tabs out first (`tr -d '\n\r\t' < <file>`, or `jq -c` for JSON). The release tools refuse any
+   control character in a value. That was fault 1, which stopped R22 at its register plan (A8). The fixed form is in
+   the `native-plan --operation plan` row of "Commands" and in SV1's `LG` and `SHAPE` lines.
+2. **After starting a service, wait for its own sign that it is ready, with a time limit, before checking it; and read
+   a check file the way it is written.** `active` from systemd (the server's service manager) only says the process
+   started. Wait in a loop for the sign the service itself gives (its start line in the journal, its socket, its
+   answer on its address), give up after a stated time, and stop the step with `_NOT_DONE` then; a hand-run step
+   reads the check after the loop instead. When a tool writes
+   several lines, read the one that holds the answer, not the whole file. That was fault 6, which stopped R22 at its
+   Perplexity step. The fixed form is in steps 7 and 8 of `deploy/preview-gate/v3/README-perplexity.md` (a 30-second
+   wait for the socket, and the probe's last line read with `tail -n 1`). B6's wait of up to 4 minutes for the API's
+   start line follows the same rule.
+3. **In an upload with downtime, no step relies on a folder or file that only a release's first start creates.** A step
+   that runs before the first start (a check, a settings step) makes what it needs itself, the same way the start does
+   (same owner, same permissions), or it moves after the start. That was fault 4, the settings check; the fixed form is
+   item 4 of "The first upload with this change (T+1)", where the check now makes the release's
+   `lifecycle-current-<label>` folder itself.
+
 **The plan's inputs on this host never change** (the owner's, 14 and 19 October 2026). The hosted kit rebuilds
 billing, the ceilings and the answer checker from the plan every time, never from the base:
 
 ```sh
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 ```
 
 - Every plan carries `--hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes`.
@@ -1526,7 +1627,7 @@ E=/etc/debateai-v3-preview/auth-dev-v1
 NP=$E/native-plan.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 AU=$(systemctl show -p User --value debateai-preview-api); AGRP=$(id -gn "$AU")
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -1681,7 +1782,7 @@ echo A5_DONE
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # A8: the plan (billing-on inputs, the live checker), the native operator's proposal, the live verify plan put back at once.
-[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "A8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "A8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$NP" || { echo "A8_NOT_DONE: native-plan.json moved since A1"; exit 1; }
 [ "$(psqlq "SELECT count(*) FROM core.work_item WHERE state IN ('READY', 'CLAIMED')")" = 0 ] || { echo "A8_NOT_DONE: a debate is queued or running"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "A8_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
@@ -1740,7 +1841,7 @@ exactly `REV`, with the live register exported from the server (S-1), and with t
 as in S-5 and S-6):
 
 ```sh
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
 ```
 
@@ -2296,7 +2397,7 @@ NP=$E/native-plan-$LABEL.json
 CAPI=/opt/debateai-v3-preview/releases/auth-dev-candidate-$LABEL-api
 ART=/opt/debateai-v3-preview/artifacts/auth-dev-$LABEL
 L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 rel() { /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs" "$@"; }
 nat() { ( cd "$CAPI/dialectical-engine" && /bin/sh -c 'exec 5<&0; p=$1; shift; printf %s "$p" 5<&- | "$@" 3<&0 0<&5 5<&-' sh '{"peerUrl":"postgresql://postgres@localhost/debateai?host=/run/debateai-v3-preview/postgresql&port=5434"}' /usr/sbin/runuser -u postgres -- /usr/bin/env -i PATH=/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin:/usr/local/bin:/usr/bin:/bin LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/native-operator.mjs" --credential-fd 3 < /dev/null > "$1" ); echo "exit $?"; }
 put() { install -o root -g root -m 0644 "$1" "$NP.new" && mv "$NP.new" "$NP" && cmp "$1" "$NP"; }
@@ -2333,8 +2434,8 @@ SEATS=$(jq -c '.answerSeats // empty' "$CP")               # the answer seats JS
 ROT=$(jq -r '.roleRotation // empty' "$CP")                # off, or empty (rotation on)
 LINEUP=''                                                  # a line-up file in $SART (see "The line-up file"), or empty
 CC=''                                                      # call-concurrency JSON, or empty
-LG=''                                                      # length-guidance JSON, or empty
-SHAPE=''                                                   # debate-shape JSON or off, or empty
+LG=''                                                      # length-guidance JSON on one line (jq -c, or tr -d '\n\r\t' < a file), or empty
+SHAPE=''                                                   # debate-shape JSON on one line (as LG), or off, or empty
 cmp -s "$S/native-plan.before.json" "$NP" || { echo "SV1_NOT_DONE: the live verify plan moved since SV0"; exit 1; }
 [ "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB")" = "$(jq -cS '.hostedBilling | {billing,dailyCeilingMicros,askRoomReads}' "$FROM")" ] || { echo "SV1_NOT_DONE: HB changes a site rule (billing, the day's ceiling or the room-read budget): only perRunCeilingMicros may change"; exit 1; }
 [ ! -e "$SART/native-plan-plan.json" ] && [ ! -e "$SART/register-proposal.json" ] || { echo "SV1_NOT_DONE: an earlier plan or proposal exists in $SART (look first)"; exit 1; }
@@ -2425,7 +2526,8 @@ given earlier, or for another version, is not enough.
 `settings-version.mjs activate <version> --by <owner> --reason "<why>"` first proves that each spending gate runs this
 release's gate code (the gate-code fingerprint: each gate's two installed gate files and its GO record equal this
 release's own copies, else `SETTINGS_GATE_HELPER_DIFFERS`, nothing asked), then reads both gates' read-only `/remaining`
-and hands the answers to the operator, which refuses unless every model, thinking level and answer ceiling the version can
+as the release's API account (a gate answers only the accounts in its GO's `allowed_peer_uids`, the API and the runner,
+never root) and hands the answers to the operator, which refuses unless every model, thinking level and answer ceiling the version can
 seat is switched on at its gate (live condition 6). Both gates must answer: a gate that is down refuses
 (`SETTINGS_GATE_UNANSWERED:<gate>`). Only then is the pointer moved, in one transaction with the release switch's lock.
 `--by` is the owner's name as it should be recorded (letters, digits, space, `._@-`), `--reason` a short note.
@@ -2569,7 +2671,10 @@ silent skip.
   release first (`settings-version.mjs check <new label> <version>`, after SB10 pinned it), and set `ACT` to it. The
   switch runs the live gate check before it writes anything whenever the version the switch activates differs from the
   active one (the new release's own site version included: it may carry a new line-up; ruling R80); both gates must
-  answer. SB13 and DR6 also pass the active version they read as `--expect-active`, so an activation that lands after
+  answer, and they answer only the accounts their GO lists in `allowed_peer_uids` (the API and the runner): the tool asks
+  as the new release's API account, never as root (R22, 2 November 2026: tools that asked as root were refused with
+  `SETTINGS_GATE_LIVE_CHECK_FAILED`, `SETTINGS_GATE_UNANSWERED:<gate>`, until root was added to both GOs as a stopgap;
+  the release guide R22's "After R22: root out of the two gates" takes it back out). SB13 and DR6 also pass the active version they read as `--expect-active`, so an activation that lands after
   their read refuses the switch (`SETTINGS_ACTIVE_VERSION_MOVED`, nothing written).
 - **The way back activates by itself.** A rollback (WB2, and WB3's retry) keeps the active version when the target
   release has passed it (it activates nothing); else it activates the version that was active the last time the target
@@ -2764,6 +2869,10 @@ echo "api-$LABEL.env and runner-$LABEL.env: sockets-only (the line-up lives in t
    line-up (free and premium), and fails `RUN_CEILING_BELOW_ONE_CALL` if not. The services' boot does not ask this of the
    site version yet. If the check passes, the boot is made just as strict in the upload after T+1 (a follow-up code
    change, not part of this upload). If it fails with that code, nothing has started: stop and ask the owner before WB1 or anything else.
+
+   **The check makes the new release's `lifecycle-current-<label>` folder** (root, 0755) when the release has never
+   started, the way prestart does: a drained upload checks before the first start (R22, 2 November 2026: older tools
+   refused `LIFECYCLE_WRITE_REFUSED` here). `CURRENT_DIRECTORY_REFUSED`: it could not make it; nothing ran.
 
 ```sh
 set -euo pipefail
@@ -3127,7 +3236,7 @@ ONP=$E/native-plan.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 C=/etc/debateai-v3-preview/public/Caddyfile
 EDGE=/etc/debateai-v3-preview/ui-edge.caddy.secret
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -3182,7 +3291,7 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # TA8: the plan (billing-on inputs, the live checker) and the native operator's proposal, in T's own native-plan file.
 REG0=$(cat "$S/register-before")
-[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "TA8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "TA8_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "TA8_NOT_DONE: the live native-plan.json moved since TA1"; exit 1; }
 [ ! -e "$NP" ] || { echo "TA8_NOT_DONE: $NP exists (look first)"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "TA8_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
@@ -4018,7 +4127,8 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 **How each step runs.** As in the transition: one script per step, `set -euo pipefail`, the names file (SB1 makes it),
 `<STEP>_NOT_DONE` guards, `<STEP>_DONE` last, no env value printed except `REGISTER_VERSION`, `RELEASE_KEY`,
 `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. The traps of the
-transition hold. Two more:
+transition hold, and so do the three house rules of "A normal release on a hosted base" (one-line option values, a
+service's own ready sign, nothing that only a first start creates). Two more:
 - **One switch command at a time.** Each `release-switch.mjs` command takes
   `/etc/debateai-v3-preview/lifecycle/release-switch.lock`; another one meanwhile refuses `RELEASE_SWITCH_BUSY`. A lock
   left by an ssh drop names its path and how to clear it (WB4).
@@ -4130,7 +4240,7 @@ ONP=$E/native-plan-$OLABEL.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 C=/etc/debateai-v3-preview/public/Caddyfile
 EDGE=/etc/debateai-v3-preview/ui-edge.caddy.secret
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -4196,7 +4306,7 @@ As "The practice" of the hosted-base recipe, on exactly `REV`, with the live reg
 quiet hour (it shares the gates' slots and daily pots with users, and counts toward the cap of 8 debates):
 
 ```sh
-HB_ON='{"billing":"on","perRunCeilingMicros":3000000,"dailyCeilingMicros":10000000,"askRoomReads":{"limit":60,"windowMs":60000,"capacity":65536}}'
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
 ```
 
@@ -4213,7 +4323,7 @@ set -euo pipefail
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
 LINEUP=''                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty
 REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
-[ "$(jq -cS . <<<"$HB_ON")" = '{"askRoomReads":{"capacity":65536,"limit":60,"windowMs":60000},"billing":"on","dailyCeilingMicros":10000000,"perRunCeilingMicros":3000000}' ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
 [ ! -e "$NP" ] || { echo "SB3_NOT_DONE: $NP exists (look first)"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "SB3_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }

@@ -1,0 +1,82 @@
+{
+  "version": "piece-settings-version-forward0169-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0168_set_aside_continue.sql",
+    "manifestSha256": "4f40002b41c1d6853d2d341c6538ee3b1cbbf10576d1ec23e892abc4ade10661",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0169_piece_settings_version.sql",
+    "sha256": "50bb99dcd7446bdce05c0933040648d1ea98709365d584c8e04a0d492c35abfb"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0124_settings_activation.sql",
+      "functions": [
+        "register.read_active_settings_version()"
+      ],
+      "grantees": [
+        "debateai_runtime"
+      ],
+      "field": "function_acl"
+    },
+    {
+      "step": "0132_web_evidence.sql",
+      "relations": [
+        "identity.web_reading"
+      ],
+      "columns": [
+        "settings_version"
+      ],
+      "field": "column_added"
+    },
+    {
+      "step": "0134_dig_model_and_month_pause.sql",
+      "relations": [
+        "identity.path_rewrite"
+      ],
+      "columns": [
+        "settings_version"
+      ],
+      "field": "column_added"
+    },
+    {
+      "step": "0136_investigation_reports.sql",
+      "relations": [
+        "identity.investigation_report"
+      ],
+      "columns": [
+        "settings_version"
+      ],
+      "field": "column_added"
+    },
+    {
+      "step": "0138_tree_updates.sql",
+      "relations": [
+        "identity.main_answer_update",
+        "identity.path_update"
+      ],
+      "columns": [
+        "settings_version"
+      ],
+      "field": "column_added"
+    },
+    {
+      "step": "0147_public_tree.sql",
+      "relations": [
+        "identity.public_answer_update",
+        "identity.public_contribution_check",
+        "identity.public_report"
+      ],
+      "columns": [
+        "settings_version"
+      ],
+      "field": "column_added"
+    }
+  ]
+}

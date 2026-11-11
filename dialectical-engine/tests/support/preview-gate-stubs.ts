@@ -17,11 +17,13 @@ import { createServer, type Server } from "node:http";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
+import { QUESTION_LANGUAGE_FIELD, argumentLanguageDirective, detectArgumentLanguage, questionLanguageSentence } from "@debateai/kernel";
 import { mapContractNameOf, mapEngineContractNameOf } from "@debateai/map";
-import { COMPARING_JUDGE_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
+import { COMPARING_JUDGE_CONTRACT_ID, COMPARING_JUDGE_SOURCES_CONTRACT_ID, POINT_INVESTIGATION_CONTRACT_ID } from "@debateai/judgement";
+import { previewModelRow, previewNanoUsdText, previewUsdTextToNano } from "@debateai/providers";
 import { STORY_CHECKER_CONTRACT_ID, STORY_CHECKER_V4_CONTRACT_ID, STORYTELLER_CONTRACT_ID, STORYTELLER_V4_CONTRACT_ID } from "@debateai/story";
 import { engineMapScriptedContent } from "./engine-map-script.js";
+import { LATER_CONTRACT_KINDS, laterStepContent, type LaterGateKind } from "./gate-later-steps.js";
 import { readFramedMaterial, wirePacket } from "./framed-packet.js";
 import { reviewArtifact, withRequestDerivedBearings } from "./reviewBearings.js";
 import { QUESTION_LANGUAGE_CHECK_CONTRACT_ID } from "../../apps/api/src/question-language/fast-check.js";
@@ -29,7 +31,7 @@ import { openingsDryContent } from "../../tools/preview-practice/practice-openin
 
 export type GateProvider = "deepinfra" | "anthropic";
 export type GateRequestKind = "PROBE" | "STORYTELLER" | "STORY_CHECKER" | "MAP" | "QUESTION_LANGUAGE" | "PANEL" | "REVIEW" | "JUDGE" | "EVALUATOR" | "COMPOSE"
-  | "VERDICT_JUDGE" | "INVESTIGATE";
+  | "VERDICT_JUDGE" | "INVESTIGATE" | LaterGateKind;
 /** A /complete request as the gate saw it (what a scenario's `override` is handed). */
 export type GateRequest = Readonly<{ provider: GateProvider; model: string; kind: GateRequestKind | "UNKNOWN"; body: Readonly<Record<string, unknown>> }>;
 /**
@@ -54,6 +56,28 @@ export const STUB_COOL_OFF_RETRY_AFTER_SECONDS = 60;
 export type GateRecord = GateRequest & Readonly<{ answer: GateAnswer }>;
 /** One read of a gate's `POST /remaining` (contract A §5), with the state it was answered. */
 export type GateRemainingRead = Readonly<{ provider: GateProvider; state: "active" | "halted" }>;
+/**
+ * V4 start step, Task 85: what one gate's `/remaining` answers, as the real gate's figures (made up in a test, or the owner's
+ * private file). `usd` (what is left today) and the reservations are the gate's decimal texts. The final-writer room is given
+ * as a pair or not at all (the real gate answers it only for a GO that names final-writer calls); `dailyPotUsd` is answered
+ * only to a request that asks for the pot (`"daily_pot": true`), as the real gate does; `enabledModels` absent: the doubles'
+ * own list for that gate.
+ */
+export type StubRemainingFigures = Readonly<{
+  usd: string;
+  calls: number;
+  maxConcurrentCalls: number;
+  largestReservationUsd: string;
+  finalWriterMaxInFlight?: number;
+  largestFinalWriterReservationUsd?: string;
+  dailyPotUsd?: string;
+  enabledModels?: readonly string[];
+}>;
+/**
+ * Task 85: the answers the real gate's ledger counts as a call of the day (every entry but an unbilled release): a request
+ * that reached the vendor and was not released unbilled.
+ */
+const BILLED_ANSWERS: ReadonlySet<GateAnswer> = new Set<GateAnswer>(["OK", "BILLED_500", "VENDOR_ERROR", "BOOKED_MAX", "UNEXPECTED"]);
 /**
  * The run-resilience scripts (spec 2026-10-12 "Tests", T1/T2 setup).
  *  - `unbilled`: models that passed their claim probe and then refuse every other request: a gate-proven unbilled
@@ -127,9 +151,48 @@ export type StubLanguage = "en" | "ro";
  */
 const ROMANIAN_DIRECTIVES = Object.freeze([argumentLanguageDirective("Romanian"), questionLanguageSentence({ code: "ro", name: "Romanian" })]);
 export function stubReplyLanguage(chat: string): StubLanguage {
-  return wirePacket(chat).messages.some((message) => typeof message.content === "string"
-    && ROMANIAN_DIRECTIVES.some((directive) => message.content.includes(directive)))
-    ? "ro" : "en";
+  const packet = wirePacket(chat);
+  if (packet.messages.some((message) => typeof message.content === "string"
+    && ROMANIAN_DIRECTIVES.some((directive) => message.content.includes(directive)))) return "ro";
+  // V4 start step (Task 91d): or the locked language field alone. A sealed contract reused under a lock names the language only in
+  // its material's last field (withQuestionLanguageField), never in its instruction: a path run's main answer on report.answer.v4,
+  // whose reply the same check refuses in another language. A model reads it there, so the stand-in does.
+  const locked = lockedFieldLanguageOf(packet);
+  if (locked !== null) return locked === "ro" ? "ro" : "en";
+  // V4 start step (Task 91d review): a request that names no language at all, neither a sentence nor the field: the question's own
+  // language, as a model told "Write natural sentences in the question's language" writes it. The main-answer update a dig triggers
+  // (R22's report design: its material is the question alone, `language: null`) is checked against the question's language.
+  if (packet.messages.some((message) => typeof message.content === "string" && LANGUAGE_SENTENCE_OPENING !== ""
+    && message.content.includes(LANGUAGE_SENTENCE_OPENING))) return "en";
+  return questionFieldLanguageOf(packet) === "ro" ? "ro" : "en";
+}
+/**
+ * V4 start step (Task 91d review): the words every language sentence a request can carry opens with (today's directive, its
+ * fallback form, and the locked sentence), read from the kernel's own sentences; empty if they ever share none.
+ */
+const LANGUAGE_SENTENCE_OPENING = ((sentences: readonly string[]): string => {
+  let opening = sentences[0]!;
+  for (const sentence of sentences) while (!sentence.startsWith(opening)) opening = opening.slice(0, -1);
+  return opening;
+})([...ROMANIAN_DIRECTIVES, argumentLanguageDirective("")]);
+/** V4 start step (Task 91d review): the primary language of a framed request's `question` field, as the kernel's guesser reads it. */
+function questionFieldLanguageOf(packet: ReturnType<typeof wirePacket>): string | null {
+  try {
+    const question = readFramedMaterial(packet).fields.find((one) => one.name === "question")?.content;
+    return question === undefined ? null : detectArgumentLanguage(question).tag.split("-")[0]!.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+/** V4 start step (Task 91d): the primary language a framed request's `question_language` field names; null without one. */
+function lockedFieldLanguageOf(packet: ReturnType<typeof wirePacket>): string | null {
+  try {
+    const field = readFramedMaterial(packet).fields.find((one) => one.name === QUESTION_LANGUAGE_FIELD);
+    const code = field === undefined ? undefined : (JSON.parse(field.content) as { code?: unknown }).code;
+    return typeof code === "string" ? code.split("-")[0]!.toLowerCase() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The stand-in's prose, the same sentences in each language it writes. */
@@ -376,17 +439,56 @@ const PROBE_QUESTION = "Reply exactly: OK";
  * turns, so it is put back in front of them (the adapter only lifted it out). Prompt caching (2026-10-12): a system
  * sent as the two cache blocks is their texts joined, which is the system text byte for byte. Length guidance L30
  * (LG-B): a first user turn sent as marked text blocks is their texts joined, the turn byte for byte.
+ *
+ * V4 start step, Task 54d: the Anthropic wire joins consecutive user messages into one turn, so a repair packet's rejection block
+ * (the format repair's full re-ask, a story's repair) travels in the same turn as the material. Each user turn is read back as the
+ * packet's own user messages (`packetUserMessagesOf`), one fenced block each, so the frame reader sees every block, the repair's
+ * included. Before, such a turn was one message of two blocks: the frame reader refused it, so a path root's re-ask on Haiku was an
+ * UNKNOWN request (a billed 500), and a cache-split story's repair threw here, inside the gate's request handler, which then never
+ * answered.
  */
 export function stubChatBody(provider: GateProvider, body: Readonly<Record<string, unknown>>): string {
   if (provider === "deepinfra") return JSON.stringify(body);
   const joined = (blocks: readonly { text?: unknown }[]): string => blocks.map((block) => typeof block?.text === "string" ? block.text : "").join("");
   // LG-B (L30): a turn sent as text blocks (the marked material) is its blocks' texts joined: today's turn byte for byte.
-  const turns = (Array.isArray(body.messages) ? body.messages : []).map((turn: { role?: unknown; content?: unknown }) =>
-    Array.isArray(turn?.content) ? { role: turn.role, content: joined(turn.content as { text?: unknown }[]) } : turn);
+  // A report's long material first (packages/providers/src/anthropic-messages.ts, dossierFirstTurns): cached material, the instructions, the rest of the material.
+  const first = (Array.isArray(body.messages) ? body.messages[0] : undefined) as { role?: unknown; content?: { text?: unknown; cache_control?: unknown }[] } | undefined;
+  if (Array.isArray(first?.content) && first.content.length === 3 && first.content[0]?.cache_control !== undefined && typeof body.system === "string") {
+    const [shared, instructions, rest] = first.content.map((block) => String(block.text));
+    // The two fenced parts are one material: one block again, as a frame reader expects.
+    const fence = shared!.slice(0, shared!.indexOf("\n"));
+    const envelope = (text: string) => JSON.parse(text.slice(text.indexOf(fence) + fence.length, text.lastIndexOf(fence))) as { fields: unknown[] };
+    // Task 54d: the rest of the material, then each user message the wire joined after it (a repair's rejection block), each its own again.
+    const [own, ...later] = packetUserMessagesOf(rest!.trimStart());
+    const whole = envelope(shared!);
+    whole.fields.push(...envelope(own!.content).fields);
+    return JSON.stringify({ messages: [{ role: "system", content: instructions!.trimStart() }, { role: "user", content: `${fence}\n${JSON.stringify(whole)}\n${fence}` }, ...later, ...(body.messages as unknown[]).slice(1)] });
+  }
+  const turns = (Array.isArray(body.messages) ? body.messages : []).flatMap((turn: { role?: unknown; content?: unknown }): unknown[] => {
+    const content = Array.isArray(turn?.content) ? joined(turn.content as { text?: unknown }[]) : turn?.content;
+    // Task 54d: a user turn is the packet's own user messages again; any other turn as before.
+    if (turn?.role === "user" && typeof content === "string") return packetUserMessagesOf(content);
+    return [Array.isArray(turn?.content) ? { role: turn.role, content } : turn];
+  });
   const system = typeof body.system === "string" ? body.system
     : Array.isArray(body.system) ? joined(body.system as { text?: unknown }[])
       : undefined;
   return JSON.stringify({ messages: system !== undefined ? [{ role: "system", content: system }, ...turns] : turns });
+}
+
+/**
+ * Task 54d: one user turn of an Anthropic body as the packet's user messages it was joined from. A framed packet's user message is
+ * one fenced block (the fence line, the material's one-line JSON envelope, the fence line again), and the wire joins consecutive
+ * ones with a blank line; so a turn of such blocks is split back into them, one message each. A turn that is not such blocks (the
+ * probe's question), or one block, is one message, as before. Only a split that joins back to the turn byte for byte is taken.
+ */
+function packetUserMessagesOf(text: string): { role: "user"; content: string }[] {
+  const lines = text.split("\n");
+  const fence = lines[0] ?? "";
+  const blocks: string[] = [];
+  for (let at = 0; fence !== "" && lines[at] === fence && lines[at + 2] === fence; at += 4) blocks.push(lines.slice(at, at + 3).join("\n"));
+  const split = blocks.length > 0 && blocks.join("\n\n") === text ? blocks : [text];
+  return split.map((content) => ({ role: "user" as const, content }));
 }
 
 /** Which contract a request is for: the probe by its question, the story by its contract id, the debate by structural keys. */
@@ -405,8 +507,12 @@ export function classifyGateRequest(chat: string): GateRequestKind | "UNKNOWN" {
   if (contractId === QUESTION_LANGUAGE_CHECK_CONTRACT_ID) return "QUESTION_LANGUAGE";
   // Engine redesign R2 (plan Task B12): the comparing judge and the point investigation, by their contract ids, before
   // any instruction sniffing (their instructions name none of the keys below).
-  if (contractId === COMPARING_JUDGE_CONTRACT_ID) return "VERDICT_JUDGE";
+  if (contractId === COMPARING_JUDGE_CONTRACT_ID || contractId === COMPARING_JUDGE_SOURCES_CONTRACT_ID) return "VERDICT_JUDGE";
   if (contractId === POINT_INVESTIGATION_CONTRACT_ID) return "INVESTIGATE";
+  // The calls beyond the arguing and the story (tests/support/gate-later-steps.ts), one row per contract id. Nothing here has a
+  // silent default: a contract on no row falls through to UNKNOWN, a billed 500 every practice test refuses, and
+  // tests/unit/preview-gate-stand-in-coverage.test.ts names it first.
+  if (Object.hasOwn(LATER_CONTRACT_KINDS, contractId)) return LATER_CONTRACT_KINDS[contractId]!;
   const instruction = stripLanguageDirectiveForTest(messages[0]?.content ?? "");
   // The panel's assessment is the judge's schema WITHOUT restatement_text (tests/unit/t03-judge-panel.test.ts).
   if (instruction.includes("fatalFlags") && !instruction.includes("restatement_text")) return "PANEL";
@@ -477,9 +583,12 @@ export type PreviewGateStubs = Readonly<{
  *  - `remainingState`: what /remaining says while the gate has not halted (default "active"); a halted DeepInfra gate
  *    always answers "halted".
  *  - `usage`: the tokens an answered request's reply reports (default 100 in, 50 out).
- * The order of answers: a halted DeepInfra gate (STOPPED or HALTED), a model cooling off (COOLING), a refused model
- * (BILLED_500), an unbilled step (the probe's script, or `debate.unbilled` for any other request), the override, the
- * contract.
+ *  - V4 start step, Task 85 (each absent: the doubles as before, byte for byte): `remaining`, each gate's /remaining
+ *    figures (StubRemainingFigures); `spendLowersRemaining`, what is left today falls as the gate's ledger counts it;
+ *    `refuseOverConcurrency`, a call over the gate's calls in flight is refused CONCURRENCY_LIMIT_REACHED.
+ * The order of answers: a halted DeepInfra gate (STOPPED or HALTED), a model cooling off (COOLING), a call over the gate's
+ * slots (GATE_REFUSED, with `refuseOverConcurrency`), a refused model (BILLED_500), an unbilled step (the probe's script,
+ * or `debate.unbilled` for any other request), the override, the contract.
  */
 export async function startPreviewGateStubs(input: Readonly<{
   storyDefaultShape: string;
@@ -489,6 +598,8 @@ export async function startPreviewGateStubs(input: Readonly<{
   override?: (request: GateRequest, chat: string) => GateOverride | null;
   enabledModels?: Readonly<Record<GateProvider, readonly string[]>>;
   remainingState?: "active" | "halted";
+  /** What /remaining says is left today (default 9.5 dollars, 1900 calls): a long scenario of many debates asks for more. */
+  remainingToday?: Readonly<{ usd: string; calls: number }>;
   /** Holds each /complete request this long before answering it (a slow vendor), so calls can overlap. */
   delayMs?: (request: GateRequest) => number;
   /**
@@ -496,9 +607,69 @@ export async function startPreviewGateStubs(input: Readonly<{
    * debates spend; null or absent: the default 100 in, 50 out.
    */
   usage?: (request: GateRequest, chat: string) => StubUsage | null;
+  /** V4 start step, Task 85: each gate's /remaining figures; a gate left out answers as before. */
+  remaining?: Readonly<Partial<Record<GateProvider, StubRemainingFigures>>>;
+  /**
+   * Task 85: what is left today falls as the real gate's ledger counts it: each billed answer (BILLED_ANSWERS) takes one of
+   * the day's calls, and a reply's usage (its tokens at the model's reviewed list prices) comes off the money, which is then
+   * answered as the gate's nine-decimal text. An unbilled release, and a refusal of the gate's own, takes nothing. (A billed
+   * vendor error reports no usage, so it takes no money; a booked-max call's reservation is not modelled.)
+   */
+  spendLowersRemaining?: boolean;
+  /**
+   * Task 85: the gate's slots. A call that arrives while the gate holds `maxConcurrentCalls` calls (default 2 on Anthropic,
+   * 10 on DeepInfra), or a final writer (callTier FINAL_WRITER) while it holds `finalWriterMaxInFlight` final writers, is
+   * refused 409 CONCURRENCY_LIMIT_REACHED before the vendor is asked and recorded GATE_REFUSED. The real gate first waits up
+   * to 60 s for a slot; the doubles refuse at once, so a test sees any call the app sends over the gate's slots. Only
+   * held calls (`delayMs`) are in flight.
+   */
+  refuseOverConcurrency?: boolean;
 }>): Promise<PreviewGateStubs> {
+  // Task 85: the final-writer room is a pair, as the real gate answers it.
+  for (const [provider, figures] of Object.entries(input.remaining ?? {})) {
+    if ((figures?.finalWriterMaxInFlight === undefined) !== (figures?.largestFinalWriterReservationUsd === undefined)) {
+      throw new TypeError(`STUB_REMAINING_FINAL_WRITER_PAIR: ${provider}'s final-writer room is given as a pair or not at all`);
+    }
+  }
   const concurrency: GateConcurrency = { now: 0, most: 0, mostByProvider: { deepinfra: 0, anthropic: 0 }, mostByModel: {} };
   const holding = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
+  // Task 85: the final writers each gate holds, and what its billed calls have spent today.
+  const holdingFinalWriters = { deepinfra: 0, anthropic: 0 } as Record<GateProvider, number>;
+  const spent = { deepinfra: { nanoUsd: 0n, calls: 0 }, anthropic: { nanoUsd: 0n, calls: 0 } } as Record<GateProvider, { nanoUsd: bigint; calls: number }>;
+  const maxCallsOf = (provider: GateProvider): number => input.remaining?.[provider]?.maxConcurrentCalls ?? (provider === "anthropic" ? 2 : 10);
+  const overSlots = (provider: GateProvider, finalWriter: boolean): boolean => {
+    const slots = input.remaining?.[provider]?.finalWriterMaxInFlight;
+    return holding[provider] >= maxCallsOf(provider) || finalWriter && slots !== undefined && holdingFinalWriters[provider] >= slots;
+  };
+  /** One billed answer's spend (`spendLowersRemaining`): one call, and the reply's usage at the model's list prices. */
+  const spend = (provider: GateProvider, model: string, answer: GateAnswer, usage: StubUsage | null): void => {
+    if (input.spendLowersRemaining !== true || !BILLED_ANSWERS.has(answer)) return;
+    spent[provider].calls += 1;
+    const row = previewModelRow(model);
+    if (usage === null || row === undefined) return;
+    const perMillion = BigInt(usage.input) * previewUsdTextToNano(row.inputUsdPerM)! + BigInt(usage.output) * previewUsdTextToNano(row.outputUsdPerM)!;
+    spent[provider].nanoUsd += (perMillion + 999_999n) / 1_000_000n;
+  };
+  /**
+   * One /remaining answer: today's seven members in today's order, then the final-writer room (a pair) and the pot (only
+   * when given and asked for), as the real gate's remaining_snapshot and remaining_answer build it.
+   */
+  const remainingAnswer = (provider: GateProvider, state: "active" | "halted", askedPot: boolean): Readonly<Record<string, unknown>> => {
+    const figures = input.remaining?.[provider];
+    const usd = figures?.usd ?? input.remainingToday?.usd ?? "9.500000000";
+    const calls = figures?.calls ?? input.remainingToday?.calls ?? 1900;
+    const leftNano = (previewUsdTextToNano(usd) ?? 0n) - spent[provider].nanoUsd;
+    return {
+      state, window_open: true,
+      remaining_usd: input.spendLowersRemaining === true ? previewNanoUsdText(leftNano > 0n ? leftNano : 0n) : usd,
+      remaining_calls: Math.max(0, calls - spent[provider].calls),
+      max_concurrent_calls: maxCallsOf(provider), largest_reservation_usd: figures?.largestReservationUsd ?? "0.214016000",
+      enabled_models: figures?.enabledModels ?? enabled[provider],
+      ...(figures?.finalWriterMaxInFlight === undefined ? {} : {
+        largest_final_writer_reservation_usd: figures.largestFinalWriterReservationUsd, final_writer_max_in_flight: figures.finalWriterMaxInFlight }),
+      ...(askedPot && figures?.dailyPotUsd !== undefined ? { daily_pot_usd: figures.dailyPotUsd } : {})
+    };
+  };
   const holdingByModel = new Map<string, number>();
   const requests: GateRecord[] = [];
   const arrivals: GateArrival[] = [];
@@ -531,7 +702,8 @@ export async function startPreviewGateStubs(input: Readonly<{
       case "QUESTION_LANGUAGE": return stubQuestionLanguageContent(chat);
       case "VERDICT_JUDGE": return stubComparingJudgeVote("A", { language });
       case "INVESTIGATE": return stubPointInvestigation("dead_end", language);
-      default: return null;
+      case "UNKNOWN": return null;
+      default: return laterStepContent(kind, chat, language);
     }
   };
   const socketFor = async (provider: GateProvider): Promise<string> => {
@@ -546,15 +718,15 @@ export async function startPreviewGateStubs(input: Readonly<{
         if (request.url === "/remaining") {
           const state = provider === "deepinfra" && halt.haltedAt !== null ? "halted" : input.remainingState ?? "active";
           remainingReads.push(Object.freeze({ provider, state }));
-          json(200, JSON.stringify({
-            state, window_open: true, remaining_usd: "9.500000000", remaining_calls: 1900,
-            max_concurrent_calls: provider === "anthropic" ? 2 : 10, largest_reservation_usd: "0.214016000",
-            enabled_models: enabled[provider]
-          }));
+          // Task 85: the pot is answered only to a request that asks for it ({"scope_id": …, "daily_pot": true}).
+          let askedPot = false;
+          try { askedPot = (JSON.parse(Buffer.concat(chunks).toString("utf8")) as { daily_pot?: unknown }).daily_pot === true; } catch { askedPot = false; }
+          json(200, JSON.stringify(remainingAnswer(provider, state, askedPot)));
           return;
         }
         if (request.url !== "/complete") { json(404, JSON.stringify({ error: "NOT_FOUND" })); return; }
-        const execution = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { requestBody: string };
+        const execution = JSON.parse(Buffer.concat(chunks).toString("utf8")) as { requestBody: string; callTier?: unknown };
+        const finalWriter = execution.callTier === "FINAL_WRITER";
         const body = JSON.parse(execution.requestBody) as Record<string, unknown>;
         const model = String(body.model);
         const chat = stubChatBody(provider, body);
@@ -563,10 +735,13 @@ export async function startPreviewGateStubs(input: Readonly<{
         const seen: GateRequest = Object.freeze({ provider, model, kind, body });
         const arrival: GateArrival = { provider, model, kind, at: performance.now(), answeredAt: null };
         arrivals.push(arrival);
+        // Task 85: a call over the gate's slots is never held; it is answered at once, after the gate's earlier refusals.
+        if (input.refuseOverConcurrency === true && overSlots(provider, finalWriter)) { answer(seen, chat, arrival, true); return; }
         const delay = input.delayMs?.(seen) ?? 0;
-        if (delay <= 0) { answer(seen, chat, arrival); return; }
+        if (delay <= 0) { answer(seen, chat, arrival, false); return; }
         concurrency.now += 1;
         holding[provider] += 1;
+        if (finalWriter) holdingFinalWriters[provider] += 1;
         holdingByModel.set(model, (holdingByModel.get(model) ?? 0) + 1);
         concurrency.most = Math.max(concurrency.most, concurrency.now);
         concurrency.mostByProvider[provider] = Math.max(concurrency.mostByProvider[provider], holding[provider]);
@@ -574,18 +749,20 @@ export async function startPreviewGateStubs(input: Readonly<{
         setTimeout(() => {
           concurrency.now -= 1;
           holding[provider] -= 1;
+          if (finalWriter) holdingFinalWriters[provider] -= 1;
           holdingByModel.set(model, holdingByModel.get(model)! - 1);
-          answer(seen, chat, arrival);
+          answer(seen, chat, arrival, false);
         }, delay);
       });
-      const answer = (seen: GateRequest, chat: string, arrival: GateArrival): void => {
+      const answer = (seen: GateRequest, chat: string, arrival: GateArrival, overGateSlots: boolean): void => {
         // Answered now (at once, or after the scenario's delay); `provider` is this socket's.
         arrival.answeredAt = performance.now();
         const { model, kind } = seen;
         const json = (status: number, payload: string) => response.writeHead(status, { "content-type": "application/json" }).end(payload);
-        const record = (answer: GateAnswer): number => {
+        const record = (answer: GateAnswer, usage: StubUsage | null = null): number => {
           // A settled reply of a model ends its run of unbilled refusals (the real gate's clear_cooling).
           if (answer === "OK") unbilledRun.delete(model);
+          spend(provider, model, answer, usage);
           return requests.push(Object.freeze({ ...seen, answer })) - 1;
         };
         const reply = (status: number, vendorBody: string) => json(200, JSON.stringify({ status, body: vendorBody }));
@@ -615,6 +792,8 @@ export async function startPreviewGateStubs(input: Readonly<{
           return;
         }
         if (cooling.has(model)) { coolingRefusal(); return; }
+        // Task 85: the real gate's own refusal over its slots: 409 {"error": "CONCURRENCY_LIMIT_REACHED"}, nothing reserved.
+        if (overGateSlots) { record("GATE_REFUSED"); refuse("CONCURRENCY_LIMIT_REACHED"); return; }
         if (input.refuseModels?.includes(model) === true) {
           record("BILLED_500");
           reply(500, JSON.stringify({ error: { message: "this model must never be called in this test" } }));
@@ -641,14 +820,16 @@ export async function startPreviewGateStubs(input: Readonly<{
             return;
           }
           served += 1;
-          record("OK");
-          reply(200, stubVendorReply(provider, model, override.content, `practice-stub-${String(served)}`, input.usage?.(seen, chat) ?? undefined));
+          const usage = input.usage?.(seen, chat) ?? null;
+          record("OK", usage ?? STUB_DEFAULT_USAGE);
+          reply(200, stubVendorReply(provider, model, override.content, `practice-stub-${String(served)}`, usage ?? undefined));
           return;
         }
         const content = answerFor(kind, chat);
         if (content === null) { record("UNEXPECTED"); reply(500, JSON.stringify({ error: { message: "unexpected test request" } })); return; }
-        record("OK");
-        reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`, input.usage?.(seen, chat) ?? undefined));
+        const usage = input.usage?.(seen, chat) ?? null;
+        record("OK", usage ?? STUB_DEFAULT_USAGE);
+        reply(200, stubVendorReply(provider, model, content, `practice-stub-${String(served)}`, usage ?? undefined));
       };
     });
     servers.push(server);

@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const api = readFileSync("apps/api/src/index.ts", "utf8");
 const db = readFileSync("packages/db/src/index.ts", "utf8");
+/** Every regular-expression metacharacter escaped, the backslash included (`#` needs none: it is plain in a pattern). */
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 
 /** Mask comments and literals so call and scope checks read TypeScript code, not prose or SQL. */
 function codeMask(source: string): string {
@@ -72,7 +74,7 @@ function scope(source: string, open: number): { start: number; end: number } {
 
 function method(source: string, name: string): { start: number; end: number } {
   const masked = codeMask(source);
-  const hits = allIndices(masked, new RegExp(`\\basync\\s+${name.replace("#", "#")}\\s*\\(`, "u"));
+  const hits = allIndices(masked, new RegExp(`\\basync\\s+${escapeRegExp(name)}\\s*\\(`, "u"));
   expect(hits).toHaveLength(1);
   // The body opens after the parameter list closes: a parameter's type may hold braces of its own.
   let depth = 0;
@@ -121,18 +123,33 @@ describe("S04 run creation stays behind the ask gate", () => {
     expect(readmissions[0]).toBeLessThan(readmit.end);
   });
 
-  it("submit is called only by POST /v1/asks, after the question check", () => {
+  // V4 start step, Task 56: the route's body after its checks is askAsOwner, which the carry-on's ports call too (the person's own
+  // dig step, never a side door), so submit is called only there, after its question check, and askAsOwner only by those two.
+  it("submit is called only by askAsOwner, after the question check", () => {
     const masked = codeMask(api);
     const calls = allIndices(masked, submitCall);
     expect(calls).toHaveLength(1);
+    const ownerAt = masked.indexOf("const askAsOwner = async (");
+    expect(ownerAt).toBeGreaterThan(-1);
+    const arrow = masked.indexOf("=>", ownerAt);
+    const owner = scope(masked, masked.indexOf("{", arrow));
+    expect(calls[0]).toBeGreaterThan(owner.start);
+    expect(calls[0]).toBeLessThan(owner.end);
+    const checkAt = masked.indexOf("options.questionCheck.check(", owner.start);
+    expect(checkAt).toBeGreaterThan(owner.start);
+    expect(checkAt).toBeLessThan(owner.end);
+    expect(calls[0]).toBeGreaterThan(checkAt);
+    // askAsOwner( is called exactly twice: inside the POST /v1/asks handler, and in the carry-on ports built inside buildApi.
+    const ownerCalls = allIndices(masked, /(?<![\w$.])askAsOwner\s*\(/u);
+    expect(ownerCalls).toHaveLength(2);
     const routeAt = api.indexOf('api.post("/v1/asks"');
     expect(routeAt).toBeGreaterThan(-1);
     const route = scope(masked, masked.indexOf("{", masked.indexOf("async (request, reply) =>", routeAt)));
-    expect(calls[0]).toBeGreaterThan(route.start);
-    expect(calls[0]).toBeLessThan(route.end);
-    const checkAt = masked.indexOf("options.questionCheck.check(", route.start);
-    expect(checkAt).toBeGreaterThan(route.start);
-    expect(calls[0]).toBeGreaterThan(checkAt);
+    expect(ownerCalls.filter((at) => at > route.start && at < route.end)).toHaveLength(1);
+    const buildApi = scope(masked, masked.indexOf("{", masked.indexOf("export function buildApi(")));
+    const portsAt = masked.indexOf("const carryOnPorts", buildApi.start);
+    expect(portsAt).toBeGreaterThan(buildApi.start);
+    expect(ownerCalls.filter((at) => at > portsAt && at < buildApi.end)).toHaveLength(1);
     const roomCalls = allIndices(masked, /\.#submitWithRoom\s*\(/u);
     expect(roomCalls).toHaveLength(1);
     const submit = method(api, "submit");

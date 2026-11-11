@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Nem sikerült létrehozni a vitát",
   "newDebate.sessionReadFailed": "A munkamenet beolvasása sikertelen",
   "newDebate.planRosterFailed": "Az előfizetési szintek listájának beolvasása sikertelen",
-  "newDebate.checkingSession": "Munkamenet ellenőrzése…",
+  "newDebate.checkingSession": "Egy pillanat…",
   "newDebate.redirectingToSignIn": "Átirányítás a bejelentkezéshez…",
   "newDebate.continueToSignIn": "Tovább a bejelentkezéshez",
   "newDebate.defaultUnavailable": "A telepítésben nincs érvényes riskTier-sor; a kockázati szint bevitelre vár.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Elérte előfizetése mai korlátját. Így is felteheti a kérdését: a vitája magától elindul ekkor: {time}.",
   "newDebate.room.personWeekFullTopPlan": "Elérte előfizetése heti korlátját. Így is felteheti a kérdését: a vitája magától elindul ekkor: {time}.",
   "newDebate.room.personMonthFullTopPlan": "Elérte előfizetése havi korlátját. Így is felteheti a kérdését: a vitája magától elindul ekkor: {time}.",
-  "newDebate.room.freeMonthFull": "Felhasználta e havi ingyenes vitáit. A következő vitája ekkor indulhat: {time}, vagy válasszon előfizetést, hogy most folytathassa.",
+  "newDebate.room.freeMonthFull": "Felhasználta e havi ingyenes keretét. A következő vitája ekkor indulhat: {time}, vagy válasszon előfizetést, hogy most folytathassa.",
   "newDebate.room.personClose": "Közel jár előfizetése korlátjához. Ez a vita így is teljes egészében lefut.",
   "newDebate.room.ownDebatesFull": "A többi vitája egyelőre a korlátja fennmaradó részét használja. Ez a vita magától elindul, amint valamelyik befejeződik.",
   "newDebate.room.upgradeLink": "Előfizetések megtekintése",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Az Ön előfizetése: Ingyenes",
   "newDebate.plan.current.PLUS": "Az Ön előfizetése: Plus",
   "newDebate.plan.current.PRO": "Az Ön előfizetése: Pro",
-  "newDebate.plan.current.MAX": "Az Ön előfizetése: Max"
+  "newDebate.plan.current.MAX": "Az Ön előfizetése: Max",
+  "newDebate.askText.otherAnswer": "Más válasz…",
+  "newDebate.askText.otherLabel": "Saját kiegészítő pontosítás",
+  "newDebate.askText.matters": "Ha a válaszok különböző irányba mutatnak, nekem a legfontosabb: {matters}",
+  "newDebate.freePublicNotice": "Az ingyenes szinten a kérdése és a hozzá tartozó vita nyilvános. Ne adjon meg személyes adatokat."
 }

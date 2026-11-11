@@ -352,6 +352,7 @@ describe("production runner provider topology", () => {
       // c5e0b2862 (debate shape, map stage).
       mapChoices: "A storage seam only: absent, the runner stores and reads a shaped run's map with "
         + "new MapChoiceRepository(pool) on its own pool, which is the production store; nothing composes it today."
+      // Dig-model revision W3-7: `pathRewrite` is composed (apps/runner/src/path-rewrite-composition.ts), no longer absent.
     };
 
     const unaccounted = optionalMembers

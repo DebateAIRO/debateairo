@@ -75,9 +75,10 @@ key bytes, inodes, symlink-resolved paths, or nested roots. API startup performs
 this check across every loaded key material and configured secret/store path and
 fails closed if any pair overlaps. Publication also requires S6 content
 encryption to be enabled, so the durable public snapshot is never sourced from
-a legacy plaintext run. Unpublish commits PRIVATE plus a database cleanup
-intent first; startup and subsequent unpublish requests reconcile that outbox
-outside database locks until the public-corpus key directory is destroyed.
+a legacy plaintext run. The Unpublish route is gone (owner decision 13), but a
+debate unpublished earlier committed PRIVATE plus a database cleanup intent
+first; startup and the periodic sweep reconcile that outbox outside database
+locks until the public-corpus key directory is destroyed.
 
 Publication-enabled API processes also require a separately provisioned
 `AUTHORIZATION_DATABASE_URL`. Its login is a member of the migration-created

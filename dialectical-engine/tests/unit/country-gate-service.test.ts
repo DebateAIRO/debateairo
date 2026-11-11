@@ -19,7 +19,7 @@ const policy = countryPolicyFromValue(
 );
 const PLACES: Readonly<Record<string, Readonly<{ country: string; tor: boolean }>>> = {
   "81.196.20.30": { country: "RO", tor: false },
-  "31.13.1.1": { country: "CH", tor: false },
+  "89.28.1.1": { country: "MD", tor: false },
   "5.45.1.1": { country: "RU", tor: false },
   "51.140.1.1": { country: "GB", tor: false },
   "78.180.1.1": { country: "TR", tor: false },
@@ -63,8 +63,8 @@ describe("the country gate in front of the support assistant", () => {
     const { gate, audit } = countryGate();
     const source = (ip: string) => ({ ip, userAgent: "test/1", requestId: "request-1" });
     expect(gate.service(source(OPEN_HERE))).toBeNull();
-    // Switzerland is sign-up only (no payment yet): the service is offered, so support is too.
-    expect(gate.service(source("31.13.1.1"))).toBeNull();
+    // Moldova is sign-up only (no payment yet): the service is offered, so support is too.
+    expect(gate.service(source("89.28.1.1"))).toBeNull();
     expect(gate.service(source("5.45.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
     expect(gate.service(source("51.140.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
     expect(gate.service(source("78.180.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
@@ -101,7 +101,7 @@ describe("the country gate in front of the support assistant", () => {
     const gated = harness(countryGate().gate);
     for (const [remoteAddress, expected] of [
       [OPEN_HERE, { signup: true, pay: true, service: true }],
-      ["31.13.1.1", { signup: true, pay: false, service: true }],
+      ["89.28.1.1", { signup: true, pay: false, service: true }],
       ["51.140.1.1", { signup: false, pay: false, service: false }],
       ["185.220.101.7", { signup: false, pay: false, service: false }]
     ] as const) {

@@ -69,7 +69,7 @@ Base: `origin/dev` at `bf4e3dde`. Branch: `feature/2026-09-26-verdict-story`.
   `COMPLETED` (`:5026`), all inside the run's content lease. After settle the work item is `DONE`
   and nothing can re-claim it.
 - **Budgets:** one shared per-run attempt ceiling (`budget.assertModelAttemptAllowed`) and one
-  per-run money envelope (hosted, provisional $0.25/run, $2/day). The runner's gateway wrapper
+  per-run money envelope (hosted, provisional <amount>5/run, <amount>/day). The runner's gateway wrapper
   (`apps/runner/src/index.ts:6181-6300`) enforces both on every call.
 
 ## 3. Architecture
@@ -479,7 +479,7 @@ with the gate.
 
 1. **New third-party dependency `@react-pdf/renderer`** (MIT) in `apps/ui`: **agreed.** It must
    still pass the 7-day release cooldown, `strictDepBuilds` and a clean `pnpm audit`.
-2. **Hosted story cap:** **$0.05 per story**, provisional, adjusted from real costs (see §8 for
+2. **Hosted story cap:** **<amount> per story**, provisional, adjusted from real costs (see §8 for
    what it implies); counted in the $2 daily cap.
 3. **Public pages get the short story only in v1; the PDF is owner-only:** **agreed.**
 

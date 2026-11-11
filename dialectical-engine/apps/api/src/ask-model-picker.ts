@@ -13,7 +13,9 @@ import {
   answerJobTokenCeilings,
   BUNDLED_MODEL_SCORECARD_SOURCE_REF,
   DEBATE_SHAPE_FORMULA_VERSION,
+  DEBATE_SHAPE_V2_FORMULA_VERSION,
   debateShapeSiteCounts,
+  debateShapeSiteCountsV2,
   engineOfRun,
   lengthGuidanceAllowanceTokens,
   readBundledModelScorecard,
@@ -22,6 +24,8 @@ import {
   type DebateShapeCeilingInput,
   type DebateShapePolicy,
   type DebateShapeSiteCounts,
+  type DebateShapeV2Input,
+  type DebateShapeV2SiteCounts,
   type EngineSettings,
   type LengthGuidance,
   type LengthGuidancePolicy,
@@ -528,22 +532,48 @@ function malformedDebateShape(reason: string): TypedDomainError {
  * a shape member OR names the shape formula, so a shape-formula receipt with its member missing is refused by the
  * parser, never priced as today's. A basis with neither is today's receipt (null). The parser's reason is kept.
  * The ONE shared reader (PF7): the picker and the preview estimate (`preview-budget-estimate.ts`) both read through it.
+ * V4 start step, Task 34: a v2 receipt (a path debate, `admittedShapeV2Of`) is no v1 shape: null, once the parser reads it.
  */
 export function admittedShapeOf(basis: Readonly<Record<string, unknown>>): Readonly<{
   shape: DebateShapeCeilingInput;
   counts: DebateShapeSiteCounts;
 }> | null {
-  if (basis.shape === undefined && basis.formula_version !== DEBATE_SHAPE_FORMULA_VERSION) return null;
-  let parsed: CostEnvelopeBasis;
+  if (basis.shape === undefined && basis.formula_version !== DEBATE_SHAPE_FORMULA_VERSION
+    && basis.formula_version !== DEBATE_SHAPE_V2_FORMULA_VERSION) return null;
+  const parsed = parsedShapedBasis(basis);
+  if (parsed.shapeV2 !== undefined) return null;
+  const shape = parsed.shape;
+  if (shape === undefined) throw malformedDebateShape("the receipt carries no shape member");
+  return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
+}
+
+/** A shaped receipt through the strict parser; its refusal is the picker's malformed-shape engine fault, reason kept. */
+function parsedShapedBasis(basis: Readonly<Record<string, unknown>>): CostEnvelopeBasis {
   try {
-    parsed = parseCostEnvelopeBasis(basis);
+    return parseCostEnvelopeBasis(basis);
   } catch (error) {
     if (error instanceof TypedDomainError && error.code === COST_ENVELOPE_UNRESOLVED) throw malformedDebateShape(error.message);
     throw error;
   }
-  const shape = parsed.shape;
-  if (shape === undefined) throw malformedDebateShape("the receipt carries no shape member");
-  return Object.freeze({ shape, counts: debateShapeSiteCounts(shape, parsed.depth) });
+}
+
+/**
+ * V4 start step, Task 34 (spec 2026-11-03 §4.3, §5): a path debate's frozen sizes (shape receipt v2) and the sites they
+ * give, read ONLY through the strict receipt parser, as `admittedShapeOf` reads v1 (PF7); null for every other receipt. A
+ * receipt is v2 when it names the v2 formula or carries a version-2 shape member: one the parser refuses is refused, never
+ * priced as another shape. The ONE shared reader of v2: the picker's split below and the preview estimate (Task 40).
+ */
+export function admittedShapeV2Of(basis: Readonly<Record<string, unknown>>): Readonly<{
+  shape: DebateShapeV2Input;
+  counts: DebateShapeV2SiteCounts;
+}> | null {
+  const member = basis.shape;
+  const versionTwo = typeof member === "object" && member !== null && (member as Readonly<Record<string, unknown>>).version === 2;
+  if (!versionTwo && basis.formula_version !== DEBATE_SHAPE_V2_FORMULA_VERSION) return null;
+  const parsed = parsedShapedBasis(basis);
+  const shape = parsed.shapeV2;
+  if (shape === undefined) throw malformedDebateShape("the receipt carries no path shape member");
+  return Object.freeze({ shape, counts: debateShapeSiteCountsV2(shape, parsed.depth) });
 }
 
 function malformedEngine(reason: string): TypedDomainError {
@@ -611,6 +641,10 @@ const ROLE_LENGTH_STEPS = Object.freeze({
  * With an engine-2 receipt (engine redesign R2, INTERFACE §3.4): JUDGE also counts the comparing judges, REVIEWER the
  * investigations at their cap (they stand in for the review a point lacked), POSITION the map's answer check (map
  * sites are the debaters'); `sites` is frozen on the receipt at admission (R1d).
+ * With a v2 receipt (V4 start step, Task 34; a path debate): POSITION = paths + map sites (the run's own list writers,
+ * merge and choose on RUN_BUILT, and the gap rounds; engine 2's answer check is 0 there), CROSS_EXCHANGE = 0 (paths are
+ * not rivals), SUPPORT_ATTACK = the author sites less POSITION and every path's answer so far (`path_outcome_sites`, author
+ * sites on the receipt, Task 13, but priced on the fixed final seats, Task 40, never a debater's).
  */
 export function expectedCallsByRoleFromBasis(
   basis: Readonly<Record<string, unknown>>
@@ -621,10 +655,14 @@ export function expectedCallsByRoleFromBasis(
   }
   const { panel_size: panelSize, call_sites: sites, serve_leg: serveLeg } = parsed.data;
   const shaped = admittedShapeOf(basis);
+  const shapedV2 = admittedShapeV2Of(basis);
   const engineSites = admittedEngineOf(basis)?.sites ?? null;
-  const positions = shaped === null ? panelSize : shaped.shape.answers + shaped.counts.mapSites;
-  const crossExchange = shaped !== null ? shaped.counts.crossNodes : panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
-  const supportAttack = sites.author - positions - crossExchange;
+  const positions = shapedV2 !== null ? shapedV2.shape.paths + shapedV2.counts.mapSites
+    : shaped === null ? panelSize : shaped.shape.answers + shaped.counts.mapSites;
+  const crossExchange = shapedV2 !== null ? 0
+    : shaped !== null ? shaped.counts.crossNodes : panelSize >= 2 ? panelSize * (panelSize - 1) : 0;
+  const pathOutcomes = shapedV2 === null ? 0 : shapedV2.counts.pathOutcomeSites;
+  const supportAttack = sites.author - positions - crossExchange - pathOutcomes;
   const perSynthesisRole = serveLeg.synthesis_loop_sites / SYNTHESIS_ROLES.length;
   if (supportAttack < 0 || !Number.isInteger(perSynthesisRole)) {
     throw new TypedDomainError(ASK_MODEL_ASSIGNMENT_INVALID, "The admitted structural basis does not split into roles");

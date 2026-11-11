@@ -6,7 +6,7 @@ import { vi, expect } from 'vitest';
 import { buildApi } from '@debateai/api';
 import * as contract from '@debateai/contract';
 import { Argon2WorkerPool, createEmailBlindIndex, encrypt, generateDek, generateTotpSecret, hashPassword, generateRecoveryCodes, hashRecoveryCode, totpCodeAtStep, type ReadableUserDekStore, type AuditContextHasher } from '@debateai/crypto';
-import { createPool, migrate, PostgresStaffRepository, PostgresStaffPrerequisiteProducer, PostgresSessionRepository, PostgresConsumerAuthRepository, PostgresStaffAlertRepository, PostgresIdentityRepository, PostgresOwnerCommandRepository, PostgresStaffIndependentReadinessPublisher, type Pool } from '@debateai/db';
+import { createPool, crossAccountPool, migrate, PostgresStaffRepository, PostgresStaffPrerequisiteProducer, PostgresSessionRepository, PostgresConsumerAuthRepository, PostgresStaffAlertRepository, PostgresIdentityRepository, PostgresOwnerCommandRepository, PostgresStaffIndependentReadinessPublisher, type Pool } from '@debateai/db';
 import { AUTH_POLICY_REGISTER_ROWS, authPolicyFromRegisterRows, MFA_POLICY_REGISTER_ROW, mfaPolicyFromValue, SESSION_POLICY_DEPLOYMENT_REGISTER_ROW, sessionPolicyFromValue, loadBootstrapRegister, buildBootstrapRegisterPublicationRows, composeStaffPolicyRegisterPublicationRows, createPostgresRegisterPublicationPort, parseRegisterVersionText } from '@debateai/register';
 import { SessionService } from '../../apps/api/src/sessions.js';
 import { StaffAccessService } from '../../apps/api/src/staff/access.js';
@@ -52,6 +52,12 @@ export async function runStaffSecurityJourney(database:TestDatabase,runtime:Pool
  // kept for the no-context control only.
  const authorizationSystem=createPool(await createSystemTwin(database,'task9_journey_authorization_system',['debateai_authorization_runtime']));
  authorization=createPool(authUrl.toString(),{crossAccount:authorizationSystem});const authorizationBare=createPool(authUrl.toString());
+ // 0171: the staff repository's grant, acceptance, capability check and key ceremony, the alert intent's user mapping and the dispatcher's outbox
+ // loop are the cross-account marker's. As main.ts wires them: the repository and the mapping on the API login's system twin (X14), and the staff
+ // runtime on the API login inside a request and on that twin outside one, where its dispatcher drains.
+ const staffSystem=createPool(await createSystemTwin(database,'task9_journey_api_system',['debateai_billing_runtime']));
+ const staffUrl=new URL(database.connectionString);await database.pool.query("CREATE ROLE task9_journey_api LOGIN PASSWORD 'task9-api-only' IN ROLE debateai_billing_runtime");staffUrl.username='task9_journey_api';staffUrl.password='task9-api-only';
+ const staffPool=createPool(staffUrl.toString(),{crossAccount:staffSystem});
 const password = 'Task9-disposable-signup-password!A42', blindIndexKey = Buffer.alloc(32, 7), deks = new Map<string, Buffer>();
 const authPolicy = authPolicyFromRegisterRows(AUTH_POLICY_REGISTER_ROWS), mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value);
 const source = {ip: '127.0.0.1',userAgent: 'task7-native-browser',requestId: 'task7-fixture'};
@@ -107,7 +113,7 @@ const responses: string[] = [];
 const applicationLogs: unknown[][] = [];
 const captured: {deliveryId: string;recipient: string;invitationUrl: string}[] = [];
 function composition() {
-    const repository = new PostgresStaffRepository(runtime), alertRepository = new PostgresStaffAlertRepository(runtime), access = new StaffAccessService(repository,sessions);
+    const repository = new PostgresStaffRepository(crossAccountPool(staffPool,'X14')), alertRepository = new PostgresStaffAlertRepository(crossAccountPool(staffPool,'X14')), access = new StaffAccessService(repository,sessions);
     const intents = runtimeComposed?.intents ?? new StaffAlertIntentProducer({keys: users,mappings: alertRepository,readiness: {require: operationId => authorizeStaffAlertFixture(database.pool,operationId)}});
     const targetInvitationTransport = runtimeComposed?.targetInvitationTransport ?? new VerifiedStaffTargetInvitationTransport({channels: repository,keys: users,publicAppUrl: origin,
         delivery: {send: async mail => {captured.push(mail);return 'ACK';}}});
@@ -200,7 +206,7 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   const targetCapture=join(root,'target-capture'),operatorPath=join(root,'operator.mjs'),rehearsalId=randomUUID();
   const operatorSource=`import {readFile,appendFile} from 'node:fs/promises';import {createHash} from 'node:crypto';export function createStaffAlertOperatorAdapters(){return {schema:'staff-alert-operator-v1',acknowledgements:new Map([['capture',{evidence:async config=>({configSha256:createHash('sha256').update(await readFile(${JSON.stringify(configPath)})).digest('hex'),generation:config.generation,rehearsalId:${JSON.stringify(rehearsalId)},expiresAt:new Date(Date.now()+60000)}),acknowledge:async()=> 'ACK'}]]),invitationDelivery:{send:async(mail,signal)=>{if(signal?.aborted)throw new Error('CLOSED');await appendFile(${JSON.stringify(targetCapture)},JSON.stringify(mail)+'\\n',{mode:0o600});return 'ACK';}},dispatch:{batchSize:100,intervalMs:100}};}`;
   await writeFile(operatorPath,operatorSource,{mode:0o600});
-  const activation={environment:{policyVersion:2 as const,origin,rpId,independentAlertConfigPath:configPath,operatorModulePath:operatorPath,operatorModuleSha256:createHash('sha256').update(operatorSource).digest('hex')},registerVersion:2,publicAppUrl:origin,pool:runtime,keys:users,operatorFiles:syntheticAlertFiles(root),configurationFiles:syntheticAlertFiles(root)};
+  const activation={environment:{policyVersion:2 as const,origin,rpId,independentAlertConfigPath:configPath,operatorModulePath:operatorPath,operatorModuleSha256:createHash('sha256').update(operatorSource).digest('hex')},registerVersion:2,publicAppUrl:origin,pool:staffPool,mappingPool:crossAccountPool(staffPool,'X14'),keys:users,operatorFiles:syntheticAlertFiles(root),configurationFiles:syntheticAlertFiles(root)};
   await expect(createStaffRuntime(activation)).rejects.toThrow('STAFF_ACTIVATION_UNAVAILABLE');
   const installed=await repository.install({generation:bundle.generation,verifier:material.verifier,operationId:randomUUID()});
   const projection=await new PostgresStaffRepository(runtime).readOwnerRecoveryInstallation();expect(projection).toEqual(installed);expect(Object.keys(projection!).sort()).toEqual(['operationId','outcome','recordedAt']);
@@ -285,6 +291,6 @@ async function possession(api:ReturnType<typeof buildApi>,a:Account,commandId:st
   const metadataCapture=await readFile(independentCapture,'utf8');expect(metadataCapture).not.toContain(handle);expect(metadataCapture).not.toContain(colleague.email);
   for(const sentinel of [...STAFF_PRIVATE_SENTINELS,bundle.proof,currentBundle.proof,nonce,recoveryNonce])expect(JSON.stringify(responses)+JSON.stringify(applicationLogs)).not.toContain(sentinel);
  } finally {
-  await runtimeComposed?.close();await api.close();await registration.drainMailDispatches();await jit?.end();await database.pool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD NULL VALID UNTIL '-infinity'");await authorization.end();await authorizationBare.end();await authorizationSystem.end();await argon2.close();for(const dek of deks.values())dek.fill(0);errorLog.mockRestore();await rm(root,{recursive:true,force:true});
+  await runtimeComposed?.close();await api.close();await registration.drainMailDispatches();await jit?.end();await database.pool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD NULL VALID UNTIL '-infinity'");await authorization.end();await authorizationBare.end();await authorizationSystem.end();await staffPool.end();await staffSystem.end();await argon2.close();for(const dek of deks.values())dek.fill(0);errorLog.mockRestore();await rm(root,{recursive:true,force:true});
  }
 }

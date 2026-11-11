@@ -7,8 +7,6 @@ import type { DebateSummary } from "@/lib/types";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { runFailureMessage } from "@/lib/v3/runFailure";
 import composeEnglish from "@/messages/en/compose.json";
-import publicEnglish from "@/messages/en/public.json";
-import { TakeDownControl } from "@/components/TakeDownControl";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
 
 /* The published verdict, in the reader's locale (it used to be the enum title-cased in English). */
@@ -109,8 +107,7 @@ export function DebatesBuffer({
   timeCatalog,
   locale,
   checkingLabel,
-  composeCatalog = composeEnglish,
-  publicCatalog = publicEnglish
+  composeCatalog = composeEnglish
 }: {
   readonly debates: readonly DebateSummary[];
   catalog: MessageCatalog;
@@ -119,7 +116,6 @@ export function DebatesBuffer({
   checkingLabel: string;
   /** The reader's `compose` catalogue: model family names on the row dots. */
   composeCatalog?: MessageCatalog;
-  publicCatalog?: MessageCatalog;
 }) {
   if (debates.length === 0) {
     return <div className="libEmpty">{t(catalog, "home.noDebates")}</div>;
@@ -149,7 +145,7 @@ export function DebatesBuffer({
       : debate.publication_review?.review_state === "APPROVED" ? "home.flag.approved"
       : debate.publication_review?.review_state === "REFUSED" ? "home.flag.refused"
       : "home.flag.flagged";
-    const row = (
+    return (
       <LibraryRow
         key={debate.id}
         href={`/debate/${debate.id}`}
@@ -164,8 +160,6 @@ export function DebatesBuffer({
         composeCatalog={composeCatalog}
       />
     );
-    if (!flagged || debate.publication_review?.visibility !== "PUBLISHED" || !debate.run_ref) return row;
-    return <div className="libTakeDownGroup" key={debate.id}>{row}<TakeDownControl runRef={debate.run_ref} homeCatalog={catalog} publicCatalog={publicCatalog} /></div>;
   });
 }
 

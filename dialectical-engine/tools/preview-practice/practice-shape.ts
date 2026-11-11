@@ -21,7 +21,9 @@ import {
   type DepthMode,
   type Scrutiny
 } from "@debateai/contract";
-import { debateShapeInForce, parseDebateShapePolicy, type DebateShapeCeilingInput, type DebateShapePolicy } from "@debateai/register";
+import {
+  debateShapeInForce, parseDebateShapePolicy, type DebateShapeCeilingInput, type DebateShapePolicy, type DebateShapeV2Input
+} from "@debateai/register";
 import {
   MAP_MARKS, MAP_OPPOSITE_SEPARATORS, MAP_OPPOSITE_TEMPLATES, mapAnswersArgued, readMapChoiceForRun, readMapItemsForRun
 } from "@debateai/map";
@@ -101,11 +103,36 @@ export type PracticeShapeSizes = Readonly<{
   closeCallExtraGraders: number; opening: string;
 }>;
 
+/**
+ * V4 start step, Task 91e: a path debate's sizes, frozen on its shape receipt v2 (envelope_basis.shape, `version: 2`; Task 13): how
+ * many paths were chosen and where they came from, the run's own list writers (RUN_BUILT only, else 0) and what each path is argued
+ * with. A path debate has no map (Task 53), so no map AIs, answers or opening.
+ */
+export type PracticePathShapeSizes = Readonly<{
+  version: 2; plan: string; depthMode: string; scrutiny: string; answerLength: string;
+  paths: number; pathsSource: string; runListWriters: number; graders: number; pointsPerPath: number; deeperTopPoints: number;
+  gapRounds: number; closeCallExtraGraders: number;
+}>;
+
+/** V4 start step, Task 91e: whether the sizes are a path debate's (receipt v2). */
+export function isPracticePathShapeSizes(sizes: PracticeShapeSizes | PracticePathShapeSizes): sizes is PracticePathShapeSizes {
+  return "version" in sizes && sizes.version === 2;
+}
+
+/**
+ * V4 start step, Task 91e: a path debate's stored set (0159's clear columns, codes only): where its paths came from and each path's
+ * author, in path order.
+ */
+export type PracticePathSet = Readonly<{ source: string; authors: readonly string[] }>;
+
 /** What the practice read from the throwaway database after the debate (no model text). */
 export type PracticeShapeFacts = Readonly<{
   /** core.run.depth_params as the ask path stored it. */
   storedDepthParams: Readonly<Record<string, unknown>> | null;
-  sizes: PracticeShapeSizes | null;
+  /** The receipt's sizes: `shape` on a v1 receipt, `shapeV2` on a path debate's (Task 91e); null on a receipt with neither. */
+  sizes: PracticeShapeSizes | PracticePathShapeSizes | null;
+  /** V4 start step, Task 91e: a path debate's stored set (null: none stored); present only on a v2 receipt, never on a v1 one. */
+  pathSet?: PracticePathSet | null;
   /**
    * Every condition mark on the served answer's latest version, by code (serve.condition_mark). Pre-flight PF-D13: a new
    * answer version copies its marks, so the marks are counted on one version only.
@@ -146,7 +173,7 @@ export type PracticeShapeBlock = Readonly<{
   /** The three settings as given on the command line (null: the site's default). */
   asked: Readonly<{ depthMode: string | null; scrutiny: string | null; answerLength: string | null }>;
   storedDepthParams: Readonly<Record<string, unknown>> | null;
-  sizes: PracticeShapeSizes | null;
+  sizes: PracticeShapeSizes | PracticePathShapeSizes | null;
   /**
    * The opening used: the receipt's; TODAYS_OPENING when the map was unavailable or gave fewer than two answers to argue
    * (ruling C-TWO, controller ruling D-NOTARGUED); null when nothing ran or no map was stored.
@@ -276,12 +303,38 @@ function sizesOf(shape: DebateShapeCeilingInput): PracticeShapeSizes {
   });
 }
 
+/** V4 start step, Task 91e: a path debate's sizes as the report shows them (`DebateShapeV2Input`, the receipt's own reading). */
+function pathSizesOf(shape: DebateShapeV2Input): PracticePathShapeSizes {
+  return Object.freeze({
+    version: 2 as const, plan: shape.plan, depthMode: shape.depthMode, scrutiny: shape.scrutiny, answerLength: shape.answerLength,
+    paths: shape.paths, pathsSource: shape.pathsSource, runListWriters: shape.runListWriters, graders: shape.graders,
+    pointsPerPath: shape.pointsPerPath, deeperTopPoints: shape.deeperTopPoints, gapRounds: shape.gapRounds,
+    closeCallExtraGraders: shape.closeCallExtraGraders
+  });
+}
+
+/**
+ * V4 start step, Task 91e: a path debate's stored set, its clear codes only (0159: the set's source, each path's author in path order;
+ * a set always holds at least one path). Null: the run stored none.
+ */
+async function readPracticePathSet(pool: Pick<Pool, "query">, runId: string): Promise<PracticePathSet | null> {
+  const rows = (await pool.query<{ source: string; author: string }>(
+    `SELECT path_set.source, path.author FROM core.start_path_set AS path_set
+       JOIN core.start_path AS path ON path.run_id = path_set.run_id
+      WHERE path_set.run_id=$1 ORDER BY path.path_no`, [runId])).rows;
+  if (rows.length === 0) return null;
+  return Object.freeze({ source: rows[0]!.source, authors: Object.freeze(rows.map((row) => row.author)) });
+}
+
 /** Reads what the run did, from the throwaway database, before it is deleted. Codes and counts only. */
 export async function readPracticeShapeFacts(pool: Pick<Pool, "query">, runId: string, answerId: string | null,
   readers: PracticeMapReaders): Promise<PracticeShapeFacts> {
   const run = (await pool.query<{ depth_params: unknown; envelope_basis: unknown }>(
     "SELECT depth_params, envelope_basis FROM core.run WHERE run_id=$1", [runId])).rows[0];
-  const shape = run === undefined ? undefined : parseCostEnvelopeBasis(run.envelope_basis).shape;
+  const basis = run === undefined ? undefined : parseCostEnvelopeBasis(run.envelope_basis);
+  const shape = basis?.shape;
+  // V4 start step, Task 91e: a path debate's receipt (v2) parses into `shapeV2`, never `shape`.
+  const pathShape = basis?.shapeV2;
   // Pre-flight PF-D13: serve.condition_mark is keyed by (answer_id, answer_version) (migrations/0006_s05.sql) and a new
   // answer version copies its marks, so only the answer's latest version in serve.answer is counted.
   const marks = answerId === null ? [] : (await pool.query<{ mark: string; n: number }>(
@@ -296,9 +349,12 @@ export async function readPracticeShapeFacts(pool: Pick<Pool, "query">, runId: s
   // (both codes only, core.map_answer_check), and, only when a check row exists, the assumptions per debated answer.
   const checkRow = (await pool.query<{ answer_check: string[]; premise_exempt: string[] }>(
     "SELECT answer_check, premise_exempt FROM core.map_answer_check WHERE run_id=$1", [runId])).rows[0];
+  // V4 start step, Task 91e: read only on a path debate's receipt, so a v1 run's facts are read query for query as before.
+  const pathSet = pathShape === undefined ? undefined : await readPracticePathSet(pool, runId);
   return Object.freeze({
     storedDepthParams: recordOf(run?.depth_params),
-    sizes: shape === undefined ? null : sizesOf(shape),
+    sizes: shape !== undefined ? sizesOf(shape) : pathShape !== undefined ? pathSizesOf(pathShape) : null,
+    ...(pathSet === undefined ? {} : { pathSet }),
     marks: Object.freeze(Object.fromEntries(marks.map((row) => [row.mark, row.n]))),
     choice: choice === null ? null
       : Object.freeze({ opening: choice.opening, answers: choice.answers.length, alsoRaised: choice.alsoRaised.length }),
@@ -314,6 +370,19 @@ export async function readPracticeShapeFacts(pool: Pick<Pool, "query">, runId: s
 
 const MAP_UNAVAILABLE = "MAP_UNAVAILABLE_TODAYS_OPENING";
 
+/**
+ * V4 start step, Task 91e: why a path debate did not run its shape, else null. A path debate has no map (Task 53): it ran its shape
+ * when it argued the paths it stored (a run without its stored set is refused, so a completed one argued them). NO_PATHS_STORED: none
+ * stored (it stopped before Start's hand-over was sealed, or before it built its own). MENU_UNAVAILABLE_QUESTION_ITSELF: a run that
+ * builds its own list got none back, so it argued one path, the question itself as the person wrote it (paths-run.ts
+ * runBuiltStartPathSet: RUN_BUILT, one PERSON_EDITED path), the path debate's "today's opening".
+ */
+function pathsNotExercised(set: PracticePathSet | null): string | null {
+  if (set === null) return "NO_PATHS_STORED";
+  return set.source === "RUN_BUILT" && set.authors.length === 1 && set.authors[0] === "PERSON_EDITED"
+    ? "MENU_UNAVAILABLE_QUESTION_ITSELF" : null;
+}
+
 /** The report's block. `facts` null: nothing was admitted (or, with `unreadable`, the facts could not be read). Pure. */
 export function practiceShapeBlock(input: Readonly<{
   source: PracticeShapeSource; registerVersion: string; row: PracticeShapeRowChange | null; asked: PracticeShapeAsk;
@@ -323,7 +392,8 @@ export function practiceShapeBlock(input: Readonly<{
 }>): PracticeShapeBlock {
   const facts = input.facts;
   const marks = facts?.marks ?? {};
-  const byStep: Record<PracticeMapStep, number> = { angles: 0, list: 0, merge: 0, gap: 0, choose: 0, check: 0 };
+  // V4 start step (Task 52): "gap-paths" is the gap round after Start (MAP:gap-paths:<round>).
+  const byStep: Record<PracticeMapStep, number> = { angles: 0, list: 0, merge: 0, gap: 0, "gap-paths": 0, choose: 0, check: 0 };
   for (const key of facts?.mapCallSiteKeys ?? []) {
     const step = practiceMapStepOf(key);
     if (step !== null) byStep[step] += 1;
@@ -337,6 +407,8 @@ export function practiceShapeBlock(input: Readonly<{
   const notExercised = input.unreadable !== undefined ? `FACTS_UNREADABLE:${input.unreadable}`
     : facts === null ? null
       : facts.sizes === null ? "NO_SHAPE_ON_RECEIPT"
+        // V4 start step, Task 91e: a path debate (receipt v2) has no map, so the map's rules below are R22's (v1) only.
+        : isPracticePathShapeSizes(facts.sizes) ? pathsNotExercised(facts.pathSet ?? null)
         : mapUnavailable ? MAP_UNAVAILABLE
           : facts.choice === null ? "NO_MAP_STORED"
             : notArgued ? "MAP_ANSWERS_NOT_ARGUED" : null;
@@ -348,8 +420,9 @@ export function practiceShapeBlock(input: Readonly<{
       answerLength: input.asked.answerLength ?? null }),
     storedDepthParams: facts?.storedDepthParams ?? null,
     sizes: facts?.sizes ?? null,
+    // A path debate's receipt names no opening (Task 91e): null, as for a run that stored no map.
     opening: facts === null ? null : mapUnavailable || notArgued ? "TODAYS_OPENING"
-      : facts.choice === null ? null : facts.sizes?.opening ?? null,
+      : facts.choice === null || facts.sizes === null || isPracticePathShapeSizes(facts.sizes) ? null : facts.sizes.opening,
     mapMarks: Object.freeze(Object.fromEntries(Object.entries(marks).filter(([code]) => (MAP_MARKS as readonly string[]).includes(code)))),
     chosenAnswers: facts?.choice?.answers ?? null,
     alsoRaised: facts?.choice?.alsoRaised ?? null,
@@ -373,6 +446,13 @@ export function practiceShapeLines(block: PracticeShapeBlock): readonly string[]
   const asked = `depth mode ${block.asked.depthMode ?? "default"}, scrutiny ${block.asked.scrutiny ?? "default"}, `
     + `answer length ${block.asked.answerLength ?? "default"}`;
   const sizes = block.sizes === null ? "none (the run was not admitted with the shape)"
+    // V4 start step, Task 91e: a path debate's sizes (receipt v2) in its own words.
+    : isPracticePathShapeSizes(block.sizes)
+      ? `plan ${block.sizes.plan}, ${String(block.sizes.paths)} paths (${block.sizes.pathsSource}), `
+        + `${String(block.sizes.runListWriters)} list writers of the run's own, `
+        + `${String(block.sizes.graders)} graders (+${String(block.sizes.closeCallExtraGraders)} on a close call), `
+        + `${String(block.sizes.pointsPerPath)} points per path, ${String(block.sizes.gapRounds)} gap rounds, ${block.sizes.depthMode}, `
+        + `scrutiny ${block.sizes.scrutiny}, answer length ${block.sizes.answerLength}`
     : `plan ${block.sizes.plan}, ${String(block.sizes.mapAIs)} map AIs, up to ${String(block.sizes.answers)} answers, `
       + `${String(block.sizes.graders)} graders (+${String(block.sizes.closeCallExtraGraders)} on a close call), `
       + `${String(block.sizes.pointsPerAnswer)} points per answer, ${block.sizes.depthMode}, scrutiny ${block.sizes.scrutiny}, `

@@ -13,7 +13,7 @@ import { ChargeStatusPoller } from "./ChargeStatusPoller";
 export type SubscriptionClient = Pick<ContractClient,
   | "getBillingSubscription" | "getBillingInvoices" | "quoteSubscriptionUpgrade" | "upgradeSubscription"
   | "downgradeSubscription" | "cancelSubscription" | "revokeSubscriptionCancel" | "withdrawSubscription"
-  | "stepUp" | "getBillingCharge" | "getBillingPlans"
+  | "getBillingCharge" | "getBillingPlans"
 >;
 type Subscription = NonNullable<Awaited<ReturnType<ContractClient["getBillingSubscription"]>>["subscription"]>;
 type Invoice = Awaited<ReturnType<ContractClient["getBillingInvoices"]>>["invoices"][number];
@@ -60,7 +60,9 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   LEGAL_DOCUMENT_STALE: Object.freeze({ key: "billing.checkout.pageOutdated", reload: false }),
   ADMISSION_RATE_LIMITED: RATE_LIMITED,
   UPGRADE_PENDING: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
-  PAYMENT_PROVIDER_UNAVAILABLE: Object.freeze({ key: "billing.checkout.formUnavailable", reload: false })
+  PAYMENT_PROVIDER_UNAVAILABLE: Object.freeze({ key: "billing.checkout.formUnavailable", reload: false }),
+  // The stored billing address is in a region the Terms exclude (Tennessee): the quote refuses before any money moves.
+  REGION_TERMS_EXCLUDED: Object.freeze({ key: "billing.checkout.regionTermsExcluded", reload: false })
 });
 
 /** A request that may have reached the payment side: a network failure, a 5xx, or anything that is not an answer. */
@@ -132,19 +134,9 @@ function withdrawDoneText(catalog: MessageCatalog, locale: LocaleCode, refund: s
   return t(catalog, "billing.subscription.withdrawDone", { amount: formatMoney(locale, refund, currency) });
 }
 
-/** The step-up itself was refused (wrong password or code, or no grant came back): the one "check your code" case. */
-class StepUpRefused extends Error {
-  constructor(readonly transport: boolean) {
-    super("WITHDRAW_STEP_UP_REFUSED");
-  }
-}
-
 function withdrawFailureWords(failure: unknown): FailureWords {
-  if (failure instanceof StepUpRefused) return failure.transport ? ACTION_FAILED : Object.freeze({ key: "billing.subscription.withdrawRefused", reload: false });
   const code = refusalOf(failure);
   if (code === "WITHDRAWAL_WINDOW_CLOSED") return Object.freeze({ key: "billing.subscription.withdrawWindowClosed", reload: true });
-  // P12d (403): the grant expired or was already used. The password and code were right, so never blame them.
-  if (code === "STEP_UP_REQUIRED") return Object.freeze({ key: "billing.subscription.stepUpExpired", reload: false });
   // A timeout after P12d queued the refund: the refund may be under way, so say so and read the state again.
   if (outcomeUnknown(failure)) return STILL_CONFIRMING;
   // Any other answer (NOT_SUBSCRIBED: withdrawn or ended meanwhile): read the state again, blame nobody.
@@ -180,8 +172,6 @@ export function SubscriptionControls({
   const [downgrade, setDowngrade] = useState<Readonly<{
     planId: DowngradeTarget; netPrice: string; currency: BillingCurrency;
   }> | null>(null);
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   // `linksHome`: W10 (P2-M20) the updated-Terms sentence is a plain link to the signed-in home page, whose accept
   // screen L4 shows (a full page load, never a client-side move). Every other sentence is plain text.
@@ -225,6 +215,7 @@ export function SubscriptionControls({
 
   useEffect(() => { void reload(); }, [reload]);
 
+
   async function run(
     action: () => Promise<void>,
     words: (failure: unknown) => FailureWords = () => ACTION_FAILED
@@ -265,21 +256,15 @@ export function SubscriptionControls({
   // The day a change "at renewal" takes effect, as a sentence may name it: never a day already past.
   const nextRenewalText = nextRenewal === null ? "" : Date.parse(nextRenewal) <= nowMs ? today : date(nextRenewal);
 
+  /**
+   * OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a, recital 37; owner ruling 2026-11-04): the button opens the
+   * statement and "Confirmați retragerea" sends it. A signed-in person, social sign-in included, is not asked to
+   * identify again: no password and no authenticator code.
+   */
   function withdraw(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     void run(async () => {
-      let token: string;
-      try {
-        const stepped = await client.stepUp(password, code, { action: "WITHDRAW_SUBSCRIPTION" });
-        const grant = stepped.step_up_grant;
-        if (grant === undefined || grant.action !== "WITHDRAW_SUBSCRIPTION") throw new StepUpRefused(false);
-        token = grant.token;
-      } catch (failure) {
-        throw failure instanceof StepUpRefused ? failure : new StepUpRefused(outcomeUnknown(failure));
-      }
-      const withdrawn = await client.withdrawSubscription(token);
-      setPassword("");
-      setCode("");
+      const withdrawn = await client.withdrawSubscription();
       setPanel("NONE");
       await reload();
       setMessage(withdrawDoneText(catalog, locale, withdrawn.refund, withdrawn.currency));
@@ -498,19 +483,6 @@ export function SubscriptionControls({
           {panel === "WITHDRAW" ? (
             <form onSubmit={withdraw}>
               <p className="setCardNote">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
-              <p className="setCardNote">{t(catalog, "billing.subscription.stepUpHint")}</p>
-              <div className="setCardRow">
-                <div className="setField">
-                  <label htmlFor="billing-withdraw-password">{t(catalog, "billing.subscription.password")}</label>
-                  <input id="billing-withdraw-password" type="password" autoComplete="current-password"
-                    value={password} onChange={(event) => setPassword(event.target.value)} required aria-invalid="false" />
-                </div>
-                <div className="setField">
-                  <label htmlFor="billing-withdraw-code">{t(catalog, "billing.subscription.code")}</label>
-                  <input id="billing-withdraw-code" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}"
-                    value={code} onChange={(event) => setCode(event.target.value)} required aria-invalid="false" />
-                </div>
-              </div>
               <div className="setCardRow">
                 <button type="submit" className="setBtn" disabled={busy}>{t(catalog, "billing.subscription.withdrawConfirm")}</button>
               </div>

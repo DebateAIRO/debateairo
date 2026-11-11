@@ -95,6 +95,15 @@ type Manifest = Readonly<{
     source: string;
     grants: readonly string[];
   }>[];
+  /**
+   * The security review (migration 0171): a grant a later step takes back, by the step that takes it, in the same words as
+   * a disclosure. The disclosure of the step that granted it stays as that step granted it; its own contract test pins it.
+   */
+  privilegeRevocations: readonly Readonly<{
+    roleName: string;
+    source: string;
+    revokes: readonly string[];
+  }>[];
   deploymentObligations: readonly Readonly<{
     id: string;
     ownerTicket: "P3-02";
@@ -257,8 +266,8 @@ describe("P3-01 production database-principal manifest", () => {
         ownsFunctions: []
       }
        ,{ roleName: "debateai_staff_security_owner", login: false, inherit: false, directMemberships: [], ownsSchemas: ["staff"],
-        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'staff.publication_review_event', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission','staff.threat_report','staff.threat_report_event','staff.threat_report_alert'],
-        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend','ledger.record_question_check_spend','staff.keep_threat_report','staff.list_threat_reports','staff.count_unread_threat_reports','staff.read_threat_report','staff.decide_threat_report','staff.erase_due_threat_reports','staff.hold_threat_report_email','staff.claim_threat_report_alerts','staff.complete_threat_report_alert','identity.read_data_export_threat_reports'] },
+        ownsRelations: ['staff.independent_alert_readiness','staff.alert_operation_readiness','staff.alert_dispatch_state','staff.owner_lineage','staff.owner_recovery_generation','staff.owner_recovery_operation', 'staff.funding_policy_selection', 'staff.publication_review_event', 'billing.internal_grant', 'billing.internal_grant_event','billing.internal_provider_admission','staff.threat_report','staff.threat_report_event','staff.threat_report_alert','identity.ask_clarify_reservation'],
+        ownsFunctions: ['staff.require_alert_readiness_jit','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.read_independent_alert_readiness','staff.authorize_alert_operation','staff.require_alert_operation','staff.guard_alert_audit_insert','staff.guard_alert_outbox_insert','staff.guard_alert_commit','staff.read_alert_user_mapping','staff.read_alert_key_mapping','staff.claim_alert_delivery','staff.settle_alert_delivery','staff.read_alert_delivery_status','staff.require_owner_recovery_jit','staff.owner_recovery_commit_guard','staff.owner_command_prepare_commit_guard','staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.owner_command_json','staff.require_owner_predecessor','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.owner_recovery_request','staff.read_committed_owner_operation','staff.commit_owner_command','staff.recheck_owner_commit','staff.erase_subject_mapping','staff.require_http_authority','staff.http_delivery_state','staff.read_enrollment','staff.read_team_page','staff.read_audit_page','staff.list_publication_reviews','staff.open_publication_review','staff.record_publication_review_copy','staff.decide_publication_review','staff.read_invitation_proof','staff.read_issued_invitation','staff.read_mutation_target','staff.read_target_invitation_channel','staff.read_owner_recovery_installation', 'billing.guard_internal_grant_projection', 'staff.erase_internal_grant_mapping', 'staff.read_internal_funding_policy', 'staff.effective_capabilities', 'staff.read_self_allowance_command', 'staff.internal_allowance_body', 'staff.assert_internal_allowance_binding', 'staff.configure_internal_allowance', 'staff.revoke_internal_allowance', 'billing.guard_internal_grant_commit', 'billing.internal_grant_json', 'billing.read_internal_allowance', 'billing.read_internal_allowance_for_run', 'billing.guard_internal_charge_scope', 'billing.record_internal_charge_scope', 'billing.read_run_funding_basis','billing.read_internal_grant_spent','billing.read_internal_grant_commitments','billing.reserve_internal_provider_call','billing.settle_internal_provider_call','billing.read_internal_run_state','ledger.record_language_check_spend','ledger.record_question_check_spend','identity.record_ask_clarify_charge','identity.read_ask_clarify_spent','identity.record_pre_start_charge','identity.read_pre_start_spent','identity.record_pre_start_try_charge','identity.link_pre_start_try','identity.read_run_quota_used','staff.keep_threat_report','staff.list_threat_reports','staff.count_unread_threat_reports','staff.read_threat_report','staff.decide_threat_report','staff.erase_due_threat_reports','staff.hold_threat_report_email','staff.claim_threat_report_alerts','staff.complete_threat_report_alert','identity.read_data_export_threat_reports','identity.reserve_ask_clarify_charge','identity.delete_ask_clarify_reservations_due'] },
       {"roleName":"debateai_password_recovery_owner","login":false,"inherit":false,"directMemberships":[],"ownsSchemas":[],"ownsRelations":["identity.password_recovery_control","identity.password_recovery_staged_code","identity.password_recovery_retry_lock","identity.password_recovery_source_window","identity.password_recovery_notice","identity.password_recovery_feed"],"ownsFunctions":["identity.password_recovery_rules","identity.password_recovery_eligible","identity.password_recovery_audit","identity.password_recovery_notice_event","identity.password_recovery_close","identity.password_recovery_current","identity.password_recovery_prepare","identity.password_recovery_start","identity.password_recovery_exchange","identity.password_recovery_read","identity.password_recovery_read_code","identity.password_recovery_accept_code","identity.password_recovery_stage_factor","identity.password_recovery_verify_factor","identity.password_recovery_stage_codes","identity.password_recovery_ack_code","identity.password_recovery_complete","identity.password_recovery_cancel","identity.expire_password_recovery","identity.password_recovery_started_scope","identity.password_recovery_admit","identity.password_recovery_failure","identity.password_recovery_cancel_session","identity.password_recovery_read_feed","identity.password_recovery_cancel_own","identity.password_recovery_claim_notice","identity.password_recovery_finish_notice"]}
     ]);
 
@@ -765,7 +774,7 @@ describe("P3-01 production database-principal manifest", () => {
   ]
 },
 // Side-by-side spec §13 (migration 0124, plan S1, D8), in source order: the activation pointer's one reader for the API's
-// role alone (the runner's login holds debateai_runtime only, so it cannot read the pointer), then the two pass readers
+// role (the runner's login holds debateai_runtime only; 0169, the owner's answer of 8 Nov, grants it the reader too), then the two pass readers
 // for the runtime. The release owner and operator stay outside this manifest until Phase 3 (sideBySideReleaseRoles).
 {
   "roleName": "debateai_billing_runtime",
@@ -861,8 +870,1069 @@ describe("P3-01 production database-principal manifest", () => {
   "roleName": "debateai_data_export_worker",
   "source": "migrations/0128_threat_reports.sql",
   "grants": ["EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"]
+},
+// V4 account memory 0131 (owner rulings N7 and N11): the six account-memory functions for the API's own role (never the
+// shared runtime role), the export reader for the export worker alone. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0131_v4_account_memory.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_page_reading_level(uuid)",
+    "EXECUTE ON FUNCTION identity.save_page_reading_level(uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_debate_last_visit(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_debate_last_visit(uuid,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_dig_links(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_dig_link(uuid,uuid,uuid,text[],text)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0131_v4_account_memory.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid)"]
+},
+// The Perplexity plan's stores (0132, 0133; task W1-3): the runner's web-evidence functions for the shared runtime role
+// (the runner; the API's roles inherit them), the person's choice and the investigation functions for the API's own role,
+// the runtime role's reserve reader, report writer and 30-day sweep, and one export reader each. No table grant.
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0132_web_evidence.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+    "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_evidence(uuid)",
+    "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0132_web_evidence.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.record_web_researched(uuid,uuid,uuid)"]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0132_web_evidence.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_web_evidence(uuid,uuid)"]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0133_investigations.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.open_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+    "EXECUTE ON FUNCTION identity.touch_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.reopen_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0133_investigations.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+    "EXECUTE ON FUNCTION identity.read_investigation_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+    "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0133_investigations.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_investigations(uuid,uuid)"]
+},
+// The dig model and the month pause (0134; dig-model revision task W2-8): the nested join, the level, rewrite and pause
+// readers and Continue for the API's own role, the rewrite turn, writer and readers, the web plan's writer and reader and the
+// pause writer and reader for the
+// shared runtime role (the runner; the API's roles inherit them), and one export reader. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0134_dig_model_and_month_pause.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
+    "EXECUTE ON FUNCTION identity.read_dig_level(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.resume_paused_run(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_run_pause(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0134_dig_model_and_month_pause.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrites_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_plan(uuid)",
+    "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0134_dig_model_and_month_pause.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_dig_model(uuid,uuid)"]
+},
+// A dig's picks and its path rewrite's material (0135; dig-model revision task W3-7): the picks' writer for the API's own
+// role, the picks' reader, the material's writer and the sweep's list for the shared runtime role (the runner; the API's
+// roles inherit them), and one export reader. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0135_dig_picks.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.record_dig_picks(uuid,uuid,uuid,text,jsonb)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0135_dig_picks.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_dig_picks_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0135_dig_picks.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_dig_picks(uuid,uuid)"]
+},
+// The investigation's final report (0136; R22 task W5-1): the report's reader for the API's own role, the waiting
+// closings, the members a report waits for, the writer, a debate's reports and the newest unreported closing's time for
+// the shared runtime role (the runner; the API's roles inherit them), and one export reader. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0136_investigation_reports.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_investigation_reports(uuid,uuid)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0136_investigation_reports.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+    "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_investigation_reports_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0136_investigation_reports.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_investigation_reports(uuid,uuid)"]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0137_public_debates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
+    "EXECUTE ON FUNCTION identity.record_public_dig_picks(uuid,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_own_public_contributions(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_free_public_ask(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0137_public_debates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_public_debate_updates(uuid)",
+    "EXECUTE ON FUNCTION identity.public_author_name_gone(uuid)",
+    "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+    "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+    "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+    "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_erasure_runtime",
+  "source": "migrations/0137_public_debates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.forget_erased_debate_public(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0137_public_debates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_public_debates(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0138_tree_updates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+    "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_line_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+    "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_main_answer_updates_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.read_run_purpose_lines_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.reopen_public_investigation(uuid,integer)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0138_tree_updates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_run_purpose_lines(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_line(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_main_answer_updates(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_run_purpose_lines(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.close_public_investigation(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_erasure_runtime",
+  "source": "migrations/0138_tree_updates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.forget_erased_debate_tree_updates(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0138_tree_updates.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_tree_updates(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0139_passage_retention.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_shown_quotes(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0139_passage_retention.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.close_investigation_keeping_texts(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_erasure_runtime",
+  "source": "migrations/0139_passage_retention.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.forget_erased_debate_passages(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0139_passage_retention.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_passage_retention(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0140_internal_spend_kinds.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0141_path_suggestions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_suggestions_of_run(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_erasure_runtime",
+  "source": "migrations/0141_path_suggestions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.forget_erased_debate_path_suggestions(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0141_path_suggestions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_path_suggestions(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0142_team_limit.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)",
+    "EXECUTE ON FUNCTION staff.read_team_room(bigint)",
+    "EXECUTE ON FUNCTION staff.read_team_limit_command(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.read_team_limit_page(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0143_run_handover.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.run_release_now(uuid)",
+    "EXECUTE ON FUNCTION identity.run_settings_version_now(uuid)",
+    "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+    "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0143_run_handover.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.continue_paused_run_in_release(uuid,uuid,text,bigint)"
+  ]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0144_ask_clarify_charge.sql",
+  "grants": [
+    "SELECT, INSERT ON identity.ask_clarify_charge"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0144_ask_clarify_charge.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.read_ask_clarify_spent(uuid,timestamptz,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0144_ask_clarify_charge.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_ask_clarify(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0145_web_researched_unsettled.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0146_team_allowances.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_member_allowance_command(jsonb,text,uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.read_member_allowance_page(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0147_public_tree.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_public_dig_parent(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.record_public_material(uuid,uuid,uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.open_public_report(uuid,uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION identity.read_public_tree_of_run(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0147_public_tree.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+    "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_path_line(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+    "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+    "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+    "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+    "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_public_debate_reports(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+    "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_erasure_runtime",
+  "source": "migrations/0147_public_tree.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.forget_erased_debate_public_tree(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0147_public_tree.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_public_tree(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0149_public_report_team_month.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)",
+    "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0150_public_review.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.read_public_review_command(jsonb,text,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_review(jsonb,text,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_review_list(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_review_overlay(uuid)",
+    "EXECUTE ON FUNCTION identity.public_review_held(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0151_public_flag.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_public_flag_target(uuid)",
+    "EXECUTE ON FUNCTION identity.open_public_flag(uuid,uuid,uuid,jsonb,integer,integer,integer)",
+    "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+    "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+    "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+    "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+    "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_flag_queue(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0152_report_export_and_check_usage.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_public_check_usage(text,uuid,timestamptz,integer,integer,integer,numeric)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0152_report_export_and_check_usage.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_public_flags(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0157_moderation_statements.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_moderation(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0153_dig_tree_settled.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+    "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0155_owner_answer_writes.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION memory.unlink_owned_memory_link(uuid,uuid,text,text)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0156_moderation_notice.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.claim_moderation_notices(integer)",
+    "EXECUTE ON FUNCTION identity.read_moderation_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_moderation_notice(uuid,uuid,text)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0157_moderation_statements.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.record_public_flag_quote(uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.claim_moderation_statements(integer)",
+    "EXECUTE ON FUNCTION identity.read_moderation_statement(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_moderation_statement(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_own_moderation_statements(uuid)",
+    "EXECUTE ON FUNCTION identity.delete_moderation_words_due()",
+    "EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.read_public_flag_queue_answered(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.claim_public_flag_mail(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_flag_mail(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.settle_stuck_public_flags()"
+  ]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0158_pre_start_charge.sql",
+  "grants": [
+    "SELECT, INSERT ON identity.pre_start_charge"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0158_pre_start_charge.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.read_pre_start_spent(uuid,timestamptz,timestamptz)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0158_pre_start_charge.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_data_export_pre_start(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0159_start_paths.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_start_paths(uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION core.read_start_paths(uuid)",
+    "EXECUTE ON FUNCTION core.read_start_path_ids(uuid)",
+    "EXECUTE ON FUNCTION core.record_carry_on_due(uuid)",
+    "EXECUTE ON FUNCTION core.claim_carry_on_due(integer)",
+    "EXECUTE ON FUNCTION core.read_carry_on_begun(integer)",
+    "EXECUTE ON FUNCTION core.record_carry_on_done(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0160_path_results.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.write_path_root(uuid,text,integer,uuid,text)",
+    "EXECUTE ON FUNCTION core.record_path_outcome(uuid,text,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION core.record_path_gap_round(uuid,integer,jsonb,bytea)",
+    "EXECUTE ON FUNCTION core.read_path_roots(uuid)",
+    "EXECUTE ON FUNCTION core.read_path_outcomes(uuid)",
+    "EXECUTE ON FUNCTION core.read_path_gap_round(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0161_path_progress.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.record_path_step(uuid,text,text)",
+    "EXECUTE ON FUNCTION core.record_path_point_mark(uuid,text,uuid,text,text)",
+    "EXECUTE ON FUNCTION core.read_path_progress(uuid)",
+    "EXECUTE ON FUNCTION core.read_carry_on_mark(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0161_path_progress.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.count_public_reports(uuid,uuid)"
+  ]
+},
+// The V4 start step's saved questions (0162, plan 2026-11-03 Task 39d): the five functions for the API's own role (never the shared
+// runtime role), the export reader for the export worker alone, as 0131. No table grant.
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0162_saved_questions.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.create_saved_question(uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_saved_questions(uuid,integer)",
+    "EXECUTE ON FUNCTION identity.read_saved_question(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.delete_saved_question(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_data_export_worker",
+  "source": "migrations/0162_saved_questions.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"]
+},
+// V4 start step, Task 57c (0165): a failed question gives back its path-list charge. The try's table for the writer's owner (as 0158's
+// charge table), the writer with the try, the link at Start and the failed debate's quota read for the shared runtime role, as 0158's.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": ["SELECT, INSERT, UPDATE (run_id, linked_at) ON identity.pre_start_try"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
+    "EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid)",
+    "EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid)",
+    // Task 57e: the one automatic retry's writer, for the runner (the shared runtime role).
+    "EXECUTE ON FUNCTION core.record_work_item_retry(uuid,uuid,timestamptz)"
+  ]
+},
+// Task 57e: whether a failed debate keeps what its charges before Start bought, for the readers' owner (they call it as their definer).
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": ["EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"]
+},
+// Task 57f: a failed debate continues where it stopped. The waiver, call by call, for the readers' owner (its readers read it); the facts and
+// the re-open for the API's role alone; the waiver's writer (the runner) and its reader (the subscription reader) for the shared runtime role.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": ["SELECT ON ledger.model_spend_call_waiver"]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.read_run_continue(uuid,uuid)",
+    "EXECUTE ON FUNCTION core.continue_failed_run(uuid,uuid,text,bigint)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0165_pre_start_release.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
+    "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
+  ]
+},
+// V4 start step, Task 56g (0166): a public debate's finished main-answer versions 0147 does not hold, ids and times only, whatever the
+// debate's state, for the runner's climb (the shared runtime role).
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0166_main_answer_times.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.read_main_answer_times(uuid)"]
+},
+// V4 start step, Task 56h (0167): a visitor's report of a public debate nothing else can carry, on a run of their own made for it (the API's role).
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0167_public_report_own_carrier.sql",
+  "grants": ["EXECUTE ON FUNCTION identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)"]
+},
+// V4 start step, Task 57j (0168): until when a set-aside debate's charges are the site's, for the readers' owner (they call it as their definer)
+// and the shared runtime role (packages/budget's subscription reader runs as it). Its table of Continues is read by no role.
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0168_set_aside_continue.sql",
+  "grants": ["EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0168_set_aside_continue.sql",
+  "grants": ["EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"]
+},
+// V4 start step, Task 57o-fix (0169; the owner's answer of 8 Nov, "Your switched-on one (Recommended)": "the runner may read which settings are
+// switched on (a number, nothing private)"): 0124's pointer reader for the runner's role too, for a background piece of an older debate.
+// Task 57p (the owner's answer of 8 Nov, "On each piece's record"): the ten writers that store which settings wrote each piece, the runner's alone.
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0169_piece_settings_version.sql",
+  "grants": ["EXECUTE ON FUNCTION register.read_active_settings_version()",
+    "EXECUTE ON FUNCTION identity.record_web_reading_with_settings(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_with_settings(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version_with_settings(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line_with_settings(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_main_answer_update_with_settings(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_check_passed_with_settings(uuid,uuid,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_answer_update_with_settings(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+    "EXECUTE ON FUNCTION identity.record_public_report_with_settings(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)"]
+},
+{
+  "roleName": "debateai_staff_security_owner",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION core.publication_is_current(uuid)",
+    "EXECUTE ON FUNCTION identity.request_owner_matches(uuid)"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.reserve_ask_clarify_charge(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,text,timestamptz,boolean,text,jsonb)"
+  ]
+},
+{
+  "roleName": "debateai_billing_runtime",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_run_is_dig(uuid,uuid)"
+  ]
+},
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0171_security_review_hardening.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.delete_ask_clarify_reservations_due(integer)",
+    "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+    "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+    "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+    "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)",
+    "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+    "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+    "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+    "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)",
+    "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+    "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+    "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+    "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+    "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+    "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)",
+    "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+    "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)",
+    "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)",
+    "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+    "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+    "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+    "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+    "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+    "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+    "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)",
+    "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+    "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+    "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+    "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+    "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+    "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+    "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+    "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)",
+    "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)",
+    "EXECUTE ON FUNCTION core.read_terminal_recorded_facts(uuid)",
+    "EXECUTE ON FUNCTION evaluator.provider_call_request_is_authorized(uuid,text,text,text)",
+    "EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+    "EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid)",
+    "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+    "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+    "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+    "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+    "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.claim_alert_delivery(integer)",
+    "EXECUTE ON FUNCTION staff.read_alert_key_mapping(uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.settle_alert_delivery(uuid,uuid,text,text)",
+    "EXECUTE ON FUNCTION staff.read_alert_delivery_status()",
+    "EXECUTE ON FUNCTION staff.read_target_invitation_channel(uuid,uuid,uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
+    "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.ack_consumer_security_notice(uuid,uuid)",
+    "EXECUTE ON FUNCTION identity.fail_consumer_security_notice(uuid,uuid,text)",
+    "EXECUTE ON FUNCTION identity.purge_expired_authentication_risk_signals(integer)",
+    "EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices()",
+    "EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz)",
+    "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+    "EXECUTE ON FUNCTION staff.\"grant\"(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.accept(uuid,uuid,uuid,uuid,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+    "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.read_owned_webauthn_challenge(uuid,uuid,text,text,jsonb,jsonb,jsonb)",
+    "EXECUTE ON FUNCTION staff.fail_owned_webauthn(uuid,uuid,uuid)",
+    "EXECUTE ON FUNCTION staff.complete_owned_webauthn_registration(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb)",
+    "EXECUTE ON FUNCTION staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
+    "EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)",
+    "EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid)",
+    "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+    "EXECUTE ON FUNCTION identity.read_consumer_passkey_credential(text,text,text)",
+    "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
+    "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)",
+    "EXECUTE ON FUNCTION identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)",
+    "EXECUTE ON FUNCTION core.record_provider_probe(uuid,text,text,text,text,text,timestamptz)",
+    "INSERT ON ledger.model_spend",
+    "INSERT ON ledger.model_spend_hold",
+    "INSERT ON ledger.model_spend_reservation"
+  ]
+},
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0172_moderation_notice_fixes.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
+  ]
 }
 ]);
+    expect(manifest.privilegeRevocations).toEqual([
+      {
+        roleName: "debateai_billing_runtime",
+        source: "migrations/0171_security_review_hardening.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
+          "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+          "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)",
+          "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)",
+          "EXECUTE ON FUNCTION identity.read_path_line(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.read_main_answer_updates(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.close_public_investigation(uuid,uuid)",
+          "EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz)"
+        ]
+      },
+      {
+        roleName: "debateai_runtime",
+        source: "migrations/0171_security_review_hardening.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+          "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz)",
+          "EXECUTE ON FUNCTION identity.reopen_public_investigation(uuid,integer)",
+          "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+          "EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid)",
+          "EXECUTE ON FUNCTION staff.keep_threat_report_with_email(text,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_authentication_risk_signals_for_recovery(uuid)",
+          "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)",
+          "EXECUTE ON FUNCTION staff.begin_invitation_challenge(uuid,uuid,text,text,text)",
+          "EXECUTE ON FUNCTION staff.begin_owner_possession_challenge(uuid,uuid,uuid,text,text,text,text)",
+          "EXECUTE ON FUNCTION staff.begin_registration_challenge(uuid,uuid,text,text)",
+          "EXECUTE ON FUNCTION staff.complete_invitation_proof(uuid,uuid,uuid,text,bigint,text,text)",
+          "EXECUTE ON FUNCTION staff.complete_owner_possession(uuid,uuid,uuid,text,bigint,text,text)",
+          "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,timestamptz,boolean,text,jsonb)",
+          "EXECUTE ON FUNCTION identity.read_account_security_hold(uuid)",
+          "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+          "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+          "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+          "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+          "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+          "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)",
+          "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+          "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+          "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+          "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)",
+          "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+          "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+          "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+          "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+          "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+          "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)",
+          "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+          "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)",
+          "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)",
+          "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+          "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+          "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+          "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+          "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+          "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+          "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+          "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+          "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)",
+          "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+          "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+          "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+          "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+          "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+          "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+          "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+          "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)",
+          "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)",
+          "EXECUTE ON FUNCTION core.read_terminal_recorded_facts(uuid)",
+          "EXECUTE ON FUNCTION evaluator.provider_call_request_is_authorized(uuid,text,text,text)",
+          "EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+          "EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid)",
+          "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+          "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+          "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+          "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+          "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.claim_alert_delivery(integer)",
+          "EXECUTE ON FUNCTION staff.read_alert_key_mapping(uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.settle_alert_delivery(uuid,uuid,text,text)",
+          "EXECUTE ON FUNCTION staff.read_alert_delivery_status()",
+          "EXECUTE ON FUNCTION staff.read_target_invitation_channel(uuid,uuid,uuid,uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.purge_expired_authentication_risk_signals(integer)",
+          "EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices()",
+          "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+          "EXECUTE ON FUNCTION staff.\"grant\"(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.accept(uuid,uuid,uuid,uuid,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+          "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.read_owned_webauthn_challenge(uuid,uuid,text,text,jsonb,jsonb,jsonb)",
+          "EXECUTE ON FUNCTION staff.fail_owned_webauthn(uuid,uuid,uuid)",
+          "EXECUTE ON FUNCTION staff.complete_owned_webauthn_registration(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb)",
+          "EXECUTE ON FUNCTION staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
+          "EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)",
+          "EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid)",
+          "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
+          "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+          "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+          "EXECUTE ON FUNCTION identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)",
+          "EXECUTE ON FUNCTION core.record_provider_probe(uuid,text,text,text,text,text,timestamptz)",
+          "INSERT ON ledger.model_spend",
+          "INSERT ON ledger.model_spend_hold",
+          "INSERT ON ledger.model_spend_reservation",
+          "UPDATE ON ledger.sequence_allocator"
+        ]
+      },
+      {
+        roleName: "debateai_authorization_runtime",
+        source: "migrations/0171_security_review_hardening.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
+          "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.ack_consumer_security_notice(uuid,uuid)",
+          "EXECUTE ON FUNCTION identity.fail_consumer_security_notice(uuid,uuid,text)",
+          "EXECUTE ON FUNCTION identity.read_consumer_passkey_credential(text,text,text)",
+          "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
+          "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
+          "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)"
+        ]
+      },
+      {
+        roleName: "debateai_runtime",
+        source: "migrations/0172_moderation_notice_fixes.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
+        ]
+      },
+      {
+        roleName: "debateai_runtime",
+        source: "migrations/0174_public_review_ungrounded_door.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"
+        ]
+      }
+    ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
       .toEqual([
         { id: "CREDENTIAL_MATERIAL_PAIRWISE_DISTINCT", ownerTicket: "P3-02" },
@@ -1190,6 +2260,196 @@ it("discloses exactly 0125's grants to the API's billing role and the export wor
   expect(declared).toHaveLength(2);
   expect(declared.some(grant => /\bON legal\./u.test(grant))).toBe(false);
 });
+
+it("discloses exactly 0131's grants to the API's own role and the export worker (V4 account memory)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0131_v4_account_memory.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  // As for 0125: every GRANT line naming one of the disclosed roles names it alone.
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0131_v4_account_memory.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Six API functions for the API's role, the export reader for the worker; nothing for the shared runtime, no table grant.
+  expect(declared).toHaveLength(7);
+  expect(declared.some(grant => / TO debateai_runtime;$/u.test(grant))).toBe(false);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0132's grants to the runtime role, the API's own role and the export worker (Perplexity plan W1-3)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0132_web_evidence.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0132_web_evidence.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables.
+  expect(declared).toHaveLength(11);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0133's grants to the runtime role, the API's own role and the export worker (Perplexity plan W1-3)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0133_investigations.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0133_investigations.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables.
+  expect(declared).toHaveLength(12);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0134's grants to the runtime role, the API's own role and the export worker (dig-model revision W2-8)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0134_dig_model_and_month_pause.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0134_dig_model_and_month_pause.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables.
+  expect(declared).toHaveLength(17);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0135's grants to the runtime role, the API's own role and the export worker (dig-model revision W3-7)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0135_dig_picks.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0135_dig_picks.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on these tables. Six GRANT lines; the erasure role's one (the
+  // deletion) is not a disclosed principal here, as 0134's.
+  expect(declared).toHaveLength(5);
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(6);
+  expect(sql).toMatch(/^GRANT EXECUTE ON FUNCTION identity\.forget_erased_debate_dig_picks\(uuid\) TO debateai_erasure_runtime;$/mu);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0136's grants to the runtime role, the API's own role and the export worker (R22 W5-1)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0136_investigation_reports.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(new RegExp(`^GRANT [^\\n]+ TO (?:${disclosed});$`, "gm"))]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0136_investigation_reports.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Function grants only: no role holds a table right on the new table. Seven GRANT lines, every one disclosed: the
+  // step adds no deletion function (an erased root's reports go by cascade from 0133's closings), so no erasure grant.
+  expect(declared).toHaveLength(7);
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(7);
+  expect(sql).not.toMatch(/^GRANT [^\n]+ TO debateai_erasure_runtime;$/mu);
+  expect(declared.some(grant => !/^GRANT EXECUTE ON FUNCTION /u.test(grant))).toBe(false);
+});
+
+it("discloses exactly 0142's grants, all to the runtime role (R22 team limit, decisions 14 and 24)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const sql = await readFile("migrations/0142_team_limit.sql", "utf8");
+  const disclosed = "debateai_runtime|debateai_staff_security_owner|debateai_billing_runtime|debateai_data_export_worker";
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)].map(([statement]) => statement)
+    .filter(statement => new RegExp(`\\bTO\\b.*\\b(?:${disclosed})\\b`, "u").test(statement)
+      && !new RegExp(` TO (?:${disclosed});$`, "u").test(statement))).toEqual([]);
+  const actual = [...sql.matchAll(/^GRANT [^\n]+ TO debateai_runtime;$/gm)]
+    .map(([statement]) => statement.replace(/\s+/gu, " ").trim()).sort();
+  const declared = manifest.privilegeDisclosures.filter(entry => entry.source === "migrations/0142_team_limit.sql")
+    .flatMap(({ roleName, grants }) => grants.map(grant => `GRANT ${grant} TO ${roleName};`)).sort();
+  expect(actual).toEqual(declared);
+  // Thirteen GRANT lines in all, every one of them a function grant to the runtime role: the step's tables and its
+  // ownership move are not granted to anyone.
+  expect(declared).toHaveLength(13);
+  expect([...sql.matchAll(/^GRANT [^\n]+;$/gm)]).toHaveLength(13);
+});
+
+it("discloses exactly 0171's grants, and records each grant it takes back under privilegeRevocations alone (the security review)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const source = "migrations/0171_security_review_hardening.sql";
+  const sql = await readFile(source, "utf8");
+  // One role per line, at the top level, so each line below is the whole statement: a function's EXECUTE, or (F5, the site's day) a ledger
+  // table's INSERT or UPDATE.
+  expect([...sql.matchAll(/^(?:GRANT|REVOKE) [^\n]+;$/gmu)].map(([statement]) => statement)
+    .filter((statement) => !/^(?:GRANT [^\n]+ TO|REVOKE (?:EXECUTE ON FUNCTION \S+|(?:INSERT|UPDATE) ON ledger\.\w+) FROM) debateai_[a-z_]+;$/u.test(statement))).toEqual([]);
+  const granted = [...sql.matchAll(/^GRANT ([^\n]+) TO (debateai_[a-z_]+);$/gmu)].map(([, grant, role]) => `${role!}:${grant!}`).sort();
+  const disclosed = manifest.privilegeDisclosures.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}:${grant}`)).sort();
+  expect(disclosed).toEqual(granted);
+  const revoked = [...sql.matchAll(/^REVOKE (EXECUTE ON FUNCTION \S+|(?:INSERT|UPDATE) ON ledger\.\w+) FROM (debateai_[a-z_]+);$/gmu)]
+    .map(([, revoke, role]) => `${role!}:${revoke!}`).sort();
+  expect(revoked.length).toBeGreaterThan(0);
+  const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
+  expect(recorded).toEqual(revoked);
+  // Nowhere else: every revocation the manifest records is a line of its own step, and no step's disclosures name it as 0171's grant.
+  for (const entry of manifest.privilegeRevocations) {
+    const own = await readFile(entry.source, "utf8");
+    for (const revoke of entry.revokes) expect(own, revoke).toContain(`REVOKE ${revoke} FROM ${entry.roleName};`);
+  }
+  for (const line of recorded) expect(disclosed, line).not.toContain(line);
+});
+
+it("discloses exactly 0172's one grant and records the one it takes back (M7: staff's door with the law replaces the release before's for the runtime)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const source = "migrations/0172_moderation_notice_fixes.sql";
+  const sql = await readFile(source, "utf8");
+  const granted = [...sql.matchAll(/^GRANT ([^\n]+) TO (debateai_[a-z_]+);$/gmu)].map(([, grant, role]) => `${role!}:${grant!}`).sort();
+  const disclosed = manifest.privilegeDisclosures.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}:${grant}`)).sort();
+  expect(disclosed).toEqual(granted);
+  expect(granted).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"]);
+  const revoked = [...sql.matchAll(/^REVOKE (EXECUTE ON FUNCTION \S+) FROM (debateai_[a-z_]+);$/gmu)].map(([, revoke, role]) => `${role!}:${revoke!}`).sort();
+  const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
+  expect(recorded).toEqual(revoked);
+  expect(recorded).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"]);
+});
+
+it("discloses no 0174 grant and records the one it takes back (0150's staff review door without a ground is no longer the runtime's)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const source = "migrations/0174_public_review_ungrounded_door.sql";
+  const sql = await readFile(source, "utf8");
+  // One statement outside the contract block, and no grant at all: the step only takes back.
+  expect([...sql.matchAll(/^(?:GRANT|REVOKE) [^\n]+;$/gmu)].map(([statement]) => statement))
+    .toEqual(["REVOKE EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime;"]);
+  expect(manifest.privilegeDisclosures.filter((entry) => entry.source === source)).toEqual([]);
+  const revoked = [...sql.matchAll(/^REVOKE (EXECUTE ON FUNCTION \S+) FROM (debateai_[a-z_]+);$/gmu)].map(([, revoke, role]) => `${role!}:${revoke!}`).sort();
+  const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
+  expect(recorded).toEqual(revoked);
+  expect(recorded).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"]);
+  // 0150's disclosure of the grant stays as history: the step it came from still makes it, and 0174 takes it back after.
+  expect(manifest.privilegeDisclosures.filter((entry) => entry.source === "migrations/0150_public_review.sql")
+    .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}:${grant}`)))
+    .toContain("debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)");
+});
+
 
 it("discloses every 0127 publication review grant, including the run ownership columns", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;

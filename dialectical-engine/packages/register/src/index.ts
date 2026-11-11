@@ -28,8 +28,13 @@ import {
   DEBATE_SHAPE_FORMULA_VERSION, assertDebateShapeCeilingInput, debateShapeReceipt, debateShapeSiteCounts
 } from "./debate-shape-ceiling.js";
 import type { DebateShapeCeilingInput } from "./debate-shape-policy.js";
+import {
+  DEBATE_SHAPE_V2_FORMULA_VERSION as SHAPE_V2_FORMULA, assertDebateShapeV2Input, debateShapeReceiptV2, debateShapeSiteCountsV2,
+  type DebateShapeV2Input
+} from "./debate-shape-v2.js";
 import { lengthGuidanceReceipt, type LengthGuidance } from "./length-guidance-policy.js";
-import { engineReceipt, type EngineSettings } from "./engine-version-policy.js";
+import { engineReceipt, withPathDebateInvestigations, type EngineSettings } from "./engine-version-policy.js";
+import { webReceipt, type WebSites } from "./web-sites.js";
 
 export const CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY = "claimTypeCompositionMap" as const;
 export {
@@ -213,6 +218,8 @@ export interface StructuralCeilingInput {
    * makers. Absent: the receipt is DR-184-v4/v5 byte for byte.
    */
   readonly shape?: DebateShapeCeilingInput;
+  /** V4 start step, Task 13: a path debate's sizes (shape receipt v2); never together with `shape`, never with a backup. */
+  readonly shapeV2?: DebateShapeV2Input;
   /**
    * Length guidance (spec 2026-10-15 §3.1, ruling L20) — the debate's numbers under the register's optional
    * `lengthGuidancePolicy` row (`resolveLengthGuidance`), passed only when the row is in force. Absent: no `length`
@@ -225,6 +232,12 @@ export interface StructuralCeilingInput {
    * Needs `length`: engine 2 is always lengthed. Absent: no `engine` member and today's ceiling, byte for byte.
    */
   readonly engine?: EngineSettings;
+  /**
+   * Web search (plan 2026-10-30, W2-2): the web part's counts (`webSitesOf` at admission), passed only for a paid
+   * debate whose web search is on. Its model calls are billed into the ceiling like a panel member's; its searches are
+   * money only (`envelope_basis.web.searches`). Absent: no `web` member and today's ceiling, byte for byte.
+   */
+  readonly web?: WebSites;
 }
 
 /**
@@ -233,7 +246,7 @@ export interface StructuralCeilingInput {
  * pass, so an omitted term reached the arithmetic as `undefined` and minted a
  * `NaN` ceiling in silence. A missing term is now as loud as an invalid one.
  */
-const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "length" | "engine">[] = Object.freeze([
+const STRUCTURAL_CEILING_MEMBERS: readonly Exclude<keyof StructuralCeilingInput, "backupSequencesProvisioned" | "shape" | "shapeV2" | "length" | "engine" | "web">[] = Object.freeze([
   "panelSize", "depth", "judgeMaxAttempts", "organMaxAttempts", "maxRecompose",
   "maxCooldownHoldsPerRun", "finalRetryAttempts", "branchingFactor",
   "compositionSegmentCap", "fixedOrgansPerComposition",
@@ -434,6 +447,15 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   if (input.shape !== undefined) assertDebateShapeCeilingInput(input.shape, input.panelSize);
   const shaped = input.shape === undefined ? null
     : Object.freeze({ shape: input.shape, counts: debateShapeSiteCounts(input.shape, input.depth) });
+  // V4 start step, Task 13: a path debate (shape receipt v2): one shape at a time, and no backup sequence.
+  if (input.shapeV2 !== undefined) {
+    if (input.shape !== undefined || backupSequences === 1) {
+      throw new TypedDomainError("STRUCTURAL_CEILING_SHAPE_INVALID", "A path debate's shape stands alone and provisions no backup");
+    }
+    assertDebateShapeV2Input(input.shapeV2, input.panelSize);
+  }
+  const shapedV2 = input.shapeV2 === undefined ? null
+    : Object.freeze({ shape: input.shapeV2, counts: debateShapeSiteCountsV2(input.shapeV2, input.depth) });
   const nodesPerRoot = input.panelSize === 1
     ? 1
     : (input.branchingFactor ** (input.depth + 1) - 1) / (input.branchingFactor - 1);
@@ -462,19 +484,34 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
   if (input.engine !== undefined && input.length === undefined) {
     throw new TypedDomainError("STRUCTURAL_CEILING_ENGINE_INVALID", "The engine member needs the length member: engine 2 is always lengthed");
   }
-  const engineMember = input.engine === undefined ? null : engineReceipt(input.engine, panelMemberAttempts);
+  // V4 start step, Task 54e (the owner's answer of 5 Nov, "One per path"): a paid path debate's engine counts one investigation
+  // per path at least (`withPathDebateInvestigations`); every other debate's engine is minted as given, its bytes unchanged.
+  const engineMember = input.engine === undefined ? null : engineReceipt(withPathDebateInvestigations(input.engine,
+    input.shapeV2 === undefined ? null : { plan: input.shapeV2.plan, paths: input.shapeV2.paths }), panelMemberAttempts);
   const engineAddedAttempts = engineMember === null ? 0 : engineMember.sites.added_model_attempts;
+  // Web search (W2-2): the web part's model calls, each one call bounded like a panel member (backup included).
+  const webMember = input.web === undefined ? null : webReceipt(input.web, panelMemberAttempts);
+  const webAddedAttempts = webMember === null ? 0 : webMember.sites.added_model_attempts;
   // Debate shape (spec 2026-10-12 §3.6): the map's sites are author sites at the cooldown allowance; every node has its
   // graders, its close-call extras (counted on EVERY node, so the ceiling never under-counts) and its reviews; the P
   // cross-replies are the cross-exchange author sites (no runner-up), as today's M(M-1).
-  const authorSites = shaped === null ? materializedNodes : shaped.counts.mapSites + shaped.counts.nodes;
-  const crossExchangeAuthorSites = shaped === null ? crossExchangeNodes : shaped.counts.crossNodes;
-  const panelSites = shaped !== null
-    ? (shaped.shape.graders + shaped.shape.closeCallExtraGraders) * shaped.counts.nodes
-    : input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
-  const reviewerSites = shaped !== null
-    ? input.reviewerCallsPerNode * shaped.counts.nodes
-    : input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
+  // V4 start step, Task 13 (decided 3 Nov): a path debate's author sites are its map, its nodes and every path's answer
+  // so far (the runner books those calls as the debate's own, so the serve reserve stays the answer's, whole); it has
+  // no cross replies; its graders and reviewers sit on every node, as v1's.
+  const authorSites = shapedV2 !== null
+    ? shapedV2.counts.mapSites + shapedV2.counts.nodes + shapedV2.counts.pathOutcomeSites
+    : shaped === null ? materializedNodes : shaped.counts.mapSites + shaped.counts.nodes;
+  const crossExchangeAuthorSites = shapedV2 !== null ? 0 : shaped === null ? crossExchangeNodes : shaped.counts.crossNodes;
+  const panelSites = shapedV2 !== null
+    ? (shapedV2.shape.graders + shapedV2.shape.closeCallExtraGraders) * shapedV2.counts.nodes
+    : shaped !== null
+      ? (shaped.shape.graders + shaped.shape.closeCallExtraGraders) * shaped.counts.nodes
+      : input.panelSize === 1 ? 0 : (input.panelSize - 1) * materializedNodes;
+  const reviewerSites = shapedV2 !== null
+    ? input.reviewerCallsPerNode * shapedV2.counts.nodes
+    : shaped !== null
+      ? input.reviewerCallsPerNode * shaped.counts.nodes
+      : input.panelSize === 1 ? 0 : input.reviewerCallsPerNode * materializedNodes;
   // THE RETIRED COMPOSITION TOPOLOGY — declared, checked, and BILLED NOWHERE.
   // The sealed row still carries `fixedOrgansPerComposition`, `maxRecompose`
   // and `compositionSegmentCap`, and `apps/api/src/main.ts` still passes all
@@ -501,7 +538,8 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     + crossExchangeAuthorSites * crossExchangeSiteAttempts
     + panelSites * panelMemberAttempts
     + serveSites * serveSiteAttempts
-    + engineAddedAttempts;
+    + engineAddedAttempts
+    + webAddedAttempts;
   return Object.freeze({
     kind: "COMPUTED_STRUCTURAL_CEILING",
     max_model_attempts: maxModelAttempts,
@@ -557,16 +595,22 @@ export function computeStructuralCeilingBasis(input: StructuralCeilingInput): Re
     serve_reserve_attempts: serveSites * serveSiteAttempts,
     hold_cap: input.maxCooldownHoldsPerRun,
     final_retry_attempts: input.finalRetryAttempts,
-    formula_version: shaped !== null ? DEBATE_SHAPE_FORMULA_VERSION : backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
+    formula_version: shapedV2 !== null ? SHAPE_V2_FORMULA
+      : shaped !== null ? DEBATE_SHAPE_FORMULA_VERSION : backupSequences === 1 ? "DR-184-v5" : "DR-184-v4",
     bounds_source_ref: "engine-exports+register",
     // Debate shape: the run's frozen sizes, LAST and only when shaped, so a receipt minted without them keeps its bytes.
     ...(shaped === null ? {} : { shape: debateShapeReceipt(shaped.shape, shaped.counts, backupSequences) }),
+    // V4 start step, Task 13: a path debate's sizes in the same slot, version 2.
+    ...(shapedV2 === null ? {} : { shape: debateShapeReceiptV2(shapedV2.shape, shapedV2.counts, 0) }),
     // Length guidance: the run's frozen numbers, after everything else and only with the row, so a receipt minted
     // without them keeps its bytes (Task 3 pins the order).
     ...(input.length === undefined ? {} : { length: lengthGuidanceReceipt(input.length) }),
     // Engine redesign (INTERFACE §3.2): the engine's frozen values and sites, LAST (after `length`) and only with the
     // engine row, so a receipt minted without them keeps its bytes. `formula_version` never changes for it.
-    ...(engineMember === null ? {} : { engine: engineMember })
+    ...(engineMember === null ? {} : { engine: engineMember }),
+    // Web search (W2-2): the web part's frozen counts, LAST (after `engine`) and only for a debate with web, so a
+    // receipt minted without it keeps its bytes. `formula_version` never changes for it.
+    ...(webMember === null ? {} : { web: webMember })
   });
 }
 
@@ -1160,6 +1204,8 @@ export {
 // Paid plans (spec 2026-09-29 §2.5.1): the plans row and the billing switch.
 export {
   BILLING_PLANS_DEPLOYMENT_REGISTER_ROW,
+  billingPlansAreMadeUp,
+  closingReservesOf,
   BILLING_PLANS_ROW_KEY,
   BILLING_PLANS_MEMBERS,
   PLAN_IDS,
@@ -1172,7 +1218,8 @@ export {
   type BillingPlan,
   type BillingPlans,
   type FreeFixedGauges,
-  type PlanId
+  type PlanId,
+  type ReserveHeld
 } from "./billing-plans.js";
 export {
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
@@ -1207,6 +1254,14 @@ export {
   type PublicationCheckPolicyValue
 } from "./publication-check-policy.js";
 export {
+  OUTBOUND_MAIL_POLICY_DEPLOYMENT_REGISTER_ROW,
+  OUTBOUND_MAIL_POLICY_ROW_KEY,
+  outboundMailPolicyFromValue,
+  readOutboundMailPolicy,
+  type OutboundMailPolicy,
+  type OutboundMailPolicyValue
+} from "./outbound-mail-policy.js";
+export {
   QUESTION_CHECK_POLICY_DEPLOYMENT_REGISTER_ROW,
   QUESTION_CHECK_POLICY_ROW_KEY,
   questionCheckPolicyFromValue,
@@ -1234,7 +1289,12 @@ export {
   readStoryPolicyFromRegister,
   type StoryPolicy,
   type StoryRegisterRow,
-  type StoryRegisterRowsInput
+  type StoryRegisterRowsInput,
+  // W3-5 (dig-model revision): the path rewrite's code-owned numbers and its thinking steps.
+  PATH_REWRITE_POLICY,
+  PATH_REWRITE_THINKING,
+  // W5-1: the final report's code-owned numbers.
+  INVESTIGATION_REPORT_POLICY
 } from "./story-policy.js";
 // A19: the optional model scorecard (absent -> the plan rosters choose the models).
 export {
@@ -1288,8 +1348,27 @@ export {
   type DebateShapePlan,
   type DebateShapePlanKey,
   type DebateShapePolicy,
-  type DebateShapeScrutinyBudget
+  type DebateShapeScrutinyBudget,
+  // V4 start step, Task 11: the start step's switch and widths.
+  debateShapeStartStepOf,
+  debateShapeStartStepStartValues,
+  type DebateShapeStartStep,
+  type DebateShapeWidths
 } from "./debate-shape-policy.js";
+// V4 start step, Task 12: shape receipt v2 (a path debate's frozen sizes).
+export {
+  DEBATE_SHAPE_V2_FORMULA_VERSION,
+  assertDebateShapeV2Input,
+  debateShapeReceiptV2,
+  debateShapeReceiptV2Schema,
+  debateShapeSiteCountsV2,
+  debateShapeV2OfReceipt,
+  isShapeReceiptV2,
+  resolveDebateShapeV2,
+  type DebateShapeReceiptV2,
+  type DebateShapeV2Input,
+  type DebateShapeV2SiteCounts
+} from "./debate-shape-v2.js";
 export {
   LENGTH_GUIDANCE_POLICY_ROW_KEY,
   answerJobTokenCeilings,
@@ -1328,8 +1407,11 @@ export {
   engineSettingsOfReceipt,
   engineVersionPolicyRow,
   engineVersionPolicyStartValues,
+  investigationSitesOf,
   parseEngineVersionPolicy,
+  pathRunInvestigations,
   readEngineVersionPolicy,
+  withPathDebateInvestigations,
   type CompositionMetricName,
   type EngineAnswerCheck,
   type EngineInvestigate,
@@ -1343,6 +1425,35 @@ export {
   type EngineSites,
   type EngineVersionPolicy
 } from "./engine-version-policy.js";
+export {
+  WEB_HAIKU_PROMPT_TOKEN_LINE,
+  WEB_READER_BATCH_TOKENS,
+  WEB_SEARCH_PAGE_TOKEN_CAP,
+  WEB_SEARCH_REQUEST_TOKEN_CAP,
+  WEB_SITES_LIMITS,
+  WEB_SITES_START,
+  webModelCalls,
+  webReaderOneCalls,
+  webReceipt,
+  webReceiptSchema,
+  webSitesOf,
+  webSitesOfReceipt,
+  // V4 start step, Task 8: web receipt v2 (a path debate's paths).
+  WEB_PATHS_KIND_MAX,
+  webReceiptAnySchema,
+  webReceiptV2Schema,
+  webSearchCapForPaths,
+  // Task 91k: web receipt v3 (two more reader-1 calls per pack; every kind).
+  webReceiptV3Schema,
+  type WebReceiptV3,
+  type WebOrigin,
+  type WebReceiptV2,
+  type WebDepth,
+  type WebKind,
+  type WebReceipt,
+  type WebSiteInput,
+  type WebSites
+} from "./web-sites.js";
 export {
   QUESTION_LANGUAGE_CHECK_DEFAULT_INSTRUCTION,
   QUESTION_LANGUAGE_POLICY_ROW_KEY,
@@ -1480,6 +1591,9 @@ export {
 } from "./staff-access-policy.js";
 
 export { internalAllowancePolicyValue } from "./internal-allowance-policy.js";
+export {
+  TEAM_FEATURE_PLAN_ID, teamLimitWindow
+} from "./team-limit.js";
 
 export * from "./consumer-recovery-policy.js";
 
@@ -1541,3 +1655,10 @@ export {
   type SettingsCallBound,
   type SettingsSeatableGateModel
 } from "./settings-check-seatable.js";
+export {
+  ABUSE_LIMITS_DEPLOYMENT_REGISTER_ROW,
+  ABUSE_LIMITS_ROW_KEY,
+  abuseLimitsFromValue,
+  readAbuseLimits,
+  type AbuseLimits
+} from "./abuse-limits.js";

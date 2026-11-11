@@ -131,7 +131,8 @@ export function createRunnerRetirementSignal(): RunnerRetirementSignal {
 
 /**
  * Part 2, spec §4 "Retirement (drained)": a release retires when, "in one database transaction", its state is
- * DRAINING, its front pair has stopped and no READY or CLAIMED work item of its runs is left, and, "in the process: no
+ * DRAINING, its front pair has stopped and no READY or CLAIMED work item of its runs is left (decision 12: a paused debate's
+ * does not count: it waits for its person, not for this release, and continues in the release then current), and, "in the process: no
  * debate task is still executing" (the task counter above, the verdict story included) and no model call of this
  * process is in flight (R1's call counter: integration M6, a keep-alive stop can end a task under its call). Then the
  * runner stops claiming, says so on stdout (`DEBATEAI_RUNNER_RETIRED {"releaseKey":…}`) and as the in-process event
@@ -198,10 +199,12 @@ const SET_ASIDE_PAGE_SIZE = 100;
 /**
  * The facts in one snapshot: a FRONT_PAIR_STOPPED row is never seen without every admission committed before it (a
  * debate admitted a second before the pair stopped is counted as open work, never missed between two reads). Needs
- * EXECUTE on `core.read_release_state` and SELECT on `core.work_item` and `core.run` (the runner runtime login has all
- * three). `fence` is the runner's own work fence (spec §3): the backstop's set-aside writes only its release's work,
+ * EXECUTE on `core.read_release_state`, `identity.run_release_now` and `identity.run_work_is_parked` (the last the
+ * cross-account marker's since 0171), and SELECT on `core.work_item` and `core.run` (the runner runtime login holds
+ * them all). `fence` is the runner's own work fence (spec §3): the backstop's set-aside writes only its release's work,
  * never under another worker's live claim, and refuses any other release key before it writes (O1). The set-aside
- * needs UPDATE on `core.work_item` and INSERT on `ledger.model_spend_waiver` (debateai_runtime has both).
+ * needs UPDATE on `core.work_item` and INSERT on `ledger.model_spend_waiver` (debateai_runtime's), and EXECUTE on
+ * `identity.run_work_is_parked` through battery's NOT_PARKED (the marker's).
  */
 export function postgresRunnerRetirementStore(
   pool: Pool,
@@ -230,7 +233,8 @@ export function postgresRunnerRetirementStore(
           `SELECT count(*)::int AS open_work
              FROM core.work_item w
              JOIN core.run r ON r.run_id = w.run_id
-            WHERE r.release_key = $1 AND w.state IN ('READY','CLAIMED')`,
+            WHERE identity.run_release_now(r.run_id) = $1 AND w.state IN ('READY','CLAIMED')
+              AND NOT identity.run_work_is_parked(w.run_id, w.state, w.claim_deadline)`,
           [releaseKey]
         );
         await client.query("COMMIT");

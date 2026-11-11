@@ -75,7 +75,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     await migrate(pool);
     expect((await pool.query('SELECT name,applied_at FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) ORDER BY name',[history.map(row=>row.name)])).rows).toEqual(history);
     const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-    const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+    const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
     // Historical import is synthetic fixture setup only; the operator never seeds development/bootstrap.
     await createPostgresRegisterPublicationPort(pool).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
     const sealedBefore=await readSealedSnapshot(pool,'4');
@@ -83,7 +83,7 @@ describe('isolated PG18 native preview publication (source evidence, not Linux s
     const approval={baseRegisterVersion:snapshot.baseRegisterVersion,baseSnapshotSha256:snapshot.baseSnapshotSha256,snapshotSha256:snapshot.snapshotSha256,deltaSha256:snapshot.deltaSha256};
     const input={publicationId:randomUUID(),sourceRef:'isolated native preview operator fixture',snapshot,approval};
     const receipt=await publishPreviewRegister(pool,input);
-    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(69);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(receipt.registerVersion).toBe('5');expect(receipt.rowCount).toBe(70);expect(receipt.publicationKind).toBe('GENERAL');expect(receipt.requestSha256).toMatch(/^[a-f0-9]{64}$/);
     expect(await publishPreviewRegister(pool,input)).toEqual(receipt);
     const singleConnection=new pg.Pool({connectionString:db.connectionString,options:'-c role=debateai_prod_migrator',max:1,connectionTimeoutMillis:5000});
     await native.withGuardedPool(singleConnection,async(c:any)=>{acquisitions++;await native.assertNativeConnection(c,target,plan.manifest.cohorts.auth106);},async(verifierPool:any)=>{
@@ -124,7 +124,7 @@ describe('the preview verify never applies a database step (PR-57)',()=>{
    const forward108=async()=>(await selected!.query('SELECT count(*)::int n FROM public.debateai_schema_migration_forward')).rows[0].n;
    // The register is already published on the preview; verify replays the actual receipt.
    const source=await buildPreviewSourceRows(await loadBootstrapRegister(),observation);
-   const base=[...source.filter(row=>!['consumerRecoveryPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
+   const base=[...source.filter(row=>!['consumerRecoveryPolicy','outboundMailPolicy','publicationCheckPolicy','questionCheckPolicy','taxAuthorities'].includes(row.rowKey)),...[STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map(row=>({rowKey:row.rowKey,valueJsonText:canonicalRegisterJson(row.valueAst),sourceRef:row.sourceRef}))];
    await createPostgresRegisterPublicationPort(selected).importHistorical({registerVersion:parseRegisterVersionText('4'),rows:base});
    const sealed=await readSealedSnapshot(selected,'4');
    const snapshot=composePreviewSnapshot({sourceRows:source,baseRows:sealed.rows,baseRegisterVersion:'4',baseSnapshotSha256:computeRegisterSnapshotSha256(base)});
@@ -181,7 +181,29 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
     '0127_publication_review.sql',
     '0128_threat_reports.sql',
     '0129_support_answer_scope.sql',
-    '0130_row_level_security.sql'
+    '0130_row_level_security.sql',
+    '0131_v4_account_memory.sql',
+    '0132_web_evidence.sql',
+    '0133_investigations.sql',
+    '0134_dig_model_and_month_pause.sql',
+    '0135_dig_picks.sql',
+    '0136_investigation_reports.sql',
+    '0137_public_debates.sql',
+    '0138_tree_updates.sql',
+    '0139_passage_retention.sql',
+    '0140_internal_spend_kinds.sql',
+    '0141_path_suggestions.sql',
+    '0142_team_limit.sql',
+    '0143_run_handover.sql',
+    '0144_ask_clarify_charge.sql',
+    '0145_web_researched_unsettled.sql',
+    '0146_team_allowances.sql',
+    '0147_public_tree.sql',
+    '0148_erasure_keeps_public.sql',
+    '0149_public_report_team_month.sql',
+    '0150_public_review.sql',
+    '0151_public_flag.sql',
+    '0152_report_export_and_check_usage.sql', '0153_dig_tree_settled.sql', '0154_region_iceland_liechtenstein.sql', '0155_owner_answer_writes.sql', '0156_moderation_notice.sql', '0157_moderation_statements.sql', '0158_pre_start_charge.sql', '0159_start_paths.sql', '0160_path_results.sql', '0161_path_progress.sql', '0162_saved_questions.sql', '0163_carry_on_session_free_digs.sql', '0164_main_answer_path_added.sql', '0165_pre_start_release.sql', '0166_main_answer_times.sql', '0167_public_report_own_carrier.sql', '0168_set_aside_continue.sql', '0169_piece_settings_version.sql', '0170_outbound_mail_limit.sql', '0171_security_review_hardening.sql', '0172_moderation_notice_fixes.sql', '0173_settle_dismissed_flag.sql', '0174_public_review_ungrounded_door.sql', '0175_statement_ai_read_verdict.sql'
    ]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;

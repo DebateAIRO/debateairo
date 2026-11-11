@@ -12,18 +12,54 @@ import { z } from "zod";
 export const ThreatReportSchema = StaffThreatReportSchema.extend({
   account: StaffThreatReportSchema.shape.account.nullable()
 }).strict();
-import { CatalogLocaleCodeSchema } from "./locale.js";
+import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguageSchema, type QuestionLanguageOffer } from "./question-language.js";
+export * from "./question-language.js";
+// V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
+export * from "./start-paths.js";
+import {
+  StartCheckSchema, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema, StartListsEventSchema,
+  StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, StartPathsSchema
+} from "./start-paths.js";
+// V4 start step, Task 15: a path debate's results per path.
+export * from "./path-outcome.js";
+// V4 start step, Task 16: Answer.branches, the run read's and the public snapshot's paths.
+export * from "./branches.js";
+import { ANSWER_BRANCH_LIMITS, AnswerBranchesSchema, PublicBranchesSchema } from "./branches.js";
+// V4 start step, Task 57a: the run read's progress of each path and the carry-on part.
+export * from "./run-paths.js";
+import { CARRY_ON_PARTS, RunPathProgressSchema } from "./run-paths.js";
+// V4 start step, Task 39c: a question not started yet, as the account keeps it (saved questions spec 2026-11-04).
+export * from "./saved-questions.js";
+import { SavedQuestionIdSchema } from "./saved-questions.js";
+// V4 start step, Task 39e: the five saved-question routes' requests and answers, in the inventory's resources.
+import {
+  SavedQuestionCreateSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionSaveSchema, SavedQuestionWrittenSchema
+} from "./saved-questions.js";
 import { SessionSchema, LegalDocumentPairSchema } from "./auth-shared.js";
 export * from "./auth-shared.js";
 import { ConsumerAuthenticationCredentialSchema, consumerAuthContractSchemas } from "./consumer-auth.js";
 export * from "./consumer-auth.js";
-import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
+import { ABSTENTION_KINDS, CONDITION_MARKS, DEBATE_ROLES, LEDGER_ACTION_KINDS, LEDGER_OUTCOMES, MODEL_STRENGTHS, READING_LEVELS, SERVED_ROOT_RULE_HISTORY, TIER_SOURCES } from "@debateai/kernel";
 import { PlanTierSchema } from "./plan-tiers.js"; export * from "./plan-tiers.js";
 import { MakerLineageSchema, PublicMakerLineageSchema } from "./lineage.js"; export * from "./lineage.js";
 import { AnswerStorySchema, PublicStoryShortSchema, StoryLanguageTagSchema } from "./story.js"; export * from "./story.js";
 import { AnswerDisclosureSchema, AnswerFloorSchema } from "./disclosure.js"; export * from "./disclosure.js";
 import { VerdictStateSchema } from "./verdict-state.js"; export * from "./verdict-state.js";
 import { DebateMapViewSchema } from "./map-view.js"; export * from "./map-view.js";
+import {
+  ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+  DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema, DigLinkModeSchema
+} from "./account-memory.js";
+export * from "./account-memory.js";
+import { PublicDebateRefusedSchema, PublicReportAcceptedSchema, PublicReportRequestSchema, AnswerContributionSchema, AnswerMainAnswerSchema, MainAnswerVersionSchema, PublicContributionSchema, PublicDigParentSchema, PublicMainAnswerSchema, PurposeLinesSchema, AskClarifyRequestSchema, AskClarifyResponseSchema, AnswerWebSchema, AskParentSchema, DebateInvestigationSchema, DigSharePercentSchema, DigSuggestionSchema, InvestigationCloseRequestSchema,
+  ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, RoomReserveSchema, WebOtherPageSchema, WebPathSchema, WebSourceSchema,
+  WEB_CONTRACT_LIMITS, AnswerDigSchema, AnswerPathRewritesSchema, DigTooDeepSchema, DigPicksOnePathSchema, DigFreePicksMaxSchema, MonthPauseSchema, PathRewriteSchema,
+  PathRewritesSchema, PointOfViewVerdictSchema, RoomNewStartsSchema, RunContinueRefusedSchema, RunContinueRequestSchema,
+  RunContinuedSchema, RunNotContinuedSchema, UsageBorrowSchema, UsageBorrowsSchema } from "./web.js";
+export * from "./web.js";
+import { InvestigationReopenRequestSchema, InvestigationReopenedSchema, InvestigationReportAcceptedSchema, InvestigationReportsSchema,
+  InvestigationReportWritingSchema, PublicReportVersionSchema } from "./investigation-report.js";
+export * from "./investigation-report.js";
 export * from "./crisis.js";
 export * from "./question-check.js";
 export * from "./harm-helpline.js";
@@ -193,12 +229,23 @@ export type Scrutiny = z.infer<typeof ScrutinySchema>;
 export const AnswerLengthSchema = z.enum(["short", "standard", "detailed"]);
 export type AnswerLength = z.infer<typeof AnswerLengthSchema>;
 
-/** Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2). */
+/**
+ * V4 reading level (owner ruling N6, 2026-10-29): the reader the answer writer and the storyteller write for. Missing
+ * (every V3 /new ask, every older run) reads as none: today's prompts, byte for byte.
+ */
+export const ReadingLevelSchema = z.enum(READING_LEVELS);
+export type ReadingLevel = z.infer<typeof ReadingLevelSchema>;
+
+/**
+ * Closed at the contract door: the depth, plus the three optional shape settings (spec 2026-10-12 §3.2), plus the V4
+ * reading level (N6), which rides here the way `answerLength` does and is stored with the run's depth_params.
+ */
 export const DepthParamsSchema = z.object({
   depth: ExpansionDepthSchema,
   depthMode: DepthModeSchema.optional(),
   scrutiny: ScrutinySchema.optional(),
-  answerLength: AnswerLengthSchema.optional()
+  answerLength: AnswerLengthSchema.optional(),
+  readingLevel: ReadingLevelSchema.optional()
 }).strict();
 export type DepthParams = z.infer<typeof DepthParamsSchema>;
 
@@ -224,17 +271,19 @@ export function debateShapeSettingsOf(depthParams: Readonly<Record<string, unkno
   });
 }
 
-/** The 35 site locales (apps/ui/messages/<locale>): the language the person's page is in (question-language spec 2026-10-13, L1). */
-export const SiteLanguageSchema = CatalogLocaleCodeSchema;
-export const SITE_LANGUAGE_CODES = CatalogLocaleCodeSchema.options;
-export type SiteLanguage = z.infer<typeof SiteLanguageSchema>;
-/** The person's answer to a real-mix offer: a reference the server signed and a choice; never a language or text of its own. */
-export const QuestionLanguageChoiceSchema = z.object({
-  check_ref: z.string().min(3).max(4096).regex(/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u),
-  choice: z.enum(["USE_REWRITE", "KEEP_MINE"]),
-  original_question_line: z.string().trim().min(1).max(8192).optional()
-}).strict();
-export type QuestionLanguageChoice = z.infer<typeof QuestionLanguageChoiceSchema>;
+/**
+ * V4 reading level (N6): an asked or stored depth_params' level, or null when it has none (every V3 ask, every run stored
+ * before the level). A present value outside the three levels is refused, as a shape setting is.
+ */
+export function readingLevelOf(depthParams: Readonly<Record<string, unknown>>): ReadingLevel | null {
+  if (!Object.hasOwn(depthParams, "readingLevel") || depthParams.readingLevel === undefined) return null;
+  const parsed = ReadingLevelSchema.safeParse(depthParams.readingLevel);
+  if (!parsed.success) throw new TypeError("DEPTH_PARAMS_SHAPE_INVALID:readingLevel");
+  return parsed.data;
+}
+
+// V4 start step, Task 9: the site language and the question-language choice moved to ./question-language.js, unchanged,
+// so the start step's contract can use them without importing this file; re-exported below.
 
 /** Side-by-side spec §13 (Task S12): a sealed settings version's number, as the room read names it and an ask echoes it. */
 const SettingsVersionSchema = z.number().int().positive();
@@ -258,7 +307,25 @@ export const AskRequestSchema = z.object({
   // Side-by-side spec §13 (Task S12): the settings version the /new page's room read answered from (its
   // `settings_version`). Present and no longer the active one, an ask whose choices the active version does not offer is
   // refused 409 ASK_SETTINGS_CHANGED ("please choose again"); absent (an older page), the ask is normalised as before.
-  settings_version: SettingsVersionSchema.optional()
+  settings_version: SettingsVersionSchema.optional(),
+  // Plan 2026-10-30 W1-6: a dig names the debate it digs (AskParentSchema, ./web.ts); absent, the ask is a new question.
+  parent: AskParentSchema.optional(),
+  // Decision 13 of 31 Oct: a dig on a public debate (PublicDigParentSchema, ./web.ts) instead of `parent`; absent, the ask is as before.
+  public_parent: PublicDigParentSchema.optional(),
+  // Decision 5: the debate's place, time and purpose lines, structured (PurposeLinesSchema, ./web.ts); absent, the debate keeps none.
+  purpose_lines: PurposeLinesSchema.optional(),
+  // Decision 13: this Free ask showed the notice that its question and debate are public. Only such a debate ever goes public.
+  free_public_notice: z.literal(true).optional(),
+  // V4 start step, Task 14 (spec 2026-11-03 §4.2), last: the proof that this line is the one checked at Next, the chosen
+  // paths, and the carry-on box ("Let the AIs carry on to the report", owner answer 9; only ever true). Absent: R22's ask.
+  start_check: StartCheckSchema.optional(),
+  start_paths: StartPathsSchema.optional(),
+  carry_on_to_report: z.literal(true).optional(),
+  // V4 start step, Task 39c (saved questions spec 2026-11-04 §3.7), last: the question not started yet this ask starts from,
+  // removed once the debate is accepted. Read only by that removal: never stored with the run, sealed, logged or passed to the runner.
+  saved_question_id: SavedQuestionIdSchema.optional()
+  // V4 start step, Task 57f (the owner's 7 Nov answers): Task 57e's `again_of` (a new debate on what a failed question kept) is gone; the
+  // same failed debate continues instead (POST /v1/runs/{id}/continue), and changed words are a new question, charged as new.
 }).strict();
 export type AskRequest = z.infer<typeof AskRequestSchema>;
 
@@ -268,7 +335,7 @@ export type AskRequest = z.infer<typeof AskRequestSchema>;
  * The same four words as `SpendScope` in @debateai/budget (the contract cannot
  * import it); tests/unit/b6a-waiting-projection.test.ts reads both.
  */
-export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT"]);
+export const SpendScopeSchema = z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH", "PERSON_GRANT", "TEAM_MONTH"]);
 
 /**
  * Final review Part 1b, Important 1 — WHY A QUESTION WAITS when no reset is
@@ -313,6 +380,8 @@ export const AskAcceptedSchema = z.object({
   // Final review Part 1b, Important 1: only on a WAITING answer whose person's
   // own running debates are all that fill their windows (a person scope).
   waits_for: WaitsForSchema.optional(),
+  // Decision 13: a dig on a public debate that could not join its tree (a failure of the store between the run's start and its join): it runs as the person's own private debate.
+  public_dig_not_joined: z.literal(true).optional(),
   applied: AskAppliedSchema.optional(),
   // Model-scorecard design, cost estimate before a run: the strength the picker applied, and
   // whether the per-run money ceiling stepped it down. Optional, so an accepted ask without
@@ -367,21 +436,6 @@ export type MadeByNewerRelease = z.infer<typeof MadeByNewerReleaseSchema>;
  * bytes — the decider safeParses its offer with this schema and locks instead, so the 409 never becomes a 500.
  */
 export const QUESTION_LANGUAGE_CHOICE_NEEDED = "QUESTION_LANGUAGE_CHOICE_NEEDED" as const;
-const LANGUAGE_NAME_BYTES = Object.freeze({ max: 64 });
-const NamedLanguageSchema = z.object({
-  code: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/u),
-  name: z.string().min(1).max(LANGUAGE_NAME_BYTES.max)
-    .refine((name) => new TextEncoder().encode(name).length <= LANGUAGE_NAME_BYTES.max, "a language name is at most 64 bytes")
-}).strict();
-export const QuestionLanguageOfferSchema = z.object({
-  check_ref: z.string().min(3).max(4096),
-  main_language: NamedLanguageSchema,
-  languages_seen: z.array(NamedLanguageSchema).min(2).max(6)
-    .refine((seen) => new Set(seen.map((language) => language.code.split("-")[0])).size === seen.length,
-      "each language is named once"),
-  proposed_question: z.string().min(1)
-}).strict();
-export type QuestionLanguageOffer = z.infer<typeof QuestionLanguageOfferSchema>;
 export const QuestionLanguageChoiceNeededSchema = z.object({
   error: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
   message: z.literal(QUESTION_LANGUAGE_CHOICE_NEEDED),
@@ -407,8 +461,18 @@ export const AskRoomQuerySchema = z.object({
   // Debate shape (spec 2026-10-12 §3.2): the /new page reads the room for the settings it will send.
   depth_mode: DepthModeSchema.optional(),
   scrutiny: ScrutinySchema.optional(),
-  answer_length: AnswerLengthSchema.optional()
-}).strict();
+  answer_length: AnswerLengthSchema.optional(),
+  // Plan 2026-10-30 W1-6 (Q14): a room read for a dig names its parent, its mode and how many picks it combines, so the
+  // answer can say the dig's share of today. The mode and the picks only beside a parent.
+  dig_parent: z.uuid().optional(),
+  dig_mode: DigLinkModeSchema.optional(),
+  dig_picks: z.string().regex(/^[0-9]{1,2}$/u).transform(Number)
+    .pipe(z.number().int().min(1).max(WEB_CONTRACT_LIMITS.digPicksMax)).optional()
+}).strict().superRefine((query, context) => {
+  if (query.dig_parent === undefined && (query.dig_mode !== undefined || query.dig_picks !== undefined)) {
+    context.addIssue({ code: "custom", message: "dig_mode and dig_picks go only beside dig_parent" });
+  }
+});
 
 /**
  * Length guidance (spec 2026-10-15 §3.8; controller ruling Q9): the answer writer's three targets for the person's plan,
@@ -437,6 +501,73 @@ const PreviewRostersSchema = z.object({
   premium: z.array(z.string().min(1)).min(1)
 }).strict();
 
+/** W1-6 (Q2): "blocked until {reset}" is a FULL person window whose reset `resets_at` names. */
+function roomReserveIssues(answer: Readonly<{ room: string; scope: string | null; reserve?: string | undefined }>, context: z.RefinementCtx): void {
+  if (answer.reserve === "BLOCKED" && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "BLOCKED names a full person window and its reset" });
+  }
+}
+
+/**
+ * W2-7 (the money rule, owner 31 Oct): new starts wait for the reset of a FULL person window; a read carries a new
+ * question's estimate or a dig's, never both.
+ */
+function roomMoneyIssues(answer: Readonly<{ room: string; scope: string | null; new_starts?: string | undefined;
+  start_share_percent?: number | undefined; dig_share_percent?: number | undefined; start_step?: unknown;
+  dig_share_by_paths?: readonly number[] | undefined }>, context: z.RefinementCtx): void {
+  if (answer.new_starts !== undefined && (answer.room !== "FULL" || !PERSON_SCOPES.has(answer.scope ?? ""))) {
+    context.addIssue({ code: "custom", message: "new starts wait only for the reset of a full person window" });
+  }
+  if (answer.start_share_percent !== undefined && answer.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "a room read estimates a new question or a dig, not both" });
+  }
+  // V4 start step, Task 14: the start step belongs to a new question's read, never a dig's.
+  if (answer.start_step !== undefined && answer.dig_share_percent !== undefined) {
+    context.addIssue({ code: "custom", message: "the start step comes with a new question's read, not a dig's" });
+  }
+  // V4 start step, Task 79b: a path debate's dig's share per path count comes only beside the dig's own share (so never on a new
+  // question's read, its share or its start step).
+  if (answer.dig_share_by_paths !== undefined && answer.dig_share_percent === undefined) {
+    context.addIssue({ code: "custom", message: "the share per path count comes with a dig's read and its share" });
+  }
+}
+
+/**
+ * V4 start step, Task 79b (owner answer Q19 of 4 Nov: "a dig's share follows a combine"): on a dig's read where the start step runs,
+ * the dig's share of today (Free: of its month) for each number of paths it may look into, entry i - 1 for i paths (1 to 7), each a
+ * whole percent (Task 38's rule), so a combine that takes one path away always shows.
+ */
+const DigShareByPathsSchema = z.array(z.number().int().min(0).max(100)).min(1).max(7);
+
+/**
+ * V4 start step, Task 14 (spec 2026-11-03 §2.6): How wide's choices (1 to 3 path counts, whole numbers 1 to 7, rising)
+ * and the one it starts on.
+ */
+export const StartStepWidthsSchema = z.object({
+  options: z.array(z.number().int().min(1).max(7)).min(1).max(3),
+  default: z.number().int().min(1).max(7)
+}).strict().superRefine((widths, context) => {
+  if (!widths.options.every((value, index) => index === 0 || value > widths.options[index - 1]!)) {
+    context.addIssue({ code: "custom", path: ["options"], message: "the widths rise" });
+  }
+  if (!widths.options.includes(widths.default)) context.addIssue({ code: "custom", path: ["default"], message: "the default is one of the widths" });
+});
+/**
+ * V4 start step, Task 14: the room read's start step: whether the lists run before Start, How wide's widths, and the
+ * share of today a debate of 1, 2, … paths takes (one entry per path count up to the widest), absent when the read has
+ * no money-rule window (internal funding, billing off).
+ */
+export const StartStepRoomSchema = z.object({
+  lists: z.enum(["ON", "OFF"]),
+  widths: StartStepWidthsSchema,
+  share_by_paths: z.array(z.number().int().min(0).max(100)).optional()
+}).strict().superRefine((room, context) => {
+  if (room.share_by_paths !== undefined && room.share_by_paths.length !== Math.max(...room.widths.options)) {
+    context.addIssue({ code: "custom", path: ["share_by_paths"], message: "one share per path count, up to the widest" });
+  }
+});
+export type StartStepRoom = z.infer<typeof StartStepRoomSchema>;
+
 const CustomerAskRoomResponseSchema = z.object({
   room: z.enum(["FITS", "CLOSE", "FULL", "ALREADY_WAITING"]),
   scope: z.enum(["SITE_DAY", "PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]).nullable(),
@@ -459,8 +590,22 @@ const CustomerAskRoomResponseSchema = z.object({
   // API answers the pages from the activation pointer. The page sends it back with the ask (`AskRequest.settings_version`).
   settings_version: SettingsVersionSchema.optional(),
   // Addition D24 (Task SA7 part A): on the preview, that version's line-up (PreviewRostersSchema); absent elsewhere.
-  preview_rosters: PreviewRostersSchema.optional()
+  preview_rosters: PreviewRostersSchema.optional(),
+  // Plan 2026-10-30 W1-6 (Q2): the reserve's word, KEPT or BLOCKED (RoomReserveSchema, ./web.ts); absent before R22.
+  reserve: RoomReserveSchema.optional(),
+  // W1-6 (Q14): a dig's share of today, only on a read asked for a dig (the owner-approved exception to I6).
+  dig_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): a new question's estimate, as a share of today in the same steps; absent on a read for a dig.
+  start_share_percent: DigSharePercentSchema.optional(),
+  // W2-7 (money rule): new questions and digs wait for `resets_at` (RoomNewStartsSchema, ./web.ts); running work goes on.
+  new_starts: RoomNewStartsSchema.optional(),
+  // V4 start step, Task 14: the step before Start, present only when its switch is on for the read's plan.
+  start_step: StartStepRoomSchema.optional(),
+  // V4 start step, Task 79b: a path debate's dig's share for each number of paths (DigShareByPathsSchema), beside its own share.
+  dig_share_by_paths: DigShareByPathsSchema.optional()
 }).strict().superRefine((answer, context) => {
+  roomReserveIssues(answer, context);
+  roomMoneyIssues(answer, context);
   if (answer.waits_for !== undefined
     && (!(answer.room === "FULL" || answer.room === "ALREADY_WAITING") || !PERSON_SCOPES.has(answer.scope ?? ""))) {
     context.addIssue({ code: "custom", message: "waits_for names a person scope of a question that would wait" });
@@ -478,13 +623,25 @@ const CustomerAskRoomResponseSchema = z.object({
 });
 const InternalFundingUsageSchema = z.object({kind:z.literal("INTERNAL"),expires_at:z.iso.datetime()}).strict();
 const InternalAskRoomResponseSchema = z.object({
-  room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]).nullable(),
+  room:z.enum(["FITS","CLOSE","FULL","ALREADY_WAITING"]),scope:z.enum(["SITE_DAY","PERSON_DAY","PERSON_WEEK","PERSON_GRANT","TEAM_MONTH"]).nullable(),
   resets_at:z.iso.datetime().nullable(),waiting_run_ref:z.string().min(1).nullable(),plan_id:z.null(),funding:InternalFundingUsageSchema,waits_for:WaitsForSchema.optional(),shape_settings:z.literal(true).optional(),answer_words:AnswerWordsSchema.optional(),length_settings:z.literal(true).optional(),
   // Side-by-side spec §13 (Task S12): as the customer answer's `settings_version`.
   settings_version:SettingsVersionSchema.optional(),
   // Addition D24 (Task SA7 part A): as the customer answer's `preview_rosters`.
-  preview_rosters:PreviewRostersSchema.optional()
+  preview_rosters:PreviewRostersSchema.optional(),
+  // Plan 2026-10-30 W1-6: as the customer answer's `reserve` and `dig_share_percent`.
+  reserve:RoomReserveSchema.optional(),
+  dig_share_percent:DigSharePercentSchema.optional(),
+  // W2-7: as the customer answer's `start_share_percent` and `new_starts`.
+  start_share_percent:DigSharePercentSchema.optional(),
+  new_starts:RoomNewStartsSchema.optional(),
+  // V4 start step, Task 14: as the customer answer's `start_step`.
+  start_step:StartStepRoomSchema.optional(),
+  // V4 start step, Task 79b: as the customer answer's `dig_share_by_paths`.
+  dig_share_by_paths:DigShareByPathsSchema.optional()
 }).strict().superRefine((answer,context)=>{
+  roomReserveIssues(answer,context);
+  roomMoneyIssues(answer,context);
   if ((answer.room==="FITS") !== (answer.scope===null) || (answer.room==="FITS" && answer.resets_at!==null)
     || ((answer.room==="ALREADY_WAITING") !== (answer.waiting_run_ref!==null))
     || ((answer.room==="FULL" || answer.room==="ALREADY_WAITING") && answer.resets_at===null)
@@ -501,7 +658,9 @@ const CustomerBillingUsageResponseSchema = z.object({
     scope: z.enum(["PERSON_DAY", "PERSON_WEEK", "PERSON_MONTH"]),
     percent: z.number().int().min(0).max(110),
     resets_at: z.iso.datetime()
-  }).strict()).max(3)
+  }).strict()).max(3),
+  // W2-7 (money rule): what running work borrowed from the next day or week to finish (UsageBorrowSchema, ./web.ts).
+  borrowed: UsageBorrowsSchema.optional()
 }).strict();
 const InternalBillingUsageResponseSchema = z.object({
  plan_id:z.null(),funding:InternalFundingUsageSchema,windows:z.array(z.object({scope:z.enum(["PERSON_DAY","PERSON_WEEK","PERSON_GRANT"]),percent:z.number().int().min(0).max(100),resets_at:z.iso.datetime()}).strict()).min(1).max(3)
@@ -526,21 +685,67 @@ export const BillingPricesSchema = z.object({
 }).strict();
 export type BillingPrices = z.infer<typeof BillingPricesSchema>;
 
+const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
+
 /**
- * GET /v1/billing/plans (public). Every plan's price in each currency, and `currency`, the one the caller's connection
- * pays in (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance".
+ * Terms §12: "Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live)". The
+ * tax the connection's country adds to every plan, as the tax engine the quote asks answers it for that country alone
+ * (no address yet).
+ */
+export const BillingPlansTaxSchema = z.object({
+  country: BillingIso2Schema,
+  tax_name: z.string().min(1).max(64),
+  /** Basis points; a US rate may be fractional (8.875 % = 887.5). */
+  tax_rate_bp: z.number().min(0).max(10_000),
+  tax_status: z.enum(["TAXABLE", "NON_TAXABLE", "NOT_REGISTERED", "REVERSE_CHARGE"])
+}).strict();
+export type BillingPlansTax = z.infer<typeof BillingPlansTaxSchema>;
+
+/**
+ * GET /v1/billing/plans' optional query: the place the visitor says they live, as the checkout's country (and, in the
+ * US and Canada, where the state's or province's tax comes from it, the postal code). Absent, the connection's country.
+ */
+export const BillingPlansQuerySchema = z.object({
+  country: z.string().trim().toUpperCase().pipe(BillingIso2Schema).optional(),
+  postal_code: z.string().trim().min(1).max(16).optional()
+}).strip();
+export type BillingPlansQuery = z.infer<typeof BillingPlansQuerySchema>;
+
+/**
+ * Where the list's prices are for, and whether they could be priced there. PRICED: `tax` and every `total_price` are
+ * that place's. COUNTRY_NEEDED: no country is known (no country chosen, and the connection's is unknown or a Tor
+ * exit). POSTAL_CODE_NEEDED / POSTAL_CODE_INVALID: a US or Canadian price needs a postal code that fits the country.
+ * TAX_UNAVAILABLE: the tax service has not answered for that place. Only PRICED shows a price.
+ */
+export const BillingPlansPlaceSchema = z.object({
+  country: BillingIso2Schema.nullable(),
+  postal_code: z.string().max(16).nullable(),
+  status: z.enum(["PRICED", "COUNTRY_NEEDED", "POSTAL_CODE_NEEDED", "POSTAL_CODE_INVALID", "TAX_UNAVAILABLE"])
+}).strict();
+export type BillingPlansPlace = z.infer<typeof BillingPlansPlaceSchema>;
+
+/**
+ * GET /v1/billing/plans (public). Every plan's net price in each currency, and `currency`, the one the place pays in
+ * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance". Terms §12: `tax` is
+ * the place's tax and each plan's `total_price` its price in `currency` with that tax; both are present exactly when
+ * `place.status` is PRICED, so a net price is never offered as the price.
  */
 export const BillingPlansResponseSchema = z.object({
   currency: BillingCurrencySchema,
+  place: BillingPlansPlaceSchema,
+  tax: BillingPlansTaxSchema.nullable(),
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
     net_prices: BillingPricesSchema,
+    total_price: BillingDecimalMoneySchema.nullable(),
     allowance_vs_plus: z.string().regex(/^\d+(?:\.\d+)?$/)
   }).strict()).min(1)
-}).strict();
+}).strict().refine(
+  (answer) => (answer.tax !== null) === (answer.place.status === "PRICED")
+    && answer.plans.every((plan) => (plan.total_price === null) === (answer.tax === null)),
+  { message: "TOTAL_PRICE_WITHOUT_TAX" }
+);
 export type BillingPlansResponse = z.infer<typeof BillingPlansResponseSchema>;
-
-const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
 
 /** POST /v1/billing/quote (paid-plans spec §2.5.3; P19's pre-fill makes `country` optional; R-15 adds `name`). */
 export const BillingQuoteRequestSchema = z.object({
@@ -733,8 +938,8 @@ export const BillingUpgradePendingErrorSchema = z.object({
 }).strict();
 /** What `upgradeSubscription` resolves to for that 409, beside NETOPIA's page. */
 export type BillingUpgradePendingResponse = Readonly<{ state: "PENDING"; charge_ref: string }>;
-/** P12d: the step-up grant for WITHDRAW_SUBSCRIPTION (the same 43-character token every step-up grant is). */
-export const BillingWithdrawRequestSchema = z.object({ step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/u) }).strict();
+/** OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up grant. */
+export const BillingWithdrawRequestSchema = z.object({}).strict();
 /**
  * `refund`: what goes back to the card. Null when a refund made in NETOPIA's admin already touched a payment:
  * the plan has ended, and the owner settles what is still due and writes (P14c; M8 follows).
@@ -795,6 +1000,19 @@ export const ArgumentLanguageSchema = z.object({
 }).strict();
 export type ArgumentLanguage = z.infer<typeof ArgumentLanguageSchema>;
 
+/**
+ * Plan 2026-10-31 decision 12: a page the AIs read before a debate was set aside by an update, for the person to read on
+ * after it stopped: its address and title, reader 1's note and the short quotes shown from it (all kept after the passages go).
+ */
+export const RunFoundPageSchema = z.object({
+  url: z.url().max(2_048).refine((url) => /^https?:\/\//iu.test(url)),
+  site: z.string().trim().min(1).max(255),
+  title: z.string().trim().min(1).max(500),
+  note: z.string().trim().min(1).max(2_000).nullable(),
+  quotes: z.array(z.string().trim().min(1).max(500)).max(32)
+}).strict();
+export type RunFoundPage = z.infer<typeof RunFoundPageSchema>;
+
 export const RunProjectionSchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
@@ -810,8 +1028,52 @@ export const RunProjectionSchema = z.object({
   waits_until: z.iso.datetime().nullable().optional(),
   // Final review Part 1b, Important 1: a WAITING run that waits only for its
   // person's own running debates (`waits_until` is then the next tick).
-  waits_for: WaitsForSchema.nullable().optional()
+  waits_for: WaitsForSchema.nullable().optional(),
+  // W2-7 (money rule): the month wall paused this debate's planned calls and searches (MonthPauseSchema, ./web.ts).
+  month_pause: MonthPauseSchema.optional(),
+  // Decision 12: only on a debate that an update set aside: what the AIs found stays readable.
+  found: z.array(RunFoundPageSchema).max(64).optional(),
+  // V4 start step, Task 75c (owner answer Q15, 5 Nov): the reading level the debate was asked at, which its map, digs and report
+  // keep (as its stored depth_params hold it); absent when it was asked without one, so an older reader still parses. Before the
+  // paths, which stay last.
+  reading_level: ReadingLevelSchema.optional(),
+  // V4 start step, Task 16: a path debate's paths as they stand while it runs; absent on every R22 run.
+  branches: AnswerBranchesSchema.optional(),
+  // V4 start step, Task 57a (./run-paths.ts), last: each path's step line, dots and findings, in the paths' order ([] while the AIs
+  // are still choosing the paths), and the part a carry-on debate is running. Both absent on every R22 run.
+  path_progress: z.array(RunPathProgressSchema).max(ANSWER_BRANCH_LIMITS.pathsMax).optional(),
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional(),
+  // V4 start step, Task 57c (the owner's 5 Nov answer Q20 A and its follow-up), last: whether a FAILED debate used any of the person's
+  // quota. NONE: nothing was taken (its path-list charge was given back, 0165, and nothing else ran); SOME: some was. Absent on every
+  // other run, and where the server cannot say, so an older reader still parses.
+  quota_used: z.enum(["NONE", "SOME"]).optional(),
+  // V4 start step, Task 57f (the owner's 7 Nov answers: "continue where it 'broke', and not charge the customer again"; Task 57e's
+  // `reusable`, renamed), last: true when POST /v1/runs/{id}/continue would continue this FAILED debate, as far as the read can know: it is
+  // the person's own, a first question or a dig, its content live, its stop ours (never their own act, a spending wall or a step's tries
+  // used up) or an upload's set-aside where Continue moves it to the release that is current (Task 57j), and fewer than 2 continues of it
+  // failed on our side (Task 57m; an update's set-aside is never one of them, Task 57m-fix). Absent otherwise (the press is then 409
+  // RUN_NOT_CONTINUABLE).
+  continuable: z.literal(true).optional(),
+  // V4 start step, Task 57m (owner 8 Nov: "We should stop after 2 continues that fail"), last: true when this FAILED debate would be
+  // continuable but two continues of it already failed again, so Continue is no longer offered and the page says it keeps failing. Never
+  // beside `continuable`; absent for any other reason it cannot continue.
+  keeps_failing: z.literal(true).optional()
 }).strict().superRefine((run, context) => {
+  if (run.found !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", message: "only a debate that stopped lists what was found so far" });
+  }
+  if (run.quota_used !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["quota_used"], message: "only a failed debate says whether any quota was used" });
+  }
+  if (run.continuable !== undefined && run.state !== "FAILED") {
+    context.addIssue({ code: "custom", path: ["continuable"], message: "only a failed debate continues where it stopped" });
+  }
+  if (run.keeps_failing !== undefined && (run.state !== "FAILED" || run.continuable !== undefined)) {
+    context.addIssue({ code: "custom", path: ["keeps_failing"], message: "only a failed debate that cannot continue keeps failing" });
+  }
+  if (run.month_pause !== undefined && !(run.state === "CLAIMED" || run.state === "RUNNING" || run.state === "HOLDING")) {
+    context.addIssue({ code: "custom", message: "only a debate already running pauses at the month wall" });
+  }
   if (run.waits_for !== undefined && run.waits_for !== null && run.state !== "WAITING") {
     context.addIssue({ code: "custom", message: "only a WAITING run waits for anything" });
   }
@@ -826,6 +1088,29 @@ export const RunProjectionSchema = z.object({
   }
   if ((run.state === "WAITING") !== (run.waits_until !== undefined && run.waits_until !== null)) {
     context.addIssue({ code: "custom", message: "WAITING requires waits_until and other states forbid it" });
+  }
+  // V4 start step, Task 57a: the progress follows the paths one for one; none while the paths are being chosen; the carry-on part
+  // only on a path debate whose carry-on box is ticked.
+  const progress = run.path_progress;
+  const paths = run.branches?.paths;
+  if (progress !== undefined && paths !== undefined
+    && (progress.length !== paths.length || progress.some((entry, index) => entry.path_id !== paths[index]?.path_id))) {
+    context.addIssue({ code: "custom", path: ["path_progress"], message: "the paths and their progress name the same paths" });
+  }
+  if (progress !== undefined && progress.length === 0 && run.branches !== undefined) {
+    context.addIssue({ code: "custom", path: ["path_progress"], message: "a path debate still choosing its paths has none to show" });
+  }
+  if (run.carry_on_part !== undefined && progress === undefined) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "only a path debate carries the carry-on part" });
+  }
+  // V4 start step, Task 57b (owner, 4 Nov, "Show it from the start"): beside the paths the box must be ticked; before the paths are
+  // named (no `branches`), the server sends a part only for an ask whose box is ticked, and it is the answer.
+  if (run.carry_on_part !== undefined && run.branches !== undefined && run.branches.carry_on_to_report !== true) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
+  }
+  if (run.carry_on_part !== undefined && run.branches === undefined && progress !== undefined
+    && (progress.length > 0 || run.carry_on_part !== "ANSWER")) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "before its paths are named, a carry-on debate is on its answer" });
   }
 });
 export type RunProjection = z.infer<typeof RunProjectionSchema>;
@@ -904,15 +1189,21 @@ export type PublicAiProvidersResponse = z.infer<typeof PublicAiProvidersResponse
  */
 export const SENSITIVE_DATA_NOTICE_VERSION = "2026-09-29" as const;
 export const SENSITIVE_DATA_CONSENT_REQUIRED = "SENSITIVE_DATA_CONSENT_REQUIRED" as const;
+/**
+ * V4 start step, Task 36 (ask-f2; owner answer Q14): where the start step runs, a new question from a person on the Free plan
+ * that arrives without `free_public_notice` is refused 403 with this code (body `{ error, message }`, as the consent above),
+ * before anything is checked or charged; the page shows the notice and sends again.
+ */
+export const FREE_PUBLIC_NOTICE_REQUIRED = "FREE_PUBLIC_NOTICE_REQUIRED" as const;
 export const SensitiveDataConsentRequestSchema = z.object({
   notice_version: z.literal(SENSITIVE_DATA_NOTICE_VERSION),
   locale: z.string().regex(/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/)
 }).strict();
 export const SensitiveDataConsentStatusSchema = z.object({ status: z.enum(["required", "given"]) }).strict();
 export type SensitiveDataConsentStatus = z.infer<typeof SensitiveDataConsentStatusSchema>;
-export const VisibilityGrantActionSchema = z.enum(["PUBLISH", "UNPUBLISH"]);
+export const VisibilityGrantActionSchema = z.enum(["PUBLISH"]);
 export const RunTargetedGrantActionSchema = z.enum([
-  "PUBLISH", "UNPUBLISH", "DELETE_PRIVATE_DEBATE"
+  "PUBLISH", "DELETE_PRIVATE_DEBATE"
 ]);
 export const StepUpAuthorizationRequestSchema = z.discriminatedUnion("action", [
   z.object({
@@ -1027,30 +1318,33 @@ export const PublicationContentRefusalSchema = z.object({
   message: z.literal(PUBLICATION_CONTENT_REFUSED_MESSAGE),
   statement: PublicationRefusalStatementSchema
 }).strict();
+/**
+ * Security review F2 (migration 0171): the 409 body of a publish of a dig. The owner decided that a dig, a debate dug from another, is never
+ * published; nothing was read, checked or provisioned for the attempt, and the debate stays private.
+ */
+export const DIG_NOT_PUBLISHABLE = "DIG_NOT_PUBLISHABLE" as const;
+export const DigNotPublishableSchema = z.object({
+  error: z.literal(DIG_NOT_PUBLISHABLE),
+  message: z.literal(DIG_NOT_PUBLISHABLE)
+}).strict();
+export type DigNotPublishable = z.infer<typeof DigNotPublishableSchema>;
 
 export const PublishDebateRequestSchema = z.object({
   step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   warning_acknowledged: z.literal(true)
 }).strict();
 
-export const UnpublishDebateRequestSchema = z.object({
-  step_up_grant: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
-  copies_may_persist_acknowledged: z.literal(true)
-}).strict();
-
 const StepUpGrantTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/);
 export const AccountErasureScheduleRequestSchema = z.object({
   confirmation: z.literal("DELETE MY ACCOUNT"),
-  step_up_grant: StepUpGrantTokenSchema,
-  delete_public_debates: z.boolean().optional()
+  step_up_grant: StepUpGrantTokenSchema
 }).strict();
 export const AccountErasureStatusSchema = z.discriminatedUnion("status", [
   z.object({ status:z.literal("NONE") }).strict(),
   z.object({
     status:z.enum(["SCHEDULED","DUE","PROCESSING"]),
     execute_at:z.iso.datetime(),
-    cancellation_ref:z.uuid(),
-    delete_public_debates:z.boolean()
+    cancellation_ref:z.uuid()
   }).strict()
 ]);
 export const AccountErasureCancelRequestSchema = z.object({
@@ -1123,6 +1417,16 @@ export const PublicationTransitionSchema = z.object({
   state: z.enum(["PRIVATE", "PUBLISHED"]),
   public_ref: z.uuid().nullable()
 }).strict();
+/**
+ * GET /v1/runs/{id}/visibility: the publish's own two fields and, security review F2, `dig`: sent (true) only for a dig, which is never published,
+ * so the page offers no Publish for it. The publish's 201 keeps the two fields alone.
+ */
+export const RunVisibilitySchema = z.object({
+  state: z.enum(["PRIVATE", "PUBLISHED"]),
+  public_ref: z.uuid().nullable(),
+  dig: z.boolean().optional()
+}).strict();
+export type RunVisibility = z.infer<typeof RunVisibilitySchema>;
 
 export const PublicDebateSummarySchema = z.object({
   public_ref: z.uuid(),
@@ -1250,6 +1554,25 @@ export const AbstentionSchema = z.object({
   ledger_unknown_ref: z.string().trim().min(1)
 }).strict();
 
+/**
+ * V4 start step, Task 79c (owner answer Q33 A, 5 Nov 2026): "Your maps" shows a dig made on someone else's public page as a card of
+ * its own, "Dig: {its pick}" (dig-f30's words), the one case of a dig card of its own. A row of GET /v1/answers (served or still open)
+ * says whether it is one (`dug_on_public`) and, for one, its first pick's words (`dig_pick`, the person's own as they sent it; absent
+ * when the dig had no pick or the words cannot be read). Both optional and last: a row without them is today's, and a dig of the
+ * person's own debate, public or not, says false (it sits under its own question).
+ */
+function publicDigRowMembers() {
+  return {
+    dug_on_public: z.boolean().optional(),
+    dig_pick: z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.pickTextMaxChars).optional()
+  };
+}
+function publicDigRowCheck(row: Readonly<{ dug_on_public?: boolean | undefined; dig_pick?: string | undefined }>, context: z.RefinementCtx): void {
+  if (row.dig_pick !== undefined && row.dug_on_public !== true) {
+    context.addIssue({ code: "custom", path: ["dig_pick"], message: "only a dig made on someone else's public page names its pick" });
+  }
+}
+
 export const AnswerSummarySchema = z.object({
   answer_id: z.string().min(1),
   run_ref: z.string().min(1),
@@ -1270,14 +1593,18 @@ export const AnswerSummarySchema = z.object({
   // nothing there and removes the home page's per-row full answer read.
   // Optional, never invented: a row with no recorded maker lineage says so by
   // omission rather than by an empty claim about what ran.
-  models: z.array(z.string().trim().min(1)).optional()
-}).strict();
+  models: z.array(z.string().trim().min(1)).optional(),
+  // V4 start step, Task 79c (owner answer Q33 A, 5 Nov), last: whether this is a dig made on someone else's public page, and its pick.
+  ...publicDigRowMembers()
+}).strict().superRefine(publicDigRowCheck);
 export const OpenRunSummarySchema = z.object({
   run_ref: z.string().min(1),
   question_line: z.string().trim().min(1),
   state: z.enum(["QUEUED", "WAITING", "CLAIMED", "RUNNING", "HOLDING", "SETTLED", "FAILED"]),
   terminal_reason: z.string().trim().min(1).nullable(),
-  created_at_sequence: z.number().int().positive()
+  created_at_sequence: z.number().int().positive(),
+  // V4 start step, Task 79c, last: the same two members on a run still open (a dig on a public page that is still running).
+  ...publicDigRowMembers()
 }).strict().superRefine((run, context) => {
   if ((run.state === "FAILED") !== (run.terminal_reason !== null)) {
     context.addIssue({
@@ -1285,6 +1612,7 @@ export const OpenRunSummarySchema = z.object({
       message: "FAILED requires a terminal reason and non-failed runs forbid one"
     });
   }
+  publicDigRowCheck(run, context);
 });
 export const AnswerIndexSchema = z.object({
   items: z.array(AnswerSummarySchema),
@@ -1320,7 +1648,11 @@ export const NodeSchema = z.object({
   condition_marks: z.array(ConditionMarkSchema),
   abstention: AbstentionSchema.nullable(),
   staleness_state: StalenessStateSchema,
-  relevant_as_of: z.iso.datetime()
+  relevant_as_of: z.iso.datetime(),
+  // Plan 2026-10-30 W1-6: the checked extracts the point rests on, as people see them (WebSourceSchema, ./web.ts), and
+  // the server's flag that its locator is one of them. Both optional: a point without the flag is never "Sure" (Q17).
+  sources: z.array(WebSourceSchema).max(WEB_CONTRACT_LIMITS.sourcesPerPointMax).optional(),
+  looked_up_checked: z.boolean().optional()
 }).strict();
 export type Node = z.infer<typeof NodeSchema>;
 
@@ -1457,7 +1789,23 @@ export const PublicDebateSchema = z.object({
   // Debate shape P2c (spec 2026-10-12 §3.3 step 8): the map view copied at publish time,
   // so the public page can list what was raised but not debated and title each position.
   // Optional: every snapshot published before it still parses.
-  map_view: DebateMapViewSchema.optional()
+  map_view: DebateMapViewSchema.optional(),
+  // Decision 13 of 31 Oct: what contributions changed since this snapshot (the snapshot itself never changes; these are read from
+  // 0137's sealed updates at each read). Optional: every snapshot published before them parses, and the API adds them, never the seal.
+  contributions: z.array(PublicContributionSchema).max(WEB_CONTRACT_LIMITS.publicContributionsMax).optional(),
+  main_answer_update: PublicMainAnswerSchema.optional(),
+  // Decision 13: the first author's account is gone: `author_pseudonym` then reads "a contributor" and the page says it in its own language.
+  author_name_gone: z.literal(true).optional(),
+  /** Decision 33: part of this debate was changed after a review. Plainly marked; no reason is ever given. */
+  changed_after_review: z.literal(true).optional(),
+  // Decisions 13 and 16: every report anyone wrote on it, oldest first; the newest is current, the earlier ones stay readable.
+  reports: z.array(PublicReportVersionSchema).max(WEB_CONTRACT_LIMITS.publicReportsMax).optional(),
+  // V4 start step, Task 16: a public path debate's paths (publicBranchesOf); absent on every R22 debate.
+  branches: PublicBranchesSchema.optional(),
+  // V4 start step, Task 75d (owner's second-round answers): the reading level the debate was asked at, copied at publish time from
+  // the run (as `language` is), so the public page shows it at that level and a dig made there is kept at it. Last and optional:
+  // every snapshot published before it parses, and a page reads one without it as Plain words.
+  reading_level: ReadingLevelSchema.optional()
 }).strict();
 export type PublicDebate = z.infer<typeof PublicDebateSchema>;
 
@@ -1609,8 +1957,32 @@ export const AnswerSchema = z.object({
   // A21: optional, so every stored and fixture answer without it still parses.
   model_assignment: AnswerModelAssignmentSchema.optional(),
   // R2: engine 2 only (INTERFACE §9.8); optional, so every engine-1 and older answer parses unchanged.
-  judges_comparison: JudgesComparisonSchema.optional()
+  judges_comparison: JudgesComparisonSchema.optional(),
+  // Plan 2026-10-30 W1-6: each path's web search, other pages and dig suggestions (AnswerWebSchema, ./web.ts); optional,
+  // so every answer served before R22 parses unchanged.
+  web: AnswerWebSchema.optional(),
+  // W2-7 (dig model): each path's rewrites by digs and the "changed since" count (AnswerPathRewritesSchema, ./web.ts),
+  // and, on a dig's own answer, what it dug and its rewrite (AnswerDigSchema). Optional: older answers parse unchanged.
+  path_rewrites: AnswerPathRewritesSchema.optional(),
+  dig: AnswerDigSchema.optional(),
+  // Decisions 3, 5 and 13 of 31 Oct (./web.ts): the main answer's automatic versions, the debate's purpose lines, and how the digger's
+  // contribution to a public debate stands. Optional: older answers parse unchanged.
+  main_answer: AnswerMainAnswerSchema.optional(),
+  purpose_lines: PurposeLinesSchema.optional(),
+  contribution: AnswerContributionSchema.optional(),
+  // V4 start step, Task 16: a path debate's paths (each its own branch); absent on every R22 answer.
+  branches: AnswerBranchesSchema.optional(),
+  // V4 start step, Task 57a (./run-paths.ts), last: the part a carry-on debate is running once its answer is served (digs, then the
+  // report); absent on every R22 answer.
+  carry_on_part: z.enum(CARRY_ON_PARTS).optional()
 }).strict().superRefine((answer, context) => {
+  // W1-6: the server's checked flag stands only on a looked-up point whose locator is one of its own sources.
+  for (const node of answer.nodes) {
+    if (node.looked_up_checked === true && (node.way_of_knowing !== "LOOKED_UP"
+      || !(node.sources ?? []).some((source) => source.extract_id === node.locator))) {
+      context.addIssue({ code: "custom", message: "looked_up_checked needs a looked-up point whose locator is one of its sources" });
+    }
+  }
   if ((answer.confidence_band === null) !== (answer.band_ceiling === null)) {
     context.addIssue({ code: "custom", message: "confidence_band and band_ceiling must be present together" });
   }
@@ -1619,6 +1991,10 @@ export const AnswerSchema = z.object({
   }
   if (answer.verdict_unavailable !== null && answer.confidence_band !== null) {
     context.addIssue({ code: "custom", message: "an unavailable verdict cannot carry a confidence band" });
+  }
+  // V4 start step, Task 57a: the carry-on part only on a path debate whose carry-on box is ticked.
+  if (answer.carry_on_part !== undefined && answer.branches?.carry_on_to_report !== true) {
+    context.addIssue({ code: "custom", path: ["carry_on_part"], message: "the carry-on part needs the box ticked" });
   }
 });
 export type Answer = z.infer<typeof AnswerSchema>;
@@ -1725,7 +2101,19 @@ export const contractInventory = Object.freeze({
     "POST /v1/account/export",
     "POST /v1/account/export/download",
     "POST /v1/account/removal-notice/take",
+    // V4 account memory (owner rulings N7 and N11, migration 0131): the reading level kept in the account.
+    "GET /v1/account/reading-level",
+    "POST /v1/account/reading-level",
+    // V4 start step, Task 39e (./saved-questions.ts): the questions not started yet: the list, the first save, a later save, Pick up
+    // and Delete.
+    "GET /v1/account/saved-questions",
+    "POST /v1/account/saved-questions",
+    "PUT /v1/account/saved-questions/{id}",
+    "GET /v1/account/saved-questions/{id}",
+    "DELETE /v1/account/saved-questions/{id}",
     "GET /v1/account/legal-status",
+    // 0157 (DSA Art 17; D1): the person's own statements of reasons.
+    "GET /v1/account/moderation-statements",
     "POST /v1/account/legal-accept",
     "POST /v1/account/legacy-runs/claim",
     "GET /v1/account/profile",
@@ -1746,11 +2134,21 @@ export const contractInventory = Object.freeze({
     "GET /v1/public/debates/{id}",
     // Addition D24: the companies the declared provider targets reach, for the "AI providers" page.
     "GET /v1/public/ai-providers",
+    // Decision 13: a report on a public debate.
+    "POST /v1/public/debates/{id}/report",
+    "POST /v1/public/debates/{id}/flag",
     "GET /v1/geo/availability",
     "POST /v1/support/messages",
     "GET /v1/support/status",
     "POST /v1/asks",
     "GET /v1/asks/room",
+    // Decision 29: dynamic step 2.
+    "POST /v1/asks/clarify",
+    // V4 start step, Task 30: the four calls before Start (./start-paths.ts); the lists and the merge answer as an event stream.
+    "POST /v1/asks/paths/lists",
+    "POST /v1/asks/paths/merge",
+    "POST /v1/asks/paths/combine",
+    "POST /v1/asks/paths/fit",
     "GET /v1/session",
     "GET /v1/deployment",
     // Side-by-side spec §6 (plan C5): the API's liveness and readiness probes.
@@ -1773,9 +2171,21 @@ export const contractInventory = Object.freeze({
     "GET /v1/runs/{id}/events",
     "GET /v1/runs/{id}/answer",
     "POST /v1/runs/{id}/publish",
-    "POST /v1/runs/{id}/unpublish",
     "POST /v1/runs/{id}/publication-review",
     "GET /v1/runs/{id}/publication-review",
+    // V4 account memory (N7, N11): the last visit of a debate and the dig links around it.
+    "GET /v1/runs/{id}/last-visit",
+    "POST /v1/runs/{id}/last-visit",
+    "GET /v1/runs/{id}/dig-links",
+    "POST /v1/runs/{id}/dig-links",
+    // R22 W3-8 (the money rule): Continue on a debate paused at the month wall, once the month has reset.
+    "POST /v1/runs/{id}/continue",
+    // R22 W5-1: the final report over an investigation: its versions, "Write my report" and "Keep digging".
+    "GET /v1/runs/{id}/investigation",
+    "POST /v1/runs/{id}/report",
+    "POST /v1/runs/{id}/reopen",
+    // W4-4: "Add to researched": one of a path's other pages, from the map.
+    "POST /v1/runs/{id}/researched",
     "GET /v1/billing/usage",
     "GET /v1/billing/plans",
     "POST /v1/billing/quote",
@@ -1812,7 +2222,7 @@ export const contractInventory = Object.freeze({
     RunTargetedGrantActionSchema,
     BeginSocialStepUpRequestSchema,SocialStepUpStatusRequestSchema,SocialStepUpStatusResponseSchema,CompleteSocialStepUpRequestSchema,StepUpAuthorizationRequestSchema, StepUpResponseSchema, BeginPasskeyStepUpRequestSchema, CompletePasskeyStepUpRequestSchema, AuthMethodsResponseSchema, RemoveAuthMethodRequestSchema, RegenerateRecoveryCodesRequestSchema, RecoveryCodesResponseSchema, MfaRecoveryPendingResponseSchema, MfaRecoveryPendingCancelRequestSchema, MfaRecoveryPendingCancelledSchema,
     DataExportRequestSchema, DataExportStatusSchema, DataExportDownloadRequestSchema,
-    PublishDebateRequestSchema, UnpublishDebateRequestSchema,
+    PublishDebateRequestSchema,
     AccountErasureScheduleRequestSchema,AccountErasureStatusSchema,
     AccountErasureCancelRequestSchema,AccountErasureCancelledSchema,PrivateDebateErasureRequestSchema,
     PrivateDebateErasureStatusSchema,LegacyRunClaimRequestSchema,LegacyRunClaimResultSchema,
@@ -1820,7 +2230,7 @@ export const contractInventory = Object.freeze({
     RecoveryEmailSettingsSchema,RecoveryEmailRequestSchema,RecoveryEmailRemoveRequestSchema,
     AccountEmailSchema,EmailChangeRequestSchema,EmailChangePendingSchema,EmailChangeLinkRequestSchema,
     EmailChangeConfirmedSchema,EmailChangeCancelledSchema,
-    PublicationTransitionSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
+    PublicationTransitionSchema, RunVisibilitySchema, DigNotPublishableSchema, PublicDebateSummarySchema, PublicDebateSchema, PublicDebateListSchema,
     DeploymentSchema, AnswerSummarySchema, OpenRunSummarySchema, AnswerIndexSchema,
     SynthesisFlagSchema, SynthesisCheckHoldSchema, RemovalNoticeTakeSchema,
     AnswerSchema, InspectionSchema, NodeSchema,
@@ -1828,6 +2238,31 @@ export const contractInventory = Object.freeze({
     ShadowSuppressionSchema, AbstentionSchema, InvestigationGapSchema, InvestigationRequestSchema,
     InvestigationAcceptedSchema, ExecutionLedgerDigestSchema, ValueHingeProjectionSchema, ConditionMarkSchema, EdgeSchema,
     AnswerStorySchema, AnswerDisclosureSchema, DebateMapViewSchema, BillingPlansResponseSchema,
+    ReadingLevelStateSchema, ReadingLevelSaveRequestSchema, LastVisitSchema, LastVisitRecordRequestSchema, LastVisitRecordedSchema,
+    DigLinkRecordSchema, DigLinksSchema, DigLinkRecordRequestSchema, DigLinkRecordedSchema,
+    // Plan 2026-10-30 W1-6: the web, dig-suggestion and investigation shapes (./web.ts); no route yet.
+    WebSourceSchema, WebOtherPageSchema, WebPathSchema, AnswerWebSchema, DigSuggestionSchema, AskParentSchema,
+    DebateInvestigationSchema, ResearchedAddRequestSchema, ResearchedAddedSchema, ResearchedRefusedSchema, InvestigationCloseRequestSchema,
+    // W2-7: the dig model's rewrite and nesting shapes and the money rule's words (./web.ts); no route yet.
+    PathRewriteSchema, PathRewritesSchema, AnswerPathRewritesSchema, AnswerDigSchema, PointOfViewVerdictSchema, DigTooDeepSchema,
+    // W3-8: the two dig refusals with their own codes (./web.ts).
+    DigPicksOnePathSchema, DigFreePicksMaxSchema,
+    MonthPauseSchema, UsageBorrowSchema, RunContinueRequestSchema, RunContinuedSchema, RunContinueRefusedSchema,
+    // W5-1: the final report over an investigation (./investigation-report.ts).
+    InvestigationReportsSchema, InvestigationReportAcceptedSchema, InvestigationReopenRequestSchema, InvestigationReopenedSchema,
+    InvestigationReportWritingSchema,
+    // The owner's changes of 31 Oct (./web.ts): the shapes the Tree and Public lanes fill; no route yet.
+    PurposeLinesSchema, MainAnswerVersionSchema, AnswerMainAnswerSchema, PublicDigParentSchema, AnswerContributionSchema,
+    PublicContributionSchema, PublicMainAnswerSchema, PublicReportVersionSchema, PublicReportRequestSchema, PublicReportAcceptedSchema, PublicDebateRefusedSchema,
+    // Decision 29: dynamic step 2.
+    AskClarifyRequestSchema, AskClarifyResponseSchema,
+    // V4 start step, Task 30: the four calls before Start, their requests and what each answers (an event of a stream, or JSON).
+    StartListsRequestSchema, StartListsEventSchema, StartMergeRequestSchema, StartMergeEventSchema, StartCombineRequestSchema,
+    StartCombineResponseSchema, StartFitRequestSchema, StartFitResponseSchema,
+    // V4 start step, Task 39e: the saved-question routes' requests (the first and later saves) and answers (the list, Pick up, a save).
+    SavedQuestionCreateSchema, SavedQuestionSaveSchema, SavedQuestionListSchema, SavedQuestionReadSchema, SavedQuestionWrittenSchema,
+    // V4 start step, Task 57f: Continue's refusals of a failed debate it cannot continue, or with no room left for the rest.
+    RunNotContinuedSchema,
     BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingCheckoutRequestSchema, BillingCheckoutResponseSchema,
     BillingCheckoutPendingErrorSchema, BillingChargeStatusResponseSchema,
     BillingSubscriptionResponseSchema, BillingDowngradeRequestSchema, BillingInvoicesResponseSchema,

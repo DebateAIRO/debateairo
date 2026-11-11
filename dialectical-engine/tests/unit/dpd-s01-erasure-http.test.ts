@@ -64,11 +64,11 @@ const headers=Object.freeze({ cookie,origin:ORIGIN,"x-csrf-token":CSRF_TOKEN });
 const basePayload=Object.freeze({ confirmation:"DELETE MY ACCOUNT",step_up_grant:GRANT_TOKEN });
 const receipt=Object.freeze({
   status:"SCHEDULED",execute_at:"2026-08-31T00:00:00.000Z",
-  cancellation_ref:CANCELLATION_REF,delete_public_debates:false
+  cancellation_ref:CANCELLATION_REF
 });
 
-describe("DPD-S01 erasure HTTP choice",()=>{
-  it("R9a a body without the key schedules as base and the 202 carries delete_public_debates false",async ()=>{
+describe("R22 decision 21: the erasure route has no public-debate option",()=>{
+  it("a plain body schedules, and the 202 names no choice",async ()=>{
     const schedule=vi.fn<AccountErasureApplication["schedule"]>(erasure().schedule);
     const api=buildApi({ application:application(),sessions:sessions(),
       accountErasure:erasure({ schedule }),allowedOrigin:ORIGIN });
@@ -86,31 +86,7 @@ describe("DPD-S01 erasure HTTP choice",()=>{
     } finally { await api.close(); }
   });
 
-  it("R9b true reaches the application and the 202 echoes the stored choice",async ()=>{
-    const schedule=vi.fn<AccountErasureApplication["schedule"]>(async ()=>({
-      status:"SCHEDULED",executeAt,cancellationRef:CANCELLATION_REF,deletePublicDebates:true
-    }));
-    const api=buildApi({ application:application(),sessions:sessions(),
-      accountErasure:erasure({ schedule }),allowedOrigin:ORIGIN });
-    try {
-      const response=await api.inject({ method:"DELETE",url:"/v1/account",headers,
-        payload:{ ...basePayload,delete_public_debates:true } });
-      expect(response.statusCode).toBe(202);
-      expect(response.json()).toEqual({ ...receipt,delete_public_debates:true });
-      expect(schedule).toHaveBeenCalledWith({
-        authenticated,grantToken:GRANT_TOKEN,deletePublicDebates:true,
-        source:{ ip:"127.0.0.1",mailLocale:"en",requestId:"req-1",userAgent:"lightMyRequest" }
-      });
-      schedule.mockClear();
-      await api.inject({ method:"DELETE",url:"/v1/account",headers,
-        payload:{ ...basePayload,delete_public_debates:false } });
-      expect(Object.keys(schedule.mock.calls[0]![0]).sort()).toEqual([
-        "authenticated","grantToken","source"
-      ]);
-    } finally { await api.close(); }
-  });
-
-  it("R9c R9d a non-boolean or an unknown key gets the base malformed-body response and never reaches the application",async ()=>{
+  it("the old option, whatever its value, is the base malformed-body response and never reaches the application",async ()=>{
     const schedule=vi.fn<AccountErasureApplication["schedule"]>(erasure().schedule);
     const api=buildApi({ application:application(),sessions:sessions(),
       accountErasure:erasure({ schedule }),allowedOrigin:ORIGIN });
@@ -118,13 +94,9 @@ describe("DPD-S01 erasure HTTP choice",()=>{
       const reference=await api.inject({ method:"DELETE",url:"/v1/account",headers,
         payload:{ confirmation:"delete my account",step_up_grant:GRANT_TOKEN } });
       expect(reference.statusCode).toBe(400);
-      for (const payload of [
-        { ...basePayload,delete_public_debates:"true" },
-        { ...basePayload,delete_public_debates:1 },
-        { ...basePayload,delete_public_debates:null },
-        { ...basePayload,delete_public_debates:true,extra:1 }
-      ]) {
-        const response=await api.inject({ method:"DELETE",url:"/v1/account",headers,payload });
+      for (const value of [true,false,"true",1,null]) {
+        const response=await api.inject({ method:"DELETE",url:"/v1/account",headers,
+          payload:{ ...basePayload,delete_public_debates:value } });
         expect({ statusCode:response.statusCode,body:response.body }).toEqual({
           statusCode:reference.statusCode,body:reference.body
         });
@@ -133,16 +105,16 @@ describe("DPD-S01 erasure HTTP choice",()=>{
     } finally { await api.close(); }
   });
 
-  it("R11 GET /v1/account/erasure carries the stored choice; NONE and the cancel response are unchanged",async ()=>{
+  it("GET /v1/account/erasure names no choice; NONE and the cancel response are unchanged",async ()=>{
     const current=vi.fn<AccountErasureApplication["current"]>(async ()=>({
-      status:"DUE",executeAt,cancellationRef:CANCELLATION_REF,deletePublicDebates:true
+      status:"DUE",executeAt,cancellationRef:CANCELLATION_REF
     }));
     const api=buildApi({ application:application(),sessions:sessions(),
       accountErasure:erasure({ current }),allowedOrigin:ORIGIN });
     try {
       const status=await api.inject({ method:"GET",url:"/v1/account/erasure",headers:{ cookie } });
       expect(status.json()).toEqual({ status:"DUE",execute_at:executeAt.toISOString(),
-        cancellation_ref:CANCELLATION_REF,delete_public_debates:true });
+        cancellation_ref:CANCELLATION_REF });
       current.mockResolvedValueOnce({ status:"NONE" });
       const none=await api.inject({ method:"GET",url:"/v1/account/erasure",headers:{ cookie } });
       expect(none.json()).toEqual({ status:"NONE" });
@@ -152,27 +124,16 @@ describe("DPD-S01 erasure HTTP choice",()=>{
     } finally { await api.close(); }
   });
 
-  it("R9 R11 the application forwards the choice to the repository and maps it back",async ()=>{
+  it("the application asks the repository for no choice",async ()=>{
     const row={
       erasureId:"66666666-6666-4666-8666-666666666666",
-      status:"SCHEDULED" as const,executeAt,cancellationRef:CANCELLATION_REF,
-      deletePublicDebates:true
+      status:"SCHEDULED" as const,executeAt,cancellationRef:CANCELLATION_REF
     };
-    const repoSchedule=vi.fn(async (_input:{ deletePublicDebates?:boolean })=>row);
-    const repoCurrent=vi.fn(async (_input:unknown)=>row);
+    const repoSchedule=vi.fn(async (_input:Record<string,unknown>)=>row);
     const app=new PostgresAccountErasureApplication(
-      { schedule:repoSchedule,current:repoCurrent } as never,{} as never
+      { schedule:repoSchedule,current:vi.fn(async ()=>row) } as never,{} as never
     );
-    await expect(app.schedule({
-      authenticated,grantToken:GRANT_TOKEN,deletePublicDebates:true
-    })).resolves.toMatchObject({ deletePublicDebates:true });
-    expect(repoSchedule.mock.calls[0]![0]).toMatchObject({ deletePublicDebates:true });
-    await expect(app.schedule({ authenticated,grantToken:GRANT_TOKEN }))
-      .resolves.toMatchObject({ deletePublicDebates:true });
-    expect(repoSchedule.mock.calls[1]![0]).toMatchObject({ deletePublicDebates:false });
-    await expect(app.current(authenticated)).resolves.toMatchObject({
-      deletePublicDebates:true
-    });
-    expect(repoCurrent).toHaveBeenCalledOnce();
+    await expect(app.schedule({ authenticated,grantToken:GRANT_TOKEN })).resolves.toMatchObject({ status:"SCHEDULED" });
+    expect(Object.keys(repoSchedule.mock.calls[0]![0])).not.toContain("deletePublicDebates");
   });
 });

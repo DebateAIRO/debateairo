@@ -1534,6 +1534,24 @@ socket here, never a runtime login); the API's runtime login may only read the a
 what passed. No new environment key. Until an activation exists, every release runs on its own site version, as before;
 on this server nothing activates anything before Phase 3.
 
+### Upgrading to the daily mail limit (migration 0170)
+
+> Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
+
+Every account mail now asks one gate before it goes: is the address on the suppression list, and is there room in today's
+shared count? The count is in the database, so it survives restarts and uploads and every API copy shares it.
+
+1. **Register first.** The API refuses to start without the `outboundMailPolicy` row (`OUTBOUND_MAIL_POLICY_UNRESOLVED`). Run
+   `pnpm register:publish-hosted` from the new checkout and repin `REGISTER_VERSION` before restarting. **On the live site, add
+   `outboundMailPolicy` with `daily_limit` 10000 to the hosted file first** (`deploy/vps/register/README.md`); without it the live
+   site seals the preview's 2000.
+2. **Then the migration, then the API.** 0170 is an expand step: the release before keeps running beside it.
+3. **Alerts.** The API writes `[OUTBOUND_MAIL_ALERT]` to its journal at 50% of the limit, when ordinary mail stops (80%) and when all
+   mail stops (100%), once a day each across every copy. It also mails `OWNER_REPORT_EMAIL_PATH`'s address when billing is on. With
+   billing off, the journal line is the only alert.
+4. **Not built yet: the bounce and complaint feed.** The suppression list stays empty until reports flow back from Amazon. Until
+   then, Amazon's own account-level suppression list is what drops mail to those addresses.
+
 ### Upgrading to the Italy-specific approval (migration 0125)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
@@ -1872,7 +1890,10 @@ manifest forbids minting one a long-lived superuser credential (audit L5-F8).
 
 1. **Data recipient** — `pg_dumpall --globals-only`, then `pg_dump --format=custom debateai`, then
    a tar of the custody tree (user-DEK store including `runs/*/content-key.v1.json`, the
-   publication-key store, the audit-key store), all in one `age` envelope. DB first, keys second:
+   publication-key store, the audit-key store), all in one `age` envelope. The tar leaves out the
+   user-DEK store's own `saved-questions/` folder, the keys of questions not started yet, so that a
+   question deleted or started after a backup can never be read from it (owner answer S8 A, 5 Nov
+   2026). DB first, keys second:
    a key referenced by a dumped row is present in the later snapshot; the reverse order can leave
    a row whose key no longer exists. A dump **alone restores nothing** — every private run is
    ciphertext under keys that live outside PostgreSQL (audit L2-F3).
@@ -1919,7 +1940,8 @@ the off-host copy grow by roughly the size of every prompt sent: plan disk and r
 `backup.sh` stays the nightly backup. Before the migrations of a side-by-side upgrade (§5, step 6)
 take one more, online, while both releases' services keep running: the same three parts in the
 same order as `backup.sh` (cluster globals, the `debateai` database in custom format, then the
-custody tree), each encrypted to the same data recipient, and their sha256 sums. Nothing
+custody tree without the user-DEK store's `saved-questions/`, as above), each encrypted to the same
+data recipient, and their sha256 sums. Nothing
 unencrypted touches the disk: each part streams straight into `age`. It stays on this host, in a
 new `0700` folder under `BACKUP_DIR`, with no off-host copy, because it is a last resort for this
 upgrade only (§11 of the side-by-side spec): going back is the switch in the other direction, not
@@ -1937,7 +1959,7 @@ covers them.
   install -d -m 0700 -o root -g root "$dir"
   sudo -u postgres pg_dumpall --globals-only | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/globals.sql.age"
   sudo -u postgres pg_dump --format=custom --compress=9 debateai | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/debateai.dump.age"
-  tar -cf - -C "$(dirname "$USER_DEK_STORE_PATH")" "$(basename "$USER_DEK_STORE_PATH")" -C "$(dirname "$PUBLICATION_KEY_STORE_PATH")" "$(basename "$PUBLICATION_KEY_STORE_PATH")" -C "$(dirname "$AUDIT_KEY_STORE_PATH")" "$(basename "$AUDIT_KEY_STORE_PATH")" | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/custody.tar.age"
+  tar -cf - --exclude="$(basename "$USER_DEK_STORE_PATH")/saved-questions" -C "$(dirname "$USER_DEK_STORE_PATH")" "$(basename "$USER_DEK_STORE_PATH")" -C "$(dirname "$PUBLICATION_KEY_STORE_PATH")" "$(basename "$PUBLICATION_KEY_STORE_PATH")" -C "$(dirname "$AUDIT_KEY_STORE_PATH")" "$(basename "$AUDIT_KEY_STORE_PATH")" | age -r "$BACKUP_DATA_RECIPIENT" > "$dir/custody.tar.age"
   (cd "$dir" && sha256sum globals.sql.age debateai.dump.age custody.tar.age > SHA256SUMS)
   echo "ONLINE_BACKUP_OK $dir"
 )
@@ -1986,6 +2008,11 @@ Only then does it print `RESTORE_DRILL_OK` and drop the scratch database and dir
 running the whole drill on a **separate machine**: that exercises "the VPS is gone" rather than
 "a table was dropped". On the live host the globals are verified, not applied, unless you set
 `DRILL_APPLY_GLOBALS=true`.
+
+**A restore brings back no question not started yet.** Their keys (the user-DEK store's
+`saved-questions/`) are in no backup (owner answer S8 A, 5 Nov 2026), so after a restore each such
+question no longer opens and leaves the person's list, and the person asks it again; every debate
+keeps its key. The drill reads no question key, so it is unaffected.
 
 Record each drill: date, artefact, `core.run` count, chain totals, and the decrypt line.
 
@@ -2264,6 +2291,29 @@ Restart `debateai-api@$label` and, with `unfinished` at 0, `debateai-runner@$lab
 answer the health probe is reported ABSENT and simply does not join a panel; it does not stop the
 service.
 
+### Web search (Perplexity) on a hosted server
+
+The owner asked for the Perplexity setup to be ready on every hosted server, not only on the test site (owner answer
+Q21, 2026-10-30; plan `2026-10-30-perplexity-and-dig-map`, task W1-1). Web search is one vendor beside the AI vendors,
+but it is not a model and never a debate target: it never joins a panel and has no thinking level.
+
+- **What it is.** Perplexity's Search API: `POST https://api.perplexity.ai/search`, fast search only
+  (`search_type` `"fast"`), at **$0.001 per search**, the page text included. Perplexity reports no usage and no cost,
+  so the app counts that fixed price for every search it makes. The request and answer rules, the bounds and the price
+  are the reviewed ones in `tests/unit/fixtures/preview-search-rows.json`, the same file the test site's spending gate
+  (`deploy/preview-gate/v3/README-perplexity.md`) and the app's search adapter both follow.
+- **This host has no spending gate**, so there is no Perplexity pot here: the app's own cost limits (the cost
+  envelopes below and each person's windows) bound what searches spend, as they bound the AI calls. Set the vendor's own
+  monthly spend limit in the Perplexity console as an outside fuse.
+- **Vetting.** Perplexity is already named in the published privacy notice and terms (step 1 still applies: record the
+  date you read its API data-use and retention terms).
+- **The key.** Step 2 above, with the short name `perplexity`: both credential files (the runner's and the API's) hold
+  the `authorization` header value, that is the scheme word `Bearer`, a space and the key (it starts with `pplx-`).
+  Rotating it means replacing both files, as for every vendor.
+- **Switching it on and off.** Web search is turned on or off by the app's settings switch (owner answer Q16), never by
+  editing a file here. The member that names the search target in `runner.env` and `api.env` arrives with the app's
+  search adapter (plan task W2-1); until a release carries it, this host makes no search.
+
 ### The cost envelopes (V-28) — and the temporary values for the first paid run
 
 Every limit here is in money, enforced in code, in the hosted deployment only. Local mode spends no money and has none of them.
@@ -2277,10 +2327,10 @@ Every charged call is one row in `ledger.model_spend`, and every limit is a sum 
 
 | Row member | Value | Meaning |
 |---|---|---|
-| `per_run_ceiling_micros` | `250000` | 0.25 USD per debate |
-| `daily_ceiling_micros` | `2000000` | 2.00 USD per UTC day |
-| `serve_reserve_basis_points` | `3000` | 30% of each debate's money is kept for writing the answer |
-| `serve_overrun_basis_points` | `2000` | writing the answer may go 20% over the per-debate ceiling |
+| `per_run_ceiling_micros` | `440000` | made up: 0.44 USD per debate |
+| `daily_ceiling_micros` | `5500000` | made up: 5.50 USD per UTC day |
+| `serve_reserve_basis_points` | `3300` | made up: 33% of each debate's money is kept for writing the answer |
+| `serve_overrun_basis_points` | `2200` | made up: writing the answer may go 22% over the per-debate ceiling |
 | `admission_close_basis_points` | `9500` | from 95% of a limit, the ask page says the limit is close |
 | `finish_up_to_basis_points` | `11500` | a debate already running may take the site's day up to 115% so it can finish |
 | `waiting_line_per_person` | `1` | one question per person may wait for the reset |
@@ -2291,9 +2341,9 @@ Basis points are hundredths of a percent, so `10000` is the whole limit.
 
 The reserve and the overrun keep money for writing the answer (spec 2026-09-26 §14.4.1).
 
-- **The split.** With the values above, the calls made while a debate is argued may spend up to 70% of the per-debate ceiling (0.175 USD). The calls that write the answer may take the same debate's total up to 120% of it (0.30 USD). Both count the same running total, so the reserve is simply the part the arguing may not touch.
-- **The day must hold one debate at its maximum** (0.30 USD), or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
-- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`: 0.05 USD, with a 20% margin, 0.06 USD). The day must hold one debate AND its story, here 0.36 USD, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
+- **The split.** With the values above, the calls made while a debate is argued may spend up to 67% of the per-debate ceiling. The calls that write the answer may take the same debate's total up to 122% of it. Both count the same running total, so the reserve is simply the part the arguing may not touch.
+- **The day must hold one debate at its maximum**, or the row is refused (`COST_ENVELOPE_POLICY_INVALID`).
+- **The verdict story** has a code-owned cap that the publication seals for you (`storyCostEnvelopePolicy`). The day must hold one debate AND its story, or publishing and both services refuse (`STORY_DAILY_CEILING_INSUFFICIENT`).
 - **Every debate charge records its part** (`spend_phase` in `ledger.model_spend`: `BODY` while arguing, `SERVE` while writing the answer).
 - **A version without the two members means 0:** no money is kept back and the margin is off (go-live checklist line 12). The file format stays `debateai.hosted-register.v1`.
 
@@ -2313,7 +2363,7 @@ The last three rows switch on the budget rule of `docs/superpowers/specs/2026-09
   - From 95%, or when the question would cross 100%, the debate still starts, and the ask page says the limit is close.
   - From 100%, the question is accepted (`202`, `WAITING`) and **waits in line**. The API's 60-second waker starts it by itself at the reset, oldest first and one per person.
   - A second waiting question from the same person is refused `422 ASK_ALREADY_WAITING`, and the page names the time the first will start.
-- **While a debate runs** it is measured against real spend only, up to the **finish edge**: 115% of the site's day, 110% of a person's window.
+- **While a debate runs** it is measured against real spend only, up to the **finish edge** of the site's day (`finish_up_to_basis_points`) and of a person's window.
   - An arguing call that would cross it is retried on the debate's cheaper models first.
   - Only when none fits does the arguing stop, and the answer is still written.
   - The opening position and the answer are exempt.
@@ -2352,7 +2402,7 @@ The publish command asks the same question before anything is sealed, a dry run 
 #### Each person's windows (billing)
 
 **Do not switch `billingPolicy` on before Part 2 (plans and payments) is deployed.** Nothing in this release stops you, but with billing on now:
-- every signed-in person becomes Free: 0.20 USD of credit a month, the sealed fixed settings and the Free plan's two models;
+- every signed-in person becomes Free: the plan's monthly credit, the sealed fixed settings and the Free plan's two models;
 - there is no way to subscribe, because checkout is Part 2;
 - the "See plans" link under the full-limit sentences (Free's ends "or choose a plan to continue now") goes to `/pricing`, a page that does not exist yet.
 
@@ -2366,7 +2416,7 @@ With billing on (hosted, and a published `billingPolicy` saying `enabled: true`)
 All are in UTC, and each person sees them in their own time zone.
 
 - **The limits** come from the `billingPlans` row: the plan's monthly credit, and for paid plans a day and a week share of it. Free has its month only.
-- **A running debate may finish up to 110%** of any person window (`finish_bp` `11000`). The extra is on the site; it is not taken from the next month.
+- **A running debate may finish past a person window's limit.** On a version that sealed billingPlans v3 that is a share past any person window (`finish_bp`). Since billingPlans v4 (owner 2026-10-30) it is a fixed amount past every day, week and month limit on every plan, Free included (`finish_bp` `10000`, `finish_overflow_micros`). Every overflow is spend inside the month too, so the month's own edge holds them all; once the month is full, every new question waits for the new month. The extra is on the site; it is not taken from the next month.
 - **The server decides the ask:**
   - the plan's tier;
   - for Free, the sealed fixed gauges;
@@ -2378,7 +2428,7 @@ All are in UTC, and each person sees them in their own time zone.
   - `BILLING_PLANS_UNRESOLVED` when it seals no `billingPlans`.
 - **The publish command warns** `warning=BILLING_PLAN_WINDOW_BELOW_RUN_CEILING:<plan>` when a plan's smallest window (its day cap, or Free's whole month) is below the per-run ceiling.
   - It does not refuse: admission uses the estimate, so a small window still fits a small debate.
-  - At today's 0.25 USD per debate, Free's 0.20 USD month triggers it. Publish realistic per-run and daily ceilings before switching billing on.
+  - Publish realistic per-run and daily ceilings before switching billing on.
 - **The site's daily ceiling protects the company, not the person.** At launch it must be at least the expected daily spend of all subscribers: subscribers × each plan's day cap × 0.3, or better, the measured figure.
 
 #### The provisional values
@@ -2455,7 +2505,7 @@ journalctl -u 'debateai-runner@*' --since today -o cat | grep -E 'DEBATEAI_SERVE
 | `"kind":"DEBATEAI_STORY"`, `"event":"STORY_PACK_INVALID"`, with `reason` (once, when the runner starts) | The story shapes (`story-shapes/`, or the directory `DEBATEAI_STORY_SHAPES_DIR` names) broke a rule or could not be read. `reason` names the rule, for example `STORY_PACK_DIR_UNRESOLVED`. The runner starts anyway, but every story is then stored as failed (`STORY_PACK_INVALID`) and the pages show the answer without one. | Fix the files or the variable, then restart the runner. |
 | `"event":"STORY_POLICY_UNREADABLE"`, with `code` (once, when the runner starts) | The register version pinned by `REGISTER_VERSION` holds the story's rows only in part, or malformed. Every story is then stored as failed with `STORY_NOT_CONFIGURED`. | Publish a new register version (the publication seals the story's code-owned rows whole) and pin it (§5 "A new register version is a new release"). |
 | `"event":"STORY_STORED"` with `"failureCode":"STORY_NOT_CONFIGURED"` (per debate) | The pinned register version has no story rows at all, as with every version published before the verdict story. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals them. No model is called for the story, and the pages show the answer without one. | Publish once and pin the new version: a new release (§5 "A new register version is a new release"). |
-| `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap (0.05 USD, or 0.06 with its margin) could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
+| `"event":"STORY_LOOP_FAILED"` or `"STORY_STORED"` with `"failureCode":"STORY_ENVELOPE_EXHAUSTED"` (per debate) | The story's own money cap could not pay for a call on any of the debate's models. **This is expected at premium prices**: the storyteller's output bound of 12,000 tokens can cost more than the whole cap. The answer is untouched, and the page shows it without a story. | Nothing, unless every story fails this way. The cap is a code-owned row, so changing it is a code change and a new publish. |
 | `"kind":"DEBATEAI_BODY_COST_FALLBACK"`, `"event":"RUN_COST_SUBSTITUTION_WRITE_FAILED"`, with `code`, `sqlState`, `runId`, `callSiteKey` | An arguing call was moved to one of the debate's cheaper models (the `runner.body.cheaper_model` line just before it), and the owner's record of that move (`core.run_cost_substitution`) could not be written. The debate is exactly what it would have been. What is lost is that one row, so the operator's run report and the owner's read do not show that move. | Nothing writes the row later. A typed `code` is a defect to report. `UNTYPED` with a `sqlState` is the database refusing or a lost connection. More than one in a day is worth investigating. |
 | `{"kind":"DEBATEAI_PERSON_WALL","event":"PLANS_UNRESOLVED"}` (once, when the runner starts) | The pinned register version has a `costEnvelopePolicy` row but no `billingPlans` row, so the runner cannot read a person's windows. A debate pinned to a person (billing on at the API) would then have every walled arguing call refused as that person's month: the arguing stops and the answer is still written. A debate with no person pin, which is every debate while billing is off, is untouched. **This is expected on this host until the next hosted publish** (`pnpm register:publish-hosted`, below), which seals the engine's own billing rows (billing off). | While billing is off: nothing; it stops once you publish and pin the new version (a new release, §5 "A new register version is a new release"). After billing is switched on it means the API and the runner are on different register versions, which one release's overlays never allow: check that both overlays of the current release name the same `REGISTER_VERSION`. |
 | `"kind":"DEBATEAI_POINT_INVESTIGATION"`, `"event":"INVESTIGATION_UNAVAILABLE"`, with `runId`, `callSiteKey`, `code` (engine 2 only: never while no register version carries the engine row) | Written once per investigation that ended unavailable: one more AI was to look into a point a reviewer could not assess, and no usable answer came back (the call failed or was refused, the money stopped it, or `code` `INVESTIGATOR_SEAT_UNPLANNED`: no investigator was planned). `code` is the error's code or class name, never AI or vendor text. The point keeps its reduced "cannot assess" weight and the debate goes on; the investigation's record says unavailable. | A single one: nothing. Many in a day: read the vendor's status and the runner's other lines from the same minutes. |
@@ -2514,10 +2564,10 @@ to look for:
 |---|---|---|
 | "Something went wrong on our side before this debate began. Please ask again." | `NOT_STARTED` | `RUN_SETUP_FAILED:<step>`, every step but `PLAN_CHANGED` and `CHOICE_UNAVAILABLE` (see their rows), `RELEASE_NOT_SERVED` (side-by-side uploads: the release that took the question no longer serves it) and `READMISSION` (a waiting question's re-admission under a new release broke after its new run was made) included, and `RUN_ROLE_ASSIGNMENT_INVALID` (the runner, claiming the debate, found the model scorecard's role assignment pinned at the ask corrupt or unable to seat a debate; its job catch then overwrites it with `RUNNER_EXECUTION_FAILED:RUN_ROLE_ASSIGNMENT_INVALID`, and both forms read the same), and `RUN_ROLE_ROTATION_INVALID` (the same claim-time refusal for the role rotation pinned at the ask: unreadable, beside a scorecard assignment, or naming a model outside the debate's panel; both forms read the same) |
 | "Your paid plan ended or was paused while this question waited, so the debate didn't start. You can ask it again." | `PLAN_ENDED` | `RUN_SETUP_FAILED:PLAN_CHANGED` only, the whole code (see the row above): not a fault. With billing on, a paid question waited in line, and by the time there was room its owner was on Free, because the plan ended, was withdrawn or erased, or was paused by a card dispute. Nothing to do; the owner can ask again under the plan they have now. Every other `RUN_SETUP_FAILED:<step>` reads `NOT_STARTED`, except `CHOICE_UNAVAILABLE` (the next row). |
-| "The site was updated while your question waited, and one of the options you chose is no longer offered. Please ask it again. It did not use any of your allowance." | `CHOICE_GONE` | `RUN_SETUP_FAILED:CHOICE_UNAVAILABLE` only, the whole code: not a fault. Side-by-side uploads: a question waiting in line was re-admitted under a new release that no longer offers one of the choices it was asked with (a model, a depth, a length), so the old question is closed and nothing was charged (the waiver). The owner asks again. |
+| "The site was updated while your question waited, and one of the options you chose is no longer offered. Please ask it again. It did not use any of your quota." | `CHOICE_GONE` | `RUN_SETUP_FAILED:CHOICE_UNAVAILABLE` only, the whole code: not a fault. Side-by-side uploads: a question waiting in line was re-admitted under a new release that no longer offers one of the choices it was asked with (a model, a depth, a length), so the old question is closed and nothing was charged (the waiver). The owner asks again. |
 | "This debate could not start because the AI models it needs were unavailable. Please try again in a while." | `MODELS_UNAVAILABLE` | `RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM`, `SYNTHESIS_ROLE_PROVIDER_ABSENT_AT_CLAIM:<role>`. The runner writes these first, then its job catch overwrites them with `RUNNER_EXECUTION_FAILED:<the same code>` (the role is lost there). Both forms read the same. |
 | "This debate reached its limit before it could produce an answer." | `RUN_LIMIT_REACHED` | `RUNNER_EXECUTION_FAILED:RUN_CEILING_BELOW_FIRST_CALL` (see the row above) |
-| "We could not finish this debate because of an update on our side. It did not use your allowance. Please ask your question again." | `SET_ASIDE` | `RUN_SET_ASIDE:<reason>`, any reason (as written; a wrapped `RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason>` would read the same, but the runner writes none today): not a fault. Side-by-side uploads: the debate was set aside because of an upload, and each one has a spend waiver (`ledger.model_spend_waiver`) with the same reason, written with its FAILED row, so it used none of the person's allowance (the site's day total still counts the money). `RUN_SET_ASIDE:BACKSTOP` (waiver `BACKSTOP`: the old release's runner, told to retire (the backstop, 7.5 hours after the switch), set aside what it still had open), `RUN_SET_ASIDE:RELEASE_NOT_SERVED` (waiver `RELEASE_NOT_SERVED`: no runner serves the release the debate belongs to), `RUN_SET_ASIDE:OWNER_STOPPED` (waiver `OWNER_STOPPED`: the owner stopped it), `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` (waiver `SETTINGS_VERSION_UNSUPPORTED`: its settings version is one this release cannot run. Settings changes without an upload (side-by-side §13): the runner takes the debate's claim, sets it aside with its waiver before any AI call, and prints one `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED` journal line with the run id, the settings version and the check that refused it (`code`); the task's catch writes nothing over it, so it never reads `RUNNER_EXECUTION_FAILED:…`). A waiting question the API could not send, `RUN_SETUP_FAILED:RELEASE_NOT_SERVED`, never began and reads `NOT_STARTED`. The owner asks again. |
+| "We could not finish this debate because of an update on our side. It did not use your quota. Please ask your question again." | `SET_ASIDE` | `RUN_SET_ASIDE:<reason>`, any reason (as written; a wrapped `RUNNER_EXECUTION_FAILED:RUN_SET_ASIDE:<reason>` would read the same, but the runner writes none today): not a fault. Side-by-side uploads: the debate was set aside because of an upload, and each one has a spend waiver (`ledger.model_spend_waiver`) with the same reason, written with its FAILED row, so it used none of the person's allowance (the site's day total still counts the money). `RUN_SET_ASIDE:BACKSTOP` (waiver `BACKSTOP`: the old release's runner, told to retire (the backstop, 7.5 hours after the switch), set aside what it still had open), `RUN_SET_ASIDE:RELEASE_NOT_SERVED` (waiver `RELEASE_NOT_SERVED`: no runner serves the release the debate belongs to), `RUN_SET_ASIDE:OWNER_STOPPED` (waiver `OWNER_STOPPED`: the owner stopped it), `RUN_SET_ASIDE:SETTINGS_VERSION_UNSUPPORTED` (waiver `SETTINGS_VERSION_UNSUPPORTED`: its settings version is one this release cannot run. Settings changes without an upload (side-by-side §13): the runner takes the debate's claim, sets it aside with its waiver before any AI call, and prints one `DEBATEAI_RUNNER_SETTINGS_UNSUPPORTED` journal line with the run id, the settings version and the check that refused it (`code`); the task's catch writes nothing over it, so it never reads `RUNNER_EXECUTION_FAILED:…`). A waiting question the API could not send, `RUN_SETUP_FAILED:RELEASE_NOT_SERVED`, never began and reads `NOT_STARTED`. The owner asks again. |
 | "This debate stopped partway because of a problem on our side. Please ask your question again." | `STOPPED` | Everything else: `CALL_BUDGET_EXHAUSTED` (a re-claim found a step's tries already used up), `RUNNER_EXECUTION_FAILED:RUNNER_TIME_LIMIT_REACHED` (the debate was stopped at its next model call because no call had finished for 60 minutes, or it had run past its six-hour ceiling; owner ruling 2026-10-11), `DAILY_COST_ENVELOPE_REACHED` and `PERSON_ALLOWANCE_REACHED` (with the budget members published they stop only the arguing and never end a debate; a question the day holds back waits in line, and its page says when it will start), every other `RUNNER_EXECUTION_FAILED:<diagnostic>`, older codes, and any code the table does not know |
 
 A code added to the engine lands in `STOPPED` until it is given a group of its own. The UI's test
@@ -2536,6 +2586,7 @@ version must carry, besides the algorithm's own rows:
 | `costEnvelopePolicy` | both services refuse: `COST_ENVELOPE_POLICY_UNRESOLVED` |
 | `publicationCheckPolicy` | the API refuses: `PUBLICATION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the publication-check deadline release on carries it (the code-owned 60000 ms, or the file's member); a version sealed before that release does not |
 | `questionCheckPolicy` | the API refuses: `QUESTION_CHECK_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from S04's release on carries it (the code-owned 15000 ms, or the file's member); a version sealed before that release does not |
+| `outboundMailPolicy` | the API refuses: `OUTBOUND_MAIL_POLICY_UNRESOLVED`. Every version `pnpm register:publish-hosted` seals from the mail limit's release on carries it (the code-owned 2000 a day, or the file's member); a version sealed before it does not, so publish first and repin `REGISTER_VERSION` before restarting on that release |
 | `billingPlans`, `billingPolicy` | optional: without them in the file, the engine's own rows are sealed (billing OFF); a file that supplies either supersedes it, and a version with `enabled: true` also needs `billingPlans` and the three budget members of `costEnvelopePolicy` |
 | `answerRoleRotationPolicy` | optional: without it the engine keeps its fixed roles. The file's `answerRoleRotation` member seals it (`"Upgrading to role rotation"` below); the API reads it at start-up, and a malformed row refuses the boot (`ANSWER_ROLE_ROTATION_POLICY_INVALID`) |
 | `lengthGuidancePolicy` | optional: without it every request keeps today's bytes; the API reads it at start-up, and a malformed row refuses the boot (`LENGTH_GUIDANCE_POLICY_INVALID:<path>`) |
@@ -2596,13 +2647,17 @@ vendor, the real ceilings after the owner's first paid run — opens a migrator 
 | `PROVIDER_TARGET_LOOPBACK_REFUSED:` / `PROVIDER_BASE_URL_TLS_REQUIRED:` / `PROVIDER_INLINE_CREDENTIAL_REFUSED:` + ref | a relay, a local or private address, cleartext, or a credential written into the file |
 | `PROVIDER_VENDOR_NOT_VETTED:` + ref | the vendor's V-9(4) record is missing or incomplete |
 | `COST_ENVELOPE_POLICY_INVALID` | the ceilings are not whole micro-units; the daily ceiling is below the per-run one plus the answer's overrun; or `serve_reserve_basis_points` is not a whole number from 0 to 9999, or `serve_overrun_basis_points` not one from 0 to 10000; or the budget rule's three members are not all present or all absent, or one is out of range (`admission_close_basis_points` from 5000 to 10000, `finish_up_to_basis_points` from 10000 to 20000, `waiting_line_per_person` from 1 to 10) |
-| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin, 0.06 USD); raise `daily_ceiling_micros` |
+| `STORY_DAILY_CEILING_INSUFFICIENT` | the daily ceiling holds one debate but not its verdict story too (the story's code-owned cap and margin); raise `daily_ceiling_micros` |
 | `RUN_CEILING_BELOW_ONE_CALL` | with the budget rule's three members in `costEnvelopePolicy`, the arguing ceiling cannot pay for the opening position's call at the cheapest price among one plan's models, priced on `providerTargets` (the start-up check, "The boot check" under the cost envelopes above); raise `per_run_ceiling_micros` or lower `serve_reserve_basis_points` |
+| `HOSTED_REGISTER_ROW_MISSING:billingPlans` / `HOSTED_REGISTER_ROW_MISSING:abuseLimits` | R22 decision 18: the code holds only made-up limits, so the file must carry the real ones. Add the member (`deploy/vps/register/README.md`); keep the file on the server, never in the repository |
+| `HOSTED_REGISTER_BILLING_PLANS_MADE_UP` | billing is on and a plan still has a monthly credit of the code's made-up row, as a copy of the example does: put your real limits in the file |
+| `ABUSE_LIMITS_INVALID` / `ABUSE_LIMITS_UNRESOLVED` | the `abuseLimits` member is malformed, or the API's register version has no such row, so the API refuses to start: publish a version from a file that carries it |
 | `BILLING_PLANS_INVALID` / `BILLING_POLICY_INVALID` | a billing row in the file is not the register's shape: prices in whole cents, plans FREE, PLUS, PRO, MAX in price order; the policy is strict (no payment environment, no owner address: the environment follows `NETOPIA_API_BASE_URL`) |
 | `BILLING_REQUIRES_ENVELOPE_MEMBERS` / `BILLING_PLANS_UNRESOLVED` | billing is switched on without the three budget members in `costEnvelopePolicy`, or without plans |
 | `ASK_ROOM_ADMISSION_UNSEALED` | the file seals the band (the budget rule's three members in `costEnvelopePolicy`) without `askRoomReads`, the room read's budget. Refused by the plan (a dry run included), by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ASK_ROOM_ADMISSION_UNSEALED`, and when the API starts. Add `askRoomReads` to the same file (go-live line 13, "Publishing them" under the cost envelopes above) |
 | `PUBLICATION_CHECK_POLICY_INVALID` | the file's optional `publicationCheckPolicy` is not `{"kind": "PUBLICATION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 60000, or the member is `null` |
 | `QUESTION_CHECK_POLICY_INVALID` | the file's optional `questionCheckPolicy` is not `{"kind": "QUESTION_CHECK_POLICY", "deadline_ms": N}` with N whole milliseconds from 1000 to 15000, or the member is `null` |
+| `OUTBOUND_MAIL_POLICY_INVALID` | the file's optional `outboundMailPolicy` is not `{"kind": "OUTBOUND_MAIL_POLICY", "daily_limit": N, "reserved_for_security_pct": P, "alert_at_pct": A}` within its bounds, leaves no room for one ordinary mail, or the member is `null` |
 | `HOSTED_REGISTER_ROLE_ROTATION_INVALID` | the file's optional `answerRoleRotation` (role rotation, spec 2026-10-11) is not exactly `{"enabled": true}` or `{"enabled": false}`: another member, a value that is not `true` or `false`, or the member is `null`. Nothing is sealed |
 | `ANSWER_ROLE_ROTATION_POLICY_INVALID` | the sealed `answerRoleRotationPolicy` row does not parse (a hand-made or damaged row). Refused by the publish's boot check as `HOSTED_REGISTER_BOOT_CHECK_FAILED:ANSWER_ROLE_ROTATION_POLICY_INVALID`, and the API refuses to start on that version: pin nothing, publish a corrected file |
 | `HOSTED_REGISTER_DEBATE_SHAPE_INVALID` | the file's optional `debateShapePolicy` is not an object, carries `kind`, or the register's own parser refuses it (a size outside its bounds, a missing plan, an unknown field). Nothing was sealed. |
@@ -2628,7 +2683,7 @@ Before restarting anything on a new version, check that the newest version carri
 rows a hosted start-up refuses without:
 
 ```sh
-sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
+sudo -u postgres psql -d debateai -c "SELECT register_version, row_key FROM register.register_row WHERE register_version = (SELECT max(register_version) FROM register.register_row) AND row_key IN ('outboundMailPolicy', 'costEnvelopePolicy', 'admissionPolicy', 'configuredProviderSet', 'publicationCheckPolicy', 'questionCheckPolicy') ORDER BY row_key"
 ```
 
 Five rows is the pass. Then make that version a new release (§5 "A new register version is a new release").
@@ -3183,7 +3238,8 @@ on every billing page, with the exact text "IP Geolocation by DB-IP", linking to
 
 The hosted register file (§11) has four billing members:
 
-- `billingPlans`: the prices and monthly credits;
+- `billingPlans`: the prices and monthly credits. Required (R22 decision 18): the real limits live only in your file on
+  the server;
 - `billingPolicy`: `enabled`, the retry days and the withdrawal days. Never shorten `dunning_retry_days` while any plan
   is PAST_DUE (a spent dunning then ends at once, before the retry date its last email promised);
 - `countryPolicy`: each country's two switches (left out, that version has no country gate at all, and billing
@@ -3191,7 +3247,8 @@ The hosted register file (§11) has four billing members:
 - `taxAuthorities`: where each tax is paid, for the summary.
 
 The kit's example (`deploy/vps/register/hosted-register.example.json`) carries `billingPlans` and `billingPolicy`
-with the spec's values and billing **off**: copy those two into `/etc/debateai/register/hosted-register.json`. It
+with made-up limits and billing **off**: copy those two into `/etc/debateai/register/hosted-register.json` and write your
+real limits over the made-up ones. It
 also carries `taxAuthorities`, equal to the code-owned text; copy that member only to correct the text (the register
 README's `taxAuthorities` row says what carrying it costs). `countryPolicy` is not in that example: it lives in
 `deploy/vps/register/country-policy.example.json`, and goes into the hosted file only once every condition of §5
@@ -3332,6 +3389,8 @@ People there can sign up and use Free; only paying is refused. To open one:
    only; deleting its entry opens it for them too.)
 3. Publish as in §14.4. The new version replaces the old one; a sealed version is never edited.
 
+Tennessee (`US-TN`, reason `TERMS_EXCLUDED`) is not a tax region: the Terms exclude it. Keep its entry while they do.
+
 The publish refuses a region id the code does not know, and a region entry with `signup` or `blocked`: a region
 never closes sign-up.
 
@@ -3420,7 +3479,7 @@ version the person accepted from there, even after the Terms change. The site li
 
 **Switching billing on.** Before this, make sure:
 
-- every row of the go-live checklist from 13 to 75 is proven (its last column holds the proof), the void rows (20, 40
+- every row of the go-live checklist from 13 to 77 is proven (its last column holds the proof), the void rows (20, 40
   and 46) excepted. Some proofs can be read only after the switch-on: they are proven right after it, and their Proof
   cells are filled then. These are parts of four rows' "How to prove it" cells: row 17, the footer of `/pricing` on the
   live site; row 18, the API's start with billing on; row 19, the first real payment's message; row 23, the check run
@@ -3953,6 +4012,7 @@ signals that matter:
 | `"event":"billing.payment.owner_review"`, with `state` | A payment was handed to you, and you got O3. `state` names NETOPIA's state. For `UNCLEAR`, nothing was recorded on the charge. (A lost dispute, status 10, writes `billing.chargeback.lost` instead.) | Do what the O3 says: look the payment up in NETOPIA's admin, then record what happened with the owner commands this section names. |
 | `"event":"billing.setting.retired"`, with `key` | At its start the API found a setting of the previous card processor in `api.env` (`key` names it; its value is never printed). The API ignores it and starts normally. | Delete that line from `/etc/debateai/api.env`, and the key file it named if there is one, then restart `debateai-api` at a quiet moment. |
 | `"event":"billing.quote.refused"`, with `code` `TAX_SERVICE_REFUSED` and `reason` | The tax service (Quaderno) refused to price a purchase. That is not an outage: most often the Quaderno key is wrong or revoked (`reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403`), or Quaderno rejects the request (`QUADERNO_HTTP_422`). The person is told to try again in a minute, and nothing is charged. The same event with `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; with any other code it is one person's own refusal (for example `ALREADY_SUBSCRIBED` or `TAX_ID_INVALID`). | `TAX_SERVICE_REFUSED`: every purchase fails until it is fixed. Check the Quaderno key file and the Quaderno account at once; fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. |
+| `"event":"billing.plans.tax_unavailable"`, with `country`, `code` and sometimes `reason` | The plans list (`/pricing` and the landing's price line) could not price one place's tax (a country, and in the US and Canada a postal code, which the line never names), so visitors from that place see no price at all ("The plans can't be shown right now") instead of the total with their tax that Terms §12 promises; a price before tax is never shown. `code` `TAX_SERVICE_UNAVAILABLE` is an outage of the tax service; `TAX_SERVICE_REFUSED` with `reason` `QUADERNO_HTTP_401` or `QUADERNO_HTTP_403` is a wrong or revoked Quaderno key; `TAX_ANSWER_MISMATCH` is an answer that was not the plan's net price in that country's currency. At most one line per place a minute; the last good answer stays on the cards meanwhile. | `TAX_SERVICE_REFUSED`: as for `billing.quote.refused` above, check the Quaderno key file and account at once, fix the key and restart `debateai-api`. `TAX_SERVICE_UNAVAILABLE`: nothing, unless it lasts; then check Quaderno's status page. `TAX_ANSWER_MISMATCH` again and again for a country: check that country's currency in the register's `currency_by_country` against what Quaderno answers for it. |
 | `"event":"billing.invoice.unknown"`, with `issuer`, `kind` and `code` | A legal document the site could not settle itself. `INVOICE_UNKNOWN`: SmartBill did not say whether it issued a Romanian invoice or credit note, and cannot be asked afterwards, so it may exist. `CREDIT_NOTE_MANUAL`: a credit note the site cannot issue itself (a second refund of one sale, or a refund made in NETOPIA's admin whose amount the site does not know). The owner summary lists it under "Invoices and credit notes to check by hand". | `INVOICE_UNKNOWN`: look in SmartBill the same day, because a Romanian document must reach e-Factura in time (your accountant knows the deadline). If it was issued, record it with `pnpm billing:invoice --record`; if not, re-queue it with `--requeue --confirm-not-issued` (**An invoice, a credit note or an email that was never sent**, below). `CREDIT_NOTE_MANUAL`: issue it by hand in SmartBill or Quaderno and record it with `--record`; for a `DASHBOARD_REFUND` line, record it with `--record` and the amount you refunded, `--amount` (**An invoice, a credit note or an email that was never sent**, below). |
 | `"event":"billing.payment.mismatch"`, with `code` or `chargeKind` | A payment check found a payment that does not match its charge, so nothing was recorded and nothing moved: `PAYMENT_AMOUNT_MISMATCH` (the amount or the currency NETOPIA reports differs from the charge's) or `PAYMENT_CUSTOMER_MISMATCH` (NETOPIA echoes another client id than our customer's). The card **is** charged, and nothing refunds it by itself. The check ends there (a `billing.outbox.dead` line with the same code) and you get O3. | Look the payment up in NETOPIA's admin by the charge reference the O3 names (it is NETOPIA's order id) and, if no plan was given for it, refund it there by hand. Report every such line: a mismatch on every first payment means NETOPIA reports amounts differently than the site reads them; stop sales (**Stopping sales, and switching billing off**, above) and report it at once. |
 | `"event":"billing.chargeback"`, with `chargeKind` | NETOPIA reported a card dispute (status 9, 10 or 16) on a payment, and the site recorded it. For status 9 or 16, an active or past-due plan is paused (`SUSPENDED`): its paid features stop, and the person gets an email (M10). For status 10 (a lost dispute), the plan ends at once (see `billing.chargeback.lost`). With `code` `DUPLICATE_PAYMENT`, the dispute is on a payment that bought nothing (a second or refused payment of the same person, a card check, or a payment the site never saw paid), which never changes the plan. | For status 9 or 16: when NETOPIA tells you the outcome, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above). For status 10: nothing. |
@@ -4146,9 +4206,10 @@ real accounts, and destroy it at the end (step 8). It needs its own:
   (`HOSTED_REGISTER_BOOT_CHECK_FAILED:BILLING_CONFIGURATION_INCOMPLETE`, §14.8), and the server cannot start billing.
   Whether §5's four conditions for that member ("Country data") must hold on a throwaway server that only you use is
   your call; they do hold for the live site. Steps 1–5 buy as a buyer in the United States, and step 4's withdrawal is
-  open only to a country in `billingPolicy`'s `withdrawal_countries` (the EU, the EEA and the UK, none of which pays in
-  USD), so in the version you publish on this server only, add `"US"` to `withdrawal_countries`; never on the live
-  host.
+  open only to a country in `billingPolicy`'s `withdrawal_countries`. Since the owner's decision of 10 November 2026
+  everyone the site serves gets the 14 days, so the code-owned list already names `"US"`: change nothing, on this
+  server or the live host. If your hosted file carries its own `billingPolicy`, its `withdrawal_countries` must name
+  every country the site serves, or the publish refuses it (`BILLING_POLICY_INVALID`).
 
 The API refuses to start with `BILLING_STAGE_LIVE_INVOICER_REFUSED` if a sandbox NETOPIA address sits beside anything
 but Quaderno's sandbox and a `.invalid` SmartBill address. Fill in the company's CUI first (§14.7): the sandbox server
@@ -4183,12 +4244,12 @@ journalctl --no-pager -u debateai-api@$label _SYSTEMD_INVOCATION_ID="$(systemctl
 price list and whose `pay` is on in `deploy/vps/register/country-policy.example.json`. Pick the United States as your
 country, answer the "Do you live in …" question with yes, and give a state in the billing details. The invoice goes to
 Quaderno's sandbox. NETOPIA's sandbox may refuse EUR and RON until the settlement form is signed, so the EUR and RON
-payments come later, in step 7. Step 4's withdrawal needs the `"US"` you added to `withdrawal_countries` in this
-server's register version (above). The Romanian path (SmartBill, the attached
+payments come later, in step 7. Step 4's withdrawal needs `"US"` in `withdrawal_countries`, which the code-owned
+list has carried since 10 November 2026 (above). The Romanian path (SmartBill, the attached
 PDF) is proven only by the fake stack in step 6 and by the SmartBill contract tests, never in this run. For go-live row
 74, ask once for a quote as a Romanian buyer and do not pay: on a fresh test account choose Plus, pick Romania, confirm
 it, fill in a Romanian address, write down the total the page shows in lei (Quaderno's sandbox calculation in RON), and
-leave without pressing **Continue to payment**.
+leave without pressing **Subscribe and pay**.
 
 **The stage clock only ever goes up.** Step 2 sets `BILLING_STAGE_CLOCK_OFFSET_DAYS=31`, and it stays at 31 through
 steps 3, 4 and 5 (to see a second renewal, raise it to 62; never lower it or remove it during the run). While it is
@@ -4203,7 +4264,7 @@ it (step 8). A host must never go live holding rows written on a moved clock; a 
 dated ahead (`BILLING_RECORDS_DATED_AHEAD`, §14.8).
 
 1. **Pay.** Sign up from the pricing page, choose Plus, pick the United States as your country, confirm it, fill in the
-   billing details, and press **Continue to payment**. On NETOPIA's sandbox page pay with the test card
+   billing details, and press **Subscribe and pay**. On NETOPIA's sandbox page pay with the test card
    9900 0048 1022 5098 (any future expiry, CVV 111).
    - Expect: you come back to the site, the plan is active within seconds, and the confirmation (M1) and receipt (M2)
      emails arrive. Settings shows the saved card.

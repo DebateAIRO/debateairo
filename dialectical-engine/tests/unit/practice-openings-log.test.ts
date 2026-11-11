@@ -144,6 +144,25 @@ describe("practice openings: openings.jsonl", () => {
     expect(long!.replyText).toContain("bytes left out");
   });
 
+  it("item 0 (9 Nov): a call's first refused reply is redacted and capped on disk as its reply text is, its issues key-shape blanked", () => {
+    const folder = fresh();
+    const key = "sk-ant-api03-ABCDEFGH12345678";
+    const log = OpeningsLog.create(folder);
+    log.append(start);
+    log.append({ kind: "call", call: call({ status: "REPAIRED", replyForm: "PATCH", firstRefused: { attempt: 0, callSiteKey: "MAP:list:0",
+      parseStatus: "SCHEMA_FAILED", replyForm: "ORIGINAL", finishReason: "stop", issues: ["too_big@points.0.claim", `odd ${key}`],
+      replyText: `first ${key} ${"word ".repeat(40_000)}` } }) });
+    log.close();
+    const text = readFileSync(join(folder, OPENINGS_FILE), "utf8");
+    expect(text).not.toContain(key);
+    const [written] = readOpeningsLog(folder).flatMap((line) => (line.kind === "call" ? [line.call] : []));
+    const refused = written!.firstRefused!;
+    expect(refused.replyText).toContain("first [REDACTED:vendor-key]");
+    expect(Buffer.byteLength(refused.replyText, "utf8")).toBeLessThanOrEqual(64 * 1024);
+    expect(reportableReplyText(refused.replyText)).toBe(refused.replyText);
+    expect(refused.issues).toEqual(["too_big@points.0.claim", "odd [REDACTED:vendor-key]"]);
+  });
+
   it("an arm line's map is redacted on disk: a key-shaped string anywhere in the model-written map is blanked, ordinary text stays", () => {
     const folder = fresh();
     const key = "sk-ant-api03-ABCDEFGH12345678";
@@ -208,7 +227,7 @@ describe("practice openings: the report", () => {
       { kind: "call", call: callFailed }, { kind: "call", call: formatFailed }, end]);
     expect((report.failures as readonly unknown[]).length).toBe(3);
     expect(reportMarkdown(report)).toContain("Wrong-format or failed calls: 3 (the exact problems are in report.json; "
-      + "reply text only for calls whose format never passed).");
+      + "reply text only for calls whose format never passed, and each one's first refused reply with its issues).");
   });
 
   it("report.md says what the openings failures hold: the openings wording, not the formats one", () => {
@@ -218,7 +237,7 @@ describe("practice openings: the report", () => {
       attempts: [{ callSiteKey: "MAP:merge", outcome: "FAILED", parseStatus: "SCHEMA_FAILED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" }] });
     const markdown = reportMarkdown(openingsReportFromLog([start, { kind: "call", call: callFailed }, { kind: "call", call: formatFailed }, end]));
     expect(markdown).toContain("Wrong-format or failed calls: 2 (the exact problems are in report.json; "
-      + "reply text only for calls whose format never passed).");
+      + "reply text only for calls whose format never passed, and each one's first refused reply with its issues).");
     expect(markdown).not.toContain("their text and the exact problems are in report.json");
   });
 
@@ -253,6 +272,32 @@ describe("practice openings: the report", () => {
     expect(failure!.replyText).not.toContain(key);
     expect(failure!.replyText).toContain("[REDACTED:vendor-key]");
     expect(reportableReplyText(failure!.replyText!)).toBe(failure!.replyText);
+  });
+
+  it("item 0 (9 Nov): report.json's failures keep each slipped call's first refused reply and its issues, redacted even from memory", () => {
+    const key = "sk-ant-api03-ABCDEFGH12345678";
+    const first = { attempt: 0, callSiteKey: "MAP:list:0", parseStatus: "SCHEMA_FAILED" as const, replyForm: "ORIGINAL" as const,
+      finishReason: "stop", issues: ["too_big@points.0.claim"], replyText: `FIRST-REFUSED ${key}` };
+    const repaired = call({ model: "m-2", order: 3, status: "REPAIRED", replyForm: "PATCH", replyText: "MERGED-REPLY", firstRefused: first,
+      attempts: [
+        { callSiteKey: "MAP:list:0", outcome: "FAILED", parseStatus: "SCHEMA_FAILED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" },
+        { callSiteKey: "MAP:list:0", outcome: "OK", parseStatus: "PARSED", latencyMs: 900, jsonRepair: null, replyForm: "PATCH" }] });
+    // A cut-off reply that read as JSON but was refused (its try FAILED, its parse PARSED) is a slip too.
+    const cutOff = call({ model: "m-1", order: 4, status: "REPAIRED", replyForm: "ORIGINAL", firstRefused: { ...first, parseStatus: "PARSED",
+      finishReason: "length", issues: [], replyText: "CUT-OFF" }, attempts: [
+      { callSiteKey: "MAP:list:0", outcome: "FAILED", parseStatus: "PARSED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" },
+      { callSiteKey: "MAP:list:0", outcome: "OK", parseStatus: "PARSED", latencyMs: 900, jsonRepair: null, replyForm: "ORIGINAL" }] });
+    const report = openingsReportFromLog([start, { kind: "call", call: call({ firstRefused: null }) }, { kind: "call", call: repaired },
+      { kind: "call", call: cutOff }, end]);
+    const failures = report.failures as readonly OpeningsCall[];
+    expect(failures.map((failure) => [failure.order, failure.replyText, failure.firstRefused?.issues, failure.firstRefused?.parseStatus]))
+      .toEqual([[3, null, ["too_big@points.0.claim"], "SCHEMA_FAILED"], [4, null, [], "PARSED"]]);
+    expect(failures[0]!.firstRefused!.replyText).toBe("FIRST-REFUSED [REDACTED:vendor-key]");
+    expect(JSON.stringify(report)).not.toContain(key);
+    expect(JSON.stringify(report)).not.toContain("MERGED-REPLY");
+    expect(reportMarkdown(report)).toContain("Wrong-format or failed calls: 2 (the exact problems are in report.json; "
+      + "reply text only for calls whose format never passed, and each one's first refused reply with its issues).");
+    expect(reportMarkdown(report)).not.toContain("FIRST-REFUSED");
   });
 
   it("is ABORTED when the run did not reach its end", () => {

@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Không thể tạo cuộc tranh luận",
   "newDebate.sessionReadFailed": "Không thể đọc phiên",
   "newDebate.planRosterFailed": "Không thể đọc danh sách gói",
-  "newDebate.checkingSession": "Đang kiểm tra phiên…",
+  "newDebate.checkingSession": "Xin chờ một chút…",
   "newDebate.redirectingToSignIn": "Đang chuyển bạn đến trang đăng nhập…",
   "newDebate.continueToSignIn": "Tiếp tục đăng nhập",
   "newDebate.defaultUnavailable": "Bản triển khai không có hàng mức rủi ro hợp lệ; hệ thống đang chờ dữ liệu để xác định mức rủi ro.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Bạn đã đạt giới hạn hôm nay của gói. Bạn vẫn có thể đặt câu hỏi: cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
   "newDebate.room.personWeekFullTopPlan": "Bạn đã đạt giới hạn tuần này của gói. Bạn vẫn có thể đặt câu hỏi: cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
   "newDebate.room.personMonthFullTopPlan": "Bạn đã đạt giới hạn tháng này của gói. Bạn vẫn có thể đặt câu hỏi: cuộc tranh luận của bạn sẽ tự bắt đầu lúc {time}.",
-  "newDebate.room.freeMonthFull": "Bạn đã dùng hết lượt tranh luận miễn phí của tháng này. Cuộc tranh luận tiếp theo có thể bắt đầu lúc {time}, hoặc chọn một gói để tiếp tục ngay.",
+  "newDebate.room.freeMonthFull": "Bạn đã dùng hết hạn mức miễn phí của tháng này. Cuộc tranh luận tiếp theo có thể bắt đầu lúc {time}, hoặc chọn một gói để tiếp tục ngay.",
   "newDebate.room.personClose": "Bạn sắp đạt giới hạn của gói. Cuộc tranh luận này vẫn sẽ diễn ra đầy đủ.",
   "newDebate.room.ownDebatesFull": "Hiện các cuộc tranh luận khác của bạn đang dùng phần còn lại của giới hạn. Cuộc tranh luận này sẽ tự bắt đầu ngay khi một trong số đó kết thúc.",
   "newDebate.room.upgradeLink": "Xem các gói",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Gói của bạn: Miễn phí",
   "newDebate.plan.current.PLUS": "Gói của bạn: Plus",
   "newDebate.plan.current.PRO": "Gói của bạn: Pro",
-  "newDebate.plan.current.MAX": "Gói của bạn: Max"
+  "newDebate.plan.current.MAX": "Gói của bạn: Max",
+  "newDebate.askText.otherAnswer": "Câu trả lời khác…",
+  "newDebate.askText.otherLabel": "Lời giải thích thêm của riêng bạn",
+  "newDebate.askText.matters": "Nếu các câu trả lời đi theo hướng khác nhau, điều quan trọng nhất đối với tôi là: {matters}",
+  "newDebate.freePublicNotice": "Với gói Miễn phí, câu hỏi của bạn và cuộc tranh luận về câu hỏi đó sẽ được công khai. Đừng đưa thông tin cá nhân vào."
 }

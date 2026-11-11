@@ -327,7 +327,7 @@ describe("N12 an upgrade on NETOPIA's page (spec §2.10)", () => {
     expect(await new EntitlementRepository(database.pool).current(run.identity.authenticated.ownerRef, run.clock.now)).toMatchObject({
       planId: "PRO", cause: "UPGRADED", periodAnchorAt: run.seeded.periodStart, paidThrough: run.seeded.periodEnd,
       monthCreditOverrideMicros: upgradeMonthCreditOverrideMicros({
-        currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 20_000_000,
+        currentMonthCreditMicros: 6_600_000, oldPlanCreditMicros: 6_600_000, newPlanCreditMicros: 33_000_000,
         periodStart: run.seeded.periodStart, periodEnd: run.seeded.periodEnd, at: quote.createdAt
       })
     });

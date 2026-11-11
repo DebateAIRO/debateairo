@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Debatu sa nepodarilo vytvoriť",
   "newDebate.sessionReadFailed": "Načítanie relácie zlyhalo",
   "newDebate.planRosterFailed": "Načítanie zoznamu úrovne programu zlyhalo",
-  "newDebate.checkingSession": "Kontroluje sa relácia…",
+  "newDebate.checkingSession": "Chvíľku…",
   "newDebate.redirectingToSignIn": "Presmerovanie na prihlásenie…",
   "newDebate.continueToSignIn": "Pokračovať na prihlásenie",
   "newDebate.defaultUnavailable": "Nasadenie nemá platný riadok riskTier; úroveň rizika čaká na vstup.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Dosiahli ste dnešný limit svojho programu. Otázku môžete položiť aj tak: vaša debata sa spustí sama v čase {time}.",
   "newDebate.room.personWeekFullTopPlan": "Dosiahli ste limit svojho programu na tento týždeň. Otázku môžete položiť aj tak: vaša debata sa spustí sama v čase {time}.",
   "newDebate.room.personMonthFullTopPlan": "Dosiahli ste limit svojho programu na tento mesiac. Otázku môžete položiť aj tak: vaša debata sa spustí sama v čase {time}.",
-  "newDebate.room.freeMonthFull": "Využili ste bezplatné debaty na tento mesiac. Vaša ďalšia debata sa môže začať v čase {time}, alebo si vyberte program a pokračujte hneď.",
+  "newDebate.room.freeMonthFull": "Využili ste bezplatnú kvótu na tento mesiac. Vaša ďalšia debata sa môže začať v čase {time}, alebo si vyberte program a pokračujte hneď.",
   "newDebate.room.personClose": "Blížite sa k limitu svojho programu. Táto debata aj tak prebehne celá.",
   "newDebate.room.ownDebatesFull": "Vaše ostatné debaty zatiaľ využívajú zvyšok vášho limitu. Táto debata sa spustí sama, len čo niektorá z nich skončí.",
   "newDebate.room.upgradeLink": "Zobraziť programy",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Váš program: Bezplatný",
   "newDebate.plan.current.PLUS": "Váš program: Plus",
   "newDebate.plan.current.PRO": "Váš program: Pro",
-  "newDebate.plan.current.MAX": "Váš program: Max"
+  "newDebate.plan.current.MAX": "Váš program: Max",
+  "newDebate.askText.otherAnswer": "Iná odpoveď…",
+  "newDebate.askText.otherLabel": "Vaše vlastné dodatočné spresnenie",
+  "newDebate.askText.matters": "Ak odpovede vedú rôznymi smermi, pre mňa je najdôležitejšie: {matters}",
+  "newDebate.freePublicNotice": "V bezplatnom programe sú vaša otázka a jej debata verejné. Neuvádzajte osobné údaje."
 }

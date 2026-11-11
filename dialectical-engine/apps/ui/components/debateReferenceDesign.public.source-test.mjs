@@ -6,33 +6,27 @@ import test from "node:test";
 const read = (path) => readFileSync(join(process.cwd(), path), "utf8");
 const publicOverview = read("components/PublicDebateOverview.tsx");
 const publicPage = read("app/public/debate/[id]/PublicDebatePageClient.tsx");
+const publicBody = read("components/v4/V4PublicPage.tsx");
 const debatePage = read("app/debate/[id]/DebatePageClient.tsx");
-const css = read("app/globals.css");
+const laneCss = read("app/public/debate/[id]/public-lane.css");
 
-test("Turn 3 public Tree is verdict-first while the other three reading views remain live", () => {
+// V's ruling of 2026-09-20 ("summary first, the argument tree one click away"), as the owner's screen review of 3 Nov 2026 rebuilt it (public-d1 A):
+// the public page is V4's, it leads with the answer, and "Explore the map" opens the same map as the person's own, read-only (one map with a read-only
+// switch, not a second copy). The classic workspace no longer serves the public route; its own public mode is left as it was for the owner's page.
+test("the public page leads with the answer, and the map is one click away, read-only", () => {
   assert.match(publicPage, /<PublicDebateOverview/);
-  // V's ruling of 2026-09-20 settled what this line encodes. The overview used
-  // to REPLACE the public Tree view, so a visitor could read the conclusion or
-  // the argument tree but never both. The ruling is "summary first, the
-  // argument tree one click away": the overview is now its own view and Tree is
-  // the canvas again. The pin still does its job — the public overview must be
-  // mounted by the workspace and gated on publicMode — only the view it answers
-  // to changed. (The test name above still says "public Tree is verdict-first";
-  // that wording is superseded by the same ruling and is left for the UI
-  // program to retitle rather than churned here.)
-  assert.match(debatePage, /publicMode && view === "overview" && publicOverview/);
-  assert.match(debatePage, /view === "thread"/);
-  assert.match(debatePage, /view === "split"/);
-  assert.match(debatePage, /view === "map"/);
-  assert.match(publicOverview, /data-design-turn="3b"/);
-  assert.match(publicOverview, /className="publicOverviewInner"/);
-  assert.match(publicOverview, /className="publicVerdictShell"/);
-  assert.match(publicOverview, /className="publicSupportRow"/);
-  assert.match(publicOverview, /className="publicArgumentAccent"/);
-  assert.match(publicOverview, /className="publicArgumentScore"/);
-  assert.match(publicOverview, /className="publicArgumentGrid"/);
-  assert.match(publicOverview, /next=\$\{encodeURIComponent\(returnPath\)\}/);
+  assert.doesNotMatch(publicPage, /<DebatePageClient/);
+  assert.match(publicOverview, /<V4PublicAnswerFirst/);
+  assert.match(publicBody, /data-public-answer-first/);
+  assert.match(publicBody, /className="v4AnswerCard v4PubAnswer"/);
+  assert.match(publicBody, /className="v4PubRows"/);
+  assert.match(publicBody, /data-public-explore/);
+  // The map is the own map's pieces with the read-only switch: no copy of the tree is drawn here.
+  assert.match(publicBody, /<V4MapTree \{\.\.\.pieces\} fold=/);
+  assert.match(publicBody, /<V4Outline \{\.\.\.pieces\} \/>/);
+  assert.match(publicBody, /readOnly: true/);
+  // The owner's page keeps its own verdict-first switch.
   assert.match(debatePage, /!publicMode && process\.env\.NEXT_PUBLIC_VERDICT_FIRST_UI/);
-  assert.match(css, /\.publicOverviewInner \{[^}]*max-width: 960px;/);
-  assert.match(css, /\.publicArgumentGrid \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.match(laneCss, /\.v4PubMain \{[^}]*max-width: 820px;/);
+  assert.match(laneCss, /\.v4PubMain:has\(\.v4PubMapView\) \{ max-width: 1280px; \}/);
 });

@@ -249,6 +249,8 @@ function host(releases: Release[], options: Options = {}) {
       return result("42\n");
     }
     if (sql.includes("FROM core.release_event")) return result(events.filter((event) => event.key === vars.release_key).map((event) => `${event.kind}|${iso(event.at)}|${event.reason ?? ""}\n`).join(""));
+    // Decision 12: the open-work read asks whether 0143 is on the database first; the public server's is past it.
+    if (sql.includes("to_regprocedure('identity.run_work_is_parked")) return result("t\n");
     if (sql.includes("core.work_item")) return result("0\n");
     if (sql.includes("current_setting('max_connections')")) return result("320|3|10\n");
     throw new Error(`unexpected SQL ${sql}`);

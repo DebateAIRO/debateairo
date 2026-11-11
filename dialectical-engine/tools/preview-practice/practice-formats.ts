@@ -232,6 +232,38 @@ export function practiceAttemptsOf(sink: PracticeSink): readonly PracticeAttempt
 }
 
 /**
+ * Item 0 (format slips, owner 9 Nov): a call's FIRST refused reply, so a later count of slips reads the slip itself, not
+ * only the reply accepted after it (after a patch follow-up the accepted one is the merged reply). `attempt` is its place
+ * in the call's tries (`PracticeAttempt`); parseStatus, finishReason (how the reply ended: "length" or "max_tokens" is a
+ * cut-off, the length retry's cause) and replyForm are its own; `issues` is what its check said, as `code@path`; its text
+ * goes through reportableReplyText, as every reply text does (a key-shaped run blanked, at most 64 KiB).
+ */
+export type PracticeFirstRefusal = Readonly<{
+  attempt: number;
+  callSiteKey: string;
+  parseStatus: RawArtifactInput["parseStatus"];
+  replyForm: PracticeReplyForm | null;
+  finishReason: string | null;
+  issues: readonly string[];
+  replyText: string;
+}>;
+
+/**
+ * The first try whose reply came back and was refused (its check failed, or its try did not end OK: a reply cut off at
+ * its bound may still read as JSON), or null when every reply was accepted or none came back (a transport failure).
+ */
+export function practiceFirstRefusalOf(sink: PracticeSink): PracticeFirstRefusal | null {
+  for (const [attempt, entry] of sink.ledger.entries()) {
+    const artifact = sink.artifacts.find((candidate) => candidate.attemptId === entry.attemptId);
+    if (artifact === undefined || (artifact.parseStatus === "PARSED" && entry.outcome === "OK")) continue;
+    return Object.freeze({ attempt, callSiteKey: entry.callSiteKey, parseStatus: artifact.parseStatus,
+      replyForm: sink.forms.get(entry.attemptId) ?? null, finishReason: practiceFinishReasonOf(artifact.metadata),
+      issues: issueListFromParseError(artifact.parseError ?? null), replyText: reportableReplyText(replyContentOf(artifact.rawText)) });
+  }
+  return null;
+}
+
+/**
  * A job's tokens, summed over its own model's gate calls (`wire`: the gate watch's events since the job began, for that
  * model only), and their cost at the model's preview price. Each count is null when no call reported it. The cost is
  * priced POST by POST at each POST's own tier, then summed: a final writer's output is not clamped at the standard

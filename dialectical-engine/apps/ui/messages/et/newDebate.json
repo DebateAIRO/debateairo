@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Väitlust ei saanud luua",
   "newDebate.sessionReadFailed": "Seansi lugemine ebaõnnestus",
   "newDebate.planRosterFailed": "Paketitasemete loendi lugemine ebaõnnestus",
-  "newDebate.checkingSession": "Seansi kontrollimine…",
+  "newDebate.checkingSession": "Üks hetk…",
   "newDebate.redirectingToSignIn": "Teid suunatakse sisselogimisele…",
   "newDebate.continueToSignIn": "Jätkake sisselogimist",
   "newDebate.defaultUnavailable": "Juurutamisel pole kehtivat rida riskTier; riskitase ootab sisendit.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Olete jõudnud oma paketi tänase piirini. Saate siiski küsida: teie väitlus algab ise kell {time}.",
   "newDebate.room.personWeekFullTopPlan": "Olete jõudnud oma paketi selle nädala piirini. Saate siiski küsida: teie väitlus algab ise {time}.",
   "newDebate.room.personMonthFullTopPlan": "Olete jõudnud oma paketi selle kuu piirini. Saate siiski küsida: teie väitlus algab ise {time}.",
-  "newDebate.room.freeMonthFull": "Olete selle kuu tasuta väitlused ära kasutanud. Teie järgmine väitlus saab alata {time} või valige pakett, et kohe jätkata.",
+  "newDebate.room.freeMonthFull": "Olete selle kuu tasuta kvoodi ära kasutanud. Teie järgmine väitlus saab alata {time} või valige pakett, et kohe jätkata.",
   "newDebate.room.personClose": "Olete oma paketi piirile lähedal. See väitlus toimub siiski täies mahus.",
   "newDebate.room.ownDebatesFull": "Teie teised väitlused kasutavad praegu teie piiri ülejäänud osa. See väitlus algab ise kohe, kui üks neist lõpeb.",
   "newDebate.room.upgradeLink": "Vaadake pakette",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Teie pakett: Tasuta",
   "newDebate.plan.current.PLUS": "Teie pakett: Plus",
   "newDebate.plan.current.PRO": "Teie pakett: Pro",
-  "newDebate.plan.current.MAX": "Teie pakett: Max"
+  "newDebate.plan.current.MAX": "Teie pakett: Max",
+  "newDebate.askText.otherAnswer": "Muu vastus…",
+  "newDebate.askText.otherLabel": "Teie enda täiendav selgitus",
+  "newDebate.askText.matters": "Kui vastused lähevad eri suundades, on mulle kõige olulisem: {matters}",
+  "newDebate.freePublicNotice": "Tasuta paketis on teie küsimus ja selle väitlus avalikud. Ärge lisage isikuandmeid."
 }

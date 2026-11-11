@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Impossibile creare il dibattito",
   "newDebate.sessionReadFailed": "Lettura della sessione non riuscita",
   "newDebate.planRosterFailed": "Lettura dell’elenco del livello del piano non riuscita",
-  "newDebate.checkingSession": "Verifica della sessione…",
+  "newDebate.checkingSession": "Un momento…",
   "newDebate.redirectingToSignIn": "Reindirizzamento all’accesso…",
   "newDebate.continueToSignIn": "Continua per accedere",
   "newDebate.defaultUnavailable": "La distribuzione non contiene una riga riskTier valida; il livello di rischio attende un valore.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Hai raggiunto il limite di oggi del tuo piano. Puoi comunque fare la tua domanda: il dibattito partirà da solo alle {time}.",
   "newDebate.room.personWeekFullTopPlan": "Hai raggiunto il limite di questa settimana del tuo piano. Puoi comunque fare la tua domanda: il dibattito partirà da solo il {time}.",
   "newDebate.room.personMonthFullTopPlan": "Hai raggiunto il limite di questo mese del tuo piano. Puoi comunque fare la tua domanda: il dibattito partirà da solo il {time}.",
-  "newDebate.room.freeMonthFull": "Hai usato i dibattiti gratuiti di questo mese. Il tuo prossimo dibattito potrà partire il {time}, oppure scegli un piano per continuare subito.",
+  "newDebate.room.freeMonthFull": "Hai usato la quota gratuita di questo mese. Il tuo prossimo dibattito potrà partire il {time}, oppure scegli un piano per continuare subito.",
   "newDebate.room.personClose": "Sei vicino al limite del tuo piano. Questo dibattito si svolgerà comunque per intero.",
   "newDebate.room.ownDebatesFull": "Gli altri tuoi dibattiti stanno usando per ora il resto del tuo limite. Questo dibattito partirà da solo non appena uno di essi sarà concluso.",
   "newDebate.room.upgradeLink": "Vedi i piani",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Il tuo piano: Gratuito",
   "newDebate.plan.current.PLUS": "Il tuo piano: Plus",
   "newDebate.plan.current.PRO": "Il tuo piano: Pro",
-  "newDebate.plan.current.MAX": "Il tuo piano: Max"
+  "newDebate.plan.current.MAX": "Il tuo piano: Max",
+  "newDebate.askText.otherAnswer": "Un'altra risposta…",
+  "newDebate.askText.otherLabel": "Il Suo chiarimento aggiuntivo",
+  "newDebate.askText.matters": "Se le risposte vanno in direzioni diverse, per me conta soprattutto: {matters}",
+  "newDebate.freePublicNotice": "Con il piano Gratuito la tua domanda e il relativo dibattito sono pubblici. Non includere dati personali."
 }

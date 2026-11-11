@@ -33,11 +33,16 @@
  *    report; the watching changes nothing they do.
  *  - No Hatchet, no worker, no start-up re-dispatch, no team gate: the practice calls executeWorkItem itself.
  *  - The story shape pack is the repository's own (the server's DEBATEAI_STORY_SHAPES_DIR is a server path).
+ *  - V4 start step, Task 91f: with a start step, the web step's plan read gives the start step's plan (premium: PLUS, free: FREE)
+ *    where the site's read finds none, as billing (kept off here) would have pinned it (`practiceWebSearchOnPlan`); the rest of
+ *    the web settings are main.ts's own call.
  *  - `wait` (the runner's cooldown hold) and `sleep` (the preview policy's one 60-second resend) can be injected, for
  *    the integration test only; the real practice waits for real.
  */
 import type { Pool } from "pg";
-import { RunRepository } from "@debateai/db";
+import {
+  PostgresDigModelRunnerRepository, PostgresPathProgressRepository, PostgresPathResultsRepository, PostgresStartPathsStore, RunRepository
+} from "@debateai/db";
 import { createTerminalActivationEvaluator, WorkItemRepository } from "@debateai/battery";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -45,7 +50,10 @@ import {
   effectiveCallConcurrency,
   readCallConcurrencyPolicy,
   type CallConcurrencyPolicy,
-  type DeploymentMode
+  type DeploymentMode,
+  type PlanId,
+  closingReservesOf,
+  readBillingPlans,
 } from "@debateai/register";
 import {
   type CostEnvelopePhase,
@@ -65,6 +73,7 @@ import {
   previewTargetGatewayControls,
   providerTargetGatewayControls,
   providerTargetPrice,
+  previewTargetChargePrice,
   resolveProviderTargetCredentials,
   withPreviewProviderCallPolicy,
   withStructureRepair,
@@ -88,11 +97,17 @@ import { assertRunnerPrimaryProviderConfiguration, createRunnerProviderTopology 
 import { createCallScheduler, type CallSubject } from "../../apps/runner/src/call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateNames, structureRepairThroughLane } from "../../apps/runner/src/call-lane-gateway.js";
 import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
+import { MonthPause, monthPaused } from "../../apps/runner/src/month-pause.js";
+import { composePathRewrite, PATH_REWRITE_WRITER_MODEL } from "../../apps/runner/src/path-rewrite-composition.js";
+import { composeInvestigationClose } from "../../apps/runner/src/investigation-close-sources.js";
+import { targetTokenCounter } from "../../apps/runner/src/token-line.js";
 import {
-  createRunnerSettingsCache, createRunSettingsVersions, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext,
-  runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runPreviewThinkingLevelsOf, type RunnerVersionReaders
+  createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings,
+  preloadRunnerSettings, readRunnerSiteContext, runCostEnvelopeGuardOf, runnerSettingsOfVersion, runnerSettingsSummary, runnerWebSearchSettings,
+  runPreviewThinkingLevelsOf, type RunnerVersionReaders
 } from "../../apps/runner/src/run-settings.js";
 import { createRunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
+import type { WebStepRunnerSettings } from "../../apps/runner/src/web-step.js";
 import { PracticeCallStats } from "./practice-parallel.js";
 
 /** The runner settings the practice needs: the non-secret runner.env keys the operator exports (README step S-2). */
@@ -142,6 +157,20 @@ export function practiceVersionReaders(callConcurrency: CallConcurrencyPolicy | 
   return Object.freeze({ readCallConcurrencyPolicy: async () => flag });
 }
 
+/**
+ * V4 start step, Task 91f (owner 9 Nov, "Fix the practice first"): THE PLAN THE PRACTICE'S WEB STEP READS. The practice asks with
+ * billing kept off, so none of its runs has a charge scope and the site's read (`readWebRunPlan`) finds no plan: the step then
+ * searches nothing, even for `--start-step premium:5`. With `webPlan` the runner's own web settings are kept member for member,
+ * and only their plan read changes: the site's read first, `webPlan` where it finds none (the plan billing would have pinned for
+ * a person on that plan). Without it: the very object given, as main.ts hands it.
+ */
+export function practiceWebSearchOnPlan<T extends Readonly<{ webSearch: WebStepRunnerSettings }>>(webPlan: PlanId | undefined, settings: T): T {
+  if (webPlan === undefined) return settings;
+  const site = settings.webSearch;
+  return Object.freeze({ ...settings, webSearch: Object.freeze({ ...site,
+    readRunPlan: async (runId: string): Promise<PlanId | null> => (await site.readRunPlan(runId)) ?? webPlan }) });
+}
+
 export async function composePracticeRunner(input: Readonly<{
   pool: Pool;
   environment: PracticeRunnerSettings;
@@ -153,6 +182,11 @@ export async function composePracticeRunner(input: Readonly<{
   keepAlivePool: Pool;
   /** The practice's --call-concurrency: used as it is, instead of the register's row. Absent: the register's row (main.ts). */
   callConcurrency?: CallConcurrencyPolicy;
+  /**
+   * V4 start step, Task 91f: the plan the web step reads where the site's read finds none (`practiceStartWebPlan`: a start-step
+   * practice's PLUS or FREE). Absent: the site's read alone (main.ts).
+   */
+  webPlan?: PlanId;
   /** Test seam: the runner's cooldown hold. Default: real time. */
   wait?: (milliseconds: number) => Promise<void>;
   /** Test seam: the preview call policy's and the claim probe's one 60-second resend. Default: real time. */
@@ -183,6 +217,8 @@ export async function composePracticeRunner(input: Readonly<{
   }
   // As main.ts (side-by-side spec §13, S14): both in-flight counters, the gateway's (attempts) and the money guard's.
   const gatewayInFlight = createRunInFlight();
+  // W3-2, as main.ts: at the month wall a debate's planned calls pause until the person continues.
+  const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });
   const moneyInFlight = createRunInFlight();
   /**
    * As main.ts: the site reads, by the SAME function (`readRunnerSiteContext`, apps/runner/src/run-settings.ts): the
@@ -215,6 +251,10 @@ export async function composePracticeRunner(input: Readonly<{
   // Side-by-side spec §13 (S6), as main.ts: each claimed run's version by run id, and each call's own version's guard.
   const runSettingsVersions = createRunSettingsVersions();
   const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);
+  // V4 start step, Task 57p (0169), as main.ts: each piece's record notes the version of the run its calls were charged to, from this map.
+  const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);
+  // V4 start step, Task 53, as main.ts: each claimed run's final-writer terms by run id (a v2 run's plan), read by the call policy.
+  const runFinalWriterTerms = createRunFinalWriterTerms();
   // Parallel AI calls (spec 2026-10-12 §3.2-§3.5), as main.ts composes them on the preview.
   const callStats = new PracticeCallStats();
   const callPolicy = input.callConcurrency
@@ -236,23 +276,36 @@ export async function composePracticeRunner(input: Readonly<{
     throw new TypeError("PRACTICE_TARGET_DECLARES_A_CREDENTIAL");
   });
   function targetGateway(target: (typeof providerTargets)[number]): ProviderGateway {
-    const price = providerTargetPrice(target);
+    // Owner answer F4 (2026-10-30), as main.ts: a reviewed Anthropic row's calls at the vendor's real prices.
+    const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));
     if (runnerSite.money !== null && price === null) {
       throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`);
     }
+    const tokenCount = targetTokenCounter(target, previewFetch, storyLog);
     const gateway = createPostgresProviderGateway(pool, {
       fetchImplementation: previewFetch,
       endpoint: target.baseUrl,
       model: target.model,
       maker: target.maker,
+      ...(tokenCount === undefined ? {} : { countInputTokens: tokenCount }),
       ...providerTargetGatewayControls(target),
       ...previewTargetGatewayControls(previewGate, target),
       inFlight: gatewayInFlight,
       // Hosted only, as main.ts: each call charged to the run's envelope (and the story's calls to the story's own).
       // Side-by-side spec §13 (S6), as main.ts: each call charged to its own run's version's guard.
       ...(runnerSite.money === null || price === null ? {} : {
-        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }),
-        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
+        // W3-2, as main.ts: the month pause on a walled call, and a dig's path rewrite on its own seam.
+        buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause, plannedMicros: () => runCostEnvelopeGuard(runId).bodyMicrosLeft(runId) }),
+        buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }),
+        buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }),
+        // W5-1: "Write my report"'s calls spend the report seam, never walled (main.ts's line).
+        buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }),
+        // R22 decisions 2 and 3: the climb's and the main-answer update's calls, each on its own never-walled seam, on the dig's run.
+        buildPathClimbCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathClimbSeam({ runId, price, requireReportedUsage: true }),
+        buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true }),
+        // Decision 13, as main.ts: the AI check on a contribution and a report on a public debate, each on its own never-walled seam.
+        buildContributionCheckCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).contributionCheckSeam({ runId, price, requireReportedUsage: true }),
+        buildPublicReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).publicReportSeam({ runId, price, requireReportedUsage: true })
       })
     });
     // Spec §3.4, as main.ts: the gate is marked unhealthy on its FIRST unsent refusal, before the resend wait.
@@ -265,6 +318,8 @@ export async function composePracticeRunner(input: Readonly<{
       gateRemaining: input.remaining,
       onFinalWriterTierUnread: finalWriterTierUnread,
       thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),
+      // V4 start step, Task 53, as main.ts: a v2 run's terms (its plan); a v1 run and a call of no run, none.
+      finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms),
       ...(input.sleep === undefined ? {} : { sleep: input.sleep })
     });
   }
@@ -303,6 +358,25 @@ export async function composePracticeRunner(input: Readonly<{
     // Charts in the verdict PDF (design 2026-10-28), as main.ts: the practice debate makes the same chart call.
     charts: true
   });
+  /**
+   * Dig-model revision W3-7: THE PATH REWRITE, switched on. A settled dig writes no story; the path it was dug from is
+   * rewritten in the story's place (apps/runner/src/path-rewrite-composition.ts, the same call as the preview practice's),
+   * its calls charged on the never-walled PATH_REWRITE seam above. Undefined when no Haiku or no GLM target is configured.
+   */
+  const writerTokenCount = (() => {
+    const haiku = providerTargets.find((target) => target.model === PATH_REWRITE_WRITER_MODEL);
+    return haiku === undefined ? undefined : targetTokenCounter(haiku, previewFetch, storyLog);
+  })();
+  const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+    members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+    settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
+  // W5-1: the closing, composed as main.ts composes it (the practice writes a report only when its script presses it).
+  const closingPrices = buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE);
+  const investigationClose = composeInvestigationClose({ pool, targets: providerTargets,
+    reserveMicros: closingReservesOf(await readBillingPlans(pool, environment.REGISTER_VERSION)) ?? { paid: 0, free: 0 }, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }),
+    members: [providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), ...providerTopology.additionalMakers],
+    priceOf: (providerRef) => closingPrices.get(providerRef) ?? null,
+    settingsVersionOf: pieceSettingsVersionOf, log: storyLog });
   function observeClaimTarget(target: (typeof providerTargets)[number]) {
     return observeClaimTimeTarget({
       preview: true,
@@ -315,6 +389,8 @@ export async function composePracticeRunner(input: Readonly<{
     });
   }
   const wait = input.wait ?? ((cooldownMs: number) => new Promise<void>((resolve) => setTimeout(resolve, cooldownMs)));
+  // V4 start step, Tasks 53 and 56, as main.ts: the one chosen paths store, read by a path debate and marking a ticked first debate DUE.
+  const startPaths = new PostgresStartPathsStore(pool);
   const runner = new WalkingSkeletonRunner(pool, providerTopology.primary.provider, {
     workerId: environment.RUNNER_WORKER_ID, claimMs: environment.CLAIM_MS, claimMarginMs: environment.CLAIM_MARGIN_MS,
     // Side-by-side spec §3, as main.ts: the runner runs only debates of its release (the practice's one key).
@@ -326,6 +402,13 @@ export async function composePracticeRunner(input: Readonly<{
     // Side-by-side spec §13 (S6), as main.ts: every debate on its own stamped version, with the run → version map.
     settingsForVersion: (version) => runnerSettings.settingsFor(version),
     runSettingsVersions,
+    // V4 start step, Task 53, as main.ts: the run → final-writer terms map, and a path debate's stores on the runner's pool.
+    runFinalWriterTerms,
+    startPaths,
+    pathResults: new PostgresPathResultsRepository(pool),
+    pathProgress: new PostgresPathProgressRepository(pool),
+    // V4 start step, Task 56, as main.ts: the same store marks a ticked first debate DUE ("Let the AIs carry on to the report").
+    carryOn: startPaths,
     providerRef: providerTopology.primary.providerRef, maker: providerTopology.primary.maker,
     ...(providerTopology.critique === undefined
       ? {} : { critique: providerTopology.critique }),
@@ -348,6 +431,9 @@ export async function composePracticeRunner(input: Readonly<{
       };
     },
     story: storyWriter,
+    // Dig-model revision W3-7: a dig's path rewrite in its story's place (above).
+    ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
+    ...(investigationClose === undefined ? {} : { investigationClose }),
     providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),
     // LG-A (Task 14 carry), as main.ts: root 0's room adds the structure-repair call to its first attempt and retry (the sum).
     structureRepairCeiling: previewStructureRepairCeiling(structureRepairRoute),
@@ -372,6 +458,12 @@ export async function composePracticeRunner(input: Readonly<{
     // model, vendor and gate, and the claim renewals on their own pool.
     callScheduler: runnerCallScheduler,
     callSubjects: previewCallSubjects(previewGate),
+    // Perplexity plan W3-1, as main.ts: the web step where the practice's gate names the search socket; a debate whose
+    // run names no paid plan (billing.run_charge_scope) is NOT_ON_PLAN and makes no web call; searches pause at the month
+    // wall through the same month pause (W4-2). V4 start step, Task 91f: main.ts's very call, its plan read given the
+    // start step's plan where the site's read finds none (billing is off in the practice); without one, exactly as given.
+    webSearch: practiceWebSearchOnPlan(input.webPlan, { webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch,
+      guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause }) }).webSearch,
     // Ruling R31, as main.ts: a call to a busy model waits on the busy coordinator BEFORE it takes any slot.
     callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model),
     renewals: new WorkItemRepository(input.keepAlivePool, { releaseKey: environment.RELEASE_KEY, workerId: environment.RUNNER_WORKER_ID }),

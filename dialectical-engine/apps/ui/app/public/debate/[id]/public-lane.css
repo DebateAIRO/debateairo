@@ -1,0 +1,206 @@
+/* Decisions 13, 16 and 22: the public page's contributions and reports, in V4's look. A nested .v4Root gives only its tokens here. */
+.v4Root.v4PublicLane { min-height: 0; background: none; font-size: inherit; }
+
+/* public-f23: long words and addresses wrap anywhere in the lane, and every side line follows the reading direction. */
+.v4PubPathNote { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; min-width: 0; overflow-wrap: anywhere; }
+.v4PubSummary { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.5; }
+.v4PubChanged { margin: 0; padding-inline-start: 18px; color: var(--text-2); font-size: 13px; }
+.v4PubAddedBy { margin: 0; color: var(--text-3); font-size: 12px; }
+.v4PubAction { align-self: flex-start; font-size: 13px; }
+
+.v4PubDig { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line-2); border-radius: var(--r-btn); background: var(--surface); }
+.v4PubDigField { display: flex; flex-direction: column; gap: 4px; }
+.v4PubDigActions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.v4PubHint { margin: 0; color: var(--text-2); font-size: 13px; }
+.v4PubLabel { margin: 0; color: var(--text-2); font-size: 12px; font-weight: 700; }
+.v4PubDigFieldHead { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.v4PubRemove { font-size: 12.5px; }
+/* Browser check (4 Nov): the box is a column, so "Add another view" stretched to its full width with the words centred
+   under the boxes; it sits on the start side, as wide as its words, like the box's other links. */
+.v4PubAddView { align-self: flex-start; }
+.v4PubHow summary { cursor: pointer; color: var(--text-2); font-size: 13px; }
+.v4PubHow[open] summary { margin-bottom: 4px; }
+/* public-f10: a dig that runs privately is a calm grey note, never the red refusal box. */
+.v4PubNote { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--line-strong); background: var(--surface-2); color: var(--text-2); font-size: 13.5px; line-height: 1.5; }
+/* public-f13: a held place is as tall as the button it waits for; the signed-out choice keeps that height, so nothing jumps. */
+.v4PubHold { visibility: hidden; }
+.v4PubSignIn { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 44px; margin: 0; color: var(--text-2); font-size: 13.5px; }
+.v4PubText { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--r-btn); background: var(--bg); color: var(--text); font: inherit; font-size: 14px; resize: vertical; }
+
+.v4PubDigPaths { display: flex; flex-direction: column; gap: 6px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); }
+/* public-f23: indented once only. A dig on a dig's path sits at the same indent, with a small tag saying whose dig it came from. */
+.v4PubDigPathsDeeper { padding-inline-start: 0; border-inline-start: 0; }
+.v4PubDigFrom {
+  align-self: flex-start; padding: 1px 8px; border: 1px solid var(--line-2); border-radius: var(--r-pill);
+  background: var(--surface-2); font-weight: 600;
+}
+.v4PubDigPathList { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.v4PubDigPathLine { margin: 0; color: var(--text); font-size: 13.5px; }
+
+.v4PubReports { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line-2); min-width: 0; overflow-wrap: anywhere; }
+.v4PubHeading { margin: 0; font-size: 18px; font-weight: 700; color: var(--text); }
+.v4PubEarlier summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
+.v4PubEarlier[open] { display: flex; flex-direction: column; gap: 10px; }
+.v4PubReportPress { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+
+.publicMainUpdate { display: flex; flex-direction: column; gap: 8px; }
+.publicMainUpdateNote { margin: 0; color: var(--muted); font-size: 12px; }
+.publicFirstAnswer summary { cursor: pointer; color: var(--text-2); font-size: 13.5px; }
+.publicFirstAnswer[open] summary { margin-bottom: 8px; }
+
+/* public-f5: "Report a problem": the quiet line next to the link that says it was sent, then the check's answer; the short line under a box left too short. */
+.v4PubFlagLine { color: var(--text-2); font-size: 13px; }
+.v4PubFlagMore { margin: 0; color: var(--text-2); font-size: 12.5px; }
+/* The DSA good-faith box (D5): the box and its sentence on one line that wraps under the words, never under the box. */
+.v4PubFlagGoodFaith { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; }
+.v4PubFlagGoodFaith input { flex: none; margin: 2px 0 0; }
+
+/* public-f6: the grey outline shown at once while a public debate loads. Still: no shimmer, so reduced motion needs nothing more. */
+.v4PubSkel { display: flex; flex-direction: column; }
+.v4PubSkelHeader { display: flex; align-items: center; min-height: 64px; padding: 10px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface); }
+.v4PubSkelMain { display: flex; flex-direction: column; gap: 14px; width: 100%; max-width: 820px; margin: 0 auto; padding: 32px var(--v4-gutter) 56px; }
+.v4PubSkelBar { display: block; height: 12px; width: 100%; border-radius: var(--r-pill); background: var(--line-2); }
+.v4PubSkelBrand { width: 180px; height: 18px; }
+.v4PubSkelTitle { height: 26px; width: 92%; }
+.v4PubSkelShort { width: 55%; }
+.v4PubSkelTag { width: 96px; flex: none; }
+.v4PubSkelCard { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; padding: 18px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PubSkelRow { display: flex; align-items: center; gap: 16px; min-height: 56px; padding: 0 16px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+
+/* public-f7 / public-f8: a public debate that cannot be shown, inside the normal header. */
+.v4PubNoteMain { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; width: 100%; max-width: 640px; margin: 0 auto; padding: 48px var(--v4-gutter) 56px; overflow-wrap: anywhere; }
+.v4PubNoteLine { margin: 0; color: var(--text); font-size: var(--t-body); line-height: 1.5; }
+.v4PubNoteWays { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: var(--t-ui); }
+
+/* ---------- public-d1 A (owner review, 3 Nov): the public page, answer first, in V4's look. Tokens only; nothing moves. ---------- */
+.v4PubMain {
+  display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 820px; margin: 0 auto;
+  padding: 28px var(--v4-gutter) 56px; min-width: 0; overflow-wrap: anywhere;
+}
+/* public-f4: the question's title is at the top on every screen, a phone's too. */
+.v4PubTitle { margin: 0; font-size: 28px; line-height: 1.2; color: var(--ink); }
+.v4PubPublished, .v4PubChangedLine { margin: 0; font-size: var(--t-meta); }
+.v4PubBody { display: flex; flex-direction: column; gap: 24px; margin-top: 14px; min-width: 0; }
+.v4PubAiNotice { margin-top: 4px; }
+.v4PubFoot { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--line-2); font-size: var(--t-meta); }
+.v4PubFoot p { margin: 0 0 4px; }
+.v4PubWorthTitle { font-weight: 700; }
+.v4PubFirstPaths { display: flex; flex-direction: column; gap: 4px; margin: 0; padding-inline-start: 18px; }
+/* The answer is the page's lead: shown whole, never cut to three lines as on a map card. */
+.v4PubAnswer .v4AnswerHeadline { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; }
+.v4PubSides { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line-2); }
+.v4PubSide { margin: 0; overflow-wrap: anywhere; }
+.v4PubSideWord { font-weight: 700; }
+
+/* The paths as rows, each with its trust word and bar; a row unfolds at once. */
+.v4PubPaths { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v4PubPathsHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.v4PubRows { display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.v4PubRow { min-width: 0; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
+.v4PubRowOpen { border-color: var(--line-strong); }
+.v4PubRowHeading { margin: 0; font: inherit; }
+.v4PubRowHead {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title chevron" "meta chevron" "bar chevron";
+  align-items: center; gap: 6px 12px; width: 100%; min-height: 56px; padding: 12px 16px;
+  border: 0; border-radius: var(--r-card); background: none; color: var(--text); text-align: start; cursor: pointer;
+}
+.v4PubRowHead:hover { background: var(--surface-2); }
+.v4PubRowTitle { grid-area: title; font-weight: 600; overflow-wrap: anywhere; }
+.v4PubRowMeta { grid-area: meta; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.v4PubRowMeta:empty { display: none; }
+.v4PubRowHead > .v4Bar { grid-area: bar; }
+.v4PubRowChevron { grid-area: chevron; color: var(--text-3); }
+.v4PubRowOpen .v4PubRowChevron { transform: rotate(180deg); }
+.v4PubRowBody { display: flex; flex-direction: column; gap: 12px; padding: 0 16px 16px; min-width: 0; overflow-wrap: anywhere; }
+.v4PubRowBody[hidden] { display: none; }
+.v4PubRowLine { margin: 0; color: var(--text); }
+.v4PubFound, .v4PubDeeper, .v4PubOwnWords { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4PubRowFoot { display: flex; flex-wrap: wrap; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* Open questions: the own map's open ground (dashed gold), each with its kind; the one star in words. */
+.v4PubOpenList { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.v4PubOpen {
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; min-width: 0;
+  border: 1.5px dashed var(--gold-border); border-radius: 12px; background: var(--gold-bg);
+}
+.v4PubOpenKind { color: var(--text-2); font-size: var(--t-meta); font-weight: 600; }
+.v4PubOpenText { color: var(--text); overflow-wrap: anywhere; }
+.v4PubStar { color: var(--con-text); font-size: var(--t-meta); font-weight: 700; }
+
+/* "Explore the map": the own map, read-only, with room for its columns. */
+.v4PubMain:has(.v4PubMapView) { max-width: 1280px; }
+.v4PubMapView { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v4PubMapBack { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; min-height: 44px; font-size: var(--t-ui); }
+/* Without its pick box an open question's row keeps its own start padding. */
+.v4PubMapView .v4OutOpen .v4OutMain { padding-inline-start: 12px; }
+
+/* public-f9: the report being written, the ready line (its status region always there, so it is read out once) and a report that could not be written. */
+.v4PubReportCard { min-width: 0; }
+.v4PubReady { margin: 0; color: var(--text); font-weight: 600; }
+.v4PubReady:empty { position: absolute; }
+/* W2L-4 (the wave-2 checks): a press on its way keeps its focus (aria-busy, never natively disabled), with the disabled
+   .v4Btn's greyed look (v4-base.css) and the wait cursor. */
+[data-public-report-check][aria-busy="true"], .v4PubRetry[aria-busy="true"] { cursor: progress; opacity: .55; }
+.v4PubReportFailed { margin: 0; padding: 8px 12px; border-inline-start: 3px solid var(--con); background: var(--surface-2); color: var(--text); font-size: 13.5px; }
+
+/* ---------- public-f4: "Report a problem" in the top bar (a phone: in the bar's menu) and at the foot of each path ---------- */
+.v4PubTopMenu { position: relative; display: flex; align-items: center; }
+.v4PubTopMenuButton { display: none; }
+.v4PubTopMenuItems { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+/* public-f26: "Copy link" at the top of the public page (V4CopyLink), with its quiet "Link copied." line. */
+.v4PubCopyLink { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; min-width: 0; }
+.v4PubCopyLink > .v4Link { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
+/* The second browser check (4 Nov): in the computer's top bar, "Link copied." sits just under the link instead of beside
+   it, so the bar's items do not move when it shows (it pushed Copy link about 100 px toward the brand). In the phone's
+   menu it stays in the list's flow. RC-2 (the checks of the last fixes, 4 Nov): the same place also says "We couldn't copy
+   the link…" (57 characters), which ran past the window's edge on one line. The line opens toward the room from the link
+   (V4CopyLink measures which side, `data-side`), wraps within the window, and lies over the header's foot without taking
+   the clicks there. */
+@media (min-width: 768px) {
+  .v4PubCopyLink { position: relative; }
+  .v4PubCopyLink > .v4PublicMarkCopied {
+    position: absolute; top: calc(100% - 8px); margin: 0; width: max-content; max-width: min(26rem, calc(100vw - 2 * var(--v4-gutter)));
+    font-size: 13px; pointer-events: none;
+  }
+  .v4PubCopyLink > .v4PublicMarkCopied[data-side="start"] { inset-inline-start: 0; }
+  .v4PubCopyLink > .v4PublicMarkCopied[data-side="end"] { inset-inline-end: 0; }
+}
+.v4PubFlag { position: relative; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; min-width: 0; }
+.v4PubFlagToggle { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
+.v4PubFlag-top .v4PubFlagLine { max-width: 320px; }
+/* The form: a small window under its link on a computer. */
+.v4PubFlagPanel {
+  position: absolute; z-index: 60; top: calc(100% + 6px); inset-inline-end: 0; width: min(360px, calc(100vw - 32px));
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-pop);
+  color: var(--text); font-size: var(--t-ui);
+}
+.v4PubFlag-foot .v4PubFlagPanel { inset-inline-end: auto; inset-inline-start: 0; }
+/* ACCESS-12 (the wave-2 checks, 4 Nov): the form is a dialog. While it is open the page behind it is covered, so a click
+   beside it closes it and nothing behind can be pressed; on a computer the cover is clear, on a phone it dims the page
+   behind the sheet. It shows at once (no move). */
+.v4PubFlagScrim { position: fixed; inset: 0; z-index: 59; background: transparent; }
+.v4PubFlagPanel > p { margin: 0; }
+.v4PubFlagForm { display: flex; flex-direction: column; gap: 6px; }
+@media (max-width: 767px) {
+  .v4PubTitle { font-size: 24px; }
+  .v4PubTopMenuButton { display: inline-flex; padding: 0 14px; }
+  .v4PubTopMenuItems { display: none; }
+  /* The second browser check and RC-1 (the checks of the last fixes, 4 Nov): the Menu button starts the bar's second row at
+     about 467 px and below, but sits beside the brand, near the end side, from about 468 to 767 px. The box opens toward the
+     room from wherever it is (V4PublicTopMenu measures which side, `data-side`): from its start edge toward the end side on
+     two rows, from its end edge toward the start side on one, so it stays on screen in either reading direction. */
+  .v4PubTopMenu[data-open="true"] .v4PubTopMenuItems {
+    position: absolute; z-index: 50; top: calc(100% + 6px); display: flex; flex-direction: column; align-items: stretch;
+    min-width: 220px; max-width: calc(100vw - 2 * var(--v4-gutter)); padding: 6px 12px;
+    background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
+  }
+  .v4PubTopMenu[data-side="start"] .v4PubTopMenuItems { inset-inline-start: 0; }
+  .v4PubTopMenu[data-side="end"] .v4PubTopMenuItems { inset-inline-end: 0; }
+  .v4PubFlagScrim { background: var(--scrim); }
+  /* The form: a sheet from the bottom on a phone. */
+  .v4PubFlagPanel, .v4PubFlag-foot .v4PubFlagPanel {
+    position: fixed; inset-inline: 0; top: auto; bottom: 0; width: auto; max-height: 85vh; overflow-y: auto;
+    padding: 16px var(--v4-gutter) calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: var(--r-card) var(--r-card) 0 0;
+  }
+}

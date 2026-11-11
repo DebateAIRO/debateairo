@@ -1,0 +1,18 @@
+{
+  "version": "report-export-forward0152-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0151_public_flag.sql",
+    "manifestSha256": "0c9c8cd60e1aae1cc29ed91b5315770fff200c021f3a4244dffa6e74a0f2842a",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0152_report_export_and_check_usage.sql",
+    "sha256": "dfaf9fbdb536f97674fdc5eb2c526e5e3335c1fa24fb1411e572b30de29498c5"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

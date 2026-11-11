@@ -28,7 +28,10 @@ export interface ContentRunFixture {
   readonly ownerRef: string;
   /** The owner's identity.session id, for a test that writes an encrypted run through the database function itself. */
   readonly authSessionId: string;
-  /** `extra.releaseKey`: the run's release stamp (side-by-side spec §1); absent, the column default `legacy` applies. */
+  /**
+   * `extra.releaseKey`: the run's release stamp (side-by-side spec §1); absent, the column default `legacy` applies. `extra.digRun`: the run is a
+   * dig's, marked so by the statement that creates it (security review F2, 0171).
+   */
   createEncryptedRun(questionLine: string, extra?: RunExtra): Promise<string>;
   createLegacyRun(questionLine: string, extra?: RunExtra): Promise<string>;
   /** Marks the run's private content erased, exactly as the V-6 erasure case does (0040's cleanup intent). */
@@ -37,7 +40,7 @@ export interface ContentRunFixture {
 }
 
 type StartRunInput = Parameters<RunRepository["startRun"]>[0];
-type RunExtra = Readonly<Pick<Partial<StartRunInput>, "releaseKey">>;
+type RunExtra = Readonly<Pick<Partial<StartRunInput>, "releaseKey" | "digRun">>;
 
 export async function startContentRunFixture(label: string): Promise<ContentRunFixture> {
   const database = await startTestDatabase();

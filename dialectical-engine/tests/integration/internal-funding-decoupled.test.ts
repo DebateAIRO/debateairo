@@ -17,7 +17,11 @@ let database: TestDatabase, runtime: Pool, fixture: ReturnType<typeof internalFu
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE funding_decoupled LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime");
+  // With 0130's cross-account marker: since 0171 the funded run's admission and settlement, its pin and the funding and grant readers ask the
+  // connection, and this login stands for their callers that name an account with no session, the runner's login and the API's system login
+  // (P3-01's runner-runtime and api-system), which hold the marker; a request login answers only for its own session's account
+  // (tests/integration/security-review-hardening-database.test.ts).
+  await database.pool.query("CREATE ROLE funding_decoupled LOGIN PASSWORD 'private-fixture-only' IN ROLE debateai_runtime,debateai_billing_runtime,debateai_rls_all_accounts");
   const url = new URL(database.connectionString);
   url.username = "funding_decoupled";
   url.password = "private-fixture-only";

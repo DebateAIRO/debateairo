@@ -26,7 +26,7 @@ export const ROOM_KEYS = Object.freeze([
  * which is why it lives apart from the hooks in `room.ts`.
  */
 export function composerRoomCatalog(catalog: MessageCatalog, fundingCatalog?: MessageCatalog): MessageCatalog {
-  const internal=["newDebate.room.internalGrantFull","newDebate.room.internalWindowFull","newDebate.room.internalClose"] as const;
+  const internal=["newDebate.room.internalGrantFull","newDebate.room.internalTeamFull","newDebate.room.internalWindowFull","newDebate.room.internalClose"] as const;
   return Object.freeze(Object.fromEntries(
     [...ROOM_KEYS.flatMap((key) => (Object.hasOwn(catalog, key) ? [[key, catalog[key]!]] : [])),
       ...internal.flatMap(key=>fundingCatalog?.[key] === undefined ? [] : [[key,fundingCatalog[key]!]])]

@@ -62,10 +62,13 @@ import {
   type RunnerVersionSettings
 } from "../../apps/runner/src/run-settings.js";
 import { validRunnerEnvironmentFixture } from "../support/apiEnvironmentFixture.js";
+import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW } from "@debateai/register";
 
 const SITE_VERSION = 17;
 const VERSION = 18;
-const POOL = {} as Pool;
+/** The loader reads only the plans row through the pool (the closing's reserve, R22 decision 18); the rest through its readers. */
+const plansPool = (rows: readonly unknown[]) => ({ query: async () => ({ rows }) }) as unknown as Pool;
+const POOL = plansPool([{ value_json: BILLING_PLANS_DEPLOYMENT_REGISTER_ROW.value, source_ref: "test" }]);
 
 const GLM = "zai-org/GLM-5.3-Flash";
 const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -308,6 +311,17 @@ describe("the loader's last check and its money (side-by-side spec §13, S6)", (
     }
     // Control: the same version with every family and a long enough claim passes.
     await expect(load(VERSION, site(), readers(VERSION).readers)).resolves.toMatchObject({ registerVersion: VERSION });
+  });
+
+  it("hosted, R22 decision 18: the guard's closing seams take their safety net from this version's plans; a version with none cannot build one", async () => {
+    const store = { readRunInvestigationReportSpentMicros: async () => 0 } as never;
+    const hosted = site({ ...hostedSite(envelope(250000, "site-row")), money: { store, inFlight: createRunInFlight() } });
+    const seamOver = async (pool: Pool) => {
+      const version = await loadRunnerVersionSettings(pool, VERSION, hosted, { readers: readers(VERSION).readers });
+      return version.costEnvelope!.guard.investigationReportSeam({ runId: "root", price: { inputMicrosPerMillionTokens: 1, outputMicrosPerMillionTokens: 1 }, requireReportedUsage: true });
+    };
+    await expect(seamOver(POOL)).resolves.toBeDefined();
+    await expect(seamOver(plansPool([]))).rejects.toMatchObject({ code: "STORY_ENVELOPE_MISSING" });
   });
 
   it("hosted: the version's guard is built over the site's one store and in-flight counter, with the version's per-run ceiling", async () => {
@@ -687,8 +701,8 @@ describe("the boot preload: open debates' and passed versions, never the pointer
     const [sql, values] = queries[0] as [string, unknown[]];
     expect(values).toEqual([KEY]);
     const flatSql = sql.replace(/\s+/gu, " ");
-    expect(flatSql).toContain("SELECT DISTINCT run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id");
-    expect(flatSql).toContain("WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1");
+    expect(flatSql).toContain("SELECT DISTINCT identity.run_settings_version_now(run.run_id)::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id");
+    expect(flatSql).toContain("WHERE item.state IN ('READY','CLAIMED') AND identity.run_release_now(run.run_id) = $1");
     // Legacy: nothing, and no query.
     expect(await new WorkItemRepository(pool).listOpenRunSettingsVersions(LEGACY_RELEASE_KEY)).toEqual([]);
     expect(queries).toHaveLength(1);
@@ -746,10 +760,15 @@ describe("the boot preload: open debates' and passed versions, never the pointer
     expect((await preloadRunnerSettings({ ...sources([18], []), cache: flaky })).loaded).toEqual([17, 18]);
   });
 
-  it("neither run-settings.ts nor main.ts names the activation pointer or its table (S16 pins every runner file)", () => {
-    for (const file of ["apps/runner/src/run-settings.ts", "apps/runner/src/main.ts"]) {
-      const source = readFileSync(new URL(`../../${file}`, import.meta.url), "utf8");
-      expect(source, file).not.toContain("read_active_settings_version");
+  it("the runner names the activation pointer's reader once, in run-settings.ts; never its table; main.ts neither (S16 pins every runner file)", () => {
+    // Task 57o-fix (owner, 8 Nov, "Your switched-on one"; 0169 grants the runner's role the reader): the one SQL text of the runner's reader
+    // of the switched-on version, for a background lane's fallback. Never the API's reader or its names.
+    const settings = readFileSync(new URL("../../apps/runner/src/run-settings.ts", import.meta.url), "utf8");
+    expect(settings.match(/read_active_settings_version/gu)).toHaveLength(1);
+    expect(settings).toContain('const SWITCHED_ON_SETTINGS_SQL = "SELECT register.read_active_settings_version() AS version";');
+    const main = readFileSync(new URL("../../apps/runner/src/main.ts", import.meta.url), "utf8");
+    expect(main).not.toContain("read_active_settings_version");
+    for (const [file, source] of [["apps/runner/src/run-settings.ts", settings], ["apps/runner/src/main.ts", main]] as const) {
       expect(source, file).not.toContain("settings_activation");
       expect(source, file).not.toMatch(/activeSettingsVersion|readActiveSettings/u);
     }

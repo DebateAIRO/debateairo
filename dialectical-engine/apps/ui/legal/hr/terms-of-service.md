@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.9 · NA SNAZI OD 12. LISTOPADA 2026.
+eyebrow: UVJETI KORIŠTENJA · v2.18 · NA SNAZI OD 1. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.9
+endMarker: KRAJ UVJETA · v2.18
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.9 · Effective 12. listopada 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 2.18 · Effective 1. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
-**In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Vaše su rasprave privatne osim ako ih objavite; ako ih objavite, svatko ih može pročitati. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
+**In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja i ne upotrebljava se za treniranje modela. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
 ## 1. Tko smo i kako nam se možete obratiti
 
@@ -142,17 +142,25 @@ Ako niste sigurni je li nešto dopušteno, obratite nam se prije objavljivanja.
 
 ## 9. Objavljivanje rasprave
 
-Rasprave su **prema zadanim postavkama privatne**. Ništa što izradite nije vidljivo drugima osim ako to objavite.
+Rasprave na plaćenom planu su **prema zadanim postavkama privatne**: ništa što ondje izradite nije vidljivo drugima osim ako to objavite. Rasprave na besplatnom planu su javne, kako ovaj odjeljak kaže.
 
 **Što se događa objavljivanjem.** Objavljivanje je namjerna radnja koja se zasebno potvrđuje. Kada objavite raspravu, izrađujemo njezinu nepromjenjivu snimku i omogućujemo svakome da je pročita bez računa. Tražilice mogu indeksirati tu snimku. Snimka prikazuje vaš **pseudonim**, vaše pitanje onako kako ste ga napisali, stablo argumenata, rezultate, presudu i raspon pouzdanosti te nosi vidljivu oznaku da je sadržaj generiran umjetnom inteligencijom. Ne prikazuje vašu adresu e-pošte, zapise o sesijama ni povijest računa.
 
-**Objavljivanje je u praksi gotovo nepovratno.** Nakon što rasprava postane javna, drugi je mogu čitati, citirati, arhivirati i spremati u predmemoriju te izrađivati njezine snimke zaslona. Povlačenjem objave rasprava se uklanja s Dialectical Engine-a i uništava se ključ naše kopije, ali nije moguće dohvatiti kopije koje već postoje drugdje. Nemojte objavljivati ništa za što ne biste htjeli da bude trajno povezano s vašim pseudonimom.
+**Rasprave na besplatnom planu su javne.** Na besplatnom planu vaše pitanje i njegova rasprava su javni. To vam kažemo prije nego što postavite pitanje. Kada rasprava završi, provjerava je umjetna inteligencija; ako provjera to dopusti, svatko je može pročitati, a tražilice je mogu indeksirati. Ako provjera to odbije, ostaje privatna samo vama. Na besplatnom planu nemojte u pitanje uključivati osobne podatke.
+
+**Nema povratka.** Jednom kad je rasprava javna, ona ostaje javna. Ne možete joj povući objavu niti je izbrisati, a brisanje računa je također ne uklanja. Možemo je sakriti dok je pregledavamo, a dio nje ukloniti ili ispraviti, ako to dopušta ovaj odjeljak. Kopije koje su drugi izradili izvan su naše kontrole. Drugi je mogu čitati, citirati, arhivirati i spremati u predmemoriju te izrađivati njezine snimke zaslona. Nemojte objavljivati ništa za što ne biste htjeli da bude trajno povezano s vašim pseudonimom.
 
 **Označena rasprava treba naše odobrenje.** Kada rasprava završi, automatizirana provjera čita njezinu sintezu s obzirom na četiri kategorije iz odjeljka 8. Raspravu koju provjera označi moguće je objaviti samo uz naše odobrenje, a oznaka se prikazuje samo vama i, ako zatražite naše odobrenje, članovima našeg tima koji imaju ovlaštenje za pregled objava; rasprava čija se sinteza prema provjeri dotiče kategorije „sklonosti samoubojstvu ili nanošenju štete drugim ljudima” umjesto toga se briše, kako navodi sljedeći odlomak. Ako naše odobrenje zatražite na stranici rasprave, član našeg tima koji ima posebno ovlaštenje za pregled objava može pročitati raspravu u obliku u kojem bi bila objavljena, bez vašeg pseudonima. Ako odobrimo, gumb Objavite ponovno vam je dostupan, a provjera kroz koju prolazi svaka objava i dalje se primjenjuje. Ako odbijemo, rasprava ostaje privatna i dajemo vam obrazloženje (odjeljak 10.). Nakon odbijanja možete zatražiti još jednom, a odlučuje član našeg tima koji nije odlučivao o prvom zahtjevu; možete se koristiti i postupkom za pritužbe iz odjeljka 10. Nakon drugog odbijanja ne možete ponovno zatražiti, ali odluku i dalje možete uputiti tijelu za izvansudsko rješavanje sporova ili sudu (odjeljak 10.). Odobrenje obuhvaća sintezu koju je recenzent pročitao, uključujući svaku kasniju verziju rasprave koja je ponavlja doslovno; prepisana se sinteza ponovno provjerava pri objavi i, ako se označi, treba vlastito odobrenje. Ako nakon našeg odobrenja objavite označenu raspravu, možete je ponovno povući gumbom Povucite na njezinoj kartici u prikazu Vaše rasprave.
 
 **Rasprave koje naša provjera briše.** Ako naša automatska provjera utvrdi da se sinteza rasprave dotiče kategorije „sklonosti samoubojstvu ili nanošenju štete drugim ljudima”, raspravu brišemo automatski i ne čuvamo je, čak i ako je već bila objavljena. Sinteza se smatra nanošenjem štete drugim ljudima kada potiče na nanošenje štete osobi ili je planira ili kada zaključuje da država, vojska, policija ili bilo tko drugi treba primijeniti silu protiv ljudi; rasprava o nasilju kao temi povijesti, prava, etike, politike, aktualnih zbivanja ili javne politike ne smatra se tako samo zbog svoje teme. Nijedna osoba raspravu ne čita unaprijed i ne može se vratiti. Kada rasprava završi, odgovor rasprave nije vam prikazan, osim kada provjera nije mogla odgovoriti na vrijeme: svaka završena rasprava zadržava se dok provjera ne odgovori (odjeljak 8.), dok stranica rasprave koja još traje prikazuje argumente i zaključak onako kako nastaju; ako provjera nije mogla odgovoriti na vrijeme, rasprava se ponovno provjerava kada pritisnete gumb Objavite. Obavijestit ćemo vas jednom, na zaslonu, s obrazloženjem i brojevima za pomoć. I dalje možete uložiti pritužbu putem postupka iz odjeljka 10., ali pritužba ne može vratiti raspravu. Premium rasprava izbrisana na ovaj način ne računa se u ograničenje vašeg paketa.
 
-**Objavljene rasprave nakon zatvaranja računa.** Kada zakažete zatvaranje računa, birate što će se dogoditi s raspravama koje ste objavili. Ako označite **„Izbrišite i moje javne rasprave”**, svaku od njih uklanjamo s Dialectical Engine-a i uništavamo ključ svoje kopije kada se zatvaranje provede, kao pri povlačenju objave, osim ako zakon nalaže čuvanje određene stavke. Ako kućicu ne označite, rasprave ostaju javne pod pseudonimom koji se više ne upotrebljava. Kopije koje su drugi napravili prije uklanjanja izvan su našeg nadzora. Ako želite zadržati pristup raspravi koju uklanjate, najprije je preuzmite.
+**Vaše ime.** Vaš pseudonim se navodi kao autor rasprave koju ste objavili, na svakoj putanji u koju ste doprinijeli, uz datum, te kao referenca u izvješću koje ste napisali. Ako izbrišete račun, vaš se pseudonim svugdje uklanja, a stranica umjesto toga prikazuje „suradnik”.
+
+**Doprinosi.** Svatko s kreditom, na besplatnom ili plaćenom planu, može istraživati javnu raspravu koristeći vlastitu kvotu. Ono što ondje napišete i ono što umjetne inteligencije iz toga napišu provjerava umjetna inteligencija prije nego što to može promijeniti javnu stranicu. Ako je dopušteno, mijenja stranicu za sve, pod vašim pseudonimom, a ostaje javno prema istim pravilima kao i rasprava: ne možete to povući. Ako je odbijeno, ostaje privatno samo vama, a stranica se ne mijenja. Ne smijete pisati ništa što nemate pravo objaviti niti osobne podatke bilo koje osobe.
+
+**Izvješća koja može napisati svatko.** Svatko s kreditom može napisati izvješće o javnoj raspravi dok joj se više ništa ne dodaje, koristeći vlastitu kvotu. Izvješće je javno. Pseudonim pisca samo je referenca: izvješće izrađuju umjetne inteligencije iz onoga što prikazuje stranica, a ono nije izjava pisca. Ranija izvješća ostaju čitljiva.
+
+**Nakon što autor ode.** Javna rasprava ostaje otvorena za doprinose i nakon što je njezin prvi autor izbrisao svoj račun. Novi doprinosi polaze od javne kopije.
 
 **Objavljeni sadržaj uvijek možemo ukloniti.** Objavljenu raspravu možemo ukloniti ili ograničiti pristup njoj kada to zahtijeva zakon, kada to naloži sud ili nadležno tijelo, ili kada krši ove Uvjete ili je nezakonita. Ništa u ovom odjeljku ne sprječava nas da postupimo po valjanoj obavijesti iz odjeljka 10. niti predstavlja obećanje da će objavljena rasprava ostati dostupna.
 
@@ -162,9 +170,9 @@ Rasprave su **prema zadanim postavkama privatne**. Ništa što izradite nije vid
 
 ## 10. Prijavljivanje sadržaja, moderiranje i pritužbe
 
-**Svatko može prijaviti sadržaj.** Ne trebate imati račun. Pišite na support@dezbatere.ro ili upotrijebite kontrolu **Prijavite** na bilo kojoj objavljenoj raspravi. Kako bismo mogli postupiti, navedite: zašto smatrate da je sadržaj nezakonit ili da krši ove Uvjete, dovoljno detaljno da možemo razumjeti tvrdnju; točnu lokaciju — puni URL i, ako možete, predmetni odlomak; svoje ime i adresu e-pošte (nije potrebno za prijave materijala seksualnog zlostavljanja djece); te da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna.
+**Svatko može prijaviti sadržaj.** Ne trebate imati račun. Pišite na support@dezbatere.ro. Ako ste prijavljeni, možete upotrijebiti i gumb **Prijavite** na bilo kojoj javnoj raspravi; on od vas traži da potvrdite da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna. Umjetna inteligencija obično čita prijavu podnesenu gumbom uz javni tekst. Ako se s njom slaže, a rasprava nikada prije nije bila skrivena, rasprava se odmah skriva, bez sudjelovanja čovjeka, a zatim je pregledava čovjek. Prijava umjesto toga ide izravno čovjeku kada je rasprava već prije bila skrivena, kada ste je već prijavili ili kada su automatske provjere za taj dan iskorištene. Ako se umjetna inteligencija ne slaže ili je prijava automatski zaustavljena (na primjer zato što ste unutar jednog sata poslali mnogo prijava ili rasprava nije javna), nijedan je čovjek ne čita: možete pisati na support@dezbatere.ro i čovjek će je pročitati ili podnijeti pritužbu putem postupka u nastavku. Kako bismo mogli postupiti, navedite: zašto smatrate da je sadržaj nezakonit ili da krši ove Uvjete, dovoljno detaljno da možemo razumjeti tvrdnju; točnu lokaciju — puni URL i, ako možete, predmetni odlomak; svoje ime i adresu e-pošte (nije potrebno za prijave materijala seksualnog zlostavljanja djece); te da u dobroj vjeri smatrate kako je vaša prijava točna i potpuna.
 
-Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno, pažljivo, nepristrano i objektivno, priopćujemo vam svoju odluku i objašnjavamo kako je možete osporiti. Ako za obradu prijave ili odlučivanje o njoj upotrebljavamo automatizirana sredstva, to ćemo navesti. Po prijavama intimnih snimki podijeljenih bez privole postupa se **u roku od 48 sati** od valjanog zahtjeva.
+Svaku prijavu potvrđujemo bez nepotrebne odgode: odmah na zaslonu i, za prijavu koju će pročitati čovjek, e-poštom. Prijave obrađujemo pravodobno, pažljivo, nepristrano i objektivno, e-poštom vam priopćujemo svoju odluku i objašnjavamo kako je možete osporiti. Ako za obradu prijave ili odlučivanje o njoj upotrebljavamo automatizirana sredstva, to ćemo navesti. Po prijavama intimnih snimki podijeljenih bez privole postupa se **u roku od 48 sati** od valjanog zahtjeva.
 
 **Dvije odvojene vrste automatiziranih odluka.**
 
@@ -175,7 +183,7 @@ Svaku prijavu potvrđujemo bez nepotrebne odgode. Prijave obrađujemo pravodobno
 
 **Kamo pripada provjera pitanja.** Provjera pitanja iz odjeljka 8. također nije odluka unutar sustava. To je automatizirani alat koji odbija pokretanje rasprave, bez sudjelovanja osobe. Pitanje koje zvuči kao riječi osobe u krizi ili koje traži metode samoubojstva ili samoozljeđivanja ili poticaj na njih umjesto odbijanja dobiva zaslon s brojevima za pomoć.
 
-**Obrazloženje.** Kad god uklonimo vaš sadržaj ili ograničimo njegovu vidljivost, odnosno suspendiramo ili zatvorimo vaš račun, dajemo vam obrazloženje: što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili i jesu li proizašle iz prijave ili naših provjera, jesu li upotrijebljena automatizirana sredstva, pravnu ili ugovornu osnovu te način na koji možete osporiti odluku: putem našeg postupka za pritužbe u nastavku, putem tijela za izvansudsko rješavanje sporova certificiranog prema Aktu EU-a o digitalnim uslugama ili na sudu. Kada naša provjera pitanja odbije pitanje prema odlomku „Pitanja koja ne pokreću raspravu” u odjeljku 7., zaslon koji vas o tome obavještava jest naše obrazloženje za to: navodi da rasprava nije započela, da je naša automatska provjera odbila pitanje bez sudjelovanja osobe, pod koje pravilo ovih Uvjeta pitanje spada i kako uložiti pritužbu putem postupka u nastavku. Za odbijeno pitanje ne obećavamo ništa više. Kada naša provjera izbriše raspravu (odjeljak 9.), obavijest koju vidite jest naše obrazloženje za to: navodi što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili, da u tome nije sudjelovala nijedna osoba, koje pravilo ovih Uvjeta vrijedi i kako uložiti pritužbu putem postupka u nastavku; druga dva puta koja ovaj odlomak navodi ostaju vam otvorena. Zaslon s brojevima za pomoć koji dobiva pitanje koje zvuči kao riječi osobe u krizi jest pomoć, a ne obrazloženje.
+**Obrazloženje.** Kad god uklonimo vaš sadržaj ili ograničimo njegovu vidljivost, odnosno suspendiramo ili zatvorimo vaš račun, dajemo vam obrazloženje: što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili i jesu li proizašle iz prijave ili naših provjera, jesu li upotrijebljena automatizirana sredstva, pravnu ili ugovornu osnovu te način na koji možete osporiti odluku: putem našeg postupka za pritužbe u nastavku, putem tijela za izvansudsko rješavanje sporova certificiranog prema Aktu EU-a o digitalnim uslugama ili na sudu. Šaljemo vam ga e-poštom, s poveznicom na cjelovito obrazloženje u vašem računu pod Postavke, Obavijesti o moderiranju, gdje ostaje. Obrazloženje dobivate i kada vaš sadržaj napusti javnu stranicu zajedno s drugim sadržajem koji pregledavamo, čak i ako nije utvrđeno da vaš sadržaj krši ikakvo pravilo. Kada naša provjera pitanja odbije pitanje prema odlomku „Pitanja koja ne pokreću raspravu” u odjeljku 7., zaslon koji vas o tome obavještava jest naše obrazloženje za to: navodi da rasprava nije započela, da je naša automatska provjera odbila pitanje bez sudjelovanja osobe, pod koje pravilo ovih Uvjeta pitanje spada i kako uložiti pritužbu putem postupka u nastavku. Za odbijeno pitanje ne obećavamo ništa više. Kada naša provjera izbriše raspravu (odjeljak 9.), obavijest koju vidite jest naše obrazloženje za to: navodi što smo učinili i koliki je doseg mjere, činjenice na koje smo se oslonili, da u tome nije sudjelovala nijedna osoba, koje pravilo ovih Uvjeta vrijedi i kako uložiti pritužbu putem postupka u nastavku; druga dva puta koja ovaj odlomak navodi ostaju vam otvorena. Zaslon s brojevima za pomoć koji dobiva pitanje koje zvuči kao riječi osobe u krizi jest pomoć, a ne obrazloženje.
 
 **Pritužba na odluku.** Ako se ne slažete s odlukom o moderiranju, odgovorite na obrazloženje ili pišite na office@dezbatere.ro u roku od **šest mjeseci**. Odluku preispituje osoba koja nije sudjelovala u njezinu prvotnom donošenju, a mi vam priopćujemo obrazloženi ishod. To ne utječe na vaše pravo da se obratite sudu ili upotrijebite alternativno rješavanje sporova prema odjeljku 18. Postupak za pritužbe prihvaća i pritužbe da nismo postupili po prijavi, da je sadržaj pogrešno uklonjen, da je račun pogrešno ograničen ili da je automatizirani alat pogrešno utjecao na vaš sadržaj, primjerice odbijanjem pitanja.
 
@@ -197,17 +205,15 @@ Osim ako je povreda ozbiljna, zakon zahtijeva neposredno postupanje ili bi odgod
 
 Ako u cijelosti ukinemo uslugu ili je povučemo iz vaše države, obavijestit ćemo vas najmanje **30 dana unaprijed**, vratiti svaki unaprijed plaćeni iznos za razdoblje nakon ukidanja i najprije omogućiti izvoz vaših rasprava.
 
-**Što se događa zatvaranjem.** Kada se račun zatvori, uništavamo ključeve za šifriranje podataka o vašem računu i vaših privatnih rasprava, čime oni postaju trajno nečitljivi, brišemo zapis o računu i, ako ste to odabrali, uklanjamo vaše objavljene rasprave iz javnog pristupa kako je opisano u odjeljku 9. Neke se stvari zadržavaju i trebate znati koje: unosi u našim revizijskim i sigurnosnim zapisnicima, koji se mogu samo dopunjavati i čuvaju se radi ispunjavanja naših zakonskih i sigurnosnih obveza; zapisi koje smo dužni čuvati prema zakonu, uključujući zapise o prihvaćanju i privoli; te, za mali broj starijih rasprava koje prethode našem sustavu šifriranja, zapisi čije je brisanje ograničenije — obavijestit ćemo vas ako se to odnosi na vaš račun. Pravila o privatnosti opisuju sve navedeno s gledišta zaštite podataka i objašnjavaju vaše pravo na brisanje.
+**Što se događa zatvaranjem.** Kada se račun zatvori, uništavamo ključeve za šifriranje podataka o vašem računu i vaših privatnih rasprava, čime oni postaju trajno nečitljivi, brišemo zapis o računu i uklanjamo vaš pseudonim iz vaših javnih rasprava, koje ostaju javne, kako je opisano u odjeljku 9. Neke se stvari zadržavaju i trebate znati koje: unosi u našim revizijskim i sigurnosnim zapisnicima, koji se mogu samo dopunjavati i čuvaju se radi ispunjavanja naših zakonskih i sigurnosnih obveza; zapisi koje smo dužni čuvati prema zakonu, uključujući zapise o prihvaćanju i privoli; te, za mali broj starijih rasprava koje prethode našem sustavu šifriranja, zapisi čije je brisanje ograničenije — obavijestit ćemo vas ako se to odnosi na vaš račun. Pravila o privatnosti opisuju sve navedeno s gledišta zaštite podataka i objašnjavaju vaše pravo na brisanje.
 
 Odjeljci 8. (u odnosu na već objavljeni sadržaj), 15., 16. i 18. nastavljaju se primjenjivati nakon prestanka.
 
 ## 12. Plaćeni planovi
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine nudi besplatni plan. Bit će dostupna tri plaćena plana, **Plus**, **Pro** i **Max**; svaki od njih otključat će cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
 
-Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium**, koji će otključati cijeli popis modela i omogućiti vam da sami postavite mjerače rasprave.
-
-**Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Comandă cu obligație de plată*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
+**Prije plaćanja** neposredno iznad gumba za plaćanje prikazujemo vam: plan; ukupnu cijenu s primjenjivim porezom; obračunsko razdoblje; činjenicu da se plan automatski obnavlja do otkazivanja; datum završetka eventualnog besplatnog probnog razdoblja i iznos koji će vam se tada naplatiti; te način otkazivanja. Uvjete obnavljanja potvrđujete označavanjem zasebnog polja. Na gumbu piše **Pretplatite se i platite** (na rumunjskom *Abonați-vă și plătiți*). Na trajnom mediju šaljemo vam potvrdu koja sadržava iste informacije, ove Uvjete i obrazac za odustanak.
 
 **Podsjetnici.** Šaljemo vam e-poruku najmanje 5 dana prije nego što se besplatno probno razdoblje pretvori u plaćeni plan; najmanje jednom godišnje za trajne planove; i između 30 i 45 dana prije svakog obnavljanja razdoblja od dvanaest mjeseci ili duljeg. Svaki podsjetnik sadržava cijenu, datum i poveznicu za otkazivanje.
 
@@ -217,7 +223,7 @@ Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium
 
 **Neuspjela plaćanja.** Ako plaćanje ne uspije, ponovno ga pokušavamo provesti tijekom 7 dana i upozoravamo vas e-poštom prije prebacivanja vašeg računa na besplatni plan. Ne brišemo vaše rasprave zbog neuspjelog plaćanja.
 
-**Porezi i kome plaćate.** Cijene uključuju PDV, GST ili porez na promet, što ovisi o tome gdje živite i prikazuje se prije plaćanja. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete.
+**Porezi i kome plaćate.** Naše cijene prikazane su bez poreza, kao cijena + PDV (ili GST odnosno porez na promet, ovisno o tome gdje živite). Porez za vašu adresu za naplatu dodaje se na naplati, gdje vam se prije plaćanja prikazuje ukupan iznos za plaćanje s uključenim porezom. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete.
 
 **Načini plaćanja.** Plaćate karticom. Prihvaćamo Visa i Mastercard; ne prihvaćamo American Express. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com), a puni broj vaše kartice nikada ne dolazi do nas.
 
@@ -225,7 +231,7 @@ Dialectical Engine nudi besplatni plan. Bit će dostupan plaćeni plan **Premium
 
 **Osporavanje kartičnih transakcija.** Ako osporite terećenje kod izdavatelja kartice, možemo suspendirati plaćene značajke dok se spor ne riješi. Za to ne naplaćujemo naknade.
 
-**Zakonska prava imaju prednost.** Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za oba plana objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas.
+**Zakonska prava imaju prednost.** Kada usluga nije u skladu s onim što smo obećali, imate pravo na usklađivanje usluge ili na razmjerno sniženje cijene ili povrat, kako je predviđeno zakonom. Osim toga, ako tijekom obračunskog razdoblja otkažete plaćeni plan, vraćamo vam dio cijene tog razdoblja koji niste iskoristili, mjeren uporabom plana, bez obzira na to koliko je dana prošlo: ako ste iskoristili 30 %, vraćamo vam 70 %; ako niste iskoristili ništa, vraćamo vam punu cijenu. Zatražite to na support@dezbatere.ro; čim vam vratimo novac, plan prestaje. Ako se primjenjuje i pravo na odustanak iz odjeljka 13, dobivate veći od ta dva povrata. Ograničenja uporabe za sve planove objavljena su u proizvodu; obavijestit ćemo vas prije njihova pooštravanja na način koji bitno utječe na vas.
 
 ## 13. Vaše pravo na odustanak
 
@@ -243,6 +249,24 @@ Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promj
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
 
+Verzija 2.18 zamijenila je verziju 2.17: Prilog A.3 navodi da su i u Quebecu rasprave na plaćenom planu prema zadanim postavkama privatne, a rasprave na besplatnom planu javne, kako je navedeno u 9. odjeljku; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni.
+
+Verzija 2.17 zamijenila je verziju 2.16: odjeljak 10. navodi kada prijavu podnesenu gumbom Prijavite čita umjetna inteligencija, a kada čovjek, da gumb traži vašu izjavu u dobroj vjeri, da prijavu potvrđujemo i odluku vam priopćujemo e-poštom te da se obrazloženja šalju e-poštom i čuvaju u vašem računu; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni.
+
+Verzija 2.16 zamijenila je verziju 2.15: odjeljak 12. navodi plaćene planove, Plus, Pro i Max, a odjeljci 12. i 15. više ne sadrže napomene iz izrade nacrta; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni.
+
+Verzija 2.15 zamijenila je verziju 2.14: odjeljak 12. navodi da su naše cijene prikazane bez poreza, kao cijena + PDV, i da se porez dodaje na naplati.
+
+Verzija 2.14 zamijenila je verziju 2.13: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova.
+
+Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi rumunjski tekst gumba za plaćanje.
+
+Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa.
+
+Verzija 2.11 zamijenila je verziju 2.10: odjeljak 9. navodi da javnu raspravu možemo sakriti dok je pregledavamo, a dio nje ukloniti ili ispraviti.
+
+Verzija 2.10 zamijenila je verziju 2.9: odjeljak 9. navodi da su rasprave na besplatnom planu javne, da se javna rasprava ne može povući iz objave ni izbrisati i da ostaje javna nakon što zatvorite račun, da svatko s kreditom može doprinijeti javnoj raspravi ili o njoj napisati izvješće te da javna rasprava ostaje otvorena nakon što je njezin prvi autor otišao; odjeljak 11. navodi što zatvaranje čini s vašim javnim raspravama.
+
 Verzija 2.9 zamijenila je verziju 2.8: odjeljku 8. dodan je odlomak „Grafikoni i statistike koje izrađujemo”, koji određuje kome pripadaju grafikoni u izvješću o raspravi i daje vam licenciju za njihovu upotrebu.
 
 Verzija 2.8 zamijenila je verziju 2.7: provjera pitanja odbija i pitanje kako počiniti kazneno djelo ili izbjeći kaznu za njega, ili treba li ga netko počiniti, na primjer nezakonito kupovati ili prodavati drogu ili oružje, krasti ili utajiti porez, i ne čuva ga; pitanje treba li promijeniti neki zakon i dalje pokreće raspravu (odjeljak 7.). Također uvodi jednu granicu za droge i dopušta da pitanje treba li promijeniti zakon o samoubojstvu, eutanaziji ili potpomognutom umiranju pokrene raspravu (odjeljak 7.), a provjera pitanja više ne čuva nijedno pitanje za naš tim (odjeljci 7. i 10.); zaslon koji odbija pitanje jest naše obrazloženje za svako pitanje koje prema odjeljku 7. ne pokreće raspravu (odjeljak 10.).
@@ -258,8 +282,6 @@ Verzija 2.7 zamijenila je verziju 2.6: dodaje provjeru pitanja, koja čita svako
 **Vaš sadržaj i vaša uporaba.** Odgovorni ste za ono što šaljete i objavljujete, uključujući to da imate pravo to poslati i da postupate u skladu s odjeljkom 7.
 
 **Događaji izvan naše kontrole.** Ne kršimo ugovor ako nas u ispunjavanju sprječava nešto izvan naše razumne kontrole. Propust ili povlačenje pružatelja modela treće strane nije automatski takav događaj; ako zbog toga usluga postane nedostupna, primjenjuje se odjeljak 14. te možete raskinuti ugovor i dobiti povrat kako je u njemu opisano.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Intelektualno vlasništvo
 
@@ -283,7 +305,7 @@ Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatno
 
 **Potrošači drugdje.** Ako živite izvan EU-a i EGP-a, ništa u ovim Uvjetima ne ograničava bilo koje pravo koje imate prema pravu svoje države da podnesete zahtjev njezinim sudovima niti bilo koje pravo kojeg se prema tom pravu ne možete odreći — uključujući, ako živite u Australiji ili Novom Zelandu, prava iz jamstava za potrošače; ako živite u Brazilu, prava iz zakona Código de Defesa do Consumidor; i ako živite u Sjedinjenim Američkim Državama, prava iz zakona vaše savezne države o zaštiti potrošača.
 
-**Prije obraćanja sudu.** Obratite nam se na support@dezbatere.ro; većina se stvari može riješiti, a cilj nam je odgovoriti u roku od 5 radnih dana. Ako ste potrošač u Rumunjskoj ili EU-u, možete se koristiti alternativnim rješavanjem sporova putem www.onoratainstanta.ro; ne obvezujemo se sudjelovati u tom postupku. Pritužbe na odluke o moderiranju podnose se prema odjeljku 10., što je zaseban postupak.
+**Prije obraćanja sudu.** Obratite nam se na support@dezbatere.ro; većina se stvari može riješiti, a cilj nam je odgovoriti u roku od 5 radnih dana. Ako ste potrošač u Rumunjskoj ili EU-u, možete se koristiti alternativnim rješavanjem sporova putem ANPC (SAL), reclamatiisal.anpc.ro; ne obvezujemo se sudjelovati u tom postupku. Pritužbe na odluke o moderiranju podnose se prema odjeljku 10., što je zaseban postupak.
 
 ## 19. Ostali uvjeti
 
@@ -305,7 +327,7 @@ Svaka se stavka primjenjuje na osobe koje žive u njezinoj regiji i navodi samo 
 
 ### A.1 Europska unija i Europski gospodarski prostor
 
-Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem www.onoratainstanta.ro. **Njemačka:** gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. **Francuska:** pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. **Italija:** odredbe o suspenziji i prestanku (11.), plaćenim planovima i njihovu obnavljanju (12.), promjenama (14.), odgovornosti (15.) te mjerodavnom pravu i mjestu rješavanja sporova (18.) zahtijevaju vaše posebno odobrenje na temelju članaka 1341. i 1342. talijanskog Građanskog zakonika. Dajete ga zasebnim poljem pri registraciji, koje se prikazuje svakome tko u polju Regija odabere Italiju ili čija veza dolazi iz Italije. **Nizozemska:** ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. **Poljska:** dostupna je poljska verzija; odaberite Polski u izborniku jezika.
+Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pred sudovima države u kojoj živite; primjenjuje se pravo na odustanak iz odjeljka 13.; alternativno rješavanje sporova dostupno je putem ANPC (SAL), reclamatiisal.anpc.ro. **Njemačka:** gumb za otkazivanje na dezbatere.ro/cancel omogućuje vam raskid pretplate bez prijave; trajanje pretplate, razdoblja obnavljanja i otkazni rokovi u skladu su s §309(9) BGB-a: svaki plan traje jedan mjesec i obnavlja se svaki mjesec dok ga ne otkažete, a možete ga otkazati u bilo kojem trenutku s učinkom od kraja tekućeg mjeseca. **Francuska:** pretplatu možete raskinuti putem interneta u tri koraka na dezbatere.ro/cancel. **Italija:** odredbe o suspenziji i prestanku (11.), plaćenim planovima i njihovu obnavljanju (12.), promjenama (14.), odgovornosti (15.) te mjerodavnom pravu i mjestu rješavanja sporova (18.) zahtijevaju vaše posebno odobrenje na temelju članaka 1341. i 1342. talijanskog Građanskog zakonika. Dajete ga zasebnim poljem pri registraciji, koje se prikazuje svakome tko u polju Regija odabere Italiju ili čija veza dolazi iz Italije. **Nizozemska:** ovi Uvjeti dostavljaju se prije sklapanja u obliku koji se može pohraniti. **Poljska:** dostupna je poljska verzija; odaberite Polski u izborniku jezika.
 
 ### A.2 Sjedinjene Američke Države
 
@@ -317,7 +339,7 @@ Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pre
 
 ### A.3 Kanada i Quebec
 
-Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. **Quebec:** ovi su Uvjeti dostupni na francuskom jeziku; ako pri registraciji odaberete Kanadu, najprije ćete ih dobiti na francuskom, a umjesto toga možete odabrati engleski; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja.
+Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Vaše podatke uređuje Prilog B.3 naših Pravila o privatnosti. **Quebec:** ovi su Uvjeti dostupni na francuskom jeziku; ako pri registraciji odaberete Kanadu, najprije ćete ih dobiti na francuskom, a umjesto toga možete odabrati engleski; rasprave na plaćenom planu su prema zadanim postavkama privatne, a rasprave na besplatnom planu su javne, kako je navedeno u 9. odjeljku; možete zatražiti uklanjanje osobnih informacija o sebi iz rezultata pretraživanja.
 
 ### A.4 Australija i Novi Zeland
 

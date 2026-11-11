@@ -31,14 +31,21 @@ export const RETIRED_SETTLE_MS=30_000;
 export function assertRunnerReleaseKey(configured,plan,source) {
  if(configured.RELEASE_KEY!==`r${plan.publication.registerVersion}-${source.sourceRevision.slice(0,12)}`)refuse('PREVIEW_RUNNER_RELEASE_KEY_MISMATCH');
 }
-/** Prepare-only (the default, `--plan <file>`): validates plan, custody, environment and release key; starts nothing. */
+/**
+ * Prepare-only (the default, `--plan <file>`): validates plan, custody, environment, the selected runner connection (the
+ * start's assertSelectedRunnerConnection: its exact role set, its publication) and release key; starts nothing. R22,
+ * 2026-11-02: the role set (0130's debateai_rls_all_accounts) refused only at --start, with the site down; a prepare
+ * now refuses it first.
+ */
 export async function prepareRunner(argv) {
  const {plan,source}=await prepareLaunch(argv,'runner',import.meta.url);
  const runtime=await tsImport(join(plan.sourceRoot,'dialectical-engine/packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);
  narrowEnvironment('runner',configured,runtime,plan.publication,plan);
+ const verify=await tsImport('./verify-native.ts',import.meta.url);
+ await verify.assertSelectedRunnerConnection(configured,plan.publication);
  assertRunnerReleaseKey(configured,plan,source);
- return {schema:'preview-auth-dev-runner-prepared-v1',sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,registerVersion:plan.publication.registerVersion,started:false,runtimeSelectionVerified:false};
+ return {schema:'preview-auth-dev-runner-prepared-v1',sourceRevision:source.sourceRevision,sourceTree:source.sourceTree,registerVersion:plan.publication.registerVersion,started:false,runtimeSelectionVerified:true};
 }
 /**
  * Start (`--start --plan <file>`), the API launcher's sequence for the runner: the same shared

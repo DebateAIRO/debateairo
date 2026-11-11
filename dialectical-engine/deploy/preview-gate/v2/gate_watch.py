@@ -67,10 +67,15 @@ class WatchError(Exception):
 # PR B: the Anthropic gate's halt watcher passes --notice anthropic-halted, so its email carries
 # the Anthropic gate's own re-open command (README-anthropic.md).
 NOTICE_KINDS = NOTICE_KINDS + ('anthropic-halted',)
+# Plan 2026-10-30, task W1-1: the Perplexity (web search) gate's halt watcher passes --notice perplexity-halted
+# (README-perplexity.md), with its own unbilled and booked notices.
+NOTICE_KINDS = NOTICE_KINDS + ('perplexity-halted',)
 # Each gate's own daily unbilled notice, by its halt kind. Google is parked: none.
-UNBILLED_KINDS = {'gate-halted': 'gate-unbilled', 'anthropic-halted': 'anthropic-unbilled'}
+UNBILLED_KINDS = {'gate-halted': 'gate-unbilled', 'anthropic-halted': 'anthropic-unbilled',
+                  'perplexity-halted': 'perplexity-unbilled'}
 # Each gate's own booked-at-maximum notice (owner ruling 2026-10-12), by its halt kind. Google: none.
-BOOKED_KINDS = {'gate-halted': 'gate-booked', 'anthropic-halted': 'anthropic-booked'}
+BOOKED_KINDS = {'gate-halted': 'gate-booked', 'anthropic-halted': 'anthropic-booked',
+                'perplexity-halted': 'perplexity-booked'}
 BOOKED_STATE_NAME = 'announced-booked.json'
 
 

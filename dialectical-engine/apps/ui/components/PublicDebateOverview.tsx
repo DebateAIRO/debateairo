@@ -1,140 +1,27 @@
 "use client";
 
-import Link from "next/link";
-import type { CSSProperties } from "react";
-import type { PublicDebate, PublicStoryShort } from "@debateai/contract";
-import { modelMeta } from "@/lib/models";
-import {
-  buildPublicDebatePresentation,
-  type PublicArgumentPresentation
-} from "@/lib/publicDebatePresentation";
-import { v3ScorePercentage } from "@/lib/v3/adapter";
-import { countStoryPositions, storyLabelWords } from "@/lib/v3/storyWords";
-import { StoryShortBlocks, type StoryShortContent } from "@/components/StoryShortBlocks";
-import { FloorAnswer } from "@/components/FloorAnswer";
-import { AlsoRaisedList } from "@/components/AlsoRaisedList";
-import { floorAnswerView, publicFloorHost, resolveFloor } from "@/lib/v3/floorAnswer";
+import type { PublicDebate } from "@debateai/contract";
 import type { LocaleCode } from "@/lib/i18n/locales";
-import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import composeEnglish from "@/messages/en/compose.json";
-import { useDebateTextLang } from "@/components/debateTextLang";
+import type { MessageCatalog } from "@/lib/i18n/translate";
+import v4English from "@/messages/en/v4.json";
+import { V4PublicAnswerFirst } from "@/components/v4/V4PublicPage";
+import { V4PublicLaneProvider, type V4PublicLaneConfig } from "@/components/v4/V4PublicLane";
 
-function verdictLabel(
-  verdict: PublicDebate["answer"]["verdict"],
-  catalog: MessageCatalog
-): string {
-  // R2 B8 fix 1: the label in words, as the story pill says it; the state's code never reaches the reader.
-  return verdict === null ? t(catalog, "public.overview.verdictUnavailable") : storyLabelWords(verdict, catalog);
-}
-
-function ArgumentCard({
-  argument,
-  catalog,
-  composeCatalog,
-  side,
-  onRead
-}: {
-  argument: PublicArgumentPresentation | null;
-  catalog: MessageCatalog;
-  composeCatalog: MessageCatalog;
-  side: "pro" | "con";
-  onRead: (nodeId: string) => void;
-}) {
-  const textLang = useDebateTextLang();
-  const label = side === "pro"
-    ? t(catalog, "public.overview.proLabel")
-    : t(catalog, "public.overview.conLabel");
-  const sideName = side === "pro"
-    ? t(catalog, "public.overview.proSideName")
-    : t(catalog, "public.overview.conSideName");
-  const arrow = side === "pro" ? "↑" : "↓";
-  if (argument === null) {
-    return (
-      <article className="publicArgumentCard publicArgumentEmpty" data-side={side}>
-        <div className="publicArgumentCore">
-          <span className="publicArgumentAccent" aria-hidden />
-          <span className="publicStancePill">{arrow} {label}</span>
-          <p>{t(catalog, "public.overview.noPublishedArgument", { side: sideName })}</p>
-        </div>
-      </article>
-    );
-  }
-
-  const base = v3ScorePercentage(argument.baseScore.value, composeCatalog);
-  const final = argument.finalScore === null ? null : v3ScorePercentage(argument.finalScore.value, composeCatalog);
-  const lineage = argument.makerLineage;
-  const model = lineage === null ? null : modelMeta(lineage.model_id, composeCatalog);
-
-  return (
-    <article className="publicArgumentCard" data-side={side} data-ai-generated="true">
-      <div className="publicArgumentCore">
-        <span className="publicArgumentAccent" aria-hidden />
-        <div className="publicArgumentTop">
-          <span className="publicStancePill">{arrow} {label}</span>
-          <span
-            className="publicArgumentScore"
-            aria-label={final
-              ? t(catalog, "public.overview.baseAndFinalAria", { base: base.text, final: final.text })
-              : t(catalog, "public.overview.baseAndWithheldAria", { base: base.text })}
-          >
-            {base.text} → {final?.text ?? t(catalog, "public.overview.withheld")}
-          </span>
-          <span className="publicArgumentSpacer" />
-          {lineage === null || model === null ? (
-            <span className="publicModelPill publicModelMissing">{t(catalog, "public.overview.modelLineageUnavailable")}</span>
-          ) : (
-            <span
-              className="publicModelPill"
-              style={{ "--model-dot": model.dot } as CSSProperties}
-            >
-              <span className="publicModelDot" aria-hidden />
-              {lineage.maker} · {model.name} · {lineage.model_id}
-            </span>
-          )}
-        </div>
-        <p className="publicArgumentClaim" {...textLang}>{argument.claim}</p>
-        <div className="publicArgumentFoot">
-          <button type="button" className="publicLockedAction" disabled aria-label={t(catalog, "public.overview.challengeLockedAria")}>
-            🔒 {t(catalog, "public.overview.challenge")}
-          </button>
-          <button type="button" className="publicReadAction" onClick={() => onRead(argument.nodeId)}>
-            {t(catalog, "public.overview.read")} <span aria-hidden>▾</span>
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/**
- * The snapshot's short story (spec 2026-09-26 §10, §14) in the shape the shared
- * blocks take, with the storyteller's confidence sentence. The positions the
- * short version left out are counted from the published tree; a snapshot
- * without a tree counts none. A story that was not fully double-checked
- * (`double_checked: false`, final review Important 2) shows the same gentle
- * catalogue line as the owner's page, in the question's language; the
- * snapshot never carries the checker's own text.
+/*
+ * The body of a public debate's page, and of the publication review that shows a reviewer the same page.
+ * Owner's screen review, 3 Nov 2026: public-d1 A rebuilt it answer-first in V4's look (components/v4/V4PublicPage.tsx); public-f1 took every score,
+ * percentage, capital-letter measure, model code, for/against count and the old disclaimer off it; public-f3 took the locked Challenge and its "Unlock
+ * actions" line away. This file keeps its export and props (the start-step branch builds on them) and switches to the new page. `composeCatalog` and
+ * `viewingNote` belonged to the old layout (its score copy and its unlock line) and are no longer read. `onDetails` and `onRead` open a publication
+ * review's own panels: without a lane (the review) the page shows the reviewer "Details" and "Read" for them; a stranger's page (with a lane) never does.
  */
-function publicStoryContent(story: PublicStoryShort, answer: PublicDebate["answer"]): StoryShortContent {
-  return {
-    headline: story.headline,
-    confidence: story.confidence,
-    summary: story.summary,
-    paths: story.paths.map((path) => ({ fate: path.fate, line: path.line, positionRef: path.position_ref })),
-    morePaths: Math.max(0, countStoryPositions(answer.nodes ?? [], answer.edges ?? []) - story.paths.length),
-    change: story.change.text,
-    reviewerNote: story.reviewer_note === null ? null : story.reviewer_note.text,
-    reservation: story.double_checked === false
-  };
-}
-
 export function PublicDebateOverview({
   debate,
   catalog,
   storyCatalog,
   storyLocale,
-  composeCatalog = composeEnglish,
-  viewingNote = "PUBLIC",
+  locale = storyLocale,
+  lane,
   onDetails,
   onRead
 }: {
@@ -142,118 +29,34 @@ export function PublicDebateOverview({
   catalog: MessageCatalog;
   /**
    * The `public` catalogue of the language the debate was argued in (spec
-   * 2026-09-26 §14.3): the short story's label, fates and lines read in it,
-   * whatever the interface's language.
+   * 2026-09-26 §14.3): the short story's words read in it, whatever the interface's language.
    */
   storyCatalog: MessageCatalog;
   storyLocale: LocaleCode;
-  /** The interface locale's `compose` catalogue: V3 score copy and model family names. */
+  /** No longer read (the old layout's score copy); kept so callers need no change. */
   composeCatalog?: MessageCatalog;
+  /** No longer read (public-f3: the "Unlock actions" line is gone); kept so callers need no change. */
   viewingNote?: "PUBLIC" | "NONE";
+  /** The reader's locale, for the dates of contributions and reports. */
+  locale?: string;
+  /** Decision 13: on the live public page, what a signed-in person can press. Absent (a publication review): the page's text alone. */
+  lane?: V4PublicLaneConfig;
+  /** A publication review's "Details" (no lane only; public-f1: a stranger's page has no Details drawer). */
   onDetails: () => void;
+  /** A publication review's "Read" on each side's strongest point (no lane only). */
   onRead: (nodeId: string) => void;
 }) {
-  const presentation = buildPublicDebatePresentation(debate, catalog);
-  // With a story, the label is said in human words and the storyteller's own
-  // sentence replaces the generic confidence words (spec §14.2), both in the
-  // question's language. Without one, the snapshot reads as it always did.
-  const story = debate.story_short;
-  // A components-only snapshot whose label the engine kept (spec §14.4.4): the
-  // label in human words and, without a story, "Our best answer:" and the
-  // leading position's statement, all in the question's language.
-  const floor = resolveFloor(publicFloorHost(debate.answer), debate.floor);
-  const floorView = floor === null ? null : floorAnswerView(floor, storyCatalog, storyLocale, storyLocale);
-  const storyVerdict = floor !== null ? floor.label : story === undefined ? null : debate.answer.verdict;
-  const returnPath = `/public/debate/${encodeURIComponent(debate.public_ref)}`;
-  const signInHref = `/login?next=${encodeURIComponent(returnPath)}`;
-
-  return (
-    <div className="publicOverviewScroll scroll" data-design-turn="3b">
-      <div className="publicOverview">
-        <div className="publicOverviewInner">
-        <section className="publicVerdictShell" aria-labelledby="public-verdict-label" data-ai-generated="true">
-          <div className="publicVerdictCore">
-            <span className="publicVerdictTab" aria-hidden />
-            <div className="publicVerdictHead">
-              {storyVerdict === null ? (
-                <span
-                  id="public-verdict-label"
-                  className="publicVerdictPill"
-                  data-verdict={presentation.verdict?.toLowerCase() ?? "unavailable"}
-                >
-                  {verdictLabel(presentation.verdict, catalog)}
-                </span>
-              ) : (
-                <span
-                  id="public-verdict-label"
-                  className="publicVerdictPill"
-                  data-verdict={storyVerdict.toLowerCase()}
-                  lang={storyLocale}
-                >
-                  {storyLabelWords(storyVerdict, storyCatalog)}
-                </span>
-              )}
-              {story === undefined && presentation.confidenceBand ? (
-                <span className="publicThresholdLabel">{t(catalog, "public.overview.confidence", { confidence: presentation.confidenceBand.toLowerCase() })}</span>
-              ) : null}
-              <button type="button" className="publicDetailsAction" onClick={onDetails}>
-                {t(catalog, "public.overview.details")} <span aria-hidden>▾</span>
-              </button>
-            </div>
-            <div className="publicVerdictText">
-              {story !== undefined
-                ? <StoryShortBlocks story={publicStoryContent(story, debate.answer)} catalog={storyCatalog} locale={storyLocale} className="publicStory" />
-                : floorView !== null
-                  ? <FloorAnswer view={floorView} showLabel={false} />
-                  : presentation.summary.length > 0
-                    ? presentation.summary.map((paragraph, index) => <p key={index}>{paragraph}</p>)
-                    : <p>{t(catalog, "public.overview.composedVerdictUnavailable")}</p>}
-              {story !== undefined && floorView !== null && floorView.thinBasis !== null ? (
-                <p className="floorAnswerNote" lang={floorView.locale} dir={floorView.direction}>{floorView.thinBasis}</p>
-              ) : null}
-            </div>
-            <p className="publicVerdictCaveat"><span aria-hidden>⚠</span> {t(catalog, "public.overview.caveat", { caveat: presentation.caveat })}</p>
-            {/* A list, so a screen reader reads four metrics rather than one run-together line. */}
-            <div className="publicMetricRow" role="list">
-              <span role="listitem">{t(catalog, "public.overview.dialecticalSupport", { support: presentation.metrics.support })}</span>
-              <span role="listitem">{t(catalog, "public.overview.verification", { reviewed: presentation.metrics.reviewed })}</span>
-              <span role="listitem">{t(catalog, "public.overview.judgeCoverage", { judged: presentation.metrics.judged })}</span>
-              <span role="listitem">{t(catalog, "public.overview.convergence", { convergence: presentation.metrics.convergence })}</span>
-            </div>
-          </div>
-        </section>
-
-        <section className="publicSupport" aria-labelledby="public-support-title">
-          <div className="publicSupportRow">
-            <span className="publicSupportPro">{t(catalog, "public.overview.caseFor", { count: presentation.proCount })}</span>
-            <div
-              className="publicSupportMeter"
-              role="img"
-              data-measured={presentation.supportMeasured ? "true" : "false"}
-              style={{ "--pro-pct": `${presentation.proPercent}%` } as CSSProperties}
-              aria-label={presentation.supportMeasured
-                ? t(catalog, "public.overview.supportPercentAria", { percent: presentation.proPercent })
-                : t(catalog, "public.overview.supportUnavailableAria")}
-            />
-            <span className="publicSupportCon">{t(catalog, "public.overview.caseAgainst", { count: presentation.conCount })}</span>
-          </div>
-          <p id="public-support-title">{t(catalog, "public.overview.strongestSurviving")}</p>
-        </section>
-
-        <section className="publicArgumentGrid" aria-label={t(catalog, "public.overview.strongestArgumentsAria")}>
-          <ArgumentCard argument={presentation.strongestPro} catalog={catalog} composeCatalog={composeCatalog} side="pro" onRead={onRead} />
-          <ArgumentCard argument={presentation.strongestCon} catalog={catalog} composeCatalog={composeCatalog} side="con" onRead={onRead} />
-        </section>
-
-        {/* Debate shape P2c: what came up but was not debated, in the question's language. */}
-        <AlsoRaisedList view={debate.map_view} catalog={storyCatalog} locale={storyLocale} />
-
-        {viewingNote === "PUBLIC" ? <p className="publicUnlockNote">
-          <span aria-hidden>🔒</span> {t(catalog, "public.overview.publicViewingNotice")} {" "}
-          <Link href={signInHref}>{t(catalog, "public.overview.unlockActions")} <span aria-hidden>→</span></Link>
-        </p> : null}
-        </div>
-      </div>
-    </div>
+  const body = (
+    <V4PublicAnswerFirst
+      debate={debate}
+      catalog={lane?.catalog ?? v4English}
+      publicCatalog={catalog}
+      storyCatalog={storyCatalog}
+      storyLocale={storyLocale}
+      locale={locale}
+      actions={lane !== undefined}
+      {...(lane === undefined ? { reviewDoors: { onDetails, onRead } } : {})}
+    />
   );
+  return lane === undefined ? body : <V4PublicLaneProvider debate={debate} lane={lane}>{body}</V4PublicLaneProvider>;
 }

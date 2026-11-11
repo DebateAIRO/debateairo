@@ -38,13 +38,17 @@ beforeAll(async () => {
 }, 240_000);
 afterAll(async () => { await runner?.end(); await api?.end(); await bare?.end(); await database?.stop(); });
 
-/** An active subscription person (the free plan, no entitlement event), as b6a-room-decisions seeds one. */
+/**
+ * An active subscription person (the free plan, no entitlement event), as b6a-room-decisions seeds one. Signed up a minute
+ * ago: the entitlement reader looks up to a JavaScript time in whole milliseconds, and a sign-up in the same millisecond
+ * came out "not signed up yet" (BILLING_OWNER_UNKNOWN), once in a whole-suite run.
+ */
 async function subscriptionPerson(): Promise<string> {
   const ownerRef = randomUUID();
   await database.pool.query(
     `INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,phone_ciphertext,
        password_hash,pseudonym,audit_token,owner_ref,state,adult_affirmed_at,created_at)
-     VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now())`,
+     VALUES ($1,$2,'{}'::jsonb,'{}'::jsonb,NULL,'test-password-hash',$3,$4,$5,'active',now(),now() - interval '1 minute')`,
     [randomUUID(), randomBytes(32), `waiver-${randomUUID()}`, randomUUID(), ownerRef]
   );
   return ownerRef;
@@ -186,10 +190,12 @@ describe("side-by-side §9, C10: a set-aside debate uses none of the person's qu
       .toEqual([{ reason: "BACKSTOP" }]);
   });
 
-  it("row-level security (0126): the same roles with no account context read none of the window and write no waiver", async () => {
+  it("row-level security (0126): the same roles with no account context are refused the person's window and write no waiver", async () => {
     // The control on the runner's login: the person's window holds the second run's 200 (the first is waived).
     expect(await new PostgresModelSpendStore(runner).readOwnerSpentMicros(ownerRef, from, to)).toBe(200);
-    expect(await new PostgresModelSpendStore(bare).readOwnerSpentMicros(ownerRef, from, to)).toBe(0);
+    // Its runs' rows are hidden (0126), and 0171's spend totals in it refuse a connection that is not the person's: a window that caps is never read
+    // as nothing spent.
+    expect(await refusalCode(new PostgresModelSpendStore(bare).readOwnerSpentMicros(ownerRef, from, to))).toBe("42501");
     const runId = await subscriptionRun(ownerRef, new Date());
     expect(await refusalCode(recordSpendWaiver(bare, runId, "BACKSTOP"))).toBe("42501");
     expect((await database.pool.query("SELECT count(*)::int AS n FROM ledger.model_spend_waiver WHERE run_id=$1", [runId])).rows[0].n)

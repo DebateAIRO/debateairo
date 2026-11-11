@@ -877,49 +877,21 @@ export class MemoryRepository {
 
   async unlinkForAnswer(answerId: string, ownership: RunOwnershipInput, actorRef: string): Promise<{ readonly memoryLinkId: string } | null> {
     const access = normalizeRunOwnership(ownership);
-    return withWriteTransaction(this.pool, async (client) => {
-      const located = await client.query<{ run_id: string }>(
-        `SELECT run_id FROM serve.answer WHERE answer_id=$1
-         ORDER BY answer_version DESC LIMIT 1`, [answerId]
-      );
-      const runId = located.rows[0]?.run_id;
-      if (runId === undefined) return null;
-      const lockedRun = await client.query<{ run_id: string }>(
-        `SELECT run_id
-         FROM core.lock_owned_live_runs(ARRAY[$1]::uuid[],$2::uuid,$3::text)`,
-        [runId, access.ownerRef, access.legacyAskerId]
-      );
-      if (lockedRun.rows[0] === undefined) return null;
-      const owned = await client.query<{ owned: boolean }>(
-        `SELECT core.run_is_owned_by($1,$2,$3) AS owned`,
-        [runId, access.ownerRef, access.legacyAskerId]
-      );
-      if (owned.rows[0]?.owned !== true) return null;
-      const link = await client.query<{ memory_link_id: string }>(
-        `SELECT link.memory_link_id
-         FROM memory.memory_link AS link
-         WHERE link.source_run_id=$1
-         ORDER BY link.at_seq DESC LIMIT 1
-         FOR UPDATE`,
-        [runId]
-      );
-      const row = link.rows[0];
-      if (row === undefined) return null;
-      // Re-read latest state after taking the link lock; a concurrent unlink
-      // cannot leave this decision based on a stale LATERAL snapshot.
-      const state = await client.query<{ state: string }>(
-        `SELECT state FROM memory.memory_link_event
-         WHERE memory_link_id=$1 ORDER BY at_seq DESC LIMIT 1`,
-        [row.memory_link_id]
-      );
-      if (state.rows[0]?.state !== "LINKED") return null;
-      await client.query(
-        `INSERT INTO memory.memory_link_event (memory_link_id, state, actor_ref, reason, at_seq)
-         VALUES ($1,'UNLINKED',$2,'ASKER_UNLINK_CONTROL',$3)`,
-        [row.memory_link_id, actorRef, await allocateSequence(client)]
-      );
-      return Object.freeze({ memoryLinkId: row.memory_link_id });
-    });
+    const located = await this.pool.query<{ run_id: string }>(
+      `SELECT run_id FROM serve.answer WHERE answer_id=$1
+       ORDER BY answer_version DESC LIMIT 1`, [answerId]
+    );
+    const runId = located.rows[0]?.run_id;
+    if (runId === undefined) return null;
+    // The runtime login may not lock memory.memory_link itself (a row lock needs UPDATE on the table). 0155's definer
+    // locks the run only when the caller owns it and it is live, checks the owner again after the lock, locks the run's
+    // newest link and re-reads its state, then records UNLINKED. It answers NULL for every refusal.
+    const unlinked = await this.pool.query<{ memory_link_id: string | null }>(
+      `SELECT memory.unlink_owned_memory_link($1,$2,$3,$4) AS memory_link_id`,
+      [runId, access.ownerRef, access.legacyAskerId, actorRef]
+    );
+    const memoryLinkId = unlinked.rows[0]?.memory_link_id ?? null;
+    return memoryLinkId === null ? null : Object.freeze({ memoryLinkId });
   }
 
   async observeAnswerContradiction(answerId: string, actorRef: string): Promise<string | null> {

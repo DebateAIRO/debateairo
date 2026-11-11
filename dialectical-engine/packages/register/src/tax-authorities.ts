@@ -164,6 +164,22 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
       }),
       afterThreshold("NO_VOEC", "NO", "Norway", "Norway's VOEC scheme (Skatteetaten)", "NOK 50,000 in a year"),
       afterThreshold("IS_VOES", "IS", "Iceland", "Iceland's VOES scheme (Skatturinn)", "ISK 2,000,000 in a year"),
+      // Research of 10 November 2026, the FTA's VAT Info 22 "Foreign businesses" (25 February 2026): §1.1.1 (liable
+      // once worldwide taxable turnover is CHF 100,000 or more; "Swiss territory" includes Liechtenstein), §1.1.2
+      // (register within 30 days), §1.1.3 (electronic services to individuals are not exempt), §4.1 (a representative
+      // in Switzerland). Quaderno is not known to watch a threshold on worldwide turnover, so the line says to watch it.
+      Object.freeze({
+        scheme: "CH_VAT", countries: Object.freeze(["CH", "LI"]), tax_statuses: null,
+        registration: "AFTER_THRESHOLD" as const,
+        where: "Nothing until the company's worldwide taxable turnover (every sale, in every country) reaches CHF "
+          + "100,000 a year; from then Swiss VAT is due on every sale to an individual in Switzerland or "
+          + "Liechtenstein, which are one VAT territory. The threshold counts sales everywhere, not only Swiss "
+          + "ones, so watch the company's total yourself. Register with Switzerland's Federal Tax Administration "
+          + "(FTA) within 30 days, through a Swiss tax representative (required).",
+        when: "After registration: a VAT return on the FTA portal for each period the FTA sets, in Swiss francs "
+          + "(sales in other currencies converted at the FTA's rate).",
+        due: noDueDate
+      }),
       fromFirstSale("GB_HMRC", "GB", "the UK", "HM Revenue & Customs (HMRC), for UK VAT"),
       Object.freeze({
         scheme: "US_STATE", countries: Object.freeze(["US"]), tax_statuses: null, registration: "AFTER_THRESHOLD" as const,
@@ -180,6 +196,20 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
         "Singapore's threshold for overseas sellers"),
       afterThreshold("JP_CONSUMPTION_TAX", "JP", "Japan", "Japan's National Tax Agency (consumption tax)",
         "Japan's threshold for foreign sellers"),
+      // Research of 5 November 2026: the threshold rose from NT$480,000 on 7 April 2025. It is not confirmed that
+      // Quaderno watches it, so the line says to watch it here instead of afterThreshold's Quaderno sentence.
+      Object.freeze({
+        scheme: "TW_BUSINESS_TAX", countries: Object.freeze(["TW"]), tax_statuses: null,
+        registration: "AFTER_THRESHOLD" as const,
+        where: "Nothing until your sales to individuals in Taiwan pass NT$600,000 in a year (the previous year or the"
+          + " current one); sales to Taiwanese companies are reverse charge. Watch Taiwan's total in this summary:"
+          + " Quaderno is not confirmed to warn you. Past the threshold, register with Taiwan's National Taxation"
+          + " Bureau (eTax Portal, cross-border section) for the 5% business tax, and issue a government e-invoice for"
+          + " every sale to an individual.",
+        when: "After registration: a return every two months, by the 15th of the month after each period, paid in"
+          + " Taiwan dollars.",
+        due: noDueDate
+      }),
       fromFirstSale("KR_VAT", "KR", "South Korea", "South Korea's National Tax Service, for VAT on electronic services"),
       fromFirstSale("IN_GST", "IN", "India", "India's GST authorities, for GST on online services"),
       fromFirstSale("AE_VAT", "AE", "the United Arab Emirates", "the UAE Federal Tax Authority, for VAT"),

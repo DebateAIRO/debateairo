@@ -85,8 +85,12 @@ async function publishWith(
   let stored: Readonly<{ publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }> | null = null;
   const repository = {
     preflightGrant: async () => true,
+    // Security review F2 (0171): not a dig, so it may be published.
+    readRunIsDig: async () => false,
     readAuthorPseudonym: async () => "Stable Public Name",
     readArgumentLanguageTag,
+    // V4 start step, Task 75d: the run's reading level, copied with the language (none here: asked without one).
+    readRunReadingLevel: async () => null,
     prepareKeyProvision: async () => true,
     publish: async (input: Readonly<{ publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }>) => {
       stored = { publicationRef: input.publicationRef, runId: input.runId, contentCiphertext: input.contentCiphertext };

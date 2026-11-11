@@ -34,6 +34,7 @@ export function SettingsPageClient({
   billingCatalog = billingEnglish,
   renewalConsent = null
 }: SettingsI18nProps & {
+
   /** The locale's `newDebate` catalogue: the session gate's copy (review F2). */
   newDebateCatalog?: MessageCatalog;
   /** The locale's `billing` catalogue: the usage bars (paid-plans spec §2.10). */
@@ -106,6 +107,8 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
         <div className="setInner">
           <h1 className="setTitle" ref={title} tabIndex={focusTitle ? -1 : undefined}>{t(catalog, "settings.account.title")}</h1>
           <a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a>
+          {/* 0157 (D1): the person's statements of reasons. */}
+          <a className="setBtn" href="/settings/notices">{t(catalog, "settings.notices.title")}</a>
           <SubscriptionControls catalog={billingCatalog} locale={locale} renewalConsent={renewalConsent} />
           <UsageBars catalog={billingCatalog} locale={locale} />
 

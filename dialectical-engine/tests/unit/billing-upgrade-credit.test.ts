@@ -5,24 +5,24 @@ const START = new Date("2026-10-01T00:00:00.000Z");
 const END = new Date("2026-10-31T00:00:00.000Z");
 const at = (fraction: number) => new Date(START.getTime() + (END.getTime() - START.getTime()) * fraction);
 const plusToPro = {
-  currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 20_000_000,
+  currentMonthCreditMicros: 6_600_000, oldPlanCreditMicros: 6_600_000, newPlanCreditMicros: 33_000_000,
   periodStart: START, periodEnd: END
 };
 
 describe("P12c A6: the month credit after an upgrade", () => {
   it("adds the new plan's extra credit for the part of the period still to run", () => {
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: at(0.5) })).toBe(12_500_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: START })).toBe(20_000_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: END })).toBe(5_000_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(END.getTime() + 1) })).toBe(5_000_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(START.getTime() - 1) })).toBe(20_000_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: at(0.5) })).toBe(19_800_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: START })).toBe(33_000_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: END })).toBe(6_600_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(END.getTime() + 1) })).toBe(6_600_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(START.getTime() - 1) })).toBe(33_000_000);
   });
 
   it("builds on an earlier upgrade's credit in the same period", () => {
     expect(upgradeMonthCreditOverrideMicros({
-      currentMonthCreditMicros: 12_500_000, oldPlanCreditMicros: 20_000_000, newPlanCreditMicros: 150_000_000,
+      currentMonthCreditMicros: 19_800_000, oldPlanCreditMicros: 33_000_000, newPlanCreditMicros: 220_000_000,
       periodStart: START, periodEnd: END, at: at(0.75)
-    })).toBe(45_000_000);
+    })).toBe(66_550_000);
   });
 
   it("floors to whole micros and never lowers the credit", () => {

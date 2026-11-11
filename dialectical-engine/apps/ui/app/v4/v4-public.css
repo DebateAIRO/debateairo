@@ -1,0 +1,48 @@
+/* V4 screen review (owner picks of 3 Nov, OWNER-PICKS-2026-11-03.md): a debate's public marks and the public dig flow.
+   Loaded by the V4 pages (app/v4/layout.tsx) and the public page (app/public/debate/[id]/page.tsx), after v4-base.css,
+   v4-map-looks.css and v4-undo.css. Site tokens and the V4 tokens only. Motion: nothing here moves; a public stage that
+   changes takes the shared 1-second highlight (.v4Highlight), and a dig being looked into takes the map's one look for
+   it (.v4Ground.v4GroundLOOKING, its one slow pulse ring, still under reduced motion). */
+
+/* ---------- journey-f20 / public-f26: the globe line under the question ---------- */
+.v4PublicMark {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 0 0 12px; min-width: 0;
+  color: var(--text-2); font-size: var(--t-ui); line-height: 1.4; overflow-wrap: anywhere;
+}
+.v4PublicMarkGlobe { flex: none; color: var(--text-2); margin-inline-end: 4px; }
+.v4PublicMarkWord { font-weight: 700; color: var(--text); }
+.v4PublicMarkCopied { margin-inline-start: 6px; color: var(--text-2); }
+.v4PublicMarkCopied:empty { display: none; }
+.v4DebTrayPublic { margin: 0; color: var(--text-2); font-size: var(--t-ui); }
+@media print { .v4PublicMark { display: none; } }
+
+/* ---------- public-f11 / public-d2: the public dig box ---------- */
+.v4PubModes { display: flex; flex-wrap: wrap; gap: 6px; }
+.v4PubChips { display: flex; flex-wrap: wrap; gap: 6px; }
+.v4PubChip { text-align: start; max-width: 100%; overflow-wrap: anywhere; }
+.v4PubChip[aria-disabled="true"] { cursor: not-allowed; opacity: .55; }
+.v4PubChipDug { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; border-style: solid; }
+.v4PubChipDugLine { color: var(--text-2); font-size: 12px; }
+.v4PubWriteOwn { align-self: flex-start; font-size: 13.5px; }
+
+/* The card under the path after the 10 seconds: being looked into (hatched, one slow ring), then a plain card. */
+.v4PubDigCard {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line-2);
+  border-radius: var(--r-btn); background: var(--surface); min-width: 0; overflow-wrap: anywhere;
+}
+.v4PubDigCardTitle { margin: 0; color: var(--text); font-size: 13.5px; }
+.v4PubDigStops { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--text-2); font-size: 12.5px; }
+.v4PubDigStop { display: inline-flex; align-items: center; gap: 6px; }
+.v4PubDigStopMark {
+  display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; flex: none;
+  border: 1.5px solid var(--line-strong); border-radius: var(--r-dot); font-size: 10px; line-height: 1;
+}
+.v4PubDigStopDone { color: var(--text); }
+.v4PubDigStopDone .v4PubDigStopMark { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+.v4PubDigOutcome { margin: 0; color: var(--text); font-size: 13.5px; font-weight: 700; }
+.v4PubDigChange { display: flex; flex-direction: column; gap: 4px; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }
+.v4PubDigChangeLine { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.5; }
+.v4PubNewWords { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; background: none; }
+.v4PubDigSee { align-self: flex-start; font-size: 13.5px; }
+.v4PubDigOpen { margin: 0; font-size: 13px; }
+.v4PubNotes { min-height: 0; }

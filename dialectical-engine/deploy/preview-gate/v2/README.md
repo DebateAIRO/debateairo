@@ -11,7 +11,7 @@ owner's words, it:
 
 The website (API) and the runner ask the gate for each model call through a local socket file.
 The gate checks the team's money for today, makes the call, records what it really cost, and
-answers. All calls share ONE team pot of $5 per day. The day resets at midnight Bucharest time.
+answers. All calls share ONE team pot per day (the owner's figure, in the GO on the server). The day resets at midnight Bucharest time.
 At most 4 calls run at the same time.
 
 If anything about a call is unclear (no cost reported, a provider error, a lost reply), the gate
@@ -247,8 +247,8 @@ stat -c '%a %U:%G %h %s' /var/lib/debateai-v3-preview/provider-team-authority-v2
 | `scope_id` | `preview-team-v2-20261009` | New name for the new pot. The API's and runner's `PREVIEW_PROVIDER_TEST_CONFIG_JSON` must carry the same `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name (measured). The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), measured with `id`. No one else may ask. |
-| `daily_budget_usd` | `"5.00"` | The owner's team pot. A string with two decimals. |
-| `max_paid_posts_per_day` | `400` | A second fuse. Each call first sets aside about $0.08, so $5 is reached long before 400. |
+| `daily_budget_usd` | the owner's figure | The owner's team pot. A string with two decimals. |
+| `max_paid_posts_per_day` | the owner's figure | A second fuse on the number of paid calls. |
 | `max_concurrent_calls` | `4` | Owner ruling. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
 | `predecessor_ledger_sha256` | v1 ledger hash | Optional. Records which v1 ledger this pot follows. |
@@ -260,8 +260,9 @@ The other fields are fixed: `schema`, `allow_paid_calls` true, `model`, `request
 G=/opt/debateai-v3-preview/operator/team-budget-v2
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 PRED=$(sha256sum /var/lib/debateai-v3-preview/provider-test-authority/budget-ledger.json | cut -d' ' -f1)
+DAILY_BUDGET=<the owner's figure>; DAILY_CALLS=<the owner's figure>
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" '{schema:"preview-provider-budget-go-v2",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,model:"zai-org/GLM-5.3-Flash",requested_effort:"high",scope_id:"preview-team-v2-20261009",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:"5.00",max_paid_posts_per_day:400,max_concurrent_calls:4,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-team-go-v2.json
+jq -n --arg b "$BR" --arg h "$HE" --arg p "$PRED" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v2",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,model:"zai-org/GLM-5.3-Flash",requested_effort:"high",scope_id:"preview-team-v2-20261009",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:4,open_days:31,predecessor_ledger_sha256:$p}' > /root/preview-archive/provider-team-go-v2.json
 install -o root -g root -m 0600 /root/preview-archive/provider-team-go-v2.json /etc/debateai-v3-preview/provider-team-go-v2.json
 jq -c . /etc/debateai-v3-preview/provider-team-go-v2.json
 ```
@@ -277,7 +278,7 @@ P=/var/lib/debateai-v3-preview/provider-team-authority-v2; GO=/etc/debateai-v3-p
 What to expect:
 - `init` prints one line with `"state": "initialized"`.
 - `activate` prints a summary with `"state": "active"`, `"window_open": true` and
-  `"daily_budget_usd": "5.00"`.
+  `daily_budget_usd` the figure you wrote.
 - A refusal is one line `{"status": "refused", "error": "<CODE>"}`. For example,
   `HELPER_CUSTODY_INVALID` (file owners or modes), `ROOT_GO_INVALID` (a GO field or hash) or
   `ACTIVATION_REFUSED` (wrong host or state).

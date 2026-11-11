@@ -38,10 +38,13 @@ export function LegalAcceptGate({
   children,
   client = contractClient,
   onSignedOut = () => window.location.assign("/login"),
-  reloadPage = () => window.location.reload()
+  reloadPage = () => window.location.reload(),
+  checkingView
 }: Readonly<{
   catalog?: MessageCatalog | undefined;
   children: ReactNode;
+  /** V4 screen review (map-f6): what shows while the status is read (AuthGate passes its own); left out: "Checking session…". */
+  checkingView?: ReactNode | undefined;
   client?: GateClient;
   /** Where a signed-out person goes; a prop so render tests never navigate jsdom. */
   onSignedOut?: () => void;
@@ -75,6 +78,7 @@ export function LegalAcceptGate({
 
   if (state === "clear") return <>{children}</>;
   if (state === "checking") {
+    if (checkingView !== undefined) return <>{checkingView}</>;
     return <div className="screen scroll"><div className="screenInner narrow"><p className="muted">{t(catalog, "newDebate.checkingSession")}</p></div></div>;
   }
 

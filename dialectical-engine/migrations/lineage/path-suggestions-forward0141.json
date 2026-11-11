@@ -1,0 +1,17 @@
+{
+  "version": "path-suggestions-forward0141-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0140_internal_spend_kinds.sql",
+    "manifestSha256": "7f3ca07dd7418841e6938099aec88c2a88f14b3f398e3cc534344c4767da40d0",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0141_path_suggestions.sql",
+    "sha256": "e5a3c09480501afba04499ac641bec2b55c1e459830d454db3c4e31d7bf58514"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

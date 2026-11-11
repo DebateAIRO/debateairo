@@ -22,6 +22,8 @@
  *             --line-up FILE runs it with that line-up, in the throwaway register only (practice-settings.ts); every mode
  *             that reads the settings takes it (formats, openings, language and judge-order then ask with that line-up).
  *             --site-language and --language-choice set the site language and answer the one-language offer (default keep).
+ *             --start-step free:3|premium:5 starts it with the step before Start and the menu's top paths, --digs 0..2
+ *             digs it after; the month's lines go to <out>/start-month.jsonl only (practice-start-step.ts, V4 Task 91b).
  *  - openings: the debate-shape comparison (spec 2026-10-12 §2): today's opening (T) and three map openings (A snowball,
  *             B blind lists, C the angle map) on 12 fixed questions; every finished call goes to <out>/openings.jsonl at
  *             once (practice-openings-log.ts) and the report is built from it, on every way out. --dry answers from a
@@ -54,6 +56,7 @@ import { mapPromptContractHash } from "@debateai/map";
 import {
   createPreviewBudgetRpcPort,
   previewFinalWriterTierUnreadLine,
+  previewGateSocket,
   previewModelRow,
   type PreviewBudgetPorts,
   type PreviewGateRemaining,
@@ -63,7 +66,7 @@ import {
 import { readOperatorCommandEnvironment } from "@debateai/register";
 import { loadStoryPack, resolveStoryPackDir } from "@debateai/story";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
-import { practiceRemainingPorts } from "./practice-ask-composition.js";
+import { practiceRemainingPorts, practiceSearchRemainingPort } from "./practice-ask-composition.js";
 import { runPracticeDebate } from "./practice-debate.js";
 import {
   onePerModel,
@@ -86,7 +89,7 @@ import {
   type OpeningsArm,
   type OpeningsQuestion
 } from "./practice-openings-questions.js";
-import { openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
+import { openingsMaxInFlightDefault, openingsQuestionRotations, runPracticeOpenings } from "./practice-openings.js";
 import { practiceJudgeOrderDryPorts, runPracticeJudgeOrderMode } from "./practice-judge-order.js";
 import { practiceDebateLanguageFromArgs, practiceLanguageDryPorts, practiceLanguagePolicy, runPracticeLanguageMode } from "./practice-language.js";
 import { parsePracticeCallConcurrency } from "./practice-parallel.js";
@@ -120,6 +123,7 @@ import {
   remainingLine
 } from "./practice-samples-log.js";
 import { practiceShapeOverrideFromArgs } from "./practice-shape.js";
+import { PRACTICE_START_FLAGS, practiceStartStepFromArgs } from "./practice-start-step.js";
 import { practiceLengthOverrideFromArgs } from "./practice-length.js";
 import { PRACTICE_ENGINE_FLAGS, practiceEngineOverrideFromArgs, practiceRegisterHasLengthRow } from "./practice-engine.js";
 import { PRACTICE_PIN_FLAGS, practicePinsGiven, practiceWriterPinsFromArgs } from "./practice-pins.js";
@@ -129,6 +133,7 @@ import {
   PracticeRefusal,
   practiceLineUpFromArgs,
   practiceSettingsWithLineUp,
+  practiceSearchSocketFromEnvironment,
   practiceSocketsFromEnvironment,
   readGateStatus,
   readPracticeSettings
@@ -168,11 +173,16 @@ type Args = Readonly<{ mode: "formats" | "debate" | "openings" | "language" | "r
 const REGISTER_NEXT_INPUT_FLAGS = Object.freeze(["--hosted-billing", "--checker", "--deepseek-enabled-on-gate", "--role-rotation",
   "--register-call-concurrency"]);
 
-const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", "--out",
+/** V4 start step, Task 91f: root's status of the web-search gate, read only by a debate that searches (`--start-step premium:N`). */
+const SEARCH_GATE_STATUS_FLAG = "--gate-status-perplexity" as const;
+
+const VALUE_FLAGS = new Set(["--settings", "--register-export", "--gate-status-deepinfra", "--gate-status-anthropic", SEARCH_GATE_STATUS_FLAG, "--out",
   "--samples", "--gap-ms", "--models", "--lanes", "--depth", "--question", "--max-in-flight", "--busy-wait-minutes", "--levels",
   "--side-by-side", "--questions", "--arms", "--call-concurrency", "--shape-policy", "--depth-mode", "--scrutiny",
   "--answer-length", "--site-language", "--language-choice", "--transcripts", "--length-policy", "--engine-policy",
   "--answer-writer-model", "--storyteller-model", "--line-up",
+  // V4 start step, Task 91b (practice-start-step.ts): debate mode only.
+  ...PRACTICE_START_FLAGS,
   ...REGISTER_NEXT_INPUT_FLAGS]);
 const SWITCHES = new Set<string>(["--sequential", "--transcript", "--dry", "--register-next", "--story-length", "--control"]);
 
@@ -403,7 +413,12 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       onCall: (call) => opened.append({ kind: "call", call }),
       onArm: (arm) => opened.append({ kind: "arm", arm }),
       onBusy: (model) => opened.append({ kind: "busy", model }),
-      onBusyWait: (wait) => opened.append({ kind: "busy-wait", ...wait })
+      onBusyWait: (wait) => opened.append({ kind: "busy-wait", ...wait }),
+      // Task 91 (arm S): each card of the step before Start, once its calls have ended.
+      onStartCard: (card) => opened.append(card),
+      // Task 91c (arm Q): each reading of the clarifying call, once it has ended; with --dry, made-up times and no call.
+      dry: setup.dry,
+      onClarify: (line) => opened.append(line)
     });
     if (settled !== null) return settled;
     const after = setup.remainingPorts === null ? { deepinfra: null, anthropic: null } : {
@@ -440,6 +455,19 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         schema: PRACTICE_REPORT_SCHEMA, mode: "rescore", verdict: rescored.verdict, exitCode: rescored.exitCode,
         reasons: rescored.reasons, startedAt: startedAt.toISOString(), finishedAt: new Date().toISOString()
       }) });
+    }
+    // V4 start step, Task 91b: --start-step and --digs, debate mode only, refused in every other mode before anything is read (a
+    // bad value too, naming the flag only), so a mistyped plan or count can never start a paid run.
+    const startStep = practiceStartStepFromArgs(args.mode, args.flags);
+    if (startStep?.plan === "free" && PRACTICE_PIN_FLAGS.some((flag) => args.flags.has(flag))) {
+      // The pins steer the rotation's counts over the premium roster (practice-pins.ts): they hold only on the premium plan.
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID", "--start-step (a free start takes no writer pin: pins hold only on premium)");
+    }
+    // V4 start step, Task 91f: only a Plus start-step debate searches the web (Free never does; a practice without --start-step names no
+    // plan): the search gate's status is read by no other run, so the flag anywhere else is refused before anything is read.
+    if (args.flags.has(SEARCH_GATE_STATUS_FLAG) && (args.mode !== "debate" || startStep?.plan !== "premium")) {
+      throw new PracticeRefusal("PRACTICE_FLAG_VALUE_INVALID",
+        `${SEARCH_GATE_STATUS_FLAG} (a --start-step premium debate only: no other practice searches the web)`);
     }
     // Parallel AI calls: the debate's runner only; checked before anything is read or sent.
     const callConcurrencyText = args.flags.get("--call-concurrency");
@@ -576,7 +604,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         before: { deepinfra: null, anthropic: null }, remainingPorts: null, questions: openingsQuestions, arms: openingsArms,
         // A busy model sits out at once unless asked otherwise; the script's waits take no time either way.
         busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 0, 0, 240) * 60_000,
-        maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: dry.sleep });
+        maxInFlight: wholeNumber(args, "--max-in-flight", openingsMaxInFlightDefault(openingsArms), 1, 20), sleep: dry.sleep });
     }
     if (args.mode === "language" && args.switches.has("--dry")) {
       // --dry: the two gate ports come ONLY from the script (practice-language.ts practiceLanguageDryPorts). No
@@ -613,6 +641,21 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     directory = assertOutsideRepository(args.flags.get("--out") ?? defaultReportDirectory(mode, startedAt), repositoryRoot());
     const sockets = practiceSocketsFromEnvironment(env);
     const settings = readPracticeSettings(required(args, "--settings"), sourceRevision());
+    /*
+     * V4 start step, Task 91f (owner 9 Nov, "Fix the practice first"): a Plus start-step debate searches the web as the site's runner
+     * does for a Plus run, where the settings name a search gate (the runner's web switch, run-settings.ts runnerWebSearchSettings).
+     * Its searches go through the relayed web-search gate socket, held to the other two gates' start rules (root's status, the gate's
+     * own "what is left today"), each refused here, before anything is spent. Review of Task 91f (coordinator ruling, 9 Nov): the
+     * owner chose this fix so that the Plus run searches, so settings that name no search gate refuse it here
+     * (PRACTICE_SEARCH_GATE_REQUIRED), never a Plus run with its paths SWITCHED_OFF. Free and no --start-step are today's.
+     */
+    const searches = mode === "debate" && startStep?.plan === "premium";
+    if (searches && previewGateSocket(settings.runner.PREVIEW_GATE_SETTINGS, "perplexity") === undefined) {
+      throw new PracticeRefusal("PRACTICE_SEARCH_GATE_REQUIRED",
+        "the settings name no search gate (perplexity_budget_socket in PREVIEW_PROVIDER_TEST_CONFIG_JSON): a --start-step premium "
+        + "debate searches the web as the site's runner does for a Plus run");
+    }
+    const searchSocket = searches ? practiceSearchSocketFromEnvironment(env, sockets) : null;
     // Addition D14-D16 (owner 2026-10-22, R25): the line-up the practice asks with. The modes that run no settings version
     // (formats, openings, language, judge-order): the --line-up file's, else the settings' env line-up (a sockets-only file
     // refuses PREVIEW_LINE_UP_REQUIRED here, before any gate is asked). A debate's is resolved once its register is read
@@ -646,6 +689,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       unsentStreakAtStart[gate] = status.unsentStreak;
       if (status.maxConcurrentCalls !== null) gateLimits[gate] = status.maxConcurrentCalls;
     }
+    // Task 91f: the search gate's own status, held to the same start rule (active, fewer than three connection failures in a row).
+    if (searchSocket !== null) assertGateStatusAllowsPractice("perplexity", readGateStatus("perplexity", required(args, SEARCH_GATE_STATUS_FLAG)));
     const register = linedFromRegister ? (() => {
       let text: string;
       try { text = readFileSync(required(args, "--register-export"), "utf8"); } catch (error) {
@@ -704,7 +749,10 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
     // PROVIDER_GATE_UNAVAILABLE (run resilience fix (c)), never a money stop.
     const budgetPorts = Object.freeze({
       deepinfra: observer.wrap("deepinfra", createPreviewBudgetRpcPort(settings.runner.PREVIEW_GATE_SETTINGS, sockets.deepinfra)),
-      anthropic: observer.wrap("anthropic", createPreviewBudgetRpcPort(settings.runner.PREVIEW_GATE_SETTINGS, sockets.anthropic))
+      anthropic: observer.wrap("anthropic", createPreviewBudgetRpcPort(settings.runner.PREVIEW_GATE_SETTINGS, sockets.anthropic)),
+      // Task 91f: the search gate's own port on its forwarded socket (its third parameter, as above: the same socket's /remaining,
+      // so a halted search gate is PROVIDER_GATE_UNAVAILABLE); the runner's search port sends through it (runnerWebSearchSettings).
+      ...(searchSocket === null ? {} : { perplexity: createPreviewBudgetRpcPort(settings.runner.PREVIEW_GATE_SETTINGS, searchSocket) })
     });
     // The gates' own read-only answer: both must be open before anything paid is sent.
     const remainingPorts = practiceRemainingPorts(settings, sockets);
@@ -714,6 +762,15 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       try { answer = await remainingPorts[gate](); } catch { throw new PracticeRefusal("PRACTICE_GATE_UNREACHABLE", gate); }
       if (answer.state !== "active" || !answer.windowOpen) throw new PracticeRefusal("PRACTICE_GATE_NOT_OPEN", `${gate}: ${answer.state}`);
       before[gate] = answer;
+    }
+    if (searchSocket !== null) {
+      // Task 91f: the search gate's own read-only answer must be open too, before anything paid is sent.
+      let answer: PreviewGateRemaining;
+      try { answer = await practiceSearchRemainingPort(settings, searchSocket)(); } catch {
+        throw new PracticeRefusal("PRACTICE_GATE_UNREACHABLE", "perplexity");
+      }
+      if (answer.state !== "active" || !answer.windowOpen) throw new PracticeRefusal("PRACTICE_GATE_NOT_OPEN", `perplexity: ${answer.state}`);
+      log("web: this Plus debate searches the web through the search gate (perplexity), as the site's runner does for a Plus run");
     }
     if (args.mode === "judge-order") {
       // R2b (D3): any preview AI may have judged; each must be enabled at its gate before anything paid is sent.
@@ -745,7 +802,7 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
         ports: budgetPorts, dry: false, folder: directory, unsentStreakAtStart, gateLimits, before, remainingPorts,
         questions: openingsQuestions, arms: openingsArms,
         busyWaitMs: wholeNumber(args, "--busy-wait-minutes", 30, 0, 240) * 60_000,
-        maxInFlight: wholeNumber(args, "--max-in-flight", PRACTICE_FORMATS_DEFAULTS.maxInFlight, 1, 20), sleep: options.sleep });
+        maxInFlight: wholeNumber(args, "--max-in-flight", openingsMaxInFlightDefault(openingsArms), 1, 20), sleep: options.sleep });
     }
     if (mode === "formats") {
       const lanes = lanesOf(args) ?? [...PRACTICE_LANES];
@@ -837,6 +894,8 @@ export async function runPractice(argv: readonly string[], env: Readonly<Record<
       ...(options.wait === undefined ? {} : { wait: options.wait }),
       ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
       ...(options.asOf === undefined ? {} : { asOf: options.asOf }),
+      // V4 start step, Task 91b: the step before Start, its digs, and the month's lines appended to start-month.jsonl in --out.
+      ...(startStep === null ? {} : { start: startStep, startMonthDirectory: directory }),
       progress: log,
       transcriptDirectory: args.switches.has("--transcript") ? directory : null
     });
@@ -902,7 +961,8 @@ if (invokedDirectly) {
     quit("UNCAUGHT:UNHANDLED_REJECTION");
   });
   // ADR-0027: an operator command names the keys it reads; the register's loader is the one reader of the environment.
-  const env = readOperatorCommandEnvironment(["PRACTICE_ACK", "PRACTICE_DEEPINFRA_SOCKET", "PRACTICE_ANTHROPIC_SOCKET"]);
+  // Task 91f: PRACTICE_PERPLEXITY_SOCKET is read only by a debate that searches (`--start-step premium:N`, a search gate named).
+  const env = readOperatorCommandEnvironment(["PRACTICE_ACK", "PRACTICE_DEEPINFRA_SOCKET", "PRACTICE_ANTHROPIC_SOCKET", "PRACTICE_PERPLEXITY_SOCKET"]);
   const outcome = await runPractice(process.argv.slice(2), env, { onControl: (given) => {
     control = given;
     // Once more as the run starts, in case anything loaded since added its own.

@@ -283,8 +283,10 @@ export async function creditNoteContext(
       chargeId: paid.charge.chargeId, transactionId: refund.transactionId, issuedOn: sale.refunded.at,
       currency: paid.charge.currency,
       refundTotalMicros: sale.amountMicros, original: { documentId: original.externalRef, number: original.number },
-      // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language, the same sentence
-      // the invoice carried for the period it credits (SmartBill's P5 still names its negative line itself).
+      // RefundRecord.description (D5 Open question 4): the credited line in the buyer's language for the period it
+      // credits, written again now (SmartBill's P5 still names its negative line itself). A credit note for an invoice
+      // issued before the 5 Nov 2026 date change may write the date day first ("1 October 2026") where its invoice wrote
+      // it month first ("October 1, 2026"): the same date, the month in words (accepted by the owner, 5 Nov 2026).
       description: invoiceLine(deps.orderText ?? englishOrderText, paid.profile.locale, paid.quote.planId, paid.period),
       // Spec §2.8 step 5: the credit note names the processor of the payment it refunds.
       processor: "netopia"

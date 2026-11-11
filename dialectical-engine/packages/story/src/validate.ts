@@ -59,6 +59,12 @@ export interface StoryMaterialIndex {
    * `shapeIds` (STORY_UNKNOWN_SHAPE). Absent on every v3 index: today's reading.
    */
   readonly fixedShapeId?: string;
+  /**
+   * Story v5 (V4 start step, Task 51): a path run's story. When set, `short.paths` is read against the person's paths (each
+   * once, in their order) and every node_refs entry against the points the material kept (`storyPathsIssues`), in place
+   * of the position and citation checks above; the text checks are the same. Absent on every other index: today's reading.
+   */
+  readonly storyPaths?: Readonly<{ pathIds: readonly string[]; pointRefs: ReadonlySet<string> }>;
 }
 
 /**
@@ -162,6 +168,13 @@ export const StoryCheckerVerdictSchema = z.object({
   criteria: StoryCheckerCriteriaSchema
 }).strict().superRefine((verdict, context) => checkerRules(verdict, context));
 
+/** v4's one rule more (and v5's): a misleading problem is one the checker names, so it needs satisfied false and an objection. */
+function misleadingRule(verdict: Readonly<{ satisfied: boolean; misleading: boolean; objection: string | null }>, context: z.RefinementCtx): void {
+  if (verdict.misleading && (verdict.satisfied || verdict.objection === null)) {
+    context.addIssue({ code: "custom", path: ["misleading"], message: "STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION" });
+  }
+}
+
 /**
  * Story v4 (R1d, spec §7.2 item 7; INTERFACE §5.3): the checker also says whether a problem would MISLEAD the person.
  * Only `misleading: true` starts round 2 (loop.ts); `satisfied: false, misleading: false` is a wording note: recorded,
@@ -176,10 +189,38 @@ export const StoryCheckerV4VerdictSchema = z.object({
   criteria: StoryCheckerCriteriaSchema
 }).strict().superRefine((verdict, context) => {
   checkerRules(verdict, context);
-  if (verdict.misleading && (verdict.satisfied || verdict.objection === null)) {
-    context.addIssue({ code: "custom", path: ["misleading"], message: "STORY_CHECKER_MISLEADING_WITHOUT_OBJECTION" });
-  }
+  misleadingRule(verdict, context);
 });
+
+/**
+ * Story v5 (V4 start step, Task 51): the check's eight criteria on a path run, v4's with the label and the losing paths
+ * replaced by the main answer and every path (a path run has no label and no losing paths).
+ */
+export const STORY_PATHS_CHECK_CRITERIA = Object.freeze([
+  "faithful_to_material", "agrees_with_main_answer", "fair_to_every_path", "no_overstatement", "citations_correct",
+  "reviewer_note_separate", "goal_marked_as_reading", "speaks_to_the_person"
+] as const);
+
+/** The v5 check's verdict: v4's members and rules, with the path run's eight criteria (in `STORY_PATHS_CHECK_CRITERIA`'s order). */
+export const StoryPathsCheckVerdictSchema = z.object({
+  satisfied: z.boolean(),
+  misleading: z.boolean(),
+  objection: z.string().trim().min(1).max(STORY_CHECKER_RUNAWAY_LIMITS.maxObjectionChars).nullable(),
+  criteria: z.object({
+    faithful_to_material: z.boolean(),
+    agrees_with_main_answer: z.boolean(),
+    fair_to_every_path: z.boolean(),
+    no_overstatement: z.boolean(),
+    citations_correct: z.boolean(),
+    reviewer_note_separate: z.boolean(),
+    goal_marked_as_reading: z.boolean(),
+    speaks_to_the_person: z.boolean()
+  }).strict()
+}).strict().superRefine((verdict, context) => {
+  checkerRules(verdict, context);
+  misleadingRule(verdict, context);
+});
+export type StoryPathsCheckVerdict = z.infer<typeof StoryPathsCheckVerdictSchema>;
 
 /** The accepted verdict: v3's members, and on a v4 verdict `misleading` too (never on a v3 one). */
 export type StoryCheckerVerdict = z.infer<typeof StoryCheckerVerdictSchema> & { readonly misleading?: boolean };
@@ -230,11 +271,56 @@ function assertStoryMaterialIndex(index: StoryMaterialIndex): void {
   }
 }
 
+/**
+ * Story v5 (V4 start step, Task 51): what code refuses in a path run's story. One `short.paths` entry per path, each once, in
+ * the person's order: an id that is not one of the paths (unknown, at the entry), a path left out (missing), else any other
+ * difference from the order given (order: two entries swapped, one path twice); and every node ref is one of the points the
+ * material kept (at the ref). None: an empty list.
+ */
+export const STORY_PATHS_ISSUES = Object.freeze({
+  missing: "STORY_PATHS_PATH_MISSING",
+  unknown: "STORY_PATHS_PATH_UNKNOWN",
+  order: "STORY_PATHS_ORDER",
+  nodeRef: "STORY_PATHS_NODE_REF_UNKNOWN"
+} as const);
+
+export function storyPathsIssues(body: StoryBody, pathIds: readonly string[], pointRefs: ReadonlySet<string>): readonly StoryIssue[] {
+  const issues: StoryIssue[] = [];
+  const issue = (path: readonly (string | number)[], message: string): void => {
+    issues.push(Object.freeze({ code: "custom", path: Object.freeze([...path]), message }));
+  };
+  const known = new Set(pathIds);
+  const given = body.short.paths.map((path) => path.position_ref);
+  given.forEach((ref, position) => {
+    if (!known.has(ref)) issue(["short", "paths", position, "position_ref"], STORY_PATHS_ISSUES.unknown);
+  });
+  const unknown = issues.length > 0;
+  if (pathIds.some((id) => !given.includes(id))) {
+    issue(["short", "paths"], STORY_PATHS_ISSUES.missing);
+  } else if (!unknown && (given.length !== pathIds.length || given.some((ref, position) => ref !== pathIds[position]))) {
+    issue(["short", "paths"], STORY_PATHS_ISSUES.order);
+  }
+  const citations = (refs: readonly string[], at: readonly (string | number)[]): void => {
+    refs.forEach((ref, position) => {
+      if (!pointRefs.has(ref)) issue([...at, "node_refs", position], STORY_PATHS_ISSUES.nodeRef);
+    });
+  };
+  body.short.paths.forEach((path, position) => citations(path.node_refs, ["short", "paths", position]));
+  citations(body.short.change.node_refs, ["short", "change"]);
+  body.why.reasons.forEach((reason, reasonIndex) => citations(reason.node_refs, ["why", "reasons", reasonIndex]));
+  body.long.sections.forEach((section, sectionIndex) => section.paragraphs.forEach((paragraph, paragraphIndex) =>
+    citations(paragraph.node_refs, ["long", "sections", sectionIndex, "paragraphs", paragraphIndex])));
+  if (body.reviewer_note !== null) citations(body.reviewer_note.node_refs, ["reviewer_note"]);
+  return Object.freeze(issues);
+}
+
 function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonly StoryIssue[] {
   const issues: StoryIssue[] = [];
   const issue = (path: readonly (string | number)[], message: string): void => {
     issues.push(Object.freeze({ code: "custom", path: Object.freeze([...path]), message }));
   };
+  // Story v5 (Task 51): a path run's paths and citations are `storyPathsIssues`'s, below; the text checks stay these.
+  const storyPaths = index.storyPaths;
   const scores = storyScorePattern(index.scoreTexts);
   const engineTokens = storyEngineTokenPattern(index.engineTokens);
   /** Every text a person reads: no hidden or reordering characters, none of the material's scores, none of its codes. */
@@ -249,6 +335,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     if (STORY_SHORT_POINT_NUMBER.test(value)) issue(at, "STORY_SHORT_POINT_NUMBER");
   };
   const citations = (refs: readonly string[], at: readonly (string | number)[]): void => {
+    if (storyPaths !== undefined) return;
     refs.forEach((ref, position) => {
       if (!index.nodeIds.has(ref)) issue([...at, "node_refs", position], "STORY_UNKNOWN_NODE_REF");
     });
@@ -264,6 +351,10 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
   const covered = new Set<string>();
   let pathsWellFormed = true;
   body.short.paths.forEach((path, position) => {
+    if (storyPaths !== undefined) {
+      siteText(path.line, ["short", "paths", position, "line"]);
+      return;
+    }
     if (!index.positionIds.has(path.position_ref)) {
       pathsWellFormed = false;
       issue(["short", "paths", position, "position_ref"], "STORY_NOT_A_POSITION");
@@ -280,7 +371,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
   });
   // Every position once while they fit under the cap; exactly the cap beyond it.
   const expected = Math.min(index.positionIds.size, index.pathCap);
-  if (pathsWellFormed && body.short.paths.length !== expected) {
+  if (storyPaths === undefined && pathsWellFormed && body.short.paths.length !== expected) {
     issue(["short", "paths"], "STORY_POSITION_COVERAGE");
   }
 
@@ -303,6 +394,7 @@ function storyContentIssues(body: StoryBody, index: StoryMaterialIndex): readonl
     siteText(body.reviewer_note.text, ["reviewer_note", "text"]);
     citations(body.reviewer_note.node_refs, ["reviewer_note"]);
   }
+  if (storyPaths !== undefined) issues.push(...storyPathsIssues(body, storyPaths.pathIds, storyPaths.pointRefs));
   return issues.slice(0, STORY_ISSUE_LIMIT);
 }
 
@@ -362,7 +454,7 @@ function readStoryBody(value: unknown): StoryRead<StoryBody> {
   return refixed !== null && refixed.success ? { ok: true, value: refixed.data, repairs: fixed!.repairs } : { ok: false, message: parsed.error.message };
 }
 
-function readCheckerVerdict(value: unknown, schema: StoryCheckerSchema): StoryRead<StoryCheckerVerdict> {
+function readCheckerVerdict<T>(value: unknown, schema: z.ZodType<T>): StoryRead<T> {
   const parsed = schema.safeParse(value);
   if (parsed.success) return { ok: true, value: parsed.data, repairs: [] };
   const fixed = fixReplyStructure(value, schema, STORY_FIXER_OPTIONS);
@@ -423,10 +515,8 @@ export function parseStoryBody(content: string, index: StoryMaterialIndex, reply
   return decided.body;
 }
 
-function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQuestionLanguage: StoryLanguageCheck | undefined,
-  v4: boolean): { readonly classification: ContentClassification; readonly verdict: StoryCheckerVerdict | null } {
-  // Story v4 (R1d): the v4 form adds `misleading`; a v3 reply is read exactly as before.
-  const schema: StoryCheckerSchema = v4 ? StoryCheckerV4VerdictSchema : StoryCheckerVerdictSchema;
+function decideChecker<T>(content: string, reply: ModelReplyFacts | undefined, inQuestionLanguage: StoryLanguageCheck | undefined,
+  schema: z.ZodType<T>): { readonly classification: ContentClassification; readonly verdict: T | null } {
   const decoded = decodeModelJson(content, reply, { trailingObjectAccepted: (value) => readCheckerVerdict(value, schema).ok });
   if (!decoded.ok) return { classification: { parseStatus: "PARSE_FAILED", parseError: decoded.error }, verdict: null };
   const read = readCheckerVerdict(decoded.value, schema);
@@ -443,7 +533,12 @@ function decideChecker(content: string, reply: ModelReplyFacts | undefined, inQu
  */
 export function classifyCheckerContent(content: string, reply?: ModelReplyFacts, inQuestionLanguage?: StoryLanguageCheck,
   v4?: boolean): ContentClassification {
-  return decideChecker(content, reply, inQuestionLanguage, v4 === true).classification;
+  return decideChecker(content, reply, inQuestionLanguage, checkerSchemaOf(v4 === true)).classification;
+}
+
+/** Story v4 (R1d): the v4 form adds `misleading`; a v3 reply is read exactly as before. */
+function checkerSchemaOf(v4: boolean): StoryCheckerSchema {
+  return v4 ? StoryCheckerV4VerdictSchema : StoryCheckerVerdictSchema;
 }
 
 /**
@@ -451,7 +546,22 @@ export function classifyCheckerContent(content: string, reply?: ModelReplyFacts,
  * Throws `STORY_CHECKER_CONTENT_INVALID` for refused content.
  */
 export function parseCheckerVerdict(content: string, reply?: ModelReplyFacts, v4?: boolean): StoryCheckerVerdict {
-  const decided = decideChecker(content, reply, undefined, v4 === true);
+  const decided = decideChecker(content, reply, undefined, checkerSchemaOf(v4 === true));
+  if (decided.verdict === null) {
+    throw new TypedDomainError("STORY_CHECKER_CONTENT_INVALID", decided.classification.parseStatus);
+  }
+  return decided.verdict;
+}
+
+/** Story v5 (Task 51): the path run's check, read as v4's is, with its own criteria (`StoryPathsCheckVerdictSchema`). */
+export function classifyStoryPathsCheckContent(content: string, reply?: ModelReplyFacts,
+  inQuestionLanguage?: StoryLanguageCheck): ContentClassification {
+  return decideChecker(content, reply, inQuestionLanguage, StoryPathsCheckVerdictSchema).classification;
+}
+
+/** The accepted v5 verdict, decoded exactly as its classifier decoded it. Throws `STORY_CHECKER_CONTENT_INVALID` for refused content. */
+export function parseStoryPathsCheckVerdict(content: string, reply?: ModelReplyFacts): StoryPathsCheckVerdict {
+  const decided = decideChecker(content, reply, undefined, StoryPathsCheckVerdictSchema);
   if (decided.verdict === null) {
     throw new TypedDomainError("STORY_CHECKER_CONTENT_INVALID", decided.classification.parseStatus);
   }

@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "לא ניתן ליצור דיון",
   "newDebate.sessionReadFailed": "קריאת ההפעלה נכשלה",
   "newDebate.planRosterFailed": "קריאת רשימת רמות התוכנית נכשלה",
-  "newDebate.checkingSession": "ההפעלה נבדקת…",
+  "newDebate.checkingSession": "רגע אחד…",
   "newDebate.redirectingToSignIn": "מעבירים אתכם להתחברות…",
   "newDebate.continueToSignIn": "המשך להתחברות",
   "newDebate.defaultUnavailable": "בפריסה אין שורת riskTier תקינה; רמת הסיכון ממתינה לקלט.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "הגעתם למגבלה היומית של התוכנית שלכם. עדיין אפשר לשאול: הדיון שלכם יתחיל מעצמו ב־{time}.",
   "newDebate.room.personWeekFullTopPlan": "הגעתם למגבלה השבועית של התוכנית שלכם. עדיין אפשר לשאול: הדיון שלכם יתחיל מעצמו ב־{time}.",
   "newDebate.room.personMonthFullTopPlan": "הגעתם למגבלה החודשית של התוכנית שלכם. עדיין אפשר לשאול: הדיון שלכם יתחיל מעצמו ב־{time}.",
-  "newDebate.room.freeMonthFull": "ניצלתם את הדיונים החינמיים של החודש. הדיון הבא שלכם יוכל להתחיל ב־{time}, או בחרו תוכנית כדי להמשיך עכשיו.",
+  "newDebate.room.freeMonthFull": "ניצלתם את המכסה החינמית של החודש. הדיון הבא שלכם יוכל להתחיל ב־{time}, או בחרו תוכנית כדי להמשיך עכשיו.",
   "newDebate.room.personClose": "אתם קרובים למגבלה של התוכנית שלכם. הדיון הזה עדיין יתקיים במלואו.",
   "newDebate.room.ownDebatesFull": "הדיונים האחרים שלכם משתמשים כרגע ביתרת המגבלה שלכם. הדיון הזה יתחיל מעצמו ברגע שאחד מהם יסתיים.",
   "newDebate.room.upgradeLink": "צפייה בתוכניות",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "התוכנית שלכם: חינם",
   "newDebate.plan.current.PLUS": "התוכנית שלכם: Plus",
   "newDebate.plan.current.PRO": "התוכנית שלכם: Pro",
-  "newDebate.plan.current.MAX": "התוכנית שלכם: Max"
+  "newDebate.plan.current.MAX": "התוכנית שלכם: Max",
+  "newDebate.askText.otherAnswer": "תשובה אחרת…",
+  "newDebate.askText.otherLabel": "הבהרה נוספת משלך",
+  "newDebate.askText.matters": "אם התשובות מושכות לכיוונים שונים, מה שהכי חשוב לי הוא: {matters}",
+  "newDebate.freePublicNotice": "בתוכנית החינמית, השאלה שלכם והדיון בה הם פומביים. אל תכללו פרטים אישיים."
 }

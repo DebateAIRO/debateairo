@@ -779,7 +779,7 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
       personAllowance: {
         read: async () => [{
           scope: "PERSON_MONTH", limitMicros: 1_000, periodStart: new Date("2026-09-15T00:00:00.000Z"),
-          resetsAt: MONTH_RESET, finishBasisPoints: 11_000, closeBasisPoints: 9_500
+          resetsAt: MONTH_RESET, finishBasisPoints: 12_100, closeBasisPoints: 9_500
         }]
       },
       entitlements: input.entitlements ?? null,
@@ -864,7 +864,8 @@ describe("B7b AskRoom.startWaiting decides like an admission, under the same loc
     return Object.freeze({
       kind: "READMIT" as const, ask: {} as never, shapePlan: "free" as const, planId: null, evaluation: {} as never,
       settingsClass: Object.freeze({ planTier: "free" as const, compositionBudgetTier: "low" as const, makerCount: 2, depth: 1 }),
-      holdMicros: null, stored: storedAsk(stale.runId), ...overrides
+      // V4 start step, Task 39: no start and no chosen paths, as every re-admission before the start step.
+      holdMicros: null, stored: storedAsk(stale.runId), start: null, startPaths: null, ...overrides
     });
   }
 

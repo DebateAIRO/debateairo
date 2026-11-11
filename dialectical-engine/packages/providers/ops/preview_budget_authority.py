@@ -22,6 +22,11 @@ largest enabled final-writer worst case (F = 0 without the member: max_concurren
 largest standard worst case, as before LG-B). The profile
 API (the helper's DeepInfraProfile docstring lists it) is all the core calls, so a new provider
 is one reviewed profile class.
+Per-request prices, beside the token rule (plan 2026-10-30, task W1-1): a row that carries request_usd (Perplexity's
+search) reserves, and is checked against its profile's per-call cap, at exactly that amount whatever the request's size
+(reservation_for); its token prices and its profile's reservation and ceiling prices are all 0 (row_prices_ok), and
+its profile's account() charges exactly that amount for a reply it fully understands. Everything else (the pot, the
+call count, the slots, cool-offs, bookings, halts, /remaining) is the same for both kinds of row.
 
 init creates fresh v3 state from a hash-bound GO; activate opens it on the reviewed Linux host
 for open_days; serve is Root-operated Unix IPC and, with probe, the only reader of Root's
@@ -156,10 +161,11 @@ an upload an older release's debate may still ask for a row or a price the new G
 reads either as that model sitting out, never as money). Every other refusal, among them every
 failure after a reservation, is the opaque PREVIEW_TEST_AUTHORITY_STOPPED.
 
-Team total (owner, 2026-10-10; raised by owner answer M1, 2026-10-15): one GO's daily_budget_usd is at most
-MAX_GO_BUDGET_USD ($12.00, the DeepInfra pot), and activate (root, in a shell, so outside every unit's sandbox) also adds
-the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is over
-TEAM_TOTAL_BUDGET_USD ($16.00: DeepInfra $12.00 + Anthropic $4.00).
+Team total: one GO's daily_budget_usd is at most the per-GO cap, and activate (root, in a shell, so outside every unit's
+sandbox) also adds the daily_budget_usd of the other provider gates' GO files (GATE_PATHS) and refuses when the sum is over
+the team total. Both figures live only in the root-owned settings file CAPS_PATH on the server, never in this public
+repository, and there is no default: read_caps refuses without that file (ROOT_CAPS_REQUIRED, ROOT_CAPS_INVALID), so no GO
+loads. A caller sees the opaque refusal; the codes are for the operator. A GO's author cannot move a cap by editing the GO.
 
 Probe fence: a probe refuses (PROBE_FENCE_REQUIRED) unless it runs inside the fenced transient
 unit the README gives (check_probe_fence), so a bare run never reads the key without the network
@@ -202,8 +208,8 @@ GO_SCHEMA = 'preview-provider-budget-go-v3'
 CONTROL_SCHEMA = 'preview-provider-budget-control-v3'
 DAY_SCHEMA = 'preview-provider-budget-day-v3'
 RESERVATION_OVERHEAD_BYTES = 2048  # Bytes the provider may add around the request (the app reserves the same).
-# Outer bounds on what a profile may declare as its own per-call cap and request size (DeepInfra:
-# $0.25 and 256 KiB, owner ruling 2026-10-10). A unit test pins every reviewed row under its profile's cap.
+# Outer bounds on what a profile may declare as its own per-call cap and request size: typing guards, not limits the site
+# runs at (each profile's own per-call cap, in the helper, is the real one). A unit test pins every reviewed row under it.
 MAX_PROFILE_CALL_CAP_USD = Decimal('1.00')
 MAX_PROFILE_REQUEST_BYTES = 1024 * 1024
 MAX_PRICE_USD_PER_M = Decimal('10.00')  # A price above this is a typo, not a preview model.
@@ -294,10 +300,14 @@ ENTRY_STATES = ('pending', 'settled', 'uncertain', 'released_unbilled', BOOKED_M
 # sent (socket timeouts, resets, TLS errors, a closed or cut reply). Only these are booked at the
 # reservation; anything else after the reservation stays uncertain and halts.
 BOOKABLE_TRANSPORT_FAILURES = (OSError, http.client.HTTPException)
-# Owner ruling 2026-10-10, raised by owner answer M1 (2026-10-15): one GO may ask for at most $12.00 a day (the
-# DeepInfra pot), and the daily team total over every provider gate's pot is $16.00 (DeepInfra $12.00 + Anthropic $4.00).
-MAX_GO_BUDGET_USD = Decimal('12.00')
-TEAM_TOTAL_BUDGET_USD = Decimal('16.00')  # Checked only by activate's sum over every gate's GO.
+# What one GO may ask for a day, and the daily total over every provider gate's pot, are the owner's and live only in this
+# file on the server (this repository is public): read_caps, no default here. It sits beside the GOs, and no unit hides it.
+CAPS_PATH = '/etc/debateai-v3-preview/provider-budget-caps-v1.json'
+CAPS_OWNER_UID = 0  # The offline tests' seam, with CAPS_PATH; main() never changes either.
+CAPS_SCHEMA = 'preview-provider-budget-caps-v1'
+CAPS_MEMBERS = frozenset({'schema', 'max_go_budget_usd', 'team_total_budget_usd'})
+CAPS_BYTES = 4 * 1024
+CAPS_USD_PATTERN = re.compile(r'(0|[1-9][0-9]{0,4})\.[0-9]{2}')
 TEAM_GO_BYTES = 64 * 1024
 # Every provider gate on the preview host, by GO provider: (private folder, GO file). Reviewed:
 # activate sums the other gates' GOs from here, and the probe fence checks every other gate's
@@ -307,6 +317,9 @@ GATE_PATHS = {
                   '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json'),
     'anthropic': ('/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
                   '/etc/debateai-v3-preview/provider-anthropic-go-v1.json'),
+    # Plan 2026-10-30, task W1-1: web search (deploy/preview-gate/v3/README-perplexity.md).
+    'perplexity': ('/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
+                   '/etc/debateai-v3-preview/provider-perplexity-go-v1.json'),
     'google': ('/var/lib/debateai-v3-preview/provider-google-authority-v1',
                '/etc/debateai-v3-preview/provider-google-go-v1.json'),
 }
@@ -435,9 +448,17 @@ def _int_in(value, low, high):
     return type(value) is int and low <= value <= high
 
 
+def request_priced(row):
+    """Whether a row is priced per request (its request_usd), not per token (plan 2026-10-30, task W1-1)."""
+    return getattr(row, 'request_usd', None) is not None
+
+
 def reservation_for(request_bytes, row, prices):
     """One call's hold: (request bytes + 2048) x input price + output bound x output price, per
-    million tokens, at the given (input, output) prices. The app computes the same figure in nano-USD."""
+    million tokens, at the given (input, output) prices. The app computes the same figure in nano-USD.
+    A per-request row (request_priced) holds exactly its request_usd, whatever the size and prices."""
+    if request_priced(row):
+        return row.request_usd
     input_price, output_price = prices
     return (Decimal(request_bytes + RESERVATION_OVERHEAD_BYTES) * input_price
             + Decimal(row.output_bound) * output_price) / Decimal(1000000)
@@ -511,6 +532,20 @@ def prices_ok(prices):
     return isinstance(prices, tuple) and len(prices) == 2 and all(_price_ok(price) for price in prices)
 
 
+def row_prices_ok(row, prices):
+    """Token prices a row may reserve at. A token row: prices_ok. A per-request row (plan 2026-10-30, task W1-1): its own
+    token prices and these prices are exactly Decimal 0, and its request_usd is a finite Decimal above 0 and at most
+    MAX_PROFILE_CALL_CAP_USD (the profile's own per-call cap is checked by row_reviewed)."""
+    if not request_priced(row):
+        return prices_ok(prices)
+    zero = (Decimal(0), Decimal(0))
+    price = row.request_usd
+    return (isinstance(prices, tuple) and len(prices) == 2 and all(type(value) is Decimal for value in prices)
+            and prices == zero and (row.input_usd_per_m, row.output_usd_per_m) == zero
+            and all(type(value) is Decimal for value in (row.input_usd_per_m, row.output_usd_per_m))
+            and type(price) is Decimal and price.is_finite() and Decimal(0) < price <= MAX_PROFILE_CALL_CAP_USD)
+
+
 def sampling_reviewed(profile, sampling):
     """None, or a non-empty tuple of (name, number) pairs: each name one of the profile's
     sampling_keys, named once, each number a finite int or float (never a bool)."""
@@ -543,7 +578,7 @@ def row_reviewed(profile, model, row):
     full-size request that reserves no more than the profile's per-call cap."""
     return bool(isinstance(model, str) and MODEL_ID_PATTERN.fullmatch(model) and '..' not in model
                 and getattr(row, 'model', None) == model and isinstance(row.maker, str) and 1 <= len(row.maker) <= 64
-                and prices_ok(profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
+                and row_prices_ok(row, profile.ceiling_prices(row)) and helper.path_valid(profile.path_for(row))
                 and _int_in(row.output_bound, 1, MAX_OUTPUT_BOUND)
                 and efforts_reviewed(profile, getattr(row, 'efforts', None))
                 and type(row.json_object) is bool and sampling_reviewed(profile, getattr(row, 'sampling', None))
@@ -627,6 +662,43 @@ def final_writer_models_valid(profile, models):
         getattr(profile.rows[model], 'final_writer_output_bound', None) is not None for model in models)
 
 
+def read_caps():
+    """(the most one GO may ask for a day, the team's daily total), read fresh from CAPS_PATH.
+
+    The custody a GO of another gate gets (other_gate_budget): a regular file (not a symlink: O_NOFOLLOW; NONBLOCK: a FIFO
+    cannot hang it) owned by root that group and others cannot write, no larger than CAPS_BYTES. It must hold exactly
+    CAPS_MEMBERS: this schema and two amounts as strings with two decimals, the per-GO cap at least one cent and at most the
+    total. Absent: ROOT_CAPS_REQUIRED. Anything else: ROOT_CAPS_INVALID. There is no default, so a server without the file
+    loads no GO at all; stop, status and halt need no GO, so they still work."""
+    try:
+        fd = os.open(CAPS_PATH, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        raise SafetyError('ROOT_CAPS_REQUIRED') from None
+    except OSError:
+        raise SafetyError('ROOT_CAPS_INVALID') from None
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != CAPS_OWNER_UID or info.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            raise SafetyError('ROOT_CAPS_INVALID')
+        with os.fdopen(os.dup(fd), 'rb') as stream:
+            raw = stream.read(CAPS_BYTES + 1)
+        caps = json.loads(raw) if len(raw) <= CAPS_BYTES else None
+    except SafetyError:
+        raise
+    except (OSError, ValueError, TypeError, RecursionError):
+        raise SafetyError('ROOT_CAPS_INVALID') from None
+    finally:
+        os.close(fd)
+    if not (isinstance(caps, dict) and set(caps) == CAPS_MEMBERS and caps['schema'] == CAPS_SCHEMA
+            and all(isinstance(caps[name], str) and CAPS_USD_PATTERN.fullmatch(caps[name])
+                    for name in ('max_go_budget_usd', 'team_total_budget_usd'))):
+        raise SafetyError('ROOT_CAPS_INVALID')
+    max_go, total = Decimal(caps['max_go_budget_usd']), Decimal(caps['team_total_budget_usd'])
+    if not Decimal('0.01') <= max_go <= total:
+        raise SafetyError('ROOT_CAPS_INVALID')
+    return max_go, total
+
+
 def valid_go(go):
     if not isinstance(go, dict) or not GO_REQUIRED <= set(go) or not set(go) <= GO_REQUIRED | GO_OPTIONAL:
         return False
@@ -641,7 +713,7 @@ def valid_go(go):
         and isinstance(go['target_host'], str) and re.fullmatch(r'[A-Za-z0-9.-]{1,128}', go['target_host'])
         and isinstance(uids, list) and uids and all(type(uid) is int and uid >= 0 for uid in uids)
         and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-        and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD
+        and Decimal('0.01') <= Decimal(budget) <= read_caps()[0]
         and _int_in(go['max_paid_posts_per_day'], 1, 5000) and _int_in(go['max_concurrent_calls'], 1, MAX_CONCURRENT_CALLS)
         and ('max_final_writer_calls' not in go or (_int_in(go['max_final_writer_calls'], 1, go['max_concurrent_calls'])
                                                     and final_writer_models_valid(profile, go['enabled_models'])))
@@ -985,7 +1057,7 @@ def other_gate_budget(path, provider, owner_uid=0):
     budget = go.get('daily_budget_usd') if isinstance(go, dict) else None
     if not (isinstance(go, dict) and go.get('schema') == GO_SCHEMA and go.get('provider') == provider
             and isinstance(budget, str) and re.fullmatch(r'(0|[1-9][0-9]?)\.[0-9]{2}', budget)
-            and Decimal('0.01') <= Decimal(budget) <= MAX_GO_BUDGET_USD):
+            and Decimal('0.01') <= Decimal(budget) <= read_caps()[0]):
         raise SafetyError('TEAM_TOTAL_UNVERIFIABLE')
     return Decimal(budget)
 
@@ -1014,7 +1086,7 @@ def activate(private, go_path, host=None, platform=None, now=None, gate_go_paths
             > Decimal(go['daily_budget_usd']):
         raise SafetyError('CONCURRENCY_EXCEEDS_BUDGET')
     # Root runs activate in a shell, outside the units that hide the gates' GOs from each other.
-    if team_total(go, gate_go_paths, owner_uid) > TEAM_TOTAL_BUDGET_USD:
+    if team_total(go, gate_go_paths, owner_uid) > read_caps()[1]:
         raise SafetyError('TEAM_TOTAL_BUDGET_EXCEEDED')
     with TeamStore(private) as store:
         control = store.control()
@@ -1108,7 +1180,7 @@ def validate_request(input, go, probe=False, moment=None):
     prices = (profile.reservation_prices(row, moment, len(raw), cache_write=True) if cache_write_of(profile, body)
               else profile.reservation_prices(row, moment, len(raw)))
     ceiling = profile.ceiling_prices(row)
-    if not prices_ok(prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
+    if not row_prices_ok(row, prices) or prices[0] > ceiling[0] or prices[1] > ceiling[1] \
             or not helper.path_valid(profile.path_for(row)):
         raise SafetyError('REQUEST_INVALID')  # Cannot happen for a reviewed profile; checked anyway.
     reserved = reservation_for(len(raw), checked, prices)
@@ -1200,6 +1272,8 @@ def reserve_call(private, go, go_sha, input, reserved, row, host, peer_uid, now,
                                        'provider': go['provider'], 'model': row.model, 'maker': row.maker,
                                        'reserve_input_usd_per_m': str(prices[0]), 'reserve_output_usd_per_m': str(prices[1]),
                                        'output_bound': row.output_bound,
+                                       # Plan 2026-10-30 (W1-1): a per-request row records its price.
+                                       **({'reserve_request_usd': str(row.request_usd)} if request_priced(row) else {}),
                                        # LG-B (controller ruling 5): logged per tier; a standard entry is unchanged.
                                        **({'call_tier': 'FINAL_WRITER'} if request_tier(input) == 'FINAL_WRITER' else {}),
                                        'requested_effort': requested_effort, 'peer_uid': peer_uid,
@@ -1682,7 +1756,10 @@ def nano_text(amount, rounding):
 
 
 def remaining_input_valid(input):
-    return isinstance(input, dict) and set(input) == {'scope_id'} and isinstance(input['scope_id'], str)
+    """Exactly {"scope_id": s}, or (V4 start step, Task 6) {"scope_id": s, "daily_pot": true} with true itself."""
+    if not isinstance(input, dict) or not isinstance(input.get('scope_id'), str):
+        return False
+    return set(input) == {'scope_id'} or (set(input) == {'scope_id', 'daily_pot'} and input['daily_pot'] is True)
 
 
 def remaining_snapshot(private, go_path, slots=None, now=None):
@@ -1729,6 +1806,9 @@ def remaining_snapshot(private, go_path, slots=None, now=None):
         reply['largest_final_writer_reservation_usd'] = nano_text(
             largest_final_writer_reservation(profile, control['enabled_models']), ROUND_CEILING)
         reply['final_writer_max_in_flight'] = limits['max_final_writer_calls']
+    # V4 start step, Task 6: the day's pot, kept in the one read and answered only to a request that asks for it
+    # (remaining_answer); rounded DOWN like what is left, never in the app's favour.
+    reply['daily_pot_usd'] = nano_text(budget, ROUND_FLOOR)
     return control['scope_id'], allowed, reply
 
 
@@ -1738,12 +1818,15 @@ def remaining_answer(snapshot, input, uid):
         raise SafetyError('IPC_REQUEST_REFUSED')
     if input['scope_id'] != scope_id:
         raise SafetyError('REMAINING_REQUEST_INVALID')
-    return reply
+    # V4 start step, Task 6: a plain request gets today's reply, without the pot.
+    if input.get('daily_pot') is True:
+        return dict(reply)
+    return {key: value for key, value in reply.items() if key != 'daily_pot_usd'}
 
 
 def remaining_report(private, go_path, input, slots=None, now=None, uid=None):
-    """One /remaining answer for exactly {"scope_id": <this state's scope>} (and, with uid, a peer
-    the GO on disk allows); anything else refuses."""
+    """One /remaining answer for exactly {"scope_id": <this state's scope>}, or that plus
+    "daily_pot": true (and, with uid, a peer the GO on disk allows); anything else refuses."""
     if not remaining_input_valid(input):
         raise SafetyError('REMAINING_REQUEST_INVALID')
     return remaining_answer(remaining_snapshot(private, go_path, slots, now), input, uid)
@@ -1786,9 +1869,14 @@ def probe_summary(observed, profile):
     max_tokens = min(1024, row.output_bound)
     billed = accounting.get('billed_output_tokens')
     completion = billed if billed is not None else accounting.get('completion_tokens')
+    # A per-request row (a search, W1-1) sends its probe body's settings, never a token limit or a thinking level.
+    sent = ({name: value for name, value in profile.probe_body(row).items() if name != 'query'} if request_priced(row)
+            else {'max_tokens': max_tokens, 'effort': effort_word(row.efforts[0]),  # The row's default (probe_body).
+                  **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})})
     return {'status': 'probed', 'provider': profile.name, 'model': row.model, 'maker': row.maker,
-            'sent': {'max_tokens': max_tokens, 'effort': effort_word(row.efforts[0]),  # The row's default (probe_body).
-                     **({'sampling': dict(row.sampling)} if getattr(row, 'sampling', None) else {})},
+            'sent': sent,
+            # W1-1: how many results a search returned (None when its reply could not be read).
+            **({'results': accounting.get('results')} if request_priced(row) else {}),
             # A model that bills past max_tokens would overrun its reservation in real use: do not enable it.
             'completion_within_max_tokens': completion <= max_tokens if type(completion) is int else None,
             'http_status': observed['changes'].get('http_status'),
@@ -2038,7 +2126,47 @@ def refusal_body(error):
     return json.dumps({'error': code}).encode()
 
 
-def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None, remaining=None):
+COUNT_DEADLINE_SECONDS = 15
+
+
+def count_tokens(private, go_path, input, *, peer_uid, slots, dispatch=None, key_loader=None, host=None, platform=None):
+    """R22 decision 28: Anthropic's token count for a call the app is about to make, close to the 100,000-token line. It is free,
+    so nothing is reserved, charged, recorded or halted: a refusal or a failed count is the same fixed refusal, and the app falls
+    back to its byte guard. Only a profile with a count_path offers it, only for an enabled model, only for a body that a call
+    could also send, only the number comes back, and it runs under this gate's own key, as every call does."""
+    go, _go_sha = load_go(go_path)
+    profile = profile_of(go['provider'])
+    count_path = getattr(profile, 'count_path', None)
+    if count_path is None or not isinstance(input, dict) or set(input) != {'scope_id', 'requestBody'} \
+            or input['scope_id'] != go['scope_id'] or not isinstance(input['requestBody'], str):
+        raise SafetyError('COUNT_REFUSED')
+    try:
+        raw = input['requestBody'].encode()
+        body = json.loads(raw)
+    except (UnicodeError, ValueError):
+        raise SafetyError('COUNT_REFUSED') from None
+    row = profile.rows.get(body.get('model')) if isinstance(body, dict) and isinstance(body.get('model'), str) else None
+    if len(raw) > profile.final_writer_max_request_bytes or row is None or row.model not in go['enabled_models'] \
+            or not profile.count_body_valid(body, row):
+        raise SafetyError('COUNT_REFUSED')
+    host, platform = host or socket.gethostname(), platform or sys.platform
+    if platform != 'linux' or host != go['target_host'] or type(peer_uid) is not int or peer_uid not in go['allowed_peer_uids']:
+        raise SafetyError('EXECUTION_AUTHORITY_REFUSED')
+    if slots.tripped:
+        raise SafetyError('AUTHORITY_STOPPED')
+    key = (key_loader or helper.read_key)(private)
+    key_pattern = getattr(profile, 'key_pattern', None)
+    if key_pattern is not None and not (isinstance(key, str) and re.fullmatch(key_pattern, key)):
+        raise SafetyError('KEY_SHAPE_INVALID')
+    send = dispatch or helper.HttpsTransport(timeout=COUNT_DEADLINE_SECONDS, profile=profile, path=count_path)
+    status, reply = send(raw, key)
+    tokens = reply.get('input_tokens') if isinstance(reply, dict) else None
+    if status != 200 or type(tokens) is not int or tokens < 0:
+        raise SafetyError('COUNT_UNAVAILABLE')
+    return {'input_tokens': tokens}
+
+
+def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_uid, now=None, remaining=None, count=None):
     class Handler(BaseHTTPRequestHandler):
         timeout = IPC_READ_TIMEOUT_SECONDS  # An idle or slow client cannot hold a thread forever.
 
@@ -2082,9 +2210,31 @@ def make_handler(private, allowed_uids, execute, slots, peer_uid_of=linux_peer_u
             except BaseException:
                 pass
 
+        def answer_count(self):
+            # Free and unrecorded: nothing is reserved, so a refused or lost reply needs no halt.
+            try:
+                uid = peer_uid_of(self.connection)
+                length = int(self.headers.get('content-length', '0'))
+                if count is None or uid not in allowed_uids or not 1 <= length <= MAX_IPC_BYTES:
+                    raise SafetyError('IPC_REQUEST_REFUSED')
+                encoded = json.dumps(count(json.loads(self.rfile.read(length)), uid), ensure_ascii=True).encode('ascii')
+            except BaseException as error:  # noqa: BLE001 - every refusal is the same fixed body
+                try:
+                    self.reply(409, refusal_body(error))
+                except BaseException:
+                    pass
+                return
+            try:
+                self.reply(200, encoded)
+            except BaseException:
+                pass
+
         def do_POST(self):
             if self.path == '/remaining':
                 self.answer_remaining()
+                return
+            if self.path == '/count':
+                self.answer_count()
                 return
             reserved = []
             try:
@@ -2265,7 +2415,11 @@ def serve(private, go_path, socket_path, platform=None, uid=None, host=None, own
         # this (main) thread takes them with sigwait: no Python signal handler runs at all. A stop
         # signal that came earlier ended the process the default way (the next start recovers).
         signal.pthread_sigmask(signal.SIG_BLOCK, STOP_SIGNALS)
+
+        def count(data, uid):
+            return count_tokens(private, go_path, data, peer_uid=uid, slots=slots)
         server = UnixThreadingServer(str(socket_path), make_handler(private, go['allowed_peer_uids'], execute, slots,
+                                                                    count=count,
                                                                     remaining=RemainingAnswers(private, go_path, slots)),
                                      allowed_uids=frozenset(go['allowed_peer_uids']))
         info = os.stat(socket_path, follow_symlinks=False)

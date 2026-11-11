@@ -9,8 +9,10 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import socket
 import sys
+import tempfile
 import threading
 import time
 import types
@@ -240,9 +242,8 @@ class GoV3Tests(GateTest):
         for limit in (0, 11, 12, 100, True, 10.0, '10'):
             with self.subTest(limit=limit), self.refused('ROOT_GO_INVALID'):
                 bridge.read_go(gate.write_go(name='bad.json', max_concurrent_calls=limit))
-        # The pot check still holds at 10: 10 x MiMo's worst case (0.14211072) = 1.4211072, which
-        # the owner's $10.00 DeepInfra pot (ruling 2026-10-10) holds.
-        for budget, ok in (('1.42', False), ('1.43', True), ('10.00', True)):
+        # The pot check still holds at 10: 10 x MiMo's worst case (0.14211072) = 1.4211072.
+        for budget, ok in (('1.42', False), ('1.43', True), ('11.00', True)):
             with self.subTest(budget=budget):
                 gate = self.gate(enabled_models=ALL, daily_budget_usd=budget, max_concurrent_calls=10)
                 gate.init()
@@ -688,11 +689,11 @@ class RemainingTests(GateTest):
         gate = self.gate().ready()
         gate.call('op-1', charge='0.01')
         self.assertEqual(self.report(gate, slots=gate.slots), {
-            'state': 'active', 'window_open': True, 'remaining_usd': '4.99', 'remaining_calls': 499,
+            'state': 'active', 'window_open': True, 'remaining_usd': '5.49', 'remaining_calls': 499,
             'max_concurrent_calls': 4, 'largest_reservation_usd': '0.0560128', 'enabled_models': [MODEL]})
         gate = self.gate(enabled_models=[MODEL, MIMO]).ready()
         self.assertEqual((self.report(gate)['largest_reservation_usd'], self.report(gate)['remaining_usd']),
-                         ('0.14211072', '5.00'))
+                         ('0.14211072', '5.50'))
 
     def test_it_never_writes_creates_or_reads_the_key(self):
         gate = self.gate().ready()
@@ -707,7 +708,7 @@ class RemainingTests(GateTest):
                 patch.object(bridge.helper, 'write_bytes', no_network):
             self.report(gate)
             gate.clock.set('2026-10-09T09:00:00+00:00')  # A new day: its ledger is not created either.
-            self.assertEqual(self.report(gate)['remaining_usd'], '5.00')
+            self.assertEqual(self.report(gate)['remaining_usd'], '5.50')
         self.assertEqual(gate.snapshot(), before)
         self.assertTrue(opened)
         for name, flags in opened:
@@ -720,6 +721,46 @@ class RemainingTests(GateTest):
                      {'scope_id': 7}, [SCOPE], SCOPE, None):
             with self.subTest(data=data), self.refused('REMAINING_REQUEST_INVALID'):
                 self.report(gate, data)
+
+    # V4 start step, Task 6: the day's pot is answered only to a request that asks for it by name, exactly true.
+    def test_the_daily_pot_is_answered_only_when_asked(self):
+        gate = self.gate().ready()
+        plain = self.report(gate)
+        self.assertNotIn('daily_pot_usd', plain)
+        self.assertEqual(self.report(gate, {'scope_id': SCOPE, 'daily_pot': True}), plain | {'daily_pot_usd': '5.50'})
+
+    def test_a_pot_request_must_say_true_exactly(self):
+        gate = self.gate().ready()
+        for data in ({'scope_id': SCOPE, 'daily_pot': False}, {'scope_id': SCOPE, 'daily_pot': 1},
+                     {'scope_id': SCOPE, 'daily_pot': 'true'}, {'scope_id': SCOPE, 'daily_pot': None},
+                     {'scope_id': SCOPE, 'daily_pot': True, 'extra': 1}):
+            with self.subTest(data=data), self.refused('REMAINING_REQUEST_INVALID'):
+                self.report(gate, data)
+
+    def test_with_the_final_writer_room_the_pot_reply_has_ten_sorted_keys(self):
+        gate = self.gate(enabled_models=ALL, max_final_writer_calls=1).ready()
+        slots = bridge.CallSlots(gate.go['max_concurrent_calls'], 1)
+        report = self.report(gate, {'scope_id': SCOPE, 'daily_pot': True}, slots=slots)
+        self.assertEqual(sorted(report), ['daily_pot_usd', 'enabled_models', 'final_writer_max_in_flight',
+                                          'largest_final_writer_reservation_usd', 'largest_reservation_usd', 'max_concurrent_calls',
+                                          'remaining_calls', 'remaining_usd', 'state', 'window_open'])
+        self.assertEqual(report['daily_pot_usd'], '5.50')
+
+    def test_one_cached_read_answers_a_plain_and_a_pot_request_each_in_its_own_shape(self):
+        gate = self.gate().ready()
+        reads = []
+        real = bridge.remaining_snapshot
+
+        def counted(*args):
+            reads.append(1)
+            return real(*args)
+        answers = bridge.RemainingAnswers(gate.private, gate.go_path, gate.slots, clock=lambda: 100.0, now=gate.clock)
+        with patch.object(bridge, 'remaining_snapshot', counted):
+            plain = answers({'scope_id': SCOPE})
+            pot = answers({'scope_id': SCOPE, 'daily_pot': True})
+        self.assertEqual(reads, [1])
+        self.assertEqual(len(plain), 7)
+        self.assertEqual(pot, plain | {'daily_pot_usd': '5.50'})
         with self.refused('STATE_MISSING'):
             self.report(self.gate())
 
@@ -827,11 +868,11 @@ class RemainingTests(GateTest):
             self.assertEqual(reads, [100.0])
             gate.call('op-1', charge='0.01')
             clock[0] = 100.9
-            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '5.00')  # Still the cached read.
+            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '5.50')  # Still the cached read.
             clock[0] = 101.0
-            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '4.99')
+            self.assertEqual(answers({'scope_id': SCOPE})['remaining_usd'], '5.49')
             self.assertEqual(reads, [100.0, 101.0])
-        self.assertEqual(first[0], self.report(gate, slots=gate.slots) | {'remaining_usd': '5.00', 'remaining_calls': 500})
+        self.assertEqual(first[0], self.report(gate, slots=gate.slots) | {'remaining_usd': '5.50', 'remaining_calls': 500})
         broken = bridge.RemainingAnswers(self.gate().private, gate.go_path, gate.slots, clock=lambda: clock[0])
         with patch.object(bridge, 'remaining_snapshot', counted):
             for _ in range(3):
@@ -1308,7 +1349,8 @@ class ProfileTests(GateTest):
 
     def test_reserved_provider_names_have_no_profile_yet(self):
         # Anthropic's profile arrived with PR B (its own tests: preview_budget_authority_anthropic_test.py).
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic'})
+        # Perplexity's arrived with plan task W1-1 (2026-10-30; preview_budget_authority_perplexity_test.py).
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'perplexity'})
         self.assertNotIn('google', bridge.helper.PROFILES)
 
 
@@ -1951,7 +1993,7 @@ class HaltedRefusalTests(GateTest):
 
     def test_a_changed_go_or_a_stopping_server_stays_opaque(self):
         gate = self.gate().ready()
-        gate.go_path = gate.write_go(name='other.json', daily_budget_usd='4.00')
+        gate.go_path = gate.write_go(name='other.json', daily_budget_usd='4.40')
         with self.refused('AUTHORITY_STOPPED'):
             gate.call('op-1')
         self.assertEqual(json.loads(bridge.refusal_body(SafetyError('AUTHORITY_STOPPED'))),
@@ -2256,9 +2298,8 @@ class ReasoningTokenTests(GateTest):
 
 
 class TeamTotalTests(GateTest):
-    """Round 2 review, figures from the owner's ruling of 2026-10-10 as raised by owner answer M1 (2026-10-15): one GO
-    is at most $12.00 a day (MAX_GO_BUDGET_USD), and activate adds the other gates' GOs to stay within the $16.00 team
-    total (DeepInfra $12.00 + Anthropic $4.00) (a fixed, reviewed list; tests reach it only through activate's seam)."""
+    """One GO is at most the per-GO cap, and activate adds the other gates' GOs to stay within the team total (a fixed,
+    reviewed list; tests reach it only through activate's seam). The figures are the fixture's made-up caps: 33.00 and 44.00."""
 
     def other_go(self, gate, provider, budget='1.50', **fields):
         path = gate.root / ('team-go-' + provider + '.json')
@@ -2267,28 +2308,29 @@ class TeamTotalTests(GateTest):
         os.chmod(path, 0o600)
         return path
 
-    def test_one_go_is_capped_at_twelve_dollars_and_the_team_total_is_sixteen(self):
-        self.assertEqual((bridge.MAX_GO_BUDGET_USD, bridge.TEAM_TOTAL_BUDGET_USD), (Decimal('12.00'), Decimal('16.00')))
+    def test_one_go_is_capped_at_the_files_per_go_cap(self):
+        self.assertEqual(bridge.read_caps(), (Decimal('33.00'), Decimal('44.00')))
         gate = self.gate()
-        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='12.00'))['daily_budget_usd'], '12.00')
-        for budget in ('12.01', '16.00', '50.00'):
+        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='33.00'))['daily_budget_usd'], '33.00')
+        for budget in ('33.01', '44.00', '50.00'):
             with self.subTest(budget=budget), self.refused('ROOT_GO_INVALID'):
                 bridge.read_go(gate.write_go(name='bad.json', daily_budget_usd=budget))
 
     def test_missing_other_gos_count_zero_and_the_sum_may_reach_the_total(self):
-        gate = self.gate(daily_budget_usd='12.00').ready()  # No other GO exists.
+        gate = self.gate(daily_budget_usd='33.00').ready()  # No other GO exists.
         self.assertEqual(gate.status()['state'], 'active')
-        self.other_go(gate, 'anthropic', '4.00')
+        self.other_go(gate, 'anthropic', '11.00')
         bridge.stop_authority(gate.private, now=gate.clock)
-        self.assertEqual(gate.activate()['state'], 'active')  # 12.00 + 4.00 = 16.00 exactly.
+        self.assertEqual(gate.activate()['state'], 'active')  # 33.00 + 11.00 = 44.00 exactly.
         self.assertEqual(bridge.team_total(gate.go, {'deepinfra': str(gate.go_path),
                                                      'anthropic': str(gate.root / 'team-go-anthropic.json')},
-                                           os.getuid()), Decimal('16.00'))
+                                           os.getuid()), Decimal('44.00'))
 
     def test_a_sum_over_the_team_total_refuses(self):
-        for others in ({'anthropic': '4.01'}, {'anthropic': '3.50', 'google': '0.51'}, {'google': '12.00'}):
+        for others in ({'anthropic': '11.01'}, {'anthropic': '5.50', 'google': '5.51'},
+                       {'google': '33.00'}, {'anthropic': '11.00', 'perplexity': '0.01'}):
             with self.subTest(others=others):
-                gate = self.gate(daily_budget_usd='12.00')
+                gate = self.gate(daily_budget_usd='33.00')
                 gate.init()
                 for provider, budget in others.items():
                     self.other_go(gate, provider, budget)
@@ -2296,32 +2338,33 @@ class TeamTotalTests(GateTest):
                     gate.activate()
                 self.assertEqual(gate.control()['state'], 'initialized')
 
-    def test_the_owners_pots_twelve_plus_four_reach_the_total_and_one_cent_more_refuses(self):
-        # Owner answer M1 (2026-10-15): DeepInfra $12.00 (2,000 calls, 10 at once, all four models), Anthropic $4.00.
-        proposed = {'daily_budget_usd': '12.00', 'max_paid_posts_per_day': 2000, 'max_concurrent_calls': 10,
+    def test_three_pots_reach_the_total_and_one_cent_more_refuses(self):
+        proposed = {'daily_budget_usd': '22.00', 'max_paid_posts_per_day': 2200, 'max_concurrent_calls': 10,
                     'enabled_models': ALL}
         gate = self.gate(**proposed)
         gate.init()
-        self.other_go(gate, 'anthropic', '4.00')
-        self.assertEqual(gate.activate()['state'], 'active')  # 12.00 + 4.00 = 16.00 exactly.
+        self.other_go(gate, 'anthropic', '11.00')
+        self.other_go(gate, 'perplexity', '11.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # 22.00 + 11.00 + 11.00 = 44.00 exactly.
         gate = self.gate(**proposed)
         gate.init()
-        self.other_go(gate, 'anthropic', '4.01')
-        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 12.00 + 4.01 = 16.01.
+        self.other_go(gate, 'anthropic', '11.01')
+        self.other_go(gate, 'perplexity', '11.00')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):  # 22.00 + 11.01 + 11.00 = 44.01.
             gate.activate()
         self.assertEqual(gate.control()['state'], 'initialized')
-        # A DeepInfra GO of 12.01 never gets as far as the sum: one GO is at most $12.00.
+        # A GO of 33.01 never gets as far as the sum: one GO is at most the per-GO cap.
         with self.refused('ROOT_GO_INVALID'):
-            bridge.read_go(gate.write_go(name='over.json', **{**proposed, 'daily_budget_usd': '12.01'}))
-        # The same sum seen from the Anthropic side: its 4.01 beside DeepInfra's 12.00 is over too.
-        anthropic = {'provider': 'anthropic', 'daily_budget_usd': '4.01'}
-        self.assertEqual(bridge.team_total(anthropic, {'deepinfra': str(self.other_go(gate, 'deepinfra', '12.00'))},
-                                           os.getuid()), Decimal('16.01'))
+            bridge.read_go(gate.write_go(name='over.json', **{**proposed, 'daily_budget_usd': '33.01'}))
+        # The same sum seen from another side: its 11.01 beside 33.00 is over too.
+        anthropic = {'provider': 'anthropic', 'daily_budget_usd': '11.01'}
+        self.assertEqual(bridge.team_total(anthropic, {'deepinfra': str(self.other_go(gate, 'deepinfra', '33.00'))},
+                                           os.getuid()), Decimal('44.01'))
 
     def test_this_providers_own_listed_go_is_not_counted_twice(self):
-        gate = self.gate(daily_budget_usd='10.00')
+        gate = self.gate(daily_budget_usd='22.00')
         gate.init()
-        self.other_go(gate, 'deepinfra', '10.00')  # The old GO of this same gate: replaced, not added.
+        self.other_go(gate, 'deepinfra', '22.00')  # The old GO of this same gate: replaced, not added.
         self.assertEqual(gate.activate()['state'], 'active')
 
     def test_an_unreadable_or_invalid_other_go_refuses(self):
@@ -2344,9 +2387,9 @@ class TeamTotalTests(GateTest):
                 elif name == 'budget_over_cap':
                     path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
                                                 'daily_budget_usd': '50.00'}))
-                elif name == 'budget_over_go_cap':  # One cent over the $12.00 a single GO may ask for.
+                elif name == 'budget_over_go_cap':  # One cent over what a single GO may ask for.
                     path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': 'anthropic',
-                                                'daily_budget_usd': '12.01'}))
+                                                'daily_budget_usd': '33.01'}))
                 elif name == 'too_large':
                     path.write_text(' ' * (bridge.TEAM_GO_BYTES + 1))
                 elif name == 'group_writable':
@@ -2383,10 +2426,169 @@ class TeamTotalTests(GateTest):
         self.assertEqual({name: go for name, (_private, go) in bridge.GATE_PATHS.items()}, {
             'deepinfra': '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json',
             'anthropic': '/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
+            'perplexity': '/etc/debateai-v3-preview/provider-perplexity-go-v1.json',
             'google': '/etc/debateai-v3-preview/provider-google-go-v1.json'})
         text = SOURCE.read_text()
         self.assertIn('result = activate(args.private, args.go)\n', text)  # main() passes no seam.
         self.assertNotIn('os.environ', text)
+
+
+class ServerCapsTests(GateTest):
+    """The money caps live only in a root-owned file on the server (the repository is public), with no default in code. Made-up
+    figures throughout: multiples of eleven, nothing like the server's."""
+
+    def setUp(self):
+        super().setUp()
+        self.folder = Path(tempfile.mkdtemp(prefix='preview-gate-caps-test-'))
+        self.addCleanup(shutil.rmtree, self.folder, ignore_errors=True)
+        self.path = self.folder / 'caps.json'
+        for seam in (patch.object(bridge, 'CAPS_PATH', str(self.path)), patch.object(bridge, 'CAPS_OWNER_UID', os.getuid())):
+            seam.start()
+            self.addCleanup(seam.stop)
+
+    def write_caps(self, max_go='33.00', total='44.00', **changes):
+        document = {'schema': 'preview-provider-budget-caps-v1', 'max_go_budget_usd': max_go,
+                    'team_total_budget_usd': total, **changes}
+        self.path.write_text(json.dumps(document))
+        os.chmod(self.path, 0o600)
+
+    def other_go(self, gate, provider, budget):
+        path = gate.root / ('team-go-' + provider + '.json')
+        path.write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': provider, 'daily_budget_usd': budget}))
+        os.chmod(path, 0o600)
+
+    def test_the_code_holds_no_figure_and_only_the_servers_file_gives_them(self):
+        for name in ('MAX_GO_BUDGET_USD', 'TEAM_TOTAL_BUDGET_USD'):
+            self.assertFalse(hasattr(bridge, name), name)
+        text = SOURCE.read_text()
+        self.assertIn("CAPS_PATH = '/etc/debateai-v3-preview/provider-budget-caps-v1.json'\n", text)
+        self.assertIn('CAPS_OWNER_UID = 0 ', text)
+        self.assertNotIn('os.environ', text)
+        self.assertEqual(text.count('CAPS_PATH ='), 1)  # Nothing in the gate ever changes it.
+
+    def test_a_go_above_the_per_go_cap_refuses_and_the_cap_moves_with_the_file_only(self):
+        self.write_caps()
+        gate = self.gate()
+        self.assertEqual(bridge.read_go(gate.write_go(name='ok.json', daily_budget_usd='33.00'))['daily_budget_usd'], '33.00')
+        with self.refused('ROOT_GO_INVALID'):
+            bridge.read_go(gate.write_go(name='over.json', daily_budget_usd='33.01'))
+        self.write_caps(max_go='22.00')
+        with self.refused('ROOT_GO_INVALID'):
+            bridge.read_go(gate.write_go(name='was-ok.json', daily_budget_usd='22.01'))
+        # A GO's author cannot change a cap by editing the GO: a member naming one makes the GO invalid.
+        for member in ('max_go_budget_usd', 'team_total_budget_usd'):
+            with self.subTest(member=member), self.refused('ROOT_GO_INVALID'):
+                bridge.read_go(gate.write_go(name='own.json', daily_budget_usd='22.00', **{member: '99.00'}))
+
+    def test_a_sum_above_the_team_total_refuses_at_the_same_refusal(self):
+        self.write_caps()
+        gate = self.gate(daily_budget_usd='33.00')
+        gate.init()
+        self.other_go(gate, 'anthropic', '11.01')
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):
+            gate.activate()
+        self.assertEqual(gate.control()['state'], 'initialized')
+        self.other_go(gate, 'anthropic', '11.00')
+        self.assertEqual(gate.activate()['state'], 'active')  # Reaches the total exactly.
+        bridge.stop_authority(gate.private, now=gate.clock)
+        self.write_caps(total='33.00')  # A lower total in the file alone refuses the same GOs.
+        with self.refused('TEAM_TOTAL_BUDGET_EXCEEDED'):
+            gate.activate()
+
+    def test_another_gates_go_above_the_per_go_cap_is_unverifiable(self):
+        self.write_caps()
+        gate = self.gate(daily_budget_usd='1.10')
+        gate.init()
+        self.other_go(gate, 'anthropic', '33.01')
+        with self.refused('TEAM_TOTAL_UNVERIFIABLE'):
+            gate.activate()
+
+    def test_without_the_file_no_go_loads_and_nothing_is_spent_but_stop_and_status_still_work(self):
+        self.write_caps()
+        gate = self.gate().ready()
+        self.path.unlink()
+        before = gate.snapshot()
+        for phase in (lambda: bridge.read_go(gate.go_path), gate.init, gate.activate, gate.call,
+                      lambda: bridge.serve(gate.private, gate.go_path, '/run/debateai-v3-preview/deepinfra-budget-v3.sock',
+                                           platform='linux', uid=0, host=HOST)):
+            with self.refused('ROOT_CAPS_REQUIRED') as caught:
+                phase()
+            self.assertEqual(gate.snapshot(), before)  # Nothing reserved, and no halt either.
+        # The caller sees only the opaque refusal; the code is for the operator.
+        self.assertEqual(json.loads(bridge.refusal_body(caught.exception)), {'error': bridge.STOPPED})
+        self.assertEqual(bridge.remaining_report(gate.private, gate.go_path, {'scope_id': SCOPE}, slots=gate.slots,
+                                                 now=gate.clock, uid=None)['window_open'], False)
+        self.assertEqual(gate.status()['state'], 'active')
+        self.assertEqual(bridge.stop_authority(gate.private, now=gate.clock)['state'], 'halted')
+
+    def test_main_names_the_operators_refusal(self):
+        self.write_caps()
+        gate = self.gate()
+        gate.init()
+        self.path.unlink()
+        self.assertEqual(bridge.main(['activate', '--private', str(gate.private), '--go', str(gate.go_path)]), 2)
+        self.assertIn('"error":"ROOT_CAPS_REQUIRED"', self.out.getvalue().replace(' ', ''))
+        self.write_caps(total='not money')
+        self.assertEqual(bridge.main(['init', '--private', str(gate.private), '--go', str(gate.go_path)]), 2)
+        self.assertIn('"error":"ROOT_CAPS_INVALID"', self.out.getvalue().replace(' ', ''))
+
+    def test_a_bad_file_refuses_and_never_falls_back(self):
+        def replace(raw):
+            def apply():
+                self.path.write_bytes(raw)
+                os.chmod(self.path, 0o600)
+            return apply
+
+        def chmod(mode):
+            return lambda: os.chmod(self.path, mode)
+
+        def symlink():
+            target = self.folder / 'real.json'
+            self.path.rename(target)
+            self.path.symlink_to(target)
+
+        def folder():
+            self.path.unlink()
+            self.path.mkdir()
+
+        def fifo():
+            self.path.unlink()
+            os.mkfifo(self.path)
+
+        def good(**changes):
+            document = {'schema': 'preview-provider-budget-caps-v1', 'max_go_budget_usd': '33.00',
+                        'team_total_budget_usd': '44.00', **changes}
+            return json.dumps(document).encode()
+        spoils = {'group_writable': chmod(0o620), 'others_writable': chmod(0o602), 'symlink': symlink, 'folder': folder, 'fifo': fifo,
+                  'not_json': replace(b'{'), 'not_utf8': replace(b'\xff\xfe'), 'not_object': replace(b'[]'), 'empty': replace(b''),
+                  'too_large': replace(good() + b' ' * bridge.CAPS_BYTES),  # Valid JSON: only its size is wrong.
+                  'wrong_schema': replace(good(schema='preview-provider-budget-caps-v2')),
+                  'extra_member': replace(good(note='x')),
+                  'missing_member': replace(json.dumps({'schema': 'preview-provider-budget-caps-v1', 'max_go_budget_usd': '33.00'}).encode()),
+                  'number': replace(good(max_go_budget_usd=33.0)), 'one_decimal': replace(good(team_total_budget_usd='44.0')),
+                  'negative': replace(good(max_go_budget_usd='-1.00')), 'nan': replace(good(team_total_budget_usd='NaN')),
+                  'zero': replace(good(max_go_budget_usd='0.00')),
+                  'per_go_above_total': replace(good(max_go_budget_usd='44.01'))}
+        if os.getuid() != 0:
+            spoils['unreadable'] = chmod(0o000)  # Root reads a mode-0000 file.
+        self.write_caps()
+        gate = self.gate()
+        for name, spoil in spoils.items():
+            with self.subTest(name):
+                self.path = self.folder / name / 'caps.json'
+                self.path.parent.mkdir()
+                bridge.CAPS_PATH = str(self.path)  # Each spoil on its own file; setUp's seam restores the name.
+                self.folder = self.path.parent
+                self.write_caps()
+                spoil()
+                with self.refused('ROOT_CAPS_INVALID'):
+                    bridge.read_go(gate.go_path)
+        self.path = self.folder / 'owner' / 'caps.json'
+        self.path.parent.mkdir()
+        bridge.CAPS_PATH = str(self.path)
+        self.write_caps()
+        with patch.object(bridge, 'CAPS_OWNER_UID', os.getuid() + 1), self.refused('ROOT_CAPS_INVALID'):  # Not root's.
+            bridge.read_go(gate.go_path)
 
 
 class ProbeFenceTests(GateTest):

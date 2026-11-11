@@ -195,10 +195,12 @@ class UnitFileTests(unittest.TestCase):
         self.assertEqual([pair for pair in directives(UNIT) if pair[0] not in changed],
                          [pair for pair in directives(V2_UNIT) if pair[0] not in changed])
         hidden, v2_hidden = ' '.join(values(UNIT, 'InaccessiblePaths')).split(), ' '.join(values(V2_UNIT, 'InaccessiblePaths')).split()
-        # v2's state, and (PR B) the other provider gates' state and GOs.
+        # v2's state, and (PR B) the other provider gates' state and GOs, Perplexity's since plan task W1-1 (2026-10-30).
         self.assertEqual(set(hidden) - set(v2_hidden), {'-' + V2_PRIVATE, '-/etc/debateai-v3-preview/provider-team-go-v2.json',
                                                         '-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1',
                                                         '-/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
+                                                        '-/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
+                                                        '-/etc/debateai-v3-preview/provider-perplexity-go-v1.json',
                                                         '-/var/lib/debateai-v3-preview/provider-google-authority-v1',
                                                         '-/etc/debateai-v3-preview/provider-google-go-v1.json'})
         self.assertLessEqual(set(v2_hidden), set(hidden))
@@ -235,32 +237,30 @@ class UnitFileTests(unittest.TestCase):
 
     def test_readme_names_the_same_paths_and_the_proposed_go(self):
         readme = (V3 / 'README.md').read_text()
-        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', '"10.00"', '2000',
-                     'max_concurrent_calls', GLM, DEEPSEEK, MIMO, QWEN, ' probe ', 'preview:qwen-3-8-flash',
+        for name in (OPERATOR, PRIVATE, GO, SOCKET, 'preview-provider-budget-go-v3', 'max_concurrent_calls', GLM, DEEPSEEK, MIMO, QWEN, ' probe ', 'preview:qwen-3-8-flash',
                      'TEAM_TOTAL_BUDGET_EXCEEDED', 'unbilled_release_ceiling', 'PROBE_FENCE_REQUIRED',
                      # 2026-10-12: busy models cool off one by one; a halted gate says so before reserving.
                      'MODEL_COOLING', 'AUTHORITY_HALTED', 'today_unbilled_releases',
                      # The two round-2 documentation findings: the midnight overlap, and a predecessor
                      # hash that is written down only.
                      '**Midnight overlap.**', '10 x $0.1421 = $1.42', 'It never checks it against v2',
-                     # 10 at once fits the $10.00 pot with all four switched on (MiMo's worst case),
-                     # owner ruling 2026-10-10 (pots and per-call caps).
-                     '$0.14211072 (MiMo) | $1.4211072 | yes', '(256 KiB)', '32,768', 'about 236 KiB',
-                     # Length guidance LG-B (2026-10-15) and owner answer M1: the GO's final-writer member, the named-field
-                     # GO edit (never the install literal), and the $12.00 pot with one final writer's slot.
-                     'max_final_writer_calls', 'ONLY_NAMED_FIELDS_CHANGED', '"12.00"', '$1.78778112'):
+                     # 10 at once with all four switched on (MiMo's worst case): the smallest pot that passes.
+                     '$0.14211072 (MiMo) | $1.4211072 | $1.43', '(256 KiB)', '32,768', 'about 236 KiB',
+                     # Length guidance LG-B (2026-10-15): the GO's final-writer member, the named-field
+                     # GO edit (never the install literal), and one final writer's slot.
+                     'max_final_writer_calls', 'ONLY_NAMED_FIELDS_CHANGED', '$1.78778112'):
             self.assertIn(name, readme)
         for old in ('"3.50"', '"4.00"', '128 KiB', '163,840', '$0.2276', '$0.0857',  # Superseded figures.
                     'At most 20 a day', '(the gate halts at 20)'):  # The daily unbilled ceiling is gone (2026-10-12).
             self.assertNotIn(old, readme)
         go_line = [line for line in readme.splitlines() if line.startswith('jq -n') and 'go-v3' in line]
         self.assertEqual(len(go_line), 1)
-        self.assertIn('daily_budget_usd:"10.00",max_paid_posts_per_day:2000,max_concurrent_calls:10,', go_line[0])
+        self.assertIn('daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:10,', go_line[0])
         self.assertIn('max_concurrent_calls:10,max_final_writer_calls:1,', go_line[0])  # LG-B: a first install names the slot too.
         # LG-B: the live GO is edited by named fields only, and only DeepInfra's GO (fix round 1 of Task 11). Final review
         # (2026-10-16, Important 1): in two phases, the hashes and M1's budget first, the final-writer slot right before
         # the proof (the R17 app reads exactly seven /remaining members); an app-only way back removes the slot again.
-        self.assertIn('.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd="12.00"', readme)
+        self.assertIn('.bridge_sha256=$b | .helper_sha256=$h | .daily_budget_usd=$d', readme)
         self.assertIn('del(.bridge_sha256,.helper_sha256,.daily_budget_usd)', readme)
         self.assertIn("jq '.max_final_writer_calls=1' \"$GO\"", readme)
         self.assertIn("del(.max_final_writer_calls)", readme)
@@ -270,6 +270,31 @@ class UnitFileTests(unittest.TestCase):
         self.assertIn('BOTH_GATES_BACK', readme)
         self.assertIn('enabled_models:["%s"]' % GLM, go_line[0])  # GLM only at first.
 
+    def test_the_caps_file_is_on_the_server_only_and_no_unit_or_probe_hides_it(self):
+        gate = load(GATE, 'gate_for_v3_caps_test')  # Import only: no helper runs, no phase starts.
+        readme = (V3 / 'README.md').read_text()
+        self.assertTrue(gate.CAPS_PATH.startswith('/etc/debateai-v3-preview/'))
+        # Its folder is one the gates already read, and nothing hides it from a gate (the units that serve) or a probe.
+        units = sorted((V3 / 'systemd').glob('*-budget.service'))
+        self.assertEqual(len(units), 3)
+        for unit in units:
+            for hidden in (' '.join(values(unit, 'InaccessiblePaths')) or '').split():
+                with self.subTest(unit=unit.name, hidden=hidden):
+                    self.assertFalse(gate.CAPS_PATH.startswith(hidden.lstrip('-')), hidden)
+        for name in ('README.md', 'README-anthropic.md', 'README-perplexity.md'):
+            for line in (V3 / name).read_text().splitlines():
+                if line.startswith('systemd-run') and ' probe ' in line:
+                    self.assertNotIn(gate.CAPS_PATH, line)
+        for text in (gate.CAPS_PATH, gate.CAPS_SCHEMA, 'max_go_budget_usd', 'team_total_budget_usd', 'ROOT_CAPS_REQUIRED',
+                     'ROOT_CAPS_INVALID', '600 root:root'):
+            self.assertIn(text, readme)
+        # Made-up amounts only, and every GO block takes the owner's figures from the operator, never from this repository.
+        self.assertIn('"max_go_budget_usd":"33.00","team_total_budget_usd":"44.00"', readme)
+        for name in ('README.md', 'README-anthropic.md', 'README-perplexity.md'):
+            text = (V3 / name).read_text()
+            self.assertIsNone(re.search(r'daily_budget_usd[:=]"|max_paid_posts_per_day:[0-9]', text), name)
+            self.assertIn('daily_budget_usd:$d,max_paid_posts_per_day:$c,', text)
+
     def test_readme_one_session_order_ends_with_all_four_on_before_the_first_debate(self):
         readme = (V3 / 'README.md').read_text()
         session = readme[readme.index('## One deploy session'):readme.index('## Daily operations')]
@@ -278,7 +303,6 @@ class UnitFileTests(unittest.TestCase):
                  "The website's list, last", "Only then the owner's first debate, with all five AIs"]
         positions = [session.index(step) for step in order]
         self.assertEqual(positions, sorted(positions))
-        self.assertIn('$10.00 + $2.00 = $12.00', session)
         self.assertIn('enabled_models:["%s","%s","%s","%s"]' % (GLM, DEEPSEEK, MIMO, QWEN), readme)
 
     def test_the_readme_probe_runs_inside_the_fence_the_probe_checks(self):

@@ -51,6 +51,15 @@ const WITHDRAWAL_LAW = Object.freeze({
 });
 
 /**
+ * Everyone the site serves gets the same 14 days (owner's decision of 10 November 2026), not only those the law
+ * covers: Switzerland, the US, Canada, Australia, New Zealand, Singapore, Japan and Taiwan, which can pay, and Moldova
+ * and South Korea, which can sign up and will pay later. A country stays on the list whether or not it can pay yet, so
+ * opening one for payment (countryPolicy) never opens it without the right; a country the site starts to serve joins
+ * here in the same change (tests/unit/b4-billing-register-rows.test.ts checks every country whose sign-up is on).
+ */
+const SERVED_WITHDRAWAL = Object.freeze(["CH", "US", "CA", "AU", "NZ", "SG", "JP", "TW", "MD", "KR"]);
+
+/**
  * The notice a CHANGED renewal needs (spec §1.10 and the global constraints:
  * M3 at least 7 business days, Monday to Friday UTC, before the charge, as
  * A7's notice rule (kept for NETOPIA until N-23 is answered) requires). P11
@@ -106,6 +115,9 @@ const billingPolicyValueSchema = z.object({
   if (WITHDRAWAL_LAW.countries.some((country) => !value.withdrawal_countries.includes(country))) {
     refuse("withdrawal_countries", "every EU/EEA country and the UK keeps its withdrawal right");
   }
+  if (SERVED_WITHDRAWAL.some((country) => !value.withdrawal_countries.includes(country))) {
+    refuse("withdrawal_countries", "every country the site serves keeps the 14-day withdrawal right");
+  }
 });
 
 /** Billing OFF. The owner switches it on by publishing a new version of this row (§1.7 step 7). */
@@ -124,10 +136,12 @@ export const BILLING_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     quote_ttl_seconds: 1_800,
     tax_code: "saas" as const,
     invoice_issuer_rules: Object.freeze({ RO: "SMARTBILL" as const, "*": "QUADERNO" as const }),
-    // Exactly the legal set (WITHDRAWAL_LAW above); the sealed row is data, so it is spelled out.
+    // The legal set (WITHDRAWAL_LAW above) plus every other country the site serves (SERVED_WITHDRAWAL): the owner's
+    // decision of 10 November 2026 gives everyone the same 14 days. The sealed row is data, so it is spelled out.
     withdrawal_countries: Object.freeze([
       "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
-      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB"
+      "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB",
+      "CH", "US", "CA", "AU", "NZ", "SG", "JP", "TW", "MD", "KR"
     ])
   })
 });

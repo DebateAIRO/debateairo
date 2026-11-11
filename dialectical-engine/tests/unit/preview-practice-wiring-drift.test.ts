@@ -22,88 +22,10 @@ import {
   practiceStorySnapshot
 } from "../../tools/preview-practice/practice-lanes.js";
 import { PRACTICE_QUESTIONS } from "../../tools/preview-practice/practice-questions.js";
+// V4 start step, Task 86: the source readers live in tests/support/source-text.ts, shared with r22-world-api-drift.test.ts.
+import { group, objectAfter, objectKeys, withoutComments } from "../support/source-text.js";
 
 const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
-
-/** Removes comments (line comments only where `//` starts a comment, not inside a string). */
-function withoutComments(source: string): string {
-  return source.replace(/\/\*[\s\S]*?\*\//gu, "").split("\n").map((line) => {
-    let quote: string | null = null;
-    for (let index = 0; index < line.length; index += 1) {
-      const char = line[index]!;
-      if (quote !== null) { if (char === "\\") index += 1; else if (char === quote) quote = null; continue; }
-      if (char === "\"" || char === "'" || char === "`") { quote = char; continue; }
-      if (char === "/" && line[index + 1] === "/") return line.slice(0, index);
-    }
-    return line;
-  }).join("\n");
-}
-
-/** The text of the balanced group that opens at `open` (inclusive), skipping strings. */
-function group(source: string, open: number): string {
-  const pairs: Record<string, string> = { "{": "}", "(": ")", "[": "]" };
-  const stack: string[] = [];
-  let quote: string | null = null;
-  for (let index = open; index < source.length; index += 1) {
-    const char = source[index]!;
-    if (quote !== null) { if (char === "\\") index += 1; else if (char === quote) quote = null; continue; }
-    if (char === "\"" || char === "'" || char === "`") { quote = char; continue; }
-    if (pairs[char] !== undefined) stack.push(pairs[char]!);
-    else if (char === "}" || char === ")" || char === "]") {
-      if (stack.pop() !== char) throw new Error("unbalanced source");
-      if (stack.length === 0) return source.slice(open, index + 1);
-    }
-  }
-  throw new Error("unterminated group");
-}
-
-/**
- * The keys an object literal sets: its own top-level keys, plus the keys of every object a top-level conditional
- * spread `...(cond ? { a } : { b })` may add.
- */
-export function objectKeys(objectText: string): Set<string> {
-  const keys = new Set<string>();
-  const body = objectText.slice(1, -1);
-  let depth = 0;
-  let quote: string | null = null;
-  for (let index = 0; index < body.length; index += 1) {
-    const char = body[index]!;
-    if (quote !== null) { if (char === "\\") index += 1; else if (char === quote) quote = null; continue; }
-    if (char === "\"" || char === "'" || char === "`") { quote = char; continue; }
-    if (depth === 0 && body.startsWith("...(", index)) {
-      const spread = group(body, index + 3);
-      const inner = spread.slice(1, -1);
-      let innerDepth = 0;
-      for (let at = 0; at < inner.length; at += 1) {
-        const c = inner[at]!;
-        if (c === "{" && innerDepth === 0) { const object = group(inner, at); for (const key of objectKeys(object)) keys.add(key); at += object.length - 1; continue; }
-        if (c === "(" || c === "[" || c === "{") innerDepth += 1;
-        if (c === ")" || c === "]" || c === "}") innerDepth -= 1;
-      }
-      index += 3 + spread.length - 1;
-      continue;
-    }
-    if (char === "{" || char === "(" || char === "[") { depth += 1; continue; }
-    if (char === "}" || char === ")" || char === "]") { depth -= 1; continue; }
-    if (depth === 0) {
-      // A key (`name:`), a shorthand property (`name,` or the last `name`) or a method (`name(...) {`).
-      const match = /^(?:async\s+)?([A-Za-z_$][\w$]*)\s*(?::|,|$|\()/u.exec(body.slice(index));
-      const before = index === 0 ? "," : body.slice(0, index).trimEnd().at(-1);
-      if (match !== null && (before === "," || before === "{" || before === undefined)) {
-        keys.add(match[1]!);
-        index += match[0].length - (match[0].endsWith("(") ? 2 : 1);
-      }
-    }
-  }
-  return keys;
-}
-
-function objectAfter(source: string, anchor: string): Set<string> {
-  const clean = withoutComments(source);
-  const at = clean.indexOf(anchor);
-  if (at < 0) throw new Error(`anchor not found: ${anchor}`);
-  return objectKeys(group(clean, clean.indexOf("{", at + anchor.length - 1)));
-}
 
 const RUNNER_MAIN = read("apps/runner/src/main.ts");
 const PRACTICE_RUNNER = read("tools/preview-practice/practice-runner-composition.ts");
@@ -183,6 +105,36 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(source).toContain("loadAdmissionSettings(pool, environment.REGISTER_VERSION, admissionSite");
     }
     expect(ADMISSION).toContain("readers.readPreviewBudgetGateSettings(pool, version, previewConfig,");
+  });
+
+  it("W3-6: both hand the runner the same web settings, and neither holds a stand-in for the web plan's store", () => {
+    // The step keeps the planner's decision in 0134's store itself (web-step.ts runRunnerWebStep), on the runner's pool.
+    const call = (source: string) => withoutComments(source).match(/webSearch: runnerWebSearchSettings\(\{[^}]*\}\)/gu)
+      ?.map((text) => text.replace(/\s+/gu, " "));
+    // W4-2: both hand in the process's month pause, so searches pause at the month wall as the AI calls do.
+    expect(call(RUNNER_MAIN)).toEqual(["webSearch: runnerWebSearchSettings({ pool, previewGate, fetch: previewFetch, "
+      + "guardOf: runnerSite.money === null ? null : runCostEnvelopeGuard, pause: monthPause })"]);
+    expect(call(PRACTICE_RUNNER)).toEqual(call(RUNNER_MAIN));
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) expect(source).not.toContain("recordPlanPathStatuses");
+  });
+
+  it("W3-7: both compose the path rewrite with the one function, the same members, and hand it to the runner the same way", () => {
+    const composed = (source: string) => flat(source).match(/const pathRewrite = composePathRewrite\(\{.*?\}\);/gu);
+    expect(composed(RUNNER_MAIN)).toEqual(["const pathRewrite = composePathRewrite({ pool, targets: providerTargets, ...(writerTokenCount === undefined ? {} : { tokenCount: writerTokenCount }), members: "
+      + "[providerTopology.primary, ...(providerTopology.critique === undefined ? [] : [providerTopology.critique]), "
+      + "...providerTopology.additionalMakers], settingsVersionOf: pieceSettingsVersionOf, log: storyLog });"]);
+    expect(composed(PRACTICE_RUNNER)).toEqual(composed(RUNNER_MAIN));
+    // Task 57p (0169): both note each piece's settings version from their own run → version map.
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      expect(flat(source)).toContain("const pieceSettingsVersionOf = (runId: string): number | undefined => runSettingsVersions.versionOf(runId);");
+    }
+    for (const source of [RUNNER_MAIN, PRACTICE_RUNNER]) {
+      expect(flat(source)).toContain("...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),");
+    }
+    // The sweep is a process's: main.ts starts it after its worker; the practice runs one debate and starts none.
+    // Task 57l: the sweep maps each dig to its own settings version first (hosted and preview; none in local mode).
+    expect(flat(RUNNER_MAIN)).toContain("startPathRewriteSweep({ ...pathRewrite.sweep, ...mapRunOf, paused: () => retirementSignal.claimsStopped() })");
+    expect(PRACTICE_RUNNER).not.toContain("startPathRewriteSweep");
   });
 
   it("parallel AI calls: both build the call scheduler, the busy coordinator, the call subjects, the attempt counter and the keep-alive renewals", () => {
@@ -297,8 +249,14 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // whenever hosted (a version without a story ceiling refuses inside its guard, STORY_ENVELOPE_MISSING).
       "const runSettingsVersions = createRunSettingsVersions();",
       "const runCostEnvelopeGuard = runCostEnvelopeGuardOf(runnerSettings, runSettingsVersions);",
+      // Owner answer F4 (2026-10-30, task W2-2): both seams charge at the vendor's real prices on the preview.
+      "const price = previewTargetChargePrice(previewGate !== undefined, target, providerTargetPrice(target));",
       "if (runnerSite.money !== null && price === null) { throw new TypeError(`PROVIDER_TARGET_PRICE_REQUIRED:${target.providerRef}`); }",
-      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }) })",
+
+      // Plan 2026-10-30 dig-model revision W3-2 (the owner's money rule): the month pause on a walled call, and a dig's
+      // path rewrite on its own never-walled seam, in both compositions alike.
+      "const monthPause = new MonthPause({ store: new PostgresDigModelRunnerRepository(pool) });",
+      "...(runnerSite.money === null || price === null ? {} : { buildCostEnvelopeSeam: (runId: string, phase: CostEnvelopePhase, sharedWall: SharedWallApplication) => monthPaused(runCostEnvelopeGuard(runId).providerSeam({ runId, price, requireReportedUsage: true, phase, sharedWall }), { runId, phase, sharedWall, pause: monthPause, plannedMicros: () => runCostEnvelopeGuard(runId).bodyMicrosLeft(runId) }), buildStoryCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).storySeam({ runId, price, requireReportedUsage: true }), buildPathRewriteCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathRewriteSeam({ runId, price, requireReportedUsage: true }), buildInvestigationReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).investigationReportSeam({ runId, price, requireReportedUsage: true }), buildPathClimbCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).pathClimbSeam({ runId, price, requireReportedUsage: true }), buildAnswerUpdateCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).answerUpdateSeam({ runId, price, requireReportedUsage: true }), buildContributionCheckCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).contributionCheckSeam({ runId, price, requireReportedUsage: true }), buildPublicReportCostEnvelopeSeam: (runId: string) => runCostEnvelopeGuard(runId).publicReportSeam({ runId, price, requireReportedUsage: true }) })",
       "settingsForVersion: (version) => runnerSettings.settingsFor(version),",
       "hosted: environment.DEPLOYMENT_MODE === \"hosted\",",
       "providerPrices: buildProviderPriceMap(providerTargets, environment.DEPLOYMENT_MODE),",
@@ -325,7 +283,7 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       "const debateEnvelope = siteCostEnvelopePolicy === null ? null : composeDebateCostEnvelope(siteCostEnvelopePolicy, await readCostEnvelopePolicy(pool, version)); if (debateEnvelope !== null && envelopeBand !== null) { const firstCalls = firstPositionCallProjections({ targets: declaredProviderTargets,",
       "bodyCeilingMicros: costEnvelopeCeilings(debateEnvelope).bodyMicros,",
       // Side-by-side spec §13 (S6): each version's guard, over the site's one store, counter and wall.
-      "store: money.store, policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy), ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }), ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }), inFlight: money.inFlight"
+      "store: money.store, policy: costEnvelopeGuardPolicy(debateEnvelope, storyPolicy, closingReserves?.ceilingMicros), ...(money.sharedWall === undefined ? {} : { sharedWall: money.sharedWall }), ...(money.fundingAdmission === undefined ? {} : { fundingAdmission: money.fundingAdmission }), inFlight: money.inFlight"
     ]) expect(loader, statement).toContain(statement);
     // The local-only refusal is gone; local mode builds no guard: the site reads give it no money (S14: the practice's
     // own money composition is gone, it reads the site as main.ts does).

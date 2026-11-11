@@ -1,13 +1,14 @@
 import type { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 import { cancelAndDestroyPrivateClient } from './private-stream.js';
-import type { InvitationContext, InvitationProof, OwnerPossessionContext, Reason, SecurityReceipt, StaffCapability, StaffContext, StaffProof } from '@debateai/kernel';
+import type { InvitationContext, InvitationProof, OwnerPossessionContext, Reason, SecurityReceipt, StaffCapability, StaffContext, StaffProof, TeamLimitAuthority } from '@debateai/kernel';
 import type { CryptoEnvelope } from '@debateai/crypto';
 import type { AuthSourceContext } from './identity.js';
 import { withMailLocale } from './mail-locale.js';
 /** Internal encrypted intent: constructed by the trusted alert application, never a browser DTO. */
 export type StaffAlertIntent = Readonly<{
     schema: 'staff-alert-v1';
-    event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED';
+    event: 'INVITE' | 'ACCEPT' | 'GRANT' | 'DISABLE' | 'BOOTSTRAP' | 'RECOVER_OWNER' | 'KEY_CHANGE' | 'ALLOWANCE_CONFIGURED' | 'ALLOWANCE_REVOKED'
+      | 'TEAM_LIMIT_CHANGED' | 'TEAM_LIMIT_PARTNER_GRANTED' | 'TEAM_LIMIT_PARTNER_REVOKED' | 'TEAM_PRACTICE_RECORDED' | 'PUBLIC_REVIEW_CHANGED';
     operationId: string;
     envelope: CryptoEnvelope;
 }>;
@@ -117,7 +118,7 @@ export interface StaffRepository {
     /** Capability-only persistent authority check; mutations validate and consume action proof separately. */
     authorize(input: Readonly<{
         context: StaffContext;
-        capability: StaffCapability;
+        capability: StaffCapability | TeamLimitAuthority;
     }>): Promise<boolean>;
     invite(input: StaffMutation & Readonly<{
         targetUserId: string;
@@ -131,14 +132,6 @@ export interface StaffRepository {
         invitationTokenHash: string;
     }>): Promise<InvitationContext | null>;
     accept(input: InvitationAcceptCommand): Promise<SecurityReceipt>;
-    storeInvitationProof(input: Readonly<{
-        context: InvitationContext;
-        challengeId: string;
-        credentialId: string;
-        newCounter: number;
-        rpId: string;
-        origin: string;
-    }>): Promise<InvitationProof>;
     readOwnerPossessionContext(input: Readonly<{
         userId: string;
         ordinarySessionId: string;
@@ -147,16 +140,6 @@ export interface StaffRepository {
         credentialId: string;
         prerequisiteHandleHash: string;
     }>): Promise<OwnerPossessionContext | null>;
-    storeOwnerPossessionReceipt(input: Readonly<{
-        context: OwnerPossessionContext;
-        challengeId: string;
-        credentialId: string;
-        newCounter: number;
-        rpId: string;
-        origin: string;
-    }>): Promise<Readonly<{
-        receiptId: string;
-    }>>;
     grant(input: StaffMutation & Readonly<{
         targetStaffId: string;
         capabilities: readonly StaffCapability[];
@@ -462,7 +445,10 @@ function date(value: unknown): Date {
 }
 function receipt(value: SecurityReceipt): SecurityReceipt { return Object.freeze({ ...value, recordedAt: date(value.recordedAt) }); }
 function invitation(value: InvitationContext): InvitationContext { return Object.freeze({ ...value, expiresAt: date(value.expiresAt) }); }
-/** This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. */
+/**
+ * This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. Since 0171 its grant, acceptance, capability check and
+ * owned key ceremony are the cross-account marker's, so main.ts builds every staff route's repository on the request pool's system login (X14).
+ */
 export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRepository, StaffManagementRepository, StaffTargetInvitationChannels {
     constructor(private readonly pool: Pool) { }
     async readOwnerRecoveryInstallation(): Promise<SecurityReceipt | null> {
@@ -597,18 +583,9 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
     async accept(input: InvitationAcceptCommand): Promise<SecurityReceipt> {
         return receipt(await this.call('SELECT staff.accept($1,$2,$3,$4,$5::jsonb,$6::jsonb) AS value', [input.context.invitationId, input.context.targetUserId, input.context.ordinarySessionId, input.proof.proofId, { operationId: input.operationId, reason: input.reason }, input.alertIntent]));
     }
-    async storeInvitationProof(input: Parameters<StaffRepository['storeInvitationProof']>[0]): Promise<InvitationProof> {
-        const value = await this.call<InvitationProof>('SELECT staff.complete_invitation_proof($1,$2,$3,$4,$5::bigint,$6,$7) AS value', [input.challengeId, input.context.targetUserId, input.context.ordinarySessionId, input.credentialId, input.newCounter, input.rpId, input.origin]);
-        return Object.freeze({ ...value, context: invitation(value.context), verifiedAt: date(value.verifiedAt), expiresAt: date(value.expiresAt) });
-    }
     async readOwnerPossessionContext(input: Parameters<StaffRepository['readOwnerPossessionContext']>[0]): Promise<OwnerPossessionContext | null> {
         const value = await this.call<OwnerPossessionContext | null>('SELECT staff.read_owner_possession_context($1,$2,$3,$4,$5,$6) AS value', [input.userId, input.ordinarySessionId, input.commandId, input.nonceHash, input.credentialId, input.prerequisiteHandleHash]);
         return value === null ? null : Object.freeze({ ...value, command: Object.freeze({ ...value.command, credentialIds: Object.freeze([...value.command.credentialIds]) as OwnerPossessionContext["command"]["credentialIds"], expiresAt: date(value.command.expiresAt) }) });
-    }
-    storeOwnerPossessionReceipt(input: Parameters<StaffRepository['storeOwnerPossessionReceipt']>[0]): Promise<Readonly<{
-        receiptId: string;
-    }>> {
-        return this.call('SELECT staff.complete_owner_possession($1,$2,$3,$4,$5::bigint,$6,$7) AS value', [input.challengeId, input.context.command.targetUserId, input.context.ordinarySessionId, input.credentialId, input.newCounter, input.rpId, input.origin]);
     }
     async beginWebAuthn(input: StaffCeremonyBegin): ReturnType<StaffWebAuthnRepository['beginWebAuthn']> {
         const value = await this.call<Awaited<ReturnType<StaffWebAuthnRepository['beginWebAuthn']>>>('SELECT staff.begin_owned_webauthn($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb) AS value', [input.userId, input.ordinarySessionId, input.purpose, input.challengeHash, input.handleHash, input.rpId, input.origin, input.userHandleHash, input.operationId, input.context, input.binding, input.scope]);
@@ -688,7 +665,11 @@ export interface StaffAlertRepository extends StaffAlertKeyMappings {
         exhausted: number;
     }>>;
 }
-/** Enumerated definer calls only. Caller cannot upload an outbox payload or receipt body. */
+/**
+ * Enumerated definer calls only. Caller cannot upload an outbox payload or receipt body. Since 0171 the outbox's claim, key mapping, settlement and
+ * status are the cross-account marker's, which the dispatcher's timer reaches outside any request, and the user mapping a staff change's alert intent
+ * asks inside the request is too: createStaffRuntime builds that one on its mapping pool (main.ts's X14). 0112's release stays the runtime's.
+ */
 export class PostgresStaffAlertRepository implements StaffAlertRepository {
     constructor(private readonly pool: Pool) { }
     private async value<T>(sql: string, values: readonly unknown[] = []): Promise<T> { const r = await guardedAuthorityQuery<{

@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "无法创建辩论",
   "newDebate.sessionReadFailed": "读取会话失败",
   "newDebate.planRosterFailed": "读取方案等级列表失败",
-  "newDebate.checkingSession": "正在检查会话…",
+  "newDebate.checkingSession": "请稍候…",
   "newDebate.redirectingToSignIn": "正在前往登录页面…",
   "newDebate.continueToSignIn": "继续登录",
   "newDebate.defaultUnavailable": "部署中没有有效的 riskTier 行；风险等级等待输入。",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "您已达到方案今天的上限。您仍然可以提问：您的辩论将于{time}自动开始。",
   "newDebate.room.personWeekFullTopPlan": "您已达到方案本周的上限。您仍然可以提问：您的辩论将于{time}自动开始。",
   "newDebate.room.personMonthFullTopPlan": "您已达到方案本月的上限。您仍然可以提问：您的辩论将于{time}自动开始。",
-  "newDebate.room.freeMonthFull": "您已用完本月的免费辩论额度。您的下一场辩论可于{time}开始，或选择一个方案立即继续。",
+  "newDebate.room.freeMonthFull": "您已用完本月的免费额度。您的下一场辩论可于{time}开始，或选择一个方案立即继续。",
   "newDebate.room.personClose": "您已接近方案的上限。本场辩论仍会完整进行。",
   "newDebate.room.ownDebatesFull": "您的其他辩论目前正在使用剩余的上限。其中任意一场结束后，本场辩论就会自动开始。",
   "newDebate.room.upgradeLink": "查看方案",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "您的方案：免费",
   "newDebate.plan.current.PLUS": "您的方案：Plus",
   "newDebate.plan.current.PRO": "您的方案：Pro",
-  "newDebate.plan.current.MAX": "您的方案：Max"
+  "newDebate.plan.current.MAX": "您的方案：Max",
+  "newDebate.askText.otherAnswer": "其他答案…",
+  "newDebate.askText.otherLabel": "您自己补充的说明",
+  "newDebate.askText.matters": "如果几个答案的方向不一样，我最看重的是：{matters}",
+  "newDebate.freePublicNotice": "在免费版中，您的问题及其辩论是公开的。请勿包含个人信息。"
 }

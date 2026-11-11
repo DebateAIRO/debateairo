@@ -3,8 +3,11 @@
 // earlier copy got answered is REPLAYED from the record — the same raw artifact and ledger entry, no vendor contact, no
 // new ledger row, no money — instead of being bought a second time. Owner ruling 2026-10-14 (the true resume).
 import {
+  PostgresPassageRetentionRepository,
+  WEB_REPLY_TEXT_CARRIER,
   decryptLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
+  webReplyTextIdOf,
   type CryptoEnvelope,
   type Pool
 } from "@debateai/db";
@@ -17,7 +20,10 @@ import {
   type ProviderGateway,
   type ProviderWireKind
 } from "@debateai/providers";
+import { TypedDomainError } from "@debateai/kernel";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
+import { seatBaseCallSiteKey } from "@debateai/serve";
+import { passageRecordedPacket } from "./passage-record.js";
 
 /** One recorded reply: the vendor's own bytes (`raw_artifact.raw_text`) and who gave it. */
 export interface RecordedArtifact {
@@ -39,9 +45,18 @@ export interface RecordedAttempt {
   readonly ledgerEntryRef: string;
   readonly rawArtifactRef: string | null;
   readonly thinkingLevel: string | null;
+  /**
+   * The sealed contracts' hash the attempt was asked under (`ledger_entry.contract_hash`): the hand-over rule's proof that
+   * it was asked under another release's wording. Absent: never answers a request whose words differ.
+   */
+  readonly contractHash?: string;
   /** The scorecard's canonical fingerprint of the attempt's prompt (`ledger.call_prompt`); null when none was kept. */
   readonly promptFingerprint: string | null;
   readonly artifact: RecordedArtifact | null;
+  /** V4 start step, Task 57f: the gateway attempt (`ledger_entry.attempt_id`), the id its charge carries; absent or null when unknown. */
+  readonly attemptId?: string | null;
+  /** Task 57f: whether the person was charged for this attempt (a `ledger.model_spend` row of the run names it, more than nothing). */
+  readonly charged?: boolean;
 }
 
 /**
@@ -80,6 +95,48 @@ export function recordedCalls(attempts: readonly RecordedAttempt[]): readonly Re
 }
 
 /**
+ * V4 start step, Task 57f (the owner's 7 Nov answers: "Only if we can't re-use, then we need to pay for this ourselves"; card "Only what never
+ * ran") — WHAT AN EARLIER COPY PAID FOR, CALL BY CALL. Each call at a site and member (as `recordedCalls` groups them, plus the attempts after the
+ * site's last answer, which never got one) with at least one charged attempt. When this copy buys a call at that site again because the
+ * earlier one cannot be handed back (it never got an answer, or its answer no longer answers this request), the earlier call's charged attempts
+ * are the site's (0165's call waiver), so the person pays each call once, as an unbroken debate would. A call this copy replays is the
+ * person's one purchase and stays theirs.
+ */
+export type CallCredit = Readonly<{
+  callSiteKey: string;
+  actorRef: string;
+  /** Whether the call got an answer (its last attempt OK); false for the attempts after the site's last answer. */
+  answered: boolean;
+  /** The call's attempts' ledger rows, to know it again when it is replayed. */
+  ledgerEntryRefs: readonly string[];
+  /** The charged attempts' ids, in ledger order: what the site takes over. */
+  attemptIds: readonly string[];
+}>;
+
+export function callCreditsOf(attempts: readonly RecordedAttempt[]): readonly CallCredit[] {
+  const open = new Map<string, RecordedAttempt[]>();
+  const credits: CallCredit[] = [];
+  const creditOf = (segment: readonly RecordedAttempt[], answered: boolean): void => {
+    const attemptIds = segment.flatMap((attempt) => attempt.charged === true && typeof attempt.attemptId === "string" ? [attempt.attemptId] : []);
+    if (attemptIds.length === 0) return;
+    credits.push(Object.freeze({ callSiteKey: segment[0]!.callSiteKey, actorRef: segment[0]!.actorRef, answered,
+      ledgerEntryRefs: Object.freeze(segment.map((attempt) => attempt.ledgerEntryRef)), attemptIds: Object.freeze(attemptIds) }));
+  };
+  for (const attempt of attempts) {
+    const site = JSON.stringify([attempt.callSiteKey, attempt.actorRef]);
+    const segment = [...(open.get(site) ?? []), attempt];
+    if (attempt.outcome !== "OK") {
+      open.set(site, segment);
+      continue;
+    }
+    open.delete(site);
+    creditOf(segment, true);
+  }
+  for (const segment of open.values()) creditOf(segment, false);
+  return Object.freeze(credits);
+}
+
+/**
  * How a recorded call answers a request whose prompt has `fingerprint`, or null when it does not. The answered gateway
  * call is the last `n` attempts (n: the OK attempt's place in its call), and the request must be that call's ORIGINAL
  * packet — its first attempt's prompt (a repair packet carries the rejected reply, so no fresh request matches one;
@@ -114,9 +171,39 @@ export function replayOf(call: RecordedCall, fingerprint: string): Replay | null
   });
 }
 
+/**
+ * THE HAND-OVER RULE (plan 2026-10-31 decision 12; owner Q6: "keep whatever the AI 'found' until that point"). A debate
+ * paused at the month wall can continue in a newer release, whose sealed wording may differ. Its copy walks the debate
+ * from the start as any reclaim does, and each recorded answer falls in one of three cases:
+ *  - THE SAME BYTES: replayed, as always.
+ *  - OTHER BYTES UNDER ANOTHER CONTRACT HASH (the record's `contract_hash` is not the request's, so a release moved the
+ *    wording): the answer STANDS as recorded, never asked or paid again. The rest of the debate runs under the new wording.
+ *  - OTHER BYTES UNDER THE SAME HASH: not an answer to this question; the call is made, as always. So a debate that never
+ *    crossed an upload behaves byte for byte as before.
+ * WHICH STEPS MAY MIX: finished steps and later steps may stand under different wording. One STEP never does. A step is the
+ * AIs asked the same thing and then weighed together: a panel grading one point, the opening positions, readers 2 and 3 of
+ * one path. `openStep` names its members before they are asked. Unless every member has an answer under the older wording
+ * and none has one under this wording, none of its older answers stands: where the words really changed, the whole step is
+ * asked again under the new ones. Where they did not, the same bytes replay and nothing is bought. A call that opens no step
+ * is a step of its own: its one recorded answer is the whole of it.
+ */
+export type ReplayStepMember = Readonly<{ callSiteKey: string; providerRef: string }>;
+
+/** What a recorded answer is to this request; `stood` when it answers another release's wording. */
+export type TakenReplay = Replay & Readonly<{ stood: boolean; step: string | null }>;
+
 export interface ReplayBook {
   /** The recorded calls not replayed yet. */
   readonly pending: number;
+  /** How many answers stood under another release's wording (a count for the run's one journal line). */
+  readonly stood: number;
+  /** The step named by `members` is about to be asked under `contractHash` (see THE HAND-OVER RULE). */
+  openStep(members: readonly ReplayStepMember[], contractHash: string): void;
+  /**
+   * A stood answer that this release cannot read (`gateway`): the step's older answers no longer stand. True when no other
+   * member of the step had stood yet, so the step can still be asked again whole; false when asking again would mix it.
+   */
+  refuseStanding(callSiteKey: string): boolean;
   /** How many nodes earlier copies of the run saved (set aside at claim). */
   readonly earlierNodes: number;
   /**
@@ -131,10 +218,39 @@ export interface ReplayBook {
    * claim, a new node).
    */
   siteNodeId(nodeId: string): string;
-  /** The recorded answer to this request, consumed, or null. */
-  take(request: Readonly<{ callSiteKey: string; providerRef: string; fingerprint: string }>): Replay | null;
+  /** The recorded answer to this request, consumed, or null. `contractHash`: what the request is asked under. */
+  take(request: Readonly<{ callSiteKey: string; providerRef: string; fingerprint: string; contractHash?: string }>): TakenReplay | null;
+  /**
+   * R22 (owner ruling 2026-10-30, "Yes, use the spare debater"): the routes whose recorded answer at a site `matches`
+   * accepts is still to be replayed, in record order, each once. The runner reads it for a position an earlier copy
+   * handed to a spare debater, so the copy hands it over again before any call (`shapeSpareThatAnswered`).
+   */
+  answeredBy(matches: (callSiteKey: string) => boolean): readonly string[];
   /** Nothing is replayed any more and the recorded content is dropped (the run's content lease is over). */
   close(): void;
+  /** V4 start step, Task 57f: how many calls earlier copies paid for are not settled yet (neither replayed nor taken over by the site). */
+  readonly redoCredits?: number;
+  /** Task 57f: the replay was handed back: its call is the person's one purchase, nothing of it goes to the site. */
+  settleReplay?(replay: TakenReplay): void;
+  /**
+   * Task 57f: this copy bought `request` (answered) and an earlier copy paid for a call at the same site and member that is not handed back:
+   * the earlier call's charged attempt ids, settled now (the site takes them over), or null. `spoiled`: a replay taken for this request whose
+   * recorded content could not be read (that call is the one bought again). Review (wave 16): with them, every earlier copy's charged
+   * attempts at the same call (any seat, any member) that never got an answer.
+   */
+  takeRedo?(request: Readonly<{ callSiteKey: string; providerRef: string }>, spoiled: TakenReplay | null): readonly string[] | null;
+}
+
+/** A site's place on a member's site: the site itself, or the site with a seat or a route after it. */
+const onSite = (callSiteKey: string, member: string): boolean => callSiteKey === member || callSiteKey.startsWith(`${member}:`);
+
+/** The fingerprint of the packet a recorded call first sent: what `replayOf` needs to read that call as it was answered. */
+function originalFingerprintOf(call: RecordedCall): string | null {
+  const accepted = call.attempts[call.attempts.length - 1];
+  const place = accepted?.artifact?.attempt;
+  if (place === null || place === undefined) return null;
+  const placed = call.attempts.filter((attempt) => attempt.outcome !== "REFUSED");
+  return placed[placed.length - place]?.promptFingerprint ?? null;
 }
 
 export const EMPTY_REPLAY_BOOK: ReplayBook = createReplayBook({ calls: [], earlierNodes: [] });
@@ -144,8 +260,15 @@ export function createReplayBook(input: Readonly<{
   calls: readonly RecordedCall[];
   /** Every node earlier copies saved, in save order. */
   earlierNodes: readonly Readonly<{ nodeId: string; provenanceRef: string | null }>[];
+  /** The run, for the one content-free line when answers stood under another release's wording. */
+  runId?: string;
+  /** V4 start step, Task 57f: what earlier copies paid for, call by call (`callCreditsOf`); absent, none. */
+  credits?: readonly CallCredit[];
 }>): ReplayBook {
   const pending = [...input.calls];
+  const credits = [...(input.credits ?? [])];
+  /** The credit of a recorded call (its answer's ledger row is one of the credit's). */
+  const creditIndexOf = (replay: TakenReplay): number => credits.findIndex((credit) => credit.ledgerEntryRefs.includes(replay.accepted.ledgerEntryRef));
   const earliestByReply = new Map<string, string>();
   for (const node of input.earlierNodes) {
     if (node.provenanceRef === null) continue;
@@ -154,9 +277,60 @@ export function createReplayBook(input: Readonly<{
   }
   const earlierNodes = input.earlierNodes.length;
   const siteNode = new Map<string, string>();
+  const barred: string[] = [];
+  /** Each opened step's member sites, and which of them have stood. */
+  const steps: Array<Readonly<{ sites: readonly string[]; stood: Set<string> }>> = [];
+  let stood = 0;
+  const hashOf = (call: RecordedCall): string | undefined => call.attempts[call.attempts.length - 1]?.contractHash;
+  const stepOf = (callSiteKey: string) => steps.find((step) => step.sites.some((site) => onSite(callSiteKey, site)));
   return {
     get pending() { return pending.length; },
+    get stood() { return stood; },
+    get redoCredits() { return credits.length; },
+    settleReplay(replay) {
+      const index = creditIndexOf(replay);
+      if (index >= 0) credits.splice(index, 1);
+    },
+    takeRedo(request, spoiled) {
+      let index = spoiled === null ? -1 : creditIndexOf(spoiled);
+      if (index < 0) {
+        const atSite = (credit: CallCredit) => credit.callSiteKey === request.callSiteKey && credit.actorRef === request.providerRef;
+        // A call that never got an answer first, then one whose answer no longer answers this request.
+        index = credits.findIndex((credit) => atSite(credit) && !credit.answered);
+        if (index < 0) index = credits.findIndex(atSite);
+      }
+      const taken = index < 0 ? [] : [...credits.splice(index, 1)[0]!.attemptIds];
+      // Independent review (wave 16): the call is answered now, so what earlier copies were charged at it and never got answered is the
+      // site's too when another member or the seat's runner-up answers it (a member out on the stopped copies, out again now): the same call
+      // at any seat (`seatBaseCallSiteKey`), by any member. An earlier copy's ANSWERED call of another member is never taken here.
+      const base = seatBaseCallSiteKey(request.callSiteKey);
+      for (let at = credits.length - 1; at >= 0; at -= 1) {
+        const credit = credits[at]!;
+        if (credit.answered || seatBaseCallSiteKey(credit.callSiteKey) !== base) continue;
+        taken.unshift(...credit.attemptIds);
+        credits.splice(at, 1);
+      }
+      return taken.length === 0 ? null : Object.freeze(taken);
+    },
     earlierNodes,
+    openStep(members, contractHash) {
+      if (pending.length === 0) return;
+      const sites = members.map((member) => member.callSiteKey);
+      steps.push(Object.freeze({ sites: Object.freeze(sites), stood: new Set<string>() }));
+      const recorded = (member: ReplayStepMember): readonly RecordedCall[] => pending.filter((call) =>
+        call.actorRef === member.providerRef && onSite(call.callSiteKey, member.callSiteKey));
+      const atSite = pending.filter((call) => sites.some((site) => onSite(call.callSiteKey, site)));
+      const whole = members.every((member) => recorded(member).some((call) => hashOf(call) !== contractHash));
+      if (!whole || atSite.some((call) => hashOf(call) === contractHash)) barred.push(...sites);
+    },
+    refuseStanding(callSiteKey) {
+      const step = stepOf(callSiteKey);
+      barred.push(...(step?.sites ?? [callSiteKey]));
+      // This answer was counted when it was taken, and it did not stand after all.
+      stood -= 1;
+      step?.stood.delete(callSiteKey);
+      return step === undefined || step.stood.size === 0;
+    },
     adopt(nodeId, provenanceRef) {
       const earliest = earliestByReply.get(provenanceRef.toLowerCase());
       if (earliest !== undefined) siteNode.set(nodeId.toLowerCase(), earliest);
@@ -170,12 +344,35 @@ export function createReplayBook(input: Readonly<{
         const replay = replayOf(call, request.fingerprint);
         if (replay === null) continue;
         pending.splice(index, 1);
-        return replay;
+        return Object.freeze({ ...replay, stood: false, step: null });
+      }
+      // No answer to these bytes. The newest answer here under another release's wording stands, unless its step cannot.
+      if (request.contractHash === undefined || barred.some((site) => onSite(request.callSiteKey, site))) return null;
+      for (let index = pending.length - 1; index >= 0; index -= 1) {
+        const call = pending[index]!;
+        if (call.actorRef !== request.providerRef || call.callSiteKey !== request.callSiteKey) continue;
+        const hash = hashOf(call);
+        if (hash === undefined || hash === request.contractHash) continue;
+        const original = originalFingerprintOf(call);
+        const replay = original === null ? null : replayOf(call, original);
+        if (replay === null) continue;
+        pending.splice(index, 1);
+        stood += 1;
+        stepOf(request.callSiteKey)?.stood.add(request.callSiteKey);
+        return Object.freeze({ ...replay, stood: true, step: request.callSiteKey });
       }
       return null;
     },
+    answeredBy(matches) {
+      return Object.freeze([...new Set(pending.filter((call) => matches(call.callSiteKey)).map((call) => call.actorRef))]);
+    },
     close() {
+      if (stood > 0 && input.runId !== undefined) {
+        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_HANDOVER", event: "ANSWERS_STOOD", runId: input.runId, stood }));
+        stood = 0;
+      }
       pending.splice(0, pending.length);
+      credits.splice(0, credits.length);
       earliestByReply.clear();
     }
   };
@@ -192,24 +389,48 @@ export function createReplayBook(input: Readonly<{
  * first copy's gateway rescued in code (A1) or answered with its follow-up (B) is replayed, not bought again. Without it
  * (hosted, local: no route) the rebuild is today's.
  */
+/** A stood answer could not be read and the step's other members already stood: asking it again would mix the step. */
+export const RUN_HANDOVER_IMPOSSIBLE = "RUN_HANDOVER_IMPOSSIBLE" as const;
+
 export function replayingGateway(
   book: ReplayBook,
   inner: ProviderGateway,
   /** Asked before an answer is replayed: a copy that must make no further call (its claim lost, its time up) stops. */
   mayCall: () => void = () => undefined,
   /** The run's structure-repair route is wired: replay A1-rescued and B-answered calls too. */
-  structureReplay = false
+  structureReplay = false,
+  /**
+   * V4 start step, Task 57f: hands an earlier copy's charged attempts to the site (0165's call waiver), when this copy buys a call again that
+   * an earlier copy paid for and cannot hand back. Absent (and with nothing paid for earlier), the gateway is today's.
+   */
+  waiveCalls?: (runId: string, attemptIds: readonly string[]) => Promise<void>
 ): ProviderGateway {
+  /** Task 57f: bought (answered) `request` again: the earlier call it replaces is the site's. A waiver not written never fails the call. */
+  const boughtAgain = async (request: ProviderCallRequest, spoiled: TakenReplay | null): Promise<ProviderCallResult> => {
+    const bought = await inner.call(request);
+    const earlier = waiveCalls === undefined ? null : book.takeRedo?.(request, spoiled) ?? null;
+    if (earlier !== null && earlier.length > 0 && request.runId !== null) {
+      try {
+        await waiveCalls!(request.runId, earlier);
+      } catch {
+        console.warn(JSON.stringify({ kind: "DEBATEAI_RUN_CALL_WAIVER", event: "NOT_WRITTEN", runId: request.runId, calls: earlier.length }));
+      }
+    }
+    return bought;
+  };
   return Object.freeze({
     call: async (request: ProviderCallRequest): Promise<ProviderCallResult> => {
-      if (book.pending === 0) return inner.call(request);
+      const redo = waiveCalls !== undefined && (book.redoCredits ?? 0) > 0;
+      if (book.pending === 0 && !redo) return inner.call(request);
       mayCall();
-      const replay = book.take({
+      const replay = book.pending === 0 ? null : book.take({
         callSiteKey: request.callSiteKey,
         providerRef: request.providerRef,
-        fingerprint: canonicalPromptFingerprint(request.packet.messages)
+        // R22: the record holds a passage by its name, so the request is compared in that form.
+        fingerprint: canonicalPromptFingerprint(passageRecordedPacket(request.runId, request.packet).messages),
+        contractHash: request.contractHash
       });
-      if (replay === null) return inner.call(request);
+      if (replay === null) return redo ? boughtAgain(request, null) : inner.call(request);
       const { accepted, answered, repairAttempts } = replay;
       const content = rebuildRecordedCallContent({
         accepted: readRecordedProviderReply(accepted.artifact.rawText, accepted.artifact.provider),
@@ -217,7 +438,13 @@ export function replayingGateway(
         ...(request.classifyContent === undefined ? {} : { classifyContent: request.classifyContent }),
         ...(structureReplay ? structureReplayReaders(request) ?? {} : {})
       });
-      if (content === null) return inner.call(request);
+      if (content === null) {
+        if (replay.stood && !book.refuseStanding(request.callSiteKey)) {
+          throw new TypedDomainError(RUN_HANDOVER_IMPOSSIBLE, "A recorded answer cannot be read and its step has answers standing");
+        }
+        return redo ? boughtAgain(request, replay) : inner.call(request);
+      }
+      book.settleReplay?.(replay);
       return Object.freeze({
         rawArtifactRef: accepted.rawArtifactRef,
         ledgerEntryRef: accepted.ledgerEntryRef,
@@ -235,6 +462,16 @@ export function replayingGateway(
 }
 
 /**
+ * V4 start step, Task 57f: the site takes over an earlier copy's charged attempts (0165's ledger.record_call_waiver, for the runner's role): the
+ * person's windows, a funded grant's and the team's no longer count them; the site's day and the debate's own ceiling still do (the money was
+ * spent). Only attempts charged on this debate are taken, each once.
+ */
+export async function waiveRedoneCalls(pool: Pick<Pool, "query">, runId: string, attemptIds: readonly string[]): Promise<number> {
+  const result = await pool.query<{ waived: number }>("SELECT ledger.record_call_waiver($1::uuid, $2::uuid[]) AS waived", [runId, [...attemptIds]]);
+  return result.rows[0]?.waived ?? 0;
+}
+
+/**
  * The book for one claimed work item, read inside the run's content lease (prompts and replies are debate content):
  * every model call the run's earlier copies recorded for it, and every node they saved. Empty on a first claim.
  */
@@ -243,17 +480,21 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
     `SELECT node_id::text, provenance_ref::text FROM core.node WHERE run_id=$1 ORDER BY created_at_seq`, [runId]);
   const rows = await pool.query<{
     call_site_key: string; actor_ref: string; outcome: string; ledger_entry_id: string; raw_artifact_ref: string | null;
-    thinking_level: string | null; attempt_id: string | null;
+    thinking_level: string | null; attempt_id: string | null; contract_hash: string;
     prompt_fingerprint: string | null; prompt_text: string | null; prompt_ciphertext: CryptoEnvelope | null;
     raw_text: string | null; artifact_ciphertext: CryptoEnvelope | null; provider: string | null; model_id: string | null;
     maker: string | null; model_version: string | null; thinking_tokens: number | null; reply_attempt: string | null;
+    charged: boolean;
   }>(
     `SELECT entry.call_site_key, entry.actor_ref, entry.outcome, entry.ledger_entry_id::text,
-            entry.raw_artifact_ref::text, entry.thinking_level, entry.attempt_id::text,
+            entry.raw_artifact_ref::text, entry.thinking_level, entry.attempt_id::text, entry.contract_hash,
             prompt.prompt_fingerprint, prompt.prompt_text, prompt.content_ciphertext AS prompt_ciphertext,
             artifact.raw_text, artifact.content_ciphertext AS artifact_ciphertext, artifact.provider, artifact.model_id,
             artifact.maker, artifact.model_version, artifact.thinking_tokens,
-            artifact.metadata_json->>'attempt' AS reply_attempt
+            artifact.metadata_json->>'attempt' AS reply_attempt,
+            -- Task 57f: whether the person was charged for the attempt (what the site takes over if this copy must buy the call again).
+            EXISTS (SELECT 1 FROM ledger.model_spend AS spend WHERE spend.run_id = entry.run_id AND spend.attempt_id = entry.attempt_id
+              AND spend.charge_micros > 0) AS charged
        FROM ledger.ledger_entry AS entry
        LEFT JOIN ledger.call_prompt AS prompt ON prompt.attempt_id = entry.attempt_id AND prompt.run_id = entry.run_id
        LEFT JOIN ledger.raw_artifact AS artifact ON artifact.raw_artifact_id = entry.raw_artifact_ref AND artifact.run_id = entry.run_id
@@ -262,13 +503,30 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
   if (rows.rows.length === 0 && nodes.rows.length === 0) return EMPTY_REPLAY_BOOK;
   const leased = await prepareLeasedContentEncryptionForRun(pool, runId);
   try {
-    const attempts = rows.rows.map((row): RecordedAttempt => {
+    // R22 (0139): a reader's reply is recorded by name; its bytes come back from their own store while the debate runs. A name
+    // with no stored text reads as no reply: the call cannot be replayed, the path an unreadable reply already takes.
+    const opened = rows.rows.map((row) => row.raw_artifact_ref === null || row.provider === null ? null
+      : decryptLeasedContentForRun<Readonly<{ rawText?: unknown }>>(
+        leased, "ledger.raw_artifact", row.raw_artifact_ref, row.artifact_ciphertext, { rawText: row.raw_text }));
+    const named = [...new Set(opened.flatMap((reply) => { const id = typeof reply?.rawText === "string" ? webReplyTextIdOf(reply.rawText) : null;
+      return id === null ? [] : [id]; }))];
+    const storedReplies = new Map<string, string>();
+    if (named.length > 0) {
+      for (const stored of (await new PostgresPassageRetentionRepository(pool).readReplyTexts(runId, named)) ?? []) {
+        const text = decryptLeasedContentForRun<unknown>(leased, WEB_REPLY_TEXT_CARRIER, stored.artifact_id, stored.content, null);
+        if (typeof text === "string") storedReplies.set(stored.artifact_id, text);
+      }
+    }
+    const replyOf = (reply: Readonly<{ rawText?: unknown }> | null): string | null => {
+      if (typeof reply?.rawText !== "string") return null;
+      const id = webReplyTextIdOf(reply.rawText);
+      return id === null ? reply.rawText : storedReplies.get(id) ?? null;
+    };
+    const attempts = rows.rows.map((row, index): RecordedAttempt => {
       const prompt = row.attempt_id === null || (row.prompt_text === null && row.prompt_ciphertext === null) ? null
         : decryptLeasedContentForRun<Readonly<{ promptFingerprint?: unknown }>>(
           leased, "ledger.call_prompt", row.attempt_id, row.prompt_ciphertext, { promptFingerprint: row.prompt_fingerprint });
-      const reply = row.raw_artifact_ref === null || row.provider === null ? null
-        : decryptLeasedContentForRun<Readonly<{ rawText?: unknown }>>(
-          leased, "ledger.raw_artifact", row.raw_artifact_ref, row.artifact_ciphertext, { rawText: row.raw_text });
+      const replyText = replyOf(opened[index] ?? null);
       return Object.freeze({
         callSiteKey: row.call_site_key,
         actorRef: row.actor_ref,
@@ -276,9 +534,12 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
         ledgerEntryRef: row.ledger_entry_id,
         rawArtifactRef: row.raw_artifact_ref,
         thinkingLevel: row.thinking_level,
+        contractHash: row.contract_hash,
+        attemptId: row.attempt_id,
+        charged: row.charged,
         promptFingerprint: typeof prompt?.promptFingerprint === "string" ? prompt.promptFingerprint : null,
-        artifact: reply === null || typeof reply.rawText !== "string" ? null : Object.freeze({
-          rawText: reply.rawText, provider: row.provider!, modelId: row.model_id!, maker: row.maker!,
+        artifact: replyText === null ? null : Object.freeze({
+          rawText: replyText, provider: row.provider!, modelId: row.model_id!, maker: row.maker!,
           modelVersion: row.model_version, thinkingTokens: row.thinking_tokens,
           attempt: row.reply_attempt === null || !/^[0-9]{1,3}$/u.test(row.reply_attempt) ? null : Number(row.reply_attempt)
         })
@@ -286,7 +547,9 @@ export async function readReplayBook(pool: Pool, runId: string, workItemId: stri
     });
     await leased.assertLive();
     return createReplayBook({
+      runId,
       calls: recordedCalls(attempts),
+      credits: callCreditsOf(attempts),
       earlierNodes: nodes.rows.map((row) => Object.freeze({ nodeId: row.node_id, provenanceRef: row.provenance_ref }))
     });
   } finally {

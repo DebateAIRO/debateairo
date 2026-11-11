@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručně
-eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.9 · ÚČINNÉ OD 12. ŘÍJNA 2026
+eyebrow: PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.18 · ÚČINNÉ OD 1. LISTOPADU 2026
 title: S čím souhlasíte
 lede: Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.
-endMarker: KONEC PODMÍNEK · v2.9
+endMarker: KONEC PODMÍNEK · v2.18
 bodyLabel: Text Podmínek poskytování služby
 annexTitle: Příloha A — Regionální podmínky
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.9 · Effective 12. října 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
+**Version 2.18 · Effective 1. listopadu 2026 · Předchozí verze na dezbatere.ro/terms/versions · Jazyk: čeština.**
 
-**In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. Vaše debaty jsou soukromé, dokud je nezveřejníte; pokud je zveřejníte, může je číst kdokoli. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
+**In short.** Musí vám být alespoň 18 let. Dialectical Engine vytváří argumenty pomocí modelů AI a vše, co vygeneruje, může být nesprávné — nejde o poradenství. V bezplatném tarifu jsou vaše debaty po dokončení veřejné, po kontrole AI; v placeném tarifu jsou soukromé, dokud je nezveřejníte. Jakmile je debata veřejná, může ji číst kdokoli a zůstává veřejná. Text, který zadáte, je odesílán poskytovatelům AI uvedeným v našem Registru poskytovatelů a nepoužívá se k trénování modelů. Nezákonný obsah hlaste na support@dezbatere.ro bez ohledu na to, zda máte účet. Rozhodným právem je rumunské právo, vaše místní spotřebitelská ochrana vám však zůstává zachována.
 
 ## 1. Kdo jsme a jak nás kontaktovat
 
@@ -142,17 +142,25 @@ Nejste-li si jisti, zda je něco dovoleno, zeptejte se nás před zveřejněním
 
 ## 9. Zveřejnění debaty
 
-Debaty jsou **ve výchozím nastavení soukromé**. Nic z toho, co vytvoříte, není viditelné nikomu jinému, dokud to nezveřejníte.
+V placeném tarifu jsou debaty **ve výchozím nastavení soukromé**: nic, co tam vytvoříte, není viditelné nikomu jinému, dokud to nezveřejníte. Debaty v bezplatném tarifu jsou veřejné, jak říká tento oddíl.
 
 **Co zveřejnění způsobí.** Zveřejnění je úmyslný, samostatně potvrzený úkon. Při zveřejnění pořídíme neměnný snímek debaty a zpřístupníme jej komukoli ke čtení bez účtu. Vyhledávače ji mohou indexovat. Snímek zobrazuje váš **pseudonym**, otázku tak, jak jste ji napsali, strom argumentů, hodnocení, závěr a interval spolehlivosti a nese viditelné označení, že obsah vytvořila AI. Nezobrazuje vaši e-mailovou adresu, záznamy relací ani historii účtu.
 
-**Zveřejnění je v praxi fakticky nevratné.** Jakmile je debata veřejná, jiné osoby ji mohou číst, citovat, pořizovat snímky obrazovky, archivovat a ukládat do mezipaměti. Zrušení zveřejnění odstraní debatu z Dialectical Engine a zničí klíč k naší kopii, nedosáhne však na kopie, které již existují jinde. Nezveřejňujte nic, co byste nechtěli mít trvale spojeno se svým pseudonymem.
+**Debaty v bezplatném tarifu jsou veřejné.** V bezplatném tarifu jsou vaše otázka a její debata veřejné. Říkáme vám to, než se zeptáte. Po dokončení debaty ji zkontroluje AI; pokud kontrola dovolí, může ji číst kdokoli a vyhledávače ji mohou indexovat. Pokud ji kontrola odmítne, zůstane soukromá pro vás. Do otázky v bezplatném tarifu neuvádějte osobní údaje.
+
+**Nelze vzít zpět.** Jakmile je debata veřejná, zůstává veřejná. Nelze ji zrušit ze zveřejnění ani smazat a smazání účtu ji neodstraní. Můžeme ji během přezkoumání dočasně skrýt a odstranit nebo opravit její část, pokud to umožňuje tento oddíl. Kopie, které vytvořili jiní, jsou mimo naši kontrolu. Ostatní ji mohou číst, citovat, pořizovat snímky obrazovky, archivovat a ukládat do mezipaměti. Nezveřejňujte nic, co byste nechtěli mít trvale spojeno se svým pseudonymem.
 
 **Označená debata vyžaduje naše schválení.** Když debata skončí, automatizovaná kontrola přečte její syntézu z hlediska čtyř kategorií uvedených v oddíle 8. Debatu, kterou kontrola označí, lze zveřejnit jen s naším schválením a označení se zobrazí pouze vám a, pokud požádáte o naše schválení, členům našeho týmu, kteří mají oprávnění posuzovat zveřejnění; debata, jejíž syntéza se podle kontroly dotýká kategorie „sklony k sebevraždě nebo k ubližování jiným lidem“, se místo toho smaže, jak uvádí následující odstavec. Pokud o naše schválení požádáte na stránce debaty, člen našeho týmu, který má zvláštní oprávnění posuzovat zveřejnění, si může přečíst debatu v podobě, v jaké by byla zveřejněna, bez vašeho pseudonymu. Pokud schválíme, tlačítko Zveřejnit vám bude opět dostupné a kontrola, kterou prochází každé zveřejnění, platí i nadále. Pokud zamítneme, debata zůstane soukromá a poskytneme vám odůvodnění (oddíl 10). Po zamítnutí můžete požádat ještě jednou a rozhodne člen našeho týmu, který o první žádosti nerozhodoval; můžete také využít postup pro vyřizování stížností podle oddílu 10. Po druhém zamítnutí už požádat znovu nemůžete, ale rozhodnutí můžete stále předložit subjektu pro mimosoudní řešení sporů nebo soudu (oddíl 10). Schválení se vztahuje na syntézu, kterou posuzovatel přečetl, včetně každé pozdější verze debaty, která ji opakuje slovo od slova; přepsaná syntéza se při zveřejnění znovu zkontroluje a pokud je označena, vyžaduje vlastní schválení. Pokud po našem schválení zveřejníte označenou debatu, můžete ji znovu odebrat tlačítkem Odebrat na její kartě v části Vaše debaty.
 
 **Debaty, které naše kontrola smaže.** Pokud naše automatická kontrola zjistí, že syntéza debaty se dotýká kategorie „sklony k sebevraždě nebo k ubližování jiným lidem“, debatu automaticky smažeme a neuchováváme ji, i když už byla zveřejněna. Syntéza se považuje za ubližování jiným lidem, když vyzývá k ublížení osobě nebo je plánuje, nebo když dospívá k závěru, že stát, armáda, policie nebo kdokoli jiný má použít sílu proti lidem; debata o násilí jako o tématu dějin, práva, etiky, politiky, aktuálního dění nebo veřejné politiky se tak nepovažuje jen kvůli svému tématu. Žádný člověk debatu předem nečte a nelze ji obnovit. Jakmile debata skončí, odpověď debaty se vám nezobrazí, kromě případu, kdy kontrola nemohla odpovědět včas: každá dokončená debata je zadržena, dokud kontrola neodpoví (oddíl 8), zatímco stránka probíhající debaty zobrazuje argumenty a závěr tak, jak vznikají; pokud kontrola nemohla odpovědět včas, debata se znovu zkontroluje, když stisknete tlačítko Zveřejnit. Řekneme vám to jednou na obrazovce, s odůvodněním a čísly pomoci. Stále můžete podat stížnost postupem v oddílu 10, ale stížnost debatu neobnoví. Prémiová debata smazaná tímto způsobem se nezapočítává do limitu vašeho tarifu.
 
-**Zveřejněné debaty při uzavření účtu.** Když naplánujete uzavření účtu, zvolíte, co se stane s debatami, které jste zveřejnili. Pokud zaškrtnete **„Smazat také mé veřejné debaty“**, každou z nich při provedení uzavření odstraníme z Dialectical Engine a zničíme klíč k naší kopii, stejně jako při zrušení zveřejnění, ledaže nám zákon ukládá uchovat konkrétní položku. Pokud políčko nezaškrtnete, debaty zůstanou veřejné pod vaším vyřazeným pseudonymem. Kopie pořízené jinými osobami před odstraněním nemůžeme ovlivnit. Chcete-li si odstraňovanou debatu ponechat, nejprve si ji stáhněte.
+**Vaše jméno.** Váš pseudonym se zobrazí jako autor debaty, kterou jste zveřejnili, na každé cestě, k níž jste přispěli, s datem, a jako odkaz u zprávy, kterou jste napsali. Pokud svůj účet vymažete, váš pseudonym se odstraní všude a místo něj stránka zobrazí „přispěvatel“.
+
+**Příspěvky.** Kdokoli s kreditem, v bezplatném nebo placeném tarifu, se může ponořit do veřejné debaty za použití svého limitu. Co tam napíšete a co z toho napíšou AI, kontroluje AI dříve, než může změnit veřejnou stránku. Pokud je to povoleno, změní stránku pro všechny, pod vaším pseudonymem, a zůstane veřejné podle stejných pravidel jako debata: nelze to vzít zpět. Pokud je to odmítnuto, zůstane to soukromé pro vás a stránka se nezmění. Nesmíte psát nic, co nemáte právo zveřejnit, ani osobní údaje o kterékoli osobě.
+
+**Zprávy od kohokoli.** Kdokoli s kreditem může napsat zprávu o veřejné debatě, dokud se k ní nic dalšího nepřidává, a to za použití svého limitu. Zpráva je veřejná. Pseudonym autora je jen odkaz: zprávu píšou AI z toho, co stránka ukazuje, a není to prohlášení autora. Dřívější zprávy zůstávají čitelné.
+
+**Po odchodu autora.** Veřejná debata zůstává otevřená pro příspěvky i poté, co její první autor smazal svůj účet. Nové příspěvky pracují s veřejnou kopií.
 
 **Zveřejněný obsah můžeme vždy odstranit.** Zveřejněnou debatu můžeme odstranit nebo k ní omezit přístup, vyžaduje-li to zákon, nařídí-li to soud nebo příslušný orgán, nebo porušuje-li tyto Podmínky či je nezákonná. Nic v tomto oddílu nám nebrání jednat na základě platného oznámení podle oddílu 10 a nic v něm nepředstavuje příslib, že zveřejněná debata zůstane dostupná.
 
@@ -162,9 +170,9 @@ Debaty jsou **ve výchozím nastavení soukromé**. Nic z toho, co vytvoříte, 
 
 ## 10. Hlášení obsahu, moderování a stížnosti
 
-**Obsah může nahlásit kdokoli.** Účet nepotřebujete. Napište na support@dezbatere.ro nebo použijte ovládací prvek **Nahlásit** u kterékoli zveřejněné debaty. Abychom mohli jednat, sdělte nám: proč se domníváte, že je obsah nezákonný nebo porušuje tyto Podmínky, a to dostatečně podrobně, abychom tvrzení pochopili; přesné umístění — úplnou adresu URL a pokud možno příslušnou pasáž; své jméno a e-mailovou adresu (nevyžaduje se u hlášení materiálu zobrazujícího sexuální zneužívání dětí); a prohlášení, že se v dobré víře domníváte, že je vaše hlášení přesné a úplné.
+**Obsah může nahlásit kdokoli.** Účet nepotřebujete. Napište na support@dezbatere.ro. Pokud jste přihlášeni, můžete také použít tlačítko **Nahlásit** u kterékoli veřejné debaty; požádá vás o potvrzení, že se v dobré víře domníváte, že je vaše hlášení přesné a úplné. AI obvykle čte hlášení podané tlačítkem vedle veřejného textu. Pokud AI s hlášením souhlasí a debata ještě nikdy nebyla skryta, debata se okamžitě skryje, bez účasti člověka, a poté ji člověk přezkoumá. Hlášení jde místo toho rovnou k člověku, pokud byla debata již dříve skryta, pokud jste ji již nahlásili nebo pokud jsou automatické kontroly pro daný den vyčerpány. Pokud AI nesouhlasí nebo je hlášení automaticky zastaveno (například proto, že jste během jedné hodiny odeslali mnoho hlášení, nebo debata není veřejná), žádný člověk ho nečte: můžete napsat na support@dezbatere.ro a člověk vaši zprávu přečte, nebo podat stížnost postupem níže. Abychom mohli jednat, sdělte nám: proč se domníváte, že je obsah nezákonný nebo porušuje tyto Podmínky, a to dostatečně podrobně, abychom tvrzení pochopili; přesné umístění — úplnou adresu URL a pokud možno příslušnou pasáž; své jméno a e-mailovou adresu (nevyžaduje se u hlášení materiálu zobrazujícího sexuální zneužívání dětí); a prohlášení, že se v dobré víře domníváte, že je vaše hlášení přesné a úplné.
 
-Každé hlášení potvrdíme bez zbytečného odkladu. Hlášení vyřizujeme včas, pečlivě, objektivně a bez svévole, sdělíme vám své rozhodnutí a způsob, jak je napadnout. Použijeme-li k vyřízení hlášení nebo rozhodnutí o něm automatizované prostředky, informujeme vás o tom. Na hlášení intimních snímků sdílených bez souhlasu reagujeme **do 48 hodin** od platné žádosti.
+Každé hlášení potvrdíme bez zbytečného odkladu: okamžitě na obrazovce a u hlášení, které přečte člověk, také e-mailem. Hlášení vyřizujeme včas, pečlivě, objektivně a bez svévole, sdělíme vám e-mailem své rozhodnutí a způsob, jak je napadnout. Použijeme-li k vyřízení hlášení nebo rozhodnutí o něm automatizované prostředky, informujeme vás o tom. Na hlášení intimních snímků sdílených bez souhlasu reagujeme **do 48 hodin** od platné žádosti.
 
 **Dva druhy automatizovaného rozhodování, které oddělujeme.**
 
@@ -175,7 +183,7 @@ Každé hlášení potvrdíme bez zbytečného odkladu. Hlášení vyřizujeme v
 
 **Kam patří kontrola otázky.** Kontrola otázky v oddílu 8 také není rozhodnutím uvnitř systému. Je to automatizovaný nástroj, který odmítne zahájit debatu, bez účasti člověka. Otázka, která zní jako slova osoby v krizi nebo která žádá o metody sebevraždy či sebepoškození nebo o povzbuzení k nim, dostane místo zamítnutí obrazovku s čísly pomoci.
 
-**Odůvodnění.** Kdykoli odstraníme váš obsah nebo omezíme jeho viditelnost či pozastavíme nebo ukončíme váš účet, poskytneme vám odůvodnění: co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli a zda pocházely z hlášení nebo z našich vlastních kontrol, zda byly použity automatizované prostředky, jaký byl právní nebo smluvní důvod a jak můžete rozhodnutí napadnout: prostřednictvím našeho postupu pro vyřizování stížností níže, prostřednictvím subjektu pro mimosoudní řešení sporů certifikovaného podle nařízení EU o digitálních službách nebo u soudu. Když naše kontrola otázky zamítne otázku podle odstavce „Otázky, které nezahájí debatu“ v oddílu 7, je obrazovka, která vám to oznámí, naším odůvodněním: uvádí, že debata nezačala, že naše automatická kontrola otázku zamítla bez účasti člověka, pod které pravidlo těchto Podmínek otázka spadá a jak podat stížnost postupem níže. U zamítnuté otázky nic dalšího neslibujeme. Když naše kontrola smaže debatu (oddíl 9), je oznámení, které vidíte, naším odůvodněním: uvádí, co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli, že se na tom nepodílel žádný člověk, které pravidlo těchto Podmínek se použije a jak podat stížnost postupem níže; zbylé dva postupy, které tento odstavec uvádí, vám zůstávají otevřeny. Obrazovka s čísly pomoci, kterou dostane otázka, která zní jako slova osoby v krizi, je pomoc, nikoli odůvodnění.
+**Odůvodnění.** Kdykoli odstraníme váš obsah nebo omezíme jeho viditelnost či pozastavíme nebo ukončíme váš účet, poskytneme vám odůvodnění: co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli a zda pocházely z hlášení nebo z našich vlastních kontrol, zda byly použity automatizované prostředky, jaký byl právní nebo smluvní důvod a jak můžete rozhodnutí napadnout: prostřednictvím našeho postupu pro vyřizování stížností níže, prostřednictvím subjektu pro mimosoudní řešení sporů certifikovaného podle nařízení EU o digitálních službách nebo u soudu. Zašleme vám ho e-mailem s odkazem na úplné odůvodnění ve vašem účtu v Nastavení, Oznámení o moderování, kde zůstává. Dostanete ho i tehdy, když váš obsah zmizí z veřejné stránky spolu s jiným obsahem, který přezkoumáváme, i když se u vašeho obsahu porušení žádného pravidla nezjistilo. Když naše kontrola otázky zamítne otázku podle odstavce „Otázky, které nezahájí debatu“ v oddílu 7, je obrazovka, která vám to oznámí, naším odůvodněním: uvádí, že debata nezačala, že naše automatická kontrola otázku zamítla bez účasti člověka, pod které pravidlo těchto Podmínek otázka spadá a jak podat stížnost postupem níže. U zamítnuté otázky nic dalšího neslibujeme. Když naše kontrola smaže debatu (oddíl 9), je oznámení, které vidíte, naším odůvodněním: uvádí, co jsme učinili a v jakém rozsahu, z jakých skutečností jsme vycházeli, že se na tom nepodílel žádný člověk, které pravidlo těchto Podmínek se použije a jak podat stížnost postupem níže; zbylé dva postupy, které tento odstavec uvádí, vám zůstávají otevřeny. Obrazovka s čísly pomoci, kterou dostane otázka, která zní jako slova osoby v krizi, je pomoc, nikoli odůvodnění.
 
 **Stížnost proti rozhodnutí.** Nesouhlasíte-li s moderátorským rozhodnutím, odpovězte na odůvodnění nebo napište na office@dezbatere.ro do **šesti měsíců**. Rozhodnutí přezkoumá osoba, která se na původním rozhodnutí nepodílela, a výsledek vám sdělíme s odůvodněním. Tím není dotčeno vaše právo obrátit se na soud nebo využít alternativní řešení sporů podle oddílu 18. Postup pro vyřizování stížností přijímá také stížnosti na to, že jsme nereagovali na hlášení, že byl obsah odstraněn nesprávně, že byl účet nesprávně omezen nebo že automatizovaný nástroj nesprávně ovlivnil váš obsah, například zamítnutím otázky.
 
@@ -197,17 +205,15 @@ S výjimkou případů, kdy je porušení závažné, zákon vyžaduje okamžit�
 
 Pokud službu zcela ukončíme nebo ji přestaneme poskytovat ve vaší zemi, upozorníme vás nejméně **30 dnů předem**, vrátíme vám případnou předplacenou částku za období po ukončení a předtím vám umožníme exportovat debaty.
 
-**Co uzavření způsobí.** Po uzavření účtu zničíme šifrovací klíče k údajům vašeho účtu a vašim soukromým debatám, čímž se stanou trvale nečitelnými, vymažeme záznam účtu a pokud jste to zvolili, odstraníme vaše zveřejněné debaty z veřejného přístupu, jak popisuje oddíl 9. Některé údaje přetrvají a měli byste vědět které: záznamy v našich auditních a bezpečnostních protokolech, které lze pouze doplňovat a které uchováváme za účelem plnění vlastních právních a bezpečnostních povinností; záznamy, které jsme ze zákona povinni uchovávat, včetně záznamů o přijetí a souhlasech; a u malého počtu starších debat vytvořených před zavedením našeho šifrovacího systému záznamy, jejichž výmaz je omezenější — pokud se to týká vašeho účtu, informujeme vás. Zásady ochrany osobních údajů vše popisují z hlediska ochrany osobních údajů a vysvětlují vaše právo na výmaz.
+**Co uzavření způsobí.** Po uzavření účtu zničíme šifrovací klíče k údajům vašeho účtu a vašim soukromým debatám, čímž se stanou trvale nečitelnými, vymažeme záznam účtu a odstraníme váš pseudonym z vašich veřejných debat, které zůstanou veřejné, jak popisuje oddíl 9. Některé údaje přetrvají a měli byste vědět které: záznamy v našich auditních a bezpečnostních protokolech, které lze pouze doplňovat a které uchováváme za účelem plnění vlastních právních a bezpečnostních povinností; záznamy, které jsme ze zákona povinni uchovávat, včetně záznamů o přijetí a souhlasech; a u malého počtu starších debat vytvořených před zavedením našeho šifrovacího systému záznamy, jejichž výmaz je omezenější — pokud se to týká vašeho účtu, informujeme vás. Zásady ochrany osobních údajů vše popisují z hlediska ochrany osobních údajů a vysvětlují vaše právo na výmaz.
 
 Oddíly 8 (pokud jde o již zveřejněný obsah), 15, 16 a 18 zůstávají v platnosti i po ukončení.
 
 ## 12. Placené tarify
 
-&#91;Inactive until a paid plan exists. Do not launch a paid tier without completing every bracket here and the checkout interface it describes.\]
+Dialectical Engine nabízí bezplatný tarif. K dispozici budou tři placené tarify, **Plus**, **Pro** a **Max**; každý z nich zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
 
-Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **Premium**, který zpřístupní úplný výběr modelů a umožní vám samostatně nastavovat parametry debaty.
-
-**Před zaplacením** vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní **Předplatit a zaplatit** (v rumunštině *Comandă cu obligație de plată*). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení.
+**Před zaplacením** vám přímo nad platebním tlačítkem zobrazíme: tarif; celkovou cenu včetně příslušné daně; fakturační období; skutečnost, že se tarif automaticky obnovuje až do zrušení; datum skončení případného bezplatného zkušebního období a částku, která vám poté bude účtována; a způsob zrušení. Podmínky obnovení potvrdíte zaškrtnutím samostatného políčka. Tlačítko zní **Předplatit a zaplatit** (v rumunštině *Abonați-vă și plătiți*). Na trvalém nosiči vám zašleme potvrzení obsahující stejné informace, tyto Podmínky a formulář pro odstoupení.
 
 **Připomenutí.** E-mail vám zašleme nejméně 5 dnů před přechodem bezplatného zkušebního období na placený tarif; nejméně jednou ročně u pokračujících tarifů; a 30 až 45 dnů před obnovením jakéhokoli období v délce dvanácti měsíců nebo delšího. Každé připomenutí obsahuje cenu, datum a odkaz ke zrušení.
 
@@ -217,7 +223,7 @@ Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **
 
 **Neúspěšné platby.** Pokud platba selže, budeme její provedení opakovat po dobu 7 dnů a před převedením účtu na bezplatný tarif vás upozorníme e-mailem. Kvůli neúspěšné platbě vaše debaty nemažeme.
 
-**Daně a komu platíte.** Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky.
+**Daně a komu platíte.** Naše ceny zobrazujeme bez daně, ve tvaru cena + DPH (nebo GST či daň z prodeje v závislosti na místě vašeho bydliště). Daň pro vaši fakturační adresu se připočítá v pokladně a pokladna vám před zaplacením ukáže celkovou částku k úhradě včetně daně. Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky.
 
 **Platební metody.** Platíte kartou. Přijímáme karty Visa a Mastercard; karty American Express nepřijímáme. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com) a celé číslo vaší karty se k nám nikdy nedostane.
 
@@ -225,7 +231,7 @@ Dialectical Engine nabízí bezplatný tarif. Bude k dispozici placený tarif **
 
 **Reklamace platby.** Pokud platbu zpochybníte u vydavatele karty, můžeme placené funkce po dobu řešení sporu pozastavit. Neúčtujeme za to žádné poplatky.
 
-**Zákonná práva mají přednost.** Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání jednotlivých tarifů jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme.
+**Zákonná práva mají přednost.** Pokud služba neodpovídá tomu, co jsme slíbili, máte právo na uvedení do souladu nebo na přiměřené snížení ceny či vrácení peněz podle zákona. Nad tento rámec, pokud placený tarif zrušíte během fakturačního období, vrátíme vám tu část ceny tohoto období, kterou jste nevyužili, měřenou podle využití tarifu, bez ohledu na to, kolik dní uplynulo: pokud jste využili 30 %, vrátíme vám 70 %; pokud jste nevyužili nic, vrátíme vám celou cenu. Požádejte o to na adrese support@dezbatere.ro; jakmile peníze vrátíme, tarif skončí. Platí-li zároveň právo na odstoupení podle oddílu 13, získáte vyšší z obou vrácených částek. Limity používání každého tarifu jsou zveřejněny v produktu; před jejich zpřísněním způsobem, který vás podstatně ovlivní, vás upozorníme.
 
 ## 13. Vaše právo na odstoupení
 
@@ -243,6 +249,24 @@ O tom, co a kdy se mění, vás předem informujeme na trvalém nosiči. Má-li 
 
 **Změny těchto Podmínek.** Tyto Podmínky můžeme měnit ze stejných druhů důvodů. U změn, které neomezují vaše práva, zveřejníme novou verzi se shrnutím změn a nejméně **30 dnů** před nabytím účinku vám zašleme e-mail; pokračováním v používání Dialectical Engine po tomto datu změnu přijímáte a před tímto datem můžete svůj účet uzavřít. U změn, které omezují vaše práva — včetně zvýšení ceny stávajícího tarifu, snížení limitů, odstranění funkcí, nového způsobu použití vašeho obsahu nebo změn odpovědnosti, rozhodného práva či řešení sporů — vás při příštím přihlášení požádáme, abyste novou verzi výslovně přijali, a změna platí pouze do budoucna. Žádnou změnu nikdy neuplatníme zpětně a tento oddíl nikdy nepoužijeme ke změně podstaty toho, za co jste v průběhu období zaplatili, aniž bychom vám nabídli možnost smlouvu ukončit. Předchozí verze zůstávají dostupné na adrese dezbatere.ro/terms/versions.
 
+Verze 2.18 nahradila verzi 2.17: příloha A.3 uvádí, že i v Quebecu jsou debaty v placeném tarifu ve výchozím nastavení soukromé a debaty v bezplatném tarifu veřejné, jak říká oddíl 9; to, za co odpovídáme, ani žádné právo podle těchto Podmínek se nemění.
+
+Verze 2.17 nahradila verzi 2.16: oddíl 10 uvádí, kdy hlášení podané tlačítkem Nahlásit čte AI a kdy člověk, že tlačítko žádá vaše prohlášení v dobré víře, že vám hlášení potvrzujeme a své rozhodnutí sdělujeme e-mailem a že odůvodnění zasíláme e-mailem a uchováváme ve vašem účtu; to, za co odpovídáme, ani žádné právo podle těchto Podmínek se nemění.
+
+Verze 2.16 nahradila verzi 2.15: oddíl 12 uvádí placené tarify, Plus, Pro a Max, a oddíly 12 a 15 už neobsahují poznámky k návrhu; to, za co odpovídáme, ani žádné právo podle těchto Podmínek se nemění.
+
+Verze 2.15 nahradila verzi 2.14: oddíl 12 uvádí, že naše ceny zobrazujeme bez daně, ve tvaru cena + DPH, a že se daň připočítá v pokladně.
+
+Verze 2.14 nahradila verzi 2.13: oddíl 18 a příloha A uvádějí jako cestu k alternativnímu řešení sporů ANPC (SAL).
+
+Verze 2.13 nahradila verzi 2.12: oddíl 12 uvádí rumunské znění platebního tlačítka.
+
+Verze 2.12 nahradila verzi 2.11: oddíl 10 uvádí, že přihlášená osoba může také použít tlačítko Nahlásit u kterékoli veřejné debaty, že AI čte hlášení podané tímto tlačítkem vedle veřejného textu a co se pak stane.
+
+Verze 2.11 nahradila verzi 2.10: oddíl 9 uvádí, že můžeme veřejnou debatu během jejího přezkoumání dočasně skrýt a odstranit nebo opravit její část.
+
+Verze 2.10 nahradila verzi 2.9: oddíl 9 uvádí, že debaty v bezplatném tarifu jsou veřejné, že veřejnou debatu nelze zrušit ze zveřejnění a zůstává veřejná i po uzavření vašeho účtu, že kdokoli s kreditem může přispívat do veřejné debaty nebo o ní psát zprávu, a že veřejná debata zůstává otevřená i poté, co její první autor odešel; oddíl 11 uvádí, co uzavření účtu způsobí s vašimi veřejnými debatami.
+
 Verze 2.9 nahradila verzi 2.8: oddíl 8 získává odstavec „Grafy a statistiky, které vytváříme“, který uvádí, komu patří grafy ve zprávě o debatě, a uděluje vám licenci k jejich používání.
 
 Verze 2.8 nahradila verzi 2.7: kontrola otázky zamítá také otázku, která se ptá, jak spáchat trestný čin nebo jak za něj uniknout trestu, nebo zda by ho někdo měl spáchat, například nelegálně koupit či prodat drogy nebo zbraně, krást nebo krátit daně, a takovou otázku neuchovává; otázka, zda by se měl změnit zákon, debatu dál zahájí (oddíl 7). Zavádí také jedinou hranici pro drogy a umožňuje, aby otázka, zda by se měl změnit zákon týkající se sebevraždy, eutanazie či asistovaného umírání, zahájila debatu (oddíl 7), a kontrola otázky již neuchovává žádnou otázku pro náš tým (oddíly 7 a 10); obrazovka, která otázku zamítne, je naším odůvodněním u každé otázky, která podle oddílu 7 debatu nezahájí (oddíl 10).
@@ -258,8 +282,6 @@ Verze 2.7 nahradila verzi 2.6: přidává kontrolu otázky, která čte každou 
 **Váš obsah a vaše užívání.** Odpovídáte za to, co zadáváte a zveřejňujete, včetně toho, že jste oprávněni obsah zadat a že dodržujete oddíl 7.
 
 **Události mimo naši kontrolu.** Nejsme v prodlení, pokud nám plnění znemožní okolnost mimo naši přiměřenou kontrolu. Selhání nebo odstoupení poskytovatele modelu třetí strany nepředstavuje automaticky takovou událost; způsobí-li nedostupnost služby, použije se oddíl 14 a můžete smlouvu ukončit a získat vrácení peněz, jak je v něm popsáno.
-
-&#91;No monetary cap and no general exclusion of indirect loss apply to consumers. If a business tier is ever offered, negotiated allocations belong in a separate order form.\]
 
 ## 16. Duševní vlastnictví
 
@@ -283,7 +305,7 @@ Způsob, jakým nakládáme s osobními údaji, stanoví **Zásady ochrany osobn
 
 **Spotřebitelé jinde.** Žijete-li mimo EU a EHP, nic v těchto Podmínkách neomezuje vaše právo podle práva vaší země podat žalobu u jejích soudů ani žádné právo podle tohoto práva, kterého se nelze vzdát — včetně práv ze spotřebitelských záruk, žijete-li v Austrálii nebo na Novém Zélandu; práv podle Código de Defesa do Consumidor, žijete-li v Brazílii; a práv podle zákonů vašeho státu na ochranu spotřebitele, žijete-li ve Spojených státech.
 
-**Před podáním žaloby.** Kontaktujte nás na support@dezbatere.ro; většinu věcí lze napravit a snažíme se odpovědět do 5 pracovních dnů. Jste-li spotřebitelem v Rumunsku nebo EU, můžete využít alternativní řešení sporů prostřednictvím www.onoratainstanta.ro; k účasti v tomto postupu se nezavazujeme. Stížnosti na moderátorská rozhodnutí se řídí oddílem 10, což je samostatný postup.
+**Před podáním žaloby.** Kontaktujte nás na support@dezbatere.ro; většinu věcí lze napravit a snažíme se odpovědět do 5 pracovních dnů. Jste-li spotřebitelem v Rumunsku nebo EU, můžete využít alternativní řešení sporů prostřednictvím ANPC (SAL), reclamatiisal.anpc.ro; k účasti v tomto postupu se nezavazujeme. Stížnosti na moderátorská rozhodnutí se řídí oddílem 10, což je samostatný postup.
 
 ## 19. Ostatní ustanovení
 
@@ -305,7 +327,7 @@ Každá položka se použije na osoby, které žijí v jejím regionu, a stanov�
 
 ### A.1 Evropská unie a Evropský hospodářský prostor
 
-Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení můžete zahájit u soudů země, v níž žijete; použije se právo na odstoupení podle oddílu 13; alternativní řešení sporů je dostupné prostřednictvím www.onoratainstanta.ro. **Německo:** tlačítko pro zrušení na adrese dezbatere.ro/cancel vám umožňuje ukončit předplatné bez přihlášení; podmínky předplatného, období obnovení a výpovědní lhůty jsou v souladu s §309 odst. 9 BGB: každý tarif trvá jeden měsíc a každý měsíc se obnovuje, dokud jej nezrušíte, a zrušit jej můžete kdykoli s účinností od konce probíhajícího měsíce. **Francie:** předplatné můžete ukončit online ve třech krocích na adrese dezbatere.ro/cancel. **Itálie:** ustanovení o pozastavení a ukončení (11), placených tarifech a jejich obnovení (12), změnách (14), odpovědnosti (15) a rozhodném právu a soudní příslušnosti (18) vyžadují váš zvláštní souhlas podle článků 1341 a 1342 italského občanského zákoníku. Udělujete jej samostatným políčkem při registraci, které se zobrazí každému, kdo v poli Oblast vybere Itálii nebo jehož připojení pochází z Itálie. **Nizozemsko:** tyto Podmínky jsou před uzavřením poskytnuty v podobě, kterou lze uložit. **Polsko:** polská verze je k dispozici; v přepínači jazyků zvolte Polski.
+Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení můžete zahájit u soudů země, v níž žijete; použije se právo na odstoupení podle oddílu 13; alternativní řešení sporů je dostupné prostřednictvím ANPC (SAL), reclamatiisal.anpc.ro. **Německo:** tlačítko pro zrušení na adrese dezbatere.ro/cancel vám umožňuje ukončit předplatné bez přihlášení; podmínky předplatného, období obnovení a výpovědní lhůty jsou v souladu s §309 odst. 9 BGB: každý tarif trvá jeden měsíc a každý měsíc se obnovuje, dokud jej nezrušíte, a zrušit jej můžete kdykoli s účinností od konce probíhajícího měsíce. **Francie:** předplatné můžete ukončit online ve třech krocích na adrese dezbatere.ro/cancel. **Itálie:** ustanovení o pozastavení a ukončení (11), placených tarifech a jejich obnovení (12), změnách (14), odpovědnosti (15) a rozhodném právu a soudní příslušnosti (18) vyžadují váš zvláštní souhlas podle článků 1341 a 1342 italského občanského zákoníku. Udělujete jej samostatným políčkem při registraci, které se zobrazí každému, kdo v poli Oblast vybere Itálii nebo jehož připojení pochází z Itálie. **Nizozemsko:** tyto Podmínky jsou před uzavřením poskytnuty v podobě, kterou lze uložit. **Polsko:** polská verze je k dispozici; v přepínači jazyků zvolte Polski.
 
 ### A.2 Spojené státy
 
@@ -317,7 +339,7 @@ Hlavní část těchto Podmínek je určena pro vás. Dále platí: řízení m�
 
 ### A.3 Kanada a Quebec
 
-Naším pracovníkem pro ochranu soukromí, a v Quebecu osobou odpovědnou za ochranu osobních údajů, je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Na vaše údaje se vztahují naše Zásady ochrany osobních údajů, příloha B.3. **Quebec:** tyto Podmínky jsou dostupné ve francouzštině; pokud při registraci zvolíte Kanadu, zobrazí se vám nejprve ve francouzštině a místo toho si můžete zvolit angličtinu; nastavení, která zachovávají soukromí vašich debat, jsou ve výchozím stavu zapnuta; můžete požádat o odstranění osobních údajů, které se vás týkají, z výsledků vyhledávání.
+Naším pracovníkem pro ochranu soukromí, a v Quebecu osobou odpovědnou za ochranu osobních údajů, je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Na vaše údaje se vztahují naše Zásady ochrany osobních údajů, příloha B.3. **Quebec:** tyto Podmínky jsou dostupné ve francouzštině; pokud při registraci zvolíte Kanadu, zobrazí se vám nejprve ve francouzštině a místo toho si můžete zvolit angličtinu; v placeném tarifu jsou debaty ve výchozím nastavení soukromé a debaty v bezplatném tarifu jsou veřejné, jak říká oddíl 9; můžete požádat o odstranění osobních údajů, které se vás týkají, z výsledků vyhledávání.
 
 ### A.4 Austrálie a Nový Zéland
 

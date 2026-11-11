@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Не удалось создать дебаты",
   "newDebate.sessionReadFailed": "Не удалось прочитать сеанс",
   "newDebate.planRosterFailed": "Не удалось загрузить набор моделей тарифа",
-  "newDebate.checkingSession": "Проверка сеанса…",
+  "newDebate.checkingSession": "Один момент…",
   "newDebate.redirectingToSignIn": "Переход к странице входа…",
   "newDebate.continueToSignIn": "Перейти к входу",
   "newDebate.defaultUnavailable": "В развёртывании нет допустимой строки riskTier; требуется указать уровень риска.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Вы достигли сегодняшнего лимита вашего тарифа. Вы всё равно можете задать вопрос: ваши дебаты начнутся сами в {time}.",
   "newDebate.room.personWeekFullTopPlan": "Вы достигли лимита вашего тарифа на эту неделю. Вы всё равно можете задать вопрос: ваши дебаты начнутся сами в {time}.",
   "newDebate.room.personMonthFullTopPlan": "Вы достигли лимита вашего тарифа на этот месяц. Вы всё равно можете задать вопрос: ваши дебаты начнутся сами в {time}.",
-  "newDebate.room.freeMonthFull": "Вы использовали бесплатные дебаты этого месяца. Ваши следующие дебаты смогут начаться в {time}, или выберите тариф, чтобы продолжить сейчас.",
+  "newDebate.room.freeMonthFull": "Вы использовали бесплатную квоту этого месяца. Ваши следующие дебаты смогут начаться в {time}, или выберите тариф, чтобы продолжить сейчас.",
   "newDebate.room.personClose": "Вы близки к лимиту вашего тарифа. Эти дебаты всё равно пройдут полностью.",
   "newDebate.room.ownDebatesFull": "Ваши другие дебаты пока используют остаток вашего лимита. Эти дебаты начнутся сами, как только одни из них закончатся.",
   "newDebate.room.upgradeLink": "Посмотреть тарифы",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "Ваш тариф: Бесплатный",
   "newDebate.plan.current.PLUS": "Ваш тариф: Plus",
   "newDebate.plan.current.PRO": "Ваш тариф: Pro",
-  "newDebate.plan.current.MAX": "Ваш тариф: Max"
+  "newDebate.plan.current.MAX": "Ваш тариф: Max",
+  "newDebate.askText.otherAnswer": "Другой ответ…",
+  "newDebate.askText.otherLabel": "Ваше собственное дополнительное уточнение",
+  "newDebate.askText.matters": "Если ответы тянут в разные стороны, для меня важнее всего: {matters}",
+  "newDebate.freePublicNotice": "На бесплатном тарифе ваш вопрос и его дебаты являются публичными. Не указывайте персональные данные."
 }

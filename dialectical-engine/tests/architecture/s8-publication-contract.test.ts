@@ -117,7 +117,7 @@ describe("Accounts S8 publication architecture", () => {
     expect(databaseSessions).toContain("grantTokenHash");
     expect(api).toContain("PublishDebateRequestSchema");
     expect(api).toContain("step_up_grant");
-    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(3);
+    expect(api.match(/auditPreflightDenial\(/g)).toHaveLength(2);
     expect(contract).toContain("warning_acknowledged");
     expect(contract).toContain("z.literal(true)");
   });
@@ -160,8 +160,14 @@ describe("Accounts S8 publication architecture", () => {
     // snapshots parse), its own strict schema in map-view.ts: argued answers keyed by root node id
     // and the also-raised claims, never a maker, a count, a mark or a map id.
     expect(schema).toContain("map_view: DebateMapViewSchema.optional()");
+    // V4 start step (Task 16): a path debate's paths ride on the snapshot, optional (old snapshots parse), their own strict
+    // public schema in branches.ts: never the "more" list, the point-of-view line, the carry-on box, the evidence or the root id.
+    expect(schema).toContain("branches: PublicBranchesSchema.optional()");
+    // V4 start step, Task 75d (owner, 5 Nov): the level the debate was asked at rides on the snapshot, last and optional (old
+    // snapshots parse), one of the three levels only, copied at publish time from the run by the owner-scoped read: no words.
+    expect(schema).toContain("reading_level: ReadingLevelSchema.optional()");
     expect([...schema.matchAll(/^  ([a-z_]+):/gmu)].map((match) => match[1]))
-      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view"]);
+      .toEqual(["public_ref", "author_pseudonym", "question", "published_at", "answer", "story_short", "language", "floor", "map_view", "contributions", "main_answer_update", "author_name_gone", "changed_after_review", "reports", "branches", "reading_level"]);
     const floorStart = disclosure.indexOf("export const AnswerFloorSchema");
     const floorEnd = disclosure.indexOf("export type AnswerFloor =");
     expect(floorStart).toBeGreaterThan(-1);
@@ -240,18 +246,13 @@ describe("Accounts S8 publication architecture", () => {
       expect(control).toContain("<SecurityConfirmation");
     expect(control).toContain("authorization={{action,target_run_id:runId}}");
       expect(control).toContain("publishRun(runId, grant.token)");
-      expect(control).toContain("unpublishRun(runId, grant.token)");
+      expect(control).not.toContain("unpublishRun");
       expect(control).toContain('type="checkbox"');
       expect(control).toContain('t(catalog, "public.publication.publishWarning")');
       expect(englishPublicCatalog["public.publication.publishWarning"]).toBe(
         "Publishing makes this debate readable by anyone and may allow search engines to index it. " +
-        "It leaves your private deletion envelope, and public copies may persist even if you later " +
-        "unpublish or delete your account."
-      );
-      expect(control).toContain('t(catalog, "public.publication.unpublishWarning")');
-      expect(englishPublicCatalog["public.publication.unpublishWarning"]).toBe(
-        "Unpublishing stops future anonymous reads from Dialectical Engine, but copies already downloaded, " +
-        "quoted, cached, or indexed may persist."
+        "Publishing is for good: you cannot take it back, and anyone with credit can add to it. " +
+        "If you erase your account your name comes off it, and personal details in the text are removed if you ask."
       );
     }
     // The home surface fetches the published list and states the indexing
@@ -264,7 +265,7 @@ describe("Accounts S8 publication architecture", () => {
       expect(home).toContain("PublicDebatesBuffer");
       expect(home).toContain('t(catalog, "home.publicIndexingNotice")');
       expect(englishHomeCatalog["home.publicIndexingNotice"]).toBe(
-        "Published debates may be indexed by search engines. Copies may persist after unpublishing."
+        "Published debates may be indexed by search engines, and copies may remain elsewhere."
       );
     }
     expect(publicRows).toContain("/public/debate/");

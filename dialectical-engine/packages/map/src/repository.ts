@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   CONTENT_JSON_SENTINEL,
+  MAP_ROOT_IN_FORCE_SQL,
   decryptLeasedContentForRun,
   encryptAttestedLeasedContentForRun,
   prepareLeasedContentEncryptionForRun,
@@ -51,21 +52,8 @@ export type MapWriteOutcome = "INSERTED" | "ALREADY_PRESENT" | "REPOINTED" | "RU
 
 const SENTINEL = JSON.stringify(CONTENT_JSON_SENTINEL);
 
-/**
- * Each position's root IN FORCE (migration 0119): the last re-point's root (the move no later move of the answer starts
- * from), else the position's own; its maker likewise; and whether that root has been set aside ('stale'). Ids and codes
- * only. `$1` is the run; a caller may append `AND position.answer_id = $2`.
- */
-const ROOT_IN_FORCE_SQL = `SELECT position.answer_id, COALESCE(moved.root_node_id, position.root_node_id)::text AS root_node_id,
-         COALESCE(moved.maker, position.maker) AS maker, node.generation_status = 'stale' AS stale
-    FROM core.map_position AS position
-    LEFT JOIN core.map_position_repoint AS moved
-      ON moved.run_id = position.run_id AND moved.answer_id = position.answer_id
-     AND NOT EXISTS (SELECT 1 FROM core.map_position_repoint AS later
-                      WHERE later.run_id = moved.run_id AND later.answer_id = moved.answer_id
-                        AND later.from_root_node_id = moved.root_node_id)
-    JOIN core.node AS node ON node.run_id = position.run_id AND node.node_id = COALESCE(moved.root_node_id, position.root_node_id)
-   WHERE position.run_id = $1`;
+/** Each position's root IN FORCE (migration 0119), shared with the answer's web paths (packages/db map-roots.ts). */
+const ROOT_IN_FORCE_SQL = MAP_ROOT_IN_FORCE_SQL;
 
 // 0117's code shapes, held here too so a breach is refused typed (and value-free) before any seal.
 const ITEM_ID = /^[a-z]{2}[0-9]{2,4}$/u;

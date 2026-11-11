@@ -169,12 +169,18 @@ export function shapePositionCount(answers: number, makersLeft: number): number 
   return Math.max(2, Math.min(answers, makersLeft, MAP_LIMITS.chooseAnswersMax));
 }
 
+/**
+ * `cross` (V4 start step, Task 45; spec 2026-11-03 §4.3): absent or true, today's plan, value for value (at least two
+ * positions, each with one cross-reply to its rival). False, a path debate's: paths are not rivals, so no cross-reply is
+ * planned, no rival is read, and one path is a whole plan.
+ */
 export function buildShapePlan(input: Readonly<{ positions: readonly ShapePositionPlan[]; depth: number;
-  scrutiny: Readonly<{ roundsPerPoint: number; pointsPerDebate: number }> }>): ShapePlan {
+  scrutiny: Readonly<{ roundsPerPoint: number; pointsPerDebate: number }>; cross?: boolean }>): ShapePlan {
+  const cross = input.cross !== false;
   const rootCount = input.positions.length;
-  if (rootCount < 2 || !Number.isSafeInteger(input.depth) || input.depth < 1) throw new TypeError("SHAPE_PLAN_INPUT_INVALID");
+  if (rootCount < (cross ? 2 : 1) || !Number.isSafeInteger(input.depth) || input.depth < 1) throw new TypeError("SHAPE_PLAN_INPUT_INVALID");
   // A cross-reply answers ANOTHER position of this plan: a rival out of range or the position itself is refused.
-  input.positions.forEach((position, rootIndex) => {
+  if (cross) input.positions.forEach((position, rootIndex) => {
     const rival = position.rivalIndex;
     if (!Number.isSafeInteger(rival) || rival < 0 || rival >= rootCount || rival === rootIndex) throw new TypeError("SHAPE_PLAN_RIVAL_INVALID");
   });
@@ -197,7 +203,7 @@ export function buildShapePlan(input: Readonly<{ positions: readonly ShapePositi
       (childIndex) => legKey(point.polarity, rootIndex, 1, childIndex));
     }
   });
-  input.positions.forEach((position, rootIndex) => {
+  if (cross) input.positions.forEach((position, rootIndex) => {
     push({ kind: "CROSS", round: 1, rootIndex, parentIndex: rootIndex, polarity: "attack", chain: null, consideration: null,
       keyPointId: null, targetRootIndex: position.rivalIndex },
     () => `JUDGE:cross-root:${String(rootIndex)}->${String(position.rivalIndex)}`);

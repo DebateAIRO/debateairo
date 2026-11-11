@@ -13,7 +13,7 @@
   "home.publicDebates": "公開ディベート",
   "home.total": "合計 {count} 件",
   "home.signInHint": "自分のディベートを表示するには、上でログインするかアカウントを作成してください。",
-  "home.publicIndexingNotice": "公開したディベートは検索エンジンに登録される場合があります。公開を取り消した後もコピーが残る可能性があります。",
+  "home.publicIndexingNotice": "公開されたディベートは検索エンジンにインデックスされる場合があり、コピーが他の場所に残ることがあります。",
   "home.debateClaim": "ディベートの主張",
   "home.claimPlaceholder": "議論できる主張または質問を入力…",
   "home.composerHint": "モデルが議論 · あなたが評価",
@@ -72,8 +72,10 @@
   "home.turn": "ターン{turn}",
   "home.sampleCoda": "ラウンドはここで終了です。勝敗は宣言されません。記録、各ターンの2つの評価、そしてあなたが譲歩した弱点が残ります。",
   "home.closingTitle": "論証の強さは、最も弱いつながりで決まります。",
-  "home.closingLede": "1ラウンドに取り組んでください。4ターン、約9分。どこで質問に答えなくなったかを正確に示す記録が得られます。",
-  "home.pricingCopy": "無料で始められます。有料プランは月額 {price} から（税別）。いつでも解約できます。",
+  "home.closingLede": "1ラウンドに取り組んでください。4ターンで、どこで質問に答えなくなったかを正確に示す記録が得られます。",
+  "home.pricingCopyPlusTax": "無料で始められます。有料プランは月額 {price} + {taxName} から。いつでも解約できます。",
+  "home.pricingCopyNoTax": "無料で始められます。有料プランは月額 {price} から（税金の加算なし）。いつでも解約できます。",
+  "home.pricingCopyChoose": "無料で始められます。有料プランは月額 {price} から（該当する場合は税金が加算されます）。いつでも解約できます。",
   "home.pricingCopyFree": "無料で始められます。カードは不要です。",
   "home.pricingLink": "プランを見る",
   "home.card1Text": "リモートワークを基本とする企業は、同等の仕事をするエンジニアに対して、原則として勤務地に左右されない給与帯を採用すべきです。ただし、法定費用、希少な技能、役割の範囲については透明性のある調整を認めます。",
@@ -144,6 +146,5 @@
   "home.removal.close": "閉じる",
   "home.flag.underReview": "フラグ付き · 審査中",
   "home.flag.approved": "承認されました",
-  "home.flag.refused": "承認されていません",
-  "home.takeDown.button": "取り下げる"
+  "home.flag.refused": "承認されていません"
 }

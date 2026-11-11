@@ -1,10 +1,33 @@
-import { describe,it,expect,vi } from 'vitest';
+import { describe,it,expect,vi,beforeAll } from 'vitest';
 import { mkdtemp,rm,realpath,writeFile,readFile,rename,chmod,symlink } from 'node:fs/promises';
 import { join,resolve } from 'node:path';import { tmpdir } from 'node:os';import { spawn } from 'node:child_process';import { createServer } from 'node:net';
 const captureFault=vi.hoisted(()=>({foreignPath:''}));
 vi.mock('node:fs/promises',async original=>{const fs=await original<typeof import('node:fs/promises')>();return {...fs,lstat:async(...args:Parameters<typeof fs.lstat>)=>{const stat=await fs.lstat(...args);return String(args[0])===captureFault.foreignPath?{...stat,uid:Number(stat.uid)+1,isFile:()=>stat.isFile(),isDirectory:()=>stat.isDirectory(),isSymbolicLink:()=>stat.isSymbolicLink()}:stat;}};});
 import { startTestDatabase } from '../support/testDatabase.js';
 import { createSyntheticSourceFixture } from '../../deploy/preview-auth-dev/v1/stage-fixture.js';
+// The stage runs the website from this checkout's apps/ui/.next, so the test makes that build itself, the way the
+// preview's ui-build does (ui-build.mjs buildUiArtifact, less its Linux custody checks): the reviewed glm-only model list
+// baked in, the webpack cache dropped, and the list recorded next to the build (preview-model-roster.json), which the stage
+// demands before anything starts. The build carries the release code of the stage's own revision ('a' x 40), which the
+// website checks against RELEASE_KEY. A failed build fails here with its last output, never as a TypeError further on.
+const STAGE_REVISION='a'.repeat(40);
+beforeAll(async()=>{
+ const ui=await import('../../deploy/'+'preview-auth-dev/v1/ui-build.mjs');
+ const roster=await import('../../deploy/'+'preview-auth-dev/v1/environment.mjs');
+ const engineRoot=resolve('.'),checkoutRoot=resolve('..');
+ await rm(join(engineRoot,'apps/ui/.next',ui.MODEL_ROSTER_FILE),{force:true});
+ const environment:NodeJS.ProcessEnv={...process.env,NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:roster.PREVIEW_FREE_MODEL_IDS_JSON,DEBATEAI_SOURCE_REVISION:STAGE_REVISION};
+ delete environment.RELEASE_KEY;
+ await new Promise<void>((done,fail)=>{
+  const child=spawn('pnpm',['--filter','dialectical-engine-v2ui','build'],{cwd:engineRoot,env:environment,shell:false,stdio:['ignore','pipe','pipe']});
+  let output='';const keep=(raw:Buffer)=>{output=(output+raw.toString()).slice(-4000);};
+  child.stdout!.on('data',keep);child.stderr!.on('data',keep);
+  child.once('error',error=>fail(new Error(`PREVIEW_STAGE_PRECONDITION: the UI build could not start (${error.message})`)));
+  child.once('close',code=>code===0?done():fail(new Error(`PREVIEW_STAGE_PRECONDITION: the UI build failed (exit ${code})\n${output}`)));
+ });
+ await ui.dropBuildCache(checkoutRoot);
+ await ui.recordModelRosterFlag(checkoutRoot,roster.PREVIEW_FREE_MODEL_IDS_JSON);
+},600_000);
 async function port(){const server=createServer();await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));const address=server.address() as any;await new Promise<void>(r=>server.close(()=>r()));return address.port as number;}
 describe('real current API main startup on isolated synthetic forward schema',()=>{
  it('awaits actual listen, selects the native snapshot, serves current and legacy refusal routes, and shuts down cleanly',async()=>{

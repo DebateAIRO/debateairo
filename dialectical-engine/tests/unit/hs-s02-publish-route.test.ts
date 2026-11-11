@@ -105,12 +105,14 @@ function publishedTexts(answer: Answer): string[] {
 }
 
 /** Memory fakes in the `publicationHarness` shape (s8-publication.test.ts), counting every side effect. */
-function publicationFakes(options: { preflight?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader } = {}) {
+function publicationFakes(options: { preflight?: boolean; dig?: boolean; story?: PublicStoryShort; mapView?: DebateMapView; mapViews?: MapViewReader } = {}) {
   const counts = { prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 };
   const stored: { publicationRef: string; runId: string; contentCiphertext: CryptoEnvelope }[] = [];
   const repository = {
     preflightGrant: async () => options.preflight ?? true,
     auditAuthenticatedPreflightDenial: async () => true,
+    // Security review F2 (0171): whether the owner's debate is a dig (a dig is never published).
+    readRunIsDig: async () => options.dig ?? false,
     readAuthorPseudonym: async () => PSEUDONYM,
     readArgumentLanguageTag: async () => null,
     prepareKeyProvision: async () => { counts.prepareKeyProvision += 1; return true; },
@@ -225,9 +227,13 @@ function routeApi(input: {
   publicationContentCheck?: PublicationContentCheck;
   synthesisPublishGate?: SynthesisPublishGate | null;
   preflight?: boolean;
+  dig?: boolean;
   leases?: LeaseProbe;
 }) {
-  const fakes = publicationFakes(input.preflight === undefined ? {} : { preflight: input.preflight });
+  const fakes = publicationFakes({
+    ...(input.preflight === undefined ? {} : { preflight: input.preflight }),
+    ...(input.dig === undefined ? {} : { dig: input.dig })
+  });
   const api = buildApi({
     application: askApplication(input.answer ?? servedAnswer(), input.leases),
     sessions: sessions(),
@@ -349,6 +355,50 @@ describe("hate-speech S02 publish path", () => {
         expect(records).toEqual([]);
         expect(counts.prepareKeyProvision).toBe(0);
       }
+    });
+  });
+
+  describe("a dig is never published (security review F2, 0171)", () => {
+    // Property: a dig is refused before anything that costs or keeps: no answer read under a content lease, no synthesis
+    // gate, no judge call, no check record, no key provision, cipher or transition.
+    it("the route answers 409 DIG_NOT_PUBLISHABLE right after the grant's check, and reads, checks and provisions nothing", async () => {
+      const judge = createPartJudgeStub({});
+      const { check, records } = contentCheck(judge);
+      const leases: LeaseProbe = { held: 0, opened: 0, answerReads: 0 };
+      let gateCalls = 0;
+      const { api, publish, counts } = routeApi({
+        publicationContentCheck: check, leases, dig: true,
+        synthesisPublishGate: { decide: async () => { gateCalls += 1; return "PROCEED" as const; } }
+      });
+      const response = await publish();
+      await api.close();
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toStrictEqual({ error: "DIG_NOT_PUBLISHABLE", message: "DIG_NOT_PUBLISHABLE" });
+      expect(leases).toEqual({ held: 0, opened: 0, answerReads: 0 });
+      expect(gateCalls).toBe(0);
+      expect(judge.packets).toHaveLength(0);
+      expect(records).toEqual([]);
+      expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
+      // The same route and fakes publish a debate that is not a dig.
+      const topLevel = routeApi({ publicationContentCheck: check, dig: false });
+      expect((await topLevel.publish()).statusCode).toBe(201);
+      await topLevel.api.close();
+      expect(topLevel.counts).toEqual({ prepareKeyProvision: 1, publish: 1, abandonKeyProvision: 0, cipherCreate: 1 });
+    });
+
+    // Property: a caller that skips the route's question still publishes no dig: the application asks again before the judge.
+    it("the application itself refuses a dig before the judge, as for a debate it may not publish", async () => {
+      const judge = createPartJudgeStub({});
+      const { check, records } = contentCheck(judge);
+      const { application, counts } = publicationFakes({ dig: true });
+      await expect(application.publish({
+        runId: RUN_ID, answer: servedAnswer(), authenticated, grantToken: GRANT_TOKEN,
+        source: { ip: "192.0.2.1", userAgent: "hs-s02", requestId: "request:hs-s02" },
+        contentCheck: check
+      })).resolves.toBeNull();
+      expect(judge.packets).toHaveLength(0);
+      expect(records).toEqual([]);
+      expect(counts).toEqual({ prepareKeyProvision: 0, publish: 0, abandonKeyProvision: 0, cipherCreate: 0 });
     });
   });
 
@@ -639,7 +689,6 @@ describe("hate-speech S02 publish path", () => {
       await inject("GET", `/v1/runs/${RUN_ID}`);
       await inject("GET", `/v1/runs/${RUN_ID}/answer`);
       await inject("GET", `/v1/runs/${RUN_ID}/visibility`);
-      await inject("POST", `/v1/runs/${RUN_ID}/unpublish`, { step_up_grant: GRANT_TOKEN });
       await inject("DELETE", `/v1/debates/${RUN_ID}`, {});
       await lifecycle.api.close();
       const refusedPreflight = routeApi({ publicationContentCheck: check, preflight: false });
@@ -683,6 +732,10 @@ describe("hate-speech S02 publish path", () => {
         "acceptance/hs-eval-s02.ts",
         "apps/api/src/index.ts",
         "apps/api/src/main.ts",
+        // Decision 13: the page's sweep runs a contribution's and a report's text through the same check.
+        // R22 decision 35: the check on a report uses the publication check's judge port.
+        "apps/api/src/public-flag.ts",
+        "apps/api/src/public-tree.ts",
         "apps/api/src/publications.ts",
         "apps/api/src/question-check/compose.ts",
         "apps/api/src/question-check/transport.ts",
@@ -699,16 +752,32 @@ describe("hate-speech S02 publish path", () => {
   describe("composition", () => {
     const main = readFileSync(join(REPOSITORY_ROOT, "apps/api/src/main.ts"), "utf8");
 
-    /** The object literal passed to the ONE `createPublicationContentCheck(` call of main.ts. */
-    function checkComposition(): string {
-      const calls = main.split("createPublicationContentCheck(").length - 1;
-      expect(calls).toBe(1);
-      const start = main.indexOf("createPublicationContentCheck(");
-      return main.slice(start, main.indexOf("});", start) + 3);
+    /**
+     * The object literals passed to main.ts's two `createPublicationContentCheck(` calls: the publish check, and the one a public debate's report goes through (R22 decision 13, 0149).
+     * The second is no second judge: the test below holds that the two differ only in where they record.
+     */
+    function checkCompositions(): readonly string[] {
+      const pieces = main.split("createPublicationContentCheck(").slice(1);
+      expect(pieces).toHaveLength(2);
+      return pieces.map((piece) => piece.slice(0, piece.indexOf("});")));
     }
-    // FIX-HS2-p1 ct-B4, and the owner's ruling of 2026-10-04: the RUNNING deployment's D is the register's
-    // publicationCheckPolicy row, read at start-up — a wired literal, or no deadline, is red. The judge transport's
-    // backstop is measured from the same D.
+    function checkComposition(): string {
+      return checkCompositions()[0]!;
+    }
+    it("the report's check shares the publish check's one judge switch and the register's D: only the recorder and the usage row's subject kind differ", () => {
+      for (const composition of checkCompositions()) {
+        expect(composition).toContain("judge: publicationJudgeSwitch.current");
+        expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);
+        expect(composition).toContain("clock: () => new Date()");
+      }
+      expect(main.split("createPublicationJudgeTransport(").length - 1).toBe(1);
+      expect(main.split("createPublicationJudgeSwitch(").length - 1).toBe(1);
+      const [publish, report] = checkCompositions() as [string, string];
+      expect(publish).toContain('recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "RUN", subjectId: row.subject_id,');
+      expect(report).toContain('recordUsage: (row) => new PostgresPublicFlagRepository(pool).recordCheckUsage({ subjectKind: "PUBLIC_REPORT", subjectId: row.subject_id,');
+      const shared = (composition: string) => composition.replace(/recorder:[^\n]*\n/u, "").replace(/subjectKind: "[A-Z_]+"/u, 'subjectKind: "?"');
+      expect(shared(publish)).toBe(shared(report));
+    });
     it("main.ts wires D from the register's publicationCheckPolicy row into the check and the judge transport, and nothing else", () => {
       const composition = checkComposition();
       expect(composition.match(/deadlineMs\s*:\s*([^,\n}]+)/gu)).toEqual(["deadlineMs: publicationCheckPolicy.deadlineMs"]);

@@ -1,16 +1,27 @@
 import {
+  AskParentSchema,
+  AskRequestSchema,
+  PublicDigParentSchema,
+  SavedQuestionIdSchema,
+  StartCheckSchema,
+  StartPathsSchema,
   ContractHttpError,
   createContractClient,
   DepthParamsSchema,
   PLAN_TIERS,
   type Answer,
   type ArgumentLanguage,
+  type AskParent,
+  type PublicDigParent,
+  type PurposeLines,
   type AskRequest,
   type ContractClient,
   type DepthParams,
   type QuestionLanguageChoice,
   type RunProjection,
-  type SiteLanguage
+  type SiteLanguage,
+  type StartCheck,
+  type StartPaths
 } from "@debateai/contract";
 import type {
   DebateAdaptiveDepthApprovalRequest,
@@ -452,14 +463,14 @@ function optionalModelStrength(config: AskConfig): AskRequest["model_strength"] 
 }
 
 /**
- * Debate shape P2c (spec 2026-10-12 §3.2): depth mode, scrutiny and answer length ride beside
+ * Debate shape P2c (spec 2026-10-12 §3.2): depth mode, scrutiny and answer length (and V4's reading level) ride beside
  * the depth in `depth_params`, each only when the page chose it. A missing one means the API's
  * default, so older callers keep working. The contract's own field schema decides what is
  * valid, so the page never restates the choices.
  */
-function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength">(
+function optionalDepthChoice<K extends "depthMode" | "scrutiny" | "answerLength" | "readingLevel">(
   config: AskConfig,
-  configKey: "depth_mode" | "scrutiny" | "answer_length",
+  configKey: "depth_mode" | "scrutiny" | "answer_length" | "reading_level",
   key: K
 ): Partial<Pick<DepthParams, K>> {
   const value = config[configKey];
@@ -495,8 +506,20 @@ export async function createDebate(
    * Question language (spec 2026-10-13): the page's language, and the person's answer to an offer
    * when there is one. Absent, the ask is today's ask, sent by today's call.
    */
-  language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>
-): Promise<{ id: string }> {
+  language?: Readonly<{ siteLanguage: SiteLanguage; choice?: QuestionLanguageChoice }>,
+  /** Plan 2026-10-30 W3-4: a dig names the debate it digs, its places, mode and picks (AskParentSchema). */
+  parent?: AskParent,
+  /** Decision 5 of 31 Oct: the debate's place, time and purpose lines, structured, whatever the page's language. */
+  purposeLines?: PurposeLines,
+  /** Decision 13: a dig on someone's public debate instead of `parent`, and that this Free ask showed the notice. */
+  publicLane?: Readonly<{ publicParent?: PublicDigParent; freePublicNotice?: true }>,
+  /**
+   * V4 start step, Task 68 (read-d2, choose-d2): Start's hand-over: the check of Next, the chosen paths and the carry-on box,
+   * each only when present (none: today's ask, byte for byte). Each is parsed by its contract schema first, so a lane that
+   * does not parse is refused before anything is sent.
+   */
+  startLane?: Readonly<{ startCheck?: StartCheck; startPaths?: StartPaths; carryOnToReport?: true; savedQuestionId?: string }>
+): Promise<{ id: string; public_dig_not_joined?: boolean }> {
   const riskTier = requiredString(config, "risk_tier");
   if (!RISK_TIERS.has(riskTier)) throw new Error("ASK_FIELD_REQUIRED: risk_tier must be casual, standard, or high-stakes.");
   const planTier = requiredString(config, "plan_tier");
@@ -523,7 +546,9 @@ export async function createDebate(
       depth: requiredInteger(config, "depth", 0),
       ...optionalDepthChoice(config, "depth_mode", "depthMode"),
       ...optionalDepthChoice(config, "scrutiny", "scrutiny"),
-      ...optionalDepthChoice(config, "answer_length", "answerLength")
+      ...optionalDepthChoice(config, "answer_length", "answerLength"),
+      // V4 reading level (owner N6, 2026-10-29): the reader the final writers write for, beside the answer length.
+      ...optionalDepthChoice(config, "reading_level", "readingLevel")
     },
     decision_scope: requiredString(config, "decision_scope"),
     as_of: asOf.toISOString(),
@@ -532,14 +557,23 @@ export async function createDebate(
     ...(modelStrength === undefined ? {} : { model_strength: modelStrength }),
     ...(language === undefined ? {} : { site_language: language.siteLanguage }),
     ...(language?.choice === undefined ? {} : { question_language_choice: language.choice }),
-    ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion })
+    ...(purposeLines === undefined ? {} : { purpose_lines: purposeLines }),
+    ...(settingsVersion === undefined ? {} : { settings_version: settingsVersion }),
+    ...(parent === undefined ? {} : { parent: AskParentSchema.parse(parent) }),
+    ...(publicLane?.publicParent === undefined ? {} : { public_parent: PublicDigParentSchema.parse(publicLane.publicParent) }),
+    ...(publicLane?.freePublicNotice === true ? { free_public_notice: true as const } : {}),
+    ...(startLane?.startCheck === undefined ? {} : { start_check: StartCheckSchema.parse(startLane.startCheck) }),
+    ...(startLane?.startPaths === undefined ? {} : { start_paths: StartPathsSchema.parse(startLane.startPaths) }),
+    ...(startLane?.carryOnToReport === undefined ? {} : { carry_on_to_report: AskRequestSchema.shape.carry_on_to_report.parse(startLane.carryOnToReport) }),
+    // V4 start step, Task 76f (saved-questions spec §3.7): the question not started yet this ask starts from, last (absent: today's bytes).
+    ...(startLane?.savedQuestionId === undefined ? {} : { saved_question_id: SavedQuestionIdSchema.parse(startLane.savedQuestionId) })
   };
   requireToken(token);
   if (language === undefined) {                                   // today's call, unchanged
     const accepted = await client.submitAsk(ask);
-    return { id: accepted.run_ref };
+    return { id: accepted.run_ref, ...(accepted.public_dig_not_joined === true ? { public_dig_not_joined: true } : {}) };
   }
   const outcome = await client.submitAskOrLanguageChoice(ask);
   if (outcome.kind === "LANGUAGE_CHOICE_NEEDED") throw new QuestionLanguageChoiceNeededError(outcome.offer);
-  return { id: outcome.accepted.run_ref };
+  return { id: outcome.accepted.run_ref, ...(outcome.accepted.public_dig_not_joined === true ? { public_dig_not_joined: true } : {}) };
 }

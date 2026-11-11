@@ -117,6 +117,7 @@ async function linkMail(profileLocale: string, mailLocale?: string): Promise<Bil
   const sent: BillingMail[] = [];
   const state = foldSubscription(activeSubscriptionEvents(OWNER, NOW, "PLUS"));
   const service = new CancelLinkService({
+    linksPerDay: 11,
     billing: {
       subscriptionForOwner: async () => state,
       customerByOwner: async () => ({ customerId: CUSTOMER }),
@@ -171,6 +172,7 @@ function linkService(profileLocale: string) {
     enqueue: async (_c: PoolClient, job: Enqueued) => { jobs.push(job); return randomUUID(); }
   };
   const service = new CancelLinkService({
+    linksPerDay: 11,
     billing: billing as never, jobs: { lockOwner: async () => undefined } as never,
     entitlements: { append: async () => undefined } as never, identities: { ownerRefByEmailBlindIndex: async () => OWNER },
     blindIndexKey: BLIND_KEY, recordsKey: KEY, recipients: { currentAddress: async () => "subscriber@example.test" },
@@ -322,7 +324,7 @@ describe("S01-C13 the subscriber's routes read the dropdown cookie (R-09, R-06)"
     const response = await api.inject({
       method: "POST", url: "/v1/billing/subscription/withdraw",
       headers: { ...SESSION_HEADER, cookie: "debateai.locale=ja" },
-      payload: { step_up_grant: "A".repeat(43) }
+      payload: {}
     });
     expect(response.statusCode).toBe(200);
     expect(jobs.find((job) => job.payload.template === "M8")?.payload.locale).toBe("ja");

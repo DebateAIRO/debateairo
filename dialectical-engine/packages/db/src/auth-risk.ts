@@ -1,10 +1,8 @@
 import type { Pool } from "pg";
 import {
-  decrypt,
   encrypt,
   type AeadAad,
   type AuditContextHasher,
-  type CryptoEnvelope,
   type ReadableUserDekStore
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
@@ -40,9 +38,10 @@ const kindSet=new Set<string>(AUTHENTICATION_RISK_SIGNAL_KINDS);
  * Which stage rejected. Bounded by construction: five constants of this module, carrying
  * no ciphertext, no plaintext, no key material and no parser message.
  *
- * The list is a VOCABULARY, not an execution order, and must not be read as one: reading a
- * stored row decrypts and parses its context BEFORE the evaluator is called at all, so
- * `context-decrypt` and `context-parse` can precede every other member on that path. Within
+ * The list is a VOCABULARY, not an execution order, and must not be read as one: a reader of
+ * stored rows decrypts and parses their context BEFORE the evaluator is called at all, so
+ * `context-decrypt` and `context-parse` can precede every other member on that path (no
+ * reader of stored rows is left since 0171 took back 0046's recovery reader). Within
  * the evaluator the argument checks do precede the per-row check, but that is a local fact
  * about one function, not a property of this array.
  */
@@ -165,11 +164,11 @@ function versioned(value:string):string{
   return `argon2id-audit:v1:${value}`;
 }
 
-type RiskRow={
-  user_id:string;risk_signal_id:string;signal_kind:AuthenticationRiskSignalKind;
-  context_ciphertext:CryptoEnvelope;observed_at:Date;expires_at:Date;evaluated_at:Date;
-};
-
+/**
+ * The sign-in risk signals' writer and their retention purge. Nothing reads them back: 0046's reader of a recovery's signals had no product
+ * caller, and 0171 took it back from every role, so the repository no longer offers it. The retention and the scan bound only that reader
+ * used stay its arguments, as main.ts reads them from the sealed recovery policy.
+ */
 export class PostgresAuthenticationRiskSignalRepository{
   constructor(
     private readonly pool:Pool,
@@ -231,52 +230,6 @@ export class PostgresAuthenticationRiskSignalRepository{
       recordSql:"SELECT identity.record_authentication_risk_signal_for_session($1,$2,$3,$4::jsonb) AS recorded",
       scopeParameters:[input.tokenHash,input.bindingHash],kind:input.kind,source:input.source
     });
-  }
-
-  async evaluateForRecovery(publicHandle:string):Promise<AuthenticationRiskSummary>{
-    const prepared=await this.pool.query<{user_id:string}>(
-      "SELECT * FROM identity.prepare_authentication_risk_signal_for_recovery($1)",[publicHandle]
-    );
-    const userId=prepared.rows[0]?.user_id;
-    if(userId===undefined) throw new TypeError("AUTH_RISK_SIGNAL_SCOPE_UNRESOLVED");
-    if(prepared.rows.length!==1) throw new TypeError("AUTH_RISK_SIGNAL_SCOPE_AMBIGUOUS");
-    const result=await this.pool.query<RiskRow>(
-      "SELECT * FROM identity.read_authentication_risk_signals_for_recovery($1)",[publicHandle]
-    );
-    if(result.rows.length>this.maxSignals){
-      throw new TypeError("AUTH_RISK_SIGNAL_SCAN_SATURATED");
-    }
-    if(result.rows.some(row=>row.user_id!==userId)){
-      throw new TypeError("AUTH_RISK_SIGNAL_CROSS_ACCOUNT");
-    }
-    if(result.rows.length===0){
-      return evaluateAuthenticationRiskSignals(
-        [],new Date(0),this.retentionMs,this.maxSignals
-      );
-    }
-    const key=await this.users.load(userId);
-    try{
-      const decoded=result.rows.map((row):DecryptedAuthenticationRiskSignal=>{
-        // One catch around both stages made a key/ciphertext mismatch and a malformed
-        // plaintext the same failure. Separate catches, one bounded category each.
-        let plaintext:Buffer;
-        try{
-          plaintext=decrypt(key,row.context_ciphertext,authenticationRiskSignalAad(userId));
-        }catch{poisoned("context-decrypt");}
-        let context:unknown;
-        try{
-          context=JSON.parse(plaintext.toString("utf8"));
-        }catch{poisoned("context-parse");}
-        return Object.freeze({
-          riskSignalId:row.risk_signal_id,kind:row.signal_kind,
-          context:context as AuthenticationRiskSignalContext,
-          observedAt:row.observed_at,expiresAt:row.expires_at
-        });
-      });
-      return evaluateAuthenticationRiskSignals(
-        decoded,result.rows[0]!.evaluated_at,this.retentionMs,this.maxSignals
-      );
-    }finally{key.fill(0);}
   }
 
   async purgeExpired(limit:number):Promise<number>{

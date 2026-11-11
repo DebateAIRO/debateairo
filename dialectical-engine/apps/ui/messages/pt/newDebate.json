@@ -75,7 +75,7 @@
   "newDebate.unableToCreate": "Não foi possível criar o debate",
   "newDebate.sessionReadFailed": "Falha ao ler a sessão",
   "newDebate.planRosterFailed": "Falha ao ler a lista do nível do plano",
-  "newDebate.checkingSession": "A verificar a sessão…",
+  "newDebate.checkingSession": "Um momento…",
   "newDebate.redirectingToSignIn": "A encaminhar para o início de sessão…",
   "newDebate.continueToSignIn": "Continuar para iniciar sessão",
   "newDebate.defaultUnavailable": "A implementação não contém uma linha riskTier válida; o nível de risco aguarda uma entrada.",
@@ -125,7 +125,7 @@
   "newDebate.room.personDayFullTopPlan": "Atingiu o limite de hoje do seu plano. Pode perguntar na mesma: o seu debate começará sozinho às {time}.",
   "newDebate.room.personWeekFullTopPlan": "Atingiu o limite desta semana do seu plano. Pode perguntar na mesma: o seu debate começará sozinho em {time}.",
   "newDebate.room.personMonthFullTopPlan": "Atingiu o limite deste mês do seu plano. Pode perguntar na mesma: o seu debate começará sozinho em {time}.",
-  "newDebate.room.freeMonthFull": "Utilizou os debates gratuitos deste mês. O seu próximo debate pode começar em {time}, ou escolha um plano para continuar já.",
+  "newDebate.room.freeMonthFull": "Utilizou a quota gratuita deste mês. O seu próximo debate pode começar em {time}, ou escolha um plano para continuar já.",
   "newDebate.room.personClose": "Está perto do limite do seu plano. Este debate será realizado na íntegra.",
   "newDebate.room.ownDebatesFull": "Os seus outros debates estão a usar, por agora, o resto do seu limite. Este debate começará sozinho assim que um deles terminar.",
   "newDebate.room.upgradeLink": "Ver planos",
@@ -133,5 +133,9 @@
   "newDebate.plan.current.FREE": "O seu plano: Gratuito",
   "newDebate.plan.current.PLUS": "O seu plano: Plus",
   "newDebate.plan.current.PRO": "O seu plano: Pro",
-  "newDebate.plan.current.MAX": "O seu plano: Max"
+  "newDebate.plan.current.MAX": "O seu plano: Max",
+  "newDebate.askText.otherAnswer": "Outra resposta…",
+  "newDebate.askText.otherLabel": "Sua própria explicação adicional",
+  "newDebate.askText.matters": "Se as respostas apontarem para lados diferentes, o que mais importa para mim é: {matters}",
+  "newDebate.freePublicNotice": "No plano Gratuito, a sua pergunta e o respetivo debate são públicos. Não inclua dados pessoais."
 }

@@ -2415,7 +2415,52 @@ export const CONTENT_CARRIERS = Object.freeze([
   "serve.synthesis_check_result",
   // Publication review (migration 0127): decision reason and the transient reviewer copy.
   "serve.publication_review_decision",
-  "serve.publication_review_copy"
+  "serve.publication_review_copy",
+  // Web evidence store (migration 0132): the search words; a page's address, site, title and date; its whole text (the
+  // transient carrier, wiped on closing or 30 days after the investigation's last activity); a reading's line and leads;
+  // a checked extract's quote; a path's pack.
+  "identity.web_search",
+  "identity.web_page",
+  "identity.web_page_text",
+  "identity.web_reading",
+  "identity.web_extract",
+  "identity.web_pack",
+  // The path rewrite (migration 0134): a path's new line and summary, "What the dig changed", the verdict's reason and the
+  // dig's own paths' lines and fates, sealed under the DIG's run key (erasing the dig erases its rewrite).
+  "identity.path_rewrite",
+  // The web plan (migration 0134): the search planner's reason for a path with no search.
+  "identity.web_plan_path",
+  // A dig's picks (migration 0135): each pick's text, the person's own words or the AI suggestion as they sent it, sealed
+  // under the DIG's run key; and the dig's own paths as its settled run gave them to its path rewrite.
+  "identity.dig_pick",
+  "identity.path_rewrite_input",
+  // The final report over an investigation (migration 0136): the report's text, sealed under the investigation's ROOT
+  // run key and bound to the report id (erasing the root erases its investigation, its closings and their reports).
+  "identity.investigation_report",
+  // The owner's changes of 31 Oct: a climb's or a public dig's path rewrite (0138), sealed under the DIG that caused it; the main
+  // answer's automatic versions under the ROOT's key; a debate's place, time and purpose lines under its own key.
+  "identity.path_update",
+  "identity.main_answer_update",
+  "identity.run_purpose_lines",
+  // 0139: the quote people see, kept apart from the passage, and a reader's saved reply in its transient store, under the run's key.
+  "identity.web_shown_quote",
+  "identity.web_reply_text",
+  // 0141: the AI's suggestions of what to dig into on one path, sealed under the run that paid for them and bound to the set's id.
+  "identity.path_suggestions",
+  // 0147: the public page sealed again for the runner under a live run's key; the main answer once the root's key is gone, under the dig's; a report on a public
+  // debate under its carrier's. The page's own copies stay under the publication's key.
+  "identity.public_material",
+  "identity.public_dig_input",
+  "identity.public_answer_update",
+  "identity.public_report",
+  // 0159 (V4 start step): the menu a person chose from at Start and each chosen path's words, sealed under the debate's own key; the set bound to
+  // its run, a path to its path id. The carry-on marks are ids and codes only, no carrier.
+  "core.start_path_set",
+  "core.start_path",
+  // 0160 (V4 start step): each chosen path's answer so far, bound to its path id, and the debate's gap round, bound to its run, sealed under the
+  // debate's own key. The roots and their moves are ids and codes only, no carrier.
+  "core.path_outcome",
+  "core.path_gap_round"
 ] as const);
 
 export type ContentCarrier = typeof CONTENT_CARRIERS[number];
@@ -2781,6 +2826,378 @@ export class FileRunContentKeyStore implements RunContentKeyStore {
     if (!UUID_V4.test(runId)) throw new RunContentKeyUnresolvedError();
     const runs = join(this.root, "runs");
     return durableRemoveDirectory(join(runs,runId),runs,this.fileSystem);
+  }
+}
+
+/**
+ * V4 start step, saved questions (plan 2026-11-03 Task 39d; owner answer S4 A, 4 Nov): each question a person has not
+ * started yet has a 32-byte key of its own, wrapped by the person's user key exactly as a debate's run key is. Its file
+ * sits beside the debates' keys, in a folder of its own (<root>/saved-questions/<id>/question-key.v1.json), so it never
+ * counts, lists or opens as a debate's key: account erasure counts the debates' keys one by one. The stores below copy
+ * the run-key stores step for step (custody modes, the `wx` temporary, fsync and rename, durableRemoveDirectory); they
+ * differ in one way: a key opens only with the caller's own { userId, ownerRef } (the session's, or the export claim's),
+ * checked against the file's owner_ref, and never by resolving an owner in the database.
+ */
+export function savedQuestionKeyId(id: string): string {
+  return `saved-question:${id}:v1`;
+}
+
+export interface SavedQuestionKeyStore {
+  /** Wraps `key` under identity.userId's user key; TypeError SAVED_QUESTION_KEY_EXISTS when the id already has a key. */
+  store(id: string, identity: RunContentKeyIdentity, key: Uint8Array): Promise<void>;
+  /** The 32-byte key, which the caller zeroes; SavedQuestionKeyUnresolvedError unless it is that owner's and opens. */
+  load(id: string, identity: RunContentKeyIdentity): Promise<Buffer>;
+  exists(id: string): Promise<boolean>;
+  /** The file's owner_ref, read without the user key. */
+  ownerRef(id: string): Promise<string>;
+  /** Every id whose file names ownerRef, sorted, read without the user key (account erasure lists them so). */
+  listByOwner(ownerRef: string): Promise<readonly string[]>;
+  destroy(id: string): Promise<KeyDestroyResult>;
+}
+
+/** A question key that is absent, another owner's, or does not open. Carries no id. */
+export class SavedQuestionKeyUnresolvedError extends CryptoError {
+  constructor() {
+    super("SAVED_QUESTION_KEY_UNRESOLVED", "SAVED_QUESTION_KEY_UNRESOLVED");
+    this.name = "SavedQuestionKeyUnresolvedError";
+  }
+}
+
+const SAVED_QUESTION_KEY_FOLDER = "saved-questions";
+const SAVED_QUESTION_KEY_FILE = "question-key.v1.json";
+
+type StoredSavedQuestionKey = Readonly<{
+  version: 1;
+  saved_question_id: string;
+  owner_ref: string;
+  key_id: string;
+  wrapped_question_key: CryptoEnvelope;
+}>;
+
+function assertSavedQuestionIdentity(id: string, identity: RunContentKeyIdentity): void {
+  if (!UUID_V4.test(id)) throw new TypeError("SAVED_QUESTION_KEY_ID_INVALID");
+  if (!UUID_V4.test(identity.userId)) throw new TypeError("SAVED_QUESTION_KEY_USER_ID_INVALID");
+  if (!UUID_V4.test(identity.ownerRef)) throw new TypeError("SAVED_QUESTION_KEY_OWNER_REF_INVALID");
+}
+
+const savedQuestionIdentityValid = (id: string, identity: RunContentKeyIdentity): boolean =>
+  UUID_V4.test(id) && UUID_V4.test(identity.userId) && UUID_V4.test(identity.ownerRef);
+
+/** The wrap's AAD names the question, "run:none" (a saved question is not a run), the owner_ref and the key's name. */
+function savedQuestionKeyAad(id: string, ownerRef: string): AeadAad {
+  return ["secret-store", "saved-question-key", id, "run:none", ownerRef, savedQuestionKeyId(id), "1"];
+}
+
+/** As strict as parseStoredRunContentKey. */
+function parseStoredSavedQuestionKey(value: unknown, id: string): StoredSavedQuestionKey {
+  if (typeof value !== "object" || value === null) throw new SavedQuestionKeyUnresolvedError();
+  const record = value as Record<string, unknown>;
+  const envelope = record.wrapped_question_key;
+  if (record.version !== 1 || record.saved_question_id !== id || !UUID_V4.test(String(record.owner_ref))
+    || record.key_id !== savedQuestionKeyId(id)
+    || typeof envelope !== "object" || envelope === null) {
+    throw new SavedQuestionKeyUnresolvedError();
+  }
+  const candidate = envelope as Record<string, unknown>;
+  if (candidate.v !== 1 || candidate.keyId !== record.key_id
+    || typeof candidate.nonce !== "string" || typeof candidate.ct !== "string"
+    || typeof candidate.tag !== "string") {
+    throw new SavedQuestionKeyUnresolvedError();
+  }
+  return Object.freeze({
+    version: 1,
+    saved_question_id: id,
+    owner_ref: String(record.owner_ref),
+    key_id: String(record.key_id),
+    wrapped_question_key: candidate as unknown as CryptoEnvelope
+  });
+}
+
+async function wrapSavedQuestionKey(
+  users: ReadableUserDekStore,
+  id: string,
+  identity: RunContentKeyIdentity,
+  key: Uint8Array
+): Promise<StoredSavedQuestionKey> {
+  assertSavedQuestionIdentity(id, identity);
+  if (key.byteLength !== KEY_BYTES) throw new TypeError("SAVED_QUESTION_KEY_INVALID");
+  const userDek = await users.load(identity.userId);
+  try {
+    const envelope = encrypt(userDek, key, savedQuestionKeyAad(id, identity.ownerRef));
+    return Object.freeze({
+      version: 1,
+      saved_question_id: id,
+      owner_ref: identity.ownerRef,
+      key_id: envelope.keyId,
+      wrapped_question_key: envelope
+    });
+  } finally {
+    userDek.fill(0);
+  }
+}
+
+async function unwrapSavedQuestionKey(
+  users: ReadableUserDekStore,
+  identity: RunContentKeyIdentity,
+  record: StoredSavedQuestionKey
+): Promise<Buffer> {
+  if (record.owner_ref !== identity.ownerRef) throw new SavedQuestionKeyUnresolvedError();
+  let userDek: Buffer | undefined;
+  try {
+    userDek = await users.load(identity.userId);
+    const key = decrypt(userDek, record.wrapped_question_key,
+      savedQuestionKeyAad(record.saved_question_id, record.owner_ref));
+    if (key.byteLength !== KEY_BYTES) {
+      key.fill(0);
+      throw new SavedQuestionKeyUnresolvedError();
+    }
+    return key;
+  } catch (error) {
+    if (error instanceof SavedQuestionKeyUnresolvedError) throw error;
+    throw new SavedQuestionKeyUnresolvedError();
+  } finally {
+    userDek?.fill(0);
+  }
+}
+
+/**
+ * The store's own refusals carry codes only. Any other failure (a file-system error names its path, and so the
+ * question's id) leaves as one code, with nothing of it attached.
+ */
+function pathlessSavedQuestionKeyError(error: unknown, code: string): Error {
+  return error instanceof CryptoError || error instanceof TypeError ? error : new CryptoError(code, code);
+}
+
+export class MemorySavedQuestionKeyStore implements SavedQuestionKeyStore {
+  readonly #records = new Map<string, StoredSavedQuestionKey>();
+
+  constructor(private readonly users: ReadableUserDekStore) {}
+
+  async store(id: string, identity: RunContentKeyIdentity, key: Uint8Array): Promise<void> {
+    assertSavedQuestionIdentity(id, identity);
+    if (this.#records.has(id)) throw new TypeError("SAVED_QUESTION_KEY_EXISTS");
+    const record = await wrapSavedQuestionKey(this.users, id, identity, key);
+    if (this.#records.has(id)) throw new TypeError("SAVED_QUESTION_KEY_EXISTS");
+    this.#records.set(id, record);
+  }
+
+  async load(id: string, identity: RunContentKeyIdentity): Promise<Buffer> {
+    if (!savedQuestionIdentityValid(id, identity)) throw new SavedQuestionKeyUnresolvedError();
+    const record = this.#records.get(id);
+    if (record === undefined) throw new SavedQuestionKeyUnresolvedError();
+    return unwrapSavedQuestionKey(this.users, identity, record);
+  }
+
+  async exists(id: string): Promise<boolean> {
+    if (!UUID_V4.test(id)) throw new SavedQuestionKeyUnresolvedError();
+    return this.#records.has(id);
+  }
+
+  async ownerRef(id: string): Promise<string> {
+    if (!UUID_V4.test(id)) throw new SavedQuestionKeyUnresolvedError();
+    const record = this.#records.get(id);
+    if (record === undefined) throw new SavedQuestionKeyUnresolvedError();
+    return record.owner_ref;
+  }
+
+  async listByOwner(ownerRef: string): Promise<readonly string[]> {
+    if (!UUID_V4.test(ownerRef)) throw new SavedQuestionKeyUnresolvedError();
+    return Object.freeze([...this.#records.entries()]
+      .filter(([, record]) => record.owner_ref === ownerRef)
+      .map(([id]) => id)
+      .sort());
+  }
+
+  async destroy(id: string): Promise<KeyDestroyResult> {
+    if (!UUID_V4.test(id)) throw new SavedQuestionKeyUnresolvedError();
+    return this.#records.delete(id) ? "DESTROYED" : "ALREADY_ABSENT";
+  }
+}
+
+export class FileSavedQuestionKeyStore implements SavedQuestionKeyStore {
+  /** root is USER_DEK_STORE_PATH, the root FileRunContentKeyStore uses; only its saved-questions/ folder is read or written. */
+  constructor(
+    private readonly root: string,
+    private readonly users: ReadableUserDekStore,
+    private readonly fileSystem: RunContentKeyFileSystem = defaultRunContentKeyFileSystem
+  ) {
+    if (root.trim() === "") throw new TypeError("SAVED_QUESTION_KEY_STORE_PATH_REQUIRED");
+  }
+
+  async store(id: string, identity: RunContentKeyIdentity, key: Uint8Array): Promise<void> {
+    const record = await wrapSavedQuestionKey(this.users, id, identity, key);
+    const folder = join(this.root, SAVED_QUESTION_KEY_FOLDER);
+    const directory = join(folder, id);
+    const location = join(directory, SAVED_QUESTION_KEY_FILE);
+    const temporary = join(directory, `${SAVED_QUESTION_KEY_FILE}.tmp`);
+    let file: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let parentHandle: Awaited<ReturnType<typeof open>> | undefined;
+    let directoryCreated = false;
+    let directoryExisted = false;
+    let published = false;
+    const modes = await custodyWriteModes(this.root, this.fileSystem);
+    try {
+      await this.fileSystem.mkdir(this.root, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(this.root, modes.directory);
+      await this.fileSystem.mkdir(folder, { recursive: true, mode: modes.directory });
+      await this.fileSystem.chmod(folder, modes.directory);
+      try {
+        await this.fileSystem.mkdir(directory, { recursive: false, mode: modes.directory });
+      } catch (error) {
+        directoryExisted = (error as NodeJS.ErrnoException).code === "EEXIST";
+        throw error;
+      }
+      directoryCreated = true;
+      await this.fileSystem.chmod(directory, modes.directory);
+      file = await this.fileSystem.open(temporary, "wx", modes.file);
+      await file.writeFile(JSON.stringify(record), "utf8");
+      // A-I3, as the run keys: the custody group while the temporary is still 0600, THEN the wider mode, then the
+      // record's own facts through the reader's own acceptance function, before the rename publishes it.
+      await applyCustodyGroupOwnership(file, modes);
+      await this.fileSystem.chmod(temporary, modes.file);
+      await assertPublishableUnderCustody(file, directory, modes, this.fileSystem);
+      await file.sync();
+      await file.close();
+      file = undefined;
+      await this.fileSystem.rename(temporary, location);
+      published = true;
+      directoryHandle = await this.fileSystem.open(directory, "r");
+      await directoryHandle.sync();
+      await directoryHandle.close();
+      directoryHandle = undefined;
+      parentHandle = await this.fileSystem.open(folder, "r");
+      await parentHandle.sync();
+      await parentHandle.close();
+      parentHandle = undefined;
+    } catch (error) {
+      // The id's folder was there before this call: its key is not this call's to touch.
+      if (directoryExisted) throw new TypeError("SAVED_QUESTION_KEY_EXISTS");
+      const cleanupFailures: unknown[] = [];
+      if (file !== undefined) {
+        try {
+          await file.close();
+        } catch (closeError) {
+          cleanupFailures.push(closeError);
+        }
+        file = undefined;
+      }
+      if (directoryHandle !== undefined) {
+        try {
+          await directoryHandle.close();
+        } catch (closeError) {
+          cleanupFailures.push(closeError);
+        }
+        directoryHandle = undefined;
+      }
+      if (parentHandle !== undefined) {
+        try {
+          await parentHandle.close();
+        } catch (closeError) {
+          cleanupFailures.push(closeError);
+        }
+        parentHandle = undefined;
+      }
+      if (!published) {
+        try {
+          await this.fileSystem.lstat(location);
+          published = true;
+        } catch (readbackError) {
+          if ((readbackError as NodeJS.ErrnoException).code !== "ENOENT") published = true;
+        }
+      }
+      if (published) {
+        throw new CryptoError(
+          "SAVED_QUESTION_KEY_STORE_DURABILITY_UNCERTAIN",
+          "SAVED_QUESTION_KEY_STORE_DURABILITY_UNCERTAIN"
+        );
+      }
+      if (directoryCreated) {
+        try {
+          await durableRemoveDirectory(directory, folder, this.fileSystem);
+        } catch (cleanupError) {
+          cleanupFailures.push(cleanupError);
+        }
+      }
+      if (cleanupFailures.length > 0) {
+        throw new CryptoError(
+          "SAVED_QUESTION_KEY_STORE_CLEANUP_FAILED",
+          "SAVED_QUESTION_KEY_STORE_CLEANUP_FAILED"
+        );
+      }
+      throw pathlessSavedQuestionKeyError(error, "SAVED_QUESTION_KEY_STORE_FAILED");
+    }
+  }
+
+  async load(id: string, identity: RunContentKeyIdentity): Promise<Buffer> {
+    if (!savedQuestionIdentityValid(id, identity)) throw new SavedQuestionKeyUnresolvedError();
+    const location = join(this.root, SAVED_QUESTION_KEY_FOLDER, id, SAVED_QUESTION_KEY_FILE);
+    try {
+      const record = parseStoredSavedQuestionKey(
+        await readCustodyRecord(location, this.fileSystem), id
+      );
+      return await unwrapSavedQuestionKey(this.users, identity, record);
+    } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
+      if (error instanceof SavedQuestionKeyUnresolvedError) throw error;
+      throw new SavedQuestionKeyUnresolvedError();
+    }
+  }
+
+  async exists(id: string): Promise<boolean> {
+    if (!UUID_V4.test(id)) throw new SavedQuestionKeyUnresolvedError();
+    try {
+      await this.fileSystem.lstat(join(this.root, SAVED_QUESTION_KEY_FOLDER, id));
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+      throw pathlessSavedQuestionKeyError(error, "SAVED_QUESTION_KEY_STORE_FAILED");
+    }
+  }
+
+  async ownerRef(id: string): Promise<string> {
+    if (!UUID_V4.test(id)) throw new SavedQuestionKeyUnresolvedError();
+    try {
+      const location = join(this.root, SAVED_QUESTION_KEY_FOLDER, id, SAVED_QUESTION_KEY_FILE);
+      return parseStoredSavedQuestionKey(
+        await readCustodyRecord(location, this.fileSystem),
+        id
+      ).owner_ref;
+    } catch (error) {
+      if (error instanceof CryptoCustodyError) throw error;
+      if (error instanceof SavedQuestionKeyUnresolvedError) throw error;
+      throw new SavedQuestionKeyUnresolvedError();
+    }
+  }
+
+  async listByOwner(ownerRef: string): Promise<readonly string[]> {
+    if (!UUID_V4.test(ownerRef)) throw new SavedQuestionKeyUnresolvedError();
+    const folder = join(this.root, SAVED_QUESTION_KEY_FOLDER);
+    let entries: Dirent<string>[];
+    try {
+      entries = await this.fileSystem.readdir(folder, { withFileTypes: true });
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return Object.freeze([]);
+      throw new SavedQuestionKeyUnresolvedError();
+    }
+    const owned: string[] = [];
+    for (const entry of entries) {
+      if (typeof entry === "string" || !entry.isDirectory() || !UUID_V4.test(entry.name)) {
+        throw new SavedQuestionKeyUnresolvedError();
+      }
+      if (await this.ownerRef(entry.name) === ownerRef) owned.push(entry.name);
+    }
+    return Object.freeze(owned.sort());
+  }
+
+  async destroy(id: string): Promise<KeyDestroyResult> {
+    if (!UUID_V4.test(id)) throw new SavedQuestionKeyUnresolvedError();
+    const folder = join(this.root, SAVED_QUESTION_KEY_FOLDER);
+    try {
+      return await durableRemoveDirectory(join(folder, id), folder, this.fileSystem);
+    } catch (error) {
+      throw pathlessSavedQuestionKeyError(error, "SAVED_QUESTION_KEY_DESTROY_FAILED");
+    }
   }
 }
 

@@ -13,7 +13,10 @@
 // `/remaining` at boot (applyPreviewGateCapacities). Only the 60-second waits and the cooldown holds are injected.
 import { randomUUID } from "node:crypto";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
-import { RunRepository, insertRunRoleRotation, type DiscoveredPanelMember, type Pool } from "@debateai/db";
+import {
+  PostgresPathProgressRepository, PostgresPathResultsRepository, PostgresStartPathsStore, RunRepository, insertRunRoleRotation,
+  type DiscoveredPanelMember, type PathProgressStore, type Pool
+} from "@debateai/db";
 import {
   assertPreviewProviderTargets,
   assertPreviewRoleTargets,
@@ -33,6 +36,7 @@ import {
   previewRunnerPolicy,
   previewRunResilience,
   previewSealedRoleFallbackCovered,
+  previewTargetChargePrice,
   previewTargetGatewayControls,
   previewTargetJsonRow,
   providerTargetGatewayControls,
@@ -41,8 +45,11 @@ import {
   PREVIEW_REVIEWED_PROVIDER_REFS,
   withPreviewProviderCallPolicy,
   withStructureRepair,
+  type PreviewGateRemaining,
   type PreviewProviderTestConfig,
-  type ProviderDiscoveryTarget
+  type ProviderCallRequest,
+  type ProviderDiscoveryTarget,
+  type ProviderGateway
 } from "@debateai/providers";
 import {
   CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY,
@@ -52,6 +59,7 @@ import {
   readStoryPolicy,
   type CallConcurrencyPolicy,
   type DebateShapeCeilingInput,
+  type DebateShapeV2Input,
   type EngineSettings,
   type LengthGuidance
 } from "@debateai/register";
@@ -82,7 +90,11 @@ import { createRunInFlight } from "../../apps/runner/src/run-in-flight.js";
 import type { DebateShapeRunnerSettings } from "../../apps/runner/src/debate-shape-boot.js";
 import type { EngineRunnerSettings } from "../../apps/runner/src/engine-boot.js";
 import type { RunnerRetirementSignal } from "../../apps/runner/src/runner-retirement.js";
+import type { WebStepRunnerSettings } from "../../apps/runner/src/web-step.js";
+import { composePathRewrite } from "../../apps/runner/src/path-rewrite-composition.js";
 import {
+  createRunFinalWriterTerms,
+  finalWriterTermsResolver,
   runCostEnvelopeGuardOf,
   runnerSettingsOfVersion,
   runPreviewThinkingLevelsOf,
@@ -99,6 +111,8 @@ import {
   type StubUsage
 } from "./preview-gate-stubs.js";
 import { clearPendingRunId, fixedRunIdTaken, nextRandomUUIDIs } from "./fixed-run-id.js";
+import { runnerPoolOrSuperuser, shareContentCipher } from "./rls-logins.js";
+import type { TestDatabase } from "./testDatabase.js";
 
 export const GLM = "zai-org/GLM-5.3-Flash";
 export const DEEPSEEK = "deepseek-ai/DeepSeek-V4.1-Flash";
@@ -212,11 +226,35 @@ export type AdmittedRun = Awaited<ReturnType<ReturnType<typeof previewDebateHarn
  * The harness over the caller's migrated database pool (read when called, so a `beforeAll` may start it) and the
  * caller's list of stub closers (closed by the caller's `afterEach`).
  */
+/** Decision 12: what another release's sealed wording sent: other bytes, under another contract hash. */
+export const OLDER_RELEASE_HASH = "older-release-sealed-contracts";
+export const olderReleaseWording = (request: ProviderCallRequest): ProviderCallRequest => {
+  const messages = request.packet.messages.map((message, index) => index === 0
+    ? { ...message, content: `Older wording of this instruction.\n${message.content}` } : message);
+  return { ...request, contractHash: OLDER_RELEASE_HASH, packet: Object.assign({}, request.packet, { messages }) };
+};
+
 export function previewDebateHarness(input: Readonly<{
   pool: () => Pool;
   stubClosers: (() => Promise<void>)[];
+  /**
+   * Upload check Task 7 (R21): the database `pool` belongs to. With it, the runner, its gateways and its story writer
+   * run on the production runner login in login mode (tests/support/rls-logins.ts, runnerPoolOrSuperuser), with the
+   * content cipher `pool` carries; admission, seeding and the read-backs stay on `pool`. Without it (a per-variant
+   * copy of the database), everything runs on `pool`, as before.
+   */
+  database?: () => TestDatabase;
 }>) {
   const pool = input.pool;
+  let runnerLogin: Promise<Pool> | undefined;
+  /** The runner's pool: one per harness, made on the first runner (so a `beforeAll` may start the database first). */
+  async function runnerPool(): Promise<Pool> {
+    if (input.database === undefined) return pool();
+    runnerLogin ??= runnerPoolOrSuperuser(input.database(), pool());
+    const own = await runnerLogin;
+    // A cipher `pool` was given after the first runner still reaches the runner's login.
+    return own === pool() ? own : shareContentCipher(pool(), own);
+  }
 
   /**
    * Both preview gates over real unix sockets, speaking the gate's RPC protocol (startPreviewGateStubs). Without
@@ -353,6 +391,11 @@ export function previewDebateHarness(input: Readonly<{
       noDigest?: boolean;
       /** Side-by-side spec §3 (B6): the release this runner runs as, as main.ts passes RELEASE_KEY; absent, `legacy`. */
       releaseKey?: string;
+      /**
+       * Decision 12 (the hand-over): each call as another release's sealed wording would have sent it, recorded so.
+       * Absent: the wording of this code.
+       */
+      reword?: (request: ProviderCallRequest) => ProviderCallRequest;
       /** Side-by-side spec §4 (B8): the retirement signal, as main.ts passes it; absent, the runner never retires. */
       retirement?: Pick<RunnerRetirementSignal, "claimsStopped" | "callsStopped">;
       /**
@@ -367,8 +410,29 @@ export function previewDebateHarness(input: Readonly<{
        * it before it composes anything). Not with `money` (the money is the versions').
        */
       perVersion?: Readonly<{ cache: RunnerSettingsCache; versions: RunSettingsVersions; site: RunnerSiteContext }>;
+      /** V4 start step, Task 53: the web step's settings (its plan read, its search port), as main.ts passes them; absent, no web step. */
+      webSearch?: WebStepRunnerSettings;
+      /** V4 start step, Task 53: a path debate's progress store; absent, 0161's on the runner's pool, as main.ts composes it. */
+      pathProgress?: PathProgressStore;
+      /**
+       * V4 start step, Task 53 (Review Focus 2): each gate's read-only `/remaining`, as main.ts passes `previewGateRemaining` to the
+       * call policy, so a final writer may get the FINAL_WRITER tier; absent, none (a final writer asks at the row's own bound).
+       */
+      gateRemaining?: Readonly<Partial<Record<GateProvider, () => Promise<PreviewGateRemaining>>>>;
+      /**
+       * V4 start step, Task 55: the path rewrite switched on, composed as main.ts composes it (`composePathRewrite` over the six targets
+       * and the topology's members, on the runner's pool), so a settled dig is rewritten in its story's place; absent, none (every
+       * settled run gets its story).
+       */
+      pathRewrite?: boolean;
+      /**
+       * V4 start step, Task 54d: the story writer's charts and tables call (one call after every accepted story), switched on as
+       * main.ts and the practice runner switch it on; absent, off, as this harness has always composed its story writer.
+       */
+      charts?: boolean;
     }> = {}
   ) {
+    const own = await runnerPool();
     const perVersion = options.perVersion;
     const siteVersionSettings = perVersion === undefined ? undefined : perVersion.cache.loaded(perVersion.site.siteVersion);
     if (perVersion !== undefined && siteVersionSettings === undefined) {
@@ -378,6 +442,8 @@ export function previewDebateHarness(input: Readonly<{
     // Side-by-side spec §13 (S6): hosted, each call's seam is its own run's version's guard (main.ts's runCostEnvelopeGuard).
     const runGuard = perVersion === undefined || perVersion.site.money === null
       ? null : runCostEnvelopeGuardOf(perVersion.cache, perVersion.versions);
+    // V4 start step, Task 53, as main.ts: each claimed run's final-writer terms by run id (a v2 run's plan), read by the call policy.
+    const runFinalWriterTerms = createRunFinalWriterTerms();
     const probeSleeps: number[] = [];
     const callSleeps: number[] = [];
     const holdWaits: number[] = [];
@@ -432,7 +498,8 @@ export function previewDebateHarness(input: Readonly<{
     gates.remainingReads.splice(bootReads);
     const busy = createPreviewBusyCoordinator();
     const versionSeams = (target: ProviderDiscoveryTarget) => {
-      const price = providerTargetPrice(target);
+      // F4 (W2-2), as the runner: a reviewed Anthropic row's calls at the vendor's real prices.
+      const price = previewTargetChargePrice(true, target, providerTargetPrice(target));
       return runGuard === null || price === null ? {} : {
         buildCostEnvelopeSeam: (runId: string, phase: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[1],
           sharedWall: Parameters<NonNullable<Parameters<typeof createPostgresProviderGateway>[1]["buildCostEnvelopeSeam"]>>[2]) =>
@@ -440,8 +507,10 @@ export function previewDebateHarness(input: Readonly<{
         buildStoryCostEnvelopeSeam: (runId: string) => runGuard(runId).storySeam({ runId, price, requireReportedUsage: true })
       };
     };
-    const targetGateway = (target: ProviderDiscoveryTarget) => withPreviewProviderCallPolicy(
-      createPostgresProviderGateway(pool(), {
+    const reworded = (gateway: ProviderGateway): ProviderGateway => options.reword === undefined ? gateway
+      : Object.freeze({ call: (request: ProviderCallRequest) => gateway.call(options.reword!(request)) });
+    const targetGateway = (target: ProviderDiscoveryTarget) => reworded(withPreviewProviderCallPolicy(
+      createPostgresProviderGateway(own, {
         fetchImplementation: gates.guardedFetch, endpoint: target.baseUrl, model: target.model, maker: target.maker,
         ...providerTargetGatewayControls(target), ...previewTargetGatewayControls(PREVIEW, target), inFlight: gatewayInFlight,
         ...(options.money === undefined ? {} : {
@@ -455,9 +524,12 @@ export function previewDebateHarness(input: Readonly<{
         // Addition D17 (SA5): each call at its own debate's table, by its run id (a call of no debate: the site's).
         ...(perVersion === undefined ? {} : {
           thinkingLevelsOf: runPreviewThinkingLevelsOf(perVersion.cache, perVersion.versions, perVersion.site.siteVersion)
-        })
+        }),
+        // V4 start step, Task 53, as main.ts: a v2 run's terms (its plan); a v1 run and a call of no run, none.
+        finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms),
+        ...(options.gateRemaining === undefined ? {} : { gateRemaining: options.gateRemaining })
       }
-    );
+    ));
     // LG-A (final review I-1): main.ts's order when the route is asked for; otherwise each target's gateway as before.
     const targetGateways = options.structureRepair === true
       ? new Map(TARGETS.map((target) => [target.providerRef, targetGateway(target)] as const)) : null;
@@ -466,7 +538,7 @@ export function previewDebateHarness(input: Readonly<{
     const topology = createRunnerProviderTopology(TARGETS, (target) => targetGateways === null ? targetGateway(target)
       : withStructureRepair(targetGateways.get(target.providerRef)!, structureRepairRoute));
     const story = new StoryWriter({
-      pool: pool(), pack: PACK,
+      pool: own, pack: PACK,
       // Ruling R36 (per version): no boot policy; every write carries its own debate's version's story policy.
       ...(perVersion === undefined ? { policy: STORY_POLICY } : {}),
       hosted: perVersion?.site.deploymentMode === "hosted", log: () => undefined,
@@ -474,7 +546,9 @@ export function previewDebateHarness(input: Readonly<{
         const member = [topology.primary, ...(topology.critique === undefined ? [] : [topology.critique]), ...topology.additionalMakers]
           .find((candidate) => candidate.providerRef === roleRef);
         return member === undefined ? null : { provider: member.provider, providerRef: member.providerRef };
-      }
+      },
+      // Task 54d, as main.ts: one chart call after every accepted story, only when asked.
+      ...(options.charts === true ? { charts: true } : {})
     });
     const observe = (target: ProviderDiscoveryTarget) => claim === "resend"
       ? observeClaimTimeTarget({
@@ -505,7 +579,11 @@ export function previewDebateHarness(input: Readonly<{
       assertPreviewRoleTargets(PREVIEW, TARGETS, [SEALED_WRITER_REF, SEALED_CHECKER_REF, STORY_POLICY.storytellerRoleRef, STORY_POLICY.storyCheckerRoleRef]);
     }
     const fixture = fixtureSettings();
-    const runner = new WalkingSkeletonRunner(pool(), topology.primary.provider, {
+    // V4 start step, Task 55, as main.ts: the path rewrite over the configured members, on the runner's own pool.
+    const pathRewrite = options.pathRewrite !== true ? undefined : composePathRewrite({ pool: own, targets: TARGETS,
+      members: [topology.primary, ...(topology.critique === undefined ? [] : [topology.critique]), ...topology.additionalMakers], log: () => undefined });
+    if (options.pathRewrite === true && pathRewrite === undefined) throw new Error("test: the targets hold no Haiku or no GLM for the path rewrite");
+    const runner = new WalkingSkeletonRunner(own, topology.primary.provider, {
       ...fixture,
       ...(options.stoppingPolicy === undefined ? {} : {
         stoppingPolicy: { ...fixture.stoppingPolicy!, delta: options.stoppingPolicy.delta, epsilon: options.stoppingPolicy.epsilon }
@@ -543,6 +621,13 @@ export function previewDebateHarness(input: Readonly<{
         providerPrices: buildProviderPriceMap(TARGETS, perVersion.site.deploymentMode),
         bodyCostFallback: perVersion.site.envelopeBand !== null
       }),
+      // V4 start step, Task 53, as main.ts: the run → final-writer terms map, and a path debate's stores on the runner's pool.
+      runFinalWriterTerms,
+      startPaths: new PostgresStartPathsStore(own),
+      pathResults: new PostgresPathResultsRepository(own),
+      pathProgress: options.pathProgress ?? new PostgresPathProgressRepository(own),
+      ...(options.webSearch === undefined ? {} : { webSearch: options.webSearch }),
+      ...(pathRewrite === undefined ? {} : { pathRewrite: pathRewrite.settings }),
       holdRecorder: {
         countCooldownHolds: async () => holdWaits.length,
         record: async (event) => { holdRecords.push(event); },
@@ -569,6 +654,8 @@ export function previewDebateHarness(input: Readonly<{
   async function admittedRun(label: string, admission: Readonly<{
     panelRefs: readonly string[]; pin?: RotatedRoles; depth?: number; question?: string;
     shape?: DebateShapeCeilingInput; settings?: DebateShapeSettings; language?: Readonly<{ tag: string; name: string }>;
+    /** V4 start step, Task 53: a path debate's sizes (shape receipt v2, `envelope_basis.shapeV2`), in place of `shape`. */
+    shapeV2?: DebateShapeV2Input;
     /** LG-C Task 17: the length row's numbers frozen on the receipt (`envelope_basis.length`); absent, today's receipt. */
     length?: LengthGuidance;
     /** R1d final wave B3: engine 2 frozen on the receipt (`envelope_basis.engine`, needs `length`); absent, engine 1. */
@@ -616,9 +703,10 @@ export function previewDebateHarness(input: Readonly<{
         depthParams: { depth, ...(admission.settings ?? {}) }, discoveredPanel: panel, strangerSampleRate: 1,
         envelopeBasis: computeStructuralCeilingBasis({ ...CEILING_TERMS, panelSize: panel.length, depth,
           ...(admission.shape === undefined ? {} : { shape: admission.shape }),
+          ...(admission.shapeV2 === undefined ? {} : { shapeV2: admission.shapeV2 }),
           ...(admission.length === undefined ? {} : { length: admission.length }),
           ...(admission.engine === undefined ? {} : { engine: admission.engine }) }),
-        ...(admission.shape === undefined ? {} : {
+        ...(admission.shape === undefined && admission.shapeV2 === undefined ? {} : {
           argumentLanguageTag: (admission.language ?? { tag: "en" }).tag,
           argumentLanguageName: (admission.language ?? { name: "English" }).name
         }),

@@ -335,7 +335,8 @@
         "billing.internal_provider_admission",
         "staff.threat_report",
         "staff.threat_report_event",
-        "staff.threat_report_alert"
+        "staff.threat_report_alert",
+        "identity.ask_clarify_reservation"
       ],
       "ownsFunctions": [
         "staff.require_alert_readiness_jit",
@@ -406,6 +407,13 @@
         "billing.read_internal_run_state",
         "ledger.record_language_check_spend",
         "ledger.record_question_check_spend",
+        "identity.record_ask_clarify_charge",
+        "identity.read_ask_clarify_spent",
+        "identity.record_pre_start_charge",
+        "identity.read_pre_start_spent",
+        "identity.record_pre_start_try_charge",
+        "identity.link_pre_start_try",
+        "identity.read_run_quota_used",
         "staff.keep_threat_report",
         "staff.list_threat_reports",
         "staff.count_unread_threat_reports",
@@ -415,7 +423,9 @@
         "staff.hold_threat_report_email",
         "staff.claim_threat_report_alerts",
         "staff.complete_threat_report_alert",
-        "identity.read_data_export_threat_reports"
+        "identity.read_data_export_threat_reports",
+        "identity.reserve_ask_clarify_charge",
+        "identity.delete_ask_clarify_reservations_due"
       ]
     },
     {
@@ -2724,6 +2734,1072 @@
       "source": "migrations/0128_threat_reports.sql",
       "grants": [
         "EXECUTE ON FUNCTION identity.read_data_export_threat_reports(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0131_v4_account_memory.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_page_reading_level(uuid)",
+        "EXECUTE ON FUNCTION identity.save_page_reading_level(uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_debate_last_visit(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_debate_last_visit(uuid,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_dig_links(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_dig_link(uuid,uuid,uuid,text[],text)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0131_v4_account_memory.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_page_memory(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0132_web_evidence.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+        "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_evidence(uuid)",
+        "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0132_web_evidence.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_web_researched(uuid,uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0132_web_evidence.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_web_evidence(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0133_investigations.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.open_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+        "EXECUTE ON FUNCTION identity.touch_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.reopen_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0133_investigations.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+        "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0133_investigations.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_investigations(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0134_dig_model_and_month_pause.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.join_investigation_nested(uuid,uuid,uuid,text[],text)",
+        "EXECUTE ON FUNCTION identity.read_dig_level(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.resume_paused_run(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_pause(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0134_dig_model_and_month_pause.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrites_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_plan(uuid)",
+        "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0134_dig_model_and_month_pause.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_dig_model(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0135_dig_picks.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_dig_picks(uuid,uuid,uuid,text,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0135_dig_picks.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_dig_picks_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0135_dig_picks.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_dig_picks(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0136_investigation_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_investigation_reports(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0136_investigation_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+        "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_investigation_reports_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0136_investigation_reports.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_investigation_reports(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
+        "EXECUTE ON FUNCTION identity.record_public_dig_picks(uuid,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_own_public_contributions(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_free_public_ask(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_public_debate_updates(uuid)",
+        "EXECUTE ON FUNCTION identity.public_author_name_gone(uuid)",
+        "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+        "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+        "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_public(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0137_public_debates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_public_debates(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_line_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_main_answer_updates_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_purpose_lines_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.reopen_public_investigation(uuid,integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_run_purpose_lines(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_line(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_main_answer_updates(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_purpose_lines(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.close_public_investigation(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_tree_updates(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0138_tree_updates.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_tree_updates(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_shown_quotes(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.close_investigation_keeping_texts(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_passages(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0139_passage_retention.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_passage_retention(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0140_internal_spend_kinds.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0141_path_suggestions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_suggestions_of_run(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0141_path_suggestions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_path_suggestions(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0141_path_suggestions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_path_suggestions(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0142_team_limit.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.read_audit_page(jsonb,text,integer,timestamptz,uuid)",
+        "EXECUTE ON FUNCTION staff.read_team_room(bigint)",
+        "EXECUTE ON FUNCTION staff.read_team_limit_command(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.read_team_limit_page(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.grant_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0143_run_handover.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.run_release_now(uuid)",
+        "EXECUTE ON FUNCTION identity.run_settings_version_now(uuid)",
+        "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+        "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0143_run_handover.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.continue_paused_run_in_release(uuid,uuid,text,bigint)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0144_ask_clarify_charge.sql",
+      "grants": [
+        "SELECT, INSERT ON identity.ask_clarify_charge"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0144_ask_clarify_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.read_ask_clarify_spent(uuid,timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0144_ask_clarify_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_ask_clarify(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0145_web_researched_unsettled.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0146_team_allowances.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.configure_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.read_member_allowance_command(jsonb,text,uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.read_member_allowance_page(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_dig_parent(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.join_public_tree(uuid,uuid,uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.record_public_material(uuid,uuid,uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.open_public_report(uuid,uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION identity.read_public_tree_of_run(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+        "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_path_line(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+        "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+        "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+        "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_public_debate_reports(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_erasure_runtime",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.forget_erased_debate_public_tree(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0147_public_tree.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_public_tree(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0149_public_report_team_month.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_report_spent_by_funding(uuid,timestamptz,timestamptz,boolean)",
+        "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0150_public_review.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.read_public_review_command(jsonb,text,uuid)",
+        "EXECUTE ON FUNCTION staff.read_public_review(jsonb,text,uuid)",
+        "EXECUTE ON FUNCTION staff.read_public_review_list(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_review_overlay(uuid)",
+        "EXECUTE ON FUNCTION identity.public_review_held(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0151_public_flag.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_public_flag_target(uuid)",
+        "EXECUTE ON FUNCTION identity.open_public_flag(uuid,uuid,uuid,jsonb,integer,integer,integer)",
+        "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+        "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+        "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+        "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+        "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.read_public_flag_queue(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.public_flag_dismiss(jsonb,uuid,jsonb,uuid,uuid,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0152_report_export_and_check_usage.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_public_check_usage(text,uuid,timestamptz,integer,integer,integer,numeric)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0152_report_export_and_check_usage.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_public_flags(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0157_moderation_statements.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_moderation(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0153_dig_tree_settled.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+        "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0155_owner_answer_writes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.record_owned_investigation_request(uuid,uuid,uuid,text,uuid,text,text,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION memory.unlink_owned_memory_link(uuid,uuid,text,text)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0156_moderation_notice.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.claim_moderation_notices(integer)",
+        "EXECUTE ON FUNCTION identity.read_moderation_notice(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.complete_moderation_notice(uuid,uuid,text)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0157_moderation_statements.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.record_public_flag_quote(uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.claim_moderation_statements(integer)",
+        "EXECUTE ON FUNCTION identity.read_moderation_statement(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.complete_moderation_statement(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_own_moderation_statements(uuid)",
+        "EXECUTE ON FUNCTION identity.delete_moderation_words_due()",
+        "EXECUTE ON FUNCTION identity.read_own_contribution_review(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.read_public_flag_queue_answered(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.public_flag_close(jsonb,uuid,jsonb,uuid,text,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.claim_public_flag_mail(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_flag_mail(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.complete_public_flag_mail(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.settle_stuck_public_flags()"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0158_pre_start_charge.sql",
+      "grants": [
+        "SELECT, INSERT ON identity.pre_start_charge"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0158_pre_start_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_pre_start_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.read_pre_start_spent(uuid,timestamptz,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0158_pre_start_charge.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_pre_start(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0159_start_paths.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.record_start_paths(uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION core.read_start_paths(uuid)",
+        "EXECUTE ON FUNCTION core.read_start_path_ids(uuid)",
+        "EXECUTE ON FUNCTION core.record_carry_on_due(uuid)",
+        "EXECUTE ON FUNCTION core.claim_carry_on_due(integer)",
+        "EXECUTE ON FUNCTION core.read_carry_on_begun(integer)",
+        "EXECUTE ON FUNCTION core.record_carry_on_done(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0160_path_results.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.write_path_root(uuid,text,integer,uuid,text)",
+        "EXECUTE ON FUNCTION core.record_path_outcome(uuid,text,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION core.record_path_gap_round(uuid,integer,jsonb,bytea)",
+        "EXECUTE ON FUNCTION core.read_path_roots(uuid)",
+        "EXECUTE ON FUNCTION core.read_path_outcomes(uuid)",
+        "EXECUTE ON FUNCTION core.read_path_gap_round(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0161_path_progress.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.record_path_step(uuid,text,text)",
+        "EXECUTE ON FUNCTION core.record_path_point_mark(uuid,text,uuid,text,text)",
+        "EXECUTE ON FUNCTION core.read_path_progress(uuid)",
+        "EXECUTE ON FUNCTION core.read_carry_on_mark(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0161_path_progress.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.count_public_reports(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0162_saved_questions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.create_saved_question(uuid,uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.save_saved_question(uuid,uuid,integer,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_saved_questions(uuid,integer)",
+        "EXECUTE ON FUNCTION identity.read_saved_question(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.delete_saved_question(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_data_export_worker",
+      "source": "migrations/0162_saved_questions.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_data_export_saved_questions(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0165_pre_start_release.sql",
+      "grants": [
+        "SELECT, INSERT, UPDATE (run_id, linked_at) ON identity.pre_start_try"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0165_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.record_pre_start_try_charge(uuid,uuid,uuid,uuid,text,text,date,bigint,bigint,bigint,text)",
+        "EXECUTE ON FUNCTION identity.link_pre_start_try(uuid,text,uuid)",
+        "EXECUTE ON FUNCTION identity.read_run_quota_used(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.record_work_item_retry(uuid,uuid,timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0165_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.run_pre_start_kept(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0165_pre_start_release.sql",
+      "grants": [
+        "SELECT ON ledger.model_spend_call_waiver"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0165_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.read_run_continue(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.continue_failed_run(uuid,uuid,text,bigint)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0165_pre_start_release.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION ledger.record_call_waiver(uuid,uuid[])",
+        "EXECUTE ON FUNCTION ledger.call_waived_attempts(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0166_main_answer_times.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_main_answer_times(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0167_public_report_own_carrier.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.open_public_report_own_carrier(uuid,uuid,uuid,boolean,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0168_set_aside_continue.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0168_set_aside_continue.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION ledger.spend_waived_until(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0169_piece_settings_version.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION register.read_active_settings_version()",
+        "EXECUTE ON FUNCTION identity.record_web_reading_with_settings(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_with_settings(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report_version_with_settings(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line_with_settings(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_main_answer_update_with_settings(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_public_path_update_with_settings(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_public_check_passed_with_settings(uuid,uuid,bigint)",
+        "EXECUTE ON FUNCTION identity.record_public_answer_update_with_settings(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea,bigint)",
+        "EXECUTE ON FUNCTION identity.record_public_report_with_settings(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea,bigint)"
+      ]
+    },
+    {
+      "roleName": "debateai_staff_security_owner",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.publication_is_current(uuid)",
+        "EXECUTE ON FUNCTION identity.request_owner_matches(uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.reserve_ask_clarify_charge(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,text,timestamptz,boolean,text,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_run_is_dig(uuid,uuid)"
+      ]
+    },
+    {
+      "roleName": "debateai_rls_all_accounts",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.delete_ask_clarify_reservations_due(integer)",
+        "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+        "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+        "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)",
+        "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+        "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+        "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+        "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)",
+        "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+        "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+        "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+        "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+        "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)",
+        "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+        "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)",
+        "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+        "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+        "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+        "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+        "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)",
+        "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)",
+        "EXECUTE ON FUNCTION core.read_terminal_recorded_facts(uuid)",
+        "EXECUTE ON FUNCTION evaluator.provider_call_request_is_authorized(uuid,text,text,text)",
+        "EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+        "EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid)",
+        "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+        "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+        "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_alert_delivery(integer)",
+        "EXECUTE ON FUNCTION staff.read_alert_key_mapping(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.settle_alert_delivery(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION staff.read_alert_delivery_status()",
+        "EXECUTE ON FUNCTION staff.read_target_invitation_channel(uuid,uuid,uuid,uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
+        "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.ack_consumer_security_notice(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.fail_consumer_security_notice(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.purge_expired_authentication_risk_signals(integer)",
+        "EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices()",
+        "EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz)",
+        "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+        "EXECUTE ON FUNCTION staff.\"grant\"(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.accept(uuid,uuid,uuid,uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.read_owned_webauthn_challenge(uuid,uuid,text,text,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.fail_owned_webauthn(uuid,uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.complete_owned_webauthn_registration(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb)",
+        "EXECUTE ON FUNCTION staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
+        "EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)",
+        "EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid)",
+        "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.read_consumer_passkey_credential(text,text,text)",
+        "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
+        "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)",
+        "EXECUTE ON FUNCTION core.record_provider_probe(uuid,text,text,text,text,text,timestamptz)",
+        "INSERT ON ledger.model_spend",
+        "INSERT ON ledger.model_spend_hold",
+        "INSERT ON ledger.model_spend_reservation"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0172_moderation_notice_fixes.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
+      ]
+    }
+  ],
+  "privilegeRevocations": [
+    {
+      "roleName": "debateai_billing_runtime",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION identity.join_public_investigation(uuid,uuid,uuid,text[],text,text)",
+        "EXECUTE ON FUNCTION identity.join_investigation(uuid,uuid,uuid,text[],text)",
+        "EXECUTE ON FUNCTION identity.close_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_reserve_event(uuid,text,bigint,uuid,integer,text,timestamptz)",
+        "EXECUTE ON FUNCTION identity.read_investigation_dig_levels(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrites(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_paused_runs(uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_line(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.read_main_answer_updates(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.close_public_investigation(uuid,uuid)",
+        "EXECUTE ON FUNCTION legal.purge_expired_acceptance(timestamptz)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION identity.read_reserve(uuid)",
+        "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_report_spent(uuid,timestamptz,timestamptz)",
+        "EXECUTE ON FUNCTION identity.reopen_public_investigation(uuid,integer)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report(uuid,integer,uuid)",
+        "EXECUTE ON FUNCTION staff.keep_threat_report(text,uuid)",
+        "EXECUTE ON FUNCTION staff.keep_threat_report_with_email(text,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_authentication_risk_signals_for_recovery(uuid)",
+        "EXECUTE ON FUNCTION staff.read_team_internal_spent(timestamptz,timestamptz)",
+        "EXECUTE ON FUNCTION staff.begin_invitation_challenge(uuid,uuid,text,text,text)",
+        "EXECUTE ON FUNCTION staff.begin_owner_possession_challenge(uuid,uuid,uuid,text,text,text,text)",
+        "EXECUTE ON FUNCTION staff.begin_registration_challenge(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION staff.complete_invitation_proof(uuid,uuid,uuid,text,bigint,text,text)",
+        "EXECUTE ON FUNCTION staff.complete_owner_possession(uuid,uuid,uuid,text,bigint,text,text)",
+        "EXECUTE ON FUNCTION identity.record_verification_delivery_with_audit(uuid,timestamptz,boolean,text,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_account_security_hold(uuid)",
+        "EXECUTE ON FUNCTION identity.read_web_page_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.read_free_debates_to_publish(integer)",
+        "EXECUTE ON FUNCTION identity.record_public_report_charge(uuid,uuid,uuid,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.record_main_answer_update(uuid,uuid,uuid,text,uuid,uuid,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_web_reply_texts(uuid,uuid[])",
+        "EXECUTE ON FUNCTION identity.read_public_material(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_dig_input(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_answer_updates(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_unwritten(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_checks_passed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_page_owed(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_reports_owed(integer)",
+        "EXECUTE ON FUNCTION identity.read_free_debate_owner(uuid)",
+        "EXECUTE ON FUNCTION identity.delete_public_flag_words_due()",
+        "EXECUTE ON FUNCTION identity.read_public_review_purge_due(integer)",
+        "EXECUTE ON FUNCTION identity.public_review_purge(uuid,text,uuid,text,integer,jsonb,text)",
+        "EXECUTE ON FUNCTION identity.settle_web_researched(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_unwritten_path_rewrites(timestamptz,integer)",
+        "EXECUTE ON FUNCTION identity.read_unreported_closings(integer)",
+        "EXECUTE ON FUNCTION identity.settle_public_contribution(uuid,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_update(uuid,uuid,text,text,uuid,jsonb)",
+        "EXECUTE ON FUNCTION core.prepare_free_publication(uuid,uuid)",
+        "EXECUTE ON FUNCTION core.publish_free_debate(uuid,uuid,text,jsonb,timestamptz)",
+        "EXECUTE ON FUNCTION identity.refuse_free_publication(uuid)",
+        "EXECUTE ON FUNCTION identity.read_debates_holding_passages(integer)",
+        "EXECUTE ON FUNCTION identity.wipe_debate_passages(uuid,text)",
+        "EXECUTE ON FUNCTION identity.wipe_inactive_web_page_text_of_idle_debates(integer)",
+        "EXECUTE ON FUNCTION identity.read_unsettled_web_researched(integer)",
+        "EXECUTE ON FUNCTION identity.read_public_digs_unsettled(timestamptz,integer)",
+        "EXECUTE ON FUNCTION identity.read_public_climbs_owed(integer)",
+        "EXECUTE ON FUNCTION identity.mark_public_climb_done(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_check_passed(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_page_skip(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION identity.record_public_debate_report(uuid,integer,uuid,jsonb)",
+        "EXECUTE ON FUNCTION identity.mark_dig_tree_settled(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_search(uuid,uuid,text,text,text,text,text,text,text,bigint,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_page(uuid,uuid,uuid,smallint,text,jsonb,bytea,integer,bytea,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_reading(uuid,uuid,uuid,smallint,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_extract(uuid,uuid,uuid,text,smallint[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_picks(uuid,text,uuid[])",
+        "EXECUTE ON FUNCTION identity.record_web_pack(uuid,uuid,text,text[],jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_dig_level_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.take_path_rewrite_turn(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_path_rewrite_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite(uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_plan_path(uuid,text,text,smallint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_run_pause(uuid,text,timestamptz,integer,integer,bigint)",
+        "EXECUTE ON FUNCTION identity.read_run_pause_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_input(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_investigation_waiting_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.record_investigation_report_version(uuid,integer,uuid,text,text,text,uuid,timestamptz,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_closing_since_of_root(uuid)",
+        "EXECUTE ON FUNCTION identity.read_public_contribution_of_run(uuid)",
+        "EXECUTE ON FUNCTION identity.take_path_update_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.read_path_update_turn(uuid)",
+        "EXECUTE ON FUNCTION identity.record_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_path_rewrite_in_line(text,uuid,uuid,uuid,integer,uuid,text,text,text,text,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_path_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_web_shown_quote(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_web_reply_text(uuid,uuid,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_path_suggestions(uuid,uuid,uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.run_work_is_parked(uuid,text,timestamptz)",
+        "EXECUTE ON FUNCTION identity.record_public_dig_input(uuid,text,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.take_public_path_turn(uuid,uuid,uuid,text,text,smallint,text,uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_path_update(uuid,text,uuid,text,text,boolean,text,text,jsonb,jsonb,smallint,jsonb,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_climb_next(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_answer_update(uuid,uuid,uuid,uuid,text,uuid,text,text,jsonb,jsonb,smallint,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.record_public_report(uuid,text,text,text,text,smallint,integer,smallint,smallint,jsonb,jsonb,jsonb,bigint,jsonb,bytea)",
+        "EXECUTE ON FUNCTION identity.read_public_report_charged_until(uuid)",
+        "EXECUTE ON FUNCTION identity.record_public_report_check(uuid,timestamptz,text,text,smallint[],text[],text,text,text,text,integer)",
+        "EXECUTE ON FUNCTION identity.dig_is_settled(uuid)",
+        "EXECUTE ON FUNCTION core.read_terminal_recorded_facts(uuid)",
+        "EXECUTE ON FUNCTION evaluator.provider_call_request_is_authorized(uuid,text,text,text)",
+        "EXECUTE ON FUNCTION serve.record_synthesis_check_inheritance(uuid,uuid,uuid,integer,uuid)",
+        "EXECUTE ON FUNCTION staff.threat_report_recipient_user(uuid)",
+        "EXECUTE ON FUNCTION staff.erase_due_threat_reports()",
+        "EXECUTE ON FUNCTION staff.claim_threat_report_alerts(integer)",
+        "EXECUTE ON FUNCTION staff.complete_threat_report_alert(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.claim_team_limit_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_team_limit_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.team_limit_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_allowance_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_allowance_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.allowance_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_public_review_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_review_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_review_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_public_flag_notices(integer)",
+        "EXECUTE ON FUNCTION staff.complete_public_flag_notice(uuid,uuid,boolean)",
+        "EXECUTE ON FUNCTION staff.public_flag_notice_user(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.claim_alert_delivery(integer)",
+        "EXECUTE ON FUNCTION staff.read_alert_key_mapping(uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.settle_alert_delivery(uuid,uuid,text,text)",
+        "EXECUTE ON FUNCTION staff.read_alert_delivery_status()",
+        "EXECUTE ON FUNCTION staff.read_target_invitation_channel(uuid,uuid,uuid,uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.purge_expired_authentication_risk_signals(integer)",
+        "EXECUTE ON FUNCTION serve.purge_expired_synthesis_check_removal_notices()",
+        "EXECUTE ON FUNCTION identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)",
+        "EXECUTE ON FUNCTION staff.\"grant\"(jsonb,uuid,jsonb,uuid,text[],uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.accept(uuid,uuid,uuid,uuid,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.authorize_action(jsonb,text)",
+        "EXECUTE ON FUNCTION staff.begin_owned_webauthn(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.read_owned_webauthn_challenge(uuid,uuid,text,text,jsonb,jsonb,jsonb)",
+        "EXECUTE ON FUNCTION staff.fail_owned_webauthn(uuid,uuid,uuid)",
+        "EXECUTE ON FUNCTION staff.complete_owned_webauthn_registration(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb)",
+        "EXECUTE ON FUNCTION staff.complete_owned_webauthn_assertion(uuid,uuid,uuid,text,bigint,text,text,text,jsonb,jsonb,jsonb,text,text)",
+        "EXECUTE ON FUNCTION identity.staff_read_owned_webauthn_key(uuid,uuid,uuid,text)",
+        "EXECUTE ON FUNCTION staff.read_alert_user_mapping(uuid)",
+        "EXECUTE ON FUNCTION ledger.record_language_check_spend(uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION ledger.record_question_check_spend(uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.record_ask_clarify_charge(uuid,uuid,uuid,uuid,text,date,bigint,bigint,bigint)",
+        "EXECUTE ON FUNCTION identity.consume_recovery_code_with_audit(uuid,uuid,text,timestamptz,jsonb)",
+        "EXECUTE ON FUNCTION core.record_provider_probe(uuid,text,text,text,text,text,timestamptz)",
+        "INSERT ON ledger.model_spend",
+        "INSERT ON ledger.model_spend_hold",
+        "INSERT ON ledger.model_spend_reservation",
+        "UPDATE ON ledger.sequence_allocator"
+      ]
+    },
+    {
+      "roleName": "debateai_authorization_runtime",
+      "source": "migrations/0171_security_review_hardening.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION identity.claim_consumer_security_notices(integer)",
+        "EXECUTE ON FUNCTION identity.read_consumer_security_notice(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.ack_consumer_security_notice(uuid,uuid)",
+        "EXECUTE ON FUNCTION identity.fail_consumer_security_notice(uuid,uuid,text)",
+        "EXECUTE ON FUNCTION identity.read_consumer_passkey_credential(text,text,text)",
+        "EXECUTE ON FUNCTION identity.complete_consumer_passkey_login(jsonb,jsonb)",
+        "EXECUTE ON FUNCTION identity.read_consumer_recovery_proof(text,integer)",
+        "EXECUTE ON FUNCTION identity.prove_consumer_recovery(jsonb,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0172_moderation_notice_fixes.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
+      ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0174_public_review_ungrounded_door.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"
       ]
     }
   ],

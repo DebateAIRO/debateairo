@@ -309,12 +309,22 @@ describe("publication reviews staff surface", () => {
     expect(enStaff["staff.reviews.category.TERRORISM"]).not.toBe(roStaff["staff.reviews.category.TERRORISM"]);
   });
 
-  it("PublicDebateOverview without viewingNote still renders the public note", () => {
+  // Owner's screen review, 3 Nov 2026 (public-f3): V4 has no Challenge and no Regenerate, so no page says "sign in to challenge, regenerate…" any more.
+  it("PublicDebateOverview renders no unlock note and no locked Challenge, with or without viewingNote", () => {
     const debate = { ...snapshot, public_ref: reviewRef, author_pseudonym: "Someone", published_at: older.asked_at };
-    const html = renderToStaticMarkup(createElement(PublicDebateOverview, {
-      debate: debate as never, catalog: enPublic, storyCatalog: enPublic, storyLocale: "en", onDetails: () => {}, onRead: () => {}
-    }));
-    expect(html).toContain("publicUnlockNote");
-    expect(html).toContain(enPublic["public.overview.publicViewingNotice"]);
+    for (const viewingNote of [undefined, "PUBLIC", "NONE"] as const) {
+      const html = renderToStaticMarkup(createElement(PublicDebateOverview, {
+        debate: debate as never, catalog: enPublic, storyCatalog: enPublic, storyLocale: "en", onDetails: () => {}, onRead: () => {},
+        ...(viewingNote === undefined ? {} : { viewingNote })
+      }));
+      expect(html).not.toContain("publicUnlockNote");
+      // The retired English words (their keys left the catalogue with the old page).
+      expect(html).not.toContain("sign in to challenge, regenerate, or flag claims");
+      expect(html).not.toContain("Unlock actions");
+      expect(html).not.toContain("publicLockedAction");
+      expect(html).not.toContain("Challenge");
+      expect(enPublic).not.toHaveProperty(["public.overview.unlockActions"]);
+      expect(enPublic).not.toHaveProperty(["public.overview.challenge"]);
+    }
   });
 });

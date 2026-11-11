@@ -152,7 +152,6 @@ function publications(overrides: Partial<PublicationApplication> = {}): Publicat
     auditPreflightDenial: async () => true,
     readOwnedVisibility: async () => ({ state: "PRIVATE", public_ref: null }),
     publish: async () => ({ state: "PUBLISHED", public_ref: PUBLIC_REF }),
-    unpublish: async () => ({ state: "PRIVATE", public_ref: null }),
     readPublicDebate: async (publicationRef) => publicationRef === PUBLIC_REF ? publicDebate : null,
     list: async () => ({
       items: [{
@@ -215,6 +214,94 @@ describe("S8 publication HTTP boundary", () => {
     await api.close();
   });
 
+  it("a dig is never published: 409 DIG_NOT_PUBLISHABLE right after the grant's check, before the answer, the synthesis gate and publish (security review F2)", async () => {
+    const publish = vi.fn<PublicationApplication["publish"]>(async () => ({ state: "PUBLISHED", public_ref: PUBLIC_REF }));
+    const isDig = vi.fn<NonNullable<PublicationApplication["isDig"]>>(async () => true);
+    const auditPreflightDenial = vi.fn<PublicationApplication["auditPreflightDenial"]>(async () => true);
+    const decide = vi.fn(async () => "PROCEED" as const);
+    const app = application();
+    const readRunAnswer = vi.fn<AskApplication["readRunAnswer"]>(async () => answer());
+    app.readRunAnswer = readRunAnswer;
+    const api = buildApi({
+      application: app, sessions: sessions(), publications: publications({ publish, isDig, auditPreflightDenial }),
+      allowedOrigin: ORIGIN, synthesisPublishGate: { decide }
+    });
+    const response = await api.inject({
+      method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
+      payload: { step_up_grant: GRANT_TOKEN, warning_acknowledged: true }
+    });
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toStrictEqual({ error: "DIG_NOT_PUBLISHABLE", message: "DIG_NOT_PUBLISHABLE" });
+    expect(isDig).toHaveBeenCalledExactlyOnceWith({ runId: RUN_ID, authenticated });
+    expect(readRunAnswer).not.toHaveBeenCalled();
+    expect(decide).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
+    expect(auditPreflightDenial).not.toHaveBeenCalled();
+    await api.close();
+
+    // A grant that is not live is still the audited 404, and nobody asks whether the debate is a dig.
+    const deniedDig = vi.fn<NonNullable<PublicationApplication["isDig"]>>(async () => true);
+    const denied = buildApi({
+      application: application(), sessions: sessions(), allowedOrigin: ORIGIN, synthesisPublishGate: { decide },
+      publications: publications({ preflightGrant: async () => false, isDig: deniedDig, auditPreflightDenial })
+    });
+    const refused = await denied.inject({
+      method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
+      payload: { step_up_grant: GRANT_TOKEN, warning_acknowledged: true }
+    });
+    expect(refused.statusCode).toBe(404);
+    expect(refused.json()).toEqual({ error: "RUN_NOT_FOUND" });
+    expect(auditPreflightDenial).toHaveBeenCalledOnce();
+    expect(deniedDig).not.toHaveBeenCalled();
+    await denied.close();
+
+    // The same route publishes a debate that is not a dig.
+    const notDig = buildApi({
+      application: application(), sessions: sessions(), allowedOrigin: ORIGIN, synthesisPublishGate: { decide },
+      publications: publications({ publish, isDig: async () => false })
+    });
+    const accepted = await notDig.inject({
+      method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
+      payload: { step_up_grant: GRANT_TOKEN, warning_acknowledged: true }
+    });
+    expect(accepted.statusCode).toBe(201);
+    expect(publish).toHaveBeenCalledOnce();
+    await notDig.close();
+  });
+
+  it("the visibility read tells the page a dig is one, and says nothing more for a debate that is not (security review F2)", async () => {
+    for (const visibility of [
+      { state: "PRIVATE", public_ref: null, dig: true },
+      { state: "PRIVATE", public_ref: null }
+    ] as const) {
+      const api = buildApi({
+        application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
+        publications: publications({ readOwnedVisibility: async () => visibility })
+      });
+      const response = await api.inject({ method: "GET", url: `/v1/runs/${RUN_ID}/visibility`, headers: mutationHeaders });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual(visibility);
+      await api.close();
+    }
+  });
+
+  it("has no Unpublish route: a signed-in owner's request is refused and nothing changes (owner decision 13)", async () => {
+    const preflightGrant = vi.fn(async () => true);
+    const api = buildApi({
+      application: application(),
+      sessions: sessions(),
+      publications: publications({ preflightGrant }),
+      allowedOrigin: ORIGIN
+    });
+    const response = await api.inject({
+      method: "POST", url: `/v1/runs/${RUN_ID}/unpublish`, headers: mutationHeaders,
+      payload: { step_up_grant: GRANT_TOKEN, copies_may_persist_acknowledged: true }
+    });
+    expect(response.statusCode).toBe(404);
+    expect(preflightGrant).not.toHaveBeenCalled();
+    await api.close();
+  });
+
   it("audits authenticated invalid grants before private S6 reads, corpus key I/O, or audit KDF work", async () => {
     const privateS6Read = vi.fn<AskApplication["readRunAnswer"]>(async () => answer());
     const privateRunRead = vi.fn<AskApplication["readRun"]>(async (runId) => ({
@@ -271,15 +358,13 @@ describe("S8 publication HTTP boundary", () => {
       allowedOrigin: ORIGIN
     });
     for (const attempt of [
-      { label: "random", method: "publish", token: "r".repeat(43) },
-      { label: "expired", method: "publish", token: "e".repeat(43) },
-      { label: "wrong-action", method: "unpublish", token: "w".repeat(43) }
+      { label: "random", token: "r".repeat(43) },
+      { label: "expired", token: "e".repeat(43) },
+      { label: "wrong-action", token: "w".repeat(43) }
     ] as const) {
       const response = await api.inject({
-        method: "POST", url: `/v1/runs/${RUN_ID}/${attempt.method}`, headers: mutationHeaders,
-        payload: attempt.method === "publish"
-          ? { step_up_grant: attempt.token, warning_acknowledged: true }
-          : { step_up_grant: attempt.token, copies_may_persist_acknowledged: true }
+        method: "POST", url: `/v1/runs/${RUN_ID}/publish`, headers: mutationHeaders,
+        payload: { step_up_grant: attempt.token, warning_acknowledged: true }
       });
       expect(response.statusCode, attempt.label).toBe(404);
       expect(response.json()).toEqual({ error: "RUN_NOT_FOUND" });

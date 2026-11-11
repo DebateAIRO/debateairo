@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import { once } from "node:events";
 import { createHash, randomUUID } from "node:crypto";
 import { createInitialBatteryRows, WorkItemRepository } from "@debateai/battery";
-import { RunRepository, migrate } from "@debateai/db";
+import { RunRepository, migrate, type Pool } from "@debateai/db";
 import { CLAIM_TYPE_COMPOSITION_MAP_ROW_KEY } from "@debateai/register";
 import { SERVE_LEG, computeStructuralCeilingBasis } from "@debateai/register";
 import {
@@ -11,6 +11,7 @@ import {
   WalkingSkeletonRunner,
   type WalkingSkeletonSettings
 } from "@debateai/runner";
+import { runnerPoolOrSuperuser } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { fixtureDiscoveredPanel } from "../support/discoveredPanel.js";
 import { withRequestDerivedBearings } from "../support/reviewBearings.js";
@@ -57,6 +58,8 @@ import { argumentLanguageDirective } from "@debateai/kernel";
  */
 
 let database: TestDatabase;
+/** Upload check Task 7 (R21): the runner's own pool, its production login in login mode (rls-logins.ts). */
+let runnerPool: Pool;
 
 const batteryRows = createInitialBatteryRows({ settlementWatchHandle: "settlement-watch:t17" });
 
@@ -566,6 +569,7 @@ function runnerSettings(): WalkingSkeletonSettings {
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  runnerPool = await runnerPoolOrSuperuser(database);
 }, 240_000);
 
 afterAll(async () => {
@@ -595,7 +599,7 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t17:${runId}`
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...runnerSettings(),
@@ -614,7 +618,7 @@ describe("T17 · the recomputed ceiling covers a maximum-path run's OBSERVED led
           wait: async () => undefined
         },
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
           }),
           providerRef: "provider:test-layer:secondary",
@@ -921,7 +925,7 @@ describe("T17B · a provider attempt REFUSED at the equality boundary reaches th
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t17b:${runId}`
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...runnerSettings(),
@@ -940,7 +944,7 @@ describe("T17B · a provider attempt REFUSED at the equality boundary reaches th
           wait: async () => undefined
         },
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
           }),
           providerRef: "provider:test-layer:secondary",
@@ -1044,7 +1048,7 @@ describe("T17C · Task M2 — an attempt stop while arguing is answered out of t
       const workItemId = await new WorkItemRepository(database.pool).enqueue({
         runId, batteryRowId: "Q1", nodeSet: [], commandKey: `t17c:${runId}`
       });
-      const runner = new WalkingSkeletonRunner(database.pool, createPostgresProviderGateway(database.pool, {
+      const runner = new WalkingSkeletonRunner(runnerPool, createPostgresProviderGateway(runnerPool, {
         endpoint: primary.endpoint, model: "test-layer/primary-model", maker: "Primary test maker"
       }), {
         ...runnerSettings(),
@@ -1063,7 +1067,7 @@ describe("T17C · Task M2 — an attempt stop while arguing is answered out of t
           wait: async () => undefined
         },
         critique: {
-          provider: createPostgresProviderGateway(database.pool, {
+          provider: createPostgresProviderGateway(runnerPool, {
             endpoint: secondary.endpoint, model: "test-layer/secondary-model", maker: "Secondary test maker"
           }),
           providerRef: "provider:test-layer:secondary",

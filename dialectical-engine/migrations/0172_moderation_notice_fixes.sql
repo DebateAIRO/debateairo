@@ -1,0 +1,753 @@
+-- 0172 · The moderation notices' seven gaps after 0157 (the owner's list of 10 November 2026, M1-M7; plan 2026-11-10-moderation-notices-m1-m7).
+--
+-- Plain words. One drained step for every fix of the list that the database must make. Each section below is named by its gap (M5, ...), and the
+-- contract at the end checks each one's end state as the step applies. 0172 never edits an earlier file: a function it changes is restated here
+-- once, with its exact signature, owner, grants and settings as 0157 left them, and declared in the manifest's amendsPostconditionsOf. Once applied,
+-- this file is fixed: any later change is a step of its own.
+-- M5. One bad row never stops the moderation mail (owner, 10 Nov 2026). 0157's queue read every new log row and decision in one statement, so one
+--   source row whose work raised (any fault in its own reads or writes: a constraint, a row in a shape the queue does not expect) rolled back the
+--   whole call, and with it the sender's claim: no statement and no further log row was ever queued again, for anyone. Each source is now handled in its own block: what it wrote
+--   goes back if it raises, it is set aside in the new identity.moderation_statement_stuck (its id, the SQLSTATE, never the words, when it first and
+--   last failed and how often), retried after an hour, and on its first failure the Owner and the team-limit holders get one staff alert,
+--   MODERATION_MAIL_FAILED, through 0151's own notices (whose kind CHECK takes the new kind, under its catalog name). A source that later succeeds
+--   takes its stuck row with it. The API's sender settles each claim on its own too, and runs the statements and the reporters' answers apart, so
+--   one failing never skips the other (apps/api/src/moderation-statements.ts, apps/api/src/main.ts).
+--
+-- n1 (side-by-side spec §5, the database rule):
+-- n1: drained
+-- n1: keeps-verifier
+--   drained         it restates thirteen of 0157's functions in place, swaps 0157's kind CHECK on identity.moderation_statement and 0151's on
+--                   staff.public_flag_notice, adds four NOT VALID CHECKs to 0157's ground and decision tables, and revokes the runtime's right on
+--                   0157's staff door without the law; all are pinned by those steps' postcondition digests (amendsPostconditionsOf), so the release
+--                   that carries it must be a drained upload.
+--                   0157's claim, read and complete keep their signatures and results, so the release before's sender still works beside it.
+--   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql stays in force.
+
+-- M5. One bad row never stops the moderation mail ------------------------------------------------------------------------------------
+-- The sources the queue set aside: a log row's event_id or a decision's decision_id, the SQLSTATE of its last failure (never its message, which may
+-- carry words), and when and how often it failed. No login holds a right on it; only the queue's owner writes it.
+CREATE TABLE IF NOT EXISTS identity.moderation_statement_stuck (
+  source_id uuid PRIMARY KEY,
+  sqlstate text NOT NULL,
+  first_failed_at timestamptz NOT NULL,
+  last_failed_at timestamptz NOT NULL,
+  tries integer NOT NULL
+);
+SELECT core.install_truncate_guard('identity.moderation_statement_stuck');
+-- Its owner is the queue's, 0150's identity owner, as 0157 gave its own tables.
+DO $m5_stuck_owner$
+DECLARE v_owner name;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  EXECUTE pg_catalog.format('ALTER TABLE identity.moderation_statement_stuck OWNER TO %I', v_owner);
+  EXECUTE 'REVOKE ALL ON identity.moderation_statement_stuck FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker';
+END
+$m5_stuck_owner$;
+-- The staff alert's kind, beside 0151's two: same name (the catalog's, 0151 left it unnamed), same table. Validated: every stored row is one of 0151's two.
+ALTER TABLE staff.public_flag_notice DROP CONSTRAINT IF EXISTS public_flag_notice_kind_check;
+ALTER TABLE staff.public_flag_notice ADD CONSTRAINT public_flag_notice_kind_check
+  CHECK (kind IN ('PUBLIC_FLAG_HIDDEN','PUBLIC_FLAG_WAITING','MODERATION_MAIL_FAILED'));
+-- 0157's queue, each source in its own block (BEGIN ... EXCEPTION WHEN OTHERS): what one source wrote goes back if it raises, it is set aside, and
+-- the loop goes on. A source set aside less than an hour ago is left out of both loops' reads, so it never takes one of the 200 places. On its
+-- first failure the alert is queued once per active Owner and team-limit holder (0151's notice, keyed by the source; its own UNIQUE keeps it once).
+-- Otherwise 0157's body, word for word: who is told of what, D7, D3, D8 and D9 are unchanged. CREATE OR REPLACE keeps its owner and its grants
+-- (none but its owner's); the contract below checks the body by its digest, which a later section that edits it in place recomputes.
+CREATE OR REPLACE FUNCTION identity.queue_moderation_statements() RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v identity.public_review_event%ROWTYPE; d identity.moderation_decision%ROWTYPE; v_count integer := 0; v_owner uuid; v_row record; v_since timestamptz;
+  v_state text; v_tries integer; v_hide uuid; v_hide_at timestamptz;
+BEGIN
+  SELECT start.since INTO v_since FROM identity.moderation_statement_since AS start;
+  FOR v IN SELECT event.* FROM identity.public_review_event AS event
+    WHERE event.recorded_at >= v_since AND event.action IN ('HIDE','REMOVE_DIG','HIDE_REPORT','REPUBLISH')
+      AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_seen AS seen WHERE seen.source_id = event.event_id)
+      AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_stuck AS stuck WHERE stuck.source_id = event.event_id AND stuck.last_failed_at > clock_timestamp() - interval '1 hour')
+    ORDER BY event.recorded_at, event.event_id LIMIT 200 LOOP
+    -- M5: this source's work, alone. What it wrote goes back if it raises; the others go on.
+    BEGIN
+      INSERT INTO identity.moderation_statement_seen (source_id) VALUES (v.event_id) ON CONFLICT (source_id) DO NOTHING;
+      IF NOT FOUND THEN CONTINUE; END IF;
+      v_owner := identity.moderation_debate_owner(v.publication_ref);
+      IF v.action = 'HIDE' THEN
+        PERFORM identity.state_moderation(v_owner, 'DEBATE_HIDDEN', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], NULL, NULL, NULL, v.recorded_at);
+        -- D7: every other person's dig and report goes with the debate. A dig still running was settled UNAVAILABLE by this hide: the same.
+        FOR v_row IN SELECT DISTINCT contribution.owner_ref, contribution.dig_run_id FROM identity.public_contribution AS contribution
+          WHERE contribution.publication_ref = v.publication_ref AND contribution.contributed_at <= v.recorded_at AND contribution.owner_ref IS DISTINCT FROM v_owner
+            AND (contribution.outcome = 'ALLOWED' OR EXISTS (SELECT 1 FROM identity.public_review_detached AS detached WHERE detached.dig_run_id = contribution.dig_run_id AND detached.revision = v.revision))
+            AND NOT EXISTS (SELECT 1 FROM identity.public_review_event AS removal WHERE removal.action = 'REMOVE_DIG' AND removal.piece_id = contribution.dig_run_id AND removal.revision < v.revision) LOOP
+          PERFORM identity.state_moderation(v_row.owner_ref, 'CONTRIBUTION_AFFECTED', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], 'DIG', v_row.dig_run_id, NULL, v.recorded_at);
+        END LOOP;
+        FOR v_row IN SELECT report.writer_ref, report.report_id FROM identity.public_report AS report
+          WHERE report.publication_ref = v.publication_ref AND report.requested_at <= v.recorded_at AND report.writer_ref IS DISTINCT FROM v_owner AND report.writer_ref IS NOT NULL
+            AND (EXISTS (SELECT 1 FROM identity.public_debate_report AS copy WHERE copy.report_id = report.report_id AND copy.recorded_at <= v.recorded_at)
+              OR report.failure_code = 'PUBLIC_REVIEW_HOLD')
+            AND NOT EXISTS (SELECT 1 FROM identity.public_review_event AS hidden WHERE hidden.action = 'HIDE_REPORT' AND hidden.piece_id = report.report_id AND hidden.revision < v.revision) LOOP
+          PERFORM identity.state_moderation(v_row.writer_ref, 'REPORT_AFFECTED', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], 'REPORT', v_row.report_id, NULL, v.recorded_at);
+        END LOOP;
+      ELSIF v.action = 'REMOVE_DIG' THEN
+        PERFORM identity.state_moderation((SELECT contribution.owner_ref FROM identity.public_contribution AS contribution WHERE contribution.dig_run_id = v.piece_id),
+          'CONTRIBUTION_REMOVED', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], 'DIG', v.piece_id, NULL, v.recorded_at);
+        -- D7: the rows written after the dig's first row and before its removal, and the reports asked for in that time (0150's rule), went too.
+        FOR v_row IN SELECT DISTINCT contribution.owner_ref, update_row.dig_run_id FROM identity.public_debate_update AS update_row
+            JOIN identity.public_contribution AS contribution ON contribution.dig_run_id = update_row.dig_run_id
+          WHERE update_row.publication_ref = v.publication_ref AND update_row.dig_run_id IS DISTINCT FROM v.piece_id AND update_row.recorded_at <= v.recorded_at
+            AND update_row.update_seq > (SELECT min(first_row.update_seq) FROM identity.public_debate_update AS first_row WHERE first_row.publication_ref = v.publication_ref AND first_row.dig_run_id = v.piece_id)
+            AND contribution.owner_ref IS DISTINCT FROM (SELECT removed.owner_ref FROM identity.public_contribution AS removed WHERE removed.dig_run_id = v.piece_id) LOOP
+          PERFORM identity.state_moderation(v_row.owner_ref, 'CONTRIBUTION_AFFECTED', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], 'DIG', v_row.dig_run_id, NULL, v.recorded_at);
+        END LOOP;
+        FOR v_row IN SELECT report.writer_ref, report.report_id FROM identity.public_report AS report
+          WHERE report.publication_ref = v.publication_ref AND report.writer_ref IS NOT NULL AND report.requested_at <= v.recorded_at
+            AND report.requested_at > (SELECT min(first_row.recorded_at) FROM identity.public_debate_update AS first_row WHERE first_row.publication_ref = v.publication_ref AND first_row.dig_run_id = v.piece_id)
+            AND EXISTS (SELECT 1 FROM identity.public_debate_report AS copy WHERE copy.report_id = report.report_id) LOOP
+          PERFORM identity.state_moderation(v_row.writer_ref, 'REPORT_AFFECTED', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], 'REPORT', v_row.report_id, NULL, v.recorded_at);
+        END LOOP;
+      ELSIF v.action = 'HIDE_REPORT' THEN
+        PERFORM identity.state_moderation((SELECT report.writer_ref FROM identity.public_report AS report WHERE report.report_id = v.piece_id),
+          'REPORT_REMOVED', v.publication_ref, v.event_id, NULL, ARRAY[v.event_id], 'REPORT', v.piece_id, NULL, v.recorded_at);
+      ELSE
+        -- D3: the corrections of this review, since the hide it ends, once per person, at the re-publish that shows them.
+        FOR v_row IN WITH corrected AS (
+            SELECT correction.event_id, correction.piece_kind, correction.piece_id, correction.pointer,
+              CASE correction.piece_kind WHEN 'SNAPSHOT' THEN v_owner
+                WHEN 'UPDATE' THEN (SELECT contribution.owner_ref FROM identity.public_debate_update AS update_row JOIN identity.public_contribution AS contribution ON contribution.dig_run_id = update_row.dig_run_id
+                  WHERE update_row.update_id = correction.piece_id)
+                ELSE (SELECT report.writer_ref FROM identity.public_report AS report WHERE report.report_id = correction.piece_id) END AS person
+            FROM identity.public_review_event AS correction
+            WHERE correction.publication_ref = v.publication_ref AND correction.action = 'CORRECT' AND correction.revision < v.revision
+              AND correction.revision > COALESCE((SELECT max(earlier.revision) FROM identity.public_review_event AS earlier
+                WHERE earlier.publication_ref = v.publication_ref AND earlier.action = 'REPUBLISH' AND earlier.revision < v.revision), 0))
+          SELECT corrected.person, array_agg(DISTINCT corrected.event_id) AS events,
+            jsonb_agg(DISTINCT jsonb_build_object('piece_kind', corrected.piece_kind, 'piece_id', corrected.piece_id, 'pointer', corrected.pointer)) AS places
+          FROM corrected WHERE corrected.person IS NOT NULL GROUP BY corrected.person LOOP
+          PERFORM identity.state_moderation(v_row.person, 'CORRECTED', v.publication_ref, v.event_id, NULL, v_row.events, NULL, NULL, v_row.places, v.recorded_at);
+        END LOOP;
+      END IF;
+      DELETE FROM identity.moderation_statement_stuck AS stuck WHERE stuck.source_id = v.event_id;
+      v_count := v_count + 1;
+    EXCEPTION WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE;
+      INSERT INTO identity.moderation_statement_stuck AS stuck (source_id, sqlstate, first_failed_at, last_failed_at, tries)
+      VALUES (v.event_id, v_state, clock_timestamp(), clock_timestamp(), 1)
+      ON CONFLICT (source_id) DO UPDATE SET sqlstate = EXCLUDED.sqlstate, last_failed_at = EXCLUDED.last_failed_at, tries = stuck.tries + 1
+      RETURNING stuck.tries INTO v_tries;
+      IF v_tries = 1 THEN PERFORM staff.queue_public_flag_notices(v.event_id, 'MODERATION_MAIL_FAILED'); END IF;
+    END;
+  END LOOP;
+  FOR d IN SELECT decision.* FROM identity.moderation_decision AS decision
+    WHERE NOT EXISTS (SELECT 1 FROM identity.moderation_statement_seen AS seen WHERE seen.source_id = decision.decision_id)
+      AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_stuck AS stuck WHERE stuck.source_id = decision.decision_id AND stuck.last_failed_at > clock_timestamp() - interval '1 hour')
+    ORDER BY decision.recorded_at, decision.decision_id LIMIT 200 LOOP
+    -- M5: the same for each decision.
+    BEGIN
+      -- M3 (owner's decision D, 10 Nov 2026): the hide this decision makes final is the latest HIDE up to the decision with no REPUBLISH after it. Each person
+      -- told at that hide that their dig (CONTRIBUTION_AFFECTED) or report (REPORT_AFFECTED) left with the debate is told the final decision, once per kind
+      -- however many pieces they had (the earlier statements name the pieces): no places, no piece. state_moderation skips an erased account (D8).
+      SELECT hide.event_id, hide.recorded_at INTO v_hide, v_hide_at FROM identity.public_review_event AS hide
+        WHERE hide.publication_ref = d.publication_ref AND hide.action = 'HIDE' AND hide.revision <= d.revision
+          AND NOT EXISTS (SELECT 1 FROM identity.public_review_event AS back WHERE back.publication_ref = d.publication_ref AND back.action = 'REPUBLISH'
+            AND back.revision > hide.revision AND back.revision <= d.revision)
+        ORDER BY hide.revision DESC LIMIT 1;
+      -- M3: a decision waits for its hide's own statements (stuck for an hour, or beyond this call's 200): told now, the final statements would never follow. It is
+      -- left unseen and not raised (that would alert), so the next pass takes it. A hide from before the watch began, or none open, never waits.
+      IF v_hide IS NOT NULL AND v_hide_at >= v_since AND NOT EXISTS (SELECT 1 FROM identity.moderation_statement_seen AS seen WHERE seen.source_id = v_hide) THEN CONTINUE; END IF;
+      INSERT INTO identity.moderation_statement_seen (source_id) VALUES (d.decision_id) ON CONFLICT (source_id) DO NOTHING;
+      IF NOT FOUND THEN CONTINUE; END IF;
+      PERFORM identity.state_moderation(identity.moderation_debate_owner(d.publication_ref), 'DEBATE_DECIDED', d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
+      FOR v_row IN SELECT DISTINCT affected.owner_ref, CASE affected.kind WHEN 'CONTRIBUTION_AFFECTED' THEN 'CONTRIBUTION_DECIDED' ELSE 'REPORT_DECIDED' END AS kind
+        FROM identity.moderation_statement AS affected WHERE affected.event_id = v_hide AND affected.kind IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED') LOOP
+        PERFORM identity.state_moderation(v_row.owner_ref, v_row.kind, d.publication_ref, NULL, d.decision_id, '{}'::uuid[], NULL, NULL, NULL, d.recorded_at);
+      END LOOP;
+      DELETE FROM identity.moderation_statement_stuck AS stuck WHERE stuck.source_id = d.decision_id;
+      v_count := v_count + 1;
+    EXCEPTION WHEN OTHERS THEN
+      GET STACKED DIAGNOSTICS v_state = RETURNED_SQLSTATE;
+      INSERT INTO identity.moderation_statement_stuck AS stuck (source_id, sqlstate, first_failed_at, last_failed_at, tries)
+      VALUES (d.decision_id, v_state, clock_timestamp(), clock_timestamp(), 1)
+      ON CONFLICT (source_id) DO UPDATE SET sqlstate = EXCLUDED.sqlstate, last_failed_at = EXCLUDED.last_failed_at, tries = stuck.tries + 1
+      RETURNING stuck.tries INTO v_tries;
+      IF v_tries = 1 THEN PERFORM staff.queue_public_flag_notices(d.decision_id, 'MODERATION_MAIL_FAILED'); END IF;
+    END;
+  END LOOP;
+  RETURN v_count;
+END $$;
+
+-- M2. A failed send backs off over about three days, then alerts the team ------------------------------------------------------------
+-- 0157 let a failed send be claimed again the moment its claim ended, so a mail outage burned the 20 tries it allows in minutes and the statement
+-- or the reporter's answer was given up. A failed try now waits: min(2^attempts_before minutes, 6 hours), attempts_before being the row's
+-- attempts before this complete's increment (1, 2, 4 ... minutes after tries 1, 2, 3; 6 hours from the tenth), so the 20 tries span about three
+-- days. The 20th retry gives up as 0157 does (failed_at) and, once, queues the staff alert MODERATION_MAIL_FAILED (0151's notices, keyed by the
+-- statement's or the mail's id). DROPPED (no address, by design, D8) never alerts. The column is nullable with no default: a row that never
+-- failed, or that the release before wrote, has none and is due at once. The four functions keep their signatures and results; each claim keeps
+-- its queue call as its first statement, so the release before's sender still works beside them.
+ALTER TABLE identity.moderation_statement ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;
+ALTER TABLE identity.public_flag_mail ADD COLUMN IF NOT EXISTS next_attempt_at timestamptz;
+CREATE OR REPLACE FUNCTION identity.claim_moderation_statements(p_limit integer)
+RETURNS TABLE(statement_id uuid, claim_token uuid)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_STATEMENT_LIMIT_INVALID'; END IF;
+  PERFORM identity.queue_moderation_statements();
+  RETURN QUERY WITH picked AS (
+    SELECT s.statement_id FROM identity.moderation_statement AS s
+    WHERE s.delivered_at IS NULL AND s.failed_at IS NULL AND (s.claim_expires_at IS NULL OR s.claim_expires_at <= clock_timestamp())
+      AND (s.next_attempt_at IS NULL OR s.next_attempt_at <= clock_timestamp())
+    ORDER BY s.created_at, s.statement_id LIMIT p_limit FOR UPDATE SKIP LOCKED
+  ) UPDATE identity.moderation_statement AS s SET claim_token = gen_random_uuid(), claim_expires_at = clock_timestamp() + interval '5 minutes'
+    FROM picked WHERE s.statement_id = picked.statement_id RETURNING s.statement_id, s.claim_token;
+END $$;
+CREATE OR REPLACE FUNCTION identity.complete_moderation_statement(p_statement_id uuid, p_claim uuid, p_outcome text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_found boolean; v_gave_up boolean;
+BEGIN
+  IF p_outcome IS NULL OR p_outcome NOT IN ('SENT','RETRY','DROPPED') THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_STATEMENT_OUTCOME_INVALID'; END IF;
+  UPDATE identity.moderation_statement AS s SET claim_token = NULL, claim_expires_at = NULL, attempts = least(s.attempts + 1, 20),
+    delivered_at = CASE WHEN p_outcome = 'SENT' THEN clock_timestamp() END,
+    failed_at = CASE WHEN p_outcome = 'DROPPED' OR (p_outcome = 'RETRY' AND s.attempts >= 19) THEN clock_timestamp() END,
+    next_attempt_at = CASE WHEN p_outcome = 'RETRY' AND s.attempts < 19 THEN clock_timestamp() + least(interval '1 minute' * power(2, s.attempts), interval '6 hours') END
+  WHERE s.statement_id = p_statement_id AND s.claim_token = p_claim AND s.claim_expires_at > clock_timestamp()
+  RETURNING p_outcome = 'RETRY' AND s.failed_at IS NOT NULL INTO v_gave_up;
+  v_found := FOUND;
+  IF v_gave_up THEN PERFORM staff.queue_public_flag_notices(p_statement_id, 'MODERATION_MAIL_FAILED'); END IF;
+  RETURN v_found;
+END $$;
+CREATE OR REPLACE FUNCTION identity.claim_public_flag_mail(p_limit integer)
+RETURNS TABLE(mail_id uuid, claim_token uuid)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+  IF p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 100 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_LIMIT_INVALID'; END IF;
+  PERFORM identity.queue_public_flag_mail();
+  RETURN QUERY WITH picked AS (
+    SELECT mail.mail_id FROM identity.public_flag_mail AS mail
+    WHERE mail.delivered_at IS NULL AND mail.failed_at IS NULL AND (mail.claim_expires_at IS NULL OR mail.claim_expires_at <= clock_timestamp())
+      AND (mail.next_attempt_at IS NULL OR mail.next_attempt_at <= clock_timestamp())
+    ORDER BY mail.created_at, mail.mail_id LIMIT p_limit FOR UPDATE SKIP LOCKED
+  ) UPDATE identity.public_flag_mail AS mail SET claim_token = gen_random_uuid(), claim_expires_at = clock_timestamp() + interval '5 minutes'
+    FROM picked WHERE mail.mail_id = picked.mail_id RETURNING mail.mail_id, mail.claim_token;
+END $$;
+CREATE OR REPLACE FUNCTION identity.complete_public_flag_mail(p_mail_id uuid, p_claim uuid, p_outcome text) RETURNS boolean
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_found boolean; v_gave_up boolean;
+BEGIN
+  IF p_outcome IS NULL OR p_outcome NOT IN ('SENT','RETRY','DROPPED') THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_FLAG_MAIL_OUTCOME_INVALID'; END IF;
+  UPDATE identity.public_flag_mail AS mail SET claim_token = NULL, claim_expires_at = NULL, attempts = least(mail.attempts + 1, 20),
+    delivered_at = CASE WHEN p_outcome = 'SENT' THEN clock_timestamp() END,
+    failed_at = CASE WHEN p_outcome = 'DROPPED' OR (p_outcome = 'RETRY' AND mail.attempts >= 19) THEN clock_timestamp() END,
+    next_attempt_at = CASE WHEN p_outcome = 'RETRY' AND mail.attempts < 19 THEN clock_timestamp() + least(interval '1 minute' * power(2, mail.attempts), interval '6 hours') END
+  WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp()
+  RETURNING p_outcome = 'RETRY' AND mail.failed_at IS NOT NULL INTO v_gave_up;
+  v_found := FOUND;
+  IF v_gave_up THEN PERFORM staff.queue_public_flag_notices(p_mail_id, 'MODERATION_MAIL_FAILED'); END IF;
+  RETURN v_found;
+END $$;
+
+-- M6, M4. A review step that acts on a report closes it, and the reporter hears one decision ------------------------------------------
+-- M6 (owner, 10 Nov 2026; decision C). 0157 mailed the reporter "a person acted on it" when a review step or DECIDE named their report as its
+-- source, and left the report open: it stayed in the queue as waiting, and a later close could tell the same reporter "no breach" after
+-- "acted" (M4). A person's step whose ground names a report (source REPORT_BUTTON, with its flag_id) now closes it as ACTED in the same
+-- transaction, through 0151's own dismissal (so the words' six months start at the step), with 0157's answer beside it. The automatic hide
+-- (0151's nil actor) is not a person's decision: it leaves the report open for one. A report already closed stays as it was closed.
+-- The close never raises: a hide can never be refused, and no step fails for its report. What it could not do goes back whole and is
+-- logged by a fixed marker only (PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED, never the error's words); a person then closes the report as before.
+-- Its operation is derived from the step's log row or decision (md5('review-close:' || source)), so it never meets a step's own, and
+-- the staff queue knows a step closed a report by recomputing it from those rows.
+CREATE OR REPLACE FUNCTION identity.close_public_flag_by_review(p_flag_id uuid, p_actor uuid, p_source_id uuid) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_operation uuid; v_at timestamptz;
+BEGIN
+  BEGIN
+    -- Locked as 0151's dismissal locks it, so a close by a person at the same moment is seen and this one does nothing.
+    PERFORM 1 FROM identity.public_flag AS flag WHERE flag.flag_id = p_flag_id AND flag.dismissed_at IS NULL FOR UPDATE;
+    IF NOT FOUND THEN RETURN; END IF;
+    v_operation := md5('review-close:' || p_source_id::text)::uuid;
+    v_at := identity.public_flag_dismiss(p_flag_id, p_actor, v_operation, encode(sha256(convert_to('review-close:' || p_source_id::text, 'UTF8')), 'hex'));
+    INSERT INTO identity.public_flag_answer (flag_id, outcome, actor_staff_id, operation_id, recorded_at) VALUES (p_flag_id, 'ACTED', p_actor, v_operation, v_at);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED';
+  END;
+END $$;
+-- n1: reviewed gives only the new function its owner, the owner of 0157's ground functions that call it, and no login a right on it
+DO $m6_close_owner$
+DECLARE v_owner name;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  EXECUTE pg_catalog.format('ALTER FUNCTION identity.close_public_flag_by_review(uuid,uuid,uuid) OWNER TO %I', v_owner);
+  EXECUTE 'REVOKE ALL ON FUNCTION identity.close_public_flag_by_review(uuid,uuid,uuid) FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker';
+END
+$m6_close_owner$;
+-- 0157's three ground functions, each with one more line after its own insert: a person's step that names a report closes it. Otherwise 0157's
+-- bodies (the contract test compares them). A hide still cannot raise: the close is inside its own block, and never raises.
+CREATE OR REPLACE FUNCTION identity.record_hide_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_event_id uuid; v_source text; v_flag uuid; v_suspected text[]; v_actor uuid;
+BEGIN
+  SELECT event.event_id, event.actor_staff_id INTO v_event_id, v_actor FROM identity.public_review_event AS event WHERE event.operation_id = p_operation AND event.publication_ref = p_publication_ref AND event.action = 'HIDE';
+  IF NOT FOUND THEN RETURN; END IF;
+  BEGIN
+    v_flag := CASE WHEN p_source = 'REPORT_BUTTON' AND EXISTS (SELECT 1 FROM identity.public_flag AS flag WHERE flag.flag_id = p_flag_id AND flag.publication_ref = p_publication_ref) THEN p_flag_id END;
+    v_source := CASE WHEN v_flag IS NOT NULL THEN 'REPORT_BUTTON' WHEN p_source IN ('EMAIL_NOTICE','OWN_INITIATIVE','AUTHORITY_ORDER') THEN p_source ELSE 'OWN_INITIATIVE' END;
+    v_suspected := CASE WHEN identity.moderation_grounds_known(p_grounds, false) THEN p_grounds ELSE '{}'::text[] END;
+    INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, suspected, source, flag_id, interim)
+    VALUES (v_event_id, p_publication_ref, ARRAY['REVIEW_HOLD'], v_suspected, v_source, v_flag, true) ON CONFLICT (event_id) DO NOTHING;
+    IF v_flag IS NOT NULL AND v_actor <> '00000000-0000-0000-0000-000000000000'::uuid THEN PERFORM identity.close_public_flag_by_review(v_flag, v_actor, v_event_id); END IF;
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, interim)
+    VALUES (v_event_id, p_publication_ref, ARRAY['REVIEW_HOLD'], 'OWN_INITIATIVE', true) ON CONFLICT (event_id) DO NOTHING;
+  END;
+END $$;
+CREATE OR REPLACE FUNCTION identity.moderation_decide(p_actor uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb,
+  p_expected_revision integer, p_operation uuid, p_request_sha256 text) RETURNS timestamptz
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_revision integer; v_at timestamptz; v_decision uuid;
+BEGIN
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:public-tree:' || p_publication_ref::text, 0));
+  SELECT COALESCE(max(event.revision), 0) INTO v_revision FROM identity.public_review_event AS event WHERE event.publication_ref = p_publication_ref;
+  IF v_revision <> p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_STALE'; END IF;
+  IF NOT identity.public_review_held(p_publication_ref) THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_NOT_HIDDEN'; END IF;
+  INSERT INTO identity.moderation_decision (publication_ref, revision, grounds, source, flag_id, facts_sha256, facts_ciphertext, actor_staff_id, operation_id, request_sha256)
+  VALUES (p_publication_ref, v_revision, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, p_actor, p_operation, p_request_sha256)
+  RETURNING recorded_at, decision_id INTO v_at, v_decision;
+  IF p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND p_actor <> '00000000-0000-0000-0000-000000000000'::uuid THEN PERFORM identity.close_public_flag_by_review(p_flag_id, p_actor, v_decision); END IF;
+  RETURN v_at;
+END $$;
+CREATE OR REPLACE FUNCTION identity.record_step_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb) RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  WITH recorded AS (
+  INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, flag_id, facts_sha256, facts_ciphertext, interim)
+  SELECT event.event_id, p_publication_ref, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, false
+  FROM identity.public_review_event AS event WHERE event.operation_id = p_operation AND event.publication_ref = p_publication_ref
+  RETURNING event_id)
+  SELECT identity.close_public_flag_by_review(p_flag_id, event.actor_staff_id, event.event_id) FROM recorded JOIN identity.public_review_event AS event ON event.event_id = recorded.event_id WHERE p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND event.actor_staff_id <> '00000000-0000-0000-0000-000000000000'::uuid
+$$;
+-- M4 (decision C): the reporter hears one decision. 0157's queue, with two changes to its second insert: a step's or a decision's ACTED is
+-- left to the close's own ACTED answer when there is one (one ACTED per report, the earliest: 0157's UNIQUE (flag_id, kind) already keeps
+-- it to one row), and NO_BREACH is never queued once ACTED is queued or sent for the report, or due before it in the same run (a step whose
+-- close was skipped, then a person's no-breach). ACTED may still follow an earlier NO_BREACH: a later, real decision.
+-- Final review: and one to its first insert. A person may decide on a report the check still reads (CHECKING); 0151's settle then still moves
+-- it to QUEUED or NOT_FOUND. A receipt or an automatic answer that would come after a person's decision (a close's answer, a step's or a
+-- decision's ground naming the report, an ACTED or NO_BREACH mail, at or before its own moment) is never queued: the reporter hears the
+-- person's decision alone. A receipt from before the decision still goes, in its order.
+CREATE OR REPLACE FUNCTION identity.queue_public_flag_mail() RETURNS integer
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_since timestamptz; v_rows integer; v_count integer := 0;
+BEGIN
+  SELECT start.since INTO v_since FROM identity.public_flag_mail_since AS start;
+  -- The receipt, and the automatic check's two decisions.
+  INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at)
+  SELECT due.flag_id, due.kind, due.happened_at FROM (
+    SELECT flag.flag_id, CASE flag.state WHEN 'QUEUED' THEN 'RECEIPT' WHEN 'HIDDEN' THEN 'AUTO_HIDDEN' ELSE 'AUTO_NOT_FOUND' END AS kind,
+      COALESCE(flag.judged_at, flag.created_at) AS happened_at, flag.created_at
+    FROM identity.public_flag AS flag WHERE COALESCE(flag.judged_at, flag.created_at) >= v_since AND flag.state IN ('QUEUED','HIDDEN','NOT_FOUND') AND flag.reporter_ref IS NOT NULL) AS due
+  WHERE NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS answer WHERE answer.flag_id = due.flag_id AND answer.recorded_at <= due.happened_at)
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS decided WHERE decided.flag_id = due.flag_id AND decided.kind IN ('ACTED','NO_BREACH') AND decided.happened_at <= due.happened_at)
+    AND NOT EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = due.flag_id AND ground.source = 'REPORT_BUTTON' AND ground.recorded_at <= due.happened_at)
+    AND NOT EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = due.flag_id AND decision.source = 'REPORT_BUTTON' AND decision.recorded_at <= due.happened_at)
+  ORDER BY due.created_at, due.flag_id LIMIT 200
+  ON CONFLICT (flag_id, kind) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
+  -- A person's decision: a close, a review step that names the report as its source, or the final decision on its debate that does.
+  INSERT INTO identity.public_flag_mail (flag_id, kind, happened_at)
+  SELECT due.flag_id, due.kind, min(due.happened_at) FROM (
+      SELECT answer.flag_id, answer.outcome AS kind, answer.recorded_at AS happened_at FROM identity.public_flag_answer AS answer
+    UNION ALL
+      SELECT ground.flag_id, 'ACTED', ground.recorded_at FROM identity.moderation_ground AS ground
+      WHERE ground.flag_id IS NOT NULL AND ground.source = 'REPORT_BUTTON'
+        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = ground.flag_id AND acted.outcome = 'ACTED')
+    UNION ALL
+      SELECT decision.flag_id, 'ACTED', decision.recorded_at FROM identity.moderation_decision AS decision
+      WHERE decision.flag_id IS NOT NULL AND decision.source = 'REPORT_BUTTON'
+        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = decision.flag_id AND acted.outcome = 'ACTED')) AS due
+    JOIN identity.public_flag AS flag ON flag.flag_id = due.flag_id
+  WHERE due.happened_at >= v_since AND flag.reporter_ref IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+    AND NOT (due.kind = 'NO_BREACH' AND (EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = 'ACTED')
+      OR EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = due.flag_id AND ground.source = 'REPORT_BUTTON' AND ground.recorded_at <= due.happened_at)
+      OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = due.flag_id AND decision.source = 'REPORT_BUTTON' AND decision.recorded_at <= due.happened_at)))
+  GROUP BY due.flag_id, due.kind ORDER BY min(due.happened_at), due.flag_id LIMIT 200
+  ON CONFLICT (flag_id, kind) DO NOTHING;
+  GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
+  RETURN v_count;
+END $$;
+-- The queue as 0151 reads it, each report with its close's outcome and, new, whether a review step closed it (closed_by_step): its answer's
+-- operation is the one the close derives from a log row or a decision that names the report. Recomputed from those rows, never read from the id.
+CREATE OR REPLACE FUNCTION identity.public_flag_queue_answered() RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT COALESCE(jsonb_agg(row_found.value || jsonb_build_object('outcome', (SELECT answer.outcome FROM identity.public_flag_answer AS answer WHERE answer.flag_id = (row_found.value->>'flag_id')::uuid),
+      'closed_by_step', EXISTS (SELECT 1 FROM identity.public_flag_answer AS answer WHERE answer.flag_id = (row_found.value->>'flag_id')::uuid AND answer.outcome = 'ACTED'
+        AND (EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = answer.flag_id AND answer.operation_id = md5('review-close:' || ground.event_id::text)::uuid)
+          OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = answer.flag_id AND answer.operation_id = md5('review-close:' || decision.decision_id::text)::uuid))))
+    ORDER BY row_found.at), '[]'::jsonb)
+  FROM jsonb_array_elements(identity.public_flag_queue()) WITH ORDINALITY AS row_found(value, at)
+$$;
+
+-- M3. Two statement kinds for the final decision --------------------------------------------------------------------------------------
+-- CONTRIBUTION_DECIDED and REPORT_DECIDED: what the queue above writes at a decision for those told at the hide. The kind CHECK is 0157's, named in
+-- its CREATE TABLE; swapped here, validated (every stored row is one of 0157's seven).
+ALTER TABLE identity.moderation_statement DROP CONSTRAINT IF EXISTS moderation_statement_kind_check;
+ALTER TABLE identity.moderation_statement ADD CONSTRAINT moderation_statement_kind_check
+  CHECK (kind IN ('DEBATE_HIDDEN','DEBATE_DECIDED','CONTRIBUTION_REMOVED','REPORT_REMOVED','CORRECTED','CONTRIBUTION_AFFECTED','REPORT_AFFECTED','CONTRIBUTION_DECIDED','REPORT_DECIDED'));
+
+-- M3: the signed-in page's reader (the data export reads it too: identity.read_data_export_moderation calls it), 0157's body with two edits. A decision's
+-- words are the debate owner's statement alone (DEBATE_DECIDED): the contributor's and the reporter's final statements (CONTRIBUTION_DECIDED, REPORT_DECIDED)
+-- carry no facts and no deleted flag, as the AFFECTED kinds never did at the hide. Same signature, owner and grants (CREATE OR REPLACE keeps them).
+CREATE OR REPLACE FUNCTION identity.read_own_moderation_statements(p_owner_ref uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('statement_id', s.statement_id, 'kind', s.kind, 'publication_ref', s.publication_ref,
+      'run_id', core.run_of_publication(s.publication_ref), 'happened_at', s.happened_at, 'piece_kind', s.piece_kind, 'places', s.places,
+      'ground', identity.moderation_statement_ground(s.statement_id), 'hidden_now', identity.public_review_held(s.publication_ref),
+      'facts', CASE WHEN s.decision_id IS NOT NULL AND s.kind = 'DEBATE_DECIDED' THEN (SELECT jsonb_build_array(decision.facts_ciphertext) FROM identity.moderation_decision AS decision WHERE decision.decision_id = s.decision_id)
+        ELSE COALESCE((SELECT jsonb_agg(ground.facts_ciphertext ORDER BY ground.recorded_at) FROM identity.moderation_ground AS ground
+          WHERE ground.event_id = ANY (s.ground_events) AND ground.facts_ciphertext IS NOT NULL AND s.kind NOT IN ('CONTRIBUTION_AFFECTED','REPORT_AFFECTED')), '[]'::jsonb) END,
+      'facts_deleted', EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.event_id = ANY (s.ground_events) AND ground.facts_deleted_at IS NOT NULL)
+        OR EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.decision_id = s.decision_id AND s.kind = 'DEBATE_DECIDED' AND decision.facts_deleted_at IS NOT NULL),
+      'quote', CASE WHEN s.kind = 'DEBATE_HIDDEN' THEN (SELECT quote.quote_ciphertext FROM identity.public_review_event AS event JOIN identity.public_flag_quote AS quote ON quote.flag_id = event.operation_id
+        WHERE event.event_id = ANY (s.ground_events) AND event.actor_staff_id = '00000000-0000-0000-0000-000000000000'::uuid LIMIT 1) END)
+    ORDER BY s.happened_at DESC, s.statement_id), '[]'::jsonb)
+  FROM identity.moderation_statement AS s WHERE s.owner_ref = p_owner_ref AND p_owner_ref IS NOT NULL
+$$;
+
+-- M1: the reporter's answer says whether an automatic check read the report first (the owner, 10 Nov 2026). 0157's body with one key more, aiReadFirst: true when
+-- 0151's check gave a verdict (AGREE, NOT_FOUND or UNSURE), false when it was unavailable (the five-minute sweep settles a stuck report so) or none ran. The
+-- receipt and the two decisions a person made (NO_BREACH, ACTED) show it; the two automatic answers already say it. Same signature, owner and grants.
+-- Final review: only a verdict given by the mail's moment counts (judged_at at or before happened_at): a person who decided while the check still
+-- read the report decided alone, whatever the check said after.
+CREATE OR REPLACE FUNCTION identity.read_public_flag_mail(p_mail_id uuid, p_claim uuid) RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT jsonb_build_object('userId', identity_user.user_id, 'mailId', mail.mail_id, 'kind', mail.kind, 'happenedAt', mail.happened_at,
+    'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false) AND flag.judged_at IS NOT NULL AND flag.judged_at <= mail.happened_at,
+    'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref), 'publicationRef', flag.publication_ref, 'emailCiphertext', identity_user.email_ciphertext)
+  FROM identity.public_flag_mail AS mail JOIN identity.public_flag AS flag ON flag.flag_id = mail.flag_id
+    JOIN identity."user" AS identity_user ON identity_user.owner_ref = flag.reporter_ref AND identity_user.state IN ('active','suspended')
+  WHERE mail.mail_id = p_mail_id AND mail.claim_token = p_claim AND mail.claim_expires_at > clock_timestamp()
+$$;
+
+-- M7. An "illegal" ground names the law it relies on --------------------------------------------------------------------------------
+-- M7 (owner, 10 Nov 2026; decision E; DSA Art 17(3)(d)). A removal, a hidden report, a correction or DECIDE whose grounds include ILLEGAL now names
+-- the law it relies on: free text of 3 to 200 characters a person types (a reference, not facts: stored plainly in the new law_ref beside 0157's
+-- ground and decision, bound into the passkey's proof as `law`, kept as long as the statement, never touched by the twelve-month sweep, shown on the
+-- person's page and in their export, and never in a mail, which keeps its line "The full statement names the law"). A hide never names one and is
+-- never refused: what it suspects is not yet decided, and its hold is Terms §9 (0150). New rows only: the two CHECKs each table gets are NOT VALID,
+-- so a row from before 0172 keeps its null.
+-- R13 (M7 review): NOT VALID only skips the first scan; every later UPDATE of a row is checked, rows from before 0172 included. 0157's
+-- twelve-month purge (identity.delete_moderation_words_due) is such an UPDATE: it sets facts_ciphertext to null on an old ILLEGAL row that names no
+-- law, and without an exemption one such row would make the whole purge raise, so no facts would go for anyone. A row whose facts are gone therefore
+-- passes the law-required CHECK; the writers' identity.moderation_law_of stays the law's first and main check, and every new step carries facts.
+ALTER TABLE identity.moderation_ground ADD COLUMN IF NOT EXISTS law_ref text;
+ALTER TABLE identity.moderation_decision ADD COLUMN IF NOT EXISTS law_ref text;
+ALTER TABLE identity.moderation_ground DROP CONSTRAINT IF EXISTS moderation_ground_law_length;
+ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;
+ALTER TABLE identity.moderation_ground DROP CONSTRAINT IF EXISTS moderation_ground_law_required;
+ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim OR facts_ciphertext IS NULL) NOT VALID;
+ALTER TABLE identity.moderation_decision DROP CONSTRAINT IF EXISTS moderation_decision_law_length;
+ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;
+ALTER TABLE identity.moderation_decision DROP CONSTRAINT IF EXISTS moderation_decision_law_required;
+ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR facts_ciphertext IS NULL) NOT VALID;
+-- The law a step's grounds need, trimmed, or null for none: ILLEGAL with no law is MODERATION_GROUND_LAW_MISSING; a law beside no ILLEGAL, or one
+-- shorter than 3 or longer than 200 characters, MODERATION_GROUND_LAW_INVALID. Staff's door asks it before the passkey is spent, and each writer again.
+CREATE OR REPLACE FUNCTION identity.moderation_law_of(p_grounds text[], p_law text) RETURNS text
+LANGUAGE plpgsql IMMUTABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_law text := NULLIF(btrim(p_law), '');
+BEGIN
+  IF 'ILLEGAL' = ANY (COALESCE(p_grounds, '{}'::text[])) THEN
+    IF v_law IS NULL THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_GROUND_LAW_MISSING'; END IF;
+  ELSIF v_law IS NOT NULL THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_GROUND_LAW_INVALID';
+  END IF;
+  IF v_law IS NOT NULL AND char_length(v_law) NOT BETWEEN 3 AND 200 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='MODERATION_GROUND_LAW_INVALID'; END IF;
+  RETURN v_law;
+END $$;
+-- The writers, new overloads with the law last (0157's arguments plus p_law), each the body above it in this file (Task 3's, with the report's
+-- one-line close, R3) plus the law: refused first, then stored. The overloads without it stay, for the release before's door, which loses its grant below.
+CREATE OR REPLACE FUNCTION identity.moderation_decide(p_actor uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb,
+  p_expected_revision integer, p_operation uuid, p_request_sha256 text, p_law text) RETURNS timestamptz
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE v_revision integer; v_at timestamptz; v_decision uuid; v_law text := identity.moderation_law_of(p_grounds, p_law);
+BEGIN
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('identity:public-tree:' || p_publication_ref::text, 0));
+  SELECT COALESCE(max(event.revision), 0) INTO v_revision FROM identity.public_review_event AS event WHERE event.publication_ref = p_publication_ref;
+  IF v_revision <> p_expected_revision THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_STALE'; END IF;
+  IF NOT identity.public_review_held(p_publication_ref) THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='PUBLIC_REVIEW_NOT_HIDDEN'; END IF;
+  INSERT INTO identity.moderation_decision (publication_ref, revision, grounds, source, flag_id, facts_sha256, facts_ciphertext, actor_staff_id, operation_id, request_sha256, law_ref)
+  VALUES (p_publication_ref, v_revision, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, p_actor, p_operation, p_request_sha256, v_law)
+  RETURNING recorded_at, decision_id INTO v_at, v_decision;
+  IF p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND p_actor <> '00000000-0000-0000-0000-000000000000'::uuid THEN PERFORM identity.close_public_flag_by_review(p_flag_id, p_actor, v_decision); END IF;
+  RETURN v_at;
+END $$;
+CREATE OR REPLACE FUNCTION identity.record_step_ground(p_operation uuid, p_publication_ref uuid, p_grounds text[], p_source text, p_flag_id uuid, p_facts_sha256 text, p_facts jsonb, p_law text) RETURNS void
+LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+  SELECT identity.moderation_law_of(p_grounds, p_law);
+  WITH recorded AS (
+  INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, flag_id, facts_sha256, facts_ciphertext, interim, law_ref)
+  SELECT event.event_id, p_publication_ref, p_grounds, p_source, p_flag_id, p_facts_sha256, p_facts, false, identity.moderation_law_of(p_grounds, p_law)
+  FROM identity.public_review_event AS event WHERE event.operation_id = p_operation AND event.publication_ref = p_publication_ref
+  RETURNING event_id)
+  SELECT identity.close_public_flag_by_review(p_flag_id, event.actor_staff_id, event.event_id) FROM recorded JOIN identity.public_review_event AS event ON event.event_id = recorded.event_id WHERE p_source = 'REPORT_BUTTON' AND p_flag_id IS NOT NULL AND event.actor_staff_id <> '00000000-0000-0000-0000-000000000000'::uuid
+$$;
+-- What a statement says: 0157's body plus `law`, the distinct laws of its grounds joined by "; " (several only for a correction's places), or null.
+-- R9: it is part of the ground, so whoever holds the statement reads it, a contributor's and a reporter's too; the facts stay the owner's (M3).
+-- Same signature, owner and grants (CREATE OR REPLACE keeps them); the page's reader and the export read it through 0172's and 0157's readers.
+CREATE OR REPLACE FUNCTION identity.moderation_statement_ground(p_statement_id uuid) RETURNS jsonb
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE s identity.moderation_statement%ROWTYPE; d identity.moderation_decision%ROWTYPE; v_grounds text[] := '{}'; v_suspected text[] := '{}'; v_sources text[] := '{}';
+  v_flag uuid; v_detected boolean := false; v_decided boolean := false; v_interim boolean := false; v_recorded boolean := false; v_event record; v_laws text[] := '{}';
+BEGIN
+  SELECT * INTO s FROM identity.moderation_statement AS statement WHERE statement.statement_id = p_statement_id;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF s.decision_id IS NOT NULL THEN
+    SELECT * INTO d FROM identity.moderation_decision AS decision WHERE decision.decision_id = s.decision_id;
+    v_grounds := d.grounds; v_sources := ARRAY[d.source]; v_flag := d.flag_id; v_recorded := true; v_laws := ARRAY[d.law_ref];
+  ELSE
+    FOR v_event IN SELECT event.event_id, event.action, event.actor_staff_id, event.operation_id, ground.grounds, ground.suspected, ground.source, ground.flag_id, ground.interim, ground.law_ref
+      FROM identity.public_review_event AS event LEFT JOIN identity.moderation_ground AS ground ON ground.event_id = event.event_id
+      WHERE event.event_id = ANY (s.ground_events) LOOP
+      IF v_event.action = 'HIDE' AND v_event.actor_staff_id = '00000000-0000-0000-0000-000000000000'::uuid THEN
+        -- 0151's automatic hide: the report it settled is its source, an AI found it and the hide itself was automated, pending a person.
+        SELECT flag.flag_id, CASE flag.reason WHEN 'CONTENT' THEN ARRAY['UNLAWFUL','HATE_SPEECH'] WHEN 'PERSONAL' THEN ARRAY['PERSONAL_DATA'] ELSE '{}'::text[] END
+          INTO v_flag, v_suspected FROM identity.public_flag AS flag WHERE flag.flag_id = v_event.operation_id;
+        v_grounds := v_grounds || ARRAY['REVIEW_HOLD']; v_sources := v_sources || ARRAY['REPORT_BUTTON']; v_decided := true; v_interim := true; v_recorded := true;
+      ELSIF v_event.grounds IS NOT NULL THEN
+        v_grounds := v_grounds || v_event.grounds; v_suspected := v_suspected || v_event.suspected; v_sources := v_sources || ARRAY[v_event.source];
+        v_flag := COALESCE(v_flag, v_event.flag_id); v_interim := v_interim OR v_event.interim; v_recorded := true; v_laws := v_laws || v_event.law_ref;
+      END IF;
+    END LOOP;
+  END IF;
+  -- An AI read the report that led here (0151's check), so automated means helped detect it.
+  v_detected := v_decided OR EXISTS (SELECT 1 FROM identity.public_flag AS flag WHERE flag.flag_id = v_flag AND flag.judge_model_id IS NOT NULL);
+  RETURN jsonb_build_object('recorded', v_recorded, 'interim', v_interim,
+    'grounds', COALESCE((SELECT jsonb_agg(DISTINCT code ORDER BY code) FROM unnest(v_grounds) AS code), '[]'::jsonb),
+    'suspected', COALESCE((SELECT jsonb_agg(DISTINCT code ORDER BY code) FROM unnest(v_suspected) AS code), '[]'::jsonb),
+    'sources', COALESCE((SELECT jsonb_agg(DISTINCT code ORDER BY code) FROM unnest(v_sources) AS code), '[]'::jsonb),
+    'automated_detection', v_detected, 'automated_decision', v_decided,
+    'law', (SELECT string_agg(DISTINCT law, '; ' ORDER BY law) FROM unnest(v_laws) AS law));
+END $$;
+-- Staff's door with the law: 0157's body and door plus p_law. The proof's body carries `law` ("" for none) beside the ground's four fields; the
+-- law is checked with the ground, before the proof is spent, and passed to the writers. A hide carries none and never waits for it.
+CREATE OR REPLACE FUNCTION staff.public_review_body_grounded(p_action text,p_command jsonb,p_law text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog AS $$
+  SELECT register.canonical_json_text(json_build_object('action',p_action,'target_id',p_command->>'targetId','step',p_command->>'step','piece_kind',p_command->>'pieceKind',
+    'piece_id',p_command->>'pieceId','pointer',p_command->>'pointer','text_sha256',p_command->>'textSha256','expected_revision',(p_command->>'expectedRevision')::bigint,'operation_id',p_command->>'operationId',
+    'grounds',p_command->>'grounds','source',p_command->>'source','flag_id',p_command->>'flagId','facts_sha256',p_command->>'factsSha256','law',COALESCE(p_law,''))::text)
+$$;
+CREATE OR REPLACE FUNCTION staff.public_review_act_grounded(p_context jsonb,p_proof uuid,p_binding jsonb,p_command jsonb,p_content jsonb,p_facts jsonb,p_alert jsonb,p_law text) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE
+  v_staff uuid:=(p_context->>'staffId')::uuid; v_user uuid:=(p_context->>'userId')::uuid; v_step text:=p_command->>'step'; v_action text; v_target uuid; v_operation uuid;
+  v_request jsonb; v_request_sha text; v_replay jsonb; v_at timestamptz; v_kind text; v_piece uuid; v_pointer text; v_text text;
+  v_grounds text[]; v_source text; v_flag uuid; v_facts_sha text; v_law text;
+BEGIN
+  IF core.jsonb_has_exact_keys(p_command,ARRAY['targetId','step','pieceKind','pieceId','pointer','textSha256','expectedRevision','operationId','grounds','source','flagId','factsSha256']) IS DISTINCT FROM true
+    OR v_step IS NULL OR v_step NOT IN ('HIDE','REPUBLISH','REMOVE_DIG','PUT_BACK','CORRECT','HIDE_REPORT','DECIDE')
+    OR jsonb_typeof(p_command->'expectedRevision') IS DISTINCT FROM 'number' OR jsonb_typeof(p_command->'grounds') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(p_command->'source') IS DISTINCT FROM 'string' OR jsonb_typeof(p_command->'flagId') IS DISTINCT FROM 'string'
+    OR jsonb_typeof(p_command->'factsSha256') IS DISTINCT FROM 'string' THEN RAISE EXCEPTION 'PUBLIC_REVIEW_COMMAND_INVALID'; END IF;
+  v_action:=CASE WHEN v_step='HIDE' THEN 'PUBLIC_REVIEW_HIDE' ELSE 'PUBLIC_REVIEW_STEP' END;
+  v_target:=(p_command->>'targetId')::uuid; v_operation:=(p_command->>'operationId')::uuid;
+  v_kind:=NULLIF(p_command->>'pieceKind',''); v_piece:=NULLIF(p_command->>'pieceId','')::uuid; v_pointer:=NULLIF(p_command->>'pointer',''); v_text:=NULLIF(p_command->>'textSha256','');
+  v_grounds:=string_to_array(NULLIF(p_command->>'grounds',''),','); v_source:=NULLIF(p_command->>'source','');
+  v_facts_sha:=NULLIF(p_command->>'factsSha256','');
+  PERFORM identity.lock_security_subjects(ARRAY[v_user]);
+  IF staff.authorize_action(p_context,'TEAM_LIMIT_SET') IS DISTINCT FROM true THEN RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_AUTHORITY_INVALID'; END IF;
+  -- Locked team tools stop everything but the hide.
+  IF v_step<>'HIDE' AND p_alert IS NULL THEN RAISE EXCEPTION USING ERRCODE='P0001',MESSAGE='STAFF_ALERT_UNAVAILABLE'; END IF;
+  IF p_binding->>'action' IS DISTINCT FROM v_action OR p_binding->>'targetId' IS DISTINCT FROM v_target::text OR p_binding->>'operationId' IS DISTINCT FROM v_operation::text
+    OR p_binding->'expectedRevision' IS DISTINCT FROM p_command->'expectedRevision'
+    OR p_binding->>'bodySha256' IS DISTINCT FROM encode(sha256(convert_to(staff.public_review_body_grounded(v_action,p_command,p_law),'UTF8')),'hex') THEN
+    RAISE EXCEPTION USING ERRCODE='42501',MESSAGE='STAFF_PROOF_INVALID';
+  END IF;
+  -- The facts the API sealed are the facts the passkey bound.
+  IF (v_facts_sha IS NULL) <> (p_facts IS NULL) THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END IF;
+  PERFORM staff.expected_revision(p_binding);
+  v_request:=jsonb_build_array(v_staff,p_binding,p_command);
+  v_request_sha:=encode(sha256(convert_to(v_request::text,'UTF8')),'hex');
+  v_replay:=CASE WHEN v_step='DECIDE' THEN identity.moderation_decision_replay(v_operation,v_request_sha) ELSE identity.public_review_replay(v_operation,v_request_sha) END;
+  IF v_replay IS NOT NULL THEN RETURN v_replay; END IF;
+  IF v_step<>'HIDE' THEN
+    BEGIN v_flag:=NULLIF(p_command->>'flagId','')::uuid; EXCEPTION WHEN invalid_text_representation THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END;
+    IF NOT identity.moderation_ground_whole(v_step,v_target,v_grounds,v_source,v_flag,v_facts_sha,p_facts) THEN RAISE EXCEPTION USING ERRCODE='22023',MESSAGE='PUBLIC_REVIEW_GROUND_INVALID'; END IF;
+    v_law:=identity.moderation_law_of(v_grounds,p_law);
+  END IF;
+  PERFORM staff.consume_action(p_context,p_proof,p_binding,'TEAM_LIMIT_SET',v_action,v_target,v_operation);
+  IF v_step='DECIDE' THEN
+    v_at:=identity.moderation_decide(v_staff,v_target,v_grounds,v_source,v_flag,v_facts_sha,p_facts,(p_command->>'expectedRevision')::integer,v_operation,v_request_sha,v_law);
+  ELSE
+    v_at:=identity.public_review_apply(v_staff,v_step,v_target,v_kind,v_piece,v_pointer,v_text,p_content,(p_command->>'expectedRevision')::integer,v_operation,v_request_sha);
+    IF v_step='HIDE' THEN
+      BEGIN v_flag:=NULLIF(p_command->>'flagId','')::uuid; EXCEPTION WHEN OTHERS THEN v_flag:=NULL; END;
+      PERFORM identity.record_hide_ground(v_operation,v_target,v_grounds,v_source,v_flag);
+    ELSIF v_step IN ('REMOVE_DIG','HIDE_REPORT','CORRECT') THEN
+      PERFORM identity.record_step_ground(v_operation,v_target,v_grounds,v_source,v_flag,v_facts_sha,p_facts,v_law);
+    END IF;
+  END IF;
+  PERFORM staff.queue_public_review_notices(v_operation);
+  IF p_alert IS NOT NULL THEN
+    PERFORM staff.record_mutation(v_operation,'PUBLIC_REVIEW_CHANGED',v_staff,v_staff,jsonb_build_object('code','SECURITY_RESPONSE'),v_user,p_alert,v_request);
+  END IF;
+  RETURN jsonb_build_object('operationId',v_operation,'outcome','COMPLETED','recordedAt',v_at);
+END $$;
+-- n1: reviewed gives the new functions their owners (0157's owners of their neighbours) and the grants 0157 gave those; the release before's
+-- door, staff.public_review_act_grounded without the law, keeps existing (0157's postcondition digests it) and loses its runtime grant: drained.
+DO $m7_law_owner$
+DECLARE v_owner name; v_name text;
+BEGIN
+  SELECT pg_catalog.pg_get_userbyid(p.proowner) INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+  FOREACH v_name IN ARRAY ARRAY['identity.moderation_law_of(text[],text)', 'identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)',
+    'identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)'] LOOP
+    EXECUTE pg_catalog.format('ALTER FUNCTION %s OWNER TO %I', v_name, v_owner);
+    EXECUTE pg_catalog.format('REVOKE ALL ON FUNCTION %s FROM PUBLIC,debateai_runtime,debateai_billing_runtime,debateai_authorization_runtime,debateai_erasure_runtime,debateai_replay,debateai_data_export_worker', v_name);
+    EXECUTE pg_catalog.format('GRANT EXECUTE ON FUNCTION %s TO debateai_staff_security_owner', v_name);
+  END LOOP;
+END
+$m7_law_owner$;
+ALTER FUNCTION staff.public_review_body_grounded(text,jsonb,text) OWNER TO debateai_staff_security_owner;
+ALTER FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) OWNER TO debateai_staff_security_owner;
+REVOKE ALL ON FUNCTION staff.public_review_body_grounded(text,jsonb,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+REVOKE ALL ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) TO debateai_runtime;
+REVOKE EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime;
+
+-- The contract: each gap's end state, checked as the step applies --------------------------------------------------------------------
+DO $moderation_notice_fixes_contract$
+DECLARE v_owner oid; v_queue oid; v_columns text; v_grantees text[];
+BEGIN
+  SELECT p.proowner INTO v_owner FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.public_review_apply(uuid,text,uuid,text,uuid,text,text,jsonb,integer,uuid,text)'::regprocedure;
+
+  -- M5: the stuck sources' table, exactly its five columns, the queue's owner's, under the truncate guard, and no other role's.
+  SELECT pg_catalog.string_agg(a.attname || ' ' || pg_catalog.format_type(a.atttypid, a.atttypmod) || CASE WHEN a.attnotnull THEN ' NOT NULL' ELSE '' END, ', ' ORDER BY a.attnum)
+    INTO v_columns FROM pg_catalog.pg_attribute AS a WHERE a.attrelid = 'identity.moderation_statement_stuck'::regclass AND a.attnum > 0 AND NOT a.attisdropped;
+  IF v_columns IS DISTINCT FROM 'source_id uuid NOT NULL, sqlstate text NOT NULL, first_failed_at timestamp with time zone NOT NULL, last_failed_at timestamp with time zone NOT NULL, tries integer NOT NULL'
+    OR (SELECT c.relowner FROM pg_catalog.pg_class AS c WHERE c.oid = 'identity.moderation_statement_stuck'::regclass) IS DISTINCT FROM v_owner
+    OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'identity.moderation_statement_stuck'::regclass AND k.contype = 'p'
+      AND pg_catalog.pg_get_constraintdef(k.oid) = 'PRIMARY KEY (source_id)')
+    OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_trigger AS t WHERE t.tgrelid = 'identity.moderation_statement_stuck'::regclass AND NOT t.tgisinternal AND (t.tgtype & 32) <> 0) THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 stuck table';
+  END IF;
+  SELECT pg_catalog.array_agg(DISTINCT pg_catalog.pg_get_userbyid(a.grantee)) INTO v_grantees
+  FROM pg_catalog.pg_class AS c CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(c.relacl, pg_catalog.acldefault('r', c.relowner))) AS a
+  WHERE c.oid = 'identity.moderation_statement_stuck'::regclass AND a.grantee <> c.relowner;
+  IF v_grantees IS NOT NULL THEN RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 stuck table granted %', v_grantees; END IF;
+  -- M5: the queue is this file's body, its owner's, a definer with 0157's settings, callable by no other role, and its owner may queue the alert.
+  v_queue := 'identity.queue_moderation_statements()'::regprocedure;
+  IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue)
+      IS DISTINCT FROM '59a59d95195db92cb15c9f44f2f7595d7af4ea248280b81cbb72b188c07da51d'
+    OR (SELECT p.proowner FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue) IS DISTINCT FROM v_owner
+    OR (SELECT p.prosecdef AND p.provolatile = 'v' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'integer'::regtype
+      FROM pg_catalog.pg_proc AS p WHERE p.oid = v_queue) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege(v_owner, 'staff.queue_public_flag_notices(uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_schema_privilege(v_owner, 'staff', 'USAGE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 queue';
+  END IF;
+  SELECT pg_catalog.array_agg(DISTINCT COALESCE(pg_catalog.pg_get_userbyid(NULLIF(a.grantee, 0)), 'PUBLIC')) INTO v_grantees
+  FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
+  WHERE p.oid = v_queue AND a.grantee <> p.proowner;
+  IF v_grantees IS NOT NULL THEN RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 queue granted %', v_grantees; END IF;
+  -- M5: the alert's kind, one CHECK on the kind under its catalog name, with 0151's two and the new one.
+  IF (SELECT pg_catalog.pg_get_constraintdef(k.oid) FROM pg_catalog.pg_constraint AS k
+      WHERE k.conrelid = 'staff.public_flag_notice'::regclass AND k.conname = 'public_flag_notice_kind_check' AND k.contype = 'c' AND k.convalidated)
+      IS DISTINCT FROM 'CHECK ((kind = ANY (ARRAY[''PUBLIC_FLAG_HIDDEN''::text, ''PUBLIC_FLAG_WAITING''::text, ''MODERATION_MAIL_FAILED''::text])))'
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'staff.public_flag_notice'::regclass AND k.contype = 'c'
+      AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%PUBLIC_FLAG_WAITING%') <> 1 THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M5 alert kind';
+  END IF;
+  -- M3: one CHECK on the statement kind, under 0157's name, with its seven kinds and the two new ones.
+  IF (SELECT pg_catalog.pg_get_constraintdef(k.oid) FROM pg_catalog.pg_constraint AS k
+      WHERE k.conrelid = 'identity.moderation_statement'::regclass AND k.conname = 'moderation_statement_kind_check' AND k.contype = 'c' AND k.convalidated)
+      IS DISTINCT FROM 'CHECK ((kind = ANY (ARRAY[''DEBATE_HIDDEN''::text, ''DEBATE_DECIDED''::text, ''CONTRIBUTION_REMOVED''::text, ''REPORT_REMOVED''::text, ''CORRECTED''::text, ''CONTRIBUTION_AFFECTED''::text, ''REPORT_AFFECTED''::text, ''CONTRIBUTION_DECIDED''::text, ''REPORT_DECIDED''::text])))'
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k WHERE k.conrelid = 'identity.moderation_statement'::regclass AND k.contype = 'c'
+      AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%DEBATE_DECIDED%') <> 1 THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M3 statement kind';
+  END IF;
+  -- M3: the page's reader is this file's body (by digest; a later section that edits it recomputes), its owner's, a definer with 0157's settings, as granted.
+  IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p
+        WHERE p.oid = 'identity.read_own_moderation_statements(uuid)'::regprocedure) IS DISTINCT FROM 'a409eb5c3034c78cb04bedddd0f78aa8c67273bc30e2ddd5f04ce9f7ebdea372'
+    OR (SELECT p.proowner = v_owner AND p.prosecdef AND p.provolatile = 's' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'jsonb'::regtype
+      FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.read_own_moderation_statements(uuid)'::regprocedure) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_own_moderation_statements(uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M3 reader';
+  END IF;
+  -- M1: the reporter's answer reader is this file's body (by digest), its owner's, a definer with 0157's settings, as granted.
+  IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p
+        WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS DISTINCT FROM '47898a11cc8f22f5baa8bda544d6b76b6a538503aa39021acd7dd65a88829fe3'
+    OR (SELECT p.proowner = v_owner AND p.prosecdef AND p.provolatile = 's' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'jsonb'::regtype
+      FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_public_flag_mail(uuid,uuid)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M1 reader';
+  END IF;
+  -- M2: the retry column on both tables (nullable, no default), and the four functions as 0157 left them: signature, result, definer, settings, owner.
+  IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a
+        WHERE a.attrelid IN ('identity.moderation_statement'::regclass, 'identity.public_flag_mail'::regclass) AND a.attname = 'next_attempt_at'
+          AND a.atttypid = 'timestamptz'::regtype AND NOT a.attnotnull AND NOT a.atthasdef AND NOT a.attisdropped) <> 2
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_proc AS p
+        WHERE p.oid IN ('identity.claim_moderation_statements(integer)'::regprocedure, 'identity.complete_moderation_statement(uuid,uuid,text)'::regprocedure,
+            'identity.claim_public_flag_mail(integer)'::regprocedure, 'identity.complete_public_flag_mail(uuid,uuid,text)'::regprocedure)
+          AND p.proowner = v_owner AND p.prosecdef AND p.provolatile = 'v' AND p.proconfig = ARRAY['search_path=pg_catalog']
+          AND p.prorettype IN ('boolean'::regtype, 'record'::regtype)) <> 4
+    OR pg_catalog.pg_get_function_result('identity.claim_moderation_statements(integer)'::regprocedure) IS DISTINCT FROM 'TABLE(statement_id uuid, claim_token uuid)'
+    OR pg_catalog.pg_get_function_result('identity.claim_public_flag_mail(integer)'::regprocedure) IS DISTINCT FROM 'TABLE(mail_id uuid, claim_token uuid)'
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.claim_moderation_statements(integer)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.complete_moderation_statement(uuid,uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.claim_public_flag_mail(integer)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.complete_public_flag_mail(uuid,uuid,text)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M2 retry';
+  END IF;
+  -- M6, M4: the close and the five functions restated for it are this file's bodies (by digest; a later section that edits one recomputes it),
+  -- each its owner's, a definer with 0157's settings. The close is callable by no other role and its owner may call 0151's dismissal; staff's
+  -- doors still call the three ground functions and the queue's reader, as 0157 granted.
+  IF (SELECT pg_catalog.count(*) FROM (VALUES
+        ('identity.close_public_flag_by_review(uuid,uuid,uuid)', 'a36f45f64f20bc382d20604479d1e9ecdf06200bde8b807cab32681df2cede7c'),
+        ('identity.record_hide_ground(uuid,uuid,text[],text,uuid)', 'acaccb507a32acb5f51c1d6404691ab40500ca3c6e33fe58e29ae9a9de935e44'),
+        ('identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)', '28517c05e58727387969c392461ccf6332ff0d9028c14472c9fe169c5af73d65'),
+        ('identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)', 'fe033e37d75be869fe053ae93753122fd07c4802e98463a92114638ba7b8b481'),
+        ('identity.queue_public_flag_mail()', 'f7c2bc7e9bf863b21a77f09047ea47aae8684609081102b242bcd0a36c6c7206'),
+        ('identity.public_flag_queue_answered()', 'c5d3ae0d5d7cf6cd0d73ff9dca6213fb4de79d2a4a037d4e6bd0d1be4b7b1f3c')) AS expected(signature, body)
+      JOIN pg_catalog.pg_proc AS p ON p.oid = pg_catalog.to_regprocedure(expected.signature)
+      WHERE pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') = expected.body
+        AND p.proowner = v_owner AND p.prosecdef AND p.proconfig = ARRAY['search_path=pg_catalog']) <> 6
+    OR (SELECT p.provolatile = 'v' AND p.prorettype = 'void'::regtype FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.close_public_flag_by_review(uuid,uuid,uuid)'::regprocedure) IS NOT TRUE
+    OR NOT pg_catalog.has_function_privilege(v_owner, 'identity.public_flag_dismiss(uuid,uuid,uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.record_hide_ground(uuid,uuid,text[],text,uuid)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.public_flag_queue_answered()', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M6 close';
+  END IF;
+  SELECT pg_catalog.array_agg(DISTINCT COALESCE(pg_catalog.pg_get_userbyid(NULLIF(a.grantee, 0)), 'PUBLIC')) INTO v_grantees
+  FROM pg_catalog.pg_proc AS p CROSS JOIN LATERAL pg_catalog.aclexplode(COALESCE(p.proacl, pg_catalog.acldefault('f', p.proowner))) AS a
+  WHERE p.oid = 'identity.close_public_flag_by_review(uuid,uuid,uuid)'::regprocedure AND a.grantee <> p.proowner;
+  IF v_grantees IS NOT NULL THEN RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M6 close granted %', v_grantees; END IF;
+  -- M7: the law's column on 0157's ground and decision (text, nullable, no default), and each table's two CHECKs, NOT VALID (rows from before keep null).
+  IF (SELECT pg_catalog.count(*) FROM pg_catalog.pg_attribute AS a
+        WHERE a.attrelid IN ('identity.moderation_ground'::regclass, 'identity.moderation_decision'::regclass) AND a.attname = 'law_ref'
+          AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef AND NOT a.attisdropped) <> 2
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k
+        WHERE k.contype = 'c' AND NOT k.convalidated AND ((k.conrelid = 'identity.moderation_ground'::regclass AND k.conname IN ('moderation_ground_law_length','moderation_ground_law_required'))
+          OR (k.conrelid = 'identity.moderation_decision'::regclass AND k.conname IN ('moderation_decision_law_length','moderation_decision_law_required')))) <> 4
+    -- R13: both law-required CHECKs let a row whose facts are gone pass, so the twelve-month purge can clear an older row that names no law.
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k
+        WHERE k.conname IN ('moderation_ground_law_required','moderation_decision_law_required') AND k.contype = 'c'
+          AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%(facts_ciphertext IS NULL)%') <> 2 THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M7 law column';
+  END IF;
+  -- M7: the law's check, the two writers' overloads, the statement's ground and staff's door with the law are this file's bodies (by digest), definers with
+  -- 0157's settings; the identity ones are the queue's owner's and staff's door may call them; the runtime calls the new door, never the release before's.
+  IF (SELECT pg_catalog.count(*) FROM (VALUES
+        ('identity.moderation_law_of(text[],text)', '73f3b027384f9f04c7e268d1812be4cc4e1f3ca6a2dd4b4921cc9be1ce502ab7'),
+        ('identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)', 'bbeacdbfe354a46e82dc4f10cc0f33e620c8a0cfcae39e2c2f0810be3290213e'),
+        ('identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)', 'fbc2254290946b186be228477134325a6398ed6d59535babbbc5caf011115b38'),
+        ('identity.moderation_statement_ground(uuid)', 'c045904c9925ef254e413bced8e06c6b21c356ff09f2e1fef6515f2f54408ed0'),
+        ('staff.public_review_body_grounded(text,jsonb,text)', 'd61fcc38d627a3b2798b12050ad173941f335ee5405fb19e8f5f5ea5a42ad82f'),
+        ('staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)', 'c5c44123b5053c1352a903bfe019147eee7c0e5a65019aa4f6f6b30fb0ff01b3')) AS expected(signature, body)
+      JOIN pg_catalog.pg_proc AS p ON p.oid = pg_catalog.to_regprocedure(expected.signature)
+      WHERE pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') = expected.body
+        AND p.proconfig = ARRAY['search_path=pg_catalog']
+        AND (p.prosecdef OR expected.signature = 'staff.public_review_body_grounded(text,jsonb,text)')
+        AND p.proowner = CASE WHEN expected.signature LIKE 'staff.%' THEN 'debateai_staff_security_owner'::regrole::oid ELSE v_owner END) <> 6
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.moderation_law_of(text[],text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_staff_security_owner', 'identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb,text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'identity.moderation_law_of(text[],text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'staff.public_review_body_grounded(text,jsonb,text)', 'EXECUTE')
+    OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)', 'EXECUTE')
+    OR pg_catalog.has_function_privilege('debateai_runtime', 'staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M7 law';
+  END IF;
+END
+$moderation_notice_fixes_contract$;

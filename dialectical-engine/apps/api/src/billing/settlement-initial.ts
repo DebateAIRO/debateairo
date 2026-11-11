@@ -78,7 +78,8 @@ export function createInitialSettlement(deps: Readonly<{
         effectiveAt: now, subscriptionId: subscription.subscriptionId, paidThrough: periodEnd, monthCreditOverrideMicros: null
       });
       const page = (path: string) => new URL(path, deps.publicAppUrl).toString();
-      // Spec §2.5.6: the withdrawal right (and its form) exists only for a tax country in the EU, the EEA or the UK.
+      // Spec §2.5.6: the withdrawal right (and its form) exists for a tax country in `withdrawalCountries`: since the
+      // owner's decision of 10 November 2026, every country the site serves.
       const withdrawal = deps.policy.withdrawalCountries.includes(quote.taxCountry);
       // Spec §2.5.10 / A26b / D7 #14 / Q-3: the Terms the person ACCEPTED, named by that acceptance's version, hash
       // and locale (read by `prepare`); P17's resolver attaches the text L2 archived under that hash

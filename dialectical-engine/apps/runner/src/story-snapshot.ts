@@ -1,13 +1,20 @@
-import { DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineQuestionKind, type WayOfKnowing } from "@debateai/kernel";
-import type { VerdictState } from "@debateai/contract";
+import {
+  DEBATE_SHAPE_MARKS, type CompositionBudgetTier, type DebateShapeMark, type EngineCitedExtract, type EngineQuestionKind, type PathId,
+  type ReadingLevel, type WayOfKnowing
+} from "@debateai/kernel";
+import type { PathGapRound, PathOutcome, TrustWord, VerdictState } from "@debateai/contract";
+import type { StoredStartPathSet } from "@debateai/db";
 import { MAP_ENGINE_INTERNAL_FIELD_NAMES, mapAlsoRaisedOf, type MapResult } from "@debateai/map";
 import type { EngineSettings, LengthGuidance } from "@debateai/register";
 import {
+  storyPathsPointsOf,
   withoutStoryNodeIds,
   type StoryAnswersNoteKind,
   type StoryBackupCandidate,
   type StoryBackupMaker,
   type StoryCostFallback,
+  type StoryPathsInput,
+  type StoryPathsPoint,
   type StoryRoleMaker,
   type StoryRoleResolver,
   type StoryRunRoleMakers,
@@ -53,6 +60,14 @@ const STORY_REASON_BY_MARK: ReadonlyMap<string, string> = new Map([[
  * handed them — neither the marks nor their reasons — so the story writer never reads a raw code. None on today's run.
  */
 const STORY_OMITTED_MARKS: ReadonlySet<string> = new Set(DEBATE_SHAPE_MARKS);
+/**
+ * R22 (owner ruling 2026-10-29): the coded reason of a halted-branch record whose leg was given up because its author's
+ * reply was refused after its repairs (`haltedExpansionConditionRecord` in ./index.ts). Like the shape marks' coded
+ * reasons, the story is never handed it, so the story writer never reads a raw code; the answer still carries the mark,
+ * which the story sees by name. Owner wording pending: the sentence that would replace this code is AI-facing (the
+ * story reads a record's reason), so it waits for the owner's approval.
+ */
+export const CONTENT_REFUSED_HALT_REASON = "EXPANSION_HALTED_CONTENT_REFUSED" as const;
 /** Free text with every node-id-shaped run replaced: the safety net under every field below. */
 const withoutNodeIds = withoutStoryNodeIds;
 
@@ -73,6 +88,13 @@ export interface StorySnapshotSource {
    * story writes in that lock; the caller decides by the receipt, never by the stored tag. Absent: today's story.
    */
   readonly languageLocked?: boolean;
+  /** V4 reading level (owner N6, 2026-10-29): the run's level, or null / absent — today's story. */
+  readonly readingLevel?: ReadingLevel | null;
+  /**
+   * Web search (W4-1; design §7.1 item 7): the extract each looked-up node cites, by node id (only this debate's). Any:
+   * each node carries its extract and the storyteller is told item 7 (`webSources`). Absent or empty: today's story.
+   */
+  readonly citedExtracts?: ReadonlyMap<string, EngineCitedExtract>;
   readonly compositionBudgetTier: CompositionBudgetTier;
   readonly verdict: {
     /** The contract's closed list (B4 Minor 2, R2b final wave P2), so a fifth state cannot be missed here. */
@@ -179,6 +201,77 @@ export interface StorySnapshotSource {
    * makers even when their refs are not candidates. Handed over only for an engine-2 debate.
    */
   readonly backupMakers?: readonly StoryBackupMaker[];
+  /**
+   * V4 start step, Task 51: a path run's paths, main answer and gap points (`StoryPathsInput`); with them the story is v5, one
+   * entry per path. `pathsFromStep` is the ladder step the runner's real count stopped at (`fitStoryPathsToTokenLine`) and
+   * `randomBytes` the story's one fence source (`closingRandomBytes(seed)`, one seed per story). Without paths neither of the two
+   * is handed on: today's story.
+   */
+  readonly paths?: StoryPathsInput | undefined;
+  readonly pathsFromStep?: number | undefined;
+  readonly randomBytes?: ((size: number) => Buffer) | undefined;
+}
+
+/**
+ * V4 start step, Task 54: a path run's story input (Task 51's `StoryPathsInput`) from what the run kept: its paths in the person's
+ * order, each with its answer so far (none: null), the main answer's segments and its trust word, and the gap round's points no path
+ * took up ("also raised"). Pure.
+ */
+export function storyPathsInputOf(input: Readonly<{
+  set: StoredStartPathSet;
+  outcomes: ReadonlyMap<PathId, PathOutcome>;
+  mainAnswer: readonly string[];
+  mainTrust: TrustWord | null;
+  gap: PathGapRound | null;
+}>): StoryPathsInput {
+  return Object.freeze({
+    paths: Object.freeze([...input.set.paths].sort((left, right) => left.pathNo - right.pathNo).map((path) => Object.freeze({
+      pathId: path.pathId, title: path.title, question: path.question, author: path.author, ownWords: Object.freeze([...path.ownWords]),
+      outcome: input.outcomes.get(path.pathId) ?? null
+    }))),
+    mainAnswer: Object.freeze([...input.mainAnswer]),
+    mainTrust: input.mainTrust,
+    alsoRaised: Object.freeze((input.gap?.points ?? []).filter((point) => point.path_id === null).map((point) => point.text))
+  });
+}
+
+/**
+ * V4 start step, Task 54c (W1-5 on a path run): the points of a path run's story as the runner's fit counts them
+ * (`fitStoryPathsToTokenLine`), built as the writer builds them from this module's snapshot (`storyPathsPointsOf` over its nodes):
+ * each authored node's words (a path run has no map, so a root's words are its statement), whether it is disputed, and the extract a
+ * looked-up node cites, exactly as `citedExtracts` hands it to the snapshot, so the extracts count in the fit. None: today's points. Pure.
+ */
+export function storyPathsPointsOfRun(authored: readonly Readonly<{ nodeId: string; statement: string }>[], disputed: ReadonlySet<string>,
+  citedExtracts?: ReadonlyMap<string, EngineCitedExtract>): readonly StoryPathsPoint[] {
+  return storyPathsPointsOf(authored.map((node) => {
+    const cited = citedExtracts?.get(node.nodeId);
+    return { nodeId: node.nodeId, claim: node.statement, ...(cited === undefined ? {} : { citedExtract: cited }) };
+  }), disputed).points;
+}
+
+/**
+ * Task 51: the path run's story input, with node ids cleared from what the models wrote after the debate (each path's answer so
+ * far, the main answer, the gap points), as every free text here is. The paths' titles and questions were written before the
+ * debate had a node, and the person's own words are theirs: both pass as they are.
+ */
+function storyPathsFrom(paths: StoryPathsInput): StoryPathsInput {
+  return Object.freeze({
+    paths: Object.freeze(paths.paths.map((path) => {
+      const outcome = path.outcome;
+      return Object.freeze({
+        ...path,
+        outcome: outcome === null ? null : Object.freeze({
+          ...outcome,
+          text: outcome.text === null ? null : Object.freeze({ ...outcome.text, line: withoutNodeIds(outcome.text.line),
+            summary: withoutNodeIds(outcome.text.summary) }),
+          what_changed: outcome.what_changed.map(withoutNodeIds)
+        })
+      });
+    })),
+    mainAnswer: Object.freeze(paths.mainAnswer.map(withoutNodeIds)),
+    mainTrust: paths.mainTrust,
+    alsoRaised: Object.freeze(paths.alsoRaised.map(withoutNodeIds))
+  });
 }
 
 /**
@@ -342,7 +435,8 @@ export function storyAnswersNoteFrom(map: StoryMapOutcome | null, arguedTodaysOp
 export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteInput {
   const baseById = new Map(source.baseStrengths.map((row) => [row.nodeId, row.baseStrength] as const));
   const finalById = new Map(source.finalStrengths.map((row) => [row.nodeId, row.strength] as const));
-  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node" && !STORY_OMITTED_MARKS.has(record.mark));
+  const nodeScoped = source.conditionMarkRecords.filter((record) => record.scope === "node" && !STORY_OMITTED_MARKS.has(record.mark)
+    && record.reason !== CONTENT_REFUSED_HALT_REASON);
   const excludedReasonOf = (nodeId: string): string | null => {
     const record = nodeScoped.find((candidate) =>
       (EXCLUDING_MARKS.has(candidate.mark) || SET_ASIDE_MARKS.has(candidate.mark))
@@ -389,7 +483,8 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
       excludedReason: excludedReasonOf(node.nodeId),
       authorModel: node.maker,
       panelDispersion: node.panelDispersion,
-      criticSummary: withoutNodeIds(node.reversalPoint)
+      criticSummary: withoutNodeIds(node.reversalPoint),
+      ...(source.citedExtracts?.has(node.nodeId) === true ? { citedExtract: source.citedExtracts.get(node.nodeId)! } : {})
     }))),
     arrows: Object.freeze(inArrowOrder(source.arrows, source.arrowOrder).map((arrow) => Object.freeze({
       sourceNodeId: arrow.sourceNodeId,
@@ -415,9 +510,18 @@ export function buildStoryRunSnapshot(source: StorySnapshotSource): StoryWriteIn
     ...(source.answersNote === undefined ? {} : { answersNote: source.answersNote }),
     ...(source.lengthGuidance === undefined ? {} : { lengthGuidance: source.lengthGuidance }),
     ...(source.languageLocked === true ? { languageLocked: true as const } : {}),
+    ...(source.readingLevel === undefined || source.readingLevel === null ? {} : { readingLevel: source.readingLevel }),
+    // W4-1: told only when a node of the material carries an extract (`storyContractForSources`).
+    ...(source.authored.some((node) => source.citedExtracts?.has(node.nodeId) === true) ? { webSources: true as const } : {}),
     // R1d: the receipt's engine and the backup storytellers, only when the runner handed them over (an engine-2 debate).
     ...(source.engine === undefined || source.engine === null ? {} : { engine: source.engine }),
     ...(source.backupCandidates === undefined ? {} : { backupCandidates: Object.freeze([...source.backupCandidates]) }),
-    ...(source.backupMakers === undefined ? {} : { backupMakers: Object.freeze([...source.backupMakers]) })
+    ...(source.backupMakers === undefined ? {} : { backupMakers: Object.freeze([...source.backupMakers]) }),
+    // Task 51: story v5 only with the paths; its step and its fence source are never handed on without them.
+    ...(source.paths === undefined ? {} : {
+      paths: storyPathsFrom(source.paths),
+      ...(source.pathsFromStep === undefined ? {} : { pathsFromStep: source.pathsFromStep }),
+      ...(source.randomBytes === undefined ? {} : { randomBytes: source.randomBytes })
+    })
   });
 }

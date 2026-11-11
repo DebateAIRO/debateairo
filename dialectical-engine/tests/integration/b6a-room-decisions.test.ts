@@ -189,7 +189,7 @@ describe("B6a two concurrent asks under one lock (budget spec §2.14, paid-plans
     const month: PersonWindow = Object.freeze({
       scope: "PERSON_MONTH", limitMicros: 1_000,
       periodStart: new Date("2031-06-15T00:00:00.000Z"), resetsAt: new Date("2031-07-15T00:00:00.000Z"),
-      finishBasisPoints: 11_000, closeBasisPoints: 9_500
+      finishBasisPoints: 12_100, closeBasisPoints: 9_500
     });
     const room = roomWith({
       clock: () => now,
@@ -300,7 +300,7 @@ describe("B6a the line holds a new question back only for the site (budget spec 
     const month: PersonWindow = Object.freeze({
       scope: "PERSON_MONTH", limitMicros: 1_000,
       periodStart: new Date("2031-05-01T00:00:00.000Z"), resetsAt: new Date("2031-06-01T00:00:00.000Z"),
-      finishBasisPoints: 11_000, closeBasisPoints: 9_500
+      finishBasisPoints: 12_100, closeBasisPoints: 9_500
     });
     const spentRun = await ownedRun(owner);
     await pin(spentRun, owner, new Date("2031-05-15T09:00:00.000Z"));

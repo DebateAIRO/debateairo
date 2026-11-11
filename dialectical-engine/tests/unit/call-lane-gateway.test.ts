@@ -9,8 +9,12 @@ import { describe, expect, it } from "vitest";
 import { TypedDomainError } from "@debateai/kernel";
 import {
   createPreviewBusyCoordinator,
+  PERPLEXITY_SEARCH_MODEL,
   PreviewGateUnsent,
   PreviewUnbilledRefusal,
+  type PerplexitySearchOutcome,
+  type PerplexitySearchPort,
+  type PerplexitySearchRequest,
   type PreviewGateRemaining,
   type PreviewProviderTestConfig,
   type ProviderCallRequest,
@@ -20,8 +24,11 @@ import {
 import {
   applyPreviewGateCapacities,
   laneGateway,
+  laneSearchPort,
   previewCallSubjects,
   previewGateNames,
+  previewSearchGateRemainingReader,
+  searchCallSubject,
   targetCallSubjects
 } from "../../apps/runner/src/call-lane-gateway.js";
 import {
@@ -309,6 +316,22 @@ describe("call subjects", () => {
     const subjects = previewCallSubjects(PREVIEW);
     expect(new Set(["preview:deepseek-v4-1-flash", "preview:claude-haiku-5-5"].map((ref) => subjects.subjectOf(ref).gate)))
       .toEqual(new Set(previewGateNames(PREVIEW)));
+    // Perplexity plan W2-1: the search gate is no model provider's gate; its own reader gives its slots at boot.
+    const withSearch = { ...PREVIEW, perplexity_budget_socket: "/run/debateai-v3-preview/perplexity-budget-v1.sock" };
+    expect(previewGateNames(withSearch)).toEqual(["deepinfra", "anthropic"]);
+    expect(previewSearchGateRemainingReader(withSearch)?.gate).toBe("perplexity");
+    expect(previewSearchGateRemainingReader(PREVIEW)).toBeUndefined();
+  });
+
+  it("web search is its own subject: the search row, the vendor perplexity, its gate only when the socket is named", () => {
+    expect(searchCallSubject({ ...PREVIEW, perplexity_budget_socket: "/run/debateai-v3-preview/perplexity-budget-v1.sock" }))
+      .toEqual({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: "perplexity" });
+    expect(searchCallSubject(PREVIEW)).toEqual({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: null });
+    // Off the preview (hosted): no gate, the vendor's own runner-wide limit.
+    expect(searchCallSubject(undefined)).toEqual({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: null });
+    // It is never a debater's subject: no reviewed ref resolves to it.
+    const subjects = previewCallSubjects(PREVIEW);
+    expect(subjects.subjectOf("preview:perplexity-search-fast")).toEqual({ model: "preview:perplexity-search-fast", vendor: "default", gate: null });
   });
 
   it("off the preview: the target's model, the vendor from its host, no gate", () => {
@@ -317,8 +340,10 @@ describe("call subjects", () => {
       { providerRef: "b", model: "haiku", baseUrl: "https://api.anthropic.com/v1" },
       { providerRef: "c", model: "local", baseUrl: "http://127.0.0.1:8080/v1" },
       { providerRef: "d", model: "lookalike", baseUrl: "https://notdeepinfra.com.example/v1" },
-      { providerRef: "e", model: "broken", baseUrl: "not a url" }
+      { providerRef: "e", model: "broken", baseUrl: "not a url" },
+      { providerRef: "f", model: "search", baseUrl: "https://api.perplexity.ai" }
     ]);
+    expect(subjects.subjectOf("f")).toEqual({ model: "search", vendor: "perplexity", gate: null });
     expect(subjects.subjectOf("a")).toEqual({ model: "glm", vendor: "deepinfra", gate: null });
     expect(subjects.subjectOf("b")).toEqual({ model: "haiku", vendor: "anthropic", gate: null });
     expect(subjects.subjectOf("c")).toEqual({ model: "local", vendor: "default", gate: null });
@@ -510,6 +535,65 @@ describe("laneGateway: beforeSlot waits outside every slot (R31)", () => {
   });
 });
 
+const SEARCH_REQUEST: PerplexitySearchRequest = Object.freeze({
+  query: "nurse net salary Germany", mode: "START", afterDate: null, language: "en", country: null
+});
+const SEARCH_SUBJECT = Object.freeze({ model: PERPLEXITY_SEARCH_MODEL, vendor: "perplexity", gate: "perplexity" });
+const searchFailed = (failure: string): PerplexitySearchOutcome =>
+  ({ outcome: "FAILED", failure, chargeMicros: 0, resultCount: 0 }) as PerplexitySearchOutcome;
+const searchEmpty: PerplexitySearchOutcome = Object.freeze({
+  outcome: "EMPTY", chargeMicros: 1000, resultCount: 0, pages: [], reused: [], dropped: []
+});
+
+describe("laneSearchPort: a web search waits for its slots in the debate's lane (Perplexity plan W2-1)", () => {
+  it("asks for the search subject's slots as an OTHER call, and hands back the outcome unchanged", async () => {
+    const lane = recordingLane();
+    const seen: Array<[PerplexitySearchRequest, AbortSignal | undefined]> = [];
+    const inner: PerplexitySearchPort = { search: async (request, signal) => { seen.push([request, signal]); return searchEmpty; } };
+    const signal = new AbortController().signal;
+    const outcome = await laneSearchPort({ lane, scheduler: recordingScheduler(), subject: SEARCH_SUBJECT, port: inner })
+      .search(SEARCH_REQUEST, signal);
+    expect(outcome).toBe(searchEmpty);
+    expect(seen).toEqual([[SEARCH_REQUEST, signal]]);
+    expect(lane.tickets).toEqual([{ ...SEARCH_SUBJECT, priority: "OTHER" }]);
+  });
+
+  it("an answered search heals its gate; a search the gate could not send makes it unhealthy; others mark nothing", async () => {
+    const scheduler = recordingScheduler();
+    const outcomes = [searchEmpty, searchFailed("GATE_UNSENT"), searchFailed("BUSY"), searchFailed("TIMEOUT")];
+    const inner: PerplexitySearchPort = { search: async () => outcomes.shift()! };
+    const port = laneSearchPort({ lane: recordingLane(), scheduler, subject: SEARCH_SUBJECT, port: inner });
+    for (let index = 0; index < 4; index += 1) await port.search(SEARCH_REQUEST);
+    expect(scheduler.marks).toEqual(["healthy:perplexity", "unhealthy:perplexity"]);
+    const noGate = recordingScheduler();
+    await laneSearchPort({ lane: recordingLane(), scheduler: noGate, subject: { ...SEARCH_SUBJECT, gate: null },
+      port: { search: async () => searchEmpty } }).search(SEARCH_REQUEST);
+    expect(noGate.marks).toEqual([]);
+  });
+
+  it("a search still waiting when the lane closes is FAILED STOPPED, never sent and never thrown", async () => {
+    const scheduler = createCallScheduler({ policy: SERIAL });
+    const lane = scheduler.openLane("debate-1");
+    const first = deferred<PerplexitySearchOutcome>();
+    let sent = 0;
+    const port = laneSearchPort({ lane, scheduler, subject: { ...SEARCH_SUBJECT, gate: null },
+      port: { search: () => { sent += 1; return first.promise; } } });
+    const a = port.search(SEARCH_REQUEST);
+    const b = port.search(SEARCH_REQUEST);
+    lane.close();
+    await expect(b).resolves.toEqual(searchFailed("STOPPED"));
+    first.resolve(searchEmpty);
+    await expect(a).resolves.toBe(searchEmpty);
+    expect(sent).toBe(1);
+  });
+
+  it("an inner port that throws anyway is FAILED UNEXPECTED, so the debate goes on", async () => {
+    const port = laneSearchPort({ lane: recordingLane(), scheduler: recordingScheduler(), subject: SEARCH_SUBJECT,
+      port: { search: async () => { throw new Error("bug"); } } });
+    await expect(port.search(SEARCH_REQUEST)).resolves.toEqual(searchFailed("UNEXPECTED"));
+  });
+});
+
 describe("the runner's wiring (source pins)", () => {
   const read = (relative: string) => readFileSync(new URL(`../../${relative}`, import.meta.url), "utf8");
   const RUNNER = read("apps/runner/src/index.ts");
@@ -528,7 +612,7 @@ describe("the runner's wiring (source pins)", () => {
     expect(claim).toBeGreaterThan(0);
     expect(open).toBeGreaterThan(claim);
     // The outermost finally: it ends the method (then the class), after the story ran inside the try.
-    expect(execute).toMatch(/\} finally \{\s*callLane\?\.close\(\);\s*keepAlive\.stop\(\);\s*\}\s*\}\s*\}\s*$/u);
+    expect(execute).toMatch(/\} finally \{\s*callLane\?\.close\(\);\s*keepAlive\.stop\(\);\s*releaseRunPassages\(claimedRunId\);\s*\}\s*\}\s*\}\s*$/u);
     expect(execute.indexOf("await storyWriter.writeAfterSettle(")).toBeLessThan(execute.lastIndexOf("callLane?.close();"));
     // S20 re-pin — final fix wave S12 (d9d6e73cc): the lane now opens BEFORE the keep-alive starts, so a keep-alive that
     // cannot start closes it in its own catch and rethrows, before the outermost try (whose finally holds the other close)
@@ -562,8 +646,14 @@ describe("the runner's wiring (source pins)", () => {
     expect(assigned).toContain("new Map([...configuredByProviderRef].map(([ref, maker]) => {\n          const provider = throughCallLane(ref, maker.provider);");
     // sitOutMaker (which lanes) runs over the configured makers once, on an out-of-panel role's UNWRAPPED maker, and
     // (debate shape, c5e0b2862, PF-B40) on a map seat's UNWRAPPED maker outside the claim-eligible list — kept, so that
-    // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is.
-    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(3);
+    // map-only member is wrapped once per run; a claim-eligible map seat takes the already-wrapped maker as it is. The web
+    // step (Perplexity plan W3-1) wraps each configured maker's UNWRAPPED copy once, for its one call per run. V4 start
+    // step, Task 53: a path debate (which runs no map and no map web step) does the same for its start steps' and gap
+    // round's map-only seats and for its own web step — so still once per run.
+    expect(code.match(/\bsitOutMaker\(/gu) ?? []).toHaveLength(6);
+    expect(code.split("members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,")).toHaveLength(3);
+    expect(code).toContain("const wrapped = pathsMapOnly.get(aiRef) ?? sitOutMaker(configured);\n          pathsMapOnly.set(aiRef, wrapped);");
+    expect(code).toContain("members: [...configuredByProviderRef.values()].map((maker) => ({ provider: sitOutMaker(maker).provider,");
     expect(code).toContain("configuredMakers.forEach((maker, index) => { configuredMakers[index] = sitOutMaker(maker); });");
     expect(code).toContain("const unwrapped = configuredByProviderRef.get(roleRef);\n      const configured = unwrapped === undefined ? undefined : sitOutMaker(unwrapped);");
     expect(code).toContain([
@@ -579,7 +669,8 @@ describe("the runner's wiring (source pins)", () => {
     // gateway, the innermost wrapper — it lanes nothing; a recorded call it answers still took its slot above it, and
     // asks the debate's keep-alive first, as a real call does.
     expect(code).toContain("const configuredByProviderRef = new Map(this.#configuredMakers.map((maker) => [maker.providerRef, replayedMaker(maker)] as const));");
-    expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay);\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
+    // V4 start step, Task 57f: the replay gateway also hands the site a call an earlier copy paid for and this copy buys again (waiveCalls).
+    expect(code).toContain("const provider = replayingGateway(replayBook, maker.provider, () => keepAlive.assertMayCall(), structureReplay, waiveCalls);\n      return Object.freeze({ ...maker, provider, judge: new Judge(provider) });");
     // Refused-repair salvage (Task 6 review): the replay reads A1 and B calls only on a run whose structure-repair route is
     // wired (the runner composition's `structureRepairCeiling`); hosted and local replay as today.
     expect(code).toContain("const structureReplay = (settings.structureRepairCeiling ?? null) !== null;");
@@ -604,7 +695,8 @@ describe("the runner's wiring (source pins)", () => {
     expect(MAIN.match(/createCallScheduler\(/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createPreviewBusyCoordinator\(\)/gu) ?? []).toHaveLength(1);
     expect(MAIN.match(/createRunInFlight\(\)/gu) ?? []).toHaveLength(2);
-    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION)\n  });");
+    // V4 start step, Task 53: plus each run's final-writer terms, by run id (a v2 run's plan).
+    expect(MAIN).toContain("withPreviewProviderCallPolicy(gateway, siteVersionSettings.previewConfig!, target, {\n    busy: previewBusy,\n    onGateUnsent: (gate) => { runnerCallScheduler.markGateUnhealthy(gate); },\n    gateRemaining: previewGateRemaining,\n    onFinalWriterTierUnread: previewFinalWriterTierUnread,\n    thinkingLevelsOf: runPreviewThinkingLevelsOf(runnerSettings, runSettingsVersions, environment.REGISTER_VERSION),\n    // V4 start step, Task 53: a v2 run's terms (its plan); a v1 run and a call of no run, none (R22's asks).\n    finalWriterTermsOf: finalWriterTermsResolver(runFinalWriterTerms)\n  });");
     // Ruling R31: on the preview only, every lane call waits on the busy coordinator before it asks for a slot.
     expect(MAIN).toContain("...(previewGate === undefined ? {} : { callBeforeSlot: (subject: CallSubject) => previewBusy.admit(subject.model) }),");
     expect(MAIN).toContain("inFlight: gatewayInFlight");

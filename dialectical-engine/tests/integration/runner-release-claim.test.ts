@@ -22,7 +22,7 @@ afterEach(async () => {
 });
 afterAll(async () => database?.stop());
 
-const { startGates, previewRunner, admittedRun } = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const { startGates, previewRunner, admittedRun } = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 
 const THIS_RELEASE = ["r1", "aaaaaaaaaaaa"].join("-");
 const OTHER_RELEASE = ["r2", "bbbbbbbbbbbb"].join("-");

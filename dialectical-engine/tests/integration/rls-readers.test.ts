@@ -55,6 +55,7 @@ import {
   RunWaitRepository,
   runInRequestScope,
   setRequestCredential,
+  withRunContentLease,
   type Pool
 } from "@debateai/db";
 import { PostgresModelSpendStore, PostgresRecentRunUsageSource } from "@debateai/budget";
@@ -861,6 +862,17 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
     expect(sightings("X28", login, seen)).toEqual([]);
   });
 
+  it("S7.1-X29 a report press's seal inside crossAccount(\"X29\") (apps/api/src/public-tree.ts, pressPublicReport: withRunContentLease on the carrier) on debateai_dev_api_system leases the runs of A and of B", async () => {
+    // Upload check Task 9 (R22 path 9): inside a stranger's request (here A's session) the report on a public debate is
+    // sealed under the debate's own run, another account's. The seal's content lease reads each account's run row.
+    const { pool, login } = reader(api.runtime, "debateai_dev_api_system");
+    const runs = [...await runsOf("a"), ...await runsOf("b")];
+    const { seen } = await record(() => inRequest(A.token, () => crossAccount("X29", async () => {
+      for (const runId of runs) await withRunContentLease(pool, [runId], async () => undefined).catch(() => undefined);
+    })));
+    expect(sightings("X29", login, seen)).toEqual([]);
+  });
+
   it("S7.1-X16 PostgresPasswordResetRepository.prepare (packages/db/src/password-reset.ts:74, identity.password_reset_prepare owned by debateai_password_reset_owner; wired on the runtime pool at apps/api/src/main.ts:1054) on debateai_dev_runtime sees rows of A and of B", async () => {
     // The forgot-password request (apps/api/src/password-reset.ts:124) looks the account up by its e-mail blind index:
     // the definer reads the user row, its e-mail channels and its TOTP factor (password_reset_eligible). Eligibility
@@ -962,11 +974,11 @@ const R44_BASE_MEMBERS: readonly (readonly [string, string])[] = Object.freeze([
   ["apps/api/src/index.ts:6195", "SELECT assignment.task_class,assignment.model_id,assignment.model_version, assignment.provider,assignment.routing_decision_id FROM identity."],
   ["apps/api/src/preview-budget-estimate.ts:1226", "SELECT run.envelope_basis, run.discovered_panel, run.composition_budget_tier, run.register_version::integer AS register_version, EXISTS (SEL"],
   ["apps/api/src/preview-budget-estimate.ts:1281", "SELECT spend.provider_ref, spend.spend_source, count(*)::integer AS calls, sum(spend.input_tokens)::text AS input_tokens, sum(spend.output_t"],
-  ["apps/api/src/release-state.ts:374", "SELECT count(DISTINCT run_id)::integer AS active FROM core.work_item WHERE state IN ('READY','CLAIMED') AND run_id IS NOT NULL"],
-  ["packages/battery/src/index.ts:340", "SELECT item.work_item_id, item.run_id FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2 "],
-  ["packages/battery/src/index.ts:378", "SELECT item.work_item_id, item.run_id FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2 "],
+  ["apps/api/src/release-state.ts:407", "SELECT count(DISTINCT run_id)::integer AS active FROM core.work_item WHERE state IN ('READY','CLAIMED') AND run_id IS NOT NULL AND NOT ident"],
+  ["packages/battery/src/index.ts:359", "SELECT item.work_item_id, item.run_id FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW(\"run.ru"],
+  ["packages/battery/src/index.ts:445", "SELECT item.work_item_id, item.run_id FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW(\"run.ru"],
   // Merged from origin/dev (1667370dd, 2026-10-22; not at base): the runner's boot preload, listOpenRunSettingsVersions.
-  ["packages/battery/src/index.ts:406", "SELECT DISTINCT run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON run.run_id = item.run_"],
+  ["packages/battery/src/index.ts:427", "SELECT DISTINCT identity.run_settings_version_now(run.run_id)::integer AS register_version FROM core.work_item AS item JOIN core.run AS run "],
   ["packages/battery/src/index.ts:413", "SELECT work.work_item_id, work.run_id FROM core.work_item AS work JOIN ledger.model_spend_hold AS hold ON hold.run_id = work.run_id WHERE wo"],
   ["packages/battery/src/index.ts:471", "WITH candidate AS ( SELECT work_item_id FROM core.work_item AS item WHERE (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock"],
   ["packages/budget/src/estimate.ts:233", "WITH sample AS ( SELECT run.run_id, max(spend.recorded_at) AS last_charged_at FROM core.run AS run JOIN ledger.model_spend AS spend ON spend"],
@@ -1067,8 +1079,8 @@ function members(list: readonly (readonly [string, string])[]): readonly (readon
 const R44_CLASSIFICATION: Readonly<Record<"reader" | "perAccount" | "neverT1", readonly (readonly [string, string])[]>> = Object.freeze({
   reader: members([
     ["apps/api/src/preview-budget-estimate.ts:1226", "X21"], ["apps/api/src/preview-budget-estimate.ts:1281", "X21"],
-    ["apps/api/src/release-state.ts:374", "X19"],
-    ["packages/battery/src/index.ts:340", "X1"], ["packages/battery/src/index.ts:378", "X1"], ["packages/battery/src/index.ts:406", "X1"],
+    ["apps/api/src/release-state.ts:407", "X19"],
+    ["packages/battery/src/index.ts:359", "X1"], ["packages/battery/src/index.ts:445", "X1"], ["packages/battery/src/index.ts:427", "X1"],
     ["packages/battery/src/index.ts:471", "X1"],
     ["packages/battery/src/index.ts:413", "X13"],
     ["packages/budget/src/estimate.ts:233", "X20"],

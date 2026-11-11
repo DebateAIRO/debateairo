@@ -17,7 +17,7 @@ import { setFlagsFromString, writeHeapSnapshot } from "node:v8";
 import { Worker } from "node:worker_threads";
 import { afterAll, beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 import type { PoolClient } from "pg";
-import { createPool, migrate, PostgresConsumerAuthRepository, PostgresConsumerSecurityRepository, PostgresSessionRepository, PostgresIdentityRepository } from "@debateai/db";
+import { createPool, migrate, PostgresConsumerAuthRepository, PostgresConsumerSecurityRepository, PostgresSessionRepository, PostgresIdentityRepository, requestScopeActive, runInRequestScope, type Pool } from "@debateai/db";
 import {
   createEmailBlindIndex,
   decodeBase32,
@@ -65,9 +65,35 @@ import {
   type VerificationMail
 } from "../../apps/api/src/mail-channel.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { createSystemTwin } from "../support/rls-logins.js";
+import { apiTestPools, createSystemTwin, provisionRlsLogins, type ApiTestPools } from "../support/rls-logins.js";
 
 let database: TestDatabase;
+/**
+ * Upload check Task 8: the API's pools as apps/api/src/main.ts builds them (apiTestPools): the registration and MFA
+ * services' identity repository on `runtime` (main.ts:495), the session, consumer-auth and consumer-security
+ * repositories on `authorization` (main.ts:998, :1039, :1870). The product's own logins in login mode (the default);
+ * database.pool in every field with DEBATEAI_TEST_API_LOGINS=0. Seeding and read-backs stay on database.pool.
+ */
+let apiPools: ApiTestPools;
+
+/**
+ * Upload check Task 8: `target` with every method run inside a request scope when called from outside one. The site
+ * calls the registration service and its repository only from a request (the API's onRequest hook opens the scope), so
+ * on the product's own logins its statements run on the runtime login. This file also calls them directly; without a
+ * scope those calls would go to the runtime pool's system login instead, which the request path never uses. A call
+ * already inside a request (through buildApi) is left as it is. With login mode off the scope changes nothing.
+ */
+function asInRequest<T extends object>(target: T): T {
+  return new Proxy(target, {
+    get(object, property) {
+      const value: unknown = Reflect.get(object, property, object);
+      if (typeof value !== "function") return value;
+      return (...args: unknown[]): unknown => requestScopeActive()
+        ? (value as (...a: unknown[]) => unknown).apply(object, args)
+        : runInRequestScope(() => (value as (...a: unknown[]) => unknown).apply(object, args));
+    }
+  });
+}
 let secretRoot: string;
 const blindIndexKey = Buffer.alloc(32, 0x3c);
 const sourceIpSalt = Buffer.alloc(32, 0x6e);
@@ -391,7 +417,7 @@ function buildService(input: {
   const policy = input.policy ?? basePolicy;
   const mail = input.mail ?? new MemoryMailSender();
   const repository = new PostgresIdentityRepository(
-    database.pool,
+    apiPools.runtime,
     new AuditContextHasher(sharedArgon2Pool(), sourceIpSalt, policy.auditSourceIpKdf)
   );
   const channels = new Set<string>();
@@ -423,7 +449,7 @@ function buildService(input: {
     ...(input.sleep === undefined ? {} : { sleep: input.sleep })
   });
   return {
-    service, repository, limiter, mail,
+    service: asInRequest(service), repository: asInRequest(repository), limiter, mail,
     async advance(milliseconds: number) {
       now = new Date(now.getTime() + milliseconds);
       // Age only this fixture's stored authority. App clocks remain independent audit/limiter inputs.
@@ -496,13 +522,13 @@ async function currentMfa(flow: ReturnType<typeof buildService>, passwordHash: s
   const audit = new AuditContextHasher(sharedArgon2Pool(),sourceIpSalt,basePolicy.auditSourceIpKdf);
   const dekStore = new FileUserDekStore(secretRoot,loadKek(Buffer.alloc(32,0x7d)));
   const mfaPolicy = mfaPolicyFromValue(MFA_POLICY_REGISTER_ROW.value);
-  const sessions = await SessionService.create({repository:new PostgresSessionRepository(database.pool,audit),
+  const sessions = await SessionService.create({repository:new PostgresSessionRepository(apiPools.authorization,audit),
     riskSignals:{recordForSession:async()=>null} as never,onRiskSignalFailure:()=>{},dekStore,argon2:sharedArgon2Pool(),
     authPolicy:basePolicy,mfaPolicy,sessionPolicy:sessionPolicyFromValue(SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.value,SESSION_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),
     blindIndexKey,dummyPasswordHash:passwordHash,clock});
-  const consumerRepository = new PostgresConsumerAuthRepository(database.pool,audit);
+  const consumerRepository = new PostgresConsumerAuthRepository(apiPools.authorization,audit);
   const mfa = new MfaEnrollmentService({repository:flow.repository,consumerRepository,sessions:sessions.consumerProducer(),dekStore,argon2:sharedArgon2Pool(),policy:mfaPolicy,clock});
-  const security = new ConsumerSecurityService(new PostgresConsumerSecurityRepository(database.pool,audit),sessions.consumerProducer(),{publicAppUrl:enrollmentOrigin,argon2:sharedArgon2Pool(),mfaPolicy,authPolicy:basePolicy});
+  const security = new ConsumerSecurityService(new PostgresConsumerSecurityRepository(apiPools.authorization,audit),sessions.consumerProducer(),{publicAppUrl:enrollmentOrigin,argon2:sharedArgon2Pool(),mfaPolicy,authPolicy:basePolicy});
   return {mfa,sessions,security,consumerRepository};
 }
 
@@ -924,7 +950,16 @@ for (let sample = 0; sample < 8; sample += 1) {
   await collectMainThreadGarbage();
   nullSamplesMib.push(process.memoryUsage().rss / 1024 / 1024);
 }
-const nullEnvelopeMib = Math.max(...nullSamplesMib) - Math.min(...nullSamplesMib);
+// Owner's ruling of 2026-11-08: a tripwire for retained memory counts GROWTH only. Each sample is compared with the lowest
+// sample before it, and only a rise counts. Drops are ignored: after a forced clean-up the operating system hands pages
+// back to it a little at a time (measured on macOS: the resident set fell 0.5 MiB per clean-up while heapTotal,
+// heapUsed and arrayBuffers stayed flat), and pages handed back are not growth. The 2 MiB bound below is unchanged.
+const residentRiseMib = (samples) => {
+  let lowest = Infinity, rise = 0;
+  for (const value of samples) { lowest = Math.min(lowest, value); rise = Math.max(rise, value - lowest); }
+  return rise;
+};
+const nullEnvelopeMib = residentRiseMib(nullSamplesMib);
 const confirmedPlatformPageSizeBytes = 16 * 1024;
 const tunedSecondaryPlateauCeilingMib = 2;
 
@@ -968,7 +1003,8 @@ for (let wave = 0; wave < 16; wave += 1) {
 clearInterval(sampler);
 sampler = undefined;
 const plateauSamples = waveRssMib.slice(12);
-const plateauSpreadMib = Math.max(...plateauSamples) - Math.min(...plateauSamples);
+// The same growth-only rule as the null envelope above: a rise across the plateau waves counts, a drop does not.
+const plateauSpreadMib = residentRiseMib(plateauSamples);
 
 service.drainMailCapacitySignals();
 // Keep the control allocation observably alive right to the end.
@@ -1127,6 +1163,7 @@ async function runPlateauDetectorChild(
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
+  apiPools = await apiTestPools(database, import.meta.url);
   secretRoot = await mkdtemp(join(tmpdir(), "debateai-s3-registration-"));
   await sharedArgon2Pool().ready();
 }, 120_000);
@@ -5788,7 +5825,8 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   } | undefined;
   const barrierPatchedClients = new WeakSet<PoolClient>();
   let poolPatchedForBarriers = false;
-  let originalPoolConnect: ((...args: readonly unknown[]) => unknown) | undefined;
+  /** Each patched pool's own connect. Upload check Task 8: the superuser pool and the API's login pools. */
+  const originalPoolConnects = new Map<Pool, (...args: readonly unknown[]) => unknown>();
 
   function instrumentClientForBarriers(client: PoolClient): PoolClient {
     if (barrierPatchedClients.has(client)) return client;
@@ -5824,11 +5862,17 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
   function patchPoolForQueryBarriers(): void {
     if (poolPatchedForBarriers) return;
     poolPatchedForBarriers = true;
-    const pool = database.pool as unknown as {
+    // The pools the API pieces run on (main.ts's runtime and authorization logins in login mode) and the superuser
+    // pool; with login mode off they are one pool, patched once.
+    for (const each of new Set<Pool>([database.pool, apiPools.runtime, apiPools.authorization])) patchOnePool(each);
+  }
+
+  function patchOnePool(target: Pool): void {
+    const pool = target as unknown as {
       connect: (...args: readonly unknown[]) => unknown;
     };
-    const connect = pool.connect.bind(database.pool);
-    originalPoolConnect = pool.connect.bind(database.pool);
+    const connect = pool.connect.bind(target);
+    originalPoolConnects.set(target, pool.connect);
     pool.connect = (...args: readonly unknown[]): unknown => {
       const callback = args.at(-1);
       if (typeof callback === "function") {
@@ -5845,11 +5889,11 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
     };
   }
 
-  /** Restores the shared pool so no later test file inherits this patch. */
+  /** Restores the shared pools so no later test file inherits this patch. */
   function restorePoolAfterQueryBarriers(): void {
-    if (!poolPatchedForBarriers || originalPoolConnect === undefined) return;
-    (database.pool as unknown as { connect: unknown }).connect = originalPoolConnect;
-    originalPoolConnect = undefined;
+    if (!poolPatchedForBarriers) return;
+    for (const [pool, connect] of originalPoolConnects) (pool as unknown as { connect: unknown }).connect = connect;
+    originalPoolConnects.clear();
     poolPatchedForBarriers = false;
   }
 
@@ -7937,7 +7981,13 @@ describe("T9 resend lock-order race through the real HTTP boundary", () => {
 
 describe("S3 VR-3 audit writer and rate-limit evidence", () => {
   it("T3 force-finalizes a real PostgreSQL refusal aggregate through the installed SIGTERM lifecycle", async () => {
-    const lifecyclePool = createPool(database.connectionString);
+    // The API's own runtime pool as main.ts builds it (on the runtime login, its system login as target), owned by this
+    // test because the lifecycle ends it; the superuser as before when login mode is off.
+    const lifecyclePool = apiPools.runtime === database.pool
+      ? createPool(database.connectionString)
+      : (await apiTestPools(database, import.meta.url, {
+        runtime: (await provisionRlsLogins(database)).url("DATABASE_URL")
+      })).runtime;
     const lifecycleArgon2 = new Argon2WorkerPool({ workers: 1 });
     const lifecycleHasher = new AuditContextHasher(
       lifecycleArgon2,
@@ -8032,7 +8082,8 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
           AND justification LIKE $1
       `, [summaryPattern]);
       const audit = await readAuditChain();
-      const dedicatedPoolClosed = await lifecyclePool.query("SELECT 1").then(
+      // Inside a request scope, as the API uses it: on the login itself, not its still-open system target.
+      const dedicatedPoolClosed = await runInRequestScope(() => lifecyclePool.query("SELECT 1")).then(
         () => false,
         () => true
       );
@@ -8549,7 +8600,17 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       ipArgon2id: "argon2id-audit:v1:" + "1".repeat(64),
       userAgentArgon2id: "argon2id-audit:v1:" + "2".repeat(64)
     });
-    const signature = "identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)";
+    // The security review's 0171: the delivery names the token its mail carried; 0085's own, which named none, is no role's.
+    const signature = "identity.record_verification_delivery_with_audit(uuid,text,timestamp with time zone,boolean,text,jsonb)";
+    const original = "identity.record_verification_delivery_with_audit(uuid,timestamp with time zone,boolean,text,jsonb)";
+    expect((await database.pool.query<{ runtime: boolean; authorization: boolean }>(`SELECT has_function_privilege('debateai_runtime',$1,'EXECUTE') AS runtime,
+      has_function_privilege('debateai_authorization_runtime',$1,'EXECUTE') AS authorization`, [original])).rows[0]).toEqual({ runtime: false, authorization: false });
+    const tokenHash = (await database.pool.query<{ token_hash: string }>(`SELECT credential.token_hash FROM identity.verification_token_credential AS credential
+      JOIN identity.channel_binding AS channel ON channel.channel_binding_id=credential.channel_binding_id
+      WHERE channel.user_id=$1 AND channel.channel_type='email' ORDER BY credential.issued_at DESC LIMIT 1`, [userId])).rows[0]!.token_hash;
+    // A saved code's use is the marker's since 0171 (X36): the API's system login holds it beside the runtime role, as this role does.
+    await database.pool.query(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='registration_test_system') THEN
+      CREATE ROLE registration_test_system NOLOGIN IN ROLE debateai_runtime,debateai_rls_all_accounts; END IF; END $$`);
     const catalog = await database.pool.query<{
       runtime_cap: boolean;
       authorization_cap: boolean;
@@ -8578,8 +8639,8 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       await roleClient.query("BEGIN");
       await roleClient.query("SET LOCAL ROLE debateai_runtime");
       await expect(roleClient.query(`SELECT identity.record_verification_delivery_with_audit(
-        $1,$2,true,NULL,$3::jsonb
-      )`, [userId,deliveryAt,sourceContext])).rejects.toMatchObject({
+        $1,$2,$3,true,NULL,$4::jsonb
+      )`, [userId,tokenHash,deliveryAt,sourceContext])).rejects.toMatchObject({
         code: "55000", message: "AUDIT_ATTEMPT_REQUIRED"
       });
       await roleClient.query("ROLLBACK");
@@ -8589,9 +8650,9 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const recorded = await roleClient.query<{ recorded: boolean }>(`
         SELECT identity.record_verification_delivery_with_audit(
-          $1,$2,true,NULL,$3::jsonb
+          $1,$2,$3,true,NULL,$4::jsonb
         ) AS recorded
-      `, [userId,deliveryAt,sourceContext]);
+      `, [userId,tokenHash,deliveryAt,sourceContext]);
       expect(recorded.rows[0]?.recorded).toBe(true);
       await roleClient.query("COMMIT");
 
@@ -8600,23 +8661,23 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const replay = await roleClient.query<{ recorded: boolean }>(`
         SELECT identity.record_verification_delivery_with_audit(
-          $1,$2,true,NULL,$3::jsonb
+          $1,$2,$3,true,NULL,$4::jsonb
         ) AS recorded
-      `, [userId,deliveryAt,sourceContext]);
+      `, [userId,tokenHash,deliveryAt,sourceContext]);
       expect(replay.rows[0]?.recorded).toBe(false);
       await roleClient.query("COMMIT");
 
       await roleClient.query("BEGIN");
       await roleClient.query("SET LOCAL ROLE debateai_runtime");
       await expect(roleClient.query(`SELECT identity.record_verification_delivery_with_audit(
-        $1,$2,true,NULL,$3::jsonb
-      )`, [userId,deliveryAt,sourceContext])).rejects.toMatchObject({
+        $1,$2,$3,true,NULL,$4::jsonb
+      )`, [userId,tokenHash,deliveryAt,sourceContext])).rejects.toMatchObject({
         code: "55000", message: "AUDIT_ATTEMPT_REQUIRED"
       });
       await roleClient.query("ROLLBACK");
 
       await roleClient.query("BEGIN");
-      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SET LOCAL ROLE registration_test_system");
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const pendingRecovery = await roleClient.query<{ valid: boolean }>(`
         SELECT identity.consume_recovery_code_with_audit(
@@ -8630,7 +8691,7 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
       // been removed/revoked; the capability revalidates the factor itself.
       await database.pool.query(`UPDATE identity."user" SET state='active' WHERE user_id=$1`, [userId]);
       await roleClient.query("BEGIN");
-      await roleClient.query("SET LOCAL ROLE debateai_runtime");
+      await roleClient.query("SET LOCAL ROLE registration_test_system");
       await roleClient.query("SELECT identity.begin_runtime_audit_attempt()");
       const noFactorRecovery = await roleClient.query<{ valid: boolean }>(`
         SELECT identity.consume_recovery_code_with_audit(
@@ -8687,7 +8748,11 @@ describe("S3 VR-3 audit writer and rate-limit evidence", () => {
     await expect(flow.service.verifyEmail({token:generateVerificationToken()},source)).rejects.toMatchObject({code:"VERIFICATION_TOKEN_INVALID"});
     const material=sessions.consumerProducer().prepare(source);
     await expect(consumerRepository.completeTotpEnrollment({enrollmentTokenHash:hashToken("verification",enrollmentToken),additionHandleHash:hashToken("verification",generateVerificationToken()),bindingHash:sessions.consumerProducer().bindingHash(source),userId:registered.user.user_id,factorId:randomUUID(),secretCiphertext:{v:1,keyId:"fixture",nonce:"AAAAAAAAAAAAAAAA",tag:"AAAAAAAAAAAAAAAAAAAAAA==",ct:"YQ=="},acceptedStep:Math.floor(Date.now()/30000),material:{sessionId:material.sessionId,sessionTokenHash:material.sessionTokenHash,csrfTokenHash:material.csrfTokenHash,sessionBindingContext:material.sessionBindingContext,idleExpiresAt:material.idleExpiresAt,absoluteExpiresAt:material.absoluteExpiresAt}},(["TERMS","PRIVACY"] as const).flatMap(kind=>legalManifestLocales(kind).map(locale=>({kind,locale,...currentDocument(kind,locale)!}))),source)).rejects.toThrow("CONSUMER_AUTH_INVALID");
-    await expect(flow.repository.activateMfaEnrollment({enrollmentTokenHash:hashToken("verification",enrollmentToken),recoveryCodeId:randomUUID(),occurredAt:new Date(),source})).rejects.toThrow("MFA_ENROLLMENT_STATE_INVALID");
+    // The retired activation (0099 left identity.activate_mfa_enrollment_with_audit a stub that refuses, revoked from
+    // the runtime and authorization logins; no product code calls it). Only the superuser can still call the stub, so
+    // this proof stays on database.pool, outside any request, as before Task 8.
+    const retiredActivation = new PostgresIdentityRepository(database.pool, new AuditContextHasher(sharedArgon2Pool(),sourceIpSalt,basePolicy.auditSourceIpKdf));
+    await expect(retiredActivation.activateMfaEnrollment({enrollmentTokenHash:hashToken("verification",enrollmentToken),recoveryCodeId:randomUUID(),occurredAt:new Date(),source})).rejects.toThrow("MFA_ENROLLMENT_STATE_INVALID");
     expect(await snapshot()).toEqual({...before,denials:before.denials+1});
     const chain=await readAuditChain();expect(chain.rootCount).toBe(1);expect(chain.chain).toHaveLength(chain.totalRows);
   });

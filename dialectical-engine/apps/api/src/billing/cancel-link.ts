@@ -29,6 +29,8 @@ export type CancelLinkDeps = Readonly<{
   identities: Readonly<{ ownerRefByEmailBlindIndex(emailBlindIndex: Buffer): Promise<string | null> }>;
   blindIndexKey: Uint8Array;
   recordsKey: Buffer;
+  /** The register's abuseLimits row: how many links one account gets in any 24 hours. */
+  linksPerDay: number;
   /** W8 (P2-I12): M9 goes to the account's current address; to the billing profile's only after an erasure. */
   recipients: BillingRecipientReader;
   /** P17's sender. Absent until P17 is composed: a request then sends nothing, like any other silent case. */
@@ -41,8 +43,7 @@ export type CancelLinkDeps = Readonly<{
 
 /** The statuses `requestCancelLocked` cancels (P2-W10: SUSPENDED too); any other plan gets no link. */
 const CANCELLABLE: ReadonlySet<string> = new Set(["ACTIVE", "PAST_DUE", "SUSPENDED"]);
-/** A25: at most three links per account in any 24 hours; each token lives 24 hours. */
-const LINKS_PER_DAY = 3;
+/** A25: each token lives 24 hours. How many links one account gets in any 24 hours is the register's abuseLimits row. */
 const DAY_MS = 86_400_000;
 
 /**
@@ -133,7 +134,7 @@ export class CancelLinkService {
       const recent = await this.deps.billing.cancelTokensIssuedForOwnerSince(
         ownerRef, new Date(now.getTime() - DAY_MS), client
       );
-      if (recent >= LINKS_PER_DAY) return false;
+      if (recent >= this.deps.linksPerDay) return false;
       await this.deps.billing.insertCancelToken(client, {
         tokenSha256: cancelTokenSha256(token), subscriptionId: state.subscriptionId, ownerRef,
         issuedAt: now, expiresAt: new Date(now.getTime() + DAY_MS)

@@ -242,7 +242,9 @@ version first). The operator commands
 (`cli.ts verdict|activate|status`) run as `postgres` through the server's own socket (libpq's `PGHOST`/`PGPORT`/
 `PGDATABASE`/`PGUSER`), the principal `release-table.mjs` uses. `activate` first reads both gates' read-only
 `/remaining` (the sockets from the current release's API env file) and hands the answers to the operator, which refuses
-unless every model the version can seat is switched on at its gate.
+unless every model the version can seat is switched on at its gate. Root asks each gate as the release's API account
+(`setpriv` with the lock's `serviceUid`/`serviceGid`, as for the check halves): a gate answers only the accounts in its
+GO's `allowed_peer_uids`, the API and the runner, never root.
 
 The online backup dumps every database of the cluster as the postgres administrator over the local socket, so the
 cluster's `pg_hba.conf` must let that administrator into each one. On the test site that is line 2,

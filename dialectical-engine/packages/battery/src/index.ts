@@ -278,6 +278,53 @@ export type ClaimRenewal =
  */
 export type WorkItemFence = Readonly<{ releaseKey: string; workerId?: string }>;
 
+/**
+ * V4 start step, Task 57e (the owner's 6 Nov rule for a failed question: one automatic retry after a few minutes, from where it stopped) —
+ * how long a debate that stopped on our side waits before it is claimed again: its copy's claim is kept until then, so nothing else takes it
+ * early and it still reads as running; then the lapsed re-send (every five minutes, runner-lapsed-resend.ts) hands it to a runner again,
+ * which resumes it from what it saved (0119's true resume). A retry happens three to eight minutes after the stop.
+ */
+export const WORK_ITEM_RETRY = Object.freeze({ delaySeconds: 180 });
+
+/**
+ * V4 start step, Tasks 57e and 57f — THE STOPS THAT ARE NOT OURS: the person's own act (a debate or account they erased while it ran), a limit
+ * the debate reached (its own ceiling, a step's tries used up) and every spending wall (the person's quota, the site's day, the debate's money
+ * ceiling, a team grant that is gone). The runner never gives one its automatic retry (apps/runner runFailureRetriesOnce), and Continue never
+ * continues a debate that stopped on one (apps/api/src/run-continue.ts stopIsOurs): one list for both, so the two never disagree.
+ * Task 57h: the debate's own call budget used up (RUN_COST_ENVELOPE_EXHAUSTED, its attempt ceiling, beside its money ceiling) is a limit it
+ * reached too: a retry or a Continue would meet it again at its first new call.
+ */
+export const RUN_STOPS_NOT_OURS: ReadonlySet<string> = new Set([
+  "PRIVATE_CONTENT_ERASED",
+  "RUN_CEILING_BELOW_FIRST_CALL",
+  "CALL_BUDGET_EXHAUSTED",
+  "PERSON_ALLOWANCE_REACHED",
+  "DAILY_COST_ENVELOPE_REACHED",
+  "RUN_COST_ENVELOPE_MONEY_REACHED",
+  "INTERNAL_FUNDING_UNAVAILABLE",
+  "RUN_COST_ENVELOPE_EXHAUSTED"
+]);
+
+/**
+ * V4 start step, Task 57h (the 57f/57g review; the owner's 7 Nov words "Only if we can't re-use, then we need to pay for this ourselves") —
+ * THE CLAIM-TIME REFUSALS A PATH DEBATE'S STORED SET MAKES FINAL: its set missing (PATHS_SET_MISSING), the menu it built refused by the
+ * contract (START_MENU_INVALID), more paths than its receipt priced (PATHS_OVER_RECEIPT). The runner records each, as it is, as the work
+ * item's terminal reason before any root (apps/runner paths-run.ts PATHS_RUN_CODES); every copy would meet the same. So Continue never
+ * offers such a debate (apps/api/src/run-continue.ts stopIsOurs), and 0165's core.run_pre_start_kept gives its path-list charge back and
+ * core.continue_failed_run refuses it, as for a debate never queued: the same codes there.
+ */
+export const RUN_PATH_SET_REFUSALS: ReadonlySet<string> = new Set([
+  "PATHS_SET_MISSING",
+  "START_MENU_INVALID",
+  "PATHS_OVER_RECEIPT"
+]);
+
+/**
+ * What a park for the one retry did: PARKED (this copy's claim kept until the delay, the retry recorded), RETRIED (the work item had its
+ * one retry already: nothing written), NOT_HELD (not this copy's claim of this release's open item: nothing written).
+ */
+export type WorkItemRetryPark = "PARKED" | "RETRIED" | "NOT_HELD";
+
 /** The head of every set-aside reason: the run was stopped by an upload, never by its own failure (spec §4, §9). */
 export const RUN_SET_ASIDE = "RUN_SET_ASIDE";
 
@@ -317,6 +364,25 @@ function assertWorkLimit(limit: number, what: string): void {
   }
 }
 
+/**
+ * The money rule (owner, 31 Oct 2026; R22 W3-8) — A DEBATE PAUSED AT THE MONTH WALL STAYS PAUSED. Its newest pause event
+ * (0134's identity.run_pause_event, read through `identity.read_run_pause_of_run`, granted to the runner's role) is
+ * PAUSED until the person presses Continue in the new month. Until then no claim takes its work item and no dispatch
+ * list names it, whatever restarts in between; a work item without a run, or of a run that is no live private debate
+ * (the read answers null), is never paused.
+ */
+const NOT_MONTH_PAUSED = (runColumn: string): string =>
+  `(${runColumn} IS NULL OR identity.read_run_pause_of_run(${runColumn})->>'state' IS DISTINCT FROM 'PAUSED')`;
+
+/**
+ * Plan 2026-10-31 decision 12 — THE HAND-OVER. A paused debate is not this release's open work: its release retires, and is
+ * never asked to wait for it or to set it aside (`identity.run_work_is_parked`, 0143: its newest pause event is PAUSED and
+ * no copy holds it). The release that owns a run's work is the one it was last handed over to (`identity.run_release_now`),
+ * else its stamp; every fence and list below reads that, and so does its settings version.
+ */
+const NOT_PARKED = (item: string): string => `NOT identity.run_work_is_parked(${item}.run_id, ${item}.state, ${item}.claim_deadline)`;
+const RELEASE_NOW = (runColumn: string): string => `identity.run_release_now(${runColumn})`;
+
 export class WorkItemRepository {
   readonly #fence: Readonly<{ releaseKey: string; workerId: string | null }>;
 
@@ -339,8 +405,9 @@ export class WorkItemRepository {
     const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
       `SELECT item.work_item_id, item.run_id
        FROM core.work_item AS item
-       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
-       WHERE item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp())
+       JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $2
+       WHERE (item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()))
+         AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
        LIMIT $1`,
       [limit, this.#fence.releaseKey]
@@ -358,7 +425,7 @@ export class WorkItemRepository {
    */
   async releaseKeyOf(workItemId: string): Promise<string | null> {
     const result = await this.pool.query<{ release_key: string }>(
-      `SELECT run.release_key
+      `SELECT ${RELEASE_NOW("run.run_id")} AS release_key
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id
        WHERE item.work_item_id = $1`,
@@ -379,7 +446,8 @@ export class WorkItemRepository {
   }> | null> {
     const result = await this.pool.query<{ run_id: string; register_version: number; release_key: string }>(
       // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
-      `SELECT run.run_id, run.register_version::integer AS register_version, run.release_key
+      `SELECT run.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version,
+              ${RELEASE_NOW("run.run_id")} AS release_key
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id
        WHERE item.work_item_id = $1`,
@@ -403,10 +471,10 @@ export class WorkItemRepository {
     if (releaseKey === LEGACY_RELEASE_KEY) return Object.freeze([]);
     const result = await this.pool.query<{ register_version: number }>(
       // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
-      `SELECT DISTINCT run.register_version::integer AS register_version
+      `SELECT DISTINCT identity.run_settings_version_now(run.run_id)::integer AS register_version
        FROM core.work_item AS item
        JOIN core.run AS run ON run.run_id = item.run_id
-       WHERE item.state IN ('READY','CLAIMED') AND run.release_key = $1
+       WHERE item.state IN ('READY','CLAIMED') AND ${RELEASE_NOW("run.run_id")} = $1
        ORDER BY register_version`,
       [releaseKey]
     );
@@ -423,8 +491,9 @@ export class WorkItemRepository {
     const result = await this.pool.query<{ work_item_id: string; run_id: string }>(
       `SELECT item.work_item_id, item.run_id
        FROM core.work_item AS item
-       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
+       JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $2
        WHERE item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()
+         AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
        LIMIT $1`,
       [limit, this.#fence.releaseKey]
@@ -460,6 +529,7 @@ export class WorkItemRepository {
        FROM core.work_item AS work
        JOIN ledger.model_spend_hold AS hold ON hold.run_id = work.run_id
        WHERE work.state = 'READY'
+         AND ${NOT_MONTH_PAUSED("work.run_id")}
          AND hold.opened_at <= clock_timestamp() - make_interval(secs => $1)
        ORDER BY work.created_at_seq, work.work_item_id
        LIMIT $2`,
@@ -518,7 +588,8 @@ export class WorkItemRepository {
           SELECT work_item_id FROM core.work_item AS item
           WHERE (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
             AND (item.run_id IS NULL
-              OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $3))
+              OR ${RELEASE_NOW("item.run_id")} = $3)
+            AND ${NOT_MONTH_PAUSED("item.run_id")}
           ORDER BY created_at_seq
           FOR UPDATE SKIP LOCKED
           LIMIT 1
@@ -546,7 +617,10 @@ export class WorkItemRepository {
     });
   }
 
-  /** Spec §3: as `claimNext`, for the one item Hatchet handed over; another release's item is never claimed (null). */
+  /**
+   * Spec §3: as `claimNext`, for the one item Hatchet handed over; another release's item is never claimed (null), nor
+   * (W3-8) an item whose debate is paused at the month wall.
+   */
   async claimById(input: {
     readonly workItemId: string;
     readonly workerId: string;
@@ -570,7 +644,8 @@ export class WorkItemRepository {
           WHERE work_item_id = $1
             AND (state = 'READY' OR (state = 'CLAIMED' AND claim_deadline <= clock_timestamp()))
             AND (item.run_id IS NULL
-              OR EXISTS (SELECT 1 FROM core.run AS run WHERE run.run_id = item.run_id AND run.release_key = $4))
+              OR ${RELEASE_NOW("item.run_id")} = $4)
+            AND ${NOT_MONTH_PAUSED("item.run_id")}
           FOR UPDATE SKIP LOCKED
         )
         UPDATE core.work_item AS item
@@ -632,6 +707,50 @@ export class WorkItemRepository {
       if (row?.claim_deadline != null) return { kind: "RENEWED", claimDeadline: row.claim_deadline };
       return row?.state === "DONE" || row?.state === "FAILED" ? { kind: "FINISHED" } : { kind: "LOST" };
     });
+  }
+
+  /**
+   * The money rule (R22 W3-8) — A PLANNED STOP'S RELEASE. A copy that stopped at the month wall gives its claim up at
+   * once (the deadline becomes now), so the item is claimable the moment the person continues; it stays CLAIMED, never
+   * FAILED, and while its debate is paused no claim or list takes it (`NOT_MONTH_PAUSED`). Fenced as a renewal is: on
+   * this worker and the deadline this copy last saw (±1 ms), so a claim another copy holds is never touched. True when
+   * this call released it.
+   */
+  async releaseClaim(input: {
+    readonly workItemId: string;
+    readonly workerId: string;
+    readonly heldUntil: Date;
+  }): Promise<boolean> {
+    return withWriteTransaction(this.pool, async (client) => {
+      const result = await client.query(
+        `UPDATE core.work_item
+         SET claim_deadline = clock_timestamp()
+         WHERE work_item_id = $1 AND state = 'CLAIMED' AND claimed_by = $2
+           AND claim_deadline BETWEEN $3::timestamptz - interval '1 millisecond'
+                                  AND $3::timestamptz + interval '1 millisecond'`,
+        [input.workItemId, input.workerId, input.heldUntil]
+      );
+      return result.rowCount === 1;
+    });
+  }
+
+  /**
+   * R22 W3-8: the run's work item a runner could claim now — READY, or CLAIMED with its claim lapsed (a copy stopped at
+   * the month wall released it); null when there is none (a runner holds it, it ended, or no item). The API's wake
+   * sends only this one, and only once Continue recorded the resume, so the pause is not read here (the API's role is
+   * not granted 0134's runner read; the claim itself still refuses a paused debate).
+   */
+  async claimableWorkItemOfRun(runId: string): Promise<string | null> {
+    const result = await this.pool.query<{ work_item_id: string }>(
+      `SELECT item.work_item_id
+       FROM core.work_item AS item
+       WHERE item.run_id = $1
+         AND (item.state = 'READY' OR (item.state = 'CLAIMED' AND item.claim_deadline <= clock_timestamp()))
+       ORDER BY item.created_at_seq, item.work_item_id
+       LIMIT 1`,
+      [runId]
+    );
+    return result.rows[0]?.work_item_id ?? null;
   }
 
   /**
@@ -715,6 +834,49 @@ export class WorkItemRepository {
   }
 
   /**
+   * V4 start step, Task 57e — THE ONE AUTOMATIC RETRY. A copy whose debate stopped on our side keeps its own claim of this release's open
+   * item until `delaySeconds` from now (WORK_ITEM_RETRY's few minutes by default), and records the item's one retry (0165's
+   * core.record_work_item_retry), on one transaction: PARKED. The item stays CLAIMED, never FAILED, so the run reads as running and nothing
+   * is given back; once the claim lapses the lapsed re-send hands it to a runner again, which resumes it (0119). An item that had its retry
+   * already is left exactly as it was (RETRIED: the caller records FAILED as today), and so is one this copy does not hold (NOT_HELD: another
+   * worker's claim, another release, settled, FAILED or DONE). A repository told no worker id parks nothing.
+   */
+  async parkForRetry(input: Readonly<{ runId: string; workItemId: string; delaySeconds?: number }>): Promise<WorkItemRetryPark> {
+    const delaySeconds = input.delaySeconds ?? WORK_ITEM_RETRY.delaySeconds;
+    if (!Number.isSafeInteger(delaySeconds) || delaySeconds < 1 || delaySeconds > 3_600) {
+      throw new TypeError("Retry delay must be a whole number of seconds between 1 and 3600");
+    }
+    if (this.#fence.workerId === null) return "NOT_HELD";
+    const retriedBefore = new Error("WORK_ITEM_RETRIED_BEFORE");
+    try {
+      return await withWriteTransaction(this.pool, async (client) => {
+        const parked = await client.query<{ claim_deadline: Date }>(
+          `UPDATE core.work_item AS item
+           SET claim_deadline = clock_timestamp() + make_interval(secs => $3)
+           FROM core.run AS run
+           WHERE item.work_item_id = $1 AND item.run_id = $2
+             AND item.state = 'CLAIMED' AND item.claimed_by = $5::text AND item.settled_attempt_id IS NULL
+             AND run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $4
+           RETURNING item.claim_deadline`,
+          [input.workItemId, input.runId, delaySeconds, this.#fence.releaseKey, this.#fence.workerId]
+        );
+        const deadline = parked.rows[0]?.claim_deadline;
+        if (parked.rowCount !== 1 || deadline === undefined) return "NOT_HELD";
+        const recorded = await client.query<{ outcome: string }>(
+          "SELECT core.record_work_item_retry($1::uuid, $2::uuid, $3::timestamptz) AS outcome",
+          [input.workItemId, input.runId, deadline]
+        );
+        // Retried before: roll the new deadline back, so the item is left exactly as it was.
+        if (recorded.rows[0]?.outcome !== "RECORDED") throw retriedBefore;
+        return "PARKED";
+      });
+    } catch (error) {
+      if (error === retriedBefore) return "RETRIED";
+      throw error;
+    }
+  }
+
+  /**
    * Records a run's work item FAILED with `reason`. Spec §3: only an item of this fence's release, and never one under
    * another worker's live claim — that copy is still running the debate (D2). An item of its own release already
    * FAILED is re-written with the new reason, as before (D2). True when the item now reads FAILED with `reason`.
@@ -735,7 +897,7 @@ export class WorkItemRepository {
          FROM core.run AS run
          WHERE item.work_item_id = $1 AND item.run_id = $2
            AND item.state <> 'DONE' AND item.settled_attempt_id IS NULL
-           AND run.run_id = item.run_id AND run.release_key = $4
+           AND run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $4
            AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
                     AND item.claimed_by IS DISTINCT FROM $5::text)`,
         [input.workItemId, input.runId, input.reason, this.#fence.releaseKey, this.#fence.workerId]
@@ -761,8 +923,9 @@ export class WorkItemRepository {
       `WITH candidate AS (
          SELECT item.work_item_id
          FROM core.work_item AS item
-         JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $1
+         JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $1
          WHERE item.state IN ('READY','CLAIMED') AND item.settled_attempt_id IS NULL
+           AND ${NOT_PARKED("item")}
            AND NOT (item.state = 'CLAIMED' AND item.claim_deadline > clock_timestamp()
                     AND item.claimed_by IS DISTINCT FROM $4::text)
          ORDER BY item.created_at_seq, item.work_item_id
@@ -809,7 +972,7 @@ export class WorkItemRepository {
        SET state = 'FAILED', claimed_by = NULL, claim_deadline = NULL, terminal_reason = $3
        FROM core.run AS run
        WHERE item.work_item_id = $1 AND item.run_id = $2
-         AND run.run_id = item.run_id AND run.release_key = $4
+         AND run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $4
          AND item.settled_attempt_id IS NULL
          AND (item.state = 'READY' OR (NOT $6::boolean AND item.state = 'CLAIMED'
               AND NOT (item.claim_deadline > clock_timestamp() AND item.claimed_by IS DISTINCT FROM $5::text)))`,

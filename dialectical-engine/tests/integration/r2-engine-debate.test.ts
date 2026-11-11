@@ -43,7 +43,7 @@ vi.mock("node:crypto", async (importOriginal) => {
 
 let database: TestDatabase;
 const stubClosers: (() => Promise<void>)[] = [];
-const harness = previewDebateHarness({ pool: () => database.pool, stubClosers });
+const harness = previewDebateHarness({ pool: () => database.pool, database: () => database, stubClosers });
 const STANDARD = { depthMode: "adaptive", scrutiny: "standard", answerLength: "standard" } as const;
 const LENGTH = resolveLengthGuidance({ policy: lengthGuidancePolicyStartValues(), plan: "free", answerLength: "standard" });
 const RUNNER_ENGINE = Object.freeze({ engineContractHash: engineContractHash() });

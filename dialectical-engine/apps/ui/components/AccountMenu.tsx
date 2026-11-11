@@ -1,12 +1,25 @@
 "use client";
 import { createPortal } from 'react-dom';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import type { ContractClient } from '@debateai/contract';
 import { contractClient } from '@/lib/api';
 import { endSession, type EndSessionClient } from '@/lib/endSession';
 import { useChromeI18n } from '@/lib/i18n/I18nProvider';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
-export function AccountMenu({ authenticated, catalog: provided, client = contractClient, redirectTo = '/login', signInHref, signInClassName = 'btn' }: {
+/**
+ * V4 screen review (ask-d6 A, 3 Nov 2026): the V4 header keeps this one menu (its keyboard, focus and sign-out rules) with
+ * its own trigger, items and words. Every part left out is the site's own: the "Account" button, Account and Security, "Log out".
+ */
+export type AccountMenuLook = Readonly<{
+    /** The trigger's class, its name for screen readers (also the menu's name) and what it shows. */
+    trigger?: Readonly<{ className: string; label: string; content: ReactNode }>;
+    /** The menu's items before the sign-out, each `role="menuitem"`; `close(false)` closes it without moving focus. */
+    items?: (close: (restoreFocus?: boolean) => void) => ReactNode;
+    /** The sign-out item's words, and the signed-out link's. */
+    logoutLabel?: string;
+    signInLabel?: string;
+}>;
+export function AccountMenu({ authenticated, catalog: provided, client = contractClient, redirectTo = '/login', signInHref, signInClassName = 'btn', look }: {
     authenticated?: boolean;
     catalog?: MessageCatalog;
     client?: EndSessionClient & Partial<Pick<ContractClient, 'readSession'>>;
@@ -14,6 +27,7 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
     /** When set, a visitor known to be signed out sees a "Log in" link here instead of nothing. */
     signInHref?: string;
     signInClassName?: string;
+    look?: AccountMenuLook;
 }) {
     const { catalog: context } = useChromeI18n();
     const catalog = provided ?? context;
@@ -64,7 +78,8 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
         catch { setError(true); }
         finally { flight.current = false; setBusy(false); }
     }
-    if (signedIn !== true) return signedIn === false && signInHref ? <a className={signInClassName} href={signInHref}>{t(catalog, 'chrome.logIn')}</a> : null;
+    if (signedIn !== true) return signedIn === false && signInHref ? <a className={signInClassName} href={signInHref}>{look?.signInLabel ?? t(catalog, 'chrome.logIn')}</a> : null;
+    const menuLabel = look?.trigger?.label ?? t(catalog, 'chrome.account');
     // Focus that leaves for another control closes the menu and stays there; focus that leaves for nowhere (no
     // relatedTarget: it would land on <body>) closes it onto the trigger, unless a press or the logout in flight caused it.
     return <div className="accountMenu" ref={root} onBlur={event => {
@@ -91,11 +106,13 @@ export function AccountMenu({ authenticated, catalog: provided, client = contrac
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
         items[next]?.focus();
     }}>
-        <button ref={trigger} type="button" className="btn" aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => { if (open) close(); else setOpen(true); }}>{t(catalog, 'chrome.account')}</button>
-        {open ? createPortal(<div ref={panel} style={{position: 'fixed', top: position.top, left: position.left, right: 'auto', bottom: 'auto', width: position.width}} id={id} role="menu" aria-label={t(catalog, 'chrome.account')} className="accountMenuPanel">
-            <a role="menuitem" href="/settings" onClick={() => close(false)}>{t(catalog, 'chrome.account')}</a>
-            <a role="menuitem" href="/settings/security" onClick={() => close(false)}>{t(catalog, 'chrome.security')}</a>
-            <button role="menuitem" type="button" data-account-logout disabled={busy} onClick={() => void logout()}>{t(catalog, 'chrome.logout')}</button>
+        <button ref={trigger} type="button" className={look?.trigger?.className ?? 'btn'} aria-label={look?.trigger === undefined ? undefined : menuLabel} aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => { if (open) close(); else setOpen(true); }}>{look?.trigger?.content ?? t(catalog, 'chrome.account')}</button>
+        {open ? createPortal(<div ref={panel} style={{position: 'fixed', top: position.top, left: position.left, right: 'auto', bottom: 'auto', width: position.width}} id={id} role="menu" aria-label={menuLabel} className="accountMenuPanel">
+            {look?.items === undefined ? <>
+                <a role="menuitem" href="/settings" onClick={() => close(false)}>{t(catalog, 'chrome.account')}</a>
+                <a role="menuitem" href="/settings/security" onClick={() => close(false)}>{t(catalog, 'chrome.security')}</a>
+            </> : look.items(close)}
+            <button role="menuitem" type="button" data-account-logout disabled={busy} onClick={() => void logout()}>{look?.logoutLabel ?? t(catalog, 'chrome.logout')}</button>
             {error ? <p role="alert">{t(catalog, 'chrome.accountError')}</p> : null}
         </div>, document.body) : null}
     </div>;
