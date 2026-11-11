@@ -366,7 +366,8 @@ describe("the map while the AIs look into each path", () => {
     const question = root.querySelector<HTMLElement>(".v4MapRoot")!;
     expect(question.querySelector(".v4Bar")).toBeNull();
     expect(root.querySelector(".v4MapRootChip")).toBeNull();
-    expect(root.textContent).not.toContain(t(catalog, "v4.map.openCount", { count: 0 }).replace("0", ""));
+    // The old chip's words (v4.map.openCount went with the unused keys, 12 Nov).
+    expect(root.textContent).not.toContain("Open questions: ");
     const extra = root.querySelector(".extraForTest")!;
     expect(question.contains(extra)).toBe(false);
     expect(question.nextElementSibling!.contains(extra)).toBe(true);
