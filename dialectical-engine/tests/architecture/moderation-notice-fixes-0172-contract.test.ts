@@ -394,8 +394,10 @@ describe("0172: the moderation notice fixes", () => {
       expect(SQL).toContain(`ALTER TABLE identity.moderation_${table} ADD COLUMN IF NOT EXISTS law_ref text;`);
       expect(SQL).toContain(`ADD CONSTRAINT moderation_${table}_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;`);
     }
-    expect(SQL).toContain("ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim) NOT VALID;");
-    expect(SQL).toContain("ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL) NOT VALID;");
+    // R13: a row whose facts are gone passes, so the twelve-month purge can clear an old ILLEGAL row that names no law.
+    expect(SQL).toContain("ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim OR facts_ciphertext IS NULL) NOT VALID;");
+    expect(SQL).toContain("ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR facts_ciphertext IS NULL) NOT VALID;");
+    expect(SQL).toContain("-- R13 (M7 review): NOT VALID only skips the first scan; every later UPDATE of a row is checked");
     // The runtime calls the new door, and no longer the release before's (drained); the twelve-month sweep and the export reader are not restated.
     expect(SQL).toContain("GRANT EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text) TO debateai_runtime;");
     expect(SQL).toContain("REVOKE EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime;");

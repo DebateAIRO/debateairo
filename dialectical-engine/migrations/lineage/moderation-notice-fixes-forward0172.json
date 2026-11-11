@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0172_moderation_notice_fixes.sql",
-    "sha256": "8c3a651b57969569cfe282efb85a4b6e2d6fdd6e17742bec88a03d4ae1c1fdfb"
+    "sha256": "b5a0a176fc568607b9354fcaae770ea18ba0aa7d8113f977b6f10fc523c102da"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

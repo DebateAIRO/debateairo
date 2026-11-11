@@ -96,6 +96,38 @@ const anHourLater = async (source: string): Promise<void> => {
   await database.pool.query("UPDATE identity.moderation_statement_stuck SET last_failed_at = last_failed_at - interval '61 minutes', first_failed_at = first_failed_at - interval '61 minutes' WHERE source_id=$1", [source]);
 };
 
+/**
+ * M7 review (R13): an ILLEGAL step ground and an ILLEGAL decision as 0157 wrote them (facts, no law), already thirteen months old. Such a row was
+ * written before 0172 added its law CHECKs NOT VALID, and that order is replayed here exactly: in one transaction the two law-required CHECKs are
+ * dropped, the rows written, and each CHECK re-added from its own catalog definition (NOT VALID, as 0172 adds it), so the rows stand as old rows do.
+ * The CHECK is never bypassed for a write that is tested: the twelve-month purge's UPDATE meets it as it would in production. Both are marked seen,
+ * as 0157's queue had already told their people.
+ */
+const pre0172 = { ref: "", eventId: randomUUID(), decisionId: randomUUID() };
+async function seedPre0172Rows(): Promise<void> {
+  const ana = await account();
+  pre0172.ref = await publishedDebate(ana);
+  const facts = JSON.stringify({ v: 1, keyId: `publication-snapshot:${pre0172.ref}:v1`, nonce: "AAAA", tag: "AAAA", ct: "YQ==" });
+  const client = await database.pool.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL session_replication_role = 'replica'");
+    const checks = (await client.query<{ table: string; name: string; definition: string }>(`SELECT k.conrelid::regclass::text AS table, k.conname AS name, pg_get_constraintdef(k.oid) AS definition
+      FROM pg_constraint AS k WHERE k.conname IN ('moderation_ground_law_required','moderation_decision_law_required') ORDER BY k.conname`)).rows;
+    expect(checks.map((check) => check.definition.endsWith(" NOT VALID"))).toEqual([true, true]);
+    for (const check of checks) await client.query(`ALTER TABLE ${check.table} DROP CONSTRAINT ${check.name}`);
+    await client.query(`INSERT INTO identity.public_review_event (event_id,publication_ref,revision,action,piece_kind,piece_id,actor_staff_id,operation_id,request_sha256,recorded_at)
+      VALUES ($1,$2,1,'REMOVE_DIG','DIG',$3,$4,$5,$6,now() - interval '13 months')`, [pre0172.eventId, pre0172.ref, randomUUID(), randomUUID(), randomUUID(), "0".repeat(64)]);
+    await client.query(`INSERT INTO identity.moderation_ground (event_id, publication_ref, grounds, source, facts_sha256, facts_ciphertext, interim, recorded_at)
+      VALUES ($1,$2,ARRAY['ILLEGAL'],'AUTHORITY_ORDER',$3,$4::jsonb,false,now() - interval '13 months')`, [pre0172.eventId, pre0172.ref, "1".repeat(64), facts]);
+    await client.query(`INSERT INTO identity.moderation_decision (decision_id, publication_ref, revision, grounds, source, facts_sha256, facts_ciphertext, actor_staff_id, operation_id, request_sha256, recorded_at)
+      VALUES ($1,$2,1,ARRAY['ILLEGAL'],'AUTHORITY_ORDER',$3,$4::jsonb,$5,$6,$3,now() - interval '13 months')`, [pre0172.decisionId, pre0172.ref, "2".repeat(64), facts, randomUUID(), randomUUID()]);
+    await client.query("INSERT INTO identity.moderation_statement_seen (source_id) VALUES ($1), ($2)", [pre0172.eventId, pre0172.decisionId]);
+    for (const check of checks) await client.query(`ALTER TABLE ${check.table} ADD CONSTRAINT ${check.name} ${check.definition}`);
+    await client.query("COMMIT");
+  } catch (error) { await client.query("ROLLBACK"); throw error; } finally { client.release(); }
+}
+
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
@@ -117,6 +149,8 @@ beforeAll(async () => {
         [m1[name].mailId, m1[name].flagId, m1[name].claim]]]);
   }
   await database.pool.query("SELECT identity.settle_stuck_public_flags()");
+  // M7 review (R13): an ILLEGAL ground and decision from before 0172, facts and no law, thirteen months old.
+  await seedPre0172Rows();
 }, timeout);
 afterAll(async () => {
   await runtime?.end();
@@ -682,6 +716,17 @@ describe("M7: an illegal ground names the law it relies on", () => {
     const longest = await removal(ref, xena);
     await step(longest.operation, ref, ["ILLEGAL"], "x".repeat(200));
     expect(await lawOfGround(longest.eventId)).toBe("x".repeat(200));
+  }, timeout);
+
+  it("R13: the twelve-month purge clears the facts of an ILLEGAL ground and decision from before 0172 that name no law, and keeps their null law", async () => {
+    await database.pool.query("SELECT identity.delete_moderation_words_due()");
+    const after = async (table: string, key: string, id: string) => (await database.pool.query(
+      `SELECT facts_ciphertext IS NULL AS gone, facts_deleted_at IS NOT NULL AS deleted, law_ref FROM identity.${table} WHERE ${key}=$1`, [id])).rows;
+    expect(await after("moderation_ground", "event_id", pre0172.eventId)).toEqual([{ gone: true, deleted: true, law_ref: null }]);
+    expect(await after("moderation_decision", "decision_id", pre0172.decisionId)).toEqual([{ gone: true, deleted: true, law_ref: null }]);
+    // The CHECK still holds for a new row: ILLEGAL with facts and no law is refused, and the writer refuses it first.
+    const { operation } = await removal(pre0172.ref, await account());
+    await expect(step(operation, pre0172.ref, ["ILLEGAL"], null)).rejects.toMatchObject({ message: "MODERATION_GROUND_LAW_MISSING" });
   }, timeout);
 
   it("the CHECKs hold for every new row: no ILLEGAL without a law (a hold excepted), and the law 3-200 characters", async () => {

@@ -416,16 +416,20 @@ $$;
 -- person's page and in their export, and never in a mail, which keeps its line "The full statement names the law"). A hide never names one and is
 -- never refused: what it suspects is not yet decided, and its hold is Terms §9 (0150). New rows only: the two CHECKs each table gets are NOT VALID,
 -- so a row from before 0172 keeps its null.
+-- R13 (M7 review): NOT VALID only skips the first scan; every later UPDATE of a row is checked, rows from before 0172 included. 0157's
+-- twelve-month purge (identity.delete_moderation_words_due) is such an UPDATE: it sets facts_ciphertext to null on an old ILLEGAL row that names no
+-- law, and without an exemption one such row would make the whole purge raise, so no facts would go for anyone. A row whose facts are gone therefore
+-- passes the law-required CHECK; the writers' identity.moderation_law_of stays the law's first and main check, and every new step carries facts.
 ALTER TABLE identity.moderation_ground ADD COLUMN IF NOT EXISTS law_ref text;
 ALTER TABLE identity.moderation_decision ADD COLUMN IF NOT EXISTS law_ref text;
 ALTER TABLE identity.moderation_ground DROP CONSTRAINT IF EXISTS moderation_ground_law_length;
 ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;
 ALTER TABLE identity.moderation_ground DROP CONSTRAINT IF EXISTS moderation_ground_law_required;
-ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim) NOT VALID;
+ALTER TABLE identity.moderation_ground ADD CONSTRAINT moderation_ground_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR interim OR facts_ciphertext IS NULL) NOT VALID;
 ALTER TABLE identity.moderation_decision DROP CONSTRAINT IF EXISTS moderation_decision_law_length;
 ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_length CHECK (law_ref IS NULL OR char_length(law_ref) BETWEEN 3 AND 200) NOT VALID;
 ALTER TABLE identity.moderation_decision DROP CONSTRAINT IF EXISTS moderation_decision_law_required;
-ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL) NOT VALID;
+ALTER TABLE identity.moderation_decision ADD CONSTRAINT moderation_decision_law_required CHECK (NOT ('ILLEGAL' = ANY (grounds)) OR law_ref IS NOT NULL OR facts_ciphertext IS NULL) NOT VALID;
 -- The law a step's grounds need, trimmed, or null for none: ILLEGAL with no law is MODERATION_GROUND_LAW_MISSING; a law beside no ILLEGAL, or one
 -- shorter than 3 or longer than 200 characters, MODERATION_GROUND_LAW_INVALID. Staff's door asks it before the passkey is spent, and each writer again.
 CREATE OR REPLACE FUNCTION identity.moderation_law_of(p_grounds text[], p_law text) RETURNS text
@@ -703,7 +707,11 @@ BEGIN
           AND a.atttypid = 'text'::regtype AND NOT a.attnotnull AND NOT a.atthasdef AND NOT a.attisdropped) <> 2
     OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k
         WHERE k.contype = 'c' AND NOT k.convalidated AND ((k.conrelid = 'identity.moderation_ground'::regclass AND k.conname IN ('moderation_ground_law_length','moderation_ground_law_required'))
-          OR (k.conrelid = 'identity.moderation_decision'::regclass AND k.conname IN ('moderation_decision_law_length','moderation_decision_law_required')))) <> 4 THEN
+          OR (k.conrelid = 'identity.moderation_decision'::regclass AND k.conname IN ('moderation_decision_law_length','moderation_decision_law_required')))) <> 4
+    -- R13: both law-required CHECKs let a row whose facts are gone pass, so the twelve-month purge can clear an older row that names no law.
+    OR (SELECT pg_catalog.count(*) FROM pg_catalog.pg_constraint AS k
+        WHERE k.conname IN ('moderation_ground_law_required','moderation_decision_law_required') AND k.contype = 'c'
+          AND pg_catalog.pg_get_constraintdef(k.oid) LIKE '%(facts_ciphertext IS NULL)%') <> 2 THEN
     RAISE EXCEPTION 'MODERATION_NOTICE_FIXES_0172_CONTRACT M7 law column';
   END IF;
   -- M7: the law's check, the two writers' overloads, the statement's ground and staff's door with the law are this file's bodies (by digest), definers with
