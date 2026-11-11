@@ -5,7 +5,8 @@
 // [3]). Each of the dig's paths is argued as its own branch with its own web search, in dig mode, its planner handed the
 // investigation's digest (Task 55d: read inside the dig's own lease, each other debate under a lease of its own); no gap round; no story: the parent's
 // path b2 is rewritten in its place, with the dig's own
-// paths named b1 and b2, and the parent's path read without its own root. A Free dig makes no web call and no gap call.
+// paths named b1 and b2, and the parent's path read from its own root in force: every point under it, without the root itself,
+// whichever points its story names, and also when the parent has no story. A Free dig makes no web call and no gap call.
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every name, question and page is made up.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { StoryBodySchema } from "@debateai/contract";
@@ -144,8 +145,22 @@ async function storyPathRefs(runId: string): Promise<ReadonlyMap<string, readonl
 
 const lower = (ids: readonly string[]): string[] => ids.map((id) => id.toLowerCase());
 
+/** Every node under `rootNodeId`, following the arrows down (core.edge), the root itself left out; lower case, sorted. */
+async function idsUnderRoot(runId: string, rootNodeId: string): Promise<string[]> {
+  const rows = (await database.pool.query<{ node_id: string }>(
+    `WITH RECURSIVE under AS (
+       SELECT edge.source_node_id FROM core.edge AS edge WHERE edge.run_id = $1 AND edge.target_node_id = $2::uuid
+       UNION
+       SELECT edge.source_node_id FROM core.edge AS edge JOIN under ON edge.target_node_id = under.source_node_id WHERE edge.run_id = $1)
+     SELECT source_node_id::text AS node_id FROM under`, [runId, rootNodeId])).rows;
+  return lower(rows.map((row) => row.node_id)).filter((id) => id !== rootNodeId.toLowerCase()).sort();
+}
+
+/** The storyteller's reply is no story at all, on every try and from every maker: the debate settles with no story to read. */
+const noStory = (request: GateRequest): GateOverride | null => request.kind === "STORY_PATHS" ? { content: "This is not a story." } : null;
+
 describe("a dig of a path debate argues its picks as paths (Task 55)", () => {
-  it("the parent's path b<n>, read for a rewrite, holds the points its story names under it, without that path's own root", async () => {
+  it("the parent's path b<n>, read for a rewrite, holds every point under its own root, whichever points its story names, without that root", async () => {
     const parent = await parentDebate();
     const parentId = parent.debate.runId;
     const roots = await new PostgresPathResultsRepository(database.pool).readPathRoots(parentId);
@@ -154,13 +169,43 @@ describe("a dig of a path debate argues its picks as paths (Task 55)", () => {
     const sources = postgresPathRewriteSources(database.pool);
     for (const root of roots) {
       const refs = named.get(root.pathId) ?? [];
-      // The story names the path's root under it (every point is named under every path here).
-      expect(lower(refs)).toContain(root.rootNodeId.toLowerCase());
+      // The story names the path's root under it, and the other paths' roots too (every point is named under every path here).
+      for (const any of roots) expect(lower(refs)).toContain(any.rootNodeId.toLowerCase());
       const path = await sources.parentPathOf({ parentRunId: parentId, positionRef: root.pathId, baseRewriteId: null });
       expect(path.positionRef).toBe(root.pathId);
       // Task 55b: nothing rewrote it yet, so its text is its answer so far, not the story's line.
       expect(path.line).toBe(OUTCOME_LINE);
-      expect(lower(path.points.map((point) => point.id))).toEqual(lower(refs).filter((id) => id !== root.rootNodeId.toLowerCase()));
+      // The path is read from the debate, as the report reads it: every point under its root in force, and none of another path's.
+      const read = lower(path.points.map((point) => point.id));
+      const under = await idsUnderRoot(parentId, root.rootNodeId);
+      expect(under.length).toBeGreaterThan(0);
+      expect([...read].sort()).toEqual(under);
+      for (const any of roots) expect(read).not.toContain(any.rootNodeId.toLowerCase());
+    }
+  }, 1_800_000);
+
+  it("a path debate with no story is still read for a rewrite: each path's answer so far and every point under its root", async () => {
+    const parent = await runOnFive("v2-dig-parent-no-story", { plan: "plus", count: 3, set: (runId) => storedPathsOf(runId, 3), before: noStory });
+    const parentId = parent.debate.runId;
+    // No story body was written: the storyteller never gave one.
+    const stories = await database.pool.query<{ story_id: string; content: unknown; content_ciphertext: CryptoEnvelope | null }>(
+      "SELECT story_id::text AS story_id, content, content_ciphertext FROM serve.answer_story WHERE run_id=$1", [parentId]);
+    for (const row of stories.rows) {
+      const content = await withRunContentLease(database.pool, [parentId], () =>
+        decryptContentForRun<unknown>(database.pool, parentId, "serve.answer_story", row.story_id, row.content_ciphertext, row.content));
+      expect((content as { body?: unknown } | null)?.body ?? null).toBeNull();
+    }
+    const roots = (await new PostgresPathResultsRepository(database.pool).readPathRoots(parentId)).filter((root) => !root.stale);
+    expect(roots.map((root) => root.pathId)).toEqual(["b1", "b2", "b3"]);
+    const sources = postgresPathRewriteSources(database.pool);
+    for (const root of roots) {
+      const path = await sources.parentPathOf({ parentRunId: parentId, positionRef: root.pathId, baseRewriteId: null });
+      expect(path.positionRef).toBe(root.pathId);
+      expect(path.line).toBe(OUTCOME_LINE);
+      expect(path.answerVersion).toBeGreaterThanOrEqual(1);
+      const under = await idsUnderRoot(parentId, root.rootNodeId);
+      expect(under.length).toBeGreaterThan(0);
+      expect(lower(path.points.map((point) => point.id)).sort()).toEqual(under);
     }
   }, 1_800_000);
 
@@ -216,7 +261,7 @@ describe("a dig of a path debate argues its picks as paths (Task 55)", () => {
     const content = await withRunContentLease(database.pool, [digId], () => decryptContentForRun<unknown>(database.pool, digId,
       PATH_REWRITE_CARRIER, entry!.rewrite_id!, entry!.content as CryptoEnvelope, null)) as { dig_paths: { position_ref: string }[] };
     expect(content.dig_paths.map((path) => path.position_ref)).toEqual(["b1", "b2"]);
-    // The writer read the parent's b2 as its story names it, without b2's own root.
+    // The writer read the parent's b2 from its own root in force: every point under it, without the root itself.
     const writers = dig.gates.requests.filter((request) => request.kind === "PATH_REWRITE_WRITER" && request.answer === "OK");
     expect(writers.length).toBeGreaterThan(0);
     const b2Root = (await new PostgresPathResultsRepository(database.pool).readPathRoots(parentId)).find((root) => root.pathId === "b2")!;
