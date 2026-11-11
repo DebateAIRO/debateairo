@@ -2,9 +2,17 @@
 // Migration 0175 (what was left of 0172's M3, owner, 11 Nov 2026) on real PostgreSQL: everyone told that a dig or a report of theirs is off the page
 // "until a person puts it back or the review ends" hears how the review ended, at a re-publish (what stays off, or that it is back) and at DECIDE.
 // The log rows are written as 0150's apply writes them; data is made up.
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { migrate } from "@debateai/db";
+import { encrypt } from "@debateai/crypto";
+import { migrate, PostgresModerationStatementRepository } from "@debateai/db";
+import { TemplatedMailSender } from "../../apps/api/src/mail-channel.js";
+import { ModerationStatementReconciler } from "../../apps/api/src/moderation-statements.js";
+import { testOutboundMailGate } from "../support/outboundMailGate.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 const timeout = 300_000;
@@ -240,5 +248,99 @@ describe("0175: everyone told \"until the review ends\" hears how it ended", () 
       VALUES ($1,$2,$3,$4,'en',now())`, [person.ownerRef, kind, ref, event]);
     for (const kind of ["CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF", "CONTRIBUTION_BACK", "REPORT_BACK"]) await insert(kind);
     await expect(insert("CONTRIBUTION_RESTORED")).rejects.toMatchObject({ code: "23514" });
+  }, timeout);
+});
+
+describe("0175 end to end: the final outcome is mailed through the API's own sender, in each person's language", () => {
+  // Each person's key and address, as the account store keeps them: the address sealed under the person's own key, opened by the sender at sending time.
+  const keys = new Map<string, Buffer>();
+  async function person(address: string, locale: string): Promise<Account> {
+    const userId = randomUUID();
+    const dek = randomBytes(32);
+    keys.set(userId, dek);
+    const sealedAddress = encrypt(dek, Buffer.from(address, "utf8"), ["identity", "user.email_ciphertext", userId, "run:none", userId, `user-dek:${userId}`, "1"]);
+    await database.pool.query(`INSERT INTO identity."user" (user_id,email_blind_index,email_ciphertext,recovery_email_ciphertext,password_hash,pseudonym,state,adult_affirmed_at)
+      VALUES ($1,$2,$3::jsonb,'{}','fixture-password',$4,'active',now())`, [userId, createHash("sha256").update(userId).digest(), JSON.stringify(sealedAddress), `mail-${userId}`]);
+    const ownerRef = (await database.pool.query<{ owner_ref: string }>('SELECT owner_ref FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.owner_ref;
+    // The language picked in the dropdown at sign-up, recorded with the Terms acceptance: the language every statement is written in.
+    await seeded([[`INSERT INTO legal.acceptance (acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id)
+      VALUES ($1,$2,'TERMS','2.17',$3,$4,'SIGN_UP',now(),$5,'aaaaaaaaaaaaaaaa')`, [randomUUID(), ownerRef, "a".repeat(64), locale, Buffer.alloc(30)]]]);
+    return { userId, ownerRef };
+  }
+  /** The plain-text parts of a captured message, decoded. */
+  const textOf = (message: string): string => [...message.matchAll(/Content-Transfer-Encoding: base64\r\n(?:[^\r\n]+\r\n)*\r\n([A-Za-z0-9+/=\r\n]+?)\r\n--/g)]
+    .map((match) => Buffer.from(match[1]!.replaceAll("\r\n", ""), "base64").toString("utf8")).join("\n").replace(/\s+/gu, " ");
+  /** The locale's own sentence after the item's link: words no other locale and no other kind has. */
+  const sentenceAfterLink = (locale: string, key: string): string => {
+    const catalog = JSON.parse(readFileSync(resolve(`packages/mail-templates/messages/${locale}/mail.json`), "utf8")) as Record<string, string>;
+    return catalog[`mail.statement.${key}`]!.split("{itemUrl}")[1]!.slice(1).trim().slice(0, 60).replace(/\s+/gu, " ");
+  };
+
+  it("a re-publish after a dig taken out: what stays off and what is back reach each person's address, in Romanian, German and French, and are settled SENT", async () => {
+    const root = mkdtempSync(join(tmpdir(), "debateai-final-outcome-mail-"));
+    const previous = process.env.DEBATEAI_DEV_MAIL_CAPTURE_DIR;
+    process.env.DEBATEAI_DEV_MAIL_CAPTURE_DIR = join(root, "mail");
+    const runtime = new Pool({ connectionString: database.connectionString, max: 2 });
+    runtime.on("connect", (client) => { void client.query("SET ROLE debateai_runtime"); });
+    try {
+      const author = await person("autor@example.test", "en");
+      const ana = await person("ana@example.test", "en");
+      const ben = await person("ben@example.test", "ro");
+      const cai = await person("cai@example.test", "de");
+      const dee = await person("dee@example.test", "fr");
+      const ref = await publishedDebate(author);
+      const anaDig = await dig(ref, ana);
+      await dig(ref, ben);
+      const caiDig = await dig(ref, cai);
+      await report(ref, dee);
+      await step(ref, "HIDE");
+      await step(ref, "REMOVE_DIG", { kind: "DIG", id: anaDig.digRunId });
+      await step(ref, "PUT_BACK", { kind: "UPDATE", id: caiDig.updateId });
+      const back = await step(ref, "REPUBLISH");
+      // The API's sender as main.ts builds it: the database's claim and read on the runtime login, the account keys, and the production sendmail path.
+      const sender = new ModerationStatementReconciler(new PostgresModerationStatementRepository(runtime),
+        { load: async (userId: string) => { const dek = keys.get(userId); if (dek === undefined) throw new Error("NO_KEY"); return Buffer.from(dek); } },
+        new TemplatedMailSender({ gate: testOutboundMailGate(), executable: resolve("deploy/dev-auth/sendmail-capture.mjs"), from: "noreply@localhost.test", timeoutMs: 10_000 }),
+        "https://dezbatere.example.test/");
+      // Every statement queued on this debate: the hide's, the removal's and the re-publish's. Each pass claims what is due and sends it.
+      for (let pass = 0; pass < 5; pass += 1) await sender.reconcile(100);
+      type Final = Readonly<{ statement_id: string; owner_ref: string; kind: string; mail_locale: string; delivered_at: Date | null }>;
+      const finals = (await database.pool.query<Final>("SELECT statement_id, owner_ref, kind, mail_locale, delivered_at FROM identity.moderation_statement WHERE event_id=$1 ORDER BY kind, owner_ref", [back])).rows;
+      const expected = [[ben, "CONTRIBUTION_KEPT_OFF", "ro", "ben@example.test", "contributionKeptOff"], [cai, "CONTRIBUTION_BACK", "de", "cai@example.test", "contributionBack"],
+        [dee, "REPORT_KEPT_OFF", "fr", "dee@example.test", "reportKeptOff"]] as const;
+      expect(finals.map(({ owner_ref, kind, mail_locale }) => ({ owner_ref, kind, mail_locale }))).toEqual(
+        expected.map(([who, kind, locale]) => ({ owner_ref: who.ownerRef, kind, mail_locale: locale })).sort((a, b) => (a.kind + a.owner_ref).localeCompare(b.kind + b.owner_ref)));
+      for (const row of finals) expect(row.delivered_at, row.kind).not.toBeNull();
+      const captured = readdirSync(join(root, "mail")).filter((name) => name.endsWith(".eml")).map((name) => readFileSync(join(root, "mail", name), "utf8"));
+      for (const [who, kind, locale, address, key] of expected) {
+        const id = finals.find((row) => row.owner_ref === who.ownerRef && row.kind === kind)!.statement_id;
+        const mails = captured.filter((message) => message.includes(`Message-ID: <${id}@`));
+        expect(mails, `${kind} ${locale}`).toHaveLength(1);
+        const [message] = mails as [string];
+        expect(message).toMatch(new RegExp(`^To: ${address.replace(".", "\\.")}\\r?$`, "mu"));
+        expect(message).toContain(`Content-Language: ${locale}`);
+        expect(message).toMatch(/^Reply-To: office@dezbatere\.ro\r?$/mu);
+        const text = textOf(message);
+        expect(text, `${kind} ${locale}`).toContain(`https://dezbatere.example.test/public/debate/${ref}`);
+        expect(text, `${kind} ${locale}`).toContain(sentenceAfterLink(locale, key));
+        expect(text).toContain(`https://dezbatere.example.test/settings/notices#${id}`);
+      }
+      // What stays off is a statement of reasons: the other content's rule, said as such, and the routes. What is back has neither.
+      const keptOff = textOf(captured.find((message) => message.includes(`Message-ID: <${finals.find((row) => row.kind === "CONTRIBUTION_KEPT_OFF")!.statement_id}@`))!);
+      const ro = JSON.parse(readFileSync(resolve("packages/mail-templates/messages/ro/mail.json"), "utf8")) as Record<string, string>;
+      expect(keptOff).toContain(ro["mail.statement.groundIntroOther"]!.replace(/\s+/gu, " "));
+      expect(keptOff).toContain(ro["mail.statement.groundHate"]!.replace(/\s+/gu, " "));
+      expect(keptOff).toContain("office@dezbatere.ro");
+      const backMail = textOf(captured.find((message) => message.includes(`Message-ID: <${finals.find((row) => row.kind === "CONTRIBUTION_BACK")!.statement_id}@`))!);
+      const de = JSON.parse(readFileSync(resolve("packages/mail-templates/messages/de/mail.json"), "utf8")) as Record<string, string>;
+      expect(backMail).not.toContain(de["mail.statement.routes"]!.replace(/\s+/gu, " ").slice(0, 40));
+      // Ana's dig was taken out: she got that statement, and no final one.
+      expect(finals.some((row) => row.owner_ref === ana.ownerRef)).toBe(false);
+    } finally {
+      await runtime.end();
+      if (previous === undefined) delete process.env.DEBATEAI_DEV_MAIL_CAPTURE_DIR;
+      else process.env.DEBATEAI_DEV_MAIL_CAPTURE_DIR = previous;
+      rmSync(root, { recursive: true, force: true });
+    }
   }, timeout);
 });
