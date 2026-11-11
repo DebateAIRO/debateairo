@@ -267,7 +267,7 @@ import {
   type WayOfKnowing
 } from "@debateai/kernel";
 import { MemoryRepository, renderMemorySentence, validateMemorySentence } from "@debateai/memory";
-import type { StoryCostFallback, StorySnapshotFailure, StoryWriteInput } from "@debateai/story";
+import type { StoryCheckerBackups, StoryCostFallback, StorySnapshotFailure, StoryWriteInput } from "@debateai/story";
 import {
   backupModelUsedRecords,
   backupSwitchEventValue,
@@ -10595,6 +10595,16 @@ export class WalkingSkeletonRunner {
       }
     }), settings.pathResults!, (error) => endsThisCopy(error) || keepAliveStop(error));
     const pathsGateway: ProviderGateway = pathsStops.gateway;
+    /**
+     * Who may check in GLM's place when its check of an answer so far or of the main answer cannot be completed: the members the paths'
+     * gateway routes to, in the run's panel order, each called through that gateway (so a stop that ends this copy is still kept), and
+     * every claim-eligible member's company before the sit-out filter, so a benched writer or checker still excludes its company.
+     */
+    const pathsCheckerBackups: StoryCheckerBackups = Object.freeze({
+      candidates: storyBackupCandidatesFrom({ panelRefs: run.discoveredPanel.map((member) => member.provider_ref),
+        claimEligible: pathsFinalMembers.map((member) => Object.freeze({ provider: pathsGateway, providerRef: member.providerRef, maker: member.maker })) }),
+      makers: storyBackupMakersFrom([...synthesisMakers, ...pathsFinalMembers])
+    });
     /** Haiku writes and GLM checks (two makers); else the run's own answer writer and checker, when they are two makers. */
     const pathsFinalSeats = ((): PathOutcomesJob["seats"] | null => {
       const seat = (member: (typeof pathsFinalMembers)[number]): PathOutcomesSeat =>
@@ -10622,7 +10632,7 @@ export class WalkingSkeletonRunner {
     const pathOutcomesBase: Omit<PathOutcomesJob, "paths"> | null = pathsFinalSeats === null ? null : Object.freeze({
       runId: run.runId, free: pathsFree, question: pathsQuestion, readingLevel,
       language: Object.freeze({ name: run.argumentLanguageName, tag: shapeLanguage === null ? "und" : run.argumentLanguageTag }),
-      seats: pathsFinalSeats, gateway: pathsGateway, store: pathsStops.store,
+      seats: pathsFinalSeats, gateway: pathsGateway, store: pathsStops.store, checkerBackups: pathsCheckerBackups,
       // R22 decision 28, as the closing's: the Haiku target's free count near the line (`pathsTokenCount`); none: the byte guard alone.
       tokenCount: pathsTokenCount, log: pathsLog
     });
@@ -12121,7 +12131,8 @@ export class WalkingSkeletonRunner {
             main = await runPathsMainAnswer({ runId: run.runId, free: pathsFree,
               answerWords: lengthGuidance?.steps.answer_writer ?? pathsShape!.answerWords,
               // Task 50's note: the main answer reads the language lock and the reading level from its question.
-              question: pathsQuestion, paths, seats: pathsFinalSeats, gateway: pathsGateway, tokenCount: pathsTokenCount, log: pathsLog,
+              question: pathsQuestion, paths, seats: pathsFinalSeats, gateway: pathsGateway, checkerBackups: pathsCheckerBackups,
+              tokenCount: pathsTokenCount, log: pathsLog,
               // Task 50b: the person said what they care about (the purpose lines' marked answer): the answer says how that goal fares.
               goalStated: pathsGoalStated(pathsPurposeLines) });
             // Review of Task 54: its loop ends FAILED on a stop that ends this copy too; that stop ends the copy (no fallback served).

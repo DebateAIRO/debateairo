@@ -659,3 +659,25 @@ describe("an answer so far whose checker cannot be reached", () => {
     expect(requests.map((request) => request.callSiteKey)).toEqual(["PATH_OUTCOME:WRITER:1:1", "PATH_OUTCOME:CHECKER:1:1"]);
   });
 });
+
+describe("the runner's answer so far, with the run's members handed over", () => {
+  it("a checker that cannot be reached: the backup's check is stored as the path's answer so far; without the lists, FAILED as before", async () => {
+    const unreachable: Answer = (request) => {
+      if (request.providerRef === GLM.providerRef) throw new ProviderCallFailedError(new Error("socket hang up"), 3, "FAILED", "ledger:dead");
+      return SATISFIED;
+    };
+    const backed = team(() => written(), unreachable);
+    const store = memoryStore();
+    const candidates = [HAIKU, GLM, DEEPSEEK].map((seat) => Object.freeze({ provider: backed.gateway, providerRef: seat.providerRef, maker: seat.maker }));
+    const outcome = await runPathOutcomeFor(jobOf({ gateway: backed.gateway, store: store.store, checkerBackups: { candidates } }), "b1");
+    expect(outcome.state).toBe("READY");
+    expect(store.rows.get("b1")).toEqual(outcome);
+    expect(backed.requests.map((request) => [request.callSiteKey, request.providerRef])).toEqual([
+      ["PATH_OUTCOME:WRITER:1:1", HAIKU.providerRef], ["PATH_OUTCOME:CHECKER:1:1", GLM.providerRef],
+      ["PATH_OUTCOME:CHECKER:1:1:BACKUP", DEEPSEEK.providerRef]]);
+    const today = team(() => written(), unreachable);
+    const todayStore = memoryStore();
+    expect(await runPathOutcomeFor(jobOf({ gateway: today.gateway, store: todayStore.store }), "b1")).toEqual(FAILED);
+    expect(today.requests.map((request) => request.callSiteKey)).toEqual(["PATH_OUTCOME:WRITER:1:1", "PATH_OUTCOME:CHECKER:1:1"]);
+  });
+});

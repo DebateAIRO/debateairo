@@ -6,7 +6,7 @@ import { INVESTIGATION_REPORT_POLICY } from "@debateai/register";
 import type { ComposedSegment } from "@debateai/serve";
 import {
   REPORT_ANSWER_PROSE, REPORT_CHECKER_PROSE, investigationReportCallSiteKey, writeOverallAnswer, type OverallAnswerWritten, type ReportAnswerDraft,
-  type ReportCallMaterial, type ReportSite, type StoryRoleMaker
+  type ReportCallMaterial, type ReportSite, type StoryCheckerBackups, type StoryRoleMaker
 } from "@debateai/story";
 import { engineContractHash } from "./engine-contracts.js";
 import { closingRandomBytes } from "./investigation-close.js";
@@ -19,7 +19,8 @@ import { fitDossierToTokenLine } from "./token-line.js";
  * V4 start step, Task 50 (spec 2026-11-03 §4.3): THE MAIN ANSWER OF A PATH RUN, written when every path's own chain has ended (Task
  * 54). It is the owner's approved "Overall view, every point" writer (31 Oct), which weighs every path and leaves none out: the
  * report's own answer step, `writeOverallAnswer`, on report.answer.v4 and report.answer-check.v3 byte for byte. Haiku writes and GLM
- * checks (the seats the paths' answers so far sit in), 2 rounds on a paid plan and 1 on Free, no backup writer.
+ * checks (the seats the paths' answers so far sit in), 2 rounds on a paid plan and 1 on Free, no backup writer; a backup checker of a
+ * third company when GLM's check cannot be completed (`checkerBackups`).
  *
  * THE MATERIAL is the report's dossier (investigation-dossier.ts), built by code from the paths (`pathsDossierInput`): the question
  * (the person's care sentence is inside it, owner answer Q4), then each path in the person's order as a first-debate path: its answer
@@ -72,6 +73,12 @@ export type PathsMainAnswerInput = Readonly<{
   goalStated?: boolean;
   gateway: ProviderGateway;
   tokenCount: TokenCounter | undefined;
+  /**
+   * The run's members a backup checker may be, each called through `gateway`, and every member's company: when GLM's check cannot
+   * be completed, one model of a third company runs it, at POST_COMPOSE_R9:EVALUATOR:<r>:BACKUP. Absent: no backup checker. There is
+   * still no backup writer.
+   */
+  checkerBackups?: StoryCheckerBackups;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>;
 
@@ -198,6 +205,7 @@ export async function runPathsMainAnswer(input: PathsMainAnswerInput): Promise<R
     runId: input.runId, subjectItemId: PATHS_MAIN_ANSWER_SUBJECT, contractHash: engineContractHash(), callSiteOf: pathsMainAnswerCallSiteOf,
     maxRounds: input.free ? INVESTIGATION_REPORT_POLICY.freeMaxRounds : INVESTIGATION_REPORT_POLICY.maxRounds,
     later: false, goalStated: input.goalStated === true, writer, checker, backupCandidates: [],
+    ...(input.checkerBackups === undefined ? {} : { checkerBackups: input.checkerBackups }),
     material: built.material,
     // The first debate's answer calls are the writer and the checker on the served lane: the answer's own money, never walled.
     send: (maker, request) => maker.provider.call(Object.freeze({ ...request, lane: "served" as const })),
