@@ -1,0 +1,26 @@
+{
+  "version": "statement-ai-read-verdict-forward0175-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0174_public_review_ungrounded_door.sql",
+    "manifestSha256": "b272c070b20813c48e47dabf9ec88cd04019e398ede5456f69e759b463b6c48f",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0175_statement_ai_read_verdict.sql",
+    "sha256": "c28a0339a2ceeef930b3ce22ba0189eac293bf04a7b3f67b44c421179825d75b"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": [
+    {
+      "step": "0157_moderation_statements.sql",
+      "functions": [
+        "identity.moderation_statement_ground(uuid)"
+      ],
+      "field": "function_definition"
+    }
+  ]
+}
