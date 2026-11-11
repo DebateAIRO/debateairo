@@ -23,7 +23,7 @@ import {
   type PrivateRunErasureCoordinator
 } from "@debateai/db";
 import { AGE_RULE_VERSION, MIN_AGE } from "@debateai/kernel";
-import { currentDocument } from "@debateai/legal-manifest";
+import { currentDocument, legalArchive } from "@debateai/legal-manifest";
 import { createNetopiaPayments, iso2ToNetopiaCountry, loadTrustedKeys } from "@debateai/payments-netopia";
 import {
   TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue, type CountryPolicy, type PlanId
@@ -494,8 +494,11 @@ export async function startBillingStack(): Promise<BillingStack> {
     async signUp(email, ipCountry, terms = "CURRENT", age = "PASSED") {
       const account = await createActiveAccount(database.pool, deks, blindIndexKey, email, ipCountry, now(), age);
       if (terms !== "NONE") {
-        // The row registration writes at sign-up (L3a), in English, as the stack's checkout locale is.
-        const current = currentDocument("TERMS", "en")!;
+        // The row registration writes at sign-up, in English, as the stack's checkout locale is. Its text is the newest
+        // archived English Terms, which a person on the live site accepted: while work goes on, the English draft can
+        // move on before the release step archives it (English first), and the confirmation email attaches only an
+        // archived text.
+        const current = legalArchive("TERMS", "en")[0]!;
         const acceptanceId = randomUUID();
         const sealed = sealRecord(recordsKey, {
           table: "legal.acceptance", column: "evidence_ciphertext", rowId: acceptanceId
