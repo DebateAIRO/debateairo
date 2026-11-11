@@ -11,7 +11,8 @@ import {
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import { sweepTreeUpdates, type TreeUpdateSettings } from "../../apps/runner/src/path-climb.js";
 import {
-  owedDigSuggestions, pathRewriteIdOf, runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings, type PathRewriteStoredInput
+  owedDigSuggestions, pathRewriteIdOf, runDigPathRewrite, runFirstDebateSuggestions, suggestAndUpdateAfterStory, type PathRewriteRunnerSettings,
+  type PathRewriteStoredInput
 } from "../../apps/runner/src/path-rewrite.js";
 import { createReplayBook, recordedCalls } from "../../apps/runner/src/run-replay.js";
 import {
@@ -238,6 +239,41 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     const isDig = team();
     await runFirstDebateSuggestions(settingsOver({ store: memoryStore(), digs: new Map([[DIG_A, dig()]]), extra: extra(false) }), digSnapshot(DIG_A, membersOf(isDig)));
     expect(isDig.haiku.bodies).toEqual([]);
+  });
+
+  it("after a story the main-answer update runs beside the first-debate suggestions, never behind them; both are done when it returns", async () => {
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    const firstSuggest = (packet: PromptPacket): boolean => readPromptFrame({ messages: packet.messages.slice(0, 2) }).contractId === "web.suggest.v1";
+    // The suggestion calls hang until released, as slow ones would.
+    const vendors = team({ haiku: async (packet) => {
+      if (!firstSuggest(packet)) return writesFitting(packet, 1);
+      await held;
+      return suggestedOn(packet);
+    } });
+    const kept: string[] = [];
+    const store: PathSuggestionsStore = { positionsOf: async () => new Set<string>(), record: async (input) => { kept.push(input.positionRef); return "RECORDED"; } };
+    let updating = false;
+    let markWaited: boolean | null = null;
+    const settings = settingsOver({ store: memoryStore(), digs: new Map(), extra: {
+      firstDebateSuggestions: { store, read: async () => ({ free: false, wouldChangeIt: null }) },
+      afterStory: async (_runId, _lease, alongside) => { updating = true; await alongside; markWaited = kept.length > 0; }
+    } });
+    let ended = false;
+    const running = suggestAndUpdateAfterStory(settings, digSnapshot(DIG_A, membersOf(vendors)), undefined, true).then(() => { ended = true; });
+    await until(() => updating && vendors.haiku.bodies.length > 0);
+    expect(kept).toEqual([]);
+    for (let at = 0; at < 50; at += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(ended).toBe(false);
+    release();
+    await running;
+    expect(kept.length).toBeGreaterThan(0);
+    expect(markWaited).toBe(true);
+    // A run rewritten in its story's place (a dig of a path) asks for no update here.
+    let asked = false;
+    await suggestAndUpdateAfterStory(settingsOver({ store: memoryStore(), digs: new Map(), extra: { afterStory: async () => { asked = true; } } }),
+      digSnapshot(DIG_A, membersOf(team())), undefined, false);
+    expect(asked).toBe(false);
   });
 
   it("at level 10 the rewrite runs and no suggestions are asked for", async () => {

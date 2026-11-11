@@ -297,7 +297,7 @@ import {
 } from "./run-seats.js";
 import type { Hatchet, TaskWorkflowDeclaration } from "@hatchet-dev/typescript-sdk";
 import { CONTENT_REFUSED_HALT_REASON, buildStoryRunSnapshot, storyAlsoRaisedFrom, storyAnswersNoteFrom, storyBackupCandidatesFrom, storyBackupMakersFrom, storyPathsInputOf, storyPathsPointsOfRun, storyRotationRoleMakers, storySeatRoleMaker } from "./story-snapshot.js";
-import { runDigPathRewrite, runFirstDebateSuggestions, type PathRewriteRunnerSettings } from "./path-rewrite.js";
+import { runDigPathRewrite, suggestAndUpdateAfterStory, type PathRewriteRunnerSettings } from "./path-rewrite.js";
 import { pokeInvestigationClosing, type InvestigationCloseSettings } from "./investigation-close.js";
 import {
   pathsSelectChains, shapeCloseCallExtraSeats, shapeCloseCallFires, shapeCloseCallFold, shapeDistinctMakerOptions, shapeRankScrutiny,
@@ -13158,13 +13158,12 @@ export class WalkingSkeletonRunner {
             // included: the version sealed no story rows); undefined only without per-version settings (the writer's own).
             await storyWriter.writeAfterSettle(settings.storyPolicy === undefined ? settled.input : Object.freeze({ ...settled.input, policy: settings.storyPolicy }));
           }
-          // W4-3: what the AI offers to dig into on a debate that got its story, now that it is written. Never rejects.
-          // V4 start step, Task 54: a path debate's suggestions are its paths', each read from its root and keyed b<n>.
-          await runFirstDebateSuggestions(settings.pathRewrite, settled.input, afterSettle.pathRoots ?? undefined);
-          // V4 start step, Task 55e (spec §4.4): a run that got its story and is a dig under the main question of a path debate (a path
-          // left out before Start) is a new first-level path, so the main answer updates (path-climb.ts); a first debate and an R22 dig
-          // do nothing. Outside the run's lease, as the rewrite's climb; never rejects.
-          if (firstDebate) await settings.pathRewrite?.afterStory?.(settled.input.runId, settled.input.stepLease ?? ((use) => use()));
+          // What the AI offers to dig into on a debate that got its story, now that it is written; a path debate's suggestions are its
+          // paths', each read from its root and keyed b<n>. Beside them, when the run got its story and is a dig under the main question
+          // of a path debate (a path left out before Start), the main-answer update for that new first-level path (path-climb.ts); a
+          // first debate and any other dig do nothing there. Side by side, so the update never waits behind the suggestion calls; both
+          // run outside the run's lease, as the rewrite's climb, and never reject (path-rewrite.ts `suggestAndUpdateAfterStory`).
+          await suggestAndUpdateAfterStory(settings.pathRewrite, settled.input, afterSettle.pathRoots ?? undefined, firstDebate);
           // V4 start step, Task 56: a first debate whose ask ticked "Let the AIs carry on to the report" is now settled with its
           // suggestions written, so the API's carry-on tick may dig into them (DUE). Before the closing poke; never rejects.
           if (firstDebate) await recordCarryOnDueSafely(settings.carryOn, settled.input.runId, (line) => { console.error(line); });

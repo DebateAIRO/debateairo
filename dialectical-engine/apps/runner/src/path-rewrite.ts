@@ -223,8 +223,9 @@ export type PathRewriteRunnerSettings = Readonly<{
   /**
    * V4 start step, Task 55e (spec §4.4): once a run that got its story is settled (index.ts), a dig under the main question of a path
    * debate updates the main answer (path-climb.ts `advanceAfterStory`); a first debate and an R22 dig do nothing. Never rejects.
+   * `alongside` is the run's first-debate suggestions, asked beside it (`suggestAndUpdateAfterStory`); the settled mark waits for them.
    */
-  afterStory?: (runId: string, lease: StepLease) => Promise<unknown>;
+  afterStory?: (runId: string, lease: StepLease, alongside?: Promise<unknown>) => Promise<unknown>;
   /**
    * Asked once the dig's row is stored and the dig is above level 10 (DIG_LEVEL_MAX): a dig there cannot be dug further.
    */
@@ -739,5 +740,23 @@ export async function runFirstDebateSuggestions(settings: PathRewriteRunnerSetti
       } }), first.store, settings.contractHash ?? engineContractHash());
   } catch (error) {
     log("FIRST_DEBATE_SUGGESTIONS_FAILED", { runId: input.runId, code: codeOf(error) });
+  }
+}
+
+/**
+ * Once a run is settled and its story written (index.ts, the after-settle branch): its first-debate suggestions and, when `gotStory`
+ * (no rewrite ran in the story's place), the main-answer update a dig under the main question owes (`afterStory`), side by side. The
+ * update is what the person waits for; the suggestions are a small extra whose calls can take minutes, so the update never waits
+ * behind them, and its settled mark waits for them instead. Returns once both are done. Never rejects.
+ */
+export async function suggestAndUpdateAfterStory(settings: PathRewriteRunnerSettings | undefined, input: StoryWriteInput,
+  pathRoots: readonly Readonly<{ ref: string; rootNodeId: string }>[] | undefined, gotStory: boolean): Promise<void> {
+  const suggestions = runFirstDebateSuggestions(settings, input, pathRoots);
+  try {
+    if (gotStory) await settings?.afterStory?.(input.runId, input.stepLease ?? BARE_STEP, suggestions);
+  } catch {
+    // `afterStory` never rejects; a defect in it never costs the suggestions or what follows.
+  } finally {
+    await suggestions;
   }
 }

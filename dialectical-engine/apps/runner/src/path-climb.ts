@@ -232,7 +232,7 @@ export async function advanceTree(settings: TreeUpdateSettings, digRunId: string
   const log = safeLog(settings);
   try {
     const own = await settings.ports.ownRewriteOf(digRunId);
-    if (own === null) return await addedPathUpdate(settings, digRunId, lease);
+    if (own === null) return await addedPathUpdate(settings, digRunId, lease, alongside);
     if (!finishedState(own.entry.state)) {
       // A failed rewrite leaves the path as it was and starts no climb: the dig has ended too.
       if (own.entry.state === "FAILED") await settings.ports.tree.markDigSettled(digRunId);
@@ -255,12 +255,15 @@ export async function advanceTree(settings: TreeUpdateSettings, digRunId: string
  * run that gets a story writes no rewrite (a first debate, or a dig under the main question), so only the added path is asked: a dig under
  * the main question of a path debate updates the main answer; anything else does nothing. Held in the shared in-flight set, so the sweep
  * never writes the same update beside it (paid twice). Never rejects; logs codes and ids only.
+ * `alongside` is the run's first-debate suggestions, asked beside this update (path-rewrite.ts `suggestAndUpdateAfterStory`): the dig
+ * is marked settled only once they are in, because that mark says nothing more is bought for it. Absent: nothing beside.
  */
-export async function advanceAfterStory(settings: TreeUpdateSettings, runId: string, lease: StepLease = BARE_STEP): Promise<TreeAdvance> {
+export async function advanceAfterStory(settings: TreeUpdateSettings, runId: string, lease: StepLease = BARE_STEP,
+  alongside?: Promise<unknown>): Promise<TreeAdvance> {
   const release = settings.inFlight === undefined ? () => undefined : settings.inFlight.begin(runId);
   if (release === null) return "LEFT";
   try {
-    return await addedPathUpdate(settings, runId, lease);
+    return await addedPathUpdate(settings, runId, lease, alongside);
   } catch (error) {
     safeLog(settings)("MAIN_ANSWER_ADDED_PATH_NOT_RECORDED", { runId, code: codeOf(error) });
     return "LEFT";
@@ -275,11 +278,13 @@ export async function advanceAfterStory(settings: TreeUpdateSettings, runId: str
  * (PATH_ADDED, the dig's run id), so a resume, the sweep or a second copy finds the one version and buys nothing. NOTHING for anything
  * else (a first debate, an R22 dig under the question, a dig whose paths are still argued): the sweep may ask again.
  */
-async function addedPathUpdate(settings: TreeUpdateSettings, digRunId: string, lease: StepLease): Promise<TreeAdvance> {
+async function addedPathUpdate(settings: TreeUpdateSettings, digRunId: string, lease: StepLease, alongside?: Promise<unknown>): Promise<TreeAdvance> {
   const added = settings.ports.addedPathOf === undefined ? null : await settings.ports.addedPathOf(digRunId, null);
   if (added === null) return "NOTHING";
   const outcome = await updateMainAnswer(settings, { digRunId, rootRunId: added.rootRunId, positionRef: added.positionRef, free: added.free,
     cause: Object.freeze({ kind: "PATH_ADDED" as const, id: digRunId }), lease });
+  // What runs beside the update is bought for this dig too; the mark below waits for it.
+  await alongside?.then(() => undefined, () => undefined);
   // 0153: nothing more will be bought for this dig's answer update.
   if (outcome !== "LEFT") await settings.ports.tree.markDigSettled(digRunId);
   return outcome;

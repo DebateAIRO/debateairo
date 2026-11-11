@@ -106,7 +106,7 @@ export function composePathRewrite(input: Readonly<{
     line: new PostgresTreeUpdateRunnerRepository(pool),
     afterStored: (digRunId, lease, alongside) => advanceTree(tree, digRunId, lease, alongside),
     // V4 start step, Task 55e: a dig under the main question of a path debate updates the main answer once its story is written.
-    afterStory: (runId, lease) => advanceAfterStory(tree, runId, lease)
+    afterStory: (runId, lease, alongside) => advanceAfterStory(tree, runId, lease, alongside)
   });
   const picks = new PostgresDigPicksRunnerRepository(pool);
   return Object.freeze({
