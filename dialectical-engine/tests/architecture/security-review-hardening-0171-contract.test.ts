@@ -788,7 +788,7 @@ describe("0171: the security review's fixes in the database", () => {
   it("follows 0170 in the chain (0172 comes after it), with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0171 } from './migration-forward0171.js';");
-    expect(chain).toContain("loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173]");
+    expect(chain).toContain("loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174]");
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "security-review-hardening-forward0171-v1";');
@@ -824,7 +824,7 @@ describe("0171: the security review's fixes in the database", () => {
       "identity.complete_consumer_passkey_login(jsonb,jsonb)", "identity.read_consumer_recovery_proof(text,integer)"]) expect(regranted, signature).toContain(signature);
     for (const signature of regranted) expect([`"${signature}"`, `'${signature}'`].some((quoted) => loader.includes(quoted)), signature).toBe(true);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-3)!;
+    const step = plan.forwardChain.at(-4)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -844,7 +844,7 @@ describe("0171: the security review's fixes in the database", () => {
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-3)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(plan.forwardChain.at(-4)!.amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`: it creates no billing relation or function and moves no billing grant, owner, definer flag or setting", () => {

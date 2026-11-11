@@ -3794,6 +3794,13 @@
       "revokes": [
         "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0174_public_review_ungrounded_door.sql",
+      "revokes": [
+        "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"
+      ]
     }
   ],
   "deploymentObligations": [

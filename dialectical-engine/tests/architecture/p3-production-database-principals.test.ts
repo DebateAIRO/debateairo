@@ -1924,6 +1924,13 @@ describe("P3-01 production database-principal manifest", () => {
         revokes: [
           "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"
         ]
+      },
+      {
+        roleName: "debateai_runtime",
+        source: "migrations/0174_public_review_ungrounded_door.sql",
+        revokes: [
+          "EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"
+        ]
       }
     ]);
     expect(manifest.deploymentObligations.map(({ id, ownerTicket }) => ({ id, ownerTicket })))
@@ -2423,6 +2430,26 @@ it("discloses exactly 0172's one grant and records the one it takes back (M7: st
   expect(recorded).toEqual(revoked);
   expect(recorded).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb)"]);
 });
+
+it("discloses no 0174 grant and records the one it takes back (0150's staff review door without a ground is no longer the runtime's)", async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;
+  const source = "migrations/0174_public_review_ungrounded_door.sql";
+  const sql = await readFile(source, "utf8");
+  // One statement outside the contract block, and no grant at all: the step only takes back.
+  expect([...sql.matchAll(/^(?:GRANT|REVOKE) [^\n]+;$/gmu)].map(([statement]) => statement))
+    .toEqual(["REVOKE EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb) FROM debateai_runtime;"]);
+  expect(manifest.privilegeDisclosures.filter((entry) => entry.source === source)).toEqual([]);
+  const revoked = [...sql.matchAll(/^REVOKE (EXECUTE ON FUNCTION \S+) FROM (debateai_[a-z_]+);$/gmu)].map(([, revoke, role]) => `${role!}:${revoke!}`).sort();
+  const recorded = manifest.privilegeRevocations.filter((entry) => entry.source === source)
+    .flatMap(({ roleName, revokes }) => revokes.map((revoke) => `${roleName}:${revoke}`)).sort();
+  expect(recorded).toEqual(revoked);
+  expect(recorded).toEqual(["debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)"]);
+  // 0150's disclosure of the grant stays as history: the step it came from still makes it, and 0174 takes it back after.
+  expect(manifest.privilegeDisclosures.filter((entry) => entry.source === "migrations/0150_public_review.sql")
+    .flatMap(({ roleName, grants }) => grants.map((grant) => `${roleName}:${grant}`)))
+    .toContain("debateai_runtime:EXECUTE ON FUNCTION staff.public_review_act(jsonb,uuid,jsonb,jsonb,jsonb,jsonb)");
+});
+
 
 it("discloses every 0127 publication review grant, including the run ownership columns", async () => {
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as Manifest;

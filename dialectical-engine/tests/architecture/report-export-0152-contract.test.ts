@@ -56,7 +56,7 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
     expect(loader).toContain(`"${TABLE}"`);
     for (const signature of [RECORD, EXPORT_READER]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-22)!;
+    const step = plan.forwardChain.at(-23)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);

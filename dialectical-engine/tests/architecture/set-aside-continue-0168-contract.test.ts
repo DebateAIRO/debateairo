@@ -42,10 +42,10 @@ describe("0168: a debate an update set aside continues where it stopped; the per
     // Task 57o-fix (0169): no longer the chain's head; 0169 follows it.
     expect(chain).toContain("loadForward0166,loadForward0167,loadForward0168,");
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-6)!;
+    const step = plan.forwardChain.at(-7)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
-    expect(step.previousManifestSha256).toBe(plan.forwardChain.at(-7)!.manifestSha256);
+    expect(step.previousManifestSha256).toBe(plan.forwardChain.at(-8)!.manifestSha256);
     expect(step.verifierSha256).toBe(VERIFIER_130);
     expect(step.replayVerifierSql).toBeUndefined();
     expect(step.amendsPostconditionsOf).toEqual([
