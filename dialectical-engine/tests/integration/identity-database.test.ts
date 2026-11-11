@@ -91,9 +91,9 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "mfa_recovery_control", "mfa_recovery_legacy_cohort", "mfa_recovery_notice", "mfa_recovery_notice_binding",
       "mfa_recovery_source_window", "mfa_recovery_staged_code",
       // 0156 the moderation notice: its queue and when it started. 0157 the statements of reasons: a hidden debate's final
-      // ground, each step's grounds, the statement, what the queue has read and when it started.
+      // ground, each step's grounds, the statement, what the queue has read and when it started. 0172 (M5): the sources the queue set aside.
       "moderation_decision", "moderation_ground", "moderation_notice", "moderation_notice_since",
-      "moderation_statement", "moderation_statement_seen", "moderation_statement_since",
+      "moderation_statement", "moderation_statement_seen", "moderation_statement_since", "moderation_statement_stuck",
       // 0170 the daily outbound mail limit.
       "outbound_mail_daily_count", "outbound_mail_suppression",
       "page_reading_level",
