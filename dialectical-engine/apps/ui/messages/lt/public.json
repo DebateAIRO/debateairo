@@ -286,7 +286,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Mūsų Paslaugų teikimo sąlygos, 7 skyrius: draudžiamas turinys, skatinantis savižudybę arba kenkimą kitiems žmonėms.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Mūsų Paslaugų teikimo sąlygos, 7 skyrius: draudžiamas religijos įžeidimas.",
   "public.moderation.ground.PERSONAL_DATA": "Mūsų Paslaugų teikimo sąlygos, 7 skyrius: nepateikite kitų žmonių asmens duomenų.",
-  "public.moderation.ground.ILLEGAL": "Įstatymas: turinys yra neteisėtas. Toliau pateiktuose faktuose nurodytas įstatymas.",
+  "public.moderation.ground.ILLEGAL": "Įstatymas: turinys yra neteisėtas.",
   "public.moderation.law": "Įstatymas, kuriuo rėmėmės: {law}",
   "public.moderation.suspectedIntro": "Kas peržiūrima (dar nenuspręsta):",
   "public.moderation.factsIntro": "Faktai, kuriais rėmėmės:",

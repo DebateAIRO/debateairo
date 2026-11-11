@@ -283,7 +283,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Ketentuan Layanan kami, bagian 7: tidak boleh ada konten yang mendorong bunuh diri atau menyakiti orang lain.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Ketentuan Layanan kami, bagian 7: tidak boleh ada penghinaan agama.",
   "public.moderation.ground.PERSONAL_DATA": "Ketentuan Layanan kami, bagian 7: jangan mengirimkan data pribadi tentang orang lain.",
-  "public.moderation.ground.ILLEGAL": "Hukum: konten tersebut ilegal. Fakta di bawah ini menyebutkan hukumnya.",
+  "public.moderation.ground.ILLEGAL": "Hukum: konten tersebut ilegal.",
   "public.moderation.law": "Hukum yang menjadi dasar kami: {law}",
   "public.moderation.suspectedIntro": "Hal yang sedang ditinjau, belum diputuskan:",
   "public.moderation.factsIntro": "Fakta yang menjadi dasar kami:",

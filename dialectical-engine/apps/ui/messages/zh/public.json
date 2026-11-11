@@ -283,7 +283,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "我们的《服务条款》第7节：禁止鼓励自杀或伤害他人的内容。",
   "public.moderation.ground.RELIGIOUS_INSULT": "我们的《服务条款》第7节：禁止宗教侮辱。",
   "public.moderation.ground.PERSONAL_DATA": "我们的《服务条款》第7节：不得提交他人的个人数据。",
-  "public.moderation.ground.ILLEGAL": "法律：该内容违法。下方的事实列明了相关法律。",
+  "public.moderation.ground.ILLEGAL": "法律：该内容违法。",
   "public.moderation.law": "我们所依据的法律：{law}",
   "public.moderation.suspectedIntro": "审核所涉事项（尚未决定）：",
   "public.moderation.factsIntro": "我们所依据的事实：",

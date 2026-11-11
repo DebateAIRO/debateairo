@@ -286,7 +286,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Наши Условия использования, раздел 7: никакого контента, поощряющего самоубийство или причинение вреда другим людям.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Наши Условия использования, раздел 7: никакого оскорбления религии.",
   "public.moderation.ground.PERSONAL_DATA": "Наши Условия использования, раздел 7: не представляйте персональные данные других лиц.",
-  "public.moderation.ground.ILLEGAL": "Закон: контент незаконен. Конкретный закон указан в фактах ниже.",
+  "public.moderation.ground.ILLEGAL": "Закон: контент незаконен.",
   "public.moderation.law": "Закон, на который мы опирались: {law}",
   "public.moderation.suspectedIntro": "Предмет проверки, решение ещё не принято:",
   "public.moderation.factsIntro": "Факты, на которые мы опирались:",

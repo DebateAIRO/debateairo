@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Unsere Nutzungsbedingungen, Abschnitt 7: Übermitteln Sie keine personenbezogenen Daten anderer Personen.",
   "mail.statement.groundIllegal": "Das Gesetz: Der Inhalt ist rechtswidrig. Die vollständige Begründung nennt das Gesetz.",
   "mail.statement.readFull": "Die vollständige Begründung mit den Tatsachen, auf die wir uns gestützt haben, finden Sie in Ihrem Konto: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Die vollständige Begründung finden Sie in Ihrem Konto: {statementUrl}",
   "mail.statement.routes": "Um diese Entscheidung anzufechten, antworten Sie auf diese E-Mail oder schreiben Sie innerhalb von sechs Monaten an office@dezbatere.ro: Eine Person, die nicht beteiligt war, prüft sie. Sie können sich auch an eine zertifizierte außergerichtliche Streitbeilegungsstelle wenden oder ein Gericht anrufen.",
   "mail.flagAnswer.receiptSubject": "Wir haben Ihre Meldung erhalten",
   "mail.flagAnswer.receipt": "Am {happened} haben wir Ihre Meldung zu dieser öffentlichen Debatte erhalten: {itemUrl}. Eine Person wird sie lesen, und wir teilen Ihnen unsere Entscheidung mit.",

@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Ár dTéarmaí Seirbhíse, alt 7: ná cuir sonraí pearsanta faoi dhaoine eile isteach.",
   "mail.statement.groundIllegal": "An dlí: tá an t-ábhar mídhleathach. Ainmníonn an ráiteas iomlán an dlí.",
   "mail.statement.readFull": "Tá an ráiteas iomlán, leis na fíricí ar ar bhraitheamar, i do chuntas: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Tá an ráiteas iomlán i do chuntas: {statementUrl}",
   "mail.statement.routes": "Chun agóid a dhéanamh i gcoinne an chinnidh seo, freagair an ríomhphost seo nó scríobh chuig office@dezbatere.ro laistigh de shé mhí: déanfaidh duine nach raibh páirteach ann athbhreithniú air. Féadfaidh tú freisin dul chuig comhlacht um réiteach díospóidí lasmuigh den chúirt atá deimhnithe, nó chuig cúirt.",
   "mail.flagAnswer.receiptSubject": "Fuaireamar do thuairisc",
   "mail.flagAnswer.receipt": "Ar {happened}, fuaireamar do thuairisc faoin díospóireacht phoiblí seo: {itemUrl}. Léifidh duine í, agus inseoimid duit cad a chinnfimid.",

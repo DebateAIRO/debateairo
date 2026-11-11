@@ -63,6 +63,28 @@ describe("0157: the statement of reasons sender", () => {
     expect(completed).toEqual(claims.map((claim) => [claim.statementId, "SENT"]));
   });
 
+  // Final review (0172): the statements of those whose dig or report left with the debate carry no facts (only the debate owner's does), so their
+  // mail's link never promises "the facts we relied on"; the kinds whose page shows the facts keep that sentence. DEBATE_HIDDEN is unchanged (R14).
+  it("the four kinds with no facts link the full statement without promising facts; DEBATE_DECIDED and CONTRIBUTION_REMOVED still promise them", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    const kinds: ModerationStatementKind[] = ["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "DEBATE_HIDDEN"];
+    const { claims } = await (async () => { const made = world(kinds.map((kind) => statement(kind)), memory); await made.reconciler.reconcile(); return made; })();
+    const catalog = JSON.parse(readFileSync(resolve(process.cwd(), "packages/mail-templates/messages/en/mail.json"), "utf8")) as Record<string, string>;
+    expect(catalog["mail.statement.readFullNoFacts"]).toBe("The full statement is in your account: {statementUrl}");
+    expect(catalog["mail.statement.readFull"]).toBe("The full statement, with the facts we relied on, is in your account: {statementUrl}");
+    memory.messages.forEach(({ mail }, index) => {
+      const link = `https://debate.example.test/settings/notices#${claims[index]!.statementId}`;
+      const { text } = renderMail(mail.templateId, mail.locale, mail.params);
+      expect(mail.params.noFacts, kinds[index]).toBe(index < 4 ? "true" : "false");
+      if (index < 4) {
+        expect(text, kinds[index]).toContain(`The full statement is in your account: ${link}`);
+        expect(text, kinds[index]).not.toContain("the facts we relied on");
+      } else {
+        expect(text, kinds[index]).toContain(`The full statement, with the facts we relied on, is in your account: ${link}`);
+      }
+    });
+  });
+
   // M3 (owner's decision D, 10 Nov 2026): the final decision to those whose dig or report left with the debate: its date, the item's link, the routes, Reply-To office@.
   it("the final-decision mails for a contributor and for a reporter render in en and ro with the routes, and carry Reply-To office@", async () => {
     const memory = new MemoryTemplatedMailSender();
@@ -107,13 +129,13 @@ describe("0157: the statement of reasons sender", () => {
   });
 
   it("the automatic hide names the rule it found and says no person was involved; a step from before 0157 says no rule was recorded", () => {
-    const automatic = statementMailParams({ happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
+    const automatic = statementMailParams({ kind: "DEBATE_HIDDEN", happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
       ground: { ...HOLD, automated_decision: true } });
     expect(automatic).toMatchObject({ automatedDecision: "true", groundHold: "true", groundHate: "true", groundNone: "false", sourceReport: "true" });
     const text = renderMail("MODERATION_STATEMENT_DEBATE_HIDDEN", "en", automatic).text;
     expect(text).toContain("An automatic check read the report and took this step by itself, with no person involved yet.");
     expect(text).toContain("Our Terms of Service, section 7: no hate speech of any kind.");
-    const before = statementMailParams({ happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
+    const before = statementMailParams({ kind: "CONTRIBUTION_REMOVED", happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
       ground: { recorded: false, interim: false, grounds: [], suspected: [], sources: [], automated_detection: false, automated_decision: false, law: null } });
     expect(before.groundNone).toBe("true");
     expect(Object.entries(before).filter(([name, value]) => name.startsWith("ground") && name !== "groundNone" && value === "true")).toEqual([]);
@@ -124,7 +146,7 @@ describe("0157: the statement of reasons sender", () => {
 
   it("0172 (M7): the law an illegal ground names stays on the page; the mail says only that the full statement names it, and never carries its words", () => {
     const LAW = "Legea nr. 8/1996, art. 139 SECRET-LAW-WORDS";
-    const params = statementMailParams({ happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
+    const params = statementMailParams({ kind: "CONTRIBUTION_REMOVED", happenedAt: "2026-11-05T09:30:00.000Z", itemUrl: "https://x.test/i", statementUrl: "https://x.test/s",
       ground: { recorded: true, interim: false, grounds: ["ILLEGAL"], suspected: [], sources: ["AUTHORITY_ORDER"], automated_detection: false, automated_decision: false, law: LAW } });
     expect(params.groundIllegal).toBe("true");
     expect(JSON.stringify(params)).not.toContain("SECRET-LAW-WORDS");

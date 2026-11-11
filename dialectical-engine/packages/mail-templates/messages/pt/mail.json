@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Os nossos Termos de Serviço, secção 7: não envie dados pessoais de outras pessoas.",
   "mail.statement.groundIllegal": "A lei: o conteúdo é ilegal. A exposição dos motivos completa indica a lei.",
   "mail.statement.readFull": "A exposição dos motivos completa, com os factos em que nos baseámos, está na sua conta: {statementUrl}",
+  "mail.statement.readFullNoFacts": "A exposição dos motivos completa está na sua conta: {statementUrl}",
   "mail.statement.routes": "Para contestar esta decisão, responda a este e-mail ou escreva para office@dezbatere.ro no prazo de seis meses: uma pessoa que não tenha participado na decisão irá revê-la. Pode também recorrer a um organismo de resolução extrajudicial de litígios certificado ou aos tribunais.",
   "mail.flagAnswer.receiptSubject": "Recebemos a sua denúncia",
   "mail.flagAnswer.receipt": "Em {happened}, recebemos a sua denúncia sobre este debate público: {itemUrl}. Uma pessoa vai lê-la e iremos comunicar-lhe a nossa decisão.",

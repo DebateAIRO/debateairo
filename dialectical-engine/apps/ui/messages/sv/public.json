@@ -284,7 +284,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Våra Användarvillkor, avsnitt 7: inget innehåll som uppmuntrar till självmord eller till att skada andra människor.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Våra Användarvillkor, avsnitt 7: ingen förolämpning av religion.",
   "public.moderation.ground.PERSONAL_DATA": "Våra Användarvillkor, avsnitt 7: skicka inte in personuppgifter om andra personer.",
-  "public.moderation.ground.ILLEGAL": "Lagen: innehållet är olagligt. Fakta nedan anger vilken lag det gäller.",
+  "public.moderation.ground.ILLEGAL": "Lagen: innehållet är olagligt.",
   "public.moderation.law": "Lagen vi stödde oss på: {law}",
   "public.moderation.suspectedIntro": "Vad granskningen gäller, ännu inte avgjort:",
   "public.moderation.factsIntro": "De fakta vi stödde oss på:",

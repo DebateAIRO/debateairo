@@ -137,13 +137,15 @@ beforeAll(async () => {
   await seeded([
     ["INSERT INTO staff.owner_designation (staff_id, active) VALUES ($1, true)", [owner]],
     ["INSERT INTO staff.team_limit_holder (staff_id, active, granted_by_staff_id, granted_operation_id) VALUES ($1, true, $2, $3)", [holder, owner, randomUUID()]]]);
-  // M1: three reporters' receipts, claimed for an hour: the check's UNSURE, a report stuck CHECKING (settled UNAVAILABLE by the sweep below), and one no check ran for.
+  // M1: three reporters' receipts, claimed for an hour: the check's UNSURE (given nine minutes ago, as 0151's settle stamps judged_at), a report stuck
+  // CHECKING (settled UNAVAILABLE by the sweep below), and one no check ran for.
   const publisher = await account();
   const ref = await publishedDebate(publisher);
   for (const [name, state, verdict] of [["unsure", "QUEUED", "UNSURE"], ["swept", "CHECKING", null], ["unchecked", "QUEUED", null]] as const) {
     const reporter = await account();
     await seeded([
-      [`INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, reason, state, verdict, created_at, content_deleted_at) VALUES ($1,$2,$3,'CONTENT',$4,$5,now() - interval '10 minutes',now())`,
+      [`INSERT INTO identity.public_flag (flag_id, publication_ref, reporter_ref, reason, state, verdict, judged_at, created_at, content_deleted_at)
+        VALUES ($1,$2,$3,'CONTENT',$4,$5,CASE WHEN $5::text IS NULL THEN NULL ELSE now() - interval '9 minutes' END,now() - interval '10 minutes',now())`,
         [m1[name].flagId, ref, reporter.ownerRef, state, verdict]],
       [`INSERT INTO identity.public_flag_mail (mail_id, flag_id, kind, happened_at, claim_token, claim_expires_at) VALUES ($1,$2,'RECEIPT',now(),$3,now() + interval '1 hour')`,
         [m1[name].mailId, m1[name].flagId, m1[name].claim]]]);
@@ -453,6 +455,29 @@ describe("M6, M4: a review step that acts on a report closes it, and the reporte
         VALUES ($1,$2,ARRAY['PERSONAL_DATA'],'REPORT_BUTTON',$3,$4,$5::jsonb,false)`, [eventId, ref, due, sha("facts"), sealed(ref)]]]);
     await close(due, "NO_BREACH", randomUUID());
     expect(await mailsOf(due)).toEqual(["RECEIPT", "ACTED"]);
+  }, timeout);
+
+  // Final review: a person's step may name a report the check still reads (CHECKING). It closes the report as ACTED; 0151's settle then still moves it
+  // to NOT_FOUND. The reporter hears the person's decision alone (no automatic answer, no receipt after "acted"), and the ACTED mail never says an AI
+  // read it first: the check's verdict came after the decision. Both orders of the sender's queue: run between the close and the settle, and not.
+  it("a report the check still reads, closed by a person's removal and then settled NOT_FOUND, gets ACTED alone, without the AI's line", async () => {
+    const ana = await account();
+    const ref = await publishedDebate(ana);
+    for (const queuedBetween of [true, false]) {
+      const rea = await account();
+      const flagId = await reportOf(ref, rea, "CHECKING");
+      await grounded(ref, "REMOVE_DIG", flagId, randomUUID());
+      expect(await answerOf(flagId)).toMatchObject({ outcome: "ACTED" });
+      if (queuedBetween) expect(await mailsOf(flagId)).toEqual(["ACTED"]);
+      expect((await database.pool.query<{ state: string }>("SELECT identity.settle_public_flag($1::uuid,'NOT_FOUND','CONTENT','fixture','fixture-model',1,1,0) AS state", [flagId])).rows[0]!.state)
+        .toBe("NOT_FOUND");
+      expect(await mailsOf(flagId), `queued between: ${queuedBetween}`).toEqual(["ACTED"]);
+      const claim = randomUUID();
+      const mailId = (await database.pool.query<{ mail_id: string }>("UPDATE identity.public_flag_mail SET claim_token=$2, claim_expires_at=now() + interval '1 hour' WHERE flag_id=$1 AND kind='ACTED' RETURNING mail_id",
+        [flagId, claim])).rows[0]!.mail_id;
+      const read = (await runtime.query<{ value: Record<string, unknown> }>("SELECT identity.read_public_flag_mail($1::uuid,$2::uuid) AS value", [mailId, claim])).rows[0]!.value;
+      expect(read).toMatchObject({ kind: "ACTED", aiReadFirst: false });
+    }
   }, timeout);
 
   it("a close that fails is skipped with a warning and no words, and the step stands", async () => {

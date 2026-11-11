@@ -16,8 +16,10 @@
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: drained
 -- n1: keeps-verifier
---   drained         it restates 0157's identity.queue_moderation_statements() in place and swaps the kind CHECK of 0151's staff.public_flag_notice, and
---                   both are pinned by those steps' postcondition digests (amendsPostconditionsOf); the release that carries it must be a drained upload.
+--   drained         it restates thirteen of 0157's functions in place, swaps 0157's kind CHECK on identity.moderation_statement and 0151's on
+--                   staff.public_flag_notice, adds four NOT VALID CHECKs to 0157's ground and decision tables, and revokes the runtime's right on
+--                   0157's staff door without the law; all are pinned by those steps' postcondition digests (amendsPostconditionsOf), so the release
+--                   that carries it must be a drained upload.
 --                   0157's claim, read and complete keep their signatures and results, so the release before's sender still works beside it.
 --   keeps-verifier  no billing relation or billing function, so lineage/verify-effective-capabilities-130.sql stays in force.
 
@@ -320,6 +322,10 @@ $$;
 -- left to the close's own ACTED answer when there is one (one ACTED per report, the earliest: 0157's UNIQUE (flag_id, kind) already keeps
 -- it to one row), and NO_BREACH is never queued once ACTED is queued or sent for the report, or due before it in the same run (a step whose
 -- close was skipped, then a person's no-breach). ACTED may still follow an earlier NO_BREACH: a later, real decision.
+-- Final review: and one to its first insert. A person may decide on a report the check still reads (CHECKING); 0151's settle then still moves
+-- it to QUEUED or NOT_FOUND. A receipt or an automatic answer that would come after a person's decision (a close's answer, a step's or a
+-- decision's ground naming the report, an ACTED or NO_BREACH mail, at or before its own moment) is never queued: the reporter hears the
+-- person's decision alone. A receipt from before the decision still goes, in its order.
 CREATE OR REPLACE FUNCTION identity.queue_public_flag_mail() RETURNS integer
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_since timestamptz; v_rows integer; v_count integer := 0;
@@ -332,6 +338,10 @@ BEGIN
       COALESCE(flag.judged_at, flag.created_at) AS happened_at, flag.created_at
     FROM identity.public_flag AS flag WHERE COALESCE(flag.judged_at, flag.created_at) >= v_since AND flag.state IN ('QUEUED','HIDDEN','NOT_FOUND') AND flag.reporter_ref IS NOT NULL) AS due
   WHERE NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = due.kind)
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS answer WHERE answer.flag_id = due.flag_id AND answer.recorded_at <= due.happened_at)
+    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS decided WHERE decided.flag_id = due.flag_id AND decided.kind IN ('ACTED','NO_BREACH') AND decided.happened_at <= due.happened_at)
+    AND NOT EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = due.flag_id AND ground.source = 'REPORT_BUTTON' AND ground.recorded_at <= due.happened_at)
+    AND NOT EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = due.flag_id AND decision.source = 'REPORT_BUTTON' AND decision.recorded_at <= due.happened_at)
   ORDER BY due.created_at, due.flag_id LIMIT 200
   ON CONFLICT (flag_id, kind) DO NOTHING;
   GET DIAGNOSTICS v_rows = ROW_COUNT; v_count := v_count + v_rows;
@@ -399,10 +409,12 @@ $$;
 -- M1: the reporter's answer says whether an automatic check read the report first (the owner, 10 Nov 2026). 0157's body with one key more, aiReadFirst: true when
 -- 0151's check gave a verdict (AGREE, NOT_FOUND or UNSURE), false when it was unavailable (the five-minute sweep settles a stuck report so) or none ran. The
 -- receipt and the two decisions a person made (NO_BREACH, ACTED) show it; the two automatic answers already say it. Same signature, owner and grants.
+-- Final review: only a verdict given by the mail's moment counts (judged_at at or before happened_at): a person who decided while the check still
+-- read the report decided alone, whatever the check said after.
 CREATE OR REPLACE FUNCTION identity.read_public_flag_mail(p_mail_id uuid, p_claim uuid) RETURNS jsonb
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   SELECT jsonb_build_object('userId', identity_user.user_id, 'mailId', mail.mail_id, 'kind', mail.kind, 'happenedAt', mail.happened_at,
-    'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false),
+    'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false) AND flag.judged_at IS NOT NULL AND flag.judged_at <= mail.happened_at,
     'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref), 'publicationRef', flag.publication_ref, 'emailCiphertext', identity_user.email_ciphertext)
   FROM identity.public_flag_mail AS mail JOIN identity.public_flag AS flag ON flag.flag_id = mail.flag_id
     JOIN identity."user" AS identity_user ON identity_user.owner_ref = flag.reporter_ref AND identity_user.state IN ('active','suspended')
@@ -653,7 +665,7 @@ BEGIN
   END IF;
   -- M1: the reporter's answer reader is this file's body (by digest), its owner's, a definer with 0157's settings, as granted.
   IF (SELECT pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') FROM pg_catalog.pg_proc AS p
-        WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS DISTINCT FROM '162d03acca757fffb8bc6e63bb6ab5d6a688b3d251db95cb451448db20b58ea6'
+        WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS DISTINCT FROM '47898a11cc8f22f5baa8bda544d6b76b6a538503aa39021acd7dd65a88829fe3'
     OR (SELECT p.proowner = v_owner AND p.prosecdef AND p.provolatile = 's' AND p.proconfig = ARRAY['search_path=pg_catalog'] AND p.prorettype = 'jsonb'::regtype
       FROM pg_catalog.pg_proc AS p WHERE p.oid = 'identity.read_public_flag_mail(uuid,uuid)'::regprocedure) IS NOT TRUE
     OR NOT pg_catalog.has_function_privilege('debateai_runtime', 'identity.read_public_flag_mail(uuid,uuid)', 'EXECUTE') THEN
@@ -684,7 +696,7 @@ BEGIN
         ('identity.record_hide_ground(uuid,uuid,text[],text,uuid)', 'acaccb507a32acb5f51c1d6404691ab40500ca3c6e33fe58e29ae9a9de935e44'),
         ('identity.moderation_decide(uuid,uuid,text[],text,uuid,text,jsonb,integer,uuid,text)', '28517c05e58727387969c392461ccf6332ff0d9028c14472c9fe169c5af73d65'),
         ('identity.record_step_ground(uuid,uuid,text[],text,uuid,text,jsonb)', 'fe033e37d75be869fe053ae93753122fd07c4802e98463a92114638ba7b8b481'),
-        ('identity.queue_public_flag_mail()', 'b2870ffa279c99b4eddb0570f8ba4e12104577163f93cc0870f2693db95455cc'),
+        ('identity.queue_public_flag_mail()', 'f7c2bc7e9bf863b21a77f09047ea47aae8684609081102b242bcd0a36c6c7206'),
         ('identity.public_flag_queue_answered()', 'c5d3ae0d5d7cf6cd0d73ff9dca6213fb4de79d2a4a037d4e6bd0d1be4b7b1f3c')) AS expected(signature, body)
       JOIN pg_catalog.pg_proc AS p ON p.oid = pg_catalog.to_regprocedure(expected.signature)
       WHERE pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(p.prosrc, 'UTF8')), 'hex') = expected.body

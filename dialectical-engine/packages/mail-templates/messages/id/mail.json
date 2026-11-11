@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Ketentuan Layanan kami, bagian 7: jangan mengirimkan data pribadi tentang orang lain.",
   "mail.statement.groundIllegal": "Hukum: konten tersebut ilegal. Pernyataan alasan lengkap menyebutkan hukumnya.",
   "mail.statement.readFull": "Pernyataan alasan lengkap, beserta fakta yang menjadi dasar kami, ada di akun Anda: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Pernyataan alasan lengkap ada di akun Anda: {statementUrl}",
   "mail.statement.routes": "Untuk mengajukan keberatan atas keputusan ini, balas email ini atau kirim pesan ke office@dezbatere.ro dalam waktu enam bulan: seseorang yang tidak terlibat akan meninjaunya. Anda juga dapat membawanya ke badan penyelesaian sengketa di luar pengadilan yang disertifikasi, atau ke pengadilan.",
   "mail.flagAnswer.receiptSubject": "Kami telah menerima laporan Anda",
   "mail.flagAnswer.receipt": "Pada {happened}, kami menerima laporan Anda tentang debat publik ini: {itemUrl}. Seseorang akan membacanya, dan kami akan memberi tahu Anda keputusan kami.",

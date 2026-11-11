@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "당사 서비스 이용약관 제7조: 다른 사람의 개인정보를 제출하지 마십시오.",
   "mail.statement.groundIllegal": "법률: 이 콘텐츠는 불법입니다. 전체 이유 설명서에 해당 법률이 나와 있습니다.",
   "mail.statement.readFull": "당사가 근거로 삼은 사실을 포함한 전체 이유 설명서는 회원님의 계정에서 확인하실 수 있습니다: {statementUrl}",
+  "mail.statement.readFullNoFacts": "전체 이유 설명서는 회원님의 계정에서 확인하실 수 있습니다: {statementUrl}",
   "mail.statement.routes": "이 결정에 이의를 제기하려면 6개월 이내에 이 이메일에 회신하거나 office@dezbatere.ro로 연락해 주세요. 결정에 관여하지 않은 사람이 검토합니다. 이 결정을 인증된 대체적 분쟁 해결 기관이나 법원에 제기할 수도 있습니다.",
   "mail.flagAnswer.receiptSubject": "회원님의 신고를 접수했습니다",
   "mail.flagAnswer.receipt": "{happened}에 이 공개 토론에 대한 회원님의 신고를 접수했습니다: {itemUrl}. 사람이 신고를 읽은 후 당사의 결정을 알려 드리겠습니다.",

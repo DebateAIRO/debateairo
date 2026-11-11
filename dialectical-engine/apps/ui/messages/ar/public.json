@@ -288,7 +288,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "شروط الخدمة لدينا، القسم 7: يُحظر المحتوى الذي يشجع على الانتحار أو إيذاء الآخرين.",
   "public.moderation.ground.RELIGIOUS_INSULT": "شروط الخدمة لدينا، القسم 7: تُحظر الإساءة إلى الدين.",
   "public.moderation.ground.PERSONAL_DATA": "شروط الخدمة لدينا، القسم 7: لا تقدم بيانات شخصية عن أشخاص آخرين.",
-  "public.moderation.ground.ILLEGAL": "القانون: المحتوى غير قانوني. تذكر الوقائع أدناه اسم القانون.",
+  "public.moderation.ground.ILLEGAL": "القانون: المحتوى غير قانوني.",
   "public.moderation.law": "القانون الذي استندنا إليه: {law}",
   "public.moderation.suspectedIntro": "موضوع المراجعة، ولم يُبتّ فيه بعد:",
   "public.moderation.factsIntro": "الوقائع التي استندنا إليها:",

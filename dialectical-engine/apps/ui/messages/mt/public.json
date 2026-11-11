@@ -287,7 +287,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "It-Termini tas-Servizz tagħna, taqsima 7: ebda kontenut li jinkoraġġixxi s-suwiċidju jew li jagħmel ħsara lil persuni oħra.",
   "public.moderation.ground.RELIGIOUS_INSULT": "It-Termini tas-Servizz tagħna, taqsima 7: ebda insult reliġjuż.",
   "public.moderation.ground.PERSONAL_DATA": "It-Termini tas-Servizz tagħna, taqsima 7: tissottomettix data personali dwar persuni oħra.",
-  "public.moderation.ground.ILLEGAL": "Il-liġi: il-kontenut huwa illegali. Il-fatti hawn taħt isemmu l-liġi.",
+  "public.moderation.ground.ILLEGAL": "Il-liġi: il-kontenut huwa illegali.",
   "public.moderation.law": "Il-liġi li bbażajna fuqha: {law}",
   "public.moderation.suspectedIntro": "Dwar xiex huwa r-rieżami, għadu mhux deċiż:",
   "public.moderation.factsIntro": "Il-fatti li bbażajna fuqhom:",

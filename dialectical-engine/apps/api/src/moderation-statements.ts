@@ -31,15 +31,22 @@ const GROUND_FLAGS: Readonly<Record<string, string>> = Object.freeze({
 });
 const SOURCE_FLAGS: Readonly<Record<string, string>> = Object.freeze({ REPORT_BUTTON: "sourceReport", EMAIL_NOTICE: "sourceEmail", AUTHORITY_ORDER: "sourceAuthority", OWN_INITIATIVE: "sourceOwn" });
 const flag = (value: boolean): string => (value ? "true" : "false");
+/**
+ * Final review (0172, M3): the kinds whose full statement carries no facts. Those told because their contribution or report left with the debate read
+ * the step, the rule and the law, never the facts staff typed (identity.read_own_moderation_statements): their mail's link says so (`noFacts`).
+ * DEBATE_HIDDEN keeps its sentence (ruling R14).
+ */
+const NO_FACTS: ReadonlySet<ModerationStatementKind> = new Set<ModerationStatementKind>(["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"]);
 
 /**
  * The mail's params for one statement: two links, the date and one flag each. A staff hide relies on the hold alone, and what a person suspected stays on
  * the page; the automatic hide relied on the rule the check found, so that rule is named beside the hold (D2).
  */
-export function statementMailParams(input: Readonly<{ happenedAt: string; itemUrl: string; statementUrl: string; ground: ModerationStatementGround }>): Record<string, string> {
+export function statementMailParams(input: Readonly<{ kind: ModerationStatementKind; happenedAt: string; itemUrl: string; statementUrl: string; ground: ModerationStatementGround }>): Record<string, string> {
   const grounds = new Set([...input.ground.grounds, ...(input.ground.automated_decision ? input.ground.suspected : [])]);
   const params: Record<string, string> = { happened: new Date(input.happenedAt).toISOString(), itemUrl: input.itemUrl, statementUrl: input.statementUrl,
-    automatedDecision: flag(input.ground.automated_decision), automatedDetection: flag(input.ground.automated_detection), groundNone: flag(!input.ground.recorded) };
+    automatedDecision: flag(input.ground.automated_decision), automatedDetection: flag(input.ground.automated_detection), groundNone: flag(!input.ground.recorded),
+    noFacts: flag(NO_FACTS.has(input.kind)) };
   for (const [code, name] of Object.entries(GROUND_FLAGS)) params[name] = flag(input.ground.recorded && grounds.has(code));
   for (const [code, name] of Object.entries(SOURCE_FLAGS)) params[name] = flag(input.ground.sources.includes(code));
   return params;
@@ -76,7 +83,7 @@ export class ModerationStatementReconciler {
       const recipient = plain.toString("utf8");
       if (!isSingleDeliverableRecipient(recipient)) return "DROPPED";
       await this.channel.sendTemplated({ to: recipient, templateId: TEMPLATE_OF[statement.kind], locale: statement.mailLocale, messageId: claim.statementId,
-        params: statementMailParams({ happenedAt: statement.happenedAt, ground: statement.ground,
+        params: statementMailParams({ kind: statement.kind, happenedAt: statement.happenedAt, ground: statement.ground,
           itemUrl: new URL(`/public/debate/${encodeURIComponent(statement.publicationRef)}`, this.appUrl).toString(),
           statementUrl: new URL(`/settings/notices#${encodeURIComponent(statement.statementId)}`, this.appUrl).toString() }) });
       return "SENT";

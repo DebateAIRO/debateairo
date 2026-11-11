@@ -103,6 +103,19 @@ describe("the moderation notices page", () => {
     expect(line.textContent).toBe(`The law we relied on: ${LAW}`);
     expect(line.getAttribute("dir")).toBe("auto");
     expect(hidden!.querySelector("[data-statement-law]")).toBeNull();
+    // Final review: the ILLEGAL line names no facts (the law has its own line, and some readers see no facts at all).
+    expect(pub["public.moderation.ground.ILLEGAL"]).toBe("The law: the content is illegal.");
+    expect([...removed!.querySelectorAll("li")].map((item) => item.textContent)).toEqual(["The law: the content is illegal."]);
+  });
+
+  it("final review: a hide that names ILLEGAL as suspected lists it under what the review is about, with no law and no facts promised", async () => {
+    const page = await mount([statement({ ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["ILLEGAL"], sources: ["EMAIL_NOTICE"], automated_detection: false, automated_decision: false, law: null } })]);
+    const card = page.querySelector("section")!;
+    const lists = [...card.querySelectorAll("ul")].map((list) => [...list.querySelectorAll("li")].map((item) => item.textContent));
+    expect(lists).toEqual([[pub["public.moderation.ground.REVIEW_HOLD"]], ["The law: the content is illegal."]]);
+    expect(card.textContent).toContain(pub["public.moderation.suspectedIntro"]);
+    expect(card.querySelector("[data-statement-law]")).toBeNull();
+    expect(card.textContent).not.toContain("facts below");
   });
 
   it("says when there are none, and when they could not be read", async () => {

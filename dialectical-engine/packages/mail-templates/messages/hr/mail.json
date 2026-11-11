@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Naši Uvjeti korištenja, odjeljak 7: ne šaljite osobne podatke drugih osoba.",
   "mail.statement.groundIllegal": "Zakon: sadržaj je nezakonit. Zakon je naveden u cjelovitom obrazloženju.",
   "mail.statement.readFull": "Cjelovito obrazloženje, s činjenicama na koje smo se oslonili, nalazi se na vašem računu: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Cjelovito obrazloženje nalazi se na vašem računu: {statementUrl}",
   "mail.statement.routes": "Da biste osporili ovu odluku, odgovorite na ovu poruku e-pošte ili pišite na office@dezbatere.ro u roku od šest mjeseci: preispitat će je osoba koja nije sudjelovala u njoj. Možete se obratiti i certificiranom tijelu za izvansudsko rješavanje sporova ili sudu.",
   "mail.flagAnswer.receiptSubject": "Primili smo vašu prijavu",
   "mail.flagAnswer.receipt": "Dana {happened} primili smo vašu prijavu u vezi s ovom javnom raspravom: {itemUrl}. Pročitat će je osoba, a mi ćemo vam javiti što smo odlučili.",

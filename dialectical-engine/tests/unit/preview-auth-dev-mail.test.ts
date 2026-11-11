@@ -98,7 +98,7 @@ describe('templated mail (billing and legal) to the allow-listed recipients only
  async function statementMail(to: string) {
   const sender = new MemoryTemplatedMailSender('noreply@dezbatere.ro');
   const flags = Object.fromEntries(['automatedDecision', 'automatedDetection', 'groundNone', 'groundHold', 'groundUnlawful', 'groundHate', 'groundWeapons', 'groundSuicide', 'groundReligious', 'groundPersonal', 'groundIllegal',
-   'sourceReport', 'sourceEmail', 'sourceAuthority', 'sourceOwn'].map((name) => [name, name === 'groundHold' || name === 'sourceOwn' ? 'true' : 'false']));
+   'sourceReport', 'sourceEmail', 'sourceAuthority', 'sourceOwn', 'noFacts'].map((name) => [name, name === 'groundHold' || name === 'sourceOwn' ? 'true' : 'false']));
   await sender.sendTemplated({ to, templateId: 'MODERATION_STATEMENT_DEBATE_HIDDEN', locale: 'en', messageId: ID,
    params: { happened: '2026-11-05T09:30:00.000Z', itemUrl: 'https://v3-preview.dezbatere.ro/public/debate/x', statementUrl: 'https://v3-preview.dezbatere.ro/settings/notices#x', ...flags } });
   return Buffer.from(sender.messages[0]!.raw, 'utf8');

@@ -284,7 +284,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Onze Servicevoorwaarden, artikel 7: geen inhoud die zelfdoding of het schaden van andere mensen aanmoedigt.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Onze Servicevoorwaarden, artikel 7: geen religieuze belediging.",
   "public.moderation.ground.PERSONAL_DATA": "Onze Servicevoorwaarden, artikel 7: dien geen persoonsgegevens over andere personen in.",
-  "public.moderation.ground.ILLEGAL": "De wet: de inhoud is illegaal. De feiten hieronder noemen de wet.",
+  "public.moderation.ground.ILLEGAL": "De wet: de inhoud is illegaal.",
   "public.moderation.law": "De wet waarop we ons baseerden: {law}",
   "public.moderation.suspectedIntro": "Waar de beoordeling over gaat, nog niet beslist:",
   "public.moderation.factsIntro": "De feiten waarop we ons baseerden:",

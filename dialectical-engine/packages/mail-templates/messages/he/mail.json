@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "תנאי השירות שלנו, סעיף 7: אל תמסרו נתונים אישיים על אנשים אחרים.",
   "mail.statement.groundIllegal": "החוק: התוכן בלתי חוקי. ההנמקה המלאה מציינת את החוק.",
   "mail.statement.readFull": "ההנמקה המלאה, עם העובדות שעליהן הסתמכנו, נמצאת בחשבון שלך: {statementUrl}",
+  "mail.statement.readFullNoFacts": "ההנמקה המלאה נמצאת בחשבון שלך: {statementUrl}",
   "mail.statement.routes": "כדי להשיג על ההחלטה הזו, אפשר להשיב למייל הזה או לכתוב אל office@dezbatere.ro בתוך שישה חודשים: אדם שלא היה מעורב בה יבחן אותה. אפשר גם לפנות לגוף ליישוב סכסוכים מחוץ לבית המשפט שהוסמך לכך או לבית משפט.",
   "mail.flagAnswer.receiptSubject": "קיבלנו את הדיווח שלך",
   "mail.flagAnswer.receipt": "ב-{happened}, קיבלנו את הדיווח שלך על הדיון הציבורי הזה: {itemUrl}. אדם יקרא אותו, ונעדכן אותך במה שנחליט.",

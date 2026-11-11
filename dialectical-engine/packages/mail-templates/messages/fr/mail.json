@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Nos Conditions d’utilisation, section 7 : ne soumettez pas de données à caractère personnel concernant d’autres personnes.",
   "mail.statement.groundIllegal": "La loi : le contenu est illicite. L’exposé des motifs complet cite la loi.",
   "mail.statement.readFull": "L’exposé des motifs complet, avec les faits sur lesquels nous nous sommes fondés, se trouve dans votre compte : {statementUrl}",
+  "mail.statement.readFullNoFacts": "L’exposé des motifs complet se trouve dans votre compte : {statementUrl}",
   "mail.statement.routes": "Pour contester cette décision, répondez à cet e-mail ou écrivez à office@dezbatere.ro dans un délai de six mois : une personne qui n’y a pas participé l’examinera. Vous pouvez aussi vous adresser à un organe de règlement extrajudiciaire des litiges certifié ou à une juridiction.",
   "mail.flagAnswer.receiptSubject": "Nous avons reçu votre signalement",
   "mail.flagAnswer.receipt": "Le {happened}, nous avons reçu votre signalement concernant ce débat public : {itemUrl}. Une personne le lira, et nous vous informerons de notre décision.",

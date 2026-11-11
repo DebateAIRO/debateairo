@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Szolgáltatási feltételeink, 7. szakasz: ne küldjön be más személyekre vonatkozó személyes adatokat.",
   "mail.statement.groundIllegal": "A jog: a tartalom jogellenes. A teljes indokolás megnevezi a jogszabályt.",
   "mail.statement.readFull": "A teljes indokolás, a tényekkel együtt, amelyekre támaszkodtunk, a fiókjában található: {statementUrl}",
+  "mail.statement.readFullNoFacts": "A teljes indokolás a fiókjában található: {statementUrl}",
   "mail.statement.routes": "Ha meg szeretné támadni ezt a döntést, válaszoljon erre az e-mailre, vagy írjon hat hónapon belül az office@dezbatere.ro címre: egy olyan személy vizsgálja felül, aki nem vett részt benne. Fordulhat tanúsított peren kívüli vitarendezési testülethez vagy bírósághoz is.",
   "mail.flagAnswer.receiptSubject": "Megkaptuk bejelentését",
   "mail.flagAnswer.receipt": "{happened} napján megkaptuk bejelentését erről a nyilvános vitáról: {itemUrl}. Egy személy el fogja olvasni, és tájékoztatjuk döntésünkről.",

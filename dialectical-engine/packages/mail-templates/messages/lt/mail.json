@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Mūsų Paslaugų teikimo sąlygos, 7 skyrius: nepateikite kitų žmonių asmens duomenų.",
   "mail.statement.groundIllegal": "Įstatymas: turinys yra neteisėtas. Visame motyvų pareiškime nurodytas įstatymas.",
   "mail.statement.readFull": "Visas motyvų pareiškimas su faktais, kuriais rėmėmės, yra jūsų paskyroje: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Visas motyvų pareiškimas yra jūsų paskyroje: {statementUrl}",
   "mail.statement.routes": "Norėdami užginčyti šį sprendimą, per šešis mėnesius atsakykite į šį el. laišką arba parašykite adresu office@dezbatere.ro: jį peržiūrės žmogus, kuris nedalyvavo priimant sprendimą. Taip pat galite kreiptis į sertifikuotą neteisminio ginčų sprendimo įstaigą arba į teismą.",
   "mail.flagAnswer.receiptSubject": "Gavome jūsų pranešimą",
   "mail.flagAnswer.receipt": "{happened} gavome jūsų pranešimą apie šiuos viešus debatus: {itemUrl}. Jį perskaitys žmogus, ir mes jums pranešime savo sprendimą.",

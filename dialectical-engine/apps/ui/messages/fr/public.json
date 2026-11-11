@@ -285,7 +285,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Nos Conditions d’utilisation, section 7 : aucun contenu encourageant le suicide ou le fait de nuire à autrui.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Nos Conditions d’utilisation, section 7 : aucune insulte religieuse.",
   "public.moderation.ground.PERSONAL_DATA": "Nos Conditions d’utilisation, section 7 : ne soumettez pas de données à caractère personnel concernant d’autres personnes.",
-  "public.moderation.ground.ILLEGAL": "La loi : le contenu est illicite. Les faits ci-dessous citent la loi.",
+  "public.moderation.ground.ILLEGAL": "La loi : le contenu est illicite.",
   "public.moderation.law": "La loi sur laquelle nous nous sommes fondés : {law}",
   "public.moderation.suspectedIntro": "Ce sur quoi porte l’examen, pas encore tranché :",
   "public.moderation.factsIntro": "Les faits sur lesquels nous nous sommes fondés :",

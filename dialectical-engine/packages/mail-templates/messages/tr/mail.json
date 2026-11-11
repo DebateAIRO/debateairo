@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Hizmet Koşullarımız, 7. bölüm: Başka kişiler hakkında kişisel veri göndermeyin.",
   "mail.statement.groundIllegal": "Kanun: İçerik hukuka aykırıdır. Tam gerekçe bildirimi ilgili kanunu belirtir.",
   "mail.statement.readFull": "Dayandığımız olgularla birlikte tam gerekçe bildirimi hesabınızdadır: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Tam gerekçe bildirimi hesabınızdadır: {statementUrl}",
   "mail.statement.routes": "Bu karara itiraz etmek için altı ay içinde bu e-postayı yanıtlayın veya office@dezbatere.ro adresine yazın: Karara dâhil olmamış bir kişi onu inceleyecektir. Ayrıca sertifikalandırılmış bir mahkeme dışı uyuşmazlık çözüm organına veya mahkemeye de başvurabilirsiniz.",
   "mail.flagAnswer.receiptSubject": "Bildiriminizi aldık",
   "mail.flagAnswer.receipt": "{happened} tarihinde bu herkese açık tartışmayla ilgili bildiriminizi aldık: {itemUrl}. Bildiriminizi bir kişi okuyacak ve verdiğimiz kararı size bildireceğiz.",

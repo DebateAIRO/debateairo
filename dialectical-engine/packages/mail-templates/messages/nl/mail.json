@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Onze Servicevoorwaarden, artikel 7: dien geen persoonsgegevens over andere personen in.",
   "mail.statement.groundIllegal": "De wet: de inhoud is illegaal. De volledige motivering noemt de wet.",
   "mail.statement.readFull": "De volledige motivering, met de feiten waarop we ons baseerden, staat in uw account: {statementUrl}",
+  "mail.statement.readFullNoFacts": "De volledige motivering staat in uw account: {statementUrl}",
   "mail.statement.routes": "Om deze beslissing aan te vechten, beantwoordt u deze e-mail of schrijft u binnen zes maanden naar office@dezbatere.ro: een persoon die er niet bij betrokken was, zal haar beoordelen. U kunt zich ook wenden tot een gecertificeerd orgaan voor buitengerechtelijke geschillenbeslechting of tot de rechter.",
   "mail.flagAnswer.receiptSubject": "We hebben uw melding ontvangen",
   "mail.flagAnswer.receipt": "Op {happened} hebben we uw melding over dit openbare debat ontvangen: {itemUrl}. Een persoon zal haar lezen, en we laten u weten wat we beslissen.",

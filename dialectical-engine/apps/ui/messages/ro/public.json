@@ -285,7 +285,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Termenii serviciului nostru, secțiunea 7: niciun conținut care încurajează sinuciderea sau faptul de a face rău altor persoane.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Termenii serviciului nostru, secțiunea 7: nicio insultă la adresa religiei.",
   "public.moderation.ground.PERSONAL_DATA": "Termenii serviciului nostru, secțiunea 7: nu transmiteți date cu caracter personal despre alte persoane.",
-  "public.moderation.ground.ILLEGAL": "Legea: conținutul este ilegal. Faptele de mai jos indică legea.",
+  "public.moderation.ground.ILLEGAL": "Legea: conținutul este ilegal.",
   "public.moderation.law": "Legea pe care ne-am bazat: {law}",
   "public.moderation.suspectedIntro": "Ce se verifică, încă nedecis:",
   "public.moderation.factsIntro": "Faptele pe care ne-am bazat:",

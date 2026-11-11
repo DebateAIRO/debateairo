@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Le nostre Condizioni di servizio, sezione 7: non inviare dati personali relativi ad altre persone.",
   "mail.statement.groundIllegal": "La legge: il contenuto è illegale. La motivazione completa indica la legge.",
   "mail.statement.readFull": "La motivazione completa, con i fatti su cui ci siamo basati, è nel suo account: {statementUrl}",
+  "mail.statement.readFullNoFacts": "La motivazione completa è nel suo account: {statementUrl}",
   "mail.statement.routes": "Per contestare questa decisione, risponda a questa email o scriva a office@dezbatere.ro entro sei mesi: la esaminerà una persona che non vi ha preso parte. Può anche rivolgersi a un organismo di risoluzione extragiudiziale delle controversie certificato, o ai tribunali.",
   "mail.flagAnswer.receiptSubject": "Abbiamo ricevuto la sua segnalazione",
   "mail.flagAnswer.receipt": "Il {happened} abbiamo ricevuto la sua segnalazione su questo dibattito pubblico: {itemUrl}. Una persona la leggerà, e le comunicheremo la nostra decisione.",

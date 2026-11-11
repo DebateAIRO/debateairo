@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "当社の利用規約 第7条：他者の個人データを送信しないでください。",
   "mail.statement.groundIllegal": "法律：このコンテンツは違法です。理由説明書の全文に、該当する法律が記載されています。",
   "mail.statement.readFull": "当社が根拠とした事実を含む理由説明書の全文は、あなたのアカウントでご覧いただけます：{statementUrl}",
+  "mail.statement.readFullNoFacts": "理由説明書の全文は、あなたのアカウントでご覧いただけます：{statementUrl}",
   "mail.statement.routes": "この決定に異議を申し立てるには、6か月以内にこのメールに返信するか、office@dezbatere.ro までご連絡ください。決定に関与していない人が見直します。認証された裁判外紛争解決機関または裁判所に持ち込むこともできます。",
   "mail.flagAnswer.receiptSubject": "あなたの通報を受け付けました",
   "mail.flagAnswer.receipt": "{happened}、この公開ディベートに関するあなたの通報を受け付けました：{itemUrl}。人が通報を読み、当社の決定をお知らせします。",

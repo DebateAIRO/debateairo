@@ -284,7 +284,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Our Terms of Service, section 7: no content encouraging suicide or harming other people.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Our Terms of Service, section 7: no religious insult.",
   "public.moderation.ground.PERSONAL_DATA": "Our Terms of Service, section 7: do not submit personal data about other people.",
-  "public.moderation.ground.ILLEGAL": "The law: the content is illegal. The facts below name the law.",
+  "public.moderation.ground.ILLEGAL": "The law: the content is illegal.",
   "public.moderation.law": "The law we relied on: {law}",
   "public.moderation.suspectedIntro": "What the review is about, not yet decided:",
   "public.moderation.factsIntro": "The facts we relied on:",

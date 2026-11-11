@@ -118,11 +118,13 @@ const when = (ifParam: string, then: string, otherwise: string | MailParamCondit
  * 0157's statement of reasons (DSA Art 17(3)): what was done, where and for how long (the kind's own sentence, with the item's link); where the facts came
  * from; how automated means were used; the ground, one flag a rule; the link to the full statement; and the routes, office@ within six months among them.
  * Every fact is a flag or a link, so nothing the person did not see on the page is ever in the mail. The ground lines are each shown alone when true.
+ * Final review (0172): `noFacts` is "true" for the kinds whose full statement carries no facts (CONTRIBUTION_AFFECTED, REPORT_AFFECTED,
+ * CONTRIBUTION_DECIDED, REPORT_DECIDED: only the debate owner's statement does), so their link never promises "the facts we relied on".
  */
 const STATEMENT_GROUNDS = Object.freeze([["groundHold", "Hold"], ["groundUnlawful", "Unlawful"], ["groundHate", "Hate"], ["groundWeapons", "Weapons"], ["groundSuicide", "Suicide"],
   ["groundReligious", "Religious"], ["groundPersonal", "Personal"], ["groundIllegal", "Illegal"]] as const);
 const statementParams = Object.freeze({ happened: "date", itemUrl: "url", statementUrl: "url", sourceReport: "flag", sourceEmail: "flag", sourceAuthority: "flag", sourceOwn: "flag",
-  automatedDecision: "flag", automatedDetection: "flag", groundNone: "flag", ...Object.fromEntries(STATEMENT_GROUNDS.map(([name]) => [name, "flag"])) } as Record<string, MailParamKind>);
+  automatedDecision: "flag", automatedDetection: "flag", groundNone: "flag", noFacts: "flag", ...Object.fromEntries(STATEMENT_GROUNDS.map(([name]) => [name, "flag"])) } as Record<string, MailParamKind>);
 const statement = (kind: string): MailTemplateDefinition => define({
   catalogue: "mail", subject: `mail.statement.${kind}Subject`,
   paragraphs: [
@@ -131,7 +133,7 @@ const statement = (kind: string): MailTemplateDefinition => define({
     when("automatedDecision", "mail.statement.automatedDecision", when("automatedDetection", "mail.statement.automatedDetection", "mail.statement.noAutomation")),
     when("groundNone", "mail.statement.groundNone", "mail.statement.groundIntro"),
     ...STATEMENT_GROUNDS.map(([name, key]) => when(name, `mail.statement.ground${key}`)),
-    "mail.statement.readFull", "mail.statement.routes"
+    when("noFacts", "mail.statement.readFullNoFacts", "mail.statement.readFull"), "mail.statement.routes"
   ],
   params: statementParams,
   replyTo: "authorities"
@@ -482,10 +484,11 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     catalogue: "owner", subject: "owner.publicFlag.waitingSubject",
     paragraphs: ["owner.publicFlag.waiting", "owner.teamLimit.open"], params: {}
   }),
-  // 0172, M5 (owner, 10 Nov 2026), under the same rule: no id, no debate, no person.
+  // 0172, M5 (owner, 10 Nov 2026), under the same rule: no id, no debate, no person. Final review: no link to the team page, which shows no
+  // moderation mail; the alert says only that it is retried and that the database operator can see which one.
   MODERATION_MAIL_FAILED: define({
     catalogue: "owner", subject: "owner.moderationMail.failedSubject",
-    paragraphs: ["owner.moderationMail.failed", "owner.teamLimit.open"], params: {}
+    paragraphs: ["owner.moderationMail.failed"], params: {}
   }),
   TEAM_ALLOWANCE_YOURS: define({
     catalogue: "owner", subject: "owner.teamAllowance.yoursSubject",

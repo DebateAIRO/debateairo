@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "It-Termini tas-Servizz tagħna, taqsima 7: tissottomettix data personali dwar persuni oħra.",
   "mail.statement.groundIllegal": "Il-liġi: il-kontenut huwa illegali. Id-dikjarazzjoni sħiħa ssemmi l-liġi.",
   "mail.statement.readFull": "Id-dikjarazzjoni sħiħa, bil-fatti li bbażajna fuqhom, tinsab fil-kont tiegħek: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Id-dikjarazzjoni sħiħa tinsab fil-kont tiegħek: {statementUrl}",
   "mail.statement.routes": "Biex tikkontesta din id-deċiżjoni, wieġeb għal din l-email jew ikteb lil office@dezbatere.ro fi żmien sitt xhur: persuna li ma kinitx involuta se tirrieżaminaha. Tista’ wkoll tressaqha quddiem korp iċċertifikat għas-soluzzjoni tat-tilwim barra mill-qorti, jew quddiem qorti.",
   "mail.flagAnswer.receiptSubject": "Irċevejna r-rapport tiegħek",
   "mail.flagAnswer.receipt": "Fil-{happened}, irċevejna r-rapport tiegħek dwar dan id-dibattitu pubbliku: {itemUrl}. Persuna se taqrah, u ngħidulek x’niddeċiedu.",

@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Termenii serviciului nostru, secțiunea 7: nu transmiteți date cu caracter personal despre alte persoane.",
   "mail.statement.groundIllegal": "Legea: conținutul este ilegal. Expunerea completă a motivelor indică legea.",
   "mail.statement.readFull": "Expunerea completă a motivelor, cu faptele pe care ne-am bazat, se află în contul dumneavoastră: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Expunerea completă a motivelor se află în contul dumneavoastră: {statementUrl}",
   "mail.statement.routes": "Pentru a contesta această decizie, răspundeți la acest e-mail sau scrieți la office@dezbatere.ro în termen de șase luni: o va examina o persoană care nu a fost implicată. Vă puteți adresa, de asemenea, unui organism de soluționare extrajudiciară a litigiilor certificat sau instanței.",
   "mail.flagAnswer.receiptSubject": "Am primit raportarea dumneavoastră",
   "mail.flagAnswer.receipt": "Pe {happened}, am primit raportarea dumneavoastră despre această dezbatere publică: {itemUrl}. O persoană o va citi și vă vom comunica decizia noastră.",

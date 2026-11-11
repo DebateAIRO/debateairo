@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { MAIL_TEMPLATE_IDS, renderMail } from "@debateai/mail-templates";
+import { MAIL_TEMPLATE_IDS, MAIL_TEMPLATES, renderMail } from "@debateai/mail-templates";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 
 const ROOT = new URL("../../", import.meta.url);
@@ -185,14 +185,14 @@ describe("0172: the moderation notice fixes", () => {
     expect(queue.indexOf("v_hide_at >= v_since")).toBeLessThan(queue.indexOf("VALUES (d.decision_id)"));
   });
 
-  it("M1: the reporter's answer reader is 0157's body plus the one key aiReadFirst (a verdict of the check, not UNAVAILABLE), the sender and the three templates use it, the two automatic mails do not", () => {
+  it("M1: the reporter's answer reader is 0157's body plus the one key aiReadFirst (a verdict of the check given by the mail's moment, not UNAVAILABLE), the sender and the three templates use it, the two automatic mails do not", () => {
     const original = read("migrations/0157_moderation_statements.sql");
     const at = original.indexOf("CREATE OR REPLACE FUNCTION identity.read_public_flag_mail");
     const was = original.slice(at, original.indexOf("$$;", original.indexOf("AS $$", at) + 5));
     const now = bodyOf("identity.read_public_flag_mail");
     expect(now.slice(0, now.indexOf("AS $$"))).toBe(was.slice(0, was.indexOf("AS $$")));
     const edited = was.replace("'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref),",
-      "'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false),\n    'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref),");
+      "'aiReadFirst', COALESCE(flag.verdict IN ('AGREE','NOT_FOUND','UNSURE'), false) AND flag.judged_at IS NOT NULL AND flag.judged_at <= mail.happened_at,\n    'mailLocale', identity.moderation_mail_locale(identity_user.owner_ref),");
     expect(edited).not.toBe(was);
     expect(now).toBe(edited);
     expect(SQL).toContain(`IS DISTINCT FROM '${sha256(now.slice(now.indexOf("AS $$") + 5))}'`);
@@ -284,8 +284,13 @@ describe("0172: the moderation notice fixes", () => {
     expect(closeBody).toContain("WHERE flag.flag_id = p_flag_id AND flag.dismissed_at IS NULL FOR UPDATE;\n    IF NOT FOUND THEN RETURN; END IF;");
     expect(closeBody).toContain("  EXCEPTION WHEN OTHERS THEN\n    RAISE WARNING 'PUBLIC_FLAG_REVIEW_CLOSE_SKIPPED';\n  END;\nEND ");
     expect(closeBody).not.toMatch(/RAISE EXCEPTION|SQLERRM|MESSAGE_TEXT|PG_EXCEPTION_DETAIL|%/u);
-    // M4: the mail queue is 0157's with the three guards added, and nothing else.
+    // M4: the mail queue is 0157's with the three guards added, and nothing else. Final review: and, in its first insert, no receipt or automatic
+    // answer once a person decided at or before its moment (a report closed, or named by a step, while the check still read it).
     const QUEUE_ADDED = [
+      "    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS answer WHERE answer.flag_id = due.flag_id AND answer.recorded_at <= due.happened_at)",
+      "    AND NOT EXISTS (SELECT 1 FROM identity.public_flag_mail AS decided WHERE decided.flag_id = due.flag_id AND decided.kind IN ('ACTED','NO_BREACH') AND decided.happened_at <= due.happened_at)",
+      "    AND NOT EXISTS (SELECT 1 FROM identity.moderation_ground AS ground WHERE ground.flag_id = due.flag_id AND ground.source = 'REPORT_BUTTON' AND ground.recorded_at <= due.happened_at)",
+      "    AND NOT EXISTS (SELECT 1 FROM identity.moderation_decision AS decision WHERE decision.flag_id = due.flag_id AND decision.source = 'REPORT_BUTTON' AND decision.recorded_at <= due.happened_at)",
       "        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = ground.flag_id AND acted.outcome = 'ACTED')",
       "        AND NOT EXISTS (SELECT 1 FROM identity.public_flag_answer AS acted WHERE acted.flag_id = decision.flag_id AND acted.outcome = 'ACTED')) AS due",
       "    AND NOT (due.kind = 'NO_BREACH' AND (EXISTS (SELECT 1 FROM identity.public_flag_mail AS mail WHERE mail.flag_id = due.flag_id AND mail.kind = 'ACTED')",
@@ -318,7 +323,9 @@ describe("0172: the moderation notice fixes", () => {
     expect(read("packages/db/src/public-flag.ts")).toContain('kind: "PUBLIC_FLAG_HIDDEN" | "PUBLIC_FLAG_WAITING" | "MODERATION_MAIL_FAILED"');
     const { subject, text } = renderMail("MODERATION_MAIL_FAILED", "en", {});
     expect(subject).toBe("A moderation email could not be sent");
-    expect(text).toContain("A moderation email could not be created or sent. Look at the moderation mail queue.");
+    expect(text).toContain("A moderation email could not be created or sent. It is retried for about three days; the team's database operator can see which one.");
+    // Final review: the team page shows no moderation mail, so the alert does not send anyone there.
+    expect(MAIL_TEMPLATES.MODERATION_MAIL_FAILED.paragraphs).toEqual(["owner.moderationMail.failed"]);
     expect(text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/u);
   });
 

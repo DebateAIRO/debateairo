@@ -58,6 +58,8 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   groundReligious: "true",
   groundPersonal: "true",
   groundIllegal: "true",
+  // Final review (0172): the statement link that promises no facts; the variant (false) renders the one that does.
+  noFacts: "true",
   expires: "2026-10-09T10:02:00.000Z",
   retryDate: "2026-10-30",
   endDate: "2026-11-06T10:00:00.000Z",

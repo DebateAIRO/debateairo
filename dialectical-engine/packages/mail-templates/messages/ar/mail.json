@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "شروط الخدمة لدينا، القسم 7: لا تقدم بيانات شخصية عن أشخاص آخرين.",
   "mail.statement.groundIllegal": "القانون: المحتوى غير قانوني. يذكر بيان الأسباب الكامل اسم القانون.",
   "mail.statement.readFull": "بيان الأسباب الكامل، مع الوقائع التي استندنا إليها، موجود في حسابك: {statementUrl}",
+  "mail.statement.readFullNoFacts": "بيان الأسباب الكامل موجود في حسابك: {statementUrl}",
   "mail.statement.routes": "للاعتراض على هذا القرار، ردّ على هذه الرسالة أو اكتب إلى office@dezbatere.ro خلال ستة أشهر: سيراجعه شخص لم يشارك فيه. ويمكنك أيضًا اللجوء إلى هيئة لتسوية المنازعات خارج نطاق القضاء معتمدة أو إلى القضاء.",
   "mail.flagAnswer.receiptSubject": "تلقّينا بلاغك",
   "mail.flagAnswer.receipt": "في {happened}، تلقّينا بلاغك عن هذه المناظرة العامة: {itemUrl}. سيقرؤه شخص، وسنخبرك بما نقرره.",

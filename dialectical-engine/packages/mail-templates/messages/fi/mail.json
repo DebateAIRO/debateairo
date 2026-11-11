@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Käyttöehtomme, kohta 7: älä lähetä muita henkilöitä koskevia henkilötietoja.",
   "mail.statement.groundIllegal": "Laki: sisältö on laiton. Täysissä perusteluissa mainitaan laki.",
   "mail.statement.readFull": "Täydet perustelut ja tosiseikat, joihin tukeuduimme, löytyvät tililtäsi: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Täydet perustelut löytyvät tililtäsi: {statementUrl}",
   "mail.statement.routes": "Voit riitauttaa tämän päätöksen vastaamalla tähän sähköpostiin tai kirjoittamalla osoitteeseen office@dezbatere.ro kuuden kuukauden kuluessa: sen käsittelee ihminen, joka ei ollut mukana päätöksessä. Voit myös kääntyä sertifioidun tuomioistuinten ulkopuolisen riidanratkaisuelimen tai tuomioistuimen puoleen.",
   "mail.flagAnswer.receiptSubject": "Saimme ilmoituksesi",
   "mail.flagAnswer.receipt": "{happened} saimme ilmoituksesi tästä julkisesta keskustelusta: {itemUrl}. Ihminen lukee sen, ja kerromme sinulle päätöksestämme.",

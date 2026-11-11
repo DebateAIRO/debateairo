@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Vores tjenestevilkår, afsnit 7: Indsend ikke personoplysninger om andre personer.",
   "mail.statement.groundIllegal": "Loven: Indholdet er ulovligt. Den fulde begrundelse angiver loven.",
   "mail.statement.readFull": "Den fulde begrundelse med de fakta, vi støttede os på, findes på din konto: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Den fulde begrundelse findes på din konto: {statementUrl}",
   "mail.statement.routes": "Hvis du vil anfægte denne afgørelse, så svar på denne e-mail eller skriv til office@dezbatere.ro inden for seks måneder: En person, der ikke var involveret, vil gennemgå den. Du kan også henvende dig til et certificeret udenretsligt tvistbilæggelsesorgan eller til domstolene.",
   "mail.flagAnswer.receiptSubject": "Vi har modtaget din anmeldelse",
   "mail.flagAnswer.receipt": "Den {happened} modtog vi din anmeldelse af denne offentlige debat: {itemUrl}. En person vil læse den, og vi fortæller dig, hvad vi beslutter.",

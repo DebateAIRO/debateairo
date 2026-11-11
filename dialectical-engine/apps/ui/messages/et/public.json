@@ -284,7 +284,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Meie teenusetingimused, jaotis 7: enesetapule või teiste inimeste kahjustamisele õhutav sisu on keelatud.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Meie teenusetingimused, jaotis 7: religioosne solvang on keelatud.",
   "public.moderation.ground.PERSONAL_DATA": "Meie teenusetingimused, jaotis 7: ärge esitage teiste inimeste isikuandmeid.",
-  "public.moderation.ground.ILLEGAL": "Seadus: sisu on ebaseaduslik. Allpool toodud faktid nimetavad seaduse.",
+  "public.moderation.ground.ILLEGAL": "Seadus: sisu on ebaseaduslik.",
   "public.moderation.law": "Seadus, millele tuginesime: {law}",
   "public.moderation.suspectedIntro": "Mida ülevaatus puudutab, veel otsustamata:",
   "public.moderation.factsIntro": "Faktid, millele tuginesime:",

@@ -284,7 +284,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Szolgáltatási feltételeink, 7. szakasz: az öngyilkosságra vagy mások bántására buzdító tartalom tilos.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Szolgáltatási feltételeink, 7. szakasz: vallási sértés tilos.",
   "public.moderation.ground.PERSONAL_DATA": "Szolgáltatási feltételeink, 7. szakasz: ne küldjön be más személyekre vonatkozó személyes adatokat.",
-  "public.moderation.ground.ILLEGAL": "A jog: a tartalom jogellenes. Az alábbi tények megnevezik a jogszabályt.",
+  "public.moderation.ground.ILLEGAL": "A jog: a tartalom jogellenes.",
   "public.moderation.law": "A jogszabály, amelyre támaszkodtunk: {law}",
   "public.moderation.suspectedIntro": "Amire a felülvizsgálat vonatkozik, még döntés nélkül:",
   "public.moderation.factsIntro": "A tények, amelyekre támaszkodtunk:",

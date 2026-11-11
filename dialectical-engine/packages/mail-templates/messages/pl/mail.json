@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Nasze Warunki świadczenia usług, punkt 7: nie przesyłaj danych osobowych innych osób.",
   "mail.statement.groundIllegal": "Prawo: treść jest niezgodna z prawem. Pełne uzasadnienie wskazuje właściwy przepis prawa.",
   "mail.statement.readFull": "Pełne uzasadnienie wraz z faktami, na których się opieraliśmy, znajduje się na Państwa koncie: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Pełne uzasadnienie znajduje się na Państwa koncie: {statementUrl}",
   "mail.statement.routes": "Aby zakwestionować tę decyzję, prosimy odpowiedzieć na tę wiadomość albo napisać na adres office@dezbatere.ro w ciągu sześciu miesięcy: sprawę rozpatrzy osoba, która nie brała udziału w decyzji. Mogą Państwo także zwrócić się do certyfikowanego organu pozasądowego rozstrzygania sporów lub do sądu.",
   "mail.flagAnswer.receiptSubject": "Otrzymaliśmy Państwa zgłoszenie",
   "mail.flagAnswer.receipt": "Dnia {happened} otrzymaliśmy Państwa zgłoszenie dotyczące tej publicznej debaty: {itemUrl}. Przeczyta je człowiek, a my poinformujemy Państwa o naszej decyzji.",

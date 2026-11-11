@@ -285,7 +285,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Naši Uvjeti korištenja, odjeljak 7: nikakav sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Naši Uvjeti korištenja, odjeljak 7: nema vrijeđanja religije.",
   "public.moderation.ground.PERSONAL_DATA": "Naši Uvjeti korištenja, odjeljak 7: ne šaljite osobne podatke drugih osoba.",
-  "public.moderation.ground.ILLEGAL": "Zakon: sadržaj je nezakonit. Zakon je naveden u činjenicama u nastavku.",
+  "public.moderation.ground.ILLEGAL": "Zakon: sadržaj je nezakonit.",
   "public.moderation.law": "Zakon na koji smo se oslonili: {law}",
   "public.moderation.suspectedIntro": "Što se provjerava, još bez odluke:",
   "public.moderation.factsIntro": "Činjenice na koje smo se oslonili:",

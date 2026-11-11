@@ -284,7 +284,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Hizmet Koşullarımız, 7. bölüm: İntihara veya başkalarına zarar vermeye teşvik eden içerik yasaktır.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Hizmet Koşullarımız, 7. bölüm: Dine hakaret yasaktır.",
   "public.moderation.ground.PERSONAL_DATA": "Hizmet Koşullarımız, 7. bölüm: Başka kişiler hakkında kişisel veri göndermeyin.",
-  "public.moderation.ground.ILLEGAL": "Kanun: İçerik hukuka aykırıdır. Aşağıdaki olgular ilgili kanunu belirtir.",
+  "public.moderation.ground.ILLEGAL": "Kanun: İçerik hukuka aykırıdır.",
   "public.moderation.law": "Dayandığımız kanun: {law}",
   "public.moderation.suspectedIntro": "İncelemenin konusu, henüz karar verilmedi:",
   "public.moderation.factsIntro": "Dayandığımız olgular:",

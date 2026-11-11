@@ -122,7 +122,7 @@ describe("the review panel", () => {
     await press("Take this dig out");
     expect(lawBox()).toBeNull();
     await ground("Illegal under the law (name the law below)", "An order from an authority", "A court ordered it removed.");
-    expect(host!.querySelector("label[for=review-law]")!.textContent).toBe("The law we rely on: its name and article, for example Legea nr. 8/1996, art. 139. The person concerned reads it on their statement.");
+    expect(host!.querySelector("label[for=review-law]")!.textContent).toBe("The law we rely on: its name and article, for example Legea nr. 8/1996, art. 139. Everyone this step affects reads it on their statement.");
     expect(lawBox()!.maxLength).toBe(200);
     expect(button("Confirm")!.disabled).toBe(true);
     await typeLaw("ab");

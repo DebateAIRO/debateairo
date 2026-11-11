@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Naše Podmínky poskytování služby, oddíl 7: nezadávejte osobní údaje jiných osob.",
   "mail.statement.groundIllegal": "Zákon: obsah je nezákonný. Úplné odůvodnění uvádí, o jaký zákon jde.",
   "mail.statement.readFull": "Úplné odůvodnění se skutečnostmi, o které jsme se opřeli, najdete ve svém účtu: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Úplné odůvodnění najdete ve svém účtu: {statementUrl}",
   "mail.statement.routes": "Chcete-li toto rozhodnutí napadnout, odpovězte na tento e-mail nebo napište do šesti měsíců na office@dezbatere.ro: posoudí ho člověk, který se na něm nepodílel. Můžete se také obrátit na certifikovaný subjekt pro mimosoudní řešení sporů nebo na soud.",
   "mail.flagAnswer.receiptSubject": "Vaše hlášení jsme přijali",
   "mail.flagAnswer.receipt": "Dne {happened} jsme přijali vaše hlášení k této veřejné debatě: {itemUrl}. Přečte ho člověk a sdělíme vám, jak jsme rozhodli.",

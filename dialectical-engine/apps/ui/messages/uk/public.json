@@ -286,7 +286,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Наші Умови надання послуг, розділ 7: жодного вмісту, що заохочує до самогубства або до заподіяння шкоди іншим людям.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Наші Умови надання послуг, розділ 7: жодної образи релігії.",
   "public.moderation.ground.PERSONAL_DATA": "Наші Умови надання послуг, розділ 7: не надсилайте персональні дані інших осіб.",
-  "public.moderation.ground.ILLEGAL": "Закон: вміст є незаконним. Цей закон названо у фактах нижче.",
+  "public.moderation.ground.ILLEGAL": "Закон: вміст є незаконним.",
   "public.moderation.law": "Закон, на який ми спиралися: {law}",
   "public.moderation.suspectedIntro": "Чого стосується перевірка (рішення ще не ухвалено):",
   "public.moderation.factsIntro": "Факти, на які ми спиралися:",

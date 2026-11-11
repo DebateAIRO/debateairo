@@ -287,7 +287,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "Ár dTéarmaí Seirbhíse, alt 7: gan ábhar a spreagann féinmharú nó dochar a dhéanamh do dhaoine eile.",
   "public.moderation.ground.RELIGIOUS_INSULT": "Ár dTéarmaí Seirbhíse, alt 7: gan maslú reiligiúnach.",
   "public.moderation.ground.PERSONAL_DATA": "Ár dTéarmaí Seirbhíse, alt 7: ná cuir sonraí pearsanta faoi dhaoine eile isteach.",
-  "public.moderation.ground.ILLEGAL": "An dlí: tá an t-ábhar mídhleathach. Ainmníonn na fíricí thíos an dlí.",
+  "public.moderation.ground.ILLEGAL": "An dlí: tá an t-ábhar mídhleathach.",
   "public.moderation.law": "An dlí ar ar bhraitheamar: {law}",
   "public.moderation.suspectedIntro": "Cad faoi a bhfuil an t-athbhreithniú, gan cinneadh fós:",
   "public.moderation.factsIntro": "Na fíricí ar ar bhraitheamar:",

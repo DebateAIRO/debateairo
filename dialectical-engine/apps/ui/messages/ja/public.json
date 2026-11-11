@@ -283,7 +283,7 @@
   "public.moderation.ground.SUICIDE_OR_HARM": "当社の利用規約 第7条：自殺や他者を傷つけることを助長するコンテンツは禁止です。",
   "public.moderation.ground.RELIGIOUS_INSULT": "当社の利用規約 第7条：宗教的侮辱は禁止です。",
   "public.moderation.ground.PERSONAL_DATA": "当社の利用規約 第7条：他者の個人データを送信しないでください。",
-  "public.moderation.ground.ILLEGAL": "法律：このコンテンツは違法です。該当する法律は、下記の事実に記載されています。",
+  "public.moderation.ground.ILLEGAL": "法律：このコンテンツは違法です。",
   "public.moderation.law": "当社が根拠とした法律：{law}",
   "public.moderation.suspectedIntro": "確認の対象（まだ決定していません）：",
   "public.moderation.factsIntro": "当社が根拠とした事実：",

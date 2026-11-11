@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "我们的《服务条款》第7节：不得提交他人的个人数据。",
   "mail.statement.groundIllegal": "法律：该内容违法。完整的理由说明列明了相关法律。",
   "mail.statement.readFull": "完整的理由说明及我们所依据的事实，可在您的账户中查看：{statementUrl}",
+  "mail.statement.readFullNoFacts": "完整的理由说明可在您的账户中查看：{statementUrl}",
   "mail.statement.routes": "如需对这一决定提出异议，请在六个月内回复本邮件或写信至 office@dezbatere.ro：将由一名未参与该决定的人员进行复核。您也可以将其提交经认证的替代性争议解决机构或法院。",
   "mail.flagAnswer.receiptSubject": "我们已收到您的举报",
   "mail.flagAnswer.receipt": "我们已于 {happened} 收到您关于这场公开辩论的举报：{itemUrl}。将由人员阅读您的举报，我们会告知您我们的决定。",

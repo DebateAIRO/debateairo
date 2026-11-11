@@ -115,6 +115,7 @@
   "mail.statement.groundPersonal": "Meie teenusetingimused, jaotis 7: ärge esitage teiste inimeste isikuandmeid.",
   "mail.statement.groundIllegal": "Seadus: sisu on ebaseaduslik. Täielik põhjendus nimetab seaduse.",
   "mail.statement.readFull": "Täielik põhjendus koos faktidega, millele tuginesime, on teie kontol: {statementUrl}",
+  "mail.statement.readFullNoFacts": "Täielik põhjendus on teie kontol: {statementUrl}",
   "mail.statement.routes": "Selle otsuse vaidlustamiseks vastake sellele e-kirjale või kirjutage kuue kuu jooksul aadressile office@dezbatere.ro: selle vaatab üle inimene, kes ei olnud otsusega seotud. Võite pöörduda ka sertifitseeritud vaidluste kohtuvälise lahendamise organi või kohtu poole.",
   "mail.flagAnswer.receiptSubject": "Saime teie teate kätte",
   "mail.flagAnswer.receipt": "{happened} saime teie teate selle avaliku debati kohta: {itemUrl}. Inimene loeb selle läbi ja anname teile oma otsusest teada.",
