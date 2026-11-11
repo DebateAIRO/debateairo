@@ -747,7 +747,6 @@ apps/ui/components/v4/V4NotStarted.tsx
 apps/ui/components/v4/V4Outline.tsx
 apps/ui/components/v4/V4Panel.tsx
 apps/ui/components/v4/V4PathRewrite.tsx
-apps/ui/components/v4/V4PausedScreen.tsx
 apps/ui/components/v4/V4PendingMap.tsx
 apps/ui/components/v4/V4PicksClearedNote.tsx
 apps/ui/components/v4/V4PublicDig.tsx
