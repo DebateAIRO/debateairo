@@ -261,6 +261,7 @@ import {
   TypedDomainError,
   exhaustive,
   LEGACY_RELEASE_KEY,
+  readWithBackupCheckerKey,
   type CompositionBudgetTier,
   type ServedRootRule,
   type WayOfKnowing
@@ -14644,9 +14645,12 @@ function storyCallSiteRole(callSiteKey: string): ProviderCallRequest["role"] | n
   // W4-4: "Add to researched"'s readers.
   const researched = webResearchedCallSiteRole(callSiteKey);
   if (researched !== null) return researched;
-  const site = STORY_CALL_SITE.exec(callSiteKey);
-  if (site === null) return null;
-  return site[1] === "STORYTELLER" ? "SYNTHESIZER" : "EVALUATOR";
+  // The story's own sites; a backup story checker's site is its checker's.
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    const site = STORY_CALL_SITE.exec(key);
+    if (site === null) return null;
+    return site[1] === "STORYTELLER" ? "SYNTHESIZER" as const : "EVALUATOR" as const;
+  }, (role) => role === "EVALUATOR");
 }
 
 /**

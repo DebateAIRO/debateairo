@@ -13,19 +13,21 @@ import {
   questionLanguageSentence, readerField, type PathId
 } from "@debateai/kernel";
 import {
-  ANTHROPIC_TOKEN_COUNT, PREVIEW_V2_FINAL_SEATS, ProviderContentUnacceptedError, buildFramedRevisionPrompt, readPromptFrame, type PromptPacket,
+  ANTHROPIC_TOKEN_COUNT, PREVIEW_V2_FINAL_SEATS, ProviderCallFailedError, ProviderContentUnacceptedError, buildFramedRevisionPrompt, readPromptFrame,
+  type PromptPacket,
   type ProviderCallRequest, type ProviderCallResult, type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
-import { PATH_OUTCOME_CHECKER_CONTRACT_ID, PATH_OUTCOME_REPLY_ISSUES, PATH_OUTCOME_WRITER_CONTRACT_ID } from "@debateai/story";
+import { PATH_OUTCOME_CHECKER_CONTRACT_ID, PATH_OUTCOME_REPLY_ISSUES, PATH_OUTCOME_WRITER_CONTRACT_ID, writePathOutcome } from "@debateai/story";
 import { engineContractHash } from "../../apps/runner/src/engine-contracts.js";
 import {
   pathOutcomeMaterial, pathsFinalSeatsOf, runPathOutcomeFor, runPathOutcomes, type PathOutcomesJob
 } from "../../apps/runner/src/path-outcomes.js";
 import {
-  PATH_REWRITE_BODY_MAX_BYTES, PATH_REWRITE_ROUND_TWO_ROOM_BYTES, pathRewriteBodyBytes, pathRewriteDigPathsOf, pathRewriteDigPathsOfRoots,
+  PATH_REWRITE_BODY_MAX_BYTES, PATH_REWRITE_ROUND_TWO_ROOM_BYTES, pathRewriteBodyBytes, pathRewriteDigPathsOf, pathRewriteDigPathsOfRoots, pathRewriteGuard,
   type PathRewritePoint, type PathRewriteQuestion
 } from "../../apps/runner/src/path-rewrite-material.js";
 import { fitPathOutcomeToTokenLine } from "../../apps/runner/src/token-line.js";
+import { closingRandomBytes } from "../../apps/runner/src/investigation-close.js";
 import { DIG_NODES, digSnapshot } from "../support/path-rewrite-world.js";
 
 /* ----------------------------------------------------------------- the world */
@@ -79,7 +81,7 @@ type Answer = (request: ProviderCallRequest, attempt: number) => string;
 const sentOf = async (request: ProviderCallRequest, packet: PromptPacket): Promise<PromptPacket> =>
   request.vendorPacketOf === undefined ? packet : request.vendorPacketOf(packet);
 function resultOf(request: ProviderCallRequest, content: string): ProviderCallResult {
-  const seat = request.providerRef === HAIKU.providerRef ? HAIKU : GLM;
+  const seat = [HAIKU, DEEPSEEK].find((member) => member.providerRef === request.providerRef) ?? GLM;
   return { rawArtifactRef: `raw:${request.callSiteKey}`, ledgerEntryRef: `ledger:${request.callSiteKey}`, content, provider: "openai-compatible-http",
     model: seat.model, maker: seat.maker, modelVersion: "test" };
 }
@@ -609,5 +611,51 @@ describe("pathRewriteDigPathsOfRoots", () => {
     // Given the judges' order, it is pathRewriteDigPathsOf exactly.
     expect(pathRewriteDigPathsOfRoots(snapshot, enrichment, new Map(), [{ ref: DIG_NODES.no, rootNodeId: DIG_NODES.no },
       { ref: DIG_NODES.yes, rootNodeId: DIG_NODES.yes }])).toEqual(pathRewriteDigPathsOf(snapshot, enrichment));
+  });
+});
+
+/* ----------------------------------------------------------------- the backup checker */
+
+describe("an answer so far whose checker cannot be reached", () => {
+  const unreachable: Answer = (request) => {
+    if (request.providerRef === GLM.providerRef) throw new ProviderCallFailedError(new Error("socket hang up"), 3, "FAILED", "ledger:dead");
+    return SATISFIED;
+  };
+  const member = (seat: Readonly<{ providerRef: string; maker: string }>) => Object.freeze({ provider: { call: async () => { throw new Error("unused"); } }, providerRef: seat.providerRef, maker: seat.maker });
+  const callOf = (gateway: ProviderGateway, logged: Array<Readonly<{ event: string; detail: Record<string, unknown> }>>,
+    over: Partial<Parameters<typeof writePathOutcome>[0]> = {}): Parameters<typeof writePathOutcome>[0] => ({
+    runId: RUN, subjectItemId: "path-outcome:b1", contractHash: engineContractHash(), pathNo: 1, maxRounds: 2,
+    writerRef: HAIKU.providerRef, checkerRef: GLM.providerRef,
+    material: pathOutcomeMaterial({ question: QUESTION, path: pathOf(1), readingLevel: null, language: ENGLISH }),
+    randomBytes: closingRandomBytes(Buffer.from("one seed for one path, made up")), send: (request) => gateway.call(request), guard: pathRewriteGuard,
+    log: (event, detail) => { logged.push({ event, detail }); }, ...over
+  });
+
+  it("a third company runs the same check at PATH_OUTCOME:CHECKER:1:1:BACKUP, with the very same packet", async () => {
+    const { gateway, requests, sent } = team(() => written(), unreachable);
+    const logged: Array<Readonly<{ event: string; detail: Record<string, unknown> }>> = [];
+    const outcome = await writePathOutcome(callOf(gateway, logged, {
+      checkerBackups: { candidates: [member(HAIKU), member(GLM), member(DEEPSEEK)] }
+    }));
+    expect(outcome).toMatchObject({ outcome: "READY", servedRound: 1 });
+    expect(requests.map((request) => [request.callSiteKey, request.role, request.lane, request.providerRef])).toEqual([
+      ["PATH_OUTCOME:WRITER:1:1", "SYNTHESIZER", "served", HAIKU.providerRef], ["PATH_OUTCOME:CHECKER:1:1", "EVALUATOR", "served", GLM.providerRef],
+      ["PATH_OUTCOME:CHECKER:1:1:BACKUP", "EVALUATOR", "served", DEEPSEEK.providerRef]]);
+    const [, planned, backup] = requests as [ProviderCallRequest, ProviderCallRequest, ProviderCallRequest];
+    expect(backup.packet).toEqual(planned.packet);
+    expect([backup.contractHash, backup.bound, backup.sharedFirstFieldCount]).toEqual([planned.contractHash, planned.bound, planned.sharedFirstFieldCount]);
+    // As each left, through the guard: the backup's packet is the failed check's, byte for byte.
+    expect(sent.map((entry) => entry.key)).toEqual(["PATH_OUTCOME:WRITER:1:1", "PATH_OUTCOME:CHECKER:1:1", "PATH_OUTCOME:CHECKER:1:1:BACKUP"]);
+    expect(sent[2]!.packet).toEqual(sent[1]!.packet);
+    expect(outcome.rounds[0]!.checker?.lineage).toMatchObject({ maker: DEEPSEEK.maker, provider_ref: DEEPSEEK.providerRef });
+    expect(logged.find((entry) => entry.event === "STORY_CHECKER_BACKUP_USED")?.detail).toEqual({ step: "PATH_OUTCOME", round: 1,
+      signal: "UNREACHABLE", firstModel: GLM.providerRef, backupModel: DEEPSEEK.providerRef });
+  });
+
+  it("with no lists handed over, nothing changes: FAILED as before, and no backup is asked", async () => {
+    const { gateway, requests } = team(() => written(), unreachable);
+    const outcome = await writePathOutcome(callOf(gateway, []));
+    expect(outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH" });
+    expect(requests.map((request) => request.callSiteKey)).toEqual(["PATH_OUTCOME:WRITER:1:1", "PATH_OUTCOME:CHECKER:1:1"]);
   });
 });

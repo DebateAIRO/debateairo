@@ -1375,6 +1375,7 @@ packages/judgement/src/public-report-check-prompt.ts
 packages/judgement/src/s04.ts
 packages/judgement/src/web-prompts.ts
 packages/kernel/src/argument-language.ts
+packages/kernel/src/backup-checker-key.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
 packages/kernel/src/engine-material.ts

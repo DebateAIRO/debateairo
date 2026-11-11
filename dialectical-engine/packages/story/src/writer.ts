@@ -2,8 +2,8 @@ import { STORY_COST_ENVELOPE_REACHED } from "@debateai/budget";
 import { StoryLanguageTagSchema, type MakerLineage, type StoryBody, type StoryChart, type StoryTable } from "@debateai/contract";
 import type { Pool } from "@debateai/db";
 import {
-  TypedDomainError, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, withReaderField, type EngineQuestionKind,
-  type QuestionLanguage, type ReadingLevel
+  TypedDomainError, backupCheckerCallSiteKey, questionLanguageFromRun, replyLanguageCheckFor, withQuestionLanguageField, withReaderField,
+  type EngineQuestionKind, type QuestionLanguage, type ReadingLevel
 } from "@debateai/kernel";
 import {
   ANTHROPIC_TOKEN_COUNT,
@@ -30,6 +30,7 @@ import {
   STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
   pickBackupStoryteller,
+  storyBackupCheckerOf,
   storyBackupSignalOf,
   type StoryBackupCandidate,
   type StoryBackupMaker,
@@ -437,6 +438,8 @@ function storyCallRequest(input: {
    * today's request.
    */
   readonly sentLine?: (packet: PromptPacket) => PromptPacket;
+  /** A backup checker's call: the checker's request, sent at the checker's call site with the backup suffix. */
+  readonly backup?: true;
 }): ProviderCallRequest {
   const turn = input.revision ?? null;
   const fence = input.randomBytes === undefined ? {} : { randomBytes: input.randomBytes };
@@ -447,7 +450,9 @@ function storyCallRequest(input: {
   const request: ProviderCallRequest = {
     runId: input.story.runId,
     subjectItemId: input.story.workItemId,
-    callSiteKey: input.site === "CHARTS" ? STORY_CHARTS_CALL_SITE_KEY : storyCallSiteKey(input.site, input.round),
+    callSiteKey: input.site === "CHARTS" ? STORY_CHARTS_CALL_SITE_KEY
+      : input.backup === true && input.site === "CHECKER" ? backupCheckerCallSiteKey(storyCallSiteKey(input.site, input.round))
+        : storyCallSiteKey(input.site, input.round),
     role: STORY_SITE_ROLES[input.site],
     lane: "story",
     preferredResponseFormat: "json_object",
@@ -942,7 +947,12 @@ export class StoryWriter {
           throw error;
         }
       };
-    const checkStory: StoryLoopDependencies["checkStory"] = async ({ round, candidate }) => {
+    /**
+     * The check, by `maker`. The planned checker's call goes through the cost fallback (the planned checker asked first, a
+     * fallback checker preferring a maker other than the draft's writer). A backup checker's call (`backup`) is the same request at the
+     * backup call site, sent straight to its maker: the cost fallback could move it onto the writer's or the failed checker's.
+     */
+    const checkWith = (maker: StoryRoleMaker, backup: boolean): StoryLoopDependencies["checkStory"] => async ({ round, candidate }) => {
       // R1d: the v4 checker form carries `misleading`; the v3 reading is today's call, unchanged.
       const reading = rememberingAcceptedReply((content, reply) => (v4 === null
         ? classifyCheckerContent(content, reply, checkerInQuestionLanguage)
@@ -951,18 +961,17 @@ export class StoryWriter {
         story: input,
         site: "CHECKER",
         round,
-        providerRef: checker.providerRef,
+        providerRef: maker.providerRef,
         bound: checkerBound,
         contract: checkerContract,
         contractHash: checkerHash,
         material: withQuestionLanguageField(withReaderField(withLengthField(toCheckerPromptMaterial(built.material, candidate),
           checkerLength), readingLevel), lock),
         classifyContent: reading.classifyContent,
-        ...checkerWords
+        ...checkerWords,
+        ...(backup ? { backup: true as const } : {})
       });
-      // Task M7: the planned checker is always asked first; a fallback checker
-      // prefers a maker other than the one that wrote this round's draft.
-      const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
+      const { result, servedBy } = await callStoryRole(maker, request, draftWriterByRound.get(round) ?? null, backup);
       const accepted = reading.acceptedAs(result.content);
       const verdict = v4 === null
         ? parseCheckerVerdict(result.content, accepted.reply)
@@ -975,9 +984,14 @@ export class StoryWriter {
         verdict
       };
     };
+    const checkStory = checkWith(checker, false);
+    // Story v4 only, as the backup storyteller: a backup checker of another company when the checker's call cannot be completed.
+    const backupChecker = (avoidRefs: readonly string[]) => (v4 === null ? {} : {
+      backupChecker: this.#backupCheckerFor(input, { checker, avoidRefs, checkWith: (maker) => checkWith(maker, true) })
+    });
     const outcome = await runStoryLoop(
       v4 === null ? { maxRounds: policy.loopMaxRounds } : { maxRounds: policy.loopMaxRounds, v4: true as const },
-      { writeStory: writeStoryWith(storyteller, false), checkStory }
+      { writeStory: writeStoryWith(storyteller, false), checkStory, ...backupChecker([]) }
     );
     this.#logLoopOutcome(outcome, input);
     // R1d decision 5 (spec §7.2 item 11): under v4 only, when the first loop ended FAILED with no draft because round 1's
@@ -988,7 +1002,8 @@ export class StoryWriter {
       first: outcome, firstWrite, storyteller, checker, policy,
       loop: (teller, firstRound) => runStoryLoop(
         { maxRounds: policy.loopMaxRounds, v4: true, firstRound },
-        { writeStory: writeStoryWith(teller, true), checkStory }
+        // The first storyteller has just failed: its company checks none of the backup's drafts.
+        { writeStory: writeStoryWith(teller, true), checkStory, ...backupChecker([storyteller.providerRef]) }
       )
     });
     // R1d decision 4: a wording note (not satisfied, not misleading) is served READY with no reservation and never shown
@@ -1123,13 +1138,15 @@ export class StoryWriter {
           throw error;
         }
       };
-    const checkStory: StoryLoopDependencies["checkStory"] = async ({ round, candidate }) => {
+    /** The check, by `maker`; a backup checker's (`backup`) at the backup call site, straight to its maker (v4's rule above). */
+    const checkWith = (maker: StoryRoleMaker, backup: boolean): StoryLoopDependencies["checkStory"] => async ({ round, candidate }) => {
       const reading = rememberingAcceptedReply((content, reply) => classifyStoryPathsCheckContent(content, reply, checkerInQuestionLanguage));
       const request = storyCallRequest({
-        story: input, site: "CHECKER", round, providerRef: checker.providerRef, bound: checkerBound, contract: checkerContract,
-        contractHash: checkerHash, material: built.checkerOf(candidate), classifyContent: reading.classifyContent, ...checkerWords, ...framing
+        story: input, site: "CHECKER", round, providerRef: maker.providerRef, bound: checkerBound, contract: checkerContract,
+        contractHash: checkerHash, material: built.checkerOf(candidate), classifyContent: reading.classifyContent, ...checkerWords, ...framing,
+        ...(backup ? { backup: true as const } : {})
       });
-      const { result, servedBy } = await callStoryRole(checker, request, draftWriterByRound.get(round) ?? null);
+      const { result, servedBy } = await callStoryRole(maker, request, draftWriterByRound.get(round) ?? null, backup);
       const accepted = reading.acceptedAs(result.content);
       const verdict = parseStoryPathsCheckVerdict(result.content, accepted.reply);
       this.#logRepair("CHECKER", round, accepted.repairs, input);
@@ -1140,13 +1157,17 @@ export class StoryWriter {
         verdict: { satisfied: verdict.satisfied, objection: verdict.objection, misleading: verdict.misleading }
       };
     };
-    const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true }, { writeStory: writeStoryWith(storyteller, false), checkStory });
+    const checkStory = checkWith(checker, false);
+    const backupChecker = (avoidRefs: readonly string[]) =>
+      this.#backupCheckerFor(input, { checker, avoidRefs, checkWith: (maker) => checkWith(maker, true) });
+    const outcome = await runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true },
+      { writeStory: writeStoryWith(storyteller, false), checkStory, backupChecker: backupChecker([]) });
     this.#logLoopOutcome(outcome, input);
     // Task 54c: v4's backup storyteller (R1d decision 5), its rounds after the first loop's, under the story's one fence and line.
     const { served, backup } = await this.#withBackup(input, {
       first: outcome, firstWrite, storyteller, checker, policy,
       loop: (teller, firstRound) => runStoryLoop({ maxRounds: policy.loopMaxRounds, v4: true, firstRound },
-        { writeStory: writeStoryWith(teller, true), checkStory })
+        { writeStory: writeStoryWith(teller, true), checkStory, backupChecker: backupChecker([storyteller.providerRef]) })
     });
     for (const round of served.rounds) {
       if (round.checker !== null && !round.satisfied && round.misleading === false) {
@@ -1227,6 +1248,23 @@ export class StoryWriter {
     const served = await args.loop(chosen, firstRound);
     this.#logLoopOutcome(served, input);
     return Object.freeze({ served, backup });
+  }
+
+  /**
+   * The loop's backup checker for one story: the run's members as candidates (the same lists as the backup storyteller's), the
+   * planned checker's company excluded, and `avoidRefs` (the first storyteller, in the backup storyteller's loop) avoided too.
+   * Logged by codes and refs only, beside the answer it is for.
+   */
+  #backupCheckerFor(input: StoryWriteInput, args: Readonly<{
+    checker: StoryRoleMaker;
+    avoidRefs: readonly string[];
+    checkWith: (maker: StoryRoleMaker) => StoryLoopDependencies["checkStory"];
+  }>): NonNullable<StoryLoopDependencies["backupChecker"]> {
+    return storyBackupCheckerOf({
+      candidates: input.backupCandidates ?? [], makers: input.backupMakers, checkerRef: args.checker.providerRef, avoidRefs: args.avoidRefs,
+      step: "STORY", checkWith: args.checkWith,
+      log: (event, detail) => this.#log(event, () => ({ answerId: input.answerId, answerVersion: input.answerVersion, ...detail }))
+    });
   }
 
   /**
