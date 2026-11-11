@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.17 · I bhFEIDHM 1 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v2.18 · I bhFEIDHM 1 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.17
+endMarker: DEIREADH NA dTÉARMAÍ · v2.18
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.17 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 2.18 · Effective 1 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig soláthraithe IS atá liostaithe inár gClár Soláthraithe, agus ní úsáidtear é chun samhlacha a oiliúint. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -249,6 +249,8 @@ Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. 
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
 
+Tháinig leagan 2.18 in ionad leagan 2.17: deir Iarscríbhinn A.3 go mbíonn díospóireachtaí i Québec freisin príobháideach mar réamhshocrú ar phlean íoctha agus poiblí ar an bplean saor in aisce, mar atá leagtha amach i rannán 9; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo.
+
 Tháinig leagan 2.17 in ionad leagan 2.16: deir rannán 10 cathain a léann IS tuairisc a dhéantar leis an gcnaipe Tuairiscigh agus cathain a léann duine í, go n-iarrann an cnaipe do dhearbhú de mheon macánta, go n-admhaímid tuairisc agus go n-insímid ár gcinneadh duit ar ríomhphost, agus go seoltar ráitis ar chúiseanna ar ríomhphost agus go gcoinnítear i do chuntas iad; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo.
 
 Tháinig leagan 2.16 in ionad leagan 2.15: ainmníonn rannán 12 na pleananna íoctha, Plus, Pro agus Max, agus níl nótaí dréachtaithe i rannáin 12 agus 15 a thuilleadh; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo.
@@ -337,7 +339,7 @@ Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh t�
 
 ### A.3 Ceanada agus Québec
 
-Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. **Québec:** tá na Téarmaí seo ar fáil i bhFraincis; má roghnaíonn tú Ceanada nuair a chláraíonn tú, gheobhaidh tú i bhFraincis ar dtús iad agus is féidir leat an Béarla a roghnú ina n-ionad; tá na socruithe a choinníonn do dhíospóireachtaí príobháideach curtha ar siúl mar réamhshocrú; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh.
+Is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais, agus i Québec an duine atá i gceannas ar chosaint faisnéise pearsanta. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.3, le do shonraí. **Québec:** tá na Téarmaí seo ar fáil i bhFraincis; má roghnaíonn tú Ceanada nuair a chláraíonn tú, gheobhaidh tú i bhFraincis ar dtús iad agus is féidir leat an Béarla a roghnú ina n-ionad; bíonn díospóireachtaí ar phlean íoctha príobháideach mar réamhshocrú, agus bíonn díospóireachtaí ar an bplean saor in aisce poiblí, mar atá leagtha amach i rannán 9; féadfaidh tú dí-innéacsú faisnéise pearsanta fút a iarraidh.
 
 ### A.4 An Astráil agus an Nua-Shéalainn
 

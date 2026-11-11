@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.17 · EFFETTIVI 1 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v2.18 · EFFETTIVI 1 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.17
+endMarker: TMIEM IT-TERMINI · v2.18
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.17 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 2.18 · Effective 1 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, u ma jintużax għat-taħriġ tal-mudelli. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -249,6 +249,8 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
 
+Il-Verżjoni 2.18 issostitwiet il-Verżjoni 2.17: l-Anness A.3 jgħid li anke fil-Quebec id-dibattiti fuq pjan bi ħlas huma privati b’mod awtomatiku u d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, kif tgħid it-taqsima 9; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
+
 Il-Verżjoni 2.17 issostitwiet il-Verżjoni 2.16: it-taqsima 10 tgħid meta IA taqra rapport magħmul bil-buttuna Irrapporta u meta taqrah persuna, li l-buttuna titlob id-dikjarazzjoni tiegħek b’rieda tajba, li nikkonfermaw rapport u ngħidulek id-deċiżjoni tagħna bl-email, u li d-dikjarazzjonijiet tar-raġunijiet jintbagħtu bl-email u jinżammu fil-kont tiegħek; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
 
 Il-Verżjoni 2.16 issostitwiet il-Verżjoni 2.15: it-taqsima 12 issemmi l-pjanijiet bi ħlas, Plus, Pro u Max, u t-taqsimiet 12 u 15 m’għadx fihom noti tal-abbozzar; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
@@ -337,7 +339,7 @@ Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista�
 
 ### A.3 Il-Kanada u Quebec
 
-L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. **Quebec:** dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; l-issettjar li jżomm id-dibattiti tiegħek privati huwa mixgħul b’mod awtomatiku; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek.
+L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-protezzjoni tal-informazzjoni personali, huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro. Il-Politika dwar il-Privatezza tagħna, Anness B.3, tkopri d-data tiegħek. **Quebec:** dawn it-Termini huma disponibbli bil-Franċiż; jekk tagħżel il-Kanada meta tirreġistra, tirċevihom l-ewwel bil-Franċiż u tista’ tagħżel l-Ingliż minflok; id-dibattiti fuq pjan bi ħlas huma privati b’mod awtomatiku, u d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, kif tgħid it-taqsima 9; tista’ titlobna nneħħu mill-indiċi informazzjoni personali dwarek.
 
 ### A.4 L-Awstralja u ż-Żelanda l-Ġdida
 

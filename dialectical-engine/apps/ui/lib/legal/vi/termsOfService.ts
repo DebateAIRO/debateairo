@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Đối với dịch vụ. Chúng tôi liên tục phát triển Dialectical Engine, và những cải tiến thường kỳ, bản sửa lỗi và thay đổi danh sách mô hình diễn ra mà không cần thông báo. Khi thực hiện thay đổi vượt ra ngoài việc duy trì hoạt động của dịch vụ như mô tả, chúng tôi chỉ làm vậy vì một trong các lý do sau: tuân thủ yêu cầu pháp lý hoặc quản lý; ứng phó vấn đề bảo mật hoặc lạm dụng; do nhà cung cấp mô hình thay đổi, hạn chế hoặc rút mô hình hay tính năng mà chúng tôi phụ thuộc; thích ứng với môi trường kỹ thuật nằm ngoài sự kiểm soát của chúng tôi; hoặc thêm, cải thiện hay ngừng một tính năng theo cách không làm phát sinh chi phí cho bạn." },
       { kind: "p", text: "Chúng tôi thông báo trước cho bạn trên một phương tiện bền vững về nội dung và thời điểm thay đổi. Nếu thay đổi có tác động tiêu cực lớn hơn mức không đáng kể đối với khả năng truy cập hoặc sử dụng dịch vụ của bạn, bạn có thể chấm dứt miễn phí trong vòng 30 ngày kể từ khi được thông báo hoặc kể từ khi thay đổi có hiệu lực, tùy thời điểm nào muộn hơn, và chúng tôi hoàn trả mọi khoản đã trả trước cho thời gian chưa sử dụng." },
       { kind: "p", text: "Đối với các Điều khoản này. Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất 30 ngày trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Phiên bản 2.18 thay thế phiên bản 2.17: Phụ lục A.3 nêu rằng ở Quebec, các cuộc tranh luận trên gói trả phí cũng mặc định là riêng tư, còn các cuộc tranh luận trên gói miễn phí là công khai, như mục 9 nêu; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi." },
       { kind: "p", text: "Phiên bản 2.17 thay thế phiên bản 2.16: mục 10 nêu rõ khi nào AI đọc báo cáo được gửi bằng nút Báo cáo và khi nào một người đọc, rằng nút này yêu cầu bạn tuyên bố thiện chí, rằng chúng tôi xác nhận báo cáo và thông báo quyết định cho bạn qua email, và rằng các bản nêu lý do được gửi qua email và lưu giữ trong tài khoản của bạn; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi." },
       { kind: "p", text: "Phiên bản 2.16 thay thế phiên bản 2.15: mục 12 nêu tên các gói trả phí, Plus, Pro và Max, và các mục 12 và 15 không còn chứa ghi chú soạn thảo; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi." },
       { kind: "p", text: "Phiên bản 2.15 thay thế phiên bản 2.14: mục 12 nêu rằng giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT, và rằng thuế được cộng thêm ở trang thanh toán." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada và Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình." }
+      { kind: "p", text: "Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. Quebec: các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; trên gói trả phí, các cuộc tranh luận mặc định là riêng tư, còn các cuộc tranh luận trên gói miễn phí là công khai, như mục 9 nêu; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "e5819e40460137800f0382893f1a794a9cbeafd89d52b4c018cd98e479c79e52",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.17 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
+  version: "2.18",
+  sha256: "348f3d38faef8bc9cb2e3fab426e04ec02cd28cd272231818107fefb24220b1e",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.18 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v2.17",
+  endMarker: "HẾT ĐIỀU KHOẢN · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

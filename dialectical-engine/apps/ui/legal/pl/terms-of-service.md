@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.17 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.18 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.17
+endMarker: KONIEC WARUNKÓW · v2.18
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.17 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 2.18 · Effective 1 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców i nie jest wykorzystywany do trenowania modeli. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -249,6 +249,8 @@ Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmiani
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
 
+Wersja 2.18 zastąpiła wersję 2.17: załącznik A.3 wskazuje, że również w Quebecu debaty w płatnym planie są domyślnie prywatne, a debaty w planie bezpłatnym są publiczne, jak wskazano w sekcji 9; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
+
 Wersja 2.17 zastąpiła wersję 2.16: sekcja 10 określa, kiedy zgłoszenie złożone przyciskiem Zgłoś czyta AI, a kiedy człowiek, że przycisk prosi o Twoje oświadczenie złożone w dobrej wierze, że potwierdzamy zgłoszenie i przekazujemy Ci decyzję e-mailem oraz że uzasadnienia są wysyłane e-mailem i przechowywane na Twoim koncie; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
 
 Wersja 2.16 zastąpiła wersję 2.15: sekcja 12 wymienia płatne plany, Plus, Pro i Max, a sekcje 12 i 15 nie zawierają już uwag redakcyjnych; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
@@ -337,7 +339,7 @@ Część główna niniejszych Warunków została opracowana z myślą o Tobie. P
 
 ### A.3 Kanada i Quebec
 
-Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. **Quebec:** niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; ustawienia zachowujące prywatność debat są domyślnie włączone; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą.
+Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Twoje dane obejmuje Załącznik B.3 do naszej Polityki prywatności. **Quebec:** niniejsze Warunki są dostępne w języku francuskim; jeśli przy rejestracji wybierzesz Kanadę, najpierw otrzymasz je w języku francuskim i możesz zamiast tego wybrać język angielski; w płatnym planie debaty są domyślnie prywatne, a debaty w planie bezpłatnym są publiczne, jak wskazano w sekcji 9; możesz zażądać usunięcia z indeksów danych osobowych, które Cię dotyczą.
 
 ### A.4 Australia i Nowa Zelandia
 

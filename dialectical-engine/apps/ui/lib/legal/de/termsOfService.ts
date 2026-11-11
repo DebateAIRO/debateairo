@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Änderungen des Dienstes. Wir entwickeln Dialectical Engine kontinuierlich weiter; routinemäßige Verbesserungen, Fehlerbehebungen und Änderungen der Modellauswahl erfolgen ohne Ankündigung. Eine Änderung, die über die Aufrechterhaltung des beschriebenen Betriebs des Dienstes hinausgeht, nehmen wir nur aus einem der folgenden Gründe vor: um einer gesetzlichen oder regulatorischen Vorgabe nachzukommen; um auf ein Sicherheits- oder Missbrauchsproblem zu reagieren; weil ein Modellanbieter ein Modell oder eine Funktion, von dem beziehungsweise der wir abhängig sind, ändert, beschränkt oder zurückzieht; um uns an eine technische Umgebung anzupassen, die wir nicht kontrollieren; oder um eine Funktion ohne zusätzliche Kosten für Sie hinzuzufügen, zu verbessern oder einzustellen." },
       { kind: "p", text: "Wir teilen Ihnen im Voraus auf einem dauerhaften Datenträger mit, was sich wann ändert. Hat die Änderung mehr als geringfügige nachteilige Auswirkungen auf Ihren Zugang zum Dienst oder dessen Nutzung, können Sie innerhalb von 30 Tagen nach der Mitteilung oder nach Inkrafttreten der Änderung, je nachdem, welcher Zeitpunkt später liegt, kostenlos kündigen; wir erstatten alle für den ungenutzten Zeitraum vorausgezahlten Beträge." },
       { kind: "p", text: "Änderungen dieser Nutzungsbedingungen. Wir können diese Nutzungsbedingungen aus denselben Arten von Gründen ändern. Bei Änderungen, die Ihre Rechte nicht einschränken, veröffentlichen wir die neue Fassung mit einer Zusammenfassung der Änderungen und senden Ihnen mindestens 30 Tage vor ihrem Inkrafttreten eine E-Mail; wenn Sie Dialectical Engine nach diesem Datum weiterhin nutzen, stimmen Sie der Änderung zu, und Sie können Ihr Konto vorher schließen. Bei Änderungen, die Ihre Rechte einschränken – darunter Preiserhöhungen für einen bestehenden Tarif, niedrigere Limits, entfernte Funktionen, neue Nutzungen Ihrer Inhalte oder Änderungen der Haftung, des anwendbaren Rechts oder der Streitbeilegung – bitten wir Sie, der neuen Fassung bei Ihrer nächsten Anmeldung ausdrücklich zuzustimmen; die Änderung gilt nur für die Zukunft. Wir nehmen Änderungen niemals rückwirkend vor und verwenden diesen Abschnitt niemals dazu, den Kern Ihrer bereits bezahlten Leistung während der Laufzeit zu ändern, ohne Ihnen eine Beendigungsmöglichkeit einzuräumen. Frühere Fassungen bleiben unter dezbatere.ro/terms/versions verfügbar." },
+      { kind: "p", text: "Version 2.18 ersetzte Version 2.17: Anhang A.3 legt fest, dass Debatten auch in Quebec im kostenpflichtigen Tarif standardmäßig privat und im kostenlosen Tarif öffentlich sind, wie Abschnitt 9 besagt; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert." },
       { kind: "p", text: "Version 2.17 ersetzte Version 2.16: Abschnitt 10 legt fest, wann eine KI eine mit der Schaltfläche Melden abgegebene Meldung liest und wann eine Person, dass die Schaltfläche Ihre Erklärung nach Treu und Glauben verlangt, dass wir eine Meldung bestätigen und Ihnen unsere Entscheidung per E-Mail mitteilen und dass Begründungen per E-Mail versandt und in Ihrem Konto aufbewahrt werden; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert." },
       { kind: "p", text: "Version 2.16 ersetzte Version 2.15: Abschnitt 12 nennt die kostenpflichtigen Tarife, Plus, Pro und Max, und die Abschnitte 12 und 15 enthalten keine Entwurfsvermerke mehr; wofür wir haften und jedes Recht aus diesen Nutzungsbedingungen bleiben unverändert." },
       { kind: "p", text: "Version 2.15 ersetzte Version 2.14: Abschnitt 12 besagt, dass unsere Preise ohne Steuern angezeigt werden, als Preis + MwSt., und dass die Steuer beim Bezahlvorgang aufgeschlagen wird." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada und Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wenn Sie bei der Registrierung Kanada wählen, erhalten Sie sie zuerst auf Französisch und können stattdessen Englisch wählen; die Einstellungen, mit denen Ihre Debatten privat bleiben, sind standardmäßig aktiviert; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen." }
+      { kind: "p", text: "Unser Datenschutzbeauftragter, in Quebec zugleich die für den Schutz personenbezogener Informationen verantwortliche Person, ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro. Für Ihre Daten gilt unsere Datenschutzerklärung, Anhang B.3. Quebec: Diese Nutzungsbedingungen sind auf Französisch verfügbar; wenn Sie bei der Registrierung Kanada wählen, erhalten Sie sie zuerst auf Französisch und können stattdessen Englisch wählen; im kostenpflichtigen Tarif sind Debatten standardmäßig privat, und Debatten im kostenlosen Tarif sind öffentlich, wie Abschnitt 9 besagt; Sie können die Entfernung personenbezogener Informationen über Sie aus Suchmaschinenindizes verlangen." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "138602cf9a588230b05341bd3b479ae8b6f29b90ab77d1b1e52be6d9103d6b11",
-  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.17 · GÜLTIG AB 1. NOVEMBER 2026",
+  version: "2.18",
+  sha256: "bba7167e115cd98d5a25acb678e1dd0ef7334fe9e029e47be647652d8ebf0a6c",
+  eyebrow: "NUTZUNGSBEDINGUNGEN · v2.18 · GÜLTIG AB 1. NOVEMBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",
-  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.17",
+  endMarker: "ENDE DER NUTZUNGSBEDINGUNGEN · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Text der Nutzungsbedingungen",
   sectionIdPrefix: "terms-section-",

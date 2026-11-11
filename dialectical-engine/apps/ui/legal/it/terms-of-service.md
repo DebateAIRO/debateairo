@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.17 · IN VIGORE DAL 1 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v2.18 · IN VIGORE DAL 1 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.17
+endMarker: FINE DELLE CONDIZIONI · v2.18
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.17 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 2.18 · Effective 1 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori e non viene utilizzato per addestrare i modelli. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -249,6 +249,8 @@ Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. 
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
 
+La versione 2.18 ha sostituito la versione 2.17: l'Allegato A.3 indica che anche in Québec i dibattiti sono privati per impostazione predefinita nel piano a pagamento e pubblici nel piano gratuito, come dice la sezione 9; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato.
+
 La versione 2.17 ha sostituito la versione 2.16: la sezione 10 indica quando un'IA legge una segnalazione fatta con il pulsante Segnala e quando la legge una persona, che il pulsante ti chiede la tua dichiarazione di buona fede, che confermiamo la ricezione di una segnalazione e ti comunichiamo la nostra decisione via email, e che le motivazioni vengono inviate via email e conservate nel tuo account; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato.
 
 La versione 2.16 ha sostituito la versione 2.15: la sezione 12 indica i piani a pagamento, Plus, Pro e Max, e le sezioni 12 e 15 non contengono più note di redazione; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato.
@@ -337,7 +339,7 @@ Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un p
 
 ### A.3 Canada e Québec
 
-Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. **Québec:** le presenti Condizioni sono disponibili in francese; se scegli il Canada al momento della registrazione, le ricevi prima in francese e puoi scegliere invece l'inglese; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano.
+Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. **Québec:** le presenti Condizioni sono disponibili in francese; se scegli il Canada al momento della registrazione, le ricevi prima in francese e puoi scegliere invece l'inglese; nel piano a pagamento i dibattiti sono privati per impostazione predefinita, mentre nel piano gratuito sono pubblici, come dice la sezione 9; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano.
 
 ### A.4 Australia e Nuova Zelanda
 

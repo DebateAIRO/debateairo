@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.17 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.18 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.17
+endMarker: SĄLYGŲ PABAIGA · v2.18
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.17 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 2.18 · Effective 2026 m. lapkričio 1 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Nemokamame plane jūsų debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane jie yra privatūs, nebent juos paskelbiate. Viešus tapusius debatus gali skaityti bet kas, ir jie lieka vieši. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams ir nenaudojamas modeliams mokyti. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -249,6 +249,8 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
 
+2.18 versija pakeitė 2.17 versiją: A.3 priede nurodyta, kad ir Kvebeke mokamame plane debatai yra privatūs pagal numatytuosius nustatymus, o nemokamame plane – vieši, kaip nurodyta 9 skyriuje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
+
 2.17 versija pakeitė 2.16 versiją: 10 skyriuje nurodyta, kada mygtuku Pranešti pateiktą pranešimą skaito DI, o kada asmuo, kad mygtukas prašo jūsų sąžiningumo patvirtinimo, kad pranešimo gavimą patvirtiname ir savo sprendimą pranešame el. paštu ir kad motyvų pareiškimai siunčiami el. paštu ir saugomi jūsų paskyroje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
 
 2.16 versija pakeitė 2.15 versiją: 12 skyriuje nurodyti mokami planai, Plus, Pro ir Max, o 12 ir 15 skyriuose nebėra rengimo pastabų; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
@@ -337,7 +339,7 @@ Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą ša
 
 ### A.3 Kanada ir Kvebekas
 
-Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
+Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. **Kvebekas:** šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; mokamame plane debatai yra privatūs pagal numatytuosius nustatymus, o nemokamame plane debatai yra vieši, kaip nurodyta 9 skyriuje; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų.
 
 ### A.4 Australija ir Naujoji Zelandija
 

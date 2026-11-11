@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "A szolgáltatás módosítása. A Dialectical Engine szolgáltatást folyamatosan fejlesztjük, és a szokásos fejlesztések, javítások és a modellválaszték módosításai előzetes értesítés nélkül történnek. Ha olyan változtatást hajtunk végre, amely túlmutat a szolgáltatás leírás szerinti működésének fenntartásán, azt kizárólag az alábbi okok valamelyikéből tesszük: jogi vagy szabályozási követelmény teljesítése; biztonsági vagy visszaélési probléma kezelése; mert egy modellszolgáltató módosítja, korlátozza vagy megszünteti valamely általunk igénybe vett modell vagy funkció biztosítását; az általunk nem ellenőrzött műszaki környezethez való alkalmazkodás; vagy valamely funkció Önnek többletköltséget nem okozó hozzáadása, fejlesztése vagy kivezetése." },
       { kind: "p", text: "Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha a módosítás az Ön szolgáltatáshoz való hozzáférésére vagy annak használatára kisebbnél nagyobb hátrányos hatást gyakorol, Ön az értesítéstől vagy a módosítás hatálybalépésétől számított 30 napon belül — a kettő közül a későbbi időpontig — díjmentesen megszüntetheti a szerződést, mi pedig visszatérítjük a fel nem használt időszakra előre kifizetett összeget." },
       { kind: "p", text: "E Feltételek módosítása. E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább 30 nappal a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions." },
+      { kind: "p", text: "A 2.18-as verzió a 2.17-es verzió helyébe lépett: az A.3. melléklet leírja, hogy Québecben is a fizetős csomagon a viták alapértelmezés szerint bizalmasak, az ingyenes csomagon pedig nyilvánosak, ahogy a 9. szakasz mondja; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan." },
       { kind: "p", text: "A 2.17-es verzió a 2.16-os verzió helyébe lépett: a 10. szakasz leírja, mikor olvassa egy MI a Bejelentés gombbal tett bejelentést, és mikor egy személy, hogy a gomb az Ön jóhiszeműségi nyilatkozatát kéri, hogy visszaigazoljuk a bejelentést, és döntésünket e-mailben közöljük, valamint hogy az indokolásokat e-mailben elküldjük és a fiókjában megőrizzük; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan." },
       { kind: "p", text: "A 2.16-os verzió a 2.15-ös verzió helyébe lépett: a 12. szakasz megnevezi a fizetős csomagokat, a Plus, a Pro és a Max csomagot, a 12. és a 15. szakasz pedig már nem tartalmaz szerkesztési megjegyzéseket; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan." },
       { kind: "p", text: "A 2.15-ös verzió a 2.14-es verzió helyébe lépett: a 12. szakasz kimondja, hogy árainkat adó nélkül, ár + héa formában tüntetjük fel, és hogy az adót a fizetési oldalon adjuk hozzá." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada és Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; vitáinak bizalmasságát biztosító beállítások alapértelmezés szerint aktívak; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását." }
+      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. Adatait Adatvédelmi szabályzatunk B.3 pontja szabályozza. Québec: e Feltételek francia nyelven is elérhetők; ha a regisztrációkor Kanadát választja, először franciául kapja meg őket, és helyette az angolt is választhatja; fizetős csomagon a viták alapértelmezés szerint bizalmasak, az ingyenes csomagon pedig nyilvánosak, ahogy a 9. szakasz mondja; Ön kérheti az Önre vonatkozó személyes adatok keresőmotorok találati listájáról való eltávolítását." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "01885c58e16c5afad00019331b2bdc3c82d663b5a694a6122fbb269f614cc874",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.17 · HATÁLYOS 2026. NOVEMBER 1.",
+  version: "2.18",
+  sha256: "e0fb51e49200a8b4e128ae80dd9b315f48474a839e64f5184eab9ec19194c801",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.18 · HATÁLYOS 2026. NOVEMBER 1.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.17",
+  endMarker: "A FELTÉTELEK VÉGE · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",

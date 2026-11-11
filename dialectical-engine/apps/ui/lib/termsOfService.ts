@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "To the service. We develop Dialectical Engine continuously, and routine improvements, fixes and model-roster changes happen without notice. Where we make a change that goes beyond keeping the service working as described, we do it only for one of these reasons: to comply with a legal or regulatory requirement; to respond to a security or abuse problem; because a model provider changes, restricts or withdraws a model or feature we depend on; to adapt to a technical environment we do not control; or to add, improve or retire a feature in a way that adds no cost to you." },
       { kind: "p", text: "We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within 30 days of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period." },
       { kind: "p", text: "To these Terms. We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least 30 days before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions." },
+      { kind: "p", text: "Version 2.18 replaced version 2.17: Annex A.3 says that, in Quebec too, debates on a paid plan are private by default and debates on the Free plan are public, as section 9 says; what we are liable for, and every right in these Terms, is unchanged." },
       { kind: "p", text: "Version 2.17 replaced version 2.16: section 10 says when an AI reads a report made with the Report button and when a person does, that the button asks for your good-faith statement, that we confirm a report and tell you our decision by email, and that statements of reasons are emailed and kept in your account; what we are liable for, and every right in these Terms, is unchanged." },
       { kind: "p", text: "Version 2.16 replaced version 2.15: section 12 names the paid plans, Plus, Pro and Max, and sections 12 and 15 no longer carry drafting notes; what we are liable for, and every right in these Terms, is unchanged." },
       { kind: "p", text: "Version 2.15 replaced version 2.14: section 12 says that our prices are shown before tax, as price + VAT, and that the tax is added at checkout." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada and Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. Quebec: these Terms are available in French; if you choose Canada when you sign up, you get them in French first and can choose English instead; the settings that keep your debates private are on by default; you may request de-indexing of personal information about you." }
+      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. Our Privacy Policy, Annex B.3, covers your data. Quebec: these Terms are available in French; if you choose Canada when you sign up, you get them in French first and can choose English instead; debates on a paid plan are private by default, and debates on the Free plan are public, as section 9 says; you may request de-indexing of personal information about you." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "63e8f9c271ed42c5466568999f4a35418b5011d8f31309dabb199f8927a30203",
-  eyebrow: "TERMS OF SERVICE · v2.17 · EFFECTIVE 1 NOVEMBER 2026",
+  version: "2.18",
+  sha256: "b598df6acbe610001b8740b17231d36f03912abbabebbe06dcf0eb5d960f3cac",
+  eyebrow: "TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
-  endMarker: "END OF TERMS · v2.17",
+  endMarker: "END OF TERMS · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Terms of Service text",
   sectionIdPrefix: "terms-section-",

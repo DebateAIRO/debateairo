@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Paslaugos pakeitimai. Nuolat tobuliname Dialectical Engine, todėl apie įprastus patobulinimus, pataisas ir modelių sąrašo pakeitimus nepranešame. Pakeitimus, kuriais ne vien palaikomas aprašytas paslaugos veikimas, atliekame tik dėl vienos iš šių priežasčių: kad įvykdytume teisinį ar reguliavimo reikalavimą; reaguotume į saugumo ar piktnaudžiavimo problemą; kai modelio teikėjas pakeičia, apriboja ar pašalina modelį ar funkciją, nuo kurių priklausome; kad prisitaikytume prie mūsų nekontroliuojamos techninės aplinkos; arba kad pridėtume, patobulintume ar pašalintume funkciją taip, kad jums neatsirastų papildomų išlaidų." },
       { kind: "p", text: "Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitimas turi didesnį nei nedidelį neigiamą poveikį jūsų prieigai prie paslaugos ar naudojimuisi ja, galite nemokamai nutraukti sutartį per 30 dienų nuo pranešimo gavimo arba pakeitimo įsigaliojimo dienos, atsižvelgiant į tai, kuri data vėlesnė, o mes grąžinsime visas iš anksto už nepanaudotą laikotarpį sumokėtas sumas." },
       { kind: "p", text: "Šių Sąlygų pakeitimai. Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš 30 dienų iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions." },
+      { kind: "p", text: "2.18 versija pakeitė 2.17 versiją: A.3 priede nurodyta, kad ir Kvebeke mokamame plane debatai yra privatūs pagal numatytuosius nustatymus, o nemokamame plane – vieši, kaip nurodyta 9 skyriuje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė." },
       { kind: "p", text: "2.17 versija pakeitė 2.16 versiją: 10 skyriuje nurodyta, kada mygtuku Pranešti pateiktą pranešimą skaito DI, o kada asmuo, kad mygtukas prašo jūsų sąžiningumo patvirtinimo, kad pranešimo gavimą patvirtiname ir savo sprendimą pranešame el. paštu ir kad motyvų pareiškimai siunčiami el. paštu ir saugomi jūsų paskyroje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė." },
       { kind: "p", text: "2.16 versija pakeitė 2.15 versiją: 12 skyriuje nurodyti mokami planai, Plus, Pro ir Max, o 12 ir 15 skyriuose nebėra rengimo pastabų; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė." },
       { kind: "p", text: "2.15 versija pakeitė 2.14 versiją: 12 skyriuje nurodyta, kad mūsų kainos rodomos be mokesčių, kaip kaina + PVM, ir kad mokestis pridedamas apmokėjimo metu." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ir Kvebekas",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų." }
+      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Jūsų duomenims taikomas mūsų Privatumo politikos B priedo B.3 skirsnis. Kvebekas: šios Sąlygos pateikiamos prancūzų kalba; jei registruodamiesi pasirinksite Kanadą, pirmiausia jas gausite prancūzų kalba, o vietoj jos galėsite pasirinkti anglų kalbą; mokamame plane debatai yra privatūs pagal numatytuosius nustatymus, o nemokamame plane debatai yra vieši, kaip nurodyta 9 skyriuje; galite prašyti pašalinti jūsų asmeninę informaciją iš indeksų." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "2f084bfb37685dda9d309f262966510012f97a81f730e3b7b69dd640f6b3d5dd",
-  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.17 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
+  version: "2.18",
+  sha256: "46d2aefcc49c741d14cf42c7b9cd47d393db90fd9e4bda9e9a897df85454af14",
+  eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.18 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",
-  endMarker: "SĄLYGŲ PABAIGA · v2.17",
+  endMarker: "SĄLYGŲ PABAIGA · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Paslaugų teikimo sąlygų tekstas",
   sectionIdPrefix: "terms-section-",

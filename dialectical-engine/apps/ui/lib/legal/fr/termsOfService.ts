@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Modifications du service. Nous développons Dialectical Engine en permanence et les améliorations courantes, les correctifs et les modifications de la liste des modèles interviennent sans préavis. Lorsque nous apportons une modification qui va au-delà du maintien du fonctionnement du service tel qu’il est décrit, nous ne le faisons que pour l’un des motifs suivants : respecter une exigence légale ou réglementaire ; répondre à un problème de sécurité ou d’utilisation abusive ; réagir à la modification, à la restriction ou au retrait par un fournisseur de modèles d’un modèle ou d’une fonctionnalité dont nous dépendons ; nous adapter à un environnement technique que nous ne contrôlons pas ; ou ajouter, améliorer ou retirer une fonctionnalité sans vous occasionner de frais." },
       { kind: "p", text: "Nous vous informons à l’avance, sur un support durable, de la modification et de sa date. Si celle-ci a une incidence négative plus que mineure sur votre accès au service ou son utilisation, vous pouvez résilier sans frais dans un délai de 30 jours à compter du jour où vous en avez été informé ou de son entrée en vigueur, la date la plus tardive étant retenue, et nous remboursons tout montant payé d’avance pour la période non utilisée." },
       { kind: "p", text: "Modifications des présentes Conditions. Nous pouvons modifier les présentes Conditions pour les mêmes types de motifs. Pour les modifications qui ne réduisent pas vos droits, nous publions la nouvelle version avec un résumé des changements et vous envoyons un e-mail au moins 30 jours avant son entrée en vigueur ; la poursuite de l’utilisation de Dialectical Engine après cette date vaut acceptation et vous pouvez clôturer votre compte avant celle-ci. Pour les modifications qui réduisent vos droits — notamment les hausses de prix d’une formule existante, les diminutions de limites, la suppression de fonctionnalités, les nouvelles utilisations de votre contenu ou les modifications relatives à la responsabilité, au droit applicable ou au règlement des litiges —, nous vous demandons d’accepter expressément la nouvelle version lors de votre prochaine connexion et la modification ne s’applique que pour l’avenir. Nous n’appliquons jamais une modification rétroactivement et n’utilisons jamais la présente section pour modifier, pendant sa durée, l’essence de ce pour quoi vous avez payé sans vous offrir une possibilité de résiliation. Les versions antérieures restent disponibles à l’adresse dezbatere.ro/terms/versions." },
+      { kind: "p", text: "La version 2.18 a remplacé la version 2.17 : l’annexe A.3 indique qu’au Québec aussi, les débats sont privés par défaut sur une formule payante et publics sur la formule gratuite, comme l’indique la section 9 ; ce dont nous sommes responsables, et chacun des droits prévus par les présentes Conditions, reste inchangé." },
       { kind: "p", text: "La version 2.17 a remplacé la version 2.16 : la section 10 indique quand une IA lit un signalement fait avec le bouton Signaler et quand une personne le lit, que le bouton vous demande votre déclaration de bonne foi, que nous accusons réception d’un signalement et vous communiquons notre décision par e-mail, et que les exposés des motifs sont envoyés par e-mail et conservés dans votre compte ; ce dont nous sommes responsables, et chacun des droits prévus par les présentes Conditions, reste inchangé." },
       { kind: "p", text: "La version 2.16 a remplacé la version 2.15 : la section 12 nomme les formules payantes, Plus, Pro et Max, et les sections 12 et 15 ne comportent plus de notes de rédaction ; ce dont nous sommes responsables, et chacun des droits prévus par les présentes Conditions, reste inchangé." },
       { kind: "p", text: "La version 2.15 a remplacé la version 2.14 : la section 12 indique que nos prix sont affichés hors taxes, sous la forme prix + TVA, et que la taxe est ajoutée lors du paiement." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada et Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est notre administrateur, joignable à privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; si vous choisissez le Canada lors de l’inscription, elles vous sont d’abord présentées en français et vous pouvez choisir l’anglais à la place ; les paramètres qui gardent vos débats privés sont activés par défaut ; vous pouvez demander la désindexation des renseignements personnels vous concernant." }
+      { kind: "p", text: "Notre responsable de la protection de la vie privée, qui est aussi, au Québec, la personne responsable de la protection des renseignements personnels, est notre administrateur, joignable à privacy@dezbatere.ro. L’annexe B.3 de notre Politique de confidentialité couvre vos données. Québec : les présentes Conditions sont disponibles en français ; si vous choisissez le Canada lors de l’inscription, elles vous sont d’abord présentées en français et vous pouvez choisir l’anglais à la place ; sur une formule payante, les débats sont privés par défaut, et les débats de la formule gratuite sont publics, comme l’indique la section 9 ; vous pouvez demander la désindexation des renseignements personnels vous concernant." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "0b2e09f35ba9f916f84c4c87834299ba2abf2eec9e404cf8f7c56468ae5f8307",
-  eyebrow: "CONDITIONS D’UTILISATION · v2.17 · PRISE D’EFFET 1ER NOVEMBRE 2026",
+  version: "2.18",
+  sha256: "2ffdd42160e44fd1a084daa8ecece11cc3d0bd4e344acddab7acf68cd0899b7d",
+  eyebrow: "CONDITIONS D’UTILISATION · v2.18 · PRISE D’EFFET 1ER NOVEMBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",
-  endMarker: "FIN DES CONDITIONS · v2.17",
+  endMarker: "FIN DES CONDITIONS · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texte des Conditions d’utilisation",
   sectionIdPrefix: "terms-section-",

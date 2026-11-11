@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Ao serviço. Desenvolvemos continuamente a Dialectical Engine, e as melhorias de rotina, correções e alterações ao conjunto de modelos ocorrem sem aviso. Quando introduzimos uma alteração que vai além da manutenção do funcionamento do serviço conforme descrito, fazemo-lo apenas por um dos seguintes motivos: cumprir um requisito legal ou regulamentar; responder a um problema de segurança ou abuso; um fornecedor de modelos alterar, restringir ou retirar um modelo ou uma funcionalidade de que dependemos; adaptar o serviço a um ambiente técnico que não controlamos; ou adicionar, melhorar ou retirar uma funcionalidade sem lhe impor custos." },
       { kind: "p", text: "Informá-lo-emos previamente, num suporte duradouro, sobre o que será alterado e quando. Se a alteração tiver um efeito negativo mais do que ligeiro no seu acesso ao serviço ou na sua utilização, poderá resolver o contrato sem encargos no prazo de 30 dias após ser informado, ou após a produção de efeitos da alteração, consoante a data que for posterior, e reembolsaremos qualquer montante pré-pago relativo ao período não utilizado." },
       { kind: "p", text: "A estes Termos. Podemos alterar estes Termos pelos mesmos tipos de motivos. No caso de alterações que não reduzam os seus direitos, publicamos a nova versão com um resumo das alterações e enviamos-lhe uma mensagem de correio eletrónico pelo menos 30 dias antes de produzir efeitos; a utilização continuada da Dialectical Engine depois dessa data significa que a aceita; pode encerrar a sua conta antes dessa data. No caso de alterações que reduzam os seus direitos — incluindo aumentos de preço de um plano existente, redução de limites, remoção de funcionalidades, novas utilizações do seu conteúdo ou alterações relativas à responsabilidade, à lei aplicável ou à resolução de litígios — pedimos-lhe que aceite expressamente a nova versão quando voltar a iniciar sessão, e a alteração só se aplica daí em diante. Nunca aplicamos uma alteração retroativamente e nunca utilizamos esta secção para alterar, durante o respetivo prazo, o essencial daquilo por que pagou sem lhe oferecer uma forma de sair. As versões anteriores permanecem disponíveis em dezbatere.ro/terms/versions." },
+      { kind: "p", text: "A versão 2.18 substituiu a versão 2.17: o Anexo A.3 indica que também no Quebeque os debates num plano pago são privados por predefinição e os do plano gratuito são públicos, como indica a secção 9; aquilo por que somos responsáveis, e cada um dos direitos previstos nestes Termos, mantém-se inalterado." },
       { kind: "p", text: "A versão 2.17 substituiu a versão 2.16: a secção 10 indica quando uma IA lê uma denúncia feita com o botão Denunciar e quando uma pessoa a lê, que o botão lhe pede a sua declaração de boa-fé, que confirmamos a receção de uma denúncia e lhe comunicamos a nossa decisão por correio eletrónico, e que as exposições dos motivos são enviadas por correio eletrónico e conservadas na sua conta; aquilo por que somos responsáveis, e cada um dos direitos previstos nestes Termos, mantém-se inalterado." },
       { kind: "p", text: "A versão 2.16 substituiu a versão 2.15: a secção 12 indica os planos pagos, Plus, Pro e Max, e as secções 12 e 15 deixam de conter notas de redação; aquilo por que somos responsáveis, e cada um dos direitos previstos nestes Termos, mantém-se inalterado." },
       { kind: "p", text: "A versão 2.15 substituiu a versão 2.14: a secção 12 indica que os nossos preços são apresentados sem impostos, como preço + IVA, e que o imposto é acrescentado na finalização da compra." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canadá e Quebeque",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; se escolher o Canadá ao registar-se, recebe-os primeiro em francês e pode escolher o inglês em alternativa; as definições que mantêm os seus debates privados estão ativadas por predefinição; pode pedir a desindexação de informações pessoais a seu respeito." }
+      { kind: "p", text: "O nosso responsável pela privacidade e, no Quebeque, a pessoa responsável pela proteção das informações pessoais é o nosso administrador, contactável em privacy@dezbatere.ro. O Anexo B.3 da nossa Política de Privacidade abrange os seus dados. Quebeque: estes Termos estão disponíveis em francês; se escolher o Canadá ao registar-se, recebe-os primeiro em francês e pode escolher o inglês em alternativa; os debates num plano pago são privados por predefinição, e os debates do plano gratuito são públicos, como indica a secção 9; pode pedir a desindexação de informações pessoais a seu respeito." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "e9fc74581ba50e0c100466bb20fb98225e821744e3e6c635482826bb9eba5b46",
-  eyebrow: "TERMOS DE SERVIÇO · v2.17 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026",
+  version: "2.18",
+  sha256: "4d0f81ed3946f000e023e0bf667b54a09e51b21f6ae648ce94d96a984531a197",
+  eyebrow: "TERMOS DE SERVIÇO · v2.18 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",
-  endMarker: "FIM DOS TERMOS · v2.17",
+  endMarker: "FIM DOS TERMOS · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Texto dos Termos de Serviço",
   sectionIdPrefix: "terms-section-",

@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Hizmette. Dialectical Engine'i sürekli geliştiririz; rutin iyileştirmeler, düzeltmeler ve model listesi değişiklikleri bildirimsiz yapılır. Hizmeti açıklandığı şekilde çalışır tutmanın ötesine geçen bir değişiklik yaptığımızda bunu yalnızca şu nedenlerden biriyle yaparız: hukuki veya düzenleyici bir gerekliliğe uymak; bir güvenlik veya kötüye kullanım sorununa müdahale etmek; bir model sağlayıcısının bağlı olduğumuz bir modeli veya özelliği değiştirmesi, kısıtlaması veya geri çekmesi; denetlemediğimiz teknik bir ortama uyum sağlamak ya da size ek maliyet getirmeyecek şekilde bir özellik eklemek, iyileştirmek veya kullanımdan kaldırmak." },
       { kind: "p", text: "Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildiririz. Değişiklik, hizmete erişiminiz veya hizmeti kullanımınız üzerinde önemsizden daha fazla olumsuz etkiye sahipse, bildirimin size iletilmesinden veya değişikliğin yürürlüğe girmesinden hangisi daha geç ise o tarihten itibaren 30 gün içinde ücretsiz olarak sözleşmeyi sona erdirebilirsiniz; kullanılmayan dönem için önceden ödenmiş tutarları iade ederiz." },
       { kind: "p", text: "Bu Koşullarda. Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az 30 gün önce size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır." },
+      { kind: "p", text: "Sürüm 2.18, sürüm 2.17'nin yerine geçmiştir: Ek A.3, Quebec'te de ücretli plandaki tartışmaların varsayılan olarak özel, ücretsiz plandaki tartışmaların ise 9. bölümde belirtildiği gibi herkese açık olduğunu belirtir; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir." },
       { kind: "p", text: "Sürüm 2.17, sürüm 2.16'nın yerine geçmiştir: 10. bölüm, Bildir düğmesiyle yapılan bir bildirimi ne zaman bir yapay zekânın, ne zaman bir kişinin okuduğunu, düğmenin sizden iyi niyet beyanı istediğini, bir bildirimi aldığımızı teyit ettiğimizi ve kararımızı size e-postayla bildirdiğimizi ve gerekçe bildirimlerinin e-postayla gönderildiğini ve hesabınızda saklandığını belirtir; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir." },
       { kind: "p", text: "Sürüm 2.16, sürüm 2.15'in yerine geçmiştir: 12. bölüm ücretli planları, yani Plus, Pro ve Max'i adlarıyla belirtir ve 12. ile 15. bölümler artık taslak notları içermez; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir." },
       { kind: "p", text: "Sürüm 2.15, sürüm 2.14'ün yerine geçmiştir: 12. bölüm, fiyatlarımızın vergi hariç olarak, fiyat + KDV şeklinde gösterildiğini ve verginin ödeme sayfasında eklendiğini söyler." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ve Quebec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; kaydolurken Kanada'yı seçerseniz Koşullar size önce Fransızca gösterilir ve bunun yerine İngilizceyi seçebilirsiniz; tartışmalarınızı özel tutan ayarlar varsayılan olarak açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz." }
+      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Verileriniz Gizlilik Politikamızın Ek B.3'ünde ele alınır. Quebec: bu Koşullar Fransızca olarak sunulur; kaydolurken Kanada'yı seçerseniz Koşullar size önce Fransızca gösterilir ve bunun yerine İngilizceyi seçebilirsiniz; ücretli planda tartışmalar varsayılan olarak özeldir, ücretsiz plandaki tartışmalar ise 9. bölümde belirtildiği gibi herkese açıktır; hakkınızdaki kişisel bilgilerin arama sonuçlarından çıkarılmasını talep edebilirsiniz." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "5dd6d9a9f9de42cdf7d00d4a9965622114b06c5114a9742dbe84f7ec968bba11",
-  eyebrow: "HİZMET KOŞULLARI · v2.17 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
+  version: "2.18",
+  sha256: "90ccde528655ead5dbbf96de239ac0c9ee3850e8f1bf6c00274a7ca4078068d1",
+  eyebrow: "HİZMET KOŞULLARI · v2.18 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",
-  endMarker: "KOŞULLARIN SONU · v2.17",
+  endMarker: "KOŞULLARIN SONU · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Hizmet Koşulları metni",
   sectionIdPrefix: "terms-section-",

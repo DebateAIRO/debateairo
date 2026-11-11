@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.17 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.18 · ÚČINNÉ OD 1. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.17
+endMarker: KONIEC PODMIENOK · v2.18
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.17 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.18 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov a nepoužíva sa na trénovanie modelov. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -249,6 +249,8 @@ O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
 
+Verzia 2.18 nahradila verziu 2.17: príloha A.3 uvádza, že aj v Quebecu sú debaty v platenom programe v predvolenom nastavení súkromné a debaty v bezplatnom programe verejné, ako uvádza časť 9; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
+
 Verzia 2.17 nahradila verziu 2.16: časť 10 uvádza, kedy hlásenie podané tlačidlom Nahlásiť číta umelá inteligencia a kedy človek, že tlačidlo od vás žiada vyhlásenie o dobrej viere, že hlásenie potvrdzujeme a rozhodnutie vám oznamujeme e-mailom a že odôvodnenia sa posielajú e-mailom a uchovávajú vo vašom účte; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
 
 Verzia 2.16 nahradila verziu 2.15: časť 12 uvádza platené programy, Plus, Pro a Max, a časti 12 a 15 už neobsahujú poznámky k návrhu; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
@@ -336,7 +338,7 @@ Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie m�
 
 ### A.3 Kanada a Quebec
 
-Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; ak pri registrácii zvolíte Kanadu, zobrazia sa vám najprv vo francúzštine a namiesto toho si môžete zvoliť angličtinu; nastavenia, ktoré zachovávajú súkromie vašich debát, sú predvolene zapnuté; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
+Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Vaše údaje upravuje príloha B.3 našich Zásad ochrany osobných údajov. **Quebec:** tieto Podmienky sú dostupné vo francúzštine; ak pri registrácii zvolíte Kanadu, zobrazia sa vám najprv vo francúzštine a namiesto toho si môžete zvoliť angličtinu; v platenom programe sú debaty v predvolenom nastavení súkromné a debaty v bezplatnom programe sú verejné, ako uvádza časť 9; môžete požiadať o odstránenie osobných údajov, ktoré sa vás týkajú, z výsledkov vyhľadávania.
 
 ### A.4 Austrália a Nový Zéland
 

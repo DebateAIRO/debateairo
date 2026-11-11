@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.17 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.18 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.17
+endMarker: HẾT ĐIỀU KHOẢN · v2.18
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.17 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 2.18 · Effective 1 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi và không được dùng để huấn luyện mô hình. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -249,6 +249,8 @@ Chúng tôi thông báo trước cho bạn trên một phương tiện bền v�
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
 
+Phiên bản 2.18 thay thế phiên bản 2.17: Phụ lục A.3 nêu rằng ở Quebec, các cuộc tranh luận trên gói trả phí cũng mặc định là riêng tư, còn các cuộc tranh luận trên gói miễn phí là công khai, như mục 9 nêu; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
+
 Phiên bản 2.17 thay thế phiên bản 2.16: mục 10 nêu rõ khi nào AI đọc báo cáo được gửi bằng nút Báo cáo và khi nào một người đọc, rằng nút này yêu cầu bạn tuyên bố thiện chí, rằng chúng tôi xác nhận báo cáo và thông báo quyết định cho bạn qua email, và rằng các bản nêu lý do được gửi qua email và lưu giữ trong tài khoản của bạn; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
 
 Phiên bản 2.16 thay thế phiên bản 2.15: mục 12 nêu tên các gói trả phí, Plus, Pro và Max, và các mục 12 và 15 không còn chứa ghi chú soạn thảo; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
@@ -337,7 +339,7 @@ Phần nội dung chung của các Điều khoản này được soạn cho bạ
 
 ### A.3 Canada và Quebec
 
-Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. **Quebec:** các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; các cài đặt giữ cuộc tranh luận của bạn ở chế độ riêng tư được bật theo mặc định; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình.
+Cán bộ phụ trách quyền riêng tư của chúng tôi, đồng thời tại Quebec là người phụ trách bảo vệ thông tin cá nhân, là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro. Phụ lục B.3 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn. **Quebec:** các Điều khoản này được cung cấp bằng tiếng Pháp; nếu bạn chọn Canada khi đăng ký, bạn sẽ nhận được các Điều khoản này bằng tiếng Pháp trước và có thể chọn tiếng Anh thay thế; trên gói trả phí, các cuộc tranh luận mặc định là riêng tư, còn các cuộc tranh luận trên gói miễn phí là công khai, như mục 9 nêu; bạn có thể yêu cầu hủy lập chỉ mục thông tin cá nhân về mình.
 
 ### A.4 Australia và New Zealand
 

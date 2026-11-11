@@ -240,6 +240,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Al servizio. Sviluppiamo continuamente Dialectical Engine e i miglioramenti ordinari, le correzioni e le modifiche alla gamma di modelli avvengono senza preavviso. Quando apportiamo una modifica che va oltre il mantenimento del funzionamento del servizio così come descritto, lo facciamo esclusivamente per uno dei seguenti motivi: adempiere a un obbligo giuridico o normativo; rispondere a un problema di sicurezza o abuso; perché un fornitore di modelli modifica, limita o ritira un modello o una funzionalità da cui dipendiamo; adeguarci a un ambiente tecnico che non controlliamo; oppure aggiungere, migliorare o ritirare una funzionalità senza alcun costo aggiuntivo per te." },
       { kind: "p", text: "Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. Se la modifica produce un effetto negativo più che minimo sul tuo accesso al servizio o sul suo utilizzo, puoi recedere gratuitamente entro 30 giorni dalla comunicazione o dall'entrata in vigore della modifica, se successiva, e rimborsiamo qualsiasi importo prepagato per il periodo non utilizzato." },
       { kind: "p", text: "Alle presenti Condizioni. Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno 30 giorni prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions." },
+      { kind: "p", text: "La versione 2.18 ha sostituito la versione 2.17: l'Allegato A.3 indica che anche in Québec i dibattiti sono privati per impostazione predefinita nel piano a pagamento e pubblici nel piano gratuito, come dice la sezione 9; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato." },
       { kind: "p", text: "La versione 2.17 ha sostituito la versione 2.16: la sezione 10 indica quando un'IA legge una segnalazione fatta con il pulsante Segnala e quando la legge una persona, che il pulsante ti chiede la tua dichiarazione di buona fede, che confermiamo la ricezione di una segnalazione e ti comunichiamo la nostra decisione via email, e che le motivazioni vengono inviate via email e conservate nel tuo account; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato." },
       { kind: "p", text: "La versione 2.16 ha sostituito la versione 2.15: la sezione 12 indica i piani a pagamento, Plus, Pro e Max, e le sezioni 12 e 15 non contengono più note di redazione; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato." },
       { kind: "p", text: "La versione 2.15 ha sostituito la versione 2.14: la sezione 12 afferma che i nostri prezzi sono indicati al netto delle imposte, come prezzo + IVA, e che l'imposta viene aggiunta al momento del pagamento." },
@@ -338,7 +339,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Canada e Québec",
     accent: "--muted",
     blocks: [
-      { kind: "p", text: "Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. Québec: le presenti Condizioni sono disponibili in francese; se scegli il Canada al momento della registrazione, le ricevi prima in francese e puoi scegliere invece l'inglese; le impostazioni che mantengono privati i tuoi dibattiti sono attive per impostazione predefinita; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano." }
+      { kind: "p", text: "Il nostro responsabile della privacy, e in Québec la persona responsabile della protezione delle informazioni personali, è il nostro amministratore, raggiungibile all'indirizzo privacy@dezbatere.ro. La nostra Informativa sulla privacy, Allegato B.3, riguarda i tuoi dati. Québec: le presenti Condizioni sono disponibili in francese; se scegli il Canada al momento della registrazione, le ricevi prima in francese e puoi scegliere invece l'inglese; nel piano a pagamento i dibattiti sono privati per impostazione predefinita, mentre nel piano gratuito sono pubblici, come dice la sezione 9; puoi chiedere la deindicizzazione delle informazioni personali che ti riguardano." }
     ]
   },
   {
@@ -377,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.17",
-  sha256: "b8179bab51d55ec8054dbf102b92d7fe87855ac79007aafec4e5953986f87564",
-  eyebrow: "CONDIZIONI DI SERVIZIO · v2.17 · IN VIGORE DAL 1 NOVEMBRE 2026",
+  version: "2.18",
+  sha256: "26abe68c554ce80f9469f9684606e88d0c4147ed0ac6ec497e0fc93d585fe4f5",
+  eyebrow: "CONDIZIONI DI SERVIZIO · v2.18 · IN VIGORE DAL 1 NOVEMBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",
-  endMarker: "FINE DELLE CONDIZIONI · v2.17",
+  endMarker: "FINE DELLE CONDIZIONI · v2.18",
   contact: "support@dezbatere.ro",
   bodyLabel: "Testo delle Condizioni di servizio",
   sectionIdPrefix: "terms-section-",
