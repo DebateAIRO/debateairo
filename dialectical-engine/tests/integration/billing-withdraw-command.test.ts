@@ -360,7 +360,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
 
 describe("W6 Settings and the owner's command: each payment's own share (P2-I8) and the weekend roll (P2-I9)", () => {
   /** The spend a withdrawal reads, the same for both paths. */
-  const spending = (spentMicros: number) => ({ readOwnerSpentMicros: async () => spentMicros });
+  const spending = (spentMicros: number) => ({ readWithdrawalSpend: async () => ({ spentMicros, liveRuns: 0 }) });
 
   /** P12d's Settings route at `at`: the signed-in session alone, no step-up (owner ruling 2026-11-04). */
   async function viaSettings(label: string, seed: (ownerRef: string) => Promise<SeededNetopiaSubscription>, at: Date, spentMicros: number) {

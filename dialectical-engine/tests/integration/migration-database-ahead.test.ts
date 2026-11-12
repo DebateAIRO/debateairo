@@ -16,7 +16,7 @@ vi.mock("../../packages/db/src/migration-lineage.js", async (original) => {
 import { describeForwardSteps, migrate, readPendingForwardSteps, verifyDatabaseAhead, type ForwardStepDeclaration, type MigrateOptions } from "../../packages/db/src/index.js";
 import { loadMigrationPlan, type MigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
-import { atStep, FORWARD_STEPS, LAST_STEP, n1Of, stepIndex, stepNameAfter, stepsAfter, stepsFrom } from "../support/forward-chain-steps.js";
+import { atStep, FORWARD_STEPS, LAST_STEP, n1Of, outsideTransactionOf, stepIndex, stepNameAfter, stepsAfter, stepsFrom } from "../support/forward-chain-steps.js";
 
 /**
  * "Database ahead" start mode (side-by-side spec 2026-10-21 §5; plan A, task A7, Review Focus 3): an older release starts
@@ -119,7 +119,7 @@ describe("an older release on a database a newer release moved forward (Review F
     // carries each header). One migrate() applied them all, so all name its chain head.
     expect((await db.pool.query(`SELECT source_name,n1_expand,keeps_verifier,outside_transaction,chain_head_manifest_sha256,recorded_at
       FROM public.debateai_schema_migration_step_n1 ORDER BY source_name`)).rows).toEqual(DECLARED.map((source_name) => ({
-      source_name, n1_expand: n1Of(source_name).expand, keeps_verifier: n1Of(source_name).keepsVerifier, outside_transaction: false,
+      source_name, n1_expand: n1Of(source_name).expand, keeps_verifier: n1Of(source_name).keepsVerifier, outside_transaction: outsideTransactionOf(source_name),
       chain_head_manifest_sha256: plan.forwardChain.at(-1)!.manifestSha256, recorded_at: expect.any(Date)
     })));
     expect(n1Of(RLS)).toEqual({ expand: false, drained: true, keepsVerifier: false });
@@ -174,7 +174,7 @@ describe("an older release on a database a newer release moved forward (Review F
       sourceSha256: atStep(plan.forwardChain, RLS).sourceSha256, verifierSha256: IN_FORCE_VERIFIER, n1Expand: false, keepsVerifier: false, outsideTransaction: false });
     expect(steps.slice(stepIndex(SIDE_BY_SIDE))).toEqual(DECLARED.map((name) => ({ name, manifestSha256: atStep(plan.forwardChain, name).manifestSha256,
       sourceSha256: atStep(plan.forwardChain, name).sourceSha256, verifierSha256: KEEPING_111.includes(name) ? VERIFIER : IN_FORCE_VERIFIER,
-      ...declares(name), outsideTransaction: false })));
+      ...declares(name), outsideTransaction: outsideTransactionOf(name) })));
     // 0122 and earlier declare nothing (all false).
     expect(steps.slice(0, stepIndex(SIDE_BY_SIDE)).every((step) => !step.n1Expand && !step.keepsVerifier && !step.outsideTransaction)).toBe(true);
   });
@@ -320,7 +320,7 @@ describe("the newer code's view of a database a release behind", () => {
     const real = await loadMigrationPlan();
     const step = real.forwardChain.at(-1)!;
     expect(await readPendingForwardSteps(behind.pool)).toEqual([{ name: HEAD_STEP, manifestSha256: step.manifestSha256,
-      sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, ...declares(HEAD_STEP), outsideTransaction: false }]);
+      sourceSha256: step.sourceSha256, verifierSha256: IN_FORCE_VERIFIER, ...declares(HEAD_STEP), outsideTransaction: outsideTransactionOf(HEAD_STEP) }]);
     // Steps up to 0122 record no declaration row; 0123 to the step before the head record the rows that release leaves.
     expect((await behind.pool.query("SELECT source_name FROM public.debateai_schema_migration_step_n1 ORDER BY source_name")).rows)
       .toEqual(DECLARED.slice(0, -1).map((source_name) => ({ source_name })));

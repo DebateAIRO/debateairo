@@ -12,9 +12,12 @@ export type CrisisSignal = "intent" | "self-harm" | "decision" | "method" | "oth
  * One language's phrases. A pattern is a regular-expression source written in plain lower-case
  * spelling; it is normalised exactly as questions are (see `normalizeForCrisisCheck`), so
  * accents may be written or left out. Allowed syntax: literals, `\b` (a Unicode word edge),
- * `\s`, `.`, `{m,n}`, `?`, `*`, `+`, `|`, `(?:…)` and `[…]`. No upper-case escapes (`\S`,
+ * `\s`, `.`, `{m,n}` (n at most 64; a class `{0,32}` or `{1,32}`, a group `{0,8}`), `?`,
+ * `*` and `+` on `\s` only, `|`, `(?:…)` and `[…]`. No upper-case escapes (`\S`,
  * `\W`, `\p{…}`): normalisation lower-cases the source. Scripts without spaces (Chinese,
- * Japanese) do not use `\b`.
+ * Japanese) do not use `\b`. Lookarounds `(?=…)`, `(?!…)`, `(?<=…)`, `(?<!…)` and `\xHH` are
+ * allowed. A range's endpoints are spelled as normalisation spells them: write a Cyrillic
+ * `а-я` as `\x61-я`. Every rule here is checked by tests/unit/crisis-lexicon-lint.test.ts.
  *
  * The bar: a phrase belongs here when a person typing it as a debate question is, more likely
  * than not, in crisis or asking for a way to die. A question ABOUT suicide as a subject of

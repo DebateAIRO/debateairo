@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { UI_API_PROOF_HEADER, UI_API_PROOF_VERDICT_HEADER } from "./trusted-client-ip.mjs";
 
 /**
  * THE WEBSITE EDGE OF A RELEASE (side-by-side uploads spec 2026-10-21 §1, §6, §7; plan C12).
@@ -13,7 +14,9 @@ import { pathToFileURL } from "node:url";
  *   another release: `next build && node release-edge.mjs --stamp` writes the build's release code into the dist dir,
  *   and the boot compares it with the key (O1: a person is never served another release's pages).
  * - GET /readyz is answered ahead of Next from its own API's /readyz (spec §6): ready only when that API is ready under
- *   the SAME key, so Caddy never sends traffic to a website whose API is another release.
+ *   the SAME key, so Caddy never sends traffic to a website whose API is another release, and (NV-03) only when that
+ *   API accepted the website's UI-to-API proof, so a pair whose copies differ never turns ready. The wait for that API
+ *   is READINESS_API_TIMEOUT_MS (2 s), below Caddy's 3 s probe timeout (NV-27).
  * - SIGTERM drains: the server stops accepting at once, and the process exits 0 once closed or at a 20 s deadline
  *   (spec §6: a planned stop is never a failure). /readyz would say DRAINING, but in practice no probe sees it (see
  *   installGracefulClose): Caddy's next health check meets a refused connection, which marks the website down the same.
@@ -38,6 +41,11 @@ const API_PATH = "/api";
 /** A reason from the API is passed on only in the shape of a code, at most this many (content-free, bounded). */
 const REASON_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/u;
 const MAX_REASONS = 16;
+/**
+ * How long GET /readyz waits for its API's /readyz (NV-27): strictly below Caddy's health_timeout 3s
+ * (deploy/vps/Caddyfile), so a slow API answer becomes this website's own 503 BOOTING, never a probe timeout.
+ */
+export const READINESS_API_TIMEOUT_MS = 2000;
 
 function refuse(code) {
   const error = new TypeError(code);
@@ -155,16 +163,24 @@ function readinessUrl(apiBase) {
   }
 }
 
-/** The API's readiness answer, or null when it is not one (unreachable, late, not JSON, another shape). */
-async function readApiReadiness(fetchImpl, url, timeoutMs) {
+/**
+ * The API's readiness answer, or null when it is not one (unreachable, late, not JSON, another shape). The website's
+ * UI-to-API proof, when it holds one, goes with the fetch, and the API's verdict on it comes back (NV-03).
+ */
+async function readApiReadiness(fetchImpl, url, timeoutMs, uiApiProof) {
   if (url === null) return null;
   try {
-    const response = await fetchImpl(url, { method: "GET", redirect: "error", signal: AbortSignal.timeout(timeoutMs) });
+    const response = await fetchImpl(url, {
+      method: "GET",
+      redirect: "error",
+      signal: AbortSignal.timeout(timeoutMs),
+      ...(uiApiProof === null ? {} : { headers: { [UI_API_PROOF_HEADER]: uiApiProof } })
+    });
     const body = JSON.parse(await response.text());
     if (body === null || typeof body !== "object" || typeof body.ready !== "boolean" || !Array.isArray(body.reasons)) {
       return null;
     }
-    return { status: response.status, body };
+    return { status: response.status, body, proofVerdict: response.headers.get(UI_API_PROOF_VERDICT_HEADER) };
   } catch {
     return null;
   }
@@ -181,18 +197,19 @@ function writeJson(res, status, body) {
  * GET /readyz ahead of Next (spec §6). The answer is the API's own body (200) when that API is ready under the same
  * key; otherwise 503 `{ready:false, releaseKey, reasons}` with the API's reasons, BOOTING when the API is unreachable,
  * late (`timeoutMs`), not JSON or not a readiness answer, RELEASE_KEY_MISMATCH when it is another release (its reasons
- * are about that release, so they are not passed on), and DRAINING added once `draining()` is true (after SIGTERM; not
- * observable in practice, see installGracefulClose).
+ * are about that release, so they are not passed on), UI_API_PROOF_REFUSED added (NV-03) when the API refused the
+ * website's `uiApiProof`, or did not accept the one the website holds, and DRAINING added once `draining()` is true
+ * (after SIGTERM; not observable in practice, see installGracefulClose).
  * Under `--dev` without a key (`releaseKey` null) the key comparison is skipped. Returns whether it handled the request.
  */
-export function createReadinessResponder({ apiBase, releaseKey, fetch: fetchImpl, timeoutMs = 1000, draining }) {
+export function createReadinessResponder({ apiBase, releaseKey, fetch: fetchImpl, timeoutMs = READINESS_API_TIMEOUT_MS, draining, uiApiProof = null }) {
   const url = readinessUrl(apiBase);
   return (req, res) => {
     if (req.method !== "GET" || typeof req.url !== "string") return false;
     const query = req.url.indexOf("?");
     if ((query === -1 ? req.url : req.url.slice(0, query)) !== READINESS_PATH) return false;
     void (async () => {
-      const api = await readApiReadiness(fetchImpl, url, timeoutMs);
+      const api = await readApiReadiness(fetchImpl, url, timeoutMs, uiApiProof);
       let reasons;
       if (api === null) {
         reasons = ["BOOTING"];
@@ -204,6 +221,14 @@ export function createReadinessResponder({ apiBase, releaseKey, fetch: fetchImpl
         reasons = api.body.reasons.filter((reason) => typeof reason === "string" && REASON_PATTERN.test(reason))
           .slice(0, MAX_REASONS);
         if (reasons.length === 0) reasons = ["BOOTING"];
+      }
+      // NV-03: a pair whose two halves do not hold the same proof never turns ready (not a waiting reason, so the
+      // release tool refuses to switch to it, or switches back). Another release's API keeps RELEASE_KEY_MISMATCH alone.
+      const sameRelease = api !== null && (releaseKey === null || api.body.releaseKey === releaseKey);
+      if (sameRelease
+        && (api.proofVerdict === "refused" || (uiApiProof !== null && api.proofVerdict !== "accepted"))
+        && !reasons.includes("UI_API_PROOF_REFUSED")) {
+        reasons.push("UI_API_PROOF_REFUSED");
       }
       if (draining() && !reasons.includes("DRAINING")) reasons.push("DRAINING");
       if (reasons.length === 0) writeJson(res, 200, api.body);

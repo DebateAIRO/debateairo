@@ -51,13 +51,13 @@ import { buildProviderPriceMap, createPostgresProviderGateway, declareHatchetWal
 import { createCallScheduler, type CallSubject } from "./call-scheduler.js";
 import { applyPreviewGateCapacities, previewCallSubjects, previewGateRemainingReaders, structureRepairThroughLane, targetCallSubjects } from "./call-lane-gateway.js";
 import { createRunInFlight } from "./run-in-flight.js";
-import { createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, readRunSettingsVersionNow, createSwitchedOnSettingsReader, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, runVersionMapper } from "./run-settings.js";
+import { createRunFinalWriterTerms, createRunnerSettingsCache, createRunSettingsVersions, finalWriterTermsResolver, loadRunnerVersionSettings, preloadRunnerSettings, readRunnerSiteContext, readRunSettingsVersionNow, createSwitchedOnSettingsReader, runCostEnvelopeGuardOf, runnerSettingsLine, runnerWebSearchSettings, runnerSettingsOfVersion, runPreviewThinkingLevelsOf, runVersionMapper, staleReadyDayAdmission } from "./run-settings.js";
 import {
   assertRunnerPrimaryProviderConfiguration,
   createRunnerProviderTopology
 } from "./provider-topology.js";
 import { reconcileRunnerStartupWork } from "./runner-startup-reconciliation.js";
-import { startLapsedClaimResend } from "./runner-lapsed-resend.js";
+import { startLapsedClaimResend, startStaleReadyResend } from "./runner-lapsed-resend.js";
 import { postgresRunnerPreviewTeamGateStore, refusePreviewOutsiderWork } from "./runner-preview-team-gate.js";
 import { announceRunnerReady } from "./runner-ready.js";
 import {
@@ -652,7 +652,9 @@ const startupReconciliation = retireRequestStanding
           }
         });
       }
-    }
+    },
+    // NV-25: more open work than one start hands over is said in one content-free line; the start goes on.
+    log: (line) => console.warn(JSON.stringify(line))
   });
 // Dig-model revision W3-7: a dig whose runner stopped mid-rewrite is rewritten again from the store (0135), at boot and
 // every five minutes, its answered calls replayed free; none while this release retires (claims stopped, §4).
@@ -712,6 +714,30 @@ const lapsedResend = startLapsedClaimResend({
   running: (workItemId) => executions.isWorkingOn(workItemId),
   log: (line) => console.warn(JSON.stringify(line))
 });
+// NV-25 (security audit run 3): a READY job Hatchet gave up after its 30-minute queue wait is handed over again by this
+// release's runner, once the run's own daily guard has admitted it again and only into this worker's free places (the
+// lapsed re-send above takes lapsed claims only). Not started on the private preview, whose start-up gate is the only
+// team check the runner makes.
+const staleReadyResend = previewGate === undefined
+  ? startStaleReadyResend({
+    work: new WorkItemRepository(pool, workFence),
+    admit: staleReadyDayAdmission({ cache: runnerSettings, hosted: environment.DEPLOYMENT_MODE === "hosted" }),
+    capacity: () => RUNNER_CAPACITY.concurrentRuns - executions.count(),
+    dispatch: async ({ runId, workItemId }) => {
+      await hatchet.runNoWait(taskName, { runId, workItemId }, {
+        additionalMetadata: {
+          v3RunId: runId,
+          v3WorkItemId: workItemId,
+          sourceOfRecord: "core.work_item",
+          dispatchSource: "runner-stale-ready-resend"
+        }
+      });
+    },
+    paused: () => retirementSignal.claimsStopped(),
+    running: (workItemId) => executions.isWorkingOn(workItemId),
+    log: (line) => console.warn(JSON.stringify(line))
+  })
+  : undefined;
 // Side-by-side spec §4: every 60 s this runner reads its release's facts in one snapshot; once it is DRAINING, its
 // front pair stopped, none of its work is READY or CLAIMED and no task of it runs, it says DEBATEAI_RUNNER_RETIRED
 // (stdout and the in-process event the preview launcher hears) BEFORE it stops the worker, so main ends as asked.
@@ -730,6 +756,7 @@ const retirement = startRunnerRetirement({
   // are the SDK's; a live-handle check needs Hatchet and Postgres running, so the unit test pins this wiring instead.
   stopWorker: async () => {
     lapsedResend.stop();
+    staleReadyResend?.stop();
     pathRewriteSweep?.stop();
     treeSweep?.stop();
     publicTreeSweep?.stop();
@@ -753,3 +780,4 @@ investigationCloseSweep?.stop();
 passageSweep?.stop();
 webResearchedSweep?.stop();
 retirement.stop();
+staleReadyResend?.stop();

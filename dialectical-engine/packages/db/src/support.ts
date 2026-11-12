@@ -59,6 +59,8 @@ export type SupportShredCounts = Readonly<{
 export type SupportShredResult =
   | Readonly<{ kind: "SHREDDED"; counts: SupportShredCounts }>
   | Readonly<{ kind: "ALREADY_SHREDDED" }>;
+/** C-1: what account erasure's support step did; NONE = the owner has no support session. */
+export type SupportErasureShredResult = SupportShredResult | Readonly<{ kind: "NONE" }>;
 
 export type SupportRelayReservationResult =
   | Readonly<{ kind: "BUSY" }>
@@ -388,6 +390,30 @@ async function destroyLockedShredTarget(
   return Object.freeze({ kind: "SHREDDED", counts });
 }
 
+/**
+ * The owner-scoped barrier and row locks both owner shreds share (C-1): the owner advisory lock
+ * (lockSupportOwners), then the owner's sessions' locks and rows. Undefined when the owner has no session.
+ */
+async function lockOwnerShredTarget(
+  client: PoolClient,
+  ownerRef: string
+): Promise<LockedShredTarget | undefined> {
+  await lockSupportOwners(client, [ownerRef]);
+  const sessionIds = (await client.query<{ session_id: string }>(`
+    SELECT session_id FROM support.session
+    WHERE identity_owner_ref=$1
+    ORDER BY session_id
+  `, [ownerRef])).rows.map(({ session_id }) => session_id);
+  if (sessionIds.length === 0) return undefined;
+  await lockSupportSessions(client, sessionIds);
+  const target = await lockShredTargetRows(client, sessionIds, "owner", ownerRef);
+  if (target.sessions.length !== sessionIds.length
+    || target.sessions.some(({ identity_owner_ref }) => identity_owner_ref !== ownerRef)) {
+    supportShredFailure("SUPPORT_SHRED_STATE_INVALID");
+  }
+  return target;
+}
+
 /** Shred-only facet shared by the API service and the operator runner. */
 export class PostgresSupportShredRepository {
   constructor(readonly pool: Pool) {}
@@ -395,19 +421,8 @@ export class PostgresSupportShredRepository {
   async shredOwner(ownerRef: string, osUser: string, at: Date): Promise<SupportShredResult> {
     assertSupportShredInput(ownerRef, osUser, at);
     return withSupportTransaction(this.pool, async (client) => {
-      await lockSupportOwners(client, [ownerRef]);
-      const sessionIds = (await client.query<{ session_id: string }>(`
-        SELECT session_id FROM support.session
-        WHERE identity_owner_ref=$1
-        ORDER BY session_id
-      `, [ownerRef])).rows.map(({ session_id }) => session_id);
-      if (sessionIds.length === 0) supportShredFailure("SUPPORT_SHRED_TARGET_NOT_FOUND");
-      await lockSupportSessions(client, sessionIds);
-      const target = await lockShredTargetRows(client, sessionIds, "owner", ownerRef);
-      if (target.sessions.length !== sessionIds.length
-        || target.sessions.some(({ identity_owner_ref }) => identity_owner_ref !== ownerRef)) {
-        supportShredFailure("SUPPORT_SHRED_STATE_INVALID");
-      }
+      const target = await lockOwnerShredTarget(client, ownerRef);
+      if (target === undefined) return supportShredFailure("SUPPORT_SHRED_TARGET_NOT_FOUND");
       return destroyLockedShredTarget(client, target, "owner", ownerRef, osUser, at);
     });
   }
@@ -425,6 +440,64 @@ export class PostgresSupportShredRepository {
       }
       return destroyLockedShredTarget(client, target, "session", sessionId, osUser, at);
     });
+  }
+
+  /**
+   * C-1: account erasure's support step (AccountErasureCoordinator), on the support data credential. Same barrier,
+   * locks, classifier, zeroing and owner audit as shredOwner, so 0054/0065's guards and assertSupportKeyCoverage hold
+   * exactly as after `pnpm support:shred --owner`. Two differences. An owner with no session is NONE, not
+   * SUPPORT_SHRED_TARGET_NOT_FOUND (most accounts never open a signed-in chat, and their erasure must not stall). And
+   * a lock wait is bounded, because this runs inside the API's shared single-flight erasure cycle while it holds the
+   * user's notification lease: a 55P03 throws, and the next 30 s cycle retries. Since 0129 (synthesis-flag S05)
+   * emptied the support tables and revoked the support role's INSERT on them, this is NONE for every owner; it stays
+   * as the erasure's guard for any support row a later release might persist again.
+   */
+  async shredOwnerForErasure(ownerRef: string, actor: string, at: Date): Promise<SupportErasureShredResult> {
+    assertSupportShredInput(ownerRef, actor, at);
+    return withSupportTransaction(this.pool, async (client) => {
+      await client.query("SET LOCAL lock_timeout = '5s'");
+      const target = await lockOwnerShredTarget(client, ownerRef);
+      if (target === undefined) return Object.freeze({ kind: "NONE" as const });
+      return destroyLockedShredTarget(client, target, "owner", ownerRef, actor, at);
+    });
+  }
+
+  /**
+   * C-1: the erasure's readback, a separate read after the shred committed. Counts the owner's support sessions and
+   * cases (a case by its session's owner or its own identity_owner_ref) that are not fully shredded. The erasure
+   * accepts only 0. The session branch and the case-by-session branch use support_session_identity_owner_ref_idx and
+   * support_case_session_id_idx. The case-by-own-owner branch has no index (0065:267-268 indexes session_id only),
+   * so it scans support."case" once per readback.
+   */
+  async liveOwnerKeyCount(ownerRef: string): Promise<number> {
+    if (typeof ownerRef !== "string" || !CANONICAL_SUPPORT_UUID.test(ownerRef)) {
+      return supportShredFailure("SUPPORT_SHRED_INPUT_INVALID");
+    }
+    const row = (await this.pool.query<{ live: string }>(`
+      SELECT (
+        (SELECT pg_catalog.count(*) FROM support.session AS owned
+          LEFT JOIN support.session_key AS key ON key.session_id=owned.session_id
+          WHERE owned.identity_owner_ref=$1::uuid
+            AND (owned.shredded_at IS NULL OR key.session_id IS NULL OR key.destroyed_at IS NULL
+              OR key.wrapped_key<>pg_catalog.decode(pg_catalog.repeat('00',61),'hex')))
+        + (SELECT pg_catalog.count(*) FROM (
+            SELECT owned_case.case_id,owned_case.shredded_at
+            FROM support.session AS owned
+            JOIN support."case" AS owned_case ON owned_case.session_id=owned.session_id
+            WHERE owned.identity_owner_ref=$1::uuid
+            UNION
+            SELECT owned_case.case_id,owned_case.shredded_at
+            FROM support."case" AS owned_case
+            WHERE owned_case.identity_owner_ref=$1::uuid
+          ) AS owned_case
+          LEFT JOIN support.case_key AS key ON key.case_id=owned_case.case_id
+          WHERE owned_case.shredded_at IS NULL OR key.case_id IS NULL OR key.destroyed_at IS NULL
+            OR key.wrapped_key<>pg_catalog.decode(pg_catalog.repeat('00',61),'hex'))
+      )::text AS live
+    `, [ownerRef])).rows[0];
+    const live = Number(row?.live);
+    if (!Number.isSafeInteger(live) || live < 0) return supportShredFailure("SUPPORT_SHRED_STATE_INVALID");
+    return live;
   }
 }
 

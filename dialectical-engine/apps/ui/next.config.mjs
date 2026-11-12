@@ -13,7 +13,8 @@ const gitHead = () => readGitHead(dirname(fileURLToPath(import.meta.url)));
  * here: apps/ui/middleware.ts sets a per-request nonce policy and server.mjs
  * pre-sets the fail-closed fallback (F-08, L3-F3). Proxied /api responses get
  * the static API policy because the proxy's response allowlist drops the
- * upstream's own header.
+ * upstream's own header. COOP same-origin (NV-05): a cross-origin opener keeps
+ * no handle on any app document, whatever edge is in front.
  */
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -36,6 +37,7 @@ const nextConfig = {
         headers: [
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "X-Frame-Options", value: "DENY" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },

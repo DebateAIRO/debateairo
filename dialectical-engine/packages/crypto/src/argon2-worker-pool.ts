@@ -47,6 +47,12 @@ export class Argon2InfrastructureError extends Error {
 export type Argon2Lane = "credential" | "audit";
 
 /**
+ * K09/NV-42. Which share of the audit lane an audit job may use. Only login
+ * success steps pass `"login"`; everything else is `"ordinary"`.
+ */
+export type Argon2AuditPriority = "ordinary" | "login";
+
+/**
  * The accepted encoded-Argon2id envelope. The numbers are exactly the finite
  * bounds the register schema already accepts for the password KDF
  * (`packages/register/src/auth-policy.ts`), so a stored hash can never demand
@@ -214,7 +220,14 @@ export const ARGON2_PROVISIONAL_BOUNDS = Object.freeze({
   // held until an `exit` (or a resolved termination) confirms death; when this
   // deadline passes with no confirmation the pool fails closed instead of
   // guessing.
-  terminationConfirmTimeoutMs: 10_000
+  terminationConfirmTimeoutMs: 10_000,
+  // K09/NV-42, provisional on the same terms: a reserve reachable only by
+  // `priority: "login"` audit jobs, so ordinary audit traffic can never refuse
+  // or out-queue a login success step. The 32/96/128 partition above still
+  // holds exactly (`credentialLaneCap + auditLaneCap === totalCap`); the reserve
+  // sits OUTSIDE it, so the pool's possible outstanding jobs rise to 160. Like
+  // every value here it awaits V's ratification against measured evidence.
+  auditReservedCap: 32
 });
 
 /** Minimal surface the pool needs, so tests can inject barrier/fault fixtures. */
@@ -240,6 +253,8 @@ export interface Argon2WorkerPoolOptions {
   readonly closeDrainMs?: number;
   readonly readyHandshakeTimeoutMs?: number;
   readonly terminationConfirmTimeoutMs?: number;
+  /** K09/NV-42. 0 means no reserve: login audit jobs then use ordinary room only. */
+  readonly auditReservedCap?: number;
   readonly spawn?: (index: number) => Argon2WorkerHandle;
   readonly now?: () => number;
   /**
@@ -270,6 +285,9 @@ export interface Argon2PoolStats {
   readonly outstandingCredential: number;
   readonly outstandingAudit: number;
   readonly outstandingTotal: number;
+  /** K09/NV-42. Audit jobs accounted against the login reserve (also in the audit counts above). */
+  readonly queuedAuditReserved: number;
+  readonly outstandingAuditReserved: number;
   readonly restartsInWindow: number;
   readonly breakerTripped: boolean;
 }
@@ -322,6 +340,10 @@ interface QueuedJob {
   readonly op: Argon2WorkerRequest["op"];
   /** The exact result this job's response frame must carry, and nothing else. */
   readonly expected: ExpectedResponse;
+  /** K09/NV-42. A login audit job: queued ahead of every ordinary audit job. */
+  readonly priority: boolean;
+  /** K09/NV-42. Accounted against the login reserve, not the ordinary caps. */
+  readonly reserved: boolean;
   /** Single live owner of the plaintext until dispatch; cleared at handoff. */
   request: Argon2WorkerRequest | undefined;
   readonly resolve: (value: string | boolean) => void;
@@ -532,6 +554,7 @@ export class Argon2WorkerPool {
   private readonly credentialLaneCap: number;
   private readonly auditLaneCap: number;
   private readonly totalCap: number;
+  private readonly auditReservedCap: number;
   private readonly jobTimeoutMs: number;
   private readonly restartBudget: number;
   private readonly restartWindowMs: number;
@@ -564,6 +587,7 @@ export class Argon2WorkerPool {
     this.credentialLaneCap = options.credentialLaneCap ?? ARGON2_PROVISIONAL_BOUNDS.credentialLaneCap;
     this.auditLaneCap = options.auditLaneCap ?? ARGON2_PROVISIONAL_BOUNDS.auditLaneCap;
     this.totalCap = options.totalCap ?? ARGON2_PROVISIONAL_BOUNDS.totalCap;
+    this.auditReservedCap = options.auditReservedCap ?? ARGON2_PROVISIONAL_BOUNDS.auditReservedCap;
     this.jobTimeoutMs = options.jobTimeoutMs ?? ARGON2_PROVISIONAL_BOUNDS.jobTimeoutMs;
     this.restartBudget = options.restartBudget ?? ARGON2_PROVISIONAL_BOUNDS.restartBudget;
     this.restartWindowMs = options.restartWindowMs ?? ARGON2_PROVISIONAL_BOUNDS.restartWindowMs;
@@ -579,6 +603,9 @@ export class Argon2WorkerPool {
       throw new TypeError("ARGON2_POOL_WORKER_COUNT_INVALID");
     }
     if (this.credentialLaneCap < 1 || this.auditLaneCap < 1 || this.totalCap < 1) {
+      throw new TypeError("ARGON2_POOL_CAPACITY_INVALID");
+    }
+    if (!Number.isInteger(this.auditReservedCap) || this.auditReservedCap < 0) {
       throw new TypeError("ARGON2_POOL_CAPACITY_INVALID");
     }
     for (let index = 0; index < this.workerCount; index += 1) {
@@ -801,6 +828,8 @@ export class Argon2WorkerPool {
       (slot) => slot.active?.job.lane === "credential"
     ).length;
     const activeAudit = active - activeCredential;
+    const queuedAuditReserved = this.queues.audit.filter((job) => job.reserved).length;
+    const activeAuditReserved = this.slots.filter((slot) => slot.active?.job.reserved === true).length;
     return Object.freeze({
       state: this.state,
       workers: this.slots.length,
@@ -815,6 +844,8 @@ export class Argon2WorkerPool {
       outstandingCredential: this.queues.credential.length + activeCredential,
       outstandingAudit: this.queues.audit.length + activeAudit,
       outstandingTotal: this.queues.credential.length + this.queues.audit.length + active,
+      queuedAuditReserved,
+      outstandingAuditReserved: queuedAuditReserved + activeAuditReserved,
       restartsInWindow: this.restarts.length,
       breakerTripped: this.breakerTripped
     });
@@ -877,7 +908,8 @@ export class Argon2WorkerPool {
   async hashAuditContext(
     value: Uint8Array,
     salt: Uint8Array,
-    parameters: Argon2AuditParameters
+    parameters: Argon2AuditParameters,
+    priority: Argon2AuditPriority = "ordinary"
   ): Promise<string> {
     const id = Argon2WorkerPool.newJobId();
     const result = await this.submitArgon2Job("audit", {
@@ -891,7 +923,7 @@ export class Argon2WorkerPool {
       iterations: parameters.iterations,
       parallelism: parameters.parallelism,
       hashLength: parameters.hashLength
-    });
+    }, priority);
     if (typeof result !== "string") throw new Argon2InfrastructureError("ARGON2_WORKER_FAILED");
     return result;
   }
@@ -905,15 +937,11 @@ export class Argon2WorkerPool {
     return lane === "credential" ? this.credentialLaneCap : this.auditLaneCap;
   }
 
-  private outstanding(lane: Argon2Lane): number {
-    const stats = this.stats();
-    return lane === "credential" ? stats.outstandingCredential : stats.outstandingAudit;
-  }
-
   private submitArgon2Job(
     lane: Argon2Lane,
     expected: ExpectedResponse,
-    request: Argon2WorkerRequest
+    request: Argon2WorkerRequest,
+    priority: Argon2AuditPriority = "ordinary"
   ): Promise<string | boolean> {
     // Capacity and liveness are decided BEFORE the payload is retained anywhere.
     // On refusal the caller's bytes are zeroed and never enter a queue node.
@@ -921,16 +949,34 @@ export class Argon2WorkerPool {
       zeroRequest(request);
       return Promise.reject(new Argon2InfrastructureError("ARGON2_POOL_UNAVAILABLE"));
     }
-    if (this.outstanding(lane) >= this.laneCap(lane)
-      || this.stats().outstandingTotal >= this.totalCap) {
+    // K09/NV-42. Ordinary room is exactly today's test, with reserved jobs left
+    // out of every ordinary count; a login audit job takes the reserve first and
+    // falls back to ordinary room. With no login job present, every decision is
+    // identical to the pre-reserve pool.
+    const stats = this.stats();
+    const login = lane === "audit" && priority === "login";
+    const ordinaryRoom = (lane === "credential"
+      ? stats.outstandingCredential
+      : stats.outstandingAudit - stats.outstandingAuditReserved) < this.laneCap(lane)
+      && stats.outstandingTotal - stats.outstandingAuditReserved < this.totalCap;
+    const reserved = login && stats.outstandingAuditReserved < this.auditReservedCap;
+    if (!reserved && !ordinaryRoom) {
       zeroRequest(request);
       return Promise.reject(new Argon2InfrastructureError("ARGON2_POOL_CAPACITY_EXHAUSTED"));
     }
     return new Promise<string | boolean>((resolve, reject) => {
       const job: QueuedJob = {
-        id: request.id, lane, op: request.op, expected, request, resolve, reject, settled: false
+        id: request.id, lane, op: request.op, expected, priority: login, reserved, request,
+        resolve, reject, settled: false
       };
-      this.queues[lane].push(job);
+      if (login) {
+        // Ahead of every queued ordinary audit job; FIFO among login jobs.
+        const firstOrdinary = this.queues.audit.findIndex((queued) => !queued.priority);
+        if (firstOrdinary === -1) this.queues.audit.push(job);
+        else this.queues.audit.splice(firstOrdinary, 0, job);
+      } else {
+        this.queues[lane].push(job);
+      }
       this.pump();
     });
   }
@@ -978,6 +1024,7 @@ export class Argon2WorkerPool {
     if (request === undefined) return;
     const handle = slot.handle;
     if (handle === undefined) {
+      // K09/NV-42: the head, restored synchronously inside pump(), so login-first order holds.
       this.queues[job.lane].unshift(job);
       return;
     }

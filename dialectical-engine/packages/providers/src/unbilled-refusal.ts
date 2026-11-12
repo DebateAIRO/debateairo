@@ -16,3 +16,16 @@ export class ProviderUnbilledRefusal extends TypedDomainError {
     super("PROVIDER_CALL_FAILED", message);
   }
 }
+
+/**
+ * NV-50 (security audit run 3): a failure the money authority says was SENT and billed — the preview gate's "sent and
+ * failed; it booked its whole reservation" (`PreviewChargeBookedMax`). The gateway charges such an attempt as
+ * unanswered (`recordUnanswered`, at its projected maximum), unlike every other typed refusal an in-process fetch
+ * raises, which never left the process. Its own module for the same cycle reason as `ProviderUnbilledRefusal`. The code
+ * stays PROVIDER_CALL_FAILED, so every caller handles it as the transport failure it is.
+ */
+export class ProviderSentBilledFailure extends TypedDomainError {
+  constructor(message: string) {
+    super("PROVIDER_CALL_FAILED", message);
+  }
+}

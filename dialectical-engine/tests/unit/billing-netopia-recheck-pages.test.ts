@@ -64,4 +64,39 @@ describe("N9 the quarantine re-check reads in pages (ruling PR-30)", () => {
     expect(empty.pages).toHaveLength(1);
     expect(empty.audit.events).toEqual([]);
   });
+
+  it("NV-44: runs one re-check at a time: a second start's call shares the first's pass", async () => {
+    const pages: Array<NoticeQuarantinePage | undefined> = [];
+    const releases: Array<(rows: NoticeQuarantineRow[]) => void> = [];
+    const releaseAll = (): void => {
+      for (const release of releases.splice(0)) release([]);
+    };
+    const repository = {
+      withTransaction: async <T>(work: (client: never) => Promise<T>) => work({} as never),
+      quarantineSince: (_client: unknown, _since: Date, page?: NoticeQuarantinePage) => {
+        pages.push(page);
+        return new Promise<NoticeQuarantineRow[]>((resolve) => { releases.push(resolve); });
+      }
+    } as unknown as NetopiaNoticeIntakeDeps["repository"];
+    const intake = new NetopiaNoticeIntake({
+      repository, jobs: {} as NetopiaNoticeIntakeDeps["jobs"], trust: testNetopiaKeys().trust(POS),
+      recordsKey: TEST_RECORDS_KEY, paymentEnvironment: "sandbox", mode: "ON", audit: recordingAudit(), kick: () => undefined
+    });
+    const first = intake.recheckQuarantine(NOW);
+    const second = intake.recheckQuarantine(NOW);
+    await Promise.resolve();
+    try {
+      expect(pages).toHaveLength(1);
+    } finally {
+      releaseAll();
+    }
+    expect(await Promise.all([first, second])).toEqual([0, 0]);
+    expect(pages).toHaveLength(1);
+    // The pass is over, so the next start reads again.
+    const third = intake.recheckQuarantine(NOW);
+    await Promise.resolve();
+    releaseAll();
+    expect(await third).toBe(0);
+    expect(pages).toHaveLength(2);
+  });
 });

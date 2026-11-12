@@ -131,7 +131,9 @@ export const MIXED_SETTINGS_ROW_MEMBERS: Readonly<Record<MixedSettingsRowKey,
   costEnvelopePolicy: Object.freeze({
     site: Object.freeze([
       "kind", "currency", "minor_units_per_unit", "daily_ceiling_micros", "provisional", "provisional_reason",
-      "admission_close_basis_points", "finish_up_to_basis_points", "waiting_line_per_person"
+      "admission_close_basis_points", "finish_up_to_basis_points", "waiting_line_per_person",
+      // NV-43: one day, one share, for every debate.
+      "owner_day_share_basis_points"
     ]),
     debate: Object.freeze(["per_run_ceiling_micros", "serve_reserve_basis_points", "serve_overrun_basis_points"])
   }),
@@ -309,6 +311,8 @@ export function composeDebateCostEnvelope(site: CostEnvelopePolicy, debate: Cost
     provisional_reason: site.provisionalReason,
     serve_reserve_basis_points: debate.serveReserveBasisPoints,
     serve_overrun_basis_points: debate.serveOverrunBasisPoints,
+    // NV-43: the owner's share of the site's day is the site's.
+    owner_day_share_basis_points: site.ownerDayShareBasisPoints,
     ...(band === null ? {} : {
       admission_close_basis_points: band.closeBasisPoints,
       finish_up_to_basis_points: band.finishBasisPoints,

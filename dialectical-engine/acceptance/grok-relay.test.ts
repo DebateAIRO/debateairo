@@ -7,6 +7,8 @@ import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   GROK_BINARY_NAME,
+  GROK_CLI_STOP_REASON_UNEXPECTED,
+  GROK_CLI_TOOL_TURNS,
   GROK_HANDSHAKE_PROMPT,
   GROK_SANDBOX_PROFILE,
   SANDBOX_PROFILE_UNAVAILABLE,
@@ -88,7 +90,7 @@ describe("GROK-01 Grok Build CLI relay", () => {
     const probeScript = [
       'const { readdirSync } = require("node:fs");',
       'const text = JSON.stringify({ cwd: process.cwd(), pwd: process.env.PWD, oldpwd: process.env.OLDPWD, entries: readdirSync(process.cwd()) });',
-      'console.log(JSON.stringify({ text, stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));'
+      'console.log(JSON.stringify({ text, stopReason: "end_turn", num_turns: 1, modelUsage: { "grok-probe-model": {} } }));'
     ].join("");
     const relay = await startGrokRelay({
       port: 0,
@@ -494,7 +496,7 @@ describe("F-GROK-SANDBOX-PROFILE the sandbox profile is probed, never assumed", 
       '  const promptIndex = argumentList.indexOf("--single") + 1;',
       '  console.log(JSON.stringify({',
       '    text: JSON.stringify({ prompt: argumentList[promptIndex], argumentList }),',
-      '    stopReason: "end_turn",',
+      '    stopReason: "end_turn", num_turns: 1,',
       '    modelUsage: { "grok-4.6-build": { input_tokens: 1, output_tokens: 1 } }',
       '  }));',
       '}'
@@ -832,7 +834,7 @@ describe("D8 lean calls — grok (Task A12b)", () => {
         binary: process.execPath,
         prefixArguments: ["-e", [
           leanCwdReportSnippet(logPath),
-          'console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));'
+          'console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", num_turns: 1, modelUsage: { "grok-probe-model": {} } }));'
         ].join("\n"), "--"]
       }
     });
@@ -887,7 +889,7 @@ describe("D8 grok's sandbox probe runs every handshake in the relay's one worksp
       'if (process.argv.includes("--sandbox")) {',
       "  process.exitCode = 1;",
       "} else {",
-      '  console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", modelUsage: { "grok-probe-model": {} } }));',
+      '  console.log(JSON.stringify({ text: JSON.stringify(leanCwdReport), stopReason: "end_turn", num_turns: 1, modelUsage: { "grok-probe-model": {} } }));',
       "}"
     ].join("\n");
     const relay = await startGrokRelay({
@@ -909,5 +911,94 @@ describe("D8 grok's sandbox probe runs every handshake in the relay's one worksp
     expect(await loggedWorkspaces(logPath)).toEqual([workspace, workspace, workspace, workspace]);
     await relay.close();
     expect(existsSync(workspace)).toBe(false);
+  });
+});
+
+describe("NV-53 a grok reply is one turn that ended end_turn, or it is refused", () => {
+  /** The development panel's explicit `none` profile: the path NV-53 found unprotected. */
+  async function startExplicitNone(): Promise<GrokRelayHandle> {
+    const relay = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      sandboxProfile: "none",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: [fakeCli] }
+    });
+    handles.push(relay);
+    return relay;
+  }
+
+  /** A handshake double whose envelope is otherwise the plain-answer shape, with `num_turns` chosen by the script. */
+  function handshakeDouble(lines: readonly string[], numTurns: string): readonly string[] {
+    return ["-e", [
+      ...lines,
+      "console.log(JSON.stringify({",
+      `  text: "OK", stopReason: "end_turn", num_turns: ${numTurns},`,
+      '  modelUsage: { "grok-probe-model": { input_tokens: 1, output_tokens: 1 } }',
+      "}));"
+    ].join("\n"), "--"];
+  }
+
+  it("names the two refusal codes it serves", () => {
+    expect(GROK_CLI_TOOL_TURNS).toBe("GROK_CLI_TOOL_TURNS");
+    expect(GROK_CLI_STOP_REASON_UNEXPECTED).toBe("GROK_CLI_STOP_REASON_UNEXPECTED");
+  });
+
+  it("refuses a served reply whose envelope reports tool turns, and serves none of its text", async () => {
+    const relay = await startExplicitNone();
+    const response = await postCompletion(relay, "TOOL_TURNS_CLI");
+    const body = await response.json() as unknown;
+
+    expect(response.status).toBe(502);
+    expect(body).toEqual({ error: "GROK_CLI_TOOL_TURNS" });
+    expect(JSON.stringify(body)).not.toContain("canary-v04");
+  });
+
+  it("refuses a reply whose envelope does not report its turn count", async () => {
+    const relay = await startExplicitNone();
+    const response = await postCompletion(relay, "TURNS_UNREPORTED_CLI");
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: "GROK_CLI_TOOL_TURNS" });
+  });
+
+  it("refuses a stop reason other than end_turn", async () => {
+    const relay = await startExplicitNone();
+    const response = await postCompletion(relay, "STOP_REASON_CLI");
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({ error: "GROK_CLI_STOP_REASON_UNEXPECTED" });
+  });
+
+  it("refuses to start when the handshake itself takes tool turns", async () => {
+    const outcome = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      sandboxProfile: "none",
+      testOnlyCommand: { binary: process.execPath, prefixArguments: handshakeDouble([], "2") }
+    }).then((relay) => { handles.push(relay); return null; }, (error: unknown) => error);
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect((outcome as Error).message).toBe("GROK_CLI_TOOL_TURNS");
+  });
+
+  it("a sandboxed handshake refused for tool turns is not evidence against the profile", async () => {
+    const attemptLog = join(await temporaryDirectory("grok-nv53-attempts-"), "attempts");
+    const outcome = await startGrokRelay({
+      port: 0,
+      timeoutMs: 1_000,
+      testOnlyCommand: {
+        binary: process.execPath,
+        prefixArguments: handshakeDouble([
+          'const fs = require("node:fs");',
+          'const sandboxed = process.argv.slice(1).includes("--sandbox");',
+          `fs.appendFileSync(${JSON.stringify(attemptLog)}, (sandboxed ? "S" : "U") + "\\n");`
+        ], "sandboxed ? 2 : 1")
+      }
+    }).then((relay) => { handles.push(relay); return null; }, (error: unknown) => error);
+
+    expect(outcome).toBeInstanceOf(Error);
+    expect((outcome as Error).message).toBe("GROK_CLI_TOOL_TURNS");
+    // Re-thrown at once: no sandboxed retry, and never the unsandboxed probe that would drop the profile.
+    expect((await readFile(attemptLog, "utf8")).split("\n").filter((line) => line !== "")).toEqual(["S"]);
   });
 });

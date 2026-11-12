@@ -41,6 +41,8 @@ Rows are appended by the orchestrator during triage (PLAN §3 A.8). Each row: re
 
 **Premise, verified in code that day.** The development relays launch every vendor CLI with tools disabled (`acceptance/claude-relay.ts`: `--tools ""`, `--safe-mode`, `--strict-mcp-config`, `--no-session-persistence`; `acceptance/grok-relay.ts`: `--tools ""`, `--sandbox`, `--no-memory`, `--no-subagents`, `--disable-web-search`; `acceptance/hermes-relay.ts`: `--toolsets context_engine`, `--ignore-user-config`, `--ignore-rules` — the `context_engine` toolset is to be confirmed harmless in RUN1). So an injection can change what a model SAYS, not what it can DO; the safeguards protect the truth of verdicts.
 
+**Correction (2026-10-27, security audit run 3, NV-53; a factual note, not a new ruling).** Since 2026-09-12 the development panel (`apps/runner/src/dev-cli-provider-panel.ts`, `grokSandboxProfile: "none"`) runs grok with `--sandbox none`, because grok refuses its `read-only` profile on Docker Desktop's symlinked socket. For that panel the premise above rests on `--tools ""` alone. The relay now refuses any grok reply whose envelope does not report one turn ending `end_turn` (`acceptance/grok-relay.ts`, `parseGrokEnvelope`), so an injected tool use cannot change what is served; a tool's side effects are not prevented by that check. The acceptance relays still ask for `--sandbox read-only` first.
+
 | # | Layer | When |
 |---|---|---|
 | 1 | Separate compartments: engine instructions and model-written text never share a block, at EVERY hand-off (the judge legs, the expansion legs, the synthesizer digest, the evaluator packet, the repair packets) | **now — RUN1** |

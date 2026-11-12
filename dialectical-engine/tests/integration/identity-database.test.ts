@@ -74,7 +74,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "dig_run",
       // 0153: the runner's mark that a dig has ended.
       "dig_tree_settled",
-      "email_change_request",
+      "email_change_request", "email_change_send_window",
       // 0137 public debates: a free ask, a public dig's contribution, the debate's updates, the report's writer and charges.
       "free_public_ask",
       // 0133 investigations: a debate and its digs, their closings and the one reserve.
@@ -99,7 +99,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "page_reading_level",
       "password_recovery_control", "password_recovery_feed", "password_recovery_notice",
       "password_recovery_retry_lock", "password_recovery_source_window", "password_recovery_staged_code",
-      "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_source_window",
+      "password_reset_control", "password_reset_notice", "password_reset_notice_binding", "password_reset_retry_lock", "password_reset_source_window",
       // 0134 the dig model: a path's rewrites and the turns that order them.
       "path_rewrite",
       // 0135 the path rewrite's material: the dig's own paths, stored before its turn.
@@ -130,7 +130,7 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "public_report_check", "public_report_writer",
       // 0150: a public debate under review: its log, its corrections, the digs detached when it was hidden, what each reviewer read.
       "public_review_correction", "public_review_detached", "public_review_event", "public_review_purged", "public_review_read", "public_update_ref",
-      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "run_execution_binding",
+      "publication_event_binding", "recovery_code", "recovery_email_request", "registration_region", "restore_fence", "run_execution_binding",
       // 0143 the hand-over of a paused debate: which release and settings version it moved from and to.
       "run_handover",
       // 0134 the month pause of a running debate.
@@ -140,7 +140,8 @@ describe("S2 identity schema on real PostgreSQL", () => {
       "runtime_audit_attempt",
       // 0162 saved questions: a person's questions not started yet, each part sealed under the question's own key.
       "saved_question",
-      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding", "user",
+      "sensitive_data_consent", "session", "social_enrollment", "social_flow", "social_identity", "staff_webauthn_metadata", "step_up_grant", "synthesis_check_erasure_binding",
+      "totp_login_lockout", "user",
       "verification_delivery_reservation", "verification_token_credential",
       // 0132 web evidence store: a debate's searches, pages, transient page texts, readings, extracts, packs, picks, choices.
       "web_extract", "web_pack", "web_page", "web_page_text",

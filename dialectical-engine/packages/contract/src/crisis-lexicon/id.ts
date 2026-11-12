@@ -28,7 +28,7 @@ export const ID: CrisisLexicon = Object.freeze({
     { signal: "self-harm", pattern: String.raw`\b${FP}\b (?:${ADV} ){0,3}(?:suka |sering |masih |terus |ingin |mau |pengen |pernah |udah |abis |habis )?(?:menyakiti|nyakitin|melukai|ngelukain|ngelukai|nyiksa|menyiksa) (?:diri(?: sendiri| ku)?|diriku|badan(?:ku)?|tubuh(?:ku)?)\b` },
     { signal: "self-harm", pattern: String.raw`\b(?:sayat|menyayat|nyayat|silet|menyilet|nyilet|gores|menggores|ngegores|ngiris) (?:tangan|lengan|pergelangan(?: tangan)?|nadi|urat nadi|paha|kulit)(?:ku| saya| aku| gue| sendiri)?\b` },
     { signal: "self-harm", pattern: String.raw`\b(?:potong|motong|mutus|putus) (?:urat )?nadi(?:ku| saya| aku| gue| sendiri)?\b` },
-    { signal: "self-harm", pattern: String.raw`\b(?:${FP}) (?:[a-z]+ ){0,2}self ?harm\b` },
+    { signal: "self-harm", pattern: String.raw`\b(?:${FP}) (?:[a-z]{1,32} ){0,2}self ?harm\b` },
     { signal: "self-harm", pattern: String.raw`\b(?:berhenti|stop|gimana cara berhenti) (?:menyakiti|nyakitin|melukai|self ?harm|nyilet|menyayat)` },
     { signal: "self-harm", pattern: String.raw`\b(?:tangan|lengan|paha)(?:ku| saya| aku| gue)? (?:udah |sudah |penuh )?barcode\b` },
     // decision

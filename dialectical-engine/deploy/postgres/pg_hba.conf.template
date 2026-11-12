@@ -17,6 +17,9 @@ local     all        postgres                                                pee
 # here the login exists but can never log in. NEVER add a peer line for it here, and never map
 # root to it: peer sees only a uid, and any process running as uid 0 that reaches this socket
 # (a root container through the compose bind mount, for one) would count as root.
+# Likewise, a container process running as the host postgres uid matches the peer line above.
+# The Hatchet container must never start as that uid, and the compose file drops
+# CAP_SETUID/CAP_SETGID so it cannot change to it (NV-57).
 #
 # Just-in-time superuser for `pnpm db:migrate` / `pnpm db:provision-principals` (README §4):
 # its password is NULL between ceremonies and VALID UNTIL <= 15 minutes during one.
@@ -52,7 +55,7 @@ local     debateai   debateai_obs_human                      scram-sha-256
 local     debateai   debateai_observation_agent              scram-sha-256
 local     debateai   debateai_observation_threshold_operator scram-sha-256
 #
-# Hatchet-lite reaches the socket through a bind mount (compose.prod.yaml); it owns only `hatchet`.
+# Hatchet-lite reaches the socket through a read-only bind mount (compose.prod.yaml); it owns only `hatchet`.
 local     hatchet    debateai_prod_hatchet                                   scram-sha-256
 #
 # Loopback TCP is TLS-only (server.crt has SAN IP:127.0.0.1 + IP:::1, TLSv1.3 floor in
