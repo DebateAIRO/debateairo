@@ -8,101 +8,12 @@ import { migrate } from "@debateai/db";
 import { lineageEvidence, loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { seedInstalledAuth106 } from "../support/auth106.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { FORWARD_STEPS } from "../support/forward-chain-steps.js";
 
 const EXPORT = "0115_data_export.sql";
-const MAIL_LOCALE = "0116_mail_locale.sql";
 const NETOPIA = "0111_billing_netopia.sql";
-const BATCH = "0112_auth_db_batch.sql";
-const PART_C = "0113_billing_price_currencies.sql";
-const ROLE_ROTATION = "0114_role_rotation.sql";
-/** The debate shape's map, chained after the mail locale (spec 2026-10-12 §3.4). */
-const MAP = "0117_debate_shape_map.sql";
-/** The language check's site cost, chained after the map (question-language spec 2026-10-13). */
-const LANGUAGE_CHECK = "0118_language_check_spend.sql";
-/** The reclaim resume, chained after the language check (spec 2026-10-14-reclaim-resume-design). */
-const RECLAIM = "0119_reclaim_resume.sql";
-/** The reply measures, chained after the reclaim resume (length guidance LG-A, spec 2026-10-15). */
-const REPLY_MEASURES = "0120_reply_measures.sql";
-/** The engine verdict, chained after the reply measures (engine redesign R2, spec 2026-10-15). */
-const ENGINE_VERDICT = "0121_engine_verdict.sql";
-/** The engine's map answer step, chained after the engine verdict (engine redesign R3, spec 2026-10-15). */
-const ENGINE_MAP_CHECK = "0122_engine_map_check.sql";
-/** The side-by-side releases, chained after the engine's map answer step (side-by-side uploads, spec 2026-10-21). */
-const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
-/** The settings activation, chained after the side-by-side releases (side-by-side uploads spec §13). */
-const SETTINGS_ACTIVATION = "0124_settings_activation.sql";
-/** The Italy-specific approval, chained after the settings activation (mission italy-clause-approval). */
-const ITALY_APPROVAL = "0125_italy_specific_approval.sql";
-const SYNTHESIS_CHECK = "0126_synthesis_check.sql";
-const PUBLICATION_REVIEW = "0127_publication_review.sql";
-const THREAT_REPORT = "0128_threat_reports.sql";
-const SUPPORT_ANSWER_SCOPE = "0129_support_answer_scope.sql";
 /** Row-level security, chained after the support answer scope (mission row-level-security, SPEC-v4 R26). */
 const RLS = "0130_row_level_security.sql";
-/** The V4 account memory (owner rulings N7 and N11), chained after row-level security. */
-const V4_ACCOUNT_MEMORY = "0131_v4_account_memory.sql";
-/** The Perplexity plan's web evidence store and investigations (task W1-3), chained after the V4 account memory. */
-const WEB_EVIDENCE = "0132_web_evidence.sql";
-const INVESTIGATIONS = "0133_investigations.sql";
-/** The dig model and the month pause (dig-model revision task W2-8), chained after the investigations. */
-const DIG_MODEL = "0134_dig_model_and_month_pause.sql";
-/** A dig's picks and its path rewrite's material (dig-model revision task W3-7), chained after the dig model. */
-const DIG_PICKS = "0135_dig_picks.sql";
-/** The investigation's final report (R22 task W5-1), chained after the dig picks. */
-const INVESTIGATION_REPORTS = "0136_investigation_reports.sql";
-/** The public debates (R22 F1, decision 13), chained after the investigation reports. */
-const PUBLIC_DEBATES = "0137_public_debates.sql";
-/** The tree updates (R22 F1, decisions 2, 3 and 5), chained after the public debates. */
-const TREE_UPDATES = "0138_tree_updates.sql";
-/** The passage retention (R22 F1, decisions 6 and 7), chained after the tree updates. */
-const PASSAGE_RETENTION = "0139_passage_retention.sql";
-/** The funded spend kinds (R22 F1, decision 14), chained after the passage retention. */
-const SPEND_KINDS = "0140_internal_spend_kinds.sql";
-/** The path suggestions (R22 decision 9), chained after the funded spend kinds. */
-const PATH_SUGGESTIONS = "0141_path_suggestions.sql";
-/** The team's one limit (R22 decisions 14 and 24), chained after the path suggestions. */
-const TEAM_LIMIT = "0142_team_limit.sql";
-/** The hand-over of a paused debate (R22 decision 12), chained after the team's one limit. */
-const RUN_HANDOVER = "0143_run_handover.sql";
-/** The small AI's quota charge at step 2 (R22 decisions 29 and 31), chained after the hand-over. */
-const ASK_CLARIFY_CHARGE = "0144_ask_clarify_charge.sql";
-/** The pages waiting after "Add to researched" (W4-4), chained after the small AI's quota charge. */
-const WEB_RESEARCHED_UNSETTLED = "0145_web_researched_unsettled.sql";
-const TEAM_ALLOWANCES = "0146_team_allowances.sql";
-const PUBLIC_TREE = "0147_public_tree.sql";
-const ERASURE_KEEPS_PUBLIC = "0148_erasure_keeps_public.sql";
-const PUBLIC_REPORT_TEAM_MONTH = "0149_public_report_team_month.sql";
-const PUBLIC_REVIEW = "0150_public_review.sql";
-const PUBLIC_FLAG = "0151_public_flag.sql";
-const REPORT_EXPORT = "0152_report_export_and_check_usage.sql";
-const DIG_TREE_SETTLED = "0153_dig_tree_settled.sql";
-const REGION_WIDEN = "0154_region_iceland_liechtenstein.sql";
-const OWNER_ANSWER_WRITES = "0155_owner_answer_writes.sql";
-const MODERATION_NOTICE = "0156_moderation_notice.sql";
-const MODERATION_STATEMENTS = "0157_moderation_statements.sql";
-const PRE_START_CHARGE = "0158_pre_start_charge.sql";
-const START_PATHS = "0159_start_paths.sql";
-const PATH_RESULTS = "0160_path_results.sql";
-const PATH_PROGRESS = "0161_path_progress.sql";
-const SAVED_QUESTIONS = "0162_saved_questions.sql";
-const CARRY_ON_DIGS = "0163_carry_on_session_free_digs.sql";
-const PATH_ADDED = "0164_main_answer_path_added.sql";
-const PRE_START_RELEASE = "0165_pre_start_release.sql";
-const MAIN_ANSWER_TIMES = "0166_main_answer_times.sql";
-const PUBLIC_REPORT_OWN_CARRIER = "0167_public_report_own_carrier.sql";
-const SET_ASIDE_CONTINUE = "0168_set_aside_continue.sql";
-const PIECE_SETTINGS_VERSION = "0169_piece_settings_version.sql";
-/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234). */
-const OUTBOUND_MAIL = "0170_outbound_mail_limit.sql";
-const SECURITY_REVIEW = "0171_security_review_hardening.sql";
-/** The moderation notices' seven gaps after 0157 (the owner's list of 10 Nov 2026). */
-const MODERATION_NOTICE_FIXES = "0172_moderation_notice_fixes.sql";
-/** The check's answer on a report a person already closed (the follow-up to 0172's M6). */
-const SETTLE_DISMISSED = "0173_settle_dismissed_flag.sql";
-/** 0150's staff review door without a ground closed to the runtime (the final review of 0172). */
-const UNGROUNDED_DOOR = "0174_public_review_ungrounded_door.sql";
-/** The statement to a debate's author says an AI read the report first only for a verdict (Q3 of 0172's final review): the chain's last step. */
-const AI_READ_VERDICT = "0175_statement_ai_read_verdict.sql";
 const ROTATE = "identity.rotate_session_after_step_up(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,timestamp with time zone,uuid,text,text,uuid,timestamp with time zone)";
 const rows = async (db: TestDatabase, table: string) => (await db.pool.query(`SELECT * FROM ${table} ORDER BY 1`)).rows;
 const ledger = (db: TestDatabase) => rows(db, "public.debateai_schema_migration");
@@ -116,11 +27,11 @@ describe("data export forward115", () => {
 
   it("G1 applies 0110, NETOPIA 0111, the auth batch 0112, Part C 0113, role rotation 0114, export 0115, the mail locale 0116, the map 0117, the language check 0118 and the reclaim resume 0119 and the reply measures 0120, the engine verdict 0121, the engine's map answer step 0122, the side-by-side releases 0123, the settings activation 0124, the Italy-specific approval 0125, the synthesis check 0126, the publication review 0127, the threat reports 0128 and the support answer scope 0129 and the V4 account memory 0130 with linked receipts", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map(step => step.name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, REPORT_EXPORT, DIG_TREE_SETTLED, REGION_WIDEN, OWNER_ANSWER_WRITES, MODERATION_NOTICE, MODERATION_STATEMENTS, PRE_START_CHARGE, START_PATHS, PATH_RESULTS, PATH_PROGRESS, SAVED_QUESTIONS, CARRY_ON_DIGS, PATH_ADDED, PRE_START_RELEASE, MAIN_ANSWER_TIMES, PUBLIC_REPORT_OWN_CARRIER, SET_ASIDE_CONTINUE, PIECE_SETTINGS_VERSION, OUTBOUND_MAIL, SECURITY_REVIEW, MODERATION_NOTICE_FIXES, SETTLE_DISMISSED, UNGROUNDED_DOOR, AI_READ_VERDICT]);
-    const names = (await ledger(db)).map(row => row.name).filter(name => /^01[1-7]/u.test(name));
-    expect(names).toEqual(["0110_account_erasure_public_debates.sql", NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, REPORT_EXPORT, DIG_TREE_SETTLED, REGION_WIDEN, OWNER_ANSWER_WRITES, MODERATION_NOTICE, MODERATION_STATEMENTS, PRE_START_CHARGE, START_PATHS, PATH_RESULTS, PATH_PROGRESS, SAVED_QUESTIONS, CARRY_ON_DIGS, PATH_ADDED, PRE_START_RELEASE, MAIN_ANSWER_TIMES, PUBLIC_REPORT_OWN_CARRIER, SET_ASIDE_CONTINUE, PIECE_SETTINGS_VERSION, OUTBOUND_MAIL, SECURITY_REVIEW, MODERATION_NOTICE_FIXES, SETTLE_DISMISSED, UNGROUNDED_DOOR, AI_READ_VERDICT]);
+    expect(plan.forwardChain.map(step => step.name)).toEqual([...FORWARD_STEPS]);
+    const names = (await ledger(db)).map(row => row.name).filter(name => name >= "0110");
+    expect(names).toEqual(["0110_account_erasure_public_debates.sql", ...FORWARD_STEPS]);
     const steps = await receipts(db);
-    expect(steps.map(step => step.source_name)).toEqual([NETOPIA, BATCH, PART_C, ROLE_ROTATION, EXPORT, MAIL_LOCALE, MAP, LANGUAGE_CHECK, RECLAIM, REPLY_MEASURES, ENGINE_VERDICT, ENGINE_MAP_CHECK, SIDE_BY_SIDE, SETTINGS_ACTIVATION, ITALY_APPROVAL, SYNTHESIS_CHECK, PUBLICATION_REVIEW, THREAT_REPORT, SUPPORT_ANSWER_SCOPE, RLS, V4_ACCOUNT_MEMORY, WEB_EVIDENCE, INVESTIGATIONS, DIG_MODEL, DIG_PICKS, INVESTIGATION_REPORTS, PUBLIC_DEBATES, TREE_UPDATES, PASSAGE_RETENTION, SPEND_KINDS, PATH_SUGGESTIONS, TEAM_LIMIT, RUN_HANDOVER, ASK_CLARIFY_CHARGE, WEB_RESEARCHED_UNSETTLED, TEAM_ALLOWANCES, PUBLIC_TREE, ERASURE_KEEPS_PUBLIC, PUBLIC_REPORT_TEAM_MONTH, PUBLIC_REVIEW, PUBLIC_FLAG, REPORT_EXPORT, DIG_TREE_SETTLED, REGION_WIDEN, OWNER_ANSWER_WRITES, MODERATION_NOTICE, MODERATION_STATEMENTS, PRE_START_CHARGE, START_PATHS, PATH_RESULTS, PATH_PROGRESS, SAVED_QUESTIONS, CARRY_ON_DIGS, PATH_ADDED, PRE_START_RELEASE, MAIN_ANSWER_TIMES, PUBLIC_REPORT_OWN_CARRIER, SET_ASIDE_CONTINUE, PIECE_SETTINGS_VERSION, OUTBOUND_MAIL, SECURITY_REVIEW, MODERATION_NOTICE_FIXES, SETTLE_DISMISSED, UNGROUNDED_DOOR, AI_READ_VERDICT]);
+    expect(steps.map(step => step.source_name)).toEqual([...FORWARD_STEPS]);
     expect(steps[4].previous_manifest_sha256).toBe(steps[3].forward_manifest_sha256);
     expect(steps[4].verifier_sha256).toBe(steps[3].verifier_sha256);
     expect(steps[5].previous_manifest_sha256).toBe(steps[4].forward_manifest_sha256);

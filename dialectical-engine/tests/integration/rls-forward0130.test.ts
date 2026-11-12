@@ -35,6 +35,7 @@ import { loadForward0130 } from "../../packages/db/src/migration-forward0130.js"
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { RLS_ALL_ACCOUNTS_ROLES, RLS_ALLOW_LIST, RLS_AMENDED, RLS_IN_SCOPE, RLS_SCOPE_RULE_SQL } from "../support/rls-scope.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { LAST_STEP } from "../support/forward-chain-steps.js";
 
 /**
  * Mission row-level-security S01, cluster C1 (PLAN S01 §1 C1, step S1.2): migration 0130 turns row security on for the
@@ -45,9 +46,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * T1-T16 are PLAN S1.2's; every title starts with its id. CI skips this directory; run it alone (two embedded clusters).
  */
 const HEAD = "0130_row_level_security.sql";
-/** The chain's last step since the statement to a debate's author says an AI read the report first only for a verdict (0175, 2026-11-11): the V4
- *  account memory and the later V4 steps follow 0130, then 0170 to 0175, so a migrate() that reaches 0130 ends at 0175. */
-const CHAIN_END = "0175_statement_ai_read_verdict.sql";
+/** The chain's last step (the tests' one list of the chain, tests/support/forward-chain-steps.ts): the V4 account memory and every
+ *  later step follow 0130, so a migrate() that reaches 0130 ends there. */
+const CHAIN_END = LAST_STEP;
 const PREVIOUS = "0129_support_answer_scope.sql";
 const MIGRATIONS = new URL("../../migrations/", import.meta.url);
 const MANIFEST = "lineage/row-level-security-forward0130.json";

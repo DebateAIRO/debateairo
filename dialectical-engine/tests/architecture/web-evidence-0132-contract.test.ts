@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { stepsLiteralFrom } from "../support/forward-chain-steps.js";
 import { CONTENT_CARRIERS } from "../../packages/crypto/src/index.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
@@ -58,7 +59,7 @@ const tableBody = (sql: string, table: string): string => {
 
 describe("0132: the web evidence store step", () => {
   it("C-T follows 0131 in the chain's STEPS, with its own loader", async () => {
-    expect(read("packages/db/src/migration-forward-chain.ts")).toContain("loadForward0131,loadForward0132,loadForward0133,loadForward0134,loadForward0135,loadForward0136,loadForward0137,loadForward0138,loadForward0139,loadForward0140,loadForward0141,loadForward0142,loadForward0143,loadForward0144,loadForward0145,loadForward0146,loadForward0147,loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]");
+    expect(read("packages/db/src/migration-forward-chain.ts")).toContain(stepsLiteralFrom("0131"));
     const loader = read("packages/db/src/migration-forward0132.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "web-evidence-forward0132-v1";');

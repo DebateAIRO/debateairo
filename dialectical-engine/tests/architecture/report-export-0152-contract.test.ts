@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { atStep } from "../support/forward-chain-steps.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationN1Compatibility, auditMigrationReplaySafety, definedFunctionNames, definedRelationNames, type N1AuditContext } from "../../tools/orphan-audit/src/index.js";
@@ -56,7 +57,7 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
     expect(loader).toContain(`"${TABLE}"`);
     for (const signature of [RECORD, EXPORT_READER]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-24)!;
+    const step = atStep(plan.forwardChain, NAME);
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);

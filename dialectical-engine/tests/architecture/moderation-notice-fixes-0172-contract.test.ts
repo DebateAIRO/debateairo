@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { stepsLiteralFrom } from "../support/forward-chain-steps.js";
 import { MAIL_TEMPLATE_IDS, MAIL_TEMPLATES, renderMail } from "@debateai/mail-templates";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 
@@ -29,9 +30,9 @@ type Manifest = { previous: { name: string; manifestSha256: string }; migration:
 const manifest = JSON.parse(read("migrations/lineage/moderation-notice-fixes-forward0172.json")) as Manifest;
 
 describe("0172: the moderation notice fixes", () => {
-  it("comes last in the chain, after 0171, with its own loader, and is bound to its own bytes", () => {
+  it("comes after 0171 in the chain, with its own loader, and is bound to its own bytes", () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]);");
+    expect(chain).toContain(stepsLiteralFrom("0170"));
     expect(chain).toContain("import { loadForward0172 } from './migration-forward0172.js';");
     const loader = read("packages/db/src/migration-forward0172.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);

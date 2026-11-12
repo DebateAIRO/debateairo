@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { atStep, stepsLiteralFrom } from "../support/forward-chain-steps.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationN1Compatibility, auditMigrationReplaySafety, definedFunctionNames, definedRelationNames, type N1AuditContext } from "../../tools/orphan-audit/src/index.js";
@@ -79,10 +80,10 @@ const bodyOf = (sql: string, name: string): string => {
 const earlierSteps = (): string[] => readdirSync(new URL("migrations/", ROOT)).filter((entry) => /^\d{4}_.*\.sql$/u.test(entry) && entry < NAME).sort();
 
 describe("0150: a public debate under review", () => {
-  it("follows 0149 as the chain's head, with its own loader, and keeps 0130's verifier", async () => {
+  it("follows 0149 in the chain, with its own loader, and keeps 0130's verifier", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0150 } from './migration-forward0150.js';");
-    expect(chain).toContain("loadForward0148,loadForward0149,loadForward0150,loadForward0151,loadForward0152,loadForward0153,loadForward0154,loadForward0155,loadForward0156,loadForward0157,loadForward0158,loadForward0159,loadForward0160,loadForward0161,loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]");
+    expect(chain).toContain(stepsLiteralFrom("0148"));
     const loader = read(LOADER_PATH);
     expect(loader).toContain(`const NAME = "${NAME}";`);
     expect(loader).toContain('const VERSION = "public-review-forward0150-v1";');
@@ -95,7 +96,7 @@ describe("0150: a public debate under review", () => {
     // The loader's postcondition digests every new function, and 0039's, which no earlier receipt in the chain holds.
     for (const signature of [...GRANTED, ...PRIVATE, RECIPE_FUNCTION]) expect(loader, signature).toContain(`"${signature}"`);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-26)!;
+    const step = atStep(plan.forwardChain, NAME);
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
     expect(step.verifierSha256).toBe(VERIFIER_130);
@@ -115,7 +116,7 @@ describe("0150: a public debate under review", () => {
     });
     // The loader refuses a manifest whose list differs from its own, and the plan hands the chain the list.
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-26)!.amendsPostconditionsOf).toEqual(AMENDS);
+    expect(atStep(plan.forwardChain, NAME).amendsPostconditionsOf).toEqual(AMENDS);
   });
 
   it("declares `-- n1: drained` and `-- n1: keeps-verifier`", () => {

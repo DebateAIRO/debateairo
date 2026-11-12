@@ -7,6 +7,7 @@ import { STAFF_ACCESS_POLICY_REGISTER_ROW,INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW
 import { buildPreviewSourceRows,composePreviewSnapshot,publishPreviewRegister,readSealedSnapshot } from '../../deploy/preview-auth-dev/v1/publish-register.js';
 import { refusePendingForwardSteps,verifyNativeState } from '../../deploy/preview-auth-dev/v1/verify-native.js';
 import { startTestDatabase } from '../support/testDatabase.js';
+import { FORWARD_STEPS } from '../support/forward-chain-steps.js';
 import { seedInstalledAuth106 } from '../support/auth106.js';
 import { seedDevLineage108 } from '../support/devLineage108.js';
 import { identifyLineage,loadMigrationPlan } from '../../packages/db/src/migration-lineage.js';
@@ -160,51 +161,7 @@ describe('the general preview guard on each complete 0108 lineage (PR-59)',()=>{
   const db=await startTestDatabase();
   try{
    const plan=await loadMigrationPlan(),pending=[plan.forward110.name,...plan.forwardChain.map(step=>step.name)];
-   expect(pending).toEqual([
-    '0110_account_erasure_public_debates.sql',
-    '0111_billing_netopia.sql',
-    '0112_auth_db_batch.sql',
-    '0113_billing_price_currencies.sql',
-    '0114_role_rotation.sql',
-    '0115_data_export.sql',
-    '0116_mail_locale.sql',
-    '0117_debate_shape_map.sql',
-    '0118_language_check_spend.sql',
-    '0119_reclaim_resume.sql',
-    '0120_reply_measures.sql',
-    '0121_engine_verdict.sql',
-    '0122_engine_map_check.sql',
-    '0123_side_by_side_releases.sql',
-    '0124_settings_activation.sql',
-    '0125_italy_specific_approval.sql',
-    '0126_synthesis_check.sql',
-    '0127_publication_review.sql',
-    '0128_threat_reports.sql',
-    '0129_support_answer_scope.sql',
-    '0130_row_level_security.sql',
-    '0131_v4_account_memory.sql',
-    '0132_web_evidence.sql',
-    '0133_investigations.sql',
-    '0134_dig_model_and_month_pause.sql',
-    '0135_dig_picks.sql',
-    '0136_investigation_reports.sql',
-    '0137_public_debates.sql',
-    '0138_tree_updates.sql',
-    '0139_passage_retention.sql',
-    '0140_internal_spend_kinds.sql',
-    '0141_path_suggestions.sql',
-    '0142_team_limit.sql',
-    '0143_run_handover.sql',
-    '0144_ask_clarify_charge.sql',
-    '0145_web_researched_unsettled.sql',
-    '0146_team_allowances.sql',
-    '0147_public_tree.sql',
-    '0148_erasure_keeps_public.sql',
-    '0149_public_report_team_month.sql',
-    '0150_public_review.sql',
-    '0151_public_flag.sql',
-    '0152_report_export_and_check_usage.sql', '0153_dig_tree_settled.sql', '0154_region_iceland_liechtenstein.sql', '0155_owner_answer_writes.sql', '0156_moderation_notice.sql', '0157_moderation_statements.sql', '0158_pre_start_charge.sql', '0159_start_paths.sql', '0160_path_results.sql', '0161_path_progress.sql', '0162_saved_questions.sql', '0163_carry_on_session_free_digs.sql', '0164_main_answer_path_added.sql', '0165_pre_start_release.sql', '0166_main_answer_times.sql', '0167_public_report_own_carrier.sql', '0168_set_aside_continue.sql', '0169_piece_settings_version.sql', '0170_outbound_mail_limit.sql', '0171_security_review_hardening.sql', '0172_moderation_notice_fixes.sql', '0173_settle_dismissed_flag.sql', '0174_public_review_ungrounded_door.sql', '0175_statement_ai_read_verdict.sql'
-   ]);
+   expect(pending).toEqual(['0110_account_erasure_public_debates.sql',...FORWARD_STEPS]);
    const ledger=async(client:{query:pg.Pool['query']}=db.pool)=>(await client.query('SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name')).rows;
    const resolutionTable=async()=>(await db.pool.query("SELECT to_regclass('public.debateai_schema_migration_resolution') IS NOT NULL present")).rows[0].present as boolean;
    await seed(db.pool);

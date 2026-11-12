@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { atStep, stepsLiteralFrom } from "../support/forward-chain-steps.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 
@@ -27,9 +28,9 @@ const statements = (): string[] => SQL.slice(0, SQL.indexOf("DO $public_review_u
   .filter((line) => line.trim() !== "" && !line.startsWith("--"));
 
 describe("0174: 0150's staff review door without a ground", () => {
-  it("comes after 0173 in the chain (0175 follows it), with its own loader, bound to its own bytes and 0173's manifest", async () => {
+  it("comes after 0173 in the chain, with its own loader, bound to its own bytes and 0173's manifest", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0172,loadForward0173,loadForward0174,loadForward0175]);");
+    expect(chain).toContain(stepsLiteralFrom("0172"));
     expect(chain).toContain("import { loadForward0174 } from './migration-forward0174.js';");
     const loader = read("packages/db/src/migration-forward0174.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -42,10 +43,10 @@ describe("0174: 0150's staff review door without a ground", () => {
     expect(manifest.migration).toEqual({ name: NAME, sha256: sha256(SQL) });
     expect(manifest.verifier).toEqual({ path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(read("migrations/lineage/verify-effective-capabilities-130.sql")) });
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-2)!;
+    const step = atStep(plan.forwardChain, NAME);
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe("0173_settle_dismissed_flag.sql");
-    expect(step.verifierSha256).toBe(plan.forwardChain.at(-3)!.verifierSha256);
+    expect(step.verifierSha256).toBe(atStep(plan.forwardChain, "0173_settle_dismissed_flag.sql").verifierSha256);
     expect(step.replayVerifierSql).toBeUndefined();
     expect(step.amendsPostconditionsOf).toEqual(AMENDS);
   });
