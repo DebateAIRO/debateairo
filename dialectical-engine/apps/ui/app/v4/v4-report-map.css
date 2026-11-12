@@ -17,7 +17,7 @@
 .v4RepStripActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 2px; }
 .v4RepStripNotYet { min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
 .v4RepStrip .v4RepDigWait { margin: 0; }
-/* The wave-2 checks (P4): a press on its way (aria-busy; with the carry-on box, up to a dig's 10 seconds) keeps its focus,
+/* The wave-2 checks (P4): a press on its way (aria-busy; with the carry-on box, up to a dig's Undo window) keeps its focus,
    so the button is never natively disabled; it takes the shared greyed look of a disabled .v4Btn (v4-base.css) and the
    wait cursor, so a press is seen to be on its way. It changes at once (no move). */
 .v4DebReportLink[aria-busy="true"], .v4RepStripWrite[aria-busy="true"], .v4RepStripNotYet[aria-disabled="true"] {

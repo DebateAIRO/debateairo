@@ -11,13 +11,11 @@ import {
 } from "@debateai/contract";
 
 /*
- * V4 start step, Task 76b (chat-undo-after-every-start, chat-undo-after-start, r2-22, read-f12, choose-f10; owner answers Q8,
- * Q11, Q12 and Q13; 4 Nov night: choose-f19, ask-f3, ask-f8, read-f3, read-f17): a press of Start, or of either "Just answer
- * it", waits 10 seconds with the site's one Undo note before anything is sent. Meanwhile the map shows at once (the question
- * and its paths being looked into, the note under the question); Undo or Esc brings the step back exactly as it was, and
- * leaving sends nothing. The card folds into the map's first card, and back on Undo. The page, its hooks, the card, the bar,
- * the note and the map pieces are the real ones; only the session, the consent and the server are stood in. Every figure and
- * text is made up.
+ * A press of Start, or of either "Just answer it", waits out the Undo window with the site's one Undo note before anything
+ * is sent. Meanwhile the map shows at once (the question and its paths being looked into, the note under the question);
+ * Undo or Esc brings the step back exactly as it was, and leaving sends nothing. The card folds into the map's first card,
+ * and back on Undo. The page, its hooks, the card, the bar, the note and the map pieces are the real ones; only the
+ * session, the consent and the server are stood in. Every figure and text is made up.
  */
 type ListsCall = { input: StartListsRequest; onEvent: (event: StartListsEvent) => void };
 type MergeCall = { input: StartMergeRequest; answer: (response: StartMergeResponse) => void };
@@ -278,19 +276,19 @@ function placeCards(): void {
   });
 }
 
-describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-22)", () => {
+describe("the Undo window", () => {
   it("START_UNDO_MS is the dig's Undo window, so both timers always match", () => {
     expect(START_UNDO_MS).toBe(DIG_UNDO_MS);
-    expect(START_UNDO_MS).toBe(10_000);
+    expect(START_UNDO_MS).toBe(5_000);
   });
 
-  it("a press at READY: nothing sent at 9_999 ms, one ask at 10_000 ms with the lane; the note names the bar's share", async () => {
+  it("a press at READY: nothing sent 1 ms before the window ends, one ask when it ends with the lane; the note names the bar's share", async () => {
     await toStepTwo();
     await toReady();
     vi.useFakeTimers();
     await click(startButton());
     expect(noteText()).toContain("Starting your question · about 18% of today");
-    await wait(9_999);
+    await wait(START_UNDO_MS - 1);
     expect(server.createDebate).not.toHaveBeenCalled();
     await wait(1);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
@@ -332,13 +330,13 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     expect(server.createDebate).not.toHaveBeenCalled();
   });
 
-  it("Undo at 5_000 ms: never sent; step 2 back as it was, focus on Start, and the confirmation line", async () => {
+  it("Undo halfway through the window: never sent; step 2 back as it was, focus on Start, and the confirmation line", async () => {
     await toStepTwo();
     await tap("The north.");
     await toReady();
     vi.useFakeTimers();
     await click(startButton());
-    await wait(5_000);
+    await wait(START_UNDO_MS / 2);
     await click(undoButton()!);
     expect(box().value).toBe(NORTH);
     expect(rows()).toHaveLength(5);
@@ -357,7 +355,7 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     await toReady();
     vi.useFakeTimers();
     await click(startButton());
-    await wait(5_000);
+    await wait(START_UNDO_MS / 2);
     await key(document.activeElement!, { key: "Escape" });
     expect(box().value).toBe(NORTH);
     expect(rows()).toHaveLength(5);
@@ -367,7 +365,7 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     expect(server.createDebate).not.toHaveBeenCalled();
   });
 
-  it("during the 10 s Back is absent and Ctrl/Cmd+Z changes nothing", async () => {
+  it("during the Undo window Back is absent and Ctrl/Cmd+Z changes nothing", async () => {
     await toStepTwo();
     await toReady();
     await removePath(5);
@@ -382,13 +380,13 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     expect(rows()).toHaveLength(4);
   });
 
-  it("after 10 s the note reads 'Starting…' and has no Undo", async () => {
+  it("once the Undo window ends the note reads 'Starting…' and has no Undo", async () => {
     await toStepTwo();
     await toReady();
     server.createDebate.mockImplementation(() => new Promise(() => undefined));
     vi.useFakeTimers();
     await click(startButton());
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(noteText()).toContain("Starting…");
     expect(undoButton()).toBeNull();
@@ -401,7 +399,7 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     server.createDebate.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 500, "SERVER_FAILURE", "SERVER_FAILURE"));
     vi.useFakeTimers();
     await click(startButton());
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(box().value).toBe(NORTH);
     expect(rows()).toHaveLength(5);
@@ -413,7 +411,7 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     expect(router.push).not.toHaveBeenCalled();
   });
 
-  it("choose-f10: a path still being written at 10_000 ms: the note waits for it, then one send right after it is written", async () => {
+  it("a path still being written when the Undo window ends: the note waits for it, then one send right after it is written", async () => {
     await toStepTwo();
     await toReady();
     const suggestion = [...host!.querySelectorAll(".v4StartSuggestion")].find((one) => buttonNamed("Combine", one) !== undefined)!;
@@ -423,7 +421,7 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     await click(startButton());
     // Task 33b's note: a path still being written is drawn with the combined tag.
     expect([...host!.querySelectorAll(".v4PathTag")].map((tag) => tag.textContent)).toContain(CATALOG["v4.paths.tag.COMBINED"]);
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(noteText()).toContain(WRITING);
     expect(server.createDebate).not.toHaveBeenCalled();
     await act(async () => {
@@ -448,39 +446,39 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     expect(server.createDebate).not.toHaveBeenCalled();
   });
 
-  it("answer Q8: a press after three days on step 2 sends the same references at +10 s, and they are taken", async () => {
+  it("a press after three days on step 2 sends the same references once the Undo window ends, and they are taken", async () => {
     await toStepTwo();
     await toReady();
     vi.useFakeTimers();
     vi.setSystemTime(Date.now() + 3 * 24 * 60 * 60 * 1000);
     await click(startButton());
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(lane()!.startCheck).toEqual({ ref: "chk.sig" });
     expect((lane()!.startPaths as { menu: unknown }).menu).toEqual(signedMenu(NUCLEAR_MENU));
     expect(router.push).toHaveBeenCalledTimes(1);
   });
 
-  it("leaving the page during the 10 s sends nothing", async () => {
+  it("leaving the page during the Undo window sends nothing", async () => {
     await toStepTwo();
     await toReady();
     vi.useFakeTimers();
     await click(startButton());
-    await wait(5_000);
+    await wait(START_UNDO_MS / 2);
     await act(async () => root!.unmount());
     root = null;
     await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
     expect(server.createDebate).not.toHaveBeenCalled();
   });
 
-  it("step 2's 'Just answer it' goes through the same note: nothing before 10_000 ms, then the menu's top five chosen by the AIs", async () => {
+  it("step 2's 'Just answer it' goes through the same note: nothing before the window ends, then the menu's top five chosen by the AIs", async () => {
     await toStepTwo();
     await toReady();
     vi.useFakeTimers();
     await click(justLink()!);
     expect(noteText()).toContain("Starting your question · about 18% of today");
     expect(host!.querySelectorAll(".v4PathCard")).toHaveLength(5);
-    await wait(9_999);
+    await wait(START_UNDO_MS - 1);
     expect(server.createDebate).not.toHaveBeenCalled();
     await wait(1);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
@@ -504,7 +502,7 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     expect(document.activeElement).toBe(stepOneJust());
     expect(host!.textContent).toContain(CANCELLED);
     await click(stepOneJust());
-    await wait(9_999);
+    await wait(START_UNDO_MS - 1);
     expect(server.createDebate).not.toHaveBeenCalled();
     await wait(1);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
@@ -521,10 +519,10 @@ describe("the 10 seconds (chat-undo-after-every-start, answers Q11 and Q13, r2-2
     ];
     vi.useFakeTimers();
     await click(startButton());
-    await wait(5_000);
+    await wait(START_UNDO_MS / 2);
     await click(undoButton()!);
     await click(startButton());
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     for (const spy of used) expect(spy).not.toHaveBeenCalled();
   });
@@ -546,7 +544,7 @@ describe("4 Nov night: a declined consent, an unknown plan, sentence D (ask-f8, 
     expect(server.createDebate).not.toHaveBeenCalled();
   });
 
-  it("read-f3: the plan unknown at the press: one room read, 'Checking your plan…', then on PLUS the 10 s and an ask without the Free flag", async () => {
+  it("the plan unknown at the press: one room read, 'Checking your plan…', then on PLUS the Undo window and an ask without the Free flag", async () => {
     let release: ((value: unknown) => void) | null = null;
     server.roomAnswer = (read) => read <= 2 ? down()
       : read === 3 ? new Promise((resolve) => { release = resolve; }) : Promise.resolve(room({ start_step: undefined }));
@@ -561,7 +559,7 @@ describe("4 Nov night: a declined consent, an unknown plan, sentence D (ask-f8, 
     await act(async () => { release!(room({ start_step: undefined })); });
     await settle();
     expect(note()).not.toBeNull();
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(server.createDebate.mock.calls[0]![7]).toBeUndefined();
   });
@@ -587,7 +585,7 @@ describe("4 Nov night: a declined consent, an unknown plan, sentence D (ask-f8, 
     await click(startButton());
     expect(server.roomReads).toBe(3);
     expect(note()).not.toBeNull();
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(server.createDebate.mock.calls[0]![7]).toEqual({ freePublicNotice: true });
   });
@@ -638,7 +636,7 @@ describe("4 Nov night: a declined consent, an unknown plan, sentence D (ask-f8, 
     server.createDebate.mockRejectedValue(new ContractHttpError("UNPROCESSABLE", 422, "ASK_ALREADY_WAITING", "ASK_ALREADY_WAITING"));
     vi.useFakeTimers();
     await click(startButton());
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(host!.querySelector(".v4AskCard")).not.toBeNull();
     expect(host!.querySelectorAll('.roomNotice[data-room="ALREADY_WAITING"]')).toHaveLength(1);
@@ -662,7 +660,7 @@ describe("choose-f19: the card folds into the map's first card, and back on Undo
     expect(firstCard().classList.contains("v4FoldMoving")).toBe(true);
     // The path cards and the note appear at once.
     for (const card of host!.querySelectorAll<HTMLElement>(".v4PathCard")) expect(card.style.transform).toBe("");
-    await wait(5_000);
+    await wait(START_UNDO_MS / 2);
     await click(undoButton()!);
     const card = host!.querySelector<HTMLElement>(".v4AskCard")!;
     expect(card.style.transform).toBe("translate(0px, -180px) scale(1, 0.2)");
@@ -691,7 +689,7 @@ describe("choose-f19: the card folds into the map's first card, and back on Undo
 });
 
 describe("pendingPathsOf (Task 33b's note)", () => {
-  it("each path's tag as the map draws it during the 10 s; no plan, no paths", () => {
+  it("each path's tag as the map draws it during the Undo window; no plan, no paths", () => {
     const base: PathPlan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
     const one = (over: Partial<PlanPath>): PlanPath => ({ ...base.paths[0]!, ...over });
     const plan: PathPlan = {

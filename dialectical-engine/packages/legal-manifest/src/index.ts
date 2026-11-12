@@ -13,11 +13,14 @@ import manifestJson from "./manifest.json" with { type: "json" };
  *     sentences yet has no consent entry, and `currentDocument` answers null for it (the checkout
  *     then refuses LEGAL_DOCUMENT_STALE — harmless while billing is off; P18 writes the sentences
  *     and regenerates);
- *   - the ARCHIVE (ruling Q-3): every TERMS and PRIVACY text that was ever current, kept byte for
- *     byte at apps/ui/legal/archive/<locale>/<sha256>.md, indexed here by kind, locale and hash with
- *     its version and path. The generator carries the committed index forward, so a text stays
- *     listed after its draft moves on; M1 attaches the version a person ACCEPTED by looking up the
- *     acceptance row's locale and sha256 (`archivedDocument`).
+ *   - the ARCHIVE: every TERMS and PRIVACY text that was released, kept byte for byte at
+ *     apps/ui/legal/archive/<locale>/<sha256>.md, indexed here by kind, locale and hash with its
+ *     version and path. The generator carries the committed index forward, so a text stays listed
+ *     after its draft moves on; the confirmation email attaches the version a person ACCEPTED by
+ *     looking up the acceptance row's locale and sha256 (`archivedDocument`). The current texts are
+ *     added by the release step (`pnpm run generate:legal:archive`), not at every edit: while work
+ *     goes on, a current text, typically an English edit whose translations lag, may not be archived
+ *     yet, and `pnpm run legal:release-check` refuses a release until every current text is.
  * `tests/unit/legal-manifest.test.ts` pins that the committed file equals the generator's output,
  * so edit the draft or the catalogue and regenerate.
  */
@@ -110,11 +113,16 @@ function parseArchive(value: unknown): LegalManifestIndex["archive"] {
  * The manifest's own grammar, refused whole (LEGAL_MANIFEST_INVALID) rather than half-read: an
  * unknown kind, a bad locale, a pair of the wrong shape for its kind, a re-acceptance floor on
  * a consent sentence (a changed sentence is simply a new version, asked for at the next checkout),
- * an archive entry off its path, a current TERMS/PRIVACY pair the archive does not hold (Q-3:
- * whatever a person accepts today must be attachable later), or a TERMS/PRIVACY floor above the
- * current version of any locale (final review I-2: the accept screen would ask for the current
- * version, record it, and still find it below the floor — a lockout no one can clear, one more
- * REACCEPT row per click). The owner raises the floor together with the drafts' version.
+ * an archive entry off its path, an archive entry that holds a current TERMS/PRIVACY text under
+ * another version than the current one, or a TERMS/PRIVACY floor above the current version of any
+ * locale (the accept screen would ask for the current version, record it, and still find it below
+ * the floor — a lockout no one can clear, one more REACCEPT row per click). The owner raises the
+ * floor together with the drafts' version.
+ *
+ * A current TERMS/PRIVACY text the archive does not hold yet is read: while work goes on the English
+ * text changes first and is archived at release. That whatever a person accepts on the live site can
+ * be attached later is the release check's to guarantee (apps/ui/scripts/legal-release-check.mjs),
+ * which refuses a release while any current text is not archived.
  */
 export function parseLegalManifest(value: unknown): LegalManifestIndex {
   const root = record(value);
@@ -145,7 +153,7 @@ export function parseLegalManifest(value: unknown): LegalManifestIndex {
     const floor = floors[kind];
     for (const [locale, pair] of byKind[kind]) {
       const archived = archive[kind].get(locale)?.get(pair.sha256);
-      if (archived === undefined || archived.version !== pair.version) invalid();
+      if (archived !== undefined && archived.version !== pair.version) invalid();
       if (floor !== null && !documentVersionAtLeast(pair.version, floor)) invalid();
     }
   }

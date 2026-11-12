@@ -52,7 +52,7 @@ vi.mock("@/lib/v4/siteVersion", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/siteVersion.js")>()),
   reloadPage: () => { reloads.count += 1; }
 }));
-// Task 76b: Start waits its 10-second Undo window before the send; here the window is 0 (the 10 seconds: v4-start-undo).
+// Start waits out its Undo window before the send; here the window is 0 (the window itself: v4-start-undo).
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

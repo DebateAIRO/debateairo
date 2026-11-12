@@ -28,7 +28,7 @@ vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alre
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
 vi.mock("@/lib/api", () => ({ contractClient: { readAnswerIndex: async () => ({ items: [], open_runs: [] }),
   clarifyAsk: async (input: { question_line: string }) => { clarify.requests.push(input); return clarify.answer(input.question_line); } } }));
-// Task 76b: Start waits its 10-second Undo window before the send; here the window is 0.
+// Start waits out its Undo window before the send; here the window is 0.
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

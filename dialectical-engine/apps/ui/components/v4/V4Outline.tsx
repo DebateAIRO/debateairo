@@ -169,7 +169,7 @@ function Children(props: Readonly<{
   reason?: PickReasonPlace;
 }>) {
   const extra = props.extra ?? null;
-  // dig-d3 B: a dig in its 10 seconds grows its seed in the outline too (the tablet's list, the phone's Map sheet).
+  // A dig in its Undo window grows its seed in the outline too (the tablet's list, the phone's Map sheet).
   const seeds = useDigSeeds(props.pieces.map.runId, props.groupKey);
   if (props.open.length === 0 && props.digs.length === 0 && extra === null && seeds.length === 0) return null;
   const reasonRow = (before: string): ReactNode => (props.reason?.before === before

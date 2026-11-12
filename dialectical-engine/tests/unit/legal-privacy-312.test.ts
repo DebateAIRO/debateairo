@@ -303,6 +303,13 @@ const ACCESS = 196;
 const ERASURE = 198;
 const WITHDRAW = 202;
 const CHANGE_LOG = 260;
+/**
+ * Section 6's paragraph on flagged debates. A person cannot take their own public debate down, so English no longer
+ * ends that paragraph's approval sentences with the leftover "you can take it down from Your debates"; the
+ * translations still have it until they are brought up to date before release (English first).
+ */
+const FLAGGED = 117;
+const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /** The two new rows, each right after its table's "Page settings and visits" row. */
 const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
 const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];
@@ -452,7 +459,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual(CHANGED);
+    expect(differing, `${code}: the changed lines`).toEqual(code === "en" ? [...CHANGED, FLAGGED].sort((a, b) => a - b) : CHANGED);
 
     const dates = DATES[code]!;
     expect(next[EYEBROW], `${code}: the eyebrow names 3.12`).toMatch(/ v3\.12 · /u);
@@ -489,6 +496,10 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
       expect(next[Number(at)], change).toBe(swapped(prior[priorIndex(Number(at))]!, SWAPS[change]!));
     }
     expect(next[SAVED_RETENTION_AT]).toBe(SAVED_RETENTION_ROW);
+    // The leftover take-down sentence goes, and nothing else on that line changes.
+    expect(prior[priorIndex(FLAGGED)]!.split(TAKE_DOWN)).toHaveLength(2);
+    expect(next[FLAGGED]).toBe(prior[priorIndex(FLAGGED)]!.replace(` ${TAKE_DOWN}`, ""));
+    expect(draftBytes("en").toString("utf8")).not.toContain(TAKE_DOWN);
     const priorLog = prior[priorIndex(CHANGE_LOG)]!;
     const tail = priorLog.slice(priorLog.indexOf("Version 3.11 replaced version 3.10:"));
     expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${tail}`);
@@ -625,10 +636,16 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
   // Tasks 83b and 83c: 3.12 was never published, so each earlier 3.12 draft leaves the archive, as the never-published
   // 3.11 drafts did in 0bbaecc47 and d3bf346e5; the versions page lists one 3.12 text per language, the one that goes up.
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, the draft's", (code) => {
+  // English first: the archive is brought up to date by the release step, not at every edit, so a draft changed since
+  // (an English edit whose translations lag) is not archived yet. The release check refuses to release it while the
+  // archive holds another text as 3.12 in that language.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, the draft's once it is archived", (code) => {
     const draft = createHash("sha256").update(draftBytes(code)).digest("hex");
     const archived = Object.entries(manifest().archive.PRIVACY?.[code] ?? {}).filter(([, entry]) => entry.version === "3.12");
-    expect(archived).toEqual([[draft, { version: "3.12", path: `apps/ui/legal/archive/${code}/${draft}.md` }]]);
+    expect(archived).toHaveLength(1);
+    if (archived.some(([sha256]) => sha256 === draft)) {
+      expect(archived).toEqual([[draft, { version: "3.12", path: `apps/ui/legal/archive/${code}/${draft}.md` }]]);
+    }
   });
 });
 

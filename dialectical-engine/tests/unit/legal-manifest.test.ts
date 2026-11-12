@@ -265,21 +265,28 @@ describe("the checkout consent sentences in the manifest (paid plans L2, R-27)",
 });
 
 describe("the archive of every published Terms and Privacy text (paid plans L2, ruling Q-3)", () => {
-  it("keeps each current draft's exact bytes under its sha256, and the manifest maps the hash to that file", () => {
+  // English first: the current texts are archived by the release step, not at every edit, so a current text may not be
+  // archived yet while work goes on (an English edit whose translations lag). The release check refuses a release
+  // until every current text is (tests/unit/legal-english-first.test.ts). What the archive does hold is exact.
+  it("keeps a current draft's exact bytes under its sha256 once archived, and the manifest maps the hash to that file", () => {
     expect(LEGAL_ARCHIVE_ROOT).toBe("apps/ui/legal/archive");
+    let archived = 0;
     for (const { code } of LOCALES) {
       for (const kind of ["TERMS", "PRIVACY"] as const) {
         const current = currentDocument(kind, code)!;
         const entry = archivedDocument(kind, code, current.sha256);
+        if (entry === null) continue;
+        archived += 1;
         expect(entry, `${code}/${kind}`).toEqual({
           version: current.version,
           sha256: current.sha256,
           path: `apps/ui/legal/archive/${code}/${current.sha256}.md`
         });
-        expect(legalArchivePath(code, current.sha256)).toBe(entry!.path);
-        expect(readFileSync(resolve(process.cwd(), entry!.path)).equals(draftBytes(code, kind)), entry!.path).toBe(true);
+        expect(legalArchivePath(code, current.sha256)).toBe(entry.path);
+        expect(readFileSync(resolve(process.cwd(), entry.path)).equals(draftBytes(code, kind)), entry.path).toBe(true);
       }
     }
+    expect(archived).toBeGreaterThan(0);
   });
 
   it("holds exactly the files the committed manifest lists, each hashing to its own name", () => {
@@ -301,7 +308,8 @@ describe("the archive of every published Terms and Privacy text (paid plans L2, 
     const current = currentDocument("TERMS", "en")!;
     const older = "1".repeat(64);
     const history: LegalArchiveIndex = { TERMS: { en: { [older]: { version: "1.9", path: legalArchivePath("en", older) } } } };
-    const manifest = buildLegalManifest(readDraft, {}, history);
+    // The release step's run (`--archive`), which lists the current texts too.
+    const manifest = buildLegalManifest(readDraft, {}, history, undefined, { archiveCurrent: true });
     expect(manifest.archive.TERMS.en).toEqual({
       [older]: { version: "1.9", path: legalArchivePath("en", older) },
       [current.sha256]: { version: current.version, path: legalArchivePath("en", current.sha256) }
@@ -323,17 +331,19 @@ describe("the archive of every published Terms and Privacy text (paid plans L2, 
     }
   });
 
-  it("refuses to parse an entry off its path, an archive for a consent kind, or a current text left out of the archive", () => {
-    const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(readDraft))) as {
+  it("refuses to parse an entry off its path or an archive for a consent kind, and reads a current text not archived yet", () => {
+    const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(readDraft, {}, {}, undefined, { archiveCurrent: true }))) as {
       archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
     };
     const sha = currentDocument("TERMS", "en")!.sha256;
     const moved = structuredClone(manifest);
     moved.archive.TERMS!.en![sha]!.path = "apps/ui/legal/en/terms-of-service.md";
     expect(() => parseLegalManifest(moved)).toThrow("LEGAL_MANIFEST_INVALID");
+    // English first: a current text the archive does not hold yet is read; the release check, not the package, refuses
+    // to release it (this pin used to refuse it, when every edit archived every language at once).
     const dropped = structuredClone(manifest);
     delete dropped.archive.TERMS!.en![sha];
-    expect(() => parseLegalManifest(dropped)).toThrow("LEGAL_MANIFEST_INVALID");
+    expect(parseLegalManifest(dropped).archive.TERMS.get("en")?.has(sha)).toBe(false);
     const consent = structuredClone(manifest);
     consent.archive.CONSENT_RENEWAL = {};
     expect(() => parseLegalManifest(consent)).toThrow("LEGAL_MANIFEST_INVALID");

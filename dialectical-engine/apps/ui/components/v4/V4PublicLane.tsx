@@ -43,11 +43,11 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
  * the Reports section, with "Write a report". A signed-in stranger digs and writes on their own quota. The dig goes through the one ask hook (consent, room,
  * refusals), so the page starts nothing another way. English for R22 (owner N10), like V4's other labels.
  * Owner screen review (3 Nov): the map's dig flow (public-f11, dig-f25): Quick look, with Thorough on paid plans; the share before the press when the room read
- * says one; the site's one 10-second Undo, during which nothing is sent or used (lib/v4/digUndo.ts). After it the person stays on the page, with a card under
+ * says one; the site's one Undo window, during which nothing is sent or used (lib/v4/digUndo.ts). After it the person stays on the page, with a card under
  * the path (public-d2 A, V4PublicDig.tsx); the box starts with the path's own suggestions as chips when the public read carries them; "This will be public."
  * under the person's own words (journey-f20).
  * The wave-2 review (4 Nov): the press runs the map's own click checks (dig-f9, lib/v4/useDigClickCheck.ts): the crisis help on the person's own views and the
- * one-time consent come at the click, and the 10 seconds start from the yes. A send still waiting while this page is open keeps its place (it is never called
+ * one-time consent come at the click, and the Undo window starts from the yes. A send still waiting while this page is open keeps its place (it is never called
  * failed while it may still start); one that met a screen after the page had gone says so in its note. The question check's screen names the path the dig is
  * about. journey-f13 / dig-f5: the box's buttons say "Dig here" and "Dig into this · up to 3%" ("Dig into your picks" for more), as on the map, with the
  * period named once by the switch (the period alone on a public page: the owner's answer to question 34, 5 Nov).
@@ -87,7 +87,7 @@ export type V4PublicLaneConfig = Readonly<{
   crisisCountryHint: string | null;
 }>;
 
-/** A press that could not be put in its 10 seconds: nothing was built to send (the plain line). */
+/** A press that could not be put in its Undo window: nothing was built to send (the plain line). */
 type DigRefused = Readonly<{ kind: "REFUSED"; message: string }>;
 
 /** What one press of "Start the dig" names: the chips tapped, the person's own views, and the mode. */
@@ -110,7 +110,7 @@ type LaneActions = Readonly<{
   /** public-d2: the path's own suggestions, when the public read carries them. */
   suggestionsFor(path: PublicPathView): readonly PublicDigSuggestion[];
   /**
-   * Runs the click checks (crisis help, consent), then puts the dig in its 10-second Undo (the site's one list): its id there, why nothing could be sent,
+   * Runs the click checks (crisis help, consent), then puts the dig in its Undo window (the site's one list): its id there, why nothing could be sent,
    * or null when a screen took over (the help screen, a "No" to the consent) and nothing waits.
    */
   startDig(path: PublicPathView, press: DigPress): Promise<number | DigRefused | null>;
@@ -151,7 +151,7 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
     publicReportWaits: (debate.reports ?? []).length > 0
   });
   const { submit, room, planTier, submitting, dialogs } = ask;
-  // The send runs after the 10 seconds, perhaps once the person has left this page: it uses the hook's last submit, which
+  // The send runs after the Undo window, perhaps once the person has left this page: it uses the hook's last submit, which
   // reads everything through refs (as the map's digs do).
   const submitRef = useRef(submit);
   useEffect(() => {
@@ -195,7 +195,7 @@ function SignedInActions({ debate, lane, returnPath, children }: Readonly<{
     // A dig of this box that started counting meanwhile is the same dig.
     const counting = waitingPublicDig(readDigUndo(), publicRef, path);
     if (counting !== null) return counting.id;
-    // dig-f9: the question check's screen can only come with the server's answer, 10 seconds after the click, so it names
+    // The question check's screen can only come with the server's answer, after the Undo window, so it names
     // the path the dig is about ("About your dig on “…”:"; the path's words are AI text).
     const about = placeAboutLine({ text: cardLabel(path.line), ai: true }, catalog);
     const send = async (dig: PendingDig): Promise<DigUndoResult> => {
@@ -329,7 +329,7 @@ type FocusTarget = Readonly<{ kind: "FIELD"; id: number }> | Readonly<{ kind: "O
 
 /**
  * "Dig into this": the path's own suggestions as chips (when the page has them), the person's own views, up to what their
- * plan combines, on their own quota. Start puts the dig in the site's one 10-second Undo; nothing is sent before it ends.
+ * plan combines, on their own quota. Start puts the dig in the site's one Undo window; nothing is sent before it ends.
  */
 function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; catalog: MessageCatalog; locale: string }>) {
   const actions = useContext(LaneContext);
@@ -342,7 +342,7 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
   const [mode, setMode] = useState<DigMode>("quick");
   const nextView = useRef(1);
   const [refusal, setRefusal] = useState<string | null>(null);
-  // The dig this box put in its 10 seconds, until it started, was refused or was undone.
+  // The dig this box put in its Undo window, until it started, was refused or was undone.
   const [pendingId, setPendingId] = useState<number | null>(null);
   // dig-f9: the click's checks (the crisis help, the one-time consent) are open: Start waits for them.
   const [checking, setChecking] = useState(false);

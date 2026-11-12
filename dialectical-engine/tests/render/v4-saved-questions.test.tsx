@@ -14,8 +14,8 @@ import {
  * V4 start step, Task 76f (saved-questions spec 2026-11-04 §3.3, §3.4, §3.6, §3.7; owner cards "When saved", "How long", "Where
  * shown"; answers Q1, Q2, Q3, Q8, S1 A, S2 A, S3 A): once the check passes after Next, the account keeps step 2 by itself, one
  * request at a time, about a second after each change and at once when the list lands; Start names the saved question and
- * removes it; "Not started yet" on step 1 lists the newest 5 with Pick up and Delete (Delete waits out the shared 10-second
- * Undo); the page asks before leaving only while the latest change is not saved. The page, its hooks, the card, the bar and the
+ * removes it; "Not started yet" on step 1 lists the newest 5 with Pick up and Delete (Delete waits out the shared Undo
+ * window); the page asks before leaving only while the latest change is not saved. The page, its hooks, the card, the bar and the
  * header are the real ones; the saved-question calls are the real contract client's over a fetch stand-in; the AI calls, the
  * session, the consent and the header's account parts are stood in. Every figure and text is made up.
  */
@@ -86,7 +86,7 @@ vi.mock("@/lib/v4/askHistory", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/askHistory.js")>()),
   loadPage: (href: string) => { loads.push(href); }
 }));
-// Task 76b: Start waits its 10-second Undo window before the send; here the window is 0 (the 10 seconds: v4-start-undo).
+// Start waits out its Undo window before the send; here the window is 0 (the window itself: v4-start-undo).
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));
@@ -135,6 +135,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import { combineMembersKey } from "../../apps/ui/lib/v4/pathPlan.js";
 import { NUCLEAR_MENU, START_FIXTURE_QUESTION, signedList, signedMenu } from "../support/v4-start-menu.js";
 
@@ -679,8 +680,8 @@ describe("'Not started yet' on step 1 (owner card 'Where shown'; answer S3 A)", 
   });
 });
 
-describe("Delete (spec §3.6: the shared Undo note, 10 seconds)", () => {
-  it("the line leaves at once with the shared note; no DELETE before 10_000 ms, one at 10_000 ms", async () => {
+describe("Delete (the shared Undo note and its window)", () => {
+  it("the line leaves at once with the shared note; no DELETE before the Undo window ends, one when it ends", async () => {
     vi.useFakeTimers();
     net.list = [B, C];
     await mount();
@@ -688,7 +689,7 @@ describe("Delete (spec §3.6: the shared Undo note, 10 seconds)", () => {
     expect(listed()).toEqual([C.question]);
     expect(host!.querySelector(".v4Undo .v4UndoText")?.textContent).toContain(`Deleted “${B.question}”`);
     expect(buttonNamed("Undo", host!.querySelector(".v4Undo")!)).toBeDefined();
-    await wait(9_999);
+    await wait(DIG_UNDO_MS - 1);
     expect(deletes()).toEqual([]);
     await wait(1);
     expect(deletes()).toHaveLength(1);
@@ -696,12 +697,12 @@ describe("Delete (spec §3.6: the shared Undo note, 10 seconds)", () => {
     expect(listed()).toEqual([C.question]);
   });
 
-  it("Undo at 4_000 ms brings the line back, and no DELETE is ever sent", async () => {
+  it("Undo partway through the window brings the line back, and no DELETE is ever sent", async () => {
     vi.useFakeTimers();
     net.list = [B, C];
     await mount();
     await click(buttonNamed("Delete", lineOf(B.question))!);
-    await wait(4_000);
+    await wait(DIG_UNDO_MS / 2);
     await click(buttonNamed("Undo", host!.querySelector(".v4Undo")!)!);
     expect(listed()).toEqual([B.question, C.question]);
     await wait(20_000);
@@ -714,7 +715,7 @@ describe("Delete (spec §3.6: the shared Undo note, 10 seconds)", () => {
     net.answer = (call) => call.method === "DELETE" ? net.json(503, { error: "SAVED_QUESTIONS_UNAVAILABLE", message: "SAVED_QUESTIONS_UNAVAILABLE" }) : undefined;
     await mount();
     await click(buttonNamed("Delete", lineOf(B.question))!);
-    await wait(10_000);
+    await wait(DIG_UNDO_MS);
     expect(deletes()).toHaveLength(1);
     expect(listed()).toEqual([B.question, C.question]);
   });

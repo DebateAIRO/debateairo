@@ -33,8 +33,8 @@ const server = vi.hoisted(() => ({
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
-// V4 start step, Task 76b: a press of Start or "Just answer it" waits its 10-second Undo window before the send; here the
-// window is 0 and `sent` lets its timer run (the 10 seconds themselves: tests/render/v4-start-undo.test.tsx).
+// A press of Start or "Just answer it" waits out its Undo window before the send; here the window is 0 and `sent` lets
+// its timer run (the window itself: tests/render/v4-start-undo.test.tsx).
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

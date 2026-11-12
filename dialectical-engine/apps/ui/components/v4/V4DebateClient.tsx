@@ -130,8 +130,8 @@ import { useSheetFocusReturn } from "@/lib/v4/useSheetFocusReturn";
 
 /*
  * V4 initial (2026-10-28), the map page shell (D3 map, D4 what changed, D6/D7 phone). It loads the debate over
- * today's V3 reads, waits calmly while it runs, then lays out rail | map | panel and owns the dig flow (row D
- * decision 1: a dig starts at once with a 10-second Undo, nothing is sent before then). Every polling loop keeps one
+ * today's V3 reads, waits calmly while it runs, then lays out rail | map | panel and owns the dig flow (a dig starts
+ * at once with its Undo window, and nothing is sent before the window ends). Every polling loop keeps one
  * request in flight at a time and stops when the page goes. Fix wave 1, Decision A: nothing is kept in the browser's
  * storage. V4 account memory (owner rulings N7 and N11, 2026-10-29): the account keeps each debate's last visit, so "what
  * changed" starts "since your last visit" (from any device) and goes on "while you were here"; and it keeps each dig's
@@ -808,7 +808,7 @@ function V4Debate({
     setDraft(next);
   }, []);
   const ownViewSerial = useRef(0);
-  // dig-f23: typed words kept in the page; the ticks kept in the address (ids only); "Clear" with a 10-second Undo; and a
+  // dig-f23: typed words kept in the page; the ticks kept in the address (ids only); "Clear" with an Undo window; and a
   // question before a link loses typed words (the browser's own one before a reload or a closed tab).
   const typed = useTypedWords();
   const addressPicks = useAddressPicks({ map, canDig, draft, commit: commitDraft });
@@ -1291,9 +1291,9 @@ function V4Debate({
   }, [map, draft, planTier, canDig, isDigMap, digs, commitDraft, clearPicks, typed, catalog, select, publicLine, mainQuestionPicks, digPathsParent,
     digPathPlan.newPickRefusal, digPathPlan.rows, locale]);
   // ── The dig flow (dig-d3 B, owner pick 3 Nov): lib/v4/useDigQueue.tsx ──────────────────────────────────────────
-  // A dig waiting out its 10 seconds belongs to the whole V4 site, not to this page (lib/v4/digUndo.ts, memory only): it
+  // A dig waiting out its Undo window belongs to the whole V4 site, not to this page (lib/v4/digUndo.ts, memory only): it
   // keeps its own Undo when the person digs again or opens another page, and the other dig buttons stay active. Its
-  // crisis help and the one-time consent run at the press, before its 10 seconds start (dig-f9), while this page can
+  // crisis help and the one-time consent run at the press, before its Undo window starts (dig-f9), while this page can
   // show them.
   // Owner N13: Free has no Quick look / Thorough choice; its digs are quick looks.
   const sentDigMode = effectiveDigMode(digMode, planTier);
@@ -1302,12 +1302,12 @@ function V4Debate({
   const digQueue = useDigQueue({
     map, canDig, servedRunId, servedQuestionLine, aboveRunIds, digQuotaRef, planTier, sentDigMode, draftRef, commitDraft,
     setVisitLinks, ask, onCounting: dismissPicksUndo, aboutOf: (target) => digAboutLine(target, catalog),
-    // Task 79 review: a combined question written during the dig's 10 seconds goes with it.
+    // A combined question written during the dig's Undo window goes with it.
     digsRest: report.digsRest, settlePaths: digPathPlan.settledPaths, catalog, locale
   });
   const { waitingDigs, queueDig, undoDig } = digQueue;
   // V4 start step, Task 79 (dig-f35, r2-22): a dig of the draft's picks on a path debate goes with its path plan (DIG_PICKS) through
-  // the shared 10-second Undo, unchanged; the words the person wrote on its rows get the crisis check at the press, as their own
+  // the shared Undo window, unchanged; the words the person wrote on its rows get the crisis check at the press, as their own
   // views do (V, 2026-09-30). Every other dig is today's.
   const { startPathsFor, ownWords: digRowWords } = digPathPlan;
   const startPicksDig = digQueue.startDig;
@@ -1323,7 +1323,7 @@ function V4Debate({
     queueDig({ target, mode: sentDigMode, sendsAt: Date.now() + DIG_UNDO_MS, paths });
   }, [startPathsFor, digRowWords, startPicksDig, offerCrisisHelp, queueDig, sentDigMode]);
   // Task 62 (journey-f13, r2-22): a chosen path's one dig button digs deeper into it, and a "+ N more" item is dug as a MORE
-  // pick of the main question; both through the shared Undo note (nothing is sent for 10 seconds), once the answer is served.
+  // pick of the main question; both through the shared Undo note (nothing is sent during its window), once the answer is served.
   const digDeeper = useMemo(() => (map === null || !canDig ? undefined : (pathId: string): void => {
     const path = map.paths.find((candidate) => candidate.id === pathId);
     if (path !== undefined) startDig({ kind: "path", path });
@@ -1504,7 +1504,7 @@ function V4Debate({
     parentRunId: parent?.runId ?? null, index, indexSettled, visit: visitAll, catalog, locale, reads: PARENT_RETRY_READS
   });
   // V4 start step, Task 57g (the owner's 7 Nov answers): "Continue where it stopped" on a question that did not finish, when its read says
-  // `continuable`: the 10-second Undo, then the same debate continues on this page (components/v4/useStoppedContinue.tsx).
+  // `continuable`: the Undo window, then the same debate continues on this page (components/v4/useStoppedContinue.tsx).
   const stoppedContinue = useStoppedContinue({
     runId, run: load?.kind === "RUN" ? load.run : null, loaded: load !== null, dig: isDigPage || recordParent !== null, room: ask.room,
     reread: () => setLoadAttempt((count) => count + 1), catalog, locale
@@ -1828,7 +1828,7 @@ function V4Debate({
   const focusBack = (): HTMLElement | null => [trayClearRef.current, barJobRef.current, mapButtonRef.current, headingRef.current]
     .find((element): element is HTMLElement => element !== null && element.isConnected) ?? null;
 
-  // dig-f23: where the tray was, "Picks cleared [Undo]" for 10 seconds, in the shared Undo note (journey-f21).
+  // Where the tray was, "Picks cleared [Undo]" for the Undo window, in the shared Undo note.
   const picksClearedNote = picksUndo.offered
     ? (
       <V4PicksClearedNote

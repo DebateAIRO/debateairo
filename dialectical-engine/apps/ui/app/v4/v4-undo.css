@@ -1,7 +1,7 @@
 /* V4 UX fixes (owner picks 3 Nov 2026): the shared Undo note (V4UndoNote.tsx, journey-f21, r2-22 A), the map page's
    self-measuring bottom stack (V4BottomStack.tsx, journey-d3 A, dig-f16, dig-f17), the site-wide dig note holder
    (V4DigUndo.tsx) and the seed card on the map (V4DigSeed.tsx, dig-d3 B). Site tokens and the V4 tokens only.
-   Motion: the countdown line (r2-22 A, the Undo's own 10 seconds), the seed's fly-in and its way back out, and the picks
+   Motion: the countdown line (over the Undo window), the seed's fly-in and its way back out, and the picks
    arrow's fold, each on the shared motion tokens of v4-base.css (--v4-move-fly, --v4-move-fold, --v4-ease-move); with
    reduced motion every move is instant and words say what the line said. No fixed widths: everything wraps at 375 px. */
 
@@ -27,7 +27,7 @@
 .v4UndoMore {
   align-self: flex-start; padding: 0 12px; border-radius: var(--r-btn); background: var(--ink); box-shadow: var(--shadow-pop);
 }
-/* r2-22 A: a thin line under the words shrinks over the 10 seconds; no number. */
+/* A thin line under the words shrinks over the Undo window (its length is set on the element); no number. */
 .v4UndoLine { position: absolute; inset-inline: 0; bottom: 0; height: 3px; background: color-mix(in srgb, var(--surface) 18%, transparent); }
 .v4UndoLineFill {
   display: block; height: 100%; background: var(--accent); transform-origin: left center;

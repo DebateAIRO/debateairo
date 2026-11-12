@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { V4DigPaths } from "../../apps/ui/components/v4/V4DigPaths.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import { digPathPlanOf } from "../../apps/ui/lib/v4/digPathPlan.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import { SHARE_DELTA_SHOW_MS } from "../../apps/ui/lib/v4/money.js";
 import { suggestionPick } from "../../apps/ui/lib/v4/suggestions.js";
 import {
@@ -255,11 +256,10 @@ describe("Task 79b: the tray's share follows the number of paths the dig looks i
 });
 
 /*
- * V4 start step, Task 79 (spec 2026-11-03 §4.4; dig-f35 "Do not build it twice", r2-1, r2-22, choose-d3; owner answers Q18 A and
- * Q19 A): on a path debate a dig's picks become paths on the very rows of the choosing step (V4StartRow), combined, split and
- * rewritten before the dig, each change undoable (Undo, Ctrl/Cmd+Z) until it is sent; then the shared 10-second Undo note,
- * unchanged, and the dig goes with its paths (DIG_PICKS). Two picks resting on one point of the map get one suggestion, "Combine ·
- * Keep apart" (code, no AI call). The combine call is the start step's own, for this dig (`{kind: "DIG", parent_run_id}`), and its
+ * On a path debate a dig's picks become paths on the very rows of the choosing step (V4StartRow, not built a second time),
+ * combined, split and rewritten before the dig, each change undoable (Undo, Ctrl/Cmd+Z) until it is sent; then the shared
+ * Undo note, unchanged, and the dig goes with its paths (DIG_PICKS). Two picks resting on one point of the map get one
+ * suggestion, "Combine · Keep apart" (code, no AI call). The combine call is the start step's own, for this dig (`{kind: "DIG", parent_run_id}`), and its
  * words are kept by the members, so the same pair combined again asks nothing. Only the reads, the ask and the combine call are
  * stand-ins; every text and share is made up.
  */
@@ -341,7 +341,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     standIn.combine = null;
   });
 
-  it("two picks are two rows; Combine with… makes one row being written, asked for this dig; after the note's 10 s it goes with its paths", async () => {
+  it("two picks are two rows; Combine with… makes one row being written, asked for this dig; after the note's Undo window it goes with its paths", async () => {
     spyCombine();
     const stored = vi.spyOn(Storage.prototype, "setItem");
     const runId = await mountV2([LAND, sug("s-batteries", "Can batteries cover a windless week?")]);
@@ -362,7 +362,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     await answerCombine(0);
     expect(rowTitles()).toEqual(["T"]);
     await click(picksButton());
-    await advance(9_500);
+    await advance(DIG_UNDO_MS - 500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
     expect(harness.submit).toHaveBeenCalledTimes(1);
@@ -396,7 +396,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     await combineRows(0, 1);
     await answerCombine(0);
     await click(picksButton());
-    await advance(3_000);
+    await advance(DIG_UNDO_MS / 2);
     await click(page().querySelector<HTMLButtonElement>(`button[aria-label="${CATALOG["v4.dig.undoLabel"]!}"]`)!);
     await advance(30_000);
     expect(harness.submit).not.toHaveBeenCalled();
@@ -448,7 +448,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     await pickInPanel(2);
     expect(page().querySelector(".v4DigPaths")).toBeNull();
     await click(picksButton());
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(handOverOf(0)).toBeUndefined();
     expect(combines).toHaveLength(0);
@@ -465,7 +465,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     expect(digRows()).toHaveLength(2);
     // Two paths: the picks' button carries the share of two paths (Task 79b's made-up [3, 5, 6]).
     await click(buttonsNamed(`${CATALOG["v4.dig.yourPicks.other"]} · ${word("v4.undo.barShare", { percent: 5 })}`, panel())[0]!);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     const sent = handOverOf(0) as { startPaths: { source: string; width: number } } | undefined;
     expect(sent?.startPaths.source).toBe("DIG_PICKS");
@@ -553,30 +553,30 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     expect(ticked()).toHaveLength(3);
   });
 
-  // Independent review (wave 16): a dig pressed while its combined question is still being written waits its 10 seconds anyway;
-  // the AI's words that come meanwhile go with it (the combine was asked and counted for them), as Start takes a combine written
-  // during its own 10 seconds. Words that have not come by then: the joined words, as before (FALLBACK).
-  it("pressed while the combined question is being written: the words that come within the 10 seconds go with the dig", async () => {
+  // A dig pressed while its combined question is still being written waits out its Undo window anyway; the AI's words that
+  // come meanwhile go with it (the combine was asked and counted for them), as Start takes a combine written during its own
+  // Undo window. Words that have not come by then: the joined words, as before (FALLBACK).
+  it("pressed while the combined question is being written: the words that come within the Undo window go with the dig", async () => {
     spyCombine();
     await mountV2([LAND, COST]);
     await pickInPanel(2);
     await combineRows(0, 1);
     expect(digRows()[0]!.textContent).toContain(CATALOG["v4.start.writing"]!);
     await click(picksButton());
-    await advance(3_000);
+    await advance(DIG_UNDO_MS / 2);
     await answerCombine(0);
-    await advance(7_100);
+    await advance(DIG_UNDO_MS / 2 + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(handOverOf(0)).toMatchObject({ startPaths: COMBINED_PATHS });
   });
 
-  it("pressed while the combined question is being written, and no words by the end of the 10 seconds: the joined words go", async () => {
+  it("pressed while the combined question is being written, and no words by the end of the Undo window: the joined words go", async () => {
     spyCombine();
     await mountV2([LAND, COST]);
     await pickInPanel(2);
     await combineRows(0, 1);
     await click(picksButton());
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     const sent = (handOverOf(0) as { startPaths: { paths: { title: string; members: unknown; combine_ref?: string }[] } }).startPaths.paths;
     expect(sent).toHaveLength(1);
@@ -597,7 +597,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     harness.submit.mockImplementationOnce(async () => ({ kind: "STARTED", runId: child }));
     harness.digView = (link) => ({ link, state: "FAILED", headline: null, counts: null, terminalReason: "RUNNER_EXECUTION_FAILED:CALL_BUDGET_EXHAUSTED" });
     await click(picksButton());
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(handOverOf(0)).toMatchObject({ startPaths: COMBINED_PATHS });
     await settle();
@@ -605,7 +605,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     expect(failed).not.toBeNull();
     await click(failed!);
     await click(buttonsNamed(CATALOG["v4.digFailed.retry"]!, panel())[0]!);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(2);
     expect(handOverOf(1)).toEqual(handOverOf(0));
   });
@@ -620,7 +620,7 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     await answerCombine(0);
     expect(digRows()).toHaveLength(2);
     await click(picksButton());
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(handOverOf(0)).toMatchObject({ startPaths: { source: "DIG_PICKS", width: 2, chosen_by: "PERSON" } });
   });

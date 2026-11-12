@@ -22,9 +22,9 @@ import type { DigTarget, PendingDig, V4OpenQuestion, V4Path } from "../../apps/u
 import type { StartPaths } from "../../packages/contract/src/index.js";
 
 /*
- * V4 UX fixes (owner pick dig-d3, 3 Nov 2026): the digs waiting out their 10-second Undo belong to the whole V4 site, in
- * the page's memory only. Each keeps its own Undo, nothing is sent before its 10 seconds, the sends go one at a time, a
- * report waits for a dig still waiting (ruling F7), and closing the tab asks first while one waits.
+ * The digs waiting out their Undo window belong to the whole V4 site, in the page's memory only. Each keeps its own Undo,
+ * nothing is sent before its window ends, the sends go one at a time, a report waits for a dig still waiting, and closing
+ * the tab asks first while one waits.
  */
 
 const path = (id: string): V4Path => ({ id, line: `Path ${id}` }) as unknown as V4Path;
@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe("the site-wide waiting digs (dig-d3)", () => {
-  it("sends nothing before 10 seconds, then sends once; the started note goes by itself", async () => {
+  it("sends nothing before the Undo window ends, then sends once; the started note goes by itself", async () => {
     const send = vi.fn<Sender>(async () => started("child-1"));
     add("a", send);
     expect(phases()).toEqual(["COUNTING"]);
@@ -74,11 +74,12 @@ describe("the site-wide waiting digs (dig-d3)", () => {
   it("several digs each keep their own Undo: undoing one never touches the other", async () => {
     const send = vi.fn<Sender>(async () => started(crypto.randomUUID()));
     const first = add("a", send);
-    await vi.advanceTimersByTimeAsync(3_000);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS / 2);
     add("b", send);
     expect(undoDig(first)).toBe(true);
     expect(phases()).toEqual(["CANCELLED", "COUNTING"]);
-    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + 100);
+    // Past the second dig's send, and past the time "Cancelled" stays on the first.
+    await vi.advanceTimersByTimeAsync(Math.max(DIG_UNDO_MS, DIG_CANCELLED_SHOWN_MS) + 100);
     expect(send).toHaveBeenCalledTimes(1);
     expect(pathIdOf(send.mock.calls[0]![0])).toBe("b");
     expect(phases()).not.toContain("CANCELLED");
@@ -150,7 +151,7 @@ describe("the site-wide waiting digs (dig-d3)", () => {
     await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + 30_000);
     expect(send).toHaveBeenCalledTimes(1);
     expect(phases()).toEqual(["SENDING", "SENDING"]);
-    // The minute runs from the first send (10 s in); the second dig goes out just after it.
+    // The minute runs from the first send (when the Undo window ends); the second dig goes out just after it.
     await vi.advanceTimersByTimeAsync(DIG_SEND_GIVE_UP_MS - 30_000 + 10);
     expect(send).toHaveBeenCalledTimes(2);
     expect(phases()).toEqual(["REFUSED", "STARTED"]);
@@ -214,7 +215,8 @@ describe("the site-wide waiting digs (dig-d3)", () => {
     const id = add("a", async () => started("c"));
     let done = false;
     void waitForDigs("run-1").then(() => { done = true; });
-    await vi.advanceTimersByTimeAsync(5_000);
+    // Halfway through the Undo window: the dig still waits.
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS / 2);
     expect(done).toBe(false);
     undoDig(id);
     await vi.advanceTimersByTimeAsync(1);
@@ -271,13 +273,15 @@ describe("nothing is sent before sendsAt; Undo means nothing is sent", () => {
   it("two digs waiting at once: neither goes before its own sendsAt, and the one undone never goes", async () => {
     const send = vi.fn<Sender>(async (pending) => started(pathIdOf(pending)));
     const first = add("a", send);
-    await vi.advanceTimersByTimeAsync(4_000);
+    // The second dig is pressed partway through the first one's Undo window.
+    const later = DIG_UNDO_MS / 2;
+    await vi.advanceTimersByTimeAsync(later);
     add("b", send);
     expect(phases()).toEqual(["COUNTING", "COUNTING"]);
-    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - 4_000 - 1);
+    await vi.advanceTimersByTimeAsync(DIG_UNDO_MS - later - 1);
     expect(send).not.toHaveBeenCalled();
     expect(undoDig(first)).toBe(true);
-    await vi.advanceTimersByTimeAsync(4_000);
+    await vi.advanceTimersByTimeAsync(later);
     expect(send).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(10);
     expect(send.mock.calls.map(([pending]) => pathIdOf(pending))).toEqual(["b"]);
@@ -296,9 +300,9 @@ describe("nothing is sent before sendsAt; Undo means nothing is sent", () => {
     expect((send.mock.calls[0]![0] as unknown as { paths: unknown }).paths).toBe(paths);
   });
 
-  // V4 start step, Task 79 (dig-f35, r2-22): a dig of picks on a path debate carries its path plan (`PendingDig.paths`) through the
-  // shared 10-second Undo, unchanged: it waits its 10 seconds, then goes with its paths; undone, nothing goes.
-  it("a dig with its paths waits its 10 seconds, then goes with them; undone, nothing goes", async () => {
+  // A dig of picks on a path debate carries its path plan (`PendingDig.paths`) through the shared Undo, unchanged: it waits
+  // out its Undo window, then goes with its paths; undone, nothing goes.
+  it("a dig with its paths waits out its Undo window, then goes with them; undone, nothing goes", async () => {
     const send = vi.fn<Sender>(async () => started("child-1"));
     const paths: StartPaths = {
       source: "DIG_PICKS", width: 1, chosen_by: "PERSON",

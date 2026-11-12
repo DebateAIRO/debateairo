@@ -7,6 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WebSource } from "../../packages/contract/src/index.js";
 import { V4SourcesFold } from "../../apps/ui/components/v4/V4Sources.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, expandBranch, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
   seededAnswer, settle, tray, typeInto, unmountMap
@@ -85,7 +86,7 @@ describe("map-f14 / dig-f4: one pick reads \"Dig into this\"; the tray comes fro
     expect(panel().classList.contains("v4Panel-root")).toBe(true);
     const dig = buttonNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!);
     await click(dig);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect((harness.submit.mock.calls[0]![3] as { picks?: unknown[] }).picks).toHaveLength(2);
   });
@@ -136,7 +137,7 @@ describe("map-f14 / dig-f4: one pick reads \"Dig into this\"; the tray comes fro
     await click(rootBox);
     expect(tray()).toBeNull();
     await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     await settle();
     // A suggestion of a path is not on the main question's list: that panel offers no button for it.
@@ -237,8 +238,8 @@ describe("map-d4 A: evidence first, sources folded, Skip to the dig button, the 
   });
 });
 
-describe("dig-f9: the consent and the crisis help run at the click, before the 10 seconds", () => {
-  it("asks the consent at the click; the 10 seconds start only once it is given, and nothing is sent before", async () => {
+describe("the consent and the crisis help run at the click, before the Undo window", () => {
+  it("asks the consent at the click; the Undo window starts only once it is given, and nothing is sent before", async () => {
     let answer: (agreed: boolean) => void = () => undefined;
     harness.ensureConsent = vi.fn(() => new Promise<boolean>((resolve) => { answer = resolve; }));
     await mountMap();
@@ -254,7 +255,7 @@ describe("dig-f9: the consent and the crisis help run at the click, before the 1
     await act(async () => answer(true));
     await settle();
     expect(notes()).toHaveLength(1);
-    await advance(9_500);
+    await advance(DIG_UNDO_MS - 500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
     expect(harness.submit).toHaveBeenCalledTimes(1);
@@ -296,7 +297,7 @@ describe("dig-f9: the consent and the crisis help run at the click, before the 1
     await openPath(PATHS.smr);
     const heading = panel().querySelector("h2")!.textContent!;
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     const about = harness.submit.mock.calls[0]![5];
     const host = document.createElement("div");
     host.innerHTML = renderToStaticMarkup(<>{about}</>);

@@ -28,7 +28,7 @@ const clarify = vi.hoisted(() => ({ asked: [] as string[], answer: (_text: strin
 vi.mock("@/lib/api", () => ({ contractClient: { readAnswerIndex: async () => ({ items: [], open_runs: [] }),
   clarifyAsk: async (input: { question_line: string }, signal?: AbortSignal) => { clarify.asked.push(input.question_line); return clarify.answer(input.question_line, signal); } } }));
 // Task 76 (read-f3): Free-only things read planIsFree, the server's own word for the plan.
-// Task 76b: Start waits its 10-second Undo window before the send; here the window is 0 and `pressStart` lets its timer run.
+// Start waits out its Undo window before the send; here the window is 0 and `pressStart` lets its timer run.
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

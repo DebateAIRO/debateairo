@@ -24,7 +24,7 @@ import { V4StartList, type StartPlanProps } from "./V4StartRow";
  *  - Combining asks the start step's combine for one question that covers the picks, for this dig ({kind: "DIG", parent_run_id});
  *    the path shows "Writing one question that covers them…" until it lands ("Combined. …"), or keeps the joined words when no
  *    words come. Words already written for the same picks are kept in the page's memory, so combining them again asks nothing.
- *  - Each change can be undone (Undo, Ctrl/Cmd+Z outside a text box) until the dig is sent; then the shared 10-second Undo note,
+ *  - Each change can be undone (Undo, Ctrl/Cmd+Z outside a text box) until the dig is sent; then the shared Undo note,
  *    unchanged (lib/v4/digUndo.ts). Remove takes the pick out of the dig (its box is unticked), and Undo brings it back.
  *  - "Combine · Keep apart" (answer Q18): when two picks on different rows rest on one point of the map, one suggestion at a
  *    time, "“Seasonal lulls?” and “2030s gap?” overlap. Dig them as one?". Combine is the same as ⋯'s; Keep apart hides that pair
@@ -206,7 +206,7 @@ export type DigPaths = Readonly<{
   /** The paths a dig of `target` sends: the plan's, when it digs exactly the draft's picks; else undefined (today's dig). */
   startPathsFor(target: DigTarget): StartPaths | undefined;
   /**
-   * Independent review (wave 16): at the send, 10 seconds after the press, the paths `startPathsFor` gave, with the AI's words
+   * At the send, once the Undo window after the press is over, the paths `startPathsFor` gave, with the AI's words
    * for a row that was still being written at the press when they have come meanwhile (with its reference); else as given.
    */
   settledPaths(paths: StartPaths): StartPaths;

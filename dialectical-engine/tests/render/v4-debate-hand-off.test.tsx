@@ -11,8 +11,7 @@ import {
 } from "../../packages/contract/src/index.js";
 
 /*
- * V4 start step, Task 76i (wait-f14 "no blank page between Start and the map", wait-f20, choose-f19's "if the map takes long",
- * and the review session's note "the map header remounts while loading"): after Start's 10 seconds the ask page hands its
+ * No blank page between Start and the map, even when the map takes long: after Start's Undo window the ask page hands its
  * question and paths to the map page in this tab's memory (lib/v4/startHandOff.ts). The map page draws them, each being looked
  * into, with one quiet "Starting…", while the session is checked (in the held header bar's place) and while its first run read
  * is on its way (under the real header); then the run map takes over with the same path ids and the same header element. A
@@ -102,6 +101,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
 import { pathPlanFromMenu } from "../../apps/ui/lib/v4/pathPlan.js";
 import { clearHandOff, handOffFor, handOffStart, type StartHandOff } from "../../apps/ui/lib/v4/startHandOff.js";
+import { START_UNDO_MS } from "../../apps/ui/lib/v4/startUndo.js";
 import { NUCLEAR_MENU, START_FIXTURE_QUESTION, signedList, signedMenu } from "../support/v4-start-menu.js";
 import { CATALOG, harness, mountMap, page, resetHarness, settle, unmountMap } from "./v4-debate-harness.js";
 
@@ -381,7 +381,7 @@ describe("the ask page hands the question and its paths over at STARTED (wait-f1
     const pressedAt = Date.now();
     await press(askHost.querySelector(".v4StartBarStart")!);
     expect(handOffFor(runId, Date.now())).toBeNull();
-    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(START_UNDO_MS); });
     await flush();
     expect(router.pushed).toHaveLength(1);
     expect(router.pushed[0]!.href).toMatch(new RegExp(`^/v4/debate/${runId}(?:\\?|$)`, "u"));
@@ -393,7 +393,7 @@ describe("the ask page hands the question and its paths over at STARTED (wait-f1
     expect(handOff!.paths.map((path) => path.title)).toEqual(plan.paths.map((path) => path.title));
     expect(handOff!.paths.map((path) => path.question)).toEqual(plan.paths.map((path) => path.question));
     expect(handOff!.level).toBe("plain");
-    expect(handOff!.at).toBeGreaterThanOrEqual(pressedAt + 10_000);
+    expect(handOff!.at).toBeGreaterThanOrEqual(pressedAt + START_UNDO_MS);
     expect(handOff!.at).toBeLessThanOrEqual(Date.now());
   });
 });

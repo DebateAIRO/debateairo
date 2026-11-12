@@ -25,7 +25,7 @@
 .v4PubChipDugLine { color: var(--text-2); font-size: 12px; }
 .v4PubWriteOwn { align-self: flex-start; font-size: 13.5px; }
 
-/* The card under the path after the 10 seconds: being looked into (hatched, one slow ring), then a plain card. */
+/* The card under the path after the Undo window: being looked into (hatched, one slow ring), then a plain card. */
 .v4PubDigCard {
   display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line-2);
   border-radius: var(--r-btn); background: var(--surface); min-width: 0; overflow-wrap: anywhere;

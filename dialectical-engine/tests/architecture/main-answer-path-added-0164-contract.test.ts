@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { stepsLiteralFrom } from "../support/forward-chain-steps.js";
 import { MAIN_ANSWER_TRIGGERS } from "../../packages/contract/src/web.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
@@ -40,10 +41,10 @@ const kindsOf = (sql: string): readonly string[] => {
 };
 
 describe("0164: a dig under the main question of a path debate updates the main answer", () => {
-  it("C-T is the chain's head, right after 0163, found by name, with its own loader and its one declared amendment of 0138", async () => {
+  it("C-T is a step of the chain, right after 0163, found by name, with its own loader and its one declared amendment of 0138", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0164 } from './migration-forward0164.js';");
-    expect(chain).toContain("loadForward0162,loadForward0163,loadForward0164,loadForward0165,loadForward0166,loadForward0167,loadForward0168,loadForward0169,loadForward0170,loadForward0171,loadForward0172,loadForward0173,loadForward0174,loadForward0175]);");
+    expect(chain).toContain(stepsLiteralFrom("0162"));
     // The amendment shape this step needs: a widened CHECK an earlier step's digest pins.
     expect(chain).toContain("|Readonly<{step:string;relations:readonly string[];constraints:readonly string[];field:'constraint_definition'}>;");
     const plan = await loadMigrationPlan();

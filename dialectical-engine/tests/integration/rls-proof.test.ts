@@ -20,6 +20,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
 import { runRlsProof } from "../../tools/rls/proof.js";
+import { LAST_STEP } from "../support/forward-chain-steps.js";
 
 const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const LOGINS = ["debateai_prod_api_runtime", "debateai_prod_api_authorization", "debateai_dev_runtime", "debateai_dev_authorization"];
@@ -52,11 +53,11 @@ describe("rls:proof — V's command at the head (PLAN S8.3, A6)", () => {
     run = Object.freeze({ ...result, before, after: await leftovers() });
   }, 1_200_000);
 
-  it("S8.3-a stdout lines 2, 3×16, 4 EXACT and line 1 CONTAINS \"RLS_PROOF cluster=throwaway migrated_to=0175_statement_ai_read_verdict.sql\" and \" in_scope=118\"; exit 0", () => {
+  it(`S8.3-a stdout lines 2, 3×16, 4 EXACT and line 1 CONTAINS "RLS_PROOF cluster=throwaway migrated_to=${LAST_STEP}" and " in_scope=118"; exit 0`, () => {
     const lines = run.stdout.split("\n");
     expect(lines.at(-1)).toBe("");
     const [first, ...rest] = lines.slice(0, -1);
-    expect(first).toContain("RLS_PROOF cluster=throwaway migrated_to=0175_statement_ai_read_verdict.sql");
+    expect(first).toContain(`RLS_PROOF cluster=throwaway migrated_to=${LAST_STEP}`);
     expect(first).toContain(" in_scope=118");
     expect(rest).toEqual([
       "RLS_PROOF seeded l5f12_relations_with_rows_of_b=6/6",

@@ -25,7 +25,7 @@ const HOST_GROUPS: ReadonlySet<string> = new Set(["undo", "dig", "digMode"]);
 
 /*
  * V4 UX fixes (owner pick dig-d3, 3 Nov): the layout stays mounted while the person moves between V4 pages, so it holds
- * the site-wide dig note: a dig pressed on the map keeps its 10 seconds and its Undo on the report or the ask page. A page
+ * the site-wide dig note: a dig pressed on the map keeps its Undo window and its Undo on the report or the ask page. A page
  * that draws the notes in its own bottom stack (the map) claims them, and this holder steps back.
  */
 export default async function V4Layout({ children }: { children: ReactNode }) {
