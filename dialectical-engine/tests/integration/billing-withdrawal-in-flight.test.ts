@@ -6,7 +6,7 @@ import { withdrawalDeadline, withdrawalRefundMicros } from "@debateai/billing-co
 import { PostgresModelSpendStore } from "@debateai/budget";
 import { BillingRepository, EntitlementRepository, RunRepository, migrate } from "@debateai/db";
 import { recordWithdrawal } from "../../apps/api/src/billing/withdrawal.js";
-import { testBillingPolicy } from "../support/billingFixtures.js";
+import { testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
   mountSubscriptionRoutes,
   seedNetopiaSubscription,
@@ -38,8 +38,8 @@ afterAll(async () => {
 const MINUTE = 60_000;
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
-/** PLUS's monthly credit (testBillingPlans). */
-const PLUS_CREDIT = 5_000_000;
+/** PLUS's monthly credit (testBillingPlans), read from the fixture, so the expectation follows its value. */
+const PLUS_CREDIT = testBillingPlans.plans.find((plan) => plan.planId === "PLUS")!.monthlyCreditMicros;
 /** 0090 `call_prompt_fingerprint_shape`: a legacy run's prompt row carries its 64-hex fingerprint in the clear. */
 const EMPTY_PROMPT_FINGERPRINT = createHash("sha256").update("[]").digest("hex");
 
@@ -140,7 +140,8 @@ async function subscriber(label: string, input: Readonly<{ activatedAt: Date; cl
   const api = await mountSubscriptionRoutes(deps, identity);
   const withdraw = () => api.inject({
     method: "POST", url: "/v1/billing/subscription/withdraw",
-    headers: { "x-test-session": identity.rawSessionToken }, payload: { step_up_grant: grant }
+    // The route takes an empty body since the withdrawal asks no re-authentication; the seeded grant is never asked.
+    headers: { "x-test-session": identity.rawSessionToken }, payload: {}
   });
   /** The refund the withdrawal owes at `at` (the clock unless named) for `creditSpentMicros` of credit used. */
   const refundAt = (creditSpentMicros: number, at: Date = input.clock) => withdrawalRefundMicros({

@@ -988,7 +988,8 @@ const R44_BASE_MEMBERS: readonly (readonly [string, string])[] = Object.freeze([
   // Security fixes run 3 (merged 2026-10-29; not at base): NV-25's stale-READY listing (WorkItemRepository.listReady, the
   // runner's own login, as listLapsedClaimed) and NV-49's estimator sample, which replaced the probe's estimate.ts:233
   // member (`WITH sample AS …`) with its candidate/ranked/sample CTEs, still inside readRecentRunUsage's X20 frame.
-  ["packages/battery/src/index.ts:449", "SELECT item.work_item_id, item.run_id, run.register_version::integer AS register_version FROM core.work_item AS item JOIN core.run AS run ON"],
+  // Its list reads the release and settings version a debate was last handed over to, as every other work list does.
+  ["packages/battery/src/index.ts:449", "SELECT item.work_item_id, item.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version FROM core.work_item AS ite"],
   ["packages/budget/src/estimate.ts:309", "WITH candidate AS ( SELECT run.run_id, run.asker_id, max(spend.recorded_at) AS last_charged_at FROM core.run AS run JOIN ledger.model_spend "],
   ["packages/budget/src/model-spend.ts:1032", "SELECT coalesce(sum(charge_micros),0)::text AS total FROM ledger.model_spend WHERE charged_on = $1::date"],
   ["packages/budget/src/model-spend.ts:1071", "SELECT coalesce(sum(greatest(0, hold.held_micros - coalesce(spent.total, 0))), 0)::text AS total FROM ( SELECT DISTINCT work.run_id FROM cor"],
