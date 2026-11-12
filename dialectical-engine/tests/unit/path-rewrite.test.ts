@@ -4,7 +4,11 @@
 // recovery order on a slip, a backup writer of another maker, a FAILED row that leaves the path's text, orders in a page
 // or a pick that stay data, code's checks of the reply (refs, verdict, trust word), and two digs of one path in order.
 import { describe, expect, it } from "vitest";
-import { readPromptFrame, type PromptPacket } from "@debateai/providers";
+import {
+  ProviderCallFailedError, readPromptFrame, type PromptPacket, type ProviderCallRequest, type ProviderCallResult
+} from "@debateai/providers";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
+import { writePathRewrite, type StoryRoleMaker } from "@debateai/story";
 import {
   ownPathSuggestionsSetIdOf, writeOwnPathSuggestions, type DigSuggestionsJob, type PathSuggestionsRefresh, type PathSuggestionsStore
 } from "../../apps/runner/src/dig-suggestions-step.js";
@@ -451,5 +455,71 @@ describe("W3-5 a dig rewrites the path it was dug from", () => {
     expect(await runDigPathRewrite(settingsOver({ store, digs: new Map() }), digSnapshot(DIG_A, membersOf(vendors)))).toBe(false);
     expect(store.turns).toHaveLength(0);
     expect(vendors.haiku.bodies).toHaveLength(0);
+  });
+});
+
+describe("the rewrite's checker cannot be reached", () => {
+  it("a backup of a third company runs the same check at PATH_REWRITE:CHECKER:1:BACKUP, and the row names it as the checker", async () => {
+    const store = memoryStore();
+    const logged: Logged = [];
+    const vendors = team({ glm: down });
+    await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]), logged }), digSnapshot(DIG_A, membersOf(vendors)));
+    expect(store.rewrites[0]).toMatchObject({ outcome: "READY", failureCode: null, rounds: 1 });
+    expect(store.rewrites[0]!.writerLineage).toMatchObject({ maker: "Anthropic", provider_ref: "ref-haiku" });
+    expect(store.rewrites[0]!.checkerLineage).toMatchObject({ maker: "DeepSeek", provider_ref: "ref-deepseek" });
+    expect(store.rewrites[0]!.artifactRefs).toHaveLength(2);
+    expect(vendors.glm.requests.map((request) => request.callSiteKey)).toEqual(["PATH_REWRITE:CHECKER:1"]);
+    expect(vendors.deepseek.requests.map((request) => [request.callSiteKey, request.role, request.lane])).toEqual([
+      ["PATH_REWRITE:CHECKER:1:BACKUP", "EVALUATOR", "story"]]);
+    expect(vendors.qwen.requests).toEqual([]);
+    // The same check: the same contract, seal and bound, and the same prompt once the per-call fence and canary are masked.
+    const [planned, backup] = [vendors.glm.requests[0]!, vendors.deepseek.requests[0]!];
+    expect(readPromptFrame(backup.packet).contractId).toBe("path-rewrite.checker.v2");
+    expect([backup.contractHash, backup.bound]).toEqual([planned.contractHash, planned.bound]);
+    expect(canonicalPromptFingerprint(backup.packet.messages)).toBe(canonicalPromptFingerprint(planned.packet.messages));
+    // Its own attempts, recorded at its own key: the first checker's spent allowance is never its.
+    expect(vendors.deepseek.ledger.map((entry) => [entry.callSiteKey, entry.outcome])).toEqual([["PATH_REWRITE:CHECKER:1:BACKUP", "OK"]]);
+    expect(logged.find((entry) => entry.event === "STORY_CHECKER_BACKUP_USED")?.detail).toMatchObject({ step: "PATH_REWRITE", round: 1,
+      signal: "UNREACHABLE", firstModel: "ref-glm", backupModel: "ref-deepseek" });
+  });
+
+  it("the writer and the checker both down: the backup writer's draft is checked by a company that neither wrote nor failed", async () => {
+    const store = memoryStore();
+    const vendors = team({ haiku: down, glm: down });
+    await runDigPathRewrite(settingsOver({ store, digs: new Map([[DIG_A, dig()]]) }), digSnapshot(DIG_A, membersOf(vendors)));
+    expect(vendors.deepseek.requests.map((request) => request.callSiteKey)).toEqual(["PATH_REWRITE:WRITER:3"]);
+    expect(vendors.glm.requests.map((request) => request.callSiteKey)).toEqual(["PATH_REWRITE:CHECKER:3"]);
+    expect(vendors.qwen.requests.map((request) => request.callSiteKey)).toEqual(["PATH_REWRITE:CHECKER:3:BACKUP"]);
+    expect(store.rewrites[0]).toMatchObject({ outcome: "READY" });
+    expect(store.rewrites[0]!.writerLineage).toMatchObject({ provider_ref: "ref-deepseek" });
+    expect(store.rewrites[0]!.checkerLineage).toMatchObject({ provider_ref: "ref-qwen" });
+  });
+
+  it("the climb's rounds use the climb's own sites, the backup's included", async () => {
+    const material = {
+      writer: [{ name: "path", content: "A path." }],
+      checkerOf: (candidate: unknown) => [{ name: "path", content: "A path." }, { name: "rewrite", content: JSON.stringify(candidate) }],
+      index: { pointRefs: new Set(["P1"]), digPathRefs: [], personWords: false }
+    };
+    const draft = JSON.stringify({ line: "A new line.", summary: "A new summary.", what_changed: [{ text: "It changed.", rests_on: ["P1"] }],
+      fate: "HELD_UP", view: null, dig_paths: [] });
+    const sent: ProviderCallRequest[] = [];
+    const answer = (maker: StoryRoleMaker, request: ProviderCallRequest): ProviderCallResult => {
+      if (maker.providerRef === "ref-glm") throw new ProviderCallFailedError(new Error("deadline"), 3, "TIMED_OUT", "ledger:slow");
+      return { rawArtifactRef: `raw:${request.callSiteKey}`, ledgerEntryRef: `ledger:${request.callSiteKey}`, provider: "openai-compatible-http",
+        content: request.role === "SYNTHESIZER" ? draft : SATISFIED, model: "m", maker: "x", modelVersion: "m" };
+    };
+    const maker = (providerRef: string, name: string) => Object.freeze({ provider: { call: async () => { throw new Error("unused"); } }, providerRef, maker: name });
+    const members = [maker("ref-haiku", "Anthropic"), maker("ref-glm", "Z.AI"), maker("ref-deepseek", "DeepSeek")];
+    const written = await writePathRewrite({
+      runId: "run", subjectItemId: "path-climb:x", contractHash: "hash", maxRounds: 2, family: "PATH_CLIMB",
+      writer: members[0]!, checker: members[1]!, backupCandidates: members, material,
+      send: async (picked, request) => { sent.push(request); return answer(picked, request); },
+      guard: (packet) => packet, log: () => undefined
+    });
+    expect(written.outcome).toMatchObject({ outcome: "READY" });
+    expect(sent.map((request) => [request.callSiteKey, request.providerRef])).toEqual([
+      ["PATH_CLIMB:WRITER:1", "ref-haiku"], ["PATH_CLIMB:CHECKER:1", "ref-glm"], ["PATH_CLIMB:CHECKER:1:BACKUP", "ref-deepseek"]]);
+    expect(written.rounds[0]!.checkerBackup).toEqual({ signal: "TOO_SLOW" });
   });
 });

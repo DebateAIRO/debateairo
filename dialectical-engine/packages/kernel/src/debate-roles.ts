@@ -1,3 +1,5 @@
+import { readWithBackupCheckerKey } from "./backup-checker-key.js";
+
 /**
  * Model-scorecard design (docs/superpowers/specs/2026-09-26-model-scorecard-and-picker-design.md):
  * the shared vocabulary. The kernel is the one minting home for a value vocabulary several
@@ -62,6 +64,11 @@ export const POINT_INVESTIGATION_KEY = /^VERDICT:investigate:[1-8]$/u;
  * embeds its author's key.
  */
 export function debateRoleFromCallSiteKey(key: string): DebateRole | null {
+  // A backup checker's key reads as its first checker's: the answer checker's backup is an answer checker; nothing else has one.
+  return readWithBackupCheckerKey(key, debateRoleOfKey, (role) => role === "ANSWER_CHECKER");
+}
+
+function debateRoleOfKey(key: string): DebateRole | null {
   const base = key.replace(SEAT_SUFFIX, "");
   // A comparing judge is a JUDGE; an investigation stands in for the review its point lacked, so it is a REVIEWER.
   // No new role: migration 0090's role CHECK is untouched.

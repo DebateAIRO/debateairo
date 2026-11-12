@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { INVESTIGATION_REPORT_LIMITS, type MakerLineage } from "@debateai/contract";
-import { LENGTH_SENTENCE_ANSWER_CHECKER, TypedDomainError } from "@debateai/kernel";
+import { LENGTH_SENTENCE_ANSWER_CHECKER, TypedDomainError, backupCheckerCallSiteKey, readWithBackupCheckerKey } from "@debateai/kernel";
 import {
   ANTHROPIC_TOKEN_COUNT,
   buildFramedPrompt,
@@ -25,10 +25,12 @@ import {
   STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
   pickBackupStoryteller,
+  storyBackupCheckerOf,
   storyBackupSignalOf,
   type StoryBackupCandidate,
   type StoryBackupMaker,
-  type StoryBackupRecord
+  type StoryBackupRecord,
+  type StoryCheckerBackups
 } from "./backup.js";
 import { runStoryLoop, storyLoopLastRound, type StoryLoopDependencies, type StoryLoopOutcome, type StoryLoopVerdict } from "./loop.js";
 import type { StoryRoleMaker } from "./writer.js";
@@ -421,8 +423,10 @@ export const ANSWER_UPDATE_CALL_SITE_PREFIX = "ANSWER_UPDATE:" as const;
 
 /** The role an answer-update call site carries, or null for any other key. */
 export function answerUpdateCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
-  const site = ANSWER_UPDATE_CALL_SITE.exec(callSiteKey);
-  return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    const site = ANSWER_UPDATE_CALL_SITE.exec(key);
+    return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+  }, (role) => role === "EVALUATOR");
 }
 
 /** The answer update's call site for a report site and round. */
@@ -437,8 +441,10 @@ export function answerUpdateCallSiteKey(site: ReportSite, round: number): string
 export const PUBLIC_REPORT_CALL_SITE = /^PUBLIC_REPORT:(ANSWER|ANSWER_ASKED|ANSWER_CHECK|STORY|STORY_CHECK):([1-4])$/u;
 export const PUBLIC_REPORT_CALL_SITE_PREFIX = "PUBLIC_REPORT:" as const;
 export function publicReportCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
-  const site = PUBLIC_REPORT_CALL_SITE.exec(callSiteKey);
-  return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    const site = PUBLIC_REPORT_CALL_SITE.exec(key);
+    return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+  }, (role) => role === "EVALUATOR");
 }
 export function publicReportCallSiteKey(site: ReportSite, round: number): string {
   return investigationReportCallSiteKey(site, round).replace(INVESTIGATION_REPORT_CALL_SITE_PREFIX, PUBLIC_REPORT_CALL_SITE_PREFIX);
@@ -453,8 +459,10 @@ export function investigationReportCallSiteKey(site: ReportSite, round: number):
 
 /** The role a report call site carries, or null for any other key. */
 export function investigationReportCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
-  const site = INVESTIGATION_REPORT_CALL_SITE.exec(callSiteKey);
-  return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    const site = INVESTIGATION_REPORT_CALL_SITE.exec(key);
+    return site === null ? null : REPORT_SITE_ROLES[site[1] as ReportSite];
+  }, (role) => role === "EVALUATOR");
 }
 
 /* ----------------------------------------------------------------- the replies */
@@ -641,6 +649,12 @@ export type ReportRunCall = Readonly<{
   checker: StoryRoleMaker;
   backupCandidates: readonly StoryBackupCandidate[];
   backupMakers?: readonly StoryBackupMaker[] | undefined;
+  /**
+   * Who may be the backup checker when the checker's call cannot be completed: absent, the backup writer's lists above. A caller
+   * with no backup writer (`backupCandidates` empty) may still hand these over. The first of another company than the draft's
+   * writer's and the checker's runs the same check, at the checker's call site with ":BACKUP".
+   */
+  checkerBackups?: StoryCheckerBackups;
   material: ReportCallMaterial;
   send: (maker: StoryRoleMaker, request: ProviderCallRequest) => Promise<ProviderCallResult>;
   /** The 100K guard on every packet sent; throws to refuse before sending. */
@@ -710,6 +724,8 @@ function reportRequest(call: StepRun, input: Readonly<{
   bound: Readonly<{ maxAttempts: number; tokenCeiling: number; deadlineMs: number }>;
   classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   revision: Readonly<{ ownDraft: string; problems: string }> | null;
+  /** A backup checker's call: the checker's request at the checker's call site with the backup suffix. */
+  backup?: boolean;
 }>): ProviderCallRequest {
   // F5's one fence is never a reason to fail: a reply that repeated it (an AI reads it in its prompt) would be material here,
   // which the door refuses, so this one call takes a fresh fence and pays the plain price.
@@ -729,7 +745,9 @@ function reportRequest(call: StepRun, input: Readonly<{
   return Object.freeze({
     runId: call.runId,
     subjectItemId: call.subjectItemId,
-    callSiteKey: (call.callSiteOf ?? investigationReportCallSiteKey)(input.site, input.round),
+    callSiteKey: input.backup === true
+      ? backupCheckerCallSiteKey((call.callSiteOf ?? investigationReportCallSiteKey)(input.site, input.round))
+      : (call.callSiteOf ?? investigationReportCallSiteKey)(input.site, input.round),
     role: REPORT_SITE_ROLES[input.site],
     lane: "story" as const,
     preferredResponseFormat: "json_object" as const,
@@ -800,13 +818,14 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
       throw error;
     }
   };
-  const check: StoryLoopDependencies<D>["checkStory"] = async ({ round, candidate }) => {
+  /** The check, by `maker`; a backup checker's (`backup`) at the backup call site. */
+  const checkWith = (maker: StoryRoleMaker, backup: boolean): StoryLoopDependencies<D>["checkStory"] => async ({ round, candidate }) => {
     const reading = rememberingAcceptedReply((content, reply) =>
       decide(content, reply, step.rules.checker, () => [], call.checkerLanguageCheck).classification);
-    const request = reportRequest(call, { site: step.checkerSite, round, providerRef: call.checker.providerRef, contract: step.checkerContract,
+    const request = reportRequest(call, { site: step.checkerSite, round, providerRef: maker.providerRef, contract: step.checkerContract,
       material: step.checkerMaterialOf(candidate), bound: INVESTIGATION_REPORT_POLICY.checkerBound,
-      classifyContent: reading.classifyContent, revision: null });
-    const result = await call.send(call.checker, request);
+      classifyContent: reading.classifyContent, revision: null, backup });
+    const result = await call.send(maker, request);
     const accepted = reading.acceptedAs(result.content);
     const decided = decide(result.content, accepted.reply, step.rules.checker, () => [], undefined);
     if (decided.value === null) throw new TypedDomainError("INVESTIGATION_REPORT_CHECKER_CONTENT_INVALID", decided.classification.parseStatus);
@@ -816,10 +835,18 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
       objection: verdict.satisfied ? null : JSON.stringify({ part: verdict.part, problem: verdict.problem }),
       misleading: step.rules.misleadingOf(verdict)
     });
-    return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, call.checker.providerRef),
+    return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, maker.providerRef),
       verdict: loopVerdict };
   };
-  const first = await runStoryLoop<D>({ maxRounds: call.maxRounds, v4: true }, { writeStory: writeWith(call.writer), checkStory: check });
+  const check = checkWith(call.checker, false);
+  const backups = call.checkerBackups ?? { candidates: call.backupCandidates, makers: call.backupMakers };
+  /** The loop's backup checker; `avoidRefs` names the first writer in the backup writer's loop (it has just failed). */
+  const backupChecker = (avoidRefs: readonly string[]) => storyBackupCheckerOf<D>({
+    candidates: backups.candidates, makers: backups.makers, checkerRef: call.checker.providerRef, avoidRefs,
+    step: `INVESTIGATION_REPORT_${step.checkerSite}`, checkWith: (maker) => checkWith(maker, true), log: call.log
+  });
+  const first = await runStoryLoop<D>({ maxRounds: call.maxRounds, v4: true },
+    { writeStory: writeWith(call.writer), checkStory: check, backupChecker: backupChecker([]) });
   if (!(first.outcome === "FAILED" && first.rounds.length === 0 && firstWrite.failed)) {
     return Object.freeze({ outcome: first, rounds: first.rounds, backup: null });
   }
@@ -835,7 +862,7 @@ async function writeStep<D>(call: StepRun, step: StepCall<D>): Promise<ReportSte
   call.log(STORY_BACKUP_USED, { signal, firstModel: call.writer.providerRef, backupModel: chosen.providerRef,
     step: `INVESTIGATION_REPORT_${step.writerSite}` });
   const second = await runStoryLoop<D>({ maxRounds: call.maxRounds, v4: true, firstRound: call.maxRounds + 1 },
-    { writeStory: writeWith(chosen), checkStory: check });
+    { writeStory: writeWith(chosen), checkStory: check, backupChecker: backupChecker([call.writer.providerRef]) });
   return Object.freeze({ outcome: second, rounds: Object.freeze([...first.rounds, ...second.rounds]), backup });
 }
 

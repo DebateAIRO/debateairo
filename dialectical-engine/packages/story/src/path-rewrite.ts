@@ -3,7 +3,7 @@ import {
   DIG_MODEL_LIMITS, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES, StoryFateSchema, WEB_CONTRACT_LIMITS, type MakerLineage,
   type StoryFate
 } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, backupCheckerCallSiteKey, readWithBackupCheckerKey } from "@debateai/kernel";
 import {
   ANTHROPIC_TOKEN_COUNT,
   buildFramedPrompt,
@@ -28,10 +28,12 @@ import {
   STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
   pickBackupStoryteller,
+  storyBackupCheckerOf,
   storyBackupSignalOf,
   type StoryBackupCandidate,
   type StoryBackupMaker,
-  type StoryBackupRecord
+  type StoryBackupRecord,
+  type StoryCheckerBackups
 } from "./backup.js";
 import { runStoryLoop, storyLoopLastRound, type StoryLoopDependencies, type StoryLoopOutcome, type StoryLoopVerdict } from "./loop.js";
 import type { StoryRoleMaker } from "./writer.js";
@@ -197,11 +199,15 @@ export function pathRewriteCallSiteKey(site: PathRewriteSite, round: number, fam
   return `${family}:${site}:${String(round)}`;
 }
 
-/** The role a climb call site carries, or null for any other key. */
+/** The role a climb call site carries (a backup checker's site its checker's), or null for any other key. */
 export function pathClimbCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
-  const site = PATH_CLIMB_CALL_SITE.exec(callSiteKey);
-  return site === null ? null : PATH_REWRITE_SITE_ROLES[site[1] as PathRewriteSite];
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    const site = PATH_CLIMB_CALL_SITE.exec(key);
+    return site === null ? null : PATH_REWRITE_SITE_ROLES[site[1] as PathRewriteSite];
+  }, isCheckerRole);
 }
+
+const isCheckerRole = (role: "SYNTHESIZER" | "EVALUATOR"): boolean => role === "EVALUATOR";
 
 /**
  * Decision 13: the AI check on a contribution to a public debate, `CONTRIBUTION_CHECK:CHECKER:{n}` (n 1 and 2: the checker, then one of another maker), an EVALUATOR call on the
@@ -224,11 +230,13 @@ export function pathRewriteSuggestCallSiteKey(path: number): string {
   return `PATH_REWRITE:SUGGEST:${String(path)}`;
 }
 
-/** The role a path-rewrite call site carries, or null for any other key. */
+/** The role a path-rewrite call site carries (a backup checker's site its checker's), or null for any other key. */
 export function pathRewriteCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
-  if (PATH_REWRITE_SUGGEST_CALL_SITE.test(callSiteKey)) return "SYNTHESIZER";
-  const site = PATH_REWRITE_CALL_SITE.exec(callSiteKey);
-  return site === null ? null : PATH_REWRITE_SITE_ROLES[site[1] as PathRewriteSite];
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    if (PATH_REWRITE_SUGGEST_CALL_SITE.test(key)) return "SYNTHESIZER";
+    const site = PATH_REWRITE_CALL_SITE.exec(key);
+    return site === null ? null : PATH_REWRITE_SITE_ROLES[site[1] as PathRewriteSite];
+  }, isCheckerRole);
 }
 
 /**
@@ -425,6 +433,11 @@ export type PathRewriteRunCall = Readonly<{
   checker: StoryRoleMaker;
   backupCandidates: readonly StoryBackupCandidate[];
   backupMakers?: readonly StoryBackupMaker[] | undefined;
+  /**
+   * Who may be the backup checker when the checker's call cannot be completed: absent, the backup writer's lists above. The
+   * first of another company than the draft's writer's and the checker's runs the same check at the checker's site with ":BACKUP".
+   */
+  checkerBackups?: StoryCheckerBackups;
   material: PathRewriteCallMaterial;
   /** One call through the run's lease, the replay book and the maker's gateway. */
   send: (maker: StoryRoleMaker, request: ProviderCallRequest) => Promise<ProviderCallResult>;
@@ -455,6 +468,8 @@ function rewriteRequest(call: PathRewriteRunCall, input: Readonly<{
   site: PathRewriteSite; round: number; providerRef: string; contract: PromptContract;
   material: readonly FramedMaterialField[]; classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   revision: Readonly<{ ownDraft: string; problems: string }> | null;
+  /** A backup checker's call: the checker's request at the checker's call site with the backup suffix. */
+  backup?: boolean;
 }>): ProviderCallRequest {
   const framed = buildFramedPrompt({ contract: input.contract, material: input.material });
   const packet = input.revision === null ? framed.packet
@@ -464,7 +479,9 @@ function rewriteRequest(call: PathRewriteRunCall, input: Readonly<{
   return Object.freeze({
     runId: call.runId,
     subjectItemId: call.subjectItemId,
-    callSiteKey: pathRewriteCallSiteKey(input.site, input.round, call.family),
+    callSiteKey: input.backup === true && input.site === "CHECKER"
+      ? backupCheckerCallSiteKey(pathRewriteCallSiteKey(input.site, input.round, call.family))
+      : pathRewriteCallSiteKey(input.site, input.round, call.family),
     role: PATH_REWRITE_SITE_ROLES[input.site],
     lane: "story" as const,
     preferredResponseFormat: "json_object" as const,
@@ -488,7 +505,8 @@ function rewriteRequest(call: PathRewriteRunCall, input: Readonly<{
  * The rewrite's rounds: the writer, then the checker, at most `maxRounds` times (the story's loop, v4 rules: a named
  * problem starts the next round, which revises the writer's own draft); when the first loop ends FAILED with no draft
  * because the first write failed with a backup signal, ONE more loop with a backup writer of another maker than the
- * writer's and the checker's, the same checker, the rounds after the first loop's. Never throws for a provider.
+ * writer's and the checker's, the same checker, the rounds after the first loop's. In either loop, a checker whose call cannot be
+ * completed hands the check to a backup checker of a third company (the loop's rule). Never throws for a provider.
  */
 export async function writePathRewrite(call: PathRewriteRunCall): Promise<PathRewriteWritten> {
   const lastRound = Math.min(storyLoopLastRound(), PATH_REWRITE_LAST_ROUND);
@@ -522,18 +540,27 @@ export async function writePathRewrite(call: PathRewriteRunCall): Promise<PathRe
         throw error;
       }
     };
-  const checkRewrite: StoryLoopDependencies<PathRewriteDraft>["checkStory"] = async ({ round, candidate }) => {
+  /** The check, by `maker`; a backup checker's (`backup`) at the backup call site. */
+  const checkWith = (maker: StoryRoleMaker, backup: boolean): StoryLoopDependencies<PathRewriteDraft>["checkStory"] => async ({ round, candidate }) => {
     const reading = rememberingAcceptedReply((content, reply) =>
       classifyPathRewriteCheckerContent(content, reply, call.checkerLanguageCheck));
-    const request = rewriteRequest(call, { site: "CHECKER", round, providerRef: call.checker.providerRef,
+    const request = rewriteRequest(call, { site: "CHECKER", round, providerRef: maker.providerRef,
       contract: PATH_REWRITE_CHECKER_V2_PROMPT_CONTRACT, material: call.material.checkerOf(candidate),
-      classifyContent: reading.classifyContent, revision: null });
-    const result = await call.send(call.checker, request);
+      classifyContent: reading.classifyContent, revision: null, backup });
+    const result = await call.send(maker, request);
     const accepted = reading.acceptedAs(result.content);
-    return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, call.checker.providerRef),
+    return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, maker.providerRef),
       verdict: parsePathRewriteVerdict(result.content, accepted.reply) };
   };
-  const first = await runStoryLoop<PathRewriteDraft>({ maxRounds: call.maxRounds, v4: true }, { writeStory: writeWith(call.writer), checkStory: checkRewrite });
+  const checkRewrite = checkWith(call.checker, false);
+  const backups = call.checkerBackups ?? { candidates: call.backupCandidates, makers: call.backupMakers };
+  /** The loop's backup checker; `avoidRefs` names the first writer in the backup writer's loop (it has just failed). */
+  const backupChecker = (avoidRefs: readonly string[]) => storyBackupCheckerOf<PathRewriteDraft>({
+    candidates: backups.candidates, makers: backups.makers, checkerRef: call.checker.providerRef, avoidRefs, step: call.family ?? "PATH_REWRITE",
+    checkWith: (maker) => checkWith(maker, true), log: call.log
+  });
+  const first = await runStoryLoop<PathRewriteDraft>({ maxRounds: call.maxRounds, v4: true },
+    { writeStory: writeWith(call.writer), checkStory: checkRewrite, backupChecker: backupChecker([]) });
   if (!(first.outcome === "FAILED" && first.rounds.length === 0 && firstWrite.failed)) {
     return Object.freeze({ outcome: first, rounds: first.rounds, backup: null });
   }
@@ -548,7 +575,7 @@ export async function writePathRewrite(call: PathRewriteRunCall): Promise<PathRe
   const backup: StoryBackupRecord = Object.freeze({ code: STORY_BACKUP_USED, signal, firstModel: call.writer.providerRef });
   call.log(STORY_BACKUP_USED, { signal, firstModel: call.writer.providerRef, backupModel: chosen.providerRef, step: "PATH_REWRITE" });
   const second = await runStoryLoop<PathRewriteDraft>({ maxRounds: call.maxRounds, v4: true, firstRound: call.maxRounds + 1 },
-    { writeStory: writeWith(chosen), checkStory: checkRewrite });
+    { writeStory: writeWith(chosen), checkStory: checkRewrite, backupChecker: backupChecker([call.writer.providerRef]) });
   return Object.freeze({ outcome: second, rounds: Object.freeze([...first.rounds, ...second.rounds]), backup });
 }
 
