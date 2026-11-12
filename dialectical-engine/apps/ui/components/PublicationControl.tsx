@@ -124,6 +124,9 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
       focusNext.current = () => toggle.current;
       setMessage(t(catalog, "public.publication.publishedSuccess"));
     } catch (failure) {
+      // Keyboard audit 2026-11-12: the refusal shows at the top of the card, while the check below has emptied itself:
+      // focus goes to the card's heading, the answer just under it (the removed-by-check notice takes focus itself).
+      if (!(failure instanceof ContractHttpError && failure.serverCode === "DEBATE_REMOVED_BY_CHECK")) focusNext.current = () => null;
       if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_REMOVED_BY_CHECK") {
         onRemovedByCheck?.();
       } else if (failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_APPROVAL_REQUIRED") {
@@ -169,6 +172,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
         ? t(catalog, "public.publication.deletedCleaned")
         : t(catalog, "public.publication.deletionPending"));
     } catch (failure) {
+      focusNext.current = () => null; // the heading, its refusal line just under it (as a refused publish)
       if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_MUST_BE_PRIVATE") {
         setMessage(t(catalog, "public.publication.mustBePrivate"));
       } else if (failure instanceof ContractHttpError && failure.serverCode === "LEGACY_CONTENT_RETAINED") {

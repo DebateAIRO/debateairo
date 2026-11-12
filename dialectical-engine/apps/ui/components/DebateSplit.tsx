@@ -8,6 +8,7 @@ import { findNodePathById, partitionArgumentChildren, perspectiveChildren } from
 import { ReferenceAuthorPill, ReferenceReviewLine, ReferenceScoreBadges } from "@/components/ReferenceNodeMeta";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
+import { focusIsLost } from "@/lib/focusGuard";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
@@ -108,8 +109,7 @@ export function DebateSplit({
     shownFocusId.current = focus.id;
     const picked = pickedFocusId.current === focus.id;
     pickedFocusId.current = null;
-    const lost = document.activeElement === null || document.activeElement === document.body;
-    if (picked || lost) focusHeadingRef.current?.focus();
+    if (picked || focusIsLost()) focusHeadingRef.current?.focus();
   }, [focus.id]);
   const ancestors = path.slice(0, -1);
 

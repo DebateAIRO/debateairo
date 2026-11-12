@@ -45,6 +45,14 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [signInAgain, setSignInAgain] = useState<string | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
     const announcer = useFormAnnouncer();
+    // Keyboard audit 2026-11-12: a refused password + code disabled both fields while it ran, so focus fell to
+    // <body>. Bumped on a refusal; the effect runs once the fields are enabled again.
+    const passwordField = useRef<HTMLInputElement>(null);
+    const [refocusPassword, setRefocusPassword] = useState(0);
+    useEffect(() => {
+        if (refocusPassword)
+            passwordField.current?.focus();
+    }, [refocusPassword]);
     useEffect(() => {
         sequence.current++;
         browser.cancel();
@@ -126,6 +134,14 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         }
         catch (failure) {
             if (owner === sequence.current) {
+                const ended = failure instanceof ContractHttpError && (failure.serverCode === 'SESSION_REQUIRED' || failure.serverCode === 'COOKIE_SESSION_REQUIRED');
+                if (!ended && failure instanceof ContractHttpError && (failure.status === 401 || failure.status === 429)) {
+                    // The server never says whether the password or the code was wrong, so the password comes first;
+                    // the old code goes, and typing the same six digits again is a new attempt.
+                    setCode('');
+                    attempt.current.edited();
+                    setRefocusPassword(n => n + 1);
+                }
                 if (onError)
                     onError(failure);
                 else if (failure instanceof ContractHttpError && (failure.serverCode === 'SESSION_REQUIRED' || failure.serverCode === 'COOKIE_SESSION_REQUIRED')) {
@@ -224,7 +240,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                         const data = new FormData(e.currentTarget);
                         void passwordProof(readSixDigitCode(String(data.get('security-code') ?? '')).digits, String(data.get('security-password') ?? ''));
                     }}>
- <div className="setField authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input ref={passwordField} id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
                         setPassword(e.target.value);
                         attempt.current.edited();
                     }}/></div>

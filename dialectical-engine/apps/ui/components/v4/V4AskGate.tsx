@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
 import { contractClient, validateSession } from "@/lib/api";
+import { focusIsLost } from "@/lib/focusGuard";
 import type { MessageCatalog } from "@/lib/i18n/translate";
 
 /*
@@ -34,6 +35,11 @@ export function V4AskGate({ catalog, locale, children }: Readonly<{
 }>) {
   const [session, setSession] = useState<V4Session>("CHECKING");
   const [legal, setLegal] = useState<"UNKNOWN" | "CLEAR" | "OWED">("UNKNOWN");
+  const page = useRef<HTMLDivElement>(null);
+  // Keyboard audit 2026-11-12 (V4A-14): what had focus in the page as it hid. Once accepted, the accept screen and its
+  // pressed button are gone: focus goes back there, or to the page's question box, not to the page as a whole.
+  const keptFocus = useRef<HTMLElement | null>(null);
+  const owed = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -55,15 +61,33 @@ export function V4AskGate({ catalog, locale, children }: Readonly<{
     if (session !== "IN") return;
     let active = true;
     void Promise.resolve().then(() => contractClient.getLegalStatus(locale)).then(
-      (status) => { if (active) setLegal(status.must_accept.length === 0 ? "CLEAR" : "OWED"); },
+      (status) => {
+        if (!active) return;
+        const owes = status.must_accept.length > 0;
+        if (owes) {
+          const held = document.activeElement;
+          keptFocus.current = held instanceof HTMLElement && page.current?.contains(held) === true ? held : null;
+        }
+        setLegal(owes ? "OWED" : "CLEAR");
+      },
       () => { if (active) setLegal("CLEAR"); }
     );
     return () => { active = false; };
   }, [session, locale]);
 
+  useEffect(() => {
+    if (legal === "OWED") owed.current = true;
+    if (legal !== "CLEAR" || !owed.current) return;
+    owed.current = false;
+    if (!focusIsLost()) return;
+    const kept = keptFocus.current;
+    keptFocus.current = null;
+    (kept?.isConnected === true ? kept : page.current?.querySelector<HTMLElement>("textarea"))?.focus();
+  }, [legal]);
+
   return (
     <>
-      <div className="v4AskGate" hidden={legal === "OWED"}>{children(session)}</div>
+      <div ref={page} className="v4AskGate" hidden={legal === "OWED"}>{children(session)}</div>
       {legal === "OWED" ? (
         <LegalAcceptGate catalog={catalog}>
           <AcceptCleared onCleared={() => setLegal("CLEAR")} />

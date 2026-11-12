@@ -243,7 +243,7 @@ export function V4BottomStack(props: Readonly<{
         {showGoodTime ? (
           <div className="v4StackGoodTime" role="note">
             <p className="v4StackGoodText">{t(catalog, "v4.bar.goodTime")}</p>
-            {job.kind === "report" ? null : writeReport("v4Btn v4BtnPrimary v4StackGoodReport")}
+            {/* CSS-8 (keyboard audit 2026-11-12): in the order they are seen, so Tab reaches the × before the button under it. */}
             <button
               type="button"
               className="v4StackGoodClose"
@@ -252,6 +252,7 @@ export function V4BottomStack(props: Readonly<{
             >
               <span aria-hidden="true">×</span>
             </button>
+            {job.kind === "report" ? null : writeReport("v4Btn v4BtnPrimary v4StackGoodReport")}
           </div>
         ) : null}
         {props.strip}

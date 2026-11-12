@@ -13,6 +13,7 @@ import {
 } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { TAB_PREFIX_ATTRIBUTE } from "@/components/DocumentTitle";
+import { focusIsLost, isFocusParked } from "@/lib/focusGuard";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4BottomStack, type V4BarJob } from "@/components/v4/V4BottomStack";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
@@ -1222,8 +1223,15 @@ function V4Debate({
   }, [layout, openQuestion]);
 
   useEffect(() => {
-    if (focusRequest > 0) headingRef.current?.focus();
+    // Keyboard audit 2026-11-12 (V4B-F5): during the run "Your question" takes the panel away, so focus goes to the
+    // question's card on the map instead.
+    if (focusRequest > 0) (headingRef.current ?? firstCardHeading())?.focus();
   }, [focusRequest]);
+  // V4B-M2: "Choose what to dig ›" on the map: once the path's panel is drawn, its choices come into view with focus.
+  const [choicesRequest, setChoicesRequest] = useState(0);
+  useEffect(() => {
+    if (choicesRequest > 0) showChoices(panelColRef.current, "choices");
+  }, [choicesRequest]);
 
   // R2TIME-4/R2REG-4, the wave-2 browser check (4 Nov): closing the phone map puts focus back on what opened it (the Map
   // button, "Your picks ▸" or the minimap), unless a row already moved it on to the panel heading (the effect above runs
@@ -1462,6 +1470,8 @@ function V4Debate({
     select,
     hideNews: () => setHiddenNews(news.length),
     focusHeading: () => headingRef.current?.focus(),
+    // V4B-F2 (keyboard audit 2026-11-12): the ready note's ✕ gives focus back where the dig notes do (focusBack, below).
+    returnFocus: () => focusBack(),
     reportHref,
     // Task 62 (wait-f10): a short answer that came after the page had stopped waiting for it.
     shortAnswerLate,
@@ -1549,6 +1559,37 @@ function V4Debate({
 
   // wait-f4: the tab title's state word ("Looking into it", "Ready", "(1) changed"), read by DocumentTitle.
   const tabPrefix = ready.tabPrefix === "" ? {} : { [TAB_PREFIX_ATTRIBUTE]: ready.tabPrefix };
+  // Keyboard audit 2026-11-12 (V4B-F6, V4B-F7): a screen before the map (couldn't load, stopped, the R22 first card) is swapped
+  // whole when a read answers, and takes the focused control with it. When focus was in that screen and nothing holds it
+  // now, it goes to the new screen's heading, or to the map's question card. Never on a first load: focus was not there.
+  const screen = map === null && load === null && loadProblem === null ? "outline" : map === null && runMap === null
+    ? `centre:${load?.kind === "RUN" ? load.run.state : loadProblem}` : "map";
+  const focusInScreen = useRef(false);
+  useEffect(() => {
+    const note = (event: FocusEvent): void => {
+      // The site's focus guard keeping the place (an outline holds nothing to focus) is no move of the person's.
+      if (event.target instanceof Element && !isFocusParked(event.target)) focusInScreen.current = event.target.closest(".v4DebCentre") !== null;
+    };
+    // A press with a pointer outside the screen: the person has left it, whether or not the press focused anything.
+    const left = (event: PointerEvent): void => {
+      if (!(event.target instanceof Element) || event.target.closest(".v4DebCentre") === null) focusInScreen.current = false;
+    };
+    document.addEventListener("focusin", note);
+    document.addEventListener("pointerdown", left);
+    return () => {
+      document.removeEventListener("focusin", note);
+      document.removeEventListener("pointerdown", left);
+    };
+  }, []);
+  const shownScreen = useRef(screen);
+  useEffect(() => {
+    if (shownScreen.current === screen) return;
+    shownScreen.current = screen;
+    if (screen === "outline" || !focusInScreen.current || !focusIsLost()) return;
+    const title = document.querySelector<HTMLElement>(".v4DebCentre h1");
+    if (title !== null && !title.hasAttribute("tabindex")) title.setAttribute("tabindex", "-1");
+    (title ?? firstCardHeading() ?? headingRef.current)?.focus();
+  }, [screen]);
   if (loadProblem === "SIGNED_OUT" && map === null) {
     // wait-f1: the sign-in ended (on the waiting card, or before the first read): sign in again, and come back here.
     return (
@@ -1735,6 +1776,7 @@ function V4Debate({
     changed,
     picked,
     onSelect: select,
+    onChooseWhat: () => setChoicesRequest((count) => count + 1),
     onTogglePick: togglePick,
     catalog,
     locale,
@@ -1851,7 +1893,8 @@ function V4Debate({
       locale={locale}
       narrow={layout === "phone"}
       hereRunId={servedRunId}
-      onSeeIt={(_entry, childRunId) => select(`dig:${childRunId}`, false)}
+      // V4C-5: the press removes See it (the dig is now open), so focus goes on to the panel heading as a keyboard press does.
+      onSeeIt={(_entry, childRunId) => select(`dig:${childRunId}`, true)}
       viewingDig={shownSelection}
       returnFocus={focusBack}
     />
@@ -1964,6 +2007,8 @@ function V4Debate({
               sinceLastVisit={hiddenNews < visitNewsCount}
               onSee={ready.notice.onSee}
               onDismiss={() => setHiddenNews(news.length)}
+              // V4B-F1 (keyboard audit 2026-11-12): with nothing left of the section, focus goes on to the map's question card.
+              focusAfter={firstCardHeading}
               results={pathResults(map)}
               catalog={catalog}
             />

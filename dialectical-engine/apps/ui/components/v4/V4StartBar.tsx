@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type MouseEvent, type ReactNode, type RefObject } from "react";
 import type { StartStepRoom } from "@debateai/contract";
+import { useModalSurface } from "@/components/consent/modalSemantics";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { SHARE_DELTA_SHOW_MS, shareDeltaLine, startPathsShareLine } from "@/lib/v4/money";
 import { DIG_MODES, type DigMode, type ReadingLevel } from "@/lib/v4/types";
@@ -176,6 +177,27 @@ function useShareDelta(percent: number | null, delta: number | null): number | n
   return shown;
 }
 
+/**
+ * Keyboard audit 2026-11-12 (V4A-16, WCAG 2.4.11): the bar's real height on the page root (--v4-start-bar-room, as the map
+ * page's stack publishes --v4-stack-room). While the bar is pinned, v4-ask.css keeps that much of the window's foot free, so
+ * a control the keyboard reaches is scrolled clear of the bar, never under it.
+ */
+function useBarRoom(ref: RefObject<HTMLDivElement | null>, narrow: boolean): void {
+  useEffect(() => {
+    const element = ref.current;
+    const root = document.documentElement;
+    if (element === null) return undefined;
+    const set = (): void => root.style.setProperty("--v4-start-bar-room", `${Math.ceil(element.getBoundingClientRect().height)}px`);
+    set();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty("--v4-start-bar-room");
+    };
+  }, [ref, narrow]);
+}
+
 /** Task 75b: the bar's two jobs, Start on step 2 (Task 75) and Next on step 1. */
 export function V4StartBar(props: V4StartBarProps | V4NextBarProps) {
   return props.job === "NEXT" ? <NextBar {...props} /> : <StartBar {...props} />;
@@ -195,14 +217,13 @@ function StartBar(props: V4StartBarProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const optionsButton = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
-  const wasOpen = useRef(false);
+  const barBox = useRef<HTMLDivElement>(null);
+  useBarRoom(barBox, narrow);
+  const closeSheet = (): void => setSheetOpen(false);
 
-  // The sheet takes focus when it opens and gives it back to "Options" when it closes (Done or Escape).
-  useEffect(() => {
-    if (sheetOpen) sheet.current?.focus();
-    else if (wasOpen.current) optionsButton.current?.focus();
-    wasOpen.current = sheetOpen;
-  }, [sheetOpen]);
+  // The sheet takes focus when it opens and gives it back to "Options" when it closes (Done or Escape). Keyboard audit
+  // 2026-11-12 (V4A-11): it is aria-modal, so the shared modal surface also keeps Tab and Shift+Tab inside it.
+  useModalSurface(sheetOpen, { containerRef: sheet, initialFocusRef: sheet, onClose: closeSheet, returnFocusRef: optionsButton });
   // A computer has no sheet: one left open when the page widens is closed.
   useEffect(() => {
     if (!narrow) setSheetOpen(false);
@@ -308,7 +329,7 @@ function StartBar(props: V4StartBarProps) {
     return (
       <>
         {above}
-        <div className={`v4StartBar${aside}`}>
+        <div ref={barBox} className={`v4StartBar${aside}`}>
           {combineLine}
           {readyButton}
           <p className="v4StartBarGet">{youGet}</p>
@@ -332,17 +353,11 @@ function StartBar(props: V4StartBarProps) {
     share
   ].filter((part) => part !== null);
   const slim = combineLine !== null;
-  const closeSheet = (): void => setSheetOpen(false);
-  const sheetKeys = (event: KeyboardEvent<HTMLDivElement>): void => {
-    if (event.key !== "Escape") return;
-    event.stopPropagation();
-    closeSheet();
-  };
 
   return (
     <>
       {above}
-      <div className={`v4StartBar v4StartBar--phone${slim ? " v4StartBar--slim" : ""}${aside}`}>
+      <div ref={barBox} className={`v4StartBar v4StartBar--phone${slim ? " v4StartBar--slim" : ""}${aside}`}>
         {publicNotice}
         {slim ? <div className="v4StartBarCombine">{combineLine}</div> : (
           <div className="v4StartBarLine">
@@ -374,7 +389,6 @@ function StartBar(props: V4StartBarProps) {
           aria-modal="true"
           aria-labelledby={`${ids}-sheet`}
           tabIndex={-1}
-          onKeyDown={sheetKeys}
         >
           <h2 id={`${ids}-sheet`} className="v4StartSheetTitle">{t(catalog, "v4.start.options")}</h2>
           <p className="v4StartBarGet">{youGet}</p>
@@ -427,6 +441,8 @@ function NextPress({ press, className, pressable, linkRef, children }: Readonly<
  */
 function NextBar(props: V4NextBarProps) {
   const { catalog, justAnswer, next, declined, under, publicNotice, above, narrow, textFocused, helpFirst } = props;
+  const barBox = useRef<HTMLDivElement>(null);
+  useBarRoom(barBox, narrow);
   // ask-f3: crisis words keep Next and the link pressable, for the help screen alone, whatever greys them.
   const nextButton = (
     <NextPress press={next} className="v4Btn v4BtnPrimary v4StartBarNext" pressable={helpFirst || !next.disabled} linkRef={next.linkRef}>
@@ -444,7 +460,7 @@ function NextBar(props: V4NextBarProps) {
       <>
         {above}
         {declined}
-        <div className={`v4StartBar v4StartBar--phone v4StartBar--nextPhone v4AskActions${aside}`}>
+        <div ref={barBox} className={`v4StartBar v4StartBar--phone v4StartBar--nextPhone v4AskActions${aside}`}>
           {publicNotice}
           {nextButton}
           {justLink}
@@ -456,7 +472,7 @@ function NextBar(props: V4NextBarProps) {
   return (
     <>
       {publicNotice}
-      <div className={`v4StartBar v4StartBar--next v4AskActions${aside}`}>
+      <div ref={barBox} className={`v4StartBar v4StartBar--next v4AskActions${aside}`}>
         {nextButton}
         {declined}
         {justLink}

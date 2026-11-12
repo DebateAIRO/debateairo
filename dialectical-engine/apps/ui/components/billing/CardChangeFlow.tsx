@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ContractHttpError, postcodeOptional, type BillingCurrency, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
+import { focusIsLost } from "@/lib/focusGuard";
 import { countryName, formatMoney } from "@/lib/billing/format";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -104,6 +105,9 @@ export function CardChangeFlow({
         : code === "BILLING_ADDRESS_REQUIRED" ? "billing.checkout.detailsRequired"
         : code === "PAYMENT_PROVIDER_UNAVAILABLE" ? "billing.checkout.formUnavailable"
         : "billing.checkout.genericError");
+      // Keyboard audit 2026-11-12: a refused phone is fixed in its field, above the button: focus goes there.
+      if (code === "BILLING_PHONE_INVALID" && (focusIsLost() || document.activeElement?.matches(":disabled")))
+        document.getElementById("card-phone")?.focus();
     }
   }
 

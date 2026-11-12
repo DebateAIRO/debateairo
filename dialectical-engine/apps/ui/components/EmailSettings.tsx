@@ -9,6 +9,7 @@ import {
 } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { focusIsLost } from "@/lib/focusGuard";
 import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
 import {useSelectedAuthCatalog} from '@/components/AuthShell';
 import { isMailAddress } from "@debateai/kernel";
@@ -78,8 +79,7 @@ export function EmailSettingsCard({
   // email (the heading again when a change is pending). It is left alone once the person has moved on.
   useEffect(() => {
     if (!restore.current) return;
-    const focused = document.activeElement;
-    if (focused !== null && focused !== document.body && focused !== heading.current) { restore.current = false; return; }
+    if (!focusIsLost() && document.activeElement !== heading.current) { restore.current = false; return; }
     (change.current ?? heading.current)?.focus();
     if (account !== null || failed) restore.current = false;
   }, [account, failed]);
@@ -224,6 +224,24 @@ export function ChangeEmailScreen({
     if (back && back !== document.body && back.isConnected && !back.matches(":disabled")) back.focus();
     else title.current?.focus();
   });
+  // Keyboard audit 2026-11-12: Enter in a field opens the check and switches that field off, so focus moves to the
+  // check's first choice (its methods load after it opens). The send button stays on, and keeps its focus.
+  const screen = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const host = screen.current;
+    if (!confirming || host === null) return;
+    const firstChoice = (): boolean => {
+      const lost = focusIsLost() || document.activeElement?.matches(":disabled") === true;
+      if (!lost) return true;
+      const choice = host.querySelector<HTMLButtonElement>(".authSecurityConfirmation .authSecurityActions button:not(:disabled)");
+      choice?.focus();
+      return choice !== null;
+    };
+    if (firstChoice()) return;
+    const observer = new MutationObserver(() => { if (firstChoice()) observer.disconnect(); });
+    observer.observe(host, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [confirming]);
 
   const normalized = normalizedAddress(newEmail);
   const newCheck: FieldCheck = newEmail.trim() === ""
@@ -276,7 +294,7 @@ export function ChangeEmailScreen({
   const confirmMessage = confirmCheck === "mismatch" ? checkMessage(confirmCheck) : null;
 
   return (
-    <div className="screen scroll setScreen emlScreen">
+    <div className="screen scroll setScreen emlScreen" ref={screen}>
       <div className="emlScreenBody">
         <div className="emlScreenInner">
           <button type="button" className="emlBack" onClick={onBack}>{t(catalog, "settings.emailChange.back")}</button>

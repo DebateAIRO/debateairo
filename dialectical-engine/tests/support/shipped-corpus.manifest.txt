@@ -588,6 +588,7 @@ apps/ui/components/EmailSettings.tsx
 apps/ui/components/EvaluatorDevMenu.tsx
 apps/ui/components/ExportDownloadClient.tsx
 apps/ui/components/FloorAnswer.tsx
+apps/ui/components/FocusGuard.tsx
 apps/ui/components/GuideModal.tsx
 apps/ui/components/HarmHelpLine.tsx
 apps/ui/components/InvestigationDrawer.tsx
@@ -679,6 +680,7 @@ apps/ui/components/consent/PrivacyPolicyModal.tsx
 apps/ui/components/consent/TermsOfServiceModal.tsx
 apps/ui/components/consent/canadaLegalLanguage.ts
 apps/ui/components/consent/modalSemantics.ts
+apps/ui/components/consent/useConsentBarRoom.ts
 apps/ui/components/consent/useConsentCatalog.ts
 apps/ui/components/consent/useLegalDocument.ts
 apps/ui/components/debateReferenceDesign.chrome.source-test.mjs
@@ -819,6 +821,7 @@ apps/ui/lib/debateTreeUtils.ts
 apps/ui/lib/dob/dobLocale.ts
 apps/ui/lib/edgeUpgrade.test.mjs
 apps/ui/lib/endSession.ts
+apps/ui/lib/focusGuard.ts
 apps/ui/lib/format.ts
 apps/ui/lib/i18n/I18nProvider.tsx
 apps/ui/lib/i18n/auth.test.mjs

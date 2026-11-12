@@ -12,6 +12,7 @@ import { V4OtherPages, V4SearchNote, V4SourceList, V4WebNoteLine } from "@/compo
 import { V4TrustBar } from "@/components/v4/V4TrustBar";
 import { V4WaitCard } from "@/components/v4/V4WaitCard";
 import { isNotFound } from "@/lib/api";
+import { focusIsLost } from "@/lib/focusGuard";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pathTrustWord } from "@/lib/report/pathTrust";
 import { STORY_POLLING, unreadableStory } from "@/lib/v3/useAnswerStory";
@@ -219,6 +220,8 @@ type Investigation = Readonly<{
   reread: () => Promise<InvestigationReports | null>;
   /** report-f2's Try again: the first read again. */
   retry: () => void;
+  /** That read is on its way: the card stays, its button says it is busy, and a press meanwhile sends nothing. */
+  retryBusy: boolean;
   /** report-f8's Check again while a version is being written. */
   checkNow: () => void;
   /** report-f7: this page is about to send its own "Write my report" (the version it begins started writing then). */
@@ -242,6 +245,9 @@ type Investigation = Readonly<{
 function useInvestigation(runId: string | null): Investigation {
   const [state, setState] = useState<InvestigationState>({ kind: "LOADING" });
   const [attempt, setAttempt] = useState(0);
+  /** Keyboard audit 2026-11-12 (V4C-7): Try again keeps the failed card (and its focused button) until the read answers. */
+  const retrying = useRef(false);
+  const [retryBusy, setRetryBusy] = useState(false);
   const forRun = useRef(runId);
   forRun.current = runId;
   // Review F1: a version may wait 20 to 40 minutes for a dig, and its `closed_at` is when "Write my report" was pressed, so
@@ -276,16 +282,25 @@ function useInvestigation(runId: string | null): Investigation {
   }, []);
 
   useEffect(() => {
-    setState({ kind: "LOADING" });
+    if (!retrying.current) {
+      setState({ kind: "LOADING" });
+      setRetryBusy(false);
+    }
+    retrying.current = false;
     if (runId === null) return;
     let active = true;
     Promise.resolve().then(() => loadInvestigation(runId)).then(
       (read) => {
         if (!active) return;
+        setRetryBusy(false);
         if (read === null) setState({ kind: "FAILED" });
         else apply(read);
       },
-      () => { if (active) setState({ kind: "FAILED" }); }
+      () => {
+        if (!active) return;
+        setRetryBusy(false);
+        setState({ kind: "FAILED" });
+      }
     );
     return () => { active = false; };
   }, [runId, attempt, apply]);
@@ -357,7 +372,12 @@ function useInvestigation(runId: string | null): Investigation {
   return {
     state,
     reread,
-    retry: () => setAttempt((value) => value + 1),
+    retry: () => {
+      retrying.current = true;
+      setRetryBusy(true);
+      setAttempt((value) => value + 1);
+    },
+    retryBusy,
     checkNow: () => check.current(),
     notePress: () => { pressedAt.current = Date.now(); },
     writingSince,
@@ -667,6 +687,17 @@ function ReportBody({ id, locale, catalog }: Readonly<{
   const drawnFor = useRef<string | null>(null);
   if (readable && digsReady) drawnFor.current = target;
   const ready = readable && (digsReady || drawnFor.current === target);
+  // Keyboard audit 2026-11-12 (V4C-9): "Try again" on a page that could not load gives way to "Loading…", then to the report:
+  // focus goes to its title, unless it moved on meanwhile (else it would be left on the page as a whole).
+  const pageRetried = useRef(false);
+  useEffect(() => {
+    if (!ready || !pageRetried.current) return;
+    pageRetried.current = false;
+    const title = document.getElementById("v4-report-title");
+    if (title === null || !focusIsLost()) return;
+    if (!title.hasAttribute("tabindex")) title.setAttribute("tabindex", "-1");
+    title.focus();
+  }, [ready]);
   const share: ReportShareItem[] = [];
   if (ready && current !== null && pdfCheck === "OFFERED") {
     share.push({ id: "pdf", label: t(catalog, "v4.investigation.downloadVersion", { n: current }), onSelect: () => void savePdfNow() });
@@ -712,7 +743,16 @@ function ReportBody({ id, locale, catalog }: Readonly<{
           {load.kind === "ERROR" ? (
             <>
               <p role="alert">{t(catalog, "v4.report.loadFailed")}</p>
-              <button type="button" className="v4Btn" onClick={() => setAttempt((value) => value + 1)}>{t(catalog, "v4.common.retry")}</button>
+              <button
+                type="button"
+                className="v4Btn"
+                onClick={() => {
+                  pageRetried.current = true;
+                  setAttempt((value) => value + 1);
+                }}
+              >
+                {t(catalog, "v4.common.retry")}
+              </button>
             </>
           ) : null}
           {load.kind === "NOT_FOUND" ? (
@@ -1110,6 +1150,14 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
   useEffect(() => {
     if (focusAsked > 0) statusRef.current?.focus();
   }, [focusAsked]);
+  // Keyboard audit 2026-11-12 (V4C-7): the read Try again asked for answered, and took the button away: focus goes to the
+  // versions' status, as after a press, unless it moved on meanwhile.
+  const retried = useRef(false);
+  useEffect(() => {
+    if (!retried.current || investigation.state.kind === "LOADING") return;
+    retried.current = false;
+    if (focusIsLost()) statusRef.current?.focus();
+  }, [investigation.state]);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -1131,6 +1179,10 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
 
   // report-f6: a press that fails may still have reached the server (its reply was lost), so the page never says nothing
   // was used: it says it could not confirm, reads the versions again at once, and offers Try again only when nothing started.
+  // Keyboard audit 2026-11-12 (V4C-10): a press runs for a while (a dig's Undo window, the send, a read), so its buttons are
+  // never natively disabled meanwhile: focus stays on the pressed one, which says it is busy, and a press then does nothing
+  // (the map's strip, ACCESS-6).
+  const pressBusy = busy ? { "aria-disabled": "true" as const, "aria-busy": "true" as const } : {};
   const press = async (kind: PressKind): Promise<void> => {
     setBusy(true);
     setNote(null);
@@ -1178,7 +1230,9 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
       </p>
       {note.checking ? null : (
         <div className="v4RepActions">
-          <button type="button" className="v4Btn" disabled={busy} onClick={() => void press(note.kind)}>{t(catalog, "v4.common.retry")}</button>
+          <button type="button" className="v4Btn" {...pressBusy} onClick={() => { if (!busy) void press(note.kind); }}>
+            {t(catalog, "v4.common.retry")}
+          </button>
         </div>
       )}
     </div>
@@ -1189,9 +1243,11 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
   const lineShown = waiting || refusedWait;
   const writeButton = (label: string) => (
     <>
-      <button type="button" className={`v4Btn v4BtnPrimary v4RepWrite${waiting ? " v4DigWaiting" : ""}`} disabled={busy}
-        aria-disabled={waiting ? "true" : undefined} aria-describedby={lineShown ? REPORT_WAITS_LINE : undefined}
+      <button type="button" className={`v4Btn v4BtnPrimary v4RepWrite${waiting ? " v4DigWaiting" : ""}`}
+        aria-disabled={waiting || busy ? "true" : undefined} aria-busy={busy ? "true" : undefined}
+        aria-describedby={lineShown ? REPORT_WAITS_LINE : undefined}
         onClick={() => {
+          if (busy) return;
           if (waiting) {
             replayHighlight(document.getElementById(REPORT_WAITS_LINE));
             return;
@@ -1215,7 +1271,17 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
         {noteLine}
         {publicLine}
         <div className="v4RepActions">
-          <button type="button" className="v4Btn" onClick={investigation.retry}>{t(catalog, "v4.common.retry")}</button>
+          <button
+            type="button"
+            className="v4Btn"
+            aria-disabled={investigation.retryBusy ? "true" : undefined}
+            aria-busy={investigation.retryBusy ? "true" : undefined}
+            onClick={() => {
+              if (investigation.retryBusy) return;
+              retried.current = true;
+              investigation.retry();
+            }}
+          >{t(catalog, "v4.common.retry")}</button>
           {writeButton(t(catalog, "v4.rail.writeReport"))}
         </div>
       </div>
@@ -1239,7 +1305,7 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
       <div className="v4RepActions v4RepNoPrint">
         {canWrite ? writeButton(t(catalog, newest?.state === "FAILED" ? "v4.investigation.writeAgain" : "v4.rail.writeReport")) : null}
         {canKeepDigging ? (
-          <button type="button" className="v4Btn v4RepKeepDigging" disabled={busy} onClick={() => void press("reopen")}>
+          <button type="button" className="v4Btn v4RepKeepDigging" {...pressBusy} onClick={() => { if (!busy) void press("reopen"); }}>
             {t(catalog, "v4.investigation.keepDigging")}
           </button>
         ) : null}

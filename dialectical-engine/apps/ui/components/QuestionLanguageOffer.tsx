@@ -59,12 +59,30 @@ export function LanguageOfferStrip({
         >
           {fill(t(catalog, "chrome.languageOffer.switch"), { language })}
         </button>
-        <button type="button" className="languageOfferDismiss" onClick={() => dismissLanguageOffer(code)}>
+        <button type="button" className="languageOfferDismiss" onClick={(event) => {
+          // Keyboard audit 2026-11-12: "No, thanks" takes the whole strip away, so focus goes on to what follows it on
+          // the page (the story strip, the views); with nothing after it, the site's focus guard keeps the place.
+          const next = nextFocusableAfter(event.currentTarget.closest(".languageOffer"));
+          if (document.activeElement === event.currentTarget) next?.focus();
+          dismissLanguageOffer(code);
+        }}>
           {t(catalog, "chrome.languageOffer.dismiss")}
         </button>
       </div>
     </section>
   );
+}
+
+/** What can take focus, in page order (the strip's own wrapper on the debate page holds the rest of the page). */
+const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
+/** The first control after `strip` inside its wrapper, skipping what is inert or hidden; null when there is none. */
+function nextFocusableAfter(strip: Element | null): HTMLElement | null {
+  const wrapper = strip?.parentElement;
+  if (!strip || !wrapper) return null;
+  return [...wrapper.querySelectorAll<HTMLElement>(FOCUSABLE)].find((candidate) =>
+    !strip.contains(candidate) && (strip.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+      && candidate.closest('[inert], [hidden], [aria-hidden="true"]') === null) ?? null;
 }
 
 type OfferState = "unchecked" | "offered" | "dismissed";

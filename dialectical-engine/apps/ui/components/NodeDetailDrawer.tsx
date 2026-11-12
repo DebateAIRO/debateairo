@@ -170,7 +170,9 @@ export function NodeDetailDrawer({
     shownNodeId.current = node.id;
     const dialog = dialogRef.current;
     if (dialog === null) return;
-    dialog.scrollTop = 0;
+    // The body is the drawer's scroller; the panel itself does not scroll.
+    const body = dialog.querySelector<HTMLElement>(":scope > .drawerBody");
+    if (body !== null) body.scrollTop = 0;
     dialog.focus();
   }, [node.id, dialogRef]);
   const { locale } = useChromeI18n();
@@ -291,7 +293,8 @@ export function NodeDetailDrawer({
           </button>
         </div>
 
-        <div className="drawerBody">
+        {/* A Tab stop of its own: the body is what scrolls (keyboard audit 2026-11-12). */}
+        <div className="drawerBody" tabIndex={0} role="region" aria-label={t(catalog, "debateDrawers.node.argumentDetail")}>
           <div className="drawerIntro">
           {v3 ? (
             <div className="nodeEyebrow drawerWayOfKnowing" data-drawer-way-of-knowing>

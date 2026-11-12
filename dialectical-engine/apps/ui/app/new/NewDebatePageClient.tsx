@@ -208,7 +208,7 @@ function NewDebateForm({
   const topicField = useRef<HTMLTextAreaElement | null>(null);
   const consent = useSensitiveDataConsent({ catalog: homeCatalog, locale, returnFocusRef: topicField });
   const crisis = useCrisisSupport({ catalog: homeCatalog, locale, countryHint: crisisCountryHint, returnFocusRef: topicField });
-  const questionRefusal = useQuestionRefusal({ catalog: homeCatalog, locale, countryHint: crisisCountryHint });
+  const questionRefusal = useQuestionRefusal({ catalog: homeCatalog, locale, countryHint: crisisCountryHint, returnFocusRef: topicField });
   // Question language (spec 2026-10-13): the page's language goes with the question (PF-L56: `locale` is a string).
   const pageLocale: LocaleCode = isLocale(locale) ? locale : "en";
   const languageChoice = useQuestionLanguageChoice({ catalog, locale: pageLocale });

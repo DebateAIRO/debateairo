@@ -5,6 +5,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigView, V4Map, V4Path, V4Selection } from "@/lib/v4/types";
 import { isRightToLeft } from "@/lib/v4/useMapKeys";
 import { digTitle, pathTitle, resolveSelection, shortText, TitleText, type ResolvedSelection, type Title } from "./V4MapTree";
+import { useRoomVariable } from "./V4UndoNote";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
@@ -92,8 +93,11 @@ export function V4WhereBar(props: Readonly<{
   const { level, total } = depthOf(resolved, map, digs);
   const here = pathOfPlace(resolved);
   const shown = map.paths.slice(0, MINIMAP_MAX);
+  // V4B-V1: it is pinned to the window's top, so the window keeps its height free above a focused control.
+  const [bar, setBar] = useState<HTMLDivElement | null>(null);
+  useRoomVariable(bar, "--v4-where-room");
   return (
-    <div className="v4WhereBar">
+    <div className="v4WhereBar" ref={setBar}>
       <p className="v4SrOnly" role="status">
         {t(catalog, "v4.phone.youAreIn", { place: last.title.text, n: level, total })}
       </p>

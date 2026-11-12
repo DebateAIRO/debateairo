@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { AnswerMainAnswer } from "@debateai/contract";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { cardLabel } from "@/lib/v4/mapLooks";
@@ -221,6 +221,13 @@ export function V4AnswerCard(props: Readonly<{
     focusAfter.current = null;
     (to === "line" ? lineRef.current : eyebrowRef.current)?.focus();
   }, [props.folded]);
+  // Keyboard audit 2026-11-12 (V4B-F9): a fold the page makes (Back, a question opened elsewhere) with focus in the body,
+  // which turns inert, moves focus to the folded line instead of dropping it to the page. Read as the render begins.
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const focusInBody = typeof document !== "undefined" && (bodyRef.current?.contains(document.activeElement) ?? false);
+  useLayoutEffect(() => {
+    if (props.folded && focusInBody) lineRef.current?.focus({ preventScroll: true });
+  }, [props.folded, focusInBody]);
   const versions = answerVersions({ mainAnswer: props.mainAnswer, reportAnswer: props.reportAnswer, answeredAt: props.answeredAt });
   const current = versions[0]!;
   const earlier = versions.slice(1);
@@ -254,7 +261,7 @@ export function V4AnswerCard(props: Readonly<{
         <span className="v4AnswerFoldWords" data-ai-generated={lineWords.length > 0 ? "true" : undefined}>{lineWords}</span>
         <span aria-hidden="true">{" ▾"}</span>
       </button>
-      <div className="v4AnswerFold" id={bodyId} inert={props.folded} aria-hidden={props.folded ? "true" : undefined}>
+      <div ref={bodyRef} className="v4AnswerFold" id={bodyId} inert={props.folded} aria-hidden={props.folded ? "true" : undefined}>
         <div className="v4AnswerInner">
           <div className="v4AnswerHead">
             <p ref={eyebrowRef} className="v4Eyebrow" tabIndex={-1}>{label}</p>

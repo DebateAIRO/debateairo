@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ContractHttpError, ModerationGroundSchema, ModerationSourceSchema, type ModerationGround, type ModerationSource, type PublicFlagQueue, type PublicReviewList, type PublicReviewPage } from "@debateai/contract";
 import { createPublicReviewClient, NO_GROUND, publicationRefOf, type PublicReviewClient, type PublicReviewGround, type PublicReviewStepInput } from "../lib/publicReviewApi.js";
 import { t, type MessageCatalog } from "../lib/i18n/translate.js";
+import { focusIsLost } from "../lib/focusGuard.js";
 import staffEnglish from "../messages/en/staff.json";
 import "./StaffAccessPanel.css";
 
@@ -62,6 +63,20 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
     }
   }, [api, catalog]);
   useEffect(() => { void load(null); return () => { reads.current++; api.cancel(); }; }, [api, load]);
+  // Keyboard audit 2026-11-12: a step's confirm box opens away from the step that asked (at the top of the debate, or at
+  // the end of the queue), so focus goes to the box's line; Cancel gives it back to the step; a finished step lands on
+  // its notice. `focusNext` names the target, picked once the render that shows it is done.
+  const opener = useRef<HTMLElement | null>(null);
+  const boxLine = useRef<HTMLParagraphElement>(null);
+  const noticeLine = useRef<HTMLParagraphElement>(null);
+  const focusNext = useRef<(() => HTMLElement | null) | null>(null);
+  useEffect(() => {
+    const pick = focusNext.current;
+    if (pick === null) return;
+    focusNext.current = null;
+    const target = pick();
+    if (target !== null && target.isConnected && !target.matches(":disabled")) target.focus();
+  });
   if (list === null) return null;
 
   async function go(change: Pending) {
@@ -79,12 +94,18 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       setPending(null);
       setMessage({ text: failureLine(catalog, failure), good: false });
     } finally {
+      focusNext.current = () => focusIsLost() ? noticeLine.current : null;
       await load(ref);
       setBusy(false);
     }
   }
   /** A new confirm box starts with an empty ground. */
-  const ask = (next: Pending) => { setGround({ grounds: [], source: null, flagId: null, facts: "", law: "" }); setPending(next); };
+  const ask = (next: Pending) => {
+    const focused = document.activeElement;
+    opener.current = focused instanceof HTMLElement ? focused : null;
+    focusNext.current = () => boxLine.current;
+    setGround({ grounds: [], source: null, flagId: null, facts: "", law: "" }); setPending(next);
+  };
   const stepOf = (line: string, input: PublicReviewStepInput): Pending => ({ line, need: STEP_NEEDS[input.step],
     run: (client2, current, at, chosen) => client2.step(at, current?.revision ?? 0, STEP_NEEDS[input.step] === "NONE" ? input : { ...input, ground: chosen }) });
   function open(event: FormEvent<HTMLFormElement>) {
@@ -133,11 +154,11 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
   </fieldset>;
   const ready = pending === null || pending.need !== "REQUIRED" || groundWhole({ ...ground, facts: ground.facts.trim() === "" ? null : ground.facts, law: ground.law.trim() === "" ? null : ground.law.trim() });
   const confirm = pending === null ? null : <div className="staffMutation" data-review-confirm>
-    <p>{pending.line}</p>{groundFields}<p className="setCardHint">{t(catalog, "staff.publicReview.passkeyConfirms")}</p>
+    <p ref={boxLine} tabIndex={-1}>{pending.line}</p>{groundFields}<p className="setCardHint">{t(catalog, "staff.publicReview.passkeyConfirms")}</p>
     <div className="staffActions"><button className="setBtn setBtnPrimary" type="button" disabled={busy || !ready} onClick={() => { void go(pending); }}>{t(catalog, "staff.publicReview.confirm")}</button>
-      <button className="setBtn" type="button" disabled={busy} onClick={() => setPending(null)}>{t(catalog, "staff.publicReview.cancel")}</button></div>
+      <button className="setBtn" type="button" disabled={busy} onClick={() => { focusNext.current = () => opener.current; setPending(null); }}>{t(catalog, "staff.publicReview.cancel")}</button></div>
   </div>;
-  const notice = message === null ? null : <p className={message.good ? "staffNotice" : "setError"} role="status">{message.text}</p>;
+  const notice = message === null ? null : <p ref={noticeLine} tabIndex={-1} className={message.good ? "staffNotice" : "setError"} role="status">{message.text}</p>;
 
   return <div className="setInner staffAccess publicReviewPanel" data-public-review-panel aria-busy={busy}>
     <section className="setCard">

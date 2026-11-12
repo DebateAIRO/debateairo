@@ -21,11 +21,12 @@ import { TurnstileChallenge } from './TurnstileChallenge';
 import { EmailPendingScreen } from './EmailPendingScreen';
 import { SecurityEnrollment } from './SecurityEnrollment';
 import { LockoutPrompt } from './LockoutPrompt';
+import { useStepFocus } from './timedStep';
 import { PhoneField } from './PhoneField';
 import { InlineFieldMessage, useFormAnnouncer } from './InlineFieldMessage';
 import { ItalyApprovalBox } from './ItalyApprovalBox';
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '../RegionField';
-import { DateOfBirthField, EMPTY_DOB } from '../DateOfBirthField';
+import { DateOfBirthField, EMPTY_DOB, firstFlaggedDobSelector } from '../DateOfBirthField';
 import { dobErrorMessage, resolveDobLocale } from '@/lib/dob/dobLocale';
 import { AuthShell } from '../AuthShell';
 import authEnglish from '@/messages/en/auth.json';
@@ -81,6 +82,13 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     // Set by a submit that did not hold exactly six digits; any edit clears it.
     const [codeIncomplete, setCodeIncomplete] = useState(false);
     const codeField = useRef<HTMLInputElement>(null);
+    // Keyboard audit 2026-11-12: a refused code disabled its field while it ran, so focus fell to <body>.
+    // Bumped on a refusal; the effect runs once the field is enabled again (as on LoginFlow).
+    const [refocusCode, setRefocusCode] = useState(0);
+    useEffect(() => {
+        if (refocusCode)
+            codeField.current?.focus();
+    }, [refocusCode]);
     // One live region per form: says the first error of a failed submit (review fix, 2026-10-09).
     const signupAnnouncer = useFormAnnouncer();
     const codeAnnouncer = useFormAnnouncer();
@@ -104,7 +112,8 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     const [italyApproved, setItalyApproved] = useState(false);
     const [italyRevealed, setItalyRevealed] = useState(false);
     const [italyError, setItalyError] = useState<string | null>(null);
-    const [italyFocusRequest, setItalyFocusRequest] = useState(0);
+    // Keyboard audit 2026-11-12 (AUTH-4): a US state refusal sends focus to the state list the same way (as on email sign-up).
+    const [italyFocusRequest, setItalyFocusRequest] = useState<{ request: number; target: () => HTMLElement | null }>({ request: 0, target: () => null });
     const italyFocusHandled = useRef(0);
     const italyInputRef = useRef<HTMLInputElement | null>(null);
     const italyShown = region.country === ITALY_COUNTRY || italyRevealed;
@@ -235,11 +244,14 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
     }, [flowExpiry, token, browser, catalog]);
     /* The refusal that reveals the box also re-enables the form, so focus waits for that render; once per request. */
     useEffect(() => {
-        if (italyFocusRequest === italyFocusHandled.current || busy)
+        if (italyFocusRequest.request === italyFocusHandled.current || busy)
             return;
-        italyFocusHandled.current = italyFocusRequest;
-        italyInputRef.current?.focus();
+        italyFocusHandled.current = italyFocusRequest.request;
+        italyFocusRequest.target()?.focus();
     }, [italyFocusRequest, busy]);
+    // Keyboard audit 2026-11-12 (AUTH-4): the security set-up, and then the lock-out card, replace the form under a new
+    // headline; focus lands on it. The other changes keep the card, whose first line says what happened (the site's guard).
+    const moved = useStepFocus(kind === 'enroll' ? 'enroll' : secured ? 'secured' : 'flow');
     function finish(result: AuthenticationResponse, sessionAlreadyAnnounced = false, enrolled = false) {
         if (result.status !== 'authenticated')
             return;
@@ -280,7 +292,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         setItalyError(italyMissing ? t(catalog, "auth.signUp.italyApprovalHint") : null);
         if (Object.keys(checked).length || noRegion || italyMissing) {
             const regionControl = region.country === 'US' ? '#signup-region-state' : '#signup-region-trigger';
-            form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : noRegion ? regionControl : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy]' : checked.terms ? '[name=terms]' : '[name=italy-approval]')?.focus();
+            form.querySelector<HTMLElement>(checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : noRegion ? regionControl : checked.dateOfBirth ? firstFlaggedDobSelector(birth, resolveDobLocale(uiLocale).order) : checked.privacy ? '[name=privacy]' : checked.terms ? '[name=terms]' : '[name=italy-approval]')?.focus();
             // The first error, in the order focus takes; the date of birth says what its own field says.
             const first = checked.email ?? checked.phone ?? (noRegion ? "auth.signUp.regionHint" : undefined) ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms ?? (italyMissing ? "auth.signUp.italyApprovalHint" : undefined) : undefined);
             signupAnnouncer.announce(first !== undefined ? t(catalog, first) : dobErrorMessage(catalog, 'incomplete', resolveDobLocale(uiLocale).order));
@@ -331,11 +343,14 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
                     setItalyRevealed(true);
                     setItalyApproved(false);
                     setError(t(catalog, "auth.signUp.italyApprovalRequired"));
-                    setItalyFocusRequest(request => request + 1);
+                    setItalyFocusRequest(current => ({ request: current.request + 1, target: () => italyInputRef.current }));
+                }
+                else if (failure instanceof ContractHttpError && failure.serverCode === 'STATE_SIGNUP_UNAVAILABLE') {
+                    setError(t(catalog, "auth.signUp.stateUnavailable"));
+                    setItalyFocusRequest(current => ({ request: current.request + 1, target: () => form.querySelector<HTMLElement>('#signup-region-state') }));
                 }
                 else
-                    setError(failure instanceof ContractHttpError && failure.serverCode === 'STATE_SIGNUP_UNAVAILABLE'
-                        ? t(catalog, "auth.signUp.stateUnavailable") : t(catalog, "auth.signUp.creationFailed"));
+                    setError(t(catalog, "auth.signUp.creationFailed"));
             }
         }
         finally {
@@ -417,8 +432,12 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         }
         catch (failure) {
             if (dispatched.current && ownedKind !== 'stepup' && !(failure instanceof ContractHttpError && failure.status >= 400 && failure.status < 500)) clearStoredSupportConversation();
-            if (owns(owner, ownedToken, ownedKind))
+            if (owns(owner, ownedToken, ownedKind)) {
                 setError(t(catalog, "auth.login.authenticationCodeRejected"));
+                setCode('');
+                attempt.current.edited();
+                setRefocusCode(n => n + 1);
+            }
         }
         finally {
             if (owner === sequence.current) {
@@ -433,7 +452,7 @@ export function SocialCompleteFlow({ client = contractClient, catalog = authEngl
         return <EmailPendingScreen email={pending} retryAfterSeconds={60} client={client} catalog={catalog} locale={uiLocale} turnstile={turnstile} onDifferentEmail={() => window.location.assign('/sign-up')}/>;
     const methods = kind === 'stepup' ? stepUpStatus?.available_methods ?? [] : loginStatus?.available_methods ?? [];
     const codeFormatError = !recoveryMode && (codeIncomplete || !readSixDigitCode(code).valid);
-    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' || secured ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} footer={null}>
+    return <AuthShell eyebrow={t(catalog, "auth.login.welcomeBack")} title={kind === 'signup' ? t(catalog, "auth.signUp.title") : kind === 'enroll' || secured ? t(catalog, "auth.enroll.securityTitle") : t(catalog, "auth.security.title")} description={name && kind === 'signup' ? t(catalog, "auth.social.welcome", { name }) : ''} focusTitle={moved} footer={null}>
  {error ? <div className="authAlert" role="alert">{error}</div> : null}
  {returnToQuestion && !stepUpResult ? <a className="authPrimary" href="/new">{t(catalog, 'auth.continue')}</a> : null}
  {stepUpResult ? <div className="recoveryStatus"><p>{t(catalog, "auth.security.complete")}</p><button type="button" className="authPrimary" onClick={() => {

@@ -45,8 +45,10 @@ export function SynthesisPanel({
   const textLang = useDebateTextLang();
   const verdictLang = !view.floor && !verdictWithheld && view.verdict ? textLang : {};
 
+  // A Tab stop of its own: the panel scrolls and holds no control, so Safari could not scroll it
+  // from the keyboard (keyboard audit 2026-11-12).
   return (
-    <aside className="synthPanel scroll" aria-label={t(catalog, "debateDrawers.synthesis.title")}>
+    <aside className="synthPanel scroll" tabIndex={0} aria-label={t(catalog, "debateDrawers.synthesis.title")}>
       <div className="synthInner">
         <div className="synthTitle">
           <span className="synthDiamond" aria-hidden />

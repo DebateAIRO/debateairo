@@ -69,6 +69,8 @@ export type V4ReadyInput = Readonly<{
   /** Puts the notice's news away (as "Hide this" does). */
   hideNews: () => void;
   focusHeading: () => void;
+  /** Keyboard audit 2026-11-12 (V4B-F2): where focus goes when the note's ✕ takes the note away with focus on it. */
+  returnFocus?: () => HTMLElement | null;
   reportHref: string;
   /**
    * V4 start step, Task 62 (wait-f10): how many times a short answer came after the page stopped waiting for it; each rise
@@ -266,7 +268,13 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
     }
   }
   const note = noteText === null || action === null ? null : (
-    <V4ReadyNote text={noteText} action={action} onClose={close} catalog={catalog} />
+    <V4ReadyNote
+      text={noteText}
+      action={action}
+      onClose={close}
+      {...(input.returnFocus === undefined ? {} : { returnFocus: input.returnFocus })}
+      catalog={catalog}
+    />
   );
   const announcer = <V4ReadyAnnouncer line={noteText === null ? "" : readyPlain(noteText)} id={moment?.id ?? 0} />;
 

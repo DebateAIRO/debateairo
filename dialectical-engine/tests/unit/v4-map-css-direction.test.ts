@@ -166,7 +166,7 @@ describe("the wave-2 review's layout rules (4 Nov)", () => {
     expect(css.search(rule)).toBeLessThan(css.indexOf(".appShell:has(.consentBar) .v4DebLayout-desktop .v4DebPanelCol"));
   });
   it("the second browser check (WCAG 2.4.11): while the cookie bar shows on a map page, the window keeps room at its foot too", () => {
-    expect(read("v4-debate.css")).toMatch(/html:has\(\.appShell \.consentBar\):has\(\.v4DebPage\) \{ scroll-padding-block-end: 188px; \}/u);
+    expect(read("v4-debate.css")).toMatch(/html:has\(\.appShell \.consentBar\):has\(\.v4DebPage\) \{ scroll-padding-block-end: max\(188px, var\(--consent-bar-room, 0px\), var\(--v4-note-foot, 0px\)\); \}/u);
   });
   it("W2L-5: on a phone whose bar carries the greyed button's reason, the panel's dig block keeps it for screen readers only", () => {
     expect(read("v4-debate.css")).toMatch(/\.v4DebLayout-phone:has\(\[data-bar-why\]\) \.v4PanelDig :is\(\[data-dig-rest\], \.v4DigWaitLine\) \{\s*position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect\(0 0 0 0\); white-space: nowrap;\s*\}/u);

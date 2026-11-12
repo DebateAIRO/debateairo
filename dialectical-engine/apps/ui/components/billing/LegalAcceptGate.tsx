@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
 import { useLegalDocument } from "@/components/consent/useLegalDocument";
 import { endSession } from "@/lib/endSession";
+import { focusIsLost } from "@/lib/focusGuard";
 import { contractClient } from "@/lib/api";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -60,6 +61,12 @@ export function LegalAcceptGate({
   const [open, setOpen] = useState<Kind | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<GateError | null>(null);
+  // Keyboard audit 2026-11-12: a stale pair withdraws the read marks, so Accept stays off under focus; the way on is
+  // Reload, which appears above the list: focus goes there.
+  const reload = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (error === "stale" && (focusIsLost() || document.activeElement?.matches(":disabled"))) reload.current?.focus();
+  }, [error]);
 
   useEffect(() => {
     let active = true;
@@ -146,7 +153,7 @@ export function LegalAcceptGate({
           </div>
         )}
         {error === "stale" ? (
-          <button className="authTextButton" type="button" onClick={reloadPage}>
+          <button className="authTextButton" type="button" ref={reload} onClick={reloadPage}>
             {t(catalog, "newDebate.legalGate.reload")}
           </button>
         ) : null}

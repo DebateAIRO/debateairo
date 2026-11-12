@@ -6,6 +6,7 @@ import { dollarsToMicros, formatDollars } from "../lib/teamLimitApi.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
+import { focusIsLost, isFocusParked } from "../lib/focusGuard.js";
 import "./StaffAccessPanel.css";
 
 type Member = TeamAllowancePage["members"][number];
@@ -82,6 +83,24 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
       api.cancel();
     };
   }, [api]);
+
+  // Keyboard audit 2026-11-12: asking switches the form (or Take back) off under focus and opens the confirm away from
+  // it: focus goes to Confirm. Cancel gives focus back to where the person asked from, once that is switched on again.
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  const asker = useRef<HTMLElement | null>(null);
+  const backToAsker = useRef(false);
+  useEffect(() => {
+    if (pending === null) return;
+    const focused = document.activeElement;
+    if (focused instanceof HTMLElement && focused !== document.body && !isFocusParked(focused)) asker.current = focused;
+    if (focusIsLost() || focused?.matches(":disabled")) confirmButton.current?.focus();
+  }, [pending]);
+  useEffect(() => {
+    if (!backToAsker.current || pending !== null || busy) return;
+    backToAsker.current = false;
+    const back = asker.current;
+    if (back?.isConnected && !back.matches(":disabled") && focusIsLost()) back.focus();
+  });
 
   if (page === null) return null;
   const { limits, members } = page;
@@ -175,8 +194,8 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
         <p>{pendingLine(pending)}</p>
         <p className="setCardHint">{t(catalog, "staff.teamAllowance.passkey")}</p>
         <div className="staffActions">
-          <button className="setBtn setBtnPrimary" type="button" disabled={busy} onClick={() => { void go(pending); }}>{t(catalog, "staff.teamAllowance.confirm")}</button>
-          <button className="setBtn" type="button" disabled={busy} onClick={() => setPending(null)}>{t(catalog, "staff.teamAllowance.cancel")}</button>
+          <button className="setBtn setBtnPrimary" type="button" ref={confirmButton} disabled={busy} onClick={() => { void go(pending); }}>{t(catalog, "staff.teamAllowance.confirm")}</button>
+          <button className="setBtn" type="button" disabled={busy} onClick={() => { backToAsker.current = true; setPending(null); }}>{t(catalog, "staff.teamAllowance.cancel")}</button>
         </div>
       </div> : null}
     </section>

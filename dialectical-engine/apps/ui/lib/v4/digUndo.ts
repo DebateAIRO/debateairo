@@ -106,6 +106,10 @@ type Slot = {
   unconfirmedLine: string;
   alive: () => boolean;
   timer: ReturnType<typeof setTimeout> | undefined;
+  /** Keyboard audit 2026-11-12 (V4C-13): focus is inside the note, so a settled note is not dropped. */
+  held: boolean;
+  /** How long a settled note stays once it is let go (set when its drop was asked while held). */
+  dropAfter: number | undefined;
 };
 
 const EMPTY: readonly DigUndoEntry[] = Object.freeze([]);
@@ -167,7 +171,29 @@ function dropLater(id: number, ms: number): void {
   const slot = slotOf(id);
   if (slot === undefined) return;
   if (slot.timer !== undefined) clearTimeout(slot.timer);
+  slot.timer = undefined;
+  slot.dropAfter = ms;
+  // V4C-13 (WCAG 2.2.1): a note with keyboard focus inside waits; its whole time starts again once focus leaves it.
+  if (slot.held) return;
   slot.timer = setTimeout(() => drop(id), ms);
+}
+
+/**
+ * Keyboard audit 2026-11-12 (V4C-13): the note's own "focus is inside me" (V4UndoNote). While held, a started or cancelled
+ * note is not dropped (its See it and Close stay reachable); let go, it stays its usual time from then. The Undo window
+ * itself is never paused.
+ */
+export function holdDig(id: number, held: boolean): void {
+  const slot = slotOf(id);
+  if (slot === undefined || slot.held === held) return;
+  slot.held = held;
+  if (waiting(slot.entry) || slot.dropAfter === undefined) return;
+  if (held) {
+    if (slot.timer !== undefined) clearTimeout(slot.timer);
+    slot.timer = undefined;
+    return;
+  }
+  dropLater(id, slot.dropAfter);
 }
 
 /** The Undo window is over: the dig is sent, after any send still in flight. */
@@ -255,7 +281,9 @@ export function addDig(input: AddDigInput): number {
     failedLine: input.failedLine,
     unconfirmedLine: input.unconfirmedLine ?? input.failedLine,
     alive: input.alive ?? (() => false),
-    timer: undefined
+    timer: undefined,
+    held: false,
+    dropAfter: undefined
   };
   slots = [...slots, slot];
   slot.timer = setTimeout(() => fire(id), Math.max(0, input.dig.sendsAt - Date.now()));

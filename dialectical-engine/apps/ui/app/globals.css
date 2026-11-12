@@ -1454,6 +1454,33 @@ html.theme-transition-fallback body *::after {
   outline: none;
 }
 
+/* Keyboard audit, 12 Nov 2026 (the focus guard, lib/focusGuard.ts). When the control a keyboard user pressed is taken
+   off the page, focus is parked on the part of the page that was around it, so the next Tab carries on from there. The
+   parked part shows the site's ring, inside its own edge so no parent can clip it. The main area keeps its quiet rule
+   above: it is the whole page. */
+[data-focus-parked]:not(.appMain):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* Keyboard audit, 12 Nov 2026: a jump link in a legal document moves focus to the section it scrolls to, so the next Tab
+   carries on from there. The section is the reading itself, not a control: it shows no ring. (Outside the consent S02
+   block, whose rules a contract test pins.) */
+.policyBody .policySection:focus { outline: none; }
+
+/* Keyboard audit, 12 Nov 2026 (WCAG 2.4.11, Focus Not Obscured). The first-visit cookie bar is fixed over the foot of
+   the window, and a control tabbed to at the bottom edge sat behind it (the browser counts it as in view and does not
+   scroll). While the bar shows, components/consent/useConsentBarRoom.ts publishes the height it covers as
+   --consent-bar-room on <html>; with no bar the room is 0 and nothing here changes anything.
+   - A focused control is scrolled clear of the bar.
+   - The page gets that room at its end, so its last controls (the footer) can be scrolled clear too. The V4 ask page and
+     the V4 map page keep their own measured room (v4-ask.css C4, v4-debate.css, v4-undo.css).
+   - The Help button shares the bar's corner and sat under it: it rides above the bar. */
+html { scroll-padding-block-end: var(--consent-bar-room, 0px); }
+.appShell:has(> .consentBar):not(:has(.v4AskMain, .v4DebPage)) { padding-bottom: var(--consent-bar-room, 0px); }
+.appShell:has(> .consentBar) .supportWidget { bottom: calc(var(--dock-offset-b) + var(--consent-bar-room, 0px)); }
+.appShell:has(> .consentBar) .supportWidgetPanel { max-height: calc(70vh - var(--consent-bar-room, 0px)); }
+
 /* Hidden until it has keyboard focus, then shown over the top bar. */
 .skipLink {
   position: absolute;
@@ -2066,8 +2093,10 @@ a:focus-visible {
 
 .authField input::placeholder { color: var(--muted); letter-spacing: normal; }
 
+/* Keyboard audit, 12 Nov 2026: the focused border is the deeper gold (4.5:1 on the card in Terracotta; the plain gold
+   was 2.94:1, under the 3:1 a focus indicator needs). Chamber's two golds are the same colour. */
 .authField input:focus {
-  border-color: var(--gold);
+  border-color: var(--gold-text);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent);
 }
 
@@ -2178,6 +2207,9 @@ a:focus-visible {
   box-shadow: var(--shadow-pop);
 }
 .dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
+/* Keyboard audit, 12 Nov 2026: on the one-time age check the date is the card's only field, so the day grid hung below
+   the card's foot and the card cut off its last row (29, 30, 31). While a grid is open there, the card does not clip. */
+.authCard:has([data-form="age-confirmation"] .dobPopover) { overflow: visible; }
 .dobFieldset .dobPopover[data-part="d"] { width: 244px; }
 .dobFieldset .dobPopover[data-part="m"] { width: 222px; }
 .dobFieldset .dobPopover[data-part="y"] { width: 262px; }
@@ -2532,7 +2564,7 @@ a:focus-visible {
   font-size: 12px;
   font-weight: 500;
 }
-.authField select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent); outline: none; }
+.authField select:focus { border-color: var(--gold-text); box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent); outline: none; }
 
 /* Saved recovery codes, with Copy and Download under them. */
 .authCodes { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
@@ -3031,7 +3063,6 @@ a:focus-visible {
   border: 1px solid var(--line-2);
   border-radius: var(--r-btn);
   background: var(--surface);
-  outline: none;
 }
 .fieldGroup textarea {
   min-height: 96px;
@@ -3709,7 +3740,9 @@ a:focus-visible {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.canvasInner[data-zoom-band="overview"] :is(
+/* The card that holds focus keeps its controls (keyboard audit 2026-11-12): zooming out with the
+   zoom keys from a card's button must not hide the button the keyboard is on. */
+.canvasInner[data-zoom-band="overview"] .nodeWrap:not(:focus-within) :is(
   .nodeHeader,
   .nodeControls,
   .nodeRootMeta,
@@ -4057,6 +4090,8 @@ a:focus-visible {
   background: var(--surface-1);
   overflow: auto;
 }
+/* A Tab stop that scrolls (keyboard audit 2026-11-12): an inset ring. */
+.synthPanel:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .synthInner {
   padding: 22px 22px 28px;
 }
@@ -4278,6 +4313,9 @@ a:focus-visible {
   overflow: auto;
   padding: 22px;
 }
+/* The body is a Tab stop (it is what scrolls, and the modal trap moves only between Tab stops).
+   Inset, because it scrolls. Keyboard audit 2026-11-12. */
+.drawerBody:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .drawerClaim {
   font-family: var(--font-serif);
   font-size: 21px;
@@ -4787,6 +4825,12 @@ a:focus-visible {
   transform: translate(-50%, -100%);
   z-index: 61;
 }
+/* With no room above its anchor the card opens below it (ChallengePopover's placement, keyboard
+   audit 2026-11-12). Not on a phone, where it is a bottom sheet whatever the placement. */
+@media (min-width: 641px) {
+  .popAnchor[data-placement="below"] { transform: translate(-50%, 0); }
+  .popAnchor[data-placement="below"] .popCard { margin-bottom: 0; margin-top: 8px; transform-origin: top center; }
+}
 .popCard {
   width: 252px;
   background: var(--surface);
@@ -4974,6 +5018,8 @@ a:focus-visible {
   min-width: 0;
   overflow: auto;
 }
+/* A Tab stop that scrolls (keyboard audit 2026-11-12): an inset ring. */
+.singleShot:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .singleShotInner {
   max-width: 720px;
   margin: 0 auto;
@@ -5298,6 +5344,8 @@ a:focus-visible {
   background: radial-gradient(var(--line-2) 1px, transparent 1px);
   background-size: 22px 22px;
 }
+/* A Tab stop that scrolls, like the Tree canvas (keyboard audit 2026-11-12): an inset ring. */
+.thread:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .threadInner {
   max-width: 800px;
   margin: 0 auto;
@@ -9530,6 +9578,8 @@ a:focus-visible {
     linear-gradient(transparent, var(--line-strong)) bottom / 100% 12px no-repeat scroll;
   background-color: var(--surface-2);
 }
+/* A Tab stop in every state (keyboard audit 2026-11-12): an inset ring, as on the summary. */
+.storyPanelBody:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .storyPanelInner { display: grid; gap: 12px; max-width: 760px; }
 .storyPanelStory { display: grid; gap: 12px; }
 .storyPanelStory .storyHeadline {
@@ -10168,6 +10218,12 @@ a:focus-visible {
   .debateTopBar {
     position: sticky;
     top: 0;
+  }
+  /* The page scrolls under the pinned header here, so a control focus moves to stops below it:
+     the header's two rows are about 100px (6 + 44 + 6 + 34 + 8 + 1, the figure .debateMain uses
+     below), plus 8px for the focus ring. Keyboard audit 2026-11-12. */
+  html:has(.debateTopBar) {
+    scroll-padding-top: 108px;
   }
   .debateMain {
     flex: 0 0 auto;

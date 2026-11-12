@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 import {
   REGION_CONTINENTS,
   REGION_COUNTRIES,
@@ -25,13 +25,6 @@ function continentName(catalog: MessageCatalog, continent: RegionContinent): str
     case "North America": return t(catalog, "auth.region.continent.northAmerica");
     case "South America": return t(catalog, "auth.region.continent.southAmerica");
     case "Oceania": return t(catalog, "auth.region.continent.oceania");
-  }
-}
-
-function onActionKey(event: ReactKeyboardEvent<HTMLButtonElement>, action: () => void): void {
-  if (event.key === "Enter" || event.key === " ") {
-    event.preventDefault();
-    action();
   }
 }
 
@@ -106,8 +99,10 @@ export function RegionField({
 
   function showContinents(): void {
     if (disabled) return;
+    /* Back lands on the continent just left, not the first one (keyboard audit 2026-11-12). */
+    const left = continent;
     setContinent(null);
-    queueMicrotask(() => firstContinentRef.current?.focus());
+    queueMicrotask(() => (wrapperRef.current?.querySelector<HTMLButtonElement>(`.regionContinent[data-continent="${left}"]`) ?? firstContinentRef.current)?.focus());
   }
 
   function pickCountry(code: string): void {
@@ -157,7 +152,6 @@ export function RegionField({
                   disabled={disabled}
                   ref={index === 0 ? firstContinentRef : undefined}
                   onClick={() => showCountries(row)}
-                  onKeyDown={(event) => onActionKey(event, () => showCountries(row))}
                 >
                   <span className="regionContinentName">{continentName(catalog, row)}</span>
                   <span className="regionCount">{String(REGION_COUNTRIES.filter((country) => country.continent === row).length)}</span>
@@ -168,12 +162,12 @@ export function RegionField({
           ) : (
             <>
               <div className="regionTop">
-                <button type="button" className="regionBack" ref={backRef} disabled={disabled} onClick={showContinents} onKeyDown={(event) => onActionKey(event, showContinents)}>{t(catalog, "auth.region.back")}</button>
+                <button type="button" className="regionBack" ref={backRef} disabled={disabled} onClick={showContinents}>{t(catalog, "auth.region.back")}</button>
                 <span className="regionContinentTitle">{continentName(catalog, continent)}</span>
               </div>
               <div className="regionGrid">
                 {regionCountriesOf(continent, locale).map(({ code }) => (
-                  <button type="button" className="regionCountry" data-code={code} data-picked={String(code === value.country)} key={code} disabled={disabled} onClick={() => pickCountry(code)} onKeyDown={(event) => onActionKey(event, () => pickCountry(code))}>
+                  <button type="button" className="regionCountry" data-code={code} data-picked={String(code === value.country)} key={code} disabled={disabled} onClick={() => pickCountry(code)}>
                     <span className="regionCellFlag">{regionFlag(code)}</span>
                     <span className="regionCellCode">{code}</span>
                     <span className="regionCellName">{regionCountryName(code, locale)}</span>

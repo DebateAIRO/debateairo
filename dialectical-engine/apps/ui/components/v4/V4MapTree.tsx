@@ -245,6 +245,11 @@ export type MapPiecesProps = Readonly<{
   onDigDeeper?: (pathId: string) => void;
   /** Task 61: digging into a "+ N more to explore" item, once the answer is ready. */
   onDigMore?: (item: V4MoreItem) => void;
+  /**
+   * Keyboard audit 2026-11-12 (V4B-M2): "Choose what to dig ›" was pressed under this path (it opens the path too); the page
+   * brings the path's choices into view. Absent: it only opens the path.
+   */
+  onChooseWhat?: (pathId: string, viaKeyboard: boolean) => void;
   /** Task 61 (journey-d2): what the page draws right under the question's card, never inside it (the waiting card, the lines). */
   rootExtra?: ReactNode;
   /**
@@ -831,13 +836,19 @@ function extraCards(path: V4Path | null, pieces: MapPiecesProps): number {
   return Math.min(SUGGESTIONS_ON_MAP, suggestions) + (suggestions > SUGGESTIONS_ON_MAP ? 1 : 0) + (choice.digHereToo(path.id) ? 1 : 0);
 }
 
-function leavesOf(open: readonly V4OpenQuestion[], digs: readonly DigView[], pieces: MapPiecesProps, selectedId: V4Selection): Leaf[] {
+/**
+ * `focusedRow` (keyboard audit 2026-11-12, V4B-F8): the row that holds keyboard focus (useMapKeys) always shows too, so a
+ * poll re-planning the card limit never takes it away from under the keyboard.
+ */
+function leavesOf(open: readonly V4OpenQuestion[], digs: readonly DigView[], pieces: MapPiecesProps, selectedId: V4Selection,
+  groupRow: string, focusedRow: string | null): Leaf[] {
   return [
     ...open.map((question): Leaf => ({
       kind: "open",
       key: question.id,
       question,
       must: question.star || pieces.picked.has(question.id) || selectedId === `open:${question.id}`
+        || focusedRow === `open:${question.id}@${groupRow}`
     })),
     ...digs.map((dig): Leaf => {
       const id = `dig:${dig.link.childRunId}`;
@@ -845,11 +856,18 @@ function leavesOf(open: readonly V4OpenQuestion[], digs: readonly DigView[], pie
         kind: "dig",
         key: id,
         dig,
-        must: digGround(dig) === "LOOKING" || selectedId === id || pieces.changed.has(id),
+        must: digGround(dig) === "LOOKING" || selectedId === id || pieces.changed.has(id)
+          || focusedRow === `${id}@${groupRow}` || (focusedRow?.startsWith(`sprout:${dig.link.childRunId}:`) ?? false),
         cards: 1 + (digSprouts(dig).length > 0 ? 1 : 0)
       };
     })
   ];
+}
+
+/** V4B-F8: the keyboard is on one of this path's suggestion rows (or its "more" or "Choose what to dig ›"). */
+function extrasHoldFocus(groupRow: string, focusedRow: string | null): boolean {
+  return focusedRow !== null && focusedRow.endsWith(`@${groupRow}`)
+    && (focusedRow.startsWith("suggestion:") || focusedRow.startsWith("suggestions-more@") || focusedRow.startsWith("dig-here-too@"));
 }
 
 const cardsOf = (leaf: Leaf): number => (leaf.kind === "dig" ? leaf.cards : 1);
@@ -863,7 +881,7 @@ const cardsOf = (leaf: Leaf): number => (leaf.kind === "dig" ? leaf.cards : 1);
  */
 function planGroups(groups: ReadonlyArray<Readonly<{ key: string; row: string; path: V4Path | null; leaves: readonly Leaf[]; extras: ReactNode }>>,
   pieces: MapPiecesProps, expanded: ReadonlySet<string>, unfolded: (key: string) => boolean, fixedCards: number,
-  focusKey: string | null): GroupPlan[] {
+  focusKey: string | null, focusedRow: string | null = null): GroupPlan[] {
   let budget = MAP_CARD_LIMIT - fixedCards;
   const shown = new Map<string, Set<string>>(groups.map((group) => [group.key, new Set<string>()]));
   const extrasShown = new Set<string>();
@@ -873,6 +891,12 @@ function planGroups(groups: ReadonlyArray<Readonly<{ key: string; row: string; p
       if (!leaf.must) continue;
       shown.get(group.key)!.add(leaf.key);
       budget -= cardsOf(leaf);
+    }
+    // V4B-F8: the suggestions block the keyboard is in stays, as a must-show card does.
+    const cards = extrasHoldFocus(group.row, focusedRow) ? extraCards(group.path, pieces) : 0;
+    if (cards > 0) {
+      extrasShown.add(group.key);
+      budget -= cards;
     }
   }
   // A group's further leaves, in the order they claim what is left: the person's own digs first, then its first two open
@@ -888,7 +912,7 @@ function planGroups(groups: ReadonlyArray<Readonly<{ key: string; row: string; p
       shown.get(focus.key)!.add(leaf.key);
       budget -= cardsOf(leaf);
     }
-    const cards = extraCards(focus.path, pieces);
+    const cards = extrasShown.has(focus.key) ? 0 : extraCards(focus.path, pieces);
     if (cards > 0) {
       extrasShown.add(focus.key);
       budget -= cards;
@@ -909,7 +933,7 @@ function planGroups(groups: ReadonlyArray<Readonly<{ key: string; row: string; p
     if (!any) break;
   }
   for (const group of open) {
-    const cards = extraCards(group.path, pieces);
+    const cards = extrasShown.has(group.key) ? 0 : extraCards(group.path, pieces);
     if (cards === 0 || cards > budget) continue;
     extrasShown.add(group.key);
     budget -= cards;
@@ -1011,14 +1035,21 @@ function Leaves(props: Readonly<{
 export function pathExtras(path: V4Path, pieces: MapPiecesProps, variant: "tree" | "outline"): ReactNode {
   const choice = pieces.choice;
   if (choice === undefined || !choice.canDig) return null;
-  const onOpenPath = (): void => pieces.onSelect(`path:${path.id}`, false);
+  // Keyboard audit 2026-11-12 (V4B-M2): from the keyboard, focus moves on to the panel as every other row's press does.
+  const onOpenPath = (event: MouseEvent<HTMLElement>): void => pieces.onSelect(`path:${path.id}`, viaKeyboard(event));
+  // "Choose what to dig ›" also brings the path's choices into view, as its words promise.
+  const onChooseWhat = (event: MouseEvent<HTMLElement>): void => {
+    const keyboard = viaKeyboard(event);
+    pieces.onSelect(`path:${path.id}`, keyboard);
+    pieces.onChooseWhat?.(path.id, keyboard);
+  };
   const suggestions = (path.suggestions ?? []).length > 0;
   const again = choice.digHereToo(path.id);
   if (!suggestions && !again) return null;
   return (
     <>
       <SuggestionLeaves path={path} choice={choice} onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} />
-      {again ? <DigHereTooLeaf onOpenPath={onOpenPath} variant={variant} catalog={pieces.catalog} pathId={path.id} /> : null}
+      {again ? <DigHereTooLeaf onOpenPath={onChooseWhat} variant={variant} catalog={pieces.catalog} pathId={path.id} /> : null}
     </>
   );
 }
@@ -1080,16 +1111,19 @@ export function V4MapTree(props: MapPiecesProps) {
   });
 
   const groups = [
-    { key: "root", row: "root", path: null, leaves: leavesOf(undugOpen(map.open, digs), digsUnder(map, digs, null), props, selectedId), extras: null },
+    {
+      key: "root", row: "root", path: null,
+      leaves: leavesOf(undugOpen(map.open, digs), digsUnder(map, digs, null), props, selectedId, "root", keys.focusedRow), extras: null
+    },
     ...map.paths.map((path) => ({
       key: path.id,
       row: `path:${path.id}`,
       path,
-      leaves: leavesOf(undugOpen(path.open, digs), digsUnder(map, digs, path.id), props, selectedId),
+      leaves: leavesOf(undugOpen(path.open, digs), digsUnder(map, digs, path.id), props, selectedId, `path:${path.id}`, keys.focusedRow),
       extras: pathExtras(path, props, "tree")
     }))
   ];
-  const plans = planGroups(groups, props, expanded, unfolded, 1 + map.paths.length, openPathId);
+  const plans = planGroups(groups, props, expanded, unfolded, 1 + map.paths.length, openPathId, keys.focusedRow);
   const rootPlan = plans[0]!;
   // dig-f22: a visible line above the first box greyed for each reason (each box still says it to screen readers).
   const reasons = pickReasonPlaces(plans.map((plan, at): PickGroup => ({
@@ -1131,7 +1165,8 @@ export function V4MapTree(props: MapPiecesProps) {
                 {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
                 <LevelWords level={1} catalog={catalog} />
               </button>
-              {props.rootExtra === undefined ? null : <div className="v4MapRootExtra">{props.rootExtra}</div>}
+              {/* V4B-M3: the waiting card's Try now, its back link and the pause's Continue keep their own Tab stops. */}
+              {props.rootExtra === undefined ? null : <div className="v4MapRootExtra" data-rove-skip="">{props.rootExtra}</div>}
               <div className="v4MapRootLeaves">
                 <Leaves plan={rootPlan} pieces={props} selectedId={selectedId} level={2} onToggle={() => toggle("root")} {...reasonOf(rootPlan.key)} />
               </div>

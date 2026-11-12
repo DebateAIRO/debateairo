@@ -78,6 +78,9 @@ export function SupportWidget() {
       data-widget-state={state}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || !expanded) return;
+        // Escape that only cancels an IME candidate belongs to the composer: closing would lose the draft
+        // (keyboard audit 2026-11-12).
+        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
         event.preventDefault();
         close();
       }}

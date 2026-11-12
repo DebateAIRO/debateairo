@@ -24,6 +24,7 @@ import "./billing.css";
 import "./security-confirmation.css";
 import "./data-export.css";
 import { DocumentTitle } from "@/components/DocumentTitle";
+import { FocusGuard } from "@/components/FocusGuard";
 
 /*
  * V4 review ask-f21: only the faces a first screen paints with are preloaded, so the browser stops warning "preloaded but
@@ -158,6 +159,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <SiteFooter variant="line" />
                 <SupportConversationGuard />
                 <DocumentTitle brand="Dialectical Engine" />
+                {/* Keyboard audit, 12 Nov: a control switched off or removed under focus never drops focus to the page. */}
+                <FocusGuard />
                 {/* The one polite live region every page shares (see components/Toast.tsx). */}
                 <div id="app-announcer" className="srOnly" role="status" aria-live="polite" />
               </div>

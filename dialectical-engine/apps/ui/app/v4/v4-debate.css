@@ -204,8 +204,10 @@
 }
 /* The second browser check (4 Nov, WCAG 2.4.11): the panel column's own room could not help while the window itself was not
    scrolled (the column's foot was still below the window's), so the window scrolled a control only just into view, under the
-   cookie bar. The window keeps the same room at its foot while the cookie bar shows on a map page. */
-html:has(.appShell .consentBar):has(.v4DebPage) { scroll-padding-block-end: 188px; }
+   cookie bar. The window keeps the same room at its foot while the cookie bar shows on a map page.
+   Keyboard audit, 12 Nov: on a phone the bar is taller than 188 px (about 230 px at 375 px wide), so the room is the bar's
+   measured height (--consent-bar-room, components/consent/useConsentBarRoom.ts) whenever that is more. */
+html:has(.appShell .consentBar):has(.v4DebPage) { scroll-padding-block-end: max(188px, var(--consent-bar-room, 0px), var(--v4-note-foot, 0px)); }
 
 /* ---------- the phone map sheet (D7) ---------- */
 .v4DebSheet {
@@ -352,6 +354,10 @@ html:has(.appShell .consentBar):has(.v4DebPage) { scroll-padding-block-end: 188p
 }
 /* On a computer it sits under the where-you-are line and stays there while the panel scrolls. */
 .v4Panel .v4TourBar { position: sticky; top: 0; z-index: 2; margin: 6px 0; }
+/* V4B-V1 (keyboard audit 2026-11-12): the panel column scrolls on its own (computer, laptop, tablet); a control the keyboard
+   reaches stops below the pinned tour bar, never under it. While focus is on the bar itself it is in view already. */
+.v4DebPanelCol:has(.v4Panel .v4TourBar) { scroll-padding-block-start: 72px; }
+.v4DebPanelCol:has(.v4TourBar :focus) { scroll-padding-block-start: 0; }
 .v4StackPhone .v4TourBar { flex: none; width: 100%; border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 0; padding: 8px var(--v4-gutter); }
 
 .v4PanelSince { margin: 4px 0 6px; font-size: var(--t-ui); font-weight: 600; color: var(--text); }

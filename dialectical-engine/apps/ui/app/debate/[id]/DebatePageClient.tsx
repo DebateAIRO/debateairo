@@ -1,6 +1,7 @@
 "use client";
 import { AccountMenu } from "@/components/AccountMenu";
 import { fundingFailureMessage } from "@/lib/billing/fundingFailure";
+import { focusIsLost } from "@/lib/focusGuard";
 
 import { AiNotice } from "@/components/AiNotice";
 import { RESET_TIME_MARK, ResetSentence } from "@/components/billing/ResetSentence";
@@ -360,6 +361,13 @@ function nodeFocusTarget(nodeId: string): HTMLElement | null {
   if (details !== null) return details;
   const card = document.querySelector(`[data-node-id="${nodeId.replace(/["\\]/g, "\\$&")}"]`);
   return card?.querySelector<HTMLElement>("button:not([disabled]), a[href]") ?? null;
+}
+
+/** The width at which globals.css hides the header's inline actions whatever the fit says. */
+const PHONE_WIDTH_QUERY = "(max-width: 640px)";
+
+function phoneWidth(): boolean {
+  return typeof window.matchMedia === "function" && window.matchMedia(PHONE_WIDTH_QUERY).matches;
 }
 
 function hasHighPriorityScoringIssue(scoring: NodeScoringPayload): boolean {
@@ -785,7 +793,8 @@ export default function DebatePageClient({
   const [replayNonce, setReplayNonce] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
-  const [popover, setPopover] = useState<PopoverState | null>(null);
+  // anchorBottom lets the popover open below its anchor when there is no room above it.
+  const [popover, setPopover] = useState<(PopoverState & { anchorBottom: number }) | null>(null);
   const [investigation, setInvestigation] = useState<{ nodeId: string; status: string; flagged: string } | null>(
     null
   );
@@ -803,7 +812,11 @@ export default function DebatePageClient({
   const debateHeaderTitleMeasureRef = useRef<HTMLSpanElement | null>(null);
   const debateHeaderControlsRef = useRef<HTMLDivElement | null>(null);
   const debateHeaderInlineActionsRef = useRef<HTMLDivElement | null>(null);
+  const debateHeaderOverflowRef = useRef<HTMLDetailsElement | null>(null);
   const [headerActionsCollapsed, setHeaderActionsCollapsed] = useState(false);
+  // The message or heading of a whole-page swap (deleted, held, fatal error, loading), for focus.
+  const pageSwapFocusRef = useRef<HTMLElement | null>(null);
+  const investigationReturnFocusRef = useRef<HTMLElement | null>(null);
   // The question's locale as the page's own run read recorded it (spec
   // 2026-09-26 §14.3); null until that read answers.
   const [readQuestionLocale, setReadQuestionLocale] = useState<LocaleCode | null>(null);
@@ -1421,6 +1434,61 @@ export default function DebatePageClient({
     });
   }, [answerExport.available, completionReason, debate?.status, debate?.topic, hasArtifacts, hasTree]);
 
+  // Keyboard audit 2026-11-12: the header shows its actions either inline or in the "⋯" menu, and
+  // CSS hides the other copy. When the copy holding focus is hidden, focus moves to its twin (same
+  // aria-label) in the copy now shown, or to the menu's summary when the menu is closed.
+  const handOffHeaderFocus = useCallback((overflowShown: boolean) => {
+    const inlineActions = debateHeaderInlineActionsRef.current;
+    const overflow = debateHeaderOverflowRef.current;
+    const active = document.activeElement;
+    if (!inlineActions || !overflow || !(active instanceof HTMLElement)) return;
+    const label = active.getAttribute("aria-label");
+    const twinIn = (scope: Element) =>
+      label === null ? null : scope.querySelector<HTMLElement>(`.debateOverflowAction[aria-label="${label.replace(/["\\]/g, "\\$&")}"]`);
+    if (overflowShown && inlineActions.contains(active)) {
+      ((overflow.open ? twinIn(overflow) : null) ?? overflow.querySelector<HTMLElement>(":scope > summary"))?.focus();
+    } else if (!overflowShown && overflow.contains(active)) {
+      overflow.open = false;
+      (twinIn(inlineActions) ?? inlineActions.querySelector<HTMLElement>("a[href], button"))?.focus();
+    }
+  }, []);
+  const headerCollapsedRef = useRef<boolean | null>(null);
+  useLayoutEffect(() => {
+    const before = headerCollapsedRef.current;
+    headerCollapsedRef.current = headerActionsCollapsed;
+    // Not on mount: nothing in the header holds focus yet.
+    if (before === null || before === headerActionsCollapsed) return;
+    handOffHeaderFocus(headerActionsCollapsed || phoneWidth());
+  }, [handOffHeaderFocus, headerActionsCollapsed]);
+  // At 640px and below the inline copy is hidden whatever the fit says (globals.css), so crossing
+  // that width (a phone turned, browser zoom) hands focus over too.
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const phone = window.matchMedia(PHONE_WIDTH_QUERY);
+    const onChange = () => handOffHeaderFocus(phone.matches || headerCollapsedRef.current === true);
+    phone.addEventListener?.("change", onChange);
+    return () => phone.removeEventListener?.("change", onChange);
+  }, [handOffHeaderFocus]);
+
+  // Keyboard audit 2026-11-12: the page replaces itself whole (a private debate deleted, the run
+  // held for the check, a fatal error, the debate gone) and the control that held focus goes with
+  // it. The deleted screen always takes focus, as the step that asked for it; the others take it
+  // only when it was lost, never from somewhere real. Not on mount: a page load keeps its own start.
+  const pageSwap = privateDeletionStatus !== null ? "deleted"
+    : held && !removedByCheck ? "held"
+    : removedByCheck ? null
+    : error && !debate ? "error"
+    : !debate ? "loading"
+    : null;
+  const shownPageSwap = useRef(pageSwap);
+  useEffect(() => {
+    if (shownPageSwap.current === pageSwap) return;
+    shownPageSwap.current = pageSwap;
+    const target = pageSwapFocusRef.current;
+    if (pageSwap === null || target === null) return;
+    if (pageSwap === "deleted" || focusIsLost()) target.focus();
+  }, [pageSwap]);
+
   const detailNode = findNode(debate?.tree ?? null, detailNodeId);
   const { scoringByNodeId, scoringErrorsByNodeId } = useMemo(
     () => indexScoringResponse(scoringState.data),
@@ -1525,7 +1593,7 @@ export default function DebatePageClient({
   function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
     if (publicMode) return;
     const rect = anchor.getBoundingClientRect();
-    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
+    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, anchorBottom: rect.bottom, text });
   }
 
   // Thread, Split and Canvas each render a Challenge affordance only when they
@@ -1550,7 +1618,7 @@ export default function DebatePageClient({
     const range = selection?.getRangeAt(0);
     const rect = range?.getBoundingClientRect();
     if (!rect) return;
-    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, text });
+    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, anchorBottom: rect.bottom, text });
   }
 
   function canFocusRecommendationNode(targetNodeId: string): boolean {
@@ -1596,7 +1664,7 @@ export default function DebatePageClient({
     return (
       <div className="screen scroll"><div className="screenInner narrow">
         <p className="eyebrow">{t(debateChromeCatalog, "debateChrome.privateDebate")}</p>
-        <h1>{privateDeletionStatus==="CLEANED"
+        <h1 tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>{privateDeletionStatus==="CLEANED"
           ? t(debateChromeCatalog, "debateChrome.privateDebateDeleted")
           : t(debateChromeCatalog, "debateChrome.privateDebateDeletionProcessing")}</h1>
         <p role="status">{privateDeletionStatus==="CLEANED"
@@ -1625,14 +1693,14 @@ export default function DebatePageClient({
         dir={localeDirection(readQuestionLocale ?? storyLocale)}>{debate?.topic}</p>}
       {removedByCheck
         ? <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={crisisCountryHint} onClose={() => window.location.assign("/?tab=yours")} />
-        : <p role="status" className="checkingNotice">{t(publicCatalog, "public.publication.checkingDebate")}</p>}
+        : <p role="status" className="checkingNotice" tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>{t(publicCatalog, "public.publication.checkingDebate")}</p>}
     </div>;
   }
   if (error && !debate) {
     return (
       <div className="screen scroll">
         <div className="screenInner narrow">
-          <div className="error" role="alert">{error}</div>
+          <div className="error" role="alert" tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>{error}</div>
           <Link className="btn" href="/" style={{ marginTop: 16 }}>
             {t(debateChromeCatalog, "debateChrome.backToLibrary")}
           </Link>
@@ -1646,7 +1714,7 @@ export default function DebatePageClient({
       <div className="screen scroll">
         <div className="screenInner narrow">
           {streamState.status === "offline" ? null : (
-            <p className="muted" role="status">
+            <p className="muted" role="status" tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>
               {initialPending
                 ? localizedPendingProgressCopy(live, streamState, debateChromeCatalog, locale)
                 : t(debateChromeCatalog, "debateChrome.loading")}
@@ -1781,7 +1849,29 @@ export default function DebatePageClient({
             ) : null}
             <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
           </div>
-          <details className="debateUtilityOverflow">
+          {/* Keyboard audit 2026-11-12: a menu closes on Escape (back to its summary), when focus
+              leaves it for another control, and once an item is used. Focus goes back to the
+              summary before the item acts, so a dialog the item opens returns focus there and
+              not to an item the closed menu hides. */}
+          <details
+            className="debateUtilityOverflow"
+            ref={debateHeaderOverflowRef}
+            onKeyDown={(event) => {
+              if (event.key !== "Escape" || !event.currentTarget.open) return;
+              event.preventDefault();
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector<HTMLElement>(":scope > summary")?.focus();
+            }}
+            onBlur={(event) => {
+              const next = event.relatedTarget;
+              if (next instanceof Node && !event.currentTarget.contains(next)) event.currentTarget.open = false;
+            }}
+            onClickCapture={(event) => {
+              if (!(event.target instanceof Element) || event.target.closest(".debateOverflowMenu .debateOverflowAction") === null) return;
+              event.currentTarget.open = false;
+              event.currentTarget.querySelector<HTMLElement>(":scope > summary")?.focus();
+            }}
+          >
             <summary className="iconBtn" role="button" aria-label={t(chromeCatalog, "chrome.moreDebateActions")} title={t(chromeCatalog, "chrome.moreDebateActions")}>
               <span aria-hidden>⋯</span>
             </summary>
@@ -2117,8 +2207,13 @@ export default function DebatePageClient({
       {popover ? (
         <ChallengePopover
           state={popover}
+          anchorBottom={popover.anchorBottom}
           onClose={() => setPopover(null)}
           onChoose={() => {
+            // The drawer and the popover close in this commit; when the control that opened the
+            // drawer has left the page ("Open target"), the investigation opens from, and returns
+            // focus to, the argument's control in the view now shown.
+            drawerReturnFocusRef.current = nodeFocusTarget(popover.nodeId);
             setScrutiny((current) => ({ ...current, [popover.nodeId]: "working" }));
             setInvestigation({ nodeId: popover.nodeId, status: "working", flagged: popover.text });
             setDetailNodeId(null);
@@ -2134,12 +2229,17 @@ export default function DebatePageClient({
           node={findNode(debate.tree, investigation.nodeId)}
           status={investigation.status}
           flagged={investigation.flagged}
-          onClose={() => setInvestigation(null)}
+          onClose={() => {
+            investigationReturnFocusRef.current = nodeFocusTarget(investigation.nodeId);
+            setInvestigation(null);
+          }}
+          returnFocusRef={investigationReturnFocusRef}
           onResolve={(status) => {
             setScrutiny((current) => ({ ...current, [investigation.nodeId]: status }));
             setInvestigation((current) => (current ? { ...current, status } : current));
           }}
           onClear={() => {
+            investigationReturnFocusRef.current = nodeFocusTarget(investigation.nodeId);
             setScrutiny((current) => {
               const next = { ...current };
               delete next[investigation.nodeId];
@@ -2503,7 +2603,8 @@ export function ScoringDiagnosticsDrawer({
             x
           </button>
         </div>
-        <div className="drawerBody">
+        {/* A Tab stop of its own: the body is what scrolls (keyboard audit 2026-11-12). */}
+        <div className="drawerBody" tabIndex={0} role="region" aria-label={t(catalog, "debateChrome.scoring.diagnostics")}>
           <div className="drawerHintMuted">{t(catalog, "debateChrome.scoring.diagnosticsHint")}</div>
           <ul className="drawerFindingList">
             {rows.map(([label, value]) => (
@@ -2709,7 +2810,9 @@ function SingleShotMain({
   catalog?: MessageCatalog;
 }) {
   return (
-    <div className="singleShot scroll">
+    // A Tab stop of its own: this box is the only way to read the result, and it holds no
+    // control a keyboard could scroll it with (keyboard audit 2026-11-12).
+    <div className="singleShot scroll" tabIndex={0} role="region" aria-label={t(catalog, "debateChrome.singleShot.result")}>
       <div className="singleShotInner">
         <div className="nodeEyebrow">{t(catalog, "debateChrome.singleShot.result")}</div>
         <h1 className="display sm" style={{ marginTop: 8 }} data-ai-generated="true">

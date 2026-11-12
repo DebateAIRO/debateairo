@@ -1,5 +1,6 @@
 "use client";
 
+import type { RefObject } from "react";
 import type { DebateNode } from "@/lib/types";
 import { scrutinyStatus as scrutinyStatuses } from "@/lib/scrutiny";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -28,7 +29,8 @@ export function InvestigationDrawer({
   onResolve,
   onClear,
   catalog = debateDrawersEnglish,
-  composeCatalog = composeEnglish
+  composeCatalog = composeEnglish,
+  returnFocusRef
 }: {
   node: DebateNode | null;
   status: string;
@@ -39,8 +41,10 @@ export function InvestigationDrawer({
   catalog?: MessageCatalog;
   /** The interface locale's `compose` catalogue: the scrutiny status table. */
   composeCatalog?: MessageCatalog;
+  /** Where focus goes on close when the control that opened the drawer has left the page. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
-  const dialogRef = useDialogSurface<HTMLElement>(onClose);
+  const dialogRef = useDialogSurface<HTMLElement>(onClose, returnFocusRef);
   const statuses = scrutinyStatuses(composeCatalog);
   const current = statuses[status] ?? statuses.working;
   const currentLabel = t(catalog, STATUS_LABEL_KEYS[status] ?? STATUS_LABEL_KEYS.working);
@@ -63,7 +67,8 @@ export function InvestigationDrawer({
           </button>
         </div>
 
-        <div className="drawerBody">
+        {/* A Tab stop of its own: the body is what scrolls (keyboard audit 2026-11-12). */}
+        <div className="drawerBody" tabIndex={0} role="region" aria-label={t(catalog, "debateDrawers.investigation.title")}>
           <div className="nodeEyebrow">{t(catalog, "debateDrawers.investigation.flaggedClaim")}</div>
           <div className="invFlagged" style={{ borderLeftColor: current.color }}>
             <div className="invFlaggedClaim">{node?.claim ?? "—"}</div>

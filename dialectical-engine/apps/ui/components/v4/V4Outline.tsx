@@ -250,7 +250,8 @@ export function V4Outline(props: MapPiecesProps) {
             {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
             <LevelWords level={1} catalog={catalog} />
           </button>
-          {props.rootExtra === undefined ? null : <div className="v4MapRootExtra">{props.rootExtra}</div>}
+          {/* V4B-M3: what hangs under the question keeps its own Tab stops (it is not one of the rows). */}
+          {props.rootExtra === undefined ? null : <div className="v4MapRootExtra" data-rove-skip="">{props.rootExtra}</div>}
           <Children
             groupKey="root"
             group="root"

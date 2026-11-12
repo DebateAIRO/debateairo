@@ -24,6 +24,9 @@
   font: inherit; font-weight: 700;
 }
 .v4UndoLink { display: inline-flex; align-items: center; text-decoration: underline; text-underline-offset: 3px; }
+/* CSS-5 (keyboard audit 2026-11-12): on the ink note the accent ring was 2.57:1 in Chamber; the surface colour is 14.6:1
+   (Terracotta) and 15.3:1 (Chamber) against --ink. */
+.v4Root .v4Undo :focus-visible { outline-color: var(--surface); }
 .v4UndoMore {
   align-self: flex-start; padding: 0 12px; border-radius: var(--r-btn); background: var(--ink); box-shadow: var(--shadow-pop);
 }
@@ -54,6 +57,16 @@
   position: fixed; inset-inline-start: var(--v4-gutter); bottom: calc(16px + var(--safe-b)); z-index: 60;
   max-width: calc(100vw - 2 * var(--v4-gutter));
 }
+/* V4C-12 (keyboard audit 2026-11-12, WCAG 2.4.11): while it shows a note, the window keeps the note's measured height
+   (--v4-undo-room, V4DigUndoHost) and its 16 px lift free at its foot, so Tab never leaves a control under it. */
+/* The first-visit cookie bar sits over the same foot (globals.css keeps --consent-bar-room clear on every page): the
+   window keeps whichever room is larger. */
+html:has(.v4UndoHost) {
+  scroll-padding-block-end: max(var(--consent-bar-room, 0px), calc(var(--v4-undo-room, 72px) + 24px + var(--safe-b, 0px)));
+  /* The map and ask pages set the foot's room with rules of their own, which win over the one above: they read the
+     note's room from here, so the note is kept clear there too (a note that follows the person to another page). */
+  --v4-note-foot: calc(var(--v4-undo-room, 72px) + 24px + var(--safe-b, 0px));
+}
 
 /* ---------- the map page's bottom stack ---------- */
 .v4Stack {
@@ -71,6 +84,13 @@
 .v4DebLayout-laptop .v4StackWide { padding-inline-end: calc(var(--v4-gutter) + 360px + 20px); }
 /* The page's bottom room is the stack's real height (dig-f16), on the page and inside the desktop panel's own scroll. */
 .appShell:has(.v4Stack) { padding-bottom: var(--v4-stack-room, 0px); }
+/* V4B-V1 / CSS-2 (keyboard audit 2026-11-12, WCAG 2.4.11): the window scrolls a focused control clear of the stack (always
+   on a phone; the notes on a computer) and of the phone's pinned where-bar (--v4-where-room, V4WhereBar). The cookie bar's
+   own room (v4-debate.css, later and more specific) takes over the foot while it shows. */
+html:has(.v4DebPage) {
+  scroll-padding-block-start: calc(var(--v4-where-room, 0px) + 8px);
+  scroll-padding-block-end: max(calc(var(--v4-stack-room, 0px) + 8px), var(--v4-note-foot, 0px));
+}
 .v4DebLayout-desktop .v4DebPanelCol, .v4DebLayout-mid .v4DebPanelCol { padding-bottom: var(--v4-stack-room, 0px); }
 
 /* A phone: one surface, never more than about a quarter of the screen; the bar always shows, what is above it scrolls. */
@@ -102,8 +122,8 @@
 }
 /* The words and the × share the first row; [Write my report] takes the next one, so the × never sits alone on a row. */
 .v4StackGoodText { margin: 0; flex: 1 1 calc(100% - 64px); min-width: 0; font-size: var(--t-ui); font-weight: 600; color: var(--ok-text); }
-.v4StackGoodReport { order: 2; text-decoration: none; min-height: 44px; }
-.v4StackGoodClose { order: 1;  flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; cursor: pointer; font-size: 20px; color: var(--text-2); }
+.v4StackGoodReport { text-decoration: none; min-height: 44px; }
+.v4StackGoodClose { flex: none; min-width: 44px; min-height: 44px; background: none; border: 0; cursor: pointer; font-size: 20px; color: var(--text-2); }
 /* journey-d3: the picks folded to one line, "Your picks ▸", which opens them. */
 .v4StackPicks { display: flex; flex-direction: column; min-width: 0; }
 .v4StackPicksToggle {

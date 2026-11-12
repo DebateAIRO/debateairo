@@ -297,6 +297,13 @@
   border-start-start-radius: var(--r-card); border-start-end-radius: var(--r-card);
 }
 .v4StartSheet:focus { outline: none; }
+/* Keyboard audit 2026-11-12 (V4A-16, WCAG 2.4.11): the window scrolls on this page (html), and while the bar is pinned it
+   keeps the bar's measured height (V4StartBar sets --v4-start-bar-room) free at its foot, so a control the keyboard reaches
+   scrolls clear of the bar, never under it. Not while the bar sits in the page: a text box has focus, step 1 on a computer,
+   or the cookie bar shows. */
+html:has(.v4StartBar:not(.v4StartBar--aside):not(.v4StartBar--next)):not(:has(.appShell .consentBar)) {
+  scroll-padding-block-end: max(calc(var(--v4-start-bar-room, 0px) + 8px), var(--v4-note-foot, 0px));
+}
 .v4StartSheetTitle { margin: 0; font-size: 17px; font-weight: 700; }
 .v4StartSheetDone { align-self: flex-start; min-height: 44px; }
 
@@ -488,7 +495,8 @@
 }
 /* The one-tap suggestions (spec §2 item 5), at most two; the list takes the focus after a press. */
 .v4StartSuggest { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.v4StartSuggest:focus { outline: none; }
+/* Keyboard audit 2026-11-12 (V4A-17): quiet for a pointer only; after a keyboard press the list shows the ring. */
+.v4StartSuggest:focus:not(:focus-visible) { outline: none; }
 .v4StartSuggestion {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0;
   padding-block: 8px; padding-inline: 12px; background: var(--surface-2); border-radius: var(--r-btn);
@@ -593,15 +601,17 @@
 .v4AskPutBack[aria-disabled="true"] { color: var(--text-3); cursor: not-allowed; text-decoration: none; }
 
 /* ---- V4 start step — Task 76f: "Not started yet" (owner card "Where shown"; answer S3 A) ---- */
-/* Under the question box and its lines, above "Your maps", in the shelf's quiet look. Each line: the question on one line, cut with
-   "…" (the whole question is its title), the day it was saved, then Pick up and Delete as full touch targets. On a phone the two
-   buttons wrap under the question. Logical properties only (Task 77's right-to-left check). */
+/* Under the question box and its lines, above "Your maps", in the shelf's quiet look. Each line: the question on two lines at
+   most, cut with "…" (the whole question is its title; keyboard audit 2026-11-12, V4A-19: two lines, as the shelf's, so a
+   keyboard user reads more than hover shows), the day it was saved, then Pick up and Delete as full touch targets. On a phone
+   the two buttons wrap under the question. Logical properties only (Task 77's right-to-left check). */
 .v4NotStarted { border-block-start: 1px solid var(--line-2); padding-block-start: 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .v4NotStartedTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; color: var(--text-2); }
 .v4NotStartedList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .v4NotStartedItem { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; min-width: 0; }
 .v4NotStartedQuestion {
-  flex: 1 1 12em; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; color: var(--ink);
+  flex: 1 1 12em; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  overflow-wrap: anywhere; font-weight: 600; color: var(--ink);
 }
 .v4NotStartedDay { font-size: var(--t-meta); color: var(--text-2); white-space: nowrap; }
 .v4NotStartedActions { display: inline-flex; gap: 4px 16px; }

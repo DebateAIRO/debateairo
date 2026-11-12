@@ -258,20 +258,38 @@ describe("RegionField artboard states", () => {
     expect(host.querySelector(".regionPopover")).toBeNull();
   });
 
-  it("E8 activates focusable rows and back controls with Enter and Space", async () => {
+  /* What a browser does with a key on a focused native button (jsdom does not): Enter clicks on keydown, Space
+     clicks on keyup — and Firefox/Safari send that keyup click to whatever holds focus by then. Unless the page
+     cancelled the keydown, which is what the old per-button key handler did before running the action itself. */
+  async function nativeKey(selector: string, value: "Enter" | " "): Promise<void> {
+    const target = query<HTMLElement>(selector);
+    target.focus();
+    let allowed = true;
+    await act(async () => { allowed = target.dispatchEvent(new KeyboardEvent("keydown", { key: value, bubbles: true, cancelable: true })); });
+    if (value === "Enter") {
+      if (allowed) await act(async () => target.click());
+      return;
+    }
+    await act(async () => { await Promise.resolve(); });
+    const keyupTarget = document.activeElement as HTMLElement;
+    await act(async () => keyupTarget.dispatchEvent(new KeyboardEvent("keyup", { key: value, bubbles: true, cancelable: true })));
+    await act(async () => keyupTarget.click());
+  }
+
+  it("E8 activates focusable rows and back controls with Enter and Space (native button activation)", async () => {
     await mountRegion();
     await click("#signup-region-trigger");
     const continent = query<HTMLButtonElement>('.regionContinent[data-continent="Europe"]');
     expect(continent.type).toBe("button");
     expect(isLocked(continent)).toBe(false);
     expect(continent.tabIndex).not.toBe(-1);
-    await key('.regionContinent[data-continent="Europe"]', "Enter");
+    await nativeKey('.regionContinent[data-continent="Europe"]', "Enter");
     expect(document.activeElement).toBe(query(".regionBack"));
     const country = query<HTMLButtonElement>('.regionCountry[data-code="RO"]');
     expect(country.type).toBe("button");
     expect(isLocked(country)).toBe(false);
     expect(country.tabIndex).not.toBe(-1);
-    await key('.regionCountry[data-code="RO"]', " ");
+    await nativeKey('.regionCountry[data-code="RO"]', " ");
     expect(query(".regionName").textContent).toBe("Romania");
     expect(document.activeElement).toBe(query("#signup-region-trigger"));
     await click("#signup-region-trigger");
@@ -279,8 +297,33 @@ describe("RegionField artboard states", () => {
     expect(back.type).toBe("button");
     expect(isLocked(back)).toBe(false);
     expect(back.tabIndex).not.toBe(-1);
-    await key(".regionBack", "Enter");
-    expect(document.activeElement).toBe(query(".regionContinent"));
+    await nativeKey(".regionBack", "Enter");
+    expect(document.activeElement).toBe(query('.regionContinent[data-continent="Europe"]'));
+  });
+
+  // Keyboard audit 2026-11-12 (AUTH-19): Space acts once. The keyup click must not reopen the list on the trigger
+  // that took focus, nor flip back to the continents from the Back button that took focus.
+  it("E8b Space on a continent or a country acts once", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    await nativeKey('.regionContinent[data-continent="Oceania"]', " ");
+    expect(query(".regionContinentTitle").textContent).toBe("Oceania");
+    expect(document.activeElement).toBe(query(".regionBack"));
+    await nativeKey('.regionCountry[data-code="AU"]', " ");
+    expect(query(".regionName").textContent).toBe("Australia");
+    expect(host.querySelector(".regionPopover")).toBeNull();
+    expect(document.activeElement).toBe(query("#signup-region-trigger"));
+  });
+
+  // Keyboard audit 2026-11-12 (AUTH-18): Back lands on the continent the person just left.
+  it("E8c Back focuses the continent that was open", async () => {
+    await mountRegion();
+    await click("#signup-region-trigger");
+    for (const continent of ["Oceania", "Asia"]) {
+      await click(`.regionContinent[data-continent="${continent}"]`);
+      await click(".regionBack");
+      expect(document.activeElement).toBe(query(`.regionContinent[data-continent="${continent}"]`));
+    }
   });
 
   it("E9 gates the 51 US states, clears after leaving the US and retains on re-pick", async () => {

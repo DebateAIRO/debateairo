@@ -145,6 +145,8 @@
 /* A right-to-left map runs on to the left: the fade sits at that end. */
 [dir="rtl"] .v4MapScrollMore { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
 .v4MapScrollHint { margin: 0; font-size: var(--t-meta); }
+/* V4B-V3 (keyboard audit 2026-11-12): a card the arrow keys scroll to stops clear of the fade, so its focus ring shows. */
+.v4MapScroll { scroll-padding-inline-end: 56px; }
 .v4MapLeafMore .v4MapMore[aria-expanded="true"] { border-style: solid; }
 .v4MapGroundMark { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); font-weight: 600; color: var(--gold-text); }
 .v4MapGroundKey {
@@ -259,6 +261,8 @@
 .v4WhereLast { font-weight: 700; color: var(--text); flex: 0 1 auto; }
 .v4WhereLast > span, .v4WherePart { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .v4WherePart { min-height: 32px; text-decoration: none; font-size: var(--t-meta); max-width: 100%; }
+/* CSS-1 (keyboard audit 2026-11-12): the crumbs' list items clip anything outside them, so the ring is drawn inside. */
+.v4WhereLine .v4WherePart:focus-visible { outline-offset: -2px; }
 .v4WhereRow { display: flex; align-items: center; gap: 10px; min-height: 28px; }
 .v4Mini { flex: 1 1 auto; min-width: 0; min-height: 28px; display: flex; align-items: center; background: none; border: 0; padding: 0; cursor: pointer; }
 .v4MiniBars { display: flex; align-items: center; gap: 4px; width: 100%; }
