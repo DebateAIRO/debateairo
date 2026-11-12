@@ -22,7 +22,11 @@ const TEMPLATE_OF: Readonly<Record<ModerationStatementKind, MailTemplateId>> = O
   CONTRIBUTION_AFFECTED: "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED",
   REPORT_AFFECTED: "MODERATION_STATEMENT_REPORT_AFFECTED",
   CONTRIBUTION_DECIDED: "MODERATION_STATEMENT_CONTRIBUTION_DECIDED",
-  REPORT_DECIDED: "MODERATION_STATEMENT_REPORT_DECIDED"
+  REPORT_DECIDED: "MODERATION_STATEMENT_REPORT_DECIDED",
+  CONTRIBUTION_KEPT_OFF: "MODERATION_STATEMENT_CONTRIBUTION_KEPT_OFF",
+  REPORT_KEPT_OFF: "MODERATION_STATEMENT_REPORT_KEPT_OFF",
+  CONTRIBUTION_BACK: "MODERATION_STATEMENT_CONTRIBUTION_BACK",
+  REPORT_BACK: "MODERATION_STATEMENT_REPORT_BACK"
 });
 /** The mail's flag for each ground code. */
 const GROUND_FLAGS: Readonly<Record<string, string>> = Object.freeze({
@@ -31,20 +35,25 @@ const GROUND_FLAGS: Readonly<Record<string, string>> = Object.freeze({
 });
 const SOURCE_FLAGS: Readonly<Record<string, string>> = Object.freeze({ REPORT_BUTTON: "sourceReport", EMAIL_NOTICE: "sourceEmail", AUTHORITY_ORDER: "sourceAuthority", OWN_INITIATIVE: "sourceOwn" });
 const flag = (value: boolean): string => (value ? "true" : "false");
+/** 0176: the kinds that restrict nothing (the content is back): their mail is the date and the two links alone, no source, rule or routes. */
+const BACK: ReadonlySet<ModerationStatementKind> = new Set<ModerationStatementKind>(["CONTRIBUTION_BACK", "REPORT_BACK"]);
 /**
  * Final review (0172, M3): the kinds whose full statement carries no facts. Those told because their contribution or report left with the debate read
  * the step, the rule and the law, never the facts staff typed (identity.read_own_moderation_statements): their mail's link says so (`noFacts`).
- * DEBATE_HIDDEN keeps its sentence (ruling R14).
+ * DEBATE_HIDDEN keeps its sentence (ruling R14). 0176: the ends of a re-publish for the same people (KEPT_OFF, BACK) carry none either.
  */
-const NO_FACTS: ReadonlySet<ModerationStatementKind> = new Set<ModerationStatementKind>(["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"]);
+const NO_FACTS: ReadonlySet<ModerationStatementKind> = new Set<ModerationStatementKind>(["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED",
+  "CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF", "CONTRIBUTION_BACK", "REPORT_BACK"]);
 
 /**
  * The mail's params for one statement: two links, the date and one flag each. A staff hide relies on the hold alone, and what a person suspected stays on
  * the page; the automatic hide relied on the rule the check found, so that rule is named beside the hold (D2).
  */
 export function statementMailParams(input: Readonly<{ kind: ModerationStatementKind; happenedAt: string; itemUrl: string; statementUrl: string; ground: ModerationStatementGround }>): Record<string, string> {
+  const links = { happened: new Date(input.happenedAt).toISOString(), itemUrl: input.itemUrl, statementUrl: input.statementUrl };
+  if (BACK.has(input.kind)) return links;
   const grounds = new Set([...input.ground.grounds, ...(input.ground.automated_decision ? input.ground.suspected : [])]);
-  const params: Record<string, string> = { happened: new Date(input.happenedAt).toISOString(), itemUrl: input.itemUrl, statementUrl: input.statementUrl,
+  const params: Record<string, string> = { ...links,
     automatedDecision: flag(input.ground.automated_decision), automatedDetection: flag(input.ground.automated_detection), groundNone: flag(!input.ground.recorded),
     noFacts: flag(NO_FACTS.has(input.kind)) };
   for (const [code, name] of Object.entries(GROUND_FLAGS)) params[name] = flag(input.ground.recorded && grounds.has(code));
