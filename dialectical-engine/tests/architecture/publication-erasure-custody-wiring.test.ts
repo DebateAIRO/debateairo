@@ -59,7 +59,11 @@ describe("NV-11 · main.ts gates publication custody apart from publication serv
       'const publications = environment.PUBLICATION_ENABLED === "true" ? publicationKeyCustody : undefined;'
     );
     expect(main).toContain("if (publicationKeyCustody !== undefined) {");
-    expect(main).not.toContain("if (publications !== undefined) {");
+    // A block that does need publication served (the public page's sweeps) may stand on `publications`, but none of them
+    // runs a key cleanup: that block stands on custody alone.
+    for (const at of [...main.matchAll(/if \(publications !== undefined\) \{/gu)].map((match) => match.index)) {
+      expect(main.slice(at, main.indexOf("\n}\n", at))).not.toMatch(/reconcileKey/u);
+    }
     expect(main).toContain("await publicationKeyCustody.reconcileKeyProvisionCleanup();");
     expect(main).toContain("await publicationKeyCustody.reconcileKeyCleanup();");
     expect(main).not.toMatch(/\bpublications\.reconcileKey/u);

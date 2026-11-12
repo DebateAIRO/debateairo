@@ -182,7 +182,12 @@ describe("the worker's sources (NV-27)", () => {
   it("spawns with an empty execArgv, and the route renders only through the worker", () => {
     expect(source("apps/ui/lib/report/reportRenderWorker.ts")).toContain("execArgv: []");
     const route = source("apps/ui/lib/report/reportRoute.ts");
-    expect(route).not.toContain('from "./renderReport.js"');
+    // The module also holds the investigation report's route, which imports its own renderer from renderReport.js and
+    // renders it in-process; the debate report's renderer is never imported here, so the debate report renders only
+    // through the worker.
+    expect(route).not.toMatch(/import \{[^}]*\brenderReportPdf\b[^}]*\} from "\.\/renderReport\.js"/u);
+    expect(route.match(/from "\.\/renderReport\.js"/gu) ?? []).toHaveLength(1);
+    expect(route).toContain('import { renderInvestigationReportPdf } from "./renderReport.js";');
     expect(route).toContain("input.render ?? renderReportPdfOffThread");
   });
 });

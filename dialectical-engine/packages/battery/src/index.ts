@@ -510,15 +510,20 @@ export class WorkItemRepository {
     })));
   }
 
-  /** NV-25: this release's READY items, oldest first, each with its run's settings version (runner-lapsed-resend.ts). */
+  /**
+   * NV-25: this release's READY items, oldest first, each with its run's settings version (runner-lapsed-resend.ts).
+   * As every other list here, the release that owns a run's work and its settings version are the ones it was last handed
+   * over to (`RELEASE_NOW`, `identity.run_settings_version_now`), and a month-paused debate's item is not listed, as
+   * `listDispatchable` leaves it out.
+   */
   async listReady(limit: number): Promise<readonly ReadyWorkItem[]> {
     assertWorkLimit(limit, "Ready work");
     const result = await this.pool.query<{ work_item_id: string; run_id: string; register_version: number }>(
       // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
-      `SELECT item.work_item_id, item.run_id, run.register_version::integer AS register_version
+      `SELECT item.work_item_id, item.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version
        FROM core.work_item AS item
-       JOIN core.run AS run ON run.run_id = item.run_id AND run.release_key = $2
-       WHERE item.state = 'READY'
+       JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $2
+       WHERE item.state = 'READY' AND ${NOT_MONTH_PAUSED("item.run_id")}
        ORDER BY item.created_at_seq, item.work_item_id
        LIMIT $1`,
       [limit, this.#fence.releaseKey]

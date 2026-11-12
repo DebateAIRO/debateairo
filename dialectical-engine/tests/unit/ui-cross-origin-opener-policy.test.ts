@@ -56,7 +56,9 @@ describe("the UI's own Cross-Origin-Opener-Policy (NV-05)", () => {
     files.push(join(UI_ROOT, "middleware.ts"));
     expect(files.length).toBeGreaterThan(100);
     const relying = files.filter((file) => {
-      const text = readFileSync(file, "utf8");
+      // `focus.opener` (components/v4/V4DigSuggest.tsx) is a React ref to the button that opened an edit box, the box's
+      // focus helper's own name, not a window's opener; any other `.opener` still counts.
+      const text = readFileSync(file, "utf8").replaceAll("focus.opener", "");
       return /\b(?:window|globalThis)\.open\s*\(/u.test(text) || /\.opener\b/u.test(text);
     });
     expect(relying).toEqual([]);

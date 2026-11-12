@@ -85,7 +85,9 @@ describe("0144: step 2's small AI in the person's quota", () => {
     expect(actual).toEqual(declared);
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0144.ts");
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/ask-clarify-charge-database.test.ts");
-    expect(read("packages/budget/src/model-spend.ts").match(/identity\.read_ask_clarify_spent/gu)).toHaveLength(2);
+    // The person's window readers (readOwnerSpentMicros and the money rule's batch reader) and the withdrawal's credit used
+    // (readWithdrawalSpend), which counts what a person's windows count.
+    expect(read("packages/budget/src/model-spend.ts").match(/identity\.read_ask_clarify_spent/gu)).toHaveLength(3);
     expect(read("packages/db/src/data-export.ts")).toContain("identity.read_data_export_ask_clarify($1,$2) ask_clarify_calls");
   });
 
