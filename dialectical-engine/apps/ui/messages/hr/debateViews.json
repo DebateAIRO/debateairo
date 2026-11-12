@@ -69,6 +69,7 @@
   "debateViews.levelCount.few": "{count} razine",
   "debateViews.levelCount.other": "{count} razina",
   "debateViews.mapInteractionHint": "Zadržite pokazivač iznad isječka za pregled · kliknite za fokus",
+  "debateViews.mapKeysHint": "Strelicama se krećete među isječcima · Enter postavlja odabrani u fokus",
   "debateViews.mapLegendHint": "Prsten = dubina · širina = količina rasprave ispod njega",
   "debateViews.mapReasoning": "Rasuđivanje",
   "debateViews.moveToParentArgument": "Prijeđite na nadređeni argument: {claim}",

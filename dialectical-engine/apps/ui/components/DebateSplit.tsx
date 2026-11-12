@@ -428,7 +428,7 @@ function SplitCard({
           </div>
         ) : (
           <>
-            <button type="button" className="splitCardClaim" {...(node.claim ? textLang : {})} onClick={() => onFocus(node.id)}>
+            <button type="button" className="splitCardClaim" id={`split-claim-${node.id}`} {...(node.claim ? textLang : {})} onClick={() => onFocus(node.id)}>
               {shownClaim(node, debateChromeCatalog)}
             </button>
             {node.active_generation?.argument ? (
@@ -445,6 +445,22 @@ function SplitCard({
               <button type="button" className="nodeCtrl focus" onClick={() => onFocus(node.id)}>
                 {t(catalog, "debateViews.focus")} <span aria-hidden="true">▸</span>
               </button>
+              {/* The same Challenge the focused claim and Thread's rows have, so a side card's
+                  passage is one press away (keyboard audit 2026-11-12, DEB1-9). */}
+              {onChallengeNode && state !== "pending" && state !== "streaming" ? (
+                <button
+                  type="button"
+                  className="nodeCtrl challenge"
+                  id={`split-challenge-${node.id}`}
+                  aria-labelledby={`split-challenge-${node.id} split-claim-${node.id}`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onChallengeNode(node, event.currentTarget);
+                  }}
+                >
+                  <span aria-hidden="true">⚐</span> {t(catalog, "debateViews.challenge")}
+                </button>
+              ) : null}
               <span style={{ flex: 1 }} />
               {node.active_generation?.argument ? (
                 <button type="button" className="nodeCtrl" onClick={() => onToggleExpand(node.id)}>

@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Podważ tę tezę",
+  "debateDrawers.challenge.whichPart": "Która część? (opcjonalnie)",
   "debateDrawers.common.close": "Zamknij",
   "debateDrawers.common.false": "fałsz",
   "debateDrawers.common.notAvailable": "niedostępne",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Brak tekstu argumentu.",
   "debateDrawers.node.noCompletedReview": "Dla tego węzła nie zapisano ukończonej recenzji wykonanej przez model innego twórcy.",
   "debateDrawers.node.noPreviousGenerations": "Brak wcześniejszych wersji.",
+  "debateDrawers.node.noScore.notInAnswer": "Ta karta nie jest częścią odpowiedzi, więc nie ma oceny.",
+  "debateDrawers.node.noScore.notYet": "Brak oceny. Oceny pojawią się, gdy odpowiedź będzie gotowa.",
+  "debateDrawers.node.noScore.question": "Samo pytanie nie ma oceny.",
   "debateDrawers.node.noScoringRecommendation": "Dla tego argumentu nie ma rekomendacji wynikającej z oceny.",
   "debateDrawers.node.notUseful": "nieprzydatne",
   "debateDrawers.node.openRecommendedTargetClaim": "Otwórz rekomendowaną tezę docelową",

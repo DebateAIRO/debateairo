@@ -83,6 +83,7 @@
   "debateViews.levelCount.many": "{count}-il livell",
   "debateViews.levelCount.other": "{count} livell",
   "debateViews.mapInteractionHint": "Żomm il-kursor fuq sezzjoni biex tispezzjonaha · ikklikkja biex tiffoka",
+  "debateViews.mapKeysHint": "It-tasti tal-vleġeġ jiċċaqalqu bejn is-sezzjonijiet · Enter jiffoka waħda",
   "debateViews.mapLegendHint": "Ċirku = fond · wisa’ = l-ammont ta’ dibattitu taħtu",
   "debateViews.mapReasoning": "Raġunament",
   "debateViews.moveToParentArgument": "Mur ’il fuq għall-argument ġenitur: {claim}",

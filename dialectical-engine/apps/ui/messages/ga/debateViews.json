@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} leibhéal",
   "debateViews.levelCount.other": "{count} leibhéal",
   "debateViews.mapInteractionHint": "Cuir an cúrsóir thar dheighleog chun í a iniúchadh · cliceáil chun díriú uirthi",
+  "debateViews.mapKeysHint": "Bog idir deighleoga leis na heochracha saighde · cuireann Enter fócas ar cheann",
   "debateViews.mapLegendHint": "Fáinne = doimhneacht · leithead = méid na díospóireachta faoina bhun",
   "debateViews.mapReasoning": "Réasúnú",
   "debateViews.moveToParentArgument": "Téigh suas chuig an máthairargóint: {claim}",

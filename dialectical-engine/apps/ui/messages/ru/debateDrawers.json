@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Оспорить",
+  "debateDrawers.challenge.whichPart": "Какая часть? (необязательно)",
   "debateDrawers.common.close": "Закрыть",
   "debateDrawers.common.false": "ложь",
   "debateDrawers.common.notAvailable": "недоступно",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Текст аргумента пока отсутствует.",
   "debateDrawers.node.noCompletedReview": "Для этого узла нет записанной завершённой проверки моделью другого разработчика.",
   "debateDrawers.node.noPreviousGenerations": "Предыдущих вариантов нет.",
+  "debateDrawers.node.noScore.notInAnswer": "Эта карточка не входит в ответ, поэтому у неё нет оценки.",
+  "debateDrawers.node.noScore.notYet": "Оценки пока нет. Оценки появятся, когда ответ будет готов.",
+  "debateDrawers.node.noScore.question": "Сам вопрос не оценивается.",
   "debateDrawers.node.noScoringRecommendation": "Для этого аргумента нет рекомендации по результатам оценки.",
   "debateDrawers.node.notUseful": "не полезно",
   "debateDrawers.node.openRecommendedTargetClaim": "Открыть рекомендованный целевой тезис",

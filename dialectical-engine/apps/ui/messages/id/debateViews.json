@@ -55,6 +55,7 @@
   "debateViews.leanAndFocusHint": "Cenderung {lean} · klik argumen untuk memfokuskannya",
   "debateViews.levelCount.other": "{count} tingkat",
   "debateViews.mapInteractionHint": "Arahkan penunjuk ke irisan untuk memeriksa · klik untuk memfokuskan",
+  "debateViews.mapKeysHint": "Tombol panah berpindah antar irisan · Enter memfokuskan irisan",
   "debateViews.mapLegendHint": "Cincin = kedalaman · lebar = jumlah debat di bawahnya",
   "debateViews.mapReasoning": "Penalaran",
   "debateViews.moveToParentArgument": "Naik ke argumen induk: {claim}",

@@ -1094,7 +1094,9 @@ export function V4MapTree(props: MapPiecesProps) {
   const [scrollBox, setScrollBox] = useState<HTMLDivElement | null>(null);
   const overflows = useOverflows(scrollBox);
   const treeRef = useRef<HTMLDivElement | null>(null);
+  const hintId = useId();
   const keys = useMapKeys(treeRef, {
+    hint: hintId,
     onExpand: (row) => {
       if (!fold || !row.startsWith("path:")) return false;
       const id = row.slice("path:".length);
@@ -1249,6 +1251,9 @@ export function V4MapTree(props: MapPiecesProps) {
         </div>
       </div>
       {overflows ? <p className="v4MapScrollHint v4Muted">{t(catalog, "v4.map.scrollHint")}</p> : null}
+      {/* V4B-M1 (keyboard audit 2026-11-12): the map's keys, shown while a card has the keyboard's ring (v4-map-looks.css).
+          A read-only map (the hand-off map, a public debate) has no pick boxes: its line names only the keys that move. */}
+      <p id={hintId} className="v4MapKeysHint v4Muted">{t(catalog, props.readOnly === true ? "v4.map.keysHintReadOnly" : "v4.map.keysHint")}</p>
       <ul className="v4MapLegend" aria-label={t(catalog, "v4.map.legendLabel")}>
         <MapLegendItems catalog={catalog} />
       </ul>

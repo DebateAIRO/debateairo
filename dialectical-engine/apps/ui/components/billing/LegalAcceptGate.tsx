@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
 import { PrivacyPolicyModal } from "@/components/consent/PrivacyPolicyModal";
 import { TermsOfServiceModal } from "@/components/consent/TermsOfServiceModal";
@@ -67,6 +67,25 @@ export function LegalAcceptGate({
   useEffect(() => {
     if (error === "stale" && (focusIsLost() || document.activeElement?.matches(":disabled"))) reload.current?.focus();
   }, [error]);
+  // Keyboard audit 2026-11-12: the screen can come up over a page the person was using (the ask page hides under it,
+  // V4AskGate). Focus is then on nothing, or on the hidden page behind it, and nothing says where it is: it goes to the
+  // heading, which names the screen (the next Tab is its first control). On a fresh page load nothing was in use, so
+  // nothing moves, and focus on something real that the screen does not cover stays there.
+  const title = useRef<HTMLHeadingElement>(null);
+  const inUse = useRef(false);
+  useLayoutEffect(() => {
+    // Read before the browser takes focus away from a page that hid as this screen came.
+    const held = document.activeElement;
+    inUse.current = held !== null && held !== document.body;
+    const used = (): void => { inUse.current = true; };
+    document.addEventListener("focusin", used);
+    return () => document.removeEventListener("focusin", used);
+  }, []);
+  useEffect(() => {
+    if (state !== "required" || !inUse.current) return;
+    const held = document.activeElement;
+    if (focusIsLost() || (held !== null && held.closest("[hidden], [inert], [aria-hidden='true']") !== null)) title.current?.focus();
+  }, [state]);
 
   useEffect(() => {
     let active = true;
@@ -143,7 +162,7 @@ export function LegalAcceptGate({
     <div className="screen scroll">
       <div className="screenInner narrow" role="region" aria-labelledby="legal-gate-title">
         <p className="eyebrow">{t(catalog, "newDebate.legalGate.eyebrow")}</p>
-        <h1 id="legal-gate-title">{t(catalog, "newDebate.legalGate.title")}</h1>
+        <h1 id="legal-gate-title" ref={title} tabIndex={-1}>{t(catalog, "newDebate.legalGate.title")}</h1>
         <p>{t(catalog, "newDebate.legalGate.body")}</p>
         {error === null ? null : (
           <div className="authAlert" role="alert">

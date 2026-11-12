@@ -736,7 +736,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{
     return (
       <div className="v4RepPage">
         {header}
-        <div className="v4RepState">
+        <div className="v4RepState" id="page-content" tabIndex={-1}>
           {load.kind === "LOADING" || (load.kind === "NOT_READY" && !notReadyShown)
             ? <p role="status" className="v4Muted">{t(catalog, "v4.common.loading")}</p>
             : null}
@@ -784,7 +784,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{
     return (
       <div className="v4RepPage">
         {header}
-        <div className="v4RepDoc">
+        <div className="v4RepDoc" id="page-content" tabIndex={-1}>
           <div className="v4RepLoading" role="status">{t(catalog, "v4.report.loadingReport")}</div>
         </div>
       </div>
@@ -802,7 +802,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{
   return (
     <div className="v4RepPage">
       {header}
-      <article className="v4RepDoc" aria-labelledby="v4-report-title">
+      <article className="v4RepDoc" aria-labelledby="v4-report-title" id="page-content" tabIndex={-1}>
         <p className="v4RepPrintBrand" aria-hidden="true">Dialectical Engine</p>
         <header className="v4RepTop">
           <p className="v4Eyebrow v4RepMeta">{t(catalog, "v4.report.eyebrow")}</p>

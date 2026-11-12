@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Dit betwisten",
+  "debateDrawers.challenge.whichPart": "Welk deel? (optioneel)",
   "debateDrawers.common.close": "Sluiten",
   "debateDrawers.common.false": "onwaar",
   "debateDrawers.common.notAvailable": "niet beschikbaar",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Nog geen argumenttekst.",
   "debateDrawers.node.noCompletedReview": "Voor dit knooppunt is geen voltooide beoordeling door een tweede maker vastgelegd.",
   "debateDrawers.node.noPreviousGenerations": "Geen eerdere generaties.",
+  "debateDrawers.node.noScore.notInAnswer": "Deze kaart maakt geen deel uit van het antwoord en heeft daarom geen score.",
+  "debateDrawers.node.noScore.notYet": "Nog geen score. Scores verschijnen zodra het antwoord klaar is.",
+  "debateDrawers.node.noScore.question": "De vraag zelf krijgt geen score.",
   "debateDrawers.node.noScoringRecommendation": "Voor dit argument is geen scoreaanbeveling beschikbaar.",
   "debateDrawers.node.notUseful": "niet nuttig",
   "debateDrawers.node.openRecommendedTargetClaim": "Aanbevolen doelstelling openen",

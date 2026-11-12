@@ -535,7 +535,7 @@ function NewDebateForm({
           ) : null}
 
           {decidedPlan === null && internalFunding === null ? (
-            <div className="ndTier" role="radiogroup" aria-label={t(catalog, "newDebate.planTier")}>
+            <div className="ndTier" role="radiogroup" aria-label={t(catalog, "newDebate.planTier")} onKeyDown={radioGroupKeys}>
               {PLAN_TIER_OPTIONS.map((option) => (
                 <button
                   key={option.value}
@@ -545,6 +545,7 @@ function NewDebateForm({
                   data-field="planTier"
                   data-value={option.value}
                   aria-checked={planTier === option.value}
+                  tabIndex={option.value === radioStop(PLAN_TIER_OPTIONS, planTier) ? 0 : -1}
                   className="ndTierOption"
                   onClick={() => choosePlanTier(option.value)}
                 >
@@ -771,6 +772,34 @@ function PlanCardModels({ plan, rosters, scorecard, catalog }: {
   );
 }
 
+/*
+ * Keyboard audit 2026-11-12 (CHR1-8 / CSS-9): the `role="radio"` groups below keep the keys native radios have. Each group
+ * is one Tab stop (`radioStop`: the chosen option, else the first); the arrows move to the next or previous option and
+ * choose it, round at the ends, on either axis (on a right-to-left page the side arrows run the other way); Home and End
+ * go to the first and the last. Choosing is the option's own press, so it does what a click does.
+ */
+function radioStop(options: ReadonlyArray<{ value: string }>, value: string): string | undefined {
+  return options.some((option) => option.value === value) ? value : options[0]?.value;
+}
+
+const RADIO_STEPS: Readonly<Record<string, number>> = { ArrowDown: 1, ArrowUp: -1, ArrowRight: 1, ArrowLeft: -1 };
+
+function radioGroupKeys(event: KeyboardEvent<HTMLElement>): void {
+  if (event.altKey || event.ctrlKey || event.metaKey) return;
+  const options = [...event.currentTarget.querySelectorAll<HTMLElement>("[role='radio']:not(:disabled)")];
+  const at = options.findIndex((option) => option === event.target);
+  if (at === -1) return;
+  const rightToLeft = event.currentTarget.closest('[dir]:not([dir="auto"])')?.getAttribute("dir") === "rtl";
+  const step = RADIO_STEPS[event.key];
+  const side = event.key === "ArrowRight" || event.key === "ArrowLeft";
+  const to = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : step === undefined ? null
+    : (at + (side && rightToLeft ? -step : step) + options.length) % options.length;
+  if (to === null) return;
+  event.preventDefault();
+  options[to]!.focus();
+  options[to]!.click();
+}
+
 /* The document's segmented tier control: one pill per option, the chosen one
    filled with ink. Radio semantics keep it operable without a pointer. */
 function SegmentedRow({
@@ -803,7 +832,7 @@ function SegmentedRow({
         <div className="ndLabel" id={`${field}-label`}>{label}</div>
         <div className="ndHint" id={`${field}-hint`} suppressHydrationWarning={hintHoldsFormattedNumbers}>{hint}</div>
       </div>
-      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`} aria-describedby={`${field}-hint`}>
+      <div className="ndSeg" role="radiogroup" aria-labelledby={`${field}-label`} aria-describedby={`${field}-hint`} onKeyDown={radioGroupKeys}>
         {options.map((option) => (
           <button
             key={option.value}
@@ -813,6 +842,7 @@ function SegmentedRow({
             data-field={field}
             data-value={option.value}
             aria-checked={value === option.value}
+            tabIndex={option.value === radioStop(options, value) ? 0 : -1}
             aria-describedby={`${field}-hint`}
             className="ndSegItem"
             disabled={disabled}

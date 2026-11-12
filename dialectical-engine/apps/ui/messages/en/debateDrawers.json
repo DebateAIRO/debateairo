@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Challenge this",
+  "debateDrawers.challenge.whichPart": "Which part? (optional)",
   "debateDrawers.common.close": "Close",
   "debateDrawers.common.false": "false",
   "debateDrawers.common.notAvailable": "not available",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "No argument text yet.",
   "debateDrawers.node.noCompletedReview": "No completed second-maker review is recorded for this node.",
   "debateDrawers.node.noPreviousGenerations": "No previous generations.",
+  "debateDrawers.node.noScore.notInAnswer": "This card is not part of the answer, so it has no score.",
+  "debateDrawers.node.noScore.notYet": "No score yet. Scores appear when the answer is ready.",
+  "debateDrawers.node.noScore.question": "The question itself is not scored.",
   "debateDrawers.node.noScoringRecommendation": "No scoring recommendation is available for this argument.",
   "debateDrawers.node.notUseful": "not useful",
   "debateDrawers.node.openRecommendedTargetClaim": "Open recommended target claim",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { MouseEvent, ReactNode, RefObject } from "react";
 import { nodeGenerations } from "@/lib/api";
 import type {
@@ -26,8 +26,12 @@ import { ScoringErrorBoundary } from "@/components/ScoringErrorBoundary";
 import type { Answer } from "@debateai/contract";
 import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { ContractNode } from "@/lib/v3/adapter";
-import { v3NodeHonestyRows, wayOfKnowingLabel } from "@/lib/v3/adapter";
+import type { V3NodeScoreAbsence } from "@/lib/v3/adapter";
+import {
+  v3NodeHonestyRows, v3NodeScoreState, v3RoundedScoreRows, v3ScoreAbsenceOf, wayOfKnowingLabel
+} from "@/lib/v3/adapter";
 import { abstentionKindLabel, markLabelFromRecords } from "@/lib/v3/labels";
+import { formatScorePercent, formatStrengthPill } from "@/lib/scoringFormat";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import debateDrawersEnglish from "@/messages/en/debateDrawers.json";
@@ -70,6 +74,13 @@ const DECISION_KIND_LABEL_KEYS: Record<string, string> = {
   reopen: "debateDrawers.node.decisionReopen"
 };
 
+// Why a card has no score, in plain words: the pill's own tooltip names internals (keyboard audit 2026-11-12).
+const NO_SCORE_KEYS: Readonly<Record<V3NodeScoreAbsence, string>> = {
+  QUESTION_CARD_IS_NOT_A_NODE: "debateDrawers.node.noScore.question",
+  NO_SERVED_ANSWER: "debateDrawers.node.noScore.notYet",
+  NODE_ABSENT_FROM_SERVED_ANSWER: "debateDrawers.node.noScore.notInAnswer"
+};
+
 function decisionKindLabel(catalog: MessageCatalog, decision: string): string {
   const key = DECISION_KIND_LABEL_KEYS[decision];
   return key ? t(catalog, key) : decision;
@@ -99,6 +110,7 @@ function pathDecisionCopy(catalog: MessageCatalog, decision: LifecycleDecision):
 export function NodeDetailDrawer({
   node,
   v3,
+  scoreAbsence,
   scoring,
   scoringError,
   feedbackSummary,
@@ -128,6 +140,12 @@ export function NodeDetailDrawer({
    * it here, rendered with the drawer's own section vocabulary.
    */
   v3?: ContractNode;
+  /**
+   * Why the card carries no V3 number, when it carries none (keyboard audit 2026-11-12, DEB1-11): the Tree's "no
+   * score" pill gives the reason only in a tooltip, so the drawer says it. The page knows which reason it is; with
+   * none handed over, the drawer can tell only the question card's.
+   */
+  scoreAbsence?: V3NodeScoreAbsence;
   scoring?: NodeScoringPayload;
   scoringError?: NodeScoringError;
   feedbackSummary?: NodeFeedbackSummary;
@@ -165,18 +183,20 @@ export function NodeDetailDrawer({
   // pressed, so focus goes back to the top of the drawer, as when it opened, and it reads the new
   // argument from the start. Not on mount: the dialog helper puts initial focus there itself.
   const shownNodeId = useRef(node.id);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (shownNodeId.current === node.id) return;
     shownNodeId.current = node.id;
     const dialog = dialogRef.current;
     if (dialog === null) return;
     // The body is the drawer's scroller; the panel itself does not scroll.
-    const body = dialog.querySelector<HTMLElement>(":scope > .drawerBody");
-    if (body !== null) body.scrollTop = 0;
+    if (bodyRef.current !== null) bodyRef.current.scrollTop = 0;
     dialog.focus();
   }, [node.id, dialogRef]);
   const { locale } = useChromeI18n();
   const textLang = useDebateTextLang();
+  // The question card is never a scored node, whatever the page has loaded; any other card's reason is the page's to give.
+  const noScoreReason = scoreAbsence ?? (node.node_type === "ROOT_CLAIM" ? v3ScoreAbsenceOf(v3NodeScoreState(node, null)) : undefined);
   const role = roleOf(node);
   const pal = role === "root" ? ROLE_PALETTES.pov : ROLE_PALETTES[role];
   const generation = node.active_generation;
@@ -294,7 +314,7 @@ export function NodeDetailDrawer({
         </div>
 
         {/* A Tab stop of its own: the body is what scrolls (keyboard audit 2026-11-12). */}
-        <div className="drawerBody" tabIndex={0} role="region" aria-label={t(catalog, "debateDrawers.node.argumentDetail")}>
+        <div className="drawerBody" ref={bodyRef} tabIndex={0} role="region" aria-label={t(catalog, "debateDrawers.node.argumentDetail")}>
           <div className="drawerIntro">
           {v3 ? (
             <div className="nodeEyebrow drawerWayOfKnowing" data-drawer-way-of-knowing>
@@ -341,7 +361,10 @@ export function NodeDetailDrawer({
               debateChromeCatalog={debateChromeCatalog}
               composeCatalog={composeCatalog}
               locale={locale}
-            /> : null}
+            /> : noScoreReason !== undefined ? (
+              // The card's "no score" pill gives its reason only in a tooltip (keyboard audit 2026-11-12).
+              <p className="drawerFindingText">{t(catalog, NO_SCORE_KEYS[noScoreReason])}</p>
+            ) : null}
 
           <div className="drawerActions drawerReferenceActions">
             {onChallenge ? (
@@ -432,6 +455,7 @@ export function NodeDetailDrawer({
                 currentUserFeedback={currentUserFeedback}
                 recommendationTargetButton={recommendationTargetButton}
                 catalog={catalog}
+                debateChromeCatalog={debateChromeCatalog}
                 composeCatalog={composeCatalog}
                 locale={locale}
               />
@@ -473,6 +497,10 @@ function NodeHonestyDetails({
         ? t(catalog, "debateDrawers.node.reviewCouldNotAssess")
         : null;
   const rows = v3NodeHonestyRows(v3, composeCatalog, locale);
+  const scoreCellIsAi = (row: (typeof rows)[number]) => row.key === "BASE SCORE" || row.key === "FINAL STRENGTH";
+  // A rounded percentage says how it was rounded only in its cell's tooltip, so the drawer says it under the table
+  // (keyboard audit 2026-11-12); an exact one adds nothing.
+  const roundedScoreRows = v3RoundedScoreRows(v3, composeCatalog, locale);
   const textLang = useDebateTextLang();
 
   return (
@@ -512,12 +540,15 @@ function NodeHonestyDetails({
             <tr key={row.key} data-drawer-section-row>
               <th scope="row" data-drawer-section-key>{row.key}</th>
               <td data-drawer-section-value title={row.title}
-                data-ai-generated={row.key === "BASE SCORE" || row.key === "FINAL STRENGTH" ? "true" : undefined}
+                data-ai-generated={scoreCellIsAi(row) ? "true" : undefined}
               >{row.value}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      {roundedScoreRows.map((row) => (
+        <div key={row.key} className="drawerFindingText" data-ai-generated={scoreCellIsAi(row) ? "true" : undefined}>{row.title}</div>
+      ))}
 
       {v3.condition_marks.length > 0 ? (
         <div className="drawerConditionPills">
@@ -568,6 +599,8 @@ function ScoringFeedbackControls({
   const downLabel = summary
     ? t(catalog, "debateDrawers.node.feedbackDownCount", { count: summary.down })
     : t(catalog, "debateDrawers.node.feedbackDown");
+  // The buttons are switched off; their reason is the line under them, not only their tooltip.
+  const unavailableId = useId();
 
   return (
     <section
@@ -588,6 +621,7 @@ function ScoringFeedbackControls({
           aria-pressed={currentVote === "up"}
           disabled
           aria-disabled="true"
+          aria-describedby={unavailableId}
           title={t(catalog, "debateDrawers.node.scoringFeedbackUnavailable")}
         >
           {upLabel}
@@ -598,12 +632,13 @@ function ScoringFeedbackControls({
           aria-pressed={currentVote === "down"}
           disabled
           aria-disabled="true"
+          aria-describedby={unavailableId}
           title={t(catalog, "debateDrawers.node.scoringFeedbackUnavailable")}
         >
           {downLabel}
         </button>
       </div>
-      <div className="drawerHintMuted">{t(catalog, "debateDrawers.node.scoringFeedbackUnavailable")}</div>
+      <div className="drawerHintMuted" id={unavailableId}>{t(catalog, "debateDrawers.node.scoringFeedbackUnavailable")}</div>
       {currentVote ? (
         <div className="drawerHintMuted" role="status">
           {t(catalog, "debateDrawers.node.previousFeedback", {
@@ -624,6 +659,7 @@ function NodeScoringDetails({
   currentUserFeedback,
   recommendationTargetButton,
   catalog,
+  debateChromeCatalog,
   composeCatalog,
   locale
 }: {
@@ -635,10 +671,21 @@ function NodeScoringDetails({
     recommendation: NodeScoringPayload["recommended_investigations"][number]
   ) => ReactNode;
   catalog: MessageCatalog;
+  debateChromeCatalog: MessageCatalog;
   composeCatalog: MessageCatalog;
   locale: string;
 }) {
   const rationaleShort = scoring?.rationale?.short?.trim();
+  // The card's strength and uncertainty pills explain themselves only in a tooltip, so the drawer says it: the
+  // strength sentence, and the uncertainty's drivers joined as the pill joins them (its "UNC 48 · heuristic" suffix is
+  // an abbreviation and a raw source name, so it stays in the tooltip).
+  const uncertaintyDrivers = (scoring?.uncertainty_drivers ?? []).map((driver) => driver.label).join("; ");
+  const pillTitles = scoring?.scores
+    ? [
+        formatStrengthPill(scoring.strength_kind, formatScorePercent(scoring.scores.strength, debateChromeCatalog), debateChromeCatalog).title,
+        uncertaintyDrivers === "" ? undefined : uncertaintyDrivers
+      ].filter((title): title is string => title !== undefined)
+    : [];
   const holes = scoring?.holes.filter((hole) => hole.description.trim()) ?? [];
   const fatalFlags = scoring?.fatal_flags.filter((flag) => flag.description.trim()) ?? [];
   const hasScoringFindings = holes.length > 0 || fatalFlags.length > 0;
@@ -675,10 +722,11 @@ function NodeScoringDetails({
         </section>
       ) : null}
 
-      {rationaleShort ? (
+      {rationaleShort || pillTitles.length > 0 ? (
         <section className="drawerScoringRationale" aria-label={t(catalog, "debateDrawers.node.scoringRationale")}>
           <div className="drawerSectionTitle">{t(catalog, "debateDrawers.node.scoringRationale")}</div>
-          <p>{rationaleShort}</p>
+          {rationaleShort ? <p>{rationaleShort}</p> : null}
+          {pillTitles.map((title) => <p key={title}>{title}</p>)}
         </section>
       ) : null}
 

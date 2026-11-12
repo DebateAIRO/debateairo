@@ -90,6 +90,7 @@
   "debateViews.levelCount.two": "مستويان ({count})",
   "debateViews.levelCount.zero": "لا مستويات ({count})",
   "debateViews.mapInteractionHint": "مرّر المؤشر فوق قطاع لفحصه · انقر للتركيز",
+  "debateViews.mapKeysHint": "مفاتيح الأسهم تنقلك بين القطاعات · Enter يجعل القطاع موضع التركيز",
   "debateViews.mapLegendHint": "الحلقة = العمق · العرض = حجم المناظرة أسفلها",
   "debateViews.mapReasoning": "الاستدلال",
   "debateViews.moveToParentArgument": "الانتقال إلى الحجة الأب: {claim}",

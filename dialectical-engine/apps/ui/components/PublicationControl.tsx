@@ -76,6 +76,10 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     const focused = document.activeElement;
     opener.current = focused instanceof HTMLElement ? focused : null;
   }
+  // Keyboard audit 2026-11-12: the security check opens at the end of the card, past the form's Cancel and past
+  // "Delete private debate…", and the card scrolls. Focus goes to the check itself (a named region) when it opens, so it
+  // is read out and in view, and the next Tab is its first method.
+  const securityCheck = (): HTMLElement | null => cardRef.current?.querySelector<HTMLElement>(".authSecurityConfirmation") ?? null;
 
   useLayoutEffect(() => {
     const card = cardRef.current;
@@ -110,6 +114,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     if (action === null || !acknowledged || busy) return;
     rememberOpener();
     setConfirming('publication');
+    focusNext.current = securityCheck;
   }
   async function publishConfirmed(result:ConfirmedSecurityAction):Promise<void> {
     if(action===null||!acknowledged)return;
@@ -153,6 +158,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     if (!deleteAcknowledged || busy || visibility?.state !== "PRIVATE") return;
     rememberOpener();
     setConfirming('delete');
+    focusNext.current = securityCheck;
   }
   async function deleteConfirmed(result:ConfirmedSecurityAction):Promise<void> {
     if(!deleteAcknowledged||visibility?.state!=='PRIVATE')return;

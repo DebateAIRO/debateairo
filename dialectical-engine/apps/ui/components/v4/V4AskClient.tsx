@@ -1871,6 +1871,8 @@ function V4AskForm({
     reloadPage();
   }
   // Task 76e (owner answer Q8): while the site is updated, one line at the top of the page, on step 1 and step 2 (draft wording).
+  // It takes no #page-content mark: the mark stays on the step's own root in every state, so a focus the skip link put there
+  // is not dropped when the line comes mid-session (keyboard audit 2026-11-12, wave-3 fix round, A8).
   const updateBanner = site.updated ? (
     <p className="v4AskHint v4AskSiteUpdated" role="status">
       {t(catalog, "v4.ask.siteUpdated")}{" "}
@@ -1967,7 +1969,7 @@ function V4AskForm({
   const pendingWords = pending === null ? "" : pending.share === null ? t(catalog, "v4.start.undo.noteNoShare")
     : t(catalog, "v4.start.undo.note", { share: t(catalog, pending.share.key, pending.share.values) });
   const pendingView = pending === null || pendingMap === null ? null : (
-    <div ref={pendingBox} className="v4AskMain v4AskPendingMap">
+    <div ref={pendingBox} className="v4AskMain v4AskPendingMap" id="page-content" tabIndex={-1}>
       <V4PendingMap
         map={pendingMap}
         catalog={catalog}
@@ -2006,7 +2008,7 @@ function V4AskForm({
       {header}
       {updateBanner}
       {pendingView !== null ? pendingView : step === "ask" ? (
-        <div ref={stepOne} className="v4AskMain">
+        <div ref={stepOne} className="v4AskMain" id="page-content" tabIndex={-1}>
           {/* Task 76c (choose-f21, answer Q3): the page opened on a started question's entry: one line at the top, with its map. */}
           {startedRun === null ? null : (
             <p className="v4AskStarted" role="status">
@@ -2156,6 +2158,7 @@ function V4AskForm({
       ) : (
         <div
           ref={stepTwo}
+          id="page-content" tabIndex={-1}
           className="v4AskMain v4AskMainRead"
           // read-f9: while an input or textarea on step 2 has focus, the bar steps back into the page (answer buttons never count).
           onFocus={(event) => setTextFocused(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)}

@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Osporite ovo",
+  "debateDrawers.challenge.whichPart": "Koji dio? (neobavezno)",
   "debateDrawers.common.close": "Zatvorite",
   "debateDrawers.common.false": "netočno",
   "debateDrawers.common.notAvailable": "nije dostupno",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Još nema teksta argumenta.",
   "debateDrawers.node.noCompletedReview": "Za ovaj čvor nije zabilježen dovršeni pregled koji je obavio model drugog proizvođača.",
   "debateDrawers.node.noPreviousGenerations": "Nema prethodno stvorenih inačica.",
+  "debateDrawers.node.noScore.notInAnswer": "Ova kartica nije dio odgovora pa nema rezultat.",
+  "debateDrawers.node.noScore.notYet": "Još nema rezultata. Rezultati se pojavljuju kad je odgovor spreman.",
+  "debateDrawers.node.noScore.question": "Samo pitanje nema rezultat.",
   "debateDrawers.node.noScoringRecommendation": "Za ovaj argument nije dostupna preporuka bodovanja.",
   "debateDrawers.node.notUseful": "nije korisno",
   "debateDrawers.node.openRecommendedTargetClaim": "Otvorite preporučenu ciljnu tvrdnju",

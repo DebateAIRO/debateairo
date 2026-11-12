@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Оспорете това",
+  "debateDrawers.challenge.whichPart": "Коя част? (по избор)",
   "debateDrawers.common.close": "Затваряне",
   "debateDrawers.common.false": "не",
   "debateDrawers.common.notAvailable": "не е достъпно",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Все още няма текст на аргумента.",
   "debateDrawers.node.noCompletedReview": "За този възел няма записана завършена рецензия от втори създател.",
   "debateDrawers.node.noPreviousGenerations": "Няма предишни генерирания.",
+  "debateDrawers.node.noScore.notInAnswer": "Тази карта не е част от отговора, затова няма оценка.",
+  "debateDrawers.node.noScore.notYet": "Все още няма оценка. Оценките се появяват, когато отговорът е готов.",
+  "debateDrawers.node.noScore.question": "Самият въпрос не се оценява.",
   "debateDrawers.node.noScoringRecommendation": "За този аргумент няма препоръка от оценяването.",
   "debateDrawers.node.notUseful": "не е полезно",
   "debateDrawers.node.openRecommendedTargetClaim": "Отваряне на препоръчаното целево твърдение",

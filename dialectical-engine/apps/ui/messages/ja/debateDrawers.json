@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "この内容に異議を申し立てる",
+  "debateDrawers.challenge.whichPart": "どの部分？（任意）",
   "debateDrawers.common.close": "閉じる",
   "debateDrawers.common.false": "偽",
   "debateDrawers.common.notAvailable": "利用不可",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "論拠の本文はまだありません。",
   "debateDrawers.node.noCompletedReview": "このノードには、別の開発元のモデルによる完了済みレビューが記録されていません。",
   "debateDrawers.node.noPreviousGenerations": "以前の生成履歴はありません。",
+  "debateDrawers.node.noScore.notInAnswer": "このカードは回答に含まれないため、スコアがありません。",
+  "debateDrawers.node.noScore.notYet": "スコアはまだありません。回答の準備ができるとスコアが表示されます。",
+  "debateDrawers.node.noScore.question": "質問そのものにはスコアがありません。",
   "debateDrawers.node.noScoringRecommendation": "この論拠に対する採点上の推奨事項はありません。",
   "debateDrawers.node.notUseful": "役に立たない",
   "debateDrawers.node.openRecommendedTargetClaim": "推奨対象の主張を開く",

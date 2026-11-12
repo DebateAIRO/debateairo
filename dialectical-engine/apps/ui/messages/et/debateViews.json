@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} tasemele",
   "debateViews.levelCount.other": "{count} tasemele",
   "debateViews.mapInteractionHint": "Uurimiseks viige kursor sektorile · fookusesse seadmiseks klõpsake",
+  "debateViews.mapKeysHint": "Nooleklahvidega liigute sektorite vahel · Enter seab fookusesse",
   "debateViews.mapLegendHint": "Ring = sügavus · laius = selle all oleva väitluse maht",
   "debateViews.mapReasoning": "Arutluskäik",
   "debateViews.moveToParentArgument": "Liikuge üles ülemargumendi juurde: {claim}",

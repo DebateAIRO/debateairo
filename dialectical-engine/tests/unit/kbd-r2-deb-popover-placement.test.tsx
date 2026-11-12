@@ -12,7 +12,7 @@ const card = { width: 252, height: 260 };
 
 describe("placeChallengePopover", () => {
   it("keeps the old placement when the card fits: centred on the anchor, above it", () => {
-    expect(placeChallengePopover({ x: 640, top: 400, bottom: 440 }, card, viewport)).toEqual({ left: 640, top: 400, placement: "above" });
+    expect(placeChallengePopover({ x: 640, top: 400, bottom: 440 }, card, viewport)).toEqual({ left: 640, top: 400, below: false });
   });
 
   it("keeps the whole card inside the left and right edges", () => {
@@ -25,17 +25,17 @@ describe("placeChallengePopover", () => {
   });
 
   it("goes below the anchor when there is no room above", () => {
-    expect(placeChallengePopover({ x: 640, top: 120, bottom: 160 }, card, viewport)).toEqual({ left: 640, top: 168, placement: "below" });
+    expect(placeChallengePopover({ x: 640, top: 120, bottom: 160 }, card, viewport)).toEqual({ left: 640, top: 168, below: true });
   });
 
   it("when neither side fits, goes where there is more room, kept inside the viewport", () => {
     // 250 px above, 120 px below: above.
     const above = placeChallengePopover({ x: 640, top: 250, bottom: 600 }, card, viewport);
-    expect(above.placement).toBe("above");
+    expect(above.below).toBe(false);
     expect(above.top).toBeGreaterThanOrEqual(0);
     // 150 px above, 220 px below: below, pulled up so the card ends inside the window.
     const below = placeChallengePopover({ x: 640, top: 150, bottom: 500 }, card, viewport);
-    expect(below.placement).toBe("below");
+    expect(below.below).toBe(true);
     expect(below.top + card.height).toBeLessThanOrEqual(viewport.height);
   });
 });

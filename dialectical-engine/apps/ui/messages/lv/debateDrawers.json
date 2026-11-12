@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Apstrīdēt šo",
+  "debateDrawers.challenge.whichPart": "Kura daļa? (neobligāti)",
   "debateDrawers.common.close": "Aizvērt",
   "debateDrawers.common.false": "aplams",
   "debateDrawers.common.notAvailable": "nav pieejams",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Argumenta teksta vēl nav.",
   "debateDrawers.node.noCompletedReview": "Šim mezglam nav reģistrēts pabeigts otra veidotāja pārskats.",
   "debateDrawers.node.noPreviousGenerations": "Iepriekšēju ģenerējumu nav.",
+  "debateDrawers.node.noScore.notInAnswer": "Šī kartīte nav atbildes daļa, tāpēc tai nav vērtējuma.",
+  "debateDrawers.node.noScore.notYet": "Vērtējuma vēl nav. Vērtējumi parādās, kad atbilde ir gatava.",
+  "debateDrawers.node.noScore.question": "Pats jautājums netiek vērtēts.",
   "debateDrawers.node.noScoringRecommendation": "Šim argumentam nav pieejams vērtēšanas ieteikums.",
   "debateDrawers.node.notUseful": "nav noderīgi",
   "debateDrawers.node.openRecommendedTargetClaim": "Atvērt ieteikto mērķa apgalvojumu",

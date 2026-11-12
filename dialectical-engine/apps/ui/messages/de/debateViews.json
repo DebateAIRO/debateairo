@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} Ebene",
   "debateViews.levelCount.other": "{count} Ebenen",
   "debateViews.mapInteractionHint": "Zeigen Sie auf ein Segment, um Details zu sehen · Klicken Sie zum Fokussieren",
+  "debateViews.mapKeysHint": "Pfeiltasten wechseln zwischen Segmenten · Enter setzt den Fokus",
   "debateViews.mapLegendHint": "Ring = Tiefe · Breite = Umfang der darunterliegenden Debatte",
   "debateViews.mapReasoning": "Schlussfolgerung",
   "debateViews.moveToParentArgument": "Zum übergeordneten Argument wechseln: {claim}",

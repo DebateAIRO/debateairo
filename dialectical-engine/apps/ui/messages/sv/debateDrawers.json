@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Ifrågasätt detta",
+  "debateDrawers.challenge.whichPart": "Vilken del? (valfritt)",
   "debateDrawers.common.close": "Stäng",
   "debateDrawers.common.false": "falskt",
   "debateDrawers.common.notAvailable": "inte tillgängligt",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Ingen argumenttext ännu.",
   "debateDrawers.node.noCompletedReview": "Ingen slutförd granskning från en andra skapare har registrerats för den här noden.",
   "debateDrawers.node.noPreviousGenerations": "Inga tidigare genereringar.",
+  "debateDrawers.node.noScore.notInAnswer": "Det här kortet ingår inte i svaret och har därför ingen poäng.",
+  "debateDrawers.node.noScore.notYet": "Ingen poäng ännu. Poängen visas när svaret är klart.",
+  "debateDrawers.node.noScore.question": "Själva frågan poängsätts inte.",
   "debateDrawers.node.noScoringRecommendation": "Ingen rekommendation från poängsättningen är tillgänglig för det här argumentet.",
   "debateDrawers.node.notUseful": "inte användbar",
   "debateDrawers.node.openRecommendedTargetClaim": "Öppna det rekommenderade målpåståendet",

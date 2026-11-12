@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Izpodbijte to",
+  "debateDrawers.challenge.whichPart": "Kateri del? (neobvezno)",
   "debateDrawers.common.close": "Zapri",
   "debateDrawers.common.false": "ne drži",
   "debateDrawers.common.notAvailable": "ni na voljo",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Besedila argumenta še ni.",
   "debateDrawers.node.noCompletedReview": "Za to vozlišče ni zabeleženega dokončanega pregleda, ki bi ga opravil model drugega razvijalca.",
   "debateDrawers.node.noPreviousGenerations": "Prejšnjih ustvarjenih različic ni.",
+  "debateDrawers.node.noScore.notInAnswer": "Ta kartica ni del odgovora, zato nima ocene.",
+  "debateDrawers.node.noScore.notYet": "Ocene še ni. Ocene se pojavijo, ko je odgovor pripravljen.",
+  "debateDrawers.node.noScore.question": "Samo vprašanje nima ocene.",
   "debateDrawers.node.noScoringRecommendation": "Za ta argument priporočilo ocenjevanja ni na voljo.",
   "debateDrawers.node.notUseful": "ni koristno",
   "debateDrawers.node.openRecommendedTargetClaim": "Odpri priporočeno ciljno trditev",

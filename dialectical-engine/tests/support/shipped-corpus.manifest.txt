@@ -627,6 +627,7 @@ apps/ui/components/SessionControls.tsx
 apps/ui/components/SettingsPageClient.tsx
 apps/ui/components/SignUpFlow.tsx
 apps/ui/components/SiteFooter.tsx
+apps/ui/components/SkipLink.tsx
 apps/ui/components/StaffAccessPanel.tsx
 apps/ui/components/StaffInvitationPanel.tsx
 apps/ui/components/StoryPanel.tsx

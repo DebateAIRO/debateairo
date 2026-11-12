@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Tantang pernyataan ini",
+  "debateDrawers.challenge.whichPart": "Bagian mana? (opsional)",
   "debateDrawers.common.close": "Tutup",
   "debateDrawers.common.false": "salah",
   "debateDrawers.common.notAvailable": "tidak tersedia",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Belum ada teks argumen.",
   "debateDrawers.node.noCompletedReview": "Belum ada tinjauan selesai dari pembuat kedua yang tercatat untuk simpul ini.",
   "debateDrawers.node.noPreviousGenerations": "Tidak ada hasil pembuatan sebelumnya.",
+  "debateDrawers.node.noScore.notInAnswer": "Kartu ini bukan bagian dari jawaban, jadi tidak memiliki skor.",
+  "debateDrawers.node.noScore.notYet": "Belum ada skor. Skor muncul saat jawaban siap.",
+  "debateDrawers.node.noScore.question": "Pertanyaan itu sendiri tidak diberi skor.",
   "debateDrawers.node.noScoringRecommendation": "Tidak ada rekomendasi penilaian untuk argumen ini.",
   "debateDrawers.node.notUseful": "tidak berguna",
   "debateDrawers.node.openRecommendedTargetClaim": "Buka klaim sasaran yang direkomendasikan",

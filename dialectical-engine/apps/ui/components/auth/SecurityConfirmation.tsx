@@ -204,7 +204,8 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 setCode('');
                 onCancel();
             }}>{t(catalog, "auth.security.cancel")}</button> : null;
-    return <section className="authSecurityConfirmation" aria-label={t(catalog, "auth.security.title")}>
+    // tabIndex -1: a screen that opens this check away from the pressed button puts focus on it (PublicationControl).
+    return <section className="authSecurityConfirmation" tabIndex={-1} aria-label={t(catalog, "auth.security.title")}>
  {error ? <p className="authFieldError" role="alert">{error}{signInAgain ? <> <a href={signInAgain}>{t(catalog, "auth.signUp.logIn")}</a></> : null}</p> : null}
  {initialProof ? <button type="button" className="setBtn setBtnPrimary" disabled={busy || disabled} onClick={async () => {
                 const result = initialProof!;

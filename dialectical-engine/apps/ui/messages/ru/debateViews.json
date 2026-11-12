@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} уровень",
   "debateViews.levelCount.other": "{count} уровня",
   "debateViews.mapInteractionHint": "Наведите на сектор для просмотра · нажмите, чтобы сфокусироваться",
+  "debateViews.mapKeysHint": "Стрелки переключают секторы · Enter фокусирует выбранный",
   "debateViews.mapLegendHint": "Кольцо = глубина · ширина = объём нижележащей ветви дебатов",
   "debateViews.mapReasoning": "Рассуждение",
   "debateViews.moveToParentArgument": "Перейти к родительскому аргументу: {claim}",

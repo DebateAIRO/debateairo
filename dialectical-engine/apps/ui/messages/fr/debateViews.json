@@ -69,6 +69,7 @@
   "debateViews.levelCount.many": "{count} niveaux",
   "debateViews.levelCount.other": "{count} niveaux",
   "debateViews.mapInteractionHint": "Survolez un secteur pour l’examiner · cliquez pour le cibler",
+  "debateViews.mapKeysHint": "Les flèches passent d’un secteur à l’autre · Enter pour le cibler",
   "debateViews.mapLegendHint": "Anneau = profondeur · largeur = volume du débat en aval",
   "debateViews.mapReasoning": "Raisonnement",
   "debateViews.moveToParentArgument": "Remonter au parent : {claim}",

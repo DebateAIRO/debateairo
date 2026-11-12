@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "इसे चुनौती दें",
+  "debateDrawers.challenge.whichPart": "कौन-सा हिस्सा? (वैकल्पिक)",
   "debateDrawers.common.close": "बंद करें",
   "debateDrawers.common.false": "असत्य",
   "debateDrawers.common.notAvailable": "उपलब्ध नहीं",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "तर्क का पाठ अभी उपलब्ध नहीं है।",
   "debateDrawers.node.noCompletedReview": "इस नोड के लिए दूसरे निर्माता की कोई पूर्ण समीक्षा दर्ज नहीं है।",
   "debateDrawers.node.noPreviousGenerations": "कोई पिछला निर्माण नहीं।",
+  "debateDrawers.node.noScore.notInAnswer": "यह कार्ड उत्तर का हिस्सा नहीं है, इसलिए इसका कोई अंक नहीं है।",
+  "debateDrawers.node.noScore.notYet": "अभी कोई अंक नहीं। उत्तर तैयार होने पर अंक दिखाई देते हैं।",
+  "debateDrawers.node.noScore.question": "प्रश्न को स्वयं कोई अंक नहीं मिलता।",
   "debateDrawers.node.noScoringRecommendation": "इस तर्क के लिए अंकन संबंधी कोई अनुशंसा उपलब्ध नहीं है।",
   "debateDrawers.node.notUseful": "उपयोगी नहीं",
   "debateDrawers.node.openRecommendedTargetClaim": "अनुशंसित लक्ष्य दावा खोलें",

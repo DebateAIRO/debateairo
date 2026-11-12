@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Ginčyti šį teiginį",
+  "debateDrawers.challenge.whichPart": "Kuri dalis? (neprivaloma)",
   "debateDrawers.common.close": "Uždaryti",
   "debateDrawers.common.false": "ne",
   "debateDrawers.common.notAvailable": "nepasiekiama",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Argumento teksto dar nėra.",
   "debateDrawers.node.noCompletedReview": "Nėra užfiksuotos užbaigtos šio mazgo peržiūros, kurią atliktų kito kūrėjo modelis.",
   "debateDrawers.node.noPreviousGenerations": "Ankstesnių generavimų nėra.",
+  "debateDrawers.node.noScore.notInAnswer": "Ši kortelė nėra atsakymo dalis, todėl jos įverčio nėra.",
+  "debateDrawers.node.noScore.notYet": "Įverčio dar nėra. Įverčiai atsiranda, kai atsakymas paruoštas.",
+  "debateDrawers.node.noScore.question": "Pats klausimas nevertinamas.",
   "debateDrawers.node.noScoringRecommendation": "Šiam argumentui vertinimo rekomendacijos nėra.",
   "debateDrawers.node.notUseful": "nenaudinga",
   "debateDrawers.node.openRecommendedTargetClaim": "Atverti rekomenduojamą tikslinį teiginį",

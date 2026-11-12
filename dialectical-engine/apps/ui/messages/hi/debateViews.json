@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} स्तर",
   "debateViews.levelCount.other": "{count} स्तर",
   "debateViews.mapInteractionHint": "जाँचने के लिए खंड पर मँडराएँ · फ़ोकस करने के लिए क्लिक करें",
+  "debateViews.mapKeysHint": "तीर कुंजियाँ खंडों के बीच ले जाती हैं · Enter से खंड पर फ़ोकस होता है",
   "debateViews.mapLegendHint": "वलय = गहराई · चौड़ाई = उसके नीचे वाद-विवाद का विस्तार",
   "debateViews.mapReasoning": "तर्क-विचार",
   "debateViews.moveToParentArgument": "मूल तर्क पर ऊपर जाएँ: {claim}",

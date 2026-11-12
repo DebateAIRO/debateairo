@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Buna itiraz et",
+  "debateDrawers.challenge.whichPart": "Hangi kısım? (isteğe bağlı)",
   "debateDrawers.common.close": "Kapat",
   "debateDrawers.common.false": "yanlış",
   "debateDrawers.common.notAvailable": "kullanılamıyor",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Henüz argüman metni yok.",
   "debateDrawers.node.noCompletedReview": "Bu düğüm için ikinci üreticinin tamamlanmış incelemesi kaydedilmemiş.",
   "debateDrawers.node.noPreviousGenerations": "Önceki oluşturma yok.",
+  "debateDrawers.node.noScore.notInAnswer": "Bu kart yanıtın parçası değil, bu yüzden puanı yok.",
+  "debateDrawers.node.noScore.notYet": "Henüz puan yok. Puanlar yanıt hazır olduğunda görünür.",
+  "debateDrawers.node.noScore.question": "Sorunun kendisi puanlanmaz.",
   "debateDrawers.node.noScoringRecommendation": "Bu argüman için puanlama önerisi bulunmuyor.",
   "debateDrawers.node.notUseful": "yararlı değil",
   "debateDrawers.node.openRecommendedTargetClaim": "Önerilen hedef iddiayı aç",

@@ -16,6 +16,10 @@ import { useEffect, useLayoutEffect, useRef, type FocusEvent, type KeyboardEvent
  * re-planning the card limit, an open question turning into a dig) puts focus on the nearest row instead of the page: the
  * same row if it is still drawn, else its path's "more" row, else the row it hangs under, else the one tab stop. A part
  * marked `data-rove-skip` (the waiting card under the question, V4B-M3) is not rows: its controls keep their own Tab stop.
+ * Keyboard audit 2026-11-12 (V4B-M1): `hint` names the line that says these keys; the row focus enters on is described by
+ * it (so a screen reader hears it once, not on every arrow press), and on a row that has a pick box Space only ever ticks it:
+ * a closed box makes it do nothing (it used to fall through to the button and open the question). A row with no pick box
+ * keeps its own Space press.
  */
 
 /** Whether the map is laid out right to left (the page's language, app/layout.tsx; or a `dir` around the map). */
@@ -35,7 +39,20 @@ const CONTROLS = "a[href], button, input, select, textarea, summary, [tabindex]"
 const SKIP = "[data-rove-skip]";
 
 /** Each returns whether it folded or unfolded anything (false: the key then moves on as if there were nothing to do). */
-type Handlers = Readonly<{ onExpand?: (row: string) => boolean; onCollapse?: (row: string) => boolean }>;
+type Handlers = Readonly<{
+  onExpand?: (row: string) => boolean;
+  onCollapse?: (row: string) => boolean;
+  /** V4B-M1: the id of the line that says the keys (it describes the row focus enters on). */
+  hint?: string;
+}>;
+
+/** V4B-M1: adds the key line to a row's description, or takes it away, keeping whatever else describes the row. */
+function describeWith(row: HTMLElement, hint: string, on: boolean): void {
+  const ids = (row.getAttribute("aria-describedby") ?? "").split(/\s+/).filter((id) => id.length > 0 && id !== hint);
+  if (on) ids.push(hint);
+  if (ids.length > 0) row.setAttribute("aria-describedby", ids.join(" "));
+  else row.removeAttribute("aria-describedby");
+}
 
 /** The rows a person can reach now, in reading order (a folded part is inert, so its rows are not). */
 function rowsOf(box: HTMLElement): HTMLElement[] {
@@ -58,10 +75,10 @@ function rowsOf(box: HTMLElement): HTMLElement[] {
   return rows;
 }
 
-/** The row's own pick box: a checkbox beside it (in its own card), never one of a row further down. */
+/** The row's own pick box: a checkbox beside it (in its own card), never one of a row further down. A closed box is drawn
+ *  disabled (PickBox), so it is still found here; a row with no box (a path, "Show more", a read-only map) finds none. */
 function pickBoxOf(row: HTMLElement): HTMLInputElement | null {
-  const box = row.parentElement?.querySelector<HTMLInputElement>(":scope > label > input[type=checkbox]") ?? null;
-  return box !== null && !box.disabled ? box : null;
+  return row.parentElement?.querySelector<HTMLInputElement>(":scope > label > input[type=checkbox]") ?? null;
 }
 
 /** The row a focused element is (or sits in), when focus is inside the map now; else null. */
@@ -147,6 +164,13 @@ export function useMapKeys(ref: RefObject<HTMLElement | null>, handlers: Handler
     active.current = row.dataset.row ?? null;
     activeParent.current = row.dataset.parent ?? null;
     for (const other of rows) other.tabIndex = other === row ? 0 : -1;
+    // V4B-M1: focus coming from outside the map is told the keys; a move inside it is not told again.
+    const hint = handlersRef.current.hint;
+    if (hint === undefined) return;
+    // A part that is not rows (the waiting card's Try now, data-rove-skip) is outside them: coming from it is entering too.
+    const from = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+    const entering = from === null || !box.contains(from) || from.closest(SKIP) !== null;
+    for (const other of rows) describeWith(other, hint, entering && other === row);
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLElement>): void => {
@@ -190,10 +214,12 @@ export function useMapKeys(ref: RefObject<HTMLElement | null>, handlers: Handler
         focusRow(box, rows.find((candidate) => candidate.dataset.row === row.dataset.parent));
         return;
       case " ": {
+        // V4B-M1: on a row that has a pick box Space is the box's key only; a closed box makes it do nothing (Enter opens
+        // the question). A row with no box is a plain button and keeps its own Space press (wave-3 fix round, A2).
         const pick = pickBoxOf(row);
         if (pick === null) return;
         event.preventDefault();
-        pick.click();
+        if (!pick.disabled) pick.click();
         return;
       }
       default:

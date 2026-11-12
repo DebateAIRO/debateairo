@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "质询此内容",
+  "debateDrawers.challenge.whichPart": "哪一部分？（选填）",
   "debateDrawers.common.close": "关闭",
   "debateDrawers.common.false": "假",
   "debateDrawers.common.notAvailable": "不可用",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "尚无论点文本。",
   "debateDrawers.node.noCompletedReview": "此节点没有由其他开发方模型完成的评审记录。",
   "debateDrawers.node.noPreviousGenerations": "没有以往的生成结果。",
+  "debateDrawers.node.noScore.notInAnswer": "此卡片不属于答案，因此没有分数。",
+  "debateDrawers.node.noScore.notYet": "暂无分数。答案准备好后会显示分数。",
+  "debateDrawers.node.noScore.question": "问题本身没有分数。",
   "debateDrawers.node.noScoringRecommendation": "没有此论点的评分建议。",
   "debateDrawers.node.notUseful": "没有用",
   "debateDrawers.node.openRecommendedTargetClaim": "打开建议的目标主张",

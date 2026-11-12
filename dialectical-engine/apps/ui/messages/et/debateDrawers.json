@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Vaidlustage see",
+  "debateDrawers.challenge.whichPart": "Milline osa? (valikuline)",
   "debateDrawers.common.close": "Sulgege",
   "debateDrawers.common.false": "väär",
   "debateDrawers.common.notAvailable": "pole saadaval",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Argumendi tekst veel puudub.",
   "debateDrawers.node.noCompletedReview": "Selle sõlme kohta pole salvestatud teise arendaja mudeli lõpetatud hinnangut.",
   "debateDrawers.node.noPreviousGenerations": "Varasemaid genereerimisi pole.",
+  "debateDrawers.node.noScore.notInAnswer": "See kaart ei kuulu vastuse hulka, seega pole sellel hinnet.",
+  "debateDrawers.node.noScore.notYet": "Hinnet veel pole. Hinded ilmuvad, kui vastus on valmis.",
+  "debateDrawers.node.noScore.question": "Küsimust ennast ei hinnata.",
   "debateDrawers.node.noScoringRecommendation": "Selle argumendi kohta pole hindamissoovitust.",
   "debateDrawers.node.notUseful": "ei olnud kasulik",
   "debateDrawers.node.openRecommendedTargetClaim": "Avage soovitatud sihtväide",

@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} niveau",
   "debateViews.levelCount.other": "{count} niveauer",
   "debateViews.mapInteractionHint": "Hold markøren over et felt for at undersøge det · klik for at fokusere",
+  "debateViews.mapKeysHint": "Piletasterne flytter mellem felter · Enter fokuserer på det valgte",
   "debateViews.mapLegendHint": "Ring = dybde · bredde = mængden af debat under den",
   "debateViews.mapReasoning": "Ræsonnement",
   "debateViews.moveToParentArgument": "Gå op til overargumentet: {claim}",

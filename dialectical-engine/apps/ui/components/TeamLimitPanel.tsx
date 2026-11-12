@@ -104,14 +104,20 @@ export function TeamLimitPanel({ client, catalog = staffEnglish, locale = "en" }
 
   // Keyboard audit 2026-11-12: asking switches the form (or Take back) off under focus and opens the confirm away from
   // it: focus goes to Confirm. Cancel gives focus back to where the person asked from, once that is switched on again.
+  // Where they asked from is read as they ask (`ask`), not here: by the time this effect runs a browser has already
+  // taken focus from the switched-off control. Nothing focused then (a mouse press that focuses no button): no place is
+  // kept, so Cancel never sends focus to the place of an earlier ask.
   const confirmButton = useRef<HTMLButtonElement>(null);
   const asker = useRef<HTMLElement | null>(null);
   const backToAsker = useRef(false);
+  function ask(change: Pending) {
+    const focused = document.activeElement;
+    asker.current = focused instanceof HTMLElement && focused !== document.body && !isFocusParked(focused) ? focused : null;
+    setPending(change);
+  }
   useEffect(() => {
     if (pending === null) return;
-    const focused = document.activeElement;
-    if (focused instanceof HTMLElement && focused !== document.body && !isFocusParked(focused)) asker.current = focused;
-    if (focusIsLost() || focused?.matches(":disabled")) confirmButton.current?.focus();
+    if (focusIsLost() || document.activeElement?.matches(":disabled")) confirmButton.current?.focus();
   }, [pending]);
   useEffect(() => {
     if (!backToAsker.current || pending !== null || busy) return;
@@ -160,7 +166,7 @@ export function TeamLimitPanel({ client, catalog = staffEnglish, locale = "en" }
     if (amountMicros === null) return refuse("staff.teamLimit.invalidAmount", "limit");
     if (amountMicros === current.amount_micros) return refuse("staff.teamLimit.sameAmount", "limit");
     setMessage(null);
-    setPending({ kind: "limit", amountMicros });
+    ask({ kind: "limit", amountMicros });
   }
   function askPick(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -168,7 +174,7 @@ export function TeamLimitPanel({ client, catalog = staffEnglish, locale = "en" }
     const member = members.find(row => row.staff_id === person);
     if (member === undefined) return refuse("staff.teamLimit.partner.chooseFirst", "partner");
     setMessage(null);
-    setPending({ kind: "pick", member });
+    ask({ kind: "pick", member });
   }
   function askPractice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -178,7 +184,7 @@ export function TeamLimitPanel({ client, catalog = staffEnglish, locale = "en" }
     if (!isPracticeRef(practiceRef)) return refuse("staff.teamLimit.practice.invalidRef", "practice");
     if (chargeMicros === null) return refuse("staff.teamLimit.invalidAmount", "practice");
     setMessage(null);
-    setPending({ kind: "practice", practiceRef, chargeMicros });
+    ask({ kind: "practice", practiceRef, chargeMicros });
   }
 
   function pendingLine(change: Pending): string {
@@ -229,7 +235,7 @@ export function TeamLimitPanel({ client, catalog = staffEnglish, locale = "en" }
       <h2 className="staffSectionTitle">{t(catalog, "staff.teamLimit.partner.title")}</h2>
       <p>{page.partner?.pseudonym ?? t(catalog, "staff.teamLimit.partner.none")}</p>
       {page.is_owner && page.partner !== null ? <>
-        <div className="staffActions"><button className="setBtn" type="button" disabled={locked} onClick={() => { setMessage(null); setPending({ kind: "takeBack", partner: page.partner! }); }}>{t(catalog, "staff.teamLimit.partner.takeBack")}</button></div>
+        <div className="staffActions"><button className="setBtn" type="button" disabled={locked} onClick={() => { setMessage(null); ask({ kind: "takeBack", partner: page.partner! }); }}>{t(catalog, "staff.teamLimit.partner.takeBack")}</button></div>
         <p className="setCardHint">{t(catalog, "staff.teamLimit.partner.onlyOne")}</p>
       </> : null}
       {page.is_owner && page.partner === null ? pickable.length === 0 ? <p className="setCardHint">{t(catalog, "staff.teamLimit.partner.nobody")}</p>

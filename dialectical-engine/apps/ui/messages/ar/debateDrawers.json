@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "الاعتراض على هذا",
+  "debateDrawers.challenge.whichPart": "أي جزء؟ (اختياري)",
   "debateDrawers.common.close": "إغلاق",
   "debateDrawers.common.false": "خطأ",
   "debateDrawers.common.notAvailable": "غير متاح",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "لا يوجد نص للحجة بعد.",
   "debateDrawers.node.noCompletedReview": "لا توجد مراجعة مكتملة من مُنشئ ثانٍ مسجّلة لهذه العقدة.",
   "debateDrawers.node.noPreviousGenerations": "لا توجد عمليات إنشاء سابقة.",
+  "debateDrawers.node.noScore.notInAnswer": "هذه البطاقة ليست جزءًا من الإجابة، لذلك لا توجد لها درجة.",
+  "debateDrawers.node.noScore.notYet": "لا توجد درجة بعد. تظهر الدرجات عندما تصبح الإجابة جاهزة.",
+  "debateDrawers.node.noScore.question": "السؤال نفسه لا يحصل على درجة.",
   "debateDrawers.node.noScoringRecommendation": "لا تتوفر توصية تقييم لهذه الحجة.",
   "debateDrawers.node.notUseful": "غير مفيد",
   "debateDrawers.node.openRecommendedTargetClaim": "فتح الادعاء المستهدف الموصى به",

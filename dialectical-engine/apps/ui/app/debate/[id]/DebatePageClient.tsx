@@ -36,6 +36,8 @@ import {
 import {
   contractNodesById,
   liveDebateDetail,
+  v3NodeScoreState,
+  v3ScoreAbsenceOf,
   v3ScoringStatusLabel
 } from "@/lib/v3/adapter";
 import { buildAnswerExport, type AnswerExport } from "@/lib/v3/answerExport";
@@ -793,8 +795,9 @@ export default function DebatePageClient({
   const [replayNonce, setReplayNonce] = useState(0);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
-  // anchorBottom lets the popover open below its anchor when there is no room above it.
-  const [popover, setPopover] = useState<(PopoverState & { anchorBottom: number }) | null>(null);
+  // anchorBottom lets the popover open below its anchor when there is no room above it; `part` is
+  // set when a Challenge button opened it (the "Which part?" box's starting words).
+  const [popover, setPopover] = useState<(PopoverState & { anchorBottom: number; part?: string }) | null>(null);
   const [investigation, setInvestigation] = useState<{ nodeId: string; status: string; flagged: string } | null>(
     null
   );
@@ -1593,7 +1596,10 @@ export default function DebatePageClient({
   function openChallenge(node: DebateNode, anchor: HTMLElement, text = "") {
     if (publicMode) return;
     const rect = anchor.getBoundingClientRect();
-    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, anchorBottom: rect.bottom, text });
+    // A Challenge button (no text) asks which part, starting from a selection in this argument's
+    // prose: the keyboard's way to challenge a passage (keyboard audit 2026-11-12, DEB1-9).
+    const part = text === "" ? proseSelectionOf(node.id) : undefined;
+    setPopover({ nodeId: node.id, x: rect.left + rect.width / 2, y: rect.top - 8, anchorBottom: rect.bottom, text, part });
   }
 
   // Thread, Split and Canvas each render a Challenge affordance only when they
@@ -1603,9 +1609,9 @@ export default function DebatePageClient({
     ? {}
     : { onChallengeNode: (node: DebateNode, anchor: HTMLElement) => openChallenge(node, anchor) };
 
-  // A keyboard or screen-reader selection inside an argument's prose opens the same challenge a
-  // mouse selection does (the views' onMouseUp handles the mouse).
-  useSelectionChallenge(!publicMode && popover === null, (nodeId) => {
+  // A touch selection inside an argument's prose opens the same challenge a mouse selection does
+  // (the views' onMouseUp handles the mouse); a keyboard selection goes through the Challenge button.
+  const proseSelectionOf = useSelectionChallenge(!publicMode && popover === null, (nodeId) => {
     const node = findNode(debate?.tree ?? null, nodeId);
     if (node) onProseSelect(node);
   });
@@ -1662,7 +1668,7 @@ export default function DebatePageClient({
   // through to the loading/connecting state below and the client retries.
   if (privateDeletionStatus!==null) {
     return (
-      <div className="screen scroll"><div className="screenInner narrow">
+      <div className="screen scroll" id="page-content" tabIndex={-1}><div className="screenInner narrow">
         <p className="eyebrow">{t(debateChromeCatalog, "debateChrome.privateDebate")}</p>
         <h1 tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>{privateDeletionStatus==="CLEANED"
           ? t(debateChromeCatalog, "debateChrome.privateDebateDeleted")
@@ -1686,7 +1692,7 @@ export default function DebatePageClient({
         </div>
         <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><DebateLocaleAndModeControls /></div>
       </header>
-      <div className="debateAiDisclosure">
+      <div className="debateAiDisclosure" id="page-content" tabIndex={-1}>
         <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
       </div>
       {removedByCheck ? null : <p className="heldMobileQuestion" lang={readQuestionLocale ?? storyLocale}
@@ -1698,7 +1704,7 @@ export default function DebatePageClient({
   }
   if (error && !debate) {
     return (
-      <div className="screen scroll">
+      <div className="screen scroll" id="page-content" tabIndex={-1}>
         <div className="screenInner narrow">
           <div className="error" role="alert" tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>{error}</div>
           <Link className="btn" href="/" style={{ marginTop: 16 }}>
@@ -1711,7 +1717,7 @@ export default function DebatePageClient({
   if (!debate) {
     // Final fix wave W3: once the stream is offline for good, the reload note speaks; no progress line stays under it.
     return (
-      <div className="screen scroll">
+      <div className="screen scroll" id="page-content" tabIndex={-1}>
         <div className="screenInner narrow">
           {streamState.status === "offline" ? null : (
             <p className="muted" role="status" tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>
@@ -1907,7 +1913,8 @@ export default function DebatePageClient({
 
       {publicMode && publicHeader ? publicHeader : null}
 
-      <div className="debateAiDisclosure">
+      {/* Where the page's content starts, after its own header: the skip link's target (keyboard audit 2026-11-12). */}
+      <div className="debateAiDisclosure" id="page-content" tabIndex={-1}>
         <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
       </div>
 
@@ -2172,6 +2179,8 @@ export default function DebatePageClient({
         <NodeDetailDrawer
           node={detailNode}
           v3={v3NodeById?.get(detailNode.id)}
+          // Why this card has no score, as the Tree's pill says it only in a tooltip (keyboard audit 2026-11-12).
+          scoreAbsence={v3ScoreAbsenceOf(v3NodeScoreState(detailNode, v3NodeById))}
           // Owner-only stop causes never reach a public pill, even if an answer
           // were ever loaded in public mode: the public pill reads the neutral words.
           conditionRecords={publicMode ? [] : answer?.condition_mark_records ?? []}
@@ -2208,14 +2217,16 @@ export default function DebatePageClient({
         <ChallengePopover
           state={popover}
           anchorBottom={popover.anchorBottom}
+          part={popover.part}
+          returnFocus={() => nodeFocusTarget(popover.nodeId)}
           onClose={() => setPopover(null)}
-          onChoose={() => {
+          onChoose={(_actionKey, part) => {
             // The drawer and the popover close in this commit; when the control that opened the
             // drawer has left the page ("Open target"), the investigation opens from, and returns
             // focus to, the argument's control in the view now shown.
             drawerReturnFocusRef.current = nodeFocusTarget(popover.nodeId);
             setScrutiny((current) => ({ ...current, [popover.nodeId]: "working" }));
-            setInvestigation({ nodeId: popover.nodeId, status: "working", flagged: popover.text });
+            setInvestigation({ nodeId: popover.nodeId, status: "working", flagged: part ?? popover.text });
             setDetailNodeId(null);
             setPopover(null);
           }}

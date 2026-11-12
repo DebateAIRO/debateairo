@@ -76,6 +76,7 @@
   "debateViews.levelCount.few": "{count} ravneh",
   "debateViews.levelCount.other": "{count} ravneh",
   "debateViews.mapInteractionHint": "Za pregled pridržite kazalec nad izsekom · kliknite za postavitev v žarišče",
+  "debateViews.mapKeysHint": "S puščicami se premikate med izseki · Enter izbranega postavi v žarišče",
   "debateViews.mapLegendHint": "Obroč = globina · širina = obseg razprave pod njim",
   "debateViews.mapReasoning": "Sklepanje",
   "debateViews.moveToParentArgument": "Pomakni se na nadrejeni argument: {claim}",

@@ -55,6 +55,7 @@
   "debateViews.leanAndFocusHint": "傾向：{lean} · 論拠をクリックするとフォーカスできます",
   "debateViews.levelCount.other": "{count}階層",
   "debateViews.mapInteractionHint": "扇形にカーソルを合わせて確認 · クリックしてフォーカス",
+  "debateViews.mapKeysHint": "矢印キーで扇形を移動 · Enterでフォーカス",
   "debateViews.mapLegendHint": "環＝深度 · 幅＝その下にあるディベートの量",
   "debateViews.mapReasoning": "推論",
   "debateViews.moveToParentArgument": "親論拠に移動：{claim}",

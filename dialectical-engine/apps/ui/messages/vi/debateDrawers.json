@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Phản biện nội dung này",
+  "debateDrawers.challenge.whichPart": "Phần nào? (không bắt buộc)",
   "debateDrawers.common.close": "Đóng",
   "debateDrawers.common.false": "sai",
   "debateDrawers.common.notAvailable": "không khả dụng",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Chưa có nội dung lập luận.",
   "debateDrawers.node.noCompletedReview": "Chưa ghi nhận đánh giá hoàn tất do mô hình của một nhà phát triển khác thực hiện cho nút này.",
   "debateDrawers.node.noPreviousGenerations": "Không có lần tạo trước.",
+  "debateDrawers.node.noScore.notInAnswer": "Thẻ này không thuộc câu trả lời nên không có điểm.",
+  "debateDrawers.node.noScore.notYet": "Chưa có điểm. Điểm sẽ hiện khi câu trả lời sẵn sàng.",
+  "debateDrawers.node.noScore.question": "Bản thân câu hỏi không được chấm điểm.",
   "debateDrawers.node.noScoringRecommendation": "Không có đề xuất chấm điểm cho lập luận này.",
   "debateDrawers.node.notUseful": "không hữu ích",
   "debateDrawers.node.openRecommendedTargetClaim": "Mở luận đề đích được đề xuất",

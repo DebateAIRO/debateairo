@@ -55,6 +55,7 @@
   "debateViews.leanAndFocusHint": "Nghiêng về {lean} · nhấp vào bất kỳ lập luận nào để chọn làm tiêu điểm",
   "debateViews.levelCount.other": "{count} cấp",
   "debateViews.mapInteractionHint": "Di chuột lên một hình quạt để xem · nhấp để chọn làm tiêu điểm",
+  "debateViews.mapKeysHint": "Phím mũi tên di chuyển giữa các hình quạt · Enter để chọn làm tiêu điểm",
   "debateViews.mapLegendHint": "Vòng = độ sâu · chiều rộng = lượng nội dung tranh luận bên dưới",
   "debateViews.mapReasoning": "Suy luận",
   "debateViews.moveToParentArgument": "Di chuyển lên lập luận mẹ: {claim}",

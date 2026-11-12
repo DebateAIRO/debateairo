@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Contester cet élément",
+  "debateDrawers.challenge.whichPart": "Quelle partie ? (facultatif)",
   "debateDrawers.common.close": "Fermer",
   "debateDrawers.common.false": "faux",
   "debateDrawers.common.notAvailable": "indisponible",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Aucun texte d’argument pour l’instant.",
   "debateDrawers.node.noCompletedReview": "Aucune évaluation achevée par un second concepteur n’est enregistrée pour ce nœud.",
   "debateDrawers.node.noPreviousGenerations": "Aucune génération antérieure.",
+  "debateDrawers.node.noScore.notInAnswer": "Cette fiche ne fait pas partie de la réponse, elle n’a donc pas de score.",
+  "debateDrawers.node.noScore.notYet": "Pas encore de score. Les scores apparaissent quand la réponse est prête.",
+  "debateDrawers.node.noScore.question": "La question elle-même n’a pas de score.",
   "debateDrawers.node.noScoringRecommendation": "Aucune recommandation de notation n’est disponible pour cet argument.",
   "debateDrawers.node.notUseful": "inutile",
   "debateDrawers.node.openRecommendedTargetClaim": "Ouvrir l’affirmation cible recommandée",

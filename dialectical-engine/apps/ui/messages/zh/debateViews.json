@@ -55,6 +55,7 @@
   "debateViews.leanAndFocusHint": "倾向{lean} · 点击任意论点即可将其设为焦点",
   "debateViews.levelCount.other": "{count} 个层级",
   "debateViews.mapInteractionHint": "将指针悬停在扇区上可查看详情 · 点击即可聚焦",
+  "debateViews.mapKeysHint": "方向键在扇区间移动 · 按 Enter 即可聚焦",
   "debateViews.mapLegendHint": "圆环 = 深度 · 宽度 = 下方辩论内容的数量",
   "debateViews.mapReasoning": "推理",
   "debateViews.moveToParentArgument": "移至父论点：{claim}",

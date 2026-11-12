@@ -66,7 +66,8 @@ export function V4AskGate({ catalog, locale, children }: Readonly<{
         const owes = status.must_accept.length > 0;
         if (owes) {
           const held = document.activeElement;
-          keptFocus.current = held instanceof HTMLElement && page.current?.contains(held) === true ? held : null;
+          // The content's start (the skip link's landing, or a press on blank space) is the page as a whole: nothing kept.
+          keptFocus.current = held instanceof HTMLElement && held.id !== "page-content" && page.current?.contains(held) === true ? held : null;
         }
         setLegal(owes ? "OWED" : "CLEAR");
       },

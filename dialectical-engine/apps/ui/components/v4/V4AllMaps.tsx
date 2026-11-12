@@ -42,8 +42,8 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
     <>
       {/* journey-f19: the quota share shows only on the ask, choosing and map pages; My questions is none of them. */}
       <V4Header catalog={catalog} showQuota={false} />
-      {/* UI-4: the site layout already holds the page's one <main>. */}
-      <div ref={area} className="v4AskMain v4MapsMain">
+      {/* UI-4: the site layout already holds the page's one <main>. Keyboard audit 2026-11-12 (CHR1-4): the skip link comes here. */}
+      <div ref={area} className="v4AskMain v4MapsMain" id="page-content" tabIndex={-1}>
         <h1 className="v4AskTitle v4Serif">{t(catalog, "v4.maps.title")}</h1>
         {load.status === "LOADING" ? <p className="v4AskHint v4Muted" role="status">{t(catalog, "v4.common.loading")}</p> : null}
         {load.status === "FAILED" ? (

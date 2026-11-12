@@ -359,6 +359,13 @@ html:has(.v4StartBar:not(.v4StartBar--aside):not(.v4StartBar--next)):not(:has(.a
 .v4StartChips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .v4StartChipItem { min-width: 0; max-inline-size: 100%; }
 .v4StartChip { min-height: 44px; min-width: 0; max-inline-size: 100%; text-align: start; overflow-wrap: anywhere; font-weight: 500; }
+/* Keyboard audit 2026-11-12 (V4A-18): the chips are no Tab stops (ArrowRight from the row reaches them); the line saying so
+   shows while the row or one of its chips has the keyboard's ring, never for a mouse. The row's button is described by it.
+   While the ring is anywhere in the list every row's line keeps its place, unseen, so the list grows once as the keyboard
+   enters it and never while moving inside it (wave-3 fix round, A4). */
+.v4StartChipsHint { display: none; margin: 0; font-size: var(--t-meta); color: var(--text-2); overflow-wrap: anywhere; }
+.v4StartList:has(:focus-visible) .v4StartChipsHint { display: block; visibility: hidden; }
+.v4StartList .v4StartRow:has(.v4StartRowButton:focus-visible, .v4StartChip:focus-visible) .v4StartChipsHint { visibility: visible; }
 /* "Combine with…": the picked row, and the rows that can be pressed to combine with it. */
 .v4StartRow--picked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
 .v4StartRow--pickable { cursor: pointer; }
@@ -613,6 +620,10 @@ html:has(.v4StartBar:not(.v4StartBar--aside):not(.v4StartBar--next)):not(:has(.a
   flex: 1 1 12em; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   overflow-wrap: anywhere; font-weight: 600; color: var(--ink);
 }
+/* Keyboard audit 2026-11-12 (CSS-7): a keyboard cannot open the title, so while the keyboard's ring is anywhere in the list
+   every question shows whole: the list changes once as the keyboard enters it, never line by line as it moves down
+   (wave-3 fix round, A4). A screen reader already reads it whole: it is the line's text and describes both buttons. */
+.v4NotStartedList:has(:focus-visible) .v4NotStartedQuestion { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .v4NotStartedDay { font-size: var(--t-meta); color: var(--text-2); white-space: nowrap; }
 .v4NotStartedActions { display: inline-flex; gap: 4px 16px; }
 .v4NotStartedPickUp, .v4NotStartedDelete, .v4NotStartedAll { min-block-size: 44px; display: inline-flex; align-items: center; }

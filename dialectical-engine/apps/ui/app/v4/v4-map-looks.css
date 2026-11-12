@@ -145,6 +145,19 @@
 /* A right-to-left map runs on to the left: the fade sits at that end. */
 [dir="rtl"] .v4MapScrollMore { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
 .v4MapScrollHint { margin: 0; font-size: var(--t-meta); }
+/* V4B-M1 (keyboard audit 2026-11-12): the map and the outline are one Tab stop moved with the arrow keys; the line saying so
+   shows only while one of their rows has the keyboard's ring (a press with the mouse shows none). Screen readers hear it on
+   the row focus enters on, hidden or not (aria-describedby, lib/v4/useMapKeys.ts). */
+.v4MapKeysHint { display: none; margin: 0; font-size: var(--t-meta); }
+.v4Map:has(.v4MapCanvas [data-rove]:focus-visible) .v4MapKeysHint,
+.v4Out:has(.v4OutTree [data-rove]:focus-visible) .v4MapKeysHint { display: block; }
+/* The outline's line sits between the shades and the tree (A9, wave-3 fix round). */
+.v4Out .v4MapKeysHint { margin-block-end: 8px; }
+/* Keyboard audit 2026-11-12 (CSS-7): the top line's question is cut to one line, its whole words in a title a keyboard cannot
+   open; while the keyboard's ring is anywhere in the map or the outline, the top line shows it whole (one change as focus
+   enters the map and one as it leaves, none while the arrows move inside it: wave-3 fix round, A4).
+   A screen reader has it whole in the page's heading (V4DebateClient's h1). */
+.v4DebBehind:has(.v4MapCanvas :focus-visible, .v4OutTree :focus-visible) .v4TopLineQuestion { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 /* V4B-V3 (keyboard audit 2026-11-12): a card the arrow keys scroll to stops clear of the fade, so its focus ring shows. */
 .v4MapScroll { scroll-padding-inline-end: 56px; }
 .v4MapLeafMore .v4MapMore[aria-expanded="true"] { border-style: solid; }

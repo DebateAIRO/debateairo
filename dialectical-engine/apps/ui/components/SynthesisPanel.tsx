@@ -103,6 +103,10 @@ export function SynthesisPanel({
                   <span className="synthLeanValue">{view.lean.label}</span>
                 </div>
               ) : null}
+              {/* The tooltip's sentence, for a keyboard: shown while the panel has the keyboard's ring (keyboard audit 2026-11-12). */}
+              {view.lean ? (
+                <p className="synthLeanSource">{t(catalog, LEAN_SOURCE_TITLE_KEYS[view.lean.source])}</p>
+              ) : null}
             </section>
 
             {view.sections && view.sections.length > 0 ? (

@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} szinten",
   "debateViews.levelCount.other": "{count} szinten",
   "debateViews.mapInteractionHint": "Mutasson egy körcikkre a vizsgálathoz · kattintson a fókuszáláshoz",
+  "debateViews.mapKeysHint": "A nyílbillentyűk körcikkek között lépnek · Az Enter fókuszál",
   "debateViews.mapLegendHint": "Gyűrű = mélység · szélesség = az alatta lévő vita mennyisége",
   "debateViews.mapReasoning": "Érvelés",
   "debateViews.moveToParentArgument": "Ugrás a fölérendelt érvhez: {claim}",

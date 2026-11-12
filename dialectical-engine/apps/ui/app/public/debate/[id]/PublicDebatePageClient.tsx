@@ -86,7 +86,7 @@ export function PublicDebatePageClient({
           </V4PublicTopMenu>
         </V4PublicHeader>
         {/* The layout already holds the page's one <main>. */}
-        <div className="v4PubMain">
+        <div className="v4PubMain" id="page-content" tabIndex={-1}>
           <h1 ref={title} tabIndex={-1} className="v4Serif v4PubTitle" data-ai-generated="true" lang={storyLocale} dir="auto">{debate.question}</h1>
           <p className="v4PubPublished v4Muted">{published}</p>
           {debate.changed_after_review === true
