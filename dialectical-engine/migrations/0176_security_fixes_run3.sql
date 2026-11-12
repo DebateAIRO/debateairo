@@ -367,7 +367,8 @@ BEGIN
     RETURN;
   END IF;
   SELECT * INTO v_account FROM identity.lock_account_t9_internal(p_user_id,true);
-  IF v_account.audit_token IS NOT NULL THEN
+  -- The connection must be the account's own, as 0171 made the sealed resend ask (identity.request_owner_matches).
+  IF v_account.audit_token IS NOT NULL AND identity.request_owner_matches(v_account.owner_ref) THEN
     PERFORM 1 FROM identity.session AS session
     WHERE session.session_id=p_session_id AND session.user_id=p_user_id
       AND session.revoked_at IS NULL

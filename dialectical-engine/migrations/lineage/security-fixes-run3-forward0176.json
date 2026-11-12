@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0176_security_fixes_run3.sql",
-    "sha256": "66e85c3b5b73b5a51d3c9602e65286d0d75cc18bccce57ebf6f9796a92778c68"
+    "sha256": "5f4b258b56572c4cfef3b464885f5e0442c00d5b93d4017b9e013076d95afff0"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0177_password_reset_notice_due.sql",
-    "manifestSha256": "c6cdd65efabadc636f614ec488f1371fa7b9fcddc79d212ae771396dad7bdd9d",
+    "manifestSha256": "0adb576ab81d97b4d57c28fb3640d65239372474bc73dbd679fd935000b61648",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

@@ -455,6 +455,9 @@ describe("run-event streams are capped per session and per account (NV-20)", () 
     const c = sameAccountSession(a, `live-run-events-${randomUUID()}`);
     const other = testHttpIdentity(`live-run-events-${randomUUID()}`);
     const runId = await ownedRunningRun(a, "cap-account");
+    // The account's other two sessions are live rows too: the database reads a run for a session it knows.
+    await persistLiveSession(database.pool, b);
+    await persistLiveSession(database.pool, c);
     const otherRunId = await ownedRunningRun(other, "cap-other");
     const capped = await startCappedApi([a, b, c, other]);
     try {

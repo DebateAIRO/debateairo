@@ -3,7 +3,7 @@
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0179_mfa_recovery_notice_due.sql",
-    "manifestSha256": "cf170e90147baa8c5084b1bbabd3f235d3a27d45ff44bc63294c2b284cdd44e0",
+    "manifestSha256": "77e0ae4360ea50d533c97b078b8b71b7ef04f0b212e594a2be67b5a512b63709",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {

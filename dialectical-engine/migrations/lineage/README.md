@@ -940,8 +940,10 @@ and the four index steps after it as 0125 to 0129; `origin/dev` took 0125 to 013
 re-chained from 0130's, which also hands them 0130's verifier, and the chain lists re-pinned). The V4 line then took
 0131 to 0175, so the five steps moved again, to 0176 to 0180, when the branch was brought onto that dev: every file
 and constant that carries the number, the manifests re-chained from 0175's (whose verifier is still 0130's), and the
-step lines added to the tests' one list of the chain. No statement changed but one: `[NV-50]`'s shared source list,
-rebuilt on the newest list (0158's) plus the two new sources, as the first renumber rebuilt it on 0128's. The sections:
+step lines added to the tests' one list of the chain. Two statements changed: `[NV-50]`'s shared source list,
+rebuilt on the newest list (0158's) plus the two new sources, as the first renumber rebuilt it on 0128's; and
+`[NV-12]`'s `identity.resend_email_change_bounded`, a copy of 0040's resend made before 0171, which now asks whether
+the connection is the account's own (`identity.request_owner_matches`), as 0171 made the sealed resend ask. The sections:
 
 - `[NV-16]` `identity.mfa_recovery_start_bounded(bytea,text,uuid,uuid[],text,text,jsonb,jsonb,bigint,uuid)`, owned by
   `debateai_mfa_recovery_owner` (SECURITY DEFINER, `search_path=pg_catalog, pg_temp`, EXECUTE for
