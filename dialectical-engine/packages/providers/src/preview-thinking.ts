@@ -6,7 +6,7 @@
  * holds the same menu) are accepted; anything else stops the app at boot. A step the table does not name runs at its AI's
  * usual level, and an AI the table does not name runs at its row's default, which is exactly today's request.
  */
-import { THINKING_LEVEL_DEFAULT_ONLY, debateRoleFromCallSiteKey, exhaustive, lengthCallStepOf } from "@debateai/kernel";
+import { THINKING_LEVEL_DEFAULT_ONLY, debateRoleFromCallSiteKey, exhaustive, lengthCallStepOf, readWithBackupCheckerKey } from "@debateai/kernel";
 import { previewModelRow, type PreviewEffort, type PreviewModelRow } from "./preview-models.js";
 
 /**
@@ -84,6 +84,16 @@ export function parsePreviewThinkingLevels(value: unknown): PreviewThinkingLevel
 export function previewThinkingStepOf(request: Readonly<{ callSiteKey: string; lane?: string }>): PreviewThinkingStep | null {
   // LG-A (L32): the structure-repair call runs at the repair model's `slip_fix` level (owner's table; absent: its usual level).
   if (lengthCallStepOf(request.callSiteKey) === "structure_repair") return "slip_fix";
+  // A backup checker runs at its first checker's step, so the owner's table gives it the same level.
+  return readWithBackupCheckerKey(request.callSiteKey, (callSiteKey) => thinkingStepOfKey(callSiteKey, request.lane),
+    (step) => PREVIEW_CHECKER_STEPS.has(step));
+}
+
+/** The checkers' steps: the only steps a backup checker's call site can be at. */
+const PREVIEW_CHECKER_STEPS: ReadonlySet<PreviewThinkingStep> = new Set<PreviewThinkingStep>(["story_checker", "path_rewrite_checker", "answer_checker"]);
+
+function thinkingStepOfKey(callSiteKey: string, lane: string | undefined): PreviewThinkingStep | null {
+  const request = { callSiteKey, lane };
   if (request.lane === "story" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)) return "story_writer";
   if (request.lane === "story" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey)) return "story_checker";
   // Dig-model revision W3-7: a dig's path rewrite, on the story lane (packages/story PATH_REWRITE_CALL_SITE; its step names

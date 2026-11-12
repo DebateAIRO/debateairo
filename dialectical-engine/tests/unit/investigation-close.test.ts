@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { InvestigationReportStorySchema } from "@debateai/contract";
 import type { PathRewriteEntry } from "@debateai/db";
 import {
-  ANTHROPIC_DOSSIER_FIRST_SYSTEM, anthropicMessagesRequestBody, previewThinkingStepOf, readPromptFrame, type ProviderCallRequest
+  ANTHROPIC_DOSSIER_FIRST_SYSTEM, ProviderCallFailedError, anthropicMessagesRequestBody, previewThinkingStepOf, readPromptFrame, type ProviderCallRequest
 } from "@debateai/providers";
 import { BILLING_PLANS_DEPLOYMENT_REGISTER_ROW, billingPlansFromValue, closingReservesOf } from "@debateai/register";
 import { engineContractHash, ENGINE_SEALED_CONTRACT_IDS } from "../../apps/runner/src/engine-contracts.js";
@@ -28,7 +28,7 @@ import { pathRewriteBodyBytes, pathRewriteBodyFits } from "../../apps/runner/src
 import { latestWrittenReportOf, servePathRewrites, type RewriteTurn } from "../../packages/serve/src/path-rewrites.js";
 import {
   CLOSING_RESERVES, DIG_FAILED, DIG_NESTED, DIG_READY, INVESTIGATION, OBJECTION, ROOT, STORY_OBJECTION, closingOf, contractOf, deepChain, fieldsOf,
-  investigationInput, memoryReports, settingsOver, team
+  investigationInput, memoryReports, projectedMicrosOf, satisfiedCheck, settingsOver, team
 } from "../support/investigation-close-world.js";
 
 const PAID_RESERVE = CLOSING_RESERVES.paid;
@@ -408,5 +408,58 @@ describe("Task 50c: the report says how the person's stated goal fares", () => {
       ["report.answer.later.v4", "report.story.v1", "report.answer-check.v3", "report.story-check.v1"]]);
     expect(sentDigest([...first.haiku.requests, ...first.glm.requests])).toBe("6f505ec386133743ac3fefd545f97e3a305dc8222294287a9ea458bdc6f6a995");
     expect(sentDigest([...second.haiku.requests, ...second.glm.requests])).toBe("fd5c259f36e4a6955066588232764a5ef4f956d70619fef9ca10737f0944ea86");
+  });
+});
+
+/**
+ * The backup checker on the report: when GLM's check cannot be completed, one model of a third company runs the same check at the
+ * same call site with ":BACKUP"; the closing admits that call against its reserve exactly as any other call.
+ */
+describe("the report's checker cannot be reached", () => {
+  const unreachable = (): never => { throw new ProviderCallFailedError(new Error("socket hang up"), 3, "FAILED", "ledger:dead"); };
+
+  it("a third company checks the answer and the story, each step's own backup, and the version is written with its lineage", async () => {
+    const store = memoryReports();
+    const logged: Array<{ event: string; detail: Record<string, unknown> }> = [];
+    const vendors = team({ glm: unreachable, qwen: satisfiedCheck });
+    expect(await closeInvestigation(settingsOver({ store, vendors, logged }), closingOf())).toBe("RECORDED");
+    expect(store.records[0]).toMatchObject({ outcome: "READY", storyOutcome: "READY", failureCode: null, answerRounds: 1, storyRounds: 1 });
+    expect(store.records[0]!.checkerLineage).toMatchObject({ maker: "Alibaba", provider_ref: "ref-qwen" });
+    expect(vendors.glm.requests.map((request) => request.callSiteKey)).toEqual(["INVESTIGATION_REPORT:ANSWER_CHECK:1", "INVESTIGATION_REPORT:STORY_CHECK:1"]);
+    expect(vendors.qwen!.requests.map((request) => [request.callSiteKey, request.role, request.lane])).toEqual([
+      ["INVESTIGATION_REPORT:ANSWER_CHECK:1:BACKUP", "EVALUATOR", "story"], ["INVESTIGATION_REPORT:STORY_CHECK:1:BACKUP", "EVALUATOR", "story"]]);
+    // The very same packet, under the closing's one fence, the same contract and bound.
+    vendors.qwen!.requests.forEach((backup, at) => {
+      const planned = vendors.glm.requests[at]!;
+      expect(backup.packet).toEqual(planned.packet);
+      expect([backup.contractHash, backup.bound, backup.subjectItemId, backup.runId]).toEqual([planned.contractHash, planned.bound, planned.subjectItemId, planned.runId]);
+    });
+    expect(logged.filter((entry) => entry.event === "STORY_CHECKER_BACKUP_USED").map((entry) => entry.detail)).toEqual([
+      expect.objectContaining({ step: "INVESTIGATION_REPORT_ANSWER_CHECK", round: 1, signal: "UNREACHABLE", firstModel: "ref-glm", backupModel: "ref-qwen" }),
+      expect.objectContaining({ step: "INVESTIGATION_REPORT_STORY_CHECK", round: 1, signal: "UNREACHABLE", firstModel: "ref-glm", backupModel: "ref-qwen" })]);
+  });
+
+  it("the closing's reserve admits the backup as any other call: one that does not fit is refused before it is sent", async () => {
+    // A first closing that fits, to read what each call projects.
+    const measured = team({ glm: unreachable, qwen: satisfiedCheck });
+    await closeInvestigation(settingsOver({ store: memoryReports(), vendors: measured }), closingOf());
+    const before = projectedMicrosOf(measured.haiku.requests[0]!) + projectedMicrosOf(measured.glm.requests[0]!);
+    const backupCost = projectedMicrosOf(measured.qwen!.requests[0]!);
+    const store = memoryReports();
+    const logged: Array<{ event: string; detail: Record<string, unknown> }> = [];
+    const vendors = team({ glm: unreachable, qwen: satisfiedCheck });
+    const reserve = before + backupCost - 1;
+    await closeInvestigation(settingsOver({ store, vendors, logged, reserveMicros: { paid: reserve, free: reserve } }), closingOf());
+    expect(vendors.qwen!.requests).toEqual([]);
+    expect(store.records[0]).toMatchObject({ outcome: "FAILED", failureCode: "INVESTIGATION_REPORT_ENVELOPE_EXHAUSTED" });
+    expect(logged.find((entry) => entry.event === "INVESTIGATION_REPORT_CEILING")?.detail)
+      .toMatchObject({ callSiteKey: "INVESTIGATION_REPORT:ANSWER_CHECK:1:BACKUP" });
+  });
+
+  it("with only two companies there is no backup: the answer fails as today", async () => {
+    const store = memoryReports();
+    const vendors = team({ glm: unreachable });
+    await closeInvestigation(settingsOver({ store, vendors }), closingOf());
+    expect(store.records[0]).toMatchObject({ outcome: "FAILED", failureCode: "INVESTIGATION_REPORT_TRANSPORT_DEATH" });
   });
 });

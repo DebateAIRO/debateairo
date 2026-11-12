@@ -2,6 +2,7 @@ import type { MakerLineage, StoryBody } from "@debateai/contract";
 import { DAILY_COST_ENVELOPE_REACHED, PERSON_ALLOWANCE_REACHED, RUN_COST_ENVELOPE_MONEY_REACHED } from "@debateai/budget";
 import { TypedDomainError } from "@debateai/kernel";
 import { ProviderCallFailedError, ProviderContentUnacceptedError } from "@debateai/providers";
+import { storyCheckerBackupSignalOf, type StoryCheckerBackupSignal } from "./backup.js";
 import type { StoryCheckerVerdict } from "./validate.js";
 
 /**
@@ -26,6 +27,13 @@ import type { StoryCheckerVerdict } from "./validate.js";
  *
  * W3-5 (dig-model revision): the loop is generic in the draft it carries (`B`, the story's body by default), so the path
  * rewrite (./path-rewrite.ts) reuses these rounds, this fallback and these failure codes for its own draft.
+ *
+ * THE BACKUP CHECKER (`backupChecker`, optional). When the checker's own call cannot be completed — one of the backup writer's
+ * four signals, or its call site already spent by an earlier copy of the run (`storyCheckerBackupSignalOf`) — the loop asks the
+ * wrapper for one model of another company than the draft's writer's and the failed checker's. That model runs the same check of
+ * the same draft, once, and every later round of this loop is checked by it too, never by the checker that failed. A checker
+ * that answered (an objection included), a money stop, a stopped run or anything unknown asks for no backup. If no company is
+ * left, or the backup's own call fails, the loop stops exactly as it does today. Without the dependency, nothing changes.
  */
 
 export const STORY_LOOP_FAILURE_CODES = Object.freeze({
@@ -82,16 +90,31 @@ export interface StoryLoopDependencies<B = StoryBody> {
     readonly priorDraft: B | null;
   }): Promise<StoryCallRecord & { readonly body: B }>;
   checkStory(input: { readonly round: number; readonly candidate: B }): Promise<StoryCallRecord & { readonly verdict: StoryLoopVerdict }>;
+  /**
+   * The backup checker for a draft written by `writerRef` (its record's provider ref), after the checker's call ended with
+   * `signal`: one model of another company and its check of the same draft at the backup checker's call site; null when no
+   * company is left. Absent: no backup checker, the loop as it always was.
+   */
+  readonly backupChecker?: (input: Readonly<{ round: number; writerRef: string; signal: StoryCheckerBackupSignal }>) => StoryLoopBackupChecker<B> | null;
 }
+
+/** A backup checker as the loop calls it: its provider ref, and its check, the same as the planned checker's. */
+export type StoryLoopBackupChecker<B = StoryBody> = Readonly<{
+  providerRef: string;
+  check: StoryLoopDependencies<B>["checkStory"];
+}>;
 
 export interface StoryRoundRecord {
   readonly round: number;
   readonly writer: StoryCallRecord;
+  /** The call whose verdict this round has: the planned checker's, or the backup checker's on a round a backup checked. */
   readonly checker: StoryCallRecord | null;
   readonly satisfied: boolean;
   readonly objection: string | null;
   /** Story v4 only, on a round whose checker answered: whether the objection named a misleading problem. */
   readonly misleading?: boolean;
+  /** Only on a round a backup checker checked: why the planned checker's call could not be completed. */
+  readonly checkerBackup?: Readonly<{ signal: StoryCheckerBackupSignal }>;
 }
 
 /** A later round's failure, when the loop kept an earlier checked draft instead (spec §6). */
@@ -229,6 +252,31 @@ export async function runStoryLoop<B = StoryBody>(
     rounds: Object.freeze([...rounds])
   });
 
+  type TakenBackup = Readonly<{ checker: StoryLoopBackupChecker<B>; signal: StoryCheckerBackupSignal }>;
+  /** The backup checker this loop has turned to, and why: once set, it checks every later round of this loop. */
+  let backup: TakenBackup | null = null;
+  /** One check, its result read inside the guarded region, so a malformed result is a named failure, never a TypeError. */
+  const checkOnce = async (check: StoryLoopDependencies<B>["checkStory"], round: number, candidate: B)
+    : Promise<StoryCallRecord & { readonly verdict: StoryLoopVerdict }> => {
+    const checked: unknown = await check({ round, candidate });
+    if (!isCheckedStory(checked)) throw dependencyResultInvalid("checkStory");
+    return checked;
+  };
+  /** The backup checker after the planned checker's call failed with `error`, or null: no signal, no dependency, or no company left. */
+  const backupAfter = (error: unknown, round: number, writer: StoryCallRecord): TakenBackup | null => {
+    const signal = storyCheckerBackupSignalOf(error);
+    if (signal === null || deps.backupChecker === undefined) return null;
+    let checker: StoryLoopBackupChecker<B> | null;
+    try {
+      checker = deps.backupChecker({ round, writerRef: writer.lineage.provider_ref, signal });
+    } catch {
+      // A defect in the wrapper's pick costs no more than having no backup: the loop never throws for a dependency.
+      return null;
+    }
+    return checker === null || typeof checker?.providerRef !== "string" || typeof checker.check !== "function"
+      ? null : Object.freeze({ checker, signal });
+  };
+
   for (let round = firstRound; round <= lastRound; round += 1) {
     // Every read of a dependency's result stays inside its guarded region, so a
     // malformed result becomes a named failure instead of a thrown TypeError.
@@ -243,21 +291,30 @@ export async function runStoryLoop<B = StoryBody>(
       return stopped(storyFailureCode(error, "WRITE"), storyFailureCause(error));
     }
 
-    let checker: StoryCallRecord;
-    let satisfied: boolean;
-    let objection: string | null;
-    let misleading: boolean;
+    let checked: StoryCallRecord & { readonly verdict: StoryLoopVerdict };
     try {
-      const checked: unknown = await deps.checkStory({ round, candidate: body });
-      if (!isCheckedStory(checked)) throw dependencyResultInvalid("checkStory");
-      checker = storyCallRecord(checked);
-      ({ satisfied, objection } = checked.verdict);
-      misleading = checked.verdict.misleading === true;
+      checked = await checkOnce(backup === null ? deps.checkStory : backup.checker.check, round, body);
     } catch (error) {
-      rounds.push(Object.freeze({ round, writer, checker: null, satisfied: false, objection: null }));
-      return stopped(storyFailureCode(error, "CHECK"), storyFailureCause(error));
+      const taken: TakenBackup | null = backup === null ? backupAfter(error, round, writer) : null;
+      if (taken === null) {
+        rounds.push(Object.freeze({ round, writer, checker: null, satisfied: false, objection: null }));
+        return stopped(storyFailureCode(error, "CHECK"), storyFailureCause(error));
+      }
+      backup = taken;
+      try {
+        checked = await checkOnce(taken.checker.check, round, body);
+      } catch (backupError) {
+        rounds.push(Object.freeze({ round, writer, checker: null, satisfied: false, objection: null }));
+        return stopped(storyFailureCode(backupError, "CHECK"), storyFailureCause(backupError));
+      }
     }
-    rounds.push(Object.freeze({ round, writer, checker, satisfied, objection, ...(v4 ? { misleading } : {}) }));
+    const checker = storyCallRecord(checked);
+    const { satisfied, objection } = checked.verdict;
+    const misleading = checked.verdict.misleading === true;
+    rounds.push(Object.freeze({
+      round, writer, checker, satisfied, objection, ...(v4 ? { misleading } : {}),
+      ...(backup === null ? {} : { checkerBackup: Object.freeze({ signal: backup.signal }) })
+    }));
     if (satisfied) return ready(round, body);
     // The parser refuses an unsatisfied verdict without an objection; a checker
     // double that returns one anyway has broken its contract.

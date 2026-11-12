@@ -15,10 +15,19 @@ import {
 import {
   STORY_BACKUP_SIGNALS,
   STORY_BACKUP_USED,
+  STORY_CHECKER_BACKUP_SIGNALS,
+  STORY_CHECKER_BACKUP_UNAVAILABLE,
+  STORY_CHECKER_BACKUP_USED,
+  pickBackupChecker,
   pickBackupStoryteller,
+  storyBackupCheckerOf,
   storyBackupSignalOf,
+  storyCheckerBackupSignalOf,
   type StoryBackupCandidate
 } from "@debateai/story";
+import { CALL_LANE_HELD_BACK, CALL_LANE_STOPPED } from "../../apps/runner/src/call-scheduler.js";
+import { RUN_MONTH_PAUSED } from "../../apps/runner/src/month-pause.js";
+import { RUN_HANDOVER_IMPOSSIBLE } from "../../apps/runner/src/run-replay.js";
 
 /**
  * Engine redesign R1d (spec 2026-10-15 §7.2 item 11, P4.6, G7; R1d decision 5): a backup storyteller only when the first
@@ -153,5 +162,125 @@ describe("the backup storyteller's pick", () => {
       makers: [...makersOf([A, B, C]), sealedChecker]
     });
     expect(chosen?.providerRef).toBe("provider:c");
+  });
+});
+
+/**
+ * The backup checker's signals: the backup writer's four, read by the same function, and one of its own. A checker's call site is
+ * used once in one copy of a run, so its allowance can only be spent when an earlier copy spent it (SPENT_EARLIER): a resumed run
+ * then reaches the same backup again. Every way a call ends that another model would meet as well is no signal.
+ */
+describe("the backup checker's signals", () => {
+  it("names the four writer's signals and SPENT_EARLIER, frozen, and two log codes", () => {
+    expect(STORY_CHECKER_BACKUP_SIGNALS).toEqual(["UNREACHABLE", "TOO_SLOW", "OUT_OF_ROOM", "UNUSABLE", "SPENT_EARLIER"]);
+    expect(Object.isFrozen(STORY_CHECKER_BACKUP_SIGNALS)).toBe(true);
+    expect([STORY_CHECKER_BACKUP_USED, STORY_CHECKER_BACKUP_UNAVAILABLE]).toEqual(["STORY_CHECKER_BACKUP_USED", "STORY_CHECKER_BACKUP_UNAVAILABLE"]);
+  });
+
+  it("reads the writer's four signals exactly as the writer's rule does", () => {
+    const failures: readonly unknown[] = [
+      new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead"),
+      new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow"),
+      new ProviderContentUnacceptedError(2, PROVIDER_CONTENT_LENGTH_EXCEEDED, "cut off", "artifact:cut", "ledger:cut", { cutOffs: 2, lastAtLowestLevel: true }),
+      new ProviderContentUnacceptedError(1, PROVIDER_CONTENT_LENGTH_EXCEEDED, "cut off", "artifact:cut", "ledger:cut", { cutOffs: 1, lastAtLowestLevel: false }),
+      new ProviderContentUnacceptedError(2, "SCHEMA_FAILED", "[]", "artifact:bad", "ledger:bad"),
+      new ProviderContentUnacceptedError(2, "PARSE_FAILED", "not json", "artifact:bad", "ledger:bad")
+    ];
+    expect(failures.map(storyCheckerBackupSignalOf)).toEqual(failures.map(storyBackupSignalOf));
+    expect(failures.map(storyCheckerBackupSignalOf)).toEqual(["UNREACHABLE", "TOO_SLOW", "OUT_OF_ROOM", null, "UNUSABLE", "UNUSABLE"]);
+  });
+
+  it("SPENT_EARLIER for the call site's own allowance, which the writer's rule does not read", () => {
+    const spent = new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject");
+    expect(storyCheckerBackupSignalOf(spent)).toBe("SPENT_EARLIER");
+    expect(storyBackupSignalOf(spent)).toBeNull();
+  });
+
+  it("gives no signal for any way a call ends that another model would meet too", () => {
+    const codes = [
+      // Money: the story's own ceiling (the closing's reserve refuses with it too), the run's, the day's, the person's.
+      STORY_COST_ENVELOPE_REACHED, RUN_COST_ENVELOPE_MONEY_REACHED, DAILY_COST_ENVELOPE_REACHED, PERSON_ALLOWANCE_REACHED,
+      // The run's attempt ceiling, and a charge that cannot be counted.
+      "RUN_COST_ENVELOPE_EXHAUSTED", "PROVIDER_USAGE_UNREPORTED", "COST_ENVELOPE_CHARGE_UNREPRESENTABLE",
+      // The run's lane, its content, its claim, its time, its release, the month wall, a hand-over that cannot go on.
+      CALL_LANE_STOPPED, CALL_LANE_HELD_BACK, "PRIVATE_CONTENT_ERASED", "RUNNER_CLAIM_LOST", "RUNNER_TIME_LIMIT_REACHED", "RUNNER_RETIRING",
+      RUN_MONTH_PAUSED, RUN_HANDOVER_IMPOSSIBLE,
+      // A reply the gateway took that a parser then refused, a dependency that broke its contract, a checker that answered badly.
+      "PATH_REWRITE_CHECKER_CONTENT_INVALID", "PATH_OUTCOME_CHECKER_CONTENT_INVALID", "INVESTIGATION_REPORT_CHECKER_CONTENT_INVALID",
+      "STORY_DEPENDENCY_RESULT_INVALID", "STORY_CHECKER_OBJECTION_REQUIRED",
+      // A packet the guard refused before sending, and a scope the gateway refused.
+      "PROMPT_FRAME_INVALID", "STORY_PROVIDER_SCOPE_UNAUTHORIZED", "STORY_ENVELOPE_MISSING"
+    ];
+    for (const code of codes) expect([code, storyCheckerBackupSignalOf(new TypedDomainError(code, "refused"))]).toEqual([code, null]);
+    for (const thrown of [new Error("plain"), new TypeError("x is undefined"), undefined, null, "TIMED_OUT", { code: "CALL_BUDGET_EXHAUSTED" },
+      { lastOutcome: "TIMED_OUT" }]) {
+      expect(storyCheckerBackupSignalOf(thrown)).toBeNull();
+    }
+  });
+});
+
+describe("the backup checker's pick", () => {
+  const member = (providerRef: string, maker: string): StoryBackupCandidate => Object.freeze({
+    provider: { call: async () => { throw new Error("unused"); } } as ProviderGateway, providerRef, maker
+  });
+  const WRITER = member("provider:writer", "maker w");
+  const CHECKER = member("provider:checker", "maker c");
+  const WRITER_TWIN = member("provider:writer-twin", "maker w");
+  const OTHER = member("provider:other", "maker o");
+  const FOURTH = member("provider:fourth", "maker f");
+  const makersOf = (members: readonly StoryBackupCandidate[]) =>
+    members.map((candidate) => Object.freeze({ providerRef: candidate.providerRef, maker: candidate.maker }));
+
+  it("the first candidate, in order, of neither the draft's writer's company nor the failed checker's", () => {
+    const chosen = pickBackupChecker({ candidates: [WRITER, CHECKER, WRITER_TWIN, OTHER, FOURTH], writerRef: WRITER.providerRef, checkerRef: CHECKER.providerRef });
+    expect(chosen).toEqual({ provider: OTHER.provider, providerRef: OTHER.providerRef });
+    expect(pickBackupChecker({ candidates: [FOURTH, OTHER], writerRef: WRITER.providerRef, checkerRef: CHECKER.providerRef })?.providerRef)
+      .toBe(FOURTH.providerRef);
+  });
+
+  it("none of another company: null", () => {
+    expect(pickBackupChecker({ candidates: [WRITER, CHECKER, WRITER_TWIN], writerRef: WRITER.providerRef, checkerRef: CHECKER.providerRef })).toBeNull();
+    expect(pickBackupChecker({ candidates: [], writerRef: WRITER.providerRef, checkerRef: CHECKER.providerRef })).toBeNull();
+  });
+
+  it("after a backup writer wrote the draft, the first writer's company is avoided too", () => {
+    // The first writer (maker w) failed; the backup writer (maker o) wrote the draft; the checker (maker c) failed.
+    const candidates = [WRITER, CHECKER, WRITER_TWIN, OTHER, FOURTH];
+    expect(pickBackupChecker({ candidates, writerRef: OTHER.providerRef, checkerRef: CHECKER.providerRef })?.providerRef).toBe(WRITER.providerRef);
+    expect(pickBackupChecker({ candidates, writerRef: OTHER.providerRef, checkerRef: CHECKER.providerRef, avoidRefs: [WRITER.providerRef] })?.providerRef)
+      .toBe(FOURTH.providerRef);
+    expect(pickBackupChecker({ candidates: [WRITER, CHECKER, WRITER_TWIN, OTHER], writerRef: OTHER.providerRef, checkerRef: CHECKER.providerRef,
+      avoidRefs: [WRITER.providerRef] })).toBeNull();
+  });
+
+  it("makers are read before the sit-out filter: a benched role still excludes its company", () => {
+    // The writer sits out, so the runner leaves it out of the candidates; its twin of the same company is never picked.
+    expect(pickBackupChecker({ candidates: [CHECKER, WRITER_TWIN, OTHER], writerRef: WRITER.providerRef, checkerRef: CHECKER.providerRef,
+      makers: makersOf([WRITER, CHECKER, WRITER_TWIN, OTHER]) })?.providerRef).toBe(OTHER.providerRef);
+    // The avoided first writer benched: its company is still avoided.
+    expect(pickBackupChecker({ candidates: [CHECKER, WRITER_TWIN, OTHER, FOURTH], writerRef: OTHER.providerRef, checkerRef: CHECKER.providerRef,
+      avoidRefs: [WRITER.providerRef], makers: makersOf([WRITER, CHECKER, WRITER_TWIN, OTHER, FOURTH]) })?.providerRef).toBe(FOURTH.providerRef);
+  });
+
+  it("the loop's dependency: logs the backup by codes and refs, and hands the loop the chosen maker's own check", async () => {
+    const logged: Array<{ event: string; detail: Record<string, unknown> }> = [];
+    const checkedWith: string[] = [];
+    const dependency = storyBackupCheckerOf({
+      candidates: [WRITER, CHECKER, OTHER], checkerRef: CHECKER.providerRef, step: "PATH_REWRITE",
+      checkWith: (maker) => async () => { checkedWith.push(maker.providerRef); throw new Error("unused"); },
+      log: (event, detail) => { logged.push({ event, detail }); }
+    });
+    const chosen = dependency({ round: 2, writerRef: WRITER.providerRef, signal: "TOO_SLOW" });
+    expect(chosen?.providerRef).toBe(OTHER.providerRef);
+    await expect(chosen!.check({ round: 2, candidate: {} as never })).rejects.toThrow("unused");
+    expect(checkedWith).toEqual([OTHER.providerRef]);
+    expect(logged).toEqual([{ event: STORY_CHECKER_BACKUP_USED,
+      detail: { step: "PATH_REWRITE", round: 2, signal: "TOO_SLOW", firstModel: CHECKER.providerRef, backupModel: OTHER.providerRef } }]);
+    // No company left: null, and the code that says so.
+    const none = storyBackupCheckerOf({ candidates: [WRITER, CHECKER], checkerRef: CHECKER.providerRef, step: "PATH_REWRITE",
+      checkWith: () => async () => { throw new Error("unused"); }, log: (event, detail) => { logged.push({ event, detail }); } });
+    expect(none({ round: 1, writerRef: WRITER.providerRef, signal: "UNREACHABLE" })).toBeNull();
+    expect(logged.at(-1)).toEqual({ event: STORY_CHECKER_BACKUP_UNAVAILABLE,
+      detail: { step: "PATH_REWRITE", round: 1, signal: "UNREACHABLE", firstModel: CHECKER.providerRef, reason: "NO_CANDIDATE" } });
   });
 });

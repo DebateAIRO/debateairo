@@ -14,6 +14,7 @@
  * back into its form. Health checks, the dormant evaluator lane and the STOPPING row have no step. `lengthCallStepOf`
  * reads which, from the call-site key.
  */
+import { readWithBackupCheckerKey } from "./backup-checker-key.js";
 import {
   COMPARING_JUDGE_KEY, POINT_INVESTIGATION_KEY, SEAT_SUFFIX, debateRoleFromCallSiteKey, type DebateRole
 } from "./debate-roles.js";
@@ -75,6 +76,11 @@ const STEP_OF_ROLE: Readonly<Record<DebateRole, LengthGuidanceStep>> = Object.fr
  */
 export function lengthCallStepOf(callSiteKey: string, lane?: string): LengthCallStep | null {
   if (callSiteKey.startsWith(STRUCTURE_REPAIR_CALL_SITE_PREFIX)) return "structure_repair";
+  // A backup checker's key is its first checker's step; a writer's key with the backup suffix has none.
+  return readWithBackupCheckerKey(callSiteKey, (key) => stepOfKey(key, lane), (step) => step === "story_checker" || step === "answer_checker");
+}
+
+function stepOfKey(callSiteKey: string, lane: string | undefined): LengthCallStep | null {
   const storyLane = lane === undefined || lane === "story";
   if (STORYTELLER_KEY.test(callSiteKey)) return storyLane ? "story_writer" : null;
   if (STORY_CHECKER_KEY.test(callSiteKey)) return storyLane ? "story_checker" : null;

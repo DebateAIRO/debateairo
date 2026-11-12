@@ -150,7 +150,7 @@ export function fittingStory(packet: PromptPacket): string {
 export type Vendor = { requests: ProviderCallRequest[] };
 export type Script = (packet: PromptPacket, call: number) => string;
 
-function vendor(name: "Anthropic" | "Z.AI", model: string, script: Script) {
+function vendor(name: "Anthropic" | "Z.AI" | "Alibaba", model: string, script: Script) {
   const state: Vendor & { provider: { call: (request: ProviderCallRequest) => Promise<ProviderCallResult> } } = {
     requests: [],
     provider: {
@@ -171,16 +171,26 @@ function vendor(name: "Anthropic" | "Z.AI", model: string, script: Script) {
   return state;
 }
 
-/** Haiku writes (answer and story from the material), GLM checks (satisfied unless scripted otherwise). */
-export function team(scripts: Partial<{ haiku: Script; glm: Script }> = {}) {
+/** A checker's satisfied verdict for the step the packet is. */
+export const satisfiedCheck: Script = (packet) => (contractOf(packet) === "report.story-check.v1" ? SATISFIED_STORY : SATISFIED);
+
+/**
+ * Haiku writes (answer and story from the material), GLM checks (satisfied unless scripted otherwise). Qwen, a third company, is a
+ * member only when the test scripts it (the backup checker's tests); every other test runs on the two.
+ */
+export function team(scripts: Partial<{ haiku: Script; glm: Script; qwen: Script }> = {}) {
   const haiku = vendor("Anthropic", "claude-haiku-5-5", scripts.haiku ?? ((packet) =>
     contractOf(packet).startsWith("report.story") ? fittingStory(packet) : fittingAnswer()));
-  const glm = vendor("Z.AI", "zai-org/GLM-5.3-Flash", scripts.glm ?? ((packet) =>
-    contractOf(packet) === "report.story-check.v1" ? SATISFIED_STORY : SATISFIED));
-  return { haiku, glm };
+  const glm = vendor("Z.AI", "zai-org/GLM-5.3-Flash", scripts.glm ?? satisfiedCheck);
+  const qwen = scripts.qwen === undefined ? undefined : vendor("Alibaba", "Qwen/Qwen3.8-Flash", scripts.qwen);
+  return { haiku, glm, qwen };
 }
 
 /* ----------------------------------------------------------------- the store and the settings */
+
+/** A call's projected maximum at its maker's price, as the closing's money check counts it before the call is sent. */
+export const projectedMicrosOf = (request: ProviderCallRequest): number => projectedCallCeilingMicros(PRICES[request.providerRef]!,
+  { requestBytes: pathRewriteBodyBytes(request.packet), completionTokenCeiling: request.bound.tokenCeiling });
 
 export type ReportStore = {
   records: InvestigationReportRecord[];
@@ -207,8 +217,7 @@ export function settingsOver(input: Readonly<{
   reserveMicros?: Readonly<{ paid: number; free: number }>;
 }>): InvestigationCloseSettings {
   const { store, vendors } = input;
-  const projected = (request: ProviderCallRequest) => projectedCallCeilingMicros(PRICES[request.providerRef]!,
-    { requestBytes: pathRewriteBodyBytes(request.packet), completionTokenCeiling: request.bound.tokenCeiling });
+  const projected = projectedMicrosOf;
   const charging = (provider: { call: (request: ProviderCallRequest) => Promise<ProviderCallResult> }) => ({
     call: async (request: ProviderCallRequest) => {
       store.charged += projected(request);
@@ -217,7 +226,8 @@ export function settingsOver(input: Readonly<{
   });
   const members = [
     { provider: charging(vendors.haiku.provider), providerRef: "ref-haiku", maker: "Anthropic" },
-    { provider: charging(vendors.glm.provider), providerRef: "ref-glm", maker: "Z.AI" }
+    { provider: charging(vendors.glm.provider), providerRef: "ref-glm", maker: "Z.AI" },
+    ...(vendors.qwen === undefined ? [] : [{ provider: charging(vendors.qwen.provider), providerRef: "ref-qwen", maker: "Alibaba" }])
   ];
   const read = (): InvestigationReportsRead => ({ investigation_id: INVESTIGATION, root_run_id: ROOT,
     reports: store.records.map((record) => ({ report_version: record.reportVersion, report_id: record.reportId, outcome: record.outcome,
