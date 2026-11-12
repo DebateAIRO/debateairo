@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Missä tarjoamme Dialectical Engine -palvelua",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja, Islanti ja Liechtenstein), Sveitsissä, Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa, Etelä-Koreassa ja Taiwanissa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
+      { kind: "p", text: "Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja, Islanti ja Liechtenstein), Sveitsissä, Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa ja Etelä-Koreassa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
     ]
   },
   {
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Aasian ja Tyynenmeren alue",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Singapore: tietosuojavastaavamme on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro; siirrot perustuvat PDPA:han verrattavissa olevaan sopimusperusteiseen suojaan; maksulliseen tilaukseen ei sovelleta lakisääteistä harkinta-aikaa, ja palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro. Japani: Specified Commercial Transactions Act -lain edellyttämä ilmoitus on osoitteessa dezbatere.ro/legal; verkkotilauksiin ei sovelleta yleistä harkinta-aikaa, ja palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro; lähetämme sisältösi tekoälypalveluntarjoajille Yhdysvaltoihin ja Euroopan unioniin, kullekin sopimuksen nojalla, joka edellyttää Japanin Act on the Protection of Personal Information -lakia vastaavaa suojaa, ja kerromme pyynnöstä, mitä nämä toimenpiteet ovat. Etelä-Korea: vapaaehtoista käsittelyä ja markkinointia koskevat suostumukset kerätään erillään palvelun tarjoamiseen tarvittavista tiedoista; tietosuojavastaavamme on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro; voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta E-Commerce Act -lain mukaisesti; hankimme uuden suostumuksesi ennen toistuvaa hinnankorotusta tai maksuttoman tilauksen muuttamista maksulliseksi; palvelu käyttää generatiivista tekoälyä, kerromme siitä ennen kuin käytät sitä, ja merkitsemme tekoälyn tuottamat tuotokset. Taiwan: voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta Consumer Protection Act -lain nojalla; tietoihisi sovelletaan Taiwanin Personal Data Protection Act -lakia (tietosuojakäytäntö, liite B.7)." }
+      { kind: "p", text: "Singapore: tietosuojavastaavamme on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro; siirrot perustuvat PDPA:han verrattavissa olevaan sopimusperusteiseen suojaan; maksulliseen tilaukseen ei sovelleta lakisääteistä harkinta-aikaa, ja palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro. Japani: Specified Commercial Transactions Act -lain edellyttämä ilmoitus on osoitteessa dezbatere.ro/legal; verkkotilauksiin ei sovelleta yleistä harkinta-aikaa, ja palautuspyynnöt käsitellään osoitteessa support@dezbatere.ro; lähetämme sisältösi tekoälypalveluntarjoajille Yhdysvaltoihin ja Euroopan unioniin, kullekin sopimuksen nojalla, joka edellyttää Japanin Act on the Protection of Personal Information -lakia vastaavaa suojaa, ja kerromme pyynnöstä, mitä nämä toimenpiteet ovat. Etelä-Korea: vapaaehtoista käsittelyä ja markkinointia koskevat suostumukset kerätään erillään palvelun tarjoamiseen tarvittavista tiedoista; tietosuojavastaavamme on toimitusjohtajamme, tavoitettavissa osoitteessa privacy@dezbatere.ro; voit peruuttaa maksullisen tilauksen seitsemän päivän kuluessa tilaamisesta E-Commerce Act -lain mukaisesti; hankimme uuden suostumuksesi ennen toistuvaa hinnankorotusta tai maksuttoman tilauksen muuttamista maksulliseksi; palvelu käyttää generatiivista tekoälyä, kerromme siitä ennen kuin käytät sitä, ja merkitsemme tekoälyn tuottamat tuotokset." }
     ]
   }
 ];
@@ -379,7 +379,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "21bd677bdea09aa7b8968a73e0579cf9572fe0d8a4aeeb6af6a32731b4fb4db2",
+  sha256: "159e4fa328431934a99a6b8c6b71ba6a6d9cb11a012007b1275f5ccbbe2f7f2b",
   eyebrow: "KÄYTTÖEHDOT · v2.18 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

@@ -311,9 +311,9 @@ const CHANGE_LOG = 260;
 const FLAGGED = 117;
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /**
- * Annex B.7's paragraph (Asia-Pacific). Taiwan is closed since the owner's decision of 12 November 2026, so English
- * no longer ends that paragraph with Taiwan's part; the translations still have it until they are brought up to
- * date before release (English first).
+ * Annex B.7's paragraph (Asia-Pacific). Taiwan is closed since the owner's decision of 12 November 2026, so the
+ * paragraph no longer ends with Taiwan's part, in English and in the 34 translations alike: a closed country is
+ * named in no language. Nothing else on the line changes.
  */
 const ASIA_PACIFIC = 294;
 const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
@@ -466,7 +466,11 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual(code === "en" ? [...CHANGED, FLAGGED, ASIA_PACIFIC].sort((a, b) => a - b) : CHANGED);
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED] : [])].sort((a, b) => a - b));
+    // Annex B.7 lost its last part and nothing else: what is left is the start of the 3.11 line.
+    const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
+    expect(asiaPacific.startsWith(next[ASIA_PACIFIC]!) && next[ASIA_PACIFIC]!.length < asiaPacific.length, `${code}: Annex B.7 only loses its end`).toBe(true);
+    expect(asiaPacific.slice(next[ASIA_PACIFIC]!.length), `${code}: the part that left is one part, Taiwan's`).toMatch(/^ ?\*[^*]+\*[^*]+$/u);
 
     const dates = DATES[code]!;
     expect(next[EYEBROW], `${code}: the eyebrow names 3.12`).toMatch(/ v3\.12 · /u);

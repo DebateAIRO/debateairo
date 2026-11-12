@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dialectical Engine'i nerelerde sunuyoruz",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda, Lihtenştayn), İsviçre'de, Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da, Güney Kore'de ve Tayvan'da yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
+      { kind: "p", text: "Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda, Lihtenştayn), İsviçre'de, Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da ve Güney Kore'de yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
     ]
   },
   {
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Asya-Pasifik",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Singapur: Veri Koruma Görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir; aktarımlar PDPA ile karşılaştırılabilir sözleşmesel korumalara dayanır; ücretli plan için kanuni bir vazgeçme hakkı uygulanmaz ve iade talepleri support@dezbatere.ro adresinden değerlendirilir. Japonya: Specified Commercial Transactions Act kapsamındaki kanuni açıklama dezbatere.ro/legal adresindedir; çevrim içi abonelikler için genel bir vazgeçme hakkı uygulanmaz ve iade talepleri support@dezbatere.ro adresinden değerlendirilir; içeriğinizi Amerika Birleşik Devletleri ve Avrupa Birliği'ndeki yapay zekâ sağlayıcılarına, her biri Japonya'nın Kişisel Bilgilerin Korunması Hakkında Kanunu'na eşdeğer koruma gerektiren bir sözleşme kapsamında göndeririz ve talep üzerine bu önlemlerin neler olduğunu size bildiririz. Güney Kore: isteğe bağlı işleme ve pazarlama rızaları, hizmeti yürütmek için gerekli unsurlardan ayrı alınır; gizlilik görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir; E-Commerce Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; yinelenen her fiyat artışından veya ücretsiz plandan ücretli plana geçişten önce yeniden rızanızı alırız; hizmet üretken yapay zekâ kullanır, bunu siz kullanmadan önce size bildiririz ve yapay zekâ tarafından üretilen çıktıları etiketleriz. Tayvan: Consumer Protection Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; Tayvan'ın Kişisel Verilerin Korunması Kanunu verilerinize uygulanır (Gizlilik Politikası, Ek B.7)." }
+      { kind: "p", text: "Singapur: Veri Koruma Görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir; aktarımlar PDPA ile karşılaştırılabilir sözleşmesel korumalara dayanır; ücretli plan için kanuni bir vazgeçme hakkı uygulanmaz ve iade talepleri support@dezbatere.ro adresinden değerlendirilir. Japonya: Specified Commercial Transactions Act kapsamındaki kanuni açıklama dezbatere.ro/legal adresindedir; çevrim içi abonelikler için genel bir vazgeçme hakkı uygulanmaz ve iade talepleri support@dezbatere.ro adresinden değerlendirilir; içeriğinizi Amerika Birleşik Devletleri ve Avrupa Birliği'ndeki yapay zekâ sağlayıcılarına, her biri Japonya'nın Kişisel Bilgilerin Korunması Hakkında Kanunu'na eşdeğer koruma gerektiren bir sözleşme kapsamında göndeririz ve talep üzerine bu önlemlerin neler olduğunu size bildiririz. Güney Kore: isteğe bağlı işleme ve pazarlama rızaları, hizmeti yürütmek için gerekli unsurlardan ayrı alınır; gizlilik görevlimiz müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir; E-Commerce Act uyarınca, abone olduktan sonra 7 gün içinde ücretli plandan cayabilirsiniz; yinelenen her fiyat artışından veya ücretsiz plandan ücretli plana geçişten önce yeniden rızanızı alırız; hizmet üretken yapay zekâ kullanır, bunu siz kullanmadan önce size bildiririz ve yapay zekâ tarafından üretilen çıktıları etiketleriz." }
     ]
   }
 ];
@@ -379,7 +379,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "90ccde528655ead5dbbf96de239ac0c9ee3850e8f1bf6c00274a7ca4078068d1",
+  sha256: "e2c490e4241e535cc8eec7bb1bfc22db255952810b0df35438ffd3a0e8f719a3",
   eyebrow: "HİZMET KOŞULLARI · v2.18 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",

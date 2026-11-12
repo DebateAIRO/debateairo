@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kje ponujamo Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine ponujamo osebam, ki živijo v naslednjih državah in regijah: Evropska unija (27 držav) in Evropski gospodarski prostor (Norveška, Islandija in Lihtenštajn), Švica, Moldavija, Združene države Amerike (razen zvezne države Tennessee), Kanada, Avstralija, Nova Zelandija, Singapur, Japonska, Južna Koreja in Tajvan. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
+      { kind: "p", text: "Dialectical Engine ponujamo osebam, ki živijo v naslednjih državah in regijah: Evropska unija (27 držav) in Evropski gospodarski prostor (Norveška, Islandija in Lihtenštajn), Švica, Moldavija, Združene države Amerike (razen zvezne države Tennessee), Kanada, Avstralija, Nova Zelandija, Singapur, Japonska in Južna Koreja. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
     ]
   },
   {
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Azijsko-pacifiška regija",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je naš direktor, ki je dosegljiv na privacy@dezbatere.ro; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, zahtevki za vračilo pa se obravnavajo na naslovu support@dezbatere.ro. Japonska: zakonsko razkritje po zakonu Specified Commercial Transactions Act je na dezbatere.ro/legal; za spletne naročnine ne velja splošno obdobje za premislek, zahtevki za vračilo pa se obravnavajo na naslovu support@dezbatere.ro; vašo vsebino pošiljamo ponudnikom umetne inteligence v Združenih državah Amerike in Evropski uniji, vsakemu na podlagi pogodbe, ki zahteva zaščito, enakovredno japonskemu zakonu Act on the Protection of Personal Information, na zahtevo pa vam povemo, kateri so ti ukrepi. Južna Koreja: privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; storitev uporablja generativno umetno inteligenco, o čemer vas obvestimo, preden jo začnete uporabljati, rezultate, ki jih ustvari umetna inteligenca, pa označimo. Tajvan: od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine po zakonu Consumer Protection Act; za vaše podatke velja tajvanski zakon Personal Data Protection Act (Pravilnik o zasebnosti, Priloga B.7)." }
+      { kind: "p", text: "Singapur: naša pooblaščena oseba za varstvo podatkov je naš direktor, ki je dosegljiv na privacy@dezbatere.ro; prenosi temeljijo na pogodbenih zaščitnih ukrepih, primerljivih s PDPA; za plačljivi paket ne velja zakonsko obdobje za premislek, zahtevki za vračilo pa se obravnavajo na naslovu support@dezbatere.ro. Japonska: zakonsko razkritje po zakonu Specified Commercial Transactions Act je na dezbatere.ro/legal; za spletne naročnine ne velja splošno obdobje za premislek, zahtevki za vračilo pa se obravnavajo na naslovu support@dezbatere.ro; vašo vsebino pošiljamo ponudnikom umetne inteligence v Združenih državah Amerike in Evropski uniji, vsakemu na podlagi pogodbe, ki zahteva zaščito, enakovredno japonskemu zakonu Act on the Protection of Personal Information, na zahtevo pa vam povemo, kateri so ti ukrepi. Južna Koreja: privolitve za neobvezno obdelavo in trženje se zbirajo ločeno od postavk, potrebnih za izvajanje storitve; naša oseba, odgovorna za zasebnost, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro; od plačljivega paketa lahko odstopite v 7 dneh od sklenitve naročnine ob upoštevanju zakona E-Commerce Act; pred vsakim ponavljajočim se zvišanjem cene ali prehodom z brezplačnega na plačljivi paket pridobimo vašo novo privolitev; storitev uporablja generativno umetno inteligenco, o čemer vas obvestimo, preden jo začnete uporabljati, rezultate, ki jih ustvari umetna inteligenca, pa označimo." }
     ]
   }
 ];
@@ -379,7 +379,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "783aed0c95b80a5aa98786987f7b3fda3b35f19856e3ac66cb4255f42243462a",
+  sha256: "3b10ca2b23c99462bee9752b318b63df81cc4a4440cd759a27fe426672597c51",
   eyebrow: "POGOJI UPORABE · v2.18 · VELJAVNI OD 1. NOVEMBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",

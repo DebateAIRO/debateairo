@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur mēs piedāvājam Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā, Islandē un Lihtenšteinā), Šveicē, Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā, Dienvidkorejā un Taivānā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
+      { kind: "p", text: "Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā, Islandē un Lihtenšteinā), Šveicē, Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā un Dienvidkorejā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
     ]
   },
   {
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Āzijas un Klusā okeāna reģions",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un atmaksas pieprasījumi tiek izskatīti, ja tie nosūtīti uz support@dezbatere.ro. Japāna: Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē dezbatere.ro/legal; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un atmaksas pieprasījumi tiek izskatīti, ja tie nosūtīti uz support@dezbatere.ro; mēs nosūtām jūsu saturu MI pakalpojumu sniedzējiem Amerikas Savienotajās Valstīs un Eiropas Savienībā, katram saskaņā ar līgumu, kas prasa aizsardzību, kura ir līdzvērtīga Japānas Act on the Protection of Personal Information prasībām, un pēc pieprasījuma mēs jums pastāstām, kādi ir šie pasākumi. Dienvidkoreja: piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; pakalpojumā tiek izmantots ģeneratīvais MI, mēs jūs par to informējam, pirms to izmantojat, un marķējam MI ģenerētos rezultātus. Taivāna: saskaņā ar Consumer Protection Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; jūsu datiem piemēro Taivānas Personal Data Protection Act (Privātuma politikas B.7 pielikums)." }
+      { kind: "p", text: "Singapūra: mūsu datu aizsardzības speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro; nosūtīšana balstās uz līgumiskiem aizsardzības pasākumiem, kas pielīdzināmi PDPA; maksas plānam nav likumā noteikta pārdomu perioda, un atmaksas pieprasījumi tiek izskatīti, ja tie nosūtīti uz support@dezbatere.ro. Japāna: Specified Commercial Transactions Act paredzētā informācija ir pieejama vietnē dezbatere.ro/legal; tiešsaistes abonementiem nav vispārēja pārdomu perioda, un atmaksas pieprasījumi tiek izskatīti, ja tie nosūtīti uz support@dezbatere.ro; mēs nosūtām jūsu saturu MI pakalpojumu sniedzējiem Amerikas Savienotajās Valstīs un Eiropas Savienībā, katram saskaņā ar līgumu, kas prasa aizsardzību, kura ir līdzvērtīga Japānas Act on the Protection of Personal Information prasībām, un pēc pieprasījuma mēs jums pastāstām, kādi ir šie pasākumi. Dienvidkoreja: piekrišanas neobligātai apstrādei un tirgvedībai tiek iegūtas atsevišķi no pakalpojuma darbībai nepieciešamajiem elementiem; mūsu privātuma speciālists ir mūsu direktors, sasniedzams privacy@dezbatere.ro; saskaņā ar E-Commerce Act varat atteikties no maksas plāna 7 dienu laikā pēc abonēšanas; pirms katra regulāra cenas paaugstinājuma vai bezmaksas plāna pārvēršanas maksas plānā mēs no jauna saņemam jūsu piekrišanu; pakalpojumā tiek izmantots ģeneratīvais MI, mēs jūs par to informējam, pirms to izmantojat, un marķējam MI ģenerētos rezultātus." }
     ]
   }
 ];
@@ -379,7 +379,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "8f339f364bcf30075d78cfeec943601d8f0175855446561b439b862bf90c8545",
+  sha256: "4322cb0b31ea14f179cb3d45f8ac336ff898d50d0853ae406d8cdadde8d31b80",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.18 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu Dialectical Engine nabízíme",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu Dialectical Engine nabízíme osobám, které žijí v těchto zemích a regionech: Evropská unie (27 zemí) a Evropský hospodářský prostor (Norsko, Island a Lichtenštejnsko), Švýcarsko, Moldavsko, Spojené státy (kromě Tennessee), Kanada, Austrálie, Nový Zéland, Singapur, Japonsko, Jižní Korea a Tchaj-wan. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme." }
+      { kind: "p", text: "Službu Dialectical Engine nabízíme osobám, které žijí v těchto zemích a regionech: Evropská unie (27 zemí) a Evropský hospodářský prostor (Norsko, Island a Lichtenštejnsko), Švýcarsko, Moldavsko, Spojené státy (kromě Tennessee), Kanada, Austrálie, Nový Zéland, Singapur, Japonsko a Jižní Korea. Jinde ji nenabízíme. Pokud žijete mimo tyto země, můžete mít k webu přístup, službu však na vás nezaměřujeme, nepřijímáme od vás platby a tyto Podmínky ani naše Zásady ochrany osobních údajů nejsou přizpůsobeny právu vaší země. Příloha A stanoví, co platí v jednotlivých regionech, v nichž službu poskytujeme." }
     ]
   },
   {
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Asie a Tichomoří",
     accent: "--con",
     blocks: [
-      { kind: "p", text: "Singapur: naším pověřencem pro ochranu osobních údajů je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro; předávání se opírá o smluvní ochranu srovnatelnou s PDPA; na placený tarif se nevztahuje zákonná lhůta na rozmyšlenou a žádosti o vrácení peněz vyřizujeme na adrese support@dezbatere.ro. Japonsko: zákonné informace podle Specified Commercial Transactions Act jsou na adrese dezbatere.ro/legal; na online předplatné se nevztahuje obecná lhůta na rozmyšlenou a žádosti o vrácení peněz vyřizujeme na adrese support@dezbatere.ro; váš obsah zasíláme poskytovatelům AI ve Spojených státech a v Evropské unii, vždy na základě smlouvy, která vyžaduje ochranu rovnocennou japonskému Act on the Protection of Personal Information, a na požádání vám sdělíme, o jaká opatření jde. Jižní Korea: souhlasy s volitelným zpracováním a marketingem se získávají odděleně od položek nezbytných k provozu služby; naším pracovníkem pro ochranu soukromí je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro; od placeného tarifu můžete odstoupit do 7 dnů od sjednání v souladu s E-Commerce Act; před každým opakovaným zvýšením ceny nebo přechodem z bezplatné na placenou službu získáme váš nový souhlas; služba využívá generativní AI, upozorníme vás na to před jejím použitím a výstupy vytvořené AI označujeme. Tchaj-wan: od placeného tarifu můžete odstoupit do 7 dnů od sjednání podle Consumer Protection Act; na vaše údaje se vztahuje tchajwanský Personal Data Protection Act (Zásady ochrany osobních údajů, příloha B.7)." }
+      { kind: "p", text: "Singapur: naším pověřencem pro ochranu osobních údajů je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro; předávání se opírá o smluvní ochranu srovnatelnou s PDPA; na placený tarif se nevztahuje zákonná lhůta na rozmyšlenou a žádosti o vrácení peněz vyřizujeme na adrese support@dezbatere.ro. Japonsko: zákonné informace podle Specified Commercial Transactions Act jsou na adrese dezbatere.ro/legal; na online předplatné se nevztahuje obecná lhůta na rozmyšlenou a žádosti o vrácení peněz vyřizujeme na adrese support@dezbatere.ro; váš obsah zasíláme poskytovatelům AI ve Spojených státech a v Evropské unii, vždy na základě smlouvy, která vyžaduje ochranu rovnocennou japonskému Act on the Protection of Personal Information, a na požádání vám sdělíme, o jaká opatření jde. Jižní Korea: souhlasy s volitelným zpracováním a marketingem se získávají odděleně od položek nezbytných k provozu služby; naším pracovníkem pro ochranu soukromí je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro; od placeného tarifu můžete odstoupit do 7 dnů od sjednání v souladu s E-Commerce Act; před každým opakovaným zvýšením ceny nebo přechodem z bezplatné na placenou službu získáme váš nový souhlas; služba využívá generativní AI, upozorníme vás na to před jejím použitím a výstupy vytvořené AI označujeme." }
     ]
   }
 ];
@@ -379,7 +379,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "53d73bb142aec576e391e75d8194b307373de40a2d7fd70bc19cf560387b4208",
+  sha256: "b0e60a22fc61b6625a45ae240948ae7c46cc897da54a7ca75fc47503f1ee7c13",
   eyebrow: "PODMÍNKY POSKYTOVÁNÍ SLUŽBY · v2.18 · ÚČINNÉ OD 1. LISTOPADU 2026",
   title: "S čím souhlasíte",
   lede: "Smlouva mezi vámi a DMS Merchandise Shop S.R.L. srozumitelným jazykem. Devatenáct oddílů a příloha A — přejděte až na konec.",
