@@ -2,7 +2,7 @@
  * The forward chain's steps, in order: the one list the tests keep of them.
  *
  * A test that needs the whole chain, its last step, the steps after one of them or a step's place reads it here, so a
- * new step is one line below and no edit anywhere else in the tests. tests/architecture/migration-forward-chain.test.ts
+ * new step adds one line below instead of an edit in every test that used to spell the chain out. tests/architecture/migration-forward-chain.test.ts
  * checks this list against the chain itself (the plan's steps, the STEPS literal of
  * packages/db/src/migration-forward-chain.ts and each step's n1 header), so a new step turns that test red on purpose
  * until its line is added here.
@@ -123,10 +123,10 @@ export function loaderOf(step: string): string {
   };
   return older[name] ?? `loadForward${name.slice(0, 4)}`;
 }
-/** How STEPS in packages/db/src/migration-forward-chain.ts reads from this step to its end: "loadForward0132,…,loadForward0175]);". */
+/** How STEPS in packages/db/src/migration-forward-chain.ts reads from this step to its end: "loadForward0132,loadForward0133,…]);", the last step's loader last. */
 export const stepsLiteralFrom = (step: string): string => `${stepsFrom(step).map(loaderOf).join(",")}]);`;
 
-/** A probe step's name, `offset` numbers after `after` (this chain's last step unless given): stepNameAfter(1, "probe") is "0176_probe.sql" while 0175 is last. */
+/** A probe step's name, `offset` numbers after `after` (this chain's last step unless given): stepNameAfter(1, "probe") is the last step's number plus one, then "_probe.sql". */
 export function stepNameAfter(offset: number, label: string, after: string = LAST_STEP): string {
   return `${String(Number(after.slice(0, 4)) + offset).padStart(4, "0")}_${label}.sql`;
 }
