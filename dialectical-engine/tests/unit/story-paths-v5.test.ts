@@ -1089,3 +1089,39 @@ describe("Task 54c: a path story keeps the web quotes, the backup storyteller an
     }
   });
 });
+
+/**
+ * The backup checker on a path run's story: the check that could not be completed is sent, the very same packet under the story's
+ * one fence, to one model of a third company, at the first check's call site with ":BACKUP".
+ */
+describe("a path story whose checker cannot be reached", () => {
+  const FIRST = POLICY.storytellerRoleRef;
+  const CHECKER = POLICY.storyCheckerRoleRef;
+  const BACKUP = "provider:backup";
+  it("is checked by a third company with the same packet, byte for byte, and stored with that checker's lineage", async () => {
+    const calls: ProviderCallRequest[] = [];
+    const reply = answering([]);
+    const router: ProviderGateway = { async call(request) {
+      calls.push(request);
+      if (request.providerRef === CHECKER) throw new ProviderCallFailedError(new Error("deadline"), 2, "TIMED_OUT", "ledger:slow");
+      const content = reply(request);
+      const classified = request.classifyContent?.(content);
+      if (classified !== undefined && classified.parseStatus !== "PARSED") throw new Error("unexpected refusal");
+      return { rawArtifactRef: `artifact:${String(calls.length)}`, ledgerEntryRef: `ledger:${String(calls.length)}`, content,
+        provider: "openai-compatible-http", model: "unit/model", maker: "unit-maker", modelVersion: "unit/model" };
+    } };
+    const candidates: readonly StoryBackupCandidate[] = Object.freeze([
+      { provider: router, providerRef: FIRST, maker: "maker-a" }, { provider: router, providerRef: CHECKER, maker: "maker-b" },
+      { provider: router, providerRef: "provider:twin", maker: "maker-a" }, { provider: router, providerRef: BACKUP, maker: "maker-c" }
+    ]);
+    const { writer, inserted } = harness(router);
+    await writer.writeAfterSettle({ ...PATH_RUN, randomBytes: closingRandomBytes(SEED), backupCandidates: candidates });
+    expect(calls.map((call) => [call.callSiteKey, call.providerRef])).toEqual([
+      ["STORY:STORYTELLER:1", FIRST], ["STORY:CHECKER:1", CHECKER], ["STORY:CHECKER:1:BACKUP", BACKUP]]);
+    const [, planned, backup] = calls as [ProviderCallRequest, ProviderCallRequest, ProviderCallRequest];
+    expect(backup.packet).toEqual(planned.packet);
+    expect([contractOf(backup), backup.contractHash, backup.bound, backup.sharedFirstFieldCount, backup.sentInputTokensBelow])
+      .toEqual([STORY_PATHS_CHECK_CONTRACT_ID, planned.contractHash, planned.bound, planned.sharedFirstFieldCount, planned.sentInputTokensBelow]);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", rounds: 1, storytellerLineage: { provider_ref: FIRST }, checkerLineage: { provider_ref: BACKUP } });
+  });
+});

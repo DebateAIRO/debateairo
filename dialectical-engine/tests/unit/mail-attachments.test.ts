@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
-import { archivedDocument } from "@debateai/legal-manifest";
+import { archivedDocument, legalArchive } from "@debateai/legal-manifest";
 import { renderWithdrawalForm } from "@debateai/mail-templates";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
 import {
@@ -56,8 +56,11 @@ describe("P17 mail attachments", () => {
     }
   });
 
-  it("finds the repository's own archived Terms from apps/api without a machine path (L2 archives every current draft)", async () => {
-    const english = readFileSync(resolve("apps/ui/legal/en/terms-of-service.md"));
+  it("finds the repository's own archived Terms from apps/api without a machine path", async () => {
+    // The newest archived English Terms: the release step archives the current texts, so while work goes on the current
+    // draft may not be archived yet (English first), and the email then attaches nothing for it.
+    const newest = legalArchive("TERMS", "en")[0]!;
+    const english = readFileSync(resolve(newest.path));
     expect(readFileSync(resolve("apps/ui/legal", termsArchivePath("en", sha(english)))).equals(english)).toBe(true);
     // Ruling Q-3: the manifest maps the hash to the same file this module reads (paths relative to dialectical-engine/).
     expect(archivedDocument("TERMS", "en", sha(english))?.path).toBe(`apps/ui/legal/${termsArchivePath("en", sha(english))}`);
@@ -96,12 +99,13 @@ describe("P17 mail attachments", () => {
     const resolvers = billingMailAttachmentResolvers({ audit });
     expect([...resolvers.keys()].sort()).toEqual(["ACCEPTED_TERMS", "WITHDRAWAL_FORM"]);
     const terms = resolvers.get("ACCEPTED_TERMS")!;
-    const english = readFileSync(resolve("apps/ui/legal/en/terms-of-service.md"));
+    // Archived texts, the newest of each language: a current draft is archived only by the release step (English first).
+    const english = readFileSync(resolve(legalArchive("TERMS", "en")[0]!.path));
     // The accepted pair is in the archive: attached, whatever the email's own locale is.
     const attached = await terms({ sha256: sha(english), locale: "en", version: "3.0" }, "de");
     expect(attached !== null && Buffer.from(attached.content).equals(english)).toBe(true);
     // The person accepted in German: the German version is the one attached, not the email locale's.
-    const german = readFileSync(resolve("apps/ui/legal/de/terms-of-service.md"));
+    const german = readFileSync(resolve(legalArchive("TERMS", "de")[0]!.path));
     const acceptedInGerman = await terms({ sha256: sha(german), locale: "de" }, "en");
     expect(acceptedInGerman !== null && Buffer.from(acceptedInGerman.content).equals(german)).toBe(true);
     expect(lines).toEqual([]);

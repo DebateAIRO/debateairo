@@ -28,6 +28,8 @@
     "generate:contract": "tsx packages/contract/src/generate.ts",
     "generate:legal": "node apps/ui/scripts/generate-legal-data.mjs",
     "generate:legal:check": "node apps/ui/scripts/generate-legal-data.mjs --check",
+    "generate:legal:archive": "node apps/ui/scripts/generate-legal-data.mjs --archive",
+    "legal:release-check": "node apps/ui/scripts/legal-release-check.mjs",
     "db:migrate": "tsx apps/runner/src/migrate-cli.ts",
     "db:provision-principals": "tsx apps/runner/src/production-database-principals-cli.ts",
     "keys:rotate-kek": "tsx apps/runner/src/rotate-kek-cli.ts",

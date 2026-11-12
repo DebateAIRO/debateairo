@@ -12,6 +12,7 @@ import {
   type ProviderCallResult,
   type ProviderGateway
 } from "@debateai/providers";
+import { backupCheckerCallSiteKey } from "@debateai/kernel";
 import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
   createReplayBook,
@@ -247,6 +248,22 @@ describe("the replay book and the replaying gateway", () => {
     await gateway.call(request("JUDGE", "a different question"));
     expect(sent).toEqual(["JUDGE", "JUDGE:root:secondary", "JUDGE"]);
     expect(book.pending).toBe(1);
+  });
+
+  it("a backup checker's answer is replayed at its own site only: never for its first checker's site, never for another member", async () => {
+    const backupKey = backupCheckerCallSiteKey("PATH_REWRITE:CHECKER:1");
+    const book = createReplayBook({ calls: recordedCalls([
+      attempt({ callSiteKey: backupKey, actorRef: "preview:backup", outcome: "OK", promptFingerprint: fp("question"), artifact: artifact(answer) })
+    ]), earlierNodes: [] });
+    const { sent, inner } = vendor();
+    const gateway = replayingGateway(book, inner);
+    await gateway.call(request("PATH_REWRITE:CHECKER:1", "question", "preview:backup"));
+    await gateway.call(request(backupKey, "question", "preview:checker"));
+    expect(sent).toEqual(["PATH_REWRITE:CHECKER:1", backupKey]);
+    expect(book.pending).toBe(1);
+    expect((await gateway.call(request(backupKey, "question", "preview:backup"))).content).toBe(answer);
+    expect(sent).toHaveLength(2);
+    expect(book.pending).toBe(0);
   });
 
   it("a recorded answer the step would refuse is asked again", async () => {

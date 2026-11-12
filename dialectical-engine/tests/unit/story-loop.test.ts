@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MakerLineage, StoryBody } from "@debateai/contract";
-import { TypedDomainError } from "@debateai/kernel";
+import { TypedDomainError, backupCheckerCallSiteKey } from "@debateai/kernel";
 import { ProviderCallFailedError, ProviderContentUnacceptedError } from "@debateai/providers";
 import {
   runStoryLoop,
@@ -543,5 +543,198 @@ describe("the loop's first round (the backup storyteller runs rounds 3 and 4)", 
     await expect(runStoryLoop({ maxRounds, v4: true, firstRound }, double.deps))
       .rejects.toMatchObject({ code: "STORY_LOOP_ROUNDS_INVALID" });
     expect(double.writes).toEqual([]);
+  });
+});
+
+/**
+ * The backup checker. When the checker's own call cannot be completed (one of the backup writer's four signals, or its call site
+ * already spent by an earlier copy of the run), the loop asks the wrapper for one model of another company, which runs the same
+ * check; that backup then checks the rest of this loop. A checker that answered, a money stop, a stopped run and anything unknown
+ * never ask for one. Without the dependency the loop is exactly as before.
+ */
+describe("the backup checker", () => {
+  const BACKUP_LINEAGE: MakerLineage = Object.freeze({
+    maker: "maker:backup", model_id: "model:backup", transport: "openai-compatible-http", provider_ref: "provider:backup"
+  });
+  const backupRecord = (round: number): StoryCallRecord => ({
+    artifactRef: `artifact:backup:${String(round)}`, callSiteKey: backupCheckerCallSiteKey(storyCallSiteKey("CHECKER", round)), lineage: BACKUP_LINEAGE
+  });
+  /** The loop's double with a backup: every pick asked for, and every check the backup ran. */
+  function withBackup(double: ReturnType<typeof recorder>, script: {
+    readonly verdicts?: readonly StoryCheckerVerdict[];
+    readonly fails?: (round: number) => unknown;
+    readonly none?: boolean;
+    readonly pickThrows?: boolean;
+  } = {}) {
+    const picks: { round: number; writerRef: string; signal: string }[] = [];
+    const checks: { round: number; candidate: StoryBody }[] = [];
+    const verdicts = script.verdicts ?? [SATISFIED];
+    const deps: StoryLoopDependencies = {
+      ...double.deps,
+      backupChecker: (input) => {
+        picks.push({ ...input });
+        if (script.pickThrows === true) throw new Error("a defect in the wrapper's pick");
+        if (script.none === true) return null;
+        return {
+          providerRef: BACKUP_LINEAGE.provider_ref,
+          check: async (checkInput) => {
+            checks.push({ ...checkInput });
+            const failure = script.fails?.(checkInput.round);
+            if (failure !== undefined) throw failure;
+            return { ...backupRecord(checkInput.round), verdict: verdicts[Math.min(checks.length - 1, verdicts.length - 1)]! };
+          }
+        };
+      }
+    };
+    return { deps, picks, checks };
+  }
+  const spent = (): TypedDomainError => new TypedDomainError("CALL_BUDGET_EXHAUSTED", "subject");
+
+  it.each([
+    ["UNREACHABLE", (): unknown => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead")],
+    ["TOO_SLOW", transportDied],
+    ["OUT_OF_ROOM", (): unknown => new ProviderContentUnacceptedError(2, "LENGTH_EXCEEDED", "cut off", "artifact:cut", "ledger:cut",
+      { cutOffs: 2, lastAtLowestLevel: true })],
+    ["UNUSABLE", contentRefused],
+    ["SPENT_EARLIER", spent]
+  ] as const)("%s: one backup checks the same draft of the same round, and the round records it", async (signal, failure) => {
+    const double = recorder({ checkFails: () => failure() });
+    const backup = withBackup(double);
+    const outcome = await runStoryLoop({ maxRounds: 2 }, backup.deps);
+    expect(outcome).toEqual({
+      outcome: "READY", body: storyFor(1), reservation: null, servedRound: 1, laterFailure: null,
+      rounds: [{ round: 1, writer: writerRecord(1), checker: backupRecord(1), satisfied: true, objection: null, checkerBackup: { signal } }]
+    });
+    // The pick names the company that wrote this draft, so the backup is of another one.
+    expect(backup.picks).toEqual([{ round: 1, writerRef: WRITER_LINEAGE.provider_ref, signal }]);
+    expect(backup.checks).toEqual([{ round: 1, candidate: storyFor(1) }]);
+    expect(double.checks).toEqual([{ round: 1, candidate: storyFor(1) }]);
+  });
+
+  it.each([
+    ["a money stop", (): unknown => new TypedDomainError("STORY_COST_ENVELOPE_REACHED", "The story has spent its envelope")],
+    ["the day's money", (): unknown => new TypedDomainError("DAILY_COST_ENVELOPE_REACHED", "The day is spent")],
+    ["the run's attempt ceiling", (): unknown => new TypedDomainError("RUN_COST_ENVELOPE_EXHAUSTED", "The run is spent")],
+    ["a stopped lane", (): unknown => new TypedDomainError("CALL_LANE_STOPPED", "stopped")],
+    ["an erased run", (): unknown => new TypedDomainError("PRIVATE_CONTENT_ERASED", "erased")],
+    ["a lost claim", (): unknown => new TypedDomainError("RUNNER_CLAIM_LOST", "lost")],
+    ["a reply the parser refused after the gateway took it", (): unknown => new TypedDomainError("PATH_REWRITE_CHECKER_CONTENT_INVALID", "PARSED")],
+    ["a single cut-off", (): unknown => new ProviderContentUnacceptedError(1, "LENGTH_EXCEEDED", "cut off", "artifact:cut", "ledger:cut",
+      { cutOffs: 1, lastAtLowestLevel: false })],
+    ["a plain error", (): unknown => new Error("bug")]
+  ])("%s asks for no backup: the outcome is exactly today's", async (_name, failure) => {
+    const today = await runStoryLoop({ maxRounds: 2 }, recorder({ checkFails: () => failure() }).deps);
+    const backup = withBackup(recorder({ checkFails: () => failure() }));
+    expect(await runStoryLoop({ maxRounds: 2 }, backup.deps)).toEqual(today);
+    expect(backup.picks).toEqual([]);
+    expect(today).toMatchObject({ outcome: "FAILED" });
+  });
+
+  it("a checker that objects is answered, never backed up", async () => {
+    const backup = withBackup(recorder({ verdicts: [unsatisfied("First objection."), unsatisfied("Second objection.")] }));
+    const outcome = await runStoryLoop({ maxRounds: 2 }, backup.deps);
+    expect(outcome).toMatchObject({ outcome: "READY_WITH_RESERVATION", reservation: "Second objection.", servedRound: 2 });
+    expect(backup.picks).toEqual([]);
+    for (const round of outcome.rounds) expect(Object.hasOwn(round, "checkerBackup")).toBe(false);
+  });
+
+  it("a checker that broke its contract (unsatisfied, no objection) is no failed call: no backup", async () => {
+    const broken = { ...unsatisfied("placeholder"), objection: null };
+    const backup = withBackup(recorder({ verdicts: [broken] }));
+    expect(await runStoryLoop({ maxRounds: 2 }, backup.deps)).toMatchObject({
+      outcome: "FAILED", failureCode: "STORY_CHECK_UNAVAILABLE", cause: "STORY_CHECKER_OBJECTION_REQUIRED"
+    });
+    expect(backup.picks).toEqual([]);
+  });
+
+  it("a checker result without a verdict is a defect, never a backup", async () => {
+    const double = recorder({});
+    const backup = withBackup({
+      ...double,
+      deps: { ...double.deps, checkStory: async (input) => ({ artifactRef: "a", callSiteKey: storyCallSiteKey("CHECKER", input.round), lineage: CHECKER_LINEAGE }) as never }
+    });
+    expect(await runStoryLoop({ maxRounds: 2 }, backup.deps)).toMatchObject({
+      outcome: "FAILED", failureCode: "STORY_UNEXPECTED_ERROR", cause: "STORY_DEPENDENCY_RESULT_INVALID"
+    });
+    expect(backup.picks).toEqual([]);
+  });
+
+  it("a backup that fails too ends the loop as today, with the backup's failure; no third checker is asked", async () => {
+    const double = recorder({ checkFails: () => transportDied() });
+    const backup = withBackup(double, { fails: () => contentRefused() });
+    const outcome = await runStoryLoop({ maxRounds: 2 }, backup.deps);
+    expect(outcome).toEqual({
+      outcome: "FAILED", failureCode: "STORY_CHECK_UNAVAILABLE", cause: "PROVIDER_CONTENT_UNACCEPTED",
+      rounds: [{ round: 1, writer: writerRecord(1), checker: null, satisfied: false, objection: null }]
+    });
+    expect(backup.picks).toHaveLength(1);
+    expect(backup.checks).toHaveLength(1);
+    expect(double.checks).toHaveLength(1);
+  });
+
+  it("no company left (the pick gives none): exactly today's outcome, with the first checker's failure", async () => {
+    const today = await runStoryLoop({ maxRounds: 2 }, recorder({ checkFails: () => transportDied() }).deps);
+    const backup = withBackup(recorder({ checkFails: () => transportDied() }), { none: true });
+    expect(await runStoryLoop({ maxRounds: 2 }, backup.deps)).toEqual(today);
+    expect(backup.picks).toHaveLength(1);
+    expect(backup.checks).toEqual([]);
+  });
+
+  it("a pick that throws costs no more than no backup: the loop never throws", async () => {
+    const today = await runStoryLoop({ maxRounds: 2 }, recorder({ checkFails: () => transportDied() }).deps);
+    const backup = withBackup(recorder({ checkFails: () => transportDied() }), { pickThrows: true });
+    await expect(runStoryLoop({ maxRounds: 2 }, backup.deps)).resolves.toEqual(today);
+  });
+
+  it("sticky: once the checker failed, the rest of this loop's checks go to the same backup, never to the checker again", async () => {
+    const double = recorder({ checkFails: () => transportDied() });
+    const backup = withBackup(double, { verdicts: [v4Verdict(PROBLEM, true), v4Verdict(null, false)] });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, backup.deps);
+    expect(double.checks.map((check) => check.round)).toEqual([1]);
+    expect(backup.checks).toEqual([{ round: 1, candidate: storyFor(1) }, { round: 2, candidate: storyFor(2) }]);
+    expect(backup.picks).toHaveLength(1);
+    // Round 2 revises its own draft against the backup's problem.
+    expect(double.writes[1]).toEqual({ round: 2, priorObjection: PROBLEM, priorDraft: storyFor(1) });
+    expect(outcome).toEqual({
+      outcome: "READY", body: storyFor(2), reservation: null, servedRound: 2, laterFailure: null,
+      rounds: [
+        { round: 1, writer: writerRecord(1), checker: backupRecord(1), satisfied: false, objection: PROBLEM, misleading: true,
+          checkerBackup: { signal: "TOO_SLOW" } },
+        { round: 2, writer: writerRecord(2), checker: backupRecord(2), satisfied: true, objection: null, misleading: false,
+          checkerBackup: { signal: "TOO_SLOW" } }
+      ]
+    });
+  });
+
+  it("a checker that fails only in round 2 is backed up in round 2; round 1 keeps its own checker", async () => {
+    const double = recorder({ verdicts: [v4Verdict(PROBLEM, true)], checkFails: (round) => (round === 2 ? transportDied() : undefined) });
+    const backup = withBackup(double, { verdicts: [v4Verdict(null, false)] });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, backup.deps);
+    expect(outcome).toMatchObject({ outcome: "READY", body: storyFor(2), servedRound: 2 });
+    expect(outcome.rounds.map((round) => [round.checker, round.checkerBackup])).toEqual([
+      [checkerRecord(1), undefined], [backupRecord(2), { signal: "TOO_SLOW" }]
+    ]);
+    expect(Object.hasOwn(outcome.rounds[0]!, "checkerBackup")).toBe(false);
+  });
+
+  it("a sticky backup that fails in round 2 keeps round 1's checked draft, as a later failure does today", async () => {
+    const double = recorder({ checkFails: () => transportDied() });
+    const backup = withBackup(double, { verdicts: [v4Verdict(PROBLEM, true)], fails: (round) => (round === 2 ? spent() : undefined) });
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true }, backup.deps);
+    expect(outcome).toMatchObject({
+      outcome: "READY_WITH_RESERVATION", body: storyFor(1), reservation: PROBLEM, servedRound: 1,
+      laterFailure: { failureCode: "STORY_ENVELOPE_EXHAUSTED", cause: "CALL_BUDGET_EXHAUSTED" }
+    });
+    expect(double.checks.map((check) => check.round)).toEqual([1]);
+    expect(backup.picks).toHaveLength(1);
+  });
+
+  it("the backup writer's loop has its own backup: each runStoryLoop call starts with the planned checker", async () => {
+    const double = recorder({ checkFails: (round) => (round === 3 ? transportDied() : undefined) });
+    const backup = withBackup(double);
+    const outcome = await runStoryLoop({ maxRounds: 2, v4: true, firstRound: 3 }, backup.deps);
+    expect(outcome).toMatchObject({ outcome: "READY", servedRound: 3 });
+    expect(outcome.rounds[0]!.checker?.callSiteKey).toBe("STORY:CHECKER:3:BACKUP");
+    expect(backup.picks).toEqual([{ round: 3, writerRef: WRITER_LINEAGE.provider_ref, signal: "TOO_SLOW" }]);
   });
 });

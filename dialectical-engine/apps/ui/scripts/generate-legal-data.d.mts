@@ -38,6 +38,26 @@ export function buildLegalManifest(
   consentEntries?: Readonly<Record<string, Readonly<Partial<Record<LegalManifestConsentKind, Pair>>>>>,
   archiveHistory?: LegalArchiveIndex,
   /** The re-acceptance floors; the DOCUMENTS config's when left out. Refused above a current draft. */
-  floors?: Readonly<Partial<Record<LegalManifestKind, string | null>>>
+  floors?: Readonly<Partial<Record<LegalManifestKind, string | null>>>,
+  /** `archiveCurrent`: also list every current draft in the archive index (the release step's `--archive`). */
+  options?: Readonly<{ archiveCurrent?: boolean }>
 ): LegalManifest;
 export function renderLegalManifest(manifest: LegalManifest): string;
+/** kind -> translated locale -> the English `{ version, sha256 }` that translation was translated from. */
+export type LegalTranslations = Readonly<Record<LegalManifestKind, Readonly<Record<string, Pair>>>>;
+export const LEGAL_TRANSLATIONS_PATH: string;
+export function parseLegalTranslations(value: unknown): LegalTranslations;
+export function renderLegalTranslations(translations: LegalTranslations): string;
+export function legalTranslationFollows(
+  translations: LegalTranslations,
+  kind: LegalManifestKind,
+  locale: string,
+  englishSha256: string
+): boolean;
+export function recordLegalTranslation(
+  translations: Readonly<Partial<Record<LegalManifestKind, Readonly<Record<string, Pair>>>>>,
+  kind: LegalManifestKind,
+  locale: string,
+  english: LegalDocument,
+  localized: LegalDocument
+): LegalTranslations;

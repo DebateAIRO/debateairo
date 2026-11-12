@@ -1101,6 +1101,8 @@ apps/ui/scripts/legal-consent-manifest.d.mts
 apps/ui/scripts/legal-consent-manifest.mjs
 apps/ui/scripts/legal-locale-check.d.mts
 apps/ui/scripts/legal-locale-check.mjs
+apps/ui/scripts/legal-release-check.d.mts
+apps/ui/scripts/legal-release-check.mjs
 apps/ui/scripts/next-config-csp.test.mjs
 apps/ui/scripts/no-hardcoded-english.test.mjs
 apps/ui/scripts/run-node-tests.mjs
@@ -1389,6 +1391,7 @@ packages/judgement/src/public-report-check-prompt.ts
 packages/judgement/src/s04.ts
 packages/judgement/src/web-prompts.ts
 packages/kernel/src/argument-language.ts
+packages/kernel/src/backup-checker-key.ts
 packages/kernel/src/date-of-birth.ts
 packages/kernel/src/debate-roles.ts
 packages/kernel/src/engine-material.ts

@@ -4,6 +4,7 @@ import {
   READER_SENTENCE_STORY_CHECKER, READER_SENTENCE_WRITING, READER_SENTENCES, TEXT_NOT_IN_QUESTION_LANGUAGE, TypedDomainError,
   argumentLanguageDirective, proseWordCount, questionLanguageSentence
 } from "@debateai/kernel";
+import { canonicalPromptFingerprint } from "@debateai/scorecard";
 import {
   ProviderCallFailedError,
   ProviderContentUnacceptedError,
@@ -1764,6 +1765,118 @@ describe("StoryWriter — story v4 under engine 2 (engine redesign R1d)", () => 
     expect(count("[]")).toBe(0);
     expect(count("{}")).toBe(0);
     for (const scalar of ["42", "null", "true", JSON.stringify("a sentence of prose")]) expect(count(scalar)).toBeNull();
+  });
+
+  /* --- the backup checker */
+
+  const FOURTH = "provider:fourth";
+  /**
+   * The first storyteller (maker-a), the checker (maker-b), a second ref of maker-a, the backup (maker-c) and a fourth company
+   * (maker-d), in panel order. The checker's call fails as `checker` says; everyone else answers as asked.
+   */
+  function checkerBackupWorld(input: Readonly<{ first?: (request: ProviderCallRequest) => string | Error; checker: (request: ProviderCallRequest) => string | Error;
+    backup?: (request: ProviderCallRequest) => string | Error; fourth?: boolean }>) {
+    const first = scripted(input.first ?? answering(CHECKER_V4_SATISFIED));
+    const checker = scripted(input.checker);
+    const twin = scripted(answering(CHECKER_V4_SATISFIED));
+    const backup = scripted(input.backup ?? answering(CHECKER_V4_SATISFIED));
+    const fourth = scripted(answering(CHECKER_V4_SATISFIED));
+    const candidates: readonly StoryBackupCandidate[] = Object.freeze([
+      Object.freeze({ provider: first.provider, providerRef: FIRST, maker: "maker-a" }),
+      Object.freeze({ provider: checker.provider, providerRef: CHECKER, maker: "maker-b" }),
+      Object.freeze({ provider: twin.provider, providerRef: TWIN, maker: "maker-a" }),
+      Object.freeze({ provider: backup.provider, providerRef: BACKUP, maker: "maker-c" }),
+      ...(input.fourth === true ? [Object.freeze({ provider: fourth.provider, providerRef: FOURTH, maker: "maker-d" })] : [])
+    ]);
+    const resolveProvider = (roleRef: string) => (roleRef === FIRST ? { provider: first.provider, providerRef: roleRef }
+      : roleRef === CHECKER ? { provider: checker.provider, providerRef: roleRef } : null);
+    return { first, checker, twin, backup, fourth, candidates, resolveProvider };
+  }
+  const UNREACHABLE = () => new ProviderCallFailedError(new Error("socket hang up"), 2, "FAILED", "ledger:dead");
+  /** What a model is asked, without the per-call fence and canary (the scorecard's own "same prompt"). */
+  const samePrompt = (request: ProviderCallRequest): string => canonicalPromptFingerprint(request.packet.messages);
+
+  it("the checker cannot be reached: one backup of a third company runs the same check at STORY:CHECKER:1:BACKUP, and the row names it", async () => {
+    const world = checkerBackupWorld({ checker: () => UNREACHABLE() });
+    const { writer, inserted, events, details } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.checker.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:1"]);
+    expect(world.backup.calls.map((call) => [call.callSiteKey, call.providerRef, call.role, call.lane])).toEqual([
+      ["STORY:CHECKER:1:BACKUP", BACKUP, "EVALUATOR", "story"]]);
+    expect(world.twin.calls).toEqual([]);
+    // The very same check: the same contract, seal, bound, words and prompt; only the model and the call site differ.
+    const [planned, backup] = [world.checker.calls[0]!, world.backup.calls[0]!];
+    expect(contractOf(backup)).toBe(STORY_CHECKER_V4_CONTRACT_ID);
+    expect([backup.contractHash, backup.bound, backup.guidedWords]).toEqual([planned.contractHash, planned.bound, planned.guidedWords]);
+    expect(samePrompt(backup)).toBe(samePrompt(planned));
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", failureCode: null, rounds: 1,
+      storytellerLineage: { provider_ref: FIRST }, checkerLineage: { provider_ref: BACKUP } });
+    expect(Object.hasOwn(inserted[0]!, "backup")).toBe(false);
+    expect(inserted[0]!.artifactRefs).toHaveLength(2);
+    expect(details.find((detail) => detail.event === "STORY_CHECKER_BACKUP_USED")).toEqual({
+      event: "STORY_CHECKER_BACKUP_USED", answerId: SNAPSHOT.answerId, answerVersion: 1, step: "STORY", round: 1, signal: "UNREACHABLE",
+      firstModel: CHECKER, backupModel: BACKUP });
+    expect(events).not.toContain("STORY_LOOP_FAILED");
+  });
+
+  it("the backup checker keeps its maker: the cost fallback never moves it, and a money refusal there is today's money stop", async () => {
+    const world = checkerBackupWorld({ checker: () => UNREACHABLE(), backup: () => MONEY() });
+    const handed: string[] = [];
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    const fallback: StoryCostFallback = async ({ planned, request, call }) => {
+      handed.push(`${request.callSiteKey}@${planned.providerRef}`);
+      return { result: await call(planned, request), servedBy: planned };
+    };
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates, costFallback: fallback });
+    expect(handed).toEqual([`STORY:STORYTELLER:1@${FIRST}`, `STORY:CHECKER:1@${CHECKER}`]);
+    expect(world.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:1:BACKUP"]);
+    expect(inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_ENVELOPE_EXHAUSTED", rounds: 1 });
+  });
+
+  it("round 2 goes straight to the same backup: the checker that failed is not asked again", async () => {
+    const world = checkerBackupWorld({ checker: () => UNREACHABLE(),
+      backup: (request) => (request.callSiteKey === "STORY:CHECKER:1:BACKUP" ? CHECKER_V4_MISLEADING : answering(CHECKER_V4_SATISFIED)(request)) });
+    const { writer, inserted } = harness({ resolveProvider: world.resolveProvider });
+    await writer.writeAfterSettle({ ...V4, backupCandidates: world.candidates });
+    expect(world.checker.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:1"]);
+    expect(world.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:1:BACKUP", "STORY:CHECKER:2:BACKUP"]);
+    expect(world.first.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:1", "STORY:STORYTELLER:2"]);
+    expect(inserted[0]).toMatchObject({ outcome: "READY", rounds: 2, checkerLineage: { provider_ref: BACKUP } });
+  });
+
+  it("after a backup storyteller, the backup checker is of a fourth company: neither writer's nor the checker's", async () => {
+    const both = checkerBackupWorld({ first: () => UNREACHABLE(), checker: () => UNREACHABLE(), fourth: true });
+    const run = harness({ resolveProvider: both.resolveProvider });
+    await run.writer.writeAfterSettle({ ...V4, backupCandidates: both.candidates });
+    expect(both.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:3"]);
+    expect(both.checker.calls.map((call) => call.callSiteKey)).toEqual(["STORY:CHECKER:3"]);
+    expect(both.fourth.calls.map((call) => [call.callSiteKey, call.providerRef])).toEqual([["STORY:CHECKER:3:BACKUP", FOURTH]]);
+    expect(both.twin.calls).toEqual([]);
+    expect(run.inserted[0]).toMatchObject({ outcome: "READY", storytellerLineage: { provider_ref: BACKUP }, checkerLineage: { provider_ref: FOURTH },
+      backup: { code: STORY_BACKUP_USED, signal: "UNREACHABLE", firstModel: FIRST } });
+    // With no fourth company, no backup checker: the story fails as today, and the code says why.
+    const three = checkerBackupWorld({ first: () => UNREACHABLE(), checker: () => UNREACHABLE() });
+    const short = harness({ resolveProvider: three.resolveProvider });
+    await short.writer.writeAfterSettle({ ...V4, backupCandidates: three.candidates });
+    expect(three.twin.calls).toEqual([]);
+    expect(three.backup.calls.map((call) => call.callSiteKey)).toEqual(["STORY:STORYTELLER:3"]);
+    expect(short.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH", rounds: 1 });
+    expect(short.details.find((detail) => detail.event === "STORY_CHECKER_BACKUP_UNAVAILABLE")).toMatchObject({ round: 3, reason: "NO_CANDIDATE" });
+  });
+
+  it("a money stop at the checker asks no backup; v3 never asks one", async () => {
+    const money = checkerBackupWorld({ checker: () => MONEY() });
+    const moneyRun = harness({ resolveProvider: money.resolveProvider });
+    await moneyRun.writer.writeAfterSettle({ ...V4, backupCandidates: money.candidates });
+    expect(money.backup.calls).toEqual([]);
+    expect(moneyRun.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_ENVELOPE_EXHAUSTED" });
+    const v3 = checkerBackupWorld({ checker: () => UNREACHABLE() });
+    const v3Run = harness({ resolveProvider: v3.resolveProvider });
+    await v3Run.writer.writeAfterSettle({ ...SNAPSHOT, lengthGuidance: GUIDANCE, backupCandidates: v3.candidates });
+    expect(v3.backup.calls).toEqual([]);
+    expect(v3Run.inserted[0]).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH" });
+    expect(v3Run.events.filter((event) => event.startsWith("STORY_CHECKER_BACKUP"))).toEqual([]);
   });
 });
 

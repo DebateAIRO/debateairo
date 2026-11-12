@@ -4,6 +4,8 @@ import {
   ProviderContentUnacceptedError,
   type ProviderGateway
 } from "@debateai/providers";
+import { TypedDomainError } from "@debateai/kernel";
+import type { StoryLoopDependencies } from "./loop.js";
 import type { StoryRoleMaker } from "./writer.js";
 
 /**
@@ -94,4 +96,89 @@ export function pickBackupStoryteller(input: Readonly<{
     && candidate.providerRef !== input.checkerRef
     && !excludedMakers.has(candidate.maker));
   return chosen === undefined ? null : Object.freeze({ provider: chosen.provider, providerRef: chosen.providerRef });
+}
+
+/* ----------------------------------------------------------------- the backup checker */
+
+/**
+ * Why a backup checker was asked: one of the backup writer's four signals, read off the checker's failed call by the same
+ * function, or SPENT_EARLIER. A checker's call site is used once in one copy of a run, and the gateway counts attempts per call
+ * site, so a call refused because its site's allowance is spent (CALL_BUDGET_EXHAUSTED) means an earlier copy of this run spent
+ * it. Reading that as a signal lets a resumed run reach the same backup again, whose recorded answer it then replays.
+ */
+export const STORY_CHECKER_BACKUP_SIGNALS = Object.freeze([...STORY_BACKUP_SIGNALS, "SPENT_EARLIER"] as const);
+export type StoryCheckerBackupSignal = typeof STORY_CHECKER_BACKUP_SIGNALS[number];
+
+/** Logged when a backup checker is asked, and when a signal was given but no company is left to ask. */
+export const STORY_CHECKER_BACKUP_USED = "STORY_CHECKER_BACKUP_USED" as const;
+export const STORY_CHECKER_BACKUP_UNAVAILABLE = "STORY_CHECKER_BACKUP_UNAVAILABLE" as const;
+
+/** The refusal the gateway gives a call whose call site has used its whole allowance of attempts. */
+const CALL_SITE_ALLOWANCE_SPENT = "CALL_BUDGET_EXHAUSTED";
+
+/**
+ * The signal a checker's failed call gives, or null (no backup). Every other ending — money, the run's attempt ceiling, a stopped
+ * lane, an erased run, a run that must stop, a reply refused after the gateway took it, anything unknown — is no signal: another
+ * model would meet the same wall, or there is nothing a second model could fix.
+ */
+export function storyCheckerBackupSignalOf(error: unknown): StoryCheckerBackupSignal | null {
+  const signal = storyBackupSignalOf(error);
+  if (signal !== null) return signal;
+  return error instanceof TypedDomainError && error.code === CALL_SITE_ALLOWANCE_SPENT ? "SPENT_EARLIER" : null;
+}
+
+/**
+ * The backup checker: the first candidate, in the given order, whose company neither wrote the draft (`writerRef`) nor ran the
+ * check that failed (`checkerRef`), nor is one to avoid (`avoidRefs`: the first writer, when a backup writer wrote the draft, since
+ * it has just failed). Companies are read as the backup writer's rule reads them (`makers` before the sit-out filter, then the
+ * candidates). None: null.
+ */
+export function pickBackupChecker(input: Readonly<{
+  candidates: readonly StoryBackupCandidate[];
+  writerRef: string;
+  checkerRef: string;
+  avoidRefs?: readonly string[];
+  makers?: readonly StoryBackupMaker[] | undefined;
+}>): StoryRoleMaker | null {
+  const avoidRefs = input.avoidRefs ?? [];
+  const known: readonly StoryBackupMaker[] = [...(input.makers ?? []), ...input.candidates];
+  const avoidedMakers = new Set(avoidRefs.flatMap((ref) => {
+    const maker = known.find((member) => member.providerRef === ref)?.maker;
+    return maker === undefined ? [] : [maker];
+  }));
+  const candidates = input.candidates.filter((candidate) => !avoidRefs.includes(candidate.providerRef) && !avoidedMakers.has(candidate.maker));
+  return pickBackupStoryteller({ candidates, firstRef: input.writerRef, checkerRef: input.checkerRef, makers: input.makers });
+}
+
+/** The lists a wrapper hands over for its backup checker: the run's members in their order, and every member's company. */
+export type StoryCheckerBackups = Readonly<{
+  candidates: readonly StoryBackupCandidate[];
+  makers?: readonly StoryBackupMaker[] | undefined;
+}>;
+
+/**
+ * The write-and-check loop's backup-checker dependency for one wrapper. `checkWith` is the wrapper's own check, built for a given
+ * maker and sent at the backup checker's call site; this picks the maker, logs the choice by codes and refs only, and hands the
+ * loop that check.
+ */
+export function storyBackupCheckerOf<B>(input: Readonly<{
+  candidates: readonly StoryBackupCandidate[];
+  makers?: readonly StoryBackupMaker[] | undefined;
+  checkerRef: string;
+  avoidRefs?: readonly string[];
+  /** Which step logs it (the story, a rewrite, a report step...). */
+  step: string;
+  checkWith: (backup: StoryRoleMaker) => StoryLoopDependencies<B>["checkStory"];
+  log: (event: string, detail: Record<string, unknown>) => void;
+}>): NonNullable<StoryLoopDependencies<B>["backupChecker"]> {
+  return ({ round, writerRef, signal }) => {
+    const chosen = pickBackupChecker({ candidates: input.candidates, writerRef, checkerRef: input.checkerRef,
+      ...(input.avoidRefs === undefined ? {} : { avoidRefs: input.avoidRefs }), makers: input.makers });
+    if (chosen === null) {
+      input.log(STORY_CHECKER_BACKUP_UNAVAILABLE, { step: input.step, round, signal, firstModel: input.checkerRef, reason: "NO_CANDIDATE" });
+      return null;
+    }
+    input.log(STORY_CHECKER_BACKUP_USED, { step: input.step, round, signal, firstModel: input.checkerRef, backupModel: chosen.providerRef });
+    return Object.freeze({ providerRef: chosen.providerRef, check: input.checkWith(chosen) });
+  };
 }

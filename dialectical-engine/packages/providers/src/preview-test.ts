@@ -346,11 +346,14 @@ export function previewRunnerPolicy<T extends { bounds: Readonly<Record<"JUDGE" 
   if (config === undefined) return policy;
   return { ...policy, bounds: { JUDGE: previewCallBound(policy.bounds.JUDGE, config), COMPOSER: previewCallBound(policy.bounds.COMPOSER, config), CONFORMANCE: previewCallBound(policy.bounds.CONFORMANCE, config) }, synthesisRolePolicy: { ...policy.synthesisRolePolicy, synthesizerBound: previewCallBound(policy.synthesisRolePolicy.synthesizerBound, config), evaluatorBound: previewCallBound(policy.synthesisRolePolicy.evaluatorBound, config) } };
 }
-/** A story call site on the story lane, by its own role: the storyteller (SYNTHESIZER) or the story checker (EVALUATOR). */
+/**
+ * A story call site on the story lane, by its own role: the storyteller (SYNTHESIZER) or the story checker (EVALUATOR). The key is
+ * read by the kernel's one reader of the story's keys, so a backup story checker is a story checker here too.
+ */
 function previewStorySite(request: ProviderCallRequest, site: "STORYTELLER" | "CHECKER"): boolean {
   return request.lane === "story" && (site === "STORYTELLER"
-    ? request.role === "SYNTHESIZER" && /^STORY:STORYTELLER:[1-8]$/u.test(request.callSiteKey)
-    : request.role === "EVALUATOR" && /^STORY:CHECKER:[1-8]$/u.test(request.callSiteKey));
+    ? request.role === "SYNTHESIZER" && lengthCallStepOf(request.callSiteKey, request.lane) === "story_writer"
+    : request.role === "EVALUATOR" && lengthCallStepOf(request.callSiteKey, request.lane) === "story_checker");
 }
 /** Task 4 review fix 1: why a final writer was sent as a STANDARD call (withPreviewProviderCallPolicy's notice). */
 export type PreviewFinalWriterTierUnread = Readonly<{ gate: string; reason: "NOT_OFFERED" | "READ_FAILED" }>;

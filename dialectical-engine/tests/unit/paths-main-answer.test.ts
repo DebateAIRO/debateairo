@@ -18,7 +18,8 @@ import {
   TEXT_NOT_IN_QUESTION_LANGUAGE, questionLanguageField, questionLanguageFromRun, questionLanguageSentence, type PathId
 } from "@debateai/kernel";
 import {
-  ANTHROPIC_TOKEN_COUNT, PREVIEW_V2_FINAL_SEATS, ProviderContentUnacceptedError, readPromptFrame, type PromptPacket, type ProviderCallRequest,
+  ANTHROPIC_TOKEN_COUNT, PREVIEW_V2_FINAL_SEATS, ProviderCallFailedError, ProviderContentUnacceptedError, readPromptFrame, type PromptPacket,
+  type ProviderCallRequest,
   type ProviderCallResult, type ProviderGateway, type TokenCounter
 } from "@debateai/providers";
 import type { MainAnswerUpdateRead, MainAnswerUpdateRecord } from "@debateai/db";
@@ -101,7 +102,8 @@ type Answer = (request: ProviderCallRequest, attempt: number) => string;
 const sentOf = async (request: ProviderCallRequest, packet: PromptPacket): Promise<PromptPacket> =>
   request.vendorPacketOf === undefined ? packet : request.vendorPacketOf(packet);
 function resultOf(request: ProviderCallRequest, content: string): ProviderCallResult {
-  const seat = request.providerRef === HAIKU.providerRef ? HAIKU : GLM;
+  const seat = request.providerRef === HAIKU.providerRef ? HAIKU : request.providerRef === "ref-deepseek"
+    ? { model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek" } : GLM;
   return { rawArtifactRef: `raw:${request.callSiteKey}`, ledgerEntryRef: `ledger:${request.callSiteKey}`, content, provider: "openai-compatible-http",
     model: seat.model, maker: seat.maker, modelVersion: "test" };
 }
@@ -671,5 +673,59 @@ describe("seven full paths in \"中\"", () => {
     const writerFields = frameOf(requests[0]!.packet).fields.map((entry) => [entry.name, entry.content]);
     expect(writerFields).toEqual(lower.material.answerWriter.map((entry) => [entry.name, entry.content]));
     expect(runLog).toContainEqual(["INVESTIGATION_REPORT_OVER_THE_TOKEN_LINE", { runId: RUN, ladderAt: byBytes.ladderAt }]);
+  });
+});
+
+/* ----------------------------------------------------------------- the backup checker */
+
+describe("a path run's main answer whose checker cannot be reached", () => {
+  const DEEPSEEK = Object.freeze({ providerRef: "ref-deepseek", model: "deepseek-ai/DeepSeek-V4.1-Flash", maker: "DeepSeek" });
+  const unreachable: Answer = (request) => {
+    if (request.providerRef === GLM.providerRef) throw new ProviderCallFailedError(new Error("socket hang up"), 3, "FAILED", "ledger:dead");
+    return SATISFIED;
+  };
+  /** The run's members as the runner hands them over: each called through the paths' one gateway. */
+  const backupsOver = (gateway: ProviderGateway) => Object.freeze({
+    candidates: [HAIKU, GLM, DEEPSEEK].map((member) => Object.freeze({ provider: gateway, providerRef: member.providerRef, maker: member.maker }))
+  });
+
+  it("a third company checks it at POST_COMPOSE_R9:EVALUATOR:1:BACKUP, on the served lane, with the very same packet; the segments are served", async () => {
+    const { gateway, requests } = team(() => JSON.stringify(ANSWER), unreachable);
+    const logged: Array<Readonly<{ event: string; detail: Record<string, unknown> }>> = [];
+    const { written, segments } = await runPathsMainAnswer(inputOf({ gateway, checkerBackups: backupsOver(gateway),
+      log: (event, detail) => { logged.push({ event, detail }); } }));
+    expect(requests.map((request) => [request.callSiteKey, request.providerRef, request.role, request.lane])).toEqual([
+      ["COMPOSER:SYNTHESIZER:INITIAL:1", HAIKU.providerRef, "SYNTHESIZER", "served"],
+      ["POST_COMPOSE_R9:EVALUATOR:1", GLM.providerRef, "EVALUATOR", "served"],
+      ["POST_COMPOSE_R9:EVALUATOR:1:BACKUP", DEEPSEEK.providerRef, "EVALUATOR", "served"]]);
+    expect(requests[2]!.packet).toEqual(requests[1]!.packet);
+    expect([requests[2]!.contractHash, requests[2]!.bound]).toEqual([requests[1]!.contractHash, requests[1]!.bound]);
+    expect(written.outcome).toMatchObject({ outcome: "READY", body: ANSWER });
+    expect(written.rounds[0]!.checker?.callSiteKey).toBe("POST_COMPOSE_R9:EVALUATOR:1:BACKUP");
+    expect(segments.length).toBeGreaterThan(0);
+    expect(logged.find((entry) => entry.event === "STORY_CHECKER_BACKUP_USED")?.detail).toMatchObject({
+      step: "INVESTIGATION_REPORT_ANSWER_CHECK", signal: "UNREACHABLE", firstModel: GLM.providerRef, backupModel: DEEPSEEK.providerRef });
+  });
+
+  it("still no backup writer: a writer that cannot answer is FAILED, whatever lists are handed over", async () => {
+    const { gateway, requests } = team(() => "not json");
+    const { written } = await runPathsMainAnswer(inputOf({ gateway, free: true, checkerBackups: backupsOver(gateway) }));
+    expect(requests.map((request) => request.callSiteKey)).toEqual(["COMPOSER:SYNTHESIZER:INITIAL:1"]);
+    expect(written.outcome.outcome).toBe("FAILED");
+  });
+
+  it("without the lists, today's main answer: FAILED with no backup asked", async () => {
+    const { gateway, requests } = team(() => JSON.stringify(ANSWER), unreachable);
+    const { written } = await runPathsMainAnswer(inputOf({ gateway }));
+    expect(requests.map((request) => request.callSiteKey)).toEqual(["COMPOSER:SYNTHESIZER:INITIAL:1", "POST_COMPOSE_R9:EVALUATOR:1"]);
+    expect(written.outcome).toMatchObject({ outcome: "FAILED", failureCode: "STORY_TRANSPORT_DEATH" });
+  });
+
+  it("the runner hands the paths' members to every answer so far and to the main answer, each called through the paths' gateway", () => {
+    const runner = readFileSync(join(process.cwd(), "apps/runner/src/index.ts"), "utf8");
+    const main = runner.indexOf("main = await runPathsMainAnswer({");
+    expect(runner.slice(main, runner.indexOf("});", main))).toContain("checkerBackups: pathsCheckerBackups");
+    const base = runner.indexOf("const pathOutcomesBase");
+    expect(runner.slice(base, runner.indexOf("});", base))).toContain("checkerBackups: pathsCheckerBackups");
   });
 });

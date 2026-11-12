@@ -97,6 +97,7 @@ export {
   runStoryLoop,
   storyCallSiteKey,
   type StoryCallRecord,
+  type StoryLoopBackupChecker,
   type StoryLoopDependencies,
   type StoryLaterFailure,
   type StoryLoopOutcome,
@@ -106,12 +107,20 @@ export {
   STORY_BACKUP_SIGNALS,
   STORY_BACKUP_UNAVAILABLE,
   STORY_BACKUP_USED,
+  STORY_CHECKER_BACKUP_SIGNALS,
+  STORY_CHECKER_BACKUP_UNAVAILABLE,
+  STORY_CHECKER_BACKUP_USED,
+  pickBackupChecker,
   pickBackupStoryteller,
+  storyBackupCheckerOf,
   storyBackupSignalOf,
+  storyCheckerBackupSignalOf,
   type StoryBackupCandidate,
   type StoryBackupMaker,
   type StoryBackupRecord,
-  type StoryBackupSignal
+  type StoryBackupSignal,
+  type StoryCheckerBackupSignal,
+  type StoryCheckerBackups
 } from "./backup.js";
 export {
   StoryRepository,

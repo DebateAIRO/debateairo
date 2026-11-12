@@ -14,7 +14,7 @@ import {
 import { PATH_REWRITE_POLICY, pathRunInvestigations, type EngineSettings } from "@debateai/register";
 import {
   PATH_OUTCOME_CHECKER_PROSE, PATH_OUTCOME_PROSE, pathOutcomeContractsFor, pathOutcomeOrdinaryRefWordsOf, writePathOutcome, type PathOutcomeDraft,
-  type PathOutcomeIndex
+  type PathOutcomeIndex, type StoryCheckerBackups
 } from "@debateai/story";
 import { engineContractHash } from "./engine-contracts.js";
 import { closingRandomBytes } from "./investigation-close.js";
@@ -27,7 +27,8 @@ import { fitPathOutcomeToTokenLine } from "./token-line.js";
 /**
  * V4 start step, Task 49 (spec 2026-11-03 §4.3): EACH PATH'S ANSWER SO FAR, as soon as that path's own arguing and checks end (Task
  * 54 starts one chain per path, `runPathChains`, each on a one-path job, `pathOutcomesJobFor`). For one path: the material (below), the writer (Haiku) and the checker (GLM) rounds of
- * packages/story/src/path-outcome.ts on the served lane, 2 on a paid plan and 1 on Free, no backup writer; then code's outcome:
+ * packages/story/src/path-outcome.ts on the served lane, 2 on a paid plan and 1 on Free, no backup writer, a backup checker of a third
+ * company when GLM's check cannot be completed (`checkerBackups`); then code's outcome:
  *  - satisfied → READY; still objected after the last round → READY_WITH_RESERVATION; no root, no material that fits, or no
  *    draft → FAILED (no root and no fit: no call);
  *  - the trust word is code's, never the AI's: FELL → DIDNT_HOLD, else `pathTrustWordOf` over the points the changes rest on (none
@@ -80,6 +81,11 @@ export type PathOutcomesJob = Readonly<{
   gateway: ProviderGateway;
   store: Pick<PathResultsStore, "readPathOutcomes" | "recordPathOutcome">;
   tokenCount: TokenCounter | undefined;
+  /**
+   * The run's members a backup checker may be, each called through `gateway`, and every member's company: when GLM's check cannot
+   * be completed, one model of a third company runs it (the write-and-check loop's rule). Absent: no backup checker.
+   */
+  checkerBackups?: StoryCheckerBackups;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>;
 
@@ -278,6 +284,7 @@ async function writtenOutcome(job: PathOutcomesJob, path: PathOutcomesPath, log:
     guard: pathRewriteGuard,
     writerLanguageCheck: replyLanguageCheckFor(job.question.line, lock, PATH_OUTCOME_PROSE),
     checkerLanguageCheck: replyLanguageCheckFor(job.question.line, lock, PATH_OUTCOME_CHECKER_PROSE),
+    ...(job.checkerBackups === undefined ? {} : { checkerBackups: job.checkerBackups }),
     log
   });
   if (written.outcome === "FAILED") {

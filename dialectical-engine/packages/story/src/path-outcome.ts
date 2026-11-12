@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { DIG_MODEL_LIMITS, POINT_OF_VIEW_OUTCOMES, POINT_OF_VIEW_SCOPES, StoryFateSchema, type MakerLineage } from "@debateai/contract";
 import {
-  PATH_RESULT_LIMITS, READER_SENTENCE_ANSWER_CHECKER, READER_SENTENCE_WRITING, START_STEP_LIMITS, TypedDomainError, languageDirectiveFor,
-  type QuestionLanguage, type ReadingLevel
+  PATH_RESULT_LIMITS, READER_SENTENCE_ANSWER_CHECKER, READER_SENTENCE_WRITING, START_STEP_LIMITS, TypedDomainError, backupCheckerCallSiteKey,
+  languageDirectiveFor, readWithBackupCheckerKey, type QuestionLanguage, type ReadingLevel
 } from "@debateai/kernel";
 import {
   ANTHROPIC_TOKEN_COUNT,
@@ -24,6 +24,7 @@ import {
   type RejectedProviderContent
 } from "@debateai/providers";
 import { PATH_REWRITE_POLICY } from "@debateai/register";
+import { storyBackupCheckerOf, type StoryCheckerBackups } from "./backup.js";
 import { runStoryLoop, type StoryLoopDependencies, type StoryLoopOutcome, type StoryLoopVerdict } from "./loop.js";
 
 /**
@@ -167,10 +168,12 @@ export function pathOutcomeCallSiteKey(site: PathOutcomeSite, pathNo: number, ro
   return `${PATH_OUTCOME_CALL_SITE_PREFIX}${site}:${String(pathNo)}:${String(round)}`;
 }
 
-/** The role an answer-so-far call site carries, or null for any other key. */
+/** The role an answer-so-far call site carries (a backup checker's site its checker's), or null for any other key. */
 export function pathOutcomeCallSiteRole(callSiteKey: string): "SYNTHESIZER" | "EVALUATOR" | null {
-  const site = PATH_OUTCOME_CALL_SITE.exec(callSiteKey);
-  return site === null ? null : PATH_OUTCOME_SITE_ROLES[site[1] as PathOutcomeSite];
+  return readWithBackupCheckerKey(callSiteKey, (key) => {
+    const site = PATH_OUTCOME_CALL_SITE.exec(key);
+    return site === null ? null : PATH_OUTCOME_SITE_ROLES[site[1] as PathOutcomeSite];
+  }, (role) => role === "EVALUATOR");
 }
 
 /* ----------------------------------------------------------------- the reply */
@@ -357,6 +360,12 @@ export type PathOutcomeRunCall = Readonly<{
   guard: (packet: PromptPacket) => PromptPacket;
   writerLanguageCheck?: PathOutcomeLanguageCheck;
   checkerLanguageCheck?: PathOutcomeLanguageCheck;
+  /**
+   * The run's members a backup checker may be (in the run's order) and every member's company: when the checker's call cannot be
+   * completed, the first of another company than the writer's and the checker's runs the same check, sent through `send` at the
+   * checker's call site with the backup suffix. Absent: no backup checker.
+   */
+  checkerBackups?: StoryCheckerBackups;
   log: (event: string, detail: Record<string, unknown>) => void;
 }>;
 
@@ -364,6 +373,8 @@ function outcomeRequest(call: PathOutcomeRunCall, input: Readonly<{
   site: PathOutcomeSite; round: number; providerRef: string; contract: PromptContract;
   material: readonly FramedMaterialField[]; classifyContent: (content: string, reply?: ModelReplyFacts) => ContentClassification;
   revision: Readonly<{ ownDraft: string; problems: string }> | null;
+  /** A backup checker's call: the checker's request at the checker's call site with the backup suffix. */
+  backup?: boolean;
 }>): ProviderCallRequest {
   const framed = buildFramedPrompt({ contract: input.contract, material: input.material, randomBytes: call.randomBytes });
   const packet = input.revision === null ? framed.packet
@@ -373,7 +384,9 @@ function outcomeRequest(call: PathOutcomeRunCall, input: Readonly<{
   return Object.freeze({
     runId: call.runId,
     subjectItemId: call.subjectItemId,
-    callSiteKey: pathOutcomeCallSiteKey(input.site, call.pathNo, input.round as 1 | 2),
+    callSiteKey: input.backup === true && input.site === "CHECKER"
+      ? backupCheckerCallSiteKey(pathOutcomeCallSiteKey(input.site, call.pathNo, input.round as 1 | 2))
+      : pathOutcomeCallSiteKey(input.site, call.pathNo, input.round as 1 | 2),
     role: PATH_OUTCOME_SITE_ROLES[input.site],
     lane: "served" as const,
     preferredResponseFormat: "json_object" as const,
@@ -395,8 +408,9 @@ function outcomeRequest(call: PathOutcomeRunCall, input: Readonly<{
 
 /**
  * One path's rounds: the writer, then the checker, at most `maxRounds` times (the story's loop, v4 rules: a named problem starts
- * the next round, which revises the writer's own draft). No backup writer. Never throws for a provider: a failure is the loop's
- * FAILED outcome (or the last objected draft, READY_WITH_RESERVATION).
+ * the next round, which revises the writer's own draft). No backup writer; a backup checker when the run hands its members over
+ * (`checkerBackups`). Never throws for a provider: a failure is the loop's FAILED outcome (or the last objected draft,
+ * READY_WITH_RESERVATION).
  */
 export async function writePathOutcome(call: PathOutcomeRunCall): Promise<StoryLoopOutcome<PathOutcomeDraft>> {
   if (!Number.isInteger(call.maxRounds) || call.maxRounds < 1 || call.maxRounds > PATH_OUTCOME_LAST_ROUND) {
@@ -415,16 +429,24 @@ export async function writePathOutcome(call: PathOutcomeRunCall): Promise<StoryL
     if (accepted.repairs.length > 0) call.log("PATH_OUTCOME_REPLY_REPAIRED", { round, site: "WRITER", repair: accepted.repairs[0]! });
     return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, call.writerRef), body };
   };
-  const checkOutcome: StoryLoopDependencies<PathOutcomeDraft>["checkStory"] = async ({ round, candidate }) => {
+  /** The check, by the member `checkerRef` names; a backup checker's (`backup`) at the backup call site. */
+  const checkWith = (checkerRef: string, backup: boolean): StoryLoopDependencies<PathOutcomeDraft>["checkStory"] => async ({ round, candidate }) => {
     const reading = rememberingAcceptedReply((content, reply) => classifyPathOutcomeCheckerContent(content, reply, call.checkerLanguageCheck));
-    const request = outcomeRequest(call, { site: "CHECKER", round, providerRef: call.checkerRef, contract: call.material.contracts.checker,
-      material: call.material.checkerOf(candidate), classifyContent: reading.classifyContent, revision: null });
+    const request = outcomeRequest(call, { site: "CHECKER", round, providerRef: checkerRef, contract: call.material.contracts.checker,
+      material: call.material.checkerOf(candidate), classifyContent: reading.classifyContent, revision: null, backup });
     const result = await call.send(request);
     const accepted = reading.acceptedAs(result.content);
-    return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, call.checkerRef),
+    return { artifactRef: result.rawArtifactRef, callSiteKey: request.callSiteKey, lineage: lineageOf(result, checkerRef),
       verdict: parsePathOutcomeVerdict(result.content, accepted.reply) };
   };
-  return runStoryLoop<PathOutcomeDraft>({ maxRounds: call.maxRounds, v4: true }, { writeStory: writeOutcome, checkStory: checkOutcome });
+  const backups = call.checkerBackups;
+  return runStoryLoop<PathOutcomeDraft>({ maxRounds: call.maxRounds, v4: true }, {
+    writeStory: writeOutcome, checkStory: checkWith(call.checkerRef, false),
+    ...(backups === undefined ? {} : { backupChecker: storyBackupCheckerOf<PathOutcomeDraft>({
+      candidates: backups.candidates, makers: backups.makers, checkerRef: call.checkerRef, step: "PATH_OUTCOME",
+      checkWith: (backup) => checkWith(backup.providerRef, true), log: call.log
+    }) })
+  });
 }
 
 function lineageOf(result: ProviderCallResult, providerRef: string): MakerLineage {
