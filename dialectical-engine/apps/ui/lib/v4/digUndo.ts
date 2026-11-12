@@ -2,20 +2,23 @@ import { useEffect, useSyncExternalStore } from "react";
 import type { DigTarget, PendingDig } from "./types.js";
 
 /*
- * V4 UX fixes (owner picks 3 Nov, dig-d3 B and journey-f21): the digs waiting out their 10-second Undo belong to the
- * whole V4 site, not to one page. This module keeps them in the page's memory only (no browser storage of any kind):
- * a dig pressed on the map keeps its 10 seconds and its Undo when the person opens the report, the ask page or another
- * map, and several digs can each wait with their own Undo. Nothing is sent before a dig's `sendsAt` (row D decision 1,
- * ruling N4); the sends then go one at a time, so a second dig never meets the first one's send in flight. While any dig
- * still waits, closing the tab brings up the browser's own "Leave site?" question.
+ * The digs waiting out their Undo window belong to the whole V4 site, not to one page. This module keeps them in the
+ * page's memory only (no browser storage of any kind): a dig pressed on the map keeps its Undo window and its Undo when
+ * the person opens the report, the ask page or another map, and several digs can each wait with their own Undo. Nothing
+ * is sent before a dig's `sendsAt` (row D decision 1, ruling N4); the sends then go one at a time, so a second dig never
+ * meets the first one's send in flight. While any dig still waits, closing the tab brings up the browser's own "Leave
+ * site?" question.
  *
  * The page that pressed the dig hands in how to send it (`send`); that page may be gone by then, so the send keeps
  * working from the page's last state (useV4Ask reads everything through refs). What happened stays on the entry for the
  * note: started (with the new dig's run), refused (the plain reason), or cancelled ("Cancelled. Nothing was used.").
  */
 
-/** Row D decision 1: the Undo window. */
-export const DIG_UNDO_MS = 10_000;
+/**
+ * The Undo window: how long a dig, a Start or a Continue waits with its Undo before anything is sent. Every other Undo of
+ * the V4 pages reads it from here, so they all keep the same length.
+ */
+export const DIG_UNDO_MS = 5_000;
 /** journey-f21 / dig-f8: how long "Cancelled. Nothing was used." stays. */
 export const DIG_CANCELLED_SHOWN_MS = 4_000;
 /** How long the "started" note stays (as the old note did). A refused dig's reason stays until it is closed. */
@@ -167,7 +170,7 @@ function dropLater(id: number, ms: number): void {
   slot.timer = setTimeout(() => drop(id), ms);
 }
 
-/** The 10 seconds are over: the dig is sent, after any send still in flight. */
+/** The Undo window is over: the dig is sent, after any send still in flight. */
 function fire(id: number): void {
   const slot = slotOf(id);
   if (slot === undefined || slot.entry.phase !== "COUNTING") return;
@@ -226,7 +229,7 @@ export function digGroupOf(target: DigTarget): string {
   return target.questions[0]?.pathId ?? "root";
 }
 
-/** Starts a dig's 10 seconds. Returns its id (for Undo). */
+/** Starts a dig's Undo window. Returns its id (for Undo). */
 export function addDig(input: AddDigInput): number {
   serial += 1;
   const id = serial;

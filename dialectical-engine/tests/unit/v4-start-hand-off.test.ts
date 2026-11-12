@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it } from "vitest";
 import { clearHandOff, handOffFor, handOffStart, START_HAND_OFF_MS, type StartHandOff } from "../../apps/ui/lib/v4/startHandOff.js";
 
 /*
- * V4 start step, Task 76i (wait-f14, wait-f20, choose-f19's "if the map takes long"): after Start's 10 seconds the ask page hands
- * the question and its paths to the map page in this tab's memory only, for START_HAND_OFF_MS. The map page finds its own run's
- * hand-off while it is young, and never another run's. All words are made up.
+ * So there is no blank page while the map takes long: after Start's Undo window the ask page hands the question and its
+ * paths to the map page in this tab's memory only, for START_HAND_OFF_MS. The map page finds its own run's hand-off while
+ * it is young, and never another run's. All words are made up.
  */
 
 const T = 1_800_000_000_000;

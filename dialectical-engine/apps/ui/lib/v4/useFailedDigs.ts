@@ -16,13 +16,13 @@ import { sentDigOf } from "./useSentDigs.js";
 /*
  * A dig that did not finish (owner review 3 Nov, dig-f12 / wait-f18): its reason, and "Try this dig again". The digs this
  * visit sends are remembered as sent (memory only), so a retry digs exactly the same picks; the retry goes through the
- * same 10-second Undo note as any dig (the page's dig queue), with the failed dig's own Quick/Thorough choice. Moved out of
+ * same Undo note as any dig (the page's dig queue), with the failed dig's own Quick/Thorough choice. Moved out of
  * V4DebateClient so the page only wires it. The owner's answer to question 3 (5 Nov 2026, A): the reason is said about the
  * dig, one V4 line per reason group (lib/v4/failedRun.ts digFailureMessage), no longer the question's sentence.
  *
  * V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, his card "Continue the same dig (Recommended)": "Same as the new
  * debate button: what the first try finished is kept, the person pays only for what never ran, and anything we must redo is on us"):
- * where the dig's own run read says `continuable`, the same button continues THAT dig. It waits out the same 10-second dig Undo (the
+ * where the dig's own run read says `continuable`, the same button continues THAT dig. It waits out the same dig Undo window (the
  * site-wide note of lib/v4/digUndo.ts, no share said: continuing pays only for what has not run), then one POST
  * /v1/runs/{digRunId}/continue (lib/v4/money.ts continueStopped, the stopped page's call); no new ask and no new dig. CONTINUING: the
  * dig keeps its place and id on the map and shows as running again (the page's `rereadDig`). NOT_CONTINUABLE: the note goes quietly,

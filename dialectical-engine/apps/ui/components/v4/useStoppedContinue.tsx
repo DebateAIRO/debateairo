@@ -13,7 +13,7 @@ import { START_UNDO_MS } from "@/lib/v4/startUndo";
 /*
  * V4 start step, Task 57g (the owner's 7 Nov answers: "we need to have a way to continue where it broke, and not charge the customer
  * again"; his card "Button on the stopped page"): the press of "Continue where it stopped" on the page of a question that did not finish.
- * It continues the SAME debate on the same page, after the site's 10-second Undo, exactly as Start's (Task 76b: START_UNDO_MS and Start's
+ * It continues the SAME debate on the same page, after the site's Undo window, exactly as Start's (Task 76b: START_UNDO_MS and Start's
  * words in the shared note, V4UndoNote): Undo (or Esc) cancels and nothing is ever sent; after the window, one POST /v1/runs/{id}/continue
  * (the month pause's call, lib/v4/money.ts continueStopped). CONTINUING: the page reads the debate again, so it shows the running debate
  * (its wait or progress screen, as after Start). NOT_CONTINUABLE: the stopped page stays and the button goes (the debate is read again).

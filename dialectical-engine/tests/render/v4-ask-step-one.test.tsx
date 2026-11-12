@@ -45,8 +45,8 @@ vi.mock("@/lib/v4/useV4Ask", () => ({
     submit: (...args: unknown[]) => ask.submit(...args), ensureConsent: async () => true, flagsCrisis: () => false
   })
 }));
-// V4 start step, Task 76b (answer Q12): "Just answer it" waits its 10-second Undo window before the send; here the window is 0
-// and a case that needs the send lets its timer run (the 10 seconds themselves: tests/render/v4-start-undo.test.tsx).
+// "Just answer it" waits out its Undo window before the send; here the window is 0 and a case that needs the send lets
+// its timer run (the window itself: tests/render/v4-start-undo.test.tsx).
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

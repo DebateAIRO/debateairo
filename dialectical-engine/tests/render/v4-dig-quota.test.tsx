@@ -3,6 +3,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import type * as Money from "../../apps/ui/lib/v4/money.js";
 import { DIG_LEVEL_MAX, type RunProjection } from "../../packages/contract/src/index.js";
 import {
@@ -127,7 +128,7 @@ describe("new starts wait for the reset (new_starts: BLOCKED_UNTIL_RESET)", () =
     expect(panel().textContent).not.toContain(word("v4.money.startsWait.PERSON_DAY", { time }));
     expect(panel().querySelector(".v4DigPeriod")).toBeNull();
     await click(button);
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
     expect(page().querySelectorAll(".v4Undo")).toHaveLength(0);
     expect(reportLinks().length).toBeGreaterThan(0);

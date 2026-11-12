@@ -49,8 +49,8 @@ vi.mock("@/components/SensitiveDataConsent", () => ({
 }));
 // Task 56: the carry-on box shows only once the behaviour is built; each case says which.
 vi.mock("@/lib/v4/carryOn", () => ({ get CARRY_ON_BUILT() { return carry.built; } }));
-// Task 76b: Start waits its 10-second Undo window before the send; here the window is 0 and a press lets its timer run
-// (`press`), since these cases are about what is sent. The 10 seconds themselves: tests/render/v4-start-undo.test.tsx.
+// Start waits out its Undo window before the send; here the window is 0 and a press lets its timer run (`press`), since
+// these cases are about what is sent. The window itself: tests/render/v4-start-undo.test.tsx.
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

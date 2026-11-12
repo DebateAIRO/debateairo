@@ -15,7 +15,7 @@ export const START_UNDO_MS = DIG_UNDO_MS;
 export type PendingStart = Readonly<{ sendsAt: number; chosenBy: "PERSON" | "AIS"; mode: DigMode; carryOn: boolean }>;
 
 /**
- * A path's tag on the map during the 10 seconds, as the server will store its author (Task 33b's note): the person's own
+ * A path's tag on the map during the Undo window, as the server will store its author (Task 33b's note): the person's own
  * path ADDED; a path in the person's words EDITED; a combine (written, still being written, or joined in code) COMBINED;
  * the AIs' path of several viewpoints TOGETHER; anything else none.
  */

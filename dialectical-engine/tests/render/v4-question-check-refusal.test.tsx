@@ -33,8 +33,7 @@ vi.mock("@/components/SensitiveDataConsent", () => ({
 vi.mock("@/components/QuestionLanguageChoice", () => ({
   useQuestionLanguageChoice: () => ({ ensureChoice: async () => { server.offers += 1; return server.languageAnswer; }, dialog: null })
 }));
-// V4 start step, Task 76b: Start waits its 10-second Undo window before the send; here the window is 0 and `sent` lets its
-// timer run.
+// Start waits out its Undo window before the send; here the window is 0 and `sent` lets its timer run.
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));
@@ -224,7 +223,7 @@ describe("a dig the question check refuses gets a plain sentence, no pop-up", ()
     expect(host!.querySelector('[data-part="about"]')).toBeNull();
   });
 
-  // Wave 2, dig-f9 (3 Nov): that screen opens about 10 seconds after the click, so it names the dig it is about, first,
+  // That screen opens only once the dig's Undo window is over, well after the click, so it names the dig it is about, first,
   // and the dialog's name includes it; the crisis check on the dig's own views runs at the click with the same help screen.
   it("names the dig it is about when the page says which dig it was", async () => {
     server.createDebate.mockRejectedValue(notStarted({ kind: "DRUGS", screen: "REFUSE", emergencyNumber: false }));

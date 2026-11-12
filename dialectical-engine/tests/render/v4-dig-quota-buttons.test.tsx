@@ -10,6 +10,7 @@ import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import { quotaChanged } from "../../apps/ui/lib/v4/quotaPulse.js";
 import type { V4DigQuota } from "../../apps/ui/lib/v4/digQuota.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import type { DigTarget } from "../../apps/ui/lib/v4/types.js";
 import { digRoomQuery } from "../../apps/ui/lib/v4/useDigQuota.js";
 import {
@@ -205,7 +206,7 @@ describe("dig-f11 / map-f9: the room read again after a quota moment", () => {
     // Pressing it explains the wait again (the line takes the highlight) and starts nothing.
     await click(button);
     expect(panel().querySelector(".v4DigWaitLine")?.classList.contains("v4Highlight")).toBe(true);
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
@@ -215,7 +216,7 @@ describe("dig-f11 / map-f9: the room read again after a quota moment", () => {
     await openPath(PATHS.smr);
     const before = harness.roomAgainReads;
     await click(buttonNamed(`${CATALOG["v4.panel.dig"]} · ${share(20)}`, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     await settle(16_000);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(harness.roomAgainReads).toBeGreaterThan(before);
@@ -256,7 +257,7 @@ describe("dig-f31: the phone's pinned bar", () => {
     expect(why.classList.contains("v4SrOnly")).toBe(false);
     expect(phoneJob().getAttribute("aria-describedby")).toBe(why.id);
     await click(phoneJob());
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
@@ -273,7 +274,7 @@ describe("dig-f31: the phone's pinned bar", () => {
     // The choices take focus; there the greyed button says why and offers nothing that digs at once.
     expect(document.activeElement).toBe(panel().querySelector(".v4Sugs"));
     expect(panel().querySelector<HTMLElement>(".v4Sugs")!.style.scrollMarginTop).toBe("60px");
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 

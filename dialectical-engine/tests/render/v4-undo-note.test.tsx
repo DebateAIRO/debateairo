@@ -5,12 +5,13 @@ import { resolve } from "node:path";
 import { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "../../apps/ui/components/v4/V4UndoNote.js";
+import { UNDO_NOTE_MS, V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "../../apps/ui/components/v4/V4UndoNote.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 
 /*
- * V4 UX fixes (owner picks 3 Nov 2026): THE Undo note (journey-f21) in jsdom. r2-22 A: a quiet line shrinks over the
- * 10 seconds, no ticking number, and with reduced motion the line stands still and words say it. dig-f7: focus moves to
- * Undo, Esc undoes, one screen-reader line, focus back afterwards. journey-f21: "Cancelled. Nothing was used."
+ * THE Undo note in jsdom: a quiet line shrinks over the Undo window, no ticking number, and with reduced motion the line
+ * stands still and words say it. Focus moves to Undo, Esc undoes, one screen-reader line, focus back afterwards; after
+ * Undo, "Cancelled. Nothing was used."
  */
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -54,7 +55,7 @@ function Page(props: Readonly<{ startAt?: number; takeFocus?: boolean; onUndo?: 
   const [sendsAt, setSendsAt] = useState(0);
   return (
     <div>
-      <button type="button" className="dig" onClick={() => { setSendsAt((props.startAt ?? Date.now()) + 10_000); setState("counting"); }}>Dig</button>
+      <button type="button" className="dig" onClick={() => { setSendsAt((props.startAt ?? Date.now()) + UNDO_NOTE_MS); setState("counting"); }}>Dig</button>
       <button type="button" className="send" onClick={() => setState("sending")}>send</button>
       {state === null ? null : (
         <V4UndoNote
@@ -97,12 +98,13 @@ describe("the shared Undo note", () => {
     expect(page.querySelector(".v4Undo")?.textContent).not.toMatch(/\(\d+\)|\b\d+ ?s\b/u);
   });
 
-  it("draws a line that shrinks over the 10 seconds, carrying on part-way when drawn again on another page", () => {
+  it("draws a line that shrinks over the Undo window, carrying on part-way when drawn again on another page", () => {
     const now = Date.now();
     const page = mount(<Page startAt={now - 3_000} takeFocus={false} />);
     press(page.querySelector(".dig")!);
     const fill = page.querySelector<HTMLElement>(".v4UndoLineFill")!;
-    expect(fill.style.animationDuration).toBe("10000ms");
+    // Without a length of its own the line runs over the site's one Undo window, so it ends as the send starts.
+    expect(fill.style.animationDuration).toBe(`${DIG_UNDO_MS}ms`);
     expect(fill.style.animationDelay).toBe("-3000ms");
     expect(fill.closest(".v4UndoLine")?.getAttribute("aria-hidden")).toBe("true");
     // A note drawn on a page it travelled to does not take focus again.
@@ -130,7 +132,7 @@ describe("the shared Undo note", () => {
     document.removeEventListener("keydown", outer);
   });
 
-  it("after the 10 seconds says it is starting, with no gap and no Undo, and focus goes back", () => {
+  it("after the Undo window says it is starting, with no gap and no Undo, and focus goes back", () => {
     const page = mount(<Page />);
     const dig = page.querySelector<HTMLButtonElement>(".dig")!;
     press(dig);
@@ -149,7 +151,7 @@ describe("the shared Undo note", () => {
     expect(reduced).toMatch(/\.v4UndoStill \{ display: inline; \}/u);
     expect(css).toMatch(/\.v4UndoStill \{ display: none; \}/u);
     // Every move takes the shared motion tokens of v4-base.css (each under half a second, instant with reduced motion);
-    // only the 10-second countdown line has its own time (r2-22 A, set on the element). No second set of motion names.
+    // only the countdown line has its own time (the Undo window, set on the element). No second set of motion names.
     expect(css).not.toMatch(/--v4-undo-[a-z-]+:/u);
     const moves = [...css.matchAll(/(?:animation|transition):[^;]*;/gu)].map((match) => match[0]).filter((rule) => !/: none;/u.test(rule));
     expect(moves.length).toBeGreaterThan(0);

@@ -6,10 +6,10 @@ import { EMPTY_DRAFT } from "./suggestions.js";
 import type { V4DigDraft } from "./types.js";
 
 /*
- * V4 screen review, 3 Nov (dig-f23): "Clear" no longer wipes the picks for good. After it, "Picks cleared [Undo]" shows
- * for 10 seconds, and Undo brings every pick back as it was (edited wordings and own views included: the words were only
- * ever in the page's memory). A new pick, or a dig being started, ends the offer. Memory only; nothing is stored. The note
- * itself is the shared Undo note (V4PicksClearedNote → V4UndoNote, journey-f21): same look, same 10 seconds.
+ * "Clear" no longer wipes the picks for good. After it, "Picks cleared [Undo]" shows for the site's Undo window, and Undo
+ * brings every pick back as it was (edited wordings and own views included: the words were only ever in the page's
+ * memory). A new pick, or a dig being started, ends the offer. Memory only; nothing is stored. The note itself is the
+ * shared Undo note (V4PicksClearedNote → V4UndoNote): same look, same Undo window.
  */
 
 /** How long "Picks cleared" offers Undo: the site's one Undo time (row D decision 1, as a dig's). */
@@ -66,7 +66,7 @@ export function usePicksUndo(input: Readonly<{
 
   const dismiss = useCallback((): void => setBefore(null), []);
 
-  // Ten seconds, then the offer ends.
+  // The Undo window, then the offer ends.
   useEffect(() => {
     if (before === null) return;
     const timer = window.setTimeout(() => setBefore(null), PICKS_UNDO_MS);

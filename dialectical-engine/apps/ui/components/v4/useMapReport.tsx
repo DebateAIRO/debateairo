@@ -279,7 +279,7 @@ export function useMapReport(input: MapReportInput): MapReport {
             type="button"
             className={`${className}${waiting ? " v4DigWaiting" : ""}`}
             // The wave-2 checks (ACCESS-6's rule on this button): with the start step's carry-on box a press sends at once and
-            // may wait for a dig's 10 seconds; the button keeps its focus (aria-disabled, never native) and ignores presses.
+            // may wait for a dig's Undo window; the button keeps its focus (aria-disabled, never native) and ignores presses.
             aria-disabled={start.busy || waiting ? "true" : undefined}
             aria-busy={start.busy ? "true" : undefined}
             aria-describedby={lineShown ? REPORT_WAITS_TOP : undefined}

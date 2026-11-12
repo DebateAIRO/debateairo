@@ -2,6 +2,7 @@
 
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import type { WriteReportResult } from "../../apps/ui/lib/v4/load.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
@@ -57,7 +58,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
  * the map page (V4DebateClient):
  *  - report-d1 A: "Write my report" turns into a small strip in the same spot: what the report covers, its share of today
  *    once the server says it, that no dig can start while it is written, Write it and Not yet (Esc too); Write it sends
- *    at once (after a dig still in its 10 seconds); a press that cannot be confirmed says so and checks the versions; with
+ *    at once (after a dig still in its Undo window); a press that cannot be confirmed says so and checks the versions; with
  *    the start step's "carry on to the report" box there is no strip; on the phone the strip grows from the pinned bar.
  *  - report-d2 A: the person stays on the map, which shows the report waiting for digs or being written in the shared
  *    waiting card ("Being written", "Started 14:02" only when this visit knows it), the rail step says so with the working
@@ -333,7 +334,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     await mountMap(1600, runId);
     await openPath(PATHS.renew);
     await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     await settle(50);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     await click(topButton()!);
@@ -535,7 +536,7 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     expect(tray.querySelector("[data-dig-rest]")).toBeNull();
     await click(trayDig);
     expect(panel().querySelector<HTMLElement>("[data-dig-rest]")!.classList.contains("v4Highlight")).toBe(true);
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
@@ -562,12 +563,12 @@ describe("report-d1: \"Write my report\" turns into a short strip in the same sp
     await click(dig);
     // W2L-5: the press gives the bar's own visible line the highlight (the panel's copy is hidden on screen on a phone).
     expect(page().querySelector<HTMLElement>("[data-bar-why]")!.classList.contains("v4Highlight")).toBe(true);
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 });
 
-describe("the wave-2 checks (P5 / W2L-10): Write it pressed while a dig counts its 10 seconds", () => {
+describe("Write it pressed while a dig counts down its Undo window", () => {
   /** Every aria-describedby in the panel names a line that is drawn. */
   const describedLinesDrawn = (): void => {
     for (const element of panel().querySelectorAll("[aria-describedby]")) {
@@ -602,7 +603,7 @@ describe("the wave-2 checks (P5 / W2L-10): Write it pressed while a dig counts i
     const boxes = [...panel().querySelectorAll<HTMLInputElement>(".v4Sugs input[type=checkbox]")];
     await click(boxes[0]!);
     await click(boxes[1]!);
-    // On smr, its whole-path dig starts its 10 seconds; the picks on renew dock in the tray with their own button.
+    // On smr, its whole-path dig starts its Undo window; the picks on renew dock in the tray with their own button.
     await openPath(PATHS.smr);
     await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
     const trayDig = (): HTMLButtonElement => page().querySelector<HTMLButtonElement>(".v4DebTrayDock .v4DebTrayActions .v4BtnPrimary")!;
@@ -742,7 +743,7 @@ describe("the owner's answers of 5 Nov 2026, question 2 A: \"See my report\" unt
     reports.load = async () => investigation(runId, "OPEN", [finished(1)], 2);
     await openPath(PATHS.renew);
     await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     await settle(50);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(header().querySelector("a.v4DebReportLink")).toBeNull();

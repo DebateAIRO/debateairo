@@ -774,7 +774,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{
         {/* journey-f20: a debate with a public page says so under its question, with its link (not on paper). */}
         <V4PublicMark stage={publicStage} catalog={catalog} />
 
-        {/* dig-d3 A, ruling F7: a dig still in its 10 seconds (pressed on the map just before) is waited for. */}
+        {/* A dig still in its Undo window (pressed on the map just before) is waited for. */}
         <V4ReportDigWait runId={load.runId} catalog={catalog} />
         <ReportArea
           runId={load.runId}
@@ -1134,11 +1134,11 @@ function ReportArea({ runId, investigation, runningDig, webNote, publicToo, isPu
   const press = async (kind: PressKind): Promise<void> => {
     setBusy(true);
     setNote(null);
-    // dig-d3 A, ruling F7: "Your report will wait for it." A dig still in its 10 seconds is not on the server yet, so the
+    // dig-d3 A, ruling F7: "Your report will wait for it." A dig still in its Undo window is not on the server yet, so the
     // report is asked for only once it has been sent (or undone).
     if (kind === "write") await waitForDigs(runId);
     if (!alive.current) return;
-    // Review F1: the press is noted as the report is asked for (after any dig in its 10 seconds), so a version that closed
+    // Review F1: the press is noted as the report is asked for (after any dig in its Undo window), so a version that closed
     // with it says when writing started.
     if (kind === "write") investigation.notePress();
     const result = kind === "write" ? await writeReport(runId) : await reopenInvestigation(runId);

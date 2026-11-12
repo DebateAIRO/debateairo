@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { V4DigFailed, type V4FailedDigs } from "../../apps/ui/components/v4/V4DigFailed.js";
 import { formatDate } from "../../apps/ui/lib/i18n/translate.js";
 import type { DigRetry } from "../../apps/ui/lib/v4/digRetry.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import { digQuestion } from "../../apps/ui/lib/v4/askText.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView } from "../../apps/ui/lib/v4/types.js";
@@ -31,8 +32,8 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
  *  - wait-f11/map-f30: a debate that did not finish offers "Ask this again" (the ask step filled from this debate, by its
  *    id only), a grey line under it, "Ask a new question" as a small link, and "Nothing was taken" only when the server
  *    confirms it; a dig's own failed page leads back to its map;
- *  - wait-f18/dig-f12: a failed dig shows its plain reason, "Try this dig again" through the 10-second Undo with its own
- *    Quick/Thorough choice, and after a second failure "This keeps failing…";
+ *  - a failed dig shows its plain reason, "Try this dig again" through the shared Undo with its own Quick/Thorough choice,
+ *    and after a second failure "This keeps failing…";
  *  - wait-f2/public-f16/public-f17: a dig paused at the month wall reads "Dig · paused until …" with a still mark, the rail
  *    counts it as paused, and its panel shows the one pause block, with Continue once the server says so.
  */
@@ -194,7 +195,7 @@ describe("a debate that did not finish (wait-f11, map-f30)", () => {
 });
 
 describe("a dig that did not finish (wait-f18, dig-f12)", () => {
-  it("shows its plain reason and tries the same dig again, with its own mode, through the 10-second Undo", async () => {
+  it("shows its plain reason and tries the same dig again, with its own mode, through the shared Undo", async () => {
     const runId = crypto.randomUUID();
     const child = crypto.randomUUID();
     recordDig(runId, child, ["path:n-mix"], "thorough");
@@ -212,7 +213,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     await click(buttonNamed(CATALOG["v4.digFailed.retry"]!, panel()));
     // The shared dig Undo note (the undo-bottom track's V4UndoNote, journey-f21): the same note as any dig.
     expect(page().querySelector(".v4Undo-counting")!.textContent).toContain(CATALOG["v4.dig.undo"]);
-    await advance(9_500);
+    await advance(DIG_UNDO_MS - 500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
     expect(harness.submit).toHaveBeenCalledTimes(1);
@@ -230,7 +231,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(panel().textContent).toContain(CATALOG["v4.digFailed.nothingTaken"]);
     await click(buttonNamed(CATALOG["v4.digFailed.retry"]!, panel()));
     await click(page().querySelector<HTMLButtonElement>(`button[aria-label="${CATALOG["v4.dig.undoLabel"]!}"]`)!);
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
     await unmountMap();
     // Its run asked something else (picks this page cannot rebuild exactly): no button that would dig something different.
@@ -284,7 +285,7 @@ describe("a dig that did not finish (wait-f18, dig-f12)", () => {
     expect(line.textContent).toBe(CATALOG["v4.reportWait.digsRest"]);
     expect(panel().contains(line)).toBe(true);
     await click(retry);
-    await advance(11_000);
+    await advance(DIG_UNDO_MS + 1_000);
     expect(harness.submit).not.toHaveBeenCalled();
   });
 

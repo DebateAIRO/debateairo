@@ -21,17 +21,17 @@ import type { useV4Ask, V4AskOutcome } from "./useV4Ask.js";
 
 /*
  * The map page's dig queue (dig-d3 B, owner pick 3 Nov; moved out of V4DebateClient so the page only wires it): a dig
- * pressed on the map waits out its 10 seconds in the site-wide list of lib/v4/digUndo.ts, keeps its Undo when the person
+ * pressed on the map waits out its Undo window in the site-wide list of lib/v4/digUndo.ts, keeps its Undo when the person
  * digs again or opens another page, and is sent one at a time. Nothing is sent before `sendsAt` (row D decision 1, N4).
  *
- * The screens a dig may need are asked AT THE PRESS, before its 10 seconds start, while this page is on screen and can
+ * The screens a dig may need are asked AT THE PRESS, before its Undo window starts, while this page is on screen and can
  * show them (the review of 4 Nov; dig-f9, owner's screen review 3 Nov), with useV4Ask's own pieces (no second crisis text):
  *  - V, 2026-09-30: the person's own views in a dig are their words (ASK-4: never the AI-written text around them); words
  *    of a person in crisis get useV4Ask's help screen at once, and nothing waits or is sent;
- *  - V, 2026-09-29: the one-time data consent opens at the press; the 10 seconds start only once it is given, and "No"
+ *  - V, 2026-09-29: the one-time data consent opens at the press; the Undo window starts only once it is given, and "No"
  *    starts nothing. A second press on the same place while it is open does nothing more.
  * The question check's screen cannot move to the press: it is the server's answer to a sent dig (ruling N4), so it may still
- * open after the 10 seconds; it then names the dig it is about ("About your dig on “Mostly renewables”:", `aboutOf`).
+ * open after the Undo window; it then names the dig it is about ("About your dig on “Mostly renewables”:", `aboutOf`).
  * A send that still meets a screen after the page has gone says so in its note ("open the map and dig again") instead of
  * vanishing without a word. Memory only: nothing is kept in the browser's storage.
  */
@@ -50,9 +50,9 @@ type DigAsk = Pick<ReturnType<typeof useV4Ask>, "submit" | "ensureConsent" | "of
 const STOPPED: DigUndoResult = Object.freeze({ kind: "STOPPED" });
 
 export type DigQueue = Readonly<{
-  /** Every dig note of the site (digs in their 10 seconds, being sent, or just settled). */
+  /** Every dig note of the site (digs in their Undo window, being sent, or just settled). */
   waitingDigs: readonly DigUndoEntry[];
-  /** Puts a dig in its 10 seconds (a dig pressed here, or a failed dig tried again, dig-f12). */
+  /** Puts a dig in its Undo window (a dig pressed here, or a failed dig tried again). */
   queueDig: (dig: PendingDig) => void;
   /** A dig of this place, in the page's Quick look / Thorough choice. */
   startDig: (target: DigTarget) => void;
@@ -111,12 +111,12 @@ export function useDigQueue(input: Readonly<{
 
   const send = async (dig: PendingDig, parentRunId: string, parentQuestionLine: string): Promise<DigUndoResult> => {
     let outcome: V4AskOutcome;
-    // Task 79 review: the paths as they go now (a combined question written during the 10 seconds goes with them).
+    // The paths as they go now (a combined question written during the Undo window goes with them).
     const paths = dig.paths === undefined ? undefined : settlePaths?.(dig.paths) ?? dig.paths;
     try {
       // ASK-4: a dig carries AI-written text, so it is sent as a dig (no client crisis pop-up on AI words). W3-4: with its
       // parent (the debate it digs, the places, the mode and the picks as sent).
-      // dig-f9: the question check's screen can only come with the server's answer, 10 seconds after the click, so it
+      // The question check's screen can only come with the server's answer, after the Undo window, so it
       // names the dig it is about.
       // V4 start step, Task 79 (dig-f35): a path debate's dig of picks goes with its paths as the person shaped them (DIG_PICKS);
       // the words written on its rows had their crisis check at the press (V4DebateClient).
@@ -188,7 +188,7 @@ export function useDigQueue(input: Readonly<{
     const parentQuestionLine = servedQuestionLine;
     // V, 2026-09-30: the person's own views read as a person in crisis: useV4Ask's help screen now, and no dig. The words
     // checked are exactly the ones the send reads (askParentOf, crisisWordsOf). V, 2026-09-29 (dig-f9): the one-time
-    // consent, asked while this page can show it; the 10 seconds start from its yes.
+    // consent, asked while this page can show it; the Undo window starts from its yes.
     const delay = Math.max(0, dig.sendsAt - Date.now());
     void clickCheck(digTargetKey(dig.target), crisisWordsOf("dig", "", askParentOf(parentRunId, dig.target, dig.mode))).then((agreed) => {
       if (!agreed) return;

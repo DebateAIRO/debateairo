@@ -13,7 +13,7 @@ import {
 /*
  * V4 start step, Task 76c (read-f2, choose-f2, choose-f21, ask-f12; owner answers Q2 A and Q3 A): step 2 has its own place in
  * the browser's history. The address says only that it is step 2; Back goes to step 1 with the words and keeps the paths (a
- * Back while a menu or sheet is open closes only that); during Start's 10 seconds Back is an Undo, and from the send until the
+ * Back while a menu or sheet is open closes only that); during Start's Undo window Back is an Undo, and from the send until the
  * outcome it is held; a reload brings the words back and calls no AI; the page asks before leaving only when something would
  * be lost (the logo too, in the page); and a started question says so when its entry is opened again. The page, its hooks, the
  * card, the bar, the header and the dialog are the real ones; only the session, the consent, the server, the header's quota
@@ -90,6 +90,7 @@ vi.mock("@/lib/api", () => ({
 }));
 
 import { V4AskClient } from "../../apps/ui/components/v4/V4AskClient.js";
+import { START_UNDO_MS } from "../../apps/ui/lib/v4/startUndo.js";
 import { NUCLEAR_MENU, START_FIXTURE_QUESTION, signedList, signedMenu } from "../support/v4-start-menu.js";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -436,14 +437,14 @@ describe("leaving (read-f2, choose-f2; answer Q2: only when something would be l
   });
 });
 
-describe("Back during Start's 10 seconds (ask-f12) and a started question (choose-f21, answer Q3)", () => {
-  it("Back at 5_000 ms is an Undo: nothing is sent, step 2 as it was with its entry, and 'Cancelled.'", async () => {
+describe("Back during Start's Undo window and a started question", () => {
+  it("Back halfway through the window is an Undo: nothing is sent, step 2 as it was with its entry, and 'Cancelled.'", async () => {
     await toStepTwo();
     await toReady();
     vi.useFakeTimers();
     await click(startButton());
     expect(host!.querySelector(".v4AskCard")).toBeNull();
-    await wait(5_000);
+    await wait(START_UNDO_MS / 2);
     await browserMove("back");
     expect(onStepTwo()).toBe(true);
     expect(stepTwoBox().value).toBe(Q);
@@ -456,13 +457,13 @@ describe("Back during Start's 10 seconds (ask-f12) and a started question (choos
     expect(server.createDebate).not.toHaveBeenCalled();
   });
 
-  it("Back at 10_500 ms, while the send is in flight, is held: step 2's entry again, the note still 'Starting…', one ask", async () => {
+  it("Back 500 ms after the window ends, while the send is in flight, is held: step 2's entry again, the note still 'Starting…', one ask", async () => {
     await toStepTwo();
     await toReady();
     server.createDebate.mockImplementation(() => new Promise(() => undefined));
     vi.useFakeTimers();
     await click(startButton());
-    await wait(10_500);
+    await wait(START_UNDO_MS + 500);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     await browserMove("back");
     expect(entry()).toEqual({ step: "read", words: Q });
@@ -478,7 +479,7 @@ describe("Back during Start's 10 seconds (ask-f12) and a started question (choos
     await toReady();
     vi.useFakeTimers();
     await click(startButton());
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(entry()).toEqual({ step: "started", runId: "run-1" });
     expect(window.location.pathname + window.location.search).toBe("/v4");
@@ -502,9 +503,9 @@ describe("Back during Start's 10 seconds (ask-f12) and a started question (choos
     const entries = window.history.length;
     vi.useFakeTimers();
     await click(host!.querySelector(".v4AskActions .v4AskJust")!);
-    // No entry is pushed for the 10 s.
+    // No entry is pushed during the Undo window.
     expect(window.history.length).toBe(entries);
-    await wait(10_000);
+    await wait(START_UNDO_MS);
     expect(server.createDebate).toHaveBeenCalledTimes(1);
     expect(entry()).toEqual({ step: "started", runId: "run-1" });
     expect(window.history.length).toBe(entries);

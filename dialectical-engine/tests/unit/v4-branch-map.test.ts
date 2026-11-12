@@ -28,7 +28,7 @@ import { pathWebOf } from "../../apps/ui/lib/v4/web.js";
  * V4 start step, Task 60 (spec 2026-11-03 §2 items 7 and 8; items wait-d1, map-d2, journey-f1, map-f4, wait-f9, wait-f16,
  * chat-undo-after-start, r2-8): the map's paths are the person's chosen paths. A served path debate draws one path per branch
  * (its id the path id, its points the nodes under its root); while it runs, the run read draws the same paths from the start,
- * each filling in from its own progress; during Start's 10 s the page draws them before any run exists. No path is made up.
+ * each filling in from its own progress; during Start's Undo window the page draws them before any run exists. No path is made up.
  * All words and figures are made up.
  */
 
@@ -344,7 +344,7 @@ describe("the map while the debate runs (buildV4RunMap)", () => {
   });
 });
 
-describe("the map during Start's 10 seconds (buildV4PendingMap, answer Q11)", () => {
+describe("the map during Start's Undo window (buildV4PendingMap)", () => {
   it("draws each chosen path being looked into, before any run exists", () => {
     const map: V4Map = buildV4PendingMap({ questionLine: Q, paths: [
       { title: T1, question: "What does each choice cost the whole power system?", tag: null },

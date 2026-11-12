@@ -316,7 +316,7 @@
 .v4AskLevelKept { overflow-wrap: anywhere; }
 .v4AskLevelWhat { min-height: 44px; font-size: var(--t-ui); }
 
-/* ---- V4 start step — Task 76b: Start's 10 seconds (answer Q11; choose-f19, the fold) ---- */
+/* ---- Start's Undo window: the card folds into the map's first card ---- */
 /* The map's first card grows from where the card was (the page sets its first transform inline, from the top left), then
    goes to its place under the fold's own token; Undo plays the same move backwards on the card. With reduced motion the
    token makes it instant and the page gives the card the 1-second highlight instead. */

@@ -125,7 +125,7 @@ type PanelProps = Readonly<{
    */
   digRest?: string | null;
   /**
-   * dig-d3 / dig-f8: the line for a dig of this place still in its 10 seconds ("Your dig starts in a few seconds. You can
+   * The line for a dig of this place still in its Undo window ("Your dig starts in a few seconds. You can
    * still undo it. [Undo]"), or null when none waits there. While it shows, this place's dig button does nothing more.
    * Absent: as before.
    */
@@ -551,7 +551,7 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
   const starting = panel.digStarting?.(props.target) ?? null;
   // public-d3 A: the period by the switch, only where this button names a share.
   const period = quota === undefined || quota.share(props.target) === null ? null : quota.periodLine;
-  // The button names only a line that is drawn: while a dig of this place counts its 10 seconds, its note takes the rest
+  // The button names only a line that is drawn: while a dig of this place counts down its Undo window, its note takes the rest
   // line's slot, so the button names none (the wave-2 owner check, 4 Nov).
   const describedBy = resting ? (starting === null ? restId : undefined) : waiting ? waitId : undefined;
   // journey-f8: the change mark is for this place's share only (another place's button is not a change of this one).

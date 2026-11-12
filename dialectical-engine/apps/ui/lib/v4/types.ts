@@ -439,7 +439,7 @@ export type DigTarget =
   | Readonly<{ kind: "picks"; path: V4Path | null; picks: readonly V4DigPick[] }>;
 
 /**
- * A dig waiting out its 10-second Undo (row D decision 1). Nothing is sent before `sendsAt`. V4 start step, Task 79 (dig-f35):
+ * A dig waiting out its Undo window. Nothing is sent before `sendsAt`. V4 start step, Task 79 (dig-f35):
  * `paths`, a path debate's dig of picks as the person shaped them (DIG_PICKS); absent, today's dig (one path per pick there).
  */
 export type PendingDig = Readonly<{ target: DigTarget; mode: DigMode; sendsAt: number; paths?: StartPaths }>;

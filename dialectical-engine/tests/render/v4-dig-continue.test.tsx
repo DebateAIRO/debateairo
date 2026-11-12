@@ -31,7 +31,7 @@ vi.mock("@/lib/v4/money", async (original) => ({
  * V4 start step, Task 57i (the owner's answer of 7 Nov afternoon, his card "Continue the same dig (Recommended)": "Same as the new debate
  * button: what the first try finished is kept, the person pays only for what never ran, and anything we must redo is on us"). On the map, a
  * failed dig whose own run read says `continuable` is tried again by continuing THAT dig: "Try this dig again" (the same words) waits out the
- * same 10-second dig Undo, then one POST /v1/runs/{digRunId}/continue; no new ask and no new dig; the dig keeps its place and id on the map
+ * same dig Undo window, then one POST /v1/runs/{digRunId}/continue; no new ask and no new dig; the dig keeps its place and id on the map
  * and shows as running again. The API's refusals: not continuable (the dig is read again and the panel offers today's fresh dig), no room
  * (the usual quota words), anything else (the dig's own "couldn't start" line, and the button can be pressed again). A dig that cannot
  * continue still queues today's fresh dig. Every question here is made up.

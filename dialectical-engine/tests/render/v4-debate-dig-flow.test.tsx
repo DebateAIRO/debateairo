@@ -2,7 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskParentSchema, DIG_LEVEL_MAX, FREE_DIG_PICKS_MAX } from "../../packages/contract/src/index.js";
-import { readDigUndo, undoDig } from "../../apps/ui/lib/v4/digUndo.js";
+import { DIG_UNDO_MS, readDigUndo, undoDig } from "../../apps/ui/lib/v4/digUndo.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, page, panel, PATHS, resetHarness,
   seededAnswer, seededStory, settle, text, tray, typeInto, unmountMap
@@ -18,10 +18,10 @@ vi.mock("@/lib/v4/accountMemory", async (original) => (await import("./v4-debate
 vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness.js")).moneyMock(await original()));
 
 /*
- * The first click test of V4DebateClient's dig flow (Perplexity plan W3-4): row D decision 1 (a dig starts at once with
- * a 10-second Undo and nothing is sent before then), and since W3-4 the dig is sent with its `parent` (AskParentSchema):
- * the debate it digs, its places (its path first), the mode, and its picks — suggestions with their text as sent, edited
- * or not, and the person's own view. Only the reads and the ask itself are stand-ins (v4-debate-harness.tsx).
+ * The first click test of V4DebateClient's dig flow: a dig starts at once with its Undo window and nothing is sent before
+ * the window ends, and the dig is sent with its `parent` (AskParentSchema): the debate it digs, its places (its path
+ * first), the mode, and its picks — suggestions with their text as sent, edited or not, and the person's own view. Only
+ * the reads and the ask itself are stand-ins (v4-debate-harness.tsx).
  */
 
 const word = (key: string, values: Record<string, string | number> = {}): string =>
@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 describe("V4DebateClient's dig flow", () => {
-  it("sends the picks of one path after 10 seconds, with their parent, and shows the dig on the map", async () => {
+  it("sends the picks of one path once the Undo window ends, with their parent, and shows the dig on the map", async () => {
     const runId = await mountMap();
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.digMode.thorough"]!, panel()));
@@ -60,7 +60,7 @@ describe("V4DebateClient's dig flow", () => {
     // the docked tray offers no second one.
     expect(buttonsNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!)).toHaveLength(0);
     await click(buttonNamed(CATALOG["v4.dig.yourPicks.other"]!, panel()));
-    await advance(9_500);
+    await advance(DIG_UNDO_MS - 500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
     expect(harness.submit).toHaveBeenCalledTimes(1);
@@ -102,20 +102,20 @@ describe("V4DebateClient's dig flow", () => {
     const runId = await mountMap();
     await openPath(PATHS.smr);
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(harness.submit.mock.calls[0]![3]).toEqual({ parent_run_id: runId, places: ["path:n-smr"], mode: "quick" });
   });
 
-  // dig-d3 (owner pick B, 3 Nov): leaving the map no longer cancels the dig in silence. It keeps its 10 seconds and its
-  // Undo on the next page (the site-wide note), and is sent only when they are over.
-  it("leaving the map during the Undo time keeps the dig: it is sent once its 10 seconds are over, not before", async () => {
+  // Leaving the map no longer cancels the dig in silence. It keeps its Undo window and its Undo on the next page (the
+  // site-wide note), and is sent only when the window is over.
+  it("leaving the map during the Undo time keeps the dig: it is sent once its Undo window is over, not before", async () => {
     const runId = await mountMap();
     await openPath(PATHS.smr);
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
-    await advance(3_000);
+    await advance(DIG_UNDO_MS / 2);
     await unmountMap();
-    await advance(6_800);
+    await advance(DIG_UNDO_MS / 2 - 200);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(400);
     expect(harness.submit).toHaveBeenCalledTimes(1);
@@ -143,7 +143,7 @@ describe("V4DebateClient's dig flow", () => {
     expect(tray()).toBeNull();
     await openPath(PATHS.renew);
     await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     await settle();
     expect(text()).toContain(CATALOG["v4.nest.tooDeep"]);
     expect(pickedOnTree()).toHaveLength(1);
@@ -159,7 +159,7 @@ describe("V4DebateClient's dig flow", () => {
       await click(branch(PATHS.renew).querySelector<HTMLInputElement>(".v4MapLeafSuggestion input[type=checkbox]")!);
       await openPath(PATHS.renew);
       await click(buttonNamed(CATALOG["v4.dig.yourPicks.one"]!, panel()));
-      await advance(10_100);
+      await advance(DIG_UNDO_MS + 100);
       await settle();
       expect(text()).toContain(word(key, values));
       expect(pickedOnTree()).toHaveLength(1);
@@ -172,7 +172,7 @@ describe("V4DebateClient's dig flow", () => {
     const parentRunId = await mountMap();
     await openPath(PATHS.smr);
     await click(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     const childRunId = (await harness.submit.mock.results[0]!.value as { runId: string }).runId;
     await unmountMap();
 

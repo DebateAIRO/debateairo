@@ -4,6 +4,7 @@ import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "../../packages/contract/src/http-error.js";
 import type { RunProjection } from "../../packages/contract/src/index.js";
+import { PICKS_UNDO_MS } from "../../apps/ui/lib/v4/usePicksUndo.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, harness, mountMap, openPath, page, panel, PATHS, resetHarness, settle,
   text, tray, typeInto, unmountMap
@@ -24,7 +25,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
  *    a shared link opens the same question; the phone's Map sheet adds no step and Back with it open closes it;
  *  - dig-f23: typed own views and wordings stay in the page between questions; ticked picks (ids, never words) ride in
  *    the address; a link that would lose typed words asks first, and the browser asks before a reload; "Clear" offers
- *    "Picks cleared [Undo]" for 10 seconds;
+ *    "Picks cleared [Undo]" for the Undo window;
  *  - map-f6: one grey outline while the page loads, and no map until the saved reading level is known;
  *  - wait-f1: a sign-in that ended says "Please sign in again to see your question." with Sign in and the way back.
  */
@@ -204,7 +205,7 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     expect(leaving.defaultPrevented).toBe(false);
   });
 
-  it("\"Clear\" shows \"Picks cleared\" with Undo for 10 seconds; Undo brings every pick back", async () => {
+  it("\"Clear\" shows \"Picks cleared\" with Undo for the Undo window; Undo brings every pick back", async () => {
     await mountMap();
     await openPath(PATHS.renew);
     const [first, second] = panelBoxes();
@@ -220,15 +221,15 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     expect(trayChips()).toHaveLength(2);
     expect(params().getAll("pick")).toHaveLength(2);
     expect(text()).not.toContain(CATALOG["v4.dig.picksCleared"]);
-    // Cleared again: after 10 seconds the offer ends and the picks stay cleared.
+    // Cleared again: once the Undo window ends the offer ends and the picks stay cleared.
     await click(buttonNamed(CATALOG["v4.dig.trayClear"]!, tray()!));
-    await advance(10_000);
+    await advance(PICKS_UNDO_MS);
     await settle();
     expect(page().querySelector(".v4PicksCleared")).toBeNull();
     expect(tray()).toBeNull();
   });
 
-  it("dig-f7: Undo has focus once; after Undo focus goes to the tray's Clear, and after the 10 seconds it never drops to the page", async () => {
+  it("Undo has focus once; after Undo focus goes to the tray's Clear, and after the Undo window it never drops to the page", async () => {
     await mountMap();
     await openPath(PATHS.renew);
     // dig-f4: the tray shows from the second pick.
@@ -247,7 +248,7 @@ describe("picks and typed words are not lost (dig-f23)", () => {
     await act(async () => { again.focus(); again.click(); });
     await settle();
     expect(document.activeElement).toBe(page().querySelector(".v4PicksCleared .v4UndoBtn"));
-    await advance(10_000);
+    await advance(PICKS_UNDO_MS);
     await settle();
     expect(page().querySelector(".v4PicksCleared")).toBeNull();
     expect(document.activeElement).not.toBe(document.body);

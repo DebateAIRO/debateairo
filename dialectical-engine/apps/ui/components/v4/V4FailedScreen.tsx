@@ -77,7 +77,7 @@ export function V4FailedScreen({
    */
   digRetry?: DigRetry["kind"];
   /**
-   * Task 57g: "Continue where it stopped", pressed (the page's 10-second Undo comes first, then POST /v1/runs/{id}/continue). Absent:
+   * "Continue where it stopped", pressed (the page's Undo window comes first, then POST /v1/runs/{id}/continue). Absent:
    * no button, no line, and "Ask this again" as before. Ignored for a dig.
    */
   onContinue?: () => void;

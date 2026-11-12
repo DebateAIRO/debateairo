@@ -7,7 +7,7 @@ import type { DigTarget } from "@/lib/v4/types";
 
 /*
  * dig-f9 (owner's screen review, 3 Nov 2026): the question check's screen can only come with the server's answer to a
- * sent dig, about 10 seconds after its click, so it opens with the place the dig is about: "About your dig on “Mostly
+ * sent dig, once its Undo window after the click is over, so it opens with the place the dig is about: "About your dig on “Mostly
  * renewables”:". One piece for the map's digs and a public page's dig box; only the place's words are marked as AI text.
  */
 

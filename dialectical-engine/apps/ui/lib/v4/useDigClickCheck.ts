@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 
 /*
  * V4 screen review, 3 Nov 2026 (OWNER-PICKS-2026-11-03.md, dig-f9): the crisis help and the one-time data consent run at
- * a dig's click, before its 10 seconds start, not when it is sent 10 seconds later, when the person may be reading
+ * a dig's click, before its Undo window starts, not when it is sent once the window is over, when the person may be reading
  * something else or may have left the page, where a screen that opened would be lost. One piece for every dig press of
  * the site (the map's queue, lib/v4/useDigQueue.tsx, and a public page's dig box, components/v4/V4PublicLane.tsx), lent
  * the site's own screens by useV4Ask: its crisis check and help screen, its consent screen. No second crisis text.
@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef } from "react";
  *    them), exactly the ones the send reads (the caller passes crisisWordsOf of the parent it will send).
  *  - V, 2026-09-29: the one-time consent opens at the press; "No" starts nothing. One consent question at a time: a
  *    second press anywhere while it is open waits for the same answer, and a second press on the same place does nothing.
- *  - Only when both pass may the caller start the 10 seconds; nothing is sent here, and Undo still means nothing is sent
+ *  - Only when both pass may the caller start the Undo window; nothing is sent here, and Undo still means nothing is sent
  *    (lib/v4/digUndo.ts). The send keeps its own checks (they pass at once by then).
  * Nothing here fetches or keeps anything of its own; the consent read is useV4Ask's. Memory only.
  */
@@ -26,7 +26,7 @@ export type DigClickChecks = Readonly<{
 
 /**
  * Returns `check(place, words)`: the crisis check on `words`, then the consent, for a dig of `place` (a key that names
- * the place on its page). Resolves true only when the dig may start its 10 seconds now; false when the help screen
+ * the place on its page). Resolves true only when the dig may start its Undo window now; false when the help screen
  * opened, the consent was refused, or a check of the same place is already open.
  */
 export function useDigClickCheck(checks: DigClickChecks): (place: string, words: readonly string[]) => Promise<boolean> {
