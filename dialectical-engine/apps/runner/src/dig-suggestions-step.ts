@@ -24,10 +24,15 @@ import type { PathRewriteDigPath, PathRewriteQuestion } from "./path-rewrite-mat
  * THE SUGGESTIONS ON A DIG'S OWN PATHS (plan 2026-10-30 task W4-3; owner Q7, 31 Oct: "only new POV or deeper insights that
  * could change the dig path should be included as options to dig into").
  *
- * Plain words: once a dig's rewrite is written, one small call per path of the dig (Haiku, the rewrite's writer, all at once)
+ * Plain words: once a dig's rewrite is stored, one small call per path of the dig (Haiku, the rewrite's writer, all at once)
  * offers up to 3 follow-up questions the person may choose to dig into, told what the whole debate already investigated. It
- * may offer none. They are sealed with the rewrite (`PathRewriteContent.dig_suggestions`, under the dig's key), so no new
- * table, a rewrite run again replays them free, and erasing the dig erases them.
+ * may offer none.
+ * They are asked after the rewrite's row is stored, beside the climb, so the rewrite the person waits for never waits for them
+ * (`writeOwnPathSuggestions`). Each path's set goes to the suggestions store (migration 0141) as soon as its call answers, the dig
+ * being both the run that paid and sealed it and the debate whose map holds the path. A rewrite row whose sealed text carries
+ * `dig_suggestions` keeps them there, and the page reads those when the store has no set for the path; other rows have theirs in
+ * the store. Erasing the dig erases both. When a runner stops before writing them, the tree's sweep writes them from the store
+ * alone, each call already answered replayed free (path-rewrite.ts `owedDigSuggestions`).
  * The other two times the AI offers (migration 0141's store, `identity.path_suggestions`; each row sealed under the run that paid):
  * - a first debate's paths, once its story is written: the approved web.suggest.v1 (`writeFirstDebateSuggestions`);
  * - a path a rewrite changed (owner Q-D8): `refreshPathSuggestions`, web.suggest-dig.v1 on its new text, for a dig's rewrite of its
@@ -158,10 +163,26 @@ async function suggestOnPath(job: DigSuggestionsJob, path: PathRewriteDigPath, a
   }
 }
 
-/** The dig's suggestions, every path at once. None on Free and at level 10: no call, nothing read. Never rejects. */
+/**
+ * Which of the dig's paths still want a call, and what to do with each path's answer as soon as it is in. Absent: every path, and
+ * nothing done but the list returned.
+ */
+export type DigSuggestionsEach = Readonly<{
+  wanted?: (path: PathRewriteDigPath) => boolean;
+  /** Handed each asked path's offer (null: the call failed, or its reply did not parse). Must not reject. */
+  answered?: (path: PathRewriteDigPath, offered: DigPathSuggestions | null) => Promise<void>;
+}>;
+
+/**
+ * The dig's suggestions, every path at once. None on Free and at level 10: no call, nothing read. A path keeps its place among the
+ * dig's paths, which names its call site, whichever others `each` leaves out, so the same path always sends the same bytes. Never rejects.
+ */
 export async function writeDigSuggestions(job: DigSuggestionsJob, alreadyInvestigated: () => Promise<string>,
-  contractHash: string = engineContractHash()): Promise<readonly DigPathSuggestions[]> {
+  contractHash: string = engineContractHash(), each: DigSuggestionsEach = {}): Promise<readonly DigPathSuggestions[]> {
   if (job.free || job.level >= DIG_LEVEL_MAX || job.digPaths.length === 0) return [];
+  const paths = job.digPaths.slice(0, WEB_CONTRACT_LIMITS.pathsMax).map((path, at) => Object.freeze({ path, at }))
+    .filter(({ path }) => each.wanted?.(path) ?? true);
+  if (paths.length === 0) return [];
   let known: string;
   try {
     known = await alreadyInvestigated();
@@ -169,22 +190,78 @@ export async function writeDigSuggestions(job: DigSuggestionsJob, alreadyInvesti
     job.log("DIG_SUGGESTIONS_UNREAD", { runId: job.digRunId, code: error instanceof TypedDomainError ? error.code : "UNTYPED" });
     return [];
   }
-  const paths = job.digPaths.slice(0, WEB_CONTRACT_LIMITS.pathsMax);
-  const done = await Promise.all(paths.map((path, at) => suggestOnPath(job, path, at, known, contractHash)));
+  const done = await Promise.all(paths.map(async ({ path, at }) => {
+    const offered = await suggestOnPath(job, path, at, known, contractHash);
+    await each.answered?.(path, offered);
+    return offered;
+  }));
   return Object.freeze(done.filter((entry): entry is DigPathSuggestions => entry !== null && entry.suggestions.length > 0));
 }
 
+/** The set id of a dig's own suggestions on one of its own paths: the dig is the run and the debate, step 0. */
+export const ownPathSuggestionsSetIdOf = (digRunId: string, positionRef: string): string => pathSuggestionsSetIdOf(digRunId, digRunId, positionRef, 0);
+
 /**
- * On the runner's pool: the digest is cut at what the dig stored for its rewrite (0135's set-once input), else at its joining,
- * so a rewrite run again reads the same digest and its calls replay.
+ * THE DIG'S OWN SUGGESTIONS, AFTER ITS ROW. Called once the rewrite's row is stored, beside the climb (path-rewrite.ts), and by the
+ * tree's sweep when a runner stopped before writing them (`owedDigSuggestions`). The calls are the ones `writeDigSuggestions` makes,
+ * byte for byte, so a call already answered is replayed free. Each path's set goes to the suggestions store as soon as its call
+ * answers: sealed under the dig's key (it paid), on the dig's own map (`debate_run_id` the dig too), its set id worked out by code
+ * (`ownPathSuggestionsSetIdOf`), so a second copy writes ALREADY.
+ *  - Every path of the dig ends with a set, so the page can tell when nothing more is coming (serve's `digSuggestionsPending`).
+ *  - A path that has a set already is not asked again: a run again pays nothing, and a set a deeper dig's rewrite of the path wrote
+ *    stays the newest. One that lands while the call is out stays the newest too.
+ *  - A call that failed, or whose reply did not parse, keeps an empty set: the path has no suggestions and nothing asks again. A path
+ *    with no point has nothing a suggestion could start from: it keeps an empty set at once, with no call.
+ *  - The store cannot be read, or the digest of what was investigated cannot: nothing is asked; the sweep asks again later.
+ *  - None on Free, none at level 10: no call, nothing read.
+ * Never rejects.
  */
-export function writeDigSuggestionsOnPool(pool: Pool): (job: DigSuggestionsJob) => Promise<readonly DigPathSuggestions[]> {
-  return (job) => writeDigSuggestions(job, async () => {
-    const stored = (await new PostgresDigPicksRunnerRepository(pool).read(job.digRunId))?.input?.recordedAt ?? null;
-    const joined = stored !== null ? null : (await new PostgresInvestigationRunnerRepository(pool).ofRun(job.digRunId))?.members
-      .find((member) => member.run_id.toLowerCase() === job.digRunId.toLowerCase())?.joined_at ?? null;
-    return readAlreadyInvestigated(pool, job.digRunId, stored ?? joined);
+export async function writeOwnPathSuggestions(job: DigSuggestionsJob, store: PathSuggestionsStore, alreadyInvestigated: () => Promise<string>,
+  contractHash: string = engineContractHash()): Promise<void> {
+  if (job.free || job.level >= DIG_LEVEL_MAX || job.digPaths.length === 0) return;
+  const codeOf = (error: unknown): string => (error instanceof TypedDomainError ? error.code : "UNTYPED");
+  const setsOn = async (): Promise<ReadonlySet<string>> =>
+    new Set([...await store.positionsOf(job.digRunId)].map((positionRef) => positionRef.toLowerCase()));
+  let kept: ReadonlySet<string>;
+  try {
+    kept = await setsOn();
+  } catch (error) {
+    job.log("DIG_SUGGESTIONS_STORE_UNREAD", { runId: job.digRunId, code: codeOf(error) });
+    return;
+  }
+  const keep = async (path: PathRewriteDigPath, offered: DigPathSuggestions | null): Promise<void> => {
+    try {
+      if ((await setsOn()).has(path.positionRef.toLowerCase())) return;
+      await store.record({ setId: ownPathSuggestionsSetIdOf(job.digRunId, path.positionRef), runId: job.digRunId, debateRunId: job.digRunId,
+        positionRef: path.positionRef, content: Object.freeze({ suggestions: offered?.suggestions ?? Object.freeze([]) }) });
+    } catch (error) {
+      job.log("DIG_SUGGESTIONS_NOT_KEPT", { runId: job.digRunId, code: codeOf(error) });
+    }
+  };
+  const owed = job.digPaths.slice(0, WEB_CONTRACT_LIMITS.pathsMax).filter((path) => !kept.has(path.positionRef.toLowerCase()));
+  await Promise.all(owed.filter((path) => path.points.length === 0).map((path) => keep(path, null)));
+  await writeDigSuggestions(job, alreadyInvestigated, contractHash, {
+    wanted: (path) => path.points.length > 0 && !kept.has(path.positionRef.toLowerCase()),
+    answered: keep
   });
+}
+
+/**
+ * The digest a dig's suggestions are told, on the runner's pool: cut at what the dig stored for its rewrite (0135's set-once input),
+ * else at its joining, so a rewrite run again, or the sweep days later, reads the same digest and its calls replay.
+ */
+function digDigestOnPool(pool: Pool, digRunId: string): () => Promise<string> {
+  return async () => {
+    const stored = (await new PostgresDigPicksRunnerRepository(pool).read(digRunId))?.input?.recordedAt ?? null;
+    const joined = stored !== null ? null : (await new PostgresInvestigationRunnerRepository(pool).ofRun(digRunId))?.members
+      .find((member) => member.run_id.toLowerCase() === digRunId.toLowerCase())?.joined_at ?? null;
+    return readAlreadyInvestigated(pool, digRunId, stored ?? joined);
+  };
+}
+
+/** `writeOwnPathSuggestions` on the runner's pool, each set kept in the suggestions store. */
+export function writeOwnPathSuggestionsOnPool(pool: Pool): (job: DigSuggestionsJob) => Promise<void> {
+  return (job) => writeOwnPathSuggestions(job, postgresPathSuggestionsStore(pool), digDigestOnPool(pool, job.digRunId));
 }
 
 /* ----------------------------------------------------------------- a path a rewrite changed (owner Q-D8) */

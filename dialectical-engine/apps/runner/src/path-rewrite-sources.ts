@@ -41,6 +41,8 @@ import type { PathRewriteDig, PathRewriteSources, PathRewriteStoredInput } from 
  *  - `pathRootsOf`: a run's roots in force (0160), each by its path id; none for a run that is no path debate.
  *  - `digExtractsOf`: the same extract rule on the dig's own points, whose passages it may read (decision 6).
  *  - `recordInput` / `storedInputOf`: 0135's identity.path_rewrite_input, the dig's own paths as `{ v: 2, dig_paths }`.
+ *  - `ownWhatChangedOf`: what the dig's own finished rewrite (0134) says it changed, opened under the dig's key; null when it has
+ *    none finished.
  *  - `parentCodesOf`: clear codes only, for a FAILED row (the base rewrite's version and fate, else the story's).
  */
 
@@ -432,6 +434,15 @@ export function postgresPathRewriteSources(pool: Pool): PathRewriteSources {
       const stored = storedDigPathsOf(input.value);
       const extracts = await extractsOfPoints(pool, runId, stored.flatMap((path) => path.points.map((point) => point.id)), "PASSAGE");
       return Object.freeze({ workItemId: input.workItemId, digPaths: storedDigPathsOf(input.value, extracts) });
+    },
+    ownWhatChangedOf: async (digRunId: string): Promise<readonly string[] | null> => {
+      const own = (await digModel.readPathRewrites(digRunId))?.own ?? null;
+      if (own === null || (own.state !== "READY" && own.state !== "READY_WITH_RESERVATION") || own.rewrite_id === null) return null;
+      const opened = await withRunContentLease(pool, [digRunId], () => decryptContentForRun<unknown>(pool, digRunId, PATH_REWRITE_CARRIER,
+        own.rewrite_id!, (own.content ?? null) as CryptoEnvelope | null, null));
+      const sentences = isRecord(opened) ? opened.what_changed : undefined;
+      if (!Array.isArray(sentences) || !sentences.every((sentence): sentence is string => typeof sentence === "string")) return unread("own rewrite");
+      return Object.freeze([...sentences]);
     },
     parentCodesOf: async ({ parentRunId, positionRef, baseRewriteId }) => {
       if (baseRewriteId !== null) {

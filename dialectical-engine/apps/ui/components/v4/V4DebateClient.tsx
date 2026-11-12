@@ -59,7 +59,8 @@ import { ownWords, parseDigQuestion } from "@/lib/v4/askText";
 import { mergeDigLinks, readDigRecords, storableItems } from "@/lib/v4/accountMemory";
 import { diffSnapshots, isRewriteWord, selectionForChange, snapshotItems } from "@/lib/v4/changes";
 import {
-  firstAnswerArriving, laterNewsOnly, mainAnswerItems, mainAnswerWriting, pathResults, pathsChangedSinceReport, stopsOfChanges, unseenIdsOf
+  digSuggestionsWatchUntil, firstAnswerArriving, laterNewsOnly, mainAnswerItems, mainAnswerWriting, pathResults, pathsChangedSinceReport, stopsOfChanges,
+  unseenIdsOf
 } from "@/lib/v4/readyMoment";
 import { effectiveDigMode } from "@/lib/v4/askConfig";
 import { panelDigsPicks, trayShows } from "@/lib/v4/digDock";
@@ -1023,10 +1024,16 @@ function V4Debate({
   });
   // dig-f1 (V4 screen review, 3 Nov 2026): and while a change is being written into the main answer, so it shows without a reload.
   // dig-f2: and while a dig further down still works or climbs (its change reaches this map's paths without a reload).
-  const rewriteBehind = map !== null && (behind || rewriteWaiting(map) || mainAnswerWriting(served?.answer) || below.busy);
-  const rewriteBehindRef = useRef(rewriteBehind);
+  const writingBehind = map !== null && (behind || rewriteWaiting(map) || mainAnswerWriting(served?.answer) || below.busy);
+  // On a dig's own page the AI's suggestions for its paths can land after its finished rewrite: read again until they are in, and
+  // never past the time they can take (checked on every read, so a read that brings nothing new cannot keep it going).
+  const suggestionsUntil = map === null ? null : digSuggestionsWatchUntil(served?.answer);
+  const rewriteBehind = writingBehind || (suggestionsUntil !== null && Date.now() < suggestionsUntil);
+  const writingBehindRef = useRef(writingBehind);
+  const suggestionsUntilRef = useRef(suggestionsUntil);
   useEffect(() => {
-    rewriteBehindRef.current = rewriteBehind;
+    writingBehindRef.current = writingBehind;
+    suggestionsUntilRef.current = suggestionsUntil;
   });
   useEffect(() => {
     if (servedRunId === null || !rewriteBehind) return;
@@ -1036,7 +1043,8 @@ function V4Debate({
       const next = await loadAnswer(servedRunId);
       if (!active) return;
       if (next !== null) setFreshAnswer(next);
-      if (rewriteBehindRef.current) timer = window.setTimeout(() => void read(), REWRITE_POLL_MS);
+      const until = suggestionsUntilRef.current;
+      if (writingBehindRef.current || (until !== null && Date.now() < until)) timer = window.setTimeout(() => void read(), REWRITE_POLL_MS);
     };
     timer = window.setTimeout(() => void read(), behind ? 0 : REWRITE_POLL_MS);
     return () => {

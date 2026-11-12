@@ -219,6 +219,23 @@ describe("0141: deleting", () => {
     expect(await rowCount("set_id", kept)).toBe(1);
   });
 
+  it("a dig's own paths: the dig seals the set and its own map holds it; a second copy writes ALREADY; erasing the dig takes it", async () => {
+    const ana = await account();
+    const [debate, dig] = [await run(ana), await run(ana)];
+    const setId = await write(dig, dig, "b1");
+    expect((await repository.readOfRun(dig))!.map(({ set_id, run_id, position_ref }) => ({ set_id, run_id, position_ref }))).toEqual([
+      { set_id: setId, run_id: dig, position_ref: "b1" }]);
+    expect(await repository.readOfRun(debate)).toEqual([]);
+    expect(await repository.record({ setId, runId: dig, debateRunId: dig, positionRef: "b1", sealed: await sealed(dig, setId) })).toBe("ALREADY");
+    // The debate it was dug from holds none of it: erasing that debate alone leaves the dig's own map as it is (0141's rule).
+    await tombstone(debate);
+    expect(await forget(debate)).toBe(0);
+    expect(await rowCount("set_id", setId)).toBe(1);
+    await tombstone(dig);
+    expect(await forget(dig)).toBe(1);
+    expect(await rowCount("set_id", setId)).toBe(0);
+  });
+
   it("deleting the account takes its rows", async () => {
     const ana = await account();
     const debate = await run(ana);
