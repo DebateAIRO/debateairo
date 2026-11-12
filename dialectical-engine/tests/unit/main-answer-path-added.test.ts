@@ -147,6 +147,20 @@ describe("a dig under the main question of a path debate updates the main answer
     expect(tree.settled).toEqual([MORE_DIG]);
   });
 
+  it("the update is written while the dig's first-debate suggestions are still out; the dig is marked settled only once they are in", async () => {
+    const tree = treeOf({ added: MORE });
+    let release: () => void = () => undefined;
+    const beside = new Promise<void>((resolve) => { release = resolve; });
+    const running = advanceAfterStory(tree.settings, MORE_DIG, undefined, beside);
+    for (let at = 0; at < 2_000 && tree.recorded.length === 0; at += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(tree.recorded).toHaveLength(1);
+    for (let at = 0; at < 50; at += 1) await new Promise<void>((resolve) => setImmediate(resolve));
+    expect(tree.settled).toEqual([]);
+    release();
+    expect(await running).toBe("ANSWER_UPDATED");
+    expect(tree.settled).toEqual([MORE_DIG]);
+  });
+
   it("one update per trigger: asked again (the sweep, a second copy), nothing more is written or bought", async () => {
     const tree = treeOf({ added: MORE });
     await advanceTree(tree.settings, MORE_DIG);

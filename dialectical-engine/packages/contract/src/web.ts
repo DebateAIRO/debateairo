@@ -673,9 +673,22 @@ export const DugPickSchema = z.object({
 export type DugPick = z.infer<typeof DugPickSchema>;
 
 /**
+ * How long after a dig's rewrite is written its page keeps reading the answer for the AI's suggestions on the dig's own paths.
+ * They are asked once the rewrite is stored, one call per path, all at once; each call makes at most 3 tries of at most 240 s
+ * (the rewrite writer's bound), so by 12 minutes every path has its set, or its call failed and the path keeps an empty set. The
+ * extra minute covers the reads and writes around the calls and the page's own 15-second reading pace. A test holds this at or
+ * above the writer's bound.
+ */
+export const DIG_SUGGESTIONS_WATCH_MS = 13 * 60_000;
+
+/**
  * `Answer.dig`, on a dig's own answer: what it dug (its parent, the path it rewrites, the places, its level, its picks)
  * and its rewrite of that path (whose `dig_paths` are the dig's own paths with their lines and fates). A dig of an open
  * question hanging under the main question rewrites no path (`position_ref` and `rewrite` null).
+ * `suggestions_pending`: present (true) while the AI's suggestions for the dig's own paths may still arrive: its rewrite is
+ * finished and was written less than DIG_SUGGESTIONS_WATCH_MS ago, it is on a paid plan below the deepest level, and one of the
+ * paths its rewrite names has no set of suggestions yet (an empty set counts as a set). The page reads the answer again while it
+ * is there.
  */
 export const AnswerDigSchema = z.object({
   parent_run_id: z.uuid(),
@@ -683,9 +696,13 @@ export const AnswerDigSchema = z.object({
   places: z.array(DigLinkPlaceSchema).max(ACCOUNT_MEMORY_LIMITS.digPlacesMax),
   level: DugLevelSchema,
   picks: z.array(DugPickSchema).max(WEB_CONTRACT_LIMITS.digPicksMax),
-  rewrite: PathRewriteSchema.nullable()
+  rewrite: PathRewriteSchema.nullable(),
+  suggestions_pending: z.literal(true).optional()
 }).strict().superRefine((dig, context) => {
   const rewrite = dig.rewrite;
+  if (dig.suggestions_pending === true && (rewrite === null || !isFinished(rewrite))) {
+    context.addIssue({ code: "custom", message: "suggestions are pending only after a finished rewrite" });
+  }
   if (rewrite === null) return;
   if (dig.position_ref === null) context.addIssue({ code: "custom", message: "only a dig of a path rewrites it" });
   if (rewrite.dig_level !== dig.level) context.addIssue({ code: "custom", message: "a dig's rewrite is of the dig's own level" });
