@@ -9,6 +9,7 @@ import type { PoolClient } from "pg";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { runOutsideTransactionStep, type ChainStep } from "../../packages/db/src/migration-forward-chain.js";
 import { MIGRATION_LOCK_TIMEOUT_MS } from "../../packages/db/src/migration-transaction.js";
+import { atStep, FORWARD_STEPS, n1Of, stepIndex, stepsLiteralFrom } from "../support/forward-chain-steps.js";
 
 /**
  * PR-54 (task N26n), PR-58 (task F10): NETOPIA's migration runs as the forward step 0111, chained after dev's 0110
@@ -39,6 +40,11 @@ const MERGED_110: Readonly<Record<string, string>> = Object.freeze({
   "lineage/auth-dev-preview-20261006-forward110.json": "aab6bee30ee55b07116c21a25701af9af33f715caf5103a0b5c82f1fd77999d2",
   "lineage/verify-dpd110-erasure-bindings.sql": "f3ae5058e531c40373a9c5017afe13abc9066db5ad4bf85063cc5f1ccb8eea6b"
 });
+/** What a failure of the chain's own list says: the tests keep one list of the steps, and a new step adds its line there. */
+const CHAIN_LIST_HINT = "the chain differs from the tests' list of its steps: add the new step's line to tests/support/forward-chain-steps.ts";
+/** The README lists the steps in one sentence: a step is joined to the one before it by a comma, or by "and" while it is the last. */
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+const listedAfter = (before: string, step: string): RegExp => new RegExp(`${escaped(before)}(?:,| and) ${escaped(step)}`, "u");
 
 describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR-54, PR-58)", () => {
   it("keeps every sealed byte of dev's lineage, its recipe's sources included", async () => {
@@ -59,45 +65,9 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     // reply measures (0120, spec 2026-10-15), then the engine verdict (0121, spec 2026-10-15 engine redesign R2), then
     // the engine's map answer step (0122, spec 2026-10-15 engine redesign R3), then the side-by-side releases (0123,
     // spec 2026-10-21 side-by-side uploads), then the settings activation (0124, side-by-side spec §13), then the
-    // Italy-specific approval (0125, mission italy-clause-approval), then row-level security (0126, mission
-    // row-level-security, SPEC-v4 R26), last (migrations/lineage/README.md).
-    expect(plan.forwardChain.map((step) => step.name)).toEqual([
-      "0111_billing_netopia.sql",
-      "0112_auth_db_batch.sql",
-      "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql",
-      "0115_data_export.sql",
-      "0116_mail_locale.sql",
-      "0117_debate_shape_map.sql",
-      "0118_language_check_spend.sql",
-      "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql",
-      "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql",
-      "0126_synthesis_check.sql",
-      "0127_publication_review.sql",
-      "0128_threat_reports.sql",
-      "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql",
-      "0131_v4_account_memory.sql",
-      "0132_web_evidence.sql",
-      "0133_investigations.sql",
-      "0134_dig_model_and_month_pause.sql",
-      "0135_dig_picks.sql",
-      "0136_investigation_reports.sql",
-      "0137_public_debates.sql",
-      "0138_tree_updates.sql",
-      "0139_passage_retention.sql",
-      "0140_internal_spend_kinds.sql",
-      "0141_path_suggestions.sql",
-      "0142_team_limit.sql",
-      "0143_run_handover.sql",
-      "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
-    ]);
+    // Italy-specific approval (0125, mission italy-clause-approval), then every later step in the order
+    // tests/support/forward-chain-steps.ts lists (migrations/lineage/README.md).
+    expect(plan.forwardChain.map((step) => step.name), CHAIN_LIST_HINT).toEqual([...FORWARD_STEPS]);
     const [step] = plan.forwardChain;
     // 0110 runs the sealed effective-capability verifier after its SQL (applyForward110) and its own manifest names it
     // as its base verifier: after 0110, the sealed verifier is the one in force.
@@ -134,46 +104,24 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     }
   });
 
+  // The tests keep one list of the chain's steps (tests/support/forward-chain-steps.ts) and read the whole chain, its last
+  // step and the steps after any one of them from it. These two cases and the one above hold that list to the chain
+  // itself, so a new step turns them red on purpose until its line is added there.
+  it("names in its STEPS, in order, the loader of every step the tests list, and nothing more", async () => {
+    const source = await readFile(new URL("migration-forward-chain.ts", DB_SOURCE), "utf8");
+    expect(source, CHAIN_LIST_HINT).toContain(`const STEPS:readonly StepLoader[]=Object.freeze([${stepsLiteralFrom(FORWARD_STEPS[0]!)}`);
+  });
+
+  it("gives each step the n1 header the tests' list says: none up to 0122, then expand or drained, each keeping the verifier but 0130", async () => {
+    const plan = await loadMigrationPlan();
+    expect(plan.forwardChain.map(({ name, n1 }) => ({ name, expand: n1.expand, drained: n1.drained, keepsVerifier: n1.keepsVerifier })), CHAIN_LIST_HINT)
+      .toEqual(FORWARD_STEPS.map((name) => ({ name, ...n1Of(name) })));
+  });
+
   it("chains Part C's 0113 after dev's 0112: the recipe, 0112's manifest and the effective verifier 0112 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, batch, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
-      "0111_billing_netopia.sql",
-      "0112_auth_db_batch.sql",
-      "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql",
-      "0115_data_export.sql",
-      "0116_mail_locale.sql",
-      "0117_debate_shape_map.sql",
-      "0118_language_check_spend.sql",
-      "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql",
-      "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql",
-      "0126_synthesis_check.sql",
-      "0127_publication_review.sql",
-      "0128_threat_reports.sql",
-      "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql",
-      "0131_v4_account_memory.sql",
-      "0132_web_evidence.sql",
-      "0133_investigations.sql",
-      "0134_dig_model_and_month_pause.sql",
-      "0135_dig_picks.sql",
-      "0136_investigation_reports.sql",
-      "0137_public_debates.sql",
-      "0138_tree_updates.sql",
-      "0139_passage_retention.sql",
-      "0140_internal_spend_kinds.sql",
-      "0141_path_suggestions.sql",
-      "0142_team_limit.sql",
-      "0143_run_handover.sql",
-      "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
-    ]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([...FORWARD_STEPS]);
     // The verifier in force after 0112 is the one 0112's manifest names (it adds no billing object): 0111's.
     const batchManifest = JSON.parse((await bytesOf("lineage/auth-db-batch-forward.json")).toString("utf8"));
     expect(batchManifest.verifier.path).toBe("lineage/verify-effective-capabilities-111.sql");
@@ -207,43 +155,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains role rotation's 0114 after 0113: the recipe, 0113's manifest and the effective verifier 0113 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, , partC, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
-      "0111_billing_netopia.sql",
-      "0112_auth_db_batch.sql",
-      "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql",
-      "0115_data_export.sql",
-      "0116_mail_locale.sql",
-      "0117_debate_shape_map.sql",
-      "0118_language_check_spend.sql",
-      "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql",
-      "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql",
-      "0126_synthesis_check.sql",
-      "0127_publication_review.sql",
-      "0128_threat_reports.sql",
-      "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql",
-      "0131_v4_account_memory.sql",
-      "0132_web_evidence.sql",
-      "0133_investigations.sql",
-      "0134_dig_model_and_month_pause.sql",
-      "0135_dig_picks.sql",
-      "0136_investigation_reports.sql",
-      "0137_public_debates.sql",
-      "0138_tree_updates.sql",
-      "0139_passage_retention.sql",
-      "0140_internal_spend_kinds.sql",
-      "0141_path_suggestions.sql",
-      "0142_team_limit.sql",
-      "0143_run_handover.sql",
-      "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
-    ]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([...FORWARD_STEPS]);
     expect(partC!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/role-rotation-forward0114.json")).toString("utf8"));
     expect(manifest).toEqual({
@@ -273,43 +185,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the debate shape's map 0117 after 0116: the recipe, 0116's manifest and the effective verifier 0116 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, , , , , mailLocale, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
-      "0111_billing_netopia.sql",
-      "0112_auth_db_batch.sql",
-      "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql",
-      "0115_data_export.sql",
-      "0116_mail_locale.sql",
-      "0117_debate_shape_map.sql",
-      "0118_language_check_spend.sql",
-      "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql",
-      "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql",
-      "0126_synthesis_check.sql",
-      "0127_publication_review.sql",
-      "0128_threat_reports.sql",
-      "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql",
-      "0131_v4_account_memory.sql",
-      "0132_web_evidence.sql",
-      "0133_investigations.sql",
-      "0134_dig_model_and_month_pause.sql",
-      "0135_dig_picks.sql",
-      "0136_investigation_reports.sql",
-      "0137_public_debates.sql",
-      "0138_tree_updates.sql",
-      "0139_passage_retention.sql",
-      "0140_internal_spend_kinds.sql",
-      "0141_path_suggestions.sql",
-      "0142_team_limit.sql",
-      "0143_run_handover.sql",
-      "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
-    ]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([...FORWARD_STEPS]);
     expect(mailLocale!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/debate-shape-map-forward0117.json")).toString("utf8"));
     expect(manifest).toEqual({
@@ -339,43 +215,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the language check's site cost 0118 after 0117: the recipe, 0117's manifest and the effective verifier 0117 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, , , , , , mapStep, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
-      "0111_billing_netopia.sql",
-      "0112_auth_db_batch.sql",
-      "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql",
-      "0115_data_export.sql",
-      "0116_mail_locale.sql",
-      "0117_debate_shape_map.sql",
-      "0118_language_check_spend.sql",
-      "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql",
-      "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql",
-      "0126_synthesis_check.sql",
-      "0127_publication_review.sql",
-      "0128_threat_reports.sql",
-      "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql",
-      "0131_v4_account_memory.sql",
-      "0132_web_evidence.sql",
-      "0133_investigations.sql",
-      "0134_dig_model_and_month_pause.sql",
-      "0135_dig_picks.sql",
-      "0136_investigation_reports.sql",
-      "0137_public_debates.sql",
-      "0138_tree_updates.sql",
-      "0139_passage_retention.sql",
-      "0140_internal_spend_kinds.sql",
-      "0141_path_suggestions.sql",
-      "0142_team_limit.sql",
-      "0143_run_handover.sql",
-      "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
-    ]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([...FORWARD_STEPS]);
     expect(mapStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/language-check-spend-forward0118.json")).toString("utf8"));
     expect(manifest).toEqual({
@@ -405,43 +245,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the reclaim resume 0119 after 0118: the recipe, 0118's manifest and the effective verifier 0118 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
     const [netopia, , , , , , , languageStep, step] = plan.forwardChain;
-    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([
-      "0111_billing_netopia.sql",
-      "0112_auth_db_batch.sql",
-      "0113_billing_price_currencies.sql",
-      "0114_role_rotation.sql",
-      "0115_data_export.sql",
-      "0116_mail_locale.sql",
-      "0117_debate_shape_map.sql",
-      "0118_language_check_spend.sql",
-      "0119_reclaim_resume.sql",
-      "0120_reply_measures.sql",
-      "0121_engine_verdict.sql",
-      "0122_engine_map_check.sql",
-      "0123_side_by_side_releases.sql",
-      "0124_settings_activation.sql",
-      "0125_italy_specific_approval.sql",
-      "0126_synthesis_check.sql",
-      "0127_publication_review.sql",
-      "0128_threat_reports.sql",
-      "0129_support_answer_scope.sql",
-      "0130_row_level_security.sql",
-      "0131_v4_account_memory.sql",
-      "0132_web_evidence.sql",
-      "0133_investigations.sql",
-      "0134_dig_model_and_month_pause.sql",
-      "0135_dig_picks.sql",
-      "0136_investigation_reports.sql",
-      "0137_public_debates.sql",
-      "0138_tree_updates.sql",
-      "0139_passage_retention.sql",
-      "0140_internal_spend_kinds.sql",
-      "0141_path_suggestions.sql",
-      "0142_team_limit.sql",
-      "0143_run_handover.sql",
-      "0144_ask_clarify_charge.sql",
-      "0145_web_researched_unsettled.sql", "0146_team_allowances.sql", "0147_public_tree.sql", "0148_erasure_keeps_public.sql", "0149_public_report_team_month.sql", "0150_public_review.sql", "0151_public_flag.sql", "0152_report_export_and_check_usage.sql", "0153_dig_tree_settled.sql", "0154_region_iceland_liechtenstein.sql", "0155_owner_answer_writes.sql", "0156_moderation_notice.sql", "0157_moderation_statements.sql", "0158_pre_start_charge.sql", "0159_start_paths.sql", "0160_path_results.sql", "0161_path_progress.sql", "0162_saved_questions.sql", "0163_carry_on_session_free_digs.sql", "0164_main_answer_path_added.sql", "0165_pre_start_release.sql", "0166_main_answer_times.sql", "0167_public_report_own_carrier.sql", "0168_set_aside_continue.sql", "0169_piece_settings_version.sql", "0170_outbound_mail_limit.sql", "0171_security_review_hardening.sql", "0172_moderation_notice_fixes.sql", "0173_settle_dismissed_flag.sql", "0174_public_review_ungrounded_door.sql", "0175_statement_ai_read_verdict.sql"
-    ]);
+    expect(plan.forwardChain.map((entry) => entry.name)).toEqual([...FORWARD_STEPS]);
     expect(languageStep!.verifierSha256).toBe(netopia!.verifierSha256);
     const manifest = JSON.parse((await bytesOf("lineage/reclaim-resume-forward0119.json")).toString("utf8"));
     expect(manifest).toEqual({
@@ -717,8 +521,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the synthesis check 0126 after 0125: the recipe, 0125's manifest and the effective verifier 0125 keeps (0111's)", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-50);
-    const prior = plan.forwardChain.at(-51);
+    const step = atStep(plan.forwardChain, "0126");
+    const prior = atStep(plan.forwardChain, "0125");
     expect(step?.name).toBe("0126_synthesis_check.sql");
     expect(prior?.name).toBe("0125_italy_specific_approval.sql");
     const manifest = JSON.parse((await bytesOf("lineage/synthesis-check-forward0126.json")).toString("utf8"));
@@ -756,15 +560,15 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("0127 is followed by 0128 and its previous is 0126", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-49);
+    const step = atStep(plan.forwardChain, "0127");
     expect(step?.name).toBe("0127_publication_review.sql");
     expect(step?.previousName).toBe("0126_synthesis_check.sql");
   });
 
   it("0127's manifest binds 0126's manifest and effective verifier SHA-256", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-49);
-    const prior = plan.forwardChain.at(-50);
+    const step = atStep(plan.forwardChain, "0127");
+    const prior = atStep(plan.forwardChain, "0126");
     expect(step?.name).toBe("0127_publication_review.sql");
     const manifest = JSON.parse((await bytesOf("lineage/publication-review-forward0127.json")).toString("utf8"));
     expect(manifest.previous).toEqual({
@@ -987,8 +791,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   }, 120_000);
   it("chains the threat reports 0128 after 0127 with 0127's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-48);
-    const previous = plan.forwardChain.at(-49);
+    const step = atStep(plan.forwardChain, "0128");
+    const previous = atStep(plan.forwardChain, "0127");
     const manifest = JSON.parse((await bytesOf("lineage/threat-reports-forward0128.json")).toString("utf8"));
     expect(step?.name).toBe("0128_threat_reports.sql");
     expect(previous?.name).toBe("0127_publication_review.sql");
@@ -1012,8 +816,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains support deletion 0129 after 0128 and records its source digest", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-47);
-    const previous = plan.forwardChain.at(-48);
+    const step = atStep(plan.forwardChain, "0129");
+    const previous = atStep(plan.forwardChain, "0128");
     const manifest = JSON.parse((await bytesOf("lineage/support-answer-scope-forward0129.json")).toString("utf8"));
     expect(step?.name).toBe("0129_support_answer_scope.sql");
     expect(previous?.name).toBe("0128_threat_reports.sql");
@@ -1026,8 +830,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the daily outbound mail limit 0170 after 0169 with 0169's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-6);
-    const previous = plan.forwardChain.at(-7);
+    const step = atStep(plan.forwardChain, "0170");
+    const previous = atStep(plan.forwardChain, "0169");
     const manifest = JSON.parse((await bytesOf("lineage/outbound-mail-limit-forward0170.json")).toString("utf8"));
     expect(step?.name).toBe("0170_outbound_mail_limit.sql");
     expect(previous?.name).toBe("0169_piece_settings_version.sql");
@@ -1053,8 +857,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the moderation notice fixes 0172 after 0171 with 0171's manifest and effective verifier (0173 comes after it), drained, declaring 0151's CHECK and 0157's queue", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-4);
-    const previous = plan.forwardChain.at(-5);
+    const step = atStep(plan.forwardChain, "0172");
+    const previous = atStep(plan.forwardChain, "0171");
     const manifest = JSON.parse((await bytesOf("lineage/moderation-notice-fixes-forward0172.json")).toString("utf8"));
     expect(step?.name).toBe("0172_moderation_notice_fixes.sql");
     expect(previous?.name).toBe("0171_security_review_hardening.sql");
@@ -1083,8 +887,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the settle on a closed report 0173 after 0172 with 0172's manifest and effective verifier, drained, declaring 0151's settle", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-3);
-    const previous = plan.forwardChain.at(-4);
+    const step = atStep(plan.forwardChain, "0173");
+    const previous = atStep(plan.forwardChain, "0172");
     const manifest = JSON.parse((await bytesOf("lineage/settle-dismissed-flag-forward0173.json")).toString("utf8"));
     expect(step?.name).toBe("0173_settle_dismissed_flag.sql");
     expect(previous?.name).toBe("0172_moderation_notice_fixes.sql");
@@ -1114,8 +918,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains 0150's ungrounded door closed (0174) after 0173 with 0173's manifest and effective verifier, drained, declaring 0150's grant", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-2);
-    const previous = plan.forwardChain.at(-3);
+    const step = atStep(plan.forwardChain, "0174");
+    const previous = atStep(plan.forwardChain, "0173");
     const manifest = JSON.parse((await bytesOf("lineage/public-review-ungrounded-door-forward0174.json")).toString("utf8"));
     expect(step?.name).toBe("0174_public_review_ungrounded_door.sql");
     expect(previous?.name).toBe("0173_settle_dismissed_flag.sql");
@@ -1143,10 +947,10 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(readme.replace(/\s+/gu, " ")).toContain("the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth");
   });
 
-  it("chains the statement's AI line (0175) after 0174 with 0174's manifest and effective verifier, last, drained, declaring 0157's statement ground", async () => {
+  it("chains the statement's AI line (0175) after 0174 with 0174's manifest and effective verifier, drained, declaring 0157's statement ground", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-1);
-    const previous = plan.forwardChain.at(-2);
+    const step = atStep(plan.forwardChain, "0175");
+    const previous = atStep(plan.forwardChain, "0174");
     const manifest = JSON.parse((await bytesOf("lineage/statement-ai-read-verdict-forward0175.json")).toString("utf8"));
     expect(step?.name).toBe("0175_statement_ai_read_verdict.sql");
     expect(previous?.name).toBe("0174_public_review_ungrounded_door.sql");
@@ -1171,13 +975,14 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     for (const needle of ["0174", "0175_statement_ai_read_verdict.sql", "statement-ai-read-verdict-forward0175.json", "verify-effective-capabilities-130.sql",
       "packages/db/src/migration-forward0175.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "identity.moderation_statement_ground(uuid)", "`UNAVAILABLE`"])
       expect(section, needle).toContain(needle);
-    expect(readme.replace(/\s+/gu, " ")).toContain("0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth and the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth");
+    expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth",
+      "the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth"));
   });
 
   it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-45);
-    const previous = plan.forwardChain.at(-46);
+    const step = atStep(plan.forwardChain, "0131");
+    const previous = atStep(plan.forwardChain, "0130");
     const manifest = JSON.parse((await bytesOf("lineage/v4-account-memory-forward0131.json")).toString("utf8"));
     expect(step?.name).toBe("0131_v4_account_memory.sql");
     expect(previous?.name).toBe("0130_row_level_security.sql");
@@ -1190,8 +995,8 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("chains the web evidence store 0132 after 0131, the investigations 0133, the dig model 0134, the dig picks 0135, the investigation reports 0136, the public debates 0137, the tree updates 0138, the passage retention 0139, the funded spend kinds 0140, the path suggestions 0141 and the team's one limit 0142 last, each keeping 0130's effective verifier", async () => {
     const plan = await loadMigrationPlan();
-    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team, handover, askClarifyCharge, researched, teamAllowances, publicTree, erasureKeepsPublic, publicReportTeamMonth, publicReview, publicFlag, reportExport, digTreeSettled, regionWiden, ownerAnswerWrites, moderationNotice, moderationStatements, preStartCharge, startPaths, pathResults, pathProgress, savedQuestions, carryOnDigs, pathAdded, preStartRelease, mainAnswerTimes, publicReportOwnCarrier, setAsideContinue, pieceSettingsVersion, outboundMail, securityReview] = [
-      plan.forwardChain.at(-45), plan.forwardChain.at(-44), plan.forwardChain.at(-43),plan.forwardChain.at(-42), plan.forwardChain.at(-41), plan.forwardChain.at(-40), plan.forwardChain.at(-39), plan.forwardChain.at(-38), plan.forwardChain.at(-37), plan.forwardChain.at(-36), plan.forwardChain.at(-35), plan.forwardChain.at(-34), plan.forwardChain.at(-33), plan.forwardChain.at(-32), plan.forwardChain.at(-31), plan.forwardChain.at(-30), plan.forwardChain.at(-29), plan.forwardChain.at(-28), plan.forwardChain.at(-27), plan.forwardChain.at(-26), plan.forwardChain.at(-25), plan.forwardChain.at(-24), plan.forwardChain.at(-23), plan.forwardChain.at(-22), plan.forwardChain.at(-21), plan.forwardChain.at(-20), plan.forwardChain.at(-19), plan.forwardChain.at(-18), plan.forwardChain.at(-17), plan.forwardChain.at(-16), plan.forwardChain.at(-15), plan.forwardChain.at(-14), plan.forwardChain.at(-13), plan.forwardChain.at(-12), plan.forwardChain.at(-11), plan.forwardChain.at(-10), plan.forwardChain.at(-9), plan.forwardChain.at(-8), plan.forwardChain.at(-7), plan.forwardChain.at(-6), plan.forwardChain.at(-5)];
+    const [account, web, investigations, digModel, digPicks, reports, publicDebates, treeUpdates, passages, spendKinds, suggestions, team, handover, askClarifyCharge, researched, teamAllowances, publicTree, erasureKeepsPublic, publicReportTeamMonth, publicReview, publicFlag, reportExport, digTreeSettled, regionWiden, ownerAnswerWrites, moderationNotice, moderationStatements, preStartCharge, startPaths, pathResults, pathProgress, savedQuestions, carryOnDigs, pathAdded, preStartRelease, mainAnswerTimes, publicReportOwnCarrier, setAsideContinue, pieceSettingsVersion, outboundMail, securityReview] =
+      plan.forwardChain.slice(stepIndex("0131"), stepIndex("0171") + 1);
     expect([account?.name, web?.name, investigations?.name, digModel?.name, digPicks?.name, reports?.name, publicDebates?.name,
       treeUpdates?.name, passages?.name, spendKinds?.name, suggestions?.name, team?.name, handover?.name, askClarifyCharge?.name, researched?.name, teamAllowances?.name, publicTree?.name, erasureKeepsPublic?.name, publicReportTeamMonth?.name, publicReview?.name, publicFlag?.name, reportExport?.name, digTreeSettled?.name, regionWiden?.name, ownerAnswerWrites?.name, moderationNotice?.name, moderationStatements?.name, preStartCharge?.name, startPaths?.name, pathResults?.name, pathProgress?.name, savedQuestions?.name, carryOnDigs?.name, pathAdded?.name, preStartRelease?.name, mainAnswerTimes?.name, publicReportOwnCarrier?.name, setAsideContinue?.name, pieceSettingsVersion?.name, outboundMail?.name, securityReview?.name])
       .toEqual(["0131_v4_account_memory.sql", "0132_web_evidence.sql", "0133_investigations.sql", "0134_dig_model_and_month_pause.sql",

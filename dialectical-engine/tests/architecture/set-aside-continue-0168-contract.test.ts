@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { atStep } from "../support/forward-chain-steps.js";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
 import { auditMigrationReplaySafety, definedFunctionNames, definedRelationNames } from "../../tools/orphan-audit/src/index.js";
@@ -42,10 +43,10 @@ describe("0168: a debate an update set aside continues where it stopped; the per
     // Task 57o-fix (0169): no longer the chain's head; 0169 follows it.
     expect(chain).toContain("loadForward0166,loadForward0167,loadForward0168,");
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-8)!;
+    const step = atStep(plan.forwardChain, NAME);
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe(PREVIOUS);
-    expect(step.previousManifestSha256).toBe(plan.forwardChain.at(-9)!.manifestSha256);
+    expect(step.previousManifestSha256).toBe(atStep(plan.forwardChain, PREVIOUS).manifestSha256);
     expect(step.verifierSha256).toBe(VERIFIER_130);
     expect(step.replayVerifierSql).toBeUndefined();
     expect(step.amendsPostconditionsOf).toEqual([

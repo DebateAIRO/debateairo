@@ -21,6 +21,7 @@ import { applyForwardStep, replayForwardChain, type ChainStep } from "../../pack
 import { parseN1Header, type N1Declaration } from "../../packages/db/src/migration-n1.js";
 import { seedInstalledAuth106 } from "../support/auth106.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { FORWARD_STEPS, stepsFrom } from "../support/forward-chain-steps.js";
 
 /**
  * One transaction per forward step (side-by-side spec 2026-10-21 §5, "Each step runs on its own"; plan A, task A6,
@@ -30,76 +31,9 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * directory; run it alone.
  */
 const SIDE_BY_SIDE = "0123_side_by_side_releases.sql";
-/** Row-level security (mission row-level-security, SPEC-v4 R26): a chain step after 0123, the one before the last. */
-const RLS = "0130_row_level_security.sql";
-/** The V4 account memory (owner rulings N7 and N11): the chain's sixth step from the end since the Perplexity plan's two, 0134, 0135 and 0136. */
-const V4 = "0131_v4_account_memory.sql";
-/** The Perplexity plan's web evidence store and investigations (task W1-3): the two steps before the last three. */
-const WEB = "0132_web_evidence.sql";
-const INVESTIGATIONS = "0133_investigations.sql";
-/** The dig model and the month pause (dig-model revision task W2-8): the third step from the end. */
-const DIG_MODEL = "0134_dig_model_and_month_pause.sql";
-/** A dig's picks and its path rewrite's material (dig-model revision task W3-7): the step before the last. */
-const DIG_PICKS = "0135_dig_picks.sql";
-/** The investigation's final report (R22 task W5-1): seven steps from the end. */
-const INVESTIGATION_REPORTS = "0136_investigation_reports.sql";
-/** The public debates (R22 F1, decision 13): six steps from the end. */
-const PUBLIC_DEBATES = "0137_public_debates.sql";
-/** The tree updates (R22 F1, decisions 2, 3 and 5): five steps from the end. */
-const TREE_UPDATES = "0138_tree_updates.sql";
-/** The passage retention (R22 F1, decisions 6 and 7): four steps from the end. */
-const PASSAGE_RETENTION = "0139_passage_retention.sql";
-/** The funded spend kinds (R22 F1, decision 14): five steps from the end. */
-const SPEND_KINDS = "0140_internal_spend_kinds.sql";
-/** The path suggestions (R22 decision 9): four steps from the end. */
-const PATH_SUGGESTIONS = "0141_path_suggestions.sql";
-/** The team's one limit (R22 decisions 14 and 24): four steps from the end. */
-const TEAM_LIMIT = "0142_team_limit.sql";
-/** The hand-over of a paused debate (R22 decision 12): three steps from the end. */
-const RUN_HANDOVER = "0143_run_handover.sql";
-/** The small AI's quota charge at step 2 (R22 decisions 29 and 31): two steps from the end. */
-const ASK_CLARIFY_CHARGE = "0144_ask_clarify_charge.sql";
-/** The pages waiting after "Add to researched" (W4-4): the chain's last step. */
-const WEB_RESEARCHED_UNSETTLED = "0145_web_researched_unsettled.sql";
-/** The Owner's allowances for team members (R22 decision 32): three steps from the end. */
-const TEAM_ALLOWANCES = "0146_team_allowances.sql";
-/** The public tree (R22 decisions 13 and 22). */
-const PUBLIC_TREE = "0147_public_tree.sql";
-/** Erasing an account keeps a public debate (R22 decision 21): the chain's last step. */
-const ERASURE_KEEPS_PUBLIC = "0148_erasure_keeps_public.sql";
-const PUBLIC_REPORT_TEAM_MONTH = "0149_public_report_team_month.sql";
-const PUBLIC_REVIEW = "0150_public_review.sql";
-const PUBLIC_FLAG = "0151_public_flag.sql";
-const REPORT_EXPORT = "0152_report_export_and_check_usage.sql";
 const DIG_TREE_SETTLED = "0153_dig_tree_settled.sql";
-const REGION_WIDEN = "0154_region_iceland_liechtenstein.sql";
-const OWNER_ANSWER_WRITES = "0155_owner_answer_writes.sql";
-const MODERATION_NOTICE = "0156_moderation_notice.sql";
-const MODERATION_STATEMENTS = "0157_moderation_statements.sql";
-const PRE_START_CHARGE = "0158_pre_start_charge.sql";
-const START_PATHS = "0159_start_paths.sql";
-const PATH_RESULTS = "0160_path_results.sql";
-const PATH_PROGRESS = "0161_path_progress.sql";
-const SAVED_QUESTIONS = "0162_saved_questions.sql";
-const CARRY_ON_DIGS = "0163_carry_on_session_free_digs.sql";
-const PATH_ADDED = "0164_main_answer_path_added.sql";
-const PRE_START_RELEASE = "0165_pre_start_release.sql";
-const MAIN_ANSWER_TIMES = "0166_main_answer_times.sql";
-const PUBLIC_REPORT_OWN_CARRIER = "0167_public_report_own_carrier.sql";
-const SET_ASIDE_CONTINUE = "0168_set_aside_continue.sql";
-const PIECE_SETTINGS_VERSION = "0169_piece_settings_version.sql";
-/** The daily outbound mail limit (owner's rulings of 2026-11-01; built as 0153 on dev, #234). */
-const OUTBOUND_MAIL = "0170_outbound_mail_limit.sql";
 /** The security review's fixes in the database. */
 const SECURITY_REVIEW = "0171_security_review_hardening.sql";
-/** The moderation notices' seven gaps after 0157 (the owner's list of 10 Nov 2026). */
-const MODERATION_NOTICE_FIXES = "0172_moderation_notice_fixes.sql";
-/** The check's answer on a report a person already closed (the follow-up to 0172's M6). */
-const SETTLE_DISMISSED = "0173_settle_dismissed_flag.sql";
-/** 0150's staff review door without a ground closed to the runtime (the final review of 0172): the step before the last. */
-const UNGROUNDED_DOOR = "0174_public_review_ungrounded_door.sql";
-/** The statement to a debate's author says an AI read the report first only for a verdict (Q3 of 0172's final review): the chain's last step. */
-const AI_READ_VERDICT = "0175_statement_ai_read_verdict.sql";
 const EXPAND: N1Declaration = Object.freeze({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
 /** A later step with constant digests, as forward-chain-replay-verifiers.test.ts builds its probes, plus its n1 header. */
 function probe(previous: ChainStep, name: string, sql: string, n1: N1Declaration = EXPAND): ChainStep {
@@ -132,59 +66,13 @@ describe("Review Focus 1: a step that fails (or a kill) between steps", () => {
 
   it("a failing step leaves every earlier step committed", async () => {
     const real = (await loadMigrationPlan()).forwardChain.map((step) => step.name);
-    expect(real).toHaveLength(65);
-    expect(real.at(-46)).toBe(RLS);
-    expect(real.at(-45)).toBe(V4);
-    expect(real.at(-44)).toBe(WEB);
-    expect(real.at(-43)).toBe(INVESTIGATIONS);
-    expect(real.at(-42)).toBe(DIG_MODEL);
-    expect(real.at(-41)).toBe(DIG_PICKS);
-    expect(real.at(-40)).toBe(INVESTIGATION_REPORTS);
-    expect(real.at(-39)).toBe(PUBLIC_DEBATES);
-    expect(real.at(-38)).toBe(TREE_UPDATES);
-    expect(real.at(-37)).toBe(PASSAGE_RETENTION);
-    expect(real.at(-36)).toBe(SPEND_KINDS);
-    expect(real.at(-35)).toBe(PATH_SUGGESTIONS);
-    expect(real.at(-34)).toBe(TEAM_LIMIT);
-    expect(real.at(-33)).toBe(RUN_HANDOVER);
-    expect(real.at(-32)).toBe(ASK_CLARIFY_CHARGE);
-    expect(real.at(-31)).toBe(WEB_RESEARCHED_UNSETTLED);
-    expect(real.at(-30)).toBe(TEAM_ALLOWANCES);
-    expect(real.at(-29)).toBe(PUBLIC_TREE);
-    expect(real.at(-28)).toBe(ERASURE_KEEPS_PUBLIC);
-    expect(real.at(-27)).toBe(PUBLIC_REPORT_TEAM_MONTH);
-    expect(real.at(-26)).toBe(PUBLIC_REVIEW);
-    expect(real.at(-25)).toBe(PUBLIC_FLAG);
-    expect(real.at(-24)).toBe(REPORT_EXPORT);
-    expect(real.at(-23)).toBe(DIG_TREE_SETTLED);
-    expect(real.at(-22)).toBe(REGION_WIDEN);
-    expect(real.at(-21)).toBe(OWNER_ANSWER_WRITES);
-    expect(real.at(-20)).toBe(MODERATION_NOTICE);
-    expect(real.at(-19)).toBe(MODERATION_STATEMENTS);
-    expect(real.at(-18)).toBe(PRE_START_CHARGE);
-    expect(real.at(-17)).toBe(START_PATHS);
-    expect(real.at(-16)).toBe(PATH_RESULTS);
-    expect(real.at(-15)).toBe(PATH_PROGRESS);
-    expect(real.at(-14)).toBe(SAVED_QUESTIONS);
-    expect(real.at(-13)).toBe(CARRY_ON_DIGS);
-    expect(real.at(-12)).toBe(PATH_ADDED);
-    expect(real.at(-11)).toBe(PRE_START_RELEASE);
-    expect(real.at(-10)).toBe(MAIN_ANSWER_TIMES);
-    expect(real.at(-9)).toBe(PUBLIC_REPORT_OWN_CARRIER);
-    expect(real.at(-8)).toBe(SET_ASIDE_CONTINUE);
-    expect(real.at(-7)).toBe(PIECE_SETTINGS_VERSION);
-    expect(real.at(-6)).toBe(OUTBOUND_MAIL);
-    expect(real.at(-5)).toBe(SECURITY_REVIEW);
-    expect(real.at(-4)).toBe(MODERATION_NOTICE_FIXES);
-    expect(real.at(-3)).toBe(SETTLE_DISMISSED);
-    expect(real.at(-2)).toBe(UNGROUNDED_DOOR);
-    expect(real.at(-1)).toBe(AI_READ_VERDICT);
+    expect(real).toEqual([...FORWARD_STEPS]);
     chain.shape = extendedBy((last) => probe(last, "0199_probe_fail.sql", "SELECT 1/0"));
     await expect(migrate(db.pool)).rejects.toMatchObject({ code: "22012" });
     chain.shape = undefined;
-    // All sixty-five real steps were applied by that same run and stay committed; the probe left nothing.
+    // Every real step was applied by that same run and stays committed; the probe left nothing.
     expect(await receipts()).toEqual(real);
-    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(65);
+    expect((await db.pool.query("SELECT count(*)::int AS n FROM public.debateai_schema_migration_step")).rows[0].n).toBe(FORWARD_STEPS.length);
     expect(await ledger()).toEqual(expect.arrayContaining(real));
     expect(await ledger()).not.toContain("0199_probe_fail.sql");
     // The next run continues where the last one stopped: everything replays, nothing is left to apply.
@@ -314,45 +202,8 @@ describe("Review Focus 2: a page read holding a lock on core.run while 0123's AL
     // to 0136 create identity tables, 0134 and 0136 also re-add CHECKs on ledger.model_spend, NOT VALID).
     chain.shape = (steps) => steps.slice(0, (steps as readonly ChainStep[]).findIndex((step) => step.name === SIDE_BY_SIDE));
     try { await migrate(db.pool); } finally { chain.shape = undefined; }
-    expect(await ledger()).not.toContain(SIDE_BY_SIDE);
-    expect(await ledger()).not.toContain(RLS);
-    expect(await ledger()).not.toContain(V4);
-    expect(await ledger()).not.toContain(INVESTIGATIONS);
-    expect(await ledger()).not.toContain(DIG_MODEL);
-    expect(await ledger()).not.toContain(DIG_PICKS);
-    expect(await ledger()).not.toContain(INVESTIGATION_REPORTS);
-    expect(await ledger()).not.toContain(PUBLIC_DEBATES);
-    expect(await ledger()).not.toContain(TREE_UPDATES);
-    expect(await ledger()).not.toContain(PASSAGE_RETENTION);
-    expect(await ledger()).not.toContain(SPEND_KINDS);
-    expect(await ledger()).not.toContain(PATH_SUGGESTIONS);
-    expect(await ledger()).not.toContain(TEAM_LIMIT);
-    expect(await ledger()).not.toContain(RUN_HANDOVER);
-    expect(await ledger()).not.toContain(ASK_CLARIFY_CHARGE);
-    expect(await ledger()).not.toContain(WEB_RESEARCHED_UNSETTLED);
-    expect(await ledger()).not.toContain(TEAM_ALLOWANCES);
-    expect(await ledger()).not.toContain(PUBLIC_TREE);
-    expect(await ledger()).not.toContain(ERASURE_KEEPS_PUBLIC);
-    expect(await ledger()).not.toContain(PUBLIC_REPORT_TEAM_MONTH);
-    expect(await ledger()).not.toContain(PUBLIC_REVIEW);
-    expect(await ledger()).not.toContain(PUBLIC_FLAG);
-    expect(await ledger()).not.toContain(DIG_TREE_SETTLED);
-    expect(await ledger()).not.toContain(REGION_WIDEN);
-    expect(await ledger()).not.toContain(OWNER_ANSWER_WRITES);
-    expect(await ledger()).not.toContain(MODERATION_NOTICE);
-    expect(await ledger()).not.toContain(MODERATION_STATEMENTS);
-    expect(await ledger()).not.toContain(PRE_START_CHARGE);
-    expect(await ledger()).not.toContain(START_PATHS);
-    expect(await ledger()).not.toContain(PATH_RESULTS);
-    expect(await ledger()).not.toContain(PATH_PROGRESS);
-    expect(await ledger()).not.toContain(SAVED_QUESTIONS);
-    expect(await ledger()).not.toContain(CARRY_ON_DIGS);
-    expect(await ledger()).not.toContain(PATH_ADDED);
-    expect(await ledger()).not.toContain(PRE_START_RELEASE);
-    expect(await ledger()).not.toContain(MAIN_ANSWER_TIMES);
-    expect(await ledger()).not.toContain(PUBLIC_REPORT_OWN_CARRIER);
-    expect(await ledger()).not.toContain(OUTBOUND_MAIL);
-    expect(await ledger()).not.toContain(SECURITY_REVIEW);
+    const applied = await ledger();
+    for (const later of stepsFrom(SIDE_BY_SIDE)) expect(applied, later).not.toContain(later);
   }, 300_000);
   afterAll(async () => { await db?.stop(); });
 
