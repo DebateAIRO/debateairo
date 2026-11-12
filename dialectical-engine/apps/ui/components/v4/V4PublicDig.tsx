@@ -18,7 +18,7 @@ import { DIG_MODES, type DigMode } from "@/lib/v4/types";
  * V4 screen review (owner picks 3 Nov 2026): the pieces of the public dig box (V4PublicLane.tsx holds the box itself).
  *  - public-f11: Quick look by default, with Thorough beside it on paid plans (Free has no such choice, owner N13).
  *  - public-d2 A: the path's own suggestions as chips; a chip someone has dug since says "Someone dug near here on 2 Nov"
- *    and opens their result on the page instead. After the 10-second Undo the person stays on the page: a card under the
+ *    and opens their result on the page instead. After the Undo window the person stays on the page: a card under the
  *    path says the dig is running, with "Open it". Nothing moves on the page while they wait: the card is read again when
  *    the person comes back to the page (it shows again in the same tab), and then shows the two stops, "Dig done" and
  *    "Checked", and one outcome: on the public page (before and after, new words underlined, "See it on the page", which
@@ -75,7 +75,7 @@ export function PublicDigChips({ chips, chosen, full, onToggle, locked, pathAnch
   /** The plan combines no more picks: chips not chosen yet cannot be added (the box says why). */
   full: boolean;
   onToggle: (suggestion: DigSuggestion) => void;
-  /** While the dig waits out its 10 seconds, nothing changes in it. */
+  /** While the dig waits out its Undo window, nothing changes in it. */
   locked: boolean;
   catalog: MessageCatalog;
   locale: string;

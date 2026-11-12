@@ -33,7 +33,7 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null, backLa
   const [about, setAbout] = React.useState<React.ReactNode>(null);
   const [helpOpen, setHelpOpen] = React.useState(false);
   // V4 screen review (dig-f9, 3 Nov): `about` names what the screen is about when it opens a while after the press that
-  // led to it (a V4 dig is sent 10 seconds after its click). Absent: the screen is as before.
+  // led to it (a V4 dig is sent only once its Undo window is over). Absent: the screen is as before.
   const offer = (failure: unknown, aboutLine?: React.ReactNode): boolean => {
     const refusal = questionRefusalOf(failure);
     if (refusal === null) return false;

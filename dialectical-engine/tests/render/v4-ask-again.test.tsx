@@ -21,7 +21,7 @@ vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { childr
 // V4 start step, Task 70b: no notice shows, so it never says one question already waits (sentence D).
 vi.mock("@/components/billing/RoomNotice", () => ({ RoomNotice: () => null, alreadyWaitingShown: () => false }));
 vi.mock("@/components/v4/V4Header", () => ({ V4Header: () => null }));
-// Task 76b: "Just answer it" waits its 10-second Undo window before the send; here the window is 0 and the test lets its timer run.
+// "Just answer it" waits out its Undo window before the send; here the window is 0 and the test lets its timer run.
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

@@ -10,10 +10,10 @@ import { waitStateOfRun, type WaitState } from "./stateWords.js";
 
 /*
  * V4 screen review (owner picks 3 Nov 2026), the public dig flow: public-f11, public-d2 A and dig-f25.
- *  - A dig pressed on someone else's public page waits out the site's one 10-second Undo (lib/v4/digUndo.ts) like a dig
+ *  - A dig pressed on someone else's public page waits out the site's one Undo window (lib/v4/digUndo.ts) like a dig
  *    on the map: nothing is sent before its time, Undo means nothing is sent. Its place in that store is the page's own
  *    reference (and the dig it hangs under), never a run id: a public page carries none, by design.
- *  - After the 10 seconds the person stays on the page; a card under the path says the dig is running, then shows two
+ *  - After the Undo window the person stays on the page; a card under the path says the dig is running, then shows two
  *    stops ("Dig done", "Checked") and one outcome, read from the dig's own run (its `contribution`, served to the
  *    digger only). This visit's started digs are kept in the page's memory only, so the card is still there when the
  *    person comes back to the page in the same tab; after a reload the server has to say it (written in the track's

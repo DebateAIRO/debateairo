@@ -1,23 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { DIG_UNDO_MS } from "@/lib/v4/digUndo";
 
 /*
- * V4 UX fixes (owner picks 3 Nov): THE Undo note of the V4 pages (journey-f21: one look, one 10 seconds, one
- * confirmation). It only shows and offers; whoever owns the thing that waits decides when it is sent and passes plain
- * words in, so a dig, a Start or any later Undo looks and behaves the same:
- *  - r2-22 A: a quiet line under the words shrinks over the 10 seconds; no ticking number. With reduced motion the line
- *    stands still and a few words say it instead ("Starts in a few seconds").
+ * THE Undo note of the V4 pages: one look, one Undo window, one confirmation. It only shows and offers; whoever owns the
+ * thing that waits decides when it is sent and passes plain words in, so a dig, a Start or any later Undo looks and behaves
+ * the same:
+ *  - A quiet line under the words shrinks over the Undo window; no ticking number. With reduced motion the line stands
+ *    still and a few words say it instead ("Starts in a few seconds").
  *  - dig-f7: focus moves to Undo when the note appears, Esc undoes, a screen reader hears one line once, and focus goes
  *    back where it was after Undo or the send.
- *  - dig-f8 / journey-f21: after the 10 seconds the note says it is starting until the outcome, so there is no gap; after
- *    Undo it says "Cancelled. Nothing was used." (the caller removes it after a few seconds).
+ *  - After the Undo window the note says it is starting until the outcome, so there is no gap; after Undo it says
+ *    "Cancelled. Nothing was used." (the caller removes it after a few seconds).
  * The note draws no position of its own: the page's bottom stack places it (inside the bottom bar on a phone,
  * bottom-left on a computer).
  */
 
-/** Row D decision 1: the Undo window. */
-export const UNDO_NOTE_MS = 10_000;
+/** How long the line shrinks when the caller does not say: the site's one Undo window, so it ends as the send starts. */
+export const UNDO_NOTE_MS = DIG_UNDO_MS;
 
 export type V4UndoNoteState = "counting" | "sending" | "cancelled" | "done";
 
@@ -37,7 +38,7 @@ export type V4UndoNoteProps = Readonly<{
   stillLine: string;
   /** Read out once, when the note takes focus ("Your dig starts in a few seconds. Undo is selected."). */
   announce: string;
-  /** After the 10 seconds, until the outcome ("Starting your dig…"). */
+  /** After the Undo window, until the outcome ("Starting your dig…"). */
   sendingLine: string;
   /** After Undo ("Cancelled. Nothing was used."). */
   confirmedLine: string;

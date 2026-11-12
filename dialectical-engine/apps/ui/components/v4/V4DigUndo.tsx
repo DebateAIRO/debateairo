@@ -233,7 +233,7 @@ export function V4DigUndoHost(props: Readonly<{ catalog: MessageCatalog; locale:
   );
 }
 
-/** dig-d3 A, ruling F7: the report page says it will wait for a dig still in its 10 seconds (or being sent). */
+/** The report page says it will wait for a dig still in its Undo window (or being sent). */
 export function V4ReportDigWait(props: Readonly<{ runId: string; catalog: MessageCatalog }>) {
   const entries = useDigUndo();
   const waiting = waitingDigsOf(entries, props.runId);

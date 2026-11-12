@@ -6,7 +6,7 @@ import type { DigLink, DigMode, DigTarget, DigView, PendingDig, V4DigPick, V4Map
 
 /*
  * Owner review 3 Nov 2026 (dig-f12, wait-f18): a dig that did not finish is not a dead end. Its panel offers "Try this dig
- * again", which digs the same picks with the same Quick/Thorough choice through the usual 10-second Undo (nothing is sent
+ * again", which digs the same picks with the same Quick/Thorough choice through the usual Undo window (nothing is sent
  * before it ends). After a second failure of the same dig the panel says "This keeps failing…" instead.
  *
  * The same picks: a dig started in this visit is remembered exactly as it was sent (in memory only, like the dig links of

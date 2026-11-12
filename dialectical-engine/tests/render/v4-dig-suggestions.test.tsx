@@ -3,6 +3,7 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import { DIG_LEVEL_MAX } from "../../packages/contract/src/index.js";
 import {
   advance, branch, buttonNamed, buttonsNamed, CATALOG, click, digPart, expandBranch, harness, mountMap, openPath, panel, PATHS, resetHarness,
@@ -209,14 +210,14 @@ describe("picks stay on one path (owner Q-D1)", () => {
 });
 
 describe("Undo sends nothing", () => {
-  it("a dig undone within 10 seconds is never sent, and the picks wait in the tray", async () => {
+  it("a dig undone within its Undo window is never sent, and the picks wait in the tray", async () => {
     await mountMap();
     await expandBranch(PATHS.renew);
     await click(treeBoxes(PATHS.renew)[0]!);
     await click(treeBoxes(PATHS.renew)[1]!);
     await click(buttonNamed(CATALOG["v4.dig.trayDigThese"]!, tray()!));
     expect(text()).toContain(CATALOG["v4.dig.undo"]);
-    await advance(4_000);
+    await advance(DIG_UNDO_MS / 2);
     await click(page().querySelector<HTMLButtonElement>(`button[aria-label="${CATALOG["v4.dig.undoLabel"]}"]`)!);
     await advance(20_000);
     expect(harness.submit).not.toHaveBeenCalled();

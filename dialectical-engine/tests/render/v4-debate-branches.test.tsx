@@ -9,6 +9,7 @@ import {
   type AnswerBranch,
   type PathOutcome
 } from "../../packages/contract/src/index.js";
+import { DIG_UNDO_MS } from "../../apps/ui/lib/v4/digUndo.js";
 import { NUCLEAR_MENU } from "../support/v4-start-menu.js";
 import {
   advance, buttonNamed, buttonsNamed, CATALOG, click, harness, mountMap, page, panel, resetHarness, seededAnswer, unmountMap
@@ -26,7 +27,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 /*
  * V4 start step, Task 62 (spec 2026-11-03 §2 items 5 and 8; items wait-d1, journey-f13, r2-22): digging on a path debate's
  * map once its answer is ready. A chosen path's one dig button ("Dig here", journey-f13's words) digs deeper into it through
- * the shared Undo note: nothing is sent for 10 seconds. A "+ N more to explore" item becomes a MORE pick of the main question,
+ * the shared Undo note: nothing is sent before its Undo window ends. A "+ N more to explore" item becomes a MORE pick of the main question,
  * sent as the AIs' words at its own place. The menu paths left out before Start are the first things the main question offers
  * to dig (spec §2.5); an R22 debate's list is unchanged. The main answer says how sure it is from its paths' words. Only the
  * reads and the ask are stand-ins (v4-debate-harness.tsx). All words are made up.
@@ -81,7 +82,7 @@ afterEach(async () => {
 });
 
 describe("digging deeper into a chosen path (journey-f13, r2-22)", () => {
-  it("its one dig button goes through the shared Undo note and sends one dig after 10 seconds", async () => {
+  it("its one dig button goes through the shared Undo note and sends one dig once the Undo window ends", async () => {
     const runId = crypto.randomUUID();
     harness.answer = v2Answer(runId);
     await mountMap(1600, runId);
@@ -91,7 +92,7 @@ describe("digging deeper into a chosen path (journey-f13, r2-22)", () => {
     const note = page().querySelector(".v4Undo")!;
     expect(note).not.toBeNull();
     expect(note.querySelector(".v4UndoLine")).not.toBeNull();
-    await advance(9_500);
+    await advance(DIG_UNDO_MS - 500);
     expect(harness.submit).not.toHaveBeenCalled();
     await advance(600);
     expect(harness.submit).toHaveBeenCalledTimes(1);
@@ -109,7 +110,7 @@ describe("a \"+ N more to explore\" item (wait-d1)", () => {
     await click(buttonsNamed(CATALOG["v4.paths.digThis"]!, panel())[1]!);
     expect(page().querySelector(".v4Undo .v4UndoLine")).not.toBeNull();
     expect(harness.submit).not.toHaveBeenCalled();
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     const parent = harness.submit.mock.calls[0]![3];
     expect(AskParentSchema.safeParse(parent).success).toBe(true);
@@ -144,7 +145,7 @@ describe("the main question offers the left-out paths first (spec §2.5)", () =>
     expect(box.checked).toBe(true);
     await click(panel().querySelector<HTMLButtonElement>(".v4PanelDigBtn")!);
     expect(page().querySelector(".v4Undo .v4UndoLine")).not.toBeNull();
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(harness.submit.mock.calls[0]![3]).toEqual({
       parent_run_id: runId, places: ["more-kp06"], mode: "quick",

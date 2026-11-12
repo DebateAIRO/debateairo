@@ -144,7 +144,7 @@ export function sameStoppedWords(typed: string, stopped: string | null): boolean
 
 /*
  * Task 57g: "Change the question" with the words left as they were goes back to the stopped debate's map, which starts the same Continue
- * there, with its 10-second Undo. The ask page hands that over in one module variable, as Start's hand-off (startHandOff.ts): it lives
+ * there, with its Undo window. The ask page hands that over in one module variable, as Start's hand-off (startHandOff.ts): it lives
  * while this tab's scripts run, so the client-side move to the map finds it; a reload or another tab does not. Never in the browser's
  * storage, never in the address. Used once, and never after CONTINUE_HAND_OFF_MS.
  */

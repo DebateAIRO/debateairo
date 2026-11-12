@@ -982,7 +982,7 @@ function Leaves(props: Readonly<{
         ])}
       {extra === null ? null : reasonRow("suggestions")}
       {extra}
-      {/* dig-d3 B: a dig still in its 10 seconds grows a still, hatched "being looked into" card here, "Your dig · … ·
+      {/* A dig still in its Undo window grows a still, hatched "being looked into" card here, "Your dig · … ·
           starting" (question 22 A; V4DigSeed.tsx, v4-undo.css .v4DigSeed). */}
       <V4DigSeedLeaves runId={pieces.map.runId} groupKey={plan.key} catalog={pieces.catalog} />
       {toggle ? (

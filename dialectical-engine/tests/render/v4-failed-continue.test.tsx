@@ -31,7 +31,7 @@ vi.mock("@/lib/v4/money", async (original) => ({
 /*
  * V4 start step, Task 57g (the owner's 7 Nov answers: "continue where it broke, and not charge the customer again"; his card "Button on
  * the stopped page"): the page of a question that did not finish offers "Continue where it stopped" when the server says it can
- * (`continuable`), continuing the SAME debate on the same page after the site's 10-second Undo, as Start's. Beside it "Ask this again" says
+ * (`continuable`), continuing the SAME debate on the same page after the site's Undo window, as Start's. Beside it "Ask this again" says
  * "Change the question" (the same link). The line under the button ("What already ran is kept. Continuing pays only for what has not run
  * yet.") shows only when some quota was used; with none, only "Nothing was taken for the failed try." (never both). Without `continuable`
  * the screen is as before. Every question here is made up.
@@ -221,8 +221,8 @@ describe("the owner's question 42 A (7 Nov): with Continue offered, the reason d
   });
 });
 
-describe("the press: the shared 10-second Undo, then one Continue (Task 57g)", () => {
-  it("shows Start's Undo note and sends nothing for 10 seconds; Undo sends nothing, ever", async () => {
+describe("the press: the shared Undo window, then one Continue", () => {
+  it("shows Start's Undo note and sends nothing during the Undo window; Undo sends nothing, ever", async () => {
     const runId = crypto.randomUUID();
     harness.run = failedRun(runId, { quota_used: "SOME", continuable: true });
     await mountMap(1600, runId);

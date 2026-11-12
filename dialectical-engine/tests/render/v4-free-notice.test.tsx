@@ -16,8 +16,8 @@ const server = vi.hoisted(() => ({
   reads: 0,
   createDebate: vi.fn(async (..._args: unknown[]) => ({ id: "11111111-1111-4111-8111-111111111111" }))
 }));
-// V4 start step, Task 76b: a press waits its 10-second Undo window before the send; here the window is 0 and `sent` lets its
-// timer run (the 10 seconds themselves: tests/render/v4-start-undo.test.tsx).
+// A press waits out its Undo window before the send; here the window is 0 and `sent` lets its timer run (the window
+// itself: tests/render/v4-start-undo.test.tsx).
 vi.mock("@/lib/v4/startUndo", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/v4/startUndo.js")>()), START_UNDO_MS: 0
 }));

@@ -80,14 +80,13 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
  * the question box (a tap places its sentence, typing over it unticks it), so there is no "We'll ask the AIs:" box and no
  * "what matters most" box; the card "What we'll look into" sits under the questions; Start waits for the paths and sends
  * what the box says with the check of Next; the refusal and language screens of Next lead back with "Edit my question".
- * V4 start step, Task 76b (chat-undo-after-every-start, r2-22, read-f12, choose-f10; owner answers Q8, Q11, Q12, Q13; 4 Nov
- * night choose-f19, ask-f3, ask-f8, read-f3, read-f17): Start and both "Just answer it" wait 10 seconds in the site's one Undo
- * note before anything is sent. The map shows at once (the question and the paths being sent, the note under the question)
- * while step 2 (or step 1) stays in memory as it was; the card folds into the map's first card, and back on Undo. A declined
- * consent or a plan still unknown at the press leaves nothing waiting.
+ * Start and both "Just answer it" wait out the Undo window in the site's one Undo note before anything is sent. The map
+ * shows at once (the question and the paths being sent, the note under the question) while step 2 (or step 1) stays in
+ * memory as it was; the card folds into the map's first card, and back on Undo. A declined consent or a plan still unknown
+ * at the press leaves nothing waiting.
  * V4 start step, Task 76c (read-f2, choose-f2, choose-f21, ask-f12; owner answers Q2 A, Q3 A): step 2 has its own entry in
  * this tab's history (lib/v4/askHistory.ts: the words, never in the address). Back goes to step 1 with the words and keeps
- * the paths (a menu or sheet open closes first); during Start's 10 seconds Back is an Undo, and from the send it is held; a
+ * the paths (a menu or sheet open closes first); during Start's Undo window Back is an Undo, and from the send it is held; a
  * reload brings the words back and calls no AI; the page asks before leaving only when something would be lost; after the
  * send the entry is the started question's, which says so when it is opened again.
  * V4 start step, Task 76h (ask-d3, read-f5, read-f8, read-f15, read-f23): step 2's clarifying questions are V4AskQuestions'
@@ -109,7 +108,7 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
  * V4 start step, Task 76f (owner cards "When saved", "How long", "Where shown"; answers Q1, Q2, Q3, Q8, S1 A, S2 A, S3 A; saved-
  * questions spec 2026-11-04): once the check passes after Next, the account keeps step 2 by itself (useSavedQuestion; its id in
  * step 2's history entry, never in the address); Start names it and removes it; "Not started yet" on step 1 lists the newest 5
- * with Pick up and Delete (the shared 10-second Undo); Pick up and a reload on step 2 reopen it through the restore with no AI
+ * with Pick up and Delete (the shared Undo window); Pick up and a reload on step 2 reopen it through the restore with no AI
  * call; the page asks before leaving only while the latest change is not saved, and the card's reload line goes meanwhile.
  */
 
@@ -230,7 +229,7 @@ function savedQuestionGone(error: unknown): boolean {
   return error instanceof ContractHttpError && error.status === 404;
 }
 
-/** Task 76f: a delete waiting out its 10 seconds in the shared Undo note (spec §3.6), then (`sent`) its answer. */
+/** A delete waiting out its Undo window in the shared Undo note, then (`sent`) its answer. */
 type WaitingDelete = Readonly<{ item: SavedQuestionSummary; sendsAt: number; sent: boolean }>;
 
 /**
@@ -318,11 +317,11 @@ function flyAnswer(from: HTMLElement, to: HTMLElement | null, text: string): boo
   return true;
 }
 
-/** Task 76b: which press waits out its 10 seconds: step 2's Start or its "Just answer it", or step 1's "Just answer it". */
+/** Which press waits out its Undo window: step 2's Start or its "Just answer it", or step 1's "Just answer it". */
 type StartPress = "start" | "just" | "quick";
 
 /**
- * Task 76b (answers Q11, Q12): a press waiting out its 10 seconds while the map shows. What is sent is kept from the press
+ * A press waiting out its Undo window while the map shows. What is sent is kept from the press
  * (step 2 is not drawn meanwhile, so none of it can change); the hand-over is taken at the send (rule 5), so a combine that
  * lands meanwhile still goes with it.
  */
@@ -481,7 +480,7 @@ function V4AskForm({
   const [goal, setGoal] = useState<V4Goal>(EMPTY_GOAL);
   const [mode, setMode] = useState<DigMode>("quick");
   const [refusal, setRefusal] = useState<string | null>(null);
-  // Task 76b (answers Q11, Q12): the press waiting out its 10 seconds (the map shows meanwhile), as a ref too for its timer
+  // The press waiting out its Undo window (the map shows meanwhile), as a ref too for its timer
   // and Undo; its note's phase: COUNTING (Undo still there), SENDING, or WRITING (the hand-over waits for a path being written).
   const [pending, setPendingState] = useState<PendingSend | null>(null);
   const pendingRef = useRef<PendingSend | null>(null);
@@ -559,7 +558,7 @@ function V4AskForm({
   // Task 76f (owner answers S1 A, S3 A): the question the account keeps for the step 2 this page holds (its first save's answer,
   // or the one picked up or reopened), as a ref too for the send; the revision it was read at; the check event's language and
   // seats a saved reading carried (a restored reading has neither of its own); a reload on step 2 still reopening from the
-  // account; "Not started yet" as last read (null: not read) and its reads; the deletes waiting out their 10 seconds.
+  // account; "Not started yet" as last read (null: not read) and its reads; the deletes waiting out their Undo window.
   const [savedId, setSavedIdState] = useState<string | null>(null);
   const savedIdRef = useRef<string | null>(null);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
@@ -777,7 +776,7 @@ function V4AskForm({
   const plan = start.plan;
 
   // Task 76f (saved-questions spec §3.3; owner card "When saved"): the account keeps step 2 once its check passed: signed in, the
-  // start step on the site, the consent given, step 2 shown (not during Start's 10 seconds, nor after its send), no language offer
+  // start step on the site, the consent given, step 2 shown (not during Start's Undo window, nor after its send), no language offer
   // waiting, no refusal, and a reading that was checked. So nothing is saved before Next, after a declined consent or crisis help.
   const reading = start.reading;
   const savingOn = session === "IN" && startRoom !== null && consented && step === "read" && pending === null && reading !== null
@@ -865,7 +864,7 @@ function V4AskForm({
   const sentLine = accepted !== null && accepted.basis === boxWords ? accepted.text : boxWords;
   const quickLine = accepted !== null && accepted.basis === plain ? accepted.text : plain;
   const tooLong = byteLength(sentLine) > askQuestionMaxBytes();
-  // Task 76b: a press is busy from its consent until it is sent or comes back (its plan read, its 10 seconds, its send).
+  // A press is busy from its consent until it is sent or comes back (its plan read, its Undo window, its send).
   const busy = ask.submitting || pending !== null || checkingPlan !== null;
   // W3-4 (the money rule, owner 31 Oct): before a new question, its share of today; when new starts wait for the day,
   // week or month reset, that line with the time takes the place of today's room notice. Shares only, never a price.
@@ -1039,7 +1038,7 @@ function V4AskForm({
   }
 
   /**
-   * Task 76b, rule 5: the 10 seconds are over. The note reads "Starting…" and Undo goes; step 2's hand-over is taken now (it
+   * The Undo window is over. The note reads "Starting…" and Undo goes; step 2's hand-over is taken now (it
    * waits for a path still being written: the note says so), then the ask. STARTED: the map's page. REFUSED or STOPPED: the
    * step back, unlocked, every pick kept, with the refusal's line (a stale reading marked, a narrowed one the card's line).
    */
@@ -1172,7 +1171,7 @@ function V4AskForm({
 
   /**
    * Step 1's "Just answer it": crisis help first (ask-f3), then nothing while it waits; the one-time consent (a no shows the
-   * line under Next, ask-f8); a plan still unknown is read once more (read-f3); then its 10 seconds (answer Q12). Step 1 has
+   * line under Next, ask-f8); a plan still unknown is read once more (read-f3); then its Undo window. Step 1 has
    * no card, so it sends the line alone, as a quick look, and the map says the AIs are choosing what to look into.
    */
   function justAnswer(): void {
@@ -1186,7 +1185,7 @@ function V4AskForm({
   /**
    * V4 start step, Task 57g (the owner's 7 Nov answers: "if it stays the same, we need to use whatever was already generated and paid
    * for"): opened from the stopped page's "Change the question", the words left as they were (trimmed) continue that debate itself when
-   * the server can: no consent, no reading, no charge here; its map starts the same Continue, with its 10-second Undo. Next and step 1's
+   * the server can: no consent, no reading, no charge here; its map starts the same Continue, with its Undo window. Next and step 1's
    * "Just answer it" alike (either would otherwise charge the same question twice). True: the page is on its way to the map.
    */
   function continuesStopped(): boolean {
@@ -1326,8 +1325,8 @@ function V4AskForm({
 
   // Task 76 (spec §2 item 6; answers Q8, Q10; read-f17): what Start can do now. PATHS_COMING while the AIs read; OFFLINE;
   // BLOCKED on a used-up quota, a refusal, a stale reading, more paths than the site now allows, sentence D, or a box Start
-  // cannot send (too short, too long); else READY. Task 76b: CHECKING_PLAN while a press reads a plan still unknown; from the
-  // 10 seconds to the send the map stands in the bar's place (its note says "Starting…" and the written-path wait).
+  // cannot send (too short, too long); else READY. CHECKING_PLAN while a press reads a plan still unknown; through the
+  // Undo window and the send the map stands in the bar's place (its note says "Starting…" and the written-path wait).
   const barState: StartBarState = checkingPlan === "start" || checkingPlan === "just" ? "CHECKING_PLAN"
     : !start.online ? "OFFLINE"
       : !start.startReady && PATHS_COMING_PHASES.has(start.phase) ? "PATHS_COMING"
@@ -1340,7 +1339,7 @@ function V4AskForm({
    * (2) the consent is ensured again (a no shows the declined line above the bar, ask-f8); (2b) a plan still unknown is read
    * once more (read-f3); a read naming Free while more is chosen than Free allows leaves nothing waiting: Free's cap or the
    * narrowed line shows and the press waits until the choices fit (never a silent drop; Thorough simply goes as a quick look);
-   * (3) the 10 seconds, with the map (sendPending above takes the hand-over at the send).
+   * (3) the Undo window, with the map (sendPending above takes the hand-over at the send).
    */
   async function pressStart(chosenBy: "PERSON" | "AIS"): Promise<void> {
     if (busy || startFlight.current || pendingRef.current !== null) return;
@@ -1740,7 +1739,7 @@ function V4AskForm({
   }
 
   /**
-   * Task 76c: the browser's Back or Forward moved this tab to another entry. (1) A press waiting out its 10 seconds (ask-f12):
+   * Task 76c: the browser's Back or Forward moved this tab to another entry. (1) A press waiting out its Undo window:
    * Back is its Undo, so nothing is ever sent, and step 2's entry goes back on top (step 1's "Just answer it" has no step-2
    * entry behind it: Back leaves the page as usual and nothing is sent); from the send until the outcome Back is held: step 2's
    * entry goes back and nothing else changes. (2) On step 2 with a ⋯ menu, the Options sheet or the More drawer open, only that
@@ -1879,7 +1878,7 @@ function V4AskForm({
       takeFocus={false}
     />
   ) : null;
-  // Task 76f (spec §3.6): each Delete waiting out its 10 seconds, in the shared Undo note ("Deleted “…”", Undo, the shrinking
+  // Each Delete waiting out its Undo window, in the shared Undo note ("Deleted “…”", Undo, the shrinking
   // line); it goes once the DELETE is sent.
   const deleteNotes = waitingDeletes.filter((one) => !one.sent).map((one) => (
     <V4UndoNote
@@ -1916,7 +1915,7 @@ function V4AskForm({
     </>
   );
 
-  // Task 76b, rule 3 (answers Q11, Q12; Task 60): the map during the 10 seconds, before any run exists: the question as it is
+  // The map during the Undo window, before any run exists: the question as it is
   // sent and the paths being sent, each being looked into (Start: the plan as it stands, so a combine written meanwhile shows;
   // "Just answer it" at READY: the menu's top paths; otherwise none, and the AIs are choosing). Task 61's tree, read-only (no
   // pick boxes), the question's card selected, no panel and nothing pulsing; the shared note under the question. Task 76i: the
@@ -1963,8 +1962,8 @@ function V4AskForm({
   const stepTwoWhy = [!boxLongEnough && !boxCrisis ? `${ids}-short2` : null, tooLong ? `${ids}-long2` : null]
     .filter((id): id is string => id !== null).join(" ") || undefined;
 
-  // One tree for both steps, so the consent / crisis / language pop-ups stay mounted in one place. Task 76b: during Start's
-  // 10 seconds the map stands in the step's place; the step's state stays in memory, so Undo brings it back as it was.
+  // One tree for both steps, so the consent / crisis / language pop-ups stay mounted in one place. During Start's
+  // Undo window the map stands in the step's place; the step's state stays in memory, so Undo brings it back as it was.
   return (
     <>
       {header}

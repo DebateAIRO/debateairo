@@ -160,7 +160,7 @@ export function useV4Ask(input: Readonly<{
   /** ASK-3: whether this text reads as a person in crisis (the page enables Start for it even when it is short). */
   flagsCrisis(text: string): boolean;
   /**
-   * dig-f9 (screen review, 3 Nov): the crisis check on a dig's own views at its click, before its 10 seconds start: true
+   * The crisis check on a dig's own views at its click, before its Undo window starts: true
    * when any of `words` reads as a person in crisis, and the help screen (in `dialogs`, the same one the send uses) opened.
    */
   offerCrisisHelp(words: readonly string[]): boolean;
@@ -287,7 +287,7 @@ export function useV4Ask(input: Readonly<{
     setInternalFunding("funding" in room ? room.funding : null);
   }, [room, adoptSettingsRead]);
 
-  // The latest state, for a submit fired later (a dig sends after its 10-second Undo): never a stale closure.
+  // The latest state, for a submit fired later (a dig sends after its Undo window): never a stale closure.
   const publicReportWaits = input.publicReportWaits === true;
   const live = React.useRef({ planTier, freePublicNotice, shapeSettings, lengthSettings, readingLevel, room, catalog, newDebateCatalog,
     pageLocale, consent, crisis, questionRefusal, languageChoice, publicReportWaits });
@@ -479,7 +479,7 @@ export function useV4Ask(input: Readonly<{
         if (dig && crisisWordsOf(origin, question, parent, startOwnWords).length === 0) {
           return refused(t(now.catalog, checkAnswer === "UNAVAILABLE" ? "v4.ask.failed" : "v4.digError.cannotFollow"));
         }
-        // dig-f9: a dig's screen opens about 10 seconds after its click, so it names the dig it is about.
+        // A dig's screen opens only once its Undo window after the click is over, so it names the dig it is about.
         now.questionRefusal.offer(exc, dig ? about : undefined);
         // ASK-5: a rewrite accepted before the screen opened sticks for the next Start, as after a refusal.
         return acceptedRewrite === undefined ? STOPPED : { kind: "STOPPED", acceptedQuestion: acceptedRewrite };

@@ -18,9 +18,9 @@ import { ContractHttpError } from "../../packages/contract/src/client.js";
  * Wave 2 (public-d1 A): the paths are rows that unfold, so each test opens the rows it reads; "Write a report" (public-f9) says it is starting, then a
  * card at the top of Reports says the report is being written and the person can leave, the checks slow down and pause in a hidden tab, and after ten
  * minutes the card says it is taking longer, with "Check again"; the ready line is read out once; a report that could not be written says so.
- * Wave 2: the map's dig flow (public-f11, dig-f25): nothing is sent before the site's 10-second Undo, Quick look with Thorough on paid plans, the share when
- * the room read says one; after it the person stays, with a card under the path that reads the dig's own run (public-d2 A); the path's own suggestions as
- * chips when the public read carries them; "This will be public." under the person's own words (journey-f20).
+ * The map's dig flow: nothing is sent before the site's Undo window ends, Quick look with Thorough on paid plans, the share when the room read says
+ * one; after it the person stays, with a card under the path that reads the dig's own run; the path's own suggestions as chips when the public read
+ * carries them; "This will be public." under the person's own words.
  */
 const lane = vi.hoisted(() => ({
   session: true as boolean | "pending",
@@ -63,7 +63,7 @@ vi.mock("@/lib/v4/useV4Ask", () => ({
 }));
 
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
-import { readDigUndo, resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
+import { DIG_UNDO_MS, readDigUndo, resetDigUndo } from "../../apps/ui/lib/v4/digUndo.js";
 import { resetPublicDigs } from "../../apps/ui/lib/v4/publicDig.js";
 import { contributionOf, seedPublicDebates, PUBLIC_DIG_SUGGESTIONS, PUBLIC_REF, PUBLIC_REF_AUTHOR_GONE, PUBLIC_UPDATE_REF } from "../../tools/v4-mock-api/public-seed.js";
 
@@ -81,7 +81,7 @@ const debate = (at = 0): PublicDebate => {
 
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
-// The press runs its click checks (crisis help, consent) before the 10 seconds start: a few more turns than a plain click.
+// The press runs its click checks (crisis help, consent) before the Undo window starts: a few more turns than a plain click.
 const flush = async (): Promise<void> => { await act(async () => { for (let i = 0; i < 12; i += 1) await Promise.resolve(); }); };
 
 async function mount(page: PublicDebate, withLane = true): Promise<HTMLDivElement> {
@@ -110,8 +110,8 @@ const rows = (): HTMLElement[] => [...host!.querySelectorAll<HTMLElement>("[data
 async function openRows(): Promise<void> {
   for (const head of [...host!.querySelectorAll<HTMLButtonElement>(".v4PubRowHead")]) if (head.getAttribute("aria-expanded") === "false") await click(head);
 }
-/** The site's 10-second Undo runs out (fake timers): the dig is sent, and its answer is read. */
-const undoRunsOut = async (): Promise<void> => { await act(async () => { vi.advanceTimersByTime(10_000); }); await flush(); };
+/** The site's Undo window runs out (fake timers): the dig is sent, and its answer is read. */
+const undoRunsOut = async (): Promise<void> => { await act(async () => { vi.advanceTimersByTime(DIG_UNDO_MS); }); await flush(); };
 const notes = (): Element | null => host!.querySelector(".v4PubNotes .v4UndoHost");
 
 beforeEach(() => {
@@ -334,7 +334,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(document.activeElement).toBe(firstOpen());
   });
 
-  it("a path of the debate: nothing is sent before the 10-second Undo; then a quick dig named by the page, and the person stays", async () => {
+  it("a path of the debate: nothing is sent before the Undo window ends; then a quick dig named by the page, and the person stays", async () => {
     vi.useFakeTimers();
     await mount(debate());
     await openRows();
@@ -347,7 +347,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(notes()!.textContent).not.toContain(V4["v4.digMode.quick"]);
     expect(document.activeElement!.textContent).toBe(V4["v4.dig.undo"]);
     expect(host!.querySelector(".v4PubDig")!.textContent).toContain(V4["v4.panel.digStarting"]);
-    await act(async () => { vi.advanceTimersByTime(9_000); });
+    await act(async () => { vi.advanceTimersByTime(DIG_UNDO_MS - 1_000); });
     expect(lane.submit).not.toHaveBeenCalled();
     await undoRunsOut();
     expect(lane.submit).toHaveBeenCalledTimes(1);
@@ -420,7 +420,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(host!.querySelector("[data-public-dig-card]")).toBeNull();
   });
 
-  // dig-f9 (the wave-2 review, 4 Nov): the map's own click checks, at the press, before the 10 seconds.
+  // The map's own click checks, at the press, before the Undo window.
   it("dig-f9: words that read as a crisis get the help screen at the press; nothing waits, nothing is sent", async () => {
     vi.useFakeTimers();
     lane.crisis = vi.fn((words: readonly string[]) => words.includes("Mine."));
@@ -436,7 +436,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(lane.submit).not.toHaveBeenCalled();
   });
 
-  it("dig-f9: the one-time consent opens at the press; the 10 seconds count from the yes, and No starts nothing", async () => {
+  it("the one-time consent opens at the press; the Undo window counts from the yes, and No starts nothing", async () => {
     vi.useFakeTimers();
     let answer: (agreed: boolean) => void = () => undefined;
     lane.ensureConsent = vi.fn(() => new Promise<boolean>((resolve) => { answer = resolve; }));
@@ -454,7 +454,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     await act(async () => { answer(true); });
     await flush();
     expect(notes()!.textContent).toContain("Digging into “Mine.”");
-    await act(async () => { vi.advanceTimersByTime(9_000); });
+    await act(async () => { vi.advanceTimersByTime(DIG_UNDO_MS - 1_000); });
     expect(lane.submit).not.toHaveBeenCalled();
     await undoRunsOut();
     expect(lane.submit).toHaveBeenCalledTimes(1);
@@ -509,10 +509,10 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     await click(firstOpen());
     await write(host!.querySelector<HTMLTextAreaElement>(".v4PubText")!, "Mine.");
     await click(startButtons()[0]!);
-    // The page goes before the 10 seconds end; the site's list keeps the dig and sends it.
+    // The page goes before the Undo window ends; the site's list keeps the dig and sends it.
     await act(async () => root?.unmount());
     host?.remove();
-    await act(async () => { vi.advanceTimersByTime(10_000); });
+    await act(async () => { vi.advanceTimersByTime(DIG_UNDO_MS); });
     await act(async () => { for (let i = 0; i < 12; i += 1) await Promise.resolve(); });
     const entry = readDigUndo()[0]!;
     expect(entry.phase).toBe("REFUSED");
@@ -551,7 +551,7 @@ describe("Dig here (journey-f13; decision 22 called it \"Dig into this\")", () =
     expect(host!.querySelectorAll(".v4PubText")).toHaveLength(4);
   });
 
-  it("a refusal reads as the hook said it, in the box, after the 10 seconds; the box stays, with the person's words", async () => {
+  it("a refusal reads as the hook said it, in the box, after the Undo window; the box stays, with the person's words", async () => {
     vi.useFakeTimers();
     lane.submit = vi.fn(async () => ({ kind: "REFUSED", message: "Plain words." }));
     await mount(debate());

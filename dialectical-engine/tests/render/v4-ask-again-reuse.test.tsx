@@ -3,7 +3,7 @@
 // was already generated and paid for ... if they change the question, then it's a new question". The ask page opened from the stopped
 // page's "Change the question" (`?again=<run id>`) reads the stopped debate back (useAskAgain) and learns whether the server can continue it
 // (`continuable`). With the words left as they were (trimmed equal) and a debate that can continue, Next runs no reading, asks for no
-// consent and charges nothing: the page goes back to that debate's map, which starts the same Continue there with its 10-second Undo
+// consent and charges nothing: the page goes back to that debate's map, which starts the same Continue there with its Undo window
 // (the map's side: tests/render/v4-failed-continue.test.tsx). Changed words are a new question, as today. Every question here is made up.
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";

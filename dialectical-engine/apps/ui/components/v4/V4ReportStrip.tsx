@@ -24,8 +24,8 @@ import { V4WaitCard } from "./V4WaitCard";
  * (only once the server says it; never on Free, where the report comes from the small reserve), that no dig can start
  * while it is written, and on Free "This question is public, so your report will be public too." (report-f15, unless the
  * question's check kept it private). Two buttons: Write it and Not yet; focus goes to Write it, and Esc or Not yet brings
- * the button back. Write it sends at once (no 10-second Undo: journey-f21 keeps the report's confirmation strip), after
- * any dig still in its 10 seconds (ruling F7: "Your report will wait for it."). A press that cannot be confirmed says
+ * the button back. Write it sends at once (no Undo window: journey-f21 keeps the report's confirmation strip), after
+ * any dig still in its Undo window (ruling F7: "Your report will wait for it."). A press that cannot be confirmed says
  * "We couldn't confirm your report started." and reads the versions again (report-f6): writing found means the map shows
  * it being written, else Try again. When the person asked at the start step to let the AIs carry on to the report, there
  * is no strip: the press asks for it at once.
@@ -60,7 +60,7 @@ export type V4ReportStripProps = Readonly<{
   sharePercent: number | null;
   /** report-f15: a Free question that is public: "your report will be public too". */
   publicLine: boolean;
-  /** The first question's run id: a dig of it still in its 10 seconds is named (ruling F7). */
+  /** The first question's run id: a dig of it still in its Undo window is named. */
   rootRunId: string;
   busy: boolean;
   note: ReportPressNote | null;
@@ -126,7 +126,7 @@ export function V4ReportStrip(props: V4ReportStripProps) {
         <p id={`${id}-public`} className="v4RepStripLine v4RepStripPublic" data-report-public="">{t(catalog, "v4.report.publicToo")}</p>
       ) : null}
       <div className="v4RepStripActions">
-        {/* ACCESS-6: both stay focusable while the press is on its way (up to a dig's 10 seconds), so Esc still reaches the
+        {/* ACCESS-6: both stay focusable while the press is on its way (up to a dig's Undo window), so Esc still reaches the
             strip and focus is never lost; a press meanwhile does nothing. */}
         {/* Task 56c: while the report waits, Write it stays here, greyed (journey-f14); a press shows the line again and sends nothing. */}
         <button
@@ -158,7 +158,7 @@ export function V4ReportStrip(props: V4ReportStripProps) {
 export type ReportStart = Readonly<{
   /** Where the strip shows (by the button that opened it), or null while it is closed. */
   at: ReportStripPlace | null;
-  /** A press is on its way (waiting for a dig's 10 seconds, sent, or being checked). */
+  /** A press is on its way (waiting for a dig's Undo window, sent, or being checked). */
   busy: boolean;
   note: ReportPressNote | null;
   /** "Write my report" pressed at this place: the strip opens there (with carry-on: the report is asked for at once). */
@@ -220,7 +220,7 @@ export function useReportStart(input: Readonly<{
     void (async () => {
       const { watch, runId } = live.current;
       const root = watch.rootRunId ?? runId;
-      // Ruling F7: a dig still in its 10 seconds is not on the server yet; the report is asked for once it is sent (or undone).
+      // A dig still in its Undo window is not on the server yet; the report is asked for once it is sent (or undone).
       await waitForDigs(root);
       if (!alive.current) return;
       watch.notePress();

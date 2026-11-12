@@ -11,7 +11,7 @@ import type { DigView } from "@/lib/v4/types";
  * finish.": its plain reason, said about the dig (the owner's answer to question 3, 5 Nov 2026: one line per reason group,
  * the same as the dig's own failed page), "Nothing was taken from your quota for this." only when the server confirms it
  * (never when some was used, question 20 A), then the way on. [Try this dig again] digs the same picks with the same
- * Quick/Thorough choice through the usual 10-second Undo note (lib/v4/digRetry.ts). After a second failure of the same dig:
+ * Quick/Thorough choice through the usual Undo note (lib/v4/digRetry.ts). After a second failure of the same dig:
  * "This keeps failing. Write your report; it uses everything that finished." ("Write my report" stays in the rail and the
  * header, never beside a dig button.) A dig already tried again shows no second button here, and its reason promises no
  * later try (the owner's third round, 5 Nov: the AIs-unavailable line drops "You can try it again in a while.").

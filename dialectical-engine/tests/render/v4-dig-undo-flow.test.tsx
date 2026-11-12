@@ -6,7 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AskRoom } from "../../apps/ui/lib/billing/room.js";
-import { addDig, readDigUndo, type DigUndoResult } from "../../apps/ui/lib/v4/digUndo.js";
+import { addDig, DIG_UNDO_MS, readDigUndo, type DigUndoResult } from "../../apps/ui/lib/v4/digUndo.js";
 import type { V4AskOutcome } from "../../apps/ui/lib/v4/useV4Ask.js";
 import { buildV4Map } from "../../apps/ui/lib/v4/mapModel.js";
 import type { DigLink, DigView, V4Path } from "../../apps/ui/lib/v4/types.js";
@@ -82,7 +82,7 @@ describe("several digs, each with its own Undo (dig-d3 A)", () => {
     expect(noteUndos()).toHaveLength(2);
     await click(noteUndos()[0]!);
     expect(notes()[0]!.textContent).toContain(CATALOG["v4.undo.cancelled"]);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(harness.submit.mock.calls[0]![3]).toEqual({ parent_run_id: runId, places: ["path:n-nuclear"], mode: "quick" });
   });
@@ -104,7 +104,7 @@ describe("several digs, each with its own Undo (dig-d3 A)", () => {
   });
 });
 
-describe("the screens a dig may need are asked at the press (the review of 4 Nov; dig-f9: before its 10 seconds)", () => {
+describe("the screens a dig may need are asked at the press, before its Undo window", () => {
   it("an own view in a person's crisis words gets the help numbers at the press; nothing waits or is sent (V, 2026-09-30)", async () => {
     await mountMap();
     await openPath(PATHS.renew);
@@ -122,13 +122,13 @@ describe("the screens a dig may need are asked at the press (the review of 4 Nov
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
-  it("the one-time consent is asked at the press, before the 10 seconds; No starts nothing and sends nothing (V, 2026-09-29)", async () => {
+  it("the one-time consent is asked at the press, before the Undo window; No starts nothing and sends nothing", async () => {
     harness.ensureConsent = vi.fn(async () => false);
     await mountMap();
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
     expect(harness.ensureConsent).toHaveBeenCalledTimes(1);
-    // dig-f9: the 10 seconds start only from a yes, so a No leaves no note behind.
+    // The Undo window starts only from a yes, so a No leaves no note behind.
     expect(notes()).toHaveLength(0);
     expect(readDigUndo()).toEqual([]);
     await advance(20_000);
@@ -141,7 +141,7 @@ describe("the screens a dig may need are asked at the press (the review of 4 Nov
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
     await unmountMap();
-    await act(async () => { await vi.advanceTimersByTimeAsync(10_100); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(DIG_UNDO_MS + 100); });
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(readDigUndo()[0]?.result).toEqual({ kind: "REFUSED", message: CATALOG["v4.dig.notStartedAway"] });
   });
@@ -187,13 +187,13 @@ describe("the note's words and keys (dig-f7, dig-f8, journey-f21)", () => {
     expect(page().querySelector(".v4DebTray")?.textContent).not.toContain(CATALOG["v4.digMode.quick"]);
   });
 
-  it("after the 10 seconds says 'Starting your dig…' until the answer, stays where the person is, then offers [See it]", async () => {
+  it("after the Undo window says 'Starting your dig…' until the answer, stays where the person is, then offers [See it]", async () => {
     let answer: (outcome: V4AskOutcome) => void = () => undefined;
     harness.submit = vi.fn(() => new Promise<V4AskOutcome>((resolve) => { answer = resolve; }));
     await mountMap();
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(notes()[0]!.textContent).toContain(CATALOG["v4.undo.sendingDig"]);
     expect(noteUndos()).toHaveLength(0);
     const childRunId = crypto.randomUUID();
@@ -242,7 +242,7 @@ describe("the seed on the map (dig-d3 B)", () => {
     await mountMap();
     await openPath(PATHS.smr);
     await press(buttonNamed(CATALOG["v4.panel.dig"]!, panel()));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     await settle();
     expect(branch(PATHS.smr).querySelector(".v4DigSeed")).toBeNull();
     expect(branch(PATHS.smr).querySelector(".v4MapDig")).not.toBeNull();
@@ -283,11 +283,11 @@ describe("the note travels with the person (dig-d3 A)", () => {
     expect(harness.submit).not.toHaveBeenCalled();
   });
 
-  it("the report page says it will wait for a dig still in its 10 seconds", async () => {
+  it("the report page says it will wait for a dig still in its Undo window", async () => {
     const { V4ReportDigWait } = await import("../../apps/ui/components/v4/V4DigUndo.js");
     const path = { id: "n-smr", line: "Small modular reactors could be ready in time." } as unknown as V4Path;
     addDig({
-      parentRunId: "run-1", runIds: ["root-run"], dig: { target: { kind: "path", path }, mode: "quick", sendsAt: Date.now() + 10_000 },
+      parentRunId: "run-1", runIds: ["root-run"], dig: { target: { kind: "path", path }, mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS },
       sharePercent: null, showMode: true, send: async (): Promise<DigUndoResult> => ({ kind: "STOPPED" }), failedLine: "Not started."
     });
     hostEl = document.createElement("div");
@@ -295,7 +295,7 @@ describe("the note travels with the person (dig-d3 A)", () => {
     hostRoot = createRoot(hostEl);
     await act(async () => hostRoot?.render(<V4ReportDigWait runId="root-run" catalog={CATALOG} />));
     expect(hostEl.textContent).toBe(word("v4.report.digWait", { question: "Small modular reactors could be ready in time." }));
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(hostEl.textContent).toBe("");
   });
 
@@ -303,7 +303,7 @@ describe("the note travels with the person (dig-d3 A)", () => {
     const { V4ReportDigWait } = await import("../../apps/ui/components/v4/V4DigUndo.js");
     const path = { id: "n-nuclear", line: "Nuclear first: did not hold. Recent reactors in Europe ran years late." } as unknown as V4Path;
     addDig({
-      parentRunId: "run-1", runIds: ["root-run"], dig: { target: { kind: "path", path }, mode: "quick", sendsAt: Date.now() + 10_000 },
+      parentRunId: "run-1", runIds: ["root-run"], dig: { target: { kind: "path", path }, mode: "quick", sendsAt: Date.now() + DIG_UNDO_MS },
       sharePercent: null, showMode: true, send: async (): Promise<DigUndoResult> => ({ kind: "STOPPED" }), failedLine: "Not started."
     });
     hostEl = document.createElement("div");
@@ -312,7 +312,7 @@ describe("the note travels with the person (dig-d3 A)", () => {
     await act(async () => hostRoot?.render(<V4ReportDigWait runId="root-run" catalog={CATALOG} />));
     expect(hostEl.textContent).toBe(word("v4.report.digWait", { question: "Nuclear first" }));
     expect(hostEl.textContent).not.toMatch(/did not hold/u);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
   });
 });
 
@@ -401,7 +401,7 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     const job = stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!;
     expect(job.textContent).toBe(CATALOG["v4.dig.yourPicks.other"]);
     await press(job);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect((harness.submit.mock.calls[0]![3] as { picks?: unknown[] }).picks).toHaveLength(2);
   });
@@ -413,7 +413,7 @@ describe("a phone's one bottom stack (journey-d3, dig-f16, dig-f17)", () => {
     await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
     await click(panel().querySelector<HTMLInputElement>(".v4Sugs input[type=checkbox]")!);
     await press(stack()!.querySelector<HTMLButtonElement>(".v4DebPhoneDig")!);
-    await advance(10_100);
+    await advance(DIG_UNDO_MS + 100);
     await settle(16_000);
     expect(harness.submit).toHaveBeenCalledTimes(1);
     expect(stack()!.querySelector(".v4StackGoodTime")).toBeNull();
