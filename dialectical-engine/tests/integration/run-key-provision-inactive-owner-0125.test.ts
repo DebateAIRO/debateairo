@@ -226,7 +226,9 @@ describe("NV-08 · run-key provision cleanup skips owners the intent trigger ref
     `)).rows[0];
     // The lengths of the N-1 lists: ERASURE_FUNCTION_SIGNATURES (account-erasure.ts; 28 since synthesis-flag's 0126 added
     // its three erasure functions on origin/dev) and CONTENT_PROVISION_SIGNATURES (index.ts).
-    expect(counts).toEqual({ erasure: 28, provision: 7 });
+    // The V4 line's steps added ten forget functions of an erased debate to the erasure list (38) and the carry-on dig's
+    // key provision to the provision list (8); the run-3 functions stay in erasure_reconcile, outside both counts.
+    expect(counts).toEqual({ erasure: 38, provision: 8 });
 
     await withLogins(async ({ runtimePool, erasurePool, contentPool, runtimeLogin }) => {
       await expect(assertAccountErasureDatabaseRole(runtimePool, erasurePool)).resolves.toBeUndefined();

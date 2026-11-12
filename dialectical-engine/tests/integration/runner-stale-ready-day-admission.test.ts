@@ -21,7 +21,7 @@ const RESERVED_ON = "2034-05-06";
 beforeAll(async () => {
   database = await startTestDatabase();
   await migrate(database.pool);
-  await database.pool.query("CREATE ROLE stale_ready_runtime LOGIN PASSWORD 'stale-ready-private-fixture-only' IN ROLE debateai_runtime");
+  await database.pool.query("CREATE ROLE stale_ready_runtime LOGIN PASSWORD 'stale-ready-private-fixture-only' IN ROLE debateai_runtime,debateai_rls_all_accounts");
   const url = new URL(database.connectionString);
   url.username = "stale_ready_runtime";
   url.password = "stale-ready-private-fixture-only";

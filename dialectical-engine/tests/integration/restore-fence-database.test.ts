@@ -25,6 +25,8 @@ const fakeAuditHasher = Object.freeze({
 let database: TestDatabase;
 let authorizationPool: Pool;
 let runtimePool: Pool;
+/** The authorization pool's system login (it holds the cross-account marker), for the user's own sign-out-everywhere. */
+let systemPool: Pool;
 let sessions: PostgresSessionRepository;
 let root: string;
 let path: string;
@@ -93,7 +95,9 @@ beforeAll(async () => {
   await database.pool.query(`
     CREATE ROLE nv07_fence_login LOGIN PASSWORD '${PASSWORD}';
     CREATE ROLE nv07_runtime_login LOGIN PASSWORD '${PASSWORD}';
+    CREATE ROLE nv07_system_login LOGIN PASSWORD '${PASSWORD}';
     GRANT debateai_authorization_runtime TO nv07_fence_login;
+    GRANT debateai_authorization_runtime, debateai_rls_all_accounts TO nv07_system_login;
     GRANT debateai_runtime TO nv07_runtime_login
   `);
   const urlFor = (role: string): string => {
@@ -104,6 +108,7 @@ beforeAll(async () => {
   };
   authorizationPool = createPool(urlFor("nv07_fence_login"));
   runtimePool = createPool(urlFor("nv07_runtime_login"));
+  systemPool = createPool(urlFor("nv07_system_login"));
   sessions = new PostgresSessionRepository(authorizationPool, fakeAuditHasher);
   root = await mkdtemp(join(tmpdir(), "nv07-restore-fence-"));
   await chmod(root, 0o700);
@@ -114,6 +119,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await authorizationPool?.end();
   await runtimePool?.end();
+  await systemPool?.end();
   await database?.stop();
   if (root !== undefined) await rm(root, { recursive: true, force: true });
 });
@@ -158,7 +164,10 @@ describe("NV-07 the restore fence on PostgreSQL", () => {
       VALUES($1,$2,$3,'{}'::jsonb,$4,$5,clock_timestamp(),clock_timestamp(),clock_timestamp()+interval '1 day')`,
     [changeId, user.userId, randomBytes(32), randomHash(), randomHash()]);
     // After the backup: the user signs everyone out.
-    await expect(sessions.revokeAllSessions({ userId: user.userId, initiatingSessionId: sessionId, occurredAt: new Date(), source }))
+    // Since 0171 a sign-out-everywhere runs for the connection's own account, or on a login that holds the cross-account
+    // marker; this fixture has no raw session token, so it signs out on the system login.
+    await expect(new PostgresSessionRepository(systemPool, fakeAuditHasher)
+      .revokeAllSessions({ userId: user.userId, initiatingSessionId: sessionId, occurredAt: new Date(), source }))
       .resolves.toBeGreaterThanOrEqual(1);
     expect(await authenticates(token)).toBe(false);
     await expect(fence.settle()).resolves.toMatchObject({ outcome: "ADVANCED" });
