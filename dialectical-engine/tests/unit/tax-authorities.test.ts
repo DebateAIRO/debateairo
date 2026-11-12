@@ -139,7 +139,7 @@ describe("P16a taxAuthorities v1", () => {
     const lines = [dev(), taxAuthoritiesFromValue(example.taxAuthorities, "hosted-register.example.json")];
     for (const policy of policies) {
       const payable = Object.entries(policy.countries).filter(([, rule]) => rule.pay).map(([code]) => code);
-      expect(payable).toEqual(expect.arrayContaining(["CH", "LI", "TW"]));
+      expect(payable).toEqual(expect.arrayContaining(["CH", "LI", "JP"]));
       for (const authorities of lines) {
         expect(payable.filter((country) => taxAuthorityFor(authorities, country, "TAXABLE") === null)).toEqual([]);
       }

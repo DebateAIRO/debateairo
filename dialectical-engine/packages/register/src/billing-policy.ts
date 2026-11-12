@@ -52,12 +52,13 @@ const WITHDRAWAL_LAW = Object.freeze({
 
 /**
  * Everyone the site serves gets the same 14 days (owner's decision of 10 November 2026), not only those the law
- * covers: Switzerland, the US, Canada, Australia, New Zealand, Singapore, Japan and Taiwan, which can pay, and Moldova
+ * covers: Switzerland, the US, Canada, Australia, New Zealand, Singapore and Japan, which can pay, and Moldova
  * and South Korea, which can sign up and will pay later. A country stays on the list whether or not it can pay yet, so
  * opening one for payment (countryPolicy) never opens it without the right; a country the site starts to serve joins
  * here in the same change (tests/unit/b4-billing-register-rows.test.ts checks every country whose sign-up is on).
+ * Taiwan left with the owner's decision of 12 November 2026, which closed it.
  */
-const SERVED_WITHDRAWAL = Object.freeze(["CH", "US", "CA", "AU", "NZ", "SG", "JP", "TW", "MD", "KR"]);
+const SERVED_WITHDRAWAL = Object.freeze(["CH", "US", "CA", "AU", "NZ", "SG", "JP", "MD", "KR"]);
 
 /**
  * The notice a CHANGED renewal needs (spec §1.10 and the global constraints:
@@ -141,7 +142,7 @@ export const BILLING_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
     withdrawal_countries: Object.freeze([
       "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
       "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB",
-      "CH", "US", "CA", "AU", "NZ", "SG", "JP", "TW", "MD", "KR"
+      "CH", "US", "CA", "AU", "NZ", "SG", "JP", "MD", "KR"
     ])
   })
 });

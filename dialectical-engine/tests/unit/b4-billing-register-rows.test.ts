@@ -225,7 +225,7 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     expect([...policy.withdrawalCountries].sort()).toEqual([
       "AT", "AU", "BE", "BG", "CA", "CH", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GB", "GR", "HR", "HU",
       "IE", "IS", "IT", "JP", "KR", "LI", "LT", "LU", "LV", "MD", "MT", "NL", "NO", "NZ", "PL", "PT", "RO", "SE",
-      "SG", "SI", "SK", "TW", "US"
+      "SG", "SI", "SK", "US"
     ]);
   });
 
@@ -238,7 +238,9 @@ describe("billingPolicy v1 keeps billing switched off", () => {
       countryPolicyFromValue(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value, COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.sourceRef),
       countryPolicyFromValue(countryExample.countryPolicy, "country-policy.example.json")
     ].flatMap((rules) => Object.entries(rules.countries).filter(([, rule]) => rule.signup || rule.pay).map(([code]) => code));
-    expect(served).toEqual(expect.arrayContaining(["US", "JP", "CH", "TW", "MD", "KR"]));
+    expect(served).toEqual(expect.arrayContaining(["US", "JP", "CH", "MD", "KR"]));
+    // Taiwan is closed (owner's decision of 12 November 2026), so it is not served and left the list.
+    expect(served).not.toContain("TW");
     for (const lists of [policy.withdrawalCountries, policyOf(hosted.billingPolicy).withdrawalCountries]) {
       expect([...new Set(served)].filter((country) => !lists.includes(country))).toEqual([]);
     }
@@ -306,8 +308,8 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     ["a withdrawal list without South Korea", (row: Record<string, unknown>) => {
       row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "KR");
     }],
-    ["a withdrawal list without Taiwan", (row: Record<string, unknown>) => {
-      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "TW");
+    ["a withdrawal list without Japan", (row: Record<string, unknown>) => {
+      row.withdrawal_countries = (row.withdrawal_countries as string[]).filter((country) => country !== "JP");
     }],
     ["a quote that lives under a minute", (row: Record<string, unknown>) => { row.quote_ttl_seconds = 30; }],
     // Final review Part 1b, Minor 6: a changed renewal needs at least 7 business days' notice (M3; A7's notice rule,

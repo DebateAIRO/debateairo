@@ -262,23 +262,24 @@ describe("legal documents — generated data", () => {
       expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toBe(
         "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area"
           + " (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada,"
-          + " Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere."
+          + " Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere."
           + " If you live outside those countries you may be able to reach the site, but we do not direct the service to you,"
           + " we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your"
           + " country. Annex A sets out what applies in each region we serve."
       );
       for (const document of [TERMS_OF_SERVICE, PRIVACY_POLICY]) {
         const all = [...document.sections.map((entry) => entry.title), ...allTexts(document)].join("\n");
-        expect(all).not.toMatch(/\bUK\b|Ukrain|Israel|Thailand|Philippines|only if listed|Reserved/u);
+        expect(all).not.toMatch(/\bUK\b|Ukrain|Israel|Taiwan|Thailand|Philippines|only if listed|Reserved/u);
       }
       // The United Kingdom is not served (owner's ruling of 9 October 2026), but since the owner's answer of
       // 10 October 2026 the service is hosted there (OVHcloud, London). The Terms never name it; the Privacy
       // Policy names it only where it says where data is held or goes (since 12 October 2026 also in the summary,
-      // section 5 and Annex B.4, all naming London).
+      // section 5 and Annex B.4, all naming London). Annex B.7 names it once, in Japan's part, among the countries the
+      // AI providers and hosts are in (Taiwan's part, which named it too, left on 12 November 2026).
       expect(allTexts(TERMS_OF_SERVICE).filter((text) => text.includes("United Kingdom"))).toEqual([]);
       const ukMentions = allTexts(PRIVACY_POLICY).filter((text) => text.includes("United Kingdom"));
       expect(ukMentions.length).toBeGreaterThan(0);
-      for (const text of ukMentions) expect(text).toMatch(/OVHcloud|London|EU countries, the United Kingdom|other EU countries, the United Kingdom/u);
+      for (const text of ukMentions) expect(text).toMatch(/OVHcloud|London|EU countries, the United Kingdom|other EU countries, the United Kingdom|located in the United States, EU countries and the United Kingdom/u);
     });
 
     it("says the support chat sends text to a model too, right after the debate paragraph", () => {

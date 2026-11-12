@@ -201,6 +201,11 @@ Zealand, Singapore and Japan. `withdrawal_countries` names every country the sit
 run's US buyer needs no added `"US"` any more (deploy/vps/README.md §14.9). The Terms (section 13, Annex A) and the
 withdraw page's text still describe the narrower set and must follow.
 
+**Amendment 2026-11-12 (V, owner decision):** Taiwan is closed: no sign-up and no payment (`TERMS_EXCLUDED`, like
+Israel). It leaves the Terms (section 2, Annex A.7), the Privacy Policy (Annex B.7) and `withdrawal_countries`. The
+`TW_BUSINESS_TAX` tax line stays for a later reopening, like the UK's. Accounts opened from Taiwan before this date
+are not touched.
+
 ### 1.6 The money check
 
 Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are
