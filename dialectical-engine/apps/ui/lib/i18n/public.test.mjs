@@ -158,7 +158,8 @@ test("the public namespace exists and covers every public translation call", () 
     usedKeys.add(match[0]);
   }
   // 0157: the statements page picks each line by the statement's kind, ground code, source and place.
-  for (const kind of ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"]) {
+  for (const kind of ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED",
+    "CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF", "CONTRIBUTION_BACK", "REPORT_BACK"]) {
     usedKeys.add(`public.moderation.kind.${kind}`);
     usedKeys.add(`public.moderation.what.${kind}`);
   }

@@ -979,6 +979,39 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth"));
   });
 
+  it("chains the final outcome of a review (0176) after 0175 with 0175's manifest and effective verifier, drained, declaring 0157's queue, reader and kind CHECK", async () => {
+    const plan = await loadMigrationPlan();
+    const step = atStep(plan.forwardChain, "0176");
+    const previous = atStep(plan.forwardChain, "0175");
+    const manifest = JSON.parse((await bytesOf("lineage/moderation-final-outcome-forward0176.json")).toString("utf8"));
+    expect(step?.name).toBe("0176_moderation_final_outcome.sql");
+    expect(previous?.name).toBe("0175_statement_ai_read_verdict.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/statement-ai-read-verdict-forward0175.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0176_moderation_final_outcome.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf).toEqual(manifest.amendsPostconditionsOf);
+    expect(step?.amendsPostconditionsOf).toEqual([{ step: "0157_moderation_statements.sql",
+      functions: ["identity.queue_moderation_statements()", "identity.read_own_moderation_statements(uuid)"], field: "function_definition",
+      relations: ["identity.moderation_statement"], constraints: ["moderation_statement_kind_check"] }]);
+  });
+
+  it("documents everyone told \"until the review ends\" hearing how it ended (0176) as the sixty-sixth chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## Everyone told \"until the review ends\" hears how it ended (0176)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0175", "0176_moderation_final_outcome.sql", "moderation-final-outcome-forward0176.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0176.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "`function_definition`", "`moderation_statement_kind_check`"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth",
+      "everyone told \"until the review ends\" hearing how it ended (0176, below) the sixty-sixth"));
+  });
+
   it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
     const step = atStep(plan.forwardChain, "0131");
