@@ -977,12 +977,16 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf 
 
 **2. Dependencies, offline.** Fill root's package store for this lockfile (the only step that
 downloads), then install the folder from the store with the network off, and build what the
-release needs (the contract and the website; the website build stamps `RELEASE_KEY`):
+release needs (the contract and the website; the website build stamps `RELEASE_KEY`). The build
+line first runs the legal release check (`pnpm run legal:release-check`, §14.7): while the Terms
+of Service or the Privacy Policy is not up to date in every language, or the archive lacks a
+current text, it lists what is missing and the build does not run. That is fixed in the
+repository and a new commit reviewed, never on this server:
 
 ```sh
 printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" fetch
 printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" install --frozen-lockfile --offline
-printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && RELEASE_KEY="$key" pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" run build
+printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf '%s\n' "$key" | grep -Eqx 'r[1-9][0-9]*-[0-9a-f]{12}' && pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" run legal:release-check && RELEASE_KEY="$key" pnpm --dir "/opt/debateai/releases/$new/dialectical-engine" run build
 ```
 
 **3. The three overlay files.** The new release takes the slot the current one does not use:
@@ -3470,7 +3474,11 @@ true:
 - proof that you own the domain, as NETOPIA asks for it.
 
 **The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
-`apps/ui/legal/archive/` (one folder per language). `pnpm run generate:legal` adds the file for each new version.
+`apps/ui/legal/archive/` (one folder per language). A change to either text is made in English first; before a
+release, every language is translated from the current English text and recorded in
+`apps/ui/legal/translated-from.json`, and `pnpm run generate:legal:archive` adds the file for each current text.
+`pnpm run legal:release-check`, which step 2 of an upgrade runs before the build, refuses a release until both are
+done and names each language that lags.
 Never delete or edit a file there: each is a version someone accepted, and the confirmation email attaches the
 version the person accepted from there, even after the Terms change. The site lists them at `/terms/versions` and
 `/privacy/versions`, as both documents promise, and shows each one at its own address.

@@ -96,8 +96,8 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("PLUS");
     expect(await stack.cardTokenOf(person.ownerRef)).toMatch(/^[0-9a-f-]{36}$/u);
     expect(ids(stack.mailsTo(person.email))).toEqual(expect.arrayContaining(["M1", "M2_INVOICE_ATTACHED"]));
-    // M1 carries the accepted Terms (ruling Q-3: L2 archived the current version, which the sign-up row names by its
-    // hash) and the model withdrawal form (A26b, P17's resolvers fed by P9b's fields from the acceptance row).
+    // M1 carries the accepted Terms (the archived text the sign-up row names by its hash, billingStack's signUp) and
+    // the model withdrawal form, both found from the fields copied from the acceptance row.
     const m1 = stack.mailsTo(person.email).find((mail) => mail.templateId === "M1")!;
     expect((m1.attachments ?? []).map((attachment) => attachment.filename)).toEqual(["terms-of-service.txt", "withdrawal-form.txt"]);
     // P2-M39, the Romanian invoice: the fake SmartBill issued ONE invoice for this charge, for the name and place the
