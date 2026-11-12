@@ -27,7 +27,7 @@ const OLD_LINE = "  v_detected := v_decided OR EXISTS (SELECT 1 FROM identity.pu
 const NEW_LINE = "  v_detected := v_decided OR EXISTS (SELECT 1 FROM identity.public_flag AS flag WHERE flag.flag_id = v_flag AND flag.verdict IN ('AGREE','NOT_FOUND','UNSURE') AND flag.judged_at <= s.happened_at);";
 
 describe("0175: the statement's AI line needs a verdict", () => {
-  it("comes last in the chain, after 0174, with its own loader, bound to its own bytes and 0174's manifest", async () => {
+  it("comes after 0174 in the chain (0176 follows it), with its own loader, bound to its own bytes and 0174's manifest", async () => {
     expect(read("packages/db/src/migration-forward-chain.ts")).toContain("import { loadForward0175 } from './migration-forward0175.js';");
     const loader = read("packages/db/src/migration-forward0175.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -41,10 +41,10 @@ describe("0175: the statement's AI line needs a verdict", () => {
     expect(manifest.verifier).toEqual({ path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(read("migrations/lineage/verify-effective-capabilities-130.sql")) });
     expect(manifest.amendsPostconditionsOf).toEqual(AMENDS);
     const plan = await loadMigrationPlan();
-    const step = plan.forwardChain.at(-1)!;
+    const step = plan.forwardChain.at(-2)!;
     expect(step.name).toBe(NAME);
     expect(step.previousName).toBe("0174_public_review_ungrounded_door.sql");
-    expect(step.verifierSha256).toBe(plan.forwardChain.at(-2)!.verifierSha256);
+    expect(step.verifierSha256).toBe(plan.forwardChain.at(-3)!.verifierSha256);
     expect(step.replayVerifierSql).toBeUndefined();
     expect(step.amendsPostconditionsOf).toEqual(AMENDS);
   });

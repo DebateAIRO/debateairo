@@ -49,8 +49,17 @@ export function ModerationNotices({ catalog, locale, client = contractClient }: 
   );
 }
 
+/**
+ * 0176 (what was left of M3, owner, 11 Nov 2026): the kinds told because their content left the page with someone else's. The rule they show is the other
+ * content's, so its intro says so. A BACK notice restricts nothing: what happened and the link only, no source, rule or routes.
+ */
+const OTHER_CONTENT: ReadonlySet<ModerationStatement["kind"]> = new Set<ModerationStatement["kind"]>(["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED",
+  "CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF"]);
+const BACK: ReadonlySet<ModerationStatement["kind"]> = new Set<ModerationStatement["kind"]>(["CONTRIBUTION_BACK", "REPORT_BACK"]);
+
 function Statement({ statement, catalog, locale }: Readonly<{ statement: ModerationStatement; catalog: MessageCatalog; locale: LocaleCode }>) {
   const { ground } = statement;
+  const back = BACK.has(statement.kind);
   // A staff hide relies on the hold alone; what the review is about is said apart, as not yet decided. The automatic hide relied on the rule it found (D2).
   const relied = ground.automated_decision ? [...new Set([...ground.grounds, ...ground.suspected])] : ground.grounds;
   const suspected = ground.automated_decision ? [] : ground.suspected.filter((code) => !ground.grounds.includes(code));
@@ -63,12 +72,13 @@ function Statement({ statement, catalog, locale }: Readonly<{ statement: Moderat
         <a className="setBtnQuiet" href={`/public/debate/${encodeURIComponent(statement.public_ref)}`}>{t(catalog, "public.moderation.openDebate")}</a>{" "}
         {t(catalog, statement.hidden_now ? "public.moderation.nowHidden" : "public.moderation.nowPublic")}
       </p>
+      {back ? null : <>
       {ground.sources.map((source) => <p key={source}>{t(catalog, `public.moderation.source.${source}`)}</p>)}
       <p>{t(catalog, ground.automated_decision ? "public.moderation.automatedDecision"
         : ground.automated_detection ? "public.moderation.automatedDetection" : "public.moderation.noAutomation")}</p>
       {!ground.recorded ? <p>{t(catalog, "public.moderation.groundNone")}</p> : (
         <>
-          <p>{t(catalog, "public.moderation.groundIntro")}</p>
+          <p>{t(catalog, OTHER_CONTENT.has(statement.kind) ? "public.moderation.groundIntroOther" : "public.moderation.groundIntro")}</p>
           <ul>{relied.map((code) => <li key={code}>{t(catalog, `public.moderation.ground.${code}`)}</li>)}</ul>
           {/* 0172 (M7; DSA Art 17(3)(d)): the law an ILLEGAL ground relies on, in staff's own words; on this page and in the export, never in a mail. */}
           {ground.law !== null ? <p data-statement-law dir="auto">{t(catalog, "public.moderation.law", { law: ground.law })}</p> : null}
@@ -99,6 +109,7 @@ function Statement({ statement, catalog, locale }: Readonly<{ statement: Moderat
         </>
       ) : null}
       <p>{t(catalog, "public.moderation.routes")}</p>
+      </>}
     </section>
   );
 }

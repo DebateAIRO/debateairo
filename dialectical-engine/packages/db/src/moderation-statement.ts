@@ -6,7 +6,9 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  * runtime reads no table. A review step queues one statement per person it affects; the sender mails each once; the signed-in page reads the
  * person's own.
  */
-export type ModerationStatementKind = "DEBATE_HIDDEN" | "DEBATE_DECIDED" | "CONTRIBUTION_REMOVED" | "REPORT_REMOVED" | "CORRECTED" | "CONTRIBUTION_AFFECTED" | "REPORT_AFFECTED" | "CONTRIBUTION_DECIDED" | "REPORT_DECIDED";
+export type ModerationStatementKind = "DEBATE_HIDDEN" | "DEBATE_DECIDED" | "CONTRIBUTION_REMOVED" | "REPORT_REMOVED" | "CORRECTED" | "CONTRIBUTION_AFFECTED" | "REPORT_AFFECTED" | "CONTRIBUTION_DECIDED" | "REPORT_DECIDED"
+  // 0176: how a re-publish ended it for a person whose content left with other content: what stays off, or that it is back.
+  | "CONTRIBUTION_KEPT_OFF" | "REPORT_KEPT_OFF" | "CONTRIBUTION_BACK" | "REPORT_BACK";
 export type ModerationStatementGround = Readonly<{
   /** False: the step was taken before 0157 kept a ground (D9). */
   recorded: boolean; interim: boolean; grounds: readonly string[]; suspected: readonly string[]; sources: readonly string[];

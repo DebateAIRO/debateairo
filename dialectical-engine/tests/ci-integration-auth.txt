@@ -128,3 +128,5 @@ tests/integration/settle-dismissed-flag-0173.test.ts
 tests/integration/public-review-ungrounded-door-0174.test.ts
 # The statement to a debate's author says an AI read the report first only for a verdict given by its moment (0175): never for UNAVAILABLE.
 tests/integration/statement-ai-read-verdict-0175.test.ts
+# Everyone told "until the review ends" hears how it ended (0176): at a re-publish, what stays off or that it is back; at DECIDE, those of a dig taken out too.
+tests/integration/moderation-final-outcome-0176.test.ts
