@@ -8,6 +8,7 @@ import { V4DigStartingLine } from "@/components/v4/V4DigUndo";
 import { PublicDigCard, PublicDigChips, PublicDigModes, V4PublicDigNotes } from "@/components/v4/V4PublicDig";
 import { FinishedReportBody } from "@/components/v4/V4ReportClient";
 import { V4WaitCard } from "@/components/v4/V4WaitCard";
+import { focusIsLost } from "@/lib/focusGuard";
 import {
   DIG_RETURN_PARAM, DIG_RETURN_UNDER_PARAM, publicDigReturnPath, signInHrefs, usePublicSignedIn
 } from "@/components/v4/V4PublicSession";
@@ -394,8 +395,7 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
       setChosen([]);
       setWriting(false);
       // Focus that was in the box (or got lost with it) goes to "Dig into this"; focus the person took elsewhere stays there.
-      const active = document.activeElement;
-      if (active === null || active === document.body || (box.current?.contains(active) ?? false)) focusNext.current = { kind: "OPEN_BUTTON" };
+      if (focusIsLost() || (box.current?.contains(document.activeElement) ?? false)) focusNext.current = { kind: "OPEN_BUTTON" };
       setOpen(false);
     } else if (phase === "REFUSED") {
       const result = pending?.result;

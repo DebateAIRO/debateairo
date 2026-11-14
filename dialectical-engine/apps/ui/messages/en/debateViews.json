@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} level",
   "debateViews.levelCount.other": "{count} levels",
   "debateViews.mapInteractionHint": "Hover a wedge to inspect · click to focus",
+  "debateViews.mapKeysHint": "Arrow keys move between wedges · Enter makes one the focus",
   "debateViews.mapLegendHint": "Ring = depth · width = the amount of debate below it",
   "debateViews.mapReasoning": "Reasoning",
   "debateViews.moveToParentArgument": "Move up to parent argument: {claim}",

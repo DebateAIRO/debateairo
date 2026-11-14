@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Оскаржити",
+  "debateDrawers.challenge.whichPart": "Яка частина? (необов’язково)",
   "debateDrawers.common.close": "Закрити",
   "debateDrawers.common.false": "ні",
   "debateDrawers.common.notAvailable": "недоступно",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Тексту аргументу ще немає.",
   "debateDrawers.node.noCompletedReview": "Для цього вузла не записано завершеної перевірки моделлю іншого розробника.",
   "debateDrawers.node.noPreviousGenerations": "Попередніх створених версій немає.",
+  "debateDrawers.node.noScore.notInAnswer": "Ця картка не входить до відповіді, тому не має оцінки.",
+  "debateDrawers.node.noScore.notYet": "Оцінки ще немає. Оцінки буде показано, коли відповідь буде готова.",
+  "debateDrawers.node.noScore.question": "Саме запитання не оцінюється.",
   "debateDrawers.node.noScoringRecommendation": "Для цього аргументу немає рекомендації за результатами оцінювання.",
   "debateDrawers.node.notUseful": "не корисно",
   "debateDrawers.node.openRecommendedTargetClaim": "Відкрити рекомендоване цільове твердження",

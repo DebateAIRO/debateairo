@@ -47,7 +47,10 @@ export function V4QuestionShareLine({ share, catalog }: Readonly<{ share: Questi
   return <p className="v4QuestionShare v4Muted">{questionShareText(share, catalog)}</p>;
 }
 
-/** The top bar's line under the header: the question on one line (its whole words on hover), then this question's share. */
+/**
+ * The top bar's line under the header: the question on one line (its whole words on hover, and while the question's card on
+ * the map has the keyboard's ring: v4-map-looks.css, keyboard audit 2026-11-12 CSS-7), then this question's share.
+ */
 export function V4TopLine({ question, share, catalog }: Readonly<{ question: string; share: QuestionShare | null; catalog: MessageCatalog }>) {
   const words = question.replace(/\s+/g, " ").trim();
   if (words.length === 0 && share === null) return null;

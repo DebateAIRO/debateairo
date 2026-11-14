@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} úroveň",
   "debateViews.levelCount.other": "{count} úrovní",
   "debateViews.mapInteractionHint": "Podržaním kurzora nad výsekom ho preskúmate · kliknutím ho zameriate",
+  "debateViews.mapKeysHint": "Šípkami prechádzate medzi výsekmi · Enter vybraný zameria",
   "debateViews.mapLegendHint": "Prstenec = hĺbka · šírka = rozsah debaty pod ním",
   "debateViews.mapReasoning": "Uvažovanie",
   "debateViews.moveToParentArgument": "Prejsť vyššie na nadradený argument: {claim}",

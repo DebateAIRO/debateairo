@@ -69,6 +69,7 @@
   "debateViews.levelCount.many": "{count} níveis",
   "debateViews.levelCount.other": "{count} níveis",
   "debateViews.mapInteractionHint": "Passe o cursor sobre um segmento para o inspecionar · clique para focar",
+  "debateViews.mapKeysHint": "As setas movem entre segmentos · Enter foca um",
   "debateViews.mapLegendHint": "Anel = profundidade · largura = quantidade de debate abaixo",
   "debateViews.mapReasoning": "Raciocínio",
   "debateViews.moveToParentArgument": "Subir para o argumento superior: {claim}",

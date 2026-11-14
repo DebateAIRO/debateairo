@@ -76,6 +76,7 @@
   "debateViews.levelCount.many": "{count} lygio",
   "debateViews.levelCount.other": "{count} lygių",
   "debateViews.mapInteractionHint": "Užveskite žymeklį ant išpjovos, kad ją peržiūrėtumėte · spustelėkite, kad sutelktumėte rodinį",
+  "debateViews.mapKeysHint": "Rodyklių klavišais judama tarp išpjovų · Enter sutelkia rodinį",
   "debateViews.mapLegendHint": "Žiedas = gylis · plotis = po juo esančių debatų apimtis",
   "debateViews.mapReasoning": "Samprotavimas",
   "debateViews.moveToParentArgument": "Pereiti aukštyn prie pirminio argumento: {claim}",

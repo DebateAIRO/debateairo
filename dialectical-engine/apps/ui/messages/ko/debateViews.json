@@ -55,6 +55,7 @@
   "debateViews.leanAndFocusHint": "기울기 {lean} · 논거를 클릭하여 초점을 맞추세요",
   "debateViews.levelCount.other": "총 {count}단계에 분포",
   "debateViews.mapInteractionHint": "부채꼴 위에 마우스를 올려 확인 · 클릭하여 초점 맞추기",
+  "debateViews.mapKeysHint": "방향키로 부채꼴 이동 · Enter로 초점 맞추기",
   "debateViews.mapLegendHint": "고리 = 깊이 · 너비 = 아래에 이어지는 토론의 양",
   "debateViews.mapReasoning": "추론",
   "debateViews.moveToParentArgument": "상위 논거로 이동: {claim}",

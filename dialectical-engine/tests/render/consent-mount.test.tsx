@@ -226,7 +226,7 @@ describe("S01-C5 the consent state machine, its mount and the Settings re-entry"
     expect(source.split("import { CookieConsent }").length - 1, "exactly one import").toBe(1);
     // Only the skip link (first in the Tab order) may precede it: the consent mount never does.
     expect(source, "TopBar is still the first child of appShell after the skip link").toMatch(
-      /<div className="appShell">\s*(?:\{\/\*[^*]*\*\/\}\s*)?<a className="skipLink" href="#main-content">[^<]*<\/a>\s*<TopBar \/>/
+      /<div className="appShell">\s*(?:\{\/\*[^*]*\*\/\}\s*)?<SkipLink>[^<]*<\/SkipLink>\s*<TopBar \/>/
     );
 
     // `t3-library.test.tsx:244` and `t9-landing.test.tsx:121-125` assert on the

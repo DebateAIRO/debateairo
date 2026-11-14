@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} tasolla",
   "debateViews.levelCount.other": "{count} tasolla",
   "debateViews.mapInteractionHint": "Tarkastele sektoria viemällä osoitin sen päälle · kohdista napsauttamalla",
+  "debateViews.mapKeysHint": "Nuolinäppäimet siirtyvät sektorien välillä · Enter kohdistaa valittuun",
   "debateViews.mapLegendHint": "Kehä = syvyys · leveys = sen alla olevan väittelyn määrä",
   "debateViews.mapReasoning": "Päättely",
   "debateViews.moveToParentArgument": "Siirry ylempään argumenttiin: {claim}",

@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} рівні",
   "debateViews.levelCount.other": "{count} рівнях",
   "debateViews.mapInteractionHint": "Наведіть на сектор, щоб переглянути · натисніть, щоб сфокусуватися",
+  "debateViews.mapKeysHint": "Стрілки переміщують між секторами · Enter фокусує вибраний",
   "debateViews.mapLegendHint": "Кільце = глибина · ширина = обсяг дебатів під ним",
   "debateViews.mapReasoning": "Міркування",
   "debateViews.moveToParentArgument": "Перейти до батьківського аргументу: {claim}",

@@ -109,17 +109,22 @@ export function SensitiveDataConsentDialog({
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const agreeRef = React.useRef<HTMLElement | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const saving = React.useRef(false);
   const [failed, setFailed] = React.useState(false);
-  // Esc, the backdrop and "I don't agree" all decline: no dismissal can agree on anyone's behalf.
+  // Esc, the backdrop and "I don't agree" all decline: no dismissal can agree on anyone's behalf. While "I agree" is
+  // saving, Esc does nothing: the consent would be saved anyway (keyboard audit 2026-11-12).
   useHideOutside(dialogRef);
-  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: agreeRef, onClose: onDecline, returnFocusRef });
+  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: agreeRef, onClose: busy ? () => undefined : onDecline, returnFocusRef });
 
   async function agree(): Promise<void> {
+    if (saving.current) return;
+    saving.current = true;
     setBusy(true);
     setFailed(false);
     try {
       await onAgree();
     } catch {
+      saving.current = false;
       setFailed(true);
       setBusy(false);
     }
@@ -129,7 +134,8 @@ export function SensitiveDataConsentDialog({
     <div
       className="policyScrim"
       ref={scrimRef}
-      onClick={(event) => backdropCloseHandler(scrimRef.current, onDecline)(event)}
+      // A click outside while "I agree" is saving declines nothing either, for the same reason as Esc above.
+      onClick={(event) => { if (!busy) backdropCloseHandler(scrimRef.current, onDecline)(event); }}
     >
       <div
         className="policyBezel sensitiveConsent"
@@ -177,7 +183,9 @@ export function SensitiveDataConsentDialog({
               type="button"
               className="policyPrimary"
               onClick={() => { void agree(); }}
-              disabled={busy}
+              // aria-disabled, not disabled: a disabled button drops focus out of the open modal, and a failed save
+              // must leave the person on it, beside the alert (keyboard audit 2026-11-12).
+              aria-disabled={busy ? "true" : undefined}
               ref={(node) => { agreeRef.current = node; }}
             >
               {t(catalog, "home.sensitiveConsent.agree")}

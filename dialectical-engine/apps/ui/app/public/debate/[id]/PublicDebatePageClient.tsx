@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { PublicDebate } from "@debateai/contract";
 import { AiNotice } from "@/components/AiNotice";
 import { PublicAnswerDisclosure } from "@/components/PublicAnswerDisclosure";
@@ -14,6 +15,8 @@ import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import { publicPageHref } from "@/lib/v4/publicState";
 import chromeEnglish from "@/messages/en/chrome.json";
 import v4English from "@/messages/en/v4.json";
+import { focusIsLost } from "@/lib/focusGuard";
+import { takeRetried } from "./CouldNotLoad";
 
 /*
  * A published debate, as a stranger reads it. Owner's screen review, 3 Nov 2026:
@@ -65,6 +68,12 @@ export function PublicDebatePageClient({
   const author = debate.author_name_gone === true ? t(v4Catalog, "v4.public.aContributor") : debate.author_pseudonym;
   // The owner's answer to question 4 (5 Nov 2026, A): the long form with the year, "published 3 November 2026".
   const published = t(publicCatalog, "public.header.summary", { author, date: formatDate(locale, debate.published_at, { dateStyle: "long" }) });
+  // Keyboard audit 2026-11-12: brought by "Try again" on the couldn't-load note, which went with the note: focus goes to
+  // the question, the page's heading. A fresh load takes no focus (it starts at its top).
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (takeRetried() && focusIsLost()) title.current?.focus();
+  }, []);
   return (
     <V4PublicSessionProvider>
       <div className="v4Root v4PubPage" data-public-page>
@@ -77,8 +86,8 @@ export function PublicDebatePageClient({
           </V4PublicTopMenu>
         </V4PublicHeader>
         {/* The layout already holds the page's one <main>. */}
-        <div className="v4PubMain">
-          <h1 className="v4Serif v4PubTitle" data-ai-generated="true" lang={storyLocale} dir="auto">{debate.question}</h1>
+        <div className="v4PubMain" id="page-content" tabIndex={-1}>
+          <h1 ref={title} tabIndex={-1} className="v4Serif v4PubTitle" data-ai-generated="true" lang={storyLocale} dir="auto">{debate.question}</h1>
           <p className="v4PubPublished v4Muted">{published}</p>
           {debate.changed_after_review === true
             ? <p className="v4PubChangedLine v4Muted" data-public-changed>{t(v4Catalog, "v4.public.changedAfterReview")}</p>

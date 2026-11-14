@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /*
@@ -45,9 +45,19 @@ export function V4ReadyNote(props: Readonly<{
   /** The note's one action: a button ("See it", "Show me") or a link (the report). */
   action: Readonly<{ label: string; onAct: () => void; href?: string }>;
   onClose: () => void;
+  /**
+   * Keyboard audit 2026-11-12 (V4B-F2, V4A-13): where focus goes when ✕ takes the note away with focus in it, so it is not
+   * left on the empty bottom stack (the map: the page's focusBack). Absent: the site's focus guard keeps the place.
+   */
+  returnFocus?: () => HTMLElement | null;
   catalog: MessageCatalog;
 }>) {
   const { text, action, onClose, catalog } = props;
+  const close = (event: MouseEvent<HTMLButtonElement>): void => {
+    const inNote = event.currentTarget.parentElement?.contains(document.activeElement) ?? false;
+    onClose();
+    if (inNote) props.returnFocus?.()?.focus();
+  };
   return (
     <div className="v4ReadyNote v4Highlight">
       <span className="v4ReadyNoteText"><ReadyWords text={text} /></span>
@@ -56,7 +66,7 @@ export function V4ReadyNote(props: Readonly<{
       ) : (
         <Link className="v4ReadyNoteAct" href={action.href} onClick={action.onAct}>{action.label}</Link>
       )}
-      <button type="button" className="v4ReadyNoteClose" onClick={onClose} aria-label={t(catalog, "v4.ready.close")}>
+      <button type="button" className="v4ReadyNoteClose" onClick={close} aria-label={t(catalog, "v4.ready.close")}>
         <span aria-hidden="true">✕</span>
       </button>
     </div>

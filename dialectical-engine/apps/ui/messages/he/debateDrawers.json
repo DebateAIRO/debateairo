@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "ערעור על טענה זו",
+  "debateDrawers.challenge.whichPart": "איזה חלק? (רשות)",
   "debateDrawers.common.close": "סגירה",
   "debateDrawers.common.false": "לא נכון",
   "debateDrawers.common.notAvailable": "לא זמין",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "אין עדיין טקסט לטיעון.",
   "debateDrawers.node.noCompletedReview": "לא תועדה עבור צומת זה ביקורת שהושלמה בידי יוצר אחר.",
   "debateDrawers.node.noPreviousGenerations": "אין יצירות קודמות.",
+  "debateDrawers.node.noScore.notInAnswer": "כרטיס זה אינו חלק מהתשובה, ולכן אין לו ציון.",
+  "debateDrawers.node.noScore.notYet": "עדיין אין ציון. הציונים מופיעים כשהתשובה מוכנה.",
+  "debateDrawers.node.noScore.question": "השאלה עצמה אינה מקבלת ציון.",
   "debateDrawers.node.noScoringRecommendation": "אין המלצה למתן ציון לטיעון זה.",
   "debateDrawers.node.notUseful": "לא מועיל",
   "debateDrawers.node.openRecommendedTargetClaim": "פתיחת טענת היעד המומלצת",

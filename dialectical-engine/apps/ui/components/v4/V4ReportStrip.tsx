@@ -207,8 +207,12 @@ export function useReportStart(input: Readonly<{
   // Asked from elsewhere (another tab, the carry-on): the strip has nothing left to ask.
   useEffect(() => {
     if (at !== null && !input.canAsk && !flight.current) {
+      // Keyboard audit 2026-11-12 (V4C-11): focus in the strip goes back to the button that opened it, as Not yet gives it,
+      // not to the top of the header around it.
+      const focused = document.activeElement?.closest("[data-report-strip]") ?? null;
       setAt(null);
       setNote(null);
+      if (focused !== null) setBack((before) => ({ at, serial: (before?.serial ?? 0) + 1 }));
     }
   }, [at, input.canAsk]);
 

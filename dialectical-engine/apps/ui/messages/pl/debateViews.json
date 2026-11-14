@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} poziom",
   "debateViews.levelCount.other": "{count} poziomu",
   "debateViews.mapInteractionHint": "Najedź na wycinek, aby go zbadać · kliknij, aby ustawić fokus",
+  "debateViews.mapKeysHint": "Strzałki przenoszą między wycinkami · Enter ustawia fokus na wybranym",
   "debateViews.mapLegendHint": "Pierścień = głębokość · szerokość = rozmiar debaty poniżej",
   "debateViews.mapReasoning": "Rozumowanie",
   "debateViews.moveToParentArgument": "Przejdź wyżej do argumentu nadrzędnego: {claim}",

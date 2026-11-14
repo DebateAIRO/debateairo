@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { V4Header } from "@/components/v4/V4Header";
 import { MapList, useMapShelf } from "@/components/v4/V4MapShelf";
+import { focusIsLost } from "@/lib/focusGuard";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { ReadingLevel } from "@/lib/v4/types";
 
@@ -26,12 +27,23 @@ const ALL_MAPS_DIGS_MAX = 5;
 function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; locale: string }>) {
   const [want, setWant] = useState(ALL_MAPS_STEP);
   const { load, busy, retry } = useMapShelf({ enabled: true, want, catalog });
+  // Keyboard audit 2026-11-12 (V4A-12): "Show more" is off while it reads (and goes when nothing more is left); once the
+  // cards come, focus goes to the first new one, the thing asked for, unless the person has moved on meanwhile.
+  const area = useRef<HTMLDivElement>(null);
+  const moreFrom = useRef<number | null>(null);
+  const shownCount = load.status === "READ" ? load.read.maps.length : 0;
+  useEffect(() => {
+    const from = moreFrom.current;
+    if (from === null || shownCount <= from) return;
+    moreFrom.current = null;
+    if (focusIsLost()) area.current?.querySelectorAll<HTMLElement>(".v4ShelfCard")[from]?.focus();
+  }, [shownCount]);
   return (
     <>
       {/* journey-f19: the quota share shows only on the ask, choosing and map pages; My questions is none of them. */}
       <V4Header catalog={catalog} showQuota={false} />
-      {/* UI-4: the site layout already holds the page's one <main>. */}
-      <div className="v4AskMain v4MapsMain">
+      {/* UI-4: the site layout already holds the page's one <main>. Keyboard audit 2026-11-12 (CHR1-4): the skip link comes here. */}
+      <div ref={area} className="v4AskMain v4MapsMain" id="page-content" tabIndex={-1}>
         <h1 className="v4AskTitle v4Serif">{t(catalog, "v4.maps.title")}</h1>
         {load.status === "LOADING" ? <p className="v4AskHint v4Muted" role="status">{t(catalog, "v4.common.loading")}</p> : null}
         {load.status === "FAILED" ? (
@@ -51,7 +63,10 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
         ) : null}
         {load.status === "READ" && load.read.more ? (
           <div>
-            <button type="button" className="v4Btn" disabled={busy} aria-busy={busy} onClick={() => setWant((value) => value + ALL_MAPS_STEP)}>
+            <button type="button" className="v4Btn" disabled={busy} aria-busy={busy} onClick={() => {
+              moreFrom.current = shownCount;
+              setWant((value) => value + ALL_MAPS_STEP);
+            }}>
               {t(catalog, "v4.maps.more")}
             </button>
           </div>

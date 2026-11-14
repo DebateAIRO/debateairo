@@ -227,7 +227,7 @@ describe("chrome", () => {
 
     // Only the skip link (first in the Tab order) may precede it; TopBar stays a direct child.
     expect(layoutSource).toMatch(
-      /<div className="appShell">\s*(?:\{\/\*[^*]*\*\/\}\s*)?<a className="skipLink" href="#main-content">[^<]*<\/a>\s*<TopBar \/>/
+      /<div className="appShell">\s*(?:\{\/\*[^*]*\*\/\}\s*)?<SkipLink>[^<]*<\/SkipLink>\s*<TopBar \/>/
     );
   });
 

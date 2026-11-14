@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} düzey",
   "debateViews.levelCount.other": "{count} düzey",
   "debateViews.mapInteractionHint": "İncelemek için bir dilimin üzerine gelin · odaklamak için tıklayın",
+  "debateViews.mapKeysHint": "Ok tuşları dilimler arasında gezinir · Enter odaklar",
   "debateViews.mapLegendHint": "Halka = derinlik · genişlik = altındaki tartışmanın miktarı",
   "debateViews.mapReasoning": "Akıl yürütme",
   "debateViews.moveToParentArgument": "Üst argümana git: {claim}",

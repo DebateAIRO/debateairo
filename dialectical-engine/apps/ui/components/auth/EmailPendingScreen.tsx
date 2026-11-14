@@ -5,6 +5,7 @@ import { ContractHttpError, type ContractClient, type LocaleCode } from "@debate
 import { AuthShell } from "@/components/AuthShell";
 import { TurnstileChallenge } from "@/components/auth/TurnstileChallenge";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
+import { focusIsLost } from "@/lib/focusGuard";
 import { catalogLocale } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { validTurnstilePublicConfig, type TurnstilePublicConfig } from "@/lib/turnstile";
@@ -42,6 +43,20 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
   const inFlight = useRef(false);
   const mounted = useRef(true);
   const configured = turnstile !== undefined && validTurnstilePublicConfig(turnstile);
+  // Keyboard audit 2026-11-12 (AUTH-11): Resend stays off after a send (the new countdown, or the spent bot check), so
+  // focus goes to the line that says how the send went: the sentence at the top, or the refusal under Resend.
+  const outcomeLine = useRef<HTMLParagraphElement>(null), refusalLine = useRef<HTMLParagraphElement>(null);
+  const settledLine = useRef<"outcome" | "refusal" | null>(null);
+  const sentWords = useRef<string | null>(null);
+  useEffect(() => {
+    const line = settledLine.current;
+    if (busy || line === null) return;
+    settledLine.current = null;
+    if (focusIsLost()) (line === "outcome" ? outcomeLine : refusalLine).current?.focus();
+    // The resend entry's send is said once: by the line that took focus, or by the announcer when focus stayed put.
+    else if (line === "outcome" && sentWords.current !== null) announcer.announce(sentWords.current);
+    sentWords.current = null;
+  }, [busy]); // eslint-disable-line react-hooks/exhaustive-deps -- runs when the send has ended, with that send's words
 
   useEffect(() => {
     mounted.current = true;
@@ -69,12 +84,14 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
       });
       if (mounted.current) {
         setDeadline(Date.now() + acknowledgement.retry_after_seconds * 1_000);
-        if (context !== undefined) { setSent(true); announcer.announce(context.sent); }
+        if (context !== undefined) { setSent(true); sentWords.current = context.sent; }
+        settledLine.current = "outcome";
       }
     } catch (failure) {
       const code = failure instanceof ContractHttpError ? failure.serverCode : null;
       if (mounted.current) setError(code === "EMAIL_INVALID" ? "auth.emailUndeliverable"
         : code === "MAIL_DAILY_LIMIT" ? "auth.mailDailyLimit" : "auth.pending.unavailable");
+      settledLine.current = "refusal";
     } finally {
       inFlight.current = false;
       if (mounted.current) { setBusy(false); setResetKey(value => value + 1); }
@@ -88,7 +105,7 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
   return <AuthShell eyebrow={context?.eyebrow ?? t(catalog, "auth.signUp.eyebrow")} title={context?.title ?? t(catalog, "auth.pending.title")}
     description={email} footer={null} focusTitle>
     {announcer.region}
-    <p className="authFinePrint" role={outcome ? "status" : undefined} aria-live={outcome ? "polite" : undefined}>{sent && context !== undefined ? context.sent : notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
+    <p ref={outcomeLine} tabIndex={-1} className="authFinePrint" role={outcome ? "status" : undefined} aria-live={outcome ? "polite" : undefined}>{sent && context !== undefined ? context.sent : notice ?? t(catalog, "auth.signUp.registrationSent")}</p>
     {configured ? <TurnstileChallenge siteKey={turnstile.siteKey} nonce={turnstile.nonce} action="resend-verification"
       locale={locale} resetKey={resetKey} onToken={token => { setProof(token); if (token !== null) setProofUnavailable(false); }} onError={() => setProofUnavailable(true)} /> : null}
     {/* Countdown text has no live region; assistive readers hear only stable state. */}
@@ -97,7 +114,7 @@ export function EmailPendingScreen({ email, retryAfterSeconds, client, catalog, 
     <button className="authPrimary" type="button" data-action="resend" disabled={busy || seconds > 0 || proof === null || !configured} onClick={() => { void resend(); }}>
       {context?.action ?? t(catalog, "auth.pending.resend")}
     </button>
-    {error !== null ? <p className="authFinePrint" role="alert">{t(catalog, error)}</p> : null}
+    {error !== null ? <p ref={refusalLine} tabIndex={-1} className="authFinePrint" role="alert">{t(catalog, error)}</p> : null}
     {!configured || proofUnavailable ? <p className="authFinePrint" role="status">{t(catalog, "auth.pending.proofUnavailable")}</p> : null}
     <button className="authSecondary" type="button" disabled={busy} onClick={onDifferentEmail}>{t(catalog, "auth.pending.different")}</button>
   </AuthShell>;

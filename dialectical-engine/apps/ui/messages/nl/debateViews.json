@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} niveau",
   "debateViews.levelCount.other": "{count} niveaus",
   "debateViews.mapInteractionHint": "Beweeg over een segment voor details · klik om het centraal te stellen",
+  "debateViews.mapKeysHint": "Pijltjestoetsen wisselen tussen segmenten · Enter stelt er één centraal",
   "debateViews.mapLegendHint": "Ring = diepte · breedte = omvang van het onderliggende debat",
   "debateViews.mapReasoning": "Redenering",
   "debateViews.moveToParentArgument": "Omhoog naar het bovenliggende argument: {claim}",

@@ -369,12 +369,72 @@ describe("on a phone: two pinned lines and the Options sheet (read-d5, choose-f1
     expect(document.activeElement).toBe(optionsButton());
   });
 
+  // Keyboard audit 2026-11-12 (V4A-11): the sheet is aria-modal, so Tab and Shift+Tab stay inside it; Escape closes it.
+  it("the sheet holds the keyboard: Tab past Done and Shift+Tab from the top stay inside; Escape gives focus back to Options", async () => {
+    await mount(props({ narrow: true, carryOnOffered: true }));
+    await act(async () => { optionsButton()!.focus(); });
+    await press(optionsButton()!);
+    const open = sheet()!;
+    const tab = async (shiftKey = false): Promise<void> => {
+      await act(async () => {
+        document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey, bubbles: true, cancelable: true }));
+      });
+    };
+    expect(document.activeElement).toBe(open);
+    await tab(true);
+    expect(document.activeElement).toBe(buttonNamed("Done", open));
+    await tab();
+    expect(open.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(startButton());
+    await act(async () => {
+      document.activeElement!.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+    expect(sheet()).toBeNull();
+    expect(document.activeElement).toBe(optionsButton());
+  });
+
   it("the combine line sits above a slimmer Start bar", async () => {
     await mount(props({ narrow: true, combineLine: <p className="made-up-combine">Made-up combine line.</p> }));
     expect(bar().classList.contains("v4StartBar--slim")).toBe(true);
     const line = host!.querySelector(".made-up-combine")!;
     expect(bar().contains(line)).toBe(true);
     expect(follows(line, startButton())).toBe(true);
+  });
+});
+
+/*
+ * Keyboard audit 2026-11-12 (V4A-16): the pinned bar publishes its measured height on the page root (--v4-start-bar-room, as
+ * the map page's stack publishes --v4-stack-room), which v4-ask.css keeps free at the window's foot while the bar is pinned.
+ */
+describe("the bar's room at the window's foot (V4A-16)", () => {
+  const room = (): string => document.documentElement.style.getPropertyValue("--v4-start-bar-room");
+  const measured = (): void => {
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+      const height = this.classList.contains("v4StartBar") ? 187.2 : 0;
+      return { x: 0, y: 0, top: 0, left: 0, right: 0, bottom: height, width: 0, height, toJSON: () => ({}) } as DOMRect;
+    });
+  };
+  afterEach(() => vi.restoreAllMocks());
+
+  it("step 2's Start bar, on a computer and on a phone: its height while it shows, nothing once it is gone", async () => {
+    measured();
+    await mount(props());
+    expect(room()).toBe("188px");
+    await rerender(props({ narrow: true }));
+    expect(room()).toBe("188px");
+    act(() => root?.unmount());
+    root = null;
+    expect(room()).toBe("");
+  });
+
+  it("step 1's Next bar too", async () => {
+    measured();
+    await mount({
+      job: "NEXT", catalog: CATALOG, locale: "en", freePlan: false, next: { label: "Next", disabled: false, busy: false, onPress: () => undefined },
+      justAnswer: { shown: true, ready: true, onPress: calls.onJust }, declined: null, under: null, publicNotice: null, above: null,
+      narrow: true, textFocused: false, helpFirst: false
+    });
+    expect(room()).toBe("188px");
   });
 });
 

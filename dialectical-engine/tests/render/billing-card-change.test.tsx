@@ -81,7 +81,10 @@ describe("P20 the card change page (A11, A12)", () => {
     expect(container.textContent).toContain(EN["billing.card.taxPlaceNote"]);
     // Spec §2.18: the card-saving agreement with the plan's monthly total, before the button.
     expect(container.textContent).toContain(EN["billing.consent.renewal"]!.replace("{total}", "$24.20"));
-    expect(continueButton(container)!.disabled).toBe(true);
+    // Locked until the agreement is ticked, but still focusable (keyboard audit 2026-11-12, SET-10): a press sends nothing.
+    expect(continueButton(container)!.getAttribute("aria-disabled")).toBe("true");
+    await act(async () => { continueButton(container)!.click(); });
+    expect(client.startCardChange).not.toHaveBeenCalled();
     await act(async () => { container.querySelector<HTMLInputElement>("#card-agreement")!.click(); });
     await act(async () => { continueButton(container)!.click(); });
     await settle();

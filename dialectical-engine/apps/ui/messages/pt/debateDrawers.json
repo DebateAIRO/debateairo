@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Contestar este ponto",
+  "debateDrawers.challenge.whichPart": "Que parte? (opcional)",
   "debateDrawers.common.close": "Fechar",
   "debateDrawers.common.false": "falso",
   "debateDrawers.common.notAvailable": "não disponível",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Ainda não existe texto para o argumento.",
   "debateDrawers.node.noCompletedReview": "Não está registada qualquer revisão concluída por um modelo de outro criador para este nó.",
   "debateDrawers.node.noPreviousGenerations": "Não existem gerações anteriores.",
+  "debateDrawers.node.noScore.notInAnswer": "Este cartão não faz parte da resposta, por isso não tem pontuação.",
+  "debateDrawers.node.noScore.notYet": "Ainda sem pontuação. As pontuações aparecem quando a resposta estiver pronta.",
+  "debateDrawers.node.noScore.question": "A própria pergunta não tem pontuação.",
   "debateDrawers.node.noScoringRecommendation": "Não está disponível qualquer recomendação de pontuação para este argumento.",
   "debateDrawers.node.notUseful": "não útil",
   "debateDrawers.node.openRecommendedTargetClaim": "Abrir a alegação-alvo recomendada",

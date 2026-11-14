@@ -55,11 +55,15 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
   const [highlightedCode, setHighlightedCode] = useState<LocaleCode>(locale);
   // A pointer press is under way: the blur it causes is the person's own click, never a focus loss to repair.
   const pressed = useRef(false);
+  // The person is using keys in the list (it was opened from the keyboard, or a key was pressed in it): only then is
+  // the arrow keys' row ringed and scrolled into view. A person using a pointer sees the list as it always was.
+  const [keys, setKeys] = useState(false);
 
   const onOpenerClose = opener?.onClose;
   const close = useCallback((returnFocus = false): void => {
     setQuery("");
     setHighlightedCode(locale);
+    setKeys(false);
     if (onOpenerClose !== undefined) {
       onOpenerClose(returnFocus);
       return;
@@ -82,6 +86,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
     pressed.current = false;
     const onPointerDown = (event: PointerEvent) => {
       pressed.current = true;
+      setKeys(false);
       if (rootRef.current?.contains(event.target as Node) || panelRef.current?.contains(event.target as Node)) return;
       close(false);
     };
@@ -95,6 +100,14 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
     if (!filteredCodes.includes(highlightedCode)) setHighlightedCode(filteredCodes[0]);
   }, [filteredCodes, highlightedCode]);
 
+  // Focus stays in the search field, so the browser never scrolls the arrow keys' row into the list for us
+  // (keyboard audit 2026-11-12).
+  useEffect(() => {
+    if (!open || !keys) return;
+    const row = panelRef.current?.querySelector<HTMLElement>(`[id="${listId}-${highlightedCode}"]`);
+    if (typeof row?.scrollIntoView === "function") row.scrollIntoView({ block: "nearest" });
+  }, [open, keys, highlightedCode, listId]);
+
   function select(code: LocaleCode): void {
     writeLocaleCookie(code);
     // The chosen row (or the search field) unmounts before the reload lands: focus waits on the trigger, not <body>.
@@ -103,6 +116,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
   }
 
   function onKeyDown(event: KeyboardEvent): void {
+    if (!keys) setKeys(true);
     if (event.key === "Tab" && panelRef.current?.contains(event.target as Node)) {
       // The panel sits at the end of <body>, so Tab out of it would leave the page: it closes and the step starts
       // from the trigger instead (Tab then moves on past it; Shift+Tab stays on it, the panel's place in the order).
@@ -155,10 +169,12 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-controls={panelId}
-        onClick={() => {
+        onClick={(event) => {
           if (open) close(false);
           else {
             setHighlightedCode(locale);
+            // A press from the keyboard is a click with no pointer count.
+            setKeys(event.detail === 0);
             setOwnOpen(true);
           }
         }}
@@ -175,6 +191,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
           style={{ position: "fixed", top: position.top, left: position.left, right: "auto", bottom: "auto", width: position.width }}
           id={panelId}
           className="languageSwitcherPanel"
+          data-keys={keys ? "true" : undefined}
           role="dialog"
           aria-modal="false"
           aria-label={t(catalog, "chrome.interfaceLanguage")}

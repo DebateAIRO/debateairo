@@ -69,6 +69,7 @@
   "debateViews.levelCount.one": "{count} livello",
   "debateViews.levelCount.other": "{count} livelli",
   "debateViews.mapInteractionHint": "Passa il puntatore su uno spicchio per esaminarlo · fai clic per metterlo a fuoco",
+  "debateViews.mapKeysHint": "Le frecce ti spostano tra gli spicchi · Enter ne mette uno a fuoco",
   "debateViews.mapLegendHint": "Anello = profondità · larghezza = quantità di dibattito sottostante",
   "debateViews.mapReasoning": "Ragionamento",
   "debateViews.moveToParentArgument": "Risali all’argomentazione superiore: {claim}",

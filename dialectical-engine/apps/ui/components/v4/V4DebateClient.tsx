@@ -13,6 +13,7 @@ import {
 } from "@debateai/contract";
 import { AuthGate } from "@/components/AuthGate";
 import { TAB_PREFIX_ATTRIBUTE } from "@/components/DocumentTitle";
+import { focusIsLost, isFocusParked } from "@/lib/focusGuard";
 import { RoomNotice } from "@/components/billing/RoomNotice";
 import { V4BottomStack, type V4BarJob } from "@/components/v4/V4BottomStack";
 import { V4ChangesBar } from "@/components/v4/V4ChangesBar";
@@ -1222,8 +1223,15 @@ function V4Debate({
   }, [layout, openQuestion]);
 
   useEffect(() => {
-    if (focusRequest > 0) headingRef.current?.focus();
+    // Keyboard audit 2026-11-12 (V4B-F5): during the run "Your question" takes the panel away, so focus goes to the
+    // question's card on the map instead.
+    if (focusRequest > 0) (headingRef.current ?? firstCardHeading())?.focus();
   }, [focusRequest]);
+  // V4B-M2: "Choose what to dig ›" on the map: once the path's panel is drawn, its choices come into view with focus.
+  const [choicesRequest, setChoicesRequest] = useState(0);
+  useEffect(() => {
+    if (choicesRequest > 0) showChoices(panelColRef.current, "choices");
+  }, [choicesRequest]);
 
   // R2TIME-4/R2REG-4, the wave-2 browser check (4 Nov): closing the phone map puts focus back on what opened it (the Map
   // button, "Your picks ▸" or the minimap), unless a row already moved it on to the panel heading (the effect above runs
@@ -1462,6 +1470,8 @@ function V4Debate({
     select,
     hideNews: () => setHiddenNews(news.length),
     focusHeading: () => headingRef.current?.focus(),
+    // V4B-F2 (keyboard audit 2026-11-12): the ready note's ✕ gives focus back where the dig notes do (focusBack, below).
+    returnFocus: () => focusBack(),
     reportHref,
     // Task 62 (wait-f10): a short answer that came after the page had stopped waiting for it.
     shortAnswerLate,
@@ -1549,12 +1559,88 @@ function V4Debate({
 
   // wait-f4: the tab title's state word ("Looking into it", "Ready", "(1) changed"), read by DocumentTitle.
   const tabPrefix = ready.tabPrefix === "" ? {} : { [TAB_PREFIX_ATTRIBUTE]: ready.tabPrefix };
+  // Keyboard audit 2026-11-12 (V4B-F6, V4B-F7): a screen before the map (couldn't load, stopped, the R22 first card) is swapped
+  // whole when a read answers, and takes the focused control with it. When focus was in that screen and nothing holds it
+  // now, it goes to the new screen's heading, or to the map's question card. Never on a first load: focus was not there.
+  const screen = map === null && load === null && loadProblem === null ? "outline" : map === null && runMap === null
+    ? `centre:${load?.kind === "RUN" ? load.run.state : loadProblem}` : "map";
+  const focusInScreen = useRef(false);
+  useEffect(() => {
+    // Whether the last thing the person did was a pointer press (a key since then: the keyboard).
+    let pointer = false;
+    const note = (event: FocusEvent): void => {
+      // The site's focus guard keeping the place (an outline holds nothing to focus) is no move of the person's.
+      if (!(event.target instanceof Element) || isFocusParked(event.target)) return;
+      // A press on the screen's plain text focuses the content's start itself (it takes focus for the skip link): no focus
+      // of the person's in the screen, so nothing is moved for them when it is swapped (wave-3 fix round, A5).
+      if (pointer && event.target.id === "page-content") {
+        focusInScreen.current = false;
+        return;
+      }
+      focusInScreen.current = event.target.closest(".v4DebCentre") !== null;
+    };
+    // A press with a pointer outside the screen: the person has left it, whether or not the press focused anything.
+    const left = (event: PointerEvent): void => {
+      pointer = true;
+      if (!(event.target instanceof Element) || event.target.closest(".v4DebCentre") === null) focusInScreen.current = false;
+    };
+    const key = (): void => {
+      pointer = false;
+    };
+    document.addEventListener("focusin", note);
+    document.addEventListener("pointerdown", left);
+    document.addEventListener("keydown", key, true);
+    return () => {
+      document.removeEventListener("focusin", note);
+      document.removeEventListener("pointerdown", left);
+      document.removeEventListener("keydown", key, true);
+    };
+  }, []);
+  const shownScreen = useRef(screen);
+  useEffect(() => {
+    if (shownScreen.current === screen) return;
+    shownScreen.current = screen;
+    if (screen === "outline" || !focusInScreen.current || !focusIsLost()) return;
+    const title = document.querySelector<HTMLElement>(".v4DebCentre h1");
+    if (title !== null && !title.hasAttribute("tabindex")) title.setAttribute("tabindex", "-1");
+    (title ?? firstCardHeading() ?? headingRef.current)?.focus();
+  }, [screen]);
+  // Keyboard audit 2026-11-12 (V4B-M4): browser zoom or a resize across 1440 / 1100 / 768 swaps the tree for the folded tree,
+  // the outline or the phone's layout, and the focused card goes with it. When focus was on something in the map area and
+  // nothing holds it after the swap, it goes to that same item in the new layout, else the open one, else the panel heading.
+  // Never on the first look (nothing was focused there yet), and never when the person had nothing focused in the area.
+  const layoutFocus = useRef<{ inArea: boolean; row: string | null }>({ inArea: false, row: null });
+  useEffect(() => {
+    const note = (event: FocusEvent): void => {
+      if (!(event.target instanceof Element) || isFocusParked(event.target)) return;
+      // The content's start itself (a press on plain text, the skip link) is no item of the area. Only a map or outline row
+      // and the panel have a counterpart in the other layout; anything else that goes (the mid strip, the phone's bar) is
+      // left to the site's focus guard, which keeps the place (wave-3 fix round, A6).
+      const inArea = event.target.id !== "page-content" && event.target.closest(".v4DebBehind") !== null
+        && (event.target.closest(".v4DebMapCol [data-row]") !== null || event.target.closest(".v4DebPanelCol") !== null);
+      layoutFocus.current = { inArea, row: inArea ? event.target.closest("[data-row]")?.getAttribute("data-row") ?? null : null };
+    };
+    document.addEventListener("focusin", note);
+    return () => document.removeEventListener("focusin", note);
+  }, []);
+  const shownLayout = useRef(layout);
+  useEffect(() => {
+    if (shownLayout.current === layout) return;
+    shownLayout.current = layout;
+    const { inArea, row } = layoutFocus.current;
+    if (!inArea || !focusIsLost()) return;
+    // The outline names a row by its place too (`path:b1@root`): the item is the part before the "@".
+    const item = row?.split("@")[0];
+    const same = item === undefined ? undefined : [...document.querySelectorAll<HTMLElement>(".v4DebMapCol [data-row]")]
+      .find((one) => one.getAttribute("data-row")?.split("@")[0] === item);
+    (same ?? document.querySelector<HTMLElement>(".v4DebMapCol [aria-current='true']") ?? headingRef.current)?.focus();
+  }, [layout]);
   if (loadProblem === "SIGNED_OUT" && map === null) {
     // wait-f1: the sign-in ended (on the waiting card, or before the first read): sign in again, and come back here.
     return (
       <div className="v4DebPage">
         <div key={HEADER_FRAME} className="v4DebBehind">{header}</div>
-        <div className="v4DebCentre">
+        <div className="v4DebCentre" id="page-content" tabIndex={-1}>
           <V4SignInAgain
             questionLine={load?.kind === "RUN" ? load.run.question_line : null}
             signInHref={signInHrefHere()}
@@ -1572,7 +1658,7 @@ function V4Debate({
         <div key={HEADER_FRAME} className="v4DebBehind">{header}</div>
         {handOff !== null && load === null
           ? <HandOffMap handOff={handOff} catalog={catalog} locale={locale} />
-          : <div className="v4DebMain"><V4LoadingOutline catalog={catalog} /></div>}
+          : <div className="v4DebMain" id="page-content" tabIndex={-1}><V4LoadingOutline catalog={catalog} /></div>}
       </div>
     );
   }
@@ -1586,7 +1672,7 @@ function V4Debate({
         {/* journey-f18 / read-f25: the waiting, paused and failed screens are on the map's step of the four. */}
         {load?.kind === "RUN" ? <div className="v4StepsTop"><V4Steps current="map" shape="line" catalog={catalog} /></div> : null}
         {/* UI-4: the layout already holds the page's one <main>. */}
-        <div className="v4DebCentre">
+        <div className="v4DebCentre" id="page-content" tabIndex={-1}>
           {load === null || load.kind !== "RUN" ? (
             <StatusScreen
               problem={loadProblem}
@@ -1735,6 +1821,7 @@ function V4Debate({
     changed,
     picked,
     onSelect: select,
+    onChooseWhat: () => setChoicesRequest((count) => count + 1),
     onTogglePick: togglePick,
     catalog,
     locale,
@@ -1851,7 +1938,8 @@ function V4Debate({
       locale={locale}
       narrow={layout === "phone"}
       hereRunId={servedRunId}
-      onSeeIt={(_entry, childRunId) => select(`dig:${childRunId}`, false)}
+      // V4C-5: the press removes See it (the dig is now open), so focus goes on to the panel heading as a keyboard press does.
+      onSeeIt={(_entry, childRunId) => select(`dig:${childRunId}`, true)}
       viewingDig={shownSelection}
       returnFocus={focusBack}
     />
@@ -1909,7 +1997,7 @@ function V4Debate({
             catalog={catalog}
           />
         ) : null}
-        <div className="v4DebMain">
+        <div className="v4DebMain" id="page-content" tabIndex={-1}>
           {parent !== null ? (
             <Link className="v4DebBack" href={levelHref(`/v4/debate/${encodeURIComponent(parent.runId)}`, null)}>
               <span aria-hidden="true">‹</span>{" "}
@@ -1964,6 +2052,8 @@ function V4Debate({
               sinceLastVisit={hiddenNews < visitNewsCount}
               onSee={ready.notice.onSee}
               onDismiss={() => setHiddenNews(news.length)}
+              // V4B-F1 (keyboard audit 2026-11-12): with nothing left of the section, focus goes on to the map's question card.
+              focusAfter={firstCardHeading}
               results={pathResults(map)}
               catalog={catalog}
             />
@@ -2124,7 +2214,7 @@ function V4Debate({
 function HandOffMap({ handOff, catalog, locale }: Readonly<{ handOff: StartHandOff; catalog: MessageCatalog; locale: string }>) {
   const map = useMemo(() => buildV4PendingMap({ questionLine: handOff.questionLine, paths: handOff.paths }), [handOff]);
   return (
-    <div className="v4DebMain">
+    <div className="v4DebMain" id="page-content" tabIndex={-1}>
       <V4PendingMap
         map={map}
         rootExtra={<p className="v4DebNote v4Muted" role="status">{t(catalog, "v4.ask.starting")}</p>}

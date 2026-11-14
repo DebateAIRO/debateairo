@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Contestați această afirmație",
+  "debateDrawers.challenge.whichPart": "Care parte? (opțional)",
   "debateDrawers.common.close": "Închideți",
   "debateDrawers.common.false": "fals",
   "debateDrawers.common.notAvailable": "indisponibil",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Nu există încă textul argumentului.",
   "debateDrawers.node.noCompletedReview": "Pentru acest nod nu este înregistrată nicio evaluare finalizată făcută de un model al altui dezvoltator.",
   "debateDrawers.node.noPreviousGenerations": "Nu există generări anterioare.",
+  "debateDrawers.node.noScore.notInAnswer": "Această fișă nu face parte din răspuns, deci nu are punctaj.",
+  "debateDrawers.node.noScore.notYet": "Încă nu există punctaj. Punctajele apar când răspunsul este gata.",
+  "debateDrawers.node.noScore.question": "Întrebarea în sine nu are punctaj.",
   "debateDrawers.node.noScoringRecommendation": "Nu este disponibilă nicio recomandare de punctare pentru acest argument.",
   "debateDrawers.node.notUseful": "neutil",
   "debateDrawers.node.openRecommendedTargetClaim": "Deschideți afirmația-țintă recomandată",

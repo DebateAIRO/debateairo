@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Spochybniť toto tvrdenie",
+  "debateDrawers.challenge.whichPart": "Ktorá časť? (nepovinné)",
   "debateDrawers.common.close": "Zavrieť",
   "debateDrawers.common.false": "nie",
   "debateDrawers.common.notAvailable": "nie je k dispozícii",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Zatiaľ nie je k dispozícii text argumentu.",
   "debateDrawers.node.noCompletedReview": "Pri tomto uzle nie je zaznamenaná žiadna dokončená kontrola druhým tvorcom.",
   "debateDrawers.node.noPreviousGenerations": "Žiadne predchádzajúce generovania.",
+  "debateDrawers.node.noScore.notInAnswer": "Táto karta nie je súčasťou odpovede, preto nemá hodnotenie.",
+  "debateDrawers.node.noScore.notYet": "Zatiaľ žiadne hodnotenie. Hodnotenia sa zobrazia, keď bude odpoveď hotová.",
+  "debateDrawers.node.noScore.question": "Samotná otázka nemá hodnotenie.",
   "debateDrawers.node.noScoringRecommendation": "Pre tento argument nie je k dispozícii žiadne odporúčanie hodnotenia.",
   "debateDrawers.node.notUseful": "neužitočné",
   "debateDrawers.node.openRecommendedTargetClaim": "Otvoriť odporúčané cieľové tvrdenie",

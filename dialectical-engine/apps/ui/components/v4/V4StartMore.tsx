@@ -69,6 +69,8 @@ export function V4StartMore(props: V4StartMoreProps) {
   const opener = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const wasOpen = useRef(false);
+  /** Keyboard audit 2026-11-12 (V4A-8): the "+ Look into this" that opened a full-list choice, for its Cancel. */
+  const fullFrom = useRef<HTMLElement | null>(null);
 
   // Focus goes into the drawer when it opens and back to "+ N more to explore" when it shuts (to the first path when the
   // drawer took the last idea, so that the button is gone).
@@ -91,12 +93,14 @@ export function V4StartMore(props: V4StartMoreProps) {
     setAdded({ ideaKey: idea.key, viewpointKey: idea.viewpoints[0]!.key });
     box.current?.focus();
   };
-  const look = (place: string, idea: PlanPath): void => {
+  const look = (place: string, idea: PlanPath, from: HTMLElement): void => {
     const action: PathPlanAction = { type: "ADD_FROM_MORE", key: idea.key, intoPathKey: null };
     const refusal = dispatch(action);
     if (refusal === null) landed(idea);
-    else if (refusal === "PATHS_FULL" && props.fullChoice !== undefined) setFull(place);
-    else onRefusal(refusal, action);
+    else if (refusal === "PATHS_FULL" && props.fullChoice !== undefined) {
+      fullFrom.current = from;
+      setFull(place);
+    } else onRefusal(refusal, action);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key === "Escape") {
@@ -135,14 +139,19 @@ export function V4StartMore(props: V4StartMoreProps) {
           {path.isNew ? <>{" · "}<span className="v4StartMoreNew">{t(catalog, "v4.start.tag.new")}</span></> : null}
         </p>
         <p className="v4StartMoreIdeaQuestion" dir="auto" data-ai-generated={ai}>{path.question}</p>
-        <button type="button" className="v4Btn v4StartMoreAdd" aria-describedby={titleId} onClick={() => look(at, path)}>
+        <button type="button" className="v4Btn v4StartMoreAdd" aria-describedby={titleId} onClick={(event) => look(at, path, event.currentTarget)}>
           {t(catalog, "v4.start.lookInto")}
         </button>
         {full === at && listFull && props.fullChoice !== undefined ? props.fullChoice({
           make: (target) => ({ type: "ADD_FROM_MORE", key: path.key, ...target }),
           listed: (after) => after.paths.some((one) => one.key === path.key),
           onDone: () => landed(path),
-          onCancel: () => setFull(null)
+          onCancel: () => {
+            setFull(null);
+            // Cancel goes with the choice: focus goes back to the idea's "+ Look into this", so it stays in the drawer.
+            if (fullFrom.current?.isConnected === true) fullFrom.current.focus();
+            else box.current?.focus();
+          }
         }) : null}
       </li>
     );

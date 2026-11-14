@@ -5,7 +5,7 @@ import { checkDob, declaredRegionFromPick, dobToIso, ITALY_APPROVAL_REQUIRED, IT
 import { RegionField, EMPTY_REGION_PICK, type RegionPick } from '@/components/RegionField';
 import { AgeRefusal } from '@/components/AgeRefusal';
 import { AuthShell } from '@/components/AuthShell';
-import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
+import { DateOfBirthField, EMPTY_DOB, firstFlaggedDobSelector } from '@/components/DateOfBirthField';
 import { EmailPendingScreen } from '@/components/auth/EmailPendingScreen';
 import { ItalyApprovalBox } from '@/components/auth/ItalyApprovalBox';
 import { SocialProviderButtons } from '@/components/auth/SocialProviderButtons';
@@ -123,8 +123,14 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const [italyApproved, setItalyApproved] = useState(false);
     const [italyRevealed, setItalyRevealed] = useState(false);
     const [italyError, setItalyError] = useState<string | null>(null);
-    const [italyFocusRequest, setItalyFocusRequest] = useState(0);
+    // Keyboard audit 2026-11-12 (AUTH-5): not only the Italy box. A refusal whose fix sits elsewhere on the card (the
+    // email, the region, the reload of updated documents) names the control the focus request lands on.
+    const [italyFocusRequest, setItalyFocusRequest] = useState<{ request: number; target: () => HTMLElement | null }>({ request: 0, target: () => null });
     const italyFocusHandled = useRef(0);
+    const reloadButton = useRef<HTMLButtonElement>(null);
+    function focusAfterRefusal(target: () => HTMLElement | null) {
+        setItalyFocusRequest(current => ({ request: current.request + 1, target }));
+    }
     const italyInputRef = useRef<HTMLInputElement | null>(null);
     /* Canada (owner ruling 2026-11-02): while Region says Canada, both documents open in French whatever the page
        language, and the switch at the top of either one moves both to English, and back, for the rest of this
@@ -148,10 +154,10 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     /* The refusal that reveals the box also re-enables the form, so the box exists and can take focus only after that
        render commits; each request is honoured once. */
     useEffect(() => {
-        if (italyFocusRequest === italyFocusHandled.current || busy)
+        if (italyFocusRequest.request === italyFocusHandled.current || busy)
             return;
-        italyFocusHandled.current = italyFocusRequest;
-        italyInputRef.current?.focus();
+        italyFocusHandled.current = italyFocusRequest.request;
+        italyFocusRequest.target()?.focus();
     }, [italyFocusRequest, busy]);
     const italyShown = region.country === ITALY_COUNTRY || italyRevealed;
     const italyMissing = italyShown && !italyApproved;
@@ -211,7 +217,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         const italyHint = t(catalog, "auth.signUp.italyApprovalHint");
         setItalyError(italyMissing ? italyHint : null);
         if (Object.keys(checked).length) {
-            const selector = checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.password ? '[name=password]' : checked.dateOfBirth ? '[name=dob-d]' : checked.privacy ? '[name=privacy-accepted]' : '[name=terms-accepted]';
+            const selector = checked.email ? '[name=email]' : checked.phone ? '[name=phone]' : checked.password ? '[name=password]' : checked.dateOfBirth ? firstFlaggedDobSelector(dateOfBirth, dobLocale.order) : checked.privacy ? '[name=privacy-accepted]' : '[name=terms-accepted]';
             form.querySelector<HTMLElement>(selector)?.focus();
             // The first error, in the order focus takes; a date of birth says what its own field says.
             const first = checked.email ?? checked.phone ?? checked.password ?? (checked.dateOfBirth === undefined ? checked.privacy ?? checked.terms : undefined);
@@ -269,13 +275,14 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 setItalyRevealed(true);
                 setItalyApproved(false);
                 setError(t(catalog, "auth.signUp.italyApprovalRequired"));
-                setItalyFocusRequest(request => request + 1);
+                focusAfterRefusal(() => italyInputRef.current);
                 return;
             }
             if (failure instanceof ContractHttpError && failure.serverCode === 'LEGAL_DOCUMENT_STALE') {
                 withdrawAcceptance();
                 setDocumentsStale(true);
                 setError(t(catalog, "auth.signUp.documentsUpdated"));
+                focusAfterRefusal(() => reloadButton.current);
                 return;
             }
             const code = failure instanceof ContractHttpError ? failure.serverCode ?? '' : '';
@@ -283,6 +290,11 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 : code === 'MAIL_DAILY_LIMIT' ? t(catalog, "auth.mailDailyLimit")
                 : code === 'STATE_SIGNUP_UNAVAILABLE' ? t(catalog, "auth.signUp.stateUnavailable")
                 : ['COUNTRY_SIGNUP_UNAVAILABLE', 'COUNTRY_UNKNOWN', 'TOR_REFUSED'].includes(code) ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.signUp.creationFailed"));
+            // Any other refusal leaves focus where the person pressed (the site's focus guard gives it back).
+            if (code === 'EMAIL_INVALID')
+                focusAfterRefusal(() => form.querySelector<HTMLElement>('#signup-email'));
+            else if (code === 'STATE_SIGNUP_UNAVAILABLE' || code === 'COUNTRY_SIGNUP_UNAVAILABLE')
+                focusAfterRefusal(() => form.querySelector<HTMLElement>(code === 'STATE_SIGNUP_UNAVAILABLE' ? '#signup-region-state' : '#signup-region-trigger'));
         }
         finally {
             setProof(null);
@@ -315,11 +327,11 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         ...(italyMissing ? [t(catalog, "auth.signUp.italyApprovalHint")] : [])
     ];
     if (refused)
-        return <AgeRefusal catalog={catalog}/>;
+        return <AgeRefusal catalog={catalog} focusTitle={!refusedOnArrival}/>;
     if (submittedEmail !== null)
         return <EmailPendingScreen email={submittedEmail} retryAfterSeconds={retryAfterSeconds} client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale} turnstile={turnstile} onDifferentEmail={() => setSubmittedEmail(null)}/>;
     return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.signUp.title")} description={t(catalog, "auth.signUp.description")} footer={null}>
- {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button type="button" className="authSecondary" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
+ {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button ref={reloadButton} type="button" className="authSecondary" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
  <div className="authAltMethods"><SocialProviderButtons client={client} catalog={catalog}/></div>
  <form className="authForm" data-form="signup" noValidate method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
  <div className="authField"><label htmlFor="signup-email">{t(catalog, "auth.email")}</label><input id="signup-email" name="email" type="email" autoComplete="username" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {

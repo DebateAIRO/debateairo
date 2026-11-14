@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} nivå",
   "debateViews.levelCount.other": "{count} nivåer",
   "debateViews.mapInteractionHint": "Håll pekaren över ett segment för att granska · klicka för att fokusera",
+  "debateViews.mapKeysHint": "Piltangenterna flyttar mellan segment · Enter fokuserar",
   "debateViews.mapLegendHint": "Ring = djup · bredd = mängden debatt under segmentet",
   "debateViews.mapReasoning": "Resonemang",
   "debateViews.moveToParentArgument": "Gå upp till det överordnade argumentet: {claim}",

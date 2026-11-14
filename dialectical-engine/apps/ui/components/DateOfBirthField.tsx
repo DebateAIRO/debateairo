@@ -43,6 +43,17 @@ function flaggedParts(error: DobErrorCode, value: DobParts): ReadonlySet<DobPart
   }
 }
 
+/**
+ * The input a failed submit focuses: the first part the field marks, in the locale's order (keyboard audit
+ * 2026-11-12). A date under the minimum age marks all three, so it is the first box.
+ */
+export function firstFlaggedDobSelector(value: DobParts, order: readonly DobPart[]): string {
+  const code = checkDob(value).code;
+  const flagged = code === "ok" ? null : flaggedParts(code, value);
+  const part = order.find((candidate) => flagged === null || flagged.has(candidate)) ?? order[0];
+  return `[name=dob-${part}]`;
+}
+
 type Cell = Readonly<{ text: string; value: string; disabled: boolean }>;
 
 function pickerCells(part: DobPart, localeTag: string, decade: number, currentYear: number): readonly Cell[] {
@@ -156,9 +167,18 @@ export function DateOfBirthField({
     return () => document.removeEventListener("mousedown", onPointerDown);
   }, [openPart]);
 
-  /* Opening the popover (or turning the decade) puts focus on the active cell. */
+  /* Set by a decade button that can turn again: the grid turns under it, but focus stays on the button so it
+     can be pressed again (keyboard audit 2026-11-12). */
+  const keepDecadeFocus = useRef(false);
+
+  /* Opening the popover (or turning the decade from the grid) puts focus on the active cell. */
   useEffect(() => {
-    if (openPart !== null) cellRefs.current[activeCell]?.focus();
+    if (openPart === null) return;
+    if (keepDecadeFocus.current) {
+      keepDecadeFocus.current = false;
+      return;
+    }
+    cellRefs.current[activeCell]?.focus();
   }, [openPart, activeCell, openDecade]);
 
   function openPicker(part: DobPart): void {
@@ -189,13 +209,17 @@ export function DateOfBirthField({
     queueMicrotask(() => focusPart(next ?? part));
   }
 
-  function turnDecade(direction: 1 | -1): void {
+  function turnDecade(direction: 1 | -1, from: "button" | "grid" = "button"): void {
     const target = openDecade + direction * 10;
     if (target + 9 < DOB_MIN_YEAR || target > currentYear) return;
     setDecade(target);
     const list = pickerCells("y", locale.tag, target, currentYear);
     const firstEnabled = list.findIndex((cell) => !cell.disabled);
-    setActiveCell(Math.max(firstEnabled, 0));
+    /* PageUp/PageDown keep the same place in the grid when that year can be picked. */
+    setActiveCell(from === "grid" && list[activeCell] !== undefined && !list[activeCell]!.disabled ? activeCell : Math.max(firstEnabled, 0));
+    /* The button that has just reached the last decade goes disabled, so focus goes into the grid instead. */
+    const after = target + direction * 10;
+    keepDecadeFocus.current = from === "button" && after + 9 >= DOB_MIN_YEAR && after <= currentYear;
   }
 
   function onCellKeyDown(event: ReactKeyboardEvent<HTMLDivElement>, part: DobPart, index: number): void {
@@ -206,6 +230,11 @@ export function DateOfBirthField({
       let next = index + moves[event.key]!;
       while (next >= 0 && next < cells.length && cells[next]!.disabled) next += Math.sign(moves[event.key]!);
       if (next >= 0 && next < cells.length) setActiveCell(next);
+      return;
+    }
+    if (part === "y" && (event.key === "PageUp" || event.key === "PageDown")) {
+      event.preventDefault();
+      turnDecade(event.key === "PageUp" ? -1 : 1, "grid");
       return;
     }
     if (event.key === "Home" || event.key === "End") {
@@ -319,6 +348,12 @@ export function DateOfBirthField({
                   aria-expanded={isOpen}
                   aria-controls={isOpen ? popoverId : undefined}
                   onClick={() => openPicker(part)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && isOpen) {
+                      event.preventDefault();
+                      closePicker(part);
+                    }
+                  }}
                 >
                   <span aria-hidden="true">{isOpen ? "▴" : "▾"}</span>
                 </button>
@@ -329,6 +364,14 @@ export function DateOfBirthField({
                     className="dobPopover"
                     data-part={part}
                     data-anchor={order.indexOf(part) === order.length - 1 ? "end" : "start"}
+                    onKeyDown={(event) => {
+                      /* Escape from anywhere inside (the decade buttons too) closes back to the box; a cell's
+                         own Escape has already done so. */
+                      if (event.key === "Escape" && !event.defaultPrevented) {
+                        event.preventDefault();
+                        closePicker(part);
+                      }
+                    }}
                   >
                     {part === "y" ? (
                       <div className="dobDecade" dir="ltr">

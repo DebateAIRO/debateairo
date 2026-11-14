@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} רמה",
   "debateViews.levelCount.other": "{count} רמות",
   "debateViews.mapInteractionHint": "רחפו מעל פלח כדי לבדוק אותו · לחצו כדי להתמקד",
+  "debateViews.mapKeysHint": "מקשי החצים עוברים בין פלחים · Enter מעביר פלח למוקד",
   "debateViews.mapLegendHint": "טבעת = עומק · רוחב = היקף הדיון שמתחתיה",
   "debateViews.mapReasoning": "הנמקה",
   "debateViews.moveToParentArgument": "מעבר מעלה לטיעון האם: {claim}",

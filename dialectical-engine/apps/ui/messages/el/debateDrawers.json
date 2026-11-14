@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Αμφισβητήστε το",
+  "debateDrawers.challenge.whichPart": "Ποιο τμήμα; (προαιρετικό)",
   "debateDrawers.common.close": "Κλείσιμο",
   "debateDrawers.common.false": "ψευδές",
   "debateDrawers.common.notAvailable": "μη διαθέσιμο",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Δεν υπάρχει ακόμη κείμενο επιχειρήματος.",
   "debateDrawers.node.noCompletedReview": "Δεν έχει καταγραφεί ολοκληρωμένη αξιολόγηση από μοντέλο δεύτερου κατασκευαστή για αυτόν τον κόμβο.",
   "debateDrawers.node.noPreviousGenerations": "Δεν υπάρχουν προηγούμενες δημιουργίες.",
+  "debateDrawers.node.noScore.notInAnswer": "Αυτή η κάρτα δεν είναι μέρος της απάντησης, γι’ αυτό δεν έχει βαθμολογία.",
+  "debateDrawers.node.noScore.notYet": "Δεν υπάρχει ακόμη βαθμολογία. Οι βαθμολογίες εμφανίζονται όταν η απάντηση είναι έτοιμη.",
+  "debateDrawers.node.noScore.question": "Η ίδια η ερώτηση δεν βαθμολογείται.",
   "debateDrawers.node.noScoringRecommendation": "Δεν υπάρχει διαθέσιμη σύσταση βαθμολόγησης για αυτό το επιχείρημα.",
   "debateDrawers.node.notUseful": "μη χρήσιμη",
   "debateDrawers.node.openRecommendedTargetClaim": "Άνοιγμα προτεινόμενου ισχυρισμού-στόχου",

@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Zpochybnit toto tvrzení",
+  "debateDrawers.challenge.whichPart": "Která část? (nepovinné)",
   "debateDrawers.common.close": "Zavřít",
   "debateDrawers.common.false": "nepravda",
   "debateDrawers.common.notAvailable": "není k dispozici",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Text argumentu zatím není k dispozici.",
   "debateDrawers.node.noCompletedReview": "U tohoto uzlu není zaznamenána žádná dokončená kontrola druhým tvůrcem.",
   "debateDrawers.node.noPreviousGenerations": "Žádná předchozí generování.",
+  "debateDrawers.node.noScore.notInAnswer": "Tato karta není součástí odpovědi, proto nemá skóre.",
+  "debateDrawers.node.noScore.notYet": "Zatím žádné skóre. Skóre se zobrazí, až bude odpověď hotová.",
+  "debateDrawers.node.noScore.question": "Samotná otázka nemá skóre.",
   "debateDrawers.node.noScoringRecommendation": "Pro tento argument není k dispozici žádné doporučení hodnocení.",
   "debateDrawers.node.notUseful": "neužitečné",
   "debateDrawers.node.openRecommendedTargetClaim": "Otevřít doporučené cílové tvrzení",

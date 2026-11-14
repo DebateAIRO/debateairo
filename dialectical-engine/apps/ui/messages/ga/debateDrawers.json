@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Tabhair dúshlán dó seo",
+  "debateDrawers.challenge.whichPart": "Cén chuid? (roghnach)",
   "debateDrawers.common.close": "Dún",
   "debateDrawers.common.false": "bréagach",
   "debateDrawers.common.notAvailable": "níl ar fáil",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Níl téacs argóna ann fós.",
   "debateDrawers.node.noCompletedReview": "Níl aon athbhreithniú críochnaithe ón dara déantóir taifeadta don nód seo.",
   "debateDrawers.node.noPreviousGenerations": "Gan aon ghiniúint roimhe seo.",
+  "debateDrawers.node.noScore.notInAnswer": "Níl an cárta seo mar chuid den fhreagra, mar sin níl scór aige.",
+  "debateDrawers.node.noScore.notYet": "Gan scór go fóill. Feictear na scóir nuair a bhíonn an freagra réidh.",
+  "debateDrawers.node.noScore.question": "Ní thugtar scór don cheist féin.",
   "debateDrawers.node.noScoringRecommendation": "Níl aon mholadh scórála ar fáil don argóint seo.",
   "debateDrawers.node.notUseful": "gan tairbhe",
   "debateDrawers.node.openRecommendedTargetClaim": "Oscail an spriocmhaíomh molta",

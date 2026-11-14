@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ContractHttpError, createPasswordResetClient, type PasswordResetClient, type PasswordResetState } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
+import { focusIsLost } from "@/lib/focusGuard";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { useAlertRegion, useDeadlineWarning, useStepFocus } from "@/components/auth/timedStep";
 import { API_BASE } from "@/lib/api";
@@ -41,6 +42,9 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
   const switchSection = useRef<HTMLElement>(null), switchOpener = useRef<HTMLElement | null>(null);
   const link = useRef<string | null>(null), cancellation = useRef<string | null>(null), mounted = useRef(true), inFlight = useRef(false), switchingToRecovery = useRef(false);
   const switchingMethod = useRef<"saved" | "known">("saved");
+  // Keyboard audit 2026-11-12 (AUTH-10): with no clear answer every control stays off but Check reset status, above the
+  // control that was pressed; focus goes to it, unless the person has already moved on.
+  const checkState = useRef<HTMLButtonElement>(null);
   const text = (key: string, values: Record<string, string | number> = {}) => t(catalog, key, values);
   const methodText = (key: string) => t(locale === "ro" ? mfaRomanian : mfaEnglish, key);
   // The server's 30-minute reset session (WCAG 2.2.1): the deadline is shown, a polite region that is always
@@ -172,6 +176,7 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
     document.getElementById(FIELD_ID[refocus.current])?.focus();
     refocus.current = null;
   });
+  useEffect(() => { if (unknown && !busy && focusIsLost()) checkState.current?.focus(); }, [unknown, busy]);
   const invalid = (field: Field) => error !== null && errorField === field;
   const describedBy = (field: Field, hint?: string) => [hint, invalid(field) ? "password-reset-error" : null].filter(Boolean).join(" ") || undefined;
   function openSwitch(event: { currentTarget: HTMLElement }, method: "saved" | "known") { switchOpener.current = event.currentTarget; setSwitchConfirmation(method); }
@@ -188,7 +193,7 @@ export function PasswordResetFlow({ catalog = english, locale = "en", client = b
     {notice && <p className="authFieldHint" role="status">{notice}</p>}
     {/* Opened from the footer, far below: focus moves to it, and Stay returns focus to the link that opened it. */}
     {switchConfirmation && <section className="recoveryStatus" ref={switchSection} tabIndex={-1} aria-label={methodText("switch.title")}><p>{methodText("switch.description")}</p><button className="authPrimary" type="button" disabled={disabled} onClick={() => switchToRecovery(switchConfirmation)}>{methodText("switch.confirm")}</button><button className="authSecondary" type="button" disabled={disabled} onClick={() => { setSwitchConfirmation(null); switchOpener.current?.focus(); }}>{methodText("switch.stay")}</button></section>}
-    {unknown && <button className="authSecondary" type="button" disabled={busy} onClick={() => void perform(async () => {
+    {unknown && <button ref={checkState} className="authSecondary" type="button" disabled={busy} onClick={() => void perform(async () => {
       const state = await client.status();
       if (!mounted.current) return;
       if (switchingToRecovery.current && (state.status === "cancelled" || state.status === "refused")) { recoverAccessAfterClosure(); return; }

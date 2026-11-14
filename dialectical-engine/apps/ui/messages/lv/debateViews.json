@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} līmenī",
   "debateViews.levelCount.other": "{count} līmeņos",
   "debateViews.mapInteractionHint": "Novietojiet rādītāju uz sektora, lai to izpētītu · noklikšķiniet, lai fokusētu",
+  "debateViews.mapKeysHint": "Bulttaustiņi pārvieto starp sektoriem · Enter fokusē",
   "debateViews.mapLegendHint": "Gredzens = dziļums · platums = zem tā esošo debašu apjoms",
   "debateViews.mapReasoning": "Spriešana",
   "debateViews.moveToParentArgument": "Pāriet uz augstāka līmeņa argumentu: {claim}",

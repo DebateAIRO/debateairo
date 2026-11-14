@@ -451,8 +451,14 @@ export function Assistant({
     });
   },[identityAvailable,identityKnown,language,messages,persistent,restorePhase,serverTime]);
 
+  // Keyboard audit 2026-11-12 (seen in Chrome): a browser starts Tab from the last place a page scrolled to when
+  // nothing has focus. Scrolling to the conversation's end as the page loaded made the first Tab on /help land in the
+  // message box, past the skip link, the header and the topic list. At load nothing has been added, so nothing is followed.
+  const followedLengthRef = useRef(messages.length);
   useEffect(() => {
-    if (!fullPage || !followLatestRef.current) return;
+    if (!fullPage || followedLengthRef.current === messages.length) return;
+    followedLengthRef.current = messages.length;
+    if (!followLatestRef.current) return;
     const end = conversationEndRef.current;
     if (end !== null && typeof end.scrollIntoView === "function") {
       end.scrollIntoView({ block:"end",behavior:"smooth" });
@@ -799,7 +805,8 @@ export function Assistant({
       </div>
     </header>
 
-    <div className="supportDeskBody">
+    {/* Keyboard audit 2026-11-12 (CHR1-4): /help's content starts here, after its own header; the skip link comes here. */}
+    <div className="supportDeskBody" id="page-content" tabIndex={-1}>
       <nav className="supportRail supportTopicRail" aria-label={t(chromeCatalog,"support.browseByTopic")}>
         <p className="supportEyebrow">{t(chromeCatalog,"support.browseByTopic")}</p>
         <div className="supportTopicList">

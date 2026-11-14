@@ -69,6 +69,7 @@
   "debateViews.levelCount.few": "{count} niveluri",
   "debateViews.levelCount.other": "{count} de niveluri",
   "debateViews.mapInteractionHint": "Treceți peste un sector pentru examinare · selectați-l pentru focalizare",
+  "debateViews.mapKeysHint": "Săgețile trec de la un sector la altul · Enter îl focalizează",
   "debateViews.mapLegendHint": "Inel = profunzime · lățime = amploarea dezbaterii subordonate",
   "debateViews.mapReasoning": "Raționament",
   "debateViews.moveToParentArgument": "Treceți la argumentul superior: {claim}",

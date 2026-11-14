@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Dies anfechten",
+  "debateDrawers.challenge.whichPart": "Welcher Teil? (optional)",
   "debateDrawers.common.close": "Schließen",
   "debateDrawers.common.false": "falsch",
   "debateDrawers.common.notAvailable": "nicht verfügbar",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Noch kein Argumenttext vorhanden.",
   "debateDrawers.node.noCompletedReview": "Für diesen Knoten wurde keine abgeschlossene Prüfung durch einen zweiten Ersteller erfasst.",
   "debateDrawers.node.noPreviousGenerations": "Keine früheren Erzeugungen vorhanden.",
+  "debateDrawers.node.noScore.notInAnswer": "Diese Karte ist nicht Teil der Antwort und hat deshalb keine Bewertung.",
+  "debateDrawers.node.noScore.notYet": "Noch keine Bewertung. Bewertungen erscheinen, sobald die Antwort fertig ist.",
+  "debateDrawers.node.noScore.question": "Die Frage selbst wird nicht bewertet.",
   "debateDrawers.node.noScoringRecommendation": "Für dieses Argument ist keine Bewertungsempfehlung verfügbar.",
   "debateDrawers.node.notUseful": "nicht hilfreich",
   "debateDrawers.node.openRecommendedTargetClaim": "Empfohlene Zielbehauptung öffnen",

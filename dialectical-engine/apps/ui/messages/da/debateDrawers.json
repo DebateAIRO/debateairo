@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Udfordr dette",
+  "debateDrawers.challenge.whichPart": "Hvilken del? (valgfrit)",
   "debateDrawers.common.close": "Luk",
   "debateDrawers.common.false": "falsk",
   "debateDrawers.common.notAvailable": "ikke tilgængelig",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Ingen argumenttekst endnu.",
   "debateDrawers.node.noCompletedReview": "Der er ikke registreret en fuldført gennemgang fra en anden modeludvikler for dette knudepunkt.",
   "debateDrawers.node.noPreviousGenerations": "Ingen tidligere genereringer.",
+  "debateDrawers.node.noScore.notInAnswer": "Dette kort er ikke en del af svaret, så det har ingen bedømmelse.",
+  "debateDrawers.node.noScore.notYet": "Ingen bedømmelse endnu. Bedømmelserne vises, når svaret er klart.",
+  "debateDrawers.node.noScore.question": "Selve spørgsmålet bliver ikke bedømt.",
   "debateDrawers.node.noScoringRecommendation": "Der er ingen bedømmelsesanbefaling til dette argument.",
   "debateDrawers.node.notUseful": "ikke nyttig",
   "debateDrawers.node.openRecommendedTargetClaim": "Åbn den anbefalede målpåstand",

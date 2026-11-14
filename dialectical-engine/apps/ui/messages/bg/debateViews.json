@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} ниво",
   "debateViews.levelCount.other": "{count} нива",
   "debateViews.mapInteractionHint": "Посочете сектор за преглед · щракнете за фокусиране",
+  "debateViews.mapKeysHint": "Със стрелките преминавате между сектори · Enter фокусира избрания",
   "debateViews.mapLegendHint": "Пръстен = дълбочина · ширина = обемът на дебата под него",
   "debateViews.mapReasoning": "Разсъждение",
   "debateViews.moveToParentArgument": "Преминаване нагоре към родителския аргумент: {claim}",

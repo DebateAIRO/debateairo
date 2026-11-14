@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Kifogásolás",
+  "debateDrawers.challenge.whichPart": "Melyik rész? (nem kötelező)",
   "debateDrawers.common.close": "Bezárás",
   "debateDrawers.common.false": "hamis",
   "debateDrawers.common.notAvailable": "nem érhető el",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Még nincs érvelési szöveg.",
   "debateDrawers.node.noCompletedReview": "Ehhez a csomóponthoz nem rögzítettünk második készítő által elvégzett felülvizsgálatot.",
   "debateDrawers.node.noPreviousGenerations": "Nincsenek korábbi változatok.",
+  "debateDrawers.node.noScore.notInAnswer": "Ez a kártya nem része a válasznak, ezért nincs pontszáma.",
+  "debateDrawers.node.noScore.notYet": "Még nincs pontszám. A pontszámok akkor jelennek meg, amikor a válasz elkészül.",
+  "debateDrawers.node.noScore.question": "Magát a kérdést nem pontozzuk.",
   "debateDrawers.node.noScoringRecommendation": "Ehhez az érvhez nem érhető el pontozási javaslat.",
   "debateDrawers.node.notUseful": "nem hasznos",
   "debateDrawers.node.openRecommendedTargetClaim": "Javasolt célállítás megnyitása",

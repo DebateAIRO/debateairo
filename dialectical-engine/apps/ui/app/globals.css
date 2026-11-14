@@ -1454,6 +1454,51 @@ html.theme-transition-fallback body *::after {
   outline: none;
 }
 
+/* Keyboard audit, 12 Nov 2026 (CHR1-4): where a page with its own header says its content starts, the skip link's target
+   (components/SkipLink.tsx). Like the main area it is a whole region, not a control: no ring (the V4 pages ring every
+   focused element, and the id outranks that). When the focus guard parks focus here it is not the skip link's landing:
+   the parked ring below must show, so this rule leaves a parked region alone. */
+#page-content:focus:not([data-focus-parked]) {
+  outline: none;
+}
+
+/* Keyboard audit, 12 Nov 2026 (the focus guard, lib/focusGuard.ts). When the control a keyboard user pressed is taken
+   off the page, focus is parked on the part of the page that was around it, so the next Tab carries on from there. The
+   parked part shows the site's ring, inside its own edge so no parent can clip it. The main area keeps its quiet rule
+   above: it is the whole page. */
+[data-focus-parked]:not(.appMain):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* Keyboard audit, 12 Nov 2026: a jump link in a legal document moves focus to the section it scrolls to, so the next Tab
+   carries on from there. The section is the reading itself, not a control: it shows no ring. (Outside the consent S02
+   block, whose rules a contract test pins.) */
+.policyBody .policySection:focus { outline: none; }
+
+/* Keyboard audit, 12 Nov 2026 (WCAG 2.4.11, Focus Not Obscured). The first-visit cookie bar is fixed over the foot of
+   the window, and a control tabbed to at the bottom edge sat behind it (the browser counts it as in view and does not
+   scroll). While the bar shows, components/consent/useConsentBarRoom.ts publishes the height it covers as
+   --consent-bar-room on <html>; with no bar the room is 0 and nothing here changes anything.
+   - A focused control is scrolled clear of the bar.
+   - The page gets that room at its end, so its last controls (the footer) can be scrolled clear too. The V4 ask page and
+     the V4 map page keep their own measured room (v4-ask.css C4, v4-debate.css, v4-undo.css).
+   - The Help button shares the bar's corner and sat under it: it rides above the bar. */
+html { scroll-padding-block-end: var(--consent-bar-room, 0px); }
+.appShell:has(> .consentBar):not(:has(.v4AskMain, .v4DebPage)) { padding-bottom: var(--consent-bar-room, 0px); }
+.appShell:has(> .consentBar) .supportWidget { bottom: calc(var(--dock-offset-b) + var(--consent-bar-room, 0px)); }
+.appShell:has(> .consentBar) .supportWidgetPanel { max-height: calc(70vh - var(--consent-bar-room, 0px)); }
+/* Same audit, seen in a real browser at 320 × 256 (a 1280 × 1024 screen at 400% zoom): the bar was taller than the
+   window. Its title was cut off above the top edge with no way to reach it, and it covered the whole page, so every
+   control tabbed to before it was hidden behind it. The bar now leaves 120px of a short window to the page (but is
+   never under 170px, and never taller than the window) and scrolls inside: Tab brings its link and buttons into view,
+   and the measured room above keeps the page's focused controls clear of it. Measured in Chrome: it bites at 320 × 256
+   only; at 427 × 341, 568 × 320, 667 × 375, 320 × 568 and every larger window the bar keeps its full height.
+   (Outside the consent S01 block; the selectors outrank that block's own.) */
+.appShell > .consentBar { display: flex; flex-direction: column; max-height: min(calc(100dvh - 24px - var(--safe-b, 0px)), max(calc(100dvh - 120px), 170px)); }
+.appShell > .consentBar > .consentBarBezel { display: flex; flex-direction: column; min-height: 0; }
+.appShell > .consentBar .consentBarCore { min-height: 0; overflow-y: auto; }
+
 /* Hidden until it has keyboard focus, then shown over the top bar. */
 .skipLink {
   position: absolute;
@@ -1717,29 +1762,12 @@ html.theme-transition-fallback body *::after {
 .iconBtn:focus-visible,
 .supportCompactClose:focus-visible,
 .modeToggle:focus-visible,
-.input:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 a:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
-}
-
-.input {
-  width: 100%;
-  font-family: var(--font-serif);
-  font-size: 16px;
-  color: var(--text);
-  padding: 14px 18px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: var(--r-panel);
-  background: var(--surface);
-  outline: none;
-  transition: border-color 0.18s;
-}
-.input:focus {
-  border-color: var(--focus);
 }
 
 /* segmented toggle (Tree / Outline) */
@@ -2066,8 +2094,10 @@ a:focus-visible {
 
 .authField input::placeholder { color: var(--muted); letter-spacing: normal; }
 
+/* Keyboard audit, 12 Nov 2026: the focused border is the deeper gold (4.5:1 on the card in Terracotta; the plain gold
+   was 2.94:1, under the 3:1 a focus indicator needs). Chamber's two golds are the same colour. */
 .authField input:focus {
-  border-color: var(--gold);
+  border-color: var(--gold-text);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent);
 }
 
@@ -2178,6 +2208,9 @@ a:focus-visible {
   box-shadow: var(--shadow-pop);
 }
 .dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
+/* Keyboard audit, 12 Nov 2026: on the one-time age check the date is the card's only field, so the day grid hung below
+   the card's foot and the card cut off its last row (29, 30, 31). While a grid is open there, the card does not clip. */
+.authCard:has([data-form="age-confirmation"] .dobPopover) { overflow: visible; }
 .dobFieldset .dobPopover[data-part="d"] { width: 244px; }
 .dobFieldset .dobPopover[data-part="m"] { width: 222px; }
 .dobFieldset .dobPopover[data-part="y"] { width: 262px; }
@@ -2359,50 +2392,6 @@ a:focus-visible {
   max-width: 560px;
 }
 
-/* Six gold-bordered slots over one real input (Turn 7 · 7b). */
-.authCodeField { position: relative; }
-
-.authField input.authCodeCapture {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: transparent;
-  caret-color: transparent;
-  font-size: 16px; /* keeps iOS from zooming on focus */
-  text-align: center;
-  z-index: 1;
-  cursor: text;
-}
-.authField input.authCodeCapture::selection { background: transparent; }
-.authField input.authCodeCapture:focus { outline: none; box-shadow: none; }
-
-.authCodeBoxes { display: flex; gap: 8px; justify-content: center; }
-
-.authCodeBox {
-  display: grid;
-  place-items: center;
-  width: 44px;
-  height: 52px;
-  border-radius: 10px;
-  border: 1px solid var(--gold-border);
-  background: var(--gold-bg);
-  font-family: var(--font-mono);
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--ink);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.authField input.authCodeCapture:focus + .authCodeBoxes .authCodeBox[data-next="true"] {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent);
-}
-
 .authField input.authRecoveryInput {
   width: 100%;
   padding: 10px 13px;
@@ -2415,8 +2404,10 @@ a:focus-visible {
   font-size: 12px;
   letter-spacing: 0.08em;
 }
+/* Keyboard audit round 3, 12 Nov 2026: the deeper gold, as the other sign-in fields (the plain gold is 2.94:1 on this
+   box's own fill in Terracotta, and the outline is taken away above). */
 .authField input.authRecoveryInput:focus {
-  border-color: var(--gold);
+  border-color: var(--gold-text);
   box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent);
 }
 
@@ -2532,7 +2523,7 @@ a:focus-visible {
   font-size: 12px;
   font-weight: 500;
 }
-.authField select:focus { border-color: var(--gold); box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent); outline: none; }
+.authField select:focus { border-color: var(--gold-text); box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent); outline: none; }
 
 /* Saved recovery codes, with Copy and Download under them. */
 .authCodes { display: flex; flex-direction: column; gap: 12px; margin-bottom: 14px; }
@@ -2749,9 +2740,6 @@ a:focus-visible {
   align-items: stretch;
   margin: 26px 0 12px;
 }
-.composer .input {
-  flex: 1;
-}
 .startBtn {
   flex: 0 0 auto;
   display: inline-flex;
@@ -2923,25 +2911,6 @@ a:focus-visible {
    New debate composer
    ============================================================ */
 
-.textareaSerif {
-  width: 100%;
-  min-height: 84px;
-  resize: vertical;
-  font-family: var(--font-serif);
-  font-size: 18px;
-  line-height: 1.4;
-  color: var(--text);
-  padding: 16px 18px;
-  border: 1.5px solid var(--line-strong);
-  border-radius: var(--r-card);
-  background: var(--surface);
-  outline: none;
-  transition: border-color 0.18s;
-}
-.textareaSerif:focus {
-  border-color: var(--focus);
-}
-
 .optionsToggle {
   display: inline-flex;
   align-items: center;
@@ -3031,7 +3000,6 @@ a:focus-visible {
   border: 1px solid var(--line-2);
   border-radius: var(--r-btn);
   background: var(--surface);
-  outline: none;
 }
 .fieldGroup textarea {
   min-height: 96px;
@@ -3114,21 +3082,6 @@ a:focus-visible {
   color: var(--muted);
   width: 64px;
   text-align: right;
-}
-.capInput {
-  flex: 0 0 auto;
-  width: 90px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 6px 8px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-btn);
-  background: var(--surface);
-  outline: none;
-  text-align: right;
-}
-.capInput:focus {
-  border-color: var(--focus);
 }
 .switch {
   flex: 0 0 auto;
@@ -3436,6 +3389,19 @@ a:focus-visible {
 [data-scoring-state="unavailable"] .topSwitchStatus {
   color: var(--text-3);
 }
+/* The completion reason in the debate header: cut to one line, its whole text was only in a tooltip, which a
+   keyboard never opens (keyboard audit 2026-11-12). It wraps instead, up to four 11px lines (55px), which fit
+   the 58px header; the longest reason (the provider hold) needs about four at the slot's 180px. */
+.debateTopClaim .topSwitchStatus {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.25;
+}
 
 .scoringInsightsPanel {
   flex: 0 0 auto;
@@ -3709,7 +3675,9 @@ a:focus-visible {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.canvasInner[data-zoom-band="overview"] :is(
+/* The card that holds focus keeps its controls (keyboard audit 2026-11-12): zooming out with the
+   zoom keys from a card's button must not hide the button the keyboard is on. */
+.canvasInner[data-zoom-band="overview"] .nodeWrap:not(:focus-within) :is(
   .nodeHeader,
   .nodeControls,
   .nodeRootMeta,
@@ -4057,6 +4025,8 @@ a:focus-visible {
   background: var(--surface-1);
   overflow: auto;
 }
+/* A Tab stop that scrolls (keyboard audit 2026-11-12): an inset ring. */
+.synthPanel:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .synthInner {
   padding: 22px 22px 28px;
 }
@@ -4191,6 +4161,23 @@ a:focus-visible {
   height: 5px;
   border-radius: 3px;
 }
+/* The lean's source, said only in the lean's tooltip for a mouse: a screen reader always reads it, and a sighted
+   keyboard user sees it while the panel (one Tab stop) has the keyboard's ring (keyboard audit 2026-11-12). */
+.synthLeanSource {
+  margin: 6px 0 0;
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.synthPanel:not(:focus-visible) .synthLeanSource {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 .synthSections {
   display: flex;
   flex-direction: column;
@@ -4278,6 +4265,9 @@ a:focus-visible {
   overflow: auto;
   padding: 22px;
 }
+/* The body is a Tab stop (it is what scrolls, and the modal trap moves only between Tab stops).
+   Inset, because it scrolls. Keyboard audit 2026-11-12. */
+.drawerBody:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .drawerClaim {
   font-family: var(--font-serif);
   font-size: 21px;
@@ -4787,6 +4777,12 @@ a:focus-visible {
   transform: translate(-50%, -100%);
   z-index: 61;
 }
+/* With no room above its anchor the card opens below it (ChallengePopover's placement, keyboard
+   audit 2026-11-12). Not on a phone, where it is a bottom sheet whatever the placement. */
+@media (min-width: 641px) {
+  .popAnchor[data-placement="below"] { transform: translate(-50%, 0); }
+  .popAnchor[data-placement="below"] .popCard { margin-bottom: 0; margin-top: 8px; transform-origin: top center; }
+}
 .popCard {
   width: 252px;
   background: var(--surface);
@@ -4816,6 +4812,30 @@ a:focus-visible {
   letter-spacing: 0.06em;
   color: var(--con-text);
   padding: 5px 9px 6px;
+}
+/* "Which part?": the passage a Challenge button's challenge is about, typed, pasted or carried
+   from a selection (keyboard audit 2026-11-12). Sits where a selection's quote sits. */
+.popPart {
+  padding: 6px 9px 9px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.popPartLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--text-3);
+  margin-bottom: 4px;
+}
+.popPartInput {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  padding: 5px 7px;
 }
 .popAction {
   display: flex;
@@ -4974,6 +4994,8 @@ a:focus-visible {
   min-width: 0;
   overflow: auto;
 }
+/* A Tab stop that scrolls (keyboard audit 2026-11-12): an inset ring. */
+.singleShot:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .singleShotInner {
   max-width: 720px;
   margin: 0 auto;
@@ -5010,16 +5032,6 @@ a:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-.tokenInput {
-  width: 180px;
-  font-family: var(--font-mono);
-  font-size: 12px;
-  padding: 7px 10px;
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-btn);
-  background: var(--surface);
-  outline: none;
 }
 
 /* ============================================================
@@ -5298,6 +5310,8 @@ a:focus-visible {
   background: radial-gradient(var(--line-2) 1px, transparent 1px);
   background-size: 22px 22px;
 }
+/* A Tab stop that scrolls, like the Tree canvas (keyboard audit 2026-11-12): an inset ring. */
+.thread:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .threadInner {
   max-width: 800px;
   margin: 0 auto;
@@ -7314,22 +7328,6 @@ a:focus-visible {
 
 .mfaCodeLabel { display: block; margin-top: 12px; font-size: 11px; font-weight: 700; }
 .mfaCodeRow { display: flex; gap: 8px; margin-top: 7px; align-items: center; }
-.mfaCodeInput {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 13px;
-  border-radius: 9px;
-  border: 1px solid var(--gold-border);
-  outline: none;
-  background: var(--gold-bg);
-  color: var(--ink);
-  font-family: var(--font-mono);
-  font-size: 14px;
-  line-height: 16.5px;
-  letter-spacing: 0.3em;
-}
-.mfaCodeInput::placeholder { color: var(--muted); }
-.mfaCodeInput:focus { box-shadow: 0 0 0 3px color-mix(in oklch, var(--gold) 22%, transparent); }
 .mfaPrimary {
   padding: 9px 15px;
   border: 0;
@@ -7363,23 +7361,6 @@ a:focus-visible {
   margin: 14px 0 0 36px;
   align-items: center;
 }
-.mfaTypeback {
-  flex: 1;
-  min-width: 0;
-  /* the document's box is two label lines tall; a real input keeps one line
-     vertically centred in the same footprint */
-  min-height: 45px;
-  padding: 8px 12px;
-  border-radius: 9px;
-  border: 1px solid var(--line-strong);
-  outline: none;
-  background: var(--shell);
-  color: var(--ink);
-  font-family: inherit;
-  font-size: 10.5px;
-}
-.mfaTypeback::placeholder { color: var(--muted); }
-.mfaTypeback:focus { border-color: var(--gold); }
 .mfaActivate {
   padding: 8px 15px;
   border: 0;
@@ -7408,7 +7389,6 @@ a:focus-visible {
   .mfaSetup { flex-direction: column; }
   .mfaStepBody, .mfaCodes, .mfaCodeActions { margin-left: 0; }
   .mfaCodeActions { flex-wrap: wrap; }
-  .mfaTypeback { min-width: 160px; }
   .mfaCodes { grid-template-columns: 1fr; }
 }
 
@@ -7651,6 +7631,17 @@ a:focus-visible {
 .libRowMeta { margin: 5px 0 0; font-size: 11px; color: var(--muted); }
 /* The publishing pseudonym is the one coloured token in the row. */
 .libRowBy { font-weight: 700; color: var(--gold-text); }
+/* The dots' model names (their only other home is a tooltip): read by a screen reader, and shown while the row has
+   the keyboard's ring (keyboard audit 2026-11-12). */
+.libRow:not(:focus-visible) .libRowModels {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
 
 .libDots { display: flex; flex: 0 0 auto; }
 .libDot {
@@ -8772,6 +8763,11 @@ a:focus-visible {
 }
 .mapReadoutClaim { font-size: 15.5px; line-height: 1.45; text-wrap: pretty; }
 .mapReadoutFooter { color: var(--muted); font-size: 11px; font-weight: 600; }
+/* The keys hint is for a keyboard only: it takes the pointer hint's place while a wedge of this map has the keyboard's
+   ring, so the footer keeps one line (keyboard audit 2026-11-12). */
+.mapReadoutFooter > .mapKeysHint { display: none; }
+.mapInner:has(.mapStage :focus-visible) .mapReadoutFooter > .mapKeysHint { display: inline; }
+.mapInner:has(.mapStage :focus-visible) .mapReadoutFooter > .mapPointerHint { display: none; }
 
 .synthPanel { flex: 0 0 280px; width: 280px; background: var(--surface-2); }
 .synthInner { display: flex; flex-direction: column; gap: 12px; padding: 18px 16px; }
@@ -9530,6 +9526,8 @@ a:focus-visible {
     linear-gradient(transparent, var(--line-strong)) bottom / 100% 12px no-repeat scroll;
   background-color: var(--surface-2);
 }
+/* A Tab stop in every state (keyboard audit 2026-11-12): an inset ring, as on the summary. */
+.storyPanelBody:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .storyPanelInner { display: grid; gap: 12px; max-width: 760px; }
 .storyPanelStory { display: grid; gap: 12px; }
 .storyPanelStory .storyHeadline {
@@ -10169,6 +10167,12 @@ a:focus-visible {
     position: sticky;
     top: 0;
   }
+  /* The page scrolls under the pinned header here, so a control focus moves to stops below it:
+     the header's two rows are about 100px (6 + 44 + 6 + 34 + 8 + 1, the figure .debateMain uses
+     below), plus 8px for the focus ring. Keyboard audit 2026-11-12. */
+  html:has(.debateTopBar) {
+    scroll-padding-top: 108px;
+  }
   .debateMain {
     flex: 0 0 auto;
     height: calc(100dvh - 100px);
@@ -10276,6 +10280,8 @@ a:focus-visible {
     width: auto;
     margin-bottom: 0;
   }
+  /* 16px: iOS zooms the page into a smaller text box when it takes focus. */
+  .popPartInput { font-size: 16px; }
 
   /* MFA setup: the stacked column kept align-items:flex-start, so the
      setup text sized to its content (418px in a 341px card) and hid the
@@ -10289,9 +10295,6 @@ a:focus-visible {
   }
   .mfaCodeRow {
     flex-wrap: wrap;
-  }
-  .mfaCodeRow .mfaCodeInput {
-    flex: 1 1 100%;
   }
   .mfaCodeRow > button {
     flex: 1 1 100%;

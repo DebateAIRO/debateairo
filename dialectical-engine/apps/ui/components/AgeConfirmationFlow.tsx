@@ -7,7 +7,7 @@ import { AgeRefusal } from "@/components/AgeRefusal";
 import { AuthShell } from "@/components/AuthShell";
 import { clearStoredSupportConversation } from "@/components/support/conversation";
 import { announceSessionChange } from "@/components/support/sessionChange";
-import { DateOfBirthField, EMPTY_DOB } from "@/components/DateOfBirthField";
+import { DateOfBirthField, EMPTY_DOB, firstFlaggedDobSelector } from "@/components/DateOfBirthField";
 import { contractClient } from "@/lib/api";
 import { resolveDobLocale, type DobLocale } from "@/lib/dob/dobLocale";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -64,6 +64,8 @@ export function AgeConfirmationFlow({
     const check = checkDob(dateOfBirth);
     if (check.code !== "ok") {
       setDateOfBirthError(check.code);
+      /* Focus goes to the first part to fix, in the locale's order (keyboard audit 2026-11-12). */
+      event.currentTarget.querySelector<HTMLElement>(firstFlaggedDobSelector(dateOfBirth, dobLocale.order))?.focus();
       return;
     }
     setBusy(true);
@@ -86,7 +88,7 @@ export function AgeConfirmationFlow({
     }
   }
 
-  if (refused) return <AgeRefusal catalog={catalog} />;
+  if (refused) return <AgeRefusal catalog={catalog} focusTitle={!refusedOnArrival} />;
 
   return (
     <AuthShell

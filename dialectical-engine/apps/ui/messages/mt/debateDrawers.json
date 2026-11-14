@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Sfida dan",
+  "debateDrawers.challenge.whichPart": "Liema parti? (mhux obbligatorju)",
   "debateDrawers.common.close": "Agħlaq",
   "debateDrawers.common.false": "falz",
   "debateDrawers.common.notAvailable": "mhux disponibbli",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Għad m’hemm ebda test tal-argument.",
   "debateDrawers.node.noCompletedReview": "Ma huwa rreġistrat ebda rieżami komplut minn mudell ta’ żviluppatur ieħor għal dan in-nodu.",
   "debateDrawers.node.noPreviousGenerations": "Ebda ġenerazzjoni preċedenti.",
+  "debateDrawers.node.noScore.notInAnswer": "Din il-kard mhix parti mit-tweġiba, għalhekk m’għandhiex punteġġ.",
+  "debateDrawers.node.noScore.notYet": "Għad m’hemm ebda punteġġ. Il-punteġġi jidhru meta t-tweġiba tkun lesta.",
+  "debateDrawers.node.noScore.question": "Il-mistoqsija nnifisha ma jkollhiex punteġġ.",
   "debateDrawers.node.noScoringRecommendation": "Ebda rakkomandazzjoni dwar il-punteġġ mhija disponibbli għal dan l-argument.",
   "debateDrawers.node.notUseful": "mhux utli",
   "debateDrawers.node.openRecommendedTargetClaim": "Iftaħ il-pretensjoni mira rakkomandata",

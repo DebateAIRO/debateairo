@@ -62,6 +62,7 @@
   "debateViews.levelCount.one": "{count} επίπεδο",
   "debateViews.levelCount.other": "{count} επίπεδα",
   "debateViews.mapInteractionHint": "Τοποθετήστε τον δείκτη πάνω από ένα κυκλικό τμήμα για λεπτομέρειες · επιλέξτε το για εστίαση",
+  "debateViews.mapKeysHint": "Τα πλήκτρα βέλους μετακινούν ανάμεσα στα κυκλικά τμήματα · το Enter εστιάζει σε ένα",
   "debateViews.mapLegendHint": "Δακτύλιος = βάθος · πλάτος = έκταση της αντιπαράθεσης κάτω από αυτόν",
   "debateViews.mapReasoning": "Συλλογισμός",
   "debateViews.moveToParentArgument": "Μετάβαση στο γονικό επιχείρημα: {claim}",

@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Contesta questo elemento",
+  "debateDrawers.challenge.whichPart": "Quale parte? (facoltativo)",
   "debateDrawers.common.close": "Chiudi",
   "debateDrawers.common.false": "falso",
   "debateDrawers.common.notAvailable": "non disponibile",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Il testo dell’argomentazione non è ancora disponibile.",
   "debateDrawers.node.noCompletedReview": "Per questo nodo non risulta alcuna revisione completata da un modello di un’altra casa produttrice.",
   "debateDrawers.node.noPreviousGenerations": "Nessuna generazione precedente.",
+  "debateDrawers.node.noScore.notInAnswer": "Questa scheda non fa parte della risposta, quindi non ha un punteggio.",
+  "debateDrawers.node.noScore.notYet": "Ancora nessun punteggio. I punteggi compaiono quando la risposta è pronta.",
+  "debateDrawers.node.noScore.question": "La domanda in sé non ha un punteggio.",
   "debateDrawers.node.noScoringRecommendation": "Non è disponibile alcuna raccomandazione di valutazione per questa argomentazione.",
   "debateDrawers.node.notUseful": "non utile",
   "debateDrawers.node.openRecommendedTargetClaim": "Apri l’affermazione consigliata",

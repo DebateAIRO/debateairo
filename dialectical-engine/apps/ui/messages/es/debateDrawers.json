@@ -1,5 +1,6 @@
 {
   "debateDrawers.challenge.title": "Cuestionar esto",
+  "debateDrawers.challenge.whichPart": "¿Qué parte? (opcional)",
   "debateDrawers.common.close": "Cerrar",
   "debateDrawers.common.false": "falso",
   "debateDrawers.common.notAvailable": "no disponible",
@@ -57,6 +58,9 @@
   "debateDrawers.node.noArgumentText": "Aún no hay texto para el argumento.",
   "debateDrawers.node.noCompletedReview": "No hay registrada ninguna revisión finalizada por un modelo de otro desarrollador para este nodo.",
   "debateDrawers.node.noPreviousGenerations": "No hay generaciones anteriores.",
+  "debateDrawers.node.noScore.notInAnswer": "Esta tarjeta no forma parte de la respuesta, por eso no tiene puntuación.",
+  "debateDrawers.node.noScore.notYet": "Aún no hay puntuación. Las puntuaciones aparecen cuando la respuesta está lista.",
+  "debateDrawers.node.noScore.question": "La propia pregunta no se puntúa.",
   "debateDrawers.node.noScoringRecommendation": "No hay ninguna recomendación de puntuación disponible para este argumento.",
   "debateDrawers.node.notUseful": "no útil",
   "debateDrawers.node.openRecommendedTargetClaim": "Abrir la afirmación objetivo recomendada",
