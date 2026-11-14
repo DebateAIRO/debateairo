@@ -509,6 +509,80 @@ describe("'Another way to see it' (spec §2 item 4; read-d3, choose-d2)", () => 
   });
 });
 
+/*
+ * Keyboard audit 2026-11-12 (V4A-7, V4A-8): a press whose button goes away puts the focus on what took its place: the swapped
+ * line after "Make this my question", "Path 1" after "Add to a path…" / "Swap for a path…", and the button that opened the
+ * full-list choice after its Cancel. Inside the More drawer the focus never leaves it.
+ */
+describe("focus after the cards' and the drawer's presses (V4A-7, V4A-8)", () => {
+  it("'Make this my question' puts the focus on the line that says the question is now this one", async () => {
+    await ready();
+    const mine = buttonIn(way("cd1"), "Make this my question");
+    await act(async () => { mine.focus(); });
+    await press(mine);
+    const swapped = way("cd1").querySelector<HTMLElement>(".v4StartWaySwapped")!;
+    expect(swapped.getAttribute("tabindex")).toBe("-1");
+    expect(document.activeElement).toBe(swapped);
+  });
+
+  it("on a card: 'Add to a path…' and 'Swap for a path…' focus Path 1; Cancel focuses the button that opened the choice", async () => {
+    await ready(pathPlanFromMenu(NUCLEAR_MENU, 5, false));
+    const look = buttonIn(way("cd1"), "+ Look into this");
+    await act(async () => { look.focus(); });
+    await press(look);
+    await press(buttonIn(way("cd1"), "Add to a path…"));
+    expect(document.activeElement).toBe(buttonIn(way("cd1"), "Path 1: Whole-system costs"));
+    await press(buttonIn(way("cd1"), "Cancel"));
+    expect(way("cd1").querySelector(".v4StartFull")).toBeNull();
+    expect(document.activeElement).toBe(look);
+    await press(look);
+    await press(buttonIn(way("cd1"), "Swap for a path…"));
+    expect(document.activeElement).toBe(buttonIn(way("cd1"), "Path 1: Whole-system costs"));
+  });
+
+  it("in the drawer: Path 1 after 'Add to a path…', the idea's '+ Look into this' after Cancel, and Tab stays inside", async () => {
+    await ready(pathPlanFromMenu(NUCLEAR_MENU, 5, false));
+    const dialog = await openDrawer();
+    const falling = idea(section(dialog, "Most useful first")!, "Falling prices");
+    const look = buttonIn(falling, "+ Look into this");
+    await act(async () => { look.focus(); });
+    await press(look);
+    await press(buttonIn(falling, "Add to a path…"));
+    expect(document.activeElement).toBe(buttonIn(falling, "Path 1: Whole-system costs"));
+    expect(drawer()!.contains(document.activeElement)).toBe(true);
+    await press(buttonIn(falling, "Cancel"));
+    expect(document.activeElement).toBe(look);
+    await key(document.activeElement!, "Tab");
+    expect(drawer()!.contains(document.activeElement)).toBe(true);
+  });
+});
+
+/*
+ * Keyboard audit 2026-11-12 (V4A-20): on a phone each card takes 85% of the row, so two or more cards always run past the
+ * screen, and a card already added with no question of its own has no button: the row itself is a Tab stop there, named by
+ * its heading, so the arrow keys can scroll it. On a computer the cards shrink to fit and the row is no Tab stop.
+ */
+describe("the cards' row scrolls from the keyboard on a phone (V4A-20)", () => {
+  const ways = (narrow: boolean): Promise<HTMLDivElement> => {
+    const plan = planAfter(pathPlanFromMenu(NUCLEAR_MENU, 5, false), { type: "USE_CARD", cardId: "cd2", intoPathKey: "kp01" });
+    const props = { plan, catalog: CATALOG, locale: "en", dispatch: () => null, onRefusal: () => undefined, share: null, narrow };
+    return mountPart(<V4StartWays {...props} onMakeMyQuestion={() => null} />);
+  };
+
+  it("phone: the row is a Tab stop named 'Another way to see it'; the added card in it has no button of its own", async () => {
+    await ways(true);
+    const strip = host!.querySelector<HTMLElement>(".v4StartWays")!;
+    expect(strip.getAttribute("tabindex")).toBe("0");
+    expect(nameOf(strip)).toBe("Another way to see it");
+    expect(host!.querySelector('.v4StartWay[data-card-id="cd2"] button')).toBeNull();
+  });
+
+  it("computer: no Tab stop on the row", async () => {
+    await ways(false);
+    expect(host!.querySelector(".v4StartWays")!.hasAttribute("tabindex")).toBe(false);
+  });
+});
+
 describe("the one-tap suggestions (spec §2 item 5; choose-f6)", () => {
   it("say the two sentences, at most two at a time", async () => {
     await ready();

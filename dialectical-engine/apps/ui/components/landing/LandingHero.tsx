@@ -8,6 +8,9 @@ export function LandingHero({ catalog }: { catalog: MessageCatalog }): JSX.Eleme
       data-landing-section="hero"
       aria-labelledby="landing-hero-title"
       className="lpSection lpHero"
+      // Keyboard audit 2026-11-12 (CHR1-4): the content starts here, after LandingChrome; the skip link comes here.
+      id="page-content"
+      tabIndex={-1}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "40px" }}>
         <span aria-hidden="true" style={{ width: "26px", height: "1px", background: "var(--pro)" }} />

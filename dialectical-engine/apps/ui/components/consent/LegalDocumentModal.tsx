@@ -148,6 +148,9 @@ export function LegalDocumentModal({
       block: "start",
       behavior: prefersReducedMotion() ? "auto" : "smooth"
     });
+    // Focus follows the jump, without a second scroll: left on the pill, it scrolled out of view and the next Tab
+    // brought the text back to the top (keyboard audit 2026-11-12).
+    section?.focus({ preventScroll: true });
   };
 
   return (
@@ -220,6 +223,7 @@ export function LegalDocumentModal({
                 key={section.no}
                 id={`${document.sectionIdPrefix}${section.no}`}
                 className="policySection"
+                tabIndex={-1}
               >
                 {/* One name for the heading: VoiceOver reads the number and title spans as two
                     runs with a stray "level" between them. */}

@@ -123,7 +123,12 @@ export function V4DigPaths(props: V4DigPathsProps) {
     }
   }, [plan, catalog]);
 
-  // Ctrl/Cmd+Z undoes the last change while the rows show; in a text box it is the text's own undo.
+  // Ctrl/Cmd+Z undoes the last change while the rows show; in a text box it is the text's own undo. Keyboard audit round 4
+  // (B7): only with focus in the rows or the panel column that holds them, never from another control elsewhere on the map
+  // page (a map card, the header, a note, the phone's Map sheet), where the change it would undo is out of sight. With
+  // nothing focused, or only a part of the page that holds the panel (after a mouse drag of a row, or a press on plain
+  // text), it still undoes, as it did before.
+  const rowsRef = useRef<HTMLDivElement | null>(null);
   const undoKey = useRef<() => boolean>(() => false);
   undoKey.current = (): boolean => {
     if (planNow.current.undo.length === 0) return false;
@@ -134,6 +139,11 @@ export function V4DigPaths(props: V4DigPathsProps) {
     const onKey = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || event.altKey || event.shiftKey || !(event.ctrlKey || event.metaKey)) return;
       if (event.key.toLowerCase() !== "z" || typing(event.target)) return;
+      const rows = rowsRef.current;
+      const scope = rows?.closest(".v4DebPanelCol") ?? rows;
+      const target = event.target;
+      if (scope === null || scope === undefined || !(target instanceof Node)) return;
+      if (!scope.contains(target) && !target.contains(scope)) return;
       if (undoKey.current()) event.preventDefault();
     };
     document.addEventListener("keydown", onKey);
@@ -155,7 +165,7 @@ export function V4DigPaths(props: V4DigPathsProps) {
     onRefusal(refusal, action);
   };
   return (
-    <div className="v4StartRows v4DigPaths" aria-busy={writing.size > 0 ? "true" : undefined}>
+    <div ref={rowsRef} className="v4StartRows v4DigPaths" aria-busy={writing.size > 0 ? "true" : undefined}>
       {overlap === null || first === undefined || second === undefined || first === second ? null : (
         <ul className="v4StartSuggest v4DigOverlap" aria-label={t(catalog, "v4.start.suggest.label")}>
           <li className="v4StartSuggestion">

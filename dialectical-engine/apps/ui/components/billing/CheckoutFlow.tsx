@@ -8,6 +8,7 @@ import {
 import { PaymentMarksGroup } from "@/components/SiteFooter";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
+import { focusIsLost } from "@/lib/focusGuard";
 import { contractClient } from "@/lib/api";
 import { phonePrefill, phoneTyped } from "@/lib/billing/callingCodes";
 import { checkoutFailureKey } from "@/lib/billing/checkoutFailure";
@@ -86,6 +87,8 @@ export function CheckoutFlow({
   /** Always mounted and polite: the price when it arrives, its removal by an edit, and why a press was refused. */
   const announcer = useFormAnnouncer();
   const started = useRef(false);
+  const priceButton = useRef<HTMLButtonElement>(null);
+  const totalSection = useRef<HTMLElement>(null);
   /** Bumped by every edit, so a price asked before an edit never shows for the edited details. */
   const edits = useRef(0);
   const name = planName(catalog, planId);
@@ -233,6 +236,8 @@ export function CheckoutFlow({
       setRenewalAccepted(false);
       setImmediateAccepted(false);
       setMessageKey(checkoutFailureKey(failure));
+      // Keyboard audit 2026-11-12: the price goes, and the pressed button with it; the way on is a fresh price.
+      if (focusIsLost() || totalSection.current?.contains(document.activeElement)) priceButton.current?.focus();
     }
   }
 
@@ -419,7 +424,7 @@ export function CheckoutFlow({
         ) : null}
         <div className="billingActions">
           {/* aria-disabled, never disabled: Tab still reaches it, and askForPrice says what a press is missing. */}
-          <button type="submit" className="btn" aria-disabled={!canQuote || undefined}>{t(catalog, "billing.checkout.showPrice")}</button>
+          <button type="submit" className="btn" ref={priceButton} aria-disabled={!canQuote || undefined}>{t(catalog, "billing.checkout.showPrice")}</button>
         </div>
         {announcer.region}
       </form>
@@ -433,7 +438,7 @@ export function CheckoutFlow({
       ) : null}
       {consents === null ? <p className="billingError" role="alert">{t(catalog, "billing.checkout.genericError")}</p> : null}
       {quote !== null ? (
-        <section aria-labelledby="checkout-total">
+        <section aria-labelledby="checkout-total" ref={totalSection}>
           <p id="checkout-total" className="billingTotal">{totalLine}</p>
           {quote.country_confirm_needed ? (
             <div className="billingConsent">

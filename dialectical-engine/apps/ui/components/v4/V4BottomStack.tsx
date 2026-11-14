@@ -159,6 +159,8 @@ export function V4BottomStack(props: Readonly<{
   /** Phone: the pinned bar. */
   mapButtonRef?: RefObject<HTMLButtonElement | null>;
   jobRef?: RefObject<HTMLElement | null>;
+  /** Phone (keyboard audit round 4, B4): the slim "Good time" line's own "Write my report", so focus can come back to it. */
+  goodTimeReportRef?: RefObject<HTMLElement | null>;
   onMap?: () => void;
   job?: V4BarJob;
   /** dig-f17: the report rule fired (the page's report moment, dig-f29: lib/v4/mapLooks.ts reportMoment). */
@@ -243,7 +245,7 @@ export function V4BottomStack(props: Readonly<{
         {showGoodTime ? (
           <div className="v4StackGoodTime" role="note">
             <p className="v4StackGoodText">{t(catalog, "v4.bar.goodTime")}</p>
-            {job.kind === "report" ? null : writeReport("v4Btn v4BtnPrimary v4StackGoodReport")}
+            {/* CSS-8 (keyboard audit 2026-11-12): in the order they are seen, so Tab reaches the × before the button under it. */}
             <button
               type="button"
               className="v4StackGoodClose"
@@ -252,6 +254,7 @@ export function V4BottomStack(props: Readonly<{
             >
               <span aria-hidden="true">×</span>
             </button>
+            {job.kind === "report" ? null : writeReport("v4Btn v4BtnPrimary v4StackGoodReport", props.goodTimeReportRef)}
           </div>
         ) : null}
         {props.strip}

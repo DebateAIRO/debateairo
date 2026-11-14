@@ -76,6 +76,10 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     const focused = document.activeElement;
     opener.current = focused instanceof HTMLElement ? focused : null;
   }
+  // Keyboard audit 2026-11-12: the security check opens at the end of the card, past the form's Cancel and past
+  // "Delete private debate…", and the card scrolls. Focus goes to the check itself (a named region) when it opens, so it
+  // is read out and in view, and the next Tab is its first method.
+  const securityCheck = (): HTMLElement | null => cardRef.current?.querySelector<HTMLElement>(".authSecurityConfirmation") ?? null;
 
   useLayoutEffect(() => {
     const card = cardRef.current;
@@ -87,6 +91,23 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     const paddingTop = Number.parseFloat(card.ownerDocument.defaultView?.getComputedStyle(card).paddingTop ?? "") || 0;
     card.scrollTop += answer.getBoundingClientRect().top - (card.getBoundingClientRect().top + card.clientTop + paddingTop);
   }, [answered]);
+
+  // Keyboard audit round 4 (C8): on a phone and in a short window the page scrolls under this card, which sticks to the
+  // window's foot. The card says how tall it really is (globals.css keeps that much of the window clear when it scrolls a
+  // focused control into view); Chrome draws it at its least height, another browser may draw it taller.
+  useEffect(() => {
+    const card = cardRef.current;
+    if (card === null) return;
+    const root = card.ownerDocument.documentElement;
+    const set = (): void => root.style.setProperty("--visibility-card-room", `${Math.ceil(card.getBoundingClientRect().height)}px`);
+    set();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
+    observer?.observe(card);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty("--visibility-card-room");
+    };
+  }, [deleted]);
 
   useEffect(() => {
     let active = true;
@@ -110,6 +131,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     if (action === null || !acknowledged || busy) return;
     rememberOpener();
     setConfirming('publication');
+    focusNext.current = securityCheck;
   }
   async function publishConfirmed(result:ConfirmedSecurityAction):Promise<void> {
     if(action===null||!acknowledged)return;
@@ -124,6 +146,9 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
       focusNext.current = () => toggle.current;
       setMessage(t(catalog, "public.publication.publishedSuccess"));
     } catch (failure) {
+      // Keyboard audit 2026-11-12: the refusal shows at the top of the card, while the check below has emptied itself:
+      // focus goes to the card's heading, the answer just under it (the removed-by-check notice takes focus itself).
+      if (!(failure instanceof ContractHttpError && failure.serverCode === "DEBATE_REMOVED_BY_CHECK")) focusNext.current = () => null;
       if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_REMOVED_BY_CHECK") {
         onRemovedByCheck?.();
       } else if (failure instanceof ContractHttpError && failure.serverCode === "PUBLICATION_APPROVAL_REQUIRED") {
@@ -150,6 +175,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     if (!deleteAcknowledged || busy || visibility?.state !== "PRIVATE") return;
     rememberOpener();
     setConfirming('delete');
+    focusNext.current = securityCheck;
   }
   async function deleteConfirmed(result:ConfirmedSecurityAction):Promise<void> {
     if(!deleteAcknowledged||visibility?.state!=='PRIVATE')return;
@@ -169,6 +195,7 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
         ? t(catalog, "public.publication.deletedCleaned")
         : t(catalog, "public.publication.deletionPending"));
     } catch (failure) {
+      focusNext.current = () => null; // the heading, its refusal line just under it (as a refused publish)
       if (failure instanceof ContractHttpError && failure.serverCode === "DEBATE_MUST_BE_PRIVATE") {
         setMessage(t(catalog, "public.publication.mustBePrivate"));
       } else if (failure instanceof ContractHttpError && failure.serverCode === "LEGACY_CONTENT_RETAINED") {

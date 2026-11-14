@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { ContractHttpError, postcodeOptional, type BillingCurrency, type ContractClient } from "@debateai/contract";
 import { contractClient } from "@/lib/api";
+import { focusIsLost } from "@/lib/focusGuard";
+import { phoneTyped } from "@/lib/billing/callingCodes";
 import { countryName, formatMoney } from "@/lib/billing/format";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -18,6 +20,9 @@ const leaveFor = (href: string): void => { window.location.replace(href); };
 /** Spec §2.11: NETOPIA's check for 0 is reached by a top-level navigation, as the checkout's page is. */
 const leaveForPayment = (url: string): void => { window.location.assign(url); };
 const sessionEnded = (failure: unknown): boolean => failure instanceof ContractHttpError && failure.status === 401;
+type CardField = keyof BillingDetails | "city";
+const FIELD_ORDER: readonly CardField[] = ["firstName", "lastName", "phone", "street", "postalCode", "city"];
+const FIELD_REQUIRED = "billing.card.fieldRequired";
 
 /** Spec 2026-10-05 §2.11 (C-2): corrected details (country and region fixed, §2.5.3), the agreement, NETOPIA's 0 check. */
 export function CardChangeFlow({
@@ -48,6 +53,8 @@ export function CardChangeFlow({
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [messageKey, setMessageKey] = useState<string | null>(null);
+  /** Set by a press on "Check my new card" while something is missing; each field then says what is wrong with it. */
+  const [showErrors, setShowErrors] = useState(false);
 
   useEffect(() => {
     if (returnedChargeRef !== null) return;
@@ -104,13 +111,41 @@ export function CardChangeFlow({
         : code === "BILLING_ADDRESS_REQUIRED" ? "billing.checkout.detailsRequired"
         : code === "PAYMENT_PROVIDER_UNAVAILABLE" ? "billing.checkout.formUnavailable"
         : "billing.checkout.genericError");
+      // Keyboard audit 2026-11-12: a refused phone is fixed in its field, above the button: focus goes there.
+      if (code === "BILLING_PHONE_INVALID" && (focusIsLost() || document.activeElement?.matches(":disabled")))
+        document.getElementById("card-phone")?.focus();
     }
   }
 
   const postalOptional = stored !== null && postcodeOptional(stored.country);
-  const complete = details !== null && [details.firstName, details.lastName, details.phone, details.street, city]
-    .every((value) => value.trim() !== "") && (postalOptional || details.postalCode.trim() !== "");
+  // The checkout's rules, field by field (keyboard audit 2026-11-12, SET-10): a phone still at its calling code is not typed.
+  const missing: Partial<Record<CardField, string>> = {};
+  if (details !== null) {
+    if (details.firstName.trim() === "") missing.firstName = FIELD_REQUIRED;
+    if (details.lastName.trim() === "") missing.lastName = FIELD_REQUIRED;
+    if (!phoneTyped(details.phone)) missing.phone = "billing.checkout.phoneInvalid";
+    if (details.street.trim() === "") missing.street = FIELD_REQUIRED;
+    if (!postalOptional && details.postalCode.trim() === "") missing.postalCode = FIELD_REQUIRED;
+    if (city.trim() === "") missing.city = FIELD_REQUIRED;
+  }
+  const fieldError = (field: CardField): string | undefined => {
+    const key = missing[field];
+    return showErrors && key !== undefined ? t(catalog, key) : undefined;
+  };
+  const firstMissing = FIELD_ORDER.find((field) => missing[field] !== undefined);
+  const complete = details !== null && firstMissing === undefined;
   const canStart = !busy && complete && agreed && renewalConsent !== null && total !== null && currency !== null;
+  // As on the checkout, the button stays focusable while it is locked: this says why (as its description and when
+  // pressed), and a press marks every missing field and moves focus to the first, or to the agreement.
+  const blocker: { key: string; target: string } | null = busy ? null
+    : firstMissing !== undefined ? { key: "billing.card.detailsRequired", target: `card-${firstMissing}` }
+    : !agreed ? { key: "billing.card.agreementRequired", target: "card-agreement" }
+    : null;
+  function pressLocked(): void {
+    if (blocker === null) return;
+    if (firstMissing !== undefined) setShowErrors(true);
+    document.getElementById(blocker.target)?.focus();
+  }
 
   return (
     <section aria-labelledby="card-change-title">
@@ -140,10 +175,16 @@ export function CardChangeFlow({
           ) : null}
           <p className="billingNote">{t(catalog, "billing.card.taxPlaceNote")}</p>
           <BillingDetailsFields catalog={catalog} idPrefix="card" values={details} postalOptional={postalOptional}
+            errors={{
+              firstName: fieldError("firstName"), lastName: fieldError("lastName"), phone: fieldError("phone"),
+              street: fieldError("street"), postalCode: fieldError("postalCode")
+            }}
             onChange={(field, value) => setDetails({ ...details, [field]: value })} />
           <div className="billingField">
             <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
-            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required aria-invalid="false" />
+            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required
+              aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "card-city-error" : undefined} />
+            {fieldError("city") ? <p id="card-city-error" className="authFieldError">{fieldError("city")}</p> : null}
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
           {total !== null && currency !== null ? (
@@ -153,9 +194,18 @@ export function CardChangeFlow({
                 <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, total, currency) })}</span>
               </label>
               <div className="billingActions">
-                <button type="button" className="btn btnDark" disabled={!canStart} onClick={() => { void start(); }}>
+                <button
+                  type="button"
+                  className="btn btnDark"
+                  // Only a lock with a reason stays focusable; with no renewal terms loaded there is nothing to do or say.
+                  disabled={busy || (!canStart && blocker === null)}
+                  aria-disabled={blocker !== null || undefined}
+                  aria-describedby={blocker !== null ? "card-check-hint" : undefined}
+                  onClick={() => { if (canStart) void start(); else pressLocked(); }}
+                >
                   {t(catalog, "billing.card.checkCard")}
                 </button>
+                {blocker !== null ? <span id="card-check-hint" className="srOnly">{t(catalog, blocker.key)}</span> : null}
               </div>
             </>
           ) : (

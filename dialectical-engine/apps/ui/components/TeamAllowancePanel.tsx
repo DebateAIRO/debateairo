@@ -6,6 +6,7 @@ import { dollarsToMicros, formatDollars } from "../lib/teamLimitApi.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
+import { focusIsLost, isFocusParked } from "../lib/focusGuard.js";
 import "./StaffAccessPanel.css";
 
 type Member = TeamAllowancePage["members"][number];
@@ -83,6 +84,30 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
     };
   }, [api]);
 
+  // Keyboard audit 2026-11-12: asking switches the form (or Take back) off under focus and opens the confirm away from
+  // it: focus goes to Confirm. Cancel gives focus back to where the person asked from, once that is switched on again.
+  // Where they asked from is read as they ask (`ask`), not here: by the time this effect runs a browser has already
+  // taken focus from the switched-off control. Nothing focused then (a mouse press that focuses no button): no place is
+  // kept, so Cancel never sends focus to the place of an earlier ask.
+  const confirmButton = useRef<HTMLButtonElement>(null);
+  const asker = useRef<HTMLElement | null>(null);
+  const backToAsker = useRef(false);
+  function ask(change: Pending) {
+    const focused = document.activeElement;
+    asker.current = focused instanceof HTMLElement && focused !== document.body && !isFocusParked(focused) ? focused : null;
+    setPending(change);
+  }
+  useEffect(() => {
+    if (pending === null) return;
+    if (focusIsLost() || document.activeElement?.matches(":disabled")) confirmButton.current?.focus();
+  }, [pending]);
+  useEffect(() => {
+    if (!backToAsker.current || pending !== null || busy) return;
+    backToAsker.current = false;
+    const back = asker.current;
+    if (back?.isConnected && !back.matches(":disabled") && focusIsLost()) back.focus();
+  });
+
   if (page === null) return null;
   const { limits, members } = page;
   const dollars = (micros: number) => formatDollars(locale, micros);
@@ -129,7 +154,7 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
     const days = Number(String(data.get("days") ?? "").trim());
     if (!Number.isInteger(days) || days < 1 || days > maxDays) return refuse("staff.teamAllowance.invalidDays");
     setMessage(null);
-    setPending({ kind: "give", member, gift: { staffId: member.staff_id, revision: member.revision, amountMicros, dayMicros, weekMicros, days } });
+    ask({ kind: "give", member, gift: { staffId: member.staff_id, revision: member.revision, amountMicros, dayMicros, weekMicros, days } });
   }
   function pendingLine(change: Pending): string {
     if (change.kind === "takeBack") return t(catalog, "staff.teamAllowance.confirmTakeBack", { name: nameOf(change.member) });
@@ -149,7 +174,7 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
           {member.allowance === null ? <span className="setCardHint">{t(catalog, "staff.teamAllowance.none")}</span> : <>
             <span>{t(catalog, "staff.teamAllowance.line", { spent: dollars(member.allowance.spent_micros), amount: dollars(member.allowance.amount_micros),
               day: dollars(member.allowance.day_micros), week: dollars(member.allowance.week_micros), ends: formatDate(locale, member.allowance.expires_at, { dateStyle: "medium" }) })}</span>
-            <div className="staffActions"><button className="setBtn" type="button" disabled={locked} onClick={() => { setMessage(null); setPending({ kind: "takeBack", member, grantId: member.allowance!.grant_id }); }}>{t(catalog, "staff.teamAllowance.takeBack")}</button></div>
+            <div className="staffActions"><button className="setBtn" type="button" disabled={locked} onClick={() => { setMessage(null); ask({ kind: "takeBack", member, grantId: member.allowance!.grant_id }); }}>{t(catalog, "staff.teamAllowance.takeBack")}</button></div>
           </>}
         </li>)}
       </ul>
@@ -175,8 +200,8 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
         <p>{pendingLine(pending)}</p>
         <p className="setCardHint">{t(catalog, "staff.teamAllowance.passkey")}</p>
         <div className="staffActions">
-          <button className="setBtn setBtnPrimary" type="button" disabled={busy} onClick={() => { void go(pending); }}>{t(catalog, "staff.teamAllowance.confirm")}</button>
-          <button className="setBtn" type="button" disabled={busy} onClick={() => setPending(null)}>{t(catalog, "staff.teamAllowance.cancel")}</button>
+          <button className="setBtn setBtnPrimary" type="button" ref={confirmButton} disabled={busy} onClick={() => { void go(pending); }}>{t(catalog, "staff.teamAllowance.confirm")}</button>
+          <button className="setBtn" type="button" disabled={busy} onClick={() => { backToAsker.current = true; setPending(null); }}>{t(catalog, "staff.teamAllowance.cancel")}</button>
         </div>
       </div> : null}
     </section>

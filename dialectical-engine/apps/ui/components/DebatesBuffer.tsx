@@ -67,6 +67,9 @@ function LibraryRow({
   composeCatalog: MessageCatalog;
 }) {
   const [byBefore, byAfter] = t(catalog, "home.by", { name: "\u0000" }).split("\u0000");
+  // The dots name their models only in a tooltip, so the meta line names them too, shown while the row has the
+  // keyboard's ring and always read by a screen reader (keyboard audit 2026-11-12).
+  const modelNames = models.map((model) => modelMeta(model, composeCatalog).name).join(", ");
   return (
     <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined} style={{ background: "var(--shell)" }}>
       <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
@@ -77,6 +80,7 @@ function LibraryRow({
             {by === undefined ? null : <>{byBefore}<span className="libRowBy">{by}</span>{byAfter} · </>}
             {meta}
             {confidenceBand ? <> · <span data-ai-generated="true">{confidenceBand}</span></> : null}
+            {models.length > 0 ? <span className="libRowModels"> · {modelNames}</span> : null}
           </p>
         </div>
         {models.length > 0 ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useId, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 import type { DebateNode } from "@/lib/types";
 import { ModelMetaLine } from "@/components/ModelPresentation";
 import { ROLE_PALETTES, renderStateOf, roleLabel, roleOf } from "@/lib/debatePresentation";
@@ -92,6 +92,10 @@ export function DebateMap({
   const [hoverId, setHoverId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const segmentRefs = useRef(new Map<string, SVGElement>());
+  // The readout's keys hint says which keys work; the wedge focus enters the map on is described by it, and the
+  // wedges the arrows move on to are not, so a screen reader hears it once per visit (keyboard audit 2026-11-12).
+  const hintId = useId();
+  const [hintOnTabStop, setHintOnTabStop] = useState(true);
 
   const maxDepth = Math.max(1, treeDepth(root));
   const ringW = (MAX_R - HUB_R - GAP - RING_GAP * (maxDepth - 1)) / maxDepth;
@@ -176,7 +180,17 @@ export function DebateMap({
         </div>
 
         <div className="mapStage" onMouseLeave={() => setHoverId(null)}>
-          <svg viewBox="0 0 600 600" width="100%" style={{ display: "block", overflow: "visible" }}>
+          <svg
+            viewBox="0 0 600 600"
+            width="100%"
+            style={{ display: "block", overflow: "visible" }}
+            onFocus={(event: FocusEvent<SVGSVGElement>) => {
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) setHintOnTabStop(false);
+            }}
+            onBlur={(event: FocusEvent<SVGSVGElement>) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHintOnTabStop(true);
+            }}
+          >
             {arcs.map((arc) => (
               <path
                 key={arc.id}
@@ -188,6 +202,7 @@ export function DebateMap({
                 style={{ cursor: "pointer", transition: "opacity 0.15s" }}
                 role="button"
                 tabIndex={arc.id === tabStopId ? 0 : -1}
+                aria-describedby={arc.id === tabStopId && hintOnTabStop ? hintId : undefined}
                 ref={segmentRef(arc.id)}
                 aria-label={`${localizedRoleLabel(arc.node, catalog, debateChromeCatalog)}: ${arc.node.claim}`}
                 lang={textLang.lang}
@@ -212,6 +227,7 @@ export function DebateMap({
               style={{ cursor: "pointer" }}
               role="button"
               tabIndex={root.id === tabStopId ? 0 : -1}
+              aria-describedby={root.id === tabStopId && hintOnTabStop ? hintId : undefined}
               ref={segmentRef(root.id)}
               aria-label={root.claim}
               lang={textLang.lang}
@@ -249,7 +265,9 @@ export function DebateMap({
             ) : null}
             <div className="mapReadoutClaim" {...textLang} data-ai-generated={readoutRole === "root" ? undefined : "true"}>{readoutNode.claim}</div>
             <div className="mapReadoutFooter">
-              <span>{t(catalog, "debateViews.mapInteractionHint")}</span>
+              {/* The keys hint shows only while a wedge has the keyboard's ring, in place of the pointer's (globals.css). */}
+              <span className="mapPointerHint">{t(catalog, "debateViews.mapInteractionHint")}</span>
+              <span className="mapKeysHint" id={hintId}>{t(catalog, "debateViews.mapKeysHint")}</span>
               <span style={{ flex: 1 }} />
               <button type="button" className="nodeCtrl link" onClick={() => onOpenSplit(readoutNode.id)}>
                 {t(catalog, "debateViews.openInSplit")} <span aria-hidden="true">▸</span>

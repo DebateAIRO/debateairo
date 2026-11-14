@@ -12,6 +12,7 @@ import composeEnglish from "../messages/en/compose.json";
 import composeRomanian from "../messages/ro/compose.json";
 import { PublicDebateOverview } from "./PublicDebateOverview.js";
 import { storyLabelWords } from "../lib/v3/storyWords.js";
+import { focusIsLost } from "../lib/focusGuard.js";
 import "./StaffAccessPanel.css";
 
 type Queue = Awaited<ReturnType<StaffApiClient["publicationReviews"]>>;
@@ -48,6 +49,28 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
   const [reason, setReason] = useState("");
   const [requestError, setRequestError] = useState(false);
   const [detail, setDetail] = useState<{ kind: "verdict" } | { kind: "argument"; nodeId: string } | null>(null);
+  // Keyboard audit 2026-11-12: every step here swaps a whole screen (queue, review, queue) or opens something away from
+  // the pressed control (the reason box; Details and Read below the whole overview). `focusNext` names where focus goes
+  // once the render that shows it is done: the new screen's heading, the reason box, the detail's heading, its opener.
+  const focusNext = useRef<(() => HTMLElement | null) | null>(null);
+  const screenHeading = useRef<HTMLHeadingElement>(null);
+  const detailHeading = useRef<HTMLHeadingElement>(null);
+  const reasonBox = useRef<HTMLTextAreaElement>(null);
+  const detailOpener = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const pick = focusNext.current;
+    if (pick === null || busy) return;
+    focusNext.current = null;
+    pick()?.focus();
+  });
+  /** A screen swap moves focus only when the swap took it away (the pressed control went with the old screen). */
+  const toScreenHeading = () => focusIsLost() ? screenHeading.current : null;
+  const openDetail = (next: { kind: "verdict" } | { kind: "argument"; nodeId: string }) => {
+    const focused = document.activeElement;
+    detailOpener.current = focused instanceof HTMLElement ? focused : null;
+    focusNext.current = () => detailHeading.current;
+    setDetail(next);
+  };
 
   useEffect(() => {
     const epoch = ++generation.current;
@@ -83,7 +106,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
         setRequestError(true);
       }
     } finally {
-      if (generation.current === epoch) setBusy(false);
+      if (generation.current === epoch) { focusNext.current = toScreenHeading; setBusy(false); }
     }
   }
 
@@ -94,6 +117,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
     setStatus(null);
     setRequestError(false);
     setDetail(null);
+    focusNext.current = toScreenHeading;
     router.replace("/admin/reviews");
   }
 
@@ -137,7 +161,7 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
       if (key === "staff.reviews.notElevated") setNotElevated(true);
       setStatus(key);
     } finally {
-      if (generation.current === epoch) setBusy(false);
+      if (generation.current === epoch) { focusNext.current = toScreenHeading; setBusy(false); }
     }
   }
 
@@ -149,11 +173,11 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
 
   return <div className={`setInner staffAccess${snapshot !== null ? " rvReadScreen" : ""}`} aria-busy={busy || queue === null && !notElevated}>
     {notElevated ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2><p className="setCardHint">{t(catalog, "staff.reviews.notElevated")}</p><div className="staffActions"><a className="setBtn" href="/admin/team">{t(catalog, "staff.title")}</a></div></section> : null}
-    {!notElevated && snapshot !== null ? <><header className="staffHeading"><h1 className="setTitle rvQuestion">{snapshot.question}</h1></header><section className="rvReview">
+    {!notElevated && snapshot !== null ? <><header className="staffHeading"><h1 ref={screenHeading} tabIndex={-1} className="setTitle rvQuestion">{snapshot.question}</h1></header><section className="rvReview">
       {categories(snapshot.categories, "staffPermissions rvChips")}
-      <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => setDetail({ kind: "verdict" })} onRead={(nodeId) => setDetail({ kind: "argument", nodeId })} />
+      <PublicDebateOverview debate={snapshot as unknown as PublicDebate} catalog={publicCatalog} storyCatalog={publicCatalog} storyLocale={locale} composeCatalog={locale === "ro" ? composeRomanian : composeEnglish} viewingNote="NONE" onDetails={() => openDetail({ kind: "verdict" })} onRead={(nodeId) => openDetail({ kind: "argument", nodeId })} />
       {detail !== null ? <section aria-label={t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")} data-review-detail={detail.kind} className="rvDetail">
-        <h2>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
+        <h2 ref={detailHeading} tabIndex={-1}>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
         {detail.kind === "verdict" ? <>
           {snapshot.answer.summary_segments.map((segment, index) => <p key={index}>{segment.text}</p>)}
           <p>{snapshot.answer.verdict === null ? t(publicCatalog, "public.overview.verdictUnavailable")
@@ -163,27 +187,27 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
           <p>{selectedNode.claim}</p>
           {selectedNode.review?.reasons.map((reason, index) => <p key={index}>{reason}</p>)}
         </> : null}
-        <button className="setBtn" type="button" onClick={() => setDetail(null)}>{t(publicCatalog, "public.honesty.close")}</button>
+        <button className="setBtn" type="button" onClick={() => { focusNext.current = () => detailOpener.current; setDetail(null); }}>{t(publicCatalog, "public.honesty.close")}</button>
       </section> : null}
       {!reasonVisible ? <div className="staffActions rvActions">
         <button className="setBtn" type="button" disabled={busy} onClick={() => { void decide("APPROVE"); }}>{t(catalog, "staff.reviews.approve")}</button>
-        <button className="setBtn" type="button" disabled={busy} onClick={() => setReasonVisible(true)}>{t(catalog, "staff.reviews.refuse")}</button>
+        <button className="setBtn" type="button" disabled={busy} onClick={() => { focusNext.current = () => reasonBox.current; setReasonVisible(true); }}>{t(catalog, "staff.reviews.refuse")}</button>
         <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={leave}>{t(catalog, "staff.reviews.back")}</button>
       </div> : null}
       {reasonVisible ? <div className="staffField rvReason">
         <label htmlFor="publication-review-reason">{t(catalog, "staff.reviews.reasonLabel")}</label>
-        <textarea id="publication-review-reason" maxLength={500} value={reason} onChange={event => setReason(event.currentTarget.value)} />
+        <textarea ref={reasonBox} id="publication-review-reason" maxLength={500} value={reason} onChange={event => setReason(event.currentTarget.value)} />
         <p className="rvCount">{t(catalog, "staff.reviews.reasonCount", { count: reason.length })}</p>
         <div className="staffActions rvActions"><button className="setBtn" type="button" disabled={busy || reason.trim().length < 1 || reason.trim().length > 500} onClick={() => { void decide("REFUSE"); }}>{t(catalog, "staff.reviews.refuse")}</button>
           <button className="setBtn setBtnQuiet" type="button" disabled={busy} onClick={leave}>{t(catalog, "staff.reviews.back")}</button></div>
       </div> : null}
     </section></> : null}
-    {!notElevated && snapshot === null && requestError ? <section className="setCard"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2>
+    {!notElevated && snapshot === null && requestError ? <section className="setCard"><h2 ref={screenHeading} tabIndex={-1} className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2>
       {status !== null ? <p role="status" className="setCardHint">{t(catalog, status)}</p> : null}
       <div className="staffActions"><button className="setBtn setBtnQuiet" type="button" onClick={leave}>{t(catalog, "staff.reviews.back")}</button></div>
     </section> : null}
     {!notElevated && snapshot === null && !requestError && queue !== null ? <section className="setCard">
-      <div className="staffSectionHead"><h2 className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2></div>
+      <div className="staffSectionHead"><h2 ref={screenHeading} tabIndex={-1} className="staffSectionTitle">{t(catalog, "staff.reviews.heading")}</h2></div>
       {status !== null ? <p className="staffNotice" role="status">{t(catalog, status)}</p> : null}
       {entries.length === 0 ? <p className="setCardHint">{t(catalog, "staff.reviews.empty")}</p> : <ul className="rvQueue">{entries.map(item => <li key={item.review_ref}>
         <div className="rvRowBody"><div className="rvRowHead"><time dateTime={item.asked_at}>{t(catalog, "staff.reviews.askedAt", { date: formatDate(locale, item.asked_at, { dateStyle: "medium", timeStyle: "short" }) })}</time>

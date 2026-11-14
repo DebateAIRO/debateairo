@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import type { AskClarifyResponse, ClarifyQuestion } from "@debateai/contract";
 import { V4StartAnswersFold } from "@/components/v4/V4StartCard";
+import { focusIsLost } from "@/lib/focusGuard";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { answerCounts, FREE_GOAL_CHOICES_MAX, GOAL_ANSWERS_MAX, goalChoiceCount } from "@/lib/v4/askText";
 import {
@@ -290,8 +291,18 @@ export function V4AskQuestions({
   const full = goalChoiceCount(goal) >= cap;
   const capWaits = full && (planIsFree || setAside.length > 0
     || questions.some((shownQuestion) => !goal.answers.some((given) => given.question === shownQuestion.text && answerCounts(given))));
-  const answered = questions.filter((shownQuestion) => goal.answers.some((given) => given.question === shownQuestion.text));
-  const folded = fold?.folded === true && answered.length > 0;
+  const answeredNow = questions.filter((shownQuestion) => goal.answers.some((given) => given.question === shownQuestion.text));
+  // Keyboard audit 2026-11-12 (V4A-5): the fold holds the questions answered when it closed. One still open that is answered
+  // after that stays where it is, open, so the pressed answer keeps its place, stays in sight and keeps the focus.
+  const foldNow = fold?.folded === true;
+  const [lastFold, setLastFold] = useState(foldNow);
+  const [foldHolds, setFoldHolds] = useState<readonly string[]>(() => (foldNow ? answeredNow.map((one) => one.text) : []));
+  if (lastFold !== foldNow) {
+    setLastFold(foldNow);
+    setFoldHolds(foldNow ? answeredNow.map((one) => one.text) : []);
+  }
+  const answered = foldNow ? answeredNow.filter((one) => foldHolds.includes(one.text)) : answeredNow;
+  const folded = foldNow && answered.length > 0;
   const block = (question: ClarifyQuestion) => {
     const at = questions.indexOf(question);
     return (
@@ -310,6 +321,19 @@ export function V4AskQuestions({
     );
   };
   const held = waiting ? rowsFrom(0) : folding;
+  // Keyboard audit 2026-11-12 (V4A-4): "Put it back" goes with its line; focus goes to the answer put back, in its question's
+  // block (its "Other" line for typed words), wherever that block now is.
+  const questionsBox = useRef<HTMLDivElement>(null);
+  const putBackFocus = useRef<string | null>(null);
+  useEffect(() => {
+    const text = putBackFocus.current;
+    if (text === null) return;
+    const back = [...(questionsBox.current?.querySelectorAll<HTMLElement>(".v4AskBlock") ?? [])]
+      .find((one) => one.querySelector(".v4AskLabel")?.textContent === text);
+    if (back === undefined) return;
+    putBackFocus.current = null;
+    if (focusIsLost()) (back.querySelector<HTMLElement>(".v4AskInput") ?? back.querySelector<HTMLElement>('[aria-pressed="true"]'))?.focus();
+  });
   // Task 76g (read-f1): one line per answer set aside, "Set aside: To 2035 · Put it back". Putting it back is one more answer, so
   // while Free's cap is reached the button waits, muted, described by the cap line, and a press changes nothing.
   const asideLine = (aside: SetAsideAnswer) => (
@@ -322,6 +346,7 @@ export function V4AskQuestions({
         {...(full ? { "aria-disabled": true as const, "aria-describedby": capId } : {})}
         onClick={() => {
           if (full) return;
+          putBackFocus.current = aside.question.text;
           onPutBack?.(aside);
         }}
       >
@@ -354,7 +379,7 @@ export function V4AskQuestions({
         ) : <span className="v4AskWaitLine" aria-hidden="true" />}
       </div>
       {shown ? (
-        <div className={arriving?.less === true ? "v4AskQuestions v4Highlight" : "v4AskQuestions"}>
+        <div ref={questionsBox} className={arriving?.less === true ? "v4AskQuestions v4Highlight" : "v4AskQuestions"}>
           <h2 className="v4AskSubTitle">
             {t(catalog, "v4.read.optionalTitle")} <span className="v4Muted v4AskOptional">{t(catalog, "v4.read.optionalNote")}</span>
           </h2>

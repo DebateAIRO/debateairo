@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ContractClient, SessionSummary } from "@debateai/contract";
 import { contractClient } from "../lib/api.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import settingsEnglish from "../messages/en/settings.json";
 import { endSession, finishSessionCleanup } from "../lib/endSession";
+import { focusIsLost } from "../lib/focusGuard";
 
 export type SessionControlClient = Pick<ContractClient,
   "listSessions" | "logout" | "revokeSession" | "revokeAllSessions"
@@ -76,6 +77,19 @@ export function SessionControls({
   // would desynchronise the server and client markup.
   const [deviceLabel, setDeviceLabel] = useState<string | null>(null);
   useEffect(() => { setDeviceLabel(currentDeviceLabel()); }, []);
+  // Keyboard audit 2026-11-12: a revoked row leaves the list with its focused Revoke, so focus goes to the Revoke now
+  // in that place (the row after it, else the one before), and to the list's heading once no row is left.
+  const heading = useRef<HTMLHeadingElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  const revokedAt = useRef<number | null>(null);
+  useEffect(() => {
+    const at = revokedAt.current;
+    if (at === null || busy !== null) return;
+    revokedAt.current = null;
+    if (!focusIsLost()) return;
+    const left = list.current?.querySelectorAll<HTMLButtonElement>(".setBtnRevoke") ?? [];
+    (left[Math.min(at, left.length - 1)] ?? heading.current)?.focus();
+  });
   const finishSession = () => {
     finishSessionCleanup(onSessionEnded ? null : "/settings");
     onSessionEnded?.();
@@ -101,7 +115,7 @@ export function SessionControls({
     try {
       await client.revokeSession(session.session_id);
       if (session.current) finishSession();
-      else await refresh();
+      else { revokedAt.current = sessions.indexOf(session); await refresh(); }
     } catch (failure) {
       setError(describeFailure(failure, catalog));
     } finally {
@@ -151,12 +165,12 @@ export function SessionControls({
     <>
       <section aria-labelledby="active-sessions-heading">
         <div className="setSectionHead">
-          <h2 className="setSectionTitle" id="active-sessions-heading">
+          <h2 className="setSectionTitle" id="active-sessions-heading" ref={heading} tabIndex={-1}>
             {t(catalog, "settings.sessions.title")}
           </h2>
           <p className="setSectionHint">{t(catalog, "settings.sessions.hint")}</p>
         </div>
-        <div className="setList">
+        <div className="setList" ref={list}>
           {loading ? <p className="setStatus">{t(catalog, "settings.sessions.loading")}</p> : null}
           {error ? <div className="setError" role="alert">{error}</div> : null}
           {!loading && sessions.length === 0 ? (

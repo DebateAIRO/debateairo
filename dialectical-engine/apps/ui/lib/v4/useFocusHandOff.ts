@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type FocusEvent } from "react";
+import { focusIsLost } from "@/lib/focusGuard";
 
 /*
  * The wave-2 checks (4 Nov, ACCESS NEW-1 and its follow-ups): a part that holds focus and then goes (the report's waiting
@@ -21,10 +22,9 @@ export type FocusHandOff = Readonly<{
   onBlur: (event: FocusEvent<HTMLElement>) => void;
 }>;
 
-/** True when no element holds focus (the page's body has it). */
+/** True when no element holds focus (the page's body has it, or a part the focus guard parked it on). */
 function focusOnPage(): boolean {
-  const active = document.activeElement;
-  return active === null || active === document.body;
+  return focusIsLost();
 }
 
 /** Gives `element` focus where it is, without scrolling the page to it. */

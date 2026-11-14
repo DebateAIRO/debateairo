@@ -41,7 +41,8 @@ export function DebateWorkspaceDrawer({
           </button>
         </div>
 
-        <div className="drawerBody">
+        {/* A Tab stop of its own: the body is what scrolls (keyboard audit 2026-11-12). */}
+        <div className="drawerBody" tabIndex={0} role="region" aria-label={t(catalog, "debateDrawers.workspace.ariaLabel")}>
           {debate.analyzer_runs.length ? (
             <section className="wsSection">
               <div className="drawerHistoryHead">

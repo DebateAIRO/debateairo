@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 import { t } from "@/lib/i18n/translate";
 import { digGround, groundClass } from "@/lib/v4/mapLooks";
 import { useMapKeys } from "@/lib/v4/useMapKeys";
@@ -212,7 +212,8 @@ export function V4Outline(props: MapPiecesProps) {
     setFolded((before) => (fold ? new Set([...before, id]) : new Set([...before].filter((key) => key !== id))));
     return true;
   };
-  const keys = useMapKeys(treeRef, { onExpand: (row) => setFold(row, false), onCollapse: (row) => setFold(row, true) });
+  const hintId = useId();
+  const keys = useMapKeys(treeRef, { hint: hintId, onExpand: (row) => setFold(row, false), onCollapse: (row) => setFold(row, true) });
   // dig-f22: a visible line above the first box greyed for each reason, in the order the rows are drawn (a folded path
   // draws none of its boxes).
   const rootOpen = undugOpen(map.open, digs);
@@ -234,6 +235,10 @@ export function V4Outline(props: MapPiecesProps) {
           <MapLegendItems catalog={catalog} />
         </ul>
       </details>
+      {/* V4B-M1 (keyboard audit 2026-11-12): the outline's keys, shown while a row has the keyboard's ring (v4-map-looks.css).
+          Above the tree, so it is in view when focus enters at the top of a long outline. A read-only outline (a public
+          debate) has no pick boxes: its line names only the keys that move. */}
+      <p id={hintId} className="v4MapKeysHint v4Muted">{t(catalog, props.readOnly === true ? "v4.map.keysHintReadOnly" : "v4.map.keysHint")}</p>
       <ul className="v4OutTree" ref={treeRef} onKeyDown={keys.onKeyDown} onFocus={keys.onFocus}>
         <li className="v4OutRow">
           <button
@@ -250,7 +255,8 @@ export function V4Outline(props: MapPiecesProps) {
             {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
             <LevelWords level={1} catalog={catalog} />
           </button>
-          {props.rootExtra === undefined ? null : <div className="v4MapRootExtra">{props.rootExtra}</div>}
+          {/* V4B-M3: what hangs under the question keeps its own Tab stops (it is not one of the rows). */}
+          {props.rootExtra === undefined ? null : <div className="v4MapRootExtra" data-rove-skip="">{props.rootExtra}</div>}
           <Children
             groupKey="root"
             group="root"

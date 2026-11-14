@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { focusIsLost } from "@/lib/focusGuard";
 import { PICKS_UNDO_MS } from "@/lib/v4/usePicksUndo";
 import { V4UndoNote } from "./V4UndoNote";
 
@@ -41,8 +42,7 @@ export function V4PicksClearedNote(props: Readonly<{
       const active = document.activeElement;
       if (root === null || active === null || !root.contains(active)) return;
       queueMicrotask(() => {
-        const now = document.activeElement;
-        if (now !== null && now !== document.body && now.isConnected) return;
+        if (!focusIsLost()) return;
         const target = returnFocus.current?.() ?? null;
         if (target !== null && target.isConnected) target.focus();
       });

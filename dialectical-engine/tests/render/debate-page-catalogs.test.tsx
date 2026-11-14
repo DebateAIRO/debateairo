@@ -168,8 +168,13 @@ const KEYBOARD_PAGE_EDITS: ReadonlyArray<readonly [string, string]> = [
   ],
   [
     '<div class="canvasZoomCluster"',
-    '<span class="srOnly" id="_R_id_">Zoom in +, Zoom out −, Fit whole tree (overview) 0, Reset zoom to 1:1 1</span><span class="srOnly" role="status"></span><div class="canvasZoomCluster"'
-  ]
+    // Round 4 (2026-11-12): the description is also the visible keys line while the canvas has the keyboard's ring.
+    '<span class="srOnly canvasKeysHint" id="_R_id_">Zoom in +, Zoom out −, Fit whole tree (overview) 0, Reset zoom to 1:1 1</span><span class="srOnly" role="status"></span><div class="canvasZoomCluster"'
+  ],
+  // Round 2 (2026-11-12): the Synthesis panel scrolls and holds no control, so it is a Tab stop too.
+  ['<aside class="synthPanel scroll" aria-label="Synthesis">', '<aside class="synthPanel scroll" tabindex="0" aria-label="Synthesis">'],
+  // Round 3 (2026-11-12): where the page's content starts, after its own header (the skip link's target).
+  ['<div class="debateAiDisclosure">', '<div class="debateAiDisclosure" id="page-content" tabindex="-1">']
 ];
 function withScreenReaderMarkup(historical: string, lensCard: boolean): string {
   const edits = [
@@ -261,7 +266,8 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     expect(() => currentExpectedActions(historical + RETIRED_SETTINGS_ANCHOR)).toThrow();
     expect(() => currentExpectedActions(historical.replace('aria-label="How it works">?</button>', 'aria-label="Other action">?</button>'))).toThrow();
     const currentPage = readFileSync(resolve(process.cwd(), "apps/ui/app/debate/[id]/DebatePageClient.tsx"), "utf8");
-    expect(currentPage).toContain('<AccountMenu catalog={chromeCatalog} />');
+    // Keyboard audit round 4 (2026-11-12): keyed, so releasing a held debate keeps the menu under focus.
+    expect(currentPage).toContain('<AccountMenu key="accountMenu" catalog={chromeCatalog} />');
   });
 
   // Follow-up 4, review F1: the workspace's AI notice reads home.* keys, which the

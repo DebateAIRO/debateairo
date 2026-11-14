@@ -6,6 +6,7 @@ import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
 import { OwnerPossessionPanel, type OwnerPossessionRecord } from "./OwnerPossessionPanel.js";
+import { focusIsLost } from "../lib/focusGuard.js";
 import "./StaffAccessPanel.css";
 type Member = StaffTeamPage["members"][number];
 type MutationKind = "invite" | "grant" | "disable" | "compromise";
@@ -74,7 +75,13 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
     const [self, setSelf] = useState<StaffElevationResponse | null>(null);
     const [team, setTeam] = useState<StaffTeamPage | null>(null);
     const [audit, setAudit] = useState<StaffAuditPage | null>(null);
-    const [status, setStatus] = useState<string | null>(null);
+    const [status, setStatusKey] = useState<string | null>(null);
+    /* Keyboard audit round 4: where an action's outcome is shown. A member's id (its article), "invite" (the members
+       card) or "emergency" (the emergency card): the place that was acted on, where focus is. Null: at the top. */
+    const [statusPlace, setStatusPlace] = useState<string | null>(null);
+    function setStatus(key: string | null, place: string | null = null) { setStatusKey(key); setStatusPlace(place); }
+    const topStatus = useRef<HTMLParagraphElement>(null);
+    const outcomeShown = useRef(false);
     const [credentialId, setCredentialId] = useState<string | null>(null);
     const [setupOpen, setSetupOpen] = useState(false);
     const [ownerSetupOpen, setOwnerSetupOpen] = useState(false);
@@ -183,6 +190,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
         const ticket = String(data.get("ticket_ref") ?? "").trim();
         const reason = { code: kind === "invite" ? "TEAM_ONBOARDING" as const : kind === "grant" ? "GRANT_CHANGE" as const : kind === "disable" ? "OFFBOARDING" as const : "SECURITY_RESPONSE" as const, ...(ticket === "" ? {} : { ticket_ref: ticket }) };
         const common = { expected_revision, operation_id: crypto.randomUUID(), reason };
+        const place = member?.staff_id ?? (kind === "invite" ? "invite" : "emergency");
         const capabilities = data.getAll("capabilities").map(String) as Array<typeof delegatedCapabilities[number]>;
         const intent: StaffActionIntent = kind === "invite" ? { action: "TEAM_INVITE", target_user_id: target, capabilities, ...common }
             : kind === "grant" ? { action: "TEAM_GRANT", target_staff_id: target, capabilities, ...common }
@@ -196,7 +204,8 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
                 return;
             await readData(authority, epoch);
             setActiveMutation(null);
-            setStatus("staff.complete");
+            setStatus("staff.complete", place);
+            outcomeShown.current = true;
         }
         catch (failure) {
             if (generation.current !== epoch)
@@ -205,6 +214,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
                 || failure.status === 403 && !authority.capabilities.some(capability => capability === "TEAM_READ" || capability === "AUDIT_READ"))) {
                 clearAuthority();
                 setStatus("staff.denied");
+                outcomeShown.current = true;
             }
             else if (failure instanceof ContractHttpError && [403, 409, 422].includes(failure.status)) {
                 try {
@@ -212,15 +222,19 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
                     if (generation.current !== epoch)
                         return;
                     const currentMember = current?.members.find(row => row.staff_id === target);
-                    setStatus(member !== undefined && currentMember !== undefined && currentMember.grant_revision !== expected_revision ? "staff.stale" : "staff.failed");
+                    setStatus(member !== undefined && currentMember !== undefined && currentMember.grant_revision !== expected_revision ? "staff.stale" : "staff.failed", place);
+                    outcomeShown.current = true;
                 }
                 catch {
                     clearAuthority();
                     setStatus("staff.denied");
+                    outcomeShown.current = true;
                 }
             }
-            else
-                setStatus(failureKey(failure));
+            else {
+                setStatus(failureKey(failure), place);
+                outcomeShown.current = true;
+            }
         }
         finally {
             setBusy(false);
@@ -282,6 +296,19 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
             setBusy(false);
         }
     }
+    const membersCard = has("TEAM_INVITE") || has("TEAM_READ") && team !== null;
+    const placeShown = statusPlace === null ? false : statusPlace === "invite" ? membersCard && has("TEAM_INVITE")
+        : statusPlace === "emergency" ? !has("TEAM_READ") && has("EMERGENCY_DISABLE")
+        : has("TEAM_READ") && team !== null && team.members.some(row => row.staff_id === statusPlace);
+    const statusClass = status === "staff.complete" ? "staffNotice" : "setError";
+    /* The outcome in the place acted on; only when that place has gone does it show at the top. */
+    const placed = (place: string) => status !== null && placeShown && statusPlace === place ? <p className={statusClass} role="status">{t(catalog, status)}</p> : null;
+    /* Shown at the top because the place acted on is gone (access ended): it takes focus when nothing real has it. */
+    useEffect(() => {
+        if (!outcomeShown.current || busy) return;
+        outcomeShown.current = false;
+        if (!placeShown && focusIsLost()) topStatus.current?.focus();
+    });
     const r = enrollment?.readiness;
     const eligible = r !== undefined && r.account_active && r.email_verified && r.totp_active && !r.security_hold;
     const yesNo = (value: boolean) => t(catalog, value ? "staff.yes" : "staff.no");
@@ -291,7 +318,7 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
     const action = (kind: MutationKind, member?: Member) => <button className="setBtn" type="button" disabled={busy} aria-expanded={activeMutation?.kind === kind && activeMutation.staffId === member?.staff_id} onClick={() => setActiveMutation({ kind, ...(member === undefined ? {} : { staffId: member.staff_id }) })}>{t(catalog, `staff.action.${kind}`)}</button>;
     return <div className="setInner staffAccess" aria-busy={busy || loading}>
       <header className="staffHeading"><p className="setEyebrow">{t(catalog, "staff.eyebrow")}</p><h1 className="setTitle">{t(catalog, "staff.title")}</h1><p className="setLede">{t(catalog, "staff.intro")}</p></header>
-      {status !== null ? <p className={status === "staff.complete" ? "staffNotice" : "setError"} role="status">{t(catalog, status)}</p> : null}
+      {status !== null && !placeShown ? <p ref={topStatus} tabIndex={-1} className={statusClass} role="status">{t(catalog, status)}</p> : null}
       {loading ? <p className="setStatus" role="status">{t(catalog, "staff.loading")}</p> : null}
       <section className="setCard staffAccessSummary">
         <div className="staffSectionHead"><h2 className="setCardTitle">{t(catalog, self === null ? "staff.unlockTitle" : "staff.verified")}</h2><span className="staffBadge" data-state={self === null ? "locked" : "active"}>{t(catalog, self === null ? "staff.lockedBadge" : "staff.verifiedBadge")}</span></div>
@@ -303,9 +330,10 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
         </>}
         {r !== undefined ? <div className="staffReadiness"><p>{t(catalog, "staff.keys", { count: r.verified_credential_count })}</p><details className="staffDetails" data-staff-account-details><summary>{t(catalog, "staff.accountDetails")}</summary><p className="staffIdentifier">{t(catalog, "staff.accountId", { id: enrollment!.user_id })}</p>{self !== null ? <p className="staffIdentifier">{t(catalog, "staff.self", { id: self.staff_id })}</p> : null}<dl className="staffReadinessList">{([["staff.accountLabel", r.account_active], ["staff.emailLabel", r.email_verified], ["staff.totpLabel", r.totp_active], ["staff.holdLabel", r.security_hold], ["staff.ownerKeysLabel", r.owner_credential_requirement_met], ["staff.delegatedKeysLabel", r.delegated_credential_requirement_met]] as const).map(([key, value]) => <div key={key}><dt>{t(catalog, key)}</dt><dd>{yesNo(value)}</dd></div>)}</dl></details></div> : null}
       </section>
-      {has("TEAM_INVITE") || has("TEAM_READ") && team !== null ? <section className="setCard">
+      {membersCard ? <section className="setCard">
         <div className="staffSectionHead"><div><h2 className="staffSectionTitle">{t(catalog, "staff.members")}</h2><p className="setCardHint">{t(catalog, "staff.membersHint")}</p></div><div className="staffActions">{has("TEAM_READ") ? <button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(); }}>{t(catalog, "staff.refresh")}</button> : null}{has("TEAM_INVITE") ? action("invite") : null}</div></div>
         {has("TEAM_INVITE") ? form("invite") : null}
+        {placed("invite")}
         {has("TEAM_READ") && team !== null ? <div className="staffMemberList">{team.members.length === 0 ? <p className="setCardHint">{t(catalog, "staff.empty")}</p> : team.members.map((member) => {
           const isSelf = member.staff_id === self?.staff_id;
           const memberName = memberDisplayName(member, self?.staff_id, catalog);
@@ -314,12 +342,13 @@ export function StaffAccessPanel({ client, catalog = staffEnglish, locale = "en"
             <ul className="staffPermissions" aria-label={t(catalog, "staff.permissions")}>{member.capabilities.map(capability => <li key={capability}>{capabilityLabel(catalog, capability)}</li>)}</ul>
             <div className="staffMemberFooter"><p className="staffDelivery" data-state={member.delivery_state}>{t(catalog, `staff.deliveryStatus.${member.delivery_state}`)}</p>{member.status === "ACTIVE" && !isSelf ? <div className="staffActions">{has("TEAM_GRANT") ? action("grant", member) : null}{has("TEAM_DISABLE") ? action("disable", member) : null}{has("EMERGENCY_DISABLE") ? action("compromise", member) : null}</div> : null}</div>
             {member.status === "ACTIVE" && !isSelf ? <>{has("TEAM_GRANT") ? form("grant", member) : null}{has("TEAM_DISABLE") ? form("disable", member) : null}{has("EMERGENCY_DISABLE") ? form("compromise", member) : null}</> : null}
+            {placed(member.staff_id)}
             <details className="staffDetails"><summary>{t(catalog, "staff.memberDetails")}</summary><p className="staffIdentifier">{t(catalog, "staff.memberReference", { name: member.pseudonym })}</p><p className="staffIdentifier">{t(catalog, "staff.memberId", { id: member.staff_id })}</p><p>{t(catalog, "staff.revision", { revision: member.grant_revision })}</p></details>
           </article>;
         })}</div> : null}
         {team?.next_cursor != null ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(team.next_cursor!); }}>{t(catalog, "staff.more")}</button></div> : null}
       </section> : null}
-      {!has("TEAM_READ") && has("EMERGENCY_DISABLE") ? <section className="setCard"><h2 className="setCardTitle">{t(catalog, "staff.emergency")}</h2><p className="setCardHint">{t(catalog, "staff.help.compromise")}</p><div className="staffActions">{action("compromise")}</div>{form("compromise")}</section> : null}
+      {!has("TEAM_READ") && has("EMERGENCY_DISABLE") ? <section className="setCard"><h2 className="setCardTitle">{t(catalog, "staff.emergency")}</h2><p className="setCardHint">{t(catalog, "staff.help.compromise")}</p><div className="staffActions">{action("compromise")}</div>{form("compromise")}{placed("emergency")}</section> : null}
       {has("AUDIT_READ") && audit !== null ? <section className="setCard"><div className="staffSectionHead"><h2 className="staffSectionTitle">{t(catalog, "staff.audit")}</h2><button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(); }}>{t(catalog, "staff.auditRefresh")}</button></div>{audit.events.length === 0 ? <p className="setCardHint">{t(catalog, "staff.auditEmpty")}</p> : <ul className="staffAuditList">{audit.events.map(event => <li key={event.event_id}><strong>{t(catalog, `staff.event.${event.event}`)}</strong><time dateTime={event.recorded_at}>{formatDate(locale, event.recorded_at, { dateStyle: "medium", timeStyle: "short" })}</time>{"delivery_state" in event ? <span className="staffDelivery" data-state={event.delivery_state}>{t(catalog, `staff.deliveryStatus.${event.delivery_state}`)}</span> : null}</li>)}</ul>}{audit.next_cursor !== null ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy} onClick={() => { void refresh(undefined, audit.next_cursor!); }}>{t(catalog, "staff.more")}</button></div> : null}</section> : null}
       {self === null ? <details className="setCard staffAdvanced" open={setupOpen}><summary onClick={(event) => { event.preventDefault(); if (busy) return; setSetupOpen(!setupOpen); setOwnerSetupOpen(false); }}>{t(catalog, "staff.advanced")}</summary>{setupOpen ? <><p className="setCardHint">{t(catalog, "staff.advancedHint")}</p>
         <section className="staffSetup"><h2 className="setCardTitle">{t(catalog, "staff.register")}</h2><p className="setCardHint">{t(catalog, "staff.registerHint")}</p><form className="staffMutation" data-staff-registration onSubmit={register}><fieldset disabled={!eligible || busy}><div className="staffField"><label htmlFor="staff-password">{t(catalog, "staff.password")}</label><input id="staff-password" name="password" type="password" autoComplete="current-password" maxLength={1024} required aria-invalid="false"/></div><div className="staffField"><label htmlFor="staff-code">{t(catalog, "staff.code")}</label><input id="staff-code" name="totp_code" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required aria-invalid="false"/></div><div className="staffActions"><button className="setBtn setBtnPrimary" type="submit">{t(catalog, "staff.register")}</button></div></fieldset></form>{credentialId !== null ? <p className="staffIdentifier" role="status">{t(catalog, "staff.registered", { id: credentialId })}</p> : null}</section>

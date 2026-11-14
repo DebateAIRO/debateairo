@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { StartStepRoom } from "@debateai/contract";
+import { focusIsLost } from "@/lib/focusGuard";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import type { MoneyLine } from "@/lib/v4/money";
 import {
@@ -186,13 +187,18 @@ function V4StartFullButtons({ plan, catalog, widerWidth, wider, onInto, onSwap, 
   onCancel(): void;
 }>) {
   const [pick, setPick] = useState<"NONE" | "ADD" | "SWAP">("NONE");
+  // Keyboard audit 2026-11-12 (V4A-8): the pressed "Add to a path…" or "Swap for a path…" goes, so focus goes to "Path 1".
+  const firstPath = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (pick !== "NONE") firstPath.current?.focus();
+  }, [pick]);
   const cancel = <button type="button" className="v4Btn" onClick={onCancel}>{t(catalog, "v4.start.full.cancel")}</button>;
   if (pick !== "NONE") {
     const choose = pick === "ADD" ? onInto : onSwap;
     return (
       <>
         {plan.paths.map((path, at) => (
-          <button key={path.key} type="button" className="v4Btn v4StartOwnPick" onClick={() => choose(path.key)}>
+          <button key={path.key} ref={at === 0 ? firstPath : undefined} type="button" className="v4Btn v4StartOwnPick" onClick={() => choose(path.key)}>
             {t(catalog, "v4.start.full.path", { n: at + 1, title: path.title })}
           </button>
         ))}
@@ -347,6 +353,15 @@ export function V4StartCard(props: V4StartCardProps) {
   const onPathsUsed = useRef(props.onPathsUsed);
   onPathsUsed.current = props.onPathsUsed;
 
+  // Keyboard audit 2026-11-12 (V4A-10): an Undo that takes away what held focus (the notice's Undo, the last bottom Undo, a
+  // row undone by Ctrl/Cmd+Z) puts focus on the first row, as the combine line's Cancel does, not on the card as a whole.
+  const card = useRef<HTMLElement>(null);
+  const undoFocus = useRef(false);
+  useEffect(() => {
+    if (!undoFocus.current) return;
+    undoFocus.current = false;
+    if (focusIsLost()) card.current?.querySelector<HTMLElement>(".v4StartList .v4StartRowButton")?.focus();
+  });
   const send = (action: PathPlanAction): PathPlanRefusal | null => {
     if (!used.current) {
       used.current = true;
@@ -354,7 +369,10 @@ export function V4StartCard(props: V4StartCardProps) {
     }
     const previous = sent.current;
     if (planNow.current !== null) sent.current = { type: action.type, from: planNow.current };
-    if (action.type === "UNDO") setNotice(null);
+    if (action.type === "UNDO") {
+      setNotice(null);
+      undoFocus.current = true;
+    }
     const refusal = start.dispatch(action);
     // A refused change changed nothing: it is never taken for the next change (one the hook makes by itself).
     if (refusal !== null) sent.current = previous;
@@ -474,7 +492,7 @@ export function V4StartCard(props: V4StartCardProps) {
     return refusal;
   };
   return (
-    <section className="v4StartCard" aria-labelledby={titleId}>
+    <section ref={card} className="v4StartCard" aria-labelledby={titleId}>
       <h2 id={titleId} className="v4AskSubTitle v4StartCardTitle">{t(catalog, "v4.start.title")}</h2>
       {freePlan && !props.questionsShown
         ? <p className="v4StartCardLine">{tPlural(catalog, "v4.start.freeLine", PATH_PLAN_LIMITS.freePathsMax, locale)}</p>
@@ -676,6 +694,12 @@ function V4StartOwnPath(props: Readonly<{
     setStep(EDITING);
     field.current?.focus();
   };
+  // Keyboard audit 2026-11-12 (V4A-9): Add is off while the fit is found; once the choice lands, focus goes to its first
+  // button (Add again would ask the fit again and drop the choice).
+  const choiceBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if ((step.kind === "FITS" || step.kind === "FULL") && focusIsLost()) choiceBox.current?.querySelector<HTMLElement>("button")?.focus();
+  }, [step.kind]);
 
   const fits = step.kind === "FITS" ? plan.paths.find((path) => path.key === step.key) ?? null : null;
   let message: string | null = error;
@@ -727,7 +751,7 @@ function V4StartOwnPath(props: Readonly<{
         <button type="submit" className="v4Btn v4StartOwnAdd" disabled={step.kind === "FINDING"}>{t(catalog, "v4.start.own.add")}</button>
       </div>
       {message === null ? null : <p id={messageId} className="v4StartOwnMessage" role="status">{message}</p>}
-      {choice === null ? null : <div className="v4StartOwnChoice">{choice}</div>}
+      {choice === null ? null : <div ref={choiceBox} className="v4StartOwnChoice">{choice}</div>}
     </form>
   );
 }

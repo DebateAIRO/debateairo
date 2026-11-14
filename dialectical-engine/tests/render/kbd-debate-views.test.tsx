@@ -189,6 +189,9 @@ describe("the Tree zooms from the keyboard while its zoom cluster stays hidden",
     expect(surface().dataset.zoom).toBe("1.0000");
   });
 
+  // jsdom applies no CSS. In a browser the overview band hides card controls, but only on cards
+  // without focus inside them (globals.css, keyboard audit 2026-11-12; kbd-r2-deb-css pins the
+  // rule), so this is the button a keyboard user was on when they pressed 0 to fit the tree.
   it("lets Enter on a card's button activate it while the tree is fitted, instead of zooming", async () => {
     await render(<Canvas />);
     key(surface(), { key: "0" });
