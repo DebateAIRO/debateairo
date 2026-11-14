@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kus me Dialectical Engine-d pakume",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra, Island ja Liechtenstein), Šveitsis, Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis ja Lõuna-Koreas. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
+      { kind: "p", text: "Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra ja Island), Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis ja Lõuna-Koreas. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
     ]
   },
   {
@@ -352,24 +352,16 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Šveits",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Teie andmetele kohaldatakse Šveitsi föderaalset andmekaitseseadust (Privaatsuspoliitika, lisa B.5). Võite pöörduda kohtusse selle Šveitsi paiga kohtus, kus elate. Tasulisele paketile ei kohaldata seadusest tulenevat taganemisõigust; tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro." }
+      { kind: "p", text: "Teil on nende Tingimuste alusel samad õigused nagu tarbijal Euroopa Liidus, sealhulgas jaotises 13 sätestatud 14-päevane taganemisõigus. Võite pöörduda Moldova kohtutesse. Teie andmetele kohaldatakse Moldova isikuandmete kaitse seadust nr 195/2024 (Privaatsuspoliitika, lisa B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Teil on nende Tingimuste alusel samad õigused nagu tarbijal Euroopa Liidus, sealhulgas jaotises 13 sätestatud 14-päevane taganemisõigus. Võite pöörduda Moldova kohtutesse. Teie andmetele kohaldatakse Moldova isikuandmete kaitse seadust nr 195/2024 (Privaatsuspoliitika, lisa B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
     title: "Aasia ja Vaikse ookeani piirkond",
-    accent: "--con",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Singapur: meie andmekaitsespetsialist on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro; andmete edastamine põhineb PDPA-ga võrreldavat kaitset pakkuvatel lepingulistel kaitsemeetmetel; tasulisele paketile ei kohaldata seadusest tulenevat järelemõtlemisõigust ja tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro. Jaapan: kaubanduslike eritehingute seaduse kohane seadusjärgne teave asub aadressil dezbatere.ro/legal; internetitellimustele ei kohaldata üldist järelemõtlemisõigust ja tagasimaksetaotlusi käsitletakse aadressil support@dezbatere.ro; saadame teie sisu tehisintellekti pakkujatele Ameerika Ühendriikides ja Euroopa Liidus, igaühele lepingu alusel, mis nõuab Jaapani isikuandmete kaitse seadusega samaväärset kaitset, ning teie taotlusel teatame, millised need meetmed on. Lõuna-Korea: vabatahtliku töötlemise ja turunduse nõusolekud kogutakse teenuse osutamiseks vajalikest nõusolekutest eraldi; meie privaatsusametnik on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro; võite tasulisest paketist e-kaubanduse seaduse kohaselt 7 päeva jooksul pärast tellimist taganeda; enne korduva hinnatõusu või tasuta paketilt tasulisele üleminekut küsime teie uut nõusolekut; teenus kasutab generatiivset tehisintellekti, teatame teile sellest enne, kui seda kasutate, ning märgistame tehisintellekti loodud väljundid." }
     ]
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "9d67d471721ff2caa8b9d52d78ffd7b2c3ddfcf624226454684e2688db34a4bc",
+  sha256: "469be1353582df379ff02187c33ae876c6d28468e7978e802b34a718df8d1ab7",
   eyebrow: "TEENUSETINGIMUSED · v2.18 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

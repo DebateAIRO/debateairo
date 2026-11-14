@@ -48,7 +48,7 @@ Ti su podaci također trajno prikazani na mrežnom mjestu dezbatere.ro/legal. Uv
 
 ## 2. Gdje nudimo Dialectical Engine
 
-Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška, Island i Lihtenštajn), Švicarska, Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan i Južna Koreja. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu.
+Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška i Island), Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan i Južna Koreja. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu.
 
 ## 3. Prihvaćanje ovih Uvjeta
 
@@ -345,14 +345,10 @@ Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih p
 
 **Naše usluge imaju jamstva koja se ne mogu isključiti prema australskom pravu o zaštiti potrošača.** U slučaju bitnih nedostataka usluge imate pravo otkazati je i dobiti povrat za neiskorišteni dio ili naknadu za njezinu smanjenu vrijednost; imate pravo i na naknadu svakog drugog razumno predvidivog gubitka ili štete. Ako nedostatak nije bitan, imate pravo na otklanjanje problema s uslugom u razumnom roku, a ako se to ne učini, na otkazivanje i povrat. U mjeri u kojoj to dopušta odjeljak 64A, naša odgovornost za povredu jamstva ograničena je na ponovno pružanje usluge ili plaćanje troška ponovnog pružanja. Na plaćeni plan ne primjenjuje se pravo na razdoblje za odustanak osim onoga koje vam daje odjeljak 12.; zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro. **Novi Zeland:** primjenjuje se Zakon o jamstvima za potrošače iz 1993. i ništa u ovim Uvjetima ne isključuje njegovu primjenu; štetne digitalne komunikacije mogu se prijaviti nama, prema odjeljku 10., ili organizaciji Netsafe.
 
-### A.5 Švicarska
+### A.5 Moldova
 
-Na vaše se podatke primjenjuje švicarski Savezni zakon o zaštiti podataka (Pravila o privatnosti, Prilog B.5). Postupak možete pokrenuti pred sudovima mjesta u Švicarskoj u kojem živite. Na plaćeni plan ne primjenjuje se zakonsko pravo na odustanak; zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro.
+Prema ovim Uvjetima imate ista prava kao potrošač u Europskoj uniji, uključujući pravo na odustanak u roku od 14 dana iz odjeljka 13. Postupak možete pokrenuti pred sudovima Moldove. Na vaše se podatke primjenjuje moldavski Zakon br. 195/2024 o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.5).
 
-### A.6 Moldova
-
-Prema ovim Uvjetima imate ista prava kao potrošač u Europskoj uniji, uključujući pravo na odustanak u roku od 14 dana iz odjeljka 13. Postupak možete pokrenuti pred sudovima Moldove. Na vaše se podatke primjenjuje moldavski Zakon br. 195/2024 o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.6).
-
-### A.7 Azija i Pacifik
+### A.6 Azija i Pacifik
 
 *Singapur:* naš službenik za zaštitu podataka jest naš direktor, dostupan na privacy@dezbatere.ro; prijenosi se temelje na ugovornoj zaštiti usporedivoj s PDPA-om; na plaćeni plan ne primjenjuje se zakonsko razdoblje za odustanak, a zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro. *Japan:* zakonska objava prema Zakonu o određenim trgovačkim transakcijama nalazi se na dezbatere.ro/legal; na internetske pretplate ne primjenjuje se opće razdoblje za odustanak, a zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro; vaš sadržaj šaljemo pružateljima usluga umjetne inteligencije u Sjedinjenim Američkim Državama i Europskoj uniji, svakome na temelju ugovora koji zahtijeva zaštitu jednakovrijednu onoj iz japanskog Zakona o zaštiti osobnih informacija, a na zahtjev vam kažemo koje su to mjere. *Južna Koreja:* privole za neobveznu obradu i marketing prikupljaju se zasebno od stavki potrebnih za rad usluge; naš službenik za privatnost jest naš direktor, dostupan na privacy@dezbatere.ro; od plaćenog plana možete odustati u roku od 7 dana od pretplate, podložno Zakonu o elektroničkoj trgovini; pribavljamo vašu novu privolu prije svakog ponavljajućeg povećanja cijene ili prelaska s besplatnog plana na plaćeni plan; usluga upotrebljava generativnu umjetnu inteligenciju, o tome vas obavještavamo prije nego što je počnete upotrebljavati, a sadržaj koji generira umjetna inteligencija označavamo.

@@ -102,14 +102,17 @@ const REGION_EXCLUDED: RegionRuleValue = Object.freeze({ pay: false, reason: "TE
 
 /**
  * The §1.5 table, every code spelled out. EU 27 + Norway and Iceland (Terms Annex A.1; one EU
- * return for the whole EU); since the owner's amendment of 4 November 2026, Liechtenstein and
- * Switzerland (one shared VAT); US, Canada, Australia, New Zealand, Singapore, Japan (tax only past
+ * return for the whole EU); US, Canada, Australia, New Zealand, Singapore, Japan (tax only past
  * thresholds Quaderno watches); the tax-from-first-sale country the Terms list, South
- * Korea, and, since the owner's amendment of 1 October 2026, Moldova (Terms Annex A.6; its own tax
+ * Korea, and, since the owner's amendment of 1 October 2026, Moldova (Terms Annex A.5; its own tax
  * rule for foreign digital sellers, not yet checked):
  * sign-up yes, pay not until the owner registers there; Ukraine: closed until the occupied regions
  * can be blocked; since the owner's amendment of 2 October 2026, the United Kingdom: not offered for
- * now, to open after launch; Turkey, Brazil, Indonesia and,
+ * now, to open after launch; since the owner's decision of 14 November 2026, Switzerland and
+ * Liechtenstein (open for sign-up and payment from 4 November until then): not offered for now. They
+ * are one VAT territory, its VAT is due from the first sale once the company's worldwide turnover is
+ * CHF 100,000 a year, which it is, and registering needs a Swiss tax representative (CH_VAT in
+ * tax-authorities.ts); the Terms and the Privacy Policy no longer name either. Turkey, Brazil, Indonesia and,
  * since the owner's amendment of 1 October 2026 (high risk, low benefit), Saudi Arabia, India, the
  * UAE, Mexico, Argentina, Colombia, Chile, Thailand and the Philippines, and, since the owner's
  * amendment of 9 October 2026, Israel, and, since the owner's decision of 12 November 2026, Taiwan
@@ -129,10 +132,9 @@ const US_STATE_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = 
 const COUNTRY_GROUPS: ReadonlyArray<readonly [readonly string[], RuleValue]> = Object.freeze([
   [["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT",
     "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "NO", "IS"], OFFERED],
-  [["LI", "CH"], OFFERED],
   [["US", "CA", "AU", "NZ", "SG", "JP"], OFFERED],
   [["KR", "MD"], SIGN_UP_ONLY],
-  [["GB", "UA"], NOT_YET],
+  [["GB", "UA", "CH", "LI"], NOT_YET],
   [["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL", "TW"], EXCLUDED],
   [["RU", "BY", "KP"], SANCTIONED],
   [["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], PROVIDERS_REFUSE]
@@ -162,7 +164,7 @@ const REGION_GROUPS: ReadonlyArray<readonly [readonly PaymentRegionId[], RegionR
 export const COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COUNTRY_POLICY_ROW_KEY,
   sourceRef: "Paid plans spec 2026-09-29 §1.5 country switches (owner decisions 29 September 2026, amended 1, 2, 8 and 9 October"
-    + " and 4, 5 and 12 November 2026):"
+    + " and 4, 5, 12 and 14 November 2026):"
     + " the Terms Annex A, sanctions and the AI providers' country lists; payment region blocks spec 2026-10-20 §2"
     + " (owner decision 20 October 2026, amended 4 November 2026): the regions closed for payment",
   value: Object.freeze({

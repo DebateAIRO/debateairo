@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Waar wij Dialectical Engine aanbieden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wij bieden Dialectical Engine aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen, IJsland en Liechtenstein), Zwitserland, Moldavië, de Verenigde Staten (behalve Tennessee), Canada, Australië, Nieuw-Zeeland, Singapore, Japan en Zuid-Korea. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
+      { kind: "p", text: "Wij bieden Dialectical Engine aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen en IJsland), Moldavië, de Verenigde Staten (behalve Tennessee), Canada, Australië, Nieuw-Zeeland, Singapore, Japan en Zuid-Korea. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
     ]
   },
   {
@@ -352,24 +352,16 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Zwitserland",
+    title: "Moldavië",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "De Zwitserse federale wet inzake gegevensbescherming is van toepassing op uw gegevens (Privacybeleid, Bijlage B.5). U kunt een procedure aanhangig maken bij de rechter van de plaats in Zwitserland waar u woont. Voor het betaalde abonnement geldt geen wettelijk herroepingsrecht; verzoeken om terugbetaling worden behandeld via support@dezbatere.ro." }
+      { kind: "p", text: "U hebt op grond van deze Voorwaarden dezelfde rechten als een consument in de Europese Unie, waaronder het herroepingsrecht van 14 dagen in hoofdstuk 13. U kunt een procedure aanhangig maken bij de Moldavische rechter. De Moldavische wet nr. 195/2024 inzake de bescherming van persoonsgegevens is van toepassing op uw gegevens (Privacybeleid, Bijlage B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldavië",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "U hebt op grond van deze Voorwaarden dezelfde rechten als een consument in de Europese Unie, waaronder het herroepingsrecht van 14 dagen in hoofdstuk 13. U kunt een procedure aanhangig maken bij de Moldavische rechter. De Moldavische wet nr. 195/2024 inzake de bescherming van persoonsgegevens is van toepassing op uw gegevens (Privacybeleid, Bijlage B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
     title: "Azië-Pacific",
-    accent: "--con",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Singapore: onze functionaris voor gegevensbescherming is onze bestuurder, bereikbaar op privacy@dezbatere.ro; doorgiften berusten op contractuele bescherming die vergelijkbaar is met de PDPA; voor het betaalde abonnement geldt geen wettelijke bedenktijd, en verzoeken om terugbetaling worden behandeld via support@dezbatere.ro. Japan: de wettelijk verplichte openbaarmaking krachtens de Specified Commercial Transactions Act staat op dezbatere.ro/legal; voor onlineabonnementen geldt geen algemene bedenktijd, en verzoeken om terugbetaling worden behandeld via support@dezbatere.ro; wij sturen uw inhoud naar AI-aanbieders in de Verenigde Staten en de Europese Unie, elk op grond van een contract dat bescherming vereist die gelijkwaardig is aan de Japanse Act on the Protection of Personal Information, en op verzoek vertellen wij u welke maatregelen dat zijn. Zuid-Korea: toestemming voor optionele verwerking en marketing wordt afzonderlijk verkregen, los van de toestemming voor wat nodig is om de dienst te laten functioneren; onze privacyfunctionaris is onze bestuurder, bereikbaar op privacy@dezbatere.ro; u kunt een betaald abonnement binnen 7 dagen na afsluiting herroepen overeenkomstig de E-Commerce Act; wij verkrijgen opnieuw uw toestemming vóór elke terugkerende prijsverhoging of omzetting van gratis naar betaald; de dienst maakt gebruik van generatieve AI, wij vertellen u dat voordat u de dienst gebruikt en wij labelen door AI gegenereerde uitvoer." }
     ]
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "4b38a1a19f6c8c756898e829a99376a70b82abe938b190d714776762cb31a87d",
+  sha256: "b65a848ea4e9d1cc490fc26e089f5a2a2d8022b896c454dae886d3be36458adb",
   eyebrow: "SERVICEVOORWAARDEN · v2.18 · VAN KRACHT OP 1 NOVEMBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Fejn noffru Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja, l-Iżlanda u l-Liechtenstein), fl-Iżvizzera, fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
+      { kind: "p", text: "Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja u l-Iżlanda), fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
     ]
   },
   {
@@ -352,24 +352,16 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "L-Iżvizzera",
+    title: "Il-Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "L-Att Federali Żvizzeru dwar il-Protezzjoni tad-Data japplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.5). Tista’ tibda proċedimenti fil-qrati tal-post fl-Iżvizzera fejn tgħix. Ebda dritt statutorju ta’ rtirar ma japplika għall-pjan bi ħlas; it-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro." }
+      { kind: "p", text: "Għandek l-istess drittijiet taħt dawn it-Termini bħal konsumatur fl-Unjoni Ewropea, inkluż id-dritt ta’ rtirar ta’ 14-il jum fit-taqsima 13. Tista’ tibda proċedimenti fil-qrati tal-Moldova. Il-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Il-Moldova",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Għandek l-istess drittijiet taħt dawn it-Termini bħal konsumatur fl-Unjoni Ewropea, inkluż id-dritt ta’ rtirar ta’ 14-il jum fit-taqsima 13. Tista’ tibda proċedimenti fil-qrati tal-Moldova. Il-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
     title: "L-Asja-Paċifiku",
-    accent: "--con",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Singapor: l-Uffiċjal tal-Protezzjoni tad-Data tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro; it-trasferimenti huma bbażati fuq protezzjonijiet kuntrattwali komparabbli mal-PDPA; ebda perjodu statutorju ta’ riflessjoni ma japplika għall-pjan bi ħlas, u t-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro. Il-Ġappun: l-iżvelar statutorju skont l-Specified Commercial Transactions Act jinsab fuq dezbatere.ro/legal; ebda perjodu ġenerali ta’ riflessjoni ma japplika għall-abbonamenti fuq l-internet, u t-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro; nibagħtu l-kontenut tiegħek lil fornituri tal-IA fl-Istati Uniti u fl-Unjoni Ewropea, kull wieħed taħt kuntratt li jirrikjedi protezzjoni ekwivalenti għal dik tal-Act on the Protection of Personal Information tal-Ġappun, u fuq talba ngħidulek x’inhuma dawk il-miżuri. Il-Korea t’Isfel: il-kunsensi għall-ipproċessar fakultattiv u għall-kummerċjalizzazzjoni jinġabru separatament mill-elementi meħtieġa biex jitħaddem is-servizz; l-uffiċjal tal-privatezza tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro; tista’ tirtira minn pjan bi ħlas fi żmien 7 ijiem minn meta tabbona, suġġett għall-E-Commerce Act; niksbu kunsens ġdid mingħandek qabel kwalunkwe żieda rikorrenti fil-prezz jew konverżjoni minn bla ħlas għal bi ħlas; is-servizz juża l-IA ġenerattiva, ngħidulek dan qabel ma tużah, u nimmarkaw ir-riżultati ġenerati mill-IA." }
     ]
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "36aeb806379533a983d25145d10cb8e769c5d38a8cd72b64bf5e9c1a86212b56",
+  sha256: "3a3b07c362e262e788ae410c17cfbd045a4d813c5a7d745b2fbbe6fa4b1fe8f4",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.18 · EFFETTIVI 1 TA’ NOVEMBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

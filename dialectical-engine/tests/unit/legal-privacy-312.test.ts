@@ -311,11 +311,12 @@ const CHANGE_LOG = 260;
 const FLAGGED = 117;
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /**
- * Annex B.7's paragraph (Asia-Pacific). Taiwan is closed since the owner's decision of 12 November 2026, so the
+ * Annex B.6's paragraph (Asia-Pacific; Annex B.7 until Switzerland's part left, see withoutSwitzerland). Taiwan is
+ * closed since the owner's decision of 12 November 2026, so the
  * paragraph no longer ends with Taiwan's part, in English and in the 34 translations alike: a closed country is
  * named in no language. Nothing else on the line changes.
  */
-const ASIA_PACIFIC = 294;
+const ASIA_PACIFIC = 290;
 const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
 /** The two new rows, each right after its table's "Page settings and visits" row. */
 const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
@@ -345,7 +346,29 @@ const manifest = (): {
 } => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
 const legalCatalog = (code: string): Record<string, string> =>
   JSON.parse(readFileSync(resolve(root, "apps/ui/messages", code, "legal.json"), "utf8"));
-const priorLines = (code: string): string[] => lines(readFileSync(resolve(root, "apps/ui/legal/archive", code, `${PRIOR[code]!}.md`), "utf8"));
+/**
+ * The owner's decision of 14 November 2026 closed Switzerland for now. In every language Annex B.5 left (its heading, a
+ * blank line, its one paragraph, a blank line), Annexes B.6 and B.7 became B.5 and B.6, and the change log's one
+ * reference to Annex B.7 follows the new number. Every pin below compares the draft with the 3.11 text after exactly
+ * that, so each still says that nothing else changed; this function pins what left.
+ */
+const SWISS_PART = 282;
+const withoutSwitzerland = (code: string, prior: readonly string[]): string[] => {
+  expect(prior[SWISS_PART], `${code}: Annex B.5's heading in 3.11`).toMatch(/^### B\.5 \S/u);
+  expect([prior[SWISS_PART + 1], prior[SWISS_PART + 3]], `${code}: Annex B.5 is one paragraph`).toEqual(["", ""]);
+  expect(prior[SWISS_PART + 2], `${code}: Annex B.5's paragraph`).toMatch(/\S/u);
+  expect(prior[SWISS_PART + 4], `${code}: Annex B.6 follows`).toMatch(/^### B\.6 \S/u);
+  const [was, now] = code === "tr" ? ["B.7'nin", "B.6'nın"] : ["B.7", "B.6"];
+  return [...prior.slice(0, SWISS_PART), ...prior.slice(SWISS_PART + 4)].map((line, index) => {
+    if (line.startsWith("### B.6 ")) return `### B.5 ${line.slice(8)}`;
+    if (line.startsWith("### B.7 ")) return `### B.6 ${line.slice(8)}`;
+    if (index !== priorIndex(CHANGE_LOG)) return line;
+    expect(line.split(was), `${code}: the change log names Annex B.7 once`).toHaveLength(2);
+    return line.replace(was, now);
+  });
+};
+const priorLines = (code: string): string[] =>
+  withoutSwitzerland(code, lines(readFileSync(resolve(root, "apps/ui/legal/archive", code, `${PRIOR[code]!}.md`), "utf8")));
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
 /**
@@ -461,15 +484,15 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(archived, `${code}: the prior text is in the archive index`).toEqual({ version: "3.11", path: `apps/ui/legal/archive/${code}/${sha256}.md` });
     const priorBytes = readFileSync(resolve(root, archived!.path));
     expect(createHash("sha256").update(priorBytes).digest("hex"), `${code}: the archived bytes`).toBe(sha256);
-    const prior = lines(priorBytes.toString("utf8"));
+    const prior = withoutSwitzerland(code, lines(priorBytes.toString("utf8")));
     const next = lines(draftBytes(code).toString("utf8"));
 
     expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
     expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED] : [])].sort((a, b) => a - b));
-    // Annex B.7 lost its last part and nothing else: what is left is the start of the 3.11 line.
+    // The Asia-Pacific paragraph lost its last part and nothing else: what is left is the start of the 3.11 line.
     const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
-    expect(asiaPacific.startsWith(next[ASIA_PACIFIC]!) && next[ASIA_PACIFIC]!.length < asiaPacific.length, `${code}: Annex B.7 only loses its end`).toBe(true);
+    expect(asiaPacific.startsWith(next[ASIA_PACIFIC]!) && next[ASIA_PACIFIC]!.length < asiaPacific.length, `${code}: the Asia-Pacific paragraph only loses its end`).toBe(true);
     expect(asiaPacific.slice(next[ASIA_PACIFIC]!.length), `${code}: the part that left is one part, Taiwan's`).toMatch(/^ ?\*[^*]+\*[^*]+$/u);
 
     const dates = DATES[code]!;
@@ -511,7 +534,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(prior[priorIndex(FLAGGED)]!.split(TAKE_DOWN)).toHaveLength(2);
     expect(next[FLAGGED]).toBe(prior[priorIndex(FLAGGED)]!.replace(` ${TAKE_DOWN}`, ""));
     expect(draftBytes("en").toString("utf8")).not.toContain(TAKE_DOWN);
-    // Taiwan's part goes from the end of Annex B.7's paragraph, and nothing before it changes.
+    // Taiwan's part goes from the end of the Asia-Pacific paragraph, and nothing before it changes.
     const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
     expect(asiaPacific.split(TAIWAN)).toHaveLength(2);
     expect(next[ASIA_PACIFIC]).toBe(asiaPacific.slice(0, asiaPacific.indexOf(TAIWAN)));

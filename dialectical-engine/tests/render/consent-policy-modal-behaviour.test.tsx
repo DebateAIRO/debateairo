@@ -100,7 +100,7 @@ function stubScrollIntoView(): Map<string, ReturnType<typeof vi.fn>> {
     stubs.set(section.id, stub);
   }
   expect(stubs.size).toBe(POLICY_SECTIONS.length);
-  expect(stubs.size).toBe(23);
+  expect(stubs.size).toBe(22);
   return stubs;
 }
 
@@ -393,9 +393,9 @@ describe("privacy policy modal — behaviour", () => {
         expect(call[0]).toEqual({ block: "start", behavior: "smooth" });
       }
     }
-    // The fifteen sections with no pill (the summary, 03, 08, 09, 11, 12, 14, the annex and
-    // its seven parts) are the zero half of that assertion.
-    expect(stubs.size - targets.size).toBe(15);
+    // The fourteen sections with no pill (the summary, 03, 08, 09, 11, 12, 14, the annex and
+    // its six parts) are the zero half of that assertion.
+    expect(stubs.size - targets.size).toBe(14);
   });
 
   it("asks for no animation when the reader has asked for reduced motion", async () => {

@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu Dialectical Engine ponúkame",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu Dialectical Engine ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko, Island a Lichtenštajnsko), Švajčiarsko, Moldavsko, Spojené štáty (okrem Tennessee), Kanada, Austrália, Nový Zéland, Singapur, Japonsko a Južná Kórea. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
+      { kind: "p", text: "Službu Dialectical Engine ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko a Island), Moldavsko, Spojené štáty (okrem Tennessee), Kanada, Austrália, Nový Zéland, Singapur, Japonsko a Južná Kórea. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
     ]
   },
   {
@@ -352,24 +352,16 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Švajčiarsko",
+    title: "Moldavsko",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Na vaše údaje sa vzťahuje švajčiarsky spolkový zákon o ochrane údajov (Zásady ochrany osobných údajov, príloha B.5). Žalobu môžete podať na súde v mieste vo Švajčiarsku, kde žijete. Na platený program sa nevzťahuje žiadne zákonné právo na odstúpenie; žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro." }
+      { kind: "p", text: "Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldavsko",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Podľa týchto Podmienok máte rovnaké práva ako spotrebiteľ v Európskej únii vrátane 14-dňového práva na odstúpenie podľa časti 13. Žalobu môžete podať na súdoch Moldavska. Na vaše údaje sa vzťahuje moldavský zákon č. 195/2024 o ochrane osobných údajov (Zásady ochrany osobných údajov, príloha B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
     title: "Ázia a Tichomorie",
-    accent: "--con",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Singapur: našou zodpovednou osobou pre ochranu osobných údajov je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro; prenosy sa opierajú o zmluvnú ochranu porovnateľnú s PDPA; na platený program sa nevzťahuje zákonná lehota na rozmyslenie a žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro. Japonsko: zákonné informácie podľa Specified Commercial Transactions Act sú na adrese dezbatere.ro/legal; na online predplatné sa nevzťahuje všeobecná lehota na rozmyslenie a žiadosti o vrátenie peňazí vybavujeme na adrese support@dezbatere.ro; váš obsah posielame poskytovateľom umelej inteligencie v Spojených štátoch a Európskej únii, každému na základe zmluvy, ktorá vyžaduje ochranu rovnocennú japonskému Act on the Protection of Personal Information, a na požiadanie vám povieme, aké sú tieto opatrenia. Južná Kórea: súhlasy s voliteľným spracúvaním a marketingom sa získavajú oddelene od položiek potrebných na prevádzku služby; našou zodpovednou osobou pre ochranu osobných údajov je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro; od plateného programu môžete odstúpiť do 7 dní od jeho uzavretia v súlade s E-Commerce Act; pred každým zvýšením ceny opakujúcej sa platby alebo prechodom z bezplatnej na platenú službu získame váš nový súhlas; služba využíva generatívnu umelú inteligenciu, upozorníme vás na to skôr, ako ju začnete používať, a výstupy vytvorené umelou inteligenciou označujeme." }
     ]
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "99511478bc4279a7ee02a47239c88a422bea608f5003f20fd630d1e79f2ecc28",
+  sha256: "2301b9de5f2ca306143990f2f4e2dd721f8c1f7ec628654c92f46f018dab8942",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.18 · ÚČINNÉ OD 1. NOVEMBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

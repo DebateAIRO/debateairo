@@ -48,7 +48,7 @@ Dessa uppgifter visas även permanent på webbplatsen på dezbatere.ro/legal. Du
 
 ## 2. Var vi erbjuder Dialectical Engine
 
-Vi erbjuder Dialectical Engine till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge, Island och Liechtenstein), Schweiz, Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan och Sydkorea. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten.
+Vi erbjuder Dialectical Engine till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge och Island), Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan och Sydkorea. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten.
 
 ## 3. Godkännande av dessa villkor
 
@@ -345,14 +345,10 @@ Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av 
 
 **Våra tjänster omfattas av garantier som inte kan uteslutas enligt Australian Consumer Law.** Vid allvarliga fel i tjänsten har du rätt att säga upp avtalet och få återbetalning för den oanvända delen eller ersättning för tjänstens minskade värde; du har även rätt till ersättning för annan rimligen förutsebar förlust eller skada. Om felet inte utgör ett allvarligt fel har du rätt att få problemen med tjänsten avhjälpta inom rimlig tid och, om detta inte sker, att säga upp avtalet och få återbetalning. I den utsträckning avsnitt 64A tillåter är vårt ansvar för brott mot en garanti begränsat till att tillhandahålla tjänsten på nytt eller betala kostnaden för detta. Ingen betänketid gäller för betalabonnemanget utöver vad avsnitt 12 ger dig; återbetalningsbegäranden hanteras via support@dezbatere.ro. **Nya Zeeland:** Consumer Guarantees Act 1993 gäller, och ingenting i dessa villkor utesluter den; skadlig digital kommunikation kan rapporteras till oss enligt avsnitt 10 eller till Netsafe.
 
-### A.5 Schweiz
+### A.5 Moldavien
 
-Schweiz federala dataskyddslag gäller för dina uppgifter (integritetspolicyn, bilaga B.5). Du får väcka talan vid domstolarna på den ort i Schweiz där du bor. Ingen lagstadgad ångerrätt gäller för betalabonnemanget; återbetalningsbegäranden hanteras via support@dezbatere.ro.
+Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.5).
 
-### A.6 Moldavien
-
-Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.6).
-
-### A.7 Asien och Stillahavsområdet
+### A.6 Asien och Stillahavsområdet
 
 *Singapore:* vårt dataskyddsombud är vår verkställande direktör, nåbar på privacy@dezbatere.ro; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och återbetalningsbegäranden hanteras via support@dezbatere.ro. *Japan:* den lagstadgade informationen enligt Specified Commercial Transactions Act finns på dezbatere.ro/legal; ingen allmän betänketid gäller för onlineabonnemang och återbetalningsbegäranden hanteras via support@dezbatere.ro; vi skickar ditt innehåll till AI-leverantörer i USA och Europeiska unionen, var och en enligt ett avtal som kräver ett skydd likvärdigt med Japans Act on the Protection of Personal Information, och på begäran berättar vi vilka dessa åtgärder är. *Sydkorea:* samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är vår verkställande direktör, nåbar på privacy@dezbatere.ro; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; tjänsten använder generativ AI, vi talar om det för dig innan du använder den och vi märker AI-genererade resultat.

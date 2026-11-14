@@ -48,7 +48,7 @@ Dawn id-dettalji jintwerew ukoll b’mod permanenti fuq is-sit fuq dezbatere.ro/
 
 ## 2. Fejn noffru Dialectical Engine
 
-Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja, l-Iżlanda u l-Liechtenstein), fl-Iżvizzera, fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu.
+Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja u l-Iżlanda), fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu.
 
 ## 3. Aċċettazzjoni ta’ dawn it-Termini
 
@@ -345,14 +345,10 @@ L-uffiċjal tal-privatezza tagħna, u fi Quebec il-persuna responsabbli għall-p
 
 **Is-servizzi tagħna jingħataw b’garanziji li ma jistgħux jiġu esklużi skont l-Australian Consumer Law.** Għal nuqqasijiet kbar fis-servizz għandek id-dritt li tikkanċella u tirċievi ħlas lura għall-parti mhux użata, jew kumpens għat-tnaqqis fil-valur tiegħu; għandek ukoll id-dritt għal kumpens għal kull telf jew ħsara oħra raġonevolment prevedibbli. Jekk in-nuqqas ma jammontax għal nuqqas kbir, għandek id-dritt li l-problemi fis-servizz jiġu rranġati fi żmien raġonevoli u, jekk dan ma jsirx, li tikkanċella u tikseb ħlas lura. Safejn tippermetti t-taqsima 64A, ir-responsabbiltà tagħna għal ksur ta’ garanzija hija limitata għall-provvista mill-ġdid tas-servizz jew għall-ħlas tal-ispiża biex dan isir. Ebda dritt għal perjodu ta’ riflessjoni ma japplika għall-pjan bi ħlas lil hinn minn dak li tagħtik it-taqsima 12; it-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro. **Iż-Żelanda l-Ġdida:** il-Consumer Guarantees Act 1993 japplika u xejn f’dawn it-Termini ma jeskludih; komunikazzjonijiet diġitali ta’ ħsara jistgħu jiġu rrappurtati lilna skont it-taqsima 10 jew lil Netsafe.
 
-### A.5 L-Iżvizzera
+### A.5 Il-Moldova
 
-L-Att Federali Żvizzeru dwar il-Protezzjoni tad-Data japplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.5). Tista’ tibda proċedimenti fil-qrati tal-post fl-Iżvizzera fejn tgħix. Ebda dritt statutorju ta’ rtirar ma japplika għall-pjan bi ħlas; it-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro.
+Għandek l-istess drittijiet taħt dawn it-Termini bħal konsumatur fl-Unjoni Ewropea, inkluż id-dritt ta’ rtirar ta’ 14-il jum fit-taqsima 13. Tista’ tibda proċedimenti fil-qrati tal-Moldova. Il-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.5).
 
-### A.6 Il-Moldova
-
-Għandek l-istess drittijiet taħt dawn it-Termini bħal konsumatur fl-Unjoni Ewropea, inkluż id-dritt ta’ rtirar ta’ 14-il jum fit-taqsima 13. Tista’ tibda proċedimenti fil-qrati tal-Moldova. Il-Liġi tal-Moldova Nru 195/2024 dwar il-protezzjoni tad-data personali tapplika għad-data tiegħek (Politika dwar il-Privatezza, Anness B.6).
-
-### A.7 L-Asja-Paċifiku
+### A.6 L-Asja-Paċifiku
 
 *Singapor:* l-Uffiċjal tal-Protezzjoni tad-Data tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro; it-trasferimenti huma bbażati fuq protezzjonijiet kuntrattwali komparabbli mal-PDPA; ebda perjodu statutorju ta’ riflessjoni ma japplika għall-pjan bi ħlas, u t-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro. *Il-Ġappun:* l-iżvelar statutorju skont l-Specified Commercial Transactions Act jinsab fuq dezbatere.ro/legal; ebda perjodu ġenerali ta’ riflessjoni ma japplika għall-abbonamenti fuq l-internet, u t-talbiet għal rimborż jiġu ttrattati fuq support@dezbatere.ro; nibagħtu l-kontenut tiegħek lil fornituri tal-IA fl-Istati Uniti u fl-Unjoni Ewropea, kull wieħed taħt kuntratt li jirrikjedi protezzjoni ekwivalenti għal dik tal-Act on the Protection of Personal Information tal-Ġappun, u fuq talba ngħidulek x’inhuma dawk il-miżuri. *Il-Korea t’Isfel:* il-kunsensi għall-ipproċessar fakultattiv u għall-kummerċjalizzazzjoni jinġabru separatament mill-elementi meħtieġa biex jitħaddem is-servizz; l-uffiċjal tal-privatezza tagħna huwa d-direttur tagħna, li tista’ tilħqu fuq privacy@dezbatere.ro; tista’ tirtira minn pjan bi ħlas fi żmien 7 ijiem minn meta tabbona, suġġett għall-E-Commerce Act; niksbu kunsens ġdid mingħandek qabel kwalunkwe żieda rikorrenti fil-prezz jew konverżjoni minn bla ħlas għal bi ħlas; is-servizz juża l-IA ġenerattiva, ngħidulek dan qabel ma tużah, u nimmarkaw ir-riżultati ġenerati mill-IA.

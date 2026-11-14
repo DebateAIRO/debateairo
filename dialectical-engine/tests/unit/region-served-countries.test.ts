@@ -28,10 +28,12 @@ describe("Region list against the country rules", () => {
     expect(fromExample.defaultRule.signup).toBe(false);
   });
 
-  it("R4 covers the two that went missing: Iceland and Liechtenstein, both offered", () => {
-    expect(servedBy(fromCode)).toEqual(expect.arrayContaining(["IS", "LI"]));
+  it("R4 covers the two that went missing: Iceland, offered, and Liechtenstein, listed but not offered for now", () => {
+    // Liechtenstein shares Switzerland's VAT; both are closed since the owner's decision of 14 November 2026.
+    expect(servedBy(fromCode)).toContain("IS");
+    expect(servedBy(fromCode)).not.toContain("LI");
     expect(fromCode.countries.IS).toMatchObject({ signup: true, pay: true });
-    expect(fromCode.countries.LI).toMatchObject({ signup: true, pay: true });
+    expect(fromCode.countries.LI).toMatchObject({ signup: false, pay: false, reason: "NOT_OFFERED" });
     expect(listed.has("IS") && listed.has("LI")).toBe(true);
   });
 });

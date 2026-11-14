@@ -67,9 +67,9 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
     expect(countryGate.signup(source("84.94.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
     // Taiwan (owner's decision of 12 November 2026): kept out by the Terms.
     expect(countryGate.signup(source("1.160.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
-    for (const ip of ["31.13.1.1", "89.28.1.1"]) {
-      expect(countryGate.signup(source(ip)), ip).toBeNull();
-    }
+    // Switzerland (owner's decision of 14 November 2026): not offered for now.
+    expect(countryGate.signup(source("31.13.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
+    expect(countryGate.signup(source("89.28.1.1"))).toBeNull();
     expect(countryGate.signup(source("185.220.101.7"))).toBe("TOR_REFUSED");
     expect(countryGate.signup(source("10.0.0.1"))).toBe("COUNTRY_UNKNOWN");
   });
@@ -94,8 +94,8 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
     expect(countryGate.availability("89.28.1.1")).toEqual({ signup: true, pay: false, service: true });
     // Taiwan (owner's decision of 12 November 2026): kept out by the Terms.
     expect(countryGate.availability("1.160.1.1")).toEqual({ signup: false, pay: false, service: false });
-    // Switzerland (owner's amendment of 4 November 2026): sign-up and payment.
-    expect(countryGate.availability("31.13.1.1")).toEqual({ signup: true, pay: true, service: true });
+    // Switzerland (owner's decision of 14 November 2026): not offered for now.
+    expect(countryGate.availability("31.13.1.1")).toEqual({ signup: false, pay: false, service: false });
     expect(countryGate.availability("185.220.101.7")).toEqual({ signup: false, pay: false, service: false });
     expect(countryGate.availability("10.0.0.1")).toEqual({ signup: false, pay: false, service: false });
   });

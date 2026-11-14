@@ -126,21 +126,21 @@ describe("privacy policy modal — rendered", () => {
   });
 
   // S02-S37 — every section of the v3.3 draft, in order: the summary, fourteen numbered
-  // sections, the annex and its seven parts, each with number, title, paragraphs, bullets and
+  // sections, the annex and its six parts, each with number, title, paragraphs, bullets and
   // accent.
-  it("renders the twenty-three sections in order, with their paragraphs, bullets and accent tokens", async () => {
+  it("renders the twenty-two sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<PrivacyPolicyModal open mode="consent" onClose={vi.fn()} />);
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     const sections = [...dialog.querySelectorAll<HTMLElement>('[id^="policy-section-"]')];
-    expect(POLICY_SECTIONS.length).toBe(23);
+    expect(POLICY_SECTIONS.length).toBe(22);
     expect(sections.map((section) => section.id)).toEqual(
       POLICY_SECTIONS.map((section) => `policy-section-${section.no}`)
     );
     expect(sections[0]!.id).toBe("policy-section-00");
     expect(sections[1]!.id).toBe("policy-section-01");
     expect(sections[15]!.id).toBe("policy-section-B");
-    expect(sections[22]!.id).toBe("policy-section-B.7");
+    expect(sections[21]!.id).toBe("policy-section-B.6");
 
     expect(sections.map((section) => section.querySelector(".policySectionTitle")!.textContent)).toEqual(
       POLICY_SECTIONS.map((section) => section.title)
@@ -180,7 +180,8 @@ describe("privacy policy modal — rendered", () => {
         ),
       0
     );
-    expect(expectedParagraphs).toBe(59);
+    // 59 until Switzerland's part (Annex B.5, one paragraph) left on 14 November 2026.
+    expect(expectedParagraphs).toBe(58);
     // R22 item 15: section 2's and section 7's "Page settings and visits" rows add two. R22 decisions 35 and 36: the report's rows and the sealed original's row add three.
     // Privacy 3.12 (plan Task 83c): section 2's and section 7's "Questions not started yet" rows add two.
     // 0157 (Privacy 3.11, amended in place): three table rows more.

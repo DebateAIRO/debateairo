@@ -22,9 +22,8 @@ const EU27 = ["AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", 
 const GROUPS = [
   { codes: [...EU27, "NO", "IS"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["US", "CA", "AU", "NZ", "SG", "JP"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
-  { codes: ["LI", "CH"], rule: { signup: true, pay: true, reason: "OFFERED", blocked: false } },
   { codes: ["KR", "MD"], rule: { signup: true, pay: false, reason: "TAX_NOT_READY", blocked: false } },
-  { codes: ["GB", "UA"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
+  { codes: ["GB", "UA", "CH", "LI"], rule: { signup: false, pay: false, reason: "NOT_OFFERED", blocked: false } },
   { codes: ["TR", "BR", "ID", "SA", "IN", "AE", "MX", "AR", "CO", "CL", "TH", "PH", "IL", "TW"], rule: { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false } },
   { codes: ["RU", "BY", "KP"], rule: { signup: false, pay: false, reason: "SANCTIONS", blocked: true } },
   { codes: ["CN", "HK", "MO", "IR", "CU", "SY", "VE", "VN"], rule: { signup: false, pay: false, reason: "PROVIDER_UNSUPPORTED", blocked: true } }
@@ -162,13 +161,16 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
       expect(decidePayment(policy, { ipCountry: country, tor: false, declaredCountry: country }), country)
         .toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
     }
-    // Owner's amendment of 4 November 2026: Switzerland and Liechtenstein open for sign-up and payment.
+    // Owner's decision of 14 November 2026: Switzerland and Liechtenstein (open from 4 November) are not offered for
+    // now, like the UK: no sign-up and no payment until a Swiss tax representative is appointed. Not blocked.
     for (const country of ["CH", "LI"]) {
-      expect(decideSignup(policy, { ipCountry: country, tor: false }), country).toEqual({ kind: "ALLOW" });
+      expect(decideSignup(policy, { ipCountry: country, tor: false }), country)
+        .toEqual({ kind: "REFUSE", code: "COUNTRY_SIGNUP_UNAVAILABLE" });
       expect(countryRule(policy, country), country)
-        .toEqual({ signup: true, pay: true, reason: "OFFERED", blocked: false });
+        .toEqual({ signup: false, pay: false, reason: "NOT_OFFERED", blocked: false });
       expect(decidePayment(policy, { ipCountry: country, tor: false, declaredCountry: country }), country)
-        .toEqual({ kind: "ALLOW" });
+        .toEqual({ kind: "REFUSE", code: "COUNTRY_PAYMENT_UNAVAILABLE" });
+      expect(decideAsk(policy, { ipCountry: country }), country).toEqual({ kind: "ALLOW" });
     }
     // Owner's decision of 12 November 2026: Taiwan cannot pay either, from Taiwan or with a Taiwanese billing country.
     expect(decidePayment(policy, { ipCountry: "TW", tor: false, declaredCountry: "TW" }))

@@ -85,12 +85,12 @@ describe("legal documents — generated data", () => {
       expect(TERMS_OF_SERVICE.sections).toBe(TERMS_SECTIONS);
     });
 
-    it("numbers the summary 00, the nineteen sections 01–19, the annex A and its parts A.1–A.7", () => {
+    it("numbers the summary 00, the nineteen sections 01–19, the annex A and its parts A.1–A.6", () => {
       expect(TERMS_SECTIONS.map((entry) => entry.no)).toEqual([
         "00",
         ...twoDigit(19),
         "A",
-        ...Array.from({ length: 7 }, (_, index) => `A.${index + 1}`)
+        ...Array.from({ length: 6 }, (_, index) => `A.${index + 1}`)
       ]);
       const titles = TERMS_SECTIONS.map((entry) => entry.title);
       expect(titles[0]).toBe("In short");
@@ -99,8 +99,10 @@ describe("legal documents — generated data", () => {
       expect(titles[20]).toBe("Annex A — Regional terms");
       expect(titles[21]).toBe("European Union and European Economic Area");
       expect(titles[22]).toBe("United States");
-      expect(titles[25]).toBe("Switzerland");
-      expect(titles[27]).toBe("Asia-Pacific");
+      // Switzerland's part left on 14 November 2026 (not offered for now); Moldova and Asia-Pacific moved up one.
+      expect(titles[25]).toBe("Moldova");
+      expect(titles[26]).toBe("Asia-Pacific");
+      expect(titles).not.toContain("Switzerland");
     });
 
     it("keeps the summary paragraph without its bold lead-in", () => {
@@ -261,7 +263,7 @@ describe("legal documents — generated data", () => {
     it("lists the countries served in plain prose, and names none it does not serve (owner's ruling of 9 October 2026)", () => {
       expect(texts(section(TERMS_OF_SERVICE, "02"))[0]).toBe(
         "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area"
-          + " (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada,"
+          + " (Norway and Iceland), Moldova, the United States (except Tennessee), Canada,"
           + " Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere."
           + " If you live outside those countries you may be able to reach the site, but we do not direct the service to you,"
           + " we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your"
@@ -269,12 +271,12 @@ describe("legal documents — generated data", () => {
       );
       for (const document of [TERMS_OF_SERVICE, PRIVACY_POLICY]) {
         const all = [...document.sections.map((entry) => entry.title), ...allTexts(document)].join("\n");
-        expect(all).not.toMatch(/\bUK\b|Ukrain|Israel|Taiwan|Thailand|Philippines|only if listed|Reserved/u);
+        expect(all).not.toMatch(/\bUK\b|Ukrain|Israel|Taiwan|Switzerland|Swiss|Liechtenstein|Thailand|Philippines|only if listed|Reserved/u);
       }
       // The United Kingdom is not served (owner's ruling of 9 October 2026), but since the owner's answer of
       // 10 October 2026 the service is hosted there (OVHcloud, London). The Terms never name it; the Privacy
       // Policy names it only where it says where data is held or goes (since 12 October 2026 also in the summary,
-      // section 5 and Annex B.4, all naming London). Annex B.7 names it once, in Japan's part, among the countries the
+      // section 5 and Annex B.4, all naming London). Annex B.6 names it once, in Japan's part, among the countries the
       // AI providers and hosts are in (Taiwan's part, which named it too, left on 12 November 2026).
       expect(allTexts(TERMS_OF_SERVICE).filter((text) => text.includes("United Kingdom"))).toEqual([]);
       const ukMentions = allTexts(PRIVACY_POLICY).filter((text) => text.includes("United Kingdom"));
@@ -371,12 +373,12 @@ describe("legal documents — generated data", () => {
       expect(PRIVACY_POLICY.sections).toBe(POLICY_SECTIONS);
     });
 
-    it("numbers the summary 00, the fourteen sections 01–14, the annex B and its parts B.1–B.7", () => {
+    it("numbers the summary 00, the fourteen sections 01–14, the annex B and its parts B.1–B.6", () => {
       expect(POLICY_SECTIONS.map((entry) => entry.no)).toEqual([
         "00",
         ...twoDigit(14),
         "B",
-        ...Array.from({ length: 7 }, (_, index) => `B.${index + 1}`)
+        ...Array.from({ length: 6 }, (_, index) => `B.${index + 1}`)
       ]);
       const titles = POLICY_SECTIONS.map((entry) => entry.title);
       expect(titles[0]).toBe("In short");
@@ -384,8 +386,9 @@ describe("legal documents — generated data", () => {
       expect(titles[14]).toBe("Changes to this policy");
       expect(titles[15]).toBe("Annex B — Regional privacy terms");
       expect(titles[16]).toBe("European Union and European Economic Area");
-      expect(titles[20]).toBe("Switzerland");
-      expect(titles[22]).toBe("Asia-Pacific");
+      expect(titles[20]).toBe("Moldova");
+      expect(titles[21]).toBe("Asia-Pacific");
+      expect(titles).not.toContain("Switzerland");
       expect(texts(section(PRIVACY_POLICY, "00"))[0]!.startsWith("We collect what an account needs")).toBe(true);
     });
 
@@ -411,9 +414,8 @@ describe("legal documents — generated data", () => {
       const rights = texts(section(PRIVACY_POLICY, "10")).join("\n");
       expect(rights).toContain("anspdcp@dataprotection.ro");
       expect(rights).not.toContain("<anspdcp");
-      const swiss = texts(section(PRIVACY_POLICY, "B.5")).join("\n");
-      expect(swiss).toContain("edoeb.admin.ch");
-      expect(swiss).not.toContain("](https://");
+      // The policy's one markdown link was in Switzerland's part, which left on 14 November 2026; none may leak.
+      expect(allTexts(PRIVACY_POLICY).join("\n")).not.toContain("](https://");
     });
 
     it("leaves no markdown syntax in any string a reader sees", () => {

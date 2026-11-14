@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Nơi chúng tôi cung cấp Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy, Iceland và Liechtenstein), Thụy Sĩ, Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản và Hàn Quốc. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
+      { kind: "p", text: "Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy và Iceland), Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản và Hàn Quốc. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
     ]
   },
   {
@@ -352,24 +352,16 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Thụy Sĩ",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Đạo luật Liên bang Thụy Sĩ về Bảo vệ Dữ liệu áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.5). Bạn có thể khởi kiện tại tòa án nơi bạn sinh sống ở Thụy Sĩ. Gói trả phí không có quyền rút lại theo luật định; yêu cầu hoàn tiền được xử lý tại support@dezbatere.ro." }
+      { kind: "p", text: "Theo các Điều khoản này, bạn có các quyền giống như người tiêu dùng tại Liên minh Châu Âu, bao gồm quyền rút lại trong 14 ngày tại mục 13. Bạn có thể khởi kiện tại tòa án của Moldova. Luật số 195/2024 của Moldova về bảo vệ dữ liệu cá nhân áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "Theo các Điều khoản này, bạn có các quyền giống như người tiêu dùng tại Liên minh Châu Âu, bao gồm quyền rút lại trong 14 ngày tại mục 13. Bạn có thể khởi kiện tại tòa án của Moldova. Luật số 195/2024 của Moldova về bảo vệ dữ liệu cá nhân áp dụng cho dữ liệu của bạn (Chính sách quyền riêng tư, Phụ lục B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
     title: "Châu Á–Thái Bình Dương",
-    accent: "--con",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Singapore: Cán bộ Bảo vệ Dữ liệu của chúng tôi là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro; việc chuyển dữ liệu dựa trên biện pháp bảo vệ theo hợp đồng tương đương với PDPA; gói trả phí không có thời gian cân nhắc theo luật định, và yêu cầu hoàn tiền được xử lý tại support@dezbatere.ro. Nhật Bản: thông tin công bố theo luật định theo Đạo luật Giao dịch Thương mại Đặc định có tại dezbatere.ro/legal; gói đăng ký trực tuyến không có thời gian cân nhắc chung, và yêu cầu hoàn tiền được xử lý tại support@dezbatere.ro; chúng tôi gửi nội dung của bạn đến các nhà cung cấp AI tại Hoa Kỳ và Liên minh Châu Âu, mỗi nhà cung cấp theo một hợp đồng yêu cầu mức bảo vệ tương đương với Đạo luật Bảo vệ Thông tin Cá nhân của Nhật Bản, và khi được yêu cầu, chúng tôi cho bạn biết các biện pháp đó là gì. Hàn Quốc: sự đồng ý đối với hoạt động xử lý tùy chọn và hoạt động tiếp thị được thu thập riêng với các nội dung cần thiết để vận hành dịch vụ; cán bộ phụ trách quyền riêng tư của chúng tôi là giám đốc của chúng tôi, có thể liên hệ tại privacy@dezbatere.ro; bạn có thể rút khỏi gói trả phí trong vòng 7 ngày kể từ khi đăng ký theo Đạo luật Thương mại Điện tử; chúng tôi xin lại sự đồng ý của bạn trước mỗi lần tăng giá định kỳ hoặc chuyển đổi từ miễn phí sang trả phí; dịch vụ sử dụng AI tạo sinh, chúng tôi cho bạn biết điều đó trước khi bạn sử dụng và gắn nhãn kết quả do AI tạo ra." }
     ]
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "b7a877a287a2dfd90e29dbf1d555259c1df833dfcad44ef9d0b53f8de9f0082d",
+  sha256: "0f549ceaba2fdfb24c1654e740460b00a53bc7a394d8ec321abf287f0e5203b7",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.18 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

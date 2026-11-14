@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dónde ofrecemos Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Ofrecemos Dialectical Engine a las personas que viven en la Unión Europea (27 países) y el Espacio Económico Europeo (Noruega, Islandia y Liechtenstein), Suiza, Moldavia, Estados Unidos (salvo Tennessee), Canadá, Australia, Nueva Zelanda, Singapur, Japón y Corea del Sur. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio." }
+      { kind: "p", text: "Ofrecemos Dialectical Engine a las personas que viven en la Unión Europea (27 países) y el Espacio Económico Europeo (Noruega e Islandia), Moldavia, Estados Unidos (salvo Tennessee), Canadá, Australia, Nueva Zelanda, Singapur, Japón y Corea del Sur. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio." }
     ]
   },
   {
@@ -352,24 +352,16 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Suiza",
+    title: "Moldavia",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "La Ley Federal suiza de Protección de Datos se aplica a sus datos (Política de privacidad, anexo B.5). Puede ejercer acciones ante los tribunales del lugar de Suiza en el que resida. No se aplica al plan de pago ningún derecho de desistimiento legal; las solicitudes de reembolso se atienden en support@dezbatere.ro." }
+      { kind: "p", text: "En virtud de estos Términos tiene los mismos derechos que un consumidor de la Unión Europea, incluido el derecho de desistimiento de 14 días de la sección 13. Puede ejercer acciones ante los tribunales de Moldavia. La Ley n.º 195/2024 de Moldavia sobre protección de datos personales se aplica a sus datos (Política de privacidad, anexo B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldavia",
-    accent: "--reasoning",
-    blocks: [
-      { kind: "p", text: "En virtud de estos Términos tiene los mismos derechos que un consumidor de la Unión Europea, incluido el derecho de desistimiento de 14 días de la sección 13. Puede ejercer acciones ante los tribunales de Moldavia. La Ley n.º 195/2024 de Moldavia sobre protección de datos personales se aplica a sus datos (Política de privacidad, anexo B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
     title: "Asia-Pacífico",
-    accent: "--con",
+    accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Singapur: nuestro delegado de protección de datos es nuestro administrador, al que puede contactar en privacy@dezbatere.ro; las transferencias se basan en protecciones contractuales comparables a la PDPA; no se aplica ningún período de reflexión legal al plan de pago, y las solicitudes de reembolso se atienden en support@dezbatere.ro. Japón: la información legal exigida por la Specified Commercial Transactions Act está disponible en dezbatere.ro/legal; no se aplica ningún período de reflexión general a las suscripciones en línea, y las solicitudes de reembolso se atienden en support@dezbatere.ro; enviamos su contenido a proveedores de IA situados en Estados Unidos y en la Unión Europea, cada uno en virtud de un contrato que exige una protección equivalente a la de la Act on the Protection of Personal Information de Japón, y, si lo solicita, le indicamos cuáles son esas medidas. Corea del Sur: los consentimientos para el tratamiento opcional y la mercadotecnia se recaban por separado de los elementos necesarios para prestar el servicio; nuestro responsable de privacidad es nuestro administrador, al que puede contactar en privacy@dezbatere.ro; puede desistir de un plan de pago en un plazo de 7 días desde la suscripción, con sujeción a la E-Commerce Act; obtenemos nuevamente su consentimiento antes de cualquier aumento de precio recurrente o conversión de un plan gratuito en uno de pago; el servicio utiliza IA generativa, se lo indicamos antes de que lo utilice y etiquetamos los resultados generados por IA." }
     ]
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "3be77f39eae896ab9c817e88c8fead63507119b079fb864a2c9e648296312dc0",
+  sha256: "d4c06911d6a4ad064143ebe82b5963e19092152aca12154602a7920c3511dde3",
   eyebrow: "TÉRMINOS DE SERVICIO · v2.18 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026",
   title: "Lo que usted acepta",
   lede: "El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.",
