@@ -1473,6 +1473,74 @@ export default function DebatePageClient({
     return () => phone.removeEventListener?.("change", onChange);
   }, [handOffHeaderFocus]);
 
+  // Keyboard audit round 4 (2026-11-12): a dialog opened from a header action (How it works, Workspace, Honesty)
+  // returns focus to its opener on close. If the header refitted while it was open (a run settling adds actions, a
+  // zoom, a resize), that opener is now the copy CSS hides, which the browser will not focus. Focus then goes to the
+  // copy shown: the ⋯ summary, or the same action inline. The action used is kept at the click, since an item of the
+  // ⋯ menu hands focus to the summary before it acts.
+  const headerDialogOpenerRef = useRef<HTMLElement | null>(null);
+  const openFromHeader = useCallback(
+    (open: (value: boolean) => void) => (event: MouseEvent<HTMLElement>) => {
+      headerDialogOpenerRef.current = event.currentTarget;
+      open(true);
+    },
+    []
+  );
+  const headerDialogOpen = guideOpen || workspaceOpen || honestyOpen;
+  const headerDialogWasOpenRef = useRef(headerDialogOpen);
+  useEffect(() => {
+    const wasOpen = headerDialogWasOpenRef.current;
+    headerDialogWasOpenRef.current = headerDialogOpen;
+    if (!wasOpen || headerDialogOpen) return;
+    const used = headerDialogOpenerRef.current;
+    headerDialogOpenerRef.current = null;
+    const inlineActions = debateHeaderInlineActionsRef.current;
+    const overflow = debateHeaderOverflowRef.current;
+    if (used === null || inlineActions === null || overflow === null) return;
+    const overflowShown = headerCollapsedRef.current === true || phoneWidth();
+    const hiddenCopy: Element = overflowShown ? inlineActions : overflow;
+    const active = document.activeElement;
+    // Only focus the dialog's close put on the hidden copy, or lost: never focus that is somewhere real.
+    if (!(active instanceof Element && hiddenCopy.contains(active)) && !focusIsLost()) return;
+    if (overflowShown) {
+      overflow.open = false;
+      overflow.querySelector<HTMLElement>(":scope > summary")?.focus();
+      return;
+    }
+    const label = used.getAttribute("aria-label");
+    const twin = label === null ? null
+      : inlineActions.querySelector<HTMLElement>(`.debateOverflowAction[aria-label="${label.replace(/["\\]/g, "\\$&")}"]`);
+    (twin ?? inlineActions.querySelector<HTMLElement>("a[href], button"))?.focus();
+  }, [headerDialogOpen]);
+
+  // Keyboard audit round 4 (2026-11-12): at 640px and below the view switch is drawn on its own row under the
+  // header's other controls (globals.css, `order: 10`), so the page puts it after them there and Tab follows what is
+  // seen. False on the server and the first client render, as on a computer; CSS draws it the same either way.
+  // Crossing that width moves the switch in the page, so a button of it that had focus is given focus again; where
+  // the person was is read before the state changes.
+  const [phoneHeader, setPhoneHeader] = useState(false);
+  const viewSwitchFocusRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const phone = window.matchMedia(PHONE_WIDTH_QUERY);
+    const sync = () => {
+      const active = document.activeElement;
+      const buttons = [...(debateHeaderRef.current?.querySelectorAll<HTMLElement>(".segment button") ?? [])];
+      const index = active instanceof HTMLElement ? buttons.indexOf(active) : -1;
+      viewSwitchFocusRef.current = index === -1 ? null : index;
+      setPhoneHeader(phone.matches);
+    };
+    sync();
+    phone.addEventListener?.("change", sync);
+    return () => phone.removeEventListener?.("change", sync);
+  }, []);
+  useLayoutEffect(() => {
+    const index = viewSwitchFocusRef.current;
+    viewSwitchFocusRef.current = null;
+    if (index === null || !focusIsLost()) return;
+    debateHeaderRef.current?.querySelectorAll<HTMLElement>(".segment button")[index]?.focus();
+  }, [phoneHeader]);
+
   // Keyboard audit 2026-11-12: the page replaces itself whole (a private debate deleted, the run
   // held for the check, a fatal error, the debate gone) and the control that held focus goes with
   // it. The deleted screen always takes focus, as the step that asked for it; the others take it
@@ -1681,16 +1749,20 @@ export default function DebatePageClient({
     );
   }
   if (held || removedByCheck) {
-    return <div className="debateView">
+    // Keyboard audit round 4 (2026-11-12): the same two providers and keys as the full page below, so releasing the
+    // hold keeps the header's controls (account menu, language, theme) instead of rebuilding them under focus.
+    return <PositionTitlesContext.Provider value={positionTitles}>
+    <DebateTextLocaleProvider value={readQuestionLocale ?? storyLocale}>
+    <div className="debateView">
       {removedByCheck ? null : <h1 className="srOnly" lang={readQuestionLocale ?? storyLocale}
         dir={localeDirection(readQuestionLocale ?? storyLocale)}>{debate?.topic}</h1>}
-      <header className="debateTopBar" data-debate-reference-chrome>
+      <header key="debateTopBar" className="debateTopBar" data-debate-reference-chrome>
         <div className="debateTopIdentityRow">
           <BrandMark />
           <span className="debateTopDivider" aria-hidden />
           {removedByCheck ? null : <div className="debateTopClaim"><span className="debateTopTitle">{debate?.topic}</span></div>}
         </div>
-        <div className="debateTopControlRow"><AccountMenu catalog={chromeCatalog} /><DebateLocaleAndModeControls /></div>
+        <div className="debateTopControlRow"><AccountMenu key="accountMenu" catalog={chromeCatalog} /><DebateLocaleAndModeControls key="localeAndMode" /></div>
       </header>
       <div className="debateAiDisclosure" id="page-content" tabIndex={-1}>
         <AiNotice catalog={{ ...homeCatalog, ...chromeCatalog }} body={t(debateChromeCatalog, "debateChrome.aiNotice")} />
@@ -1700,7 +1772,9 @@ export default function DebatePageClient({
       {removedByCheck
         ? <CheckRemovalNotice catalog={homeCatalog} locale={locale} countryHint={crisisCountryHint} onClose={() => window.location.assign("/?tab=yours")} />
         : <p role="status" className="checkingNotice" tabIndex={-1} ref={(element) => { pageSwapFocusRef.current = element; }}>{t(publicCatalog, "public.publication.checkingDebate")}</p>}
-    </div>;
+    </div>
+    </DebateTextLocaleProvider>
+    </PositionTitlesContext.Provider>;
   }
   if (error && !debate) {
     return (
@@ -1740,6 +1814,36 @@ export default function DebatePageClient({
   const scoringStatusText = scoringStatusMessage();
   const scoringConfidenceText = formatScoringConfidenceCopy(debateChromeCatalog);
   const scoringInsightsExpandable = scoringState.status === "loaded" && scoringByNodeId.size > 0;
+  // At 640px and below the switch is drawn on its own row under the header's other controls, so it comes after them
+  // in the page too (keyboard audit round 4); on a computer it keeps its place between the scoring pill and the menu.
+  const viewSwitch = hasTree ? (
+    <div className="segment" role="group" aria-label={t(chromeCatalog, "chrome.view")}>
+      {publicMode && publicOverview ? (
+        <button type="button" aria-pressed={view === "overview"} onClick={() => setView("overview")}>
+          {t(chromeCatalog, "chrome.overview")}
+        </button>
+      ) : null}
+      <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
+        {t(chromeCatalog, "chrome.thread")}
+      </button>
+      <button
+        type="button"
+        aria-pressed={view === "split"}
+        onClick={() => {
+          setFocusNodeId((current) => current ?? debate.tree?.children[0]?.id ?? debate.tree?.id ?? null);
+          setView("split");
+        }}
+      >
+        {t(chromeCatalog, "chrome.split")}
+      </button>
+      <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
+        {t(chromeCatalog, "chrome.tree")}
+      </button>
+      <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
+        {t(chromeCatalog, "chrome.map")}
+      </button>
+    </div>
+  ) : null;
   return (
     <PositionTitlesContext.Provider value={positionTitles}>
     <DebateTextLocaleProvider value={debateTextLocale}>
@@ -1758,7 +1862,7 @@ export default function DebatePageClient({
         {runStatusText}
       </p>
       {/* ---- top bar ---- */}
-      <header className="debateTopBar" data-debate-reference-chrome ref={debateHeaderRef}>
+      <header key="debateTopBar" className="debateTopBar" data-debate-reference-chrome ref={debateHeaderRef}>
         <div className="debateTopIdentityRow" ref={debateHeaderIdentityRef}>
           <BrandMark />
           <span className="debateTopDivider" aria-hidden />
@@ -1799,36 +1903,9 @@ export default function DebatePageClient({
               <span id="debate-scoring-count">{t(chromeCatalog, "chrome.scoring", { scored: scoringByNodeId.size, total: countClaims(debate.tree) })}</span>
             </button>
           </ScoringErrorBoundary>
-          {hasTree ? (
-            <div className="segment" role="group" aria-label={t(chromeCatalog, "chrome.view")}>
-              {publicMode && publicOverview ? (
-                <button type="button" aria-pressed={view === "overview"} onClick={() => setView("overview")}>
-                  {t(chromeCatalog, "chrome.overview")}
-                </button>
-              ) : null}
-              <button type="button" aria-pressed={view === "thread"} onClick={() => setView("thread")}>
-                {t(chromeCatalog, "chrome.thread")}
-              </button>
-              <button
-                type="button"
-                aria-pressed={view === "split"}
-                onClick={() => {
-                  setFocusNodeId((current) => current ?? debate.tree?.children[0]?.id ?? debate.tree?.id ?? null);
-                  setView("split");
-                }}
-              >
-                {t(chromeCatalog, "chrome.split")}
-              </button>
-              <button type="button" aria-pressed={view === "tree"} onClick={() => setView("tree")}>
-                {t(chromeCatalog, "chrome.tree")}
-              </button>
-              <button type="button" aria-pressed={view === "map"} onClick={() => setView("map")}>
-                {t(chromeCatalog, "chrome.map")}
-              </button>
-            </div>
-          ) : null}
-          <AccountMenu catalog={chromeCatalog} />
-          <DebateLocaleAndModeControls />
+          {phoneHeader ? null : viewSwitch}
+          <AccountMenu key="accountMenu" catalog={chromeCatalog} />
+          <DebateLocaleAndModeControls key="localeAndMode" />
           <div className="debateUtilityActions" ref={debateHeaderInlineActionsRef}>
             <Link className="btnGhost debateOverflowAction" href="/" aria-label={t(chromeCatalog, "chrome.library")}>
               <span aria-hidden>←</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.library")}</span>
@@ -1839,12 +1916,12 @@ export default function DebatePageClient({
               </button>
             ) : null}
             {hasArtifacts && !publicMode ? (
-              <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label={t(chromeCatalog, "chrome.workspace")}>
+              <button type="button" className="btn debateOverflowAction" onClick={openFromHeader(setWorkspaceOpen)} aria-label={t(chromeCatalog, "chrome.workspace")}>
                 <span aria-hidden>◫</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.workspace")}</span>
               </button>
             ) : null}
             {honestyAvailable ? (
-              <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label={t(chromeCatalog, "chrome.honesty")}>
+              <button type="button" className="btn debateOverflowAction" onClick={openFromHeader(setHonestyOpen)} aria-label={t(chromeCatalog, "chrome.honesty")}>
                 <span aria-hidden>◈</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.honesty")}</span>
               </button>
             ) : null}
@@ -1853,7 +1930,7 @@ export default function DebatePageClient({
                 <span aria-hidden>↓</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.export")}</span>
               </a>
             ) : null}
-            <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
+            <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={openFromHeader(setGuideOpen)}>?</button>
           </div>
           {/* Keyboard audit 2026-11-12: a menu closes on Escape (back to its summary), when focus
               leaves it for another control, and once an item is used. Focus goes back to the
@@ -1891,12 +1968,12 @@ export default function DebatePageClient({
                 </button>
               ) : null}
               {hasArtifacts && !publicMode ? (
-                <button type="button" className="btn debateOverflowAction" onClick={() => setWorkspaceOpen(true)} aria-label={t(chromeCatalog, "chrome.workspace")}>
+                <button type="button" className="btn debateOverflowAction" onClick={openFromHeader(setWorkspaceOpen)} aria-label={t(chromeCatalog, "chrome.workspace")}>
                   <span aria-hidden>◫</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.workspace")}</span>
                 </button>
               ) : null}
               {honestyAvailable ? (
-                <button type="button" className="btn debateOverflowAction" onClick={() => setHonestyOpen(true)} aria-label={t(chromeCatalog, "chrome.honesty")}>
+                <button type="button" className="btn debateOverflowAction" onClick={openFromHeader(setHonestyOpen)} aria-label={t(chromeCatalog, "chrome.honesty")}>
                   <span aria-hidden>◈</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.honesty")}</span>
                 </button>
               ) : null}
@@ -1905,9 +1982,10 @@ export default function DebatePageClient({
                   <span aria-hidden>↓</span><span className="debateActionLabel">{t(chromeCatalog, "chrome.export")}</span>
                 </a>
               ) : null}
-              <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={() => setGuideOpen(true)}>?</button>
+              <button type="button" className="iconBtn debateOverflowAction" aria-label={t(chromeCatalog, "chrome.howItWorks")} onClick={openFromHeader(setGuideOpen)}>?</button>
             </div>
           </details>
+          {phoneHeader ? viewSwitch : null}
         </div>
       </header>
 

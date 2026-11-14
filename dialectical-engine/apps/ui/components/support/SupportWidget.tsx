@@ -37,18 +37,34 @@ export function SupportWidget() {
   const root = useRef<HTMLDivElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const opened = useRef(false);
+  // Whether closing gives focus back to the toggle: not when the panel closes because focus already went elsewhere.
+  const refocus = useRef(true);
+  // The last thing the person did was a pointer press, not a key: the focus it moves is their own click or tap, and it
+  // leaves the panel as it was. Kept until the next key press, not until the pointer lifts: on a touch screen the focus
+  // moves only after the finger is up (round 4 review: a tap outside closed the panel and lost the draft).
+  const pressed = useRef(false);
 
   useEffect(() => {
     if (!expanded) return;
     opened.current = true;
     root.current?.querySelector<HTMLElement>('[name="support-message"]')?.focus();
+    pressed.current = false;
+    const press = (): void => { pressed.current = true; };
+    const key = (): void => { pressed.current = false; };
+    document.addEventListener("pointerdown",press,true);
+    document.addEventListener("keydown",key,true);
+    return () => {
+      document.removeEventListener("pointerdown",press,true);
+      document.removeEventListener("keydown",key,true);
+    };
   },[expanded]);
 
   // The toggle is the only thing left to carry focus once the panel is dismissed,
   // and it is where the keyboard has to land to reopen it.
   useEffect(() => {
     if (expanded || !opened.current) return;
-    toggle.current?.focus();
+    if (refocus.current) toggle.current?.focus();
+    refocus.current = true;
   },[expanded]);
 
   useEffect(() => {
@@ -62,8 +78,9 @@ export function SupportWidget() {
     setExpanded(true);
   }
 
-  function close(): void {
+  function close(returnFocus = true): void {
     if (!expanded) return;
+    refocus.current = returnFocus;
     setExpanded(false);
     if (motionWanted()) setClosing(true);
   }
@@ -76,6 +93,15 @@ export function SupportWidget() {
       ref={root}
       className="supportWidget"
       data-widget-state={state}
+      // Keyboard audit round 4 (12 Nov 2026): the open panel sits over the corner of the page, and its toggle is hidden
+      // meanwhile, so Tab out of it went to controls under it. Focus that leaves for another control closes the panel
+      // and stays there (the widget is not modal: Tab is never held). Focus that falls to nowhere, or moves with a
+      // pointer press, leaves the panel as it was.
+      onBlur={(event) => {
+        const next = event.relatedTarget as Node | null;
+        if (!expanded || next === null || pressed.current || event.currentTarget.contains(next)) return;
+        close(false);
+      }}
       onKeyDown={(event) => {
         if (event.key !== "Escape" || !expanded) return;
         // Escape that only cancels an IME candidate belongs to the composer: closing would lose the draft
@@ -102,7 +128,7 @@ export function SupportWidget() {
       {expanded || closing ? (
         <section className="supportWidgetPanel scroll" data-support-widget-panel>
           <Assistant
-            onClose={close}
+            onClose={() => close()}
           />
           <a className="supportWidgetFullPage" href="/help">
             <span>{t(catalog,"support.fullPage")}</span>

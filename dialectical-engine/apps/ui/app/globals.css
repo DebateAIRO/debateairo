@@ -1346,6 +1346,8 @@ select {
   .supportTopicRail { padding: 14px 10px; }
   .supportTopicList { display: flex; overflow-x: auto; padding-bottom: 3px; }
   .supportTopic { width: 170px; flex: 0 0 170px; }
+  /* Keyboard audit round 4 (E9): the sideways scroller above cut off the browser's ring, drawn outside the topic. */
+  .supportTopic:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
   .supportAgentHeader { align-items: flex-start; flex-wrap: wrap; }
   .supportAgentIdentity { min-width: 180px; }
   .supportAgentIdentity p { white-space: normal; }
@@ -1498,6 +1500,56 @@ html { scroll-padding-block-end: var(--consent-bar-room, 0px); }
 .appShell > .consentBar { display: flex; flex-direction: column; max-height: min(calc(100dvh - 24px - var(--safe-b, 0px)), max(calc(100dvh - 120px), 170px)); }
 .appShell > .consentBar > .consentBarBezel { display: flex; flex-direction: column; min-height: 0; }
 .appShell > .consentBar .consentBarCore { min-height: 0; overflow-y: auto; }
+/* Same audit, seen in a painted browser: the Help button is fixed in the bottom right corner, and a control tabbed to at
+   the foot of the window sat under it (82% of the landing page's footer language button at 1280 × 800, up to 70% of
+   other right-hand controls on a narrow window). A browser counts a control at the bottom edge as in view and does not
+   scroll it clear.
+   - A focused control is scrolled clear of the Help button too: its offset, its 42px and 12px of air. With the cookie
+     notice showing, the button rides above the notice, so the two rooms add up. (The footers keep that corner empty
+     themselves: legal.css.)
+   - In a short window the notice and the Help button do not both fit above a focused control. While the notice shows
+     there, the Help button waits; it is back as soon as the notice is answered. */
+html:has(.supportWidget[data-widget-state="collapsed"]) { scroll-padding-block-end: calc(var(--consent-bar-room, 0px) + var(--dock-offset-b) + 54px); }
+/* Round 4 (E2): the public debate page can show the dig Undo note (bottom left, v4-undo.css) beside the Help button. The
+   rule above outranked the note's own, so the window kept the Help button's room where the note needed more. Where both
+   show, it keeps the larger of the two (the note's room as v4-undo.css computes it, --v4-note-foot). */
+html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scroll-padding-block-end: max(calc(var(--consent-bar-room, 0px) + var(--dock-offset-b) + 54px), var(--v4-note-foot, 0px)); }
+@media (max-height: 520px) {
+  /* Round 4 (E7): not display: none. A panel opened before the window became short (a phone turned on its side) closed
+     onto a button that could not take focus, and focus was lost. The button fades out and lets presses through, and
+     shows again while it has focus, so closing the panel still lands on it. */
+  .appShell:has(> .consentBar) .supportWidget[data-widget-state="collapsed"]:not(:focus-within) { opacity: 0; pointer-events: none; }
+  html:has(.appShell > .consentBar):has(.supportWidget[data-widget-state="collapsed"]) { scroll-padding-block-end: var(--consent-bar-room, 0px); }
+  html:has(.appShell > .consentBar):has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scroll-padding-block-end: max(var(--consent-bar-room, 0px), var(--v4-note-foot, 0px)); }
+}
+
+/* Keyboard audit round 4 (E4), seen at 320 x 256 (400% zoom): the cookie storage card and the legal document modal are
+   92vh tall with a fixed head and foot, and only the middle shrank: the storage card's list (a Tab stop) and the
+   Privacy text went to about 0px, and the modal's "Close" was cut off. The middle now keeps 96px and the inner frame
+   scrolls instead, so Tab brings every part into view; in a window they fit, the frame has nothing to scroll. The text
+   still scrolls itself, so the modal's read-to-the-end check measures what it did. (Outside the consent S01/S02 blocks;
+   the selectors outrank theirs.) */
+.consentCard > .consentCardCore { overflow-y: auto; }
+.consentCardCore > .consentCatList { min-height: 96px; }
+.policyBezel > .policyCore { overflow-y: auto; }
+.policyCore > .policyBody { min-height: 96px; }
+
+/* Keyboard audit round 4 (E6): in forced colours (Windows High Contrast) a box-shadow is dropped and every border is
+   painted the same, so these fields and buttons, whose only focus mark is a border colour and a shadow, showed none.
+   There they get a system-colour outline; in normal colours nothing changes. (:root outranks the rules that take
+   their outline away, in this file and in v4-ask.css.) */
+@media (forced-colors: active) {
+  :root .authField input:focus,
+  :root .authField input.authRecoveryInput:focus,
+  :root .authField select:focus,
+  :root .dobFieldset .dobInput:focus,
+  :root .dobFieldset .dobPickerToggle:focus-visible,
+  :root .dobFieldset .dobDecadeButton:focus-visible,
+  :root .dobFieldset .dobCell:focus-visible,
+  :root .supportComposer input:focus-visible,
+  :root .v4AskField:focus,
+  :root .v4AskInput:focus { outline: 2px solid Highlight; outline-offset: 1px; }
+}
 
 /* Hidden until it has keyboard focus, then shown over the top bar. */
 .skipLink {
@@ -2209,8 +2261,10 @@ a:focus-visible {
 }
 .dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
 /* Keyboard audit, 12 Nov 2026: on the one-time age check the date is the card's only field, so the day grid hung below
-   the card's foot and the card cut off its last row (29, 30, 31). While a grid is open there, the card does not clip. */
-.authCard:has([data-form="age-confirmation"] .dobPopover) { overflow: visible; }
+   the card's foot and the card cut off its last row (29, 30, 31). While a grid is open there, the card does not clip.
+   Round 4: the same field on the /enroll-mfa and /recover onboarding step was still cut off, so this holds for any
+   date grid open inside an auth card. */
+.authCard:has(.dobPopover) { overflow: visible; }
 .dobFieldset .dobPopover[data-part="d"] { width: 244px; }
 .dobFieldset .dobPopover[data-part="m"] { width: 222px; }
 .dobFieldset .dobPopover[data-part="y"] { width: 262px; }
@@ -2610,6 +2664,9 @@ a:focus-visible {
   background: var(--con-bg);
   color: var(--con-text);
 }
+/* Keyboard audit round 4: an alert that takes focus after a refusal (so it is scrolled to and read) is a message, not a
+   control: no ring of its own. The parked-part ring still shows if the focus guard parks there. */
+.authAlert[tabindex="-1"]:focus:not([data-focus-parked]) { outline: none; }
 
 .authPhase {
   font-size: 14px;
@@ -3687,6 +3744,40 @@ a:focus-visible {
 ) {
   visibility: hidden;
   opacity: 0;
+  pointer-events: none;
+}
+/* Every card's controls stay in the Tab order at overview zoom (keyboard audit round 4), so Tab can get inside a card
+   at any zoom. They stay transparent and unclickable until their card holds focus (the rule above then lets go), so
+   what a mouse user sees never changes. This must NOT depend on where focus is now (no `:focus-visible`, no `:has()`
+   on the canvas): a browser checks that the next control can take focus AFTER the last one has let go of it, when
+   nothing in the Tree is focused, and a rule that waits for focus there drops the keyboard on nothing (seen in
+   Chrome). The two leading classes are there for weight: the hiding rule's `:is()` list counts as its heaviest entry
+   (`.node > .roleBadge`, two classes). */
+.canvasViewport .canvas .canvasInner[data-zoom-band="overview"] .nodeWrap:not(:focus-within) .nodeControls {
+  visibility: visible;
+}
+/* The Tree's keys, told to screen readers by the canvas's description, are shown from that same element while the
+   canvas itself has the keyboard's ring (keyboard audit round 4, like the Map's keys line): over the canvas's lower
+   left corner, so nothing moves; never on hover or a click. */
+.canvasViewport > .canvas:focus-visible + .canvasKeysHint {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: var(--z-canvas-sticky);
+  width: auto;
+  max-width: calc(100% - 24px);
+  height: auto;
+  margin: 0;
+  padding: 5px 9px;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
   pointer-events: none;
 }
 .canvasLinks {
@@ -6506,6 +6597,8 @@ a:focus-visible {
 .setBtnQuiet { padding: 7px 15px; color: var(--muted); }
 .setBtnRevoke { padding: 6px 14px; font-size: 11px; color: var(--muted); }
 .setBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Keyboard audit round 4: locked but still in the Tab order (aria-disabled, a press goes to what is missing): looks the same. */
+.setBtn[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 
 /* Danger card */
 .setCardDanger { border-color: var(--dispute-border); }
@@ -6712,6 +6805,8 @@ a:focus-visible {
 }
 .emlSubmit:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .emlSubmit:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Keyboard audit round 4: locked but still in the Tab order (aria-disabled, a press goes to the first box to fix). */
+.emlSubmit[aria-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
 .emlNote { margin: 0; font-size: 10.5px; line-height: 1.55; color: var(--text-2); text-align: center; text-wrap: pretty; }
 .emlContinue { width: auto; margin-top: 22px; padding: 11px 22px; }
 
@@ -9710,6 +9805,28 @@ a:focus-visible {
   background: var(--surface-2);
   color: var(--text);
 }
+/* Keyboard audit round 4 (C8), seen in a painted browser at 390 x 844: at 640px and below the page scrolls as a whole
+   and this card, shrunk to its least height, sticks to the foot of the window over the reading views. A browser counts
+   a control under it as in view and does not scroll it clear: 10 of the Tree's 67 controls and 3 of the Thread's 99
+   took focus wholly hidden behind the card. A short window of any width scrolls the same way (the round 4 block after
+   the phone block below). The window keeps the card's height plus 8px clear when it scrolls a focused control into
+   view: the card publishes its real height (--visibility-card-room, PublicationControl), since Chrome draws it at its
+   least height and another browser may draw it taller; before it has said, its least height (min-height above). At the end of the page the card is back in its own place and
+   covers nothing. The three rules outrank, case by case, the cookie notice's room and the Help button's room
+   (the consent-bar and Help rules near the top of this file), and keep the larger room of the two. */
+@media (max-width: 640px), (max-height: 520px) {
+  html:has(.debateView > section.card.publicationControl) {
+    scroll-padding-block-end: max(var(--consent-bar-room, 0px), calc(var(--visibility-card-room, min(6rem, 25dvh)) + 8px));
+  }
+  html:has(.debateView > section.card.publicationControl):has(.supportWidget[data-widget-state="collapsed"]) {
+    scroll-padding-block-end: max(calc(var(--consent-bar-room, 0px) + var(--dock-offset-b) + 54px), calc(var(--visibility-card-room, min(6rem, 25dvh)) + 8px));
+  }
+}
+@media (max-height: 520px) {
+  html:has(.appShell > .consentBar):has(.debateView > section.card.publicationControl):has(.supportWidget[data-widget-state="collapsed"]) {
+    scroll-padding-block-end: max(var(--consent-bar-room, 0px), calc(var(--visibility-card-room, min(6rem, 25dvh)) + 8px));
+  }
+}
 /* The card's controls paint their own background from the same token pair as their text (ui-N1): the global rule gives
    every control `color: inherit` and leaves the user agent's white/grey background, which in dark mode sat under the
    theme's near-white text (1.04–1.20 : 1). Scoped to this card only; the checkbox keeps its native rendering. */
@@ -10114,6 +10231,32 @@ a:focus-visible {
    phone-width overflow measured at 320–414px and must win over the
    earlier breakpoints it adjusts.
    ============================================================ */
+
+/* Keyboard audit round 4, seen in a painted browser: in a short window wider than a phone (a phone on its side,
+   844 x 390; a laptop at 200% zoom) the debate column is one 100dvh box, and the header, the AI notice, the progress
+   strip and the owner's Visibility card took all of it: the reading views were 0px tall, so every Tree and Thread
+   control took focus inside a box with no height. Here the column scrolls as a page, as it does on a phone (the phone
+   block just below): the one-row header (58px) stays pinned, the notices scroll away, and the reading views keep the
+   window's height under the header. */
+@media (min-width: 641px) and (max-height: 520px) {
+  .debateView {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+  .debateTopBar {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+  }
+  html:has(.debateTopBar) {
+    scroll-padding-top: 66px;
+  }
+  .debateMain {
+    flex: 0 0 auto;
+    height: calc(100dvh - 58px);
+  }
+}
 
 @media (max-width: 640px) {
   /* The app bar held six actions in one unwrapped row (431px on a 375px

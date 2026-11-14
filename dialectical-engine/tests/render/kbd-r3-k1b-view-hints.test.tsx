@@ -54,8 +54,9 @@ const describedBy = (element: Element): string[] => (element.getAttribute("aria-
 describe("DEB1-12: the view hints say what the keyboard does, without clutter for pointer users", () => {
   it("the three visible hints are their original pointer text; the Map's keys hint names the keys its handler answers", () => {
     expect(EN["debateViews.mapInteractionHint"]).toBe("Hover a wedge to inspect · click to focus");
-    expect(EN["debateViews.clickLevelToStepBack"]).toBe("click a level to step back up");
-    expect(EN["debateViews.leanAndFocusHint"]).toBe("Leans {lean} · click any argument to make it the focus");
+    // Round 4 (2026-11-12): these two no longer name only the mouse ("choose", not "click").
+    expect(EN["debateViews.clickLevelToStepBack"]).toBe("choose a level to step back up");
+    expect(EN["debateViews.leanAndFocusHint"]).toBe("Leans {lean} · choose any argument to make it the focus");
     expect(EN["debateViews.mapKeysHint"]).toBe("Arrow keys move between wedges · Enter makes one the focus");
   });
 

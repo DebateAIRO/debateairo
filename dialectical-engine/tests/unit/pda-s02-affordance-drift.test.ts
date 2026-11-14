@@ -41,7 +41,10 @@ function expectLocalizedAriaLabel(
 
 describe("S02 owner/public affordance drift pins", () => {
   it("pins and classifies the owner top-bar affordance inventory", () => {
-    const topBar = between(ownerPage, "{/* ---- top bar ---- */}", "{/* ---- verdict-first banner");
+    // Keyboard audit round 4 (2026-11-12): the view switch is built once above the return and placed in the top bar
+    // (before the account menu on a computer, after the ⋯ menu on a phone), so its block counts as part of the bar.
+    const topBar = between(ownerPage, "const viewSwitch = hasTree ? (", ") : null;")
+      + between(ownerPage, "{/* ---- top bar ---- */}", "{/* ---- verdict-first banner");
 
     // READ + PUBLIC-ONLY ADDITION — four reading-mode controls are shared with
     // the public page (Thread, Split, Tree, Map). V's ruling of 2026-09-20
@@ -77,7 +80,7 @@ describe("S02 owner/public affordance drift pins", () => {
     expectLocalizedAriaLabel(topBar, "chrome.howItWorks", "How it works", 2);
     // MUTATION-CAPABLE OWNER ACCOUNT SURFACE — settings stays owner-only.
     expectLocalizedAriaLabel(topBar, "chrome.settings", "Settings", 0);
-    expect(occurrences(topBar, "<AccountMenu catalog={chromeCatalog} />")).toBe(1);
+    expect(occurrences(topBar, '<AccountMenu key="accountMenu" catalog={chromeCatalog} />')).toBe(1);
     // READ/STRUCTURAL — owner overflow itself contains the duplicated responsive actions.
     expectLocalizedAriaLabel(topBar, "chrome.moreDebateActions", "More debate actions", 1);
     // MUTATION — challenge callbacks stay owner-only. The owner and public routes

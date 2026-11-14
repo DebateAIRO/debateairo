@@ -92,6 +92,23 @@ export function PublicationControl({ runId,onPrivateDeletion,onRemovedByCheck,cl
     card.scrollTop += answer.getBoundingClientRect().top - (card.getBoundingClientRect().top + card.clientTop + paddingTop);
   }, [answered]);
 
+  // Keyboard audit round 4 (C8): on a phone and in a short window the page scrolls under this card, which sticks to the
+  // window's foot. The card says how tall it really is (globals.css keeps that much of the window clear when it scrolls a
+  // focused control into view); Chrome draws it at its least height, another browser may draw it taller.
+  useEffect(() => {
+    const card = cardRef.current;
+    if (card === null) return;
+    const root = card.ownerDocument.documentElement;
+    const set = (): void => root.style.setProperty("--visibility-card-room", `${Math.ceil(card.getBoundingClientRect().height)}px`);
+    set();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
+    observer?.observe(card);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty("--visibility-card-room");
+    };
+  }, [deleted]);
+
   useEffect(() => {
     let active = true;
     void client.readRunVisibility(runId)

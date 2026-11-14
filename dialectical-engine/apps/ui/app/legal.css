@@ -445,6 +445,16 @@
 .appShell:has(.tokenDock) > .siteFooterLine {
   padding-right: calc(var(--dock-offset-b) + 150px);
 }
+/* Keyboard audit round 4 (E3): on the debate canvas that line is one row scrolling sideways (about 1,270px), and the
+   padding above clears the corner only when the row is scrolled to its end. A footer link Tab reaches is scrolled
+   clear of the corner too (physical right, like the corner itself, so right-to-left is the same). */
+.appShell:has(.debateView):has(.supportWidget) > .siteFooterLine,
+.appShell:has(.debateView):has(.tokenDock) > .siteFooterLine {
+  scroll-padding-right: calc(var(--dock-offset-b) + 150px);
+}
+/* Keyboard audit, 12 Nov 2026, seen in a painted browser: the full footer's last row ends in that same corner with the
+   language button, and the Help button covered 82% of it when it had the keyboard. It keeps the corner empty too. */
+.appShell:has(.supportWidget) .siteFooterFull .siteFooterBase { padding-right: calc(var(--dock-offset-b) + 150px); }
 
 /* ---------- 15c phone ---------- */
 
@@ -493,6 +503,9 @@
   .siteFooterLine nav { margin-inline-start: 0; }
   .appShell:has(.supportWidget) > .siteFooterLine,
   .appShell:has(.tokenDock) > .siteFooterLine { padding-right: 16px; padding-bottom: 72px; }
+  /* On a phone the row needs its whole width, so the full footer ends above the Help button instead. */
+  .appShell:has(.supportWidget) .siteFooterFull .siteFooterBase { padding-right: 0; }
+  .appShell:has(.supportWidget) .siteFooterFull { padding-bottom: calc(var(--dock-offset-b) + 54px); }
 
   /* On a phone the canvas keeps the whole screen; its links live on every other screen. */
   .appShell:has(.debateView) > .siteFooterLine { display: none; }

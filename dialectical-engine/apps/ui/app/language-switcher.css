@@ -59,6 +59,13 @@
   inset-inline-end: 0;
   z-index: 90;
   width: min(470px, calc(100vw - 24px));
+  /* Keyboard audit round 4 (E5): never taller than the window (less 12px each side). In a short window the panel ran
+     past its foot, and the arrow keys' row left the window. The head and the search keep their size; the list shrinks
+     and scrolls. LanguageSwitcher.tsx places it inside the window with the same limit. */
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
   overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: 14px;
@@ -68,6 +75,7 @@
 }
 
 .languageSwitcherHead {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -100,6 +108,7 @@
 }
 
 .languageSwitcherSearch {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 9px;
@@ -125,6 +134,7 @@
 .languageSwitcherSearch input::placeholder { color: var(--muted); opacity: 1; }
 
 .languageSwitcherList {
+  min-height: 0;
   max-height: 320px;
   overflow: auto;
   padding: 0 10px 14px;

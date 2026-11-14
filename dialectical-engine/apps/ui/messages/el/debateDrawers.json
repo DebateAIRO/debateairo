@@ -81,7 +81,7 @@
   "debateDrawers.node.scoringFindingsAria": "Κενά βαθμολόγησης και κρίσιμες επισημάνσεις",
   "debateDrawers.node.scoringRationale": "Αιτιολόγηση βαθμολόγησης",
   "debateDrawers.node.scoringUnavailable": "Η βαθμολόγηση δεν είναι διαθέσιμη",
-  "debateDrawers.node.selectToChallenge": "Επιλέξτε οποιαδήποτε παραπάνω πρόταση για να την αμφισβητήσετε.",
+  "debateDrawers.node.selectToChallenge": "Επιλέξτε οποιαδήποτε παραπάνω πρόταση για να την αμφισβητήσετε ή επιλέξτε «Αμφισβήτηση».",
   "debateDrawers.node.setAsideReason": "παραμερίστηκε επειδή: {reason}",
   "debateDrawers.node.stoppedPath": "Διαδρομή που διακόπηκε",
   "debateDrawers.node.stoppedPathExplanation": "Αυτή η διαδρομή διερεύνησης τέθηκε σε παύση ή εγκαταλείφθηκε. Διατηρείται εδώ για αναφορά — οι εγκαταλελειμμένες διαδρομές δεν διαγράφονται ποτέ. Μπορείτε να συνεχίσετε τη διερεύνηση δημιουργώντας εκ νέου αυτό το επιχείρημα.",

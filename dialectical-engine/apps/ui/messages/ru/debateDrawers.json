@@ -81,7 +81,7 @@
   "debateDrawers.node.scoringFindingsAria": "Пробелы и критические флаги оценки",
   "debateDrawers.node.scoringRationale": "Обоснование оценки",
   "debateDrawers.node.scoringUnavailable": "Оценка недоступна",
-  "debateDrawers.node.selectToChallenge": "Выделите выше любое предложение, чтобы его оспорить.",
+  "debateDrawers.node.selectToChallenge": "Выделите выше любое предложение, чтобы его оспорить, или нажмите «Оспорить».",
   "debateDrawers.node.setAsideReason": "отложено по причине: {reason}",
   "debateDrawers.node.stoppedPath": "Остановленный путь",
   "debateDrawers.node.stoppedPathExplanation": "Этот путь исследования был приостановлен или оставлен. Он сохранён здесь для справки: оставленные пути никогда не удаляются. Чтобы возобновить исследование, создайте этот аргумент заново.",

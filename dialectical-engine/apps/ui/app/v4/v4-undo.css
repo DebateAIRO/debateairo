@@ -111,6 +111,19 @@ html:has(.v4DebPage) {
 .v4StackPhone .v4UndoNotes { width: 100%; max-width: none; }
 .v4StackPhone .v4Undo { box-shadow: none; }
 .v4StackPhone .v4DebPhoneBar { flex: none; border-top: 0; box-shadow: none; }
+/* Keyboard audit round 4 (B5, WCAG 2.4.11): in a short window (320 x 256, 400% zoom; a phone on its side, about 667 x 375)
+   a quarter of the window is less than the bar alone, so the notes above it shrank to nothing and the tour's bar pushed
+   the pinned bar below the window. The stack grows to what it holds, up to 192 px (plus the safe area) or three quarters
+   of a shorter window, never below the quarter above (a window 768 px tall or more is unchanged), and always leaving 64 px
+   of page under the pinned where-bar (the review: at 320 x 256 the where-bar and a 192 px stack left no page at all); the
+   notes keep room for one control; and if it still must, the stack scrolls inside, so whatever in it has focus is
+   scrolled into view. */
+.v4StackPhone:not(:has(.v4RepStrip-bottom)) {
+  max-height: max(25vh, min(75vh, calc(192px + var(--safe-b, 0px)), calc(100vh - var(--v4-where-room, 0px) - 64px)));
+  max-height: max(25dvh, min(75dvh, calc(192px + var(--safe-b, 0px)), calc(100dvh - var(--v4-where-room, 0px) - 64px)));
+  overflow-y: auto; overscroll-behavior: contain;
+}
+.v4StackPhone > .v4StackTop:not(:empty) { min-height: 56px; }
 /* wait-f2: the bar's "Paused · Continue" job: still words, no pulse. */
 .v4DebPhonePaused { flex: 1 1 auto; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: var(--t-ui); }
 .v4DebPhonePausedWord { font-weight: 700; }

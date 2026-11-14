@@ -489,7 +489,7 @@ export function OpenWord(props: Readonly<{ catalog: MessageCatalog }>) {
  * their own, beside the card's (never inside it), that shows or hides what a dot is; focus stays on it. Nothing unchecked is
  * ever shown. While the run waits (`running` false) the ring stands still. Null with no dot yet.
  */
-export function V4PathDots(props: Readonly<{ dots: readonly RunPathPointState[]; running: boolean; catalog: MessageCatalog }>) {
+export function V4PathDots(props: Readonly<{ pathId: string; dots: readonly RunPathPointState[]; running: boolean; catalog: MessageCatalog }>) {
   const [open, setOpen] = useState(false);
   const noteId = useId();
   if (props.dots.length === 0) return null;
@@ -498,6 +498,10 @@ export function V4PathDots(props: Readonly<{ dots: readonly RunPathPointState[];
       <button
         type="button"
         className="v4PathDotsBtn"
+        // Keyboard audit round 4 (B3): a row of its own under its path's card, so when the dots go (the path is filled in)
+        // with the keyboard on them, focus goes to that card (useMapKeys' nearest row), never to the question's card.
+        data-row={`dots:${props.pathId}`}
+        data-parent={`path:${props.pathId}`}
         aria-label={t(props.catalog, "v4.paths.dots")}
         aria-expanded={open}
         aria-controls={noteId}
@@ -614,7 +618,7 @@ export function V4PathCard(props: Readonly<{
         {props.changed && marks.tag === null ? <NewDot catalog={catalog} /> : null}
         <LevelWords level={2} catalog={catalog} />
       </button>
-      {progress === null ? null : <V4PathDots dots={progress.dots} running={props.running} catalog={catalog} />}
+      {progress === null ? null : <V4PathDots pathId={path.id} dots={progress.dots} running={props.running} catalog={catalog} />}
     </div>
   );
 }
@@ -1059,19 +1063,31 @@ function pathOfSelection(resolved: ResolvedSelection): string | null {
   return pathIdOf(resolved);
 }
 
-/** map-f22: whether the drawn map is wider than its box (so a hint says it goes on to the right). */
-function useOverflows(box: HTMLElement | null): boolean {
-  const [overflows, setOverflows] = useState(false);
+/**
+ * map-f22: whether the drawn map is wider than its box (so a hint says it goes on to the right), and, keyboard audit round 4
+ * (B6), whether more of it lies past the box's end side now: the end fade shows only then, so a focused card in the last
+ * column, scrolled to the end, is wholly clear of it (a right-to-left box scrolls to negative offsets, the same rule holds).
+ */
+function useOverflows(box: HTMLElement | null): Readonly<{ overflows: boolean; moreAtEnd: boolean }> {
+  const [state, setState] = useState({ overflows: false, moreAtEnd: false });
   useEffect(() => {
     if (box === null || typeof ResizeObserver === "undefined") return;
-    const check = (): void => setOverflows(box.scrollWidth > box.clientWidth + 1);
+    const check = (): void => {
+      const overflows = box.scrollWidth > box.clientWidth + 1;
+      const moreAtEnd = overflows && Math.abs(box.scrollLeft) + box.clientWidth < box.scrollWidth - 1;
+      setState((was) => (was.overflows === overflows && was.moreAtEnd === moreAtEnd ? was : { overflows, moreAtEnd }));
+    };
     check();
     const observer = new ResizeObserver(check);
     observer.observe(box);
     if (box.firstElementChild !== null) observer.observe(box.firstElementChild);
-    return () => observer.disconnect();
+    box.addEventListener("scroll", check, { passive: true });
+    return () => {
+      observer.disconnect();
+      box.removeEventListener("scroll", check);
+    };
   }, [box]);
-  return overflows;
+  return state;
 }
 
 export function V4MapTree(props: MapPiecesProps) {
@@ -1092,7 +1108,7 @@ export function V4MapTree(props: MapPiecesProps) {
   const openPathId = pathOfSelection(resolved);
   const unfolded = (key: string): boolean => !fold || key === "root" || key === openPathId || unfoldedByKey.has(key);
   const [scrollBox, setScrollBox] = useState<HTMLDivElement | null>(null);
-  const overflows = useOverflows(scrollBox);
+  const { overflows, moreAtEnd } = useOverflows(scrollBox);
   const treeRef = useRef<HTMLDivElement | null>(null);
   const hintId = useId();
   const keys = useMapKeys(treeRef, {
@@ -1144,7 +1160,7 @@ export function V4MapTree(props: MapPiecesProps) {
   const hasPaths = map.paths.length > 0;
   return (
     <div className={`v4Map${fold ? " v4MapFold" : ""}`}>
-      <div className={`v4MapScroll${overflows ? " v4MapScrollMore" : ""}`} ref={setScrollBox}>
+      <div className={`v4MapScroll${moreAtEnd ? " v4MapScrollMore" : ""}`} ref={setScrollBox}>
         <div className="v4MapCanvas" ref={treeRef} onKeyDown={keys.onKeyDown} onFocus={keys.onFocus}>
           <div className="v4MapHeads" aria-hidden="true">
             <span>{t(catalog, "v4.map.colQuestion")}</span>

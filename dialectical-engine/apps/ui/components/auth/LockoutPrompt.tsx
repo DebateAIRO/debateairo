@@ -8,6 +8,7 @@ import { SecurityConfirmation, type SecurityConfirmationClient } from './Securit
 import { SecurityEnrollment, type EnrollmentClient } from './SecurityEnrollment';
 import { EphemeralCodes } from './EphemeralCodes';
 import { useFormAnnouncer } from './InlineFieldMessage';
+import { focusIsLost } from '@/lib/focusGuard';
 export type LockoutPromptClient = Pick<ContractClient, 'authMethods' | 'regenerateRecoveryCodes'> & EnrollmentClient & SecurityConfirmationClient;
 type Choice = 'REGENERATE_RECOVERY_CODES' | 'ADD_PASSKEY';
 /** The account check may take this long; after it the card is skipped and the person moves on (review fix, 2026-10-09). */
@@ -39,6 +40,9 @@ export function LockoutPrompt({ catalog, client = contractClient, onDone }: {
     done.current = onDone;
     const finished = useRef(false);
     const heading = useRef<HTMLHeadingElement>(null);
+    const card = useRef<HTMLElement>(null);
+    // Keyboard audit round 4: an expiry moves focus only when it was in the card or nowhere; read before the step goes.
+    const expiryStays = useRef(false);
     const announcer = useFormAnnouncer();
     const id = useId();
     function finish() {
@@ -60,7 +64,10 @@ export function LockoutPrompt({ catalog, client = contractClient, onDone }: {
     }, [client]);
     function choose(action: Choice) { setError(null); setGrant(null); setChoice({ action }); }
     function back() { setChoice(null); setGrant(null); setError(null); }
-    function expired() { back(); setError(t(catalog, 'auth.lockout.expired')); }
+    function expired() {
+        expiryStays.current = !(card.current?.contains(document.activeElement) || focusIsLost());
+        back(); setError(t(catalog, 'auth.lockout.expired'));
+    }
     async function confirmed(result: ConfirmedSecurityAction) {
         if (!choice || flight.current || !matchingSecurityGrant(result, choice)) return;
         if (choice.action === 'ADD_PASSKEY') { setGrant({ token: result.step_up_grant.token, expiresAt: result.step_up_grant.expires_at }); return; }
@@ -82,12 +89,13 @@ export function LockoutPrompt({ catalog, client = contractClient, onDone }: {
     // The card replaces a set-up form that held focus, and each step replaces the controls of the last.
     useEffect(() => {
         if (step === null) return;
-        heading.current?.focus();
+        if (expiryStays.current) expiryStays.current = false;
+        else heading.current?.focus();
         announcer.announce(stepLabel);
     }, [step, stepLabel, announcer.announce]);
     if (check === 'pending') return <p role="status">{t(catalog, 'auth.lockout.checking')}</p>;
     if (check === 'skipped') return null;
-    return <section className="authLockout" aria-labelledby={`${id}-title`}>
+    return <section className="authLockout" ref={card} aria-labelledby={`${id}-title`}>
         <h2 id={`${id}-title`} ref={heading} tabIndex={-1}>{t(catalog, 'auth.lockout.title')}</h2>
         <p>{t(catalog, 'auth.lockout.why')}</p>
         {error ? <p className="authFieldError" role="alert">{error}</p> : null}

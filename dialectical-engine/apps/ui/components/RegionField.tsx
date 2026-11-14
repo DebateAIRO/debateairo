@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   REGION_CONTINENTS,
   REGION_COUNTRIES,
@@ -26,6 +26,19 @@ function continentName(catalog: MessageCatalog, continent: RegionContinent): str
     case "South America": return t(catalog, "auth.region.continent.southAmerica");
     case "Oceania": return t(catalog, "auth.region.continent.oceania");
   }
+}
+
+/** How many columns the country grid shows as laid out (two; one in a narrow container), read from the page. */
+function gridColumns(grid: HTMLElement | null): number {
+  if (grid === null || typeof getComputedStyle !== "function") return 2;
+  /* The resolved value is one length per column ("130px 130px"); a declared one may hold functions ("minmax(0, 1fr)"). */
+  const tracks = getComputedStyle(grid).gridTemplateColumns.replace(/\([^()]*\)/g, "").trim();
+  return tracks === "" || tracks === "none" ? 2 : tracks.split(/\s+/).length;
+}
+
+/** A name compared without case or accents, for typing a letter to jump to a country. */
+function plain(text: string, locale: string): string {
+  return text.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase(locale);
 }
 
 export function RegionField({
@@ -56,6 +69,9 @@ export function RegionField({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const backRef = useRef<HTMLButtonElement | null>(null);
   const firstContinentRef = useRef<HTMLButtonElement | null>(null);
+  /* Keyboard audit round 4: the country grid is one Tab stop, moved with the arrow keys (roving tabindex). */
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [stopCode, setStopCode] = useState<string | null>(null);
   const pickedContinent = value.country === null ? null : regionContinentOf(value.country);
 
   useEffect(() => {
@@ -88,12 +104,14 @@ export function RegionField({
       return;
     }
     setContinent(pickedContinent);
+    setStopCode(null);
     setOpen(true);
   }
 
   function showCountries(next: RegionContinent): void {
     if (disabled) return;
     setContinent(next);
+    setStopCode(null);
     queueMicrotask(() => backRef.current?.focus());
   }
 
@@ -112,11 +130,48 @@ export function RegionField({
     queueMicrotask(() => triggerRef.current?.focus());
   }
 
+  const countries = continent === null ? [] : regionCountriesOf(continent, locale).map(({ code }) => code);
+  /* The stop: where the arrows last left it, else the chosen country, else the first. */
+  const stop = stopCode !== null && countries.includes(stopCode) ? stopCode
+    : value.country !== null && countries.includes(value.country) ? value.country : countries[0] ?? null;
+
+  function onCountryKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, code: string): void {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const at = countries.indexOf(code);
+    const rtl = event.currentTarget.closest("[dir]")?.getAttribute("dir") === "rtl";
+    const columns = gridColumns(gridRef.current);
+    let next: number | null = null;
+    switch (event.key) {
+      case "ArrowRight": next = at + (rtl ? -1 : 1); break;
+      case "ArrowLeft": next = at + (rtl ? 1 : -1); break;
+      case "ArrowDown": next = at + columns; break;
+      case "ArrowUp": next = at - columns; break;
+      case "Home": next = 0; break;
+      case "End": next = countries.length - 1; break;
+      default: {
+        /* A letter jumps to the next country whose name starts with it (Space still picks). */
+        if (event.key.length !== 1 || event.key.trim() === "") return;
+        const letter = plain(event.key, locale);
+        const order = [...countries.slice(at + 1), ...countries.slice(0, at + 1)];
+        const found = order.find((candidate) => plain(regionCountryName(candidate, locale), locale).startsWith(letter));
+        if (found === undefined) return;
+        next = countries.indexOf(found);
+      }
+    }
+    event.preventDefault();
+    if (next < 0 || next >= countries.length) return;
+    const target = countries[next]!;
+    setStopCode(target);
+    gridRef.current?.querySelector<HTMLButtonElement>(`.regionCountry[data-code="${target}"]`)?.focus();
+  }
+
   return (
     <div className="authField regionField" ref={wrapperRef} onKeyDown={(event) => {
       if (!open || event.key !== "Tab") return;
       const last = wrapperRef.current?.querySelector(".regionContinent:last-of-type, .regionCountry:last-of-type");
-      if ((!event.shiftKey && event.target === last) || (event.shiftKey && event.target === triggerRef.current)) setOpen(false);
+      /* The country grid is one stop, so Tab from any country leaves the popover. */
+      const fromCountry = event.target instanceof Element && event.target.classList.contains("regionCountry");
+      if ((!event.shiftKey && (event.target === last || fromCountry)) || (event.shiftKey && event.target === triggerRef.current)) setOpen(false);
     }}>
       <label htmlFor={triggerId}>{label ?? t(catalog, "auth.region.label")}</label>
       <div className="regionPicker">
@@ -163,11 +218,13 @@ export function RegionField({
             <>
               <div className="regionTop">
                 <button type="button" className="regionBack" ref={backRef} disabled={disabled} onClick={showContinents}>{t(catalog, "auth.region.back")}</button>
-                <span className="regionContinentTitle">{continentName(catalog, continent)}</span>
+                <span className="regionContinentTitle" id={`${popoverId}-continent`}>{continentName(catalog, continent)}</span>
               </div>
-              <div className="regionGrid">
-                {regionCountriesOf(continent, locale).map(({ code }) => (
-                  <button type="button" className="regionCountry" data-code={code} data-picked={String(code === value.country)} key={code} disabled={disabled} onClick={() => pickCountry(code)}>
+              {/* Round 4 review: one Tab stop moved with the arrow keys, so a list a screen reader names and counts ("1 of 35"). */}
+              <div className="regionGrid" ref={gridRef} role="listbox" aria-labelledby={`${popoverId}-continent`}>
+                {countries.map((code) => (
+                  <button type="button" role="option" aria-selected={code === value.country} className="regionCountry" data-code={code} data-picked={String(code === value.country)} key={code} disabled={disabled}
+                    tabIndex={code === stop ? 0 : -1} onFocus={() => setStopCode(code)} onKeyDown={(event) => onCountryKeyDown(event, code)} onClick={() => pickCountry(code)}>
                     <span className="regionCellFlag">{regionFlag(code)}</span>
                     <span className="regionCellCode">{code}</span>
                     <span className="regionCellName">{regionCountryName(code, locale)}</span>

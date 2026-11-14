@@ -1190,6 +1190,7 @@ function V4Debate({
   const { selected, openQuestion, openSheet, closeSheet } = address;
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set(["root", selected]));
   const [focusRequest, setFocusRequest] = useState(0);
+  const [scrollRequest, setScrollRequest] = useState(0);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const panelColRef = useRef<HTMLElement | null>(null);
   // Task 62 (map-f4, "Kept where you were"): the selection lives above both maps and survives the switch from the run map to
@@ -1214,12 +1215,15 @@ function V4Debate({
   const openDigLive = useDigProgress(openDig, loadDigProgress);
   const sheetOpen = layout === "phone" && address.sheetOpen;
 
-  const select = useCallback((selection: V4Selection, viaKeyboard: boolean): void => {
+  const select = useCallback((selection: V4Selection, viaKeyboard: boolean, keepFocus = false): void => {
     // Phone: tapping a row of the outline opens it in the panel, so the sheet closes (openQuestion closes it).
     openQuestion(selection);
     setOpened((previous) => (previous.has(selection) ? previous : new Set([...previous, selection])));
     // UI-5: on the phone the new question always opens at its heading (focus scrolls it into view).
-    if (viaKeyboard || layout === "phone") setFocusRequest((count) => count + 1);
+    // Keyboard audit round 4 (B1): the changes tour keeps focus on its own Next and Done on every layout (V4TourBar), so its
+    // steps ask for no heading focus, the phone's included. On the phone the heading is still brought into view, as focus did.
+    if (!keepFocus && (viaKeyboard || layout === "phone")) setFocusRequest((count) => count + 1);
+    else if (keepFocus && layout === "phone") setScrollRequest((count) => count + 1);
   }, [layout, openQuestion]);
 
   useEffect(() => {
@@ -1227,6 +1231,9 @@ function V4Debate({
     // question's card on the map instead.
     if (focusRequest > 0) (headingRef.current ?? firstCardHeading())?.focus();
   }, [focusRequest]);
+  useEffect(() => {
+    if (scrollRequest > 0) headingRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [scrollRequest]);
   // V4B-M2: "Choose what to dig ›" on the map: once the path's panel is drawn, its choices come into view with focus.
   const [choicesRequest, setChoicesRequest] = useState(0);
   useEffect(() => {
@@ -1635,6 +1642,38 @@ function V4Debate({
       .find((one) => one.getAttribute("data-row")?.split("@")[0] === item);
     (same ?? document.querySelector<HTMLElement>(".v4DebMapCol [aria-current='true']") ?? headingRef.current)?.focus();
   }, [layout]);
+  // Keyboard audit round 4 (B2): on a phone the waiting card's "Your paths" list goes when the debate finishes, and the same
+  // paths come back as the question screen's rows (V4PathList). When focus was lost from a path of the old list, it goes to
+  // that path's row. A blur that leaves the path in place (a press on plain text) forgets it; a switch to another window or
+  // tab does not (the browser blurs without saying where to, and the debate may finish while the person is away).
+  const runListFocus = useRef<string | null>(null);
+  useEffect(() => {
+    const note = (event: FocusEvent): void => {
+      if (!(event.target instanceof Element) || isFocusParked(event.target)) return;
+      runListFocus.current = event.target.closest(".v4RunPhonePaths [data-path-card]")?.getAttribute("data-path-card") ?? null;
+    };
+    const left = (event: FocusEvent): void => {
+      const from = event.target;
+      if (event.relatedTarget !== null || !(from instanceof Element)) return;
+      window.setTimeout(() => {
+        if (from.isConnected && document.hasFocus()) runListFocus.current = null;
+      }, 0);
+    };
+    document.addEventListener("focusin", note);
+    document.addEventListener("focusout", left);
+    return () => {
+      document.removeEventListener("focusin", note);
+      document.removeEventListener("focusout", left);
+    };
+  }, []);
+  const runWaits = map === null;
+  useEffect(() => {
+    if (runWaits) return;
+    const path = runListFocus.current;
+    runListFocus.current = null;
+    if (path === null || !focusIsLost()) return;
+    [...document.querySelectorAll<HTMLElement>(".v4PathList [data-path]")].find((row) => row.getAttribute("data-path") === path)?.focus();
+  }, [runWaits]);
   if (loadProblem === "SIGNED_OUT" && map === null) {
     // wait-f1: the sign-in ended (on the waiting card, or before the first read): sign in again, and come back here.
     return (
@@ -2171,6 +2210,7 @@ function V4Debate({
             : undefined}
           mapButtonRef={mapButtonRef}
           jobRef={barJobRef}
+          goodTimeReportRef={report.goodTimeRef}
           onMap={sheetFocus.openFromMap}
           job={phoneJob}
           // Task 56c: no slim "Good time to write your report" line while the report waits for the reset (the top bar's button

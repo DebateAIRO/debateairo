@@ -96,8 +96,11 @@ type Guard = {
   parked: Focusable | null;
   /** The dialog or panel the person's focus was last in, if any. */
   detour: Element | null;
-  /** A control owed focus on the page behind a dialog or panel that is open: it waits there until that has closed. */
-  outer: Place | null;
+  /**
+   * Controls owed focus behind a dialog or panel that is open: each waits there until that has closed. They wait in
+   * layers, the one on the page first, the newest (inside a panel, behind a dialog over it) last.
+   */
+  outer: Place[];
   /** The page the loss happened on. */
   path: string;
   /** True while the person's last input came from the keyboard. */
@@ -128,7 +131,7 @@ export function isFocusParked(element: Element | null): boolean {
 export function resetFocusGuard(): void {
   if (live === null) return;
   live.owed = null;
-  live.outer = null;
+  live.outer = [];
   live.gone = null;
   live.spot = null;
   if (live.held !== null && !live.held.el.isConnected) live.held = null;
@@ -247,17 +250,39 @@ function stopFrom(spot: Spot, backwards: boolean, stops: readonly Focusable[]): 
 export function installFocusGuard(): () => void {
   if (typeof document === "undefined" || typeof MutationObserver === "undefined") return () => undefined;
   const guard: Guard = {
-    held: null, owed: null, gone: null, spot: null, parked: null, detour: null, outer: null, path: "", keyboard: false,
+    held: null, owed: null, gone: null, spot: null, parked: null, detour: null, outer: [], path: "", keyboard: false,
     moving: false, timer: null
   };
   live = guard;
 
   const forget = (): void => {
     guard.owed = null;
-    guard.outer = null;
+    guard.outer = [];
     guard.gone = null;
     guard.spot = null;
   };
+
+  /**
+   * Puts a place behind the dialog or panel now open, as its newest layer. A place already waiting keeps its layer, with
+   * what was just seen of it. A place taken off the page is kept: the parts that were around it still say where to park,
+   * and which dialog or panel it was in.
+   */
+  const wait = (place: Place): void => {
+    const index = guard.outer.findIndex((waiting) => waiting.el === place.el);
+    if (index >= 0) guard.outer[index] = place;
+    else guard.outer.push(place);
+  };
+
+  /** The dialog or panel a waiting place is in; for one taken off the page, the one it was in. */
+  const detourOf = (place: Place): Element | null =>
+    place.el.isConnected ? place.el.closest(DETOUR) : place.around.find((part) => part.matches(DETOUR)) ?? null;
+
+  /**
+   * True when a waiting place is inside `fence`; for one taken off the page, when it was. A control still on the page
+   * is asked where it is now, never where it was: one moved out to the page behind a dialog is not given focus there.
+   */
+  const holds = (fence: Element, place: Place): boolean =>
+    place.el.isConnected ? fence.contains(place.el) : place.around.includes(fence as HTMLElement);
 
   /**
    * `deep` also asks whether the browser still names, as the focused element, a control it can no longer focus. Chrome
@@ -311,29 +336,67 @@ export function installFocusGuard(): () => void {
   /** A wait that has run out stays run out: a dialog that comes and goes later does not bring the control back. */
   const waitedLong = (owed: Readonly<{ since: number }>): boolean => Date.now() - owed.since > FOCUS_GUARD_OWED_MS;
 
-  /** The dialog or panel the person's focus was last in, while it is still open. */
+  const isOpen = (detour: Element | null): detour is Element =>
+    detour !== null && detour.isConnected && detour.closest(OUT_OF_REACH) === null && shown(detour);
+
+  /**
+   * The dialog or panel the person's focus was last in, while it is still open. When that has closed (a dialog that
+   * took focus over a panel), the open one that holds the newest place waiting.
+   */
   const openDetour = (): Element | null => {
-    const detour = guard.detour;
-    return detour !== null && detour.isConnected && detour.closest(OUT_OF_REACH) === null && shown(detour) ? detour : null;
+    if (isOpen(guard.detour)) return guard.detour;
+    for (let index = guard.outer.length - 1; index >= 0; index -= 1) {
+      const detour = detourOf(guard.outer[index]!);
+      if (isOpen(detour)) return detour;
+    }
+    return null;
   };
 
   /**
    * The dialog or panel that fences things in now, with what is owed sorted against it: a control owed focus on the page
    * behind it waits (`outer`) and is owed again, its wait starting afresh, once that dialog or panel has closed. A loss
    * inside what has closed is over by then.
+   *
+   * Places wait in layers. The one back in reach is the newest inside what fences now, or the one on the page when
+   * nothing does. The layers after it were inside what has closed: they are dropped, never given focus one by one. With
+   * nothing open, a place inside a dialog or panel (one shut but left on the page) is dropped too. A place taken off the
+   * page while it waited comes back all the same: focus then parks on the part around it.
    */
   const fenceNow = (): Element | null => {
     const fence = openModal() ?? openDetour();
     if (guard.owed !== null && fence !== null && !fence.contains(guard.owed.el)) {
-      if (!waitedLong(guard.owed)) guard.outer = guard.outer ?? guard.owed;
+      if (!waitedLong(guard.owed)) wait(guard.owed);
       guard.owed = null;
     }
     const outer = guard.outer;
-    if (outer !== null && (fence === null || fence.contains(outer.el))) {
-      guard.outer = null;
-      if (fence === null || guard.owed === null) guard.owed = { ...outer, since: Date.now() };
+    let back = -1;
+    if (fence === null && outer.length > 0) {
+      if (detourOf(outer[0]!) === null) back = 0;
+      else outer.length = 0;
+    }
+    if (fence !== null) {
+      for (let index = outer.length - 1; index >= 0 && back < 0; index -= 1) if (holds(fence, outer[index]!)) back = index;
+    }
+    if (back >= 0) {
+      const place = outer[back]!;
+      outer.length = back;
+      if (fence === null || guard.owed === null) guard.owed = { ...place, since: Date.now() };
     }
     return fence;
+  };
+
+  /**
+   * The parts to park around when a place owed focus cannot take it. An earlier loss keeps its say while some part
+   * around it is still on the page. When none is (the focused button of a dialog that has closed), the place owed
+   * focus says where the person was: the card on the page, not the page's main area.
+   */
+  const parkAround = (owed: Place): readonly HTMLElement[] => {
+    const gone = guard.gone;
+    // A dialog or panel among those parts that has closed says the earlier loss was inside it: whatever of the page
+    // still stands around it (a dialog drawn inside the main area) is not where the person was.
+    const closed = gone?.some((el) => el.matches(DETOUR) && !isOpen(el)) ?? false;
+    const stands = !closed && (gone?.some((el) => el.isConnected && el !== document.body && el !== document.documentElement) ?? false);
+    return gone !== null && stands ? gone : owed.around;
   };
 
   /** Parks on the nearest part of `around` that takes focus; inside `fence` when a dialog or panel is open. */
@@ -407,7 +470,7 @@ export function installFocusGuard(): () => void {
         // person's next key, which rests focus on the part around it (Tab carries on from the gap it left).
         if (!long || now) {
           guard.owed = null;
-          guard.gone = guard.gone ?? owed.around;
+          guard.gone = parkAround(owed);
         }
       } else if (now && (long || !takesTyping(owed.el))) {
         // The person pressed a key before a control that keys press came back, or after a long wait: they have moved
@@ -415,7 +478,7 @@ export function installFocusGuard(): () => void {
         // their back.
         guard.owed = null;
         guard.spot = { at: owed.el };
-        guard.gone = guard.gone ?? owed.around;
+        guard.gone = parkAround(owed);
       } else if (!long && canHoldFocus(owed.el)) {
         guard.owed = null;
         move(owed.el);
@@ -426,7 +489,7 @@ export function installFocusGuard(): () => void {
         }
         // The browser would not focus it after all: its surroundings keep the place.
         guard.spot = guard.spot ?? { at: owed.el };
-        guard.gone = guard.gone ?? owed.around;
+        guard.gone = parkAround(owed);
       }
       // Otherwise it is still off (a text box is waited for, whatever is typed meanwhile), or the wait has been long:
       // nothing moves by itself then.
@@ -516,7 +579,7 @@ export function installFocusGuard(): () => void {
       }
     }
     classify(touched, switched);
-    if (guard.owed !== null || guard.gone !== null || guard.outer !== null) settle();
+    if (guard.owed !== null || guard.gone !== null || guard.outer.length > 0) settle();
   };
 
   const onFocusIn = (event: FocusEvent): void => {
@@ -536,16 +599,24 @@ export function installFocusGuard(): () => void {
     guard.spot = null;
     // The person (or the screen) moved on to another control: nothing is owed any more. A dialog or panel over the page
     // is a detour: what was owed on the page before it waits for it to close, however long the person stays in there.
+    // A place waiting inside the dialog or panel focus is now in is not owed any more either: the person is back there.
     const owed = guard.owed;
     guard.owed = null;
-    if (guard.detour === null) guard.outer = null;
-    else if (owed !== null && !guard.detour.contains(owed.el)) guard.outer = guard.outer ?? (waitedLong(owed) ? null : owed);
+    const here = guard.detour;
+    if (here === null) {
+      guard.outer = [];
+      return;
+    }
+    guard.outer = guard.outer.filter((place) => !holds(here, place));
+    if (owed !== null && !here.contains(owed.el)) {
+      if (!waitedLong(owed)) wait(owed);
+    }
     // A dialog that takes focus in the same breath as the control that opened it is switched off: focus never fell to
     // the page, so no loss was seen, but that control is owed focus all the same once the dialog has closed.
     else if (
-      guard.outer === null && owed === null && guard.keyboard && before !== null && before.el !== el &&
-      before.el.isConnected && !guard.detour.contains(before.el) && !canHoldFocus(before.el)
-    ) guard.outer = before;
+      owed === null && guard.keyboard && before !== null && before.el !== el &&
+      before.el.isConnected && !here.contains(before.el) && !canHoldFocus(before.el)
+    ) wait(before);
   };
 
   const onFocusOut = (event: FocusEvent): void => {

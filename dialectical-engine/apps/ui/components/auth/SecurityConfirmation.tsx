@@ -48,6 +48,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     // Keyboard audit 2026-11-12: a refused password + code disabled both fields while it ran, so focus fell to
     // <body>. Bumped on a refusal; the effect runs once the fields are enabled again.
     const passwordField = useRef<HTMLInputElement>(null);
+    const codeField = useRef<HTMLInputElement>(null);
     const [refocusPassword, setRefocusPassword] = useState(0);
     useEffect(() => {
         if (refocusPassword)
@@ -239,13 +240,18 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
  {methods?.available_step_up_methods.includes('password_totp') && passwordMode ? <form className="authForm" method="post" action="/settings/security" noValidate onSubmit={e => {
                         e.preventDefault();
                         const data = new FormData(e.currentTarget);
-                        void passwordProof(readSixDigitCode(String(data.get('security-code') ?? '')).digits, String(data.get('security-password') ?? ''));
+                        const secret = String(data.get('security-password') ?? ''), typed = readSixDigitCode(String(data.get('security-code') ?? ''));
+                        // Keyboard audit round 4: Confirm stays in the Tab order while something is missing (aria-disabled);
+                        // a press, or Enter in a box, goes to the first of the two that is not complete.
+                        if (!secret) { passwordField.current?.focus(); return; }
+                        if (!typed.complete) { codeField.current?.focus(); return; }
+                        void passwordProof(typed.digits, secret);
                     }}>
  <div className="setField authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input ref={passwordField} id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
                         setPassword(e.target.value);
                         attempt.current.edited();
                     }}/></div>
- <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input ref={codeField} id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
                         const typed = readSixDigitCode(e.target.value);
                         const shown = typed.valid ? typed.digits : e.target.value;
                         if (shown !== code)
@@ -258,7 +264,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                         if (typed.complete)
                             void passwordProof(typed.digits, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
                     }}/><InlineFieldMessage id={`${id}-code-error`} message={codeError}/></div>
- <button type="submit" className="setBtn setBtnPrimary" disabled={busy || disabled || !password || !readSixDigitCode(code).complete}>{t(catalog, "auth.security.confirm")}</button>
+ <button type="submit" className="setBtn setBtnPrimary" disabled={busy || disabled} aria-disabled={!password || !readSixDigitCode(code).complete || undefined}>{t(catalog, "auth.security.confirm")}</button>
  {cancelButton}
  {announcer.region}
  </form> : null}

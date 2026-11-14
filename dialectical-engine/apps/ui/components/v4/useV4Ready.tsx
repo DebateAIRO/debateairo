@@ -64,8 +64,11 @@ export type V4ReadyInput = Readonly<{
   /** The place the panel shows. */
   selected: V4Selection;
   phone: boolean;
-  /** Opens a place in the panel; `focusHeading` moves focus to its heading. */
-  select: (selection: V4Selection, focusHeading: boolean) => void;
+  /**
+   * Opens a place in the panel; `focusHeading` moves focus to its heading. `keepFocus` (the changes tour) leaves focus where
+   * it is on every layout, the phone's included (keyboard audit round 4, B1).
+   */
+  select: (selection: V4Selection, focusHeading: boolean, keepFocus?: boolean) => void;
   /** Puts the notice's news away (as "Hide this" does). */
   hideNews: () => void;
   focusHeading: () => void;
@@ -206,7 +209,7 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
       return;
     }
     setTour({ stops, index: 0 });
-    input.select(stops[0]!, false);
+    input.select(stops[0]!, false, true);
     setFlash({ stop: stops[0]!, serial: next() });
   };
   const close = (): void => {
@@ -287,7 +290,7 @@ export function useV4Ready(input: V4ReadyInput): V4Ready {
         const stop = tour.stops[index];
         if (stop === undefined) return;
         setTour({ ...tour, index });
-        input.select(stop, false);
+        input.select(stop, false, true);
         setFlash({ stop, serial: next() });
         // dig-f18: the last stop puts the notice away (the bar keeps "Done").
         if (index === tour.stops.length - 1) input.hideNews();

@@ -80,7 +80,8 @@ describe("sign-in and sign-up fields", () => {
   });
 
   it("the one-time age check does not cut off the date grid's last row", () => {
-    expect(declarations('.authCard:has([data-form="age-confirmation"] .dobPopover)')).toContain("overflow: visible");
+    // Round 4 (D2): widened from the age check's form to any open date grid in an auth card.
+    expect(declarations('.authCard:has(.dobPopover)')).toContain("overflow: visible");
   });
 });
 

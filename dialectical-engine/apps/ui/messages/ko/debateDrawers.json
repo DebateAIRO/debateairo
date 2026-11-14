@@ -81,7 +81,7 @@
   "debateDrawers.node.scoringFindingsAria": "채점 누락 항목 및 치명적 플래그",
   "debateDrawers.node.scoringRationale": "채점 근거",
   "debateDrawers.node.scoringUnavailable": "채점 이용 불가",
-  "debateDrawers.node.selectToChallenge": "이의를 제기할 문장을 위에서 선택하세요.",
+  "debateDrawers.node.selectToChallenge": "이의를 제기할 문장을 위에서 선택하거나 ‘이의 제기’를 누르세요.",
   "debateDrawers.node.setAsideReason": "다음 이유로 제외됨: {reason}",
   "debateDrawers.node.stoppedPath": "중단된 경로",
   "debateDrawers.node.stoppedPathExplanation": "이 조사 경로는 일시 중지되거나 포기되었습니다. 참고할 수 있도록 이곳에 보존되며, 포기한 경로도 삭제되지 않습니다. 이 논거를 다시 생성하면 조사를 재개할 수 있습니다.",

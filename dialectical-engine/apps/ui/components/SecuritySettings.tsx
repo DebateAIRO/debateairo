@@ -58,6 +58,9 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     const pageTitle = useRef<HTMLHeadingElement>(null);
     const cardHeading = useRef<HTMLHeadingElement>(null);
     const errorMessage = useRef<HTMLParagraphElement>(null);
+    const card = useRef<HTMLElement>(null);
+    // Keyboard audit round 4: whether the expiry may take focus, read before the card goes (focus was in it, or nowhere).
+    const expiryTakesFocus = useRef(false);
     const opener = useRef<HTMLElement | null>(null);
     // Keyboard audit 2026-11-12: an opener that leaves with its row (a removed method) hands focus to its list's heading,
     // so the person carries on in that list; the page title is only the last resort.
@@ -101,7 +104,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     // The grant behind a resumed confirmation (WCAG 2.2.1); a set-up warns about its grant itself (`deadline`).
     const warning = useDeadlineWarning(held?.step_up_grant.expires_at ?? null, announcer.announce, t(authCatalog, 'auth.security.expiresSoon'));
     useEffect(() => {
-        if (expiredAt)
+        if (expiredAt && (expiryTakesFocus.current || focusIsLost()))
             errorMessage.current?.focus();
     }, [expiredAt]);
     useEffect(() => {
@@ -179,6 +182,8 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     // message, and keep what was chosen and typed for Try again.
     function expire(key: 'auth.security.expired' | 'auth.enroll.timedOut') {
         const { selected: action, removeRecovery: remove, email: typed } = latest.current;
+        // Focus elsewhere on the page stays where the person is: the alert says the time ran out.
+        expiryTakesFocus.current = !!card.current?.contains(document.activeElement) || focusIsLost();
         cancel();
         setNotice(null);
         setError(t(authCatalog, key));
@@ -301,7 +306,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
                 {(providers?.providers ?? []).filter(provider => !links?.providers.some(link => link.provider === provider.id)).map(provider => <button type="button" className="setBtn" key={provider.id} disabled={busy || !links} onClick={() => choose({ action: 'LINK_PROVIDER', target_provider: provider.id })}>{t(authCatalog, 'auth.social.continue', { provider: provider.name })}</button>)}
             </div>
         </section>
-        {selected ? <section className="setCard" aria-labelledby="security-card-title">
+        {selected ? <section className="setCard" ref={card} aria-labelledby="security-card-title">
             <h2 className="setCardTitle" id="security-card-title" ref={cardHeading} tabIndex={-1}>{cardTitle(selected)}</h2>
             {warning ? <p className="setStatus">{t(authCatalog, 'auth.security.expiresSoon')}</p> : null}
             {selected.action === 'CHANGE_RECOVERY_EMAIL' ? <>{removeRecovery ? null : <div className="authField"><label htmlFor="security-recovery-email">{t(authCatalog, 'auth.recovery.emailTitle')}</label><input id="security-recovery-email" type="email" value={email} autoComplete="email" onChange={event => setEmail(event.target.value)}/></div>}

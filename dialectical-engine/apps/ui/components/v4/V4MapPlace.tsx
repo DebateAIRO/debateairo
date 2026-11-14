@@ -164,7 +164,8 @@ export function V4PathList(props: Readonly<{
           const star = path.open.some((question) => question.star);
           return (
             <li key={path.id}>
-              <button type="button" className="v4PathListRow" onClick={(event) => props.onSelect(`path:${path.id}`, event.detail === 0)}>
+              {/* Keyboard audit round 4 (B2): `data-path` lets the page find a path's row when the run's list gives way to it. */}
+              <button type="button" className="v4PathListRow" data-path={path.id} onClick={(event) => props.onSelect(`path:${path.id}`, event.detail === 0)}>
                 <span className="v4PathListLabel">
                   {star ? <span className="v4MapStar" aria-hidden="true">★ </span> : null}
                   <TitleText title={pathTitle(path, catalog, 60)} catalog={catalog} />

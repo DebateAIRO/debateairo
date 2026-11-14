@@ -65,13 +65,15 @@ async function signUp(register: ReturnType<typeof vi.fn>, region: [string, strin
 }
 const refusal = (code: string, status = 422) => vi.fn().mockRejectedValue(new ContractHttpError("UNPROCESSABLE", status, code, code));
 
-it("AUTH-5: a sign-up that could not be created gives focus back to the password box Enter was pressed in", async () => {
+// Round 4 (D5): a refusal that names no field now sends focus to the alert that says it (it was: back to the password
+// box Enter was pressed in, far below the alert; off screen on a phone). See kbd-r4-d-signup-refusal-alert.test.tsx.
+it("AUTH-5: a sign-up that could not be created gives focus to the alert that says so", async () => {
   const register = vi.fn().mockRejectedValue(new Error("offline"));
   await signUp(register);
   expect(register).toHaveBeenCalledOnce();
   expect(document.querySelector("[role=alert]")?.textContent).toBe(auth["auth.signUp.creationFailed"]);
   expect(document.activeElement).not.toBe(document.body);
-  expect(document.activeElement).toBe(field("password"));
+  expect(document.activeElement).toBe(document.querySelector(".authAlert[role=alert]"));
 });
 
 it("AUTH-5: an address the server cannot deliver to sends focus to the email box", async () => {

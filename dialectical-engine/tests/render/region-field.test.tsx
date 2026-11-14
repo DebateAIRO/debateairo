@@ -235,14 +235,16 @@ describe("RegionField artboard states", () => {
     expect(host.querySelector(".regionPopover"), "inside grid gap press").not.toBeNull();
   });
 
-  it("Q3 closes on Tab from the final country cell but stays open from the previous cell", async () => {
+  // Round 4 (D4): the country grid is one Tab stop, so Tab from any country leaves the popover (it was: only the last
+  // cell, when every country was a stop); Shift+Tab from a country goes back to Back and keeps it open.
+  it("Q3 closes on Tab from the grid (one stop), but stays open on Shift+Tab from it", async () => {
     await mountRegion();
     await click("#signup-region-trigger");
     await click('.regionContinent[data-continent="Europe"]');
     const cells = all<HTMLButtonElement>(".regionCountry");
-    await key(`.regionCountry[data-code="${cells.at(-2)!.dataset.code}"]`, "Tab");
+    await act(async () => cells.at(-2)!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true, cancelable: true })));
     expect(host.querySelector(".regionPopover")).not.toBeNull();
-    await key(`.regionCountry[data-code="${cells.at(-1)!.dataset.code}"]`, "Tab");
+    await key(`.regionCountry[data-code="${cells.at(-2)!.dataset.code}"]`, "Tab");
     expect(host.querySelector(".regionPopover")).toBeNull();
   });
 
@@ -288,7 +290,9 @@ describe("RegionField artboard states", () => {
     const country = query<HTMLButtonElement>('.regionCountry[data-code="RO"]');
     expect(country.type).toBe("button");
     expect(isLocked(country)).toBe(false);
-    expect(country.tabIndex).not.toBe(-1);
+    // Round 4 (D4): the grid is one Tab stop (roving tabindex); the country that has focus holds it.
+    await act(async () => country.focus());
+    expect(country.tabIndex).toBe(0);
     await nativeKey('.regionCountry[data-code="RO"]', " ");
     expect(query(".regionName").textContent).toBe("Romania");
     expect(document.activeElement).toBe(query("#signup-region-trigger"));

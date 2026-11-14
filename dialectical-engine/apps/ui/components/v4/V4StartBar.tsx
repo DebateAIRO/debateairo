@@ -220,6 +220,10 @@ function StartBar(props: V4StartBarProps) {
   const barBox = useRef<HTMLDivElement>(null);
   useBarRoom(barBox, narrow);
   const closeSheet = (): void => setSheetOpen(false);
+  // Keyboard audit round 4 (A5): "Your paths are ready ↓" stays while it has focus, past its 4 seconds, and goes once focus
+  // has left it, so it never vanishes under the person. Anyone not on it sees it go on time, as before.
+  const [readyHeld, setReadyHeld] = useState(false);
+  useEffect(() => setReadyHeld(false), [narrow]);
 
   // The sheet takes focus when it opens and gives it back to "Options" when it closes (Done or Escape). Keyboard audit
   // 2026-11-12 (V4A-11): it is aria-modal, so the shared modal surface also keeps Tab and Shift+Tab inside it.
@@ -319,9 +323,12 @@ function StartBar(props: V4StartBarProps) {
     </label>
   ) : null;
 
-  const readyButton = readyNote
-    ? <button type="button" className="v4Link v4StartBarReady" onClick={onReadyNote}>{t(catalog, "v4.start.readyNote")}</button>
-    : null;
+  const readyButton = readyNote || readyHeld ? (
+    <button type="button" className="v4Link v4StartBarReady" onClick={onReadyNote}
+      onFocus={() => setReadyHeld(true)} onBlur={() => { if (document.hasFocus()) setReadyHeld(false); }}>
+      {t(catalog, "v4.start.readyNote")}
+    </button>
+  ) : null;
 
   const aside = textFocused ? " v4StartBar--aside" : "";
 

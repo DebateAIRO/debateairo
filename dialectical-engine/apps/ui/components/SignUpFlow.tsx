@@ -128,6 +128,8 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     const [italyFocusRequest, setItalyFocusRequest] = useState<{ request: number; target: () => HTMLElement | null }>({ request: 0, target: () => null });
     const italyFocusHandled = useRef(0);
     const reloadButton = useRef<HTMLButtonElement>(null);
+    // Keyboard audit round 4: a refusal that names no field sends focus to the alert at the top that says it.
+    const alertBox = useRef<HTMLDivElement>(null);
     function focusAfterRefusal(target: () => HTMLElement | null) {
         setItalyFocusRequest(current => ({ request: current.request + 1, target }));
     }
@@ -232,6 +234,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
         }
         if (!proof) {
             setError(t(catalog, "auth.pending.proofUnavailable"));
+            focusAfterRefusal(() => alertBox.current);
             return;
         }
         flight.current = true;
@@ -290,11 +293,13 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
                 : code === 'MAIL_DAILY_LIMIT' ? t(catalog, "auth.mailDailyLimit")
                 : code === 'STATE_SIGNUP_UNAVAILABLE' ? t(catalog, "auth.signUp.stateUnavailable")
                 : ['COUNTRY_SIGNUP_UNAVAILABLE', 'COUNTRY_UNKNOWN', 'TOR_REFUSED'].includes(code) ? t(catalog, "auth.signUp.countryUnavailable") : t(catalog, "auth.signUp.creationFailed"));
-            // Any other refusal leaves focus where the person pressed (the site's focus guard gives it back).
+            // Any other refusal names no field: focus goes to the alert that says it (round 4), not back to the foot.
             if (code === 'EMAIL_INVALID')
                 focusAfterRefusal(() => form.querySelector<HTMLElement>('#signup-email'));
             else if (code === 'STATE_SIGNUP_UNAVAILABLE' || code === 'COUNTRY_SIGNUP_UNAVAILABLE')
                 focusAfterRefusal(() => form.querySelector<HTMLElement>(code === 'STATE_SIGNUP_UNAVAILABLE' ? '#signup-region-state' : '#signup-region-trigger'));
+            else
+                focusAfterRefusal(() => alertBox.current);
         }
         finally {
             setProof(null);
@@ -331,7 +336,7 @@ export function SignUpFlow({ turnstile, catalog = authEnglish, client = contract
     if (submittedEmail !== null)
         return <EmailPendingScreen email={submittedEmail} retryAfterSeconds={retryAfterSeconds} client={{ resendVerification: client.resendVerification ?? contractClient.resendVerification }} catalog={catalog} locale={locale} turnstile={turnstile} onDifferentEmail={() => setSubmittedEmail(null)}/>;
     return <AuthShell eyebrow={t(catalog, "auth.signUp.eyebrow")} title={t(catalog, "auth.signUp.title")} description={t(catalog, "auth.signUp.description")} footer={null}>
- {error ? <div className="authAlert" role="alert">{error}</div> : null}{documentsStale ? <button ref={reloadButton} type="button" className="authSecondary" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
+ {error ? <div className="authAlert" role="alert" ref={alertBox} tabIndex={-1}>{error}</div> : null}{documentsStale ? <button ref={reloadButton} type="button" className="authSecondary" onClick={reloadPage}>{t(catalog, "auth.signUp.reloadDocuments")}</button> : null}
  <div className="authAltMethods"><SocialProviderButtons client={client} catalog={catalog}/></div>
  <form className="authForm" data-form="signup" noValidate method="post" action="/sign-up" aria-busy={busy} onSubmit={submitRegistration}>
  <div className="authField"><label htmlFor="signup-email">{t(catalog, "auth.email")}</label><input id="signup-email" name="email" type="email" autoComplete="username" placeholder={t(catalog, "auth.emailPlaceholder")} value={email} onChange={e => {

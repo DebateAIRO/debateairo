@@ -81,7 +81,7 @@
   "debateDrawers.node.scoringFindingsAria": "חוסרים ודגלים קריטיים במתן הציון",
   "debateDrawers.node.scoringRationale": "נימוקי הציון",
   "debateDrawers.node.scoringUnavailable": "מתן הציונים אינו זמין",
-  "debateDrawers.node.selectToChallenge": "כדי לערער, בחרו משפט כלשהו למעלה.",
+  "debateDrawers.node.selectToChallenge": "כדי לערער, בחרו משפט כלשהו למעלה או לחצו על ״ערעור״.",
   "debateDrawers.node.setAsideReason": "הוסט הצידה מהסיבה הבאה: {reason}",
   "debateDrawers.node.stoppedPath": "נתיב שנעצר",
   "debateDrawers.node.stoppedPathExplanation": "נתיב חקירה זה הושהה או ננטש. הוא נשמר כאן לעיון — נתיבים שננטשו אינם נמחקים. אפשר לחדש את החקירה באמצעות יצירה מחדש של הטיעון.",

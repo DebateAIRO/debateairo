@@ -256,7 +256,13 @@ export function ChangeEmailScreen({
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!ready || busy) return;
+    if (busy) return;
+    /* Keyboard audit round 4: Send stays in the Tab order while a box is empty or not yet right (aria-disabled); a
+       press, or Enter in a box, goes to the first such box, which says what is wrong with it, or that it is required. */
+    if (!ready) {
+      document.getElementById(newCheck !== "valid" ? "email-change-new" : "email-change-confirm")?.focus();
+      return;
+    }
     const focused = document.activeElement;
     opener.current = focused instanceof HTMLElement ? focused : null;
     setConfirming(true);
@@ -319,6 +325,7 @@ export function ChangeEmailScreen({
                   autoComplete="email"
                   spellCheck={false}
                   value={newEmail}
+                  aria-required="true"
                   aria-invalid={newCheck === "invalid" || newCheck === "same"}
                   aria-describedby={newMessage === null ? undefined : "email-change-new-check"}
                   data-check={newCheck}
@@ -340,6 +347,7 @@ export function ChangeEmailScreen({
                   autoComplete="off"
                   spellCheck={false}
                   value={confirmEmail}
+                  aria-required="true"
                   aria-invalid={confirmCheck === "mismatch"}
                   aria-describedby={confirmMessage === null ? undefined : "email-change-confirm-check"}
                   data-check={confirmCheck}
@@ -350,7 +358,7 @@ export function ChangeEmailScreen({
                 )}
               </div>
               <div className="emlRule" aria-hidden="true" />
-              <button type="submit" className="emlSubmit" disabled={!ready || busy}>
+              <button type="submit" className="emlSubmit" disabled={busy} aria-disabled={!ready || undefined}>
                 {busy ? t(catalog, "settings.emailChange.submitting") : t(catalog, "settings.emailChange.submit")}
               </button>
               <p className="emlNote">{t(catalog, "settings.emailChange.note")}</p>

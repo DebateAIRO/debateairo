@@ -160,6 +160,10 @@
 .v4DebBehind:has(.v4MapCanvas :focus-visible, .v4OutTree :focus-visible) .v4TopLineQuestion { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 /* V4B-V3 (keyboard audit 2026-11-12): a card the arrow keys scroll to stops clear of the fade, so its focus ring shows. */
 .v4MapScroll { scroll-padding-inline-end: 56px; }
+/* Keyboard audit round 4 (B6): the fade above shows only while more of the map lies past the box's end (V4MapTree's
+   useOverflows), and the canvas ends with room for a last-column card's whole ring (3 px ink + 2 px out), so scrolled to the
+   end that card is wholly clear, in both directions. */
+.v4Map > .v4MapScroll { padding-inline-end: 8px; }
 .v4MapLeafMore .v4MapMore[aria-expanded="true"] { border-style: solid; }
 .v4MapGroundMark { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); font-weight: 600; color: var(--gold-text); }
 .v4MapGroundKey {

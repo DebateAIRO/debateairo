@@ -13,6 +13,7 @@ import { useDeadlineWarning } from './timedStep';
 import { totpQrMatrix } from '@/lib/totpQr';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
 import authEnglish from '@/messages/en/auth.json';
+import { focusIsLost } from '@/lib/focusGuard';
 export type EnrollmentAuthority = {
     kind: 'pending';
     token: string;
@@ -59,6 +60,8 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     const warningAnnouncer = useFormAnnouncer();
     const section = useRef<HTMLElement>(null);
     const expiredMessage = useRef<HTMLParagraphElement>(null);
+    // Keyboard audit round 4: the time-out takes focus only from inside the set-up (or from nowhere), read before it goes.
+    const expiryTakesFocus = useRef(false);
     // Set by the warning's Start again, so the new code field takes focus once the new set-up arrives.
     const restarted = useRef(false);
     useEffect(() => {
@@ -89,7 +92,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
     }, [totp]);
     // The time-out message replaces the set-up the person was in: focus lands on it, and Start again follows.
     useEffect(() => {
-        if (expired)
+        if (expired && (expiryTakesFocus.current || focusIsLost()))
             expiredMessage.current?.focus();
     }, [expired]);
     const allowed = authority.kind === 'recovery' ? authority.availableMethods : authority.kind === 'grant' ? availableMethods ?? ['passkey', 'totp'] : ['passkey', 'totp'];
@@ -123,6 +126,7 @@ export function SecurityEnrollment({ authority, client = contractClient, catalog
         if (!expiresAt)
             return;
         const timer = setTimeout(() => {
+            expiryTakesFocus.current = !!section.current?.contains(document.activeElement) || focusIsLost();
             clearCeremony();
             setExpired(true);
             onExpired?.();

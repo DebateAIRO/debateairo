@@ -137,6 +137,19 @@ function byteLength(text: string): number {
 /** useLayoutEffect in the browser (no frame at the old height), useEffect on the server (which has no layout). */
 const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
+/** Input types that take no typed words (a phone shows no keyboard for them). */
+const NOT_TEXT_ENTRY = new Set(["checkbox", "radio", "button", "submit", "reset", "image", "file", "range", "color", "hidden"]);
+
+/**
+ * read-f9 with keyboard audit round 4 (A6): focus that types words, so the pinned bar steps into the page: a textarea or a text
+ * input, never a check box or a radio button, and never anything inside the bar itself (it would un-pin under the focused box).
+ */
+function typesWords(target: EventTarget): boolean {
+  if (!(target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)) return false;
+  if (target instanceof HTMLInputElement && NOT_TEXT_ENTRY.has(target.type)) return false;
+  return target.closest(".v4StartBar") === null;
+}
+
 /** V4 start step, Task 75b (ask-d2 A): a phone's width, where step 1's Next sits in the bottom bar (the card's 600 px rule). */
 const NARROW_QUERY = "(max-width: 600px)";
 
@@ -1164,8 +1177,11 @@ function V4AskForm({
     focusAfter.current = null;
     if (pendingShown || press === null) return;
     const within = step === "ask" ? stepOne.current : stepTwo.current;
+    // On a phone step 2's "Just answer it" is only in the Options sheet, which is shut again: Options is the way back to it
+    // (keyboard audit round 4, A4).
     const pressed = press === "quick" ? within?.querySelector<HTMLElement>(".v4AskJust")
-      : press === "just" ? within?.querySelector<HTMLElement>(".v4StartBarJust") ?? within?.querySelector<HTMLElement>(".v4StartBarStart")
+      : press === "just" ? within?.querySelector<HTMLElement>(".v4StartBarJust") ?? within?.querySelector<HTMLElement>(".v4StartBarOptions")
+        ?? within?.querySelector<HTMLElement>(".v4StartBarStart")
         : within?.querySelector<HTMLElement>(".v4StartBarStart");
     pressed?.focus();
   }, [pendingShown]);
@@ -1349,7 +1365,11 @@ function V4AskForm({
     if (barState !== "READY") return;
     const press: StartPress = chosenBy === "PERSON" ? "start" : "just";
     startFlight.current = true;
+    // The declined line stays until the consent is given, as step 1's does: its "Show it again" is what opens the consent
+    // screen, which gives focus back to it after another no (keyboard audit round 4, A2).
+    const declinedBefore = declinedAtStart;
     clearPressLines();
+    setDeclinedAtStart(declinedBefore);
     setRefusalStart(null);
     try {
       const agreed = await ask.ensureConsent().catch(() => false);
@@ -1357,6 +1377,7 @@ function V4AskForm({
         setDeclinedAtStart(chosenBy);
         return;
       }
+      setDeclinedAtStart(null);
       const known = await planAtPress(press);
       if (known === null) return;
       const free = known.free;
@@ -2160,8 +2181,8 @@ function V4AskForm({
           ref={stepTwo}
           id="page-content" tabIndex={-1}
           className="v4AskMain v4AskMainRead"
-          // read-f9: while an input or textarea on step 2 has focus, the bar steps back into the page (answer buttons never count).
-          onFocus={(event) => setTextFocused(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)}
+          // read-f9: while text entry on step 2 has focus, the bar steps back into the page (buttons and check boxes never count).
+          onFocus={(event) => setTextFocused(typesWords(event.target))}
           onBlur={() => setTextFocused(false)}
         >
           <div>

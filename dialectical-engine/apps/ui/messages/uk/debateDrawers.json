@@ -81,7 +81,7 @@
   "debateDrawers.node.scoringFindingsAria": "Прогалини й критичні позначки оцінювання",
   "debateDrawers.node.scoringRationale": "Обґрунтування оцінки",
   "debateDrawers.node.scoringUnavailable": "Оцінювання недоступне",
-  "debateDrawers.node.selectToChallenge": "Виберіть будь-яке речення вище, щоб оскаржити його.",
+  "debateDrawers.node.selectToChallenge": "Виберіть будь-яке речення вище, щоб оскаржити його, або натисніть «Оскаржити».",
   "debateDrawers.node.setAsideReason": "відкладено з причини: {reason}",
   "debateDrawers.node.stoppedPath": "Зупинений шлях",
   "debateDrawers.node.stoppedPathExplanation": "Цей шлях дослідження призупинено або покинуто. Його збережено тут для довідки — покинуті шляхи ніколи не видаляються. Щоб відновити дослідження, створіть цей аргумент повторно.",

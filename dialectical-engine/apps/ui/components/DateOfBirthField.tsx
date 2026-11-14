@@ -253,7 +253,20 @@ export function DateOfBirthField({
       closePicker(part);
       return;
     }
-    if (event.key === "Tab") setOpenPart(null);
+    if (event.key === "Tab") {
+      /* Keyboard audit round 4: the year grid's decade buttons come before it, so Shift+Tab goes back to them and the
+         popover stays open; only Tab out of the grid (its last stop) closes it here. */
+      const decadeButtons = event.shiftKey && part === "y"
+        ? [...(event.currentTarget.closest(".dobPopover")?.querySelectorAll<HTMLButtonElement>(".dobDecadeButton") ?? [])].filter((button) => !button.disabled)
+        : [];
+      const last = decadeButtons[decadeButtons.length - 1];
+      if (last) {
+        event.preventDefault();
+        last.focus();
+        return;
+      }
+      setOpenPart(null);
+    }
   }
 
   function onInputChange(part: DobPart, raw: string): void {
@@ -370,6 +383,13 @@ export function DateOfBirthField({
                       if (event.key === "Escape" && !event.defaultPrevented) {
                         event.preventDefault();
                         closePicker(part);
+                        return;
+                      }
+                      /* Shift+Tab out of the first decade button leaves the popover: it closes, and the browser carries
+                         on from where the button was (the toggle). Tab between the buttons and into the grid keeps it. */
+                      if (event.key === "Tab" && event.shiftKey && !event.defaultPrevented
+                        && event.target === event.currentTarget.querySelector(".dobDecadeButton:not(:disabled)")) {
+                        setOpenPart(null);
                       }
                     }}
                   >

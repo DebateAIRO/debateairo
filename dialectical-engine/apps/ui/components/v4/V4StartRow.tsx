@@ -642,8 +642,9 @@ export function V4StartList(props: StartPlanProps) {
         first.focus();
         break;
       }
+      // Enter only: Space is left to the button, which clicks on key-up (onPress). Opening the menu on Space's key-down
+      // moved focus to its first item, and a browser that clicks what is focused at key-up then chose it (A1, round 4).
       case "Enter":
-      case " ":
         event.preventDefault();
         pressRow(path, at);
         break;
@@ -679,8 +680,8 @@ export function V4StartList(props: StartPlanProps) {
         if (next >= 0 && next < plan.paths.length) rowAt(next)?.focus();
         break;
       }
+      // Enter only, as on the row: Space opens the menu through the chip's own click on key-up (onOpen).
       case "Enter":
-      case " ":
         event.preventDefault();
         setMenu({ kind: "CHIP", key: path.viewpoints[chip]!.key });
         break;
