@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Where we offer Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway, Iceland and Liechtenstein), Switzerland, Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan, South Korea and Taiwan. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway and Iceland), Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Switzerland",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "The Swiss Federal Act on Data Protection applies to your data (Privacy Policy, Annex B.5). You may bring proceedings in the courts of the place in Switzerland where you live. No statutory withdrawal right applies to the paid plan; refund requests are handled at support@dezbatere.ro." }
+      { kind: "p", text: "You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Asia-Pacific",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "You have the same rights under these Terms as a consumer in the European Union, including the 14-day withdrawal right in section 13. You may bring proceedings in the courts of Moldova. Moldova's Law No. 195/2024 on personal data protection applies to your data (Privacy Policy, Annex B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asia-Pacific",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapore: our Data Protection Officer is our director, reachable at privacy@dezbatere.ro; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan, and refund requests are handled at support@dezbatere.ro. Japan: the statutory disclosure under the Specified Commercial Transactions Act is at dezbatere.ro/legal; no general cooling-off applies to online subscriptions, and refund requests are handled at support@dezbatere.ro; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. South Korea: consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is our director, reachable at privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output. Taiwan: you may withdraw from a paid plan within 7 days of subscribing, under the Consumer Protection Act; Taiwan's Personal Data Protection Act applies to your data (Privacy Policy, Annex B.7)." }
+      { kind: "p", text: "Singapore: our Data Protection Officer is our director, reachable at privacy@dezbatere.ro; transfers rest on contractual protections comparable to the PDPA; no statutory cooling-off applies to the paid plan, and refund requests are handled at support@dezbatere.ro. Japan: the statutory disclosure under the Specified Commercial Transactions Act is at dezbatere.ro/legal; no general cooling-off applies to online subscriptions, and refund requests are handled at support@dezbatere.ro; we send your content to AI providers in the United States and the European Union, each under a contract that requires protection equivalent to Japan's Act on the Protection of Personal Information, and on request we tell you what those measures are. South Korea: consents to optional processing and marketing are collected separately from the items needed to run the service; our privacy officer is our director, reachable at privacy@dezbatere.ro; you may withdraw from a paid plan within 7 days of subscribing subject to the E-Commerce Act; we obtain your fresh consent before any recurring price increase or free-to-paid conversion; the service uses generative AI, we tell you so before you use it, and we label AI-generated output." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "e48cbb6092d5f283d59ed5f9e7f4012023895d65947df413e9cbc37a8948e6cd",
+  sha256: "639ddc5d634805e36cd7e8538975032f2fadb7dbe1d8174dd68ca6446d28a03f",
   eyebrow: "TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

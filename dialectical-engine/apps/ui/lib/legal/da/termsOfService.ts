@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hvor vi tilbyder Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi tilbyder Dialectical Engine til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge, Island og Liechtenstein), Schweiz, Moldova, USA (undtagen Tennessee), Canada, Australien, New Zealand, Singapore, Japan, Sydkorea og Taiwan. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
+      { kind: "p", text: "Vi tilbyder Dialectical Engine til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge og Island), Moldova, USA (undtagen Tennessee), Canada, Australien, New Zealand, Singapore, Japan og Sydkorea. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Schweiz",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Den schweiziske forbundslov om databeskyttelse gælder for dine data (privatlivspolitikken, bilag B.5). Du kan anlægge sag ved domstolene på det sted i Schweiz, hvor du bor. Der gælder ingen lovbestemt fortrydelsesret for betalingsabonnementet; anmodninger om tilbagebetaling behandles via support@dezbatere.ro." }
+      { kind: "p", text: "Du har de samme rettigheder efter disse vilkår som en forbruger i Den Europæiske Union, herunder fortrydelsesretten på 14 dage i afsnit 13. Du kan anlægge sag ved domstolene i Moldova. Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder for dine data (privatlivspolitikken, bilag B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Asien og Stillehavsområdet",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Du har de samme rettigheder efter disse vilkår som en forbruger i Den Europæiske Union, herunder fortrydelsesretten på 14 dage i afsnit 13. Du kan anlægge sag ved domstolene i Moldova. Moldovas lov nr. 195/2024 om beskyttelse af personoplysninger gælder for dine data (privatlivspolitikken, bilag B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asien og Stillehavsområdet",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapore: Vores databeskyttelsesansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro; overførsler er baseret på kontraktmæssig beskyttelse, der kan sammenlignes med PDPA; der gælder ingen lovbestemt betænkningstid for betalingsabonnementet, og anmodninger om tilbagebetaling behandles via support@dezbatere.ro. Japan: Den lovpligtige meddelelse i henhold til Specified Commercial Transactions Act findes på dezbatere.ro/legal; der gælder ingen generel betænkningstid for onlineabonnementer, og anmodninger om tilbagebetaling behandles via support@dezbatere.ro; vi sender dit indhold til AI-udbydere i USA og Den Europæiske Union, hver i henhold til en kontrakt, der kræver en beskyttelse svarende til Japans Act on the Protection of Personal Information, og på anmodning fortæller vi dig, hvilke foranstaltninger der er tale om. Sydkorea: Samtykker til valgfri behandling og markedsføring indhentes særskilt fra de punkter, der er nødvendige for at drive tjenesten; vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro; du kan fortryde et betalingsabonnement senest 7 dage efter tegningen med forbehold af E-Commerce Act; vi indhenter dit nye samtykke før enhver tilbagevendende prisstigning eller overgang fra gratis til betalt; tjenesten bruger generativ AI, det fortæller vi dig, før du bruger den, og vi mærker AI-genereret output. Taiwan: Du kan fortryde et betalingsabonnement senest 7 dage efter tegningen i henhold til Consumer Protection Act; Taiwans Personal Data Protection Act gælder for dine data (privatlivspolitikken, bilag B.7)." }
+      { kind: "p", text: "Singapore: Vores databeskyttelsesansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro; overførsler er baseret på kontraktmæssig beskyttelse, der kan sammenlignes med PDPA; der gælder ingen lovbestemt betænkningstid for betalingsabonnementet, og anmodninger om tilbagebetaling behandles via support@dezbatere.ro. Japan: Den lovpligtige meddelelse i henhold til Specified Commercial Transactions Act findes på dezbatere.ro/legal; der gælder ingen generel betænkningstid for onlineabonnementer, og anmodninger om tilbagebetaling behandles via support@dezbatere.ro; vi sender dit indhold til AI-udbydere i USA og Den Europæiske Union, hver i henhold til en kontrakt, der kræver en beskyttelse svarende til Japans Act on the Protection of Personal Information, og på anmodning fortæller vi dig, hvilke foranstaltninger der er tale om. Sydkorea: Samtykker til valgfri behandling og markedsføring indhentes særskilt fra de punkter, der er nødvendige for at drive tjenesten; vores privatlivsansvarlige er vores direktør, som kan kontaktes på privacy@dezbatere.ro; du kan fortryde et betalingsabonnement senest 7 dage efter tegningen med forbehold af E-Commerce Act; vi indhenter dit nye samtykke før enhver tilbagevendende prisstigning eller overgang fra gratis til betalt; tjenesten bruger generativ AI, det fortæller vi dig, før du bruger den, og vi mærker AI-genereret output." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "3ba68424d5c17983617c9dbc36fc124d396e5e6b868b53a5e609ddf08fb20f96",
+  sha256: "fdf0efad2bed7fc897d1688410771241818b627c5f45da7a7e112e88b58683bc",
   eyebrow: "TJENESTEVILKÅR · v2.18 · GÆLDENDE FRA 1. NOVEMBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

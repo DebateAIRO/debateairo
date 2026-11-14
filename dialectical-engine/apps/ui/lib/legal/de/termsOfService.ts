@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Wo wir Dialectical Engine anbieten",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wir bieten Dialectical Engine Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen, Island und Liechtenstein), in der Schweiz, in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee), in Kanada, Australien, Neuseeland, Singapur, Japan, Südkorea und Taiwan leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
+      { kind: "p", text: "Wir bieten Dialectical Engine Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen und Island), in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee), in Kanada, Australien, Neuseeland, Singapur, Japan und Südkorea leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Schweiz",
+    title: "Moldau",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Für Ihre Daten gilt das Schweizer Bundesgesetz über den Datenschutz (Datenschutzerklärung, Anhang B.5). Sie können vor den Gerichten des Ortes in der Schweiz klagen, an dem Sie leben. Für den kostenpflichtigen Tarif besteht kein gesetzliches Widerrufsrecht; Erstattungsanfragen werden unter support@dezbatere.ro bearbeitet." }
+      { kind: "p", text: "Sie haben nach diesen Nutzungsbedingungen dieselben Rechte wie Verbraucher in der Europäischen Union, einschließlich des 14-tägigen Widerrufsrechts nach Abschnitt 13. Sie können vor den Gerichten der Republik Moldau klagen. Für Ihre Daten gilt das moldauische Gesetz Nr. 195/2024 über den Schutz personenbezogener Daten (Datenschutzerklärung, Anhang B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldau",
+    title: "Asien-Pazifik",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Sie haben nach diesen Nutzungsbedingungen dieselben Rechte wie Verbraucher in der Europäischen Union, einschließlich des 14-tägigen Widerrufsrechts nach Abschnitt 13. Sie können vor den Gerichten der Republik Moldau klagen. Für Ihre Daten gilt das moldauische Gesetz Nr. 195/2024 über den Schutz personenbezogener Daten (Datenschutzerklärung, Anhang B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asien-Pazifik",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro; Übermittlungen beruhen auf vertraglichen Schutzvorkehrungen, die mit dem PDPA vergleichbar sind; für den kostenpflichtigen Tarif besteht kein gesetzliches Rücktrittsrecht, und Erstattungsanfragen werden unter support@dezbatere.ro bearbeitet. Japan: Die gesetzliche Offenlegung nach dem Specified Commercial Transactions Act ist unter dezbatere.ro/legal verfügbar; für Online-Abonnements besteht kein allgemeines Rücktrittsrecht, und Erstattungsanfragen werden unter support@dezbatere.ro bearbeitet; wir senden Ihre Inhalte an KI-Anbieter in den Vereinigten Staaten und der Europäischen Union, jeweils auf Grundlage eines Vertrags, der einen dem japanischen Act on the Protection of Personal Information gleichwertigen Schutz verlangt, und teilen Ihnen auf Anfrage mit, welche Maßnahmen dies sind. Südkorea: Einwilligungen in optionale Verarbeitung und Werbung werden getrennt von den Angaben eingeholt, die für den Betrieb des Dienstes erforderlich sind; unser Datenschutzbeauftragter ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro; Sie können einen kostenpflichtigen Tarif nach Maßgabe des E-Commerce Act innerhalb von 7 Tagen nach Abschluss widerrufen; vor jeder wiederkehrenden Preiserhöhung oder Umwandlung eines kostenlosen in einen kostenpflichtigen Tarif holen wir erneut Ihre Einwilligung ein; der Dienst nutzt generative KI, wir weisen Sie vor der Nutzung darauf hin, und wir kennzeichnen KI-generierte Ergebnisse. Taiwan: Sie können einen kostenpflichtigen Tarif nach Maßgabe des Consumer Protection Act innerhalb von 7 Tagen nach Abschluss widerrufen; für Ihre Daten gilt der taiwanische Personal Data Protection Act (Datenschutzerklärung, Anhang B.7)." }
+      { kind: "p", text: "Singapur: Unser Datenschutzbeauftragter ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro; Übermittlungen beruhen auf vertraglichen Schutzvorkehrungen, die mit dem PDPA vergleichbar sind; für den kostenpflichtigen Tarif besteht kein gesetzliches Rücktrittsrecht, und Erstattungsanfragen werden unter support@dezbatere.ro bearbeitet. Japan: Die gesetzliche Offenlegung nach dem Specified Commercial Transactions Act ist unter dezbatere.ro/legal verfügbar; für Online-Abonnements besteht kein allgemeines Rücktrittsrecht, und Erstattungsanfragen werden unter support@dezbatere.ro bearbeitet; wir senden Ihre Inhalte an KI-Anbieter in den Vereinigten Staaten und der Europäischen Union, jeweils auf Grundlage eines Vertrags, der einen dem japanischen Act on the Protection of Personal Information gleichwertigen Schutz verlangt, und teilen Ihnen auf Anfrage mit, welche Maßnahmen dies sind. Südkorea: Einwilligungen in optionale Verarbeitung und Werbung werden getrennt von den Angaben eingeholt, die für den Betrieb des Dienstes erforderlich sind; unser Datenschutzbeauftragter ist unser Geschäftsführer, erreichbar unter privacy@dezbatere.ro; Sie können einen kostenpflichtigen Tarif nach Maßgabe des E-Commerce Act innerhalb von 7 Tagen nach Abschluss widerrufen; vor jeder wiederkehrenden Preiserhöhung oder Umwandlung eines kostenlosen in einen kostenpflichtigen Tarif holen wir erneut Ihre Einwilligung ein; der Dienst nutzt generative KI, wir weisen Sie vor der Nutzung darauf hin, und wir kennzeichnen KI-generierte Ergebnisse." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "bba7167e115cd98d5a25acb678e1dd0ef7334fe9e029e47be647652d8ebf0a6c",
+  sha256: "93d8d825ae9ba9988716d04ec4d39324cbb094a90567ff8859622942b32f4ea2",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.18 · GÜLTIG AB 1. NOVEMBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

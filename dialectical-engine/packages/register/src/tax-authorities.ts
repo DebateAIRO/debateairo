@@ -168,6 +168,8 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
       // once worldwide taxable turnover is CHF 100,000 or more; "Swiss territory" includes Liechtenstein), §1.1.2
       // (register within 30 days), §1.1.3 (electronic services to individuals are not exempt), §4.1 (a representative
       // in Switzerland). Quaderno is not known to watch a threshold on worldwide turnover, so the line says to watch it.
+      // Both are closed since the owner's decision of 14 November 2026, until a Swiss tax representative is appointed;
+      // the line stays, like the UK's, for the day they reopen.
       Object.freeze({
         scheme: "CH_VAT", countries: Object.freeze(["CH", "LI"]), tax_statuses: null,
         registration: "AFTER_THRESHOLD" as const,
@@ -198,6 +200,8 @@ export const TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW = Object.freeze({
         "Japan's threshold for foreign sellers"),
       // Research of 5 November 2026: the threshold rose from NT$480,000 on 7 April 2025. It is not confirmed that
       // Quaderno watches it, so the line says to watch it here instead of afterThreshold's Quaderno sentence.
+      // Taiwan is closed since the owner's decision of 12 November 2026; the line stays, like the UK's and
+      // India's, for the day it reopens.
       Object.freeze({
         scheme: "TW_BUSINESS_TAX", countries: Object.freeze(["TW"]), tax_statuses: null,
         registration: "AFTER_THRESHOLD" as const,

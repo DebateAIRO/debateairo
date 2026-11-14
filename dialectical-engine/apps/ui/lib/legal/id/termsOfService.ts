@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tempat kami menawarkan Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia, Islandia, dan Liechtenstein), Swiss, Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, Korea Selatan, dan Taiwan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
+      { kind: "p", text: "Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia dan Islandia), Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, dan Korea Selatan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Swiss",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Undang-Undang Federal Swiss tentang Perlindungan Data berlaku atas data Anda (Kebijakan Privasi, Lampiran B.5). Anda dapat mengajukan perkara di pengadilan tempat Anda tinggal di Swiss. Tidak ada hak penarikan diri berdasarkan undang-undang yang berlaku atas paket berbayar; permintaan pengembalian dana ditangani di support@dezbatere.ro." }
+      { kind: "p", text: "Anda memiliki hak yang sama berdasarkan Ketentuan ini seperti konsumen di Uni Eropa, termasuk hak penarikan diri 14 hari dalam bagian 13. Anda dapat mengajukan perkara di pengadilan Moldova. Undang-Undang Moldova No. 195/2024 tentang perlindungan data pribadi berlaku atas data Anda (Kebijakan Privasi, Lampiran B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Asia-Pasifik",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Anda memiliki hak yang sama berdasarkan Ketentuan ini seperti konsumen di Uni Eropa, termasuk hak penarikan diri 14 hari dalam bagian 13. Anda dapat mengajukan perkara di pengadilan Moldova. Undang-Undang Moldova No. 195/2024 tentang perlindungan data pribadi berlaku atas data Anda (Kebijakan Privasi, Lampiran B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asia-Pasifik",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapura: Petugas Perlindungan Data kami adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro; transfer berlandaskan perlindungan kontraktual yang sebanding dengan PDPA; tidak ada masa tenang berdasarkan undang-undang yang berlaku atas paket berbayar, dan permintaan pengembalian dana ditangani di support@dezbatere.ro. Jepang: pengungkapan berdasarkan undang-undang menurut Specified Commercial Transactions Act tersedia di dezbatere.ro/legal; tidak ada masa tenang umum yang berlaku atas langganan daring, dan permintaan pengembalian dana ditangani di support@dezbatere.ro; kami mengirimkan konten Anda kepada penyedia AI di Amerika Serikat dan Uni Eropa, masing-masing berdasarkan kontrak yang mewajibkan perlindungan yang setara dengan Act on the Protection of Personal Information Jepang, dan atas permintaan kami memberi tahu Anda langkah-langkah tersebut. Korea Selatan: persetujuan atas pemrosesan opsional dan pemasaran dikumpulkan secara terpisah dari hal yang diperlukan untuk menjalankan layanan; petugas privasi kami adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro; Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan dengan tunduk pada E-Commerce Act; kami memperoleh persetujuan baru Anda sebelum setiap kenaikan harga berulang atau perubahan dari gratis menjadi berbayar; layanan ini menggunakan AI generatif, kami memberi tahu Anda hal tersebut sebelum Anda menggunakannya, dan kami memberi label pada keluaran yang dihasilkan AI. Taiwan: Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan, berdasarkan Consumer Protection Act; Personal Data Protection Act Taiwan berlaku atas data Anda (Kebijakan Privasi, Lampiran B.7)." }
+      { kind: "p", text: "Singapura: Petugas Perlindungan Data kami adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro; transfer berlandaskan perlindungan kontraktual yang sebanding dengan PDPA; tidak ada masa tenang berdasarkan undang-undang yang berlaku atas paket berbayar, dan permintaan pengembalian dana ditangani di support@dezbatere.ro. Jepang: pengungkapan berdasarkan undang-undang menurut Specified Commercial Transactions Act tersedia di dezbatere.ro/legal; tidak ada masa tenang umum yang berlaku atas langganan daring, dan permintaan pengembalian dana ditangani di support@dezbatere.ro; kami mengirimkan konten Anda kepada penyedia AI di Amerika Serikat dan Uni Eropa, masing-masing berdasarkan kontrak yang mewajibkan perlindungan yang setara dengan Act on the Protection of Personal Information Jepang, dan atas permintaan kami memberi tahu Anda langkah-langkah tersebut. Korea Selatan: persetujuan atas pemrosesan opsional dan pemasaran dikumpulkan secara terpisah dari hal yang diperlukan untuk menjalankan layanan; petugas privasi kami adalah direktur kami, yang dapat dihubungi di privacy@dezbatere.ro; Anda dapat menarik diri dari paket berbayar dalam waktu 7 hari sejak berlangganan dengan tunduk pada E-Commerce Act; kami memperoleh persetujuan baru Anda sebelum setiap kenaikan harga berulang atau perubahan dari gratis menjadi berbayar; layanan ini menggunakan AI generatif, kami memberi tahu Anda hal tersebut sebelum Anda menggunakannya, dan kami memberi label pada keluaran yang dihasilkan AI." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "98f48b284945f31c97788424e56bec4c999aa852cfff9e7cba8c1bd8f5788b73",
+  sha256: "506df22d173c7a70d1245446e4f7fcc21ff037bd0737f11b097fcd5f8e7efd07",
   eyebrow: "KETENTUAN LAYANAN · v2.18 · BERLAKU 1 NOVEMBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

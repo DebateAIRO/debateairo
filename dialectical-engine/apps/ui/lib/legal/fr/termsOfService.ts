@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pays dans lesquels nous proposons Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Nous proposons Dialectical Engine aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège, Islande et Liechtenstein), en Suisse, en Moldavie, aux États-Unis (Tennessee excepté), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon, en Corée du Sud et à Taïwan. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
+      { kind: "p", text: "Nous proposons Dialectical Engine aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège et Islande), en Moldavie, aux États-Unis (Tennessee excepté), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon et en Corée du Sud. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Suisse",
+    title: "Moldavie",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "La loi fédérale suisse sur la protection des données s’applique à vos données (Politique de confidentialité, annexe B.5). Vous pouvez agir devant les tribunaux du lieu de votre domicile en Suisse. Aucun droit légal de rétractation ne s’applique à la formule payante ; les demandes de remboursement sont traitées à l’adresse support@dezbatere.ro." }
+      { kind: "p", text: "Vous bénéficiez, au titre des présentes Conditions, des mêmes droits qu’un consommateur de l’Union européenne, y compris du droit de rétractation de 14 jours prévu à la section 13. Vous pouvez agir devant les tribunaux de Moldavie. La loi moldave n° 195/2024 sur la protection des données à caractère personnel s’applique à vos données (Politique de confidentialité, annexe B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldavie",
+    title: "Asie-Pacifique",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vous bénéficiez, au titre des présentes Conditions, des mêmes droits qu’un consommateur de l’Union européenne, y compris du droit de rétractation de 14 jours prévu à la section 13. Vous pouvez agir devant les tribunaux de Moldavie. La loi moldave n° 195/2024 sur la protection des données à caractère personnel s’applique à vos données (Politique de confidentialité, annexe B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asie-Pacifique",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapour : notre délégué à la protection des données est notre administrateur, joignable à privacy@dezbatere.ro ; les transferts reposent sur des protections contractuelles comparables à celles de la PDPA ; aucun délai légal de réflexion ne s’applique à la formule payante, et les demandes de remboursement sont traitées à l’adresse support@dezbatere.ro. Japon : l’information légale au titre du Specified Commercial Transactions Act est disponible à l’adresse dezbatere.ro/legal ; aucun droit général de rétractation ne s’applique aux abonnements en ligne, et les demandes de remboursement sont traitées à l’adresse support@dezbatere.ro ; nous envoyons votre contenu à des fournisseurs d’IA situés aux États-Unis et dans l’Union européenne, chacun en vertu d’un contrat exigeant une protection équivalente à celle de l’Act on the Protection of Personal Information japonais, et, sur demande, nous vous indiquons quelles sont ces mesures. Corée du Sud : les consentements aux traitements facultatifs et à la prospection sont recueillis séparément des éléments nécessaires à l’exploitation du service ; notre responsable de la protection de la vie privée est notre administrateur, joignable à privacy@dezbatere.ro ; vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, sous réserve de l’E-Commerce Act ; nous obtenons à nouveau votre consentement avant toute hausse récurrente de prix ou conversion d’une formule gratuite en formule payante ; le service utilise l’IA générative, nous vous en informons avant que vous ne l’utilisiez et apposons une mention sur les résultats générés par l’IA. Taïwan : vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, en vertu du Consumer Protection Act ; le Personal Data Protection Act de Taïwan s’applique à vos données (Politique de confidentialité, annexe B.7)." }
+      { kind: "p", text: "Singapour : notre délégué à la protection des données est notre administrateur, joignable à privacy@dezbatere.ro ; les transferts reposent sur des protections contractuelles comparables à celles de la PDPA ; aucun délai légal de réflexion ne s’applique à la formule payante, et les demandes de remboursement sont traitées à l’adresse support@dezbatere.ro. Japon : l’information légale au titre du Specified Commercial Transactions Act est disponible à l’adresse dezbatere.ro/legal ; aucun droit général de rétractation ne s’applique aux abonnements en ligne, et les demandes de remboursement sont traitées à l’adresse support@dezbatere.ro ; nous envoyons votre contenu à des fournisseurs d’IA situés aux États-Unis et dans l’Union européenne, chacun en vertu d’un contrat exigeant une protection équivalente à celle de l’Act on the Protection of Personal Information japonais, et, sur demande, nous vous indiquons quelles sont ces mesures. Corée du Sud : les consentements aux traitements facultatifs et à la prospection sont recueillis séparément des éléments nécessaires à l’exploitation du service ; notre responsable de la protection de la vie privée est notre administrateur, joignable à privacy@dezbatere.ro ; vous pouvez vous rétracter d’une formule payante dans un délai de 7 jours suivant la souscription, sous réserve de l’E-Commerce Act ; nous obtenons à nouveau votre consentement avant toute hausse récurrente de prix ou conversion d’une formule gratuite en formule payante ; le service utilise l’IA générative, nous vous en informons avant que vous ne l’utilisiez et apposons une mention sur les résultats générés par l’IA." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "2ffdd42160e44fd1a084daa8ecece11cc3d0bd4e344acddab7acf68cd0899b7d",
+  sha256: "0228187893ccc15dd889f7e56c01b85bf6852178fc08c42f5f833bace159bd12",
   eyebrow: "CONDITIONS D’UTILISATION · v2.18 · PRISE D’EFFET 1ER NOVEMBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",

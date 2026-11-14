@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hol kínáljuk a Dialectical Engine szolgáltatást",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia, Izland és Liechtenstein), Svájc, Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán, Dél-Korea és Tajvan. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
+      { kind: "p", text: "A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia és Izland), Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán és Dél-Korea. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Svájc",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Adataira a svájci szövetségi adatvédelmi törvény alkalmazandó (Adatvédelmi szabályzat, B.5 pont). Svájcban a lakóhelye szerinti bíróság előtt indíthat eljárást. A fizetős csomagra nem vonatkozik törvényes elállási jog; a visszatérítési kérelmeket a support@dezbatere.ro címen kezeljük." }
+      { kind: "p", text: "E Feltételek alapján Önt ugyanazok a jogok illetik meg, mint egy európai uniós fogyasztót, ideértve a 13. szakasz szerinti 14 napos elállási jogot. Moldova bíróságai előtt indíthat eljárást. Adataira Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó (Adatvédelmi szabályzat, B.5 pont)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Ázsia és a csendes-óceáni térség",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "E Feltételek alapján Önt ugyanazok a jogok illetik meg, mint egy európai uniós fogyasztót, ideértve a 13. szakasz szerinti 14 napos elállási jogot. Moldova bíróságai előtt indíthat eljárást. Adataira Moldova személyes adatok védelméről szóló 195/2024. számú törvénye alkalmazandó (Adatvédelmi szabályzat, B.6 pont)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Ázsia és a csendes-óceáni térség",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az adattovábbítások a PDPA rendelkezéseihez hasonló szerződéses garanciákon alapulnak; a fizetős csomagra nem vonatkozik törvényes türelmi elállási jog, a visszatérítési kérelmeket pedig a support@dezbatere.ro címen kezeljük. Japán: a meghatározott kereskedelmi ügyletekről szóló törvény szerinti kötelező tájékoztatás a dezbatere.ro/legal címen érhető el; az online előfizetésekre nem vonatkozik általános türelmi elállási jog, a visszatérítési kérelmeket pedig a support@dezbatere.ro címen kezeljük; tartalmát az Egyesült Államokban és az Európai Unióban működő MI-szolgáltatóknak küldjük el, mindegyiknek olyan szerződés alapján, amely a japán személyesinformáció-védelmi törvénnyel egyenértékű védelmet ír elő, és kérésre tájékoztatjuk ezekről az intézkedésekről. Dél-Korea: az opcionális adatkezeléshez és marketinghez adott hozzájárulásokat a szolgáltatás működtetéséhez szükséges tételektől elkülönítve gyűjtjük; adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az elektronikus kereskedelemről szóló törvényre figyelemmel az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; minden ismétlődő áremelés vagy ingyenesről fizetősre váltás előtt újból beszerezzük hozzájárulását; a szolgáltatás generatív MI-t használ, erről a használat előtt tájékoztatjuk, és megjelöljük az MI által létrehozott kimeneteket. Tajvan: a fogyasztóvédelmi törvény alapján az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; adataira Tajvan személyes adatok védelméről szóló törvénye alkalmazandó (Adatvédelmi szabályzat, B.7 pont)." }
+      { kind: "p", text: "Szingapúr: adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az adattovábbítások a PDPA rendelkezéseihez hasonló szerződéses garanciákon alapulnak; a fizetős csomagra nem vonatkozik törvényes türelmi elállási jog, a visszatérítési kérelmeket pedig a support@dezbatere.ro címen kezeljük. Japán: a meghatározott kereskedelmi ügyletekről szóló törvény szerinti kötelező tájékoztatás a dezbatere.ro/legal címen érhető el; az online előfizetésekre nem vonatkozik általános türelmi elállási jog, a visszatérítési kérelmeket pedig a support@dezbatere.ro címen kezeljük; tartalmát az Egyesült Államokban és az Európai Unióban működő MI-szolgáltatóknak küldjük el, mindegyiknek olyan szerződés alapján, amely a japán személyesinformáció-védelmi törvénnyel egyenértékű védelmet ír elő, és kérésre tájékoztatjuk ezekről az intézkedésekről. Dél-Korea: az opcionális adatkezeléshez és marketinghez adott hozzájárulásokat a szolgáltatás működtetéséhez szükséges tételektől elkülönítve gyűjtjük; adatvédelmi tisztviselőnk az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen; az elektronikus kereskedelemről szóló törvényre figyelemmel az előfizetéstől számított 7 napon belül elállhat a fizetős csomagtól; minden ismétlődő áremelés vagy ingyenesről fizetősre váltás előtt újból beszerezzük hozzájárulását; a szolgáltatás generatív MI-t használ, erről a használat előtt tájékoztatjuk, és megjelöljük az MI által létrehozott kimeneteket." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "e0fb51e49200a8b4e128ae80dd9b315f48474a839e64f5184eab9ec19194c801",
+  sha256: "796ca88bf4d3bc9bdb99204787e381039570f4958c850a7d6bd35c0482967b07",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.18 · HATÁLYOS 2026. NOVEMBER 1.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

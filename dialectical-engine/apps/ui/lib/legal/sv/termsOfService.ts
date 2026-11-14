@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Var vi erbjuder Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi erbjuder Dialectical Engine till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge, Island och Liechtenstein), Schweiz, Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan, Sydkorea och Taiwan. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
+      { kind: "p", text: "Vi erbjuder Dialectical Engine till personer som bor i Europeiska unionen (27 länder) och Europeiska ekonomiska samarbetsområdet (Norge och Island), Moldavien, USA (förutom Tennessee), Kanada, Australien, Nya Zeeland, Singapore, Japan och Sydkorea. Vi erbjuder inte tjänsten på andra platser. Om du bor utanför dessa länder kan du kanske nå webbplatsen, men vi riktar inte tjänsten till dig, vi tar inte emot betalning från dig och dessa villkor och vår integritetspolicy är inte anpassade till lagstiftningen i ditt land. Bilaga A anger vad som gäller i varje region där vi tillhandahåller tjänsten." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Schweiz",
+    title: "Moldavien",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Schweiz federala dataskyddslag gäller för dina uppgifter (integritetspolicyn, bilaga B.5). Du får väcka talan vid domstolarna på den ort i Schweiz där du bor. Ingen lagstadgad ångerrätt gäller för betalabonnemanget; återbetalningsbegäranden hanteras via support@dezbatere.ro." }
+      { kind: "p", text: "Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldavien",
+    title: "Asien och Stillahavsområdet",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Enligt dessa villkor har du samma rättigheter som en konsument i Europeiska unionen, däribland ångerrätten på 14 dagar i avsnitt 13. Du får väcka talan vid domstolarna i Moldavien. Moldaviens lag nr 195/2024 om skydd av personuppgifter gäller för dina uppgifter (integritetspolicyn, bilaga B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asien och Stillahavsområdet",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapore: vårt dataskyddsombud är vår verkställande direktör, nåbar på privacy@dezbatere.ro; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och återbetalningsbegäranden hanteras via support@dezbatere.ro. Japan: den lagstadgade informationen enligt Specified Commercial Transactions Act finns på dezbatere.ro/legal; ingen allmän betänketid gäller för onlineabonnemang och återbetalningsbegäranden hanteras via support@dezbatere.ro; vi skickar ditt innehåll till AI-leverantörer i USA och Europeiska unionen, var och en enligt ett avtal som kräver ett skydd likvärdigt med Japans Act on the Protection of Personal Information, och på begäran berättar vi vilka dessa åtgärder är. Sydkorea: samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är vår verkställande direktör, nåbar på privacy@dezbatere.ro; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; tjänsten använder generativ AI, vi talar om det för dig innan du använder den och vi märker AI-genererade resultat. Taiwan: du får frånträda ett betalabonnemang inom 7 dagar från tecknandet enligt Consumer Protection Act; Taiwans Personal Data Protection Act gäller för dina uppgifter (integritetspolicyn, bilaga B.7)." }
+      { kind: "p", text: "Singapore: vårt dataskyddsombud är vår verkställande direktör, nåbar på privacy@dezbatere.ro; överföringar grundas på avtalsmässiga skydd som är jämförbara med PDPA; ingen lagstadgad betänketid gäller för betalabonnemanget och återbetalningsbegäranden hanteras via support@dezbatere.ro. Japan: den lagstadgade informationen enligt Specified Commercial Transactions Act finns på dezbatere.ro/legal; ingen allmän betänketid gäller för onlineabonnemang och återbetalningsbegäranden hanteras via support@dezbatere.ro; vi skickar ditt innehåll till AI-leverantörer i USA och Europeiska unionen, var och en enligt ett avtal som kräver ett skydd likvärdigt med Japans Act on the Protection of Personal Information, och på begäran berättar vi vilka dessa åtgärder är. Sydkorea: samtycken till valfri behandling och marknadsföring inhämtas separat från de uppgifter som behövs för att driva tjänsten; vår integritetsansvariga är vår verkställande direktör, nåbar på privacy@dezbatere.ro; du får frånträda ett betalabonnemang inom 7 dagar från tecknandet i enlighet med E-Commerce Act; vi inhämtar ditt nya samtycke före varje återkommande prishöjning eller övergång från kostnadsfritt abonnemang till betalabonnemang; tjänsten använder generativ AI, vi talar om det för dig innan du använder den och vi märker AI-genererade resultat." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "f5cbfc286e69245faf0fc32d97a96ce8a9ee65aa3be38bf17bf0b4137ac5fd78",
+  sha256: "800f9c2c9907f3ad3ca48688e960ca10803e80c2df06cb2406a191f7be612ccb",
   eyebrow: "ANVÄNDARVILLKOR · v2.18 · GÄLLER FRÅN 1 NOVEMBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",
