@@ -643,8 +643,8 @@ importers:
         specifier: workspace:*
         version: link:../register
       mmdb-lib:
-        specifier: 2.2.1
-        version: 2.2.1
+        specifier: 3.0.3
+        version: 3.0.3
 
   packages/graph:
     dependencies:
@@ -2802,8 +2802,8 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
-  mmdb-lib@2.2.1:
-    resolution: {integrity: sha512-DXO4L9W+08T+A7h5+xdT32l7IMot8z7WOH+7C1Maol571PnktQ8un7Ni4CyPFp4H+vht/FDA5/tpjRvWMFQDMw==}
+  mmdb-lib@3.0.3:
+    resolution: {integrity: sha512-xQPoBXcNjjHiOvOraFBKtA++uNWF6aCVHL9dRKFXEov8eI3QJwtgiw3qApsonFT5SpoqsEVISUTg3HIDs2DiXw==}
     engines: {node: '>=10', npm: '>=6'}
 
   ms@2.1.3:
@@ -5030,7 +5030,7 @@ snapshots:
 
   mkdirp@3.0.1: {}
 
-  mmdb-lib@2.2.1: {}
+  mmdb-lib@3.0.3: {}
 
   ms@2.1.3: {}
 
