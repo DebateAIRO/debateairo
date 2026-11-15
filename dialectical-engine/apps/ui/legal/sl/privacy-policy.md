@@ -170,8 +170,6 @@ Ko načrtujete izbris računa, razprave, ki ste jih objavili, ostanejo javne; va
 
 **Kaj izbris dejansko naredi.** Vaše zasebne razprave in podatki računa so šifrirani s ključi, posebnimi za vaš račun in posamezno razpravo. Izbris računa uniči te ključe, zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ do javne kopije razprave se ob izbrisu ne uniči: razprava ostane javna (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Avtomatizirane odločitve in profiliranje
 
 Ocene, oznake stanja in razsodbe v razpravi so avtomatizirane ocene **argumentov, ne oseb**. Za vas nimajo pravnih učinkov in na vas ne vplivajo na podobno pomemben način. O vas ne sprejmemo nobene odločitve, ki bi temeljila izključno na avtomatizirani obdelavi in bi imela pravne ali podobno pomembne učinke, ter vas ne profiliramo.

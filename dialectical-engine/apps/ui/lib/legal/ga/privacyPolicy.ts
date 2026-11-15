@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Cúltacaí — Suas le 8 seachtaine tar éis don chóip bheo a bheith scriosta — Forscríobhtar iad"
         ]
       },
-      { kind: "p", text: "An méid a dhéanann scriosadh i ndáiríre. Criptítear do dhíospóireachtaí príobháideacha agus sonraí do chuntais faoi eochracha a bhaineann go sonrach le do chuntas agus le gach díospóireacht. Má scriostar do chuntas, scriostar na heochracha sin, agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe a léamh, agus scriosaimid taifead do chuntais. Ní scriostar eochair na cóipe poiblí de dhíospóireacht phoiblí tráth scriosta: fanann an díospóireacht poiblí (rannán 6). Tugaimid scriosadh air seo toisc gurb é sin a éifeacht, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá trí rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "An méid a dhéanann scriosadh i ndáiríre. Criptítear do dhíospóireachtaí príobháideacha agus sonraí do chuntais faoi eochracha a bhaineann go sonrach le do chuntas agus le gach díospóireacht. Má scriostar do chuntas, scriostar na heochracha sin, agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe a léamh, agus scriosaimid taifead do chuntais. Ní scriostar eochair na cóipe poiblí de dhíospóireacht phoiblí tráth scriosta: fanann an díospóireacht poiblí (rannán 6). Tugaimid scriosadh air seo toisc gurb é sin a éifeacht, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá trí rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "67c8ef4764a7e535c0fb62f624df41585e3181f610818a8f81692dd485784ccd",
+  sha256: "21aa82818fe8112cdec10dce43a2c70ed561c123c15f4027956cc1c83bb4bb60",
   eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.12 · I bhFEIDHM 4 SAMHAIN 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",

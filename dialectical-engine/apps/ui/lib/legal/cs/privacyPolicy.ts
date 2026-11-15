@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Zálohy — Až 8 týdnů po vymazání aktivní kopie — Přepsány"
         ]
       },
-      { kind: "p", text: "Co výmaz ve skutečnosti znamená. Vaše soukromé debaty a údaje účtu jsou šifrovány pomocí klíčů určených konkrétně pro váš účet a jednotlivé debaty. Výmaz účtu tyto klíče zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii veřejné debaty se při výmazu nezničí: debata zůstává veřejná (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Co výmaz ve skutečnosti znamená. Vaše soukromé debaty a údaje účtu jsou šifrovány pomocí klíčů určených konkrétně pro váš účet a jednotlivé debaty. Výmaz účtu tyto klíče zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii veřejné debaty se při výmazu nezničí: debata zůstává veřejná (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "a5b37475fc074544f881350f8e806d8ee2b5e1415477b343accc441ab7a9a9f0",
+  sha256: "0eadb64455cd9ef22db0c103a2944f41a9483177ce6d4d02d9f2fcb94c794304",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.12 · ÚČINNÉ OD 4. LISTOPADU 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

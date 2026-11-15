@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "备份 — 实时副本删除后最长 8 周 — 覆盖"
         ]
       },
-      { kind: "p", text: "删除实际上会产生什么效果。 您的私密辩论和账户数据使用您账户及每项辩论专用的密钥加密。删除账户会销毁这些密钥，此后我们或任何其他人均无法读取加密记录；我们还会删除账户记录。公开辩论的公开副本密钥在删除账户时不会被销毁：该辩论保持公开（第6节）。我们将此称为删除，是因为其效果正是如此，并且我们备有支持该结论的书面评估；如需进一步了解，请提出询问。需要注意三点：安全审计记录仅可追加且不会删除，但其中不含可读取的您的标识符；少量较早的辩论早于我们现行加密方案，如果您的账户涉及这种情况，我们会告知关闭账户对这些辩论的实际效果；已经发送给 AI 提供商的数据副本受《名录》中该提供商的保留条款约束，而不受我们的删除操作约束。" },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "删除实际上会产生什么效果。 您的私密辩论和账户数据使用您账户及每项辩论专用的密钥加密。删除账户会销毁这些密钥，此后我们或任何其他人均无法读取加密记录；我们还会删除账户记录。公开辩论的公开副本密钥在删除账户时不会被销毁：该辩论保持公开（第6节）。我们将此称为删除，是因为其效果正是如此，并且我们备有支持该结论的书面评估；如需进一步了解，请提出询问。需要注意三点：安全审计记录仅可追加且不会删除，但其中不含可读取的您的标识符；少量较早的辩论早于我们现行加密方案，如果您的账户涉及这种情况，我们会告知关闭账户对这些辩论的实际效果；已经发送给 AI 提供商的数据副本受《名录》中该提供商的保留条款约束，而不受我们的删除操作约束。" }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "ed01e6c92e1179debe388c148ed139263475ab1eb3e85f801d3281e72bfdad06",
+  sha256: "d9ff8ddf8bc9f854972ff00455e1c29086d9c37b711d90e2c1cf57faaa14555f",
   eyebrow: "隐私政策 · v3.12 · 生效日期 2026 年 11 月 4 日",
   title: "我们存储哪些内容及其原因",
   lede: "以通俗语言说明您依据 GDPR (EU) 2016/679 享有的权利及我们承担的义务。共十四节及附件 B — 请滚动至末尾。",

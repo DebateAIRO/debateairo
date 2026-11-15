@@ -170,8 +170,6 @@ Když naplánujete smazání účtu, zveřejněné debaty zůstanou veřejné; v
 
 **Co výmaz ve skutečnosti znamená.** Vaše soukromé debaty a údaje účtu jsou šifrovány pomocí klíčů určených konkrétně pro váš účet a jednotlivé debaty. Výmaz účtu tyto klíče zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii veřejné debaty se při výmazu nezničí: debata zůstává veřejná (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatizovaná rozhodnutí a profilování
 
 Hodnocení, značky podmínek a závěry v debatě jsou automatizovaným hodnocením **argumentů, nikoli osob**. Nemají pro vás právní účinky ani vás obdobně významně neovlivňují. Nečiníme o vás žádná rozhodnutí, která by byla založena výhradně na automatizovaném zpracování a měla právní nebo obdobně významné účinky, a neprovádíme vaše profilování.

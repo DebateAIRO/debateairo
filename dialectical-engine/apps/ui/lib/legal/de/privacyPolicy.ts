@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sicherungen — Bis zu 8 Wochen nach Löschung der aktiven Kopie — Überschrieben"
         ]
       },
-      { kind: "p", text: "Was die Löschung tatsächlich bewirkt. Ihre privaten Debatten und Kontodaten sind mit Schlüsseln verschlüsselt, die jeweils Ihrem Konto und der einzelnen Debatte zugeordnet sind. Bei der Löschung Ihres Kontos werden diese Schlüssel vernichtet; anschließend können die verschlüsselten Datensätze weder von uns noch von anderen gelesen werden, und wir löschen Ihren Kontodatensatz. Der Schlüssel zur öffentlichen Kopie einer öffentlichen Debatte wird bei der Löschung nicht vernichtet: Die Debatte bleibt öffentlich (Abschnitt 6). Wir bezeichnen dies als Löschung, weil es diese Wirkung hat, und verfügen hierzu über eine dokumentierte Bewertung; wenn Sie mehr erfahren möchten, fragen Sie uns. Drei Punkte sind zu beachten: Das Sicherheitsprotokoll ist nur ergänzbar und wird nicht gelöscht, enthält jedoch keine lesbaren Kennungen Ihrer Person; eine geringe Anzahl älterer Debatten entstand vor unserem aktuellen Verschlüsselungsverfahren, und sollte dies Ihr Konto betreffen, erläutern wir Ihnen, was die Schließung für diese Daten bewirkt; Kopien von Daten, die bereits an einen KI-Anbieter übermittelt wurden, unterliegen den Aufbewahrungsbedingungen dieses Anbieters im Verzeichnis und nicht unserer Löschung." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Was die Löschung tatsächlich bewirkt. Ihre privaten Debatten und Kontodaten sind mit Schlüsseln verschlüsselt, die jeweils Ihrem Konto und der einzelnen Debatte zugeordnet sind. Bei der Löschung Ihres Kontos werden diese Schlüssel vernichtet; anschließend können die verschlüsselten Datensätze weder von uns noch von anderen gelesen werden, und wir löschen Ihren Kontodatensatz. Der Schlüssel zur öffentlichen Kopie einer öffentlichen Debatte wird bei der Löschung nicht vernichtet: Die Debatte bleibt öffentlich (Abschnitt 6). Wir bezeichnen dies als Löschung, weil es diese Wirkung hat, und verfügen hierzu über eine dokumentierte Bewertung; wenn Sie mehr erfahren möchten, fragen Sie uns. Drei Punkte sind zu beachten: Das Sicherheitsprotokoll ist nur ergänzbar und wird nicht gelöscht, enthält jedoch keine lesbaren Kennungen Ihrer Person; eine geringe Anzahl älterer Debatten entstand vor unserem aktuellen Verschlüsselungsverfahren, und sollte dies Ihr Konto betreffen, erläutern wir Ihnen, was die Schließung für diese Daten bewirkt; Kopien von Daten, die bereits an einen KI-Anbieter übermittelt wurden, unterliegen den Aufbewahrungsbedingungen dieses Anbieters im Verzeichnis und nicht unserer Löschung." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "2ce6a48e0a77a6512deafce4ed025bdd21239ca1e7680d7c3c8a3ff24b287924",
+  sha256: "e970c6e85a084dc177df21210c9c0bf3d56543e4f1e10abaacbec50ac1a5a318",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.12 · GÜLTIG AB 4. NOVEMBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

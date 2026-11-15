@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Cadangan — Hingga 8 minggu setelah salinan aktif dihapus — Ditimpa"
         ]
       },
-      { kind: "p", text: "Apa yang sebenarnya dilakukan penghapusan. Debat privat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat publik tidak dimusnahkan saat penghapusan: debat tetap publik (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Apa yang sebenarnya dilakukan penghapusan. Debat privat dan data akun Anda dienkripsi di bawah kunci yang khusus untuk akun Anda dan setiap debat. Menghapus akun Anda memusnahkan kunci tersebut, setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat publik tidak dimusnahkan saat penghapusan: debat tetap publik (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "4e0fde601eaa21bfb0457ab05118e92ba433686dda44657ec67a9e9929887358",
+  sha256: "5f94ccc2d687ba702887632f3ecfdf48c27da7b158ad8b239481118abe7e00cd",
   eyebrow: "KEBIJAKAN PRIVASI · v3.12 · BERLAKU 4 NOVEMBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

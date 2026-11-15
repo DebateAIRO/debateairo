@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Dublējumkopijas — Līdz 8 nedēļām pēc aktīvās kopijas dzēšanas — Tiek pārrakstītas"
         ]
       },
-      { kind: "p", text: "Ko dzēšana faktiski dara. Jūsu privātās debates un konta dati ir šifrēti, izmantojot tieši jūsu kontam un katrām debatēm paredzētas atslēgas. Dzēšot kontu, šīs atslēgas tiek iznīcinātas, pēc tam šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publiskas debates publiskās kopijas atslēga dzēšanas laikā netiek iznīcināta: debate paliek publiska (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina trīs lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Ko dzēšana faktiski dara. Jūsu privātās debates un konta dati ir šifrēti, izmantojot tieši jūsu kontam un katrām debatēm paredzētas atslēgas. Dzēšot kontu, šīs atslēgas tiek iznīcinātas, pēc tam šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publiskas debates publiskās kopijas atslēga dzēšanas laikā netiek iznīcināta: debate paliek publiska (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina trīs lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "117ff41f54dd1423c280c92d103b0ed935beecccd5a61883dbe38d6e4670d1e7",
+  sha256: "27cb27521be79f9e6cc4d39bd6aa7312bf4d0b2c8881c4963b78a04d40ea9d70",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.12 · SPĒKĀ NO 2026. GADA 4. NOVEMBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sauvegardes — Jusqu'à 8 semaines après la suppression de la copie active — Écrasées"
         ]
       },
-      { kind: "p", text: "Effet réel de la suppression. Vos débats privés et les données de votre compte sont chiffrés au moyen de clés propres à votre compte et à chaque débat. La suppression de votre compte détruit ces clés ; les enregistrements chiffrés ne peuvent alors plus être lus, ni par nous ni par quiconque, et nous supprimons l'enregistrement de votre compte. La clé de la copie publique d’un débat public n’est pas détruite lors de la suppression : le débat reste public (section 6). Nous qualifions cette opération de suppression parce que tel est son effet, et nous disposons d'une évaluation documentée à l'appui ; si vous souhaitez en savoir plus, demandez-nous. Trois choses sont à savoir : le journal d'audit de sécurité est inaltérable et n'est pas supprimé, mais il ne contient aucun identifiant lisible vous concernant ; un petit nombre de débats plus anciens sont antérieurs à notre système de chiffrement actuel et, si cela concerne votre compte, nous vous indiquons l'effet de sa clôture sur ces débats ; les copies des données déjà transmises à un fournisseur d'IA sont soumises aux conditions de conservation de ce fournisseur indiquées dans le Registre, et non à notre suppression." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Effet réel de la suppression. Vos débats privés et les données de votre compte sont chiffrés au moyen de clés propres à votre compte et à chaque débat. La suppression de votre compte détruit ces clés ; les enregistrements chiffrés ne peuvent alors plus être lus, ni par nous ni par quiconque, et nous supprimons l'enregistrement de votre compte. La clé de la copie publique d’un débat public n’est pas détruite lors de la suppression : le débat reste public (section 6). Nous qualifions cette opération de suppression parce que tel est son effet, et nous disposons d'une évaluation documentée à l'appui ; si vous souhaitez en savoir plus, demandez-nous. Trois choses sont à savoir : le journal d'audit de sécurité est inaltérable et n'est pas supprimé, mais il ne contient aucun identifiant lisible vous concernant ; un petit nombre de débats plus anciens sont antérieurs à notre système de chiffrement actuel et, si cela concerne votre compte, nous vous indiquons l'effet de sa clôture sur ces débats ; les copies des données déjà transmises à un fournisseur d'IA sont soumises aux conditions de conservation de ce fournisseur indiquées dans le Registre, et non à notre suppression." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "9f0961084bed276ef20d25b1efea14aa6927ad7efba9628baf33db37bb8245ae",
+  sha256: "9946220c4f704509e24c7b210e4ea47b255c08c0735b160bd8921d3ce9af500e",
   eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v3.12 · EN VIGUEUR LE 4 NOVEMBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",

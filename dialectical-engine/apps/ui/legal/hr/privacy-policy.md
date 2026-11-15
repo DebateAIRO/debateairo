@@ -170,8 +170,6 @@ Kada zakažete brisanje računa, rasprave koje ste objavili ostaju javne; vaš s
 
 **Što se brisanjem doista čini.** Vaše privatne rasprave i podaci o računu šifrirani su ključevima specifičnima za vaš račun i za svaku raspravu. Brisanjem računa uništavaju se ti ključevi, nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije javne rasprave ne uništava se pri brisanju: rasprava ostaje javna (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju se uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatizirane odluke i izrada profila
 
 Rezultati, oznake uvjeta i presude u raspravi automatizirane su procjene **argumenata, a ne osoba**. Ne proizvode pravne učinke za vas niti na vas na sličan način znatno utječu. O vama ne donosimo odluku koja se temelji isključivo na automatiziranoj obradi i proizvodi pravne ili slične znatne učinke te ne izrađujemo vaš profil.

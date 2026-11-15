@@ -170,8 +170,6 @@ Hesabınızın silinmesini planladığınızda, yayımladığınız tartışmala
 
 **Silmenin fiilen yaptığı.** Özel tartışmalarınız ve hesap verileriniz, hesabınıza ve her tartışmaya özgü anahtarlar altında şifrelenir. Hesabınızın silinmesi bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Herkese açık bir tartışmanın herkese açık kopyasının anahtarı silme sırasında imha edilmez: tartışma herkese açık kalır (bölüm 6). Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Otomatik kararlar ve profilleme
 
 Bir tartışmadaki puanlar, koşul işaretleri ve hükümler **kişilerin değil, argümanların** otomatik değerlendirmeleridir. Sizin üzerinizde hukuki etki doğurmaz ve sizi benzer şekilde önemli ölçüde etkilemezler. Hakkınızda yalnızca otomatik işlemeye dayanan ve hukuki veya benzer ölçüde önemli etkiler doğuran hiçbir karar vermeyiz ve profilinizi çıkarmayız.

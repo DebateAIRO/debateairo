@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Varmuuskopiot — Enintään 8 viikkoa aktiivisen kopion poistamisen jälkeen — Korvataan uusilla tiedoilla"
         ]
       },
-      { kind: "p", text: "Mitä poistaminen tosiasiassa tekee. Yksityiset väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Julkisen väittelyn julkisen kopion avainta ei tuhoida poiston yhteydessä: väittely pysyy julkisena (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Mitä poistaminen tosiasiassa tekee. Yksityiset väittelysi ja tilitietosi salataan tilillesi ja kullekin väittelylle ominaisilla avaimilla. Tilisi poistaminen tuhoaa nämä avaimet, minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Julkisen väittelyn julkisen kopion avainta ei tuhoida poiston yhteydessä: väittely pysyy julkisena (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "585177493d9c4b75145cf4de4185fbf2a95fbf6cbd7269b198c2357dd9937e73",
+  sha256: "a328e9bd868a3745f909338a543c9223317b5618faa54e3b30441ed9baf7f2f4",
   eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.12 · VOIMASSA 4. MARRASKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",

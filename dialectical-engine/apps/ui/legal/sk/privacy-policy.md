@@ -170,8 +170,6 @@ Keď naplánujete odstránenie účtu, debaty, ktoré ste zverejnili, zostanú v
 
 **Čo vymazanie skutočne spôsobí.** Vaše súkromné debaty a údaje účtu sú šifrované pomocou kľúčov určených pre váš účet a jednotlivé debaty. Odstránením účtu sa tieto kľúče zničia, takže my ani nikto iný už nedokáže šifrované záznamy prečítať, a záznam vášho účtu vymažeme. Kľúč k verejnej kópii debaty sa pri odstránení nezničí: debata zostáva verejná (časť 6). Označujeme to ako vymazanie, pretože taký je jeho účinok, a máme preň zdokumentované posúdenie; ak chcete vedieť viac, opýtajte sa. Mali by ste vedieť tri veci: bezpečnostný auditný záznam je nemenný a nevymazáva sa, neobsahuje však žiadne vaše čitateľné identifikátory; malý počet starších debát vznikol pred našou súčasnou schémou šifrovania, a ak sa to týka vášho účtu, oznámime vám, čo odstránenie účtu znamená pre tieto debaty; kópie údajov, ktoré už boli odoslané poskytovateľovi umelej inteligencie, sa riadia podmienkami uchovávania daného poskytovateľa uvedenými v registri, nie naším vymazaním.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatizované rozhodnutia a profilovanie
 
 Hodnotenia, značky podmienok a verdikty v debate sú automatizovaným hodnotením **argumentov, nie osôb**. Nemajú voči vám právne účinky ani vás podobne významne neovplyvňujú. Neprijímame o vás žiadne rozhodnutie založené výlučne na automatizovanom spracúvaní, ktoré by malo právne alebo podobne významné účinky, a nevytvárame váš profil.

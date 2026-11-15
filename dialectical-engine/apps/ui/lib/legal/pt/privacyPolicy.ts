@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Cópias de segurança — Até 8 semanas após a eliminação da cópia ativa — São substituídas"
         ]
       },
-      { kind: "p", text: "O que a eliminação efetivamente faz. Os seus debates privados e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. A chave da cópia pública de um debate público não é destruída na eliminação: o debate continua público (secção 6). Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "O que a eliminação efetivamente faz. Os seus debates privados e os dados da sua conta são cifrados com chaves específicas da sua conta e de cada debate. A eliminação da conta destrói essas chaves, após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. A chave da cópia pública de um debate público não é destruída na eliminação: o debate continua público (secção 6). Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "bb7ca71955b411a2323ef0658fecfcf87e6c11874e4e147715c266db2b550a68",
+  sha256: "2b2a32d234f7fb32223643ffedc23fe2971f75befd1ac6381571722ff303f0a1",
   eyebrow: "POLÍTICA DE PRIVACIDADE · v3.12 · EM VIGOR DESDE 4 DE NOVEMBRO DE 2026",
   title: "O que armazenamos e porquê",
   lede: "Os seus direitos e as nossas obrigações ao abrigo do GDPR (EU) 2016/679, em linguagem clara. Catorze secções e o Anexo B — desloque-se até ao fim.",

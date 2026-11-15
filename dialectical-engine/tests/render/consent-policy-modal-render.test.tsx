@@ -181,7 +181,8 @@ describe("privacy policy modal — rendered", () => {
       0
     );
     // 59 until Switzerland's part (Annex B.5, one paragraph) left on 14 November 2026.
-    expect(expectedParagraphs).toBe(58);
+    // 58 until section 7's drafting note on support and backup retention left on 15 November 2026.
+    expect(expectedParagraphs).toBe(57);
     // R22 item 15: section 2's and section 7's "Page settings and visits" rows add two. R22 decisions 35 and 36: the report's rows and the sealed original's row add three.
     // Privacy 3.12 (plan Task 83c): section 2's and section 7's "Questions not started yet" rows add two.
     // 0157 (Privacy 3.11, amended in place): three table rows more.

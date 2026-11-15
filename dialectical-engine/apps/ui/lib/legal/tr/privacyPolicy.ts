@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Yedekler — Canlı kopya silindikten sonra en fazla 8 hafta — Üzerine yazılır"
         ]
       },
-      { kind: "p", text: "Silmenin fiilen yaptığı. Özel tartışmalarınız ve hesap verileriniz, hesabınıza ve her tartışmaya özgü anahtarlar altında şifrelenir. Hesabınızın silinmesi bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Herkese açık bir tartışmanın herkese açık kopyasının anahtarı silme sırasında imha edilmez: tartışma herkese açık kalır (bölüm 6). Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Silmenin fiilen yaptığı. Özel tartışmalarınız ve hesap verileriniz, hesabınıza ve her tartışmaya özgü anahtarlar altında şifrelenir. Hesabınızın silinmesi bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Herkese açık bir tartışmanın herkese açık kopyasının anahtarı silme sırasında imha edilmez: tartışma herkese açık kalır (bölüm 6). Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "e0462201226a7f80ae66d38b2d0ec10c00e435505d14ce6d37f342fffad9ed12",
+  sha256: "3275737c4d4f00f69810f778d9790483b84d10e42a2b30e493240a8ae2fbc8f2",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.12 · YÜRÜRLÜK TARİHİ 4 KASIM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

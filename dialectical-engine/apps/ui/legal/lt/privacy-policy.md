@@ -170,8 +170,6 @@ Kai planuojate paskyros ištrynimą, jūsų paskelbti debatai lieka vieši; iš 
 
 **Ką ištrynimas iš tikrųjų reiškia.** Jūsų privačių debatų ir paskyros duomenys užšifruojami jūsų paskyrai ir kiekvieniems debatams būdingais raktais. Ištrynus paskyrą šie raktai sunaikinami, todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Viešo debato viešos kopijos raktas ištrynimo metu nesunaikinamas: debatas lieka viešas (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatizuoti sprendimai ir profiliavimas
 
 Debatų įverčiai, sąlygų žymos ir verdiktai yra automatizuoti **argumentų, o ne žmonių** vertinimai. Jie jums nesukelia teisinių pasekmių ir nedaro panašaus reikšmingo poveikio. Nepriimame jokio vien automatizuotu tvarkymu pagrįsto sprendimo dėl jūsų, kuris sukeltų teisinių ar panašiai reikšmingų pasekmių, ir jūsų neprofiliuojame.

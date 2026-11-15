@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sikkerhedskopier — Op til 8 uger efter at den aktive kopi er slettet — Overskrives"
         ]
       },
-      { kind: "p", text: "Hvad sletning faktisk gør. Dine private debatter og kontodata er krypteret under nøgler, der er specifikke for din konto og for hver debat. Når din konto slettes, destrueres disse nøgler, hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentlig debat destrueres ikke ved sletning: debatten forbliver offentlig (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Hvad sletning faktisk gør. Dine private debatter og kontodata er krypteret under nøgler, der er specifikke for din konto og for hver debat. Når din konto slettes, destrueres disse nøgler, hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentlig debat destrueres ikke ved sletning: debatten forbliver offentlig (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "f64ec23124191941053dbec778b523abcd6d54d49798aa37bb8d0e485090daf5",
+  sha256: "9ed5d81b56926bfd274146b10906ad0f08b0d21761e345776059c074af8361c8",
   eyebrow: "PRIVATLIVSPOLITIK · v3.12 · GÆLDENDE FRA 4. NOVEMBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",
