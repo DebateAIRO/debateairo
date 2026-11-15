@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Copii de siguranță — Până la 8 săptămâni după ștergerea copiei active — Suprascrise"
         ]
       },
-      { kind: "p", text: "Ce produce efectiv ștergerea. Dezbaterile private și datele contului sunt criptate cu chei specifice contului și fiecărei dezbateri. Ștergerea contului distruge aceste chei, după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Cheia copiei publice a unei dezbateri publice nu este distrusă la ștergere: dezbaterea rămâne publică (secțiunea 6). Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Ce produce efectiv ștergerea. Dezbaterile private și datele contului sunt criptate cu chei specifice contului și fiecărei dezbateri. Ștergerea contului distruge aceste chei, după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Cheia copiei publice a unei dezbateri publice nu este distrusă la ștergere: dezbaterea rămâne publică (secțiunea 6). Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "022dcfd6254c6540bc49b91dcbe56b002ff359e0425e16e2d9c81f97b3369cc3",
+  sha256: "5b960ca8150e9916c20156e3a7552247f971a5eaa071d2c82ac648822d2a83f8",
   eyebrow: "POLITICA DE CONFIDENȚIALITATE · v3.12 · ÎN VIGOARE DE LA 4 NOIEMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",

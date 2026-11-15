@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Varnostne kopije — Do 8 tednov po izbrisu žive kopije — Prepišejo se"
         ]
       },
-      { kind: "p", text: "Kaj izbris dejansko naredi. Vaše zasebne razprave in podatki računa so šifrirani s ključi, posebnimi za vaš račun in posamezno razpravo. Izbris računa uniči te ključe, zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ do javne kopije razprave se ob izbrisu ne uniči: razprava ostane javna (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Kaj izbris dejansko naredi. Vaše zasebne razprave in podatki računa so šifrirani s ključi, posebnimi za vaš račun in posamezno razpravo. Izbris računa uniči te ključe, zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ do javne kopije razprave se ob izbrisu ne uniči: razprava ostane javna (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "05719cf3124aefed1b120879e015548a820e8c79a2dbdded5444d1712b40ed57",
+  sha256: "8cf1be2b0e1539f9d217ff041fe1f50ea9116372da75cb5bf87979d5910f8b20",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.12 · VELJA OD 4. NOVEMBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

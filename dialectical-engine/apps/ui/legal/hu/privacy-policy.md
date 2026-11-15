@@ -170,8 +170,6 @@ Amikor ütemezi fiókja törlését, a közzétett viták nyilvánosak maradnak;
 
 **Mit tesz valójában a törlés.** Magánjellegű vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A nyilvános vita nyilvános másolatának kulcsa a törléskor nem semmisül meg: a vita nyilvános marad (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatizált döntések és profilalkotás
 
 A vitában szereplő pontszámok, feltételjelölések és döntések **érvek, nem személyek** automatizált értékelései. Nem járnak Önre nézve joghatással, és hasonlóan jelentős hatást sem gyakorolnak Önre. Nem hozunk Önről kizárólag automatizált adatkezelésen alapuló, joghatással vagy hasonlóan jelentős hatással járó döntést, és nem alkotunk profilt Önről.

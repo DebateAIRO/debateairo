@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Back-ups — Tot 8 weken nadat de actuele kopie is verwijderd — Overschreven"
         ]
       },
-      { kind: "p", text: "Wat verwijdering daadwerkelijk doet. Uw privédebatten en accountgegevens zijn versleuteld met sleutels die specifiek zijn voor uw account en elk debat. Wanneer u uw account verwijdert, worden die sleutels vernietigd, waarna de versleutelde gegevens niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. De sleutel van de openbare kopie van een openbaar debat wordt bij verwijdering niet vernietigd: het debat blijft openbaar (paragraaf 6). Wij omschrijven dit als verwijdering omdat dit het effect ervan is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Drie zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Wat verwijdering daadwerkelijk doet. Uw privédebatten en accountgegevens zijn versleuteld met sleutels die specifiek zijn voor uw account en elk debat. Wanneer u uw account verwijdert, worden die sleutels vernietigd, waarna de versleutelde gegevens niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. De sleutel van de openbare kopie van een openbaar debat wordt bij verwijdering niet vernietigd: het debat blijft openbaar (paragraaf 6). Wij omschrijven dit als verwijdering omdat dit het effect ervan is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Drie zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "eaad6ebe0e84281a145298bcd331ac75aea1c9a17869bdebf7f1dff949819f44",
+  sha256: "76b240d83d3b4c4fbb8f2ffad8b04df5cb9927a4ce816bc617f1da6dd56dc465",
   eyebrow: "PRIVACYBELEID · v3.12 · VAN KRACHT OP 4 NOVEMBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

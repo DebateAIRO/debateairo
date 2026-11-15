@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Varukoopiad — Kuni 8 nädalat pärast aktiivse koopia kustutamist — Kirjutatakse üle"
         ]
       },
-      { kind: "p", text: "Mida kustutamine tegelikult teeb. Teie privaatsed väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaliku väitluse avaliku koopia võtit ei hävitata kustutamisel: väitlus jääb avalikuks (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnenud ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Mida kustutamine tegelikult teeb. Teie privaatsed väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaliku väitluse avaliku koopia võtit ei hävitata kustutamisel: väitlus jääb avalikuks (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnenud ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "66b81589f091d867202ddfd73f6e3e6c093c9af778d4d7ab94ec752bfe09b950",
+  sha256: "dfe3a4f2e9f57a9e545eae9206d928b38490a536f749b1bb52bcabbebec7683e",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.12 · KEHTIB ALATES 4. NOVEMBRIST 2026",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",

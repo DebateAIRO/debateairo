@@ -170,8 +170,6 @@ When you schedule the deletion of your account, the debates you published stay p
 
 **What deletion actually does.** Your private debates and account data are encrypted under keys specific to your account and to each debate. Deleting your account destroys those keys, after which the encrypted records cannot be read by us or anyone else, and we delete your account record. The key to a public debate's public copy is not destroyed at deletion: the debate stays public (section 6). We describe this as deletion because that is its effect, and we hold a documented assessment behind it; if you want to know more, ask. Three things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automated decisions and profiling
 
 The scores, condition marks and verdicts in a debate are automated evaluations of **arguments, not of people**. They do not produce legal effects on you and do not similarly significantly affect you. We make no decision about you that is based solely on automated processing and has legal or similarly significant effects, and we do not profile you.

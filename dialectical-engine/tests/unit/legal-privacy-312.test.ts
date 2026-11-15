@@ -285,7 +285,8 @@ const DATES: Readonly<Record<string, Readonly<{ eyebrow: string; line: string; u
  * paragraph, section 3's "About you", section 4's contract, sensitive-information and question-check rows, section 6's
  * Free paragraph, section 7's new row, section 9, section 10's Access, Erasure and Withdraw consent rows, section 14's log.
  * V4's 0157 (3.11 amended in place) adds section 2's moderation notices row and section 7's two rows, so the lines from
- * the Next paragraph on moved by one, and those from section 9 on by three.
+ * the Next paragraph on moved by one, and those from section 9 on by three. Section 7's drafting note left on
+ * 15 November 2026 (see withoutNote), so the lines from section 9 on moved back by two.
  */
 const EYEBROW = 4;
 const END_MARKER = 7;
@@ -298,11 +299,11 @@ const SENSITIVE_CONSENT = 84;
 const QUESTION_CHECK = 88;
 const FREE = 125;
 const SAVED_RETENTION_AT = 154;
-const SECURITY = 186;
-const ACCESS = 196;
-const ERASURE = 198;
-const WITHDRAW = 202;
-const CHANGE_LOG = 260;
+const SECURITY = 184;
+const ACCESS = 194;
+const ERASURE = 196;
+const WITHDRAW = 200;
+const CHANGE_LOG = 258;
 /**
  * Section 6's paragraph on flagged debates. A person cannot take their own public debate down, so English no longer
  * ends that paragraph's approval sentences with the leftover "you can take it down from Your debates"; the
@@ -316,7 +317,7 @@ const TAKE_DOWN = "If you publish a flagged debate after our approval, you can t
  * paragraph no longer ends with Taiwan's part, in English and in the 34 translations alike: a closed country is
  * named in no language. Nothing else on the line changes.
  */
-const ASIA_PACIFIC = 290;
+const ASIA_PACIFIC = 288;
 const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
 /** The two new rows, each right after its table's "Page settings and visits" row. */
 const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
@@ -352,8 +353,21 @@ const legalCatalog = (code: string): Record<string, string> =>
  * reference to Annex B.7 follows the new number. Every pin below compares the draft with the 3.11 text after exactly
  * that, so each still says that nothing else changed; this function pins what left.
  */
-const SWISS_PART = 282;
-const withoutSwitzerland = (code: string, prior: readonly string[]): string[] => {
+const SWISS_PART = 280;
+/**
+ * Section 7 ended with an English drafting note, published in every language: "[The support retention period and the
+ * backup line describe policies to implement; …]". The support chat stores nothing and section 7's table says so in
+ * every language, so the note left on 15 November 2026 (the line and the blank line after it). Every pin below
+ * compares the draft with the 3.11 text less that note; this function pins what left.
+ */
+const NOTE = 170;
+const withoutNote = (code: string, prior: readonly string[]): string[] => {
+  expect(prior[NOTE], `${code}: section 7's drafting note in 3.11`).toMatch(/^&#91;The support retention period and the backup line /u);
+  expect([prior[NOTE - 1], prior[NOTE + 1]], `${code}: the note is its own paragraph`).toEqual(["", ""]);
+  return [...prior.slice(0, NOTE), ...prior.slice(NOTE + 2)];
+};
+const withoutSwitzerland = (code: string, raw: readonly string[]): string[] => {
+  const prior = withoutNote(code, raw);
   expect(prior[SWISS_PART], `${code}: Annex B.5's heading in 3.11`).toMatch(/^### B\.5 \S/u);
   expect([prior[SWISS_PART + 1], prior[SWISS_PART + 3]], `${code}: Annex B.5 is one paragraph`).toEqual(["", ""]);
   expect(prior[SWISS_PART + 2], `${code}: Annex B.5's paragraph`).toMatch(/\S/u);

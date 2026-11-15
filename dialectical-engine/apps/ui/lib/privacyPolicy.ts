@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Backups — Up to 8 weeks after the live copy is deleted — Overwritten"
         ]
       },
-      { kind: "p", text: "What deletion actually does. Your private debates and account data are encrypted under keys specific to your account and to each debate. Deleting your account destroys those keys, after which the encrypted records cannot be read by us or anyone else, and we delete your account record. The key to a public debate's public copy is not destroyed at deletion: the debate stays public (section 6). We describe this as deletion because that is its effect, and we hold a documented assessment behind it; if you want to know more, ask. Three things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "What deletion actually does. Your private debates and account data are encrypted under keys specific to your account and to each debate. Deleting your account destroys those keys, after which the encrypted records cannot be read by us or anyone else, and we delete your account record. The key to a public debate's public copy is not destroyed at deletion: the debate stays public (section 6). We describe this as deletion because that is its effect, and we hold a documented assessment behind it; if you want to know more, ask. Three things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "165d049b1505c2f2b9cd1ff433081aa7dc8c4180842621d7b5568bad548ae08e",
+  sha256: "c8a6e30d7e806edc317b7a033e4e6386912c157088e9ed5e363a4ed70781e0c4",
   eyebrow: "PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",

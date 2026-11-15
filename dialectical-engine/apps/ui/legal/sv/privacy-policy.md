@@ -170,8 +170,6 @@ När du schemalägger att ditt konto ska raderas förblir de debatter du har pub
 
 **Vad radering faktiskt innebär.** Dina privata debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en offentlig debatts offentliga kopia förstörs inte vid radering: debatten förblir offentlig (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatiserade beslut och profilering
 
 Poäng, villkorsmarkeringar och utslag i en debatt är automatiserade bedömningar av **argument, inte personer**. De får inga rättsliga följder för dig och påverkar dig inte heller på liknande sätt i betydande grad. Vi fattar inga beslut om dig som enbart grundas på automatiserad behandling och har rättsliga eller på liknande sätt betydande följder, och vi profilerar dig inte.

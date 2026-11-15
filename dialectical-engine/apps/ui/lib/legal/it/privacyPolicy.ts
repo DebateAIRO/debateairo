@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Backup — Fino a 8 settimane dopo la cancellazione della copia attiva — Sovrascritti"
         ]
       },
-      { kind: "p", text: "Cosa comporta effettivamente la cancellazione. I tuoi dibattiti privati e i dati del tuo account sono cifrati mediante chiavi specifiche per il tuo account e per ogni dibattito. La cancellazione dell'account distrugge tali chiavi, dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblico non viene distrutta alla cancellazione: il dibattito resta pubblico (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Cosa comporta effettivamente la cancellazione. I tuoi dibattiti privati e i dati del tuo account sono cifrati mediante chiavi specifiche per il tuo account e per ogni dibattito. La cancellazione dell'account distrugge tali chiavi, dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblico non viene distrutta alla cancellazione: il dibattito resta pubblico (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "c3fca6235ee061b7db80ff68e379fb98f533643401e336eb44d3b6520d24d769",
+  sha256: "be40a424a8a6730c1f9e893b7c4c0b7efd9c642ccddc436ee2a8790c636e44d4",
   eyebrow: "INFORMATIVA SULLA PRIVACY · v3.12 · IN VIGORE DAL 4 NOVEMBRE 2026",
   title: "Cosa conserviamo e perché",
   lede: "I tuoi diritti e i nostri obblighi ai sensi del GDPR (EU) 2016/679, in un linguaggio chiaro. Quattordici sezioni e Allegato B — scorri fino alla fine.",

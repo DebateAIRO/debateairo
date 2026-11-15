@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Biztonsági mentések — Az élő példány törlése után legfeljebb 8 hétig — Felülírjuk"
         ]
       },
-      { kind: "p", text: "Mit tesz valójában a törlés. Magánjellegű vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A nyilvános vita nyilvános másolatának kulcsa a törléskor nem semmisül meg: a vita nyilvános marad (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Mit tesz valójában a törlés. Magánjellegű vitáit és fiókadatait a fiókjára és minden egyes vitára jellemző kulcsokkal titkosítjuk. Fiókja törlése megsemmisíti ezeket a kulcsokat, ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A nyilvános vita nyilvános másolatának kulcsa a törléskor nem semmisül meg: a vita nyilvános marad (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "bd326283c1a286a1b172dc75f9e5299b4837ff5ec4234458de875f31ee209791",
+  sha256: "2a71b0eb41a33d7cc28c7cfa0ee93d398d6a7aafba6a84f2fcd82e9bab16956a",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.12 · HATÁLYOS 2026. NOVEMBER 4.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

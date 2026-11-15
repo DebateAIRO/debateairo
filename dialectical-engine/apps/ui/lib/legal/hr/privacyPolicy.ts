@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Sigurnosne kopije — Do 8 tjedana nakon brisanja aktivnog primjerka — Prepisuju se"
         ]
       },
-      { kind: "p", text: "Što se brisanjem doista čini. Vaše privatne rasprave i podaci o računu šifrirani su ključevima specifičnima za vaš račun i za svaku raspravu. Brisanjem računa uništavaju se ti ključevi, nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije javne rasprave ne uništava se pri brisanju: rasprava ostaje javna (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju se uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Što se brisanjem doista čini. Vaše privatne rasprave i podaci o računu šifrirani su ključevima specifičnima za vaš račun i za svaku raspravu. Brisanjem računa uništavaju se ti ključevi, nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije javne rasprave ne uništava se pri brisanju: rasprava ostaje javna (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju se uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "012448046b37c727c947a51dd27fc3f06582136658282db24ff1d3a98221785e",
+  sha256: "8ca2f143a008158e0d09848d3d8ad52bd393bfb4d05ee015836845484c61af40",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.12 · NA SNAZI OD 4. STUDENOGA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

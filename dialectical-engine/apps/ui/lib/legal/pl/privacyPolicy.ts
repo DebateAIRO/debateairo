@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kopie zapasowe — Do 8 tygodni od usunięcia kopii aktywnej — Zostają nadpisane"
         ]
       },
-      { kind: "p", text: "Co faktycznie powoduje usunięcie. Twoje prywatne debaty i dane konta są szyfrowane przy użyciu kluczy właściwych dla Twojego konta i każdej debaty. Usunięcie konta niszczy te klucze, po czym zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Klucz publicznej kopii publicznej debaty nie zostaje zniszczony podczas usuwania konta: debata pozostaje publiczna (punkt 6). Opisujemy to jako usunięcie, ponieważ taki jest jego skutek, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o trzech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Co faktycznie powoduje usunięcie. Twoje prywatne debaty i dane konta są szyfrowane przy użyciu kluczy właściwych dla Twojego konta i każdej debaty. Usunięcie konta niszczy te klucze, po czym zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Klucz publicznej kopii publicznej debaty nie zostaje zniszczony podczas usuwania konta: debata pozostaje publiczna (punkt 6). Opisujemy to jako usunięcie, ponieważ taki jest jego skutek, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o trzech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "65b48b907543317b33a748de015a68ea5fde39497ff3bbf0298f4cda615097d0",
+  sha256: "510080bcf0afedb35881d6724d466f5343769327f473db0782932adbfab87736",
   eyebrow: "POLITYKA PRYWATNOŚCI · v3.12 · OBOWIĄZUJE OD 4 LISTOPADA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",

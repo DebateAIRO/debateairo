@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Atsarginės kopijos — Iki 8 savaičių po to, kai aktyvioji kopija ištrinama — Perrašomos"
         ]
       },
-      { kind: "p", text: "Ką ištrynimas iš tikrųjų reiškia. Jūsų privačių debatų ir paskyros duomenys užšifruojami jūsų paskyrai ir kiekvieniems debatams būdingais raktais. Ištrynus paskyrą šie raktai sunaikinami, todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Viešo debato viešos kopijos raktas ištrynimo metu nesunaikinamas: debatas lieka viešas (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Ką ištrynimas iš tikrųjų reiškia. Jūsų privačių debatų ir paskyros duomenys užšifruojami jūsų paskyrai ir kiekvieniems debatams būdingais raktais. Ištrynus paskyrą šie raktai sunaikinami, todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Viešo debato viešos kopijos raktas ištrynimo metu nesunaikinamas: debatas lieka viešas (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "9101abb665f6e9f292280b47c86b1faeead7d4dabac44eb8927336b96d9568c5",
+  sha256: "e2c0152f8ab9ac11bc74f4bbfef91db6c07e1387a96da6eae3a27aff625e5246",
   eyebrow: "PRIVATUMO POLITIKA · v3.12 · ĮSIGALIOJA 2026 M. LAPKRIČIO 4 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",

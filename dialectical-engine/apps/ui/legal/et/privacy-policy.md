@@ -170,8 +170,6 @@ Kui kavandate oma konto kustutamise, jäävad teie avaldatud väitlused avalikuk
 
 **Mida kustutamine tegelikult teeb.** Teie privaatsed väitlused ja kontoandmed on krüpteeritud teie kontole ja igale väitlusele omaste võtmetega. Konto kustutamisel hävitatakse need võtmed, mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaliku väitluse avaliku koopia võtit ei hävitata kustutamisel: väitlus jääb avalikuks (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnenud ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]
-
 ## 8. Automatiseeritud otsused ja profiilianalüüs
 
 Väitluse hinded, tingimusmärgid ja otsused on **argumentide, mitte inimeste** automatiseeritud hinnangud. Need ei too teile kaasa õiguslikke tagajärgi ega mõjuta teid muul viisil sarnaselt märkimisväärselt. Me ei tee teie kohta üksnes automatiseeritud töötlusel põhinevaid otsuseid, millel on õiguslik või sarnaselt oluline mõju, ega tee teie kohta profiilianalüüsi.

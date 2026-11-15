@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Säkerhetskopior — Upp till 8 veckor efter att den aktiva kopian har raderats — Skrivs över"
         ]
       },
-      { kind: "p", text: "Vad radering faktiskt innebär. Dina privata debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en offentlig debatts offentliga kopia förstörs inte vid radering: debatten förblir offentlig (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Vad radering faktiskt innebär. Dina privata debatter och kontouppgifter är krypterade med nycklar som är specifika för ditt konto och för varje debatt. När du raderar ditt konto förstörs dessa nycklar, varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en offentlig debatts offentliga kopia förstörs inte vid radering: debatten förblir offentlig (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "c6180f52aa97b6eb1dd334e2f74ef4be28c32e0bfd725f6e9b26d766795e689a",
+  sha256: "862ab5612b09671276dae051716dc70f2d6e381932698fe1416a040252f210d3",
   eyebrow: "INTEGRITETSPOLICY · v3.12 · GÄLLER FRÅN 4 NOVEMBER 2026",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",

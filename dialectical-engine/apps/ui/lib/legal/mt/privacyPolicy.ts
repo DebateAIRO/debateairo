@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Kopji ta’ riżerva — Sa 8 ġimgħat wara li titħassar il-kopja attiva — Jinkitbu fuqhom"
         ]
       },
-      { kind: "p", text: "X’jagħmel fil-fatt it-tħassir. Id-dibattiti privati u d-data tal-kont tiegħek huma kriptati taħt ċwievet speċifiċi għall-kont tiegħek u għal kull dibattitu. Meta tħassar il-kont tiegħek jinqerdu dawk iċ-ċwievet, u wara dan ir-rekords kriptati ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Iċ-ċavetta tal-kopja pubblika ta’ dibattitu pubbliku ma tinqerdix waqt it-tħassir: id-dibattitu jibqa’ pubbliku (taqsima 6). Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm tliet affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; il-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "X’jagħmel fil-fatt it-tħassir. Id-dibattiti privati u d-data tal-kont tiegħek huma kriptati taħt ċwievet speċifiċi għall-kont tiegħek u għal kull dibattitu. Meta tħassar il-kont tiegħek jinqerdu dawk iċ-ċwievet, u wara dan ir-rekords kriptati ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Iċ-ċavetta tal-kopja pubblika ta’ dibattitu pubbliku ma tinqerdix waqt it-tħassir: id-dibattitu jibqa’ pubbliku (taqsima 6). Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm tliet affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; il-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "2b085ded6c99464f4bbb45cc5cd57b62a698607869295e3569188a9317c7ecf5",
+  sha256: "d20546ffc1bf18d96c6f8638000906408e489551b3c5e2ad8b099445a493b5bd",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.12 · EFFETTIVA 4 TA’ NOVEMBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

@@ -170,8 +170,6 @@ Plānojot konta dzēšanu, jūsu publicētās debates paliek publiskas; no tām 
 
 **Ko dzēšana faktiski dara.** Jūsu privātās debates un konta dati ir šifrēti, izmantojot tieši jūsu kontam un katrām debatēm paredzētas atslēgas. Dzēšot kontu, šīs atslēgas tiek iznīcinātas, pēc tam šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publiskas debates publiskās kopijas atslēga dzēšanas laikā netiek iznīcināta: debate paliek publiska (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina trīs lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana.
 
-&#91;The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.\]
-
 ## 8. Automatizēti lēmumi un profilēšana
 
 Debašu vērtējumi, nosacījumu atzīmes un spriedumi ir automatizēti **argumentu, nevis personu** novērtējumi. Tie jums nerada juridiskas sekas un līdzīgā veidā jūs būtiski neietekmē. Mēs nepieņemam nevienu lēmumu par jums, kurš ir balstīts tikai uz automatizētu apstrādi un kuram ir juridiskas vai līdzīgi būtiskas sekas, un mēs jūs neprofilējam.

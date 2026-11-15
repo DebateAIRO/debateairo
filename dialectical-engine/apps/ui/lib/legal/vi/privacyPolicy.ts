@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Bản sao lưu — Tối đa 8 tuần sau khi bản đang hoạt động bị xóa — Bị ghi đè"
         ]
       },
-      { kind: "p", text: "Việc xóa thực sự có tác dụng gì. Các cuộc tranh luận riêng tư và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai của một cuộc tranh luận công khai không bị hủy khi xóa: cuộc tranh luận vẫn công khai (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Việc xóa thực sự có tác dụng gì. Các cuộc tranh luận riêng tư và dữ liệu tài khoản của bạn được mã hóa bằng các khóa dành riêng cho tài khoản và từng cuộc tranh luận. Việc xóa tài khoản sẽ hủy các khóa đó, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai của một cuộc tranh luận công khai không bị hủy khi xóa: cuộc tranh luận vẫn công khai (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "7802d525c9f585125b97dbbd7667423aa89cc7855d11447c3138cfb114e9e988",
+  sha256: "498e31ba8edc9f20cadbee25f5ed73e839643dd38d2e10dcc40d2849669a3fca",
   eyebrow: "CHÍNH SÁCH QUYỀN RIÊNG TƯ · v3.12 · CÓ HIỆU LỰC 4 THÁNG 11 NĂM 2026",
   title: "Dữ liệu chúng tôi lưu trữ và lý do",
   lede: "Các quyền của bạn và nghĩa vụ của chúng tôi theo GDPR (EU) 2016/679, được trình bày bằng ngôn ngữ dễ hiểu. Mười bốn mục và Phụ lục B — cuộn đến cuối.",

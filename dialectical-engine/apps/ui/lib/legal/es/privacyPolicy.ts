@@ -192,8 +192,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "Copias de seguridad — Hasta 8 semanas después de eliminarse la copia activa — Se sobrescriben"
         ]
       },
-      { kind: "p", text: "Qué hace realmente la eliminación. Sus debates privados y los datos de su cuenta están cifrados con claves específicas de su cuenta y de cada debate. Al eliminar su cuenta se destruyen esas claves, tras lo cual ni nosotros ni ninguna otra persona podemos leer los registros cifrados, y eliminamos el registro de su cuenta. La clave de la copia pública de un debate público no se destruye al eliminar la cuenta: el debate sigue siendo público (apartado 6). Lo describimos como eliminación porque ese es su efecto y disponemos de una evaluación documentada que lo respalda; si desea saber más, pregúntenos. Debe saber tres cosas: el registro de auditoría de seguridad solo permite adiciones y no se elimina, pero no contiene identificadores suyos legibles; un reducido número de debates antiguos es anterior a nuestro sistema de cifrado actual y, si esto afecta a su cuenta, le explicaremos qué efecto tiene el cierre sobre ellos; las copias de datos que ya se hayan enviado a un proveedor de IA se rigen por las condiciones de conservación de dicho proveedor que figuran en el Registro, no por nuestra eliminación." },
-      { kind: "p", text: "[The support retention period and the backup line describe policies to implement; the system currently keeps support records indefinitely and has no backup-expiry mechanism. Do not publish figures that are not enforced.]" }
+      { kind: "p", text: "Qué hace realmente la eliminación. Sus debates privados y los datos de su cuenta están cifrados con claves específicas de su cuenta y de cada debate. Al eliminar su cuenta se destruyen esas claves, tras lo cual ni nosotros ni ninguna otra persona podemos leer los registros cifrados, y eliminamos el registro de su cuenta. La clave de la copia pública de un debate público no se destruye al eliminar la cuenta: el debate sigue siendo público (apartado 6). Lo describimos como eliminación porque ese es su efecto y disponemos de una evaluación documentada que lo respalda; si desea saber más, pregúntenos. Debe saber tres cosas: el registro de auditoría de seguridad solo permite adiciones y no se elimina, pero no contiene identificadores suyos legibles; un reducido número de debates antiguos es anterior a nuestro sistema de cifrado actual y, si esto afecta a su cuenta, le explicaremos qué efecto tiene el cierre sobre ellos; las copias de datos que ya se hayan enviado a un proveedor de IA se rigen por las condiciones de conservación de dicho proveedor que figuran en el Registro, no por nuestra eliminación." }
     ]
   },
   {
@@ -365,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "d63e1476ffcd9405447e71cfec2c108f55afa1908d1e856cb007f3857e61278a",
+  sha256: "4a3ae99c57606a62aa61393bc205ca49f5eb00045ea041a273e507fe92077aac",
   eyebrow: "POLÍTICA DE PRIVACIDAD · v3.12 · EN VIGOR DESDE 4 DE NOVIEMBRE DE 2026",
   title: "Qué almacenamos y por qué",
   lede: "Sus derechos y nuestras obligaciones conforme al RGPD – GDPR (EU) 2016/679, en lenguaje claro. Catorce secciones y el anexo B — desplácese hasta el final.",
