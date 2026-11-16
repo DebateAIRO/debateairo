@@ -10,7 +10,7 @@ import {
   SESSION_COOKIE_NAME,
   type AskApplication
 } from "@debateai/api";
-import { PublicDebateSchema, type Answer, type DebateMapView, type PublicDebate, type PublicStoryShort } from "@debateai/contract";
+import { type Answer, type DebateMapView, type PublicDebate, type PublicStoryShort } from "@debateai/contract";
 import {
   MemoryPublicationKeyStore,
   PublicationCipher,
