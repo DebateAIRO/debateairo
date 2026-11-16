@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada a Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Na žiadosti odpovedáme do 30 dní. Naďalej zodpovedáme za osobné informácie, ktoré prenášame poskytovateľom umelej inteligencie mimo Kanady, a zmluvami vyžadujeme porovnateľnú ochranu; títo poskytovatelia môžu podliehať zákonom krajín, v ktorých pôsobia, vrátane zákonného prístupu orgánov. Marketingové e-maily zasielame iba s vaším výslovným súhlasom podľa CASL. Porušenie bezpečnostných opatrení, ktoré pre vás vytvára skutočné riziko závažnej ujmy, hlásime Úradu komisára pre ochranu súkromia Kanady a vám a o každom porušení vedieme záznam 24 mesiacov. Quebec: pred oznámením osobných informácií mimo Quebecu vykonáme posúdenie vplyvu na súkromie; incident dôvernosti, ktorý predstavuje riziko vážnej ujmy, hlásime Commission d'accès à l'information a vám a vedieme register incidentov; nastavenia zachovávajúce súkromie vašich debát sú predvolene zapnuté; môžete nás požiadať o vyradenie z indexu alebo zastavenie šírenia vašich osobných informácií; môžete požiadať o svoje údaje v štruktúrovanom, bežne používanom formáte; časť 8 opisuje naše automatizované spracúvanie." }
+      { kind: "p", text: "Našou zodpovednou osobou pre ochranu osobných údajov a v Quebecu osobou zodpovednou za ochranu osobných informácií je náš konateľ, s ktorým sa možno skontaktovať na adrese privacy@dezbatere.ro. Na žiadosti odpovedáme do 30 dní. Naďalej zodpovedáme za osobné informácie, ktoré prenášame poskytovateľom umelej inteligencie mimo Kanady, a zmluvami vyžadujeme porovnateľnú ochranu; títo poskytovatelia môžu podliehať zákonom krajín, v ktorých pôsobia, vrátane zákonného prístupu orgánov. Marketingové e-maily zasielame iba s vaším výslovným súhlasom podľa CASL. Porušenie bezpečnostných opatrení, ktoré pre vás vytvára skutočné riziko závažnej ujmy, hlásime Úradu komisára pre ochranu súkromia Kanady a vám a o každom porušení vedieme záznam 24 mesiacov. Quebec: pred oznámením osobných informácií mimo Quebecu vykonáme posúdenie vplyvu na súkromie; incident dôvernosti, ktorý predstavuje riziko vážnej ujmy, hlásime Commission d'accès à l'information a vám a vedieme register incidentov; v platenom programe sú debaty v predvolenom nastavení súkromné a debaty v bezplatnom programe sú verejné, ako uvádza časť 6; môžete nás požiadať o vyradenie z indexu alebo zastavenie šírenia vašich osobných informácií; môžete požiadať o svoje údaje v štruktúrovanom, bežne používanom formáte; časť 8 opisuje naše automatizované spracúvanie." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "2bac861a7c0e7cd246590ad5ad9398a89028f231e3d55a53050cbc506958d613",
+  sha256: "dbfa7c26e548283e1a5ae4241443d4a39d242e466627f175729195ba3085e72f",
   eyebrow: "ZÁSADY OCHRANY OSOBNÝCH ÚDAJOV · v3.12 · ÚČINNÉ OD 4. NOVEMBRA 2026",
   title: "Čo uchovávame a prečo",
   lede: "Vaše práva a naše povinnosti podľa GDPR (EU) 2016/679 zrozumiteľne. Štrnásť častí a príloha B — prejdite až na koniec.",

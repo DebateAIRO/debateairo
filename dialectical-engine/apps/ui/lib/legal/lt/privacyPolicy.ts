@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ir Kvebekas",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Į prašymus atsakome per 30 dienų. Mes ir toliau atsakome už asmeninę informaciją, kurią perduodame DI paslaugų teikėjams už Kanados ribų, ir sutartimis reikalaujame lygiavertės apsaugos; tiems teikėjams gali būti taikomi jų veiklos šalių įstatymai, įskaitant teisėtą valdžios institucijų prieigą. Rinkodaros el. laiškai siunčiami tik gavus jūsų aiškų sutikimą pagal CASL. Apie saugumo priemonių pažeidimą, dėl kurio jums kyla reali didelės žalos rizika, pranešame Kanados privatumo komisaro biurui ir jums, o kiekvieno pažeidimo įrašą saugome 24 mėnesius. Kvebekas: prieš perduodami asmeninę informaciją už Kvebeko ribų atliekame poveikio privatumui vertinimą; apie konfidencialumo incidentą, dėl kurio kyla rimtos žalos rizika, pranešame Commission d'accès à l'information ir jums bei tvarkome incidentų registrą; nustatymai, pagal kuriuos jūsų debatai lieka privatūs, yra įjungti pagal numatytuosius nustatymus; galite prašyti panaikinti jūsų asmeninės informacijos indeksavimą arba nustoti ją platinti; galite prašyti pateikti savo duomenis struktūrizuotu, įprastai naudojamu formatu; 8 skyriuje aprašytas mūsų automatizuotas tvarkymas." }
+      { kind: "p", text: "Mūsų privatumo pareigūnas, o Kvebeke — už asmeninės informacijos apsaugą atsakingas asmuo, yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro. Į prašymus atsakome per 30 dienų. Mes ir toliau atsakome už asmeninę informaciją, kurią perduodame DI paslaugų teikėjams už Kanados ribų, ir sutartimis reikalaujame lygiavertės apsaugos; tiems teikėjams gali būti taikomi jų veiklos šalių įstatymai, įskaitant teisėtą valdžios institucijų prieigą. Rinkodaros el. laiškai siunčiami tik gavus jūsų aiškų sutikimą pagal CASL. Apie saugumo priemonių pažeidimą, dėl kurio jums kyla reali didelės žalos rizika, pranešame Kanados privatumo komisaro biurui ir jums, o kiekvieno pažeidimo įrašą saugome 24 mėnesius. Kvebekas: prieš perduodami asmeninę informaciją už Kvebeko ribų atliekame poveikio privatumui vertinimą; apie konfidencialumo incidentą, dėl kurio kyla rimtos žalos rizika, pranešame Commission d'accès à l'information ir jums bei tvarkome incidentų registrą; mokamame plane debatai yra privatūs pagal numatytuosius nustatymus, o nemokamame plane debatai yra vieši, kaip nurodyta 6 skyriuje; galite prašyti panaikinti jūsų asmeninės informacijos indeksavimą arba nustoti ją platinti; galite prašyti pateikti savo duomenis struktūrizuotu, įprastai naudojamu formatu; 8 skyriuje aprašytas mūsų automatizuotas tvarkymas." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "e2c0152f8ab9ac11bc74f4bbfef91db6c07e1387a96da6eae3a27aff625e5246",
+  sha256: "a37028529980a11d623a9f5a420c38a76015473bb2d6c6487464a9ada45f6e3b",
   eyebrow: "PRIVATUMO POLITIKA · v3.12 · ĮSIGALIOJA 2026 M. LAPKRIČIO 4 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
