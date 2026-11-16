@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ve Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Talepleri 30 gün içinde yanıtlarız. Kanada dışındaki yapay zekâ sağlayıcılarına aktardığımız kişisel bilgilerden sorumlu olmaya devam eder ve sözleşmeler yoluyla karşılaştırılabilir koruma sağlanmasını şart koşarız; bu sağlayıcılar, makamların hukuka uygun erişimi de dâhil olmak üzere faaliyet gösterdikleri ülkelerin kanunlarına tabi olabilir. Pazarlama e-postası CASL kapsamında yalnızca açık rızanızla gönderilir. Size önemli zarar verme konusunda gerçek bir risk oluşturan güvenlik önlemi ihlallerini Kanada Gizlilik Komiserliği Ofisine ve size bildiririz ve her ihlalin kaydını 24 ay boyunca tutarız. Quebec: kişisel bilgileri Quebec dışına aktarmadan önce bir gizlilik etki değerlendirmesi yaparız; ciddi zarar riski taşıyan gizlilik olaylarını Commission d'accès à l'information'a ve size bildirir ve olaylara ilişkin bir kayıt tutarız; tartışmalarınızı gizli tutan ayarlar varsayılan olarak etkindir; hakkınızdaki kişisel bilgileri dizinden çıkarmamızı veya yaymayı bırakmamızı isteyebilirsiniz; verilerinizi yapılandırılmış ve yaygın kullanılan bir biçimde talep edebilirsiniz; bölüm 8 otomatik işlememizi açıklar." }
+      { kind: "p", text: "Gizlilik görevlimiz ve Quebec'te kişisel bilgilerin korunmasından sorumlu kişi müdürümüzdür; kendisine privacy@dezbatere.ro adresinden ulaşılabilir. Talepleri 30 gün içinde yanıtlarız. Kanada dışındaki yapay zekâ sağlayıcılarına aktardığımız kişisel bilgilerden sorumlu olmaya devam eder ve sözleşmeler yoluyla karşılaştırılabilir koruma sağlanmasını şart koşarız; bu sağlayıcılar, makamların hukuka uygun erişimi de dâhil olmak üzere faaliyet gösterdikleri ülkelerin kanunlarına tabi olabilir. Pazarlama e-postası CASL kapsamında yalnızca açık rızanızla gönderilir. Size önemli zarar verme konusunda gerçek bir risk oluşturan güvenlik önlemi ihlallerini Kanada Gizlilik Komiserliği Ofisine ve size bildiririz ve her ihlalin kaydını 24 ay boyunca tutarız. Quebec: kişisel bilgileri Quebec dışına aktarmadan önce bir gizlilik etki değerlendirmesi yaparız; ciddi zarar riski taşıyan gizlilik olaylarını Commission d'accès à l'information'a ve size bildirir ve olaylara ilişkin bir kayıt tutarız; ücretli planda tartışmalar varsayılan olarak özeldir, ücretsiz plandaki tartışmalar ise 6. bölümde belirtildiği gibi herkese açıktır; hakkınızdaki kişisel bilgileri dizinden çıkarmamızı veya yaymayı bırakmamızı isteyebilirsiniz; verilerinizi yapılandırılmış ve yaygın kullanılan bir biçimde talep edebilirsiniz; bölüm 8 otomatik işlememizi açıklar." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "3275737c4d4f00f69810f778d9790483b84d10e42a2b30e493240a8ae2fbc8f2",
+  sha256: "ea239841b55abad6b39a31c7a5321803f044053c0b16ccff8c34295163d8fdff",
   eyebrow: "GİZLİLİK POLİTİKASI · v3.12 · YÜRÜRLÜK TARİHİ 4 KASIM 2026",
   title: "Neleri neden saklıyoruz?",
   lede: "GDPR (EU) 2016/679 kapsamındaki haklarınız ve yükümlülüklerimiz sade bir dille açıklanmıştır. On dört bölüm ve Ek B — sonuna kadar kaydırın.",

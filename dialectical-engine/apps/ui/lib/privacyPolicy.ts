@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Canada and Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. We answer requests within 30 days. We remain accountable for personal information we transfer to AI providers outside Canada, and use contracts to require comparable protection; those providers may be subject to the laws of the countries where they operate, including lawful access by authorities. Marketing email is sent only with your express consent under CASL. We report a breach of security safeguards that creates a real risk of significant harm to you to the Office of the Privacy Commissioner of Canada and to you, and we keep a record of every breach for 24 months. Quebec: before communicating personal information outside Quebec we conduct a privacy impact assessment; we report a confidentiality incident that presents a risk of serious injury to the Commission d'accès à l'information and to you, and keep a register of incidents; the settings that keep your debates private are on by default; you may ask us to de-index or cease disseminating personal information about you; you may request your data in a structured, commonly used format; section 8 describes our automated processing." }
+      { kind: "p", text: "Our privacy officer, and in Quebec the person in charge of the protection of personal information, is our director, reachable at privacy@dezbatere.ro. We answer requests within 30 days. We remain accountable for personal information we transfer to AI providers outside Canada, and use contracts to require comparable protection; those providers may be subject to the laws of the countries where they operate, including lawful access by authorities. Marketing email is sent only with your express consent under CASL. We report a breach of security safeguards that creates a real risk of significant harm to you to the Office of the Privacy Commissioner of Canada and to you, and we keep a record of every breach for 24 months. Quebec: before communicating personal information outside Quebec we conduct a privacy impact assessment; we report a confidentiality incident that presents a risk of serious injury to the Commission d'accès à l'information and to you, and keep a register of incidents; debates on a paid plan are private by default, and debates on the Free plan are public, as section 6 says; you may ask us to de-index or cease disseminating personal information about you; you may request your data in a structured, commonly used format; section 8 describes our automated processing." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "c8a6e30d7e806edc317b7a033e4e6386912c157088e9ed5e363a4ed70781e0c4",
+  sha256: "909c56718fa6e26a7cbad9035f7af33c3ae8a2bd518e7fe9af2163039a1a8238",
   eyebrow: "PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",

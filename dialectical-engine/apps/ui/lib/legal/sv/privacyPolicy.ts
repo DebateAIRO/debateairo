@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada och Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vi besvarar begäranden inom 30 dagar. Vi förblir ansvariga för personuppgifter som vi överför till AI-leverantörer utanför Kanada och använder avtal för att kräva jämförbart skydd; dessa leverantörer kan omfattas av lagarna i de länder där de är verksamma, inklusive myndigheters lagliga åtkomst. Marknadsföringsmeddelanden skickas endast med ditt uttryckliga samtycke enligt CASL. Vi anmäler ett intrång i säkerhetsskyddet som medför en verklig risk för betydande skada för dig till Office of the Privacy Commissioner of Canada och till dig, och vi för ett register över varje intrång i 24 månader. Quebec: innan vi överför personuppgifter utanför Quebec genomför vi en konsekvensbedömning avseende integritet; vi anmäler en sekretessincident som innebär en risk för allvarlig skada till Commission d'accès à l'information och till dig, och vi för ett register över incidenter; de inställningar som håller dina debatter privata är aktiverade som standard; du kan be oss att avindexera eller upphöra med spridningen av personuppgifter om dig; du kan begära dina uppgifter i ett strukturerat och allmänt använt format; avsnitt 8 beskriver vår automatiserade behandling." }
+      { kind: "p", text: "Vår integritetsansvariga, och i Quebec den person som ansvarar för skyddet av personuppgifter, är vår verkställande direktör, nåbar på privacy@dezbatere.ro. Vi besvarar begäranden inom 30 dagar. Vi förblir ansvariga för personuppgifter som vi överför till AI-leverantörer utanför Kanada och använder avtal för att kräva jämförbart skydd; dessa leverantörer kan omfattas av lagarna i de länder där de är verksamma, inklusive myndigheters lagliga åtkomst. Marknadsföringsmeddelanden skickas endast med ditt uttryckliga samtycke enligt CASL. Vi anmäler ett intrång i säkerhetsskyddet som medför en verklig risk för betydande skada för dig till Office of the Privacy Commissioner of Canada och till dig, och vi för ett register över varje intrång i 24 månader. Quebec: innan vi överför personuppgifter utanför Quebec genomför vi en konsekvensbedömning avseende integritet; vi anmäler en sekretessincident som innebär en risk för allvarlig skada till Commission d'accès à l'information och till dig, och vi för ett register över incidenter; på ett betalabonnemang är debatter privata som standard, och debatter på det kostnadsfria abonnemanget är offentliga, som avsnitt 6 anger; du kan be oss att avindexera eller upphöra med spridningen av personuppgifter om dig; du kan begära dina uppgifter i ett strukturerat och allmänt använt format; avsnitt 8 beskriver vår automatiserade behandling." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "862ab5612b09671276dae051716dc70f2d6e381932698fe1416a040252f210d3",
+  sha256: "10132f480112d8cfe0a3e6096a15dbcb56285e2994d0f5c1d19385f154150781",
   eyebrow: "INTEGRITETSPOLICY · v3.12 · GÄLLER FRÅN 4 NOVEMBER 2026",
   title: "Vad vi lagrar och varför",
   lede: "Dina rättigheter och våra skyldigheter enligt GDPR (EU) 2016/679, på ett lättbegripligt språk. Fjorton avsnitt och bilaga B — rulla till slutet.",

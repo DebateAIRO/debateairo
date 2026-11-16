@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada i Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Na zahtjeve odgovaramo u roku od 30 dana. Ostajemo odgovorni za osobne podatke koje prenosimo pružateljima usluga umjetne inteligencije izvan Kanade i ugovorima zahtijevamo usporedivu zaštitu; na te se pružatelje mogu primjenjivati zakoni država u kojima posluju, uključujući zakonit pristup tijela vlasti. Marketinška e-pošta šalje se samo uz vašu izričitu privolu prema CASL-u. Povredu sigurnosnih zaštitnih mjera koja stvara stvaran rizik od znatne štete za vas prijavljujemo Uredu povjerenika za privatnost Kanade i vama te evidenciju o svakoj povredi čuvamo 24 mjeseca. Quebec: prije priopćavanja osobnih podataka izvan Quebeca provodimo procjenu učinka na privatnost; incident povjerljivosti koji predstavlja rizik od ozbiljne štete prijavljujemo tijelu Commission d'accès à l'information i vama te vodimo evidenciju incidenata; postavke kojima se vaše rasprave zadržavaju privatnima uključene su prema zadanom; možete zatražiti da uklonimo iz indeksa ili prestanemo širiti osobne podatke o vama; možete zatražiti svoje podatke u strukturiranom, uobičajenom formatu; odjeljak 8 opisuje našu automatiziranu obradu." }
+      { kind: "p", text: "Naš službenik za privatnost, a u Quebecu osoba odgovorna za zaštitu osobnih podataka, jest naš direktor, dostupan na privacy@dezbatere.ro. Na zahtjeve odgovaramo u roku od 30 dana. Ostajemo odgovorni za osobne podatke koje prenosimo pružateljima usluga umjetne inteligencije izvan Kanade i ugovorima zahtijevamo usporedivu zaštitu; na te se pružatelje mogu primjenjivati zakoni država u kojima posluju, uključujući zakonit pristup tijela vlasti. Marketinška e-pošta šalje se samo uz vašu izričitu privolu prema CASL-u. Povredu sigurnosnih zaštitnih mjera koja stvara stvaran rizik od znatne štete za vas prijavljujemo Uredu povjerenika za privatnost Kanade i vama te evidenciju o svakoj povredi čuvamo 24 mjeseca. Quebec: prije priopćavanja osobnih podataka izvan Quebeca provodimo procjenu učinka na privatnost; incident povjerljivosti koji predstavlja rizik od ozbiljne štete prijavljujemo tijelu Commission d'accès à l'information i vama te vodimo evidenciju incidenata; rasprave na plaćenom planu su prema zadanim postavkama privatne, a rasprave na besplatnom planu su javne, kako je navedeno u 6. odjeljku; možete zatražiti da uklonimo iz indeksa ili prestanemo širiti osobne podatke o vama; možete zatražiti svoje podatke u strukturiranom, uobičajenom formatu; odjeljak 8 opisuje našu automatiziranu obradu." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "8ca2f143a008158e0d09848d3d8ad52bd393bfb4d05ee015836845484c61af40",
+  sha256: "3fbe5d8942c9e1a3550ad4f8f91104f8eda0eee8e2ef7da3c3f237c75566f02b",
   eyebrow: "PRAVILA O PRIVATNOSTI · v3.12 · NA SNAZI OD 4. STUDENOGA 2026.",
   title: "Što pohranjujemo i zašto",
   lede: "Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.",

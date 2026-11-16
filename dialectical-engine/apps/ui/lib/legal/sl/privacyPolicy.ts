@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada in Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Na zahteve odgovorimo v 30 dneh. Še naprej smo odgovorni za osebne podatke, ki jih prenašamo ponudnikom umetne inteligence zunaj Kanade, in s pogodbami zahtevamo primerljivo zaščito; za te ponudnike lahko veljajo zakoni držav, v katerih poslujejo, vključno z zakonitim dostopom organov. Trženjska e-pošta se pošilja samo z vašo izrecno privolitvijo v skladu s CASL. Kršitev varnostnih ukrepov, ki za vas pomeni resnično tveganje znatne škode, prijavimo Uradu kanadskega pooblaščenca za zasebnost in vam ter o vsaki kršitvi 24 mesecev hranimo evidenco. Quebec: pred posredovanjem osebnih podatkov zunaj Quebeca izvedemo oceno učinka na zasebnost; incident zaupnosti, ki pomeni tveganje resne škode, prijavimo Commission d'accès à l'information in vam ter vodimo register incidentov; nastavitve, ki vaše razprave ohranjajo zasebne, so privzeto vključene; zahtevate lahko, da vaše osebne podatke odstranimo iz indeksov ali prenehamo razširjati; zahtevate lahko svoje podatke v strukturirani, splošno uporabljani obliki; razdelek 8 opisuje našo avtomatizirano obdelavo." }
+      { kind: "p", text: "Naša oseba, odgovorna za zasebnost, v Quebecu pa oseba, odgovorna za varstvo osebnih podatkov, je naš direktor, ki je dosegljiv na privacy@dezbatere.ro. Na zahteve odgovorimo v 30 dneh. Še naprej smo odgovorni za osebne podatke, ki jih prenašamo ponudnikom umetne inteligence zunaj Kanade, in s pogodbami zahtevamo primerljivo zaščito; za te ponudnike lahko veljajo zakoni držav, v katerih poslujejo, vključno z zakonitim dostopom organov. Trženjska e-pošta se pošilja samo z vašo izrecno privolitvijo v skladu s CASL. Kršitev varnostnih ukrepov, ki za vas pomeni resnično tveganje znatne škode, prijavimo Uradu kanadskega pooblaščenca za zasebnost in vam ter o vsaki kršitvi 24 mesecev hranimo evidenco. Quebec: pred posredovanjem osebnih podatkov zunaj Quebeca izvedemo oceno učinka na zasebnost; incident zaupnosti, ki pomeni tveganje resne škode, prijavimo Commission d'accès à l'information in vam ter vodimo register incidentov; na plačljivem paketu so razprave privzeto zasebne, razprave na brezplačnem paketu pa so javne, kot pove razdelek 6; zahtevate lahko, da vaše osebne podatke odstranimo iz indeksov ali prenehamo razširjati; zahtevate lahko svoje podatke v strukturirani, splošno uporabljani obliki; razdelek 8 opisuje našo avtomatizirano obdelavo." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "8cf1be2b0e1539f9d217ff041fe1f50ea9116372da75cb5bf87979d5910f8b20",
+  sha256: "d61e94cf5b01148a7cde9af17736b4b33f10a6b3df3444b360354bcec635b970",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.12 · VELJA OD 4. NOVEMBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
