@@ -64,11 +64,19 @@ export function countStoryPositions(
   nodes: readonly Readonly<{ node_id: string }>[],
   edges: readonly Readonly<Pick<Edge, "from_node_ref" | "target_kind" | "target_ref">>[]
 ): number {
+  return storyPositionIds(nodes, edges).size;
+}
+
+/** The positions `countStoryPositions` counts, by node id: the points that argue about nothing else. */
+export function storyPositionIds(
+  nodes: readonly Readonly<{ node_id: string }>[],
+  edges: readonly Readonly<Pick<Edge, "from_node_ref" | "target_kind" | "target_ref">>[]
+): ReadonlySet<string> {
   const arguing = new Set<string>();
   for (const edge of edges) {
     // A self-referencing edge is not an argument about another point.
     if (edge.target_kind === "NODE" && edge.target_ref === edge.from_node_ref) continue;
     arguing.add(edge.from_node_ref);
   }
-  return nodes.filter((node) => !arguing.has(node.node_id)).length;
+  return new Set(nodes.filter((node) => !arguing.has(node.node_id)).map((node) => node.node_id));
 }
