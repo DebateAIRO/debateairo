@@ -54,7 +54,7 @@ export function DebateWorkspaceDrawer({
                       <h3>{run.analyzer_type}</h3>
                       <span className="pill">{run.status}</span>
                     </div>
-                    <p>{run.output.findings?.[0] || t(catalog, "debateDrawers.workspace.noFinding")}</p>
+                    <p data-ai-generated={run.output.findings?.[0] ? "true" : undefined}>{run.output.findings?.[0] || t(catalog, "debateDrawers.workspace.noFinding")}</p>
                     <p className="wsMuted">{provenanceLabel(run.provenance)}</p>
                   </article>
                 ))}
@@ -74,14 +74,14 @@ export function DebateWorkspaceDrawer({
                       <h3>{run.agent_name || run.role || run.id}</h3>
                       <span className="pill">{run.status}</span>
                     </div>
-                    <p>{run.summary || run.agent.description || t(catalog, "debateDrawers.workspace.noSummary")}</p>
+                    <p data-ai-generated={run.summary ? "true" : undefined}>{run.summary || run.agent.description || t(catalog, "debateDrawers.workspace.noSummary")}</p>
                     {run.skills_used.length ? (
                       <p className="wsMuted">{t(catalog, "debateDrawers.workspace.skills", { skills: run.skills_used.map((s) => s.name || s.id).join(", ") })}</p>
                     ) : null}
                     <div className="wsColumns">
                       <div>
                         <div className="wsColLabel">{t(catalog, "debateDrawers.workspace.pros", { count: run.pros.length })}</div>
-                        <ul>
+                        <ul data-ai-generated="true">
                           {run.pros.map((item) => (
                             <li key={item}>{item}</li>
                           ))}
@@ -89,7 +89,7 @@ export function DebateWorkspaceDrawer({
                       </div>
                       <div>
                         <div className="wsColLabel">{t(catalog, "debateDrawers.workspace.cons", { count: run.cons.length })}</div>
-                        <ul>
+                        <ul data-ai-generated="true">
                           {run.cons.map((item) => (
                             <li key={item}>{item}</li>
                           ))}
@@ -109,7 +109,7 @@ export function DebateWorkspaceDrawer({
                 <span>{t(catalog, "debateDrawers.workspace.singleShot")}</span>
               </div>
               <article className="wsCard">
-                <p>{singleShot.final_text}</p>
+                <p data-ai-generated="true">{singleShot.final_text}</p>
                 <p className="wsMuted">
                   {t(catalog, "debateDrawers.workspace.singleShotWinner", { model: singleShot.model_id, side: t(catalog, sideKey(singleShot.global_winner.side)) })}
                 </p>

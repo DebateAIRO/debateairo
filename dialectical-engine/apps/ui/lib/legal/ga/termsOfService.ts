@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Na háiteanna ina gcuirimid Dialectical Engine ar fáil",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua, an Íoslainn agus an Lichtinstéin), san Eilvéis, sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin, sa Chóiré Theas agus sa Téaváin. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
+      { kind: "p", text: "Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua agus an Íoslainn), sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin agus sa Chóiré Theas. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "An Eilvéis",
+    title: "An Mholdóiv",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Tá feidhm ag an Swiss Federal Act on Data Protection maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.5). Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na háite san Eilvéis ina bhfuil cónaí ort. Níl feidhm ag aon cheart reachtúil tarraingthe siar maidir leis an bplean íoctha; láimhseáiltear iarrataí aisíocaíochta ag support@dezbatere.ro." }
+      { kind: "p", text: "Tá na cearta céanna agat faoi na Téarmaí seo agus atá ag tomhaltóir san Aontas Eorpach, lena n-áirítear an ceart tarraingt siar laistigh de 14 lá i rannán 13. Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na Moldóive. Tá feidhm ag Dlí Uimh. 195/2024 na Moldóive maidir le cosaint sonraí pearsanta i leith do shonraí (Beartas Príobháideachais, Iarscríbhinn B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "An Mholdóiv",
+    title: "An Áise agus an tAigéan Ciúin",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tá na cearta céanna agat faoi na Téarmaí seo agus atá ag tomhaltóir san Aontas Eorpach, lena n-áirítear an ceart tarraingt siar laistigh de 14 lá i rannán 13. Féadfaidh tú imeachtaí a thionscnamh i gcúirteanna na Moldóive. Tá feidhm ag Dlí Uimh. 195/2024 na Moldóive maidir le cosaint sonraí pearsanta i leith do shonraí (Beartas Príobháideachais, Iarscríbhinn B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "An Áise agus an tAigéan Ciúin",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singeapór: is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár nOifigeach Cosanta Sonraí; tá aistrithe bunaithe ar chosaintí conarthacha atá inchomparáide leis an PDPA; ní bhaineann aon tréimhse mhachnaimh reachtúil leis an bplean íoctha, agus láimhseáiltear iarrataí aisíocaíochta ag support@dezbatere.ro. An tSeapáin: tá an nochtadh reachtúil faoin Specified Commercial Transactions Act ag dezbatere.ro/legal; níl feidhm ag aon tréimhse mhachnaimh ghinearálta maidir le síntiúis ar líne, agus láimhseáiltear iarrataí aisíocaíochta ag support@dezbatere.ro; seolaimid d'ábhar chuig soláthraithe IS sna Stáit Aontaithe agus san Aontas Eorpach, gach ceann acu faoi chonradh a éilíonn cosaint atá coibhéiseach leis an gcosaint faoi Act on the Protection of Personal Information na Seapáine, agus ar iarratas insímid duit cad iad na bearta sin. An Chóiré Theas: bailítear toilithe le próiseáil roghnach agus margaíocht ar leithligh ó na míreanna a theastaíonn chun an tseirbhís a reáchtáil; is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais; féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála faoi réir an E-Commerce Act; faighimid do thoiliú úr roimh aon mhéadú praghais athfhillteach nó tiontú ó phlean saor in aisce go plean íoctha; úsáideann an tseirbhís IS ghiniúnach, insímid é sin duit sula n-úsáideann tú í, agus lipéadaímid aschur a ghintear le IS. An Téaváin: féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála, faoin Consumer Protection Act; tá feidhm ag Personal Data Protection Act na Téaváine maidir le do shonraí (Beartas Príobháideachais, Iarscríbhinn B.7)." }
+      { kind: "p", text: "Singeapór: is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár nOifigeach Cosanta Sonraí; tá aistrithe bunaithe ar chosaintí conarthacha atá inchomparáide leis an PDPA; ní bhaineann aon tréimhse mhachnaimh reachtúil leis an bplean íoctha, agus láimhseáiltear iarrataí aisíocaíochta ag support@dezbatere.ro. An tSeapáin: tá an nochtadh reachtúil faoin Specified Commercial Transactions Act ag dezbatere.ro/legal; níl feidhm ag aon tréimhse mhachnaimh ghinearálta maidir le síntiúis ar líne, agus láimhseáiltear iarrataí aisíocaíochta ag support@dezbatere.ro; seolaimid d'ábhar chuig soláthraithe IS sna Stáit Aontaithe agus san Aontas Eorpach, gach ceann acu faoi chonradh a éilíonn cosaint atá coibhéiseach leis an gcosaint faoi Act on the Protection of Personal Information na Seapáine, agus ar iarratas insímid duit cad iad na bearta sin. An Chóiré Theas: bailítear toilithe le próiseáil roghnach agus margaíocht ar leithligh ó na míreanna a theastaíonn chun an tseirbhís a reáchtáil; is é ár stiúrthóir, ar féidir teagmháil a dhéanamh leis ag privacy@dezbatere.ro, ár n-oifigeach príobháideachais; féadfaidh tú tarraingt siar ó phlean íoctha laistigh de 7 lá tar éis liostála faoi réir an E-Commerce Act; faighimid do thoiliú úr roimh aon mhéadú praghais athfhillteach nó tiontú ó phlean saor in aisce go plean íoctha; úsáideann an tseirbhís IS ghiniúnach, insímid é sin duit sula n-úsáideann tú í, agus lipéadaímid aschur a ghintear le IS." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "253f1cd078bf5f883994aac68f857b825524897e6b23f95653b07924ae578b77",
+  sha256: "8d194648463cf752a18ef264a21611f56dc592bdc3e71010ba522a507b3a9bb3",
   eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.18 · I bhFEIDHM 1 SAMHAIN 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",

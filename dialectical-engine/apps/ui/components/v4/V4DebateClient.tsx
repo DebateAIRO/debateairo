@@ -1617,7 +1617,7 @@ function V4Debate({
             <section className="v4Card v4DebStatus v4DebProgress v4DebFirstCard">
               <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
               {/* The person's own words (the tab title follows this heading); the added lines are not a title. */}
-              <h1 className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(load.run.question_line)}</h1>
+              <h1 className="v4Serif v4DebStatusQuestion">{ownWords(load.run.question_line)}</h1>
               {/* Owner review 3 Nov (wait-f5): paused at the month wall, the one pause block stands in the waiting card's place. */}
               <V4RunRoot
                 map={null}
@@ -1874,7 +1874,7 @@ function V4Debate({
       {/* The tab title follows this heading (DocumentTitle): the person's own words, not the added lines. R2TIME-9: it
           sits outside the inert wrapper, so the title stays while the phone map is open. wait-f4: the state word above
           (data-tab-prefix) and the one live region sit outside it too. */}
-      <h1 className="v4SrOnly" data-ai-generated="true">{ownWords(view.question)}</h1>
+      <h1 className="v4SrOnly">{ownWords(view.question)}</h1>
       {ready.announcer}
       {/* Task 62 (map-f4): a path that filled in between two reads, said once, politely (the title marked as AI text only when
           an AI wrote it). */}
@@ -1916,7 +1916,7 @@ function V4Debate({
               {parent.question.length > 0 ? (
                 <>
                   {t(catalog, "v4.debate.backTo")}{" "}
-                  <span className="v4DebBackQuestion" data-ai-generated="true">{parent.question}</span>
+                  <span className="v4DebBackQuestion">{parent.question}</span>
                 </>
               ) : t(catalog, "v4.debate.backToEarlier")}
             </Link>
@@ -1931,7 +1931,7 @@ function V4Debate({
           {storyWait ? (
             <section className="v4Card v4DebFirstCard" aria-label={t(catalog, "v4.debate.yourQuestion")}>
               <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
-              <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{firstCardQuestion(view)}</p>
+              <p className="v4Serif v4DebStatusQuestion">{firstCardQuestion(view)}</p>
             </section>
           ) : null}
           {/* Task 62: the answer card waits for the answer (during the run the map's first card is the question). */}

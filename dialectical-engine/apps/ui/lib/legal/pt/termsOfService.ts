@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Onde disponibilizamos a Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Disponibilizamos a Dialectical Engine a pessoas que residam na União Europeia (27 países) e no Espaço Económico Europeu (Noruega, Islândia e Liechtenstein), na Suíça, na Moldávia, nos Estados Unidos (exceto o Tennessee), no Canadá, na Austrália, na Nova Zelândia, em Singapura, no Japão, na Coreia do Sul e em Taiwan. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
+      { kind: "p", text: "Disponibilizamos a Dialectical Engine a pessoas que residam na União Europeia (27 países) e no Espaço Económico Europeu (Noruega e Islândia), na Moldávia, nos Estados Unidos (exceto o Tennessee), no Canadá, na Austrália, na Nova Zelândia, em Singapura, no Japão e na Coreia do Sul. Não a disponibilizamos noutros locais. Se residir fora desses países, poderá conseguir aceder ao sítio, mas não dirigimos o serviço a si, não aceitamos pagamentos seus e estes Termos e a nossa Política de Privacidade não estão adaptados à legislação do seu país. O Anexo A estabelece o que se aplica em cada região que servimos." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Suíça",
+    title: "Moldávia",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "A Lei Federal suíça sobre a Proteção de Dados aplica-se aos seus dados (Política de Privacidade, Anexo B.5). Pode intentar ações nos tribunais do local da Suíça onde reside. Não se aplica ao plano pago qualquer direito legal de retratação; os pedidos de reembolso são tratados em support@dezbatere.ro." }
+      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldávia",
+    title: "Ásia-Pacífico",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Ao abrigo destes Termos, tem os mesmos direitos que um consumidor na União Europeia, incluindo o direito de retratação de 14 dias previsto na secção 13. Pode intentar ações nos tribunais da Moldávia. A Lei n.º 195/2024 da Moldávia relativa à proteção de dados pessoais aplica-se aos seus dados (Política de Privacidade, Anexo B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Ásia-Pacífico",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é o nosso administrador, contactável em privacy@dezbatere.ro; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão, e os pedidos de reembolso são tratados em support@dezbatere.ro. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em dezbatere.ro/legal; não se aplica um período geral de reflexão às subscrições em linha, e os pedidos de reembolso são tratados em support@dezbatere.ro; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é o nosso administrador, contactável em privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA. Taiwan: pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do Consumer Protection Act; a Personal Data Protection Act de Taiwan aplica-se aos seus dados (Política de Privacidade, Anexo B.7)." }
+      { kind: "p", text: "Singapura: o nosso Encarregado da Proteção de Dados é o nosso administrador, contactável em privacy@dezbatere.ro; as transferências assentam em proteções contratuais comparáveis às da PDPA; não se aplica ao plano pago qualquer período legal de reflexão, e os pedidos de reembolso são tratados em support@dezbatere.ro. Japão: a divulgação legal ao abrigo do Specified Commercial Transactions Act está disponível em dezbatere.ro/legal; não se aplica um período geral de reflexão às subscrições em linha, e os pedidos de reembolso são tratados em support@dezbatere.ro; enviamos o seu conteúdo para fornecedores de IA nos Estados Unidos e na União Europeia, cada um ao abrigo de um contrato que exige uma proteção equivalente à da Act on the Protection of Personal Information do Japão, e, mediante pedido, informamo-lo sobre essas medidas. Coreia do Sul: os consentimentos para tratamento facultativo e marketing são recolhidos separadamente dos elementos necessários ao funcionamento do serviço; o nosso responsável pela privacidade é o nosso administrador, contactável em privacy@dezbatere.ro; pode retratar-se de um plano pago no prazo de 7 dias após a subscrição, nos termos do E-Commerce Act; obtemos novamente o seu consentimento antes de qualquer aumento de preço recorrente ou conversão de gratuito para pago; o serviço utiliza IA generativa, informamo-lo disso antes de o utilizar e identificamos os resultados gerados por IA." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "4d0f81ed3946f000e023e0bf667b54a09e51b21f6ae648ce94d96a984531a197",
+  sha256: "f646eefa5ef569061193df52b4ab867fcd51d1d0cdfb95d727757ced11c9f806",
   eyebrow: "TERMOS DE SERVIÇO · v2.18 · EM VIGOR DESDE 1 DE NOVEMBRO DE 2026",
   title: "Aquilo com que concorda",
   lede: "O contrato entre si e a DMS Merchandise Shop S.R.L., em linguagem clara. Dezanove secções e o Anexo A — desloque-se até ao fim.",

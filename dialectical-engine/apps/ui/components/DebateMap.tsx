@@ -191,6 +191,7 @@ export function DebateMap({
                 ref={segmentRef(arc.id)}
                 aria-label={`${localizedRoleLabel(arc.node, catalog, debateChromeCatalog)}: ${arc.node.claim}`}
                 lang={textLang.lang}
+                data-ai-generated={arc.node.node_type === "ROOT_CLAIM" ? undefined : "true"}
                 onClick={() => onOpenSplit(arc.id)}
                 onMouseEnter={() => setHoverId(arc.id)}
                 onFocus={() => {

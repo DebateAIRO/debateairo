@@ -201,6 +201,19 @@ Zealand, Singapore and Japan. `withdrawal_countries` names every country the sit
 run's US buyer needs no added `"US"` any more (deploy/vps/README.md §14.9). The Terms (section 13, Annex A) and the
 withdraw page's text still describe the narrower set and must follow.
 
+**Amendment 2026-11-12 (V, owner decision):** Taiwan is closed: no sign-up and no payment (`TERMS_EXCLUDED`, like
+Israel). It leaves the Terms (section 2, Annex A.7), the Privacy Policy (Annex B.7) and `withdrawal_countries`. The
+`TW_BUSINESS_TAX` tax line stays for a later reopening, like the UK's. Accounts opened from Taiwan before this date
+are not touched.
+
+**Amendment 2026-11-14 (V, owner decision):** Switzerland and Liechtenstein are closed for now: no sign-up and no
+payment (`NOT_OFFERED`, like the UK). They are one VAT territory; with the company's worldwide turnover above CHF
+100,000 a year, Swiss VAT is due from the first paid sale there, and registering needs a Swiss tax representative.
+They reopen once one is appointed. The Terms' section 2 no longer lists them, the Swiss sections (Terms Annex A.5,
+Privacy Policy Annex B.5) are removed and the later sections renumbered (Moldova A.5/B.5, Asia-Pacific A.6/B.6).
+Switzerland leaves `withdrawal_countries`; Liechtenstein stays on it as part of the law's own list. The `CH_VAT`
+tax line stays.
+
 ### 1.6 The money check
 
 Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are

@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur siūlome Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje, Islandijoje ir Lichtenšteine), Šveicarijoje, Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje, Pietų Korėjoje ir Taivane. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
+      { kind: "p", text: "Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje ir Islandijoje), Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje ir Pietų Korėjoje. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Šveicarija",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Jūsų duomenims taikomas Šveicarijos federalinis duomenų apsaugos įstatymas (Privatumo politikos B priedo B.5 skirsnis). Galite iškelti bylą tos Šveicarijos vietovės, kurioje gyvenate, teismuose. Mokamam planui netaikoma įstatymų nustatyta teisė atsisakyti sutarties; prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro." }
+      { kind: "p", text: "Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.5 skirsnis)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Azijos ir Ramiojo vandenyno regionas",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pagal šias Sąlygas turite tokias pačias teises kaip vartotojas Europos Sąjungoje, įskaitant 13 skyriuje nustatytą 14 dienų teisę atsisakyti sutarties. Galite iškelti bylą Moldovos teismuose. Jūsų duomenims taikomas Moldovos įstatymas Nr. 195/2024 dėl asmens duomenų apsaugos (Privatumo politikos B priedo B.6 skirsnis)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Azijos ir Ramiojo vandenyno regionas",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro. Japonija: įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu dezbatere.ro/legal; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. Pietų Korėja: sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime. Taivanas: pagal Vartotojų apsaugos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; jūsų duomenims taikomas Taivano asmens duomenų apsaugos įstatymas (Privatumo politikos B priedo B.7 skirsnis)." }
+      { kind: "p", text: "Singapūras: mūsų duomenų apsaugos pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; perdavimai grindžiami sutartinėmis apsaugos priemonėmis, panašiomis į PDPA; mokamam planui netaikomas įstatymų nustatytas apsigalvojimo laikotarpis, o prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro. Japonija: įstatymų nustatytas atskleidimas pagal Specialiųjų komercinių sandorių įstatymą pateiktas adresu dezbatere.ro/legal; internetinėms prenumeratoms netaikomas bendrasis apsigalvojimo laikotarpis, o prašymai grąžinti pinigus nagrinėjami adresu support@dezbatere.ro; jūsų turinį siunčiame DI paslaugų teikėjams Jungtinėse Amerikos Valstijose ir Europos Sąjungoje, kiekvienam pagal sutartį, kuria reikalaujama apsaugos, lygiavertės Japonijos Asmeninės informacijos apsaugos įstatymo reikalavimams, o paprašius informuojame, kokios tai priemonės. Pietų Korėja: sutikimai dėl neprivalomo duomenų tvarkymo ir rinkodaros gaunami atskirai nuo paslaugai teikti būtinų dalykų; mūsų privatumo pareigūnas yra mūsų direktorius, su kuriuo galite susisiekti adresu privacy@dezbatere.ro; pagal Elektroninės prekybos įstatymą galite atsisakyti mokamo plano per 7 dienas nuo jo užsakymo; prieš kiekvieną pasikartojantį kainos padidinimą ar nemokamo plano pakeitimą mokamu iš naujo gauname jūsų sutikimą; paslauga naudoja generatyvųjį DI, apie tai informuojame prieš jums pradedant ja naudotis, o DI sugeneruotą turinį pažymime." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "46d2aefcc49c741d14cf42c7b9cd47d393db90fd9e4bda9e9a897df85454af14",
+  sha256: "c85d08f67e70022473b212107274494fc012678b5d570f3f4cf3ee849801e799",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.18 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

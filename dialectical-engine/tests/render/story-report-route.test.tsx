@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError, type Answer, type AnswerStory, type RunProjection } from "@debateai/contract";
 import { GET, HEAD } from "../../apps/ui/app/debate/[id]/report/route.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/ui/lib/aiDisclosure.js";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { reportSupportedForLocale, type ReportCatalogLoader } from "../../apps/ui/lib/report/reportLanguage.js";
 import {
@@ -288,6 +289,8 @@ describe("handleReportRequest", () => {
     );
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    // EU AI Act Art. 50(2): the download says, for machines, that its body is AI-generated.
+    expect(response.headers.get(AI_GENERATED_HEADER)).toBe(AI_GENERATED_HEADER_VALUE);
     expect(Buffer.from(await response.arrayBuffer()).subarray(0, 5).toString("latin1")).toBe("%PDF-");
     expect(readAnswerStory).toHaveBeenCalledWith(STORY_FIXTURE_ANSWER.answer_id);
   });
@@ -383,10 +386,11 @@ describe("HEAD: the same answer as GET, without making the PDF (review polish)",
     const { get, head, render } = await both(reader({ readAnswerStory: async () => storyFixture("READY_WITH_RESERVATION") }));
     expect(head.status).toBe(200);
     expect(get.status).toBe(200);
-    for (const name of ["content-type", "content-disposition", "cache-control", "x-content-type-options"]) {
+    for (const name of ["content-type", "content-disposition", "cache-control", "x-content-type-options", AI_GENERATED_HEADER]) {
       expect(head.headers.get(name), name).toBe(get.headers.get(name));
     }
     expect(head.headers.get("content-type")).toBe("application/pdf");
+    expect(head.headers.get(AI_GENERATED_HEADER)).toBe(AI_GENERATED_HEADER_VALUE);
     expect(head.body).toBeNull();
     expect(render).not.toHaveBeenCalled();
   });
@@ -422,6 +426,9 @@ describe("HEAD: the same answer as GET, without making the PDF (review polish)",
       expect(head.status, name).not.toBe(200);
       expect(head.headers.get("content-type"), name).toBe(get.headers.get("content-type"));
       expect(head.headers.get("cache-control"), name).toBe(get.headers.get("cache-control"));
+      // A refusal is one plain catalogue line, not generated content: it carries no AI mark.
+      expect(get.headers.get(AI_GENERATED_HEADER), name).toBeNull();
+      expect(head.headers.get(AI_GENERATED_HEADER), name).toBeNull();
       expect(head.body, name).toBeNull();
       expect(render, name).not.toHaveBeenCalled();
     }

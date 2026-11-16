@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdzie oferujemy Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferujemy Dialectical Engine osobom mieszkającym w Unii Europejskiej (27 państw) i Europejskim Obszarze Gospodarczym (Norwegia, Islandia i Liechtenstein), Szwajcarii, Mołdawii, Stanach Zjednoczonych (z wyjątkiem stanu Tennessee), Kanadzie, Australii, Nowej Zelandii, Singapurze, Japonii, Korei Południowej i na Tajwanie. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie." }
+      { kind: "p", text: "Oferujemy Dialectical Engine osobom mieszkającym w Unii Europejskiej (27 państw) i Europejskim Obszarze Gospodarczym (Norwegia i Islandia), Mołdawii, Stanach Zjednoczonych (z wyjątkiem stanu Tennessee), Kanadzie, Australii, Nowej Zelandii, Singapurze, Japonii i Korei Południowej. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Szwajcaria",
+    title: "Mołdawia",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Do Twoich danych ma zastosowanie szwajcarska federalna ustawa o ochronie danych (Polityka prywatności, Załącznik B.5). Możesz wszcząć postępowanie przed sądami miejsca w Szwajcarii, w którym mieszkasz. W odniesieniu do planu płatnego nie przysługuje ustawowe prawo odstąpienia; wnioski o zwrot rozpatrujemy pod adresem support@dezbatere.ro." }
+      { kind: "p", text: "Na podstawie niniejszych Warunków przysługują Ci takie same prawa jak konsumentowi w Unii Europejskiej, w tym 14-dniowe prawo odstąpienia określone w sekcji 13. Możesz wszcząć postępowanie przed sądami Mołdawii. Do Twoich danych ma zastosowanie mołdawska ustawa nr 195/2024 o ochronie danych osobowych (Polityka prywatności, Załącznik B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Mołdawia",
+    title: "Azja i Pacyfik",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Na podstawie niniejszych Warunków przysługują Ci takie same prawa jak konsumentowi w Unii Europejskiej, w tym 14-dniowe prawo odstąpienia określone w sekcji 13. Możesz wszcząć postępowanie przed sądami Mołdawii. Do Twoich danych ma zastosowanie mołdawska ustawa nr 195/2024 o ochronie danych osobowych (Polityka prywatności, Załącznik B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Azja i Pacyfik",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapur: naszym Inspektorem Ochrony Danych jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro; przekazywanie danych opiera się na zabezpieczeniach umownych porównywalnych z PDPA; w odniesieniu do planu płatnego nie przysługuje ustawowy okres na rezygnację, a wnioski o zwrot rozpatrujemy pod adresem support@dezbatere.ro. Japonia: ujawnienie wymagane przez Specified Commercial Transactions Act jest dostępne pod adresem dezbatere.ro/legal; do subskrypcji internetowych nie ma zastosowania ogólne prawo do rezygnacji, a wnioski o zwrot rozpatrujemy pod adresem support@dezbatere.ro; przesyłamy Twoje treści dostawcom AI w Stanach Zjednoczonych i Unii Europejskiej, każdemu na podstawie umowy wymagającej ochrony równoważnej z japońską Act on the Protection of Personal Information, a na żądanie informujemy Cię, jakie to są środki. Korea Południowa: zgody na opcjonalne przetwarzanie i marketing są zbierane odrębnie od zgód wymaganych do świadczenia usługi; naszym inspektorem ds. prywatności jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro; możesz odstąpić od planu płatnego w terminie 7 dni od subskrypcji, z zastrzeżeniem E-Commerce Act; przed każdą cykliczną podwyżką ceny lub przekształceniem planu bezpłatnego w płatny ponownie uzyskujemy Twoją zgodę; usługa wykorzystuje generatywną AI, informujemy Cię o tym, zanim z niej skorzystasz, i oznaczamy wyniki wygenerowane przez AI. Tajwan: możesz odstąpić od planu płatnego w terminie 7 dni od subskrypcji, na podstawie Consumer Protection Act; do Twoich danych ma zastosowanie tajwańska Personal Data Protection Act (Polityka prywatności, Załącznik B.7)." }
+      { kind: "p", text: "Singapur: naszym Inspektorem Ochrony Danych jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro; przekazywanie danych opiera się na zabezpieczeniach umownych porównywalnych z PDPA; w odniesieniu do planu płatnego nie przysługuje ustawowy okres na rezygnację, a wnioski o zwrot rozpatrujemy pod adresem support@dezbatere.ro. Japonia: ujawnienie wymagane przez Specified Commercial Transactions Act jest dostępne pod adresem dezbatere.ro/legal; do subskrypcji internetowych nie ma zastosowania ogólne prawo do rezygnacji, a wnioski o zwrot rozpatrujemy pod adresem support@dezbatere.ro; przesyłamy Twoje treści dostawcom AI w Stanach Zjednoczonych i Unii Europejskiej, każdemu na podstawie umowy wymagającej ochrony równoważnej z japońską Act on the Protection of Personal Information, a na żądanie informujemy Cię, jakie to są środki. Korea Południowa: zgody na opcjonalne przetwarzanie i marketing są zbierane odrębnie od zgód wymaganych do świadczenia usługi; naszym inspektorem ds. prywatności jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro; możesz odstąpić od planu płatnego w terminie 7 dni od subskrypcji, z zastrzeżeniem E-Commerce Act; przed każdą cykliczną podwyżką ceny lub przekształceniem planu bezpłatnego w płatny ponownie uzyskujemy Twoją zgodę; usługa wykorzystuje generatywną AI, informujemy Cię o tym, zanim z niej skorzystasz, i oznaczamy wyniki wygenerowane przez AI." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "e18f725e00a7312a19f9a0e55cdde9740e95e6e8fd46b4a03b7b609ae3b77fd9",
+  sha256: "2e98d121125cc7ffff9c8750935f7a1ad8a1a306242c79177582379b2a85333c",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.18 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",

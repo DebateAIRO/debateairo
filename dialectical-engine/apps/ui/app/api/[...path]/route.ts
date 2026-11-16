@@ -1,4 +1,5 @@
 import { previewAskProxyCeiling } from "../../../lib/previewAskProxyCeiling.js";
+import { AI_GENERATED_HEADER } from "../../../lib/aiDisclosure.js";
 import {
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
@@ -47,7 +48,9 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "retry-after",
   "vary",
   // Side-by-side spec §7 (plan C12): the API's release, which the browser compares with the page's.
-  "x-debateai-release"
+  "x-debateai-release",
+  // EU AI Act Art. 50(2): the API's machine-readable mark on a body that carries AI-generated content.
+  AI_GENERATED_HEADER
 ] as const);
 /** L3-F1: aligned with the API's Fastify bodyLimit (B5); the proxy never buffers more. */
 const MAX_PROXY_BODY_BYTES = 1_048_576;

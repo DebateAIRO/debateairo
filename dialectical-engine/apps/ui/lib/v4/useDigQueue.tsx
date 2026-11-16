@@ -11,7 +11,7 @@ import {
   type DigUndoResult
 } from "./digUndo.js";
 import type { V4DigQuota } from "./digQuota.js";
-import { firstByOf } from "./mapLooks.js";
+import { firstByOf, questionsByOf } from "./mapLooks.js";
 import { useDigClickCheck } from "./useDigClickCheck.js";
 import { sharePeriodOf } from "./money.js";
 import { askParentOf, placesOf, removePick } from "./suggestions.js";
@@ -138,7 +138,9 @@ export function useDigQueue(input: Readonly<{
         mode: dig.mode,
         startedAt,
         // dig-f20: the person's own words are never marked as AI text (kept for this visit; the dig's answer tells later).
-        firstBy: firstByOf(dig.target)
+        firstBy: firstByOf(dig.target),
+        // Art. 50(2): who wrote each question, so the person's own words in a dig of several picks are never marked either.
+        questionsBy: questionsByOf(dig.target)
       };
       // Kept for this visit even when the page has gone meanwhile (Decision A: memory only), and in the account (N11:
       // which debate it came from, where on the map, its mode). Best-effort: without the record it is found by text.

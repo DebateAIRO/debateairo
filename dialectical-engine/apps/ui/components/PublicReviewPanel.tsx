@@ -31,6 +31,38 @@ const failureLine = (catalog: MessageCatalog, failure: unknown): string => {
   if (failure instanceof ContractHttpError && failure.serverCode !== null && FAILURE_CODES.has(failure.serverCode)) return t(catalog, `staff.publicReview.failure.${failure.serverCode}`);
   return t(catalog, failure instanceof Error && failure.name === "NotAllowedError" ? "staff.publicReview.failure.passkeyCancelled" : "staff.publicReview.failure.other");
 };
+/** Keys whose words are a person's name, never AI text: the asker's pseudonym, a contributor's, a report's writer. */
+const NAME_KEYS: ReadonlySet<string> = new Set(["author_pseudonym", "contributor", "writer"]);
+/** Keys under a web source that hold the page's own words (its title, site, address, the quote taken from it), not the AIs'. */
+const PAGE_KEYS: ReadonlySet<string> = new Set(["quote", "title", "site", "url", "link", "page_title", "domain"]);
+/** A code the page stores (PERSON_OWN_VIEW, SERVED, a badge): no sentence anyone wrote. */
+const CODE = /^[A-Z][A-Z0-9_]*$/u;
+
+/**
+ * EU AI Act Art. 50(2): whether one piece of a reviewed debate (one string of the page, an update or a report, by its pointer)
+ * is AI-written. The owner's rule: never the person's question (wherever it is repeated, as the root claim is), never
+ * the person's own words (a path or a view they wrote, their own words in a dig), never a name or a stored code, and never a
+ * web page's own words. Everything else on the page is the AIs'. `siblings`: the other pieces of the same piece (a path's
+ * `author`, a view's `title`). A correction typed by staff is never AI text, so only the original is asked about.
+ */
+export function reviewPieceIsAi(piece: Readonly<{ pointer: string; original: string }>, siblings: readonly Readonly<{ pointer: string; original: string }>[], question: string): boolean {
+  const steps = piece.pointer.split("/").slice(1);
+  const key = steps.at(-1) ?? "";
+  const parent = piece.pointer.slice(0, piece.pointer.length - key.length - 1);
+  const sibling = (name: string) => siblings.find((other) => other.pointer === `${parent}/${name}`);
+  if (piece.pointer === "/question" || piece.original.trim() === question.trim()) return false;
+  if (NAME_KEYS.has(key) || steps.includes("own_words") || CODE.test(piece.original.trim())) return false;
+  if (steps.includes("sources") && PAGE_KEYS.has(key)) return false;
+  // A path the person wrote (author PERSON_…) is theirs whole; a view with no title is the person's own (the contract: own views carry none).
+  if (steps[0] === "branches" && steps[1] === "paths" && steps.length === 4 && (key === "title" || key === "question")
+    && (sibling("author")?.original ?? "").startsWith("PERSON_")) return false;
+  if (steps.includes("viewpoints") && key === "question" && sibling("title") === undefined) return false;
+  return true;
+}
+
+/** Stands in for the earlier line while "Before it: …" is read from the catalogue (only the line is AI text). */
+const TEXT_SLOT = "⁣⁣";
+
 const SIX_MONTHS_MS = 183 * 24 * 60 * 60_000;
 const when = (at: string) => new Date(at).toISOString().slice(0, 16).replace("T", " ");
 
@@ -96,12 +128,14 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
     setMessage(null);
     void load(found);
   }
-  const pieceRow = (kind: "SNAPSHOT" | "UPDATE" | "REPORT", id: string, piece: Piece) => {
+  const pieceRow = (kind: "SNAPSHOT" | "UPDATE" | "REPORT", id: string, piece: Piece, siblings: readonly Piece[]) => {
     const key = `${kind}:${id}:${piece.pointer}`;
     if (find !== "" && !`${piece.original} ${piece.corrected ?? ""}`.toLowerCase().includes(find.toLowerCase())) return null;
+    // Art. 50(2): the original marked when the AIs wrote it; a correction is the staff's own words, never marked.
+    const ai = reviewPieceIsAi(piece, siblings, page?.question ?? "") ? "true" : undefined;
     return <li key={key} data-review-piece={piece.pointer}>
       <span className="setCardHint">{piece.pointer}</span>
-      {piece.corrected === null ? <p>{piece.original}</p> : <><p data-review-original><del>{piece.original}</del></p><p data-review-corrected>{piece.corrected}</p></>}
+      {piece.corrected === null ? <p data-ai-generated={ai}>{piece.original}</p> : <><p data-review-original data-ai-generated={ai}><del>{piece.original}</del></p><p data-review-corrected>{piece.corrected}</p></>}
       {page?.hidden === true ? (editing === key ? <form onSubmit={(event) => {
         event.preventDefault();
         const text = String(new FormData(event.currentTarget).get("text") ?? "").trim();
@@ -112,6 +146,8 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
         : <div className="staffActions"><button className="setBtn" type="button" disabled={busy} onClick={() => setEditing(key)}>{t(catalog, "staff.publicReview.replaceThis")}</button></div>) : null}
     </li>;
   };
+  const [beforeOpen = "", beforeClose = ""] = t(catalog, "staff.publicReview.before", { text: TEXT_SLOT }).split(TEXT_SLOT);
+  const beforeParts = [beforeOpen, beforeClose] as const;
   const reportsHere = queue.filter((report) => report.publication_ref === (page?.publication_ref ?? ref));
   const groundFields = pending === null || pending.need === "NONE" ? null : <fieldset className="staffField" data-review-ground={pending.need}>
     <legend>{t(catalog, "staff.publicReview.ground.legend")}</legend>
@@ -184,7 +220,7 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       <div className="staffField"><label htmlFor="public-review-find">{t(catalog, "staff.publicReview.find")}</label><input id="public-review-find" value={find} onChange={(event) => setFind(event.target.value)} autoComplete="off" /></div>
       {page.snapshot_unreadable ? <p className="setError">{t(catalog, "staff.publicReview.snapshotUnreadable")}</p> : null}
       <h3>{t(catalog, "staff.publicReview.snapshot", { at: when(page.published_at) })}</h3>
-      <ul className="staffAuditList" data-review-snapshot>{page.snapshot.map((piece) => pieceRow("SNAPSHOT", page.publication_ref, piece))}</ul>
+      <ul className="staffAuditList" data-review-snapshot>{page.snapshot.map((piece) => pieceRow("SNAPSHOT", page.publication_ref, piece, page.snapshot))}</ul>
       <h3>{t(catalog, "staff.publicReview.digs")}</h3>
       {page.digs.length === 0 ? <p className="setCardHint">{t(catalog, "staff.publicReview.noDigs")}</p> : null}
       {page.digs.map((dig) => <article key={dig.dig_run_id} data-review-dig={dig.removed ? "REMOVED" : "ALLOWED"}>
@@ -192,8 +228,8 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
         {page.hidden && !dig.removed ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => ask(stepOf(t(catalog, "staff.publicReview.confirm.removeDig", { who: dig.contributor ?? t(catalog, "staff.publicReview.thePerson") }), { step: "REMOVE_DIG", pieceKind: "DIG", pieceId: dig.dig_run_id }))}>{t(catalog, "staff.publicReview.takeOut")}</button></div> : null}
         {page.updates.filter((row) => row.dig_run_id === dig.dig_run_id).map((row) => <div key={row.update_id} data-review-update={row.state}>
           <p><strong>{t(catalog, row.kind === "PATH" ? "staff.publicReview.kind.PATH" : "staff.publicReview.kind.MAIN")}</strong> <span className="setCardHint">{t(catalog, "staff.publicReview.updateLine", { at: when(row.recorded_at), state: t(catalog, `staff.publicReview.state.${row.state}`) })}</span></p>
-          {row.before === null ? null : <p className="setCardHint">{t(catalog, "staff.publicReview.before", { text: row.before })}</p>}
-          <ul className="staffAuditList">{row.pieces.map((piece) => pieceRow("UPDATE", row.update_id, piece))}</ul>
+          {row.before === null ? null : <p className="setCardHint">{beforeParts[0]}<span data-ai-generated="true">{row.before}</span>{beforeParts[1]}</p>}
+          <ul className="staffAuditList">{row.pieces.map((piece) => pieceRow("UPDATE", row.update_id, piece, row.pieces))}</ul>
           {page.hidden && row.state === "AFFECTED" ? <div className="staffActions"><button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => ask(stepOf(t(catalog, "staff.publicReview.confirm.putBackUpdate"), { step: "PUT_BACK", pieceKind: "UPDATE", pieceId: row.update_id }))}>{t(catalog, "staff.publicReview.putThisBack")}</button></div> : null}
         </div>)}
       </article>)}
@@ -202,7 +238,7 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       {page.reports.map((report) => <article key={report.report_id} data-review-report={report.state}>
         <h4>{report.writer === null ? t(catalog, "staff.publicReview.reportHeading", { version: report.report_version, at: when(report.recorded_at) }) : t(catalog, "staff.publicReview.reportHeadingWriter", { version: report.report_version, writer: report.writer, at: when(report.recorded_at) })}</h4>
         <p className="setCardHint">{t(catalog, `staff.publicReview.state.${report.state}`)}</p>
-        <ul className="staffAuditList">{report.pieces.map((piece) => pieceRow("REPORT", report.report_id, piece))}</ul>
+        <ul className="staffAuditList">{report.pieces.map((piece) => pieceRow("REPORT", report.report_id, piece, report.pieces))}</ul>
         {page.hidden ? <div className="staffActions">
           {report.state !== "HIDDEN" ? <button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => ask(stepOf(t(catalog, "staff.publicReview.confirm.hideReport"), { step: "HIDE_REPORT", pieceKind: "REPORT", pieceId: report.report_id }))}>{t(catalog, "staff.publicReview.hideReport")}</button> : null}
           {report.state === "AFFECTED" ? <button className="setBtn" type="button" disabled={busy || pending !== null} onClick={() => ask(stepOf(t(catalog, "staff.publicReview.confirm.putBackReport"), { step: "PUT_BACK", pieceKind: "REPORT", pieceId: report.report_id }))}>{t(catalog, "staff.publicReview.putThisBack")}</button> : null}

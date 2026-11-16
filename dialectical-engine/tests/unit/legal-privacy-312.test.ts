@@ -285,7 +285,8 @@ const DATES: Readonly<Record<string, Readonly<{ eyebrow: string; line: string; u
  * paragraph, section 3's "About you", section 4's contract, sensitive-information and question-check rows, section 6's
  * Free paragraph, section 7's new row, section 9, section 10's Access, Erasure and Withdraw consent rows, section 14's log.
  * V4's 0157 (3.11 amended in place) adds section 2's moderation notices row and section 7's two rows, so the lines from
- * the Next paragraph on moved by one, and those from section 9 on by three.
+ * the Next paragraph on moved by one, and those from section 9 on by three. Section 7's drafting note left on
+ * 15 November 2026 (see withoutNote), so the lines from section 9 on moved back by two.
  */
 const EYEBROW = 4;
 const END_MARKER = 7;
@@ -298,18 +299,42 @@ const SENSITIVE_CONSENT = 84;
 const QUESTION_CHECK = 88;
 const FREE = 125;
 const SAVED_RETENTION_AT = 154;
-const SECURITY = 186;
-const ACCESS = 196;
-const ERASURE = 198;
-const WITHDRAW = 202;
-const CHANGE_LOG = 260;
+const SECURITY = 184;
+const ACCESS = 194;
+const ERASURE = 196;
+const WITHDRAW = 200;
+const CHANGE_LOG = 258;
 /**
  * Section 6's paragraph on flagged debates. A person cannot take their own public debate down, so English no longer
  * ends that paragraph's approval sentences with the leftover "you can take it down from Your debates"; the
  * translations still have it until they are brought up to date before release (English first).
  */
 const FLAGGED = 117;
+/**
+ * A public debate stays public after its author closes the account, and English says on what basis: section 4's
+ * publishing row names the basis before and after closure, section 6's paragraph on the name says why the text stays
+ * and that a person can object, and section 10's Objection row says the objection covers it. English only until the
+ * translations are brought up to date before release; legal-public-debate-stays-public pins the wording.
+ */
+const KEPT_AFTER_CLOSURE = [85, 127, 198];
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
+/**
+ * Annex B.6's paragraph (Asia-Pacific; Annex B.7 until Switzerland's part left, see withoutSwitzerland). Taiwan is
+ * closed since the owner's decision of 12 November 2026, so the
+ * paragraph no longer ends with Taiwan's part, in English and in the 34 translations alike: a closed country is
+ * named in no language. Nothing else on the line changes.
+ */
+const ASIA_PACIFIC = 288;
+const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
+/**
+ * Annex B.3's paragraph (Canada and Quebec). Its Quebec part said that "the settings that keep your debates private
+ * are on by default", but section 6 makes debates on the Free plan public, in Quebec as everywhere else (the owner,
+ * 16 November 2026). In every language that one clause now says what section 6 says, in the words Terms 2.18's
+ * Annex A.3 already uses there; nothing else on the line changes.
+ */
+const QUEBEC = 276;
+const QUEBEC_BEFORE = "the settings that keep your debates private are on by default";
+const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates on the Free plan are public, as section 6 says";
 /** The two new rows, each right after its table's "Page settings and visits" row. */
 const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
 const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];
@@ -338,7 +363,42 @@ const manifest = (): {
 } => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
 const legalCatalog = (code: string): Record<string, string> =>
   JSON.parse(readFileSync(resolve(root, "apps/ui/messages", code, "legal.json"), "utf8"));
-const priorLines = (code: string): string[] => lines(readFileSync(resolve(root, "apps/ui/legal/archive", code, `${PRIOR[code]!}.md`), "utf8"));
+/**
+ * The owner's decision of 14 November 2026 closed Switzerland for now. In every language Annex B.5 left (its heading, a
+ * blank line, its one paragraph, a blank line), Annexes B.6 and B.7 became B.5 and B.6, and the change log's one
+ * reference to Annex B.7 follows the new number. Every pin below compares the draft with the 3.11 text after exactly
+ * that, so each still says that nothing else changed; this function pins what left.
+ */
+const SWISS_PART = 280;
+/**
+ * Section 7 ended with an English drafting note, published in every language: "[The support retention period and the
+ * backup line describe policies to implement; …]". The support chat stores nothing and section 7's table says so in
+ * every language, so the note left on 15 November 2026 (the line and the blank line after it). Every pin below
+ * compares the draft with the 3.11 text less that note; this function pins what left.
+ */
+const NOTE = 170;
+const withoutNote = (code: string, prior: readonly string[]): string[] => {
+  expect(prior[NOTE], `${code}: section 7's drafting note in 3.11`).toMatch(/^&#91;The support retention period and the backup line /u);
+  expect([prior[NOTE - 1], prior[NOTE + 1]], `${code}: the note is its own paragraph`).toEqual(["", ""]);
+  return [...prior.slice(0, NOTE), ...prior.slice(NOTE + 2)];
+};
+const withoutSwitzerland = (code: string, raw: readonly string[]): string[] => {
+  const prior = withoutNote(code, raw);
+  expect(prior[SWISS_PART], `${code}: Annex B.5's heading in 3.11`).toMatch(/^### B\.5 \S/u);
+  expect([prior[SWISS_PART + 1], prior[SWISS_PART + 3]], `${code}: Annex B.5 is one paragraph`).toEqual(["", ""]);
+  expect(prior[SWISS_PART + 2], `${code}: Annex B.5's paragraph`).toMatch(/\S/u);
+  expect(prior[SWISS_PART + 4], `${code}: Annex B.6 follows`).toMatch(/^### B\.6 \S/u);
+  const [was, now] = code === "tr" ? ["B.7'nin", "B.6'nın"] : ["B.7", "B.6"];
+  return [...prior.slice(0, SWISS_PART), ...prior.slice(SWISS_PART + 4)].map((line, index) => {
+    if (line.startsWith("### B.6 ")) return `### B.5 ${line.slice(8)}`;
+    if (line.startsWith("### B.7 ")) return `### B.6 ${line.slice(8)}`;
+    if (index !== priorIndex(CHANGE_LOG)) return line;
+    expect(line.split(was), `${code}: the change log names Annex B.7 once`).toHaveLength(2);
+    return line.replace(was, now);
+  });
+};
+const priorLines = (code: string): string[] =>
+  withoutSwitzerland(code, lines(readFileSync(resolve(root, "apps/ui/legal/archive", code, `${PRIOR[code]!}.md`), "utf8")));
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
 /**
@@ -454,12 +514,27 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(archived, `${code}: the prior text is in the archive index`).toEqual({ version: "3.11", path: `apps/ui/legal/archive/${code}/${sha256}.md` });
     const priorBytes = readFileSync(resolve(root, archived!.path));
     expect(createHash("sha256").update(priorBytes).digest("hex"), `${code}: the archived bytes`).toBe(sha256);
-    const prior = lines(priorBytes.toString("utf8"));
+    const prior = withoutSwitzerland(code, lines(priorBytes.toString("utf8")));
     const next = lines(draftBytes(code).toString("utf8"));
 
     expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual(code === "en" ? [...CHANGED, FLAGGED].sort((a, b) => a - b) : CHANGED);
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE] : [])].sort((a, b) => a - b));
+    // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
+    const quebecBefore = prior[priorIndex(QUEBEC)]!;
+    const quebecAfter = next[QUEBEC]!;
+    expect(quebecBefore, `${code}: Annex B.3's paragraph in 3.11`).toContain("Commission d'accès à l'information");
+    let head = 0;
+    while (quebecBefore[head] === quebecAfter[head]) head += 1;
+    let foot = 0;
+    while (foot < Math.min(quebecBefore.length, quebecAfter.length) - head && quebecBefore.at(-1 - foot) === quebecAfter.at(-1 - foot)) foot += 1;
+    expect(head, `${code}: the change is in the Quebec part`).toBeGreaterThan(quebecBefore.indexOf("Commission d'accès à l'information"));
+    expect(quebecAfter.slice(head, quebecAfter.length - foot), `${code}: the new clause points to section 6`).toMatch(/6/u);
+    expect(quebecBefore.slice(head, quebecBefore.length - foot), `${code}: the old clause pointed nowhere`).not.toMatch(/\d/u);
+    // The Asia-Pacific paragraph lost its last part and nothing else: what is left is the start of the 3.11 line.
+    const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
+    expect(asiaPacific.startsWith(next[ASIA_PACIFIC]!) && next[ASIA_PACIFIC]!.length < asiaPacific.length, `${code}: the Asia-Pacific paragraph only loses its end`).toBe(true);
+    expect(asiaPacific.slice(next[ASIA_PACIFIC]!.length), `${code}: the part that left is one part, Taiwan's`).toMatch(/^ ?\*[^*]+\*[^*]+$/u);
 
     const dates = DATES[code]!;
     expect(next[EYEBROW], `${code}: the eyebrow names 3.12`).toMatch(/ v3\.12 · /u);
@@ -500,6 +575,16 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(prior[priorIndex(FLAGGED)]!.split(TAKE_DOWN)).toHaveLength(2);
     expect(next[FLAGGED]).toBe(prior[priorIndex(FLAGGED)]!.replace(` ${TAKE_DOWN}`, ""));
     expect(draftBytes("en").toString("utf8")).not.toContain(TAKE_DOWN);
+    // Taiwan's part goes from the end of the Asia-Pacific paragraph, and nothing before it changes.
+    const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
+    expect(asiaPacific.split(TAIWAN)).toHaveLength(2);
+    expect(next[ASIA_PACIFIC]).toBe(asiaPacific.slice(0, asiaPacific.indexOf(TAIWAN)));
+    expect(next[ASIA_PACIFIC]!.endsWith("as the Personal Information Protection Act requires.")).toBe(true);
+    expect(draftBytes("en").toString("utf8")).not.toContain("Taiwan");
+    // Quebec: Free debates are public there too, as section 6 says; nothing else in Annex B.3 changes.
+    expect(prior[priorIndex(QUEBEC)]!.split(QUEBEC_BEFORE)).toHaveLength(2);
+    expect(next[QUEBEC]).toBe(prior[priorIndex(QUEBEC)]!.replace(QUEBEC_BEFORE, QUEBEC_AFTER));
+    expect(draftBytes("en").toString("utf8")).not.toContain(QUEBEC_BEFORE);
     const priorLog = prior[priorIndex(CHANGE_LOG)]!;
     const tail = priorLog.slice(priorLog.indexOf("Version 3.11 replaced version 3.10:"));
     expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${tail}`);

@@ -7,6 +7,7 @@ import {
   STORY_CHARTS_ANSWER_FORM,
   STORY_CHARTS_CALL_SITE_KEY,
   STORY_CHARTS_CONTRACT_ID,
+  STORY_CHARTS_INSTRUCTION,
   STORYTELLER_CONTRACT_ID,
   StoryWriter,
   buildAnswerStory,
@@ -53,7 +54,9 @@ const CONTEXT: StoryChartsContext = {
     ["P2", "Payroll costs rise by 8 % a year."],
     ["P3", "Three teams saw 0,5 fewer sick days and 4.5 more in a second year."]
   ]),
-  scoreTexts: new Set(["0.61", "0,61"])
+  scoreTexts: new Set(["0.61", "0,61"]),
+  // Chart relevance (2026-11-16): the debate's answers. A strength is charted for these and for nothing else.
+  positions: new Set(["P1", "P2", "P3"])
 };
 
 function bar(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -155,6 +158,99 @@ describe("readStoryCharts: a chart is kept whole or dropped whole", () => {
     expect(read.dropped).toEqual(["CHART_ANCHOR_TAKEN", "CHART_ANCHOR_TAKEN", "CHART_ANCHOR_TAKEN", "CHART_ANCHOR_TAKEN"]);
   });
 
+  // Chart relevance (2026-11-16): a strength compares the debate's answers, never the points argued under them.
+  const strengths = (refs: readonly string[], overrides: Record<string, unknown> = {}): Record<string, unknown> => bar({
+    y: { label: "Strength", source: "strength", log: false },
+    items: refs.map((ref, index) => ({ label: `Answer ${String(index + 1)}`, node_ref: ref, x: null, y: null })),
+    ...overrides
+  });
+
+  it("keeps a strength chart of the debate's answers", () => {
+    const read = readStoryCharts({ charts: [strengths(["P1", "P2"])] }, CONTEXT);
+    expect(read.dropped).toEqual([]);
+    expect(read.charts).toHaveLength(1);
+  });
+
+  it("drops a strength chart of the points argued under an answer", () => {
+    const read = readStoryCharts({ charts: [strengths(["P1", "P2"])] }, { ...CONTEXT, positions: new Set(["P1"]) });
+    expect(read).toEqual({ charts: [], dropped: ["CHART_STRENGTH_NOT_ANSWER"] });
+  });
+
+  it("drops a strength chart that shows one answer twice", () => {
+    const read = readStoryCharts({ charts: [strengths(["P1", "P1"])] }, CONTEXT);
+    expect(read).toEqual({ charts: [], dropped: ["CHART_STRENGTH_NOT_ANSWER"] });
+  });
+
+  it("drops a scatter whose strength axis rests on points, whatever its other axis plots", () => {
+    const scatter = strengths(["P1", "P2", "P3"], {
+      after: "long.1.1",
+      kind: "scatter",
+      x: { label: "Change (%)", source: "figure", log: false },
+      items: [
+        { label: "Output per hour", node_ref: "P1", x: { value: 12, text: "12%" }, y: null },
+        { label: "Payroll", node_ref: "P2", x: { value: 8, text: "8 %" }, y: null },
+        { label: "Sick days", node_ref: "P3", x: { value: 4.5, text: "4.5" }, y: null }
+      ]
+    });
+    const read = readStoryCharts({ charts: [scatter] }, { ...CONTEXT, positions: new Set(["P1", "P2"]) });
+    expect(read).toEqual({ charts: [], dropped: ["CHART_STRENGTH_NOT_ANSWER"] });
+  });
+
+  it("drops a chart that puts a price beside a percentage on one axis", () => {
+    const read = readStoryCharts({ charts: [bar({ items: [
+      { label: "Monthly cost", node_ref: "P1", x: null, y: { value: 1250.5, text: "$1,250.50" } },
+      { label: "Payroll", node_ref: "P2", x: null, y: { value: 8, text: "8 %" } }] })] }, CONTEXT);
+    expect(read).toEqual({ charts: [], dropped: ["CHART_FIGURE_UNITS_DIFFER"] });
+  });
+
+  it("keeps a unit written as a sign on one figure and in words on another: only two different signs differ", () => {
+    const claims = new Map([...CONTEXT.claims, ["P2", "Payroll costs rise by 8 percent a year."]]);
+    const read = readStoryCharts({ charts: [bar({ items: [
+      { label: "Output per hour", node_ref: "P1", x: null, y: { value: 12, text: "12%" } },
+      { label: "Payroll", node_ref: "P2", x: null, y: { value: 8, text: "8 percent" } }] })] }, { ...CONTEXT, claims });
+    expect(read.dropped).toEqual([]);
+    expect(read.charts).toHaveLength(1);
+  });
+
+  it("drops a chart whose every value is the same: it compares nothing", () => {
+    const claims = new Map([...CONTEXT.claims, ["P2", "Payroll costs rise by 12 % a year."]]);
+    const read = readStoryCharts({ charts: [bar({ items: [
+      { label: "Output per hour", node_ref: "P1", x: null, y: { value: 12, text: "12%" } },
+      { label: "Payroll", node_ref: "P2", x: null, y: { value: 12, text: "12 %" } }] })] }, { ...CONTEXT, claims });
+    expect(read).toEqual({ charts: [], dropped: ["CHART_NOTHING_TO_COMPARE"] });
+  });
+
+  describe("a figure written with a scale word", () => {
+    const claims = new Map([
+      ["P1", "The first plan costs $1.2 million a year, 12% more than today."],
+      ["P2", "The second plan costs $800,000 a year."],
+      ["P3", "c"]
+    ]);
+    const costs = (first: Record<string, unknown>): Record<string, unknown> => bar({
+      y: { label: "Cost per year (USD)", source: "figure", log: false },
+      items: [
+        { label: "First plan", node_ref: "P1", x: null, y: first },
+        { label: "Second plan", node_ref: "P2", x: null, y: { value: 800000, text: "$800,000" } }
+      ]
+    });
+
+    it("is read as the whole number it states, so it sits on one axis with a number written out", () => {
+      const read = readStoryCharts({ charts: [costs({ value: 1200000, text: "$1.2 million" })] }, { ...CONTEXT, claims });
+      expect(read.dropped).toEqual([]);
+      expect(read.charts[0]?.items[0]?.y).toEqual({ value: 1200000, text: "$1.2 million" });
+    });
+
+    it("is still refused a number its words do not state", () => {
+      const read = readStoryCharts({ charts: [costs({ value: 5000, text: "$1.2 million" })] }, { ...CONTEXT, claims });
+      expect(read).toEqual({ charts: [], dropped: ["CHART_FIGURE_MISMATCH"] });
+    });
+
+    it("scales nothing without a word after the number", () => {
+      const read = readStoryCharts({ charts: [costs({ value: 12000, text: "12%" })] }, { ...CONTEXT, claims });
+      expect(read).toEqual({ charts: [], dropped: ["CHART_FIGURE_MISMATCH"] });
+    });
+  });
+
   it("refuses only a reply that is not { charts: [...] }, so the gateway re-asks for that alone", () => {
     expect(classifyStoryChartsContent(JSON.stringify({ charts: [] })).parseStatus).toBe("PARSED");
     expect(classifyStoryChartsContent(JSON.stringify({ charts: [{ kind: "pie" }] })).parseStatus).toBe("PARSED");
@@ -174,6 +270,13 @@ describe("readStoryCharts: a chart is kept whole or dropped whole", () => {
     expect(STORY_CHARTS_ANSWER_FORM).toContain("charts has 0 to 4 entries");
     expect(STORY_CHARTS_ANSWER_FORM).toContain("3 to 12 items");
     expect(STORY_CHARTS_ANSWER_FORM).toContain("at most 160 characters");
+  });
+
+  it("tells the model what a strength may be charted for, and what a figure's value is", () => {
+    expect(STORY_CHARTS_INSTRUCTION).toContain("how strong each position turned out");
+    expect(STORY_CHARTS_INSTRUCTION).not.toContain("how strong each point or position");
+    expect(STORY_CHARTS_ANSWER_FORM).toContain("an id from the positions field");
+    expect(STORY_CHARTS_ANSWER_FORM).toContain("1200000 for 1.2 million");
   });
 });
 
@@ -384,6 +487,30 @@ describe("StoryWriter — the chart call (charts on)", () => {
     expect(inserted[0]?.charts?.[0]?.items.map((item) => item.node_ref)).toEqual([ROOT, ATTACK]);
     expect(details).toContainEqual(expect.objectContaining({
       event: "STORY_CHARTS_WRITTEN", charts: 1, dropped: ["CHART_FIGURE_NOT_IN_CLAIM"]
+    }));
+  });
+
+  // Chart relevance (2026-11-16): the plan the 30 October debate got. P1 is the position and P2 a point under it.
+  it("a plan that charts the strength of points stores no chart: a strength compares the answers", async () => {
+    const { provider } = answering(JSON.stringify({
+      question_form: "yes-no",
+      charts: [{
+        after: "why.1", kind: "bar", title: "Point strength for claims about the four-day week", x: null,
+        y: { label: "Strength after weighing (%)", source: "strength", log: false },
+        items: [
+          { label: "Adopt the four-day week", node_ref: "P1", x: null, y: null },
+          { label: "Payroll costs rise", node_ref: "P2", x: null, y: null }
+        ],
+        frontier: null
+      }],
+      tables: []
+    }));
+    const { writer, inserted, details } = harness(provider, true);
+    await writer.writeAfterSettle(SNAPSHOT);
+    expect(inserted[0]?.outcome).toBe("READY");
+    expect(inserted[0]).not.toHaveProperty("charts");
+    expect(details).toContainEqual(expect.objectContaining({
+      event: "STORY_CHARTS_WRITTEN", charts: 0, dropped: ["CHART_STRENGTH_NOT_ANSWER"]
     }));
   });
 

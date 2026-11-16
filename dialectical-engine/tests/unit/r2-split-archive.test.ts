@@ -39,8 +39,8 @@ describe("R2 SPLIT in the data export (Q1 option 1)", () => {
     const split = { ...first!, run_answer: { ...(first!.run_answer as Record<string, unknown>), verdict_state: "SPLIT" } };
     const contested = { ...second!, run_answer: { ...(second!.run_answer as Record<string, unknown>), verdict_state: "CONTESTED" } };
     const html = renderYourDataHtml({ ...snapshotA, debates: { debates: [split, contested], web_sources: [] } }, loadArchiveCatalog("en"));
-    expect(html).toMatch(/<span class="pill split">Contested<\/span>/u);
-    expect(html).toMatch(/<span class="pill contested">Close call<\/span>/u);
+    expect(html).toMatch(/<span class="pill split" data-ai-generated="true">Contested<\/span>/u);
+    expect(html).toMatch(/<span class="pill contested" data-ai-generated="true">Close call<\/span>/u);
   });
 
   it("lists SPLIT as a published verdict and as a floor (types follow the contract)", () => {

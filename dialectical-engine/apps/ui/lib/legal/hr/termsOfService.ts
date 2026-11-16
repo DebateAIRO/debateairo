@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Gdje nudimo Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška, Island i Lihtenštajn), Švicarska, Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan, Južna Koreja i Tajvan. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
+      { kind: "p", text: "Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška i Island), Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan i Južna Koreja. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Švicarska",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Na vaše se podatke primjenjuje švicarski Savezni zakon o zaštiti podataka (Pravila o privatnosti, Prilog B.5). Postupak možete pokrenuti pred sudovima mjesta u Švicarskoj u kojem živite. Na plaćeni plan ne primjenjuje se zakonsko pravo na odustanak; zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro." }
+      { kind: "p", text: "Prema ovim Uvjetima imate ista prava kao potrošač u Europskoj uniji, uključujući pravo na odustanak u roku od 14 dana iz odjeljka 13. Postupak možete pokrenuti pred sudovima Moldove. Na vaše se podatke primjenjuje moldavski Zakon br. 195/2024 o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Azija i Pacifik",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Prema ovim Uvjetima imate ista prava kao potrošač u Europskoj uniji, uključujući pravo na odustanak u roku od 14 dana iz odjeljka 13. Postupak možete pokrenuti pred sudovima Moldove. Na vaše se podatke primjenjuje moldavski Zakon br. 195/2024 o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Azija i Pacifik",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapur: naš službenik za zaštitu podataka jest naš direktor, dostupan na privacy@dezbatere.ro; prijenosi se temelje na ugovornoj zaštiti usporedivoj s PDPA-om; na plaćeni plan ne primjenjuje se zakonsko razdoblje za odustanak, a zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro. Japan: zakonska objava prema Zakonu o određenim trgovačkim transakcijama nalazi se na dezbatere.ro/legal; na internetske pretplate ne primjenjuje se opće razdoblje za odustanak, a zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro; vaš sadržaj šaljemo pružateljima usluga umjetne inteligencije u Sjedinjenim Američkim Državama i Europskoj uniji, svakome na temelju ugovora koji zahtijeva zaštitu jednakovrijednu onoj iz japanskog Zakona o zaštiti osobnih informacija, a na zahtjev vam kažemo koje su to mjere. Južna Koreja: privole za neobveznu obradu i marketing prikupljaju se zasebno od stavki potrebnih za rad usluge; naš službenik za privatnost jest naš direktor, dostupan na privacy@dezbatere.ro; od plaćenog plana možete odustati u roku od 7 dana od pretplate, podložno Zakonu o elektroničkoj trgovini; pribavljamo vašu novu privolu prije svakog ponavljajućeg povećanja cijene ili prelaska s besplatnog plana na plaćeni plan; usluga upotrebljava generativnu umjetnu inteligenciju, o tome vas obavještavamo prije nego što je počnete upotrebljavati, a sadržaj koji generira umjetna inteligencija označavamo. Tajvan: od plaćenog plana možete odustati u roku od 7 dana od pretplate, prema Zakonu o zaštiti potrošača; na vaše se podatke primjenjuje tajvanski Zakon o zaštiti osobnih podataka (Pravila o privatnosti, Prilog B.7)." }
+      { kind: "p", text: "Singapur: naš službenik za zaštitu podataka jest naš direktor, dostupan na privacy@dezbatere.ro; prijenosi se temelje na ugovornoj zaštiti usporedivoj s PDPA-om; na plaćeni plan ne primjenjuje se zakonsko razdoblje za odustanak, a zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro. Japan: zakonska objava prema Zakonu o određenim trgovačkim transakcijama nalazi se na dezbatere.ro/legal; na internetske pretplate ne primjenjuje se opće razdoblje za odustanak, a zahtjevi za povrat rješavaju se na adresi support@dezbatere.ro; vaš sadržaj šaljemo pružateljima usluga umjetne inteligencije u Sjedinjenim Američkim Državama i Europskoj uniji, svakome na temelju ugovora koji zahtijeva zaštitu jednakovrijednu onoj iz japanskog Zakona o zaštiti osobnih informacija, a na zahtjev vam kažemo koje su to mjere. Južna Koreja: privole za neobveznu obradu i marketing prikupljaju se zasebno od stavki potrebnih za rad usluge; naš službenik za privatnost jest naš direktor, dostupan na privacy@dezbatere.ro; od plaćenog plana možete odustati u roku od 7 dana od pretplate, podložno Zakonu o elektroničkoj trgovini; pribavljamo vašu novu privolu prije svakog ponavljajućeg povećanja cijene ili prelaska s besplatnog plana na plaćeni plan; usluga upotrebljava generativnu umjetnu inteligenciju, o tome vas obavještavamo prije nego što je počnete upotrebljavati, a sadržaj koji generira umjetna inteligencija označavamo." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "ccd01e4b861e48a6f43f3361ea326269546b2bdbb1d98d2232924ad830900d5a",
+  sha256: "51a44ed237c1c47132ad70a47086e724b2b3618564cffee477c81eca37e3e4ea",
   eyebrow: "UVJETI KORIŠTENJA · v2.18 · NA SNAZI OD 1. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
