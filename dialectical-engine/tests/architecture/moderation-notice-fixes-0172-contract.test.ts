@@ -160,8 +160,8 @@ describe("0172: the moderation notice fixes", () => {
       expect(read("apps/api/src/mail-channel.ts")).toContain(`MODERATION_STATEMENT_${kind}: "moderation-notice"`);
       expect(MAIL_TEMPLATE_IDS).toContain(`MODERATION_STATEMENT_${kind}`);
     }
-    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided"),');
-    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),');
+    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided", true),'); // 0176: the other content's rule, said as such
+    expect(read("packages/mail-templates/src/templates.ts")).toContain('MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided", true),');
   });
 
   it("M3: the page's reader gives a decision's words to the debate owner's statement alone; it is 0157's body plus those edits, and the export reads through it", () => {

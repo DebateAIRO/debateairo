@@ -53,6 +53,9 @@ describe("the moderation notices page", () => {
     expect(text).not.toContain(pub["public.moderation.suspectedIntro"]);
     expect(text).toContain(pub["public.moderation.ground.HATE_SPEECH"]);
     expect(page.querySelector("blockquote")!.textContent).toBe("the words the check found");
+    // EU AI Act Art. 50(2): the quote is the AI check's copy of the published (AI-written) page; the intro is the site's own.
+    expect(page.querySelector("blockquote")!.getAttribute("data-ai-generated")).toBe("true");
+    expect(page.querySelector("blockquote")!.previousElementSibling!.closest('[data-ai-generated="true"]')).toBeNull();
   });
 
   it("a removal shows the facts staff typed; a correction lists its places; facts past twelve months say they were deleted; a step with no ground says so", async () => {
@@ -88,6 +91,34 @@ describe("the moderation notices page", () => {
       act(() => root?.unmount()); host?.remove();
     }
     expect(ro["public.moderation.what.REPORT_DECIDED"]).not.toBe(pub["public.moderation.what.REPORT_DECIDED"]);
+  });
+
+  it("0176: a notice told because content left with other content names the other content's rule as such; a BACK notice gives no rule, source or routes", async () => {
+    for (const catalog of [pub, ro]) {
+      const removal = { recorded: true, interim: false, grounds: ["HATE_SPEECH" as const], suspected: [], sources: ["OWN_INITIATIVE" as const], automated_detection: false, automated_decision: false, law: null };
+      const page = await mount([
+        statement({ statement_id: "57a7e000-0000-4000-8000-000000000008", kind: "CONTRIBUTION_KEPT_OFF", piece_kind: null, hidden_now: false, ground: removal }),
+        statement({ statement_id: "57a7e000-0000-4000-8000-000000000009", kind: "REPORT_DECIDED", piece_kind: null, ground: removal }),
+        statement({ statement_id: "57a7e000-0000-4000-8000-00000000000a", kind: "CONTRIBUTION_BACK", piece_kind: null, hidden_now: false, ground: removal }),
+        statement({ statement_id: "57a7e000-0000-4000-8000-00000000000b", kind: "REPORT_BACK", piece_kind: null, hidden_now: false, ground: removal })], catalog);
+      for (const kind of ["CONTRIBUTION_KEPT_OFF", "REPORT_DECIDED"]) {
+        const card = page.querySelector<HTMLElement>(`[data-statement-kind=${kind}]`)!;
+        expect(card.textContent).toContain(catalog[`public.moderation.what.${kind}`]);
+        expect(card.textContent).toContain(catalog["public.moderation.groundIntroOther"]);
+        expect(card.textContent).not.toContain(catalog["public.moderation.groundIntro"]);
+        expect(card.textContent).toContain(catalog["public.moderation.ground.HATE_SPEECH"]);
+        expect(card.textContent).toContain(catalog["public.moderation.routes"]);
+      }
+      for (const kind of ["CONTRIBUTION_BACK", "REPORT_BACK"]) {
+        const card = page.querySelector<HTMLElement>(`[data-statement-kind=${kind}]`)!;
+        expect(card.textContent).toContain(catalog[`public.moderation.kind.${kind}`]);
+        expect(card.textContent).toContain(catalog[`public.moderation.what.${kind}`]);
+        expect(card.textContent).not.toContain(catalog["public.moderation.ground.HATE_SPEECH"]);
+        expect(card.textContent).not.toContain(catalog["public.moderation.source.OWN_INITIATIVE"]);
+        expect(card.textContent).not.toContain(catalog["public.moderation.routes"]);
+      }
+      act(() => root?.unmount()); host?.remove();
+    }
   });
 
   it("0172 (M7): an illegal ground names the law we relied on, in its own words; a ground with none says nothing of a law", async () => {

@@ -79,7 +79,7 @@ const DOCUMENTS = {
     versionAnchor: "Version 3.12",
     numberedSections: 14,
     annexLetter: "B",
-    annexParts: 7,
+    annexParts: 6,
     contact: { constant: "privacy@dezbatere.ro" },
     sectionIdPrefix: "policy-section-",
     titleId: "policy-modal-title",
@@ -96,7 +96,7 @@ const DOCUMENTS = {
     versionAnchor: "Version 2.18",
     numberedSections: 19,
     annexLetter: "A",
-    annexParts: 7,
+    annexParts: 6,
     // This frozen token is found in the table without depending on the translated row label.
     contact: { tableToken: "support@dezbatere.ro" },
     sectionIdPrefix: "terms-section-",

@@ -54,7 +54,7 @@ export class PostgresLegacyRunClaimRepository {
     return Object.freeze({ status:row.claim_status,claimedCount:row.claimed_count });
   }
 
-  /** NV-01: charges one claim attempt to the account's budget (0176's core.legacy_claim_admit), before any claim work. */
+  /** NV-01: charges one claim attempt to the account's budget (0177's core.legacy_claim_admit), before any claim work. */
   async admit(
     userId: string,
     policy: Readonly<{ maxAttempts: number; windowMs: number; lockMs: number }>
@@ -74,7 +74,7 @@ export class PostgresLegacyRunClaimRepository {
     return Object.freeze({ admitted:row.admitted,retryAfterMs });
   }
 
-  /** NV-01: after a CLAIMED outcome, drops the account's count unless a lock is active (0176's core.legacy_claim_clear). */
+  /** NV-01: after a CLAIMED outcome, drops the account's count unless a lock is active (0177's core.legacy_claim_clear). */
   async clearAttempts(userId: string): Promise<void> {
     await this.pool.query("SELECT core.legacy_claim_clear($1)",[userId]);
   }

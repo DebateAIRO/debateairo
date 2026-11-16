@@ -299,6 +299,11 @@ export type DigLink = Readonly<{
    * suggestion. Absent: unknown (the dig's own answer tells once it is done).
    */
   firstBy?: "AI" | "PERSON";
+  /**
+   * EU AI Act Art. 50(2), dig-f20 per item: who wrote each of `questions`, in its order, when the page knows it (a dig started
+   * in this visit; lib/v4/mapLooks.ts questionsByOf). Absent: unknown (digQuestionIsAi then asks the dig's own answer).
+   */
+  questionsBy?: readonly ("AI" | "PERSON")[];
 }>;
 
 /**

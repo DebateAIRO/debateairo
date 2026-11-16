@@ -52,7 +52,8 @@ function world(statements: ReadonlyArray<ModerationStatementMail | null>, channe
 describe("0157: the statement of reasons sender", () => {
   it("sends each kind's template to the account's address, in its language, with the two links, and settles it SENT", async () => {
     const memory = new MemoryTemplatedMailSender();
-    const kinds: ModerationStatementKind[] = ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED"];
+    const kinds: ModerationStatementKind[] = ["DEBATE_HIDDEN", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "REPORT_REMOVED", "CORRECTED", "CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED",
+      "CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF", "CONTRIBUTION_BACK", "REPORT_BACK"];
     const { reconciler, claims, completed } = world(kinds.map((kind, index) => statement(kind, { mailLocale: index === 1 ? "ro" : "en" })), memory);
     await reconciler.reconcile(100);
     expect(memory.messages.map(({ mail }) => [mail.to, mail.templateId, mail.locale, mail.messageId])).toEqual(kinds.map((kind, index) =>
@@ -65,9 +66,10 @@ describe("0157: the statement of reasons sender", () => {
 
   // Final review (0172): the statements of those whose dig or report left with the debate carry no facts (only the debate owner's does), so their
   // mail's link never promises "the facts we relied on"; the kinds whose page shows the facts keep that sentence. DEBATE_HIDDEN is unchanged (R14).
-  it("the four kinds with no facts link the full statement without promising facts; DEBATE_DECIDED and CONTRIBUTION_REMOVED still promise them", async () => {
+  it("the eight kinds with no facts link the full statement without promising facts; DEBATE_DECIDED and CONTRIBUTION_REMOVED still promise them", async () => {
     const memory = new MemoryTemplatedMailSender();
-    const kinds: ModerationStatementKind[] = ["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "DEBATE_HIDDEN"];
+    const kinds: ModerationStatementKind[] = ["CONTRIBUTION_AFFECTED", "REPORT_AFFECTED", "CONTRIBUTION_DECIDED", "REPORT_DECIDED", "CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF",
+      "CONTRIBUTION_BACK", "REPORT_BACK", "DEBATE_DECIDED", "CONTRIBUTION_REMOVED", "DEBATE_HIDDEN"];
     const { claims } = await (async () => { const made = world(kinds.map((kind) => statement(kind)), memory); await made.reconciler.reconcile(); return made; })();
     const catalog = JSON.parse(readFileSync(resolve(process.cwd(), "packages/mail-templates/messages/en/mail.json"), "utf8")) as Record<string, string>;
     expect(catalog["mail.statement.readFullNoFacts"]).toBe("The full statement is in your account: {statementUrl}");
@@ -75,8 +77,9 @@ describe("0157: the statement of reasons sender", () => {
     memory.messages.forEach(({ mail }, index) => {
       const link = `https://debate.example.test/settings/notices#${claims[index]!.statementId}`;
       const { text } = renderMail(mail.templateId, mail.locale, mail.params);
-      expect(mail.params.noFacts, kinds[index]).toBe(index < 4 ? "true" : "false");
-      if (index < 4) {
+      // 0176: a BACK mail carries its date and two links alone (no flag); its link never promises facts either.
+      expect(mail.params.noFacts, kinds[index]).toBe(index >= 6 && index < 8 ? undefined : index < 8 ? "true" : "false");
+      if (index < 8) {
         expect(text, kinds[index]).toContain(`The full statement is in your account: ${link}`);
         expect(text, kinds[index]).not.toContain("the facts we relied on");
       } else {
@@ -93,9 +96,12 @@ describe("0157: the statement of reasons sender", () => {
     expect(memory.messages).toHaveLength(4);
     const en = memory.messages.slice(0, 2).map(({ mail }) => renderMail(mail.templateId, mail.locale, mail.params));
     expect(en[0]!.subject).toBe("Our decision on the debate your contribution was in");
-    expect(en[0]!.text).toContain(`we decided that this public debate stays off the public page: https://debate.example.test/public/debate/${REF}. What you contributed there stays off it too, in every copy of the page.`);
+    expect(en[0]!.text).toContain(`we decided that this public debate stays off the public page: https://debate.example.test/public/debate/${REF}. What you contributed there stays off it too, in every country and with no end date, because the debate does, not because of a finding about your own contribution.`);
+    // 0176: the rule named is the debate's, and the mail says so; it never reads as a finding on the person's own content.
+    expect(en[0]!.text).toContain("The rule we relied on, for other content and not for yours:");
+    expect(en[0]!.text).not.toContain("The rule we relied on:\n");
     expect(en[1]!.subject).toBe("Our decision on the debate your report was in");
-    expect(en[1]!.text).toContain("Any report you asked for there stays off it too, in every copy of the page.");
+    expect(en[1]!.text).toContain("Any report you asked for there stays off it too, in every country and with no end date, because the debate does, not because of a finding about your own report.");
     for (const { mail, raw } of memory.messages) {
       const { text } = renderMail(mail.templateId, mail.locale, mail.params);
       // The routes paragraph is the one the same locale's other decision mail carries (the first line that names office@).
@@ -106,6 +112,48 @@ describe("0157: the statement of reasons sender", () => {
     }
     // ro has its own words, not English.
     expect(renderMail("MODERATION_STATEMENT_CONTRIBUTION_DECIDED", "ro", memory.messages[2]!.mail.params).subject).not.toBe(en[0]!.subject);
+  });
+
+  // 0176 (what was left of M3, owner, 11 Nov 2026): the end of a review that put the debate back, for those whose content left with other content.
+  it("what stays off after a re-publish: everywhere, with no end date, the other content's rule, the routes; what is back: the link alone", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    const removal = { recorded: true, interim: false, grounds: ["HATE_SPEECH"], suspected: [], sources: ["OWN_INITIATIVE"], automated_detection: false, automated_decision: false, law: null };
+    await world([statement("CONTRIBUTION_KEPT_OFF", { ground: removal }), statement("REPORT_KEPT_OFF", { ground: removal }),
+      statement("CONTRIBUTION_BACK", { ground: removal }), statement("REPORT_BACK", { ground: removal })], memory).reconciler.reconcile();
+    const [keptOff, reportKeptOff, back, reportBack] = memory.messages.map(({ mail }) => renderMail(mail.templateId, mail.locale, mail.params));
+    expect(keptOff!.subject).toBe("Your contribution stays off a public debate's page");
+    expect(keptOff!.text).toContain(`this debate came back on the public page, but not all of what you contributed there: https://debate.example.test/public/debate/${REF}. Some or all of it stays off the page, in every country and with no end date`);
+    expect(reportKeptOff!.text).toContain("One or more of them stay off the page, in every country and with no end date");
+    for (const text of [keptOff!.text, reportKeptOff!.text]) {
+      expect(text).toContain("The rule we relied on, for other content and not for yours:");
+      expect(text).toContain("Our Terms of Service, section 7: no hate speech of any kind.");
+      expect(text).toContain("To challenge this decision");
+    }
+    expect(back!.subject).toBe("Your contribution is back on a public debate's page");
+    expect(reportBack!.subject).toBe("Your report is back on a public debate's page");
+    for (const text of [back!.text, reportBack!.text]) {
+      expect(text).toContain("is back on it too, in every country.");
+      expect(text).toContain("The full statement is in your account:");
+      // Nothing is restricted: no rule, no source and no routes.
+      expect(text).not.toContain("The rule we relied on");
+      expect(text).not.toContain("hate speech");
+      expect(text).not.toContain("To challenge this decision");
+    }
+    for (const { raw } of memory.messages) expect(raw).toMatch(/^Reply-To: office@dezbatere\.ro\r?$/mu);
+  });
+
+  it("every final notice renders in every mail locale, in its own words", async () => {
+    const memory = new MemoryTemplatedMailSender();
+    const locales = ["bg", "hr", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "ga", "it", "lv", "lt", "mt", "pl", "pt", "ro", "ru", "sk", "sl", "es", "sv", "uk", "zh", "hi", "id", "ja", "ko", "vi", "ar", "he", "tr"];
+    const kinds: ModerationStatementKind[] = ["CONTRIBUTION_DECIDED", "REPORT_DECIDED", "CONTRIBUTION_KEPT_OFF", "REPORT_KEPT_OFF", "CONTRIBUTION_BACK", "REPORT_BACK"];
+    await world(locales.flatMap((locale) => kinds.map((kind) => statement(kind, { mailLocale: locale }))), memory).reconciler.reconcile(500);
+    expect(memory.messages).toHaveLength(locales.length * kinds.length);
+    for (const { mail } of memory.messages) {
+      const { subject, text } = renderMail(mail.templateId, mail.locale, mail.params);
+      expect(text, `${mail.templateId} ${mail.locale}`).toContain(`https://debate.example.test/public/debate/${REF}`);
+      expect(text).not.toMatch(/\{(happened|itemUrl|statementUrl)\}/u);
+      if (mail.locale !== "en") expect(subject, `${mail.templateId} ${mail.locale}`).not.toBe(renderMail(mail.templateId, "en", mail.params).subject);
+    }
   });
 
   it("a staff hide on a report: what was done, everywhere and with no end date, the source, the AI's part, the hold, the routes; Reply-To office@", async () => {

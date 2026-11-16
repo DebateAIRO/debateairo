@@ -65,9 +65,11 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
     expect(countryGate.signup(source("51.140.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
     // Israel (owner's amendment of 9 October 2026): kept out by the Terms.
     expect(countryGate.signup(source("84.94.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
-    for (const ip of ["31.13.1.1", "1.160.1.1", "89.28.1.1"]) {
-      expect(countryGate.signup(source(ip)), ip).toBeNull();
-    }
+    // Taiwan (owner's decision of 12 November 2026): kept out by the Terms.
+    expect(countryGate.signup(source("1.160.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
+    // Switzerland (owner's decision of 14 November 2026): not offered for now.
+    expect(countryGate.signup(source("31.13.1.1"))).toBe("COUNTRY_SIGNUP_UNAVAILABLE");
+    expect(countryGate.signup(source("89.28.1.1"))).toBeNull();
     expect(countryGate.signup(source("185.220.101.7"))).toBe("TOR_REFUSED");
     expect(countryGate.signup(source("10.0.0.1"))).toBe("COUNTRY_UNKNOWN");
   });
@@ -75,7 +77,7 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
   it("refuses a new debate only from an always-blocked country", () => {
     const { gate: countryGate } = gate();
     expect(countryGate.ask(source("5.45.1.1"))).toBe("COUNTRY_ASK_BLOCKED");
-    for (const ip of ["81.196.20.30", "78.180.1.1", "84.94.1.1", "31.13.1.1", "185.220.101.7", "10.0.0.1"]) {
+    for (const ip of ["81.196.20.30", "78.180.1.1", "84.94.1.1", "1.160.1.1", "31.13.1.1", "185.220.101.7", "10.0.0.1"]) {
       expect(countryGate.ask(source(ip)), ip).toBeNull();
     }
   });
@@ -90,10 +92,10 @@ describe("the country gate (paid plans G3a, spec §2.3.3)", () => {
     expect(countryGate.availability("84.94.1.1")).toEqual({ signup: false, pay: false, service: false });
     // Moldova (owner's amendment of 1 October 2026): sign-up, no payment yet.
     expect(countryGate.availability("89.28.1.1")).toEqual({ signup: true, pay: false, service: true });
-    // Switzerland (owner's amendment of 4 November 2026) and Taiwan (owner's decision of 5 November 2026): sign-up and payment.
-    for (const ip of ["31.13.1.1", "1.160.1.1"]) {
-      expect(countryGate.availability(ip), ip).toEqual({ signup: true, pay: true, service: true });
-    }
+    // Taiwan (owner's decision of 12 November 2026): kept out by the Terms.
+    expect(countryGate.availability("1.160.1.1")).toEqual({ signup: false, pay: false, service: false });
+    // Switzerland (owner's decision of 14 November 2026): not offered for now.
+    expect(countryGate.availability("31.13.1.1")).toEqual({ signup: false, pay: false, service: false });
     expect(countryGate.availability("185.220.101.7")).toEqual({ signup: false, pay: false, service: false });
     expect(countryGate.availability("10.0.0.1")).toEqual({ signup: false, pay: false, service: false });
   });

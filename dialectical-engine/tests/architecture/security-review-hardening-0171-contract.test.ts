@@ -624,7 +624,7 @@ const SNAPSHOT_WRITERS = ["core.transition_run_publication", "core.publish_free_
  */
 const NO_FUNCTION_PINS = ["0113_billing_price_currencies.sql", "0114_role_rotation.sql", "0122_engine_map_check.sql", "0129_support_answer_scope.sql", "0154_region_iceland_liechtenstein.sql", "0164_main_answer_path_added.sql",
   // The four index steps after the security fixes of audit run 3: each digests its one index row alone.
-  "0177_password_reset_notice_due.sql", "0178_backup_email_notice_due.sql", "0179_mfa_recovery_notice_due.sql", "0180_mfa_recovery_control_user_started.sql"] as const;
+  "0178_password_reset_notice_due.sql", "0179_backup_email_notice_due.sql", "0180_mfa_recovery_notice_due.sql", "0181_mfa_recovery_control_user_started.sql"] as const;
 /**
  * The steps applied before the chain, each by its own module. The chain records no amendment of either (it refuses one, AMENDMENT_ORDER), so this step
  * may change none of the functions their digests pin; 0110's module says a change to one of its shared functions re-plans 110.
@@ -638,7 +638,7 @@ const PRE_CHAIN = ["0108_preview_recovery_verified_bindings.sql", "0110_account_
 const IRREGULAR_PINS = { "0108_preview_recovery_verified_bindings.sql": 5, "0110_account_erasure_public_debates.sql": 10, "0111_billing_netopia.sql": 3,
   "0112_auth_db_batch.sql": 30, "0116_mail_locale.sql": 17,
   // The security fixes of audit run 3: its digest is handed each section's functions in turn, the 33 its SECTIONS list names.
-  "0176_security_fixes_run3.sql": 33 } as const;
+  "0177_security_fixes_run3.sql": 33 } as const;
 /**
  * The loaders that read pg_proc outside their digest, with how often they name pg_proc or pg_get_functiondef there: 0116's replay verifier asks its
  * writers and its sealed functions by name and one function's grant, and 0108's check of the migrating role asks six billing functions' owner. Neither
@@ -763,7 +763,7 @@ const pinnedBy = (): ReadonlyMap<string, readonly string[]> => {
     };
     const valueOf = (value: string): string[] => {
       if (/^[A-Z][A-Z0-9_]*$/u.test(value)) return listed(value, []);
-      // 0176 digests each section's functions in turn (functionEvidence(client,section.functions)): every signature its SECTIONS list names.
+      // 0177 digests each section's functions in turn (functionEvidence(client,section.functions)): every signature its SECTIONS list names.
       if (value === "signatures" && /functionEvidence\(client,section\.functions\)/u.test(loader)) {
         const sections = loader.slice(loader.indexOf("const SECTIONS"), loader.indexOf("]);", loader.indexOf("const SECTIONS")));
         return [...sections.matchAll(/'([a-z_]+\.[a-z_0-9]+\([^()]*\))'/gu)].map((match) => plain(match[1]!));

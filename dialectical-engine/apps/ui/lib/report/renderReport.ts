@@ -4,6 +4,7 @@ import { Font, renderToBuffer } from "@react-pdf/renderer";
 import type { Answer, AnswerDisclosure, AnswerStory } from "@debateai/contract";
 import { InvestigationReportDocument } from "./InvestigationReportDocument.js";
 import { buildInvestigationReportPdfModel, type FinishedInvestigationReport } from "./investigationReportModel.js";
+import { installPdfAiMark } from "./pdfAiMark.js";
 import { ReportDocumentView } from "./ReportDocument.js";
 import { reportPlacedFont } from "./reportGlyphs.js";
 import { REPORT_FONT_FACES, type ReportFontFamily } from "./reportFonts.js";
@@ -128,6 +129,7 @@ export async function renderReportPdf(input: Readonly<{
   const model = buildReportModel(input.answer, input.story, input.generatedAt, input.catalogs, input.disclosure ?? null);
   const { faces } = reportLayout(model.language, reportPrintedText(model));
   await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
+  installPdfAiMark();
   return renderToBuffer(ReportDocumentView({ model, logo: model.charts.length === 0 ? null : resolveReportLogo(fontDirectory) }));
 }
 
@@ -148,5 +150,6 @@ export async function renderInvestigationReportPdf(input: Readonly<{
   const model = buildInvestigationReportPdfModel(input);
   const { faces } = reportLayout(model.language, reportPrintedText(model));
   await prepareReportFonts([...new Set([...faces.body, ...faces.heading])]);
+  installPdfAiMark();
   return renderToBuffer(InvestigationReportDocument({ model }));
 }

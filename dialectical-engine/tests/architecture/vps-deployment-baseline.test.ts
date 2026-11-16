@@ -1304,7 +1304,7 @@ describe("VPS baseline: runbook and environment templates", () => {
     const folder = lines.find((line) => line.includes('[ -d "${F%/*}" ] ||'));
     expect(folder).toMatch(/RESTORE_FENCE_NOT_DONE[^\n]*exit 1/u);
     for (const line of lines.filter((candidate) => candidate.includes("RESTORE_FENCE_NOT_DONE"))) expect(line, line).toMatch(/exit 1/u);
-    for (const needle of ["restore_fence_release_public_hold_v1", "before migration 0176", "a removed passkey", "an unlinked social sign-in"]) {
+    for (const needle of ["restore_fence_release_public_hold_v1", "before migration 0177", "a removed passkey", "an unlinked social sign-in"]) {
       expect(section, needle).toContain(needle);
     }
     // §5: both ways back point to it.

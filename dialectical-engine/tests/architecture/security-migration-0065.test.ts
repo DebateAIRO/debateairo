@@ -91,7 +91,7 @@ const MUTABLE_UNGUARDED_RELATIONS: Readonly<Record<string, string>> = {
   "identity.mfa_recovery_notice_binding": "0106: private request/account-cascade binding",
   "identity.mfa_recovery_notice": "0106: delivery lease/sent/dead state changes",
   "identity.mfa_recovery_source_window": "0106: source window increments and is pruned",
-  "identity.restore_fence": "0176 NV-07: the restore fence singleton; its token and hold are updated in place every minute",
+  "identity.restore_fence": "0177 NV-07: the restore fence singleton; its token and hold are updated in place every minute",
   "staff.subject": "0085/0089: capabilities/state/epoch and erased user binding change",
   "staff.privilege_session": "0087: idle renewal/revocation and account/session cascade",
   "staff.action_proof": "0085/0086: proof consumed; parent/session cascade",

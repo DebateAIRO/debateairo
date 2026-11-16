@@ -6,6 +6,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // proxy proofs must sit in an enforced suite; `node --test` with a raw
 // `[...path]` glob silently runs zero tests).
 import * as route from "../../apps/ui/app/api/[...path]/route.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/ui/lib/aiDisclosure.js";
+import {
+  AI_GENERATED_HEADER as API_AI_GENERATED_HEADER,
+  AI_GENERATED_HEADER_VALUE as API_AI_GENERATED_HEADER_VALUE
+} from "../../apps/api/src/ai-generated.js";
 
 const RETIRED_DEV_HEADER = ["x", "user", "dev", "token"].join("-");
 
@@ -117,6 +122,23 @@ describe("v2-ui same-origin proxy (ported ACC-01 rev-3 route)", () => {
       params: Promise.resolve({ path: ["v1", "session"] })
     });
     expect(response.headers.get("x-debateai-release")).toBe(releaseKey);
+  });
+
+  it("passes the API's AI-generated mark through (EU AI Act Art. 50(2))", async () => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ items: [], total: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json", [AI_GENERATED_HEADER]: AI_GENERATED_HEADER_VALUE }
+      })) as typeof fetch;
+    const response = await route.GET(new Request("http://web.local/api/v1/public/debates?limit=1&offset=0"), {
+      params: Promise.resolve({ path: ["v1", "public", "debates"] })
+    });
+    expect(response.headers.get(AI_GENERATED_HEADER)).toBe(AI_GENERATED_HEADER_VALUE);
+  });
+
+  it("names the same mark in the UI and the API", () => {
+    expect(AI_GENERATED_HEADER).toBe(API_AI_GENERATED_HEADER);
+    expect(AI_GENERATED_HEADER_VALUE).toBe(API_AI_GENERATED_HEADER_VALUE);
   });
 
   it("passes an upstream failure through verbatim instead of masking it (DR-115)", async () => {

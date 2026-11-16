@@ -429,6 +429,8 @@ const TEMPLATED_MAIL_PURPOSE: Readonly<Record<MailTemplateId, MailPurpose>> = Ob
   MODERATION_STATEMENT_CORRECTED: "moderation-notice", MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: "moderation-notice",
   MODERATION_STATEMENT_REPORT_AFFECTED: "moderation-notice",
   MODERATION_STATEMENT_CONTRIBUTION_DECIDED: "moderation-notice", MODERATION_STATEMENT_REPORT_DECIDED: "moderation-notice",
+  MODERATION_STATEMENT_CONTRIBUTION_KEPT_OFF: "moderation-notice", MODERATION_STATEMENT_REPORT_KEPT_OFF: "moderation-notice",
+  MODERATION_STATEMENT_CONTRIBUTION_BACK: "moderation-notice", MODERATION_STATEMENT_REPORT_BACK: "moderation-notice",
   PUBLIC_FLAG_ANSWER_RECEIPT: "moderation-notice", PUBLIC_FLAG_ANSWER_AUTO_HIDDEN: "moderation-notice",
   PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: "moderation-notice", PUBLIC_FLAG_ANSWER_NO_BREACH: "moderation-notice", PUBLIC_FLAG_ANSWER_ACTED: "moderation-notice",
   OUTBOUND_MAIL_SHARE: "owner-limit-alert", OUTBOUND_MAIL_SIGN_UP_STOPPED: "owner-limit-alert", OUTBOUND_MAIL_ALL_STOPPED: "owner-limit-alert"

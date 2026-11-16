@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { openCount, V4MapTree } from "../../apps/ui/components/v4/V4MapTree.js";
 import { V4Outline } from "../../apps/ui/components/v4/V4Outline.js";
 import { V4Panel } from "../../apps/ui/components/v4/V4Panel.js";
+import { V4WhereBar } from "../../apps/ui/components/v4/V4MapPlace.js";
 import { V4TrustBar } from "../../apps/ui/components/v4/V4TrustBar.js";
 import { formatDate, t } from "../../apps/ui/lib/i18n/translate.js";
 import type {
@@ -424,6 +425,39 @@ describe("V4 map pieces, fix wave 1", () => {
     expect(heading.hasAttribute("data-ai-generated")).toBe(false);
   });
 
+  it("marks each of a dig's other questions by who wrote it: the person's own view or edit never (dig-f20, Art. 50(2))", () => {
+    const also = (view: DigView): readonly (readonly [string, boolean])[] => {
+      const root = panel(buildMap(), `dig:${view.link.childRunId}`, "plain", { digs: [view] });
+      const items = [...root.querySelectorAll<HTMLElement>(".v4PanelWhy li")];
+      expect(items.length).toBeGreaterThan(0);
+      return items.map((item) => [item.textContent ?? "", item.closest('[data-ai-generated="true"]') !== null] as const);
+    };
+    const base = dig("c-own", "RUNNING", ["w"]);
+    // Started in this visit: the page knows who wrote each item.
+    const known: DigView = { ...base, link: { ...base.link, questions: ["AI first", "My own view", "AI second"], questionsBy: ["AI", "PERSON", "AI"] } };
+    expect(also(known)).toEqual([["My own view", false], ["AI second", true]]);
+    // Done: the dig's own answer names each pick and who wrote it.
+    const told: DigView = { ...dig("c-told", "DONE", ["w"]), link: { ...dig("c-told", "DONE", ["w"]).link, questions: ["First pick", "Edited by me"] },
+      picks: [{ text: "First pick", by: "AI_SUGGESTION" }, { text: "Edited by me", by: "PERSON_EDITED" }] };
+    expect(also(told)).toEqual([["Edited by me", false]]);
+    // Nothing says who wrote them (a dig found again by its text): AI text, as the dig link says.
+    const unknown: DigView = { ...base, link: { ...base.link, childRunId: "c-unknown", questions: ["One", "Two"] } };
+    expect(also(unknown)).toEqual([["Two", true]]);
+  });
+
+  it("the phone's place line says where you are with only an AI title marked (map-f7, Art. 50(2))", () => {
+    const where = (selected: V4Selection) => dom(renderToStaticMarkup(
+      <V4WhereBar map={buildMap()} digs={digs} selected={selected} onSelect={noop} onOpenMap={noop} position={null} catalog={catalog} />
+    )).querySelector<HTMLElement>(".v4WhereBar > [role=status]")!;
+    const open = where("open:o:0");
+    expect(open.textContent).toBe(t(catalog, "v4.phone.youAreIn", { place: "Open question o:0", n: 2, total: 3 }));
+    expect(open.querySelector('[data-ai-generated="true"]')?.textContent).toBe("Open question o:0");
+    expect(open.closest("[data-ai-generated]")).toBeNull();
+    const question = where("root");
+    expect(question.textContent).toBe(t(catalog, "v4.phone.youAreIn", { place: t(catalog, "v4.panel.crumbRoot"), n: 1, total: 3 }));
+    expect(question.querySelector("[data-ai-generated]")).toBeNull();
+  });
+
   it("keeps the whole answer under \"Read the full answer\" while the short one is written (map-f21), and shows it when the short one is missing", () => {
     const map: V4Map = { ...buildMap(), headline: null, summary: null, storyState: "WRITING", fallbackText: "First part.\n\nSecond part." };
     const root = panel(map, "root", "plain");
@@ -462,8 +496,19 @@ describe("V4 map pieces, fix wave 1", () => {
     const sent = root.querySelector("details.v4PanelSent")!;
     expect(sent.hasAttribute("open")).toBe(false);
     expect(sent.querySelector("summary")?.textContent).toBe(t(catalog, "v4.panel.sentHeading"));
-    expect(sent.querySelector('[data-ai-generated="true"]')?.textContent).toBe(question);
+    // EU AI Act Art. 50(2), the owner's "Never mark the question": the question as sent, the heading and the root cards are
+    // the person's, never marked as AI text (even when an AI wrote some of their words first).
+    expect(sent.querySelector(".v4PanelSentText")?.textContent).toBe(question);
+    expect(sent.querySelector("[data-ai-generated]")).toBeNull();
+    expect(root.querySelector("h2")?.closest("[data-ai-generated]")).toBeNull();
+    expect(root.querySelector("h2")?.querySelector("[data-ai-generated]")).toBeNull();
     expect(tree(map, "root").querySelector(".v4MapRootTitle")?.textContent).toBe("Should we do the thing?");
+    expect(tree(map, "root").querySelector(".v4MapRootTitle")?.closest("[data-ai-generated]")).toBeNull();
+    const outline = dom(renderToStaticMarkup(
+      <V4Outline map={map} digs={[]} selected="root" changed={new Set()} picked={new Set()} onSelect={noop} onTogglePick={noop} catalog={catalog} locale="en" />
+    ));
+    expect(outline.querySelector(".v4OutRootTitle")?.textContent).toBe("Should we do the thing?");
+    expect(outline.querySelector(".v4OutRootTitle")?.closest("[data-ai-generated]")).toBeNull();
     expect(panel(buildMap(), "root", "plain").querySelector("details.v4PanelSent")).toBeNull();
   });
 

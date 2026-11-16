@@ -6,6 +6,7 @@ import {
   type AskApplication
 } from "@debateai/api";
 import type { Answer, PublicDebate } from "@debateai/contract";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 import type { PublicationApplication } from "../../apps/api/src/publications.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
 import type { PublicationCipher } from "../../packages/crypto/src/index.js";
@@ -188,6 +189,23 @@ describe("S8 publication HTTP boundary", () => {
       expect(absent.statusCode).toBe(404);
       expect(absent.json()).toEqual({ error: "DEBATE_NOT_FOUND" });
     }
+    await api.close();
+  });
+
+  it("marks the public debate reads as AI-generated, and never their refusals (EU AI Act Art. 50(2))", async () => {
+    const api = buildApi({ application: application(), publications: publications() });
+    const visible = await api.inject({ method: "GET", url: `/v1/public/debates/${PUBLIC_REF}` });
+    expect(visible.statusCode).toBe(200);
+    expect(visible.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
+    const listed = await api.inject({ method: "GET", url: "/v1/public/debates?limit=10&offset=0" });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
+    const absent = await api.inject({ method: "GET", url: `/v1/public/debates/${MISSING_REF}` });
+    expect(absent.statusCode).toBe(404);
+    expect(absent.headers[AI_GENERATED_HEADER]).toBeUndefined();
+    const malformed = await api.inject({ method: "GET", url: "/v1/public/debates?limit=0&offset=0" });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.headers[AI_GENERATED_HEADER]).toBeUndefined();
     await api.close();
   });
 

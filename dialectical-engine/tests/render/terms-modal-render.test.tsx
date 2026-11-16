@@ -176,11 +176,11 @@ describe("terms of service modal — rendered", () => {
     }
   });
 
-  it("renders the twenty-eight sections in order, with their paragraphs, bullets and accent tokens", async () => {
+  it("renders the twenty-seven sections in order, with their paragraphs, bullets and accent tokens", async () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     const sections = [...dialog().querySelectorAll<HTMLElement>('[id^="terms-section-"]')];
-    expect(TERMS_SECTIONS.length).toBe(28);
+    expect(TERMS_SECTIONS.length).toBe(27);
     expect(sections.map((section) => section.id)).toEqual(
       TERMS_SECTIONS.map((section) => `terms-section-${section.no}`)
     );
@@ -209,7 +209,8 @@ describe("terms of service modal — rendered", () => {
       expect(number.dataset.accent).toBe(token);
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
-    expect(dialog().querySelectorAll(".policyText").length).toBe(131);
+    // 131 until Switzerland's part (Annex A.5, one paragraph) left on 14 November 2026.
+    expect(dialog().querySelectorAll(".policyText").length).toBe(130);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 

@@ -55,7 +55,7 @@ export function V4SignInAgain(props: Readonly<{ questionLine: string | null; sig
       {words.length > 0 ? (
         <>
           <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>
-          <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{words}</p>
+          <p className="v4Serif v4DebStatusQuestion">{words}</p>
         </>
       ) : null}
       {/* A live region around the heading: someone waiting on this card hears that it changed. */}

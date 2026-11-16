@@ -97,7 +97,7 @@ export function V4FailedScreen({
   return (
     <section className="v4Card v4DebStatus v4DebFailed">
       <p className="v4Eyebrow">{t(catalog, dig === null ? "v4.debate.yourQuestion" : "v4.seed.yourDig")}</p>
-      <p className="v4Serif v4DebStatusQuestion" data-ai-generated="true">{ownWords(run.question_line)}</p>
+      <p className="v4Serif v4DebStatusQuestion">{ownWords(run.question_line)}</p>
       <h1 className="v4DebStatusTitle">{t(catalog, dig === null ? "v4.debate.failedTitle" : "v4.debate.digFailedTitle")}</h1>
       <p>
         {dig !== null

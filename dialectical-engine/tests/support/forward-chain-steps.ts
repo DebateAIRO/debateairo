@@ -80,11 +80,12 @@ const STEPS: ReadonlyArray<readonly [name: string, n1: ForwardStepN1]> = [
   ["0173_settle_dismissed_flag.sql", "drained"],
   ["0174_public_review_ungrounded_door.sql", "drained"],
   ["0175_statement_ai_read_verdict.sql", "drained"],
-  ["0176_security_fixes_run3.sql", "expand"],
-  ["0177_password_reset_notice_due.sql", "expand, outside transaction"],
-  ["0178_backup_email_notice_due.sql", "expand, outside transaction"],
-  ["0179_mfa_recovery_notice_due.sql", "expand, outside transaction"],
-  ["0180_mfa_recovery_control_user_started.sql", "expand, outside transaction"]
+  ["0176_moderation_final_outcome.sql", "drained"],
+  ["0177_security_fixes_run3.sql", "expand"],
+  ["0178_password_reset_notice_due.sql", "expand, outside transaction"],
+  ["0179_backup_email_notice_due.sql", "expand, outside transaction"],
+  ["0180_mfa_recovery_notice_due.sql", "expand, outside transaction"],
+  ["0181_mfa_recovery_control_user_started.sql", "expand, outside transaction"]
 ];
 
 /** Every step's file name, in chain order. */

@@ -668,10 +668,10 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // checkout, and routeLeaseBodyQueries sends a body statement to a lease's client only while its own source is the
 // lease's (a crossAccount frame in a request's lease reaches the target). migrate() is unchanged.
 // The security fixes of audit run 3 brought onto the V4 line: the module carries both sides' lines above, and the
-// erasure_reconcile attestation's comment names the security fixes' step by its number after the V4 line's steps (0176).
+// erasure_reconcile attestation's comment names the security fixes' step by its number after the V4 line's steps (0177).
 // migrate() is the run-3 one (the migration lock tried every 50 ms; its slice, sha256 ceb877cc96cb…, as on the run-3
 // branch): the V4 line left migrate() as it was.
-const NATIVE_MIGRATE_MODULE_SHA256 = "93465f90ce9009b5e6cb4687d34a3fd25b1991788804efd64579127e811ce864";
+const NATIVE_MIGRATE_MODULE_SHA256 = "289cee04cb41bcbf507dcd131a85d5f26d0cc4ae9ca23506eee3850d8abd1fb9";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

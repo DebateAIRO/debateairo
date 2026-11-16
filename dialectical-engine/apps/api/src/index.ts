@@ -429,6 +429,7 @@ import {
 import type { RecoveryApplication } from "./recovery.js";
 import { clientIpNetworkScope, normalizeClientIp, TRUSTED_UI_PROXY_NETWORKS } from "./client-ip.js";
 import { gateForwardedHeaders, UI_API_PROOF_VERDICT_HEADER, type UiApiProofVerdict } from "./ui-api-proof.js";
+import { AI_GENERATED_HEADERS, carriesAiGeneratedContent, markAiGenerated } from "./ai-generated.js";
 import {
   installSupportRoutes,
   type SupportAdmission,
@@ -3072,6 +3073,14 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     catch { reply.code(401); return { error: "STAFF_AUTHORITY_INVALID" }; }
     return payload;
   });
+  // EU AI Act Art. 50(2): a successful body that carries AI-generated content says so in a header (./ai-generated.ts names
+  // the routes and what decides each). Registered after the hook above, so it reads the status that hook leaves; a
+  // refusal is never marked. The event streams bypass this (their writeHead names the mark), as does the language offer.
+  api.addHook("preSerialization", async (request, reply, payload) => {
+    if (reply.statusCode < 200 || reply.statusCode >= 300) return payload;
+    if (carriesAiGeneratedContent(canonicalRoute(request.method, request.routeOptions.url ?? ""), payload)) markAiGenerated(reply);
+    return payload;
+  });
   // Fastify skips preSerialization for string/Buffer/stream payloads. Final emission always checks.
   api.addHook("onSend", async (request, reply, payload) => {
     if (reply.statusCode >= 400) return payload;
@@ -3287,6 +3296,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Question language (spec 2026-10-13): a real mix ends the request with the offer; no run exists. The decider
     // sends only an offer the contract accepts (PF-L19: one it refuses becomes the lock), so this parse holds.
     if (knownError instanceof QuestionLanguageChoiceNeeded) {
+      // EU AI Act Art. 50(2): the offer's `proposed_question` is the AI's rewrite of the question, so this 409 is marked.
+      markAiGenerated(reply);
       return reply.status(409).send(QuestionLanguageChoiceNeededSchema.parse({
         error: QUESTION_LANGUAGE_CHOICE_NEEDED, message: QUESTION_LANGUAGE_CHOICE_NEEDED, offer: knownError.offer
       }));
@@ -4878,11 +4889,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const startStepFailed = (route: AuthorizationRoute): void => {
     console.error(JSON.stringify(Object.freeze({ event: "api.start_step.failed", route })));
   };
-  const startStreamOf = (request: FastifyRequest, reply: FastifyReply, clientGone: AbortSignal,
+  const startStreamOf = (request: FastifyRequest, reply: FastifyReply, clientGone: AbortSignal, front: StartFront,
     onStop: (cause: StartStreamStop, stream: StartStream) => void): StartStream => openStartStream(reply, {
     // writeHead bypasses onSend: the security set, the release and a refreshed cookie are named here, as on the run-event stream.
+    // EU AI Act Art. 50(2): so is the AI-generated mark, on a stream the step writes (a front that answers none writes no AI word).
     headers: { ...SECURITY_HEADERS, ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
-      ...(request.cookieRefresh === undefined ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }) },
+      ...(request.cookieRefresh === undefined ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
+      ...("none" in front ? {} : AI_GENERATED_HEADERS) },
     heartbeatMs: options.startStepTiming?.heartbeatMs ?? START_STEP_TIMING.heartbeatMs,
     maxLifeMs: options.startStepTiming?.streamMaxLifeMs ?? START_STEP_TIMING.streamMaxLifeMs,
     draining: () => options.readiness?.draining() ?? false, onStop, clientGone });
@@ -4902,7 +4915,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     const original = asked.question_language_choice?.original_question_line;
     const front = await startFront(request, asker, original === undefined ? [asked.question_line] : [asked.question_line, original]);
     // Draining: the lists end DRAINING (the page reads again from the next process); past the stream's longest life: none DEADLINE.
-    const stream = startStreamOf(request, reply, clientGone, (cause, open) => {
+    const stream = startStreamOf(request, reply, clientGone, front, (cause, open) => {
       if (cause === "DRAINING") open.end("end", { reason: "DRAINING" });
       else streamNone(open, "DEADLINE");
     });
@@ -4944,7 +4957,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         return reply.status(refused.status).send({ error: refused.code, message: refused.code });
       }
     }
-    const stream = startStreamOf(request, reply, clientGone, (cause, open) => {
+    const stream = startStreamOf(request, reply, clientGone, front, (cause, open) => {
       streamNone(open, cause === "DRAINING" ? "DRAINING" : "DEADLINE");
     });
     if ("none" in front) return streamNone(stream, front.none);
@@ -5438,6 +5451,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         "cache-control": "no-store",
         // writeHead bypasses onSend: the stream names its release here (side-by-side spec §6, plan C5).
         ...(options.releaseKey === undefined ? {} : { "x-debateai-release": options.releaseKey }),
+        // EU AI Act Art. 50(2): the run's events carry the AIs' work, and writeHead bypasses the hook that marks the rest.
+        ...AI_GENERATED_HEADERS,
         ...(request.cookieRefresh === undefined
           ? {} : { "set-cookie": [...refreshedCookies(request.cookieRefresh)] }),
         connection: "keep-alive"

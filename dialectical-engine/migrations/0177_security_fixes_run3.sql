@@ -1,11 +1,11 @@
--- 0176 · Security audit run 3 fixes (one shared forward step, migrations/lineage/README.md "The security fixes of
--- audit run 3 (0176)").
+-- 0177 · Security audit run 3 fixes (one shared forward step, migrations/lineage/README.md "The security fixes of
+-- audit run 3 (0177)").
 --
 -- Every SQL change of the run-3 fix branch lives in this one step, in one section per issue. Each section opens with
 --   -- ==== [<issue id>] <short title> ====
 -- and holds only that issue's statements; a later section is inserted just before [NV-50], which stays last (its
 -- ACCESS EXCLUSIVE lock on ledger.model_spend is held until this step commits). The loader
--- (packages/db/src/migration-forward0176.ts, loadForward0176) digests each section's objects in its own group of the
+-- (packages/db/src/migration-forward0177.ts, loadForward0177) digests each section's objects in its own group of the
 -- postcondition evidence, so a section's objects are checked on every later migrate() for as long as the step is
 -- applied. Once the step is applied anywhere, its bytes never change again.
 --
@@ -528,7 +528,7 @@ BEGIN
       )
       AND NOT has_schema_privilege('debateai_runtime',namespace.oid,'USAGE')
   ) THEN
-    RAISE EXCEPTION 'SECURITY_FIXES_0176_NV08_DRIFT';
+    RAISE EXCEPTION 'SECURITY_FIXES_0177_NV08_DRIFT';
   END IF;
 END $$;
 
@@ -652,7 +652,7 @@ GRANT EXECUTE ON FUNCTION identity.totp_login_clear(uuid,uuid) TO debateai_autho
 -- then (the MFA loop keeps 0112's cap of 64; the backup loop gets the same cap); and the MFA claim returns mail_locale
 -- itself, as the backup and password-reset claims do. plan_cache_mode=force_custom_plan keeps a backend from reusing a
 -- generic sequential-scan plan built while a table was small. The pending-only due indexes that bound every claim's
--- reads are the outside-transaction steps 0177-0179 (a concurrent build cannot run in this step's transaction). The
+-- reads are the outside-transaction steps 0178-0180 (a concurrent build cannot run in this step's transaction). The
 -- sealed claims and mail_locale_of_mfa_claim keep their grants for the release before.
 CREATE OR REPLACE FUNCTION identity.backup_email_claim_pending_notice(p_lease integer) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp SET plan_cache_mode=force_custom_plan AS $$
@@ -712,7 +712,7 @@ GRANT EXECUTE ON FUNCTION identity.mfa_recovery_claim_pending_notice(integer) TO
 -- this row's lock at every boot, every minute while current and each time it becomes current
 -- (apps/api/src/restore-fence.ts, packages/db/src/restore-fence.ts): it reads the file only once it holds the lock,
 -- compares, and on any disagreement but "row and file both empty" (a fresh install, or the first boot that carries
--- 0176) revokes every long-lived bearer in one transaction and holds public reads; in every case it writes the next
+-- 0177) revokes every long-lived bearer in one transaction and holds public reads; in every case it writes the next
 -- token here and to the file before it commits. A crash between the file write and the commit leaves them
 -- disagreeing, which the next settle treats as a restore: a spurious sign-out, never a missed restore. Only the owner,
 -- as postgres, releases the hold (restore_fence_release_public_hold_v1). The table is new, has no grant, and only the
@@ -1170,7 +1170,7 @@ BEGIN
       AND NOT has_function_privilege('debateai_replay',fail.oid,'EXECUTE')
       AND has_function_privilege('debateai_erasure_runtime',fail.oid,'EXECUTE')
   ) THEN
-    RAISE EXCEPTION 'SECURITY_FIXES_0176_NV02_DRIFT';
+    RAISE EXCEPTION 'SECURITY_FIXES_0177_NV02_DRIFT';
   END IF;
 END $$;
 
@@ -1400,7 +1400,7 @@ BEGIN
       AND has_function_privilege('debateai_erasure_runtime',entry_point.oid,'EXECUTE')
       AND has_schema_privilege('debateai_erasure_runtime',namespace.oid,'USAGE')
   ) THEN
-    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='SECURITY_FIXES_0176_NV30_DRIFT';
+    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='SECURITY_FIXES_0177_NV30_DRIFT';
   END IF;
 END $$;
 
@@ -1918,7 +1918,7 @@ BEGIN
         AND NOT has_function_privilege('debateai_content_provision',copy.oid,'EXECUTE')
         AND NOT has_function_privilege('debateai_replay',copy.oid,'EXECUTE')
         AND has_function_privilege('debateai_erasure_runtime',copy.oid,'EXECUTE'))<>2 THEN
-    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='SECURITY_FIXES_0176_NV09_DRIFT';
+    RAISE EXCEPTION USING ERRCODE='55000', MESSAGE='SECURITY_FIXES_0177_NV09_DRIFT';
   END IF;
 END $$;
 
@@ -2042,7 +2042,7 @@ GRANT EXECUTE ON FUNCTION identity.backup_email_admit_evicting(uuid,text,jsonb,b
 -- source list is replaced in place, wider, by name (one pair for it in this step), and a new restriction makes every
 -- unanswered row name its run and its attempt and carry no phase. Both are NOT VALID, so nothing is scanned; a later
 -- contract step validates them. LAST in this step on purpose: the pair takes ACCESS EXCLUSIVE on ledger.model_spend
--- until 0176 commits, so every spend read and write waits for the rest of the step (deploy/vps/README.md, run 3).
+-- until 0177 commits, so every spend read and write waits for the rest of the step (deploy/vps/README.md, run 3).
 -- n1: reviewed the shared source list only widens (0074's, last widened by 0158); every source the release before writes stays allowed
 ALTER TABLE ledger.model_spend DROP CONSTRAINT IF EXISTS model_spend_spend_source_check;
 ALTER TABLE ledger.model_spend ADD CONSTRAINT model_spend_spend_source_check

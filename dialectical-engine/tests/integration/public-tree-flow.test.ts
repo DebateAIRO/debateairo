@@ -1821,6 +1821,9 @@ async function delegate(): Promise<Actor> {
       { owner_ref: xena.ownerRef, kind: "CONTRIBUTION_REMOVED", mail_locale: "en" },
       { owner_ref: wes.ownerRef, kind: "REPORT_AFFECTED", mail_locale: "en" },
       { owner_ref: wes.ownerRef, kind: "REPORT_REMOVED", mail_locale: "en" },
+      // 0176: at the re-publish, the review's end for those told their piece left with other content. Fay's dig went with the hidden debate and
+      // stays off (0150's rules); Xena's dig and Wes's report were taken out themselves, so their removals were their end.
+      { owner_ref: fay.ownerRef, kind: "CONTRIBUTION_KEPT_OFF", mail_locale: "en" },
       { owner_ref: ana.ownerRef, kind: "CORRECTED", mail_locale: "de" }
     ]);
     expect(await queued(auto.ref)).toEqual([{ owner_ref: ana.ownerRef, kind: "DEBATE_HIDDEN", mail_locale: "de" }, { owner_ref: ana.ownerRef, kind: "DEBATE_DECIDED", mail_locale: "de" }]);
@@ -1845,7 +1848,8 @@ async function delegate(): Promise<Actor> {
     expect(to(xena)).toEqual(["MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED"]);
     expect(to(wes)).toEqual(["MODERATION_STATEMENT_REPORT_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED", "MODERATION_STATEMENT_REPORT_REMOVED"]);
     expect(to(una)).toEqual(["MODERATION_STATEMENT_DEBATE_HIDDEN"]);
-    expect(to(fay)).toEqual(["MODERATION_STATEMENT_CONTRIBUTION_AFFECTED"]);
+    // 0176: Fay hears the end of the review that took her dig along: what stays off, everywhere and with no end date.
+    expect(to(fay)).toEqual(["MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_CONTRIBUTION_KEPT_OFF"]);
     expect(to(ivy)).toEqual([]);
     expect(to(rea)).toEqual([]);
     expect((await q().query("SELECT failed_at IS NOT NULL AS dropped, delivered_at IS NULL AS unsent FROM identity.moderation_statement WHERE publication_ref=$1", [late.ref])).rows).toEqual([{ dropped: true, unsent: true }]);

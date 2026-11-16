@@ -306,7 +306,7 @@ const CONTENT_PROVISION_SIGNATURES = Object.freeze([
   // V4 start step (0163, plan 2026-11-03 Task 56a): a carry-on dig of a debate's chosen path, without a live sign-in.
   "core.prepare_carry_on_run_key_provision(uuid,uuid,text)"
 ] as const);
-/** K02 (NV-08, 0176): provision capabilities in the erasure_reconcile schema, which the N-1 release (counting core only) does not attest. Resolved by OID, never by text, on the attested pool. */
+/** K02 (NV-08, 0177): provision capabilities in the erasure_reconcile schema, which the N-1 release (counting core only) does not attest. Resolved by OID, never by text, on the attested pool. */
 const CONTENT_PROVISION_RECONCILE_SIGNATURES = Object.freeze([
   "erasure_reconcile.claim_run_key_provision_cleanup(integer)"
 ] as const);

@@ -105,7 +105,7 @@ export class EmailChangeService {
     readonly mail: EmailChangeMailSender;
     readonly tokenTtlMs?: number;
     readonly resendCooldownMs?: number;
-    /** The per-account send budget (the API passes the register's outbound limits); 0176 checks the same bounds. */
+    /** The per-account send budget (the API passes the register's outbound limits); 0177 checks the same bounds. */
     readonly sendLimit?: Readonly<{ maximumSends: number; windowMs: number }>;
     readonly now?: () => Date;
     readonly tokenFactory?: () => string;

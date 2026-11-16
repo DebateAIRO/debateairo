@@ -7,7 +7,8 @@
  * M10_ENDED (the owner's decision of 24 October 2026: a lost charge-back ended the plan), and 0156's three MODERATION_ notices
  * (the owner's request of 5 November 2026: a person whose content a review took off the public page is told), and 0157's seven
  * MODERATION_STATEMENT_ kinds (the DSA statements of reasons, the owner's D1 of 6 November 2026), and 0172's MODERATION_MAIL_FAILED (M5, owner, 10 Nov
- * 2026: a moderation mail could not be created or sent; the staff alert beside PUBLIC_FLAG_WAITING).
+ * 2026: a moderation mail could not be created or sent; the staff alert beside PUBLIC_FLAG_WAITING), and 0176's four ends of a re-publish for a person
+ * whose content left with other content (owner, 11 Nov 2026).
  */
 export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
@@ -19,6 +20,7 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "MODERATION_STATEMENT_REPORT_REMOVED",
   "MODERATION_STATEMENT_CORRECTED", "MODERATION_STATEMENT_CONTRIBUTION_AFFECTED", "MODERATION_STATEMENT_REPORT_AFFECTED",
   "MODERATION_STATEMENT_CONTRIBUTION_DECIDED", "MODERATION_STATEMENT_REPORT_DECIDED",
+  "MODERATION_STATEMENT_CONTRIBUTION_KEPT_OFF", "MODERATION_STATEMENT_REPORT_KEPT_OFF", "MODERATION_STATEMENT_CONTRIBUTION_BACK", "MODERATION_STATEMENT_REPORT_BACK",
   "PUBLIC_FLAG_ANSWER_RECEIPT", "PUBLIC_FLAG_ANSWER_AUTO_HIDDEN", "PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND", "PUBLIC_FLAG_ANSWER_NO_BREACH", "PUBLIC_FLAG_ANSWER_ACTED",
   "OUTBOUND_MAIL_SHARE", "OUTBOUND_MAIL_SIGN_UP_STOPPED", "OUTBOUND_MAIL_ALL_STOPPED"
 ] as const);
@@ -120,22 +122,34 @@ const when = (ifParam: string, then: string, otherwise: string | MailParamCondit
  * Every fact is a flag or a link, so nothing the person did not see on the page is ever in the mail. The ground lines are each shown alone when true.
  * Final review (0172): `noFacts` is "true" for the kinds whose full statement carries no facts (CONTRIBUTION_AFFECTED, REPORT_AFFECTED,
  * CONTRIBUTION_DECIDED, REPORT_DECIDED: only the debate owner's statement does), so their link never promises "the facts we relied on".
+ * 0176 (what was left of M3, owner, 11 Nov 2026): `other` is for the kinds told because their content left with someone else's (AFFECTED, DECIDED,
+ * KEPT_OFF): the rule named is the other content's, so its intro says so ("for other content, not for yours") and never reads as a finding on theirs.
  */
 const STATEMENT_GROUNDS = Object.freeze([["groundHold", "Hold"], ["groundUnlawful", "Unlawful"], ["groundHate", "Hate"], ["groundWeapons", "Weapons"], ["groundSuicide", "Suicide"],
   ["groundReligious", "Religious"], ["groundPersonal", "Personal"], ["groundIllegal", "Illegal"]] as const);
 const statementParams = Object.freeze({ happened: "date", itemUrl: "url", statementUrl: "url", sourceReport: "flag", sourceEmail: "flag", sourceAuthority: "flag", sourceOwn: "flag",
   automatedDecision: "flag", automatedDetection: "flag", groundNone: "flag", noFacts: "flag", ...Object.fromEntries(STATEMENT_GROUNDS.map(([name]) => [name, "flag"])) } as Record<string, MailParamKind>);
-const statement = (kind: string): MailTemplateDefinition => define({
+const statement = (kind: string, other = false): MailTemplateDefinition => define({
   catalogue: "mail", subject: `mail.statement.${kind}Subject`,
   paragraphs: [
     `mail.statement.${kind}`,
     when("sourceReport", "mail.statement.sourceReport", when("sourceEmail", "mail.statement.sourceEmail", when("sourceAuthority", "mail.statement.sourceAuthority", when("sourceOwn", "mail.statement.sourceOwn")))),
     when("automatedDecision", "mail.statement.automatedDecision", when("automatedDetection", "mail.statement.automatedDetection", "mail.statement.noAutomation")),
-    when("groundNone", "mail.statement.groundNone", "mail.statement.groundIntro"),
+    when("groundNone", "mail.statement.groundNone", other ? "mail.statement.groundIntroOther" : "mail.statement.groundIntro"),
     ...STATEMENT_GROUNDS.map(([name, key]) => when(name, `mail.statement.ground${key}`)),
     when("noFacts", "mail.statement.readFullNoFacts", "mail.statement.readFull"), "mail.statement.routes"
   ],
   params: statementParams,
+  replyTo: "authorities"
+});
+/**
+ * 0176: the content is back on the page, so nothing is restricted and there is nothing to give reasons for or to challenge: what happened, and the
+ * link to the notice in the account: its date and its two links, and no flag (the sender gives these kinds those three alone).
+ */
+const statementBack = (kind: string): MailTemplateDefinition => define({
+  catalogue: "mail", subject: `mail.statement.${kind}Subject`,
+  paragraphs: [`mail.statement.${kind}`, "mail.statement.readFullNoFacts"],
+  params: { happened: "date", itemUrl: "url", statementUrl: "url" },
   replyTo: "authorities"
 });
 /**
@@ -440,11 +454,17 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   MODERATION_STATEMENT_CONTRIBUTION_REMOVED: statement("contributionRemoved"),
   MODERATION_STATEMENT_REPORT_REMOVED: statement("reportRemoved"),
   MODERATION_STATEMENT_CORRECTED: statement("corrected"),
-  MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: statement("contributionAffected"),
-  MODERATION_STATEMENT_REPORT_AFFECTED: statement("reportAffected"),
+  MODERATION_STATEMENT_CONTRIBUTION_AFFECTED: statement("contributionAffected", true),
+  MODERATION_STATEMENT_REPORT_AFFECTED: statement("reportAffected", true),
   // 0172 (M3; the owner's decision D): the final decision, to each person whose dig or report left with the debate at its hide. One mail a person and kind.
-  MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided"),
-  MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided"),
+  MODERATION_STATEMENT_CONTRIBUTION_DECIDED: statement("contributionDecided", true),
+  MODERATION_STATEMENT_REPORT_DECIDED: statement("reportDecided", true),
+  // 0176 (what was left of M3): the end of a review that put the debate back, to each person whose dig or report left with other content at its hide or
+  // at a dig taken out: what stays off (a statement of reasons, the other content's ground), or that it is back. One mail a person and kind.
+  MODERATION_STATEMENT_CONTRIBUTION_KEPT_OFF: statement("contributionKeptOff", true),
+  MODERATION_STATEMENT_REPORT_KEPT_OFF: statement("reportKeptOff", true),
+  MODERATION_STATEMENT_CONTRIBUTION_BACK: statementBack("contributionBack"),
+  MODERATION_STATEMENT_REPORT_BACK: statementBack("reportBack"),
   // 0157 (DSA Art 16(4)-(6); the owner's D4): the answers to the person who reported. The date and the debate's link only: no words of the report
   // or the debate, no staff id. The receipt names no decision; each decision says how automated means were used and gives office@ and the routes.
   PUBLIC_FLAG_ANSWER_RECEIPT: define({ catalogue: "mail", subject: "mail.flagAnswer.receiptSubject", paragraphs: ["mail.flagAnswer.receipt", when("aiReadFirst", "mail.flagAnswer.aiReadFirst")], params: { happened: "date", itemUrl: "url" }, optional: { aiReadFirst: "flag" } }),

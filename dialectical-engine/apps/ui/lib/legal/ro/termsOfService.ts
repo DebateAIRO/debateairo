@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unde oferim Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferim Dialectical Engine persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia, Islanda și Liechtenstein), în Elveția, Moldova, Statele Unite (cu excepția statului Tennessee), Canada, Australia, Noua Zeelandă, Singapore, Japonia, Coreea de Sud și Taiwan. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
+      { kind: "p", text: "Oferim Dialectical Engine persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia și Islanda), în Moldova, Statele Unite (cu excepția statului Tennessee), Canada, Australia, Noua Zeelandă, Singapore, Japonia și Coreea de Sud. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
     ]
   },
   {
@@ -352,26 +352,18 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
   },
   {
     no: "A.5",
-    title: "Elveția",
+    title: "Moldova",
     accent: "--gold",
     blocks: [
-      { kind: "p", text: "Datelor dumneavoastră li se aplică Legea federală elvețiană privind protecția datelor (Politica de confidențialitate, Anexa B.5). Puteți introduce acțiuni în fața instanțelor din localitatea din Elveția în care locuiți. Planului cu plată nu i se aplică niciun drept legal de retragere; cererile de rambursare sunt soluționate la support@dezbatere.ro." }
+      { kind: "p", text: "În temeiul acestor Termeni aveți aceleași drepturi ca un consumator din Uniunea Europeană, inclusiv dreptul de retragere de 14 zile din secțiunea 13. Puteți introduce acțiuni în fața instanțelor din Republica Moldova. Datelor dumneavoastră li se aplică Legea nr. 195/2024 privind protecția datelor cu caracter personal a Republicii Moldova (Politica de confidențialitate, Anexa B.5)." }
     ]
   },
   {
     no: "A.6",
-    title: "Moldova",
+    title: "Asia-Pacific",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "În temeiul acestor Termeni aveți aceleași drepturi ca un consumator din Uniunea Europeană, inclusiv dreptul de retragere de 14 zile din secțiunea 13. Puteți introduce acțiuni în fața instanțelor din Republica Moldova. Datelor dumneavoastră li se aplică Legea nr. 195/2024 privind protecția datelor cu caracter personal a Republicii Moldova (Politica de confidențialitate, Anexa B.6)." }
-    ]
-  },
-  {
-    no: "A.7",
-    title: "Asia-Pacific",
-    accent: "--con",
-    blocks: [
-      { kind: "p", text: "Singapore: responsabilul nostru cu protecția datelor este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro; transferurile se bazează pe garanții contractuale comparabile cu PDPA; planului cu plată nu i se aplică nicio perioadă legală de reflecție, iar cererile de rambursare sunt soluționate la support@dezbatere.ro. Japonia: informarea legală în temeiul Legii privind tranzacțiile comerciale specificate este disponibilă la dezbatere.ro/legal; abonamentelor online nu li se aplică o perioadă generală de reflecție, iar cererile de rambursare sunt soluționate la support@dezbatere.ro; trimitem conținutul dumneavoastră furnizorilor de IA din Statele Unite și din Uniunea Europeană, fiecare în temeiul unui contract care impune o protecție echivalentă cu Legea japoneză privind protecția informațiilor cu caracter personal, iar la cerere vă comunicăm care sunt aceste măsuri. Coreea de Sud: consimțămintele pentru prelucrarea opțională și marketing sunt colectate separat de elementele necesare operării serviciului; responsabilul nostru cu protecția vieții private este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro; vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, sub rezerva Legii privind comerțul electronic; vă obținem un nou consimțământ înaintea oricărei majorări recurente a prețului sau conversii de la un plan gratuit la unul cu plată; serviciul folosește inteligență artificială generativă, vă informăm despre aceasta înainte să îl utilizați și etichetăm rezultatele generate de inteligența artificială. Taiwan: vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, în temeiul Legii privind protecția consumatorilor; datelor dumneavoastră li se aplică Legea taiwaneză privind protecția datelor cu caracter personal (Politica de confidențialitate, Anexa B.7)." }
+      { kind: "p", text: "Singapore: responsabilul nostru cu protecția datelor este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro; transferurile se bazează pe garanții contractuale comparabile cu PDPA; planului cu plată nu i se aplică nicio perioadă legală de reflecție, iar cererile de rambursare sunt soluționate la support@dezbatere.ro. Japonia: informarea legală în temeiul Legii privind tranzacțiile comerciale specificate este disponibilă la dezbatere.ro/legal; abonamentelor online nu li se aplică o perioadă generală de reflecție, iar cererile de rambursare sunt soluționate la support@dezbatere.ro; trimitem conținutul dumneavoastră furnizorilor de IA din Statele Unite și din Uniunea Europeană, fiecare în temeiul unui contract care impune o protecție echivalentă cu Legea japoneză privind protecția informațiilor cu caracter personal, iar la cerere vă comunicăm care sunt aceste măsuri. Coreea de Sud: consimțămintele pentru prelucrarea opțională și marketing sunt colectate separat de elementele necesare operării serviciului; responsabilul nostru cu protecția vieții private este administratorul nostru, care poate fi contactat la privacy@dezbatere.ro; vă puteți retrage dintr-un plan cu plată în termen de 7 zile de la abonare, sub rezerva Legii privind comerțul electronic; vă obținem un nou consimțământ înaintea oricărei majorări recurente a prețului sau conversii de la un plan gratuit la unul cu plată; serviciul folosește inteligență artificială generativă, vă informăm despre aceasta înainte să îl utilizați și etichetăm rezultatele generate de inteligența artificială." }
     ]
   }
 ];
@@ -379,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "36a5c6f97295906a25c760e012aeacac6dc9ed149927ee4eeeebf01c83960664",
+  sha256: "6c75754053ffa211d5bca36e13d5e12409a06aec61c4da7f27660242d13e8447",
   eyebrow: "TERMENII SERVICIULUI · v2.18 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
