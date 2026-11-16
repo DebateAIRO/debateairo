@@ -19,6 +19,7 @@ import {
 } from "../../packages/crypto/src/index.js";
 import type { PostgresPublicationRepository } from "@debateai/db";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { publicDebateOfStoredCopy } from "../../apps/api/src/public-tree.js";
 import { RepositoryAnswerMapViewApplication, type MapViewReader, type MapViewSource } from "../../apps/api/src/map-views.js";
 import type { AuthenticatedSession, SessionApplication } from "../../apps/api/src/sessions.js";
 import {
@@ -139,7 +140,12 @@ function publicationFakes(options: { preflight?: boolean; dig?: boolean; story?:
   const decryptStored = async (): Promise<PublicDebate> => {
     const last = stored.at(-1)!;
     const prepared = await cipher.open(last.publicationRef, last.runId);
-    try { return PublicDebateSchema.parse(prepared.decrypt(last.contentCiphertext)); } finally { prepared.close(); }
+    try {
+      // The stored copy holds no author name; it is read as the page reads it, with the account's.
+      const read = publicDebateOfStoredCopy(prepared.decrypt(last.contentCiphertext), PSEUDONYM);
+      if (!read.success) throw read.error;
+      return read.data;
+    } finally { prepared.close(); }
   };
   return { application, counts, stored, decryptStored };
 }

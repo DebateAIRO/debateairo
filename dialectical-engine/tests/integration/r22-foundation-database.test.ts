@@ -272,7 +272,7 @@ describe("0137: a stranger's dig joins a public tree", () => {
     expect(await tree.readTurn(next)).toMatchObject({ state: "FRONT", base_kind: null });
   });
 
-  it("the erased digger's name goes, the row and the page stay; the first author's name goes the same way", async () => {
+  it("the erased digger's name goes, the row and the page stay", async () => {
     const [ana, dan] = [await account(), await account()];
     const root = await run(ana);
     const dig = await run(dan);
@@ -281,7 +281,6 @@ describe("0137: a stranger's dig joins a public tree", () => {
     const runnerRepo = new PostgresPublicDebateRunnerRepository(runner);
     await runnerRepo.settleCheck(dig, "ALLOWED", null);
     await runnerRepo.recordPageUpdate({ updateId: randomUUID(), publicationRef, kind: "MAIN_ANSWER", positionRef: null, digRunId: dig, content: pubEnvelope(publicationRef) as never });
-    expect(await runnerRepo.isAuthorNameGone(publicationRef)).toBe(false);
     await tombstone(dig);
     await erasure.query("SELECT identity.forget_erased_debate_public($1)", [dig]);
     expect((await runnerRepo.readPageUpdates(publicationRef))[0]).toMatchObject({ kind: "MAIN_ANSWER", contributor: null });

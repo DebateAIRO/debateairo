@@ -2702,7 +2702,7 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     expect(await finalize()).toBe("COMMITTED");
   });
 
-  it("DPD-S01 R22 a keep erasure leaves every current public debate byte-identical",async ()=>{
+  it("DPD-S01 R22 a keep erasure leaves every current public debate as it was, but for its author's name",async ()=>{
     const fixture=await identityWithGrant("keep");
     const refs=[(await publish(fixture.identity,"keep-1")).ref,
       (await publish(fixture.identity,"keep-2")).ref];
@@ -2718,7 +2718,19 @@ describe("DPD-S01 delete public debates at account erasure", () => {
       exists:(ref:string)=>publicationCipher.exists(ref),keyReadable
     });
     expect(await clean(scheduled.erasureId,coordinator)).toBe("CLEANED");
-    expect(await Promise.all(refs.map(publicRead))).toEqual(before);
+    // The name is the account's, so it goes with the account; every other byte of the page stands.
+    const nameless=(body:string)=>{
+      const { author_pseudonym:_name,author_name_gone:_gone,...rest }=JSON.parse(body) as Record<string,unknown>;
+      return rest;
+    };
+    const after=await Promise.all(refs.map(publicRead));
+    expect(after.map((read)=>({ statusCode:read.statusCode,page:nameless(read.body) })))
+      .toEqual(before.map((read)=>({ statusCode:read.statusCode,page:nameless(read.body) })));
+    for (const read of before) expect(JSON.parse(read.body)).toMatchObject({ author_pseudonym:fixture.identity.pseudonym });
+    for (const read of after) {
+      expect(JSON.parse(read.body)).toMatchObject({ author_pseudonym:"a contributor",author_name_gone:true });
+      expect(read.body).not.toContain(fixture.identity.pseudonym);
+    }
     for (const ref of refs) expect(keyReadable).toHaveBeenCalledWith(ref);
     expect((await database.pool.query(`
       SELECT delete_public_debates,retained_public_snapshot_count,
@@ -2730,6 +2742,112 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     });
     expect(await publicationCipher.exists(refs[0]!)).toBe(true);
   });
+
+  // The page reads the first author's name from the account, as it reads a contributor's; the stored copy never holds it.
+  // So the erasure that deletes the account is what removes the name, and nothing stored has to be rewritten.
+  it("after its author's account is erased, nothing stored holds the pseudonym and the page says \"a contributor\"",async ()=>{
+    /** Every table, in every schema of ours, with a row whose text holds `needle`. */
+    async function tablesHolding(needle:string):Promise<string[]> {
+      const tables=(await database.pool.query<{ schema:string;name:string }>(`
+        SELECT table_schema AS schema,table_name AS name FROM information_schema.tables
+        WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema')
+        ORDER BY table_schema,table_name
+      `)).rows;
+      expect(tables.length).toBeGreaterThan(50);
+      const holding:string[]=[];
+      for (const table of tables) {
+        const found=await database.pool.query<{ n:number }>(
+          `SELECT count(*)::int AS n FROM "${table.schema}"."${table.name}" AS t WHERE to_jsonb(t)::text LIKE $1`,
+          [`%${needle}%`]
+        );
+        if (found.rows[0]!.n>0) holding.push(`${table.schema}.${table.name}`);
+      }
+      return holding;
+    }
+    const fixture=await identityWithGrant("name-gone");
+    const { identity }=fixture;
+    const runId=await createRun(identity,"dpd-name-gone");
+    const publishToken=await grant(identity,runId,"PUBLISH","g",new Date());
+    const application=publications();
+    // Published as the product publishes: the application builds and seals the stored copy.
+    const published=await application.publish({
+      contentCheck:{ check:async ()=>({ outcome:"ALLOW" }) },runId,
+      authenticated:{
+        userId:identity.userId,ownerRef:identity.ownerRef,tokenHash:identity.sessionTokenHash,
+        csrfTokenHash:`hash:csrf:${identity.sessionId}`,authKind:"cookie" as const,
+        session:{
+          session_id:identity.sessionId,asker_id:identity.ownerRef,caller_scope:"ASKER",
+          ownership_provenance:"server_session",provisional_identity_model:false
+        }
+      },
+      grantToken:publishToken,source,
+      answer:buildFairShapedAnswer({
+        run_ref:runId,terminal:"SERVED",question_line:"name-gone public question",verdict_state:"SUPPORTED",
+        composed_text:[{ segment_id:"seg:name-gone-1",text:"name-gone public answer",load_bearing:true,served_number_refs:[] }],
+        badges:[],residual_objections:[],reversal_point:"new evidence",as_of:new Date().toISOString()
+      })
+    });
+    expect(published).toMatchObject({ state:"PUBLISHED" });
+    const ref=(published as { public_ref:string }).public_ref;
+    const storedRow=async ()=>(await database.pool.query<{ content_ciphertext:CryptoEnvelope }>(
+      "SELECT content_ciphertext FROM serve.publication_snapshot WHERE publication_ref=$1",[ref]
+    )).rows[0]!.content_ciphertext;
+    const opened=async (content:CryptoEnvelope)=>{
+      const key=await publicationCipher.open(ref,runId);
+      try { return key.decrypt<Record<string,unknown>>(content); } finally { key.close(); }
+    };
+
+    // While the account lives the page shows the name, read from the account: the stored copy does not hold it.
+    const shownBefore=(await application.readPublicDebate(ref))!;
+    expect(shownBefore.author_pseudonym).toBe(identity.pseudonym);
+    expect(shownBefore.author_name_gone).toBeUndefined();
+    const rowBefore=await storedRow();
+    const copyBefore=await opened(rowBefore);
+    expect(copyBefore).toMatchObject({ public_ref:ref,question:"name-gone public question" });
+    expect(copyBefore).not.toHaveProperty("author_pseudonym");
+    expect(JSON.stringify(copyBefore)).not.toContain(identity.pseudonym);
+    expect(await tablesHolding(identity.pseudonym)).toEqual(["identity.user"]);
+
+    const scheduled=(await schedule(fixture,false))!;
+    await due(identity.userId);
+    expect(await clean(scheduled.erasureId)).toBe("CLEANED");
+    expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE user_id=$1',[identity.userId])).rowCount).toBe(0);
+
+    // The page stands and says "a contributor", by the application, over HTTP and in the list.
+    const shownAfter=(await application.readPublicDebate(ref))!;
+    expect(shownAfter).toEqual({ ...shownBefore,author_pseudonym:"a contributor",author_name_gone:true });
+    const http=await publicRead(ref);
+    expect(http.statusCode).toBe(200);
+    expect(JSON.parse(http.body)).toMatchObject({ public_ref:ref,author_pseudonym:"a contributor",author_name_gone:true });
+    expect(http.body).not.toContain(identity.pseudonym);
+    expect((await application.list(200,0)).items.find((item)=>item.public_ref===ref))
+      .toMatchObject({ author_pseudonym:"a contributor" });
+
+    // The stored copy is the row it was (nothing was rewritten) and holds no name; no table holds the pseudonym any more.
+    const rowAfter=await storedRow();
+    expect(rowAfter).toEqual(rowBefore);
+    const copyAfter=await opened(rowAfter);
+    expect(copyAfter).not.toHaveProperty("author_pseudonym");
+    expect(JSON.stringify(copyAfter)).not.toContain(identity.pseudonym);
+    expect(await tablesHolding(identity.pseudonym)).toEqual([]);
+
+    // The audit trail: no entry holds the pseudonym, the account, the publication or its debate. The publishing entry names two
+    // references made for that one event, and the table that tied them to the account went with the account.
+    const audit=(await database.pool.query<{ event_type:string;actor_key_ref:string;target_type:string;target_id:string }>(
+      "SELECT * FROM identity.audit_event"
+    )).rows;
+    const auditText=JSON.stringify(audit);
+    for (const identifier of [identity.pseudonym,identity.userId,identity.ownerRef,ref,runId]) {
+      expect(auditText,identifier).not.toContain(identifier);
+    }
+    const erased=audit.filter((entry)=>entry.event_type==="identity.account.erased"&&entry.target_id===scheduled.erasureId);
+    expect(erased).toHaveLength(1);
+    expect(erased[0]).toMatchObject({ actor_key_ref:identity.auditToken,target_type:"identity.account_erasure" });
+    expect(audit.filter((entry)=>entry.event_type.startsWith("debate.publication.")&&entry.actor_key_ref===identity.auditToken)).toEqual([]);
+    expect((await database.pool.query(
+      "SELECT 1 FROM identity.publication_event_binding WHERE user_id=$1",[identity.userId]
+    )).rowCount).toBe(0);
+  },240_000);
 
   it("DPD-S01 R23 a remove request with no public debate commits with counts (0, 0)",async ()=>{
     const fixture=await identityWithGrant("empty");

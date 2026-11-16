@@ -188,7 +188,6 @@ function application(): PostgresPublicationApplication {
   return new PostgresPublicationApplication(new PostgresPublicationRepository(api, hasher), publicationCipher, undefined, undefined, undefined, undefined, null, {
     readUpdates: (ref) => new PostgresPublicDebateRunnerRepository(api).readPageUpdates(ref),
     readReports: (ref) => new PostgresPublicPageRepository(api).readReports(ref),
-    authorNameGone: (ref) => new PostgresPublicDebateRunnerRepository(api).isAuthorNameGone(ref),
     readOverlay: (ref) => new PostgresPublicReviewRepository(api).readOverlay(ref),
     isHeld: (ref) => new PostgresPublicReviewRepository(api).isHeld(ref)
   });

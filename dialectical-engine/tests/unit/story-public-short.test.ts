@@ -19,6 +19,7 @@ import {
   PostgresPublicationApplication,
   type PublicationStoryReader
 } from "../../apps/api/src/publications.js";
+import { publicDebateOfStoredCopy } from "../../apps/api/src/public-tree.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import { toPublicStoryShort } from "../../packages/story/src/public.js";
 import { countStoryPositions, morePathsWords } from "../../apps/ui/lib/v3/storyWords.js";
@@ -115,7 +116,10 @@ async function publishWith(
   if (snapshot === null) throw new TypeError("STORY_TEST_SNAPSHOT_MISSING");
   const prepared = await cipher.open(snapshot.publicationRef, snapshot.runId);
   try {
-    return PublicDebateSchema.parse(prepared.decrypt(snapshot.contentCiphertext));
+    // The stored copy holds no author name; it is read as the page reads it, with the account's.
+    const read = publicDebateOfStoredCopy(prepared.decrypt(snapshot.contentCiphertext), "Stable Public Name");
+    if (!read.success) throw read.error;
+    return read.data;
   } finally {
     prepared.close();
   }
