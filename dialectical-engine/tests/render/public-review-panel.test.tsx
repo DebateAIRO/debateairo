@@ -142,6 +142,46 @@ describe("the review panel", () => {
     await press("Confirm");
     expect(step).toHaveBeenLastCalledWith(REF, 1, { step: "DECIDE", ground: { grounds: ["HATE_SPEECH"], source: "OWN_INITIATIVE", flagId: null, facts: "Kept hidden.", law: null } });
   });
+  it("Art. 50(2): the AIs' words are marked, the person's question and own words, names, codes, web quotes and the staff's correction never", async () => {
+    const base = pageOf(true);
+    const piece = (pointer: string, original: string, corrected: string | null = null) => ({ pointer, original, corrected });
+    const page = PublicReviewPageSchema.parse({ ...base, snapshot: [
+      piece("/question", "A made-up question?"),
+      piece("/author_pseudonym", "Quiet Heron"),
+      piece("/answer/summary_segments/0/text", "An AI summary."),
+      piece("/answer/nodes/0/claim", "A made-up question?"),
+      piece("/answer/nodes/1/claim", "An AI claim."),
+      piece("/answer/nodes/1/sources/0/quote", "Words quoted from a web page."),
+      piece("/answer/badges/0", "PEER_REVIEWED"),
+      piece("/branches/paths/0/title", "An AI path title"),
+      piece("/branches/paths/0/author", "AI_SUGGESTION"),
+      piece("/branches/paths/0/viewpoints/0/title", "An AI viewpoint"),
+      piece("/branches/paths/0/viewpoints/0/question", "An AI viewpoint question?"),
+      piece("/branches/paths/0/viewpoints/1/question", "My own view."),
+      piece("/branches/paths/1/title", "My own path"),
+      piece("/branches/paths/1/question", "My own path question?"),
+      piece("/branches/paths/1/author", "PERSON_OWN_VIEW"),
+      piece("/story_short/summary", "An AI story.", "A staff correction.")
+    ], updates: base.updates, reports: [{ report_id: LATER, report_version: 1, writer: "Quiet Heron", requested_at: "2026-10-22T08:00:00.000Z", recorded_at: "2026-10-22T09:00:00.000Z", state: "ON_THE_PAGE",
+      pieces: [piece("/answer/headline", "An AI report headline."), piece("/paths/0/dig/own_words/0", "My own words in a dig."), piece("/writer", "Quiet Heron")] }] });
+    await mount(client({ read: vi.fn(async () => page) } as never));
+    await open();
+    const marked = (text: string) => {
+      const found = [...host!.querySelectorAll("[data-review-piece] p, [data-review-piece] del")].find((node) => node.textContent === text);
+      expect(found, text).toBeDefined();
+      return found!.closest('[data-ai-generated="true"]') !== null;
+    };
+    for (const text of ["An AI summary.", "An AI claim.", "An AI path title", "An AI viewpoint", "An AI viewpoint question?", "An AI story.", "The dig's line.", "An AI report headline."]) expect(marked(text), text).toBe(true);
+    for (const text of ["A made-up question?", "Quiet Heron", "Words quoted from a web page.", "PEER_REVIEWED", "AI_SUGGESTION", "My own view.", "My own path", "My own path question?",
+      "PERSON_OWN_VIEW", "A staff correction.", "My own words in a dig."]) expect(marked(text), text).toBe(false);
+    expect(host!.querySelector("[data-review-debate] h2")!.closest("[data-ai-generated]")).toBeNull();
+    // "Before it: …": the earlier line is the AIs', the label the site's.
+    const before = [...host!.querySelectorAll("[data-review-update] p")].find((node) => node.textContent === "Before it: The text before.")!;
+    expect(before.querySelector('[data-ai-generated="true"]')?.textContent).toBe("The text before.");
+    expect(before.closest("[data-ai-generated]")).toBeNull();
+    // The reporter's own words in the queue are theirs.
+    expect(host!.querySelector("[data-report-queue] [data-ai-generated]")).toBeNull();
+  });
   it("while hidden: each dig's text with what it changed and its state; a correction shows both texts; the steps name their piece", async () => {
     const step = vi.fn(async () => ({}));
     await mount(client({ read: vi.fn(async () => pageOf(true)), step } as never));

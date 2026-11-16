@@ -18,6 +18,17 @@ import homeEnglish from "../../apps/ui/messages/en/home.json" with { type: "json
 import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
 import supportEnglish from "../../apps/ui/messages/en/support.json" with { type: "json" };
 import { resetSupportOfferedForTests, SUPPORT_OFFERED_STORAGE_KEY } from "../../apps/ui/components/support/availability.js";
+import type { ReactElement } from "react";
+import { DebateMap } from "../../apps/ui/components/DebateMap.js";
+import { RecommendedInvestigations } from "../../apps/ui/components/RecommendedInvestigations.js";
+import { DebateWorkspaceDrawer } from "../../apps/ui/components/DebateWorkspaceDrawer.js";
+import { InvestigationDrawer } from "../../apps/ui/components/InvestigationDrawer.js";
+import { I18nProvider } from "../../apps/ui/lib/i18n/I18nProvider.js";
+import { V4ContributionNote } from "../../apps/ui/components/v4/V4ContributionNote.js";
+import { V4SignInAgain } from "../../apps/ui/components/v4/V4LoadingOutline.js";
+import { V4WaitCard } from "../../apps/ui/components/v4/V4WaitCard.js";
+import type { DebateDetail, RecommendedInvestigation } from "../../apps/ui/lib/types.js";
+import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
 
 describe("AI disclosure at the point of use", () => {
   beforeEach(() => {
@@ -143,5 +154,89 @@ describe("AI disclosure at the point of use", () => {
       container.remove();
       vi.unstubAllGlobals();
     }
+  });
+});
+
+/*
+ * EU AI Act Art. 50(2): every AI-generated text sits inside data-ai-generated="true"; the person's own question never does,
+ * even when its words first came from an AI (the owner: "Never mark the question"; settings.transparency.machineReadableMiddle).
+ */
+describe("machine-readable marks: AI text marked, the person's question never", () => {
+  const html = (element: ReactElement): HTMLElement => {
+    const container = document.createElement("div");
+    container.innerHTML = renderToStaticMarkup(<I18nProvider locale="en" catalog={chromeEnglish}>{element}</I18nProvider>);
+    return container;
+  };
+  const marked = (element: Element | null | undefined): boolean => element?.closest('[data-ai-generated="true"]') != null;
+
+  it("the reference map marks each AI claim's segment (its label and title), never the question's hub", () => {
+    const detail = debateDetailFromAnswer(buildFairShapedAnswer());
+    const root = html(<DebateMap root={detail.tree!} onOpenSplit={() => {}} />);
+    const arcs = [...root.querySelectorAll("svg path[role=button]")];
+    expect(arcs.length).toBeGreaterThan(0);
+    for (const arc of arcs) {
+      expect(marked(arc)).toBe(true);
+      expect(marked(arc.querySelector("title"))).toBe(true);
+    }
+    expect(marked(root.querySelector("svg circle[role=button]"))).toBe(false);
+  });
+
+  it("marks a recommended investigation's reason, not the site's own words around it", () => {
+    const recommendations = [{ action: "find_evidence", reason: "A generated reason.", priority: 1, target_node_id: "node:1" }] as unknown as RecommendedInvestigation[];
+    const root = html(<RecommendedInvestigations recommendations={recommendations} />);
+    expect(root.querySelector(".recommendationReason")?.getAttribute("data-ai-generated")).toBe("true");
+    expect(marked(root.querySelector(".recommendationMeta"))).toBe(false);
+    expect(marked(root.querySelector(".recommendationActions"))).toBe(false);
+  });
+
+  it("the workspace drawer marks what the analyzers and agents wrote, not their fallbacks", () => {
+    const debate = {
+      analyzer_runs: [{ id: "a1", analyzer_type: "fallacy", status: "done", output: { findings: ["An AI finding."] }, provenance: {} }],
+      agent_runs: [{ id: "g1", agent_name: "Agent", role: "pro", status: "done", summary: "An AI summary.", agent: {}, skills_used: [],
+        pros: ["An AI pro."], cons: ["An AI con."], provenance: {} }]
+    } as unknown as DebateDetail;
+    const root = html(<DebateWorkspaceDrawer debate={debate} singleShot={null} onClose={() => {}} />);
+    const textOf = (words: string) => [...root.querySelectorAll("p, li")].find((element) => element.textContent === words);
+    for (const words of ["An AI finding.", "An AI summary.", "An AI pro.", "An AI con."]) expect(marked(textOf(words)), words).toBe(true);
+    expect(marked(root.querySelector("h3"))).toBe(false);
+    const empty = { analyzer_runs: [{ id: "a2", analyzer_type: "fallacy", status: "done", output: {}, provenance: {} }], agent_runs: [] } as unknown as DebateDetail;
+    const none = html(<DebateWorkspaceDrawer debate={empty} singleShot={null} onClose={() => {}} />);
+    expect(none.querySelector('[data-ai-generated="true"]')).toBeNull();
+  });
+
+  it("the investigation drawer marks the flagged AI claim and its flagged words, never the question itself", () => {
+    const detail = debateDetailFromAnswer(buildFairShapedAnswer());
+    const argument = detail.tree!.children[0]!;
+    const root = html(<InvestigationDrawer node={argument} status="working" flagged="some words" onClose={() => {}} onResolve={() => {}} onClear={() => {}} />);
+    expect(marked(root.querySelector(".invFlaggedClaim"))).toBe(true);
+    const span = root.querySelector(".invFlaggedSpan")!;
+    expect(span.querySelector('[data-ai-generated="true"]')?.textContent).toBe("some words");
+    expect(marked(span)).toBe(false);
+    const question = html(<InvestigationDrawer node={detail.tree!} status="working" flagged="words" onClose={() => {}} onResolve={() => {}} onClear={() => {}} />);
+    expect(question.querySelector('[data-ai-generated="true"]')).toBeNull();
+  });
+
+  it("a dig's rewrite of a public path is AI text; the note's own words are not", () => {
+    const contribution = { public_ref: "f1000000-0000-4000-8000-000000000001", state: "KEPT_PRIVATE",
+      rewrite: { line: "A rewritten line.", summary: "What the rewrite says.", fate: "PARTLY_HELD", what_changed: ["One thing changed."] } };
+    const root = html(<V4ContributionNote contribution={contribution as never} catalog={v4English} />);
+    const rewrite = root.querySelector("[data-contribution-rewrite=READY]")!;
+    for (const words of ["A rewritten line.", "What the rewrite says.", "One thing changed."]) {
+      const element = [...rewrite.querySelectorAll("p, li, strong")].find((node) => node.textContent === words);
+      expect(marked(element), words).toBe(true);
+    }
+    expect(marked(rewrite.querySelector("h3"))).toBe(false);
+    expect(marked(root.querySelector(".v4ContributionNote"))).toBe(false);
+  });
+
+  it("the sign-in-again card and the waiting card show the question and the one gone back to unmarked", () => {
+    const signIn = html(<V4SignInAgain questionLine="Should we do the thing?" signInHref="/login" catalog={v4English} />);
+    expect(signIn.textContent).toContain("Should we do the thing?");
+    expect(signIn.querySelector('[data-ai-generated="true"]')).toBeNull();
+    const wait = html(<V4WaitCard state={{ kind: "LOOKING" }} question="Should we do the thing?" back={{ href: "/v4/debate/p", question: "The earlier question?" }}
+      catalog={v4English} locale="en" />);
+    expect(wait.textContent).toContain("The earlier question?");
+    expect(wait.querySelector(".v4WaitQuestion")?.textContent).toBe("Should we do the thing?");
+    expect(wait.querySelector('[data-ai-generated="true"]')).toBeNull();
   });
 });

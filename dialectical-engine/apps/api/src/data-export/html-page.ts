@@ -31,6 +31,13 @@ function storyTexts(value: unknown): string[] {
   ].map(words).filter(Boolean);
 }
 
+/**
+ * EU AI Act Art. 50(2): the machine-readable mark on each element showing AI-generated content (the verdict, the answer,
+ * the story, the arguments), as the site marks its own pages. Never on the person's question (owner's rule), never on a
+ * label; an attribute only, which the style sheet never selects on, so nothing a reader sees changes.
+ */
+const AI = ' data-ai-generated="true"';
+
 function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: string): string {
   const date = dateText(entry.created_at, locale);
   const visibility = entry.visibility_history.at(-1)?.state;
@@ -72,10 +79,10 @@ function renderDebate(entry: DebateEntry, catalog: ArchiveCatalog, locale: strin
   const story = storyTexts(answer?.story);
   return `<article><p class="label">${escapeHtml(catalog["archive.question"])}</p>
     <h3>${escapeHtml(entry.question)}</h3><p class="meta">${escapeHtml(date)} · ${escapeHtml(visibilityLabel)}</p>
-    ${verdictKey ? `<p class="label verdict-label">${escapeHtml(catalog["archive.verdict"])}</p><span class="pill ${verdict.toLowerCase()}">${escapeHtml(catalog[verdictKey])}</span>` : ""}
-    ${answerText ? `<div class="answer">${escapeHtml(answerText).replace(/\n\n/g, "<br><br>")}</div>` : ""}
-    ${story.length ? `<p class="label section-label">${escapeHtml(catalog["archive.story"])}</p>${story.map((text) => `<p class="story-text">${escapeHtml(text)}</p>`).join("")}` : ""}
-    ${claims.length ? `<p class="label section-label">${escapeHtml(catalog["archive.arguments"])}</p><ul>${claims.map((claim) => `<li>${escapeHtml(claim)}</li>`).join("")}</ul>` : ""}
+    ${verdictKey ? `<p class="label verdict-label">${escapeHtml(catalog["archive.verdict"])}</p><span class="pill ${verdict.toLowerCase()}"${AI}>${escapeHtml(catalog[verdictKey])}</span>` : ""}
+    ${answerText ? `<div class="answer"${AI}>${escapeHtml(answerText).replace(/\n\n/g, "<br><br>")}</div>` : ""}
+    ${story.length ? `<p class="label section-label">${escapeHtml(catalog["archive.story"])}</p>${story.map((text) => `<p class="story-text"${AI}>${escapeHtml(text)}</p>`).join("")}` : ""}
+    ${claims.length ? `<p class="label section-label">${escapeHtml(catalog["archive.arguments"])}</p><ul${AI}>${claims.map((claim) => `<li>${escapeHtml(claim)}</li>`).join("")}</ul>` : ""}
     ${latestCheck && checkVerdictKey ? `<p class="label section-label">${escapeHtml(catalog["archive.contentCheck"])}</p><p class="check"><strong${latestCheck.verdict === "FLAGGED" ? ' class="flagged"' : ""}>${escapeHtml(catalog[checkVerdictKey])}</strong> · ${checkCategories ? `${escapeHtml(checkCategories)} · ` : ""}${escapeHtml(formatArchiveTime(new Date(latestCheck.checked_at), locale))}</p>` : ""}
     ${reviewRows ? `<p class="label section-label">${escapeHtml(catalog["archive.publicationReview"])}</p>${reviewRows}` : ""}
   </article>`;

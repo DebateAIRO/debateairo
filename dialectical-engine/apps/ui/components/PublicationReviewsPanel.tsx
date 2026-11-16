@@ -155,13 +155,14 @@ export function PublicationReviewsPanel({ client, catalog = staffEnglish, public
       {detail !== null ? <section aria-label={t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")} data-review-detail={detail.kind} className="rvDetail">
         <h2>{t(publicCatalog, detail.kind === "verdict" ? "public.overview.details" : "public.overview.read")}</h2>
         {detail.kind === "verdict" ? <>
-          {snapshot.answer.summary_segments.map((segment, index) => <p key={index}>{segment.text}</p>)}
+          {/* EU AI Act Art. 50(2): the AIs' words are marked; the site's labels and the person's question are not. */}
+          {snapshot.answer.summary_segments.map((segment, index) => <p key={index} data-ai-generated="true">{segment.text}</p>)}
           <p>{snapshot.answer.verdict === null ? t(publicCatalog, "public.overview.verdictUnavailable")
-            : `${t(publicCatalog, "public.honesty.verdict")}: ${storyLabelWords(snapshot.answer.verdict, publicCatalog)}`}</p>
-          {snapshot.answer.reversal_point ? <p>{snapshot.answer.reversal_point}</p> : null}
+            : <>{`${t(publicCatalog, "public.honesty.verdict")}: `}<span data-ai-generated="true">{storyLabelWords(snapshot.answer.verdict, publicCatalog)}</span></>}</p>
+          {snapshot.answer.reversal_point ? <p data-ai-generated="true">{snapshot.answer.reversal_point}</p> : null}
         </> : selectedNode !== null && selectedNode !== undefined ? <>
-          <p>{selectedNode.claim}</p>
-          {selectedNode.review?.reasons.map((reason, index) => <p key={index}>{reason}</p>)}
+          <p data-ai-generated={selectedNode.claim.trim() === snapshot.question.trim() ? undefined : "true"}>{selectedNode.claim}</p>
+          {selectedNode.review?.reasons.map((reason, index) => <p key={index} data-ai-generated="true">{reason}</p>)}
         </> : null}
         <button className="setBtn" type="button" onClick={() => setDetail(null)}>{t(publicCatalog, "public.honesty.close")}</button>
       </section> : null}

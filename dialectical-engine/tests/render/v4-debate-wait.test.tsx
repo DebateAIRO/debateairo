@@ -148,6 +148,9 @@ describe("the map from Start (wait-d1, map-d2, journey-f1, r2-8)", () => {
     await mountMap(1600, runId);
     // r2-8 / answer Q17: the first card is the question as it was sent, its answers sentences in it, never chips or pins.
     expect(flat(page().querySelector(".v4MapRoot .v4MapRootTitle"))).toBe(`${Q} Looking at Romania. Up to 2050.`);
+    // Art. 50(2), the owner's "Never mark the question": the question as sent and the page's heading are the person's.
+    expect(page().querySelector(".v4MapRoot .v4MapRootTitle")!.closest("[data-ai-generated]")).toBeNull();
+    for (const heading of page().querySelectorAll("h1")) expect(heading.closest("[data-ai-generated]"), heading.textContent ?? "").toBeNull();
     expect(page().querySelector(".v4ChoiceChips")).toBeNull();
     // journey-d2: the waiting card sits under it, with its one state line.
     expect(waitWord()).toBe(CATALOG["v4.state.LOOKING"]);
@@ -265,6 +268,7 @@ describe("the map from Start (wait-d1, map-d2, journey-f1, r2-8)", () => {
     harness.run = { run_ref: runId, question_line: Q, state: "RUNNING", terminal_reason: null, hold_until: null } as RunProjection;
     await mountMap(1600, runId);
     expect(flat(page().querySelector(".v4DebFirstCard .v4DebStatusQuestion"))).toBe(Q);
+    expect(page().querySelector(".v4DebFirstCard .v4DebStatusQuestion")!.closest("[data-ai-generated]")).toBeNull();
     expect(page().querySelector(".v4DebFirstCard [data-wait-block]")).not.toBeNull();
     expect(waitWord()).toBe(CATALOG["v4.state.LOOKING"]);
     expect(page().querySelector(".v4DebMapCol")).toBeNull();

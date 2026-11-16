@@ -109,6 +109,8 @@ describe("the breadcrumb on a dig's map", () => {
     };
     await mountMap(1600, DIG_RUNS.levelOne);
     expect(page().querySelector<HTMLAnchorElement>("a.v4DebBack")!.getAttribute("href")).toBe(`/v4/debate/${DIG_RUNS.root}`);
+    // Art. 50(2), the owner's "Never mark the question": the question it goes back to is the person's.
+    expect(page().querySelector("a.v4DebBack [data-ai-generated]")).toBeNull();
   });
 });
 

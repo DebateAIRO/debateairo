@@ -34,9 +34,10 @@ export function V4ContributionNote({ contribution, catalog }: Readonly<{ contrib
       ) : (
         <section className="v4ContributionRewrite" data-contribution-rewrite="READY">
           <h3>{t(catalog, "v4.contribution.rewriteTitle")}</h3>
-          <p><strong>{rewrite.line}</strong></p>
-          <p>{rewrite.summary}</p>
-          {rewrite.what_changed.length === 0 ? null : <ul>{rewrite.what_changed.map((sentence) => <li key={sentence}>{sentence}</li>)}</ul>}
+          {/* EU AI Act Art. 50(2): the rewrite is the AIs' (marked as in V4PathRewrite); the heading above is the site's. */}
+          <p data-ai-generated="true"><strong>{rewrite.line}</strong></p>
+          <p data-ai-generated="true">{rewrite.summary}</p>
+          {rewrite.what_changed.length === 0 ? null : <ul data-ai-generated="true">{rewrite.what_changed.map((sentence) => <li key={sentence}>{sentence}</li>)}</ul>}
         </section>
       )}
     </>

@@ -33,7 +33,7 @@ import {
   type V4Point,
   type V4Selection
 } from "@/lib/v4/types";
-import { cardLabel, groundClass } from "@/lib/v4/mapLooks";
+import { cardLabel, digQuestionIsAi, groundClass } from "@/lib/v4/mapLooks";
 import {
   branchIsTheirs,
   digFor,
@@ -725,7 +725,7 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
     ? (
       <details className="v4PanelSent">
         <summary>{t(catalog, "v4.panel.sentHeading")}</summary>
-        <p className="v4PanelSentText" data-ai-generated="true">{map.question.trim()}</p>
+        <p className="v4PanelSentText">{map.question.trim()}</p>
       </details>
     )
     : null;
@@ -1133,7 +1133,11 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
   const { panel } = props;
   const { dig } = props.resolved;
   const headline = dig.headline?.trim() ?? "";
-  const more = dig.link.questions.slice(1).filter((question) => question.trim().length > 0);
+  // Art. 50(2) / dig-f20: each item marked by who wrote it (the person's own view or edit never), not the list as a whole.
+  const more = dig.link.questions
+    .map((question, at) => ({ question, ai: digQuestionIsAi(dig, at) }))
+    .slice(1)
+    .filter((item) => item.question.trim().length > 0);
   // W4-6: a dig of the new model writes no story; it says what became of its rewrite of the path it came from.
   const rewrite = dig.rewrite;
   const finished = rewrite !== undefined && rewrite !== null && (rewrite.state === "READY" || rewrite.state === "READY_WITH_RESERVATION")
@@ -1160,8 +1164,8 @@ function DigBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolved
       {more.length > 0
         ? (
           <Section title={t(panel.catalog, "v4.panel.digAlso")}>
-            <ul className="v4PanelWhy" data-ai-generated="true">
-              {more.map((question, index) => <li key={index}>{question}</li>)}
+            <ul className="v4PanelWhy">
+              {more.map((item, index) => <li key={index} data-ai-generated={item.ai ? "true" : undefined}>{item.question}</li>)}
             </ul>
           </Section>
         )
@@ -1248,8 +1252,9 @@ function headingOf(resolved: ResolvedSelection, map: V4Map, catalog: MessageCata
   // map-f29 / dig-f20: what the dig looked into, in its own words, marked as AI text only when an AI wrote them.
   if (resolved.kind === "dig") return { ...digTitle(resolved.dig, catalog, HEADING_MAX, map), more: 0 };
   if (resolved.kind === "more") return { text: t(catalog, "v4.paths.moreHeading"), ai: false, more: 0 };
-  // The person's own words; the lines added from their choices sit in "What we asked the AIs".
-  return { text: ownWords(map.question), ai: true, more: 0 };
+  // The person's own words; the lines added from their choices sit in "What we asked the AIs". Never marked as AI text (the
+  // owner's Art. 50(2) rule: the question is theirs, even when an AI wrote some of its words first).
+  return { text: ownWords(map.question), ai: false, more: 0 };
 }
 
 export function V4Panel(props: PanelProps) {

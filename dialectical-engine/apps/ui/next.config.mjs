@@ -18,6 +18,9 @@ const gitHead = () => readGitHead(dirname(fileURLToPath(import.meta.url)));
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@debateai/contract", "@debateai/kernel", "@debateai/legal-manifest"],
+  // EU AI Act Art. 50(2): lib/report/pdfAiMark.ts marks the report PDFs by wrapping pdfkit's metadata step. Next keeps
+  // @react-pdf/renderer external by default; pdfkit must be too, so both load Node's one copy of it, not a bundled second.
+  serverExternalPackages: ["pdfkit"],
   distDir: process.env.NEXT_DIST_DIR || ".next",
   env: { NEXT_PUBLIC_DEBATEAI_RELEASE_CODE: resolveBuildReleaseCode(process.env, gitHead) },
   // L3-F9: no framework fingerprint on responses.

@@ -193,7 +193,7 @@ function V4StartFullButtons({ plan, catalog, widerWidth, wider, onInto, onSwap, 
       <>
         {plan.paths.map((path, at) => (
           <button key={path.key} type="button" className="v4Btn v4StartOwnPick" onClick={() => choose(path.key)}>
-            {t(catalog, "v4.start.full.path", { n: at + 1, title: path.title })}
+            <LineText line={titledLine(catalog, "v4.start.full.path", path, { n: at + 1 })} />
           </button>
         ))}
         {cancel}
@@ -329,15 +329,37 @@ export type V4StartCardProps = Readonly<{
   hideReloadLine?: boolean;
 }>;
 
+/**
+ * EU AI Act Art. 50(2): a sentence of the card's that names a path by its title. The sentence is the site's; the title is
+ * marked as AI text unless the person wrote it (V4StartRow's rule: `wording` PERSON).
+ */
+type TitledLine = Readonly<{ before: string; title: string; ai: boolean; after: string }>;
+/** A line the card says: the site's words alone, or a sentence around a path's title. */
+type CardLine = string | TitledLine;
+
+/** Stands in for the title while the sentence around it is read from the catalogue. */
+const TITLE_SLOT = "⁣⁣";
+
+function titledLine(catalog: MessageCatalog, key: string, path: PlanPath, values: Readonly<Record<string, string | number>> = {}): TitledLine {
+  const [before = "", after = ""] = t(catalog, key, { ...values, title: TITLE_SLOT }).split(TITLE_SLOT);
+  return { before, title: path.title, ai: path.wording !== "PERSON", after };
+}
+
+/** A card line as shown: only an AI-written title inside it is marked as AI text. */
+function LineText({ line }: Readonly<{ line: CardLine }>) {
+  if (typeof line === "string") return <>{line}</>;
+  return <>{line.before}<span data-ai-generated={line.ai ? "true" : undefined}>{line.title}</span>{line.after}</>;
+}
+
 /** One notice above the list; `undoAt`: its own Undo shows while the plan's Undo stack is this deep (narrowing's). */
-type Notice = Readonly<{ text: string; undoAt: number | null }>;
+type Notice = Readonly<{ text: CardLine; undoAt: number | null }>;
 
 export function V4StartCard(props: V4StartCardProps) {
   const { start, widths, freePlan, catalog, locale, narrow, share } = props;
   const { phase, plan } = start;
   const titleId = useId();
   const [notice, setNotice] = useState<Notice | null>(null);
-  const [spoken, setSpoken] = useState("");
+  const [spoken, setSpoken] = useState<CardLine>("");
   const listShown = plan !== null && (phase === "READY" || phase === "STALE");
   const planNow = useRef(plan);
   planNow.current = plan;
@@ -382,7 +404,7 @@ export function V4StartCard(props: V4StartCardProps) {
       const moved = movedToMore(before, plan);
       if (moved.length === 0) return;
       const text = moved.length === 1
-        ? t(catalog, "v4.start.notice.narrowed.one", { title: moved[0]!.title })
+        ? titledLine(catalog, "v4.start.notice.narrowed.one", moved[0]!)
         : tPlural(catalog, "v4.start.notice.narrowed", moved.length, locale);
       setNotice({ text, undoAt: plan.undo.length });
       setSpoken(text);
@@ -391,7 +413,7 @@ export function V4StartCard(props: V4StartCardProps) {
     const madeRoom = action !== null && action !== "REMOVE" ? movedToMore(before, plan) : [];
     if (madeRoom.length > 0) {
       const text = madeRoom.length === 1
-        ? t(catalog, "v4.start.notice.madeRoom.one", { title: madeRoom[0]!.title })
+        ? titledLine(catalog, "v4.start.notice.madeRoom.one", madeRoom[0]!)
         : tPlural(catalog, "v4.start.notice.madeRoom", madeRoom.length, locale);
       setNotice({ text, undoAt: null });
       setSpoken(text);
@@ -487,7 +509,7 @@ export function V4StartCard(props: V4StartCardProps) {
         : null}
       {listShown && notice !== null ? (
         <div className="v4StartNotice">
-          <p>{notice.text}</p>
+          <p><LineText line={notice.text} /></p>
           {notice.undoAt !== null && notice.undoAt === undoCount ? (
             <button type="button" className="v4Btn v4StartNoticeUndo" onClick={() => { send({ type: "UNDO" }); }}>
               {t(catalog, "v4.start.undo")}
@@ -521,7 +543,7 @@ export function V4StartCard(props: V4StartCardProps) {
           offerIfCrisis={props.offerIfCrisis}
         />
       ) : null}
-      <p className="v4SrOnly v4StartSpoken" role="status" aria-live="polite">{spoken}</p>
+      <p className="v4SrOnly v4StartSpoken" role="status" aria-live="polite"><LineText line={spoken} /></p>
     </section>
   );
 }
@@ -678,11 +700,11 @@ function V4StartOwnPath(props: Readonly<{
   };
 
   const fits = step.kind === "FITS" ? plan.paths.find((path) => path.key === step.key) ?? null : null;
-  let message: string | null = error;
+  let message: CardLine | null = error;
   let choice: ReactNode = null;
   if (step.kind === "FINDING") message = t(catalog, "v4.start.own.finding");
   else if (step.kind === "FITS" && fits !== null) {
-    message = t(catalog, "v4.start.own.fits", { title: fits.title });
+    message = titledLine(catalog, "v4.start.own.fits", fits);
     choice = (
       <>
         <button type="button" className="v4Btn" onClick={() => into(fits.key)}>{t(catalog, "v4.start.own.addThere")}</button>
@@ -726,7 +748,7 @@ function V4StartOwnPath(props: Readonly<{
         />
         <button type="submit" className="v4Btn v4StartOwnAdd" disabled={step.kind === "FINDING"}>{t(catalog, "v4.start.own.add")}</button>
       </div>
-      {message === null ? null : <p id={messageId} className="v4StartOwnMessage" role="status">{message}</p>}
+      {message === null ? null : <p id={messageId} className="v4StartOwnMessage" role="status"><LineText line={message} /></p>}
       {choice === null ? null : <div className="v4StartOwnChoice">{choice}</div>}
     </form>
   );
