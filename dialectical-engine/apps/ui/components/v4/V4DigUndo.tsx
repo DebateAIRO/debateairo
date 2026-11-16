@@ -8,6 +8,7 @@ import { clock24 } from "@/lib/v4/clock";
 import {
   digGroupOf,
   dismissDig,
+  holdDig,
   markDigFocused,
   undoDig,
   useDigNotesClaimed,
@@ -17,7 +18,7 @@ import {
 } from "@/lib/v4/digUndo";
 import { cardLabel, firstByOf } from "@/lib/v4/mapLooks";
 import type { DigTarget } from "@/lib/v4/types";
-import { V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "./V4UndoNote";
+import { useRoomVariable, V4UndoNote, V4UndoNotes, type V4UndoNoteState } from "./V4UndoNote";
 
 /*
  * V4 UX fixes (owner picks 3 Nov: dig-d3 B, dig-f7, dig-f8, dig-f10, journey-f21): the dig's words around the shared
@@ -168,10 +169,17 @@ export function V4DigNotes(props: V4DigNotesProps) {
           confirmedLine={t(catalog, "v4.undo.cancelled")}
           doneLine={<>{doneWords}{seeIt === null ? null : <>{" "}{seeIt}</>}</>}
           doneAnnounce={doneWords}
-          onClose={() => dismissDig(entry.id)}
+          onClose={() => {
+            // V4C-4 (keyboard audit 2026-11-12): Close takes the note away with focus on it; on the map, focus goes back where
+            // the note's Undo would have given it (else the site's focus guard keeps the place).
+            if ((document.activeElement?.closest(".v4Undo") ?? null) !== null) props.returnFocus?.()?.focus();
+            dismissDig(entry.id);
+          }}
           closeLabel={t(catalog, "v4.dig.close")}
           takeFocus={!entry.focused}
           onFocusTaken={() => markDigFocused(entry.id)}
+          // V4C-13: a started note's See it and Close do not time out while focus is in the note.
+          onHold={(held) => holdDig(entry.id, held)}
           {...(props.returnFocus === undefined ? {} : { returnFocus: props.returnFocus })}
           folded={folded}
         />
@@ -225,9 +233,12 @@ export function V4DigUndoHost(props: Readonly<{ catalog: MessageCatalog; locale:
   const entries = useDigUndo();
   const claimed = useDigNotesClaimed();
   const narrow = useNarrow();
+  // V4C-12 (keyboard audit 2026-11-12): the note is fixed at the window's foot; its real height is the window's room there.
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  useRoomVariable(host, "--v4-undo-room");
   if (claimed || entries.length === 0) return null;
   return (
-    <div className="v4UndoHost">
+    <div className="v4UndoHost" ref={setHost}>
       <V4DigNotes entries={entries} catalog={props.catalog} locale={props.locale} narrow={narrow} />
     </div>
   );

@@ -27,6 +27,7 @@ import { V4NotStarted } from "@/components/v4/V4NotStarted";
 import { contractClient } from "@/lib/api";
 import type { AskRoom } from "@/lib/billing/room";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
+import { focusIsLost } from "@/lib/focusGuard";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
 import { askHistoryOf, loadPage, stepOneAddress, stepTwoAddress, withAskHistory } from "@/lib/v4/askHistory";
@@ -135,6 +136,19 @@ function byteLength(text: string): number {
 
 /** useLayoutEffect in the browser (no frame at the old height), useEffect on the server (which has no layout). */
 const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/** Input types that take no typed words (a phone shows no keyboard for them). */
+const NOT_TEXT_ENTRY = new Set(["checkbox", "radio", "button", "submit", "reset", "image", "file", "range", "color", "hidden"]);
+
+/**
+ * read-f9 with keyboard audit round 4 (A6): focus that types words, so the pinned bar steps into the page: a textarea or a text
+ * input, never a check box or a radio button, and never anything inside the bar itself (it would un-pin under the focused box).
+ */
+function typesWords(target: EventTarget): boolean {
+  if (!(target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)) return false;
+  if (target instanceof HTMLInputElement && NOT_TEXT_ENTRY.has(target.type)) return false;
+  return target.closest(".v4StartBar") === null;
+}
 
 /** V4 start step, Task 75b (ask-d2 A): a phone's width, where step 1's Next sits in the bottom bar (the card's 600 px rule). */
 const NARROW_QUERY = "(max-width: 600px)";
@@ -1163,8 +1177,11 @@ function V4AskForm({
     focusAfter.current = null;
     if (pendingShown || press === null) return;
     const within = step === "ask" ? stepOne.current : stepTwo.current;
+    // On a phone step 2's "Just answer it" is only in the Options sheet, which is shut again: Options is the way back to it
+    // (keyboard audit round 4, A4).
     const pressed = press === "quick" ? within?.querySelector<HTMLElement>(".v4AskJust")
-      : press === "just" ? within?.querySelector<HTMLElement>(".v4StartBarJust") ?? within?.querySelector<HTMLElement>(".v4StartBarStart")
+      : press === "just" ? within?.querySelector<HTMLElement>(".v4StartBarJust") ?? within?.querySelector<HTMLElement>(".v4StartBarOptions")
+        ?? within?.querySelector<HTMLElement>(".v4StartBarStart")
         : within?.querySelector<HTMLElement>(".v4StartBarStart");
     pressed?.focus();
   }, [pendingShown]);
@@ -1348,7 +1365,11 @@ function V4AskForm({
     if (barState !== "READY") return;
     const press: StartPress = chosenBy === "PERSON" ? "start" : "just";
     startFlight.current = true;
+    // The declined line stays until the consent is given, as step 1's does: its "Show it again" is what opens the consent
+    // screen, which gives focus back to it after another no (keyboard audit round 4, A2).
+    const declinedBefore = declinedAtStart;
     clearPressLines();
+    setDeclinedAtStart(declinedBefore);
     setRefusalStart(null);
     try {
       const agreed = await ask.ensureConsent().catch(() => false);
@@ -1356,6 +1377,7 @@ function V4AskForm({
         setDeclinedAtStart(chosenBy);
         return;
       }
+      setDeclinedAtStart(null);
       const known = await planAtPress(press);
       if (known === null) return;
       const free = known.free;
@@ -1547,7 +1569,10 @@ function V4AskForm({
       try {
         read = await contractClient.readSavedQuestion(id);
       } catch (error) {
-        if (savedQuestionGone(error)) setSavedListReads((count) => count + 1);
+        if (savedQuestionGone(error)) {
+          savedLineFocus(id);
+          setSavedListReads((count) => count + 1);
+        }
         return;
       }
       if (!alive.current) return;
@@ -1592,11 +1617,39 @@ function V4AskForm({
    * the line back (nothing is tried again by itself); one that answers gone takes it out of the list.
    */
   const focusAfterUndo = useRef<string | null>(null);
+  // Keyboard audit 2026-11-12 (V4A-2, V4A-3): a Delete's note that goes at the end of its window with focus on its Undo, or a
+  // Pick up whose question is gone (its line goes), hands focus to the Pick up of the line now in that place (the one before
+  // it at the end of the list), or to the question box once the list is empty; never to step 1 as a whole.
+  const deleteAt = useRef(new Map<string, number>());
+  const deleteHeld = useRef<string | null>(null);
+  const savedFocusAt = useRef<number | null>(null);
+  const savedLines = (): HTMLElement[] => [...(stepOne.current?.querySelectorAll<HTMLElement>(".v4NotStartedItem") ?? [])];
+  function savedLineFocus(id: string): void {
+    const lines = savedLines();
+    const at = lines.findIndex((one) => one.dataset.savedId === id);
+    if (at >= 0 && lines[at]!.contains(document.activeElement)) savedFocusAt.current = at;
+  }
+  useEffect(() => {
+    const at = savedFocusAt.current;
+    if (at === null) return;
+    if (!focusIsLost()) {
+      // Still on the line (its new read has not come): wait for it; anywhere else, the person has moved on.
+      if (!(stepOne.current?.querySelector(".v4NotStarted")?.contains(document.activeElement) ?? false)) savedFocusAt.current = null;
+      return;
+    }
+    savedFocusAt.current = null;
+    const lines = savedLines();
+    const line = lines[Math.min(at, lines.length - 1)];
+    (line?.querySelector<HTMLElement>(".v4NotStartedPickUp") ?? questionField.current)?.focus();
+  }, [notStartedItems]);
   function deleteSaved(item: SavedQuestionSummary): void {
     if (waitingDeletes.some((one) => one.item.id === item.id)) return;
+    deleteAt.current.set(item.id, Math.max(0, notStartedItems.findIndex((one) => one.id === item.id)));
     setWaitingDeletes((now) => [...now, { item, sendsAt: Date.now() + DIG_UNDO_MS, sent: false }]);
     deleteTimers.current.set(item.id, setTimeout(() => {
       deleteTimers.current.delete(item.id);
+      if (deleteHeld.current === item.id) savedFocusAt.current = deleteAt.current.get(item.id) ?? 0;
+      deleteAt.current.delete(item.id);
       setWaitingDeletes((now) => now.map((one) => one.item.id === item.id ? { ...one, sent: true } : one));
       void (async () => {
         let gone = true;
@@ -1616,6 +1669,7 @@ function V4AskForm({
     if (timer === undefined) return;
     clearTimeout(timer);
     deleteTimers.current.delete(id);
+    deleteAt.current.delete(id);
     focusAfterUndo.current = id;
     setWaitingDeletes((now) => now.filter((one) => one.item.id !== id));
   }
@@ -1838,6 +1892,8 @@ function V4AskForm({
     reloadPage();
   }
   // Task 76e (owner answer Q8): while the site is updated, one line at the top of the page, on step 1 and step 2 (draft wording).
+  // It takes no #page-content mark: the mark stays on the step's own root in every state, so a focus the skip link put there
+  // is not dropped when the line comes mid-session (keyboard audit 2026-11-12, wave-3 fix round, A8).
   const updateBanner = site.updated ? (
     <p className="v4AskHint v4AskSiteUpdated" role="status">
       {t(catalog, "v4.ask.siteUpdated")}{" "}
@@ -1888,6 +1944,10 @@ function V4AskForm({
       sendsAt={one.sendsAt}
       durationMs={DIG_UNDO_MS}
       onUndo={() => undoDelete(one.item.id)}
+      onHold={(held) => {
+        if (held) deleteHeld.current = one.item.id;
+        else if (deleteHeld.current === one.item.id) deleteHeld.current = null;
+      }}
       undoLabel={t(catalog, "v4.start.undo")}
       stillLine={t(catalog, "v4.saved.deleteStill")}
       announce={t(catalog, "v4.saved.deleteAnnounce")}
@@ -1930,7 +1990,7 @@ function V4AskForm({
   const pendingWords = pending === null ? "" : pending.share === null ? t(catalog, "v4.start.undo.noteNoShare")
     : t(catalog, "v4.start.undo.note", { share: t(catalog, pending.share.key, pending.share.values) });
   const pendingView = pending === null || pendingMap === null ? null : (
-    <div ref={pendingBox} className="v4AskMain v4AskPendingMap">
+    <div ref={pendingBox} className="v4AskMain v4AskPendingMap" id="page-content" tabIndex={-1}>
       <V4PendingMap
         map={pendingMap}
         catalog={catalog}
@@ -1969,7 +2029,7 @@ function V4AskForm({
       {header}
       {updateBanner}
       {pendingView !== null ? pendingView : step === "ask" ? (
-        <div ref={stepOne} className="v4AskMain">
+        <div ref={stepOne} className="v4AskMain" id="page-content" tabIndex={-1}>
           {/* Task 76c (choose-f21, answer Q3): the page opened on a started question's entry: one line at the top, with its map. */}
           {startedRun === null ? null : (
             <p className="v4AskStarted" role="status">
@@ -2119,9 +2179,10 @@ function V4AskForm({
       ) : (
         <div
           ref={stepTwo}
+          id="page-content" tabIndex={-1}
           className="v4AskMain v4AskMainRead"
-          // read-f9: while an input or textarea on step 2 has focus, the bar steps back into the page (answer buttons never count).
-          onFocus={(event) => setTextFocused(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)}
+          // read-f9: while text entry on step 2 has focus, the bar steps back into the page (buttons and check boxes never count).
+          onFocus={(event) => setTextFocused(typesWords(event.target))}
           onBlur={() => setTextFocused(false)}
         >
           <div>

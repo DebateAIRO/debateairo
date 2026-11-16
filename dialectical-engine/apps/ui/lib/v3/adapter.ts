@@ -377,6 +377,11 @@ export function v3NodeScoreState(
   };
 }
 
+/** The typed reason a card carries no number, or undefined when it carries one (the drawer says the reason in words). */
+export function v3ScoreAbsenceOf(state: V3NodeScoreState): V3NodeScoreAbsence | undefined {
+  return state.status === "ABSENT" ? state.reason : undefined;
+}
+
 /**
  * V2's score-badge shape: a short mono pill plus the whole story in `title`.
  * `id` names WHICH contract field the pill carries, so the renderer can mark
@@ -418,6 +423,14 @@ export function v3ScorePercentage(
           probability: value
         })
       };
+}
+
+/**
+ * Whether `v3ScorePercentage` shows this probability rounded (its text then starts with "≈"). The same arithmetic, so
+ * the drawer can say the rounding in words without matching on the text (keyboard audit 2026-11-12).
+ */
+export function v3ScorePercentageIsRounded(value: number): boolean {
+  return Math.round(value * 100 * 100) / 100 / 100 !== value;
 }
 
 export type V3NodeScoreDetail = Readonly<{
@@ -544,6 +557,24 @@ export function v3NodeHonestyRows(
       key: t(catalog, "compose.v3.honesty.judgeDisagreement"),
       value: disagreementLabel(node.disagreement, catalog)
     }
+  ];
+}
+
+/**
+ * The honesty rows whose percentage is shown rounded: the base score's and the final strength's, when rounding
+ * changed them. Their `title` is the sentence that says how, which the drawer shows under its table (keyboard
+ * audit 2026-11-12); an exact percentage needs no such line.
+ */
+export function v3RoundedScoreRows(
+  node: ContractNode,
+  catalog: MessageCatalog = composeEnglish,
+  locale = "en"
+): readonly V3NodeHonestyRow[] {
+  // v3NodeHonestyRows puts the base score first and the final strength second (and throws when the latter is withheld).
+  const [baseRow, finalRow] = v3NodeHonestyRows(node, catalog, locale);
+  return [
+    ...(v3ScorePercentageIsRounded(node.base_score.value) ? [baseRow!] : []),
+    ...(node.final_strength !== null && v3ScorePercentageIsRounded(node.final_strength.value) ? [finalRow!] : [])
   ];
 }
 

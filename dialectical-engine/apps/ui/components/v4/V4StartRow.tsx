@@ -399,6 +399,16 @@ export function V4StartRow(props: RowProps) {
     n, count, title: path.title, viewpoints, state
   });
   const together = path.viewpoints.length > 1;
+  // Keyboard audit 2026-11-12 (V4A-18): the chips are reached with ArrowRight from the row; a line says so (v4-ask.css).
+  // On a right-to-left page the key is ArrowLeft (rightToLeft above), so the line names that one. The direction is the
+  // page's, read once the line is on the page (the server draws the left-to-right words; the line is hidden until a key
+  // puts the ring on its row, long after this has run).
+  const chipsHintId = useId();
+  const chipsHintRef = useRef<HTMLParagraphElement | null>(null);
+  const [mirrored, setMirrored] = useState(false);
+  useEffect(() => {
+    if (chipsHintRef.current !== null) setMirrored(rightToLeft(chipsHintRef.current));
+  }, [together]);
   // In "Combine with…", a tap anywhere on another row presses it (its own buttons keep their own presses).
   const onRowClick = combining && !picked
     ? (event: MouseEvent<HTMLLIElement>): void => {
@@ -429,6 +439,7 @@ export function V4StartRow(props: RowProps) {
           type="button"
           className="v4StartRowButton"
           aria-label={label}
+          aria-describedby={together ? chipsHintId : undefined}
           aria-haspopup={combining ? undefined : "menu"}
           aria-expanded={combining ? undefined : props.menuOpen}
           onClick={props.onPress}
@@ -494,6 +505,9 @@ export function V4StartRow(props: RowProps) {
               />
             ))}
           </ul>
+          <p id={chipsHintId} ref={chipsHintRef} className="v4StartChipsHint">
+            {t(catalog, mirrored ? "v4.start.chip.keysHintRtl" : "v4.start.chip.keysHint")}
+          </p>
           {chipMenu?.node ?? null}
         </div>
       ) : null}
@@ -628,8 +642,9 @@ export function V4StartList(props: StartPlanProps) {
         first.focus();
         break;
       }
+      // Enter only: Space is left to the button, which clicks on key-up (onPress). Opening the menu on Space's key-down
+      // moved focus to its first item, and a browser that clicks what is focused at key-up then chose it (A1, round 4).
       case "Enter":
-      case " ":
         event.preventDefault();
         pressRow(path, at);
         break;
@@ -665,8 +680,8 @@ export function V4StartList(props: StartPlanProps) {
         if (next >= 0 && next < plan.paths.length) rowAt(next)?.focus();
         break;
       }
+      // Enter only, as on the row: Space opens the menu through the chip's own click on key-up (onOpen).
       case "Enter":
-      case " ":
         event.preventDefault();
         setMenu({ kind: "CHIP", key: path.viewpoints[chip]!.key });
         break;

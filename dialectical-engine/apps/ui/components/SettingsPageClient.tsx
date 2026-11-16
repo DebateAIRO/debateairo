@@ -18,6 +18,7 @@ import { SubscriptionControls } from "@/components/billing/SubscriptionControls"
 import { UsageBars } from "@/components/billing/UsageBars";
 import { ConsentSettingsPanel } from "@/components/consent/ConsentSettingsPanel";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { focusIsLost } from "@/lib/focusGuard";
 import { modelDot } from "@/lib/models";
 import type { SettingsView } from "@/lib/v3/adapter";
 import settingsEnglish from "@/messages/en/settings.json";
@@ -79,8 +80,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
   const title = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (!focusTitle) return;
-    const focused = document.activeElement;
-    if (focused === null || focused === document.body) title.current?.focus();
+    if (focusIsLost()) title.current?.focus();
   }, [focusTitle]);
 
   if (changingFrom !== null) {

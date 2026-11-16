@@ -10,6 +10,7 @@ import {
 import { CookieBar } from "./CookieBar";
 import { CookiePreferencesCard } from "./CookiePreferencesCard";
 import { PrivacyPolicyModal } from "./PrivacyPolicyModal";
+import { useConsentBarRoom } from "./useConsentBarRoom";
 import { useConsentCatalog } from "./useConsentCatalog";
 
 /**
@@ -58,6 +59,13 @@ export function CookieConsent() {
    * moves no focus itself; it lends a node and the ONE helper decides.
    */
   const cardButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  /**
+   * The bar itself, lent so the room it takes at the foot of the window can be measured and kept clear for whatever a
+   * keyboard user tabs to (WCAG 2.4.11; keyboard audit 12 Nov 2026).
+   */
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useConsentBarRoom(barRef, surface === "bar");
 
   useEffect(() => {
     setSurface(readConsent() === null ? "bar" : "silent");
@@ -125,6 +133,7 @@ export function CookieConsent() {
       onAcknowledge={acknowledge}
       onOpenCard={openCard}
       cardButtonRef={cardButtonRef}
+      barRef={barRef}
     />
   );
 }

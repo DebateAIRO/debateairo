@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import type { Answer, ExecutionLedgerDigest, Inspection, InvestigationGap } from "@debateai/contract";
 import { DEBATE_SHAPE_MARKS, ENGINE_MARKS } from "@debateai/kernel";
 import type { LiveRunState } from "@/lib/v3/liveEvents";
@@ -27,6 +27,7 @@ import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
 import publicEnglish from "@/messages/en/public.json";
 import { useDialogSurface } from "@/components/dialogSurface";
+import { focusIsLost } from "@/lib/focusGuard";
 import { useDebateTextLang } from "@/components/debateTextLang";
 
 /**
@@ -205,6 +206,13 @@ export function AnswerHonestyDrawer({
   );
   const leftoverEdgeIds = new Set(unrepresentedEdges(answer, composeCatalog).map((edge) => edge.edge_id));
   const componentsOnly = answer.serve_state === "COMPONENTS_ONLY";
+  // Keyboard audit 2026-11-12: "Unlink prior answer" can go with the refresh it caused, taking focus with it; its answer
+  // is the status line at the drawer's foot, so focus goes there (only when nothing else holds it).
+  const unlinkShown = answer.memory_disclosure !== null && answer.memory_disclosure.matched && answer.memory_disclosure.unlink.available;
+  const actionStatus = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!unlinkShown && focusIsLost()) actionStatus.current?.focus();
+  }, [unlinkShown]);
 
   return (
     <>
@@ -220,7 +228,8 @@ export function AnswerHonestyDrawer({
           </button>
         </div>
 
-        <div className="drawerBody">
+        {/* A Tab stop of its own: the body is what scrolls (keyboard audit 2026-11-12). */}
+        <div className="drawerBody" tabIndex={0} role="region" aria-label={t(catalog, "misc.answerHonesty.honestyAndProvenance")}>
           <section className="wsSection" aria-label={t(catalog, "misc.answerHonesty.answerState")}>
             <div className="drawerSectionTitle">{t(catalog, "misc.answerHonesty.answerState")}</div>
             <ul className="drawerFindingList">
@@ -791,7 +800,7 @@ export function AnswerHonestyDrawer({
           </section>
 
           {actionState !== null ? (
-            <div className="pill" role="status">
+            <div ref={actionStatus} tabIndex={-1} className="pill" role="status">
               {actionState}
             </div>
           ) : null}

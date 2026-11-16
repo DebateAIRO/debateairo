@@ -19,7 +19,7 @@ export function questionRefusalOf(failure: unknown): RefusalScreen | null {
   return failure.serverCode === "QUESTION_CHECK_UNAVAILABLE" ? "UNAVAILABLE" : null;
 }
 
-export function useQuestionRefusal({ catalog, locale, countryHint = null, backLabel }: Readonly<{
+export function useQuestionRefusal({ catalog, locale, countryHint = null, backLabel, returnFocusRef }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   countryHint?: string | null;
@@ -28,6 +28,12 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null, backLa
    * (V4's step 2: "Edit my question"); absent, today's label for every other caller.
    */
   backLabel?: string;
+  /**
+   * Where focus goes when the screen (or its help-numbers screen) closes and the control that opened it can no longer
+   * hold focus: Start was disabled while the ask ran, so the browser had dropped focus to the page. Callers pass their
+   * question field, as for `useCrisisSupport` (keyboard audit 2026-11-12).
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }>): Readonly<{ offer(failure: unknown, about?: React.ReactNode): boolean; dialog: React.ReactNode }> {
   const [screen, setScreen] = React.useState<RefusalScreen | null>(null);
   const [about, setAbout] = React.useState<React.ReactNode>(null);
@@ -42,10 +48,10 @@ export function useQuestionRefusal({ catalog, locale, countryHint = null, backLa
     setScreen(refusal);
     return true;
   };
-  const dialog = helpOpen ? <CrisisSupportDialog catalog={catalog} locale={locale} countryHint={countryHint} onBack={() => setHelpOpen(false)} />
+  const dialog = helpOpen ? <CrisisSupportDialog catalog={catalog} locale={locale} countryHint={countryHint} onBack={() => setHelpOpen(false)} returnFocusRef={returnFocusRef} />
     : screen !== null ? <QuestionRefusalDialog
       catalog={catalog} locale={locale} countryHint={countryHint} screen={screen} about={about} backLabel={backLabel}
-      onBack={() => setScreen(null)} onHelpNumbers={() => { setScreen(null); setHelpOpen(true); }}
+      onBack={() => setScreen(null)} onHelpNumbers={() => { setScreen(null); setHelpOpen(true); }} returnFocusRef={returnFocusRef}
     /> : null;
   return { offer, dialog };
 }
@@ -58,7 +64,7 @@ function browserLanguages(): readonly string[] {
   return navigator.languages?.length ? navigator.languages : [navigator.language].filter(Boolean);
 }
 
-function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = null, backLabel, onBack, onHelpNumbers }: Readonly<{
+function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = null, backLabel, onBack, onHelpNumbers, returnFocusRef }: Readonly<{
   catalog: MessageCatalog;
   locale: string;
   countryHint: string | null;
@@ -69,11 +75,13 @@ function QuestionRefusalDialog({ catalog, locale, countryHint, screen, about = n
   backLabel?: string | undefined;
   onBack: () => void;
   onHelpNumbers: () => void;
+  /** Where focus goes on close when the opener can no longer hold it (see the hook above). */
+  returnFocusRef?: React.RefObject<HTMLElement | null> | undefined;
 }>): React.ReactElement {
   const dialogRef = React.useRef<HTMLElement | null>(null);
   const titleRef = React.useRef<HTMLElement | null>(null);
   useHideOutside(dialogRef);
-  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: titleRef, onClose: onBack });
+  useModalSurface(true, { containerRef: dialogRef, initialFocusRef: titleRef, onClose: onBack, returnFocusRef });
   const unavailable = screen === "UNAVAILABLE";
   const title = t(catalog, unavailable ? "home.questionRefusal.unavailableTitle" : "home.questionRefusal.title");
   const complain = t(catalog, "home.questionRefusal.complain", { months: t(catalog, "home.questionRefusal.months") });

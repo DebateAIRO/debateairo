@@ -48,6 +48,11 @@ export function V4ChangesBar(props: Readonly<{
   stops: number;
   onSee: (event: MouseEvent<HTMLButtonElement>) => void;
   onDismiss: () => void;
+  /**
+   * Keyboard audit 2026-11-12 (V4B-F1): where focus goes when "Hide this" takes the whole section away with focus in it (no
+   * results under the news); the map's question card, which comes right after. Absent: the site's focus guard decides.
+   */
+  focusAfter?: () => HTMLElement | null;
   /** journey-f10: every path a dig settled on this map, with its result. */
   results: readonly PathResult[];
   catalog: MessageCatalog;
@@ -71,7 +76,15 @@ export function V4ChangesBar(props: Readonly<{
                 {t(catalog, stops === 1 ? "v4.ready.seeIt" : "v4.ready.showMe")}
               </button>
             ) : null}
-            <button type="button" className="v4Link v4DebChangesDismiss" onClick={onDismiss}>{t(catalog, "v4.changes.dismiss")}</button>
+            <button
+              type="button"
+              className="v4Link v4DebChangesDismiss"
+              onClick={(event) => {
+                const gone = results.length === 0 && event.currentTarget.closest("section")?.contains(document.activeElement) === true;
+                onDismiss();
+                if (gone) props.focusAfter?.()?.focus();
+              }}
+            >{t(catalog, "v4.changes.dismiss")}</button>
           </div>
         </div>
       )}

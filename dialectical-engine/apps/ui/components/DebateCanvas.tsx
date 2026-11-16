@@ -35,6 +35,7 @@ import miscEnglish from "@/messages/en/misc.json";
 import debateChromeEnglish from "@/messages/en/debateChrome.json";
 import composeEnglish from "@/messages/en/compose.json";
 import { useDebateTextLang } from "@/components/debateTextLang";
+import { focusIsLost } from "@/lib/focusGuard";
 
 // Verdict-first UI (Phase 9): low-strength node dimming is additive and
 // gated behind NEXT_PUBLIC_VERDICT_FIRST_UI -- flag off must leave rendering
@@ -151,6 +152,26 @@ export function DebateCanvas({
     }
     if (changed) setHeights(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  });
+
+  // Keyboard audit 2026-11-12: a card can leave the Tree under focus (a settled run sets its path aside). Focus then goes
+  // to the Tree's own Tab stop (the canvas region, whose arrow and zoom keys work), not to the page.
+  const focusedCard = useRef<Readonly<{ id: string; canvas: HTMLElement }> | null>(null);
+  useEffect(() => {
+    const note = (event: FocusEvent) => {
+      const target = event.target instanceof Node ? event.target : null;
+      const id = target === null ? undefined : Object.keys(cardRefs.current).find((key) => cardRefs.current[key]?.contains(target));
+      const canvas = id === undefined ? null : cardRefs.current[id]?.closest<HTMLElement>(".canvas") ?? null;
+      focusedCard.current = id === undefined || canvas === null ? null : { id, canvas };
+    };
+    document.addEventListener("focusin", note);
+    return () => document.removeEventListener("focusin", note);
+  }, []);
+  useLayoutEffect(() => {
+    const held = focusedCard.current;
+    if (held === null || layout.placed.some((placed) => placed.id === held.id)) return;
+    focusedCard.current = null;
+    if (held.canvas.isConnected && focusIsLost()) held.canvas.focus({ preventScroll: true });
   });
 
   // Drop stale measurements when claims disappear.

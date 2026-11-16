@@ -67,18 +67,25 @@ export function V4StartWays(props: V4StartWaysProps) {
   const [noRoom, setNoRoom] = useState<string | null>(null);
   const addedLines = useRef(new Map<string, HTMLElement>());
   const focusAdded = useRef<string | null>(null);
+  /** Keyboard audit 2026-11-12 (V4A-7, V4A-8): the swapped lines, the card to focus one of, and the button that opened a full-list choice. */
+  const swappedLines = useRef(new Map<string, HTMLElement>());
+  const focusSwapped = useRef<string | null>(null);
+  const fullFrom = useRef<HTMLElement | null>(null);
 
-  // Once a card is on the list, its pressed button is gone: focus goes to the line that says where it went.
+  // Once a card is on the list, its pressed button is gone: focus goes to the line that says where it went. The same after
+  // "Make this my question": the button goes, and focus goes to the line that says the question is now this one.
   useEffect(() => {
     const cardId = focusAdded.current;
-    if (cardId === null) return;
+    const swappedId = focusSwapped.current;
     focusAdded.current = null;
-    addedLines.current.get(cardId)?.focus();
+    focusSwapped.current = null;
+    if (cardId !== null) addedLines.current.get(cardId)?.focus();
+    else if (swappedId !== null) swappedLines.current.get(swappedId)?.focus();
   });
 
   if (plan.cards.length === 0) return null;
 
-  const use = (card: StartCard, intoPathKey: string | null): void => {
+  const use = (card: StartCard, intoPathKey: string | null, from: HTMLElement): void => {
     const action: PathPlanAction = { type: "USE_CARD", cardId: card.card_id, intoPathKey };
     setNoRoom(null);
     const refusal = dispatch(action);
@@ -86,6 +93,7 @@ export function V4StartWays(props: V4StartWaysProps) {
       setFull(null);
       focusAdded.current = card.card_id;
     } else if (refusal === "PATHS_FULL" && props.fullChoice !== undefined) {
+      fullFrom.current = from;
       setFull(card.card_id);
     } else {
       onRefusal(refusal, action);
@@ -94,7 +102,9 @@ export function V4StartWays(props: V4StartWaysProps) {
   const makeMine = (card: StartCard): void => {
     if (props.onMakeMyQuestion === null) return;
     setFull(null);
-    setNoRoom(props.onMakeMyQuestion(card.card_id) === "PATHS_FULL" ? card.card_id : null);
+    const refusal = props.onMakeMyQuestion(card.card_id);
+    setNoRoom(refusal === "PATHS_FULL" ? card.card_id : null);
+    if (refusal === null) focusSwapped.current = card.card_id;
   };
   const listFull = plan.paths.length >= plan.width;
   const keptAt = keptQuestionAt(plan);
@@ -108,13 +118,13 @@ export function V4StartWays(props: V4StartWaysProps) {
     const buttons: ReactNode[] = [];
     if (listed === null && fitsAt >= 0) {
       buttons.push(
-        <button key="into" type="button" className="v4Btn" onClick={() => use(card, card.fits_path_ref)}>
+        <button key="into" type="button" className="v4Btn" onClick={(event) => use(card, card.fits_path_ref, event.currentTarget)}>
           {t(catalog, "v4.start.ways.addTo", { n: fitsAt + 1 })}
         </button>,
-        <button key="own" type="button" className="v4Btn" onClick={() => use(card, null)}>{t(catalog, "v4.start.ways.addAsPath")}</button>
+        <button key="own" type="button" className="v4Btn" onClick={(event) => use(card, null, event.currentTarget)}>{t(catalog, "v4.start.ways.addAsPath")}</button>
       );
     } else if (listed === null) {
-      buttons.push(<button key="look" type="button" className="v4Btn" onClick={() => use(card, null)}>{t(catalog, "v4.start.lookInto")}</button>);
+      buttons.push(<button key="look" type="button" className="v4Btn" onClick={(event) => use(card, null, event.currentTarget)}>{t(catalog, "v4.start.lookInto")}</button>);
     }
     if (offerMine) {
       buttons.push(<button key="mine" type="button" className="v4Btn" onClick={() => makeMine(card)}>{t(catalog, "v4.start.ways.makeMine")}</button>);
@@ -133,7 +143,11 @@ export function V4StartWays(props: V4StartWaysProps) {
           </p>
         )}
         {swapped ? (
-          <p className="v4StartWaySwapped">
+          <p
+            ref={(element) => { if (element === null) swappedLines.current.delete(card.card_id); else swappedLines.current.set(card.card_id, element); }}
+            className="v4StartWaySwapped"
+            tabIndex={-1}
+          >
             {keptAt === null ? t(catalog, "v4.start.ways.swappedNow") : t(catalog, "v4.start.ways.swapped", { n: keptAt + 1 })}
           </p>
         ) : null}
@@ -146,7 +160,11 @@ export function V4StartWays(props: V4StartWaysProps) {
             setFull(null);
             focusAdded.current = card.card_id;
           },
-          onCancel: () => setFull(null)
+          onCancel: () => {
+            setFull(null);
+            // Keyboard audit 2026-11-12 (V4A-8): Cancel goes with the choice; focus goes back to the button that opened it.
+            if (fullFrom.current?.isConnected === true) fullFrom.current.focus();
+          }
         }) : null}
       </li>
     );
@@ -155,7 +173,9 @@ export function V4StartWays(props: V4StartWaysProps) {
   return (
     <section className="v4StartWaysBlock" aria-labelledby={titleId}>
       <h3 id={titleId} className="v4StartWaysTitle">{t(catalog, "v4.start.ways.title")}</h3>
-      <ul className="v4StartWays">{plan.cards.map(way)}</ul>
+      {/* Keyboard audit 2026-11-12 (V4A-20): on a phone the cards always run past the screen (85% each), and a card already
+          used may have no button; the row is then a Tab stop of its own, so the arrow keys scroll it. A computer's cards fit. */}
+      <ul className="v4StartWays" {...(props.narrow ? { tabIndex: 0, "aria-labelledby": titleId } : {})}>{plan.cards.map(way)}</ul>
     </section>
   );
 }

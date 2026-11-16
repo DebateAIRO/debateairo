@@ -24,6 +24,8 @@ import "./billing.css";
 import "./security-confirmation.css";
 import "./data-export.css";
 import { DocumentTitle } from "@/components/DocumentTitle";
+import { FocusGuard } from "@/components/FocusGuard";
+import { SkipLink } from "@/components/SkipLink";
 
 /*
  * V4 review ask-f21: only the faces a first screen paints with are preloaded, so the browser stops warning "preloaded but
@@ -143,10 +145,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <ConsentCatalogProvider catalog={consent}>
             <LegalDocumentsProvider locale={locale} privacy={privacy} terms={terms}>
               <div className="appShell">
-                {/* First in the Tab order: lets a keyboard or screen-reader user pass the bar. */}
-                <a className="skipLink" href="#main-content">
-                  {t(chrome, "chrome.skipToContent")}
-                </a>
+                {/* First in the Tab order: lets a keyboard or screen-reader user pass the bar, and on a page that draws its
+                    own header, that header too (components/SkipLink.tsx). */}
+                <SkipLink>{t(chrome, "chrome.skipToContent")}</SkipLink>
                 <TopBar />
                 {/* Side-by-side C13: an old open page learns a newer version is out; one quiet line, never a block. */}
                 <NewVersionNote />
@@ -158,6 +159,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <SiteFooter variant="line" />
                 <SupportConversationGuard />
                 <DocumentTitle brand="Dialectical Engine" />
+                {/* Keyboard audit, 12 Nov: a control switched off or removed under focus never drops focus to the page. */}
+                <FocusGuard />
                 {/* The one polite live region every page shares (see components/Toast.tsx). */}
                 <div id="app-announcer" className="srOnly" role="status" aria-live="polite" />
               </div>

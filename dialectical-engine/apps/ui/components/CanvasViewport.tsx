@@ -637,7 +637,9 @@ export function CanvasViewport({
           </div>
         </div>
       </div>
-      <span className="srOnly" id={zoomKeysId}>
+      {/* Also the visible keys line while the canvas has the keyboard's ring (globals.css, keyboard audit round 4):
+          it must stay right after the canvas. */}
+      <span className="srOnly canvasKeysHint" id={zoomKeysId}>
         {`${t(catalog, "debateViews.zoomIn")} +, ${t(catalog, "debateViews.zoomOut")} −, ${t(catalog, "debateViews.fitWholeTree")} 0, ${t(catalog, "debateViews.resetZoom")} 1`}
       </span>
       <span className="srOnly" role="status">{keyZoomNote}</span>

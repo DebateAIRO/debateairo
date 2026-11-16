@@ -71,6 +71,9 @@
 .v4RepCardTitle { font-family: var(--font-display); font-size: 19px; line-height: 1.35; color: var(--text-strong); }
 .v4RepCard:focus:not(:focus-visible), .v4RepStatusBox:focus:not(:focus-visible) { outline: none; }
 .v4RepStatusBox, .v4RepPressNote, .v4RepSlow, .v4RepDigMore { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+/* Keyboard audit, 12 Nov 2026 (V4C-10): a press on its way keeps its focus, so its button is never natively disabled
+   (aria-busy); it takes the greyed look of a disabled .v4Btn (v4-base.css) and the wait cursor, as the map's strip does. */
+.v4RepPage .v4Btn[aria-busy="true"] { cursor: progress; opacity: .55; }
 .v4RepDigMoreLink { display: inline-flex; align-items: center; min-height: 44px; }
 
 /* report-f3: the first debate's answer: open before any report, behind a closed row once one exists. */

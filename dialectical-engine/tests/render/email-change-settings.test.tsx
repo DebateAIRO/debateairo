@@ -166,7 +166,8 @@ describe("Turn 14 change form (14B)", () => {
     expect(document.body.textContent).toContain("✓ Valid address");
     await type("Confirm new email", "ana.popescu@icub.com");
     expect(document.body.textContent).toContain("✗ Doesn't match the new email");
-    expect(button("Send confirmation link").disabled).toBe(true);
+    // Keyboard audit round 4 (D7): locked Send stays in the Tab order (aria-disabled); a press goes to the box to fix.
+    expect(button("Send confirmation link").getAttribute("aria-disabled")).toBe("true");
     await type("New email", "ANA.POPESCU@unibuc.ro");
     expect(document.body.textContent).toContain("✗ This is already your email");
   });

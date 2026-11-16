@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type MouseEvent, type RefObject } from "react";
 import type { DigSuggestion } from "@debateai/contract";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { cardLabel } from "@/lib/v4/mapLooks";
@@ -274,7 +274,7 @@ function KindTag(props: Readonly<{ suggestion: DigSuggestion; catalog: MessageCa
 export function SuggestionLeaves(props: Readonly<{
   path: V4Path;
   choice: V4DigChoice;
-  onOpenPath: () => void;
+  onOpenPath: (event: MouseEvent<HTMLElement>) => void;
   variant: "tree" | "outline";
   catalog: MessageCatalog;
 }>) {
@@ -317,7 +317,7 @@ export function SuggestionLeaves(props: Readonly<{
  * here too", which promised a dig it did not start; it says where it goes, "Choose what to dig ›" (dig-f31's words).
  */
 export function DigHereTooLeaf(props: Readonly<{
-  onOpenPath: () => void;
+  onOpenPath: (event: MouseEvent<HTMLElement>) => void;
   variant: "tree" | "outline";
   catalog: MessageCatalog;
   /** The path it hangs under: its row keeps one id on the map's arrow keys (map-f10). */

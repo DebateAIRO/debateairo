@@ -13,6 +13,7 @@
  */
 
 import * as React from "react";
+import { isFocusParked } from "@/lib/focusGuard";
 
 export type ModalSurface = Readonly<{
   containerRef: React.RefObject<HTMLElement | null>;
@@ -137,13 +138,25 @@ function focusElement(element: HTMLElement | null): void {
 }
 
 function trapTab(entry: StackEntry, event: KeyboardEvent): void {
-  const focusable = focusableWithin(entry.read().containerRef.current);
+  const container = entry.read().containerRef.current;
+  const focusable = focusableWithin(container);
   if (focusable.length === 0) return;
   const active = document.activeElement as HTMLElement | null;
   const index = active === null ? -1 : focusable.indexOf(active);
   const step = event.shiftKey ? -1 : 1;
   // Focus outside the surface enters at the first (or, going backwards, the last) candidate.
   let cursor = index === -1 ? (event.shiftKey ? focusable.length : -1) : index;
+  // Focus INSIDE the surface on a part that is not a Tab stop itself (a section a jump link moved focus to, a place the
+  // focus guard parked on) carries on from where that part is, as it would on a page: sending it back to the first
+  // control undid the jump (keyboard audit, 12 Nov 2026). The surface's own container holds every candidate, so from
+  // there this is still "the first", and backwards "the last".
+  if (index === -1 && active !== null && container !== null && container.contains(active)) {
+    const before = (candidate: HTMLElement): boolean =>
+      (active.compareDocumentPosition(candidate) & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+    const found = focusable.findIndex((candidate) => !before(candidate));
+    const firstAfter = found === -1 ? focusable.length : found;
+    cursor = event.shiftKey ? firstAfter : firstAfter - 1;
+  }
   event.preventDefault();
   // Advance past any candidate `focus()` refused, so a control the selector matched but the
   // platform will not focus (a hidden or invisible one) cannot turn Tab into a dead key.
@@ -238,6 +251,9 @@ function handleDocumentKeydown(event: KeyboardEvent): void {
   const top = topmostSurface();
   if (top === undefined) return;
   if (event.key === "Escape") {
+    // Escape that only cancels an IME candidate (Japanese, Chinese, Korean input) belongs to the text field: closing
+    // the surface on it would throw the draft away (keyboard audit, 12 Nov 2026).
+    if (event.isComposing || event.keyCode === 229) return;
     event.preventDefault();
     event.stopPropagation();
     top.read().onClose();
@@ -272,7 +288,9 @@ export function useModalSurface(open: boolean, surface: ModalSurface): void {
   React.useEffect(() => {
     if (!open) return undefined;
     const entry: StackEntry = { read: () => surfaceRef.current };
-    const opener = document.activeElement as HTMLElement | null;
+    // A part the focus guard parked focus on is not an opener: it only kept the place of a control that is gone.
+    const active = document.activeElement as HTMLElement | null;
+    const opener = isFocusParked(active) ? null : active;
     surfaceStack.push(entry);
     attachListener();
     focusElement(surfaceRef.current.initialFocusRef.current);
@@ -302,7 +320,8 @@ export function useModalSurface(open: boolean, surface: ModalSurface): void {
       const named = surfaceRef.current.returnFocusRef?.current ?? null;
       if (survived) {
         focusElement(opener);
-        return;
+        // An opener the browser will not focus after all (hidden, inert) did not survive either.
+        if (document.activeElement === opener) return;
       }
       if (named !== null && named.isConnected) focusElement(named);
     };

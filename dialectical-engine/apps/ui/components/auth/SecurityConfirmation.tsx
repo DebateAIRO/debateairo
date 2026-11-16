@@ -45,6 +45,15 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
     const [signInAgain, setSignInAgain] = useState<string | null>(null);
     const [passwordMode, setPasswordMode] = useState(false);
     const announcer = useFormAnnouncer();
+    // Keyboard audit 2026-11-12: a refused password + code disabled both fields while it ran, so focus fell to
+    // <body>. Bumped on a refusal; the effect runs once the fields are enabled again.
+    const passwordField = useRef<HTMLInputElement>(null);
+    const codeField = useRef<HTMLInputElement>(null);
+    const [refocusPassword, setRefocusPassword] = useState(0);
+    useEffect(() => {
+        if (refocusPassword)
+            passwordField.current?.focus();
+    }, [refocusPassword]);
     useEffect(() => {
         sequence.current++;
         browser.cancel();
@@ -126,6 +135,14 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
         }
         catch (failure) {
             if (owner === sequence.current) {
+                const ended = failure instanceof ContractHttpError && (failure.serverCode === 'SESSION_REQUIRED' || failure.serverCode === 'COOKIE_SESSION_REQUIRED');
+                if (!ended && failure instanceof ContractHttpError && (failure.status === 401 || failure.status === 429)) {
+                    // The server never says whether the password or the code was wrong, so the password comes first;
+                    // the old code goes, and typing the same six digits again is a new attempt.
+                    setCode('');
+                    attempt.current.edited();
+                    setRefocusPassword(n => n + 1);
+                }
                 if (onError)
                     onError(failure);
                 else if (failure instanceof ContractHttpError && (failure.serverCode === 'SESSION_REQUIRED' || failure.serverCode === 'COOKIE_SESSION_REQUIRED')) {
@@ -188,7 +205,8 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                 setCode('');
                 onCancel();
             }}>{t(catalog, "auth.security.cancel")}</button> : null;
-    return <section className="authSecurityConfirmation" aria-label={t(catalog, "auth.security.title")}>
+    // tabIndex -1: a screen that opens this check away from the pressed button puts focus on it (PublicationControl).
+    return <section className="authSecurityConfirmation" tabIndex={-1} aria-label={t(catalog, "auth.security.title")}>
  {error ? <p className="authFieldError" role="alert">{error}{signInAgain ? <> <a href={signInAgain}>{t(catalog, "auth.signUp.logIn")}</a></> : null}</p> : null}
  {initialProof ? <button type="button" className="setBtn setBtnPrimary" disabled={busy || disabled} onClick={async () => {
                 const result = initialProof!;
@@ -222,13 +240,18 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
  {methods?.available_step_up_methods.includes('password_totp') && passwordMode ? <form className="authForm" method="post" action="/settings/security" noValidate onSubmit={e => {
                         e.preventDefault();
                         const data = new FormData(e.currentTarget);
-                        void passwordProof(readSixDigitCode(String(data.get('security-code') ?? '')).digits, String(data.get('security-password') ?? ''));
+                        const secret = String(data.get('security-password') ?? ''), typed = readSixDigitCode(String(data.get('security-code') ?? ''));
+                        // Keyboard audit round 4: Confirm stays in the Tab order while something is missing (aria-disabled);
+                        // a press, or Enter in a box, goes to the first of the two that is not complete.
+                        if (!secret) { passwordField.current?.focus(); return; }
+                        if (!typed.complete) { codeField.current?.focus(); return; }
+                        void passwordProof(typed.digits, secret);
                     }}>
- <div className="setField authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-password`}>{t(catalog, "auth.password")}</label><input ref={passwordField} id={`${id}-password`} name="security-password" type="password" autoComplete="current-password" placeholder={t(catalog, "auth.password")} value={password} disabled={busy || disabled} onChange={e => {
                         setPassword(e.target.value);
                         attempt.current.edited();
                     }}/></div>
- <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
+ <div className="setField authField"><label htmlFor={`${id}-code`}>{t(catalog, "auth.login.authenticationCodeLabel")}</label><input ref={codeField} id={`${id}-code`} name="security-code" autoComplete="one-time-code" inputMode="numeric" placeholder={t(catalog, "auth.login.authenticationCodeLabel")} value={code} disabled={busy || disabled} aria-invalid={!!codeError} aria-describedby={codeError ? `${id}-code-error` : undefined} onChange={e => {
                         const typed = readSixDigitCode(e.target.value);
                         const shown = typed.valid ? typed.digits : e.target.value;
                         if (shown !== code)
@@ -241,7 +264,7 @@ export function SecurityConfirmation({ authorization, catalog, client = contract
                         if (typed.complete)
                             void passwordProof(typed.digits, String(e.currentTarget.form ? new FormData(e.currentTarget.form).get('security-password') ?? '' : password));
                     }}/><InlineFieldMessage id={`${id}-code-error`} message={codeError}/></div>
- <button type="submit" className="setBtn setBtnPrimary" disabled={busy || disabled || !password || !readSixDigitCode(code).complete}>{t(catalog, "auth.security.confirm")}</button>
+ <button type="submit" className="setBtn setBtnPrimary" disabled={busy || disabled} aria-disabled={!password || !readSixDigitCode(code).complete || undefined}>{t(catalog, "auth.security.confirm")}</button>
  {cancelButton}
  {announcer.region}
  </form> : null}

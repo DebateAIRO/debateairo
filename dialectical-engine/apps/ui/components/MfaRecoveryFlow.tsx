@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ContractHttpError, createMfaRecoveryClient, type MfaRecoveryClient, type MfaRecoveryState } from "@debateai/contract";
 import { AuthShell } from "@/components/AuthShell";
+import { focusIsLost } from "@/lib/focusGuard";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { useAlertRegion, useDeadlineWarning, useStepFocus } from "@/components/auth/timedStep";
 import { API_BASE } from "@/lib/api";
@@ -31,6 +32,9 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
   // The invalid field to focus once the form is enabled again.
   const refocus = useRef<string | null>(null);
   const switchSection = useRef<HTMLElement>(null), switchOpener = useRef<HTMLElement | null>(null);
+  // Keyboard audit 2026-11-12 (AUTH-10): with no clear answer every control stays off but Check recovery state, above the
+  // control that was pressed; focus goes to it, unless the person has already moved on.
+  const checkState = useRef<HTMLButtonElement>(null);
   // The replacement session's deadline (WCAG 2.2.1): a polite region that is always mounted warns about a minute
   // before it, and an alert says when it ran out. No lifetime is changed here.
   const announcer = useFormAnnouncer(), expiry = useAlertRegion();
@@ -98,6 +102,7 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
   const prefix = phase === "email_link" ? "link" : phase === "cancel_link" ? "cancel" : phase === "factor_required" ? "factor" : phase === "totp_required" ? "totp" : phase === "codes_required" || phase === "ack_required" ? "codes" : phase === "completed" ? "done" : phase === "finish_link" ? "finishCheck" : phase === "finish_wait" ? "finishWait" : phase === "finish_ready" ? "finish" : phase === "finish_closed" ? "finishClosed" : phase === "already_waiting" ? "alreadyWaiting" : phase;
   const disabled = busy || unknown;
   useEffect(() => { if (disabled || refocus.current === null) return; document.getElementById(refocus.current)?.focus(); refocus.current = null; });
+  useEffect(() => { if (unknown && !busy && focusIsLost()) checkState.current?.focus(); }, [unknown, busy]);
   const invalid = (field: string) => error !== null && errorField === field;
   const describedBy = (field: string, hint?: string) => [hint, invalid(field) ? "mfa-error" : null].filter(Boolean).join(" ") || undefined;
   function openSwitch(event: { currentTarget: HTMLElement }) { switchOpener.current = event.currentTarget; setSwitchConfirm(true); }
@@ -108,8 +113,8 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
     {warning && <p className="authFieldHint">{text("deadline.warning")}</p>}
     {error && <div className="authAlert" id="mfa-error" role="alert">{error}</div>}{notice && <p className="authFieldHint" role="status">{notice}</p>}
     {phase === "finish_link" && error && !busy && !unknown && <button className="authPrimary" type="button" onClick={() => void perform(loadFinish)}>{text("finishCheck.retry")}</button>}
-    {unknown && finishing.current !== null && <button className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(loadFinish, true)}>{text("check.state")}</button>}
-    {unknown && finishing.current === null && <button className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(async () => { const state = await client.status(); if (!mounted.current) return; if (switching.current && state.status === "cancelled") { showConfirmedCancellation(); return; } if (state.status === "refused") { switching.current = false; setSwitchConfirm(false); apply(state); return; } apply(state); if (switching.current && !["completed", "cancelled", "refused"].includes(state.status)) { await client.cancelCurrent(); if (mounted.current) showConfirmedCancellation(); } }, true)}>{text("check.state")}</button>}
+    {unknown && finishing.current !== null && <button ref={checkState} className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(loadFinish, true)}>{text("check.state")}</button>}
+    {unknown && finishing.current === null && <button ref={checkState} className="authSecondary recoveryCancel" type="button" disabled={busy} onClick={() => void perform(async () => { const state = await client.status(); if (!mounted.current) return; if (switching.current && state.status === "cancelled") { showConfirmedCancellation(); return; } if (state.status === "refused") { switching.current = false; setSwitchConfirm(false); apply(state); return; } apply(state); if (switching.current && !["completed", "cancelled", "refused"].includes(state.status)) { await client.cancelCurrent(); if (mounted.current) showConfirmedCancellation(); } }, true)}>{text("check.state")}</button>}
     {/* Opened from the footer or the bottom of the panel: focus moves to it, and Stay returns focus to its opener. */}
     {switchConfirm && <section className="recoveryStatus" ref={switchSection} tabIndex={-1} aria-label={text("switch.title")}><p>{text("cancel.pause")}</p><button className="authPrimary" type="button" disabled={disabled} onClick={() => { switching.current = true; void perform(async () => { await client.cancelCurrent(); if (mounted.current) showConfirmedCancellation(); }); }}>{text("switch.confirm")}</button><button className="authSecondary" type="button" disabled={disabled} onClick={() => { setSwitchConfirm(false); switchOpener.current?.focus(); }}>{text("switch.stay")}</button></section>}
     {phase === "request" && <form className="authForm" method="post" action="/recover-authenticator" onSubmit={submit(async () => { await client.start(email.trim(), destination); if (mounted.current) { setEmail(""); setPhase("sent"); } })}><div className="authField"><label htmlFor="mfa-email">{text("email")}</label><input id="mfa-email" name="email" type="email" autoComplete="email" required aria-invalid="false" disabled={disabled} value={email} onChange={event => setEmail(event.target.value)} aria-describedby="mfa-email-hint" /><p id="mfa-email-hint" className="authFieldHint">{text("email.hint")}</p></div><div className="authField"><label htmlFor="mfa-destination">{text("destination")}</label><select className="mfaRecoveryDestination" id="mfa-destination" name="destination" disabled={disabled} value={destination} onChange={event => setDestination(event.target.value as "primary" | "backup")}><option value="primary">{text("destination.primary")}</option><option value="backup">{text("destination.backup")}</option></select><p className="authFieldHint">{text("destination.hint")}</p></div><button className="authPrimary" disabled={disabled}>{busy ? text("working") : text("request.button")}</button><p className="authFieldHint">{text("recognized.hint")}</p></form>}

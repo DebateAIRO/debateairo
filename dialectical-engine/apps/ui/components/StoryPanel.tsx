@@ -118,7 +118,9 @@ export function StoryPanel({
             <span className="storyPanelLabel" data-verdict={view.verdictState ?? "none"}>{storyLabelWords(view.label, catalog)}</span>
           )}
         </summary>
-        <div className="storyPanelBody">
+        {/* A Tab stop in every state: the body scrolls, and while the story is written or
+            unavailable it holds no control to scroll it with (keyboard audit 2026-11-12). */}
+        <div className="storyPanelBody" tabIndex={0} role="region" aria-label={title}>
           <div className="storyPanelInner">
             <StoryBodyView view={view} catalog={catalog} locale={locale} />
           </div>
