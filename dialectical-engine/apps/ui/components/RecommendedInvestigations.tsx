@@ -51,7 +51,7 @@ export function RecommendedInvestigations({
           <span>{t(catalog, "debateDrawers.recommendations.priority", { priority: recommendation.priority })}</span>
           <span>{t(catalog, targetAvailable ? "debateDrawers.recommendations.targetAvailable" : "debateDrawers.recommendations.targetUnavailable")}</span>
         </div>
-        <div className="recommendationReason">{recommendation.reason}</div>
+        <div className="recommendationReason" data-ai-generated="true">{recommendation.reason}</div>
         <div className="recommendationActions">
           <button
             type="button"

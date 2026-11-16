@@ -94,6 +94,9 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     const dialog = document.querySelector('[data-dialog="question-language"]')!;
     expect(dialog.textContent).toContain("Întrebarea ta amestecă limbile");
     expect(dialog.querySelector("blockquote bdi")!.getAttribute("lang")).toBe("ro");   // M2: on the <bdi>
+    // EU AI Act Art. 50(2): the proposed rewrite is the AI's (apps/api question-language fast-check); the pop-up's own words are not.
+    expect(dialog.querySelector("blockquote bdi")!.getAttribute("data-ai-generated")).toBe("true");
+    expect(dialog.querySelector("#question-language-body")!.closest("[data-ai-generated]")).toBeNull();
     expect(dialog.textContent).toContain(OFFER.proposed_question);
     expect(dialog.textContent).not.toMatch(/eld|score|model|check_ref/iu);
     await act(async () => { button("Folosește varianta propusă").click(); });

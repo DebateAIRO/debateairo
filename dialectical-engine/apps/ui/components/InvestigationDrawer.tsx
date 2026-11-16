@@ -20,6 +20,9 @@ const STATUS_LABEL_KEYS: Record<string, string> = {
   refuted: "debateDrawers.investigation.refuted"
 };
 
+/** Stands in for the flagged words while the sentence around them is read from the catalogue (only they are AI text). */
+const FLAGGED_SLOT = "⁣⁣";
+
 export function InvestigationDrawer({
   node,
   status,
@@ -45,6 +48,9 @@ export function InvestigationDrawer({
   const current = statuses[status] ?? statuses.working;
   const currentLabel = t(catalog, STATUS_LABEL_KEYS[status] ?? STATUS_LABEL_KEYS.working);
   const resolved = status !== "working";
+  // EU AI Act Art. 50(2): an AI claim and the words flagged in it are AI text; the question (the root claim) is the person's.
+  const claimIsAi = node !== null && node.node_type !== "ROOT_CLAIM";
+  const [flaggedBefore = "", flaggedAfter = ""] = t(catalog, "debateDrawers.investigation.flaggedSpan", { text: FLAGGED_SLOT }).split(FLAGGED_SLOT);
 
   return (
     <>
@@ -66,8 +72,8 @@ export function InvestigationDrawer({
         <div className="drawerBody">
           <div className="nodeEyebrow">{t(catalog, "debateDrawers.investigation.flaggedClaim")}</div>
           <div className="invFlagged" style={{ borderLeftColor: current.color }}>
-            <div className="invFlaggedClaim">{node?.claim ?? "—"}</div>
-            {flagged ? <div className="invFlaggedSpan">{t(catalog, "debateDrawers.investigation.flaggedSpan", { text: flagged })}</div> : null}
+            <div className="invFlaggedClaim" data-ai-generated={claimIsAi ? "true" : undefined}>{node?.claim ?? "—"}</div>
+            {flagged ? <div className="invFlaggedSpan">{flaggedBefore}<span data-ai-generated={claimIsAi ? "true" : undefined}>{flagged}</span>{flaggedAfter}</div> : null}
           </div>
 
           <div className="drawerDivider" />

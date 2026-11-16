@@ -735,7 +735,7 @@ function NodeScoringDetails({
                 {recommendationTargetButton(topRecommendation)}
                 {manualInvestigationButton(topRecommendation)}
               </div>
-              <p>{topRecommendation.reason}</p>
+              <p data-ai-generated="true">{topRecommendation.reason}</p>
               {additionalRecommendations.length > 0 ? (
                 <details>
                   <summary className="linkBtn">
@@ -753,7 +753,7 @@ function NodeScoringDetails({
                           {recommendationTargetButton(recommendation)}
                           {manualInvestigationButton(recommendation)}
                         </div>
-                        <div className="drawerFindingText">{recommendation.reason}</div>
+                        <div className="drawerFindingText" data-ai-generated="true">{recommendation.reason}</div>
                       </li>
                     ))}
                   </ul>

@@ -1126,7 +1126,7 @@ export function V4MapTree(props: MapPiecesProps) {
                 aria-current={rootSelected ? "true" : undefined}
                 onClick={(event) => props.onSelect("root", viaKeyboard(event))}
               >
-                <span className="v4MapRootTitle v4Serif" data-ai-generated="true">{firstCardQuestion(map)}</span>
+                <span className="v4MapRootTitle v4Serif">{firstCardQuestion(map)}</span>
                 {run ? null : <V4TrustBar counts={map.counts} unchecked={map.unchecked} catalog={catalog} />}
                 {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
                 <LevelWords level={1} catalog={catalog} />

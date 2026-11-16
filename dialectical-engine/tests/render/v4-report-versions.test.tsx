@@ -883,6 +883,13 @@ describe("the report on paper and in other languages", () => {
     }
     // Padding and rule lines sit on the reading side.
     expect(css).not.toMatch(/padding-left|border-left|margin-left/u);
+    // Art. 50(2), the owner's "Never mark the question": the report's title is the person's question, in its own direction.
+    const title = node.querySelector("#v4-report-title")!;
+    expect(title.querySelector("[data-ai-generated]")).toBeNull();
+    expect(title.closest("[data-ai-generated]")).toBeNull();
+    const question = title.querySelector<HTMLElement>("span[dir=auto]")!;
+    expect(question.lang).toBe("ar");
+    for (const sent of node.querySelectorAll(".v4RepSentText")) expect(sent.closest("[data-ai-generated]")).toBeNull();
   });
 });
 

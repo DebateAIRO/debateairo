@@ -106,6 +106,8 @@ describe("S04 threat reports page", () => {
     expect(text()).toContain(newRef);
     expect(host.querySelector(".threatReportsDecideHint")?.compareDocumentPosition(host.querySelector(".threatReportsDecisions")!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(text()).not.toContain("payment");
+    // Art. 50(2): the asker's question and the account details are a person's, never marked as AI text.
+    expect(host.querySelector("[data-ai-generated]")).toBeNull();
   });
   it("shows no account identifiers for a kept threat from a signed-out asker", async () => {
     // Property: staff can read and decide an anonymous report without a fabricated identity.

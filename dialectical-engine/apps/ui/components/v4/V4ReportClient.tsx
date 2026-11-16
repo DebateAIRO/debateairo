@@ -23,6 +23,7 @@ import {
   loadDigView, loadInvestigation, loadStory, loadV4, reopenInvestigation, storyReadFailed, writeReport, type FinishedReportVersion
 } from "@/lib/v4/load";
 import { buildV4Map } from "@/lib/v4/mapModel";
+import { digQuestionIsAi } from "@/lib/v4/mapLooks";
 import { mergeDigLinks, readDigRecords } from "@/lib/v4/accountMemory";
 import { waitForDigs } from "@/lib/v4/digUndo";
 import { loadedLevelOf } from "@/lib/v4/debateLevel";
@@ -162,6 +163,17 @@ function aiListProps(language: string | null): AiListProps {
 }
 function aiItemProps(language: string | null): AiItemProps {
   return language === null ? { "data-ai-generated": "true" } : { "data-ai-generated": "true", lang: language };
+}
+/**
+ * The person's question, as AI text is shown (the debate's language, its own direction) but never marked as AI-generated: the
+ * owner's Art. 50(2) rule, "Never mark the question", even when an AI wrote some of its words first.
+ */
+function ownProps(language: string | null): AiListProps {
+  return aiListProps(language);
+}
+/** An item of a list of a dig's questions: marked as AI text only when the AIs wrote it (dig-f20), in the debate's language. */
+function digItemProps(language: string | null, ai: boolean): AiItemProps | Readonly<{ lang?: string }> {
+  return ai ? aiItemProps(language) : language === null ? {} : { lang: language };
 }
 
 export function V4ReportClient({ id, locale, catalog, newDebateCatalog }: Props) {
@@ -609,7 +621,6 @@ function ReportBody({ id, locale, catalog }: Readonly<{
   // after the h1, so the "Report:" prefix sits inside the h1 (hidden on screen) instead of a document.title write.
   const ownQuestion = map !== null ? ownWords(map.question) : null;
   const language = load.kind === "SERVED" ? load.language : null;
-  const ai = aiProps(language);
 
   const mapHref = `/v4/debate/${encodeURIComponent(target)}`;
   const classicHref = `/debate/${encodeURIComponent(target)}`;
@@ -768,7 +779,7 @@ function ReportBody({ id, locale, catalog }: Readonly<{
           <p className="v4Eyebrow v4RepMeta">{t(catalog, "v4.report.eyebrow")}</p>
           <h1 id="v4-report-title" className="v4RepTitle">
             <span className="v4SrOnly">{t(catalog, "v4.report.titlePrefix")} </span>
-            <span {...ai}>{ownQuestion}</span>
+            <span {...ownProps(language)}>{ownQuestion}</span>
           </h1>
         </header>
         {/* journey-f20: a debate with a public page says so under its question, with its link (not on paper). */}
@@ -843,7 +854,7 @@ function FirstAnswer({ map, level, locale, catalog, language, digs, digsReady, s
       {sent ? (
         <section className="v4RepSent" aria-labelledby="v4-report-sent">
           <h2 id="v4-report-sent" className="v4Eyebrow v4RepSentLabel">{t(catalog, "v4.report.sentHeading")}</h2>
-          <p className="v4RepSentText" {...ai}>{map.question}</p>
+          <p className="v4RepSentText" {...ownProps(language)}>{map.question}</p>
         </section>
       ) : null}
 
@@ -1034,7 +1045,9 @@ function ReportDigItem({ dig, catalog, language }: Readonly<{
   return (
     <li className="v4RepDig">
       <ul className="v4RepDigQuestions" {...aiListProps(language)}>
-        {dig.link.questions.map((question, at) => <li key={at} {...aiItemProps(language)}>{question}</li>)}
+        {dig.link.questions.map((question, at) => (
+          <li key={at} {...digItemProps(language, digQuestionIsAi({ link: dig.link, picks: view?.picks }, at))}>{question}</li>
+        ))}
       </ul>
       <p className="v4RepDigMeta">
         {/* A dig found again from the account list has no known mode: then only its state is shown. */}

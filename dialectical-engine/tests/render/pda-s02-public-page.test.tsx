@@ -66,6 +66,9 @@ describe("S02 public debate answer surface", () => {
     const text = container.textContent ?? "";
     expect.soft(text).toContain(publicDebate.question);
     expect(container.querySelector("h1")!.textContent).toBe(publicDebate.question);
+    // Art. 50(2), the owner's "Never mark the question": the asker's question is theirs, never marked as AI text.
+    expect(container.querySelector("h1")!.closest("[data-ai-generated]")).toBeNull();
+    expect(container.querySelector("h1")!.querySelector("[data-ai-generated]")).toBeNull();
     expect.soft(text).toContain(publicDebate.author_pseudonym);
     // Owner's answer to question 5 (5 Nov 2026): English pages write the day first, whatever the browser's own form; and to
     // question 4 (A): "published" takes the long form with the year ("24 August 2026"), never "24/08/2026".

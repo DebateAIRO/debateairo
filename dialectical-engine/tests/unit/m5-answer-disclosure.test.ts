@@ -18,6 +18,7 @@ import {
   type AnswerDisclosureApplication
 } from "../../apps/api/src/disclosures.js";
 import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 import {
   TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders
 } from "../support/httpSession.js";
@@ -324,6 +325,8 @@ describe("GET /v1/answers/{id}/disclosure (spec §14.4.5)", () => {
     const response = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
+    // EU AI Act Art. 50(2): the record is provenance codes about the AIs, not their content: no mark.
+    expect(response.headers[AI_GENERATED_HEADER]).toBeUndefined();
     expect(AnswerDisclosureSchema.parse(response.json())).toMatchObject({
       answer_id: STORY_TEST_ANSWER_ID,
       floor: { verdict_state: "SUPPORTED", leading_node_id: LEADING, basis_incomplete: false },
@@ -499,6 +502,23 @@ describe("M5 · the story route treats a floor answer like a served one", () => 
     expect(AnswerStorySchema.parse(response.json()).status).toBe("READY");
     expect(calls).toEqual([]);
     expect(floorCalls).toEqual([]);
+    await server.close();
+  });
+
+  it("marks the answer and its story as AI-generated, and not the disclosure record (EU AI Act Art. 50(2))", async () => {
+    const server = api({
+      answer: answerOf(FLOOR_ANSWER_OVERRIDES), stories: stories(storedStoryRecord()),
+      disclosures: disclosures(buildAnswerDisclosure(FLOOR_READ))
+    });
+    const story = await server.inject({ method: "GET", url: `/v1/answers/${STORY_TEST_ANSWER_ID}/story`, headers: HEADERS });
+    expect(story.statusCode).toBe(200);
+    expect(story.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
+    const answer = await server.inject({ method: "GET", url: `/v1/answers/${STORY_TEST_ANSWER_ID}`, headers: HEADERS });
+    expect(answer.statusCode).toBe(200);
+    expect(answer.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
+    const disclosure = await server.inject({ method: "GET", url: URL_OF, headers: HEADERS });
+    expect(disclosure.statusCode).toBe(200);
+    expect(disclosure.headers[AI_GENERATED_HEADER]).toBeUndefined();
     await server.close();
   });
 

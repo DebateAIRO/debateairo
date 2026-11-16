@@ -61,7 +61,7 @@ describe("data export readable page", () => {
     expect(archiveHtml).toMatch(/<header>[\s\S]*?<h1>[^<]+<\/h1>[\s\S]*?<\/header>/);
     expect(archiveHtml).toMatch(/<section class="account-section">[\s\S]*?<div class="account-card">[\s\S]*?<dl>/);
     expect(archiveHtml).toMatch(/<p class="label">Question<\/p>\s*<h3>MARK-Q2<\/h3>\s*<p class="meta">/);
-    expect(archiveHtml).toMatch(/<p class="label verdict-label">Verdict<\/p>\s*<span class="pill contested">Close call<\/span>/);
+    expect(archiveHtml).toMatch(/<p class="label verdict-label">Verdict<\/p>\s*<span class="pill contested" data-ai-generated="true">Close call<\/span>/);
     expect(archiveHtml).toMatch(/<footer>[^<]*README\.txt[^<]*<\/footer>/);
     for (const token of ["#F9F6F1", "#FDFBF6", "#29261F", "#14110E", "#181410", "#F2EAD9", "#D9C8A9", "#705A33"]) {
       expect(archiveHtml).toContain(token);
@@ -76,6 +76,26 @@ describe("data export readable page", () => {
   it("H-11 (V-42) does not show the role rotation record", () => {
     const html = page();
     expect(html).not.toMatch(/MARK-ROT|Maker [ABCD]|LEAST_SHARE_SEEDED_TIE_V1/);
+  });
+
+  it("H-12 (EU AI Act Art. 50(2)) marks each AI-generated part for machines, never the person's question, and shows nothing new", () => {
+    const html = page();
+    const marked = (pattern: RegExp) => html.match(pattern)?.length ?? 0;
+    for (const n of [1, 2]) {
+      expect(html).toMatch(new RegExp(`<div class="answer" data-ai-generated="true">MARK-ANSWER${n}-v2`));
+      expect(html).toMatch(new RegExp(`<p class="story-text" data-ai-generated="true">MARK-STORY-headline-${n}</p>`));
+      expect(html).toMatch(new RegExp(`<ul data-ai-generated="true"><li>MARK-NODE${n}a-v2</li>`));
+      // The question is the person's own words: never marked.
+      expect(html).toMatch(new RegExp(`<h3>MARK-Q${n}</h3>`));
+    }
+    expect(marked(/<span class="pill [a-z]+" data-ai-generated="true">/g)).toBe(2);
+    expect(marked(/<div class="answer" data-ai-generated="true">/g)).toBe(2);
+    expect(marked(/<p class="story-text" data-ai-generated="true">/g)).toBeGreaterThanOrEqual(18);
+    expect(marked(/<p class="story-text">/g)).toBe(0);
+    expect(marked(/<ul data-ai-generated="true">/g)).toBe(2);
+    expect(html).not.toMatch(/<h3[^>]*data-ai-generated/);
+    // The mark is an attribute only: the style sheet never selects on it, so nothing a reader sees changes.
+    expect(html.match(/<style>([\s\S]*?)<\/style>/)?.[1]).not.toContain("data-ai-generated");
   });
 
   it("H-10 keeps the S5 heading, label, and unreadable metadata declarations", () => {

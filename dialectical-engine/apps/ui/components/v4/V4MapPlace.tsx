@@ -30,6 +30,8 @@ const SWIPE_EDGE_PX = 24;
 const POSITION_SHOWN_MS = 1_500;
 /** map-d1: a window shorter than this folds the answer card into its line. */
 const SHORT_QUERY = "(max-height: 699px)";
+/** Stands in for the place's title while the "You are in" sentence is read from the catalogue. */
+const PLACE_SLOT = "⁣⁣";
 
 /** The path a selection sits on (the path itself, or the path its open question or dig hangs under); null: the question. */
 export function pathOfPlace(resolved: ResolvedSelection): V4Path | null {
@@ -92,10 +94,12 @@ export function V4WhereBar(props: Readonly<{
   const { level, total } = depthOf(resolved, map, digs);
   const here = pathOfPlace(resolved);
   const shown = map.paths.slice(0, MINIMAP_MAX);
+  // Art. 50(2): the sentence is the site's; only the place's title, when an AI wrote it, is marked as AI text.
+  const [placeBefore = "", placeAfter = ""] = t(catalog, "v4.phone.youAreIn", { place: PLACE_SLOT, n: level, total }).split(PLACE_SLOT);
   return (
     <div className="v4WhereBar">
       <p className="v4SrOnly" role="status">
-        {t(catalog, "v4.phone.youAreIn", { place: last.title.text, n: level, total })}
+        {placeBefore}<span data-ai-generated={last.title.ai ? "true" : undefined}>{last.title.text}</span>{placeAfter}
       </p>
       <div className="v4WhereHead">
         <nav className="v4WhereLine" aria-label={t(catalog, "v4.panel.crumbsLabel")}>

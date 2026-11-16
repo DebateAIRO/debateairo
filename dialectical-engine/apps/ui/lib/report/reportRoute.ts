@@ -1,5 +1,6 @@
 import { ContractHttpError, webRanOnFree, type Answer, type AnswerDisclosure, type AnswerStory, type ContractClient } from "@debateai/contract";
 import publicEnglish from "../../messages/en/public.json" with { type: "json" };
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../aiDisclosure.js";
 import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, type LocaleCode } from "../i18n/locales.js";
 import { questionLocale } from "../i18n/questionLocale.js";
 import { ownWords } from "../v4/askText.js";
@@ -63,7 +64,10 @@ function pdfHeaders(question: string, now: Date): Record<string, string> {
     "content-type": "application/pdf",
     "content-disposition": reportContentDisposition(question, now),
     "cache-control": "no-store",
-    "x-content-type-options": "nosniff"
+    "x-content-type-options": "nosniff",
+    // EU AI Act Art. 50(2): both report PDFs are AI-generated; the mark is for machines and changes nothing a reader sees.
+    // A refusal is a plain catalogue line, never this header.
+    [AI_GENERATED_HEADER]: AI_GENERATED_HEADER_VALUE
   };
 }
 

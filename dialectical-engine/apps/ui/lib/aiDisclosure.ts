@@ -17,3 +17,10 @@ export const AI_EXPORT_DISCLOSURE = {
   // copy (FIX-DEBATE-CATALOGS follow-up 3 keeps its bytes and names the choice).
   notice: t(homeEnglish, "home.aiBlock")
 } as const;
+
+/**
+ * EU AI Act Art. 50(2): the machine-readable mark on HTTP responses whose body carries AI-generated content
+ * (API answers, report PDFs). A header changes nothing a reader sees. apps/api sets the same name and value.
+ */
+export const AI_GENERATED_HEADER = "x-ai-generated";
+export const AI_GENERATED_HEADER_VALUE = "true";

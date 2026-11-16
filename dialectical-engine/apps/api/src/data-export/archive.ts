@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { ACCOUNT_AI_SCOPE, DEBATES_AI_SCOPE, SUPPORT_AI_SCOPE, exportAiDisclosure, type ExportAiDisclosure } from "./ai-disclosure.js";
 import { renderYourDataHtml } from "./html-page.js";
 import { renderReadme } from "./readme.js";
 import type { ArchiveCatalog } from "./archive-catalog.js";
@@ -21,9 +22,20 @@ function assertSafeKeys(value: unknown): void {
 const sha256 = (bytes: Uint8Array): string => createHash("sha256").update(bytes).digest("hex");
 const json = (value: unknown): Buffer => Buffer.from(JSON.stringify(value, null, 2) + "\n", "utf8");
 
-function dataFile(section: object, generatedAt: string): Buffer {
+/**
+ * EU AI Act Art. 50(2): the data files holding AI-generated content, and the scope each one's `ai_disclosure` names.
+ * The record sits beside the file's sections, never inside one, so no recorded value and no record count changes.
+ */
+const AI_SCOPE_BY_FILE: Readonly<Partial<Record<string, string>>> = {
+  "account.json": ACCOUNT_AI_SCOPE, "debates.json": DEBATES_AI_SCOPE, "support.json": SUPPORT_AI_SCOPE
+};
+
+/** For machines (manifest.json): every entry that holds AI-generated content, the readable page included. */
+const AI_GENERATED_ENTRIES = ["your-data.html", "account.json", "debates.json", "support.json"] as const;
+
+function dataFile(section: object, generatedAt: string, aiDisclosure: ExportAiDisclosure | null): Buffer {
   assertSafeKeys(section);
-  return json({ format_version: 1, generated_at: generatedAt, ...section });
+  return json({ format_version: 1, generated_at: generatedAt, ...(aiDisclosure === null ? {} : { ai_disclosure: aiDisclosure }), ...section });
 }
 
 function records(section: object): number {
@@ -50,12 +62,15 @@ export function buildArchive(snapshot: ExportSnapshot, catalog: ArchiveCatalog):
     ["README.txt", Buffer.from(renderReadme(), "utf8")],
     ["your-data.html", Buffer.from(renderYourDataHtml(snapshot, catalog), "utf8")]
   ]);
-  for (const [name, section] of Object.entries(sectionByName)) payloads.set(name, dataFile(section, generatedAt));
+  for (const [name, section] of Object.entries(sectionByName)) {
+    const scope = AI_SCOPE_BY_FILE[name];
+    payloads.set(name, dataFile(section, generatedAt, scope === undefined ? null : exportAiDisclosure(scope)));
+  }
   const manifestEntries = ARCHIVE_ENTRY_NAMES.filter((name) => name !== "manifest.json").map((name) => {
     const bytes = payloads.get(name)!;
     return { name, bytes: bytes.length, sha256: sha256(bytes), records: name.endsWith(".json") ? records(sectionByName[name as keyof typeof sectionByName]) : null };
   });
-  payloads.set("manifest.json", json({ format_version: 1, generated_at: generatedAt, entries: manifestEntries }));
+  payloads.set("manifest.json", json({ format_version: 1, generated_at: generatedAt, entries: manifestEntries, ai_generated_entries: AI_GENERATED_ENTRIES }));
   const zip = writeZip(ARCHIVE_ENTRY_NAMES.map((name) => ({ name, bytes: payloads.get(name)! })), snapshot.generatedAt);
   return { zip, sha256: sha256(zip), bytes: zip.length, filename: archiveFilename(snapshot.requestedAt) };
 }

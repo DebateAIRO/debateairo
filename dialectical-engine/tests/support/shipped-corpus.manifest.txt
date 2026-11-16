@@ -19,6 +19,7 @@ apps/api/src/active-settings-version.ts
 apps/api/src/admission-alarm.ts
 apps/api/src/admission-settings.ts
 apps/api/src/admission.ts
+apps/api/src/ai-generated.ts
 apps/api/src/ask-billing.ts
 apps/api/src/ask-clarify.ts
 apps/api/src/ask-model-picker.ts
@@ -104,6 +105,7 @@ apps/api/src/consumer-security.ts
 apps/api/src/consumer-webauthn-verifier.ts
 apps/api/src/consumer-webauthn.ts
 apps/api/src/country-gate.ts
+apps/api/src/data-export/ai-disclosure.ts
 apps/api/src/data-export/archive-catalog.ts
 apps/api/src/data-export/archive.ts
 apps/api/src/data-export/html-page.ts
@@ -944,6 +946,8 @@ apps/ui/lib/report/ReportTable.tsx
 apps/ui/lib/report/fonts.test.mjs
 apps/ui/lib/report/investigationReportModel.ts
 apps/ui/lib/report/pathTrust.ts
+apps/ui/lib/report/pdfAiMark.ts
+apps/ui/lib/report/pdfkit.d.ts
 apps/ui/lib/report/pointNumbers.ts
 apps/ui/lib/report/renderReport.ts
 apps/ui/lib/report/reportCharts.ts

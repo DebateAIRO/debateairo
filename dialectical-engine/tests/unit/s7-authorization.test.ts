@@ -10,6 +10,7 @@ import {
   testSessionApplication,testSessionHeaders
 } from "../support/httpSession.js";
 import { questionCheckPass } from "../support/questionCheckPass.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 import type { AnswerStoryApplication } from "../../apps/api/src/stories.js";
 import type { AnswerDisclosureApplication } from "../../apps/api/src/disclosures.js";
 import type { AnswerMapViewApplication } from "../../apps/api/src/map-views.js";
@@ -564,6 +565,7 @@ describe("S7 deny-by-default authorization", () => {
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: "RUN_NOT_FOUND" });
+    expect(response.headers[AI_GENERATED_HEADER]).toBeUndefined();
     expect(ownershipReads).toBe(1);
     expect(streamed).toBe(false);
     await api.close();
@@ -591,6 +593,8 @@ describe("S7 deny-by-default authorization", () => {
     expect(response.statusCode).toBe(200);
     expect(response.body).toContain("event: run.accepted");
     expect(streamed).toBe(true);
+    // EU AI Act Art. 50(2): the stream carries the AIs' work; writeHead bypasses onSend, so it names the mark itself.
+    expect(response.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
     await api.close();
   });
 
@@ -628,6 +632,7 @@ describe("S7 deny-by-default authorization", () => {
     });
     expect(foreign.statusCode).toBe(404);
     expect(foreign.json()).toEqual({ error: route.error });
+    expect(foreign.headers[AI_GENERATED_HEADER]).toBeUndefined();
     expect(storyReads).toEqual([]);
     expect(disclosureReads).toEqual([]);
     expect(mapReads).toEqual([]);
@@ -666,6 +671,7 @@ describe("S7 deny-by-default authorization", () => {
     });
     expect(response.statusCode).toBe(404);
     expect(response.json()).toEqual({ error: route.error });
+    expect(response.headers[AI_GENERATED_HEADER]).toBeUndefined();
     expect(storyReads).toEqual([]);
     expect(disclosureReads).toEqual([]);
     expect(mapReads).toEqual([]);
