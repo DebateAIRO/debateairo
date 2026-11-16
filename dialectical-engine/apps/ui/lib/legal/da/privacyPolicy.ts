@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Canada og Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vi besvarer anmodninger inden for 30 dage. Vi er fortsat ansvarlige for personoplysninger, som vi overfører til AI-udbydere uden for Canada, og bruger kontrakter til at kræve tilsvarende beskyttelse; disse udbydere kan være underlagt lovgivningen i de lande, hvor de opererer, herunder myndigheders lovlige adgang. Markedsføringsmails sendes kun med dit udtrykkelige samtykke efter CASL. Vi anmelder et brud på sikkerhedsforanstaltningerne, der skaber en reel risiko for betydelig skade for dig, til Office of the Privacy Commissioner of Canada og til dig, og vi registrerer hvert brud i 24 måneder. Quebec: Før vi videregiver personoplysninger uden for Quebec, foretager vi en konsekvensanalyse vedrørende privatliv; vi anmelder en fortrolighedshændelse, der indebærer en risiko for alvorlig skade, til Commission d'accès à l'information og til dig og fører et register over hændelser; de indstillinger, der holder dine debatter private, er som standard slået til; du kan bede os om at afindeksere eller ophøre med at udbrede personoplysninger om dig; du kan anmode om dine data i et struktureret, almindeligt anvendt format; afsnit 8 beskriver vores automatiserede behandling." }
+      { kind: "p", text: "Vores privatlivsansvarlige, og i Quebec den person, der er ansvarlig for beskyttelsen af personoplysninger, er vores direktør, som kan kontaktes på privacy@dezbatere.ro. Vi besvarer anmodninger inden for 30 dage. Vi er fortsat ansvarlige for personoplysninger, som vi overfører til AI-udbydere uden for Canada, og bruger kontrakter til at kræve tilsvarende beskyttelse; disse udbydere kan være underlagt lovgivningen i de lande, hvor de opererer, herunder myndigheders lovlige adgang. Markedsføringsmails sendes kun med dit udtrykkelige samtykke efter CASL. Vi anmelder et brud på sikkerhedsforanstaltningerne, der skaber en reel risiko for betydelig skade for dig, til Office of the Privacy Commissioner of Canada og til dig, og vi registrerer hvert brud i 24 måneder. Quebec: Før vi videregiver personoplysninger uden for Quebec, foretager vi en konsekvensanalyse vedrørende privatliv; vi anmelder en fortrolighedshændelse, der indebærer en risiko for alvorlig skade, til Commission d'accès à l'information og til dig og fører et register over hændelser; debatter på et betalt abonnement er private som standard, og debatter på det gratis abonnement er offentlige, som afsnit 6 angiver; du kan bede os om at afindeksere eller ophøre med at udbrede personoplysninger om dig; du kan anmode om dine data i et struktureret, almindeligt anvendt format; afsnit 8 beskriver vores automatiserede behandling." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "9ed5d81b56926bfd274146b10906ad0f08b0d21761e345776059c074af8361c8",
+  sha256: "ff74c10d0851ebd54e2eecaa6574edd260a578f5f5ad44f9ca8f82eedfe88ba8",
   eyebrow: "PRIVATLIVSPOLITIK · v3.12 · GÆLDENDE FRA 4. NOVEMBER 2026",
   title: "Hvad vi opbevarer, og hvorfor",
   lede: "Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.",

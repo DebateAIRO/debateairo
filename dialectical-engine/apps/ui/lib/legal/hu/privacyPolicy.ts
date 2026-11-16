@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada és Québec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. A kérelmekre 30 napon belül válaszolunk. Továbbra is felelősek maradunk a Kanadán kívüli MI-szolgáltatóknak továbbított személyes adatokért, és szerződésekben követelünk meg összehasonlítható védelmet; ezekre a szolgáltatókra a működési országuk jogszabályai vonatkozhatnak, beleértve a hatóságok jogszerű hozzáférését. Marketing e-mailt kizárólag az Ön CASL szerinti kifejezett hozzájárulásával küldünk. A biztonsági intézkedések olyan megsértését, amely valós kockázatát jelenti annak, hogy Önt jelentős kár éri, bejelentjük az Office of the Privacy Commissioner of Canada hivatalnak és Önnek, és minden ilyen esetről 24 hónapig nyilvántartást vezetünk. Québec: személyes adatok Québecen kívüli közlése előtt adatvédelmi hatásvizsgálatot végzünk; a súlyos kár kockázatával járó titoktartási incidenst bejelentjük a Commission d'accès à l'information szervnek és Önnek, és az incidensekről nyilvántartást vezetünk; a vitáit magánjellegűként megőrző beállítások alapértelmezés szerint be vannak kapcsolva; kérheti, hogy szüntessük meg az Önre vonatkozó személyes adatok indexelését vagy terjesztését; adatait strukturált, széles körben használt formátumban kérheti; a 8. szakasz ismerteti automatizált adatkezelésünket." }
+      { kind: "p", text: "Adatvédelmi tisztviselőnk, Québecben pedig a személyes adatok védelméért felelős személy: az ügyvezetőnk, elérhető a privacy@dezbatere.ro címen. A kérelmekre 30 napon belül válaszolunk. Továbbra is felelősek maradunk a Kanadán kívüli MI-szolgáltatóknak továbbított személyes adatokért, és szerződésekben követelünk meg összehasonlítható védelmet; ezekre a szolgáltatókra a működési országuk jogszabályai vonatkozhatnak, beleértve a hatóságok jogszerű hozzáférését. Marketing e-mailt kizárólag az Ön CASL szerinti kifejezett hozzájárulásával küldünk. A biztonsági intézkedések olyan megsértését, amely valós kockázatát jelenti annak, hogy Önt jelentős kár éri, bejelentjük az Office of the Privacy Commissioner of Canada hivatalnak és Önnek, és minden ilyen esetről 24 hónapig nyilvántartást vezetünk. Québec: személyes adatok Québecen kívüli közlése előtt adatvédelmi hatásvizsgálatot végzünk; a súlyos kár kockázatával járó titoktartási incidenst bejelentjük a Commission d'accès à l'information szervnek és Önnek, és az incidensekről nyilvántartást vezetünk; fizetős csomagon a viták alapértelmezés szerint bizalmasak, az ingyenes csomagon pedig nyilvánosak, ahogy a 6. szakasz mondja; kérheti, hogy szüntessük meg az Önre vonatkozó személyes adatok indexelését vagy terjesztését; adatait strukturált, széles körben használt formátumban kérheti; a 8. szakasz ismerteti automatizált adatkezelésünket." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "2a71b0eb41a33d7cc28c7cfa0ee93d398d6a7aafba6a84f2fcd82e9bab16956a",
+  sha256: "ec50e1c52b272109b2ff2e76b3c2ee6c2034079901fb5ec6ea834d0aee06bb7f",
   eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.12 · HATÁLYOS 2026. NOVEMBER 4.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",

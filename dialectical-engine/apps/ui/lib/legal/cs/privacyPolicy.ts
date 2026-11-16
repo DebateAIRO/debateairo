@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada a Québec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Naším pracovníkem pro ochranu soukromí, a v Québecu osobou odpovědnou za ochranu osobních údajů, je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Na žádosti odpovídáme do 30 dnů. Za osobní údaje, které předáváme poskytovatelům AI mimo Kanadu, nadále odpovídáme a smluvně vyžadujeme srovnatelnou ochranu; tito poskytovatelé mohou podléhat právním předpisům zemí, ve kterých působí, včetně zákonného přístupu orgánů. Marketingové e-maily zasíláme pouze s vaším výslovným souhlasem podle CASL. Porušení bezpečnostních opatření, které pro vás vytváří skutečné riziko závažné újmy, ohlašujeme Office of the Privacy Commissioner of Canada a vám a o každém porušení vedeme záznam po dobu 24 měsíců. Québec: před sdělením osobních údajů mimo Québec provádíme posouzení dopadů na soukromí; incident týkající se důvěrnosti, který představuje riziko vážné újmy, ohlašujeme Commission d'accès à l'information a vám a vedeme rejstřík incidentů; nastavení, která uchovávají vaše debaty v soukromí, jsou ve výchozím stavu zapnuta; můžete nás požádat o odstranění z indexu nebo ukončení šíření osobních údajů o vás; můžete si vyžádat své údaje ve strukturovaném, běžně používaném formátu; oddíl 8 popisuje naše automatizované zpracování." }
+      { kind: "p", text: "Naším pracovníkem pro ochranu soukromí, a v Québecu osobou odpovědnou za ochranu osobních údajů, je náš jednatel, kterého lze kontaktovat na adrese privacy@dezbatere.ro. Na žádosti odpovídáme do 30 dnů. Za osobní údaje, které předáváme poskytovatelům AI mimo Kanadu, nadále odpovídáme a smluvně vyžadujeme srovnatelnou ochranu; tito poskytovatelé mohou podléhat právním předpisům zemí, ve kterých působí, včetně zákonného přístupu orgánů. Marketingové e-maily zasíláme pouze s vaším výslovným souhlasem podle CASL. Porušení bezpečnostních opatření, které pro vás vytváří skutečné riziko závažné újmy, ohlašujeme Office of the Privacy Commissioner of Canada a vám a o každém porušení vedeme záznam po dobu 24 měsíců. Québec: před sdělením osobních údajů mimo Québec provádíme posouzení dopadů na soukromí; incident týkající se důvěrnosti, který představuje riziko vážné újmy, ohlašujeme Commission d'accès à l'information a vám a vedeme rejstřík incidentů; v placeném tarifu jsou debaty ve výchozím nastavení soukromé a debaty v bezplatném tarifu jsou veřejné, jak říká oddíl 6; můžete nás požádat o odstranění z indexu nebo ukončení šíření osobních údajů o vás; můžete si vyžádat své údaje ve strukturovaném, běžně používaném formátu; oddíl 8 popisuje naše automatizované zpracování." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "0eadb64455cd9ef22db0c103a2944f41a9483177ce6d4d02d9f2fcb94c794304",
+  sha256: "6b260401f18a5d39747ae330411e19ba00f8a05fb8747bfe2e917d6a739114e9",
   eyebrow: "ZÁSADY OCHRANY OSOBNÍCH ÚDAJŮ · v3.12 · ÚČINNÉ OD 4. LISTOPADU 2026",
   title: "Co uchováváme a proč",
   lede: "Vaše práva a naše povinnosti podle GDPR (EU) 2016/679 srozumitelným jazykem. Čtrnáct oddílů a příloha B — přejděte až na konec.",

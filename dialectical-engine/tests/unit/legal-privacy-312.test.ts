@@ -319,6 +319,15 @@ const TAKE_DOWN = "If you publish a flagged debate after our approval, you can t
  */
 const ASIA_PACIFIC = 288;
 const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
+/**
+ * Annex B.3's paragraph (Canada and Quebec). Its Quebec part said that "the settings that keep your debates private
+ * are on by default", but section 6 makes debates on the Free plan public, in Quebec as everywhere else (the owner,
+ * 16 November 2026). In every language that one clause now says what section 6 says, in the words Terms 2.18's
+ * Annex A.3 already uses there; nothing else on the line changes.
+ */
+const QUEBEC = 276;
+const QUEBEC_BEFORE = "the settings that keep your debates private are on by default";
+const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates on the Free plan are public, as section 6 says";
 /** The two new rows, each right after its table's "Page settings and visits" row. */
 const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
 const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];
@@ -503,7 +512,18 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED] : [])].sort((a, b) => a - b));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED] : [])].sort((a, b) => a - b));
+    // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
+    const quebecBefore = prior[priorIndex(QUEBEC)]!;
+    const quebecAfter = next[QUEBEC]!;
+    expect(quebecBefore, `${code}: Annex B.3's paragraph in 3.11`).toContain("Commission d'accès à l'information");
+    let head = 0;
+    while (quebecBefore[head] === quebecAfter[head]) head += 1;
+    let foot = 0;
+    while (foot < Math.min(quebecBefore.length, quebecAfter.length) - head && quebecBefore.at(-1 - foot) === quebecAfter.at(-1 - foot)) foot += 1;
+    expect(head, `${code}: the change is in the Quebec part`).toBeGreaterThan(quebecBefore.indexOf("Commission d'accès à l'information"));
+    expect(quebecAfter.slice(head, quebecAfter.length - foot), `${code}: the new clause points to section 6`).toMatch(/6/u);
+    expect(quebecBefore.slice(head, quebecBefore.length - foot), `${code}: the old clause pointed nowhere`).not.toMatch(/\d/u);
     // The Asia-Pacific paragraph lost its last part and nothing else: what is left is the start of the 3.11 line.
     const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
     expect(asiaPacific.startsWith(next[ASIA_PACIFIC]!) && next[ASIA_PACIFIC]!.length < asiaPacific.length, `${code}: the Asia-Pacific paragraph only loses its end`).toBe(true);
@@ -554,6 +574,10 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(next[ASIA_PACIFIC]).toBe(asiaPacific.slice(0, asiaPacific.indexOf(TAIWAN)));
     expect(next[ASIA_PACIFIC]!.endsWith("as the Personal Information Protection Act requires.")).toBe(true);
     expect(draftBytes("en").toString("utf8")).not.toContain("Taiwan");
+    // Quebec: Free debates are public there too, as section 6 says; nothing else in Annex B.3 changes.
+    expect(prior[priorIndex(QUEBEC)]!.split(QUEBEC_BEFORE)).toHaveLength(2);
+    expect(next[QUEBEC]).toBe(prior[priorIndex(QUEBEC)]!.replace(QUEBEC_BEFORE, QUEBEC_AFTER));
+    expect(draftBytes("en").toString("utf8")).not.toContain(QUEBEC_BEFORE);
     const priorLog = prior[priorIndex(CHANGE_LOG)]!;
     const tail = priorLog.slice(priorLog.indexOf("Version 3.11 replaced version 3.10:"));
     expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${tail}`);

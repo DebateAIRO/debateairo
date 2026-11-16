@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada i Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Na żądania odpowiadamy w ciągu 30 dni. Pozostajemy odpowiedzialni za dane osobowe przekazywane dostawcom AI poza Kanadą i na podstawie umów wymagamy porównywalnej ochrony; dostawcy ci mogą podlegać prawu krajów, w których działają, w tym zgodnemu z prawem dostępowi organów publicznych. Marketingowe wiadomości e-mail są wysyłane wyłącznie za Twoją wyraźną zgodą zgodnie z CASL. Naruszenie zabezpieczeń, które stwarza realne ryzyko poważnej szkody dla Ciebie, zgłaszamy Office of the Privacy Commissioner of Canada i Tobie, a każde naruszenie ewidencjonujemy przez 24 miesiące. Quebec: przed przekazaniem danych osobowych poza Quebec przeprowadzamy ocenę skutków dla prywatności; incydent dotyczący poufności, który stwarza ryzyko poważnej szkody, zgłaszamy Commission d'accès à l'information i Tobie oraz prowadzimy rejestr incydentów; ustawienia zapewniające prywatność debat są domyślnie włączone; możesz poprosić nas o usunięcie z indeksu lub zaprzestanie rozpowszechniania danych osobowych na Twój temat; możesz zażądać swoich danych w ustrukturyzowanym, powszechnie używanym formacie; sekcja 8 opisuje nasze zautomatyzowane przetwarzanie." }
+      { kind: "p", text: "Naszym inspektorem ds. prywatności, a w Quebecu osobą odpowiedzialną za ochronę danych osobowych, jest nasz dyrektor, z którym można się skontaktować pod adresem privacy@dezbatere.ro. Na żądania odpowiadamy w ciągu 30 dni. Pozostajemy odpowiedzialni za dane osobowe przekazywane dostawcom AI poza Kanadą i na podstawie umów wymagamy porównywalnej ochrony; dostawcy ci mogą podlegać prawu krajów, w których działają, w tym zgodnemu z prawem dostępowi organów publicznych. Marketingowe wiadomości e-mail są wysyłane wyłącznie za Twoją wyraźną zgodą zgodnie z CASL. Naruszenie zabezpieczeń, które stwarza realne ryzyko poważnej szkody dla Ciebie, zgłaszamy Office of the Privacy Commissioner of Canada i Tobie, a każde naruszenie ewidencjonujemy przez 24 miesiące. Quebec: przed przekazaniem danych osobowych poza Quebec przeprowadzamy ocenę skutków dla prywatności; incydent dotyczący poufności, który stwarza ryzyko poważnej szkody, zgłaszamy Commission d'accès à l'information i Tobie oraz prowadzimy rejestr incydentów; w płatnym planie debaty są domyślnie prywatne, a debaty w planie bezpłatnym są publiczne, jak wskazano w sekcji 6; możesz poprosić nas o usunięcie z indeksu lub zaprzestanie rozpowszechniania danych osobowych na Twój temat; możesz zażądać swoich danych w ustrukturyzowanym, powszechnie używanym formacie; sekcja 8 opisuje nasze zautomatyzowane przetwarzanie." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "510080bcf0afedb35881d6724d466f5343769327f473db0782932adbfab87736",
+  sha256: "5ee459c234fa59e0f8ce45479a4513ddad1ed4889a522fe58499ecf27e20eb08",
   eyebrow: "POLITYKA PRYWATNOŚCI · v3.12 · OBOWIĄZUJE OD 4 LISTOPADA 2026",
   title: "Co przechowujemy i dlaczego",
   lede: "Twoje prawa i nasze obowiązki wynikające z RODO (UE) 2016/679 (ang. GDPR (EU) 2016/679), wyjaśnione prostym językiem. Czternaście sekcji i załącznik B — przewiń do końca.",

@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanāda un Kvebeka",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Uz pieprasījumiem mēs atbildam 30 dienu laikā. Mēs saglabājam atbildību par personas informāciju, ko nosūtām MI pakalpojumu sniedzējiem ārpus Kanādas, un ar līgumiem pieprasām līdzvērtīgu aizsardzību; uz šiem pakalpojumu sniedzējiem var attiekties to darbības valstu tiesību akti, tostarp iestāžu likumīga piekļuve. Tirgvedības e-pasta ziņojumi tiek sūtīti tikai ar jūsu nepārprotamu piekrišanu saskaņā ar CASL. Par drošības pasākumu pārkāpumu, kas rada reālu būtiska kaitējuma risku jums, mēs ziņojam Office of the Privacy Commissioner of Canada un jums, un mēs glabājam ierakstu par katru pārkāpumu 24 mēnešus. Kvebeka: pirms personas informācijas nosūtīšanas ārpus Kvebekas mēs veicam privātuma ietekmes novērtējumu; par konfidencialitātes incidentu, kas rada nopietna kaitējuma risku, mēs ziņojam Commission d'accès à l'information un jums un uzturam incidentu reģistru; iestatījumi, kas nodrošina jūsu debašu privātumu, ir ieslēgti pēc noklusējuma; varat mums lūgt atcelt indeksēšanu vai pārtraukt personas informācijas izplatīšanu par jums; varat pieprasīt savus datus strukturētā, plaši izmantotā formātā; 8. sadaļā ir aprakstīta mūsu automatizētā apstrāde." }
+      { kind: "p", text: "Mūsu privātuma speciālists, bet Kvebekā — persona, kas atbild par personas informācijas aizsardzību, ir mūsu direktors, sasniedzams privacy@dezbatere.ro. Uz pieprasījumiem mēs atbildam 30 dienu laikā. Mēs saglabājam atbildību par personas informāciju, ko nosūtām MI pakalpojumu sniedzējiem ārpus Kanādas, un ar līgumiem pieprasām līdzvērtīgu aizsardzību; uz šiem pakalpojumu sniedzējiem var attiekties to darbības valstu tiesību akti, tostarp iestāžu likumīga piekļuve. Tirgvedības e-pasta ziņojumi tiek sūtīti tikai ar jūsu nepārprotamu piekrišanu saskaņā ar CASL. Par drošības pasākumu pārkāpumu, kas rada reālu būtiska kaitējuma risku jums, mēs ziņojam Office of the Privacy Commissioner of Canada un jums, un mēs glabājam ierakstu par katru pārkāpumu 24 mēnešus. Kvebeka: pirms personas informācijas nosūtīšanas ārpus Kvebekas mēs veicam privātuma ietekmes novērtējumu; par konfidencialitātes incidentu, kas rada nopietna kaitējuma risku, mēs ziņojam Commission d'accès à l'information un jums un uzturam incidentu reģistru; debates maksas plānā pēc noklusējuma ir privātas, bet debates bezmaksas plānā ir publiskas, kā norādīts 6. sadaļā; varat mums lūgt atcelt indeksēšanu vai pārtraukt personas informācijas izplatīšanu par jums; varat pieprasīt savus datus strukturētā, plaši izmantotā formātā; 8. sadaļā ir aprakstīta mūsu automatizētā apstrāde." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "27cb27521be79f9e6cc4d39bd6aa7312bf4d0b2c8881c4963b78a04d40ea9d70",
+  sha256: "f00d0c6117d4d941e47802b202955854ffc39c52e30bc1453d78bf99e4527105",
   eyebrow: "PRIVĀTUMA POLITIKA · v3.12 · SPĒKĀ NO 2026. GADA 4. NOVEMBRA",
   title: "Ko mēs glabājam un kāpēc",
   lede: "Jūsu tiesības un mūsu pienākumi saskaņā ar GDPR (EU) 2016/679, izklāstīti vienkāršā valodā. Četrpadsmit sadaļas un B pielikums — ritiniet līdz beigām.",

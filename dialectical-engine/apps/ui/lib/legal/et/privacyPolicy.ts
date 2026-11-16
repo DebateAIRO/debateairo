@@ -332,7 +332,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     title: "Kanada ja Quebec",
     accent: "--ok-dot",
     blocks: [
-      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Vastame taotlustele 30 päeva jooksul. Vastutame jätkuvalt isikuandmete eest, mille edastame tehisintellekti pakkujatele väljaspool Kanadat, ja kasutame võrreldava kaitse nõudmiseks lepinguid; nende pakkujate suhtes võivad kehtida nende tegevusriikide seadused, sealhulgas ametiasutuste seaduslik juurdepääs. Turundusmeile saadetakse CASL-i alusel ainult teie selgesõnalisel nõusolekul. Teatame turvameetmete rikkumisest, mis tekitab teile olulise kahju tegeliku ohu, Kanada privaatsusvolinikule (Office of the Privacy Commissioner of Canada) ja teile ning säilitame iga rikkumise kohta kirjet 24 kuud. Quebec: enne isikuandmete edastamist väljapoole Quebeci viime läbi andmekaitsealase mõjuhinnangu; teatame konfidentsiaalsusintsidendist, mis tekitab tõsise kahju ohu, asutusele Commission d'accès à l'information ja teile ning peame intsidentide registrit; teie väitlusi privaatsena hoidvad seaded on vaikimisi sisse lülitatud; võite paluda meil teie isikuandmed otsingumootorite indeksist eemaldada või nende levitamine lõpetada; võite taotleda oma andmeid struktureeritud ja üldkasutatavas vormingus; jaotis 8 kirjeldab meie automatiseeritud töötlust." }
+      { kind: "p", text: "Meie privaatsusametnik, Quebecis ka isikuandmete kaitse eest vastutav isik, on meie juhatuse liige, kellega saab ühendust võtta aadressil privacy@dezbatere.ro. Vastame taotlustele 30 päeva jooksul. Vastutame jätkuvalt isikuandmete eest, mille edastame tehisintellekti pakkujatele väljaspool Kanadat, ja kasutame võrreldava kaitse nõudmiseks lepinguid; nende pakkujate suhtes võivad kehtida nende tegevusriikide seadused, sealhulgas ametiasutuste seaduslik juurdepääs. Turundusmeile saadetakse CASL-i alusel ainult teie selgesõnalisel nõusolekul. Teatame turvameetmete rikkumisest, mis tekitab teile olulise kahju tegeliku ohu, Kanada privaatsusvolinikule (Office of the Privacy Commissioner of Canada) ja teile ning säilitame iga rikkumise kohta kirjet 24 kuud. Quebec: enne isikuandmete edastamist väljapoole Quebeci viime läbi andmekaitsealase mõjuhinnangu; teatame konfidentsiaalsusintsidendist, mis tekitab tõsise kahju ohu, asutusele Commission d'accès à l'information ja teile ning peame intsidentide registrit; tasulise paketi väitlused on vaikimisi privaatsed ja tasuta paketi väitlused on avalikud, nagu jaotises 6 öeldud; võite paluda meil teie isikuandmed otsingumootorite indeksist eemaldada või nende levitamine lõpetada; võite taotleda oma andmeid struktureeritud ja üldkasutatavas vormingus; jaotis 8 kirjeldab meie automatiseeritud töötlust." }
     ]
   },
   {
@@ -364,7 +364,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "dfe3a4f2e9f57a9e545eae9206d928b38490a536f749b1bb52bcabbebec7683e",
+  sha256: "d81ca88c3ccd53e9b574858c9f54c7f19921448a49484a00fbf5ec9324a6bf5b",
   eyebrow: "PRIVAATSUSPOLIITIKA · v3.12 · KEHTIB ALATES 4. NOVEMBRIST 2026",
   title: "Mida ja miks me talletame",
   lede: "Teie õigused ja meie kohustused GDPR (EU) 2016/679 alusel lihtsas keeles. Neliteist jaotist ja lisa B — kerige lõpuni.",
