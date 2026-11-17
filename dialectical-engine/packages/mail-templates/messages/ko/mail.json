@@ -10,7 +10,7 @@
   "mail.M1.active": "감사합니다. {plan} 요금제가 이제 활성화되었습니다.",
   "mail.M1.price": "매월 {totalAmount}(세금 포함)를 지불하십니다. 요금제는 {renewDate}에 갱신되며, 이후 해지하실 때까지 매월 갱신됩니다.",
   "mail.M1.cancel": "설정에서 언제든지 해지하실 수 있으며, 로그인하지 않고 이 페이지에서도 해지하실 수 있습니다: {cancelPageUrl}",
-  "mail.M1.withdrawal": "EU, EEA 또는 영국에 거주하시는 경우 {withdrawalDays}일 이내에 철회하실 수 있습니다. 이 경우 이미 사용한 부분만 지불하시면 됩니다: 사용한 일수와 사용한 크레딧 중 더 큰 비율입니다. 철회 양식 견본이 이 이메일에 첨부되어 있습니다.",
+  "mail.M1.withdrawal": "거주 지역에 관계없이 {withdrawalDays}일 이내에 철회하실 수 있습니다. 이 경우 요금제 크레딧 중 이미 사용하신 비율만큼만 지불하시면 됩니다. 전혀 사용하지 않으셨다면 가격 전액을 돌려받으십니다. 철회 양식 견본이 이 이메일에 첨부되어 있습니다.",
   "mail.M1.termsAttached": "동의하신 약관이 첨부되어 있습니다. 최신 버전은 항상 {termsUrl}에서 확인하실 수 있습니다",
   "mail.M1.termsCurrent": "현재 약관은 {termsUrl}에서 온라인으로 확인하실 수 있습니다",
   "mail.M2.subject": "{totalAmount}에 대한 Dialectical Engine 영수증",

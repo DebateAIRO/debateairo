@@ -10,7 +10,7 @@
   "mail.M1.active": "Gracias. Su plan {plan} ya está activo.",
   "mail.M1.price": "Usted paga {totalAmount} al mes, impuestos incluidos. El plan se renueva el {renewDate} y después cada mes hasta que lo cancele.",
   "mail.M1.cancel": "Puede cancelarlo en cualquier momento en Configuración, o sin iniciar sesión en esta página: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Si reside en la UE, el EEE o el Reino Unido, puede desistir en un plazo de {withdrawalDays} días. En ese caso solo paga la parte ya utilizada: la mayor entre los días utilizados y el crédito utilizado. El modelo de formulario de desistimiento se adjunta a este correo.",
+  "mail.M1.withdrawal": "Resida donde resida, puede desistir en un plazo de {withdrawalDays} días. En ese caso solo paga la parte del crédito del plan que haya utilizado; si no ha utilizado nada, recupera el precio completo. El modelo de formulario de desistimiento se adjunta a este correo.",
   "mail.M1.termsAttached": "Se adjuntan las Condiciones que usted aceptó. La versión más reciente está siempre en {termsUrl}",
   "mail.M1.termsCurrent": "Nuestras Condiciones vigentes están en línea en {termsUrl}",
   "mail.M2.subject": "Su recibo de Dialectical Engine por {totalAmount}",
