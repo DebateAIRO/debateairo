@@ -10,7 +10,7 @@
   "mail.M1.active": "Go raibh maith agat. Tá do phlean {plan} gníomhach anois.",
   "mail.M1.price": "Íocann tú {totalAmount} sa mhí, cáin san áireamh. Athnuachann an plean ar {renewDate} agus ansin gach mí go dtí go gcuireann tú ar ceal é.",
   "mail.M1.cancel": "Is féidir leat cur ar ceal am ar bith sna Socruithe, nó gan síniú isteach ar an leathanach seo: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Má chónaíonn tú san AE, sa LEE nó sa Ríocht Aontaithe, is féidir leat tarraingt siar laistigh de {withdrawalDays} lá. Ansin ní íocann tú ach as an gcuid a úsáideadh cheana: an ceann is mó de na laethanta a úsáideadh nó den chreidmheas a úsáideadh. Tá an fhoirm tarraingthe siar shamplach ceangailte leis an ríomhphost seo.",
+  "mail.M1.withdrawal": "Pé áit a bhfuil cónaí ort, is féidir leat tarraingt siar laistigh de {withdrawalDays} lá. Ansin ní íocann tú ach as an gcuid de chreidmheas an phlean atá úsáidte agat; mura bhfuil aon chreidmheas úsáidte agat, faigheann tú an praghas iomlán ar ais. Tá an fhoirm tarraingthe siar shamplach ceangailte leis an ríomhphost seo.",
   "mail.M1.termsAttached": "Tá na Téarmaí a ghlac tú leo ceangailte. Bíonn an leagan is déanaí i gcónaí ag {termsUrl}",
   "mail.M1.termsCurrent": "Tá ár dTéarmaí reatha ar líne ag {termsUrl}",
   "mail.M2.subject": "Do admháil Dialectical Engine ar {totalAmount}",

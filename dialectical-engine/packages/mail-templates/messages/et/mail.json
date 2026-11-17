@@ -10,7 +10,7 @@
   "mail.M1.active": "Täname. Teie pakett {plan} on nüüd aktiivne.",
   "mail.M1.price": "Te maksate {totalAmount} kuus, maksud sisaldavad. Pakett uueneb {renewDate} ja seejärel iga kuu, kuni selle tühistate.",
   "mail.M1.cancel": "Võite igal ajal tühistada seadetes või sisse logimata sellel lehel: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Kui elate ELis, EMPs või Ühendkuningriigis, võite lepingust taganeda {withdrawalDays} päeva jooksul. Siis maksate ainult juba kasutatud osa eest: suurema osa kasutatud päevadest või kasutatud krediidist. Taganemisavalduse tüüpvorm on sellele e-kirjale lisatud.",
+  "mail.M1.withdrawal": "Olenemata sellest, kus te elate, võite lepingust taganeda {withdrawalDays} päeva jooksul. Siis maksate ainult paketi krediidi selle osa eest, mille olete kasutanud; kui te pole krediiti üldse kasutanud, saate tagasi kogu hinna. Taganemisavalduse tüüpvorm on sellele e-kirjale lisatud.",
   "mail.M1.termsAttached": "Teie aktsepteeritud tingimused on lisatud. Uusim versioon on alati aadressil {termsUrl}",
   "mail.M1.termsCurrent": "Meie kehtivad tingimused on veebis aadressil {termsUrl}",
   "mail.M2.subject": "Teie Dialectical Engine kviitung summale {totalAmount}",

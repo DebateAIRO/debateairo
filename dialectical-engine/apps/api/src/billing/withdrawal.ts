@@ -1,7 +1,7 @@
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundPerPaymentMicros, type PriceCurrency, type WithdrawalPayment
+  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundMicros, type PriceCurrency
 } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
 import { planById } from "@debateai/register";
@@ -22,7 +22,7 @@ export type WithdrawalRequest = Readonly<{
   ownerRef: string;
   /**
    * When the person withdrew: now for Settings; the instant the email or the model form arrived for the owner's
-   * command (P14c). The window, the days share, the credit spent and the credit in force are all taken at it.
+   * command (P14c). The window, the credit spent and the credit in force are all taken at it.
    */
   withdrewAt: Date;
   source: "SETTINGS" | "OWNER";
@@ -42,30 +42,11 @@ export type WithdrawalRequest = Readonly<{
 export type WithdrawalOutcome = Readonly<{ refundMicros: number | null; currency: PriceCurrency }>;
 
 /**
- * W6 (P2-I8): each paid transaction with what it still holds (never below zero: a provider refund's figure is only an
- * upper bound, and such a withdrawal goes to the owner) and the stretch of the period it paid for. An UPGRADE charge
- * covers its own `periodStart`..`periodEnd` (its quote's creation to the period end, upgrade.ts); every other payment
- * covers the subscription's period, which starts at the activation (P9b), not at the INITIAL charge's provisional
- * checkout period (checkout.ts), so a withdrawal without an upgrade is measured exactly as before.
+ * What these paid transactions still hold, added up: what each took less what already went back from it, never below
+ * zero (a provider refund's figure is only an upper bound, and such a withdrawal goes to the owner).
  */
-export function withdrawalPayments(
-  paid: ReadonlyArray<PaidTransaction>,
-  charges: ReadonlyArray<Pick<ChargeRow, "chargeId" | "kind" | "periodStart" | "periodEnd">>,
-  period: Readonly<{ start: Date; end: Date }>
-): WithdrawalPayment[] {
-  return paid.map((row) => {
-    const charge = charges.find((candidate) => candidate.chargeId === row.chargeId);
-    if (charge === undefined) {
-      throw new TypedDomainError("BILLING_SUBSCRIPTION_EVENTS_INVALID", "A paid transaction names a charge of another subscription");
-    }
-    const upgrade = charge.kind === "UPGRADE";
-    return Object.freeze({
-      paidMicros: Math.max(row.paidMicros - row.refundedMicros, 0),
-      coverageStart: upgrade ? charge.periodStart : period.start,
-      coverageEnd: upgrade ? charge.periodEnd : period.end
-    });
-  });
-}
+const stillHeld = (paid: ReadonlyArray<PaidTransaction>): number =>
+  paid.reduce((total, row) => total + Math.max(row.paidMicros - row.refundedMicros, 0), 0);
 
 /** Rolls back the refund intents alone when a transaction cannot take one; WITHDRAWN is written after it. */
 const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
@@ -91,18 +72,21 @@ export const WITHDRAWAL_WAIT_STATEMENT_AGE_MS = 60 * 60 * 1000;
  * refund (RefundDesk's WITHDRAWAL follow-up), or goes now when nothing is due back. W9 (P2-I11): the same transaction
  * queues the acknowledgement of receipt (Directive 2011/83/EU art. 11(3)) for every withdrawal it records: M8_RECEIVED
  * ("we received your withdrawal on …; we're refunding {amount}", or the owner's check), or, when nothing is due back,
- * M8 itself, which then says everything at once. The credit share uses the credit
- * in force at `withdrewAt` (A6's override after an upgrade) and the credit spent by calls sent from the period start
- * to it (NV-45) ("withdrawal after an upgrade: the paid total is the sum of all successful charges since the first
- * activation"); both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is
- * written. NV-45: while more than a day of the window is left and the statement is under an hour old, it waits for
+ * M8 itself, which then says everything at once.
+ *
+ * The refund (owner's decision of 16 November 2026, one rule for every country the site serves): what the payments
+ * made up to `withdrewAt` still hold, added up, times the share of the plan credit not used, floored to cents once
+ * (`withdrawalRefundMicros`). The days gone by do not count: nothing used gives the whole price back, and the whole
+ * credit used gives nothing back. The credit is the one in force at `withdrewAt` (A6's override after an upgrade) and
+ * the credit used is what was spent from the period start to it ("withdrawal after an upgrade: the paid total is the
+ * sum of all successful charges since the first activation"); both are read before the lock, so a plan or period that
+ * changed meanwhile is refused and nothing is written. The credit used counts calls by when they were sent (NV-45).
+ * NV-45: while more than a day of the window is left and the statement is under an hour old, it waits for
  * the person's debates that may still be using credit (`WITHDRAWAL_DEBATE_RUNNING`, before the lock: nothing is
- * written and the grant is not spent).
- * W6 (P2-I8): each of those payments gives back its own share, its days measured over the stretch it paid for
- * (`withdrawalPayments`: an UPGRADE's starts at its quote's creation), and the sum is floored once. C1 (P2-W6): a
- * payment whose SUCCEEDED is after `withdrewAt` (an upgrade paid after the emailed statement arrived, before the
- * owner ran the command) takes no share: it goes back whole, what it still holds, on top of that sum. The refund is
- * still split newest first, so such a payment is the first to go back.
+ * written and the grant is not spent). C1 (P2-W6): a payment whose SUCCEEDED is after `withdrewAt` (an
+ * upgrade paid after the emailed statement arrived, before the owner ran the command) takes no share: it goes back
+ * whole, what it still holds, on top of that amount. The refund is still split newest first, so such a payment is the
+ * first to go back.
  *
  * D6a F20(c): when a refund made in NETOPIA's admin touched any paid payment (`providerRefunded`, whose
  * refunded amount is only an upper bound), or when a transaction already holds a refund request
@@ -141,7 +125,6 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
   // The plan whose credit was in force when the person withdrew (an upgrade since then is not theirs to pay back).
   const creditPlanId = entitlement.planId === "FREE" ? before.planId : entitlement.planId;
   const periodStart = before.currentPeriodStart;
-  const periodEnd = before.currentPeriodEnd;
   const activatedAt = before.activatedAt;
   const decided = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
@@ -159,16 +142,14 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     }
     const paid = paidTransactions(charges, activatedAt);
     // C1 (P2-W6): a payment made after the statement arrived (the owner's command records it later) was made after
-    // the person had withdrawn, so it goes back whole (what it still holds); the shares cover only the payments up to
-    // `withdrewAt`. Settings withdraws now, so nothing is ever after it there.
+    // the person had withdrawn, so it goes back whole (what it still holds); the credit share covers only the payments
+    // up to `withdrewAt`. Settings withdraws now, so nothing is ever after it there.
     const statedOver = paid.filter((row) => row.succeededAt.getTime() <= withdrewAt.getTime());
     const madeAfter = paid.filter((row) => row.succeededAt.getTime() > withdrewAt.getTime());
-    const refundMicros = withdrawalRefundPerPaymentMicros({
-      payments: withdrawalPayments(statedOver, charges, { start: periodStart, end: periodEnd }),
-      now: withdrewAt, creditSpentMicros: spentMicros,
+    const refundMicros = withdrawalRefundMicros({
+      paidMicros: stillHeld(statedOver), creditSpentMicros: spentMicros,
       monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planById(deps.plans, creditPlanId).monthlyCreditMicros
-    }) + withdrawalPayments(madeAfter, charges, { start: periodStart, end: periodEnd })
-      .reduce((total, payment) => total + payment.paidMicros, 0);
+    }) + stillHeld(madeAfter);
     let byOwner = paid.some((row) => row.providerRefunded);
     let allocations: RefundAllocation[] = [];
     if (!byOwner) {

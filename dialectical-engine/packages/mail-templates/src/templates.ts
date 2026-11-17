@@ -187,8 +187,10 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     catalogue: "mail", subject: "mail.M1.subject",
     paragraphs: [
       "mail.M1.active", "mail.M1.price", "mail.M1.cancel",
-      // Spec §2.5.6: the withdrawal right, and the form P9b attaches with it, exist only in a withdrawal country;
-      // P9b sends withdrawalDays exactly there.
+      // Spec §2.5.6: P9b sends withdrawalDays, and attaches the form, when the tax country is on the withdrawal
+      // list (policy.withdrawalCountries). Every country the site serves is on it since 10 November 2026, and the
+      // sentence says "Wherever you live" (owner's decision of 16 November 2026), so the paragraph goes out with
+      // every M1; the param stays optional because the list, not this template, decides.
       { ifParam: "withdrawalDays", test: "present", then: "mail.M1.withdrawal", otherwise: null },
       // Spec §2.5.10: the accepted version's text is attached when its bytes still match; otherwise the email says
       // only where the CURRENT Terms are, never that the current page is the version accepted.

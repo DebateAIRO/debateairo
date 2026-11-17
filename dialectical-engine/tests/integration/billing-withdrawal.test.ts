@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { BillingJobQueries, BillingRepository, createPool, EntitlementRepository, migrate, type OutboxJob } from "@debateai/db";
-import { foldSubscription, microsToDecimal, withdrawalRefundPerPaymentMicros } from "@debateai/billing-core";
+import { foldSubscription, microsToDecimal } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
+import { testBillingPolicy } from "../support/billingFixtures.js";
 import {
   mountSubscriptionRoutes,
   netopiaRefundDesk,
@@ -82,21 +83,18 @@ const creditNotesOf = async (ref: string) => (await database.pool.query<{ kind: 
 )).rows;
 
 describe("P12d withdrawal on real PostgreSQL", () => {
-  it("refunds the unused share across both charges newest first, ends the plan, and sends M8 after the last refund", async () => {
+  it("refunds the share of the credit not used across both charges newest first, ends the plan, and sends M8 after the last refund", async () => {
     const run = await start("p12d-happy", { activatedDaysAgo: 1, taxCountry: "RO" });
     const upgradeAt = new Date(run.now.getTime() - 12 * 3_600_000);
     const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
       at: upgradeAt, netMicros: 15_000_000, taxMicros: 3_150_000,
       providerPaymentId: "7700123", monthCreditOverrideMicros: 19_800_000
     });
-    // W6 (P2-I8): each payment over its own coverage; the upgrade's starts at its quote, a minute before it was paid.
-    const expected = withdrawalRefundPerPaymentMicros({
-      payments: [
-        { paidMicros: run.seeded.totalMicros, coverageStart: run.seeded.periodStart, coverageEnd: run.seeded.periodEnd },
-        { paidMicros: 18_150_000, coverageStart: new Date(upgradeAt.getTime() - 60_000), coverageEnd: run.seeded.periodEnd }
-      ],
-      now: run.now, creditSpentMicros: 1_000_000, monthlyCreditMicros: 19_800_000
-    });
+    // Owner's decision of 16 November 2026: both payments, 24.20 + 18.15 = 42.35, times the credit not used, 18.80 of
+    // the 19.80 in force after the upgrade (1.00 spent): 42.35 × 18.80 ÷ 19.80 = 40.2111…, floored to 40.21. The day
+    // the person withdraws on plays no part.
+    expect(run.seeded.totalMicros).toBe(24_200_000);
+    const expected = 40_210_000;
     // Both transactions are needed: the upgrade alone cannot cover the refund.
     expect(expected).toBeGreaterThan(18_150_000);
     const response = await run.withdraw();
@@ -186,13 +184,15 @@ describe("P12d withdrawal on real PostgreSQL", () => {
   });
 
   it("keeps the rest of a withdrawal refund open when the owner records a part: still reminded, no M8 until the rest", async () => {
-    const run = await start("p12d-part", { activatedDaysAgo: 1, taxCountry: "RO" });
+    // 1.00 of Plus's made-up 6.60 credit used, so the refund is a part of the payment from the start:
+    // 24.20 × 5.60 ÷ 6.60 = 20.5333…, floored to 20.53.
+    const run = await start("p12d-part", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 1_000_000 });
     expect((await run.withdraw()).statusCode).toBe(200);
     const ref = `${run.seeded.initialChargeId}:${run.seeded.providerPaymentId}`;
     const [request] = (await refundRequests(run.billing, run.seeded.initialChargeId)).filter(([, , reason]) => reason === "WITHDRAWAL");
     const requestedMicros = request![1] as number;
+    expect(requestedMicros).toBe(20_530_000);
     const partMicros = 5_000_000;
-    expect(requestedMicros).toBeGreaterThan(partMicros);
     const owner = desk();
     const [job] = await claimRefunds([ref]);
     expect(await owner.handle(job!, new Date())).toEqual({ kind: "DONE" });
@@ -231,16 +231,45 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
-  it("refuses long after 14 days and for a tax country without the withdrawal right", async () => {
+  it("refuses long after 14 days and for a tax country that is not on the policy's list", async () => {
     // 25 days: well past the 14 calendar days (R2 Q-6) in any time zone, whatever day the test runs on.
     const late = await start("p12d-late", { activatedDaysAgo: 25, taxCountry: "RO" });
     expect((await late.withdraw()).json().error).toBe("WITHDRAWAL_WINDOW_CLOSED");
     await late.api.close();
-    const us = await start("p12d-us", { activatedDaysAgo: 1, taxCountry: "US" });
-    const refused = await us.withdraw();
+    // The list (`policy.withdrawalCountries`) is still what opens the window. It holds every country the site serves;
+    // Brazil is not one of them, so a plan whose tax country is Brazil has no window.
+    expect(testBillingPolicy.withdrawalCountries).not.toContain("BR");
+    const unlisted = await start("p12d-unlisted", { activatedDaysAgo: 1, taxCountry: "BR" });
+    const refused = await unlisted.withdraw();
     expect(refused.statusCode).toBe(409);
     expect(refused.json().error).toBe("WITHDRAWAL_WINDOW_CLOSED");
-    await us.api.close();
+    expect(foldSubscription(await unlisted.billing.subscriptionEvents(unlisted.seeded.subscriptionId)).status).toBe("ACTIVE");
+    await unlisted.api.close();
+  });
+
+  it("lets a buyer in the United States and one in Japan withdraw inside the 14 days (owner's decision of 16 November 2026)", async () => {
+    // Day 13 for the United States and day 1 for Japan, nothing used: the whole 24.20 goes back on either day.
+    for (const [label, taxCountry, activatedDaysAgo] of [["p12d-us", "US", 13], ["p12d-jp", "JP", 1]] as const) {
+      const run = await start(label, { activatedDaysAgo, taxCountry, spentMicros: 0 });
+      const view = await run.api.inject({
+        method: "GET", url: "/v1/billing/subscription", headers: { "x-test-session": run.identity.rawSessionToken }
+      });
+      expect(view.json().subscription.withdrawal_open_until, taxCountry).not.toBeNull();
+      const response = await run.withdraw();
+      expect(response.statusCode, taxCountry).toBe(200);
+      expect(response.json(), taxCountry).toEqual({ refund: "24.20", currency: "USD" });
+      expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("WITHDRAWN");
+      expect(await refundRequests(run.billing, run.seeded.initialChargeId))
+        .toEqual([[run.seeded.providerPaymentId, 24_200_000, "WITHDRAWAL"]]);
+      await run.api.close();
+    }
+    // The day does not count for a part refund either: 30 % of the credit used gives 70 % back on day 1 and on day 13
+    // alike (24.20 × 4.62 ÷ 6.60 = 16.94).
+    for (const [label, activatedDaysAgo] of [["p12d-us-day1", 1], ["p12d-us-day13", 13]] as const) {
+      const run = await start(label, { activatedDaysAgo, taxCountry: "US", spentMicros: 1_980_000 });
+      expect((await run.withdraw()).json(), label).toEqual({ refund: "16.94", currency: "USD" });
+      await run.api.close();
+    }
   });
 
   it("writes no refund intent and sends M8 at once when the whole credit was used", async () => {
@@ -346,6 +375,36 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     await run.api.close();
   });
 
+  it("measures the share on what each payment still holds: an earlier refund of ours is not refunded twice", async () => {
+    // Plus (24.20) holds an earlier refund request of ours for 1.00, so it still holds 23.20; the upgrade holds its
+    // whole 18.15 (15.00 + 21 % VAT): 23.20 + 18.15 = 41.35 in all. 11.88 of the 19.80 credit in force after the upgrade
+    // is used (60 %), so 7.92 is left: 41.35 × 7.92 ÷ 19.80 = 41.35 × 0.4 = 16.54 exactly. Measured on what the two
+    // payments took (24.20 + 18.15 = 42.35) it would be 42.35 × 0.4 = 16.94, the 1.00 counted a second time.
+    const run = await start("p12d-still-held", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 11_880_000 });
+    expect(run.seeded.totalMicros).toBe(24_200_000);
+    const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
+      at: new Date(run.now.getTime() - 12 * 3_600_000), netMicros: 15_000_000, taxMicros: 3_150_000,
+      providerPaymentId: "7700790", monthCreditOverrideMicros: 19_800_000
+    });
+    // An earlier refund of ours on the INITIAL payment, still in flight (as in the case above).
+    await run.billing.withTransaction((client) => run.billing.appendChargeEvent(client, chargeEvent(
+      run.seeded.initialChargeId, "REFUND_REQUESTED", new Date(run.now.getTime() - 60_000), {
+        providerPaymentId: run.seeded.providerPaymentId, amountMicros: 1_000_000, errorCode: "SUBSCRIPTION_ENDED"
+      }
+    )));
+    const response = await run.withdraw();
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ refund: "16.54", currency: "USD" });
+    expect((await run.billing.subscriptionEvents(run.seeded.subscriptionId)).at(-1))
+      .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: 16_540_000 } });
+    // 16.54 is under the upgrade's 18.15, so the newest payment covers it alone: the payment that already holds a
+    // request is not asked again, and the withdrawal stays with RefundDesk (not handed to the owner).
+    expect(await refundRequests(run.billing, upgrade.chargeId)).toEqual([["7700790", 16_540_000, "WITHDRAWAL"]]);
+    expect(await refundRequests(run.billing, run.seeded.initialChargeId))
+      .toEqual([[run.seeded.providerPaymentId, 1_000_000, "SUBSCRIPTION_ENDED"]]);
+    await run.api.close();
+  });
+
   it("records a withdrawal refund under the owner lock first, then the charge's refund lock (the writers' order)", async () => {
     const run = await start("p12d-lock-order", { activatedDaysAgo: 1, taxCountry: "RO" });
     expect((await run.withdraw()).statusCode).toBe(200);
@@ -390,9 +449,9 @@ describe("P12d withdrawal on real PostgreSQL", () => {
   });
 
   it("records one refund once when the owner's command runs twice at once: one REFUNDED, one M8 (P2-M6)", async () => {
-    // 3.96 of Plus's made-up 6.60 credit used: the larger share is 60 %, so the refund is under half the payment and the sum
-    // guard alone would let a second REFUNDED row for it in (a NETOPIA refund may be recorded in parts, PR-20: no
-    // unique key stops a second one, only the re-read under the owner lock does).
+    // 3.96 of Plus's made-up 6.60 credit used, 60 %: the refund is 24.20 × 2.64 ÷ 6.60 = 9.68, under half the payment,
+    // so the sum guard alone would let a second REFUNDED row for it in (a NETOPIA refund may be recorded in parts,
+    // PR-20: no unique key stops a second one, only the re-read under the owner lock does).
     const run = await start("p2-m6-two-recorders", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 3_960_000 });
     expect((await run.withdraw()).statusCode).toBe(200);
     const ownerRef = run.identity.authenticated.ownerRef;
@@ -400,6 +459,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
       .filter(([, , reason]) => reason === "WITHDRAWAL");
     const amountMicros = request![1] as number;
     const paidMicros = (await run.billing.charge(run.seeded.initialChargeId))!.totalMicros;
+    expect(amountMicros).toBe(9_680_000);
     expect(2 * amountMicros).toBeLessThanOrEqual(paidMicros);
     expect(ownerRef).toBe(run.seeded.ownerRef);
     // Two runs of `pnpm billing:refund-done` for the whole request (the owner pressed it twice), each on its own desk

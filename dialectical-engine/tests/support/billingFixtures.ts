@@ -68,9 +68,14 @@ export const testBillingPolicy: BillingPolicy = Object.freeze({
   quoteTtlSeconds: 1_800,
   taxCode: "saas",
   invoiceIssuerRules: { RO: "SMARTBILL", "*": "QUADERNO" },
+  // Every country the site serves, as the sealed row lists them since 10 November 2026 (the same list as
+  // deploy/vps/register/hosted-register.example.json `withdrawal_countries`): the EU 27, Iceland, Liechtenstein,
+  // Norway and the UK, then the United States, Canada, Australia, New Zealand, Singapore, Japan, Moldova and South
+  // Korea. Owner's decision of 16 November 2026: everyone the site serves may withdraw within 14 days.
   withdrawalCountries: [
-    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU",
-    "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB"
+    "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV",
+    "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "IS", "LI", "NO", "GB",
+    "US", "CA", "AU", "NZ", "SG", "JP", "MD", "KR"
   ],
   sourceRef: "test:billing-policy"
 }) as BillingPolicy;

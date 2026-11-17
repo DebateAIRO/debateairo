@@ -10,7 +10,7 @@
   "mail.M1.active": "Köszönjük. A(z) {plan} csomagja mostantól aktív.",
   "mail.M1.price": "Havonta {totalAmount} összeget fizet, adóval együtt. A csomag megújulásának napja: {renewDate}; ezután minden hónapban megújul, amíg le nem mondja.",
   "mail.M1.cancel": "Bármikor lemondhatja a Beállításokban, vagy bejelentkezés nélkül ezen az oldalon: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Ha az EU-ban, az EGT-ben vagy az Egyesült Királyságban él, {withdrawalDays} napon belül elállhat a szerződéstől. Ilyenkor csak a már felhasznált részért fizet: a felhasznált napok vagy a felhasznált kredit arányai közül a nagyobbért. Az elállási nyilatkozatminta csatolva van ehhez az e-mailhez.",
+  "mail.M1.withdrawal": "Bárhol él is, {withdrawalDays} napon belül elállhat a szerződéstől. Ilyenkor csak a csomag kreditjének Ön által felhasznált részéért fizet; ha semmit sem használt fel belőle, a teljes árat visszakapja. Az elállási nyilatkozatminta csatolva van ehhez az e-mailhez.",
   "mail.M1.termsAttached": "Az Ön által elfogadott Feltételek csatolva vannak. A legújabb változat mindig itt érhető el: {termsUrl}",
   "mail.M1.termsCurrent": "Jelenlegi Feltételeink itt érhetők el online: {termsUrl}",
   "mail.M2.subject": "Dialectical Engine-nyugtája {totalAmount} összegről",

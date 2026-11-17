@@ -13,11 +13,9 @@ export function LandingPage({
   catalog,
   lowestPaidPrice,
   tax = "UNPRICED",
-  taxName = null,
   footerBilling
 }: {
-  catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; taxName?: string | null;
-  footerBilling: SiteFooterBilling;
+  catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; footerBilling: SiteFooterBilling;
 }): JSX.Element {
   return (
     <div className="lpRoot">
@@ -26,7 +24,7 @@ export function LandingPage({
       <LandingSample catalog={catalog} />
       <LandingMethod catalog={catalog} />
       <LandingPricing
-        catalog={catalog} lowestPaidPrice={lowestPaidPrice} tax={tax} taxName={taxName} billingOn={footerBilling.billingOn}
+        catalog={catalog} lowestPaidPrice={lowestPaidPrice} tax={tax} billingOn={footerBilling.billingOn}
       />
       <SiteFooter variant="full" billing={footerBilling} />
     </div>
