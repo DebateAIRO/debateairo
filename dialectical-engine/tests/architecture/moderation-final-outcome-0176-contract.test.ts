@@ -6,7 +6,6 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { parseN1Header } from "../../packages/db/src/migration-n1.js";
-import { atStep, stepsLiteralFrom } from "../support/forward-chain-steps.js";
 
 const ROOT = new URL("../../", import.meta.url);
 const read = (path: string): string => readFileSync(new URL(path, ROOT), "utf8");
