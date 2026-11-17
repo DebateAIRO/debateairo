@@ -193,7 +193,23 @@ describe("P17 renderMail", () => {
       "You pay $24.20 a month, tax included. The plan renews on 29 October 2026 and then every month until you cancel."
     );
     expect(mail.text).toContain("https://dezbatere.ro/cancel");
-    expect(mail.text).toContain("you may withdraw within 14 days");
+    // Owner's decision of 16 November 2026: everyone may withdraw, and pays only for the plan's credit used. The
+    // sentence names no region and no days share.
+    const withdrawal = "Wherever you live, you may withdraw within 14 days. You then pay only for the share of the plan's credit"
+      + " you have used; if you have used none, you get the full price back. The model withdrawal form is attached to this email.";
+    expect(mail.text).toContain(withdrawal);
+    expect(JSON.parse(readFileSync(resolve("packages/mail-templates/messages/en/mail.json"), "utf8"))["mail.M1.withdrawal"])
+      .toBe(withdrawal.replace("14 days", "{withdrawalDays} days"));
+    // No English billing email (M1 to M12, the plan names, the model withdrawal form) names a region for the right or
+    // keeps the earlier refund rule. The catalogue's other emails are not about a plan and are not read here.
+    const billingMail = Object.entries(
+      JSON.parse(readFileSync(resolve("packages/mail-templates/messages/en/mail.json"), "utf8")) as Record<string, string>
+    ).filter(([key]) => /^mail\.(?:M\d|plan\.|withdrawalForm\.)/u.test(key));
+    expect(billingMail.map(([key]) => key)).toContain("mail.M1.withdrawal");
+    for (const [key, value] of billingMail) {
+      expect(value, key).not.toMatch(/\b(?:EU|EEA|UK)\b|European|United Kingdom|days used|the larger of|[Pp]ro[ -]rata/u);
+    }
+    expect(mail.text).not.toMatch(/If you live in|the EEA|days used|the larger of/u);
     expect(mail.text).toContain("DMS Merchandise Shop S.R.L.");
     expect(mail.html).toMatch(/^<!doctype html>\n<html lang="en" dir="ltr">/);
   });
@@ -209,7 +225,9 @@ describe("P17 renderMail", () => {
     expect(attached.text).not.toMatch(/also online|same as the|accepted are online/u);
   });
 
-  it("offers the withdrawal right and its form only where it exists (withdrawalDays is optional, P9b)", () => {
+  // Every served country is a withdrawal country (owner's decision of 16 November 2026), so P9b sends withdrawalDays
+  // with every M1. The param stays optional: the list of countries, not the template, decides.
+  it("offers the withdrawal right and its form only when P9b sends withdrawalDays (the param is optional)", () => {
     const { withdrawalDays: _days, ...noRight } = paramsFor("M1");
     const without = renderMail("M1", "en", noRight).text;
     expect(without).not.toContain("withdraw");

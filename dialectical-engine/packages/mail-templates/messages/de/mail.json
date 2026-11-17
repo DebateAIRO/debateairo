@@ -10,7 +10,7 @@
   "mail.M1.active": "Vielen Dank. Ihr Tarif {plan} ist jetzt aktiv.",
   "mail.M1.price": "Sie zahlen {totalAmount} pro Monat, inklusive Steuern. Der Tarif verlängert sich am {renewDate} und danach jeden Monat, bis Sie kündigen.",
   "mail.M1.cancel": "Sie können jederzeit in den Einstellungen kündigen oder ohne Anmeldung auf dieser Seite: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Wenn Sie in der EU, im EWR oder im Vereinigten Königreich wohnen, können Sie innerhalb von {withdrawalDays} Tagen widerrufen. Sie zahlen dann nur für den bereits genutzten Teil: den größeren Anteil aus genutzten Tagen oder genutztem Guthaben. Das Muster-Widerrufsformular ist dieser E-Mail beigefügt.",
+  "mail.M1.withdrawal": "Unabhängig davon, wo Sie wohnen, können Sie innerhalb von {withdrawalDays} Tagen widerrufen. Sie zahlen dann nur für den Anteil des Tarifguthabens, den Sie genutzt haben; haben Sie nichts genutzt, erhalten Sie den vollen Preis zurück. Das Muster-Widerrufsformular ist dieser E-Mail beigefügt.",
   "mail.M1.termsAttached": "Die von Ihnen akzeptierten Bedingungen sind beigefügt. Die neueste Fassung finden Sie immer unter {termsUrl}",
   "mail.M1.termsCurrent": "Unsere aktuellen Bedingungen finden Sie online unter {termsUrl}",
   "mail.M2.subject": "Ihre Dialectical Engine-Quittung über {totalAmount}",

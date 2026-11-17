@@ -187,7 +187,7 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     }
   });
 
-  it("a withdrawal within 14 days refunds the price minus the larger of days or credit used", async () => {
+  it("a withdrawal within 14 days refunds the price times the share of the credit not used, whatever the day", async () => {
     const person = await stack.signUp("withdraw.person@example.test", "DE");
     const chargeRef = await stack.subscribe(person, "PRO", "DE");
     const paid = await stack.database.pool.query<{ total_micros: string }>(
@@ -195,10 +195,13 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     );
     const paidCents = Number(paid.rows[0]!.total_micros) / 10_000;
     await stack.spend(person, 3_300_000);              // 10% of Pro's made-up month (testBillingPlans)
-    stack.advanceDays(2);                               // 2 days of a 28–31-day period: under 10%
+    // Owner's decision of 16 November 2026: the days gone by do not count. Nine days of a 28–31-day period are about
+    // 30 % of it, and the refund is still the 90 % of the price that matches the credit not used.
+    stack.advanceDays(9);
     // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in person withdraws with no step-up.
     const withdrawn = await stack.post(person, "/v1/billing/subscription/withdraw", {});
     expect(withdrawn.status).toBe(200);
+    // price × (33.00 − 3.30) ÷ 33.00 = price × 0.9, floored to the cent.
     const expectedCents = Math.floor(paidCents * 0.9);
     expect(withdrawn.body.refund).toBe((expectedCents / 100).toFixed(2));
     await stack.runJobs();

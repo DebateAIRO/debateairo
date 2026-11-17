@@ -164,7 +164,8 @@ test("the spec's sentences G2, G3, B1–B5 read exactly as approved in English (
   assert.equal(english["billing.checkout.confirmCountry"], "Your connection looks like it's from {ipCountry}. Do you live in {declaredCountry}?");
   assert.equal(english["billing.checkout.total"], "{plan} — {net} + {taxLabel} = {total} per month. Renews on the {day} of each month until you cancel.");
   assert.equal(english["billing.consent.renewal"], "I agree that NETOPIA Payments keeps my card and that {total} is charged to it every month until I cancel. I can cancel at any time in Settings or at dezbatere.ro/cancel.");
-  assert.equal(english["billing.consent.immediateStart"], "Start my plan now. I understand that if I withdraw within 14 days, I pay for the part already used: the larger of the days used or the credit used.");
+  // Owner's decision of 16 November 2026: a withdrawal is paid for by the plan credit used alone; days do not count.
+  assert.equal(english["billing.consent.immediateStart"], "Start my plan now. I understand that if I withdraw within 14 days, I pay only for the share of the plan's credit I have used.");
   assert.equal(english["billing.checkout.subscribeAndPay"], "Subscribe and pay");
   assert.equal(english["billing.checkout.waitingForBank"], "Waiting for your bank to confirm…");
   assert.equal(english["billing.checkout.willEmail"], "We'll email you as soon as your bank confirms.");
@@ -209,7 +210,9 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
     "billing.subscription.downgradeNotLower": "That plan isn't lower than your current plan.",
     // DOWNGRADE_NOT_AVAILABLE_NOW (409): the renewal charge for the next period is already written at the current plan.
     "billing.subscription.downgradeNotAvailableNow": "Your plan is renewing right now, so a change can't be scheduled yet. You can change it as soon as the renewal has gone through.",
-    "billing.subscription.withdrawWindowClosed": "The 14-day withdrawal period has ended, or it doesn't apply where you live. You can still cancel at any time.",
+    // WITHDRAWAL_WINDOW_CLOSED (409): the 14 days are over. Everyone served has the right (owner's decision of
+    // 16 November 2026), so the sentence no longer says it may not apply where the person lives.
+    "billing.subscription.withdrawWindowClosed": "The 14-day withdrawal period has ended. You can still cancel at any time.",
     // STEP_UP_REQUIRED (403): the grant expired or was used; the password and code were right.
     "billing.subscription.stepUpExpired": "Please confirm it's you again: that confirmation expired or was already used.",
     "billing.checkout.erasurePending": "Your account is scheduled for deletion. Cancel the deletion in Settings to subscribe or change your plan.",
@@ -227,6 +230,26 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
   for (const [key, value] of Object.entries(expected)) assert.equal(english[key], value, key);
   // None of them may blame the password: only a refused step-up asks to check it (billing.subscription.withdrawRefused).
   for (const key of Object.keys(expected)) assert.doesNotMatch(english[key], /password|code/iu, key);
+});
+
+test("the withdrawal sentences give everyone the 14 days and one refund rule, in English exactly (owner's decision of 16 November 2026)", () => {
+  const english = catalogue("en");
+  // Who: everyone the site serves, wherever they live. No country or region is named.
+  assert.equal(english["billing.withdrawPage.who"],
+    "Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, without giving a reason.");
+  // What comes back: the price times the share of the plan's credit not used. Days elapsed do not count.
+  assert.equal(english["billing.withdrawPage.refund"],
+    "You get back the price minus the share of the plan's credit you have used, however many days have passed. If you have used none, you get the full price back. The money goes back to your card, and the plan ends at once.");
+  assert.equal(english["billing.subscription.withdrawHint"],
+    "You can withdraw until {date}. You get back the price minus the share of the plan's credit you have used. If you have used none, you get the full price back.");
+  // No English billing sentence keeps the earlier rule (the larger of the days share or the credit share), limits the
+  // right to a region, or says it may not apply where the person lives. The other 34 locales are held to the same
+  // keys and placeholders by the parity test above; their wording is not read here.
+  for (const [key, value] of Object.entries(english)) {
+    assert.doesNotMatch(value, /the larger of|days used|pro rata/iu, `${key} keeps the earlier refund rule`);
+    assert.doesNotMatch(value, /\b(?:EU|EEA|UK)\b|European Union|European Economic Area|United Kingdom/u, `${key} names a region`);
+    assert.doesNotMatch(value, /(?:doesn't|does not|may not) apply where you live/iu, `${key} says the right may not apply`);
+  }
 });
 
 test("a plan paused by a payment dispute is cancelled with true words, in English exactly (P2-W10)", () => {

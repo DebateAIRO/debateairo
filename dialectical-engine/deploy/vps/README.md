@@ -3845,9 +3845,11 @@ It prints one line saying what it did. Two answers need a word:
 Status 16 records that the payment was defended (pausing the plan first if no dispute was recorded for it yet), and
 changes nothing else.
 
-**A withdrawal sent by email or on the model form.** The Terms (§13) let a person in the EU, the EEA or the UK
-withdraw within 14 days by the model form attached to their confirmation email, or by any clear statement, sent to
-the company's address. You carry it out with `pnpm billing:withdraw`, the same day it arrives. It records the
+**A withdrawal sent by email or on the model form.** The Terms (§13) let every paid buyer, wherever they live,
+withdraw within 14 days (the owner's decision of 16 November 2026) by the model form attached to their confirmation
+email, or by any clear statement, sent to the company's address. You carry it out with `pnpm billing:withdraw`, the
+same day it arrives. It works out the refund itself: the price times the share of the plan's credit the person has
+not used, so a person who used none gets the whole price back. It records the
 withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
 the 14 days), ends the plan, queues the refund, and emails the person at once that their withdrawal was received
 (M8_RECEIVED, "We've received your withdrawal", dated when the statement arrived). The confirmation that the money
@@ -3892,22 +3894,22 @@ same email comes when this happens to a withdrawal made in Settings, so you neve
 The person's own email says that a refund was already made on one of their payments and that you will email them
 within 14 days. What is due is worked out per payment, exactly
 as the site does it. The moment that counts is the withdrawal's: for a statement sent by email or on the form, the
-time it arrived, as you recorded it. Each payment made up to that moment gives back its amount times (1 minus the
-larger of two shares). A payment made after it (its `SUCCEEDED` row in `billing.charge_event` is dated after that
-moment, for example an upgrade paid after the statement was sent) takes no share: it gives back all it still holds.
+time it arrived, as you recorded it. Each payment made up to that moment gives back its amount times the share of the
+month's credit not used. The days gone by do not count (the owner's decision of 16 November 2026). A payment made
+after it (its `SUCCEEDED` row in `billing.charge_event` is dated after that moment, for example an upgrade paid after
+the statement was sent) takes no share: it gives back all it still holds.
 - **Its amount** is what it still holds: what it paid, less what was already refunded on it. For the payment the
   refund in NETOPIA's admin touched, the amount already refunded is the amount NETOPIA's admin shows as refunded.
-- **The first share** is the part of that payment's own days already used at the moment of the withdrawal. The first
-  payment's days run from the start of the period. An upgrade's days run from the moment its price was quoted, shortly
-  before it was paid (the upgrade charge's `period_start` in `billing.charge`), not from the payment. Both run to the
-  end of the period.
-- **The second share** is the credit used from the start of the period to the withdrawal, divided by the month's
-  credit in force when the person withdrew. After an upgrade paid up to that moment, that is the prorated credit the
-  upgrade set (`month_credit_override_micros` on the `UPGRADED` row of `billing.entitlement_event`), never either
-  plan's full monthly credit; an upgrade paid after that moment does not set it.
+- **The share of credit not used** is the credit not used, divided by the month's credit in force when the person
+  withdrew. The credit not used is that credit in force, less the credit used from the start of the period to the
+  withdrawal. With no credit used the share is 1, and the payment gives back all it still holds. With all the credit
+  used, or more, the share is 0, and the payment gives back nothing. After an upgrade paid up to that moment, the
+  credit in force is the prorated credit the upgrade set (`month_credit_override_micros` on the `UPGRADED` row of
+  `billing.entitlement_event`), never either plan's full monthly credit; an upgrade paid after that moment does not
+  set it.
 
-Add the shared payments' amounts unrounded, round the sum down to the cent once, and add in full what each payment
-made after that moment still holds. That is what is due; the two steps below settle it.
+Add up, unrounded, what the payments made up to that moment give back, round the sum down to the cent once, and add
+in full what each payment made after that moment still holds. That is what is due; the two steps below settle it.
 
 1. **First, in NETOPIA's admin,** refund the part due on the payment the refund in NETOPIA's admin touched. The command
    cannot take money back from that payment: it refuses it and writes nothing.
@@ -4341,10 +4343,15 @@ systemctl restart debateai-api@$label
      whether the card was saved (go-live row N-11).
    - The "we couldn't take the payment" emails (M5a–c) and the move to Free (M6) are proven by the fake stack in step 6.
 4. **Withdraw.** On a fresh test account (the United States again), pay for Plus, then in Settings press Withdraw within
-   14 days and confirm with your password and authenticator code.
+   14 days and then **Confirm withdrawal**. No password or authenticator code is asked (the owner's ruling of 4 November 2026).
    - Expect the acknowledgement email (M8_RECEIVED), the Free plan, and your own email O2_REFUND_DUE with the amount.
-   - Refund exactly that amount on that payment in NETOPIA's sandbox admin, then record it with `pnpm billing:refund-done`
-     (**A refund handed to you**, §14.8). Expect the refund email (M8).
+     The amount is the whole payment, and the email says so ("This is the whole payment."). A withdrawal gives back
+     the price times the share of the plan's credit not used (the owner's decision of 16 November 2026; the days gone
+     by do not count), and on this host's moved clock no credit is counted as used, even if the account ran a debate.
+   - Refund exactly that amount on that payment in NETOPIA's sandbox admin, in one refund. A whole refund is recorded
+     by the site itself once NETOPIA reports it: expect the refund email (M8) with no command run. If M8 has not come
+     after 15 minutes, record the refund yourself with `pnpm billing:refund-done` (**A refund handed to you**, §14.8),
+     which takes the whole amount too, and then expect M8. Write down which of the two recorded it.
 5. **Cancel through the emailed link.** On another test account (the United States again), pay for Plus first: a cancel
    link is sent only for a plan that is paid and not cancelled yet. Then open `/cancel` signed out and enter the
    account's email.

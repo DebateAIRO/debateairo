@@ -10,7 +10,7 @@
   "mail.M1.active": "Hvala vam. Vaš plan {plan} sada je aktivan.",
   "mail.M1.price": "Plaćate {totalAmount} mjesečno, s uključenim porezom. Plan se obnavlja {renewDate}, a zatim svaki mjesec dok ga ne otkažete.",
   "mail.M1.cancel": "Možete otkazati u bilo kojem trenutku u Postavkama ili bez prijave na ovoj stranici: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Ako živite u EU-u, EGP-u ili Ujedinjenoj Kraljevini, možete raskinuti ugovor u roku od {withdrawalDays} dana. Tada plaćate samo već iskorišteni dio: veći od udjela iskorištenih dana ili iskorištenog kredita. Obrazac za jednostrani raskid ugovora priložen je ovoj e-poruci.",
+  "mail.M1.withdrawal": "Gdje god živjeli, možete raskinuti ugovor u roku od {withdrawalDays} dana. Tada plaćate samo udio kredita plana koji ste iskoristili; ako niste iskoristili ništa, vraća vam se puna cijena. Obrazac za jednostrani raskid ugovora priložen je ovoj e-poruci.",
   "mail.M1.termsAttached": "Uvjeti koje ste prihvatili priloženi su. Najnovija verzija uvijek je na {termsUrl}",
   "mail.M1.termsCurrent": "Naši trenutačni Uvjeti dostupni su na internetu na {termsUrl}",
   "mail.M2.subject": "Vaša potvrda Dialectical Engine za {totalAmount}",
