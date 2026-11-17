@@ -553,6 +553,10 @@ describe("P3-01 production database-principal manifest", () => {
         // writes (serve.serve_disclosure, serve.synthesis_round, ledger.raw_artifact);
         // no privilege is added.
         { component: "apps/runner:serve-disclosure-cli", environmentKey: "DATABASE_URL", purpose: "SERVE_DISCLOSURE_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:serve-disclosure" },
+        // The owner's cost read-out (`pnpm ops:cost-readout`) runs as the runner, with the runner's own EnvironmentFile,
+        // on a read-only connection, and only SELECTs rows that principal already reads and writes (ledger.model_spend,
+        // ledger.ledger_entry, ledger.raw_artifact); no privilege is added.
+        { component: "apps/runner:cost-readout-cli", environmentKey: "DATABASE_URL", purpose: "COST_READOUT_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:cost-readout" },
         // Side-by-side spec §13 (S14): check-version's runner half (`pnpm settings:check-runner <v>`) runs as the runner,
         // with that release's own runner.env, on a two-connection pool, and only reads (the register's rows); it writes
         // nothing, so no privilege is added.

@@ -362,6 +362,20 @@ export function loadServeDisclosureReportEnvironment() {
   return parseServeDisclosureReportEnvironment(process.env);
 }
 
+/**
+ * The owner's cost read-out (`pnpm ops:cost-readout`, apps/runner/src/cost-readout-cli.ts). It reads the spend ledger
+ * as the runner's own database principal, so it takes the runner's `DATABASE_URL`, through this loader and no other.
+ * On the host it runs under `systemd-run` with the runner's `EnvironmentFile` (deploy/vps/README.md §11), and the
+ * production floors hold here too.
+ */
+export function parseCostReadoutEnvironment(source: EnvironmentSource) {
+  return withProductionFloors(parseEnvironmentSource({ DATABASE_URL: z.string().url(), NODE_ENV: nodeEnvironment }, source));
+}
+
+export function loadCostReadoutEnvironment() {
+  return parseCostReadoutEnvironment(process.env);
+}
+
 const positiveInteger = z.coerce.number().int().positive();
 const nonNegativeInteger = z.coerce.number().int().nonnegative();
 const boundedRate = z.coerce.number().min(0).max(1);

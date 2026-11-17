@@ -301,7 +301,7 @@ observation agent's is set separately (§12).
 | `api.env` `PUBLICATION_CLEANUP_DATABASE_URL` | `api-publication-cleanup` | `debateai_prod_api_publication_cleanup` | publication-key cleanup |
 | `api.env` `ERASURE_DATABASE_URL` | `api-erasure` | `debateai_prod_api_erasure` | account and private-run erasure |
 | `api.env` `DATA_EXPORT_DATABASE_URL` | `api-data-export` | `debateai_prod_api_data_export` | the data-export worker: claim, snapshot read, complete, fail, sweep — never a request route (V-25) |
-| `runner.env` `DATABASE_URL` | `runner-runtime` | `debateai_prod_runner_runtime` | the runner, and its read-only disclosure report `pnpm ops:serve-disclosure`, run as the runner (§11, "One answer's record") |
+| `runner.env` `DATABASE_URL` | `runner-runtime` | `debateai_prod_runner_runtime` | the runner, and its two read-only reports, run as the runner: the disclosure report `pnpm ops:serve-disclosure` (§11, "One answer's record") and the cost read-out `pnpm ops:cost-readout` (§11, "Where the money went") |
 | `observation-agent.env` `OBSERVATION_DATABASE_URL` | `observation-agent` | `debateai_observation_agent` | the observation agent (§12); reads the threshold policy, cannot write it |
 | `observation-threshold-operator.env` `OBSERVATION_THRESHOLD_OPERATOR_DATABASE_URL` | `observation-threshold-operator` | `debateai_observation_threshold_operator` | `oactl thresholds apply` only — the one principal that may write the threshold policy (§12, `DL7-F9`) |
 
@@ -2900,6 +2900,44 @@ A refusal is one code on stderr: `SERVE_DISCLOSURE_USAGE` (not exactly one id), 
 `DATABASE_URL`: the `EnvironmentFile` was not loaded), `DATABASE_URL_TLS_REQUIRED:DATABASE_URL`,
 `SERVE_DISCLOSURE_CONNECTION_NOT_READ_ONLY`, `SERVE_DISCLOSURE_PRINCIPAL_INVALID` (not run as the
 runner, with `runner.env`), or `SERVE_DISCLOSURE_REPORT_FAILED`.
+
+#### Where the money went: the cost read-out
+
+Every charge for an AI call or a web search is one row of the spend ledger (`ledger.model_spend`). The
+cost read-out adds those rows up for a span of days, or for one run, so you can see which step of a
+debate costs the most before you change anything:
+
+```sh
+# The last 7 days. Add "--days 30", or "--from 2026-11-01 --to 2026-11-07", after the command for another span.
+systemd-run --pipe --wait --collect --uid=debateai-runner --gid=debateai-runner --property=EnvironmentFile=/etc/debateai/runner.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm ops:cost-readout
+# One debate or one dig: paste the run's id at the prompt.
+read -r RUN_ID && systemd-run --pipe --wait --collect --uid=debateai-runner --gid=debateai-runner --property=EnvironmentFile=/etc/debateai/runner.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm ops:cost-readout --run "$RUN_ID"
+```
+
+It connects as the runner's own database principal, the way the report above does, on one read-only
+connection, and on this host it refuses any principal but `debateai_prod_runner_runtime`. It prints
+codes, counts, amounts in US dollars and the names of models, never a question, an answer, an address
+or a credential. Add `--json` for the same numbers as one JSON object.
+
+| Part | Meaning |
+|---|---|
+| `total` | everything charged in the span, and in how many charges. A span counts a charge by the UTC day it was made |
+| `seen before by the vendor` | input tokens the vendor reported as already seen and billed at its cheaper rate. It is "at least", because not every vendor reports it; the next line says for how many charges it was reported |
+| `runs with a charge` | a run is one debate or one dig. Half of them cost the first amount or less; one in ten cost more than the second |
+| `by step` | one line for each step of the flow, dearest first: the words for it, then its code in square brackets. Inside a debate the code is the family of the call site (`PANEL`, `JUDGE:review`, `WEB:read1`); outside it the code is the charge's source (`STORY`, `PATH_REWRITE`, `PRE_START`). A code with no words is a kind of call this report has not been taught yet: it still gets its own line |
+| `by job` | the same charges by the seven jobs the model picker chooses a model for, and one line for every call that is none of them |
+| `by model` | the same charges by the model that was called |
+| `the dearest runs` | the ten runs that cost the most in the span; read one of them with `--run` |
+
+In every table `seen before` says `unknown` when no call of that line reported it. The lines of a table
+add up to the total.
+
+A refusal is one code on stderr: `COST_READOUT_USAGE` (the arguments name no span or run this command
+can read, or a day that does not exist), `COST_READOUT_RUN_NOT_FOUND` (nothing was charged to that
+run), `COST_READOUT_ENVIRONMENT_INVALID` (no `DATABASE_URL`: the `EnvironmentFile` was not loaded),
+`DATABASE_URL_TLS_REQUIRED:DATABASE_URL`, `DATABASE_POOL_FAILED` (the database could not be reached),
+`COST_READOUT_CONNECTION_NOT_READ_ONLY`, `COST_READOUT_PRINCIPAL_INVALID` (not run as the runner, with
+`runner.env`), or `COST_READOUT_FAILED`.
 
 #### What the runner's log says about answers and stories
 
