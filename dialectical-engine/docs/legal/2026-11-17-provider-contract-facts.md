@@ -4,6 +4,12 @@ Read on 2026-11-17 from each vendor's own pages and contract documents. These ar
 the DeepInfra and Perplexity rows in `apps/ui/lib/legal/pages.ts`. The Anthropic and Google facts of
 `2026-10-10-preview-provider-facts.md` still stand; this note adds to them.
 
+It continues `2026-11-16-deepinfra-perplexity-facts.md`, which read the vendors' public pages a day
+earlier. The two agree on DeepInfra; this note adds the text of its agreement. On Perplexity they
+differ in one place: the earlier note found no terms specific to the Search API and so recorded "no
+training" from the general API Terms. The Search Addendum below is those terms, and the row follows
+it. Where Perplexity processes and how to contact it come from the earlier note.
+
 These notes are not legal advice; the owner (and counsel, before the public site) confirms them.
 
 ## Is a data processing agreement in place?
@@ -39,9 +45,8 @@ DeepInfra to send the text to that third party.
 
 `https://deepinfra.com/Qwen/Qwen3.8-Flash` carries the "Partner" tag (read 2026-11-17), and
 Qwen3.8-Flash is in the line-up. DeepInfra does not say which company the partner is, where it
-processes, or how long it keeps text. The owner asks DeepInfra. Until the answer is in, the DeepInfra
-row's retention text carries a bracketed sentence saying one model runs at an unnamed partner. Once
-the partner is known it needs its own row, and the bracketed sentence goes.
+processes, or how long it keeps text. The owner asks DeepInfra. Until the answer is in, the partner
+has a row of its own on the page (`DEEPINFRA_PARTNER_PROVIDER`), with every fact "[to confirm]".
 
 ## Perplexity (web search)
 
@@ -55,8 +60,8 @@ for that endpoint, so the general API promises (no training, zero retention) do 
 | Zero data retention | No. Addendum 1.2.2: obligations for its other products, "e.g., ... zero data retention obligations", "do not apply to the Search Services" | Same page, section 1.2.2 |
 | May it train on your data? | Yes, in the sense of the page's question: section 2.2 allows use to improve and develop its products. The Data Processing Addendum, section 5, says personal data "will not be used for training of Perplexity's large language models" | Same page, section 2.2; https://www.perplexity.ai/hub/legal/dpa, section 5 |
 | Transfer basis | EU standard contractual clauses, Modules 2 and 3, Irish law (Data Processing Addendum, section 11). Perplexity is not on the EU–US Data Privacy Framework list (searched 2026-11-17, no result) | https://www.perplexity.ai/hub/legal/dpa; https://www.dataprivacyframework.gov/list |
-| Where it processes | Not stated for API customers. Stays "[to confirm]" | — |
-| Contact | None given for API customers; its privacy notice says it does not cover the API. Stays "[to confirm]" | https://www.perplexity.ai/hub/legal/privacy-notice (updated 23 October 2026) |
+| Where it processes | No region is named. The page says the United States, where Perplexity and every company its trust centre lists as working for it are | `2026-11-16-deepinfra-perplexity-facts.md` |
+| Contact | legal-notices@perplexity.ai, the address the API Terms give for notices (section 11.6). Its privacy notice says it does not cover the API | `2026-11-16-deepinfra-perplexity-facts.md`; https://www.perplexity.ai/hub/legal/privacy-notice (updated 23 October 2026) |
 
 ### What a search carries
 
@@ -69,13 +74,14 @@ about the topic, which can contain words from the person's question, and nothing
 
 ### Applied: the English texts say what web search is
 
-The English Terms (the summary and section 8) and Privacy Policy (the summary, section 3 and section
-5) said we use AI providers only under terms that do not allow training on your content. That was not
-true of web search. They now promise it of "AI model providers", and say of web search what it
-receives (the short search phrases the models write) and what Perplexity's terms let it do (keep them
-and the results, and use them for its own business, such as improving its search). The register's
-intro and the Perplexity row say the same. English only: the version numbers stay 2.18 and 3.12, and
-the other 34 languages follow before release.
+The English Terms (the summary and section 8) and Privacy Policy (the summary, section 4 and section
+5) said that the terms of DeepInfra, Anthropic and Perplexity do not allow training on your content.
+That was not true of web search. They now say it of DeepInfra and Anthropic, and say of web search
+what it receives (the short search phrases the models write) and what Perplexity's terms let it do
+(keep them and the results, and use them for its own business, such as improving its search). The
+register's intro and the Perplexity row say the same. English only: the version numbers stay 2.18 and
+3.12. The other 34 languages still name Perplexity in the no-training sentences, and their Perplexity
+row still gives the 30 days of the earlier note; they follow before release.
 
 ### Open: names of people in a search
 

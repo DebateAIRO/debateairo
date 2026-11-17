@@ -87,6 +87,19 @@ describe("VPS env examples cover the strict environment shapes (Task 14 amendmen
     // The section 5 form the step copies.
     expect(readme).toContain("install -m 0644 deploy/vps/systemd/*.service deploy/vps/systemd/*.timer /etc/systemd/system/");
   });
+  it("NV-07: the restore fence is set in the example, writable (optionally) under the unit, and its folder provisioned 0700", () => {
+    const example = readFileSync(resolve(engineRoot, "deploy/vps/env/api.env.example"), "utf8");
+    const unit = readFileSync(resolve(engineRoot, "deploy/vps/systemd/debateai-api@.service"), "utf8");
+    const readme = readFileSync(resolve(engineRoot, "deploy/vps/README.md"), "utf8");
+    expect(inventory("API_ENVIRONMENT_KEYS").optional).toContain("RESTORE_FENCE_PATH");
+    const path = /^RESTORE_FENCE_PATH=(.+)$/m.exec(example)?.[1];
+    expect(path).toBe("/var/lib/debateai/api/restore-fence/fence");
+    const folder = path!.slice(0, path!.lastIndexOf("/"));
+    expect(unit.match(/^ReadWritePaths=(.+)$/m)?.[1]?.split(/\s+/)).toContain(`-${folder}`);
+    expect(readme).toContain(`install -d -m 0700 -o debateai-api -g debateai-api ${folder}`);
+    expect(readme).toContain(`| \`${folder}\` | \`0700\` | \`debateai-api\``);
+    expect(readme).toContain(`stat -c '%a %U %G %n' ${folder}`);
+  });
   it.each(CASES)("$service: every REQUIRED key of the shape is in $example", ({ example, keys }) => {
     const shape = inventory(keys);
     expect(shape.required.length).toBeGreaterThan(0);

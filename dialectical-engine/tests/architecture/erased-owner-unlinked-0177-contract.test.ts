@@ -28,9 +28,9 @@ const source = (signature: string): string => {
 };
 
 describe("0177: an erased account's owner reference leaves its debates", () => {
-  it("comes last in the chain, after 0176, with its own loader, bound to its own bytes and 0176's manifest", async () => {
+  it("comes in the chain after 0176, with its own loader, bound to its own bytes and 0176's manifest", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
-    expect(chain).toContain("loadForward0175,loadForward0176,loadForward0177]);");
+    expect(chain).toContain("loadForward0175,loadForward0176,loadForward0177,");
     expect(chain).toContain("import { loadForward0177 } from './migration-forward0177.js';");
     const loader = read("packages/db/src/migration-forward0177.ts");
     expect(loader).toContain(`const NAME = "${NAME}";`);
@@ -44,7 +44,8 @@ describe("0177: an erased account's owner reference leaves its debates", () => {
     expect(manifest.verifier.path).toBe("lineage/verify-effective-capabilities-130.sql");
     expect(manifest.amendsPostconditionsOf).toEqual([]);
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.at(-1)?.name).toBe(NAME);
+    const step = plan.forwardChain.find((candidate) => candidate.name === NAME);
+    expect(step?.previousName).toBe("0176_moderation_final_outcome.sql");
     expect(parseN1Header(NAME, SQL)).toMatchObject({ expand: false, drained: true, keepsVerifier: true, outsideTransaction: false });
   });
 

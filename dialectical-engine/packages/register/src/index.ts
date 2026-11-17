@@ -1124,6 +1124,8 @@ export {
   loadServeDisclosureReportEnvironment,
   loadSettlementEnvironment,
   parseApiEnvironment,
+  // NV-11: publication key custody, separate from publication serving.
+  publicationCustodyOf,
   parseStaffAccessEnvironment,
   parseBillingInvoiceEnvironment,
   parseBillingOperatorEnvironment,
@@ -1178,6 +1180,7 @@ export {
   costEnvelopeCeilings,
   costEnvelopeBand,
   costEnvelopePolicyFromValue,
+  ownerDayShareMicrosOf,
   readCostEnvelopePolicy,
   storyEnvelopeCeilings,
   type CostEnvelopeCeilings,

@@ -11,9 +11,11 @@ import { activeVersionAlarm, checkActiveSettingsVersionAtBoot } from "./admissio
 import { PasswordResetService } from "./password-reset.js";
 import { PasswordResetNotificationWorker, SendmailPasswordResetSender } from "./password-reset-mail.js";
 import { BackupEmailService, MfaRecoveryService } from "./email-mfa-recovery.js";
-import { EmailRecoveryNotificationWorker, SendmailEmailRecoverySender } from "./email-mfa-mail.js";
+import { EmailRecoveryNotificationWorker, SendmailEmailRecoverySender, reconcileEachIndependently } from "./email-mfa-mail.js";
 import { PostgresPasswordResetRepository } from "../../../packages/db/src/password-reset.js";
 import { PostgresBackupEmailRepository, PostgresMfaRecoveryRepository } from "../../../packages/db/src/email-mfa-recovery.js";
+import { PostgresRestoreFenceRepository } from "../../../packages/db/src/restore-fence.js";
+import { FileRestoreFence, resolveRestoreFencePath, restoreFenceJournalLine } from "./restore-fence.js";
 import { readPasswordResetPolicy, readBackupEmailPolicy, readMfaRecoveryPolicy } from "@debateai/register";
 import { SocialStepUpService } from './social-step-up.js';
 import { SocialAuthService } from './social-auth.js';
@@ -51,7 +53,9 @@ import { continueRoomOf } from "./run-continue.js";
 import { PostgresOutboundMailStore } from "../../../packages/db/src/outbound-mail.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
+import { routeLeaseBodyQueries } from "@debateai/db";
 import { UnixTurnstileVerifier } from "./turnstile.js";
+import { loadUiApiProof } from "./ui-api-proof.js";
 import { AccountProfileService } from "./account-profile.js";
 import { RecoveryEmailService } from "./recovery-email.js";
 import { PostgresAccountProfileRepository,PostgresRecoveryEmailRepository } from "@debateai/db";
@@ -87,7 +91,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import type { PreparedPublicationCipher } from "@debateai/crypto";
-import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -106,12 +110,14 @@ import {
   readNetopiaEnvironmentGroup,
   type BillingPolicy,
   loadApiEnvironment,
+  publicationCustodyOf,
   loadRetiredBillingSettings,
   createSupportConfigurationPort,
   readPanelDiscoveryPolicy,
   readAdmissionPolicy,
   readCostEnvelopePolicy,
   readCostEstimateStartPolicy,
+  ownerDayShareMicrosOf,
   readCountryPolicy,
   readAuthPolicy,
   readMfaPolicy,
@@ -181,7 +187,7 @@ import {
   assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
   billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
 } from "./billing/connectors.js";
-import { MfaEnrollmentService } from "./mfa.js";
+import { MfaEnrollmentService, MfaVerificationLimiter } from "./mfa.js";
 import { SessionService } from "./sessions.js";
 import { StaffWebAuthnService } from "./staff/webauthn.js";
 import { StaffAccessService } from "./staff/access.js";
@@ -215,7 +221,7 @@ import { accountMemoryStoreFrom } from "./account-memory.js";
 import { savedQuestionStoreFrom } from "./saved-questions/store.js";
 import { createSavedQuestionService, savedQuestionOpener } from "./saved-questions/service.js";
 import { StoryRepository } from "@debateai/story";
-import { PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
+import { LEGACY_RUN_CLAIM_ACCOUNT_POLICY, LEGACY_RUN_CLAIM_SOURCE_POLICY, PostgresLegacyRunClaimApplication } from "./legacy-claim.js";
 import { SendmailRecoveryEmailMailSender, SendmailEmailChangeMailSender, SendmailMailSender, SendmailSecurityNotificationSender, TemplatedMailSender } from "./mail-channel.js";
 import { systemMailDomainCheck } from "./mail-domain-check.js";
 import { OutboundMailGate, outboundMailReport } from "./outbound-mail-gate.js";
@@ -226,6 +232,7 @@ import {
   createSingleFlightErasureReconciler,
   PostgresAccountErasureApplication
 } from "./account-erasure.js";
+import { runErasureReconcileChain } from "./erasure-reconcile-chain.js";
 import { installBootCustody } from "./boot-custody.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, settingsVersionPassed, siteCapBootLine } from "./release-state.js";
@@ -239,6 +246,7 @@ import {
   type ProviderDiscoveryProbeStore
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { createUnattributedEntriesReporter } from "./run-key-store-report.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
 import { projectSupportDraftReport,type SupportDraftReport } from "./support/response-policy.js";
@@ -256,6 +264,8 @@ import { SupportMessageLimiter } from "./support/memory-limits.js";
 import { createMemorySupportCallRecords } from "./support/memory-call-records.js";
 
 const environment = loadApiEnvironment();
+// NV-11: custody (keys, store, cleanup) is separate from serving; see publicationCustodyOf.
+const publicationCustody = publicationCustodyOf(environment);
 // NETOPIA spec 2026-10-05 §2.17.1: a removed card-processor setting still in api.env is named once, never its value.
 for (const key of loadRetiredBillingSettings()) console.warn(JSON.stringify({ event: "billing.setting.retired", key }));
 // Addition D14-D16 / ruling R25: "is this the preview?" keys on the env's gate part, present for every accepted form of
@@ -310,7 +320,7 @@ const boot = installBootCustody();
  */
 const userKeks = boot.runSync("user-dek-kek", () => loadKekRing(environment.KEK_PATH, environment.KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)));
 const kek = userKeks.current;
-const corpusKeks = environment.PUBLICATION_ENABLED === "true"
+const corpusKeks = publicationCustody.keys
   ? boot.runSync("corpus-kek", () => loadKekRing(environment.CORPUS_KEK_PATH!, environment.CORPUS_KEK_PREVIOUS_PATH, (handle) => boot.holdKek(handle)))
   : undefined;
 const corpusKek = corpusKeks?.current;
@@ -329,10 +339,15 @@ boot.hold({ end: async () => { sourceIpSalt.fill(0); } });
 // later, the billing profile use it) and is zeroed by the startup owner.
 const recordsKey = boot.runSync("records-key", () => loadSecretKey(environment.RECORDS_KEY_PATH));
 boot.hold({ end: async () => { recordsKey.fill(0); } });
+// NV-03: the UI-to-API proof, under the same ledger. A hosted API refuses to start without it (UI_API_PROOF_REQUIRED);
+// without one, buildApi honours no forwarded client address. Zeroed by the startup owner.
+const uiApiProof = boot.runSync("ui-api-proof", () => loadUiApiProof(environment));
+if (uiApiProof !== null) boot.hold({ end: async () => { uiApiProof.fill(0); } });
 // L2-F8: this guarded the whole check on publication being enabled, so a
 // private-only deployment could point KEK_PATH and BLIND_INDEX_KEY_PATH at one
 // file and boot. The private domains are always checked; the corpus KEK and
-// publication store join the same check only when publication is on.
+// publication store join the same check when publication custody is used
+// (NV-11: serving, or the custody paths configured with serving off).
 await boot.run("publication-secret-domains", async () => assertPublicationSecretDomains({
   privateKek: kek,
   ...(corpusKek === undefined ? {} : {
@@ -358,16 +373,20 @@ await boot.run("publication-secret-domains", async () => assertPublicationSecret
   // Paid plans: the billing custody files are text, not 32-byte keys, so they cannot be pairwise compared
   // as key material — but they are refused here if they alias any key, store or each other by path or inode.
   additionalStorePaths: [environment.AUDIT_KEY_STORE_PATH, ...billingCustodyPaths(environment),
-    ...(environment.DATA_EXPORT_STORE_PATH === undefined ? [] : [environment.DATA_EXPORT_STORE_PATH])]
+    ...(environment.DATA_EXPORT_STORE_PATH === undefined ? [] : [environment.DATA_EXPORT_STORE_PATH]),
+    ...(environment.UI_API_PROOF_PATH === undefined ? [] : [environment.UI_API_PROOF_PATH])]
 }));
 // Row-level security S01 (DECISIONS D29, D50): the two system logins, the targets every statement made outside a
 // request goes to (wired to the T1 pools after this block).
 const systemPool = boot.hold(createPool(environment.API_SYSTEM_DATABASE_URL!, API_DATABASE_POOLS.system));
 const authorizationSystemPool = boot.hold(createPool(environment.API_AUTHORIZATION_SYSTEM_DATABASE_URL!, API_DATABASE_POOLS.authorizationSystem));
 const pool = boot.hold(createPool(environment.DATABASE_URL, API_DATABASE_POOLS.runtime));
+// NV-31: a lease body's queries run on its lease's connection, so a leased read holds one connection, not two.
+routeLeaseBodyQueries(pool);
 const authorizationPool = boot.hold(createPool(environment.AUTHORIZATION_DATABASE_URL!, API_DATABASE_POOLS.authorization));
-const publicationCleanupPool = environment.PUBLICATION_ENABLED === "true"
+const publicationCleanupPool = publicationCustody.cleanup
   ? boot.hold(createPool(environment.PUBLICATION_CLEANUP_DATABASE_URL!, API_DATABASE_POOLS.publicationCleanup)) : pool;
+if (publicationCleanupPool !== pool) routeLeaseBodyQueries(publicationCleanupPool);
 // Cleanup remains necessary when new encrypted writes are disabled: an intent
 // left by an earlier enabled process must not abort every erasure cycle under
 // the ordinary runtime principal.
@@ -423,7 +442,7 @@ await boot.run("database-roles", () => attestEveryRoute(() => Promise.all([
   assertAccountErasureDatabaseRole(pool,erasurePool),
   assertAccountErasureDatabaseRole(legacyAskAdmissionPool,erasurePool),
   assertPublicationDatabaseRoleSeparation(pool, authorizationPool),
-  ...(environment.PUBLICATION_ENABLED === "true" ? [
+  ...(publicationCustody.cleanup ? [
     assertPublicationCleanupDatabaseRole(publicationCleanupPool)
   ] : []),
   assertContentProvisionDatabaseRole(pool,contentProvisionPool),
@@ -436,6 +455,17 @@ await boot.run("account-context-logins", () => assertAccountContextLogins({
   requestPools: [pool, legacyAskAdmissionPool, authorizationPool, releaseWatchPool],
   systemPools: [systemPool, authorizationSystemPool, roomDecisionPool]
 }));
+// NV-07: the restore fence. Before any policy read, any background pass and listen: a database older than this
+// host's fence file has every long-lived bearer revoked and public reads held before it answers anything.
+const restoreFencePath = boot.runSync("restore-fence-path", () => resolveRestoreFencePath(environment, billingCustodyPaths(environment)));
+const restoreFence = restoreFencePath === null ? undefined
+  : new FileRestoreFence({ path: restoreFencePath, repository: new PostgresRestoreFenceRepository(authorizationPool) });
+const reportRestoreFence = (settlement: Awaited<ReturnType<FileRestoreFence["settle"]>>): void => {
+  const line = restoreFenceJournalLine(settlement);
+  if (line === null) return;
+  if (settlement.outcome === "RESTORE_REVOKED") console.error(line); else console.info(line);
+};
+await boot.run("restore-fence", async () => { if (restoreFence !== undefined) reportRestoreFence(await restoreFence.settle()); });
 const authPolicy = await boot.run("auth-policy", () => readAuthPolicy(pool, environment.REGISTER_VERSION));
 const mfaPolicy = await boot.run("mfa-policy", () => readMfaPolicy(pool, environment.REGISTER_VERSION));
 const sessionPolicy = await boot.run("session-policy", () => readSessionPolicy(pool, environment.REGISTER_VERSION));
@@ -444,6 +474,8 @@ const backupEmailPolicy = await boot.run("backup-email-policy", () => readBackup
 const mfaRecoveryPolicy = await boot.run("mfa-recovery-policy", () => readMfaRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const recoveryPolicy = await boot.run("recovery-policy", () => readRecoveryPolicy(pool, environment.REGISTER_VERSION));
 const admissionPolicy = await boot.run("admission-policy", () => readAdmissionPolicy(pool, environment.REGISTER_VERSION));
+// B10 and NV-47: one limiter per process, shared by the routes (buildApi) and the question-language owner budget.
+const admissionLimiter = new AdmissionLimiter(admissionPolicy);
 /**
  * Paid plans G3a (amendment A14): the country gate runs only in hosted mode AND when the register
  * version in force publishes `countryPolicy` — one decision, countryPolicyInForce, which never reads
@@ -585,6 +617,11 @@ const aiProviderCompanies = providerCompaniesOfTargets(declaredProviderTargets);
 // version's rosters, roles and gate terms are the admission loader's (its stages "preview-line-up",
 // "preview-scorecard-conflict" and "preview-budget-gate").
 const previewFetch = previewGate === undefined ? undefined : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate));
+// NV-58: the fast language check gives up at its own short limit (policy.fastCheck.timeoutMs, 1-15 s), far inside the
+// gate's 1,200 s; its ports half-close on that abort, so a check the gate already sent is delivered and dropped,
+// never a lost paid reply that halts the team's gate. Probes and every other caller keep `previewFetch`.
+const previewLanguageCheckFetch = previewGate === undefined ? undefined
+  : createPreviewGuardedFetch(createPreviewBudgetRpcPorts(previewGate, { onAbort: "HALF_CLOSE" }));
 // Fresh-site estimate (owner rulings 2026-10-22): the estimate's trusted minimum and per-depth starting figures, sealed as
 // the optional costEstimateStartPolicy row. Hosted only (only the room estimates); absent = null = today's estimate (20
 // samples, the run's maximum while short); a malformed row refuses this boot (COST_ESTIMATE_START_POLICY_INVALID).
@@ -699,7 +736,7 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
       policy,
       dayCeilingMicros,
       previewGate,
-      previewFetch,
+      previewFetch: previewLanguageCheckFetch,
       readCredential: () => supportAnthropicMessagesKey(supportModelTarget, readSupportCredentialOnce),
       spend: {
         // 0171: the writer is the cross-account marker's alone, so each check's record runs inside the ask's request on its site (X30),
@@ -708,6 +745,9 @@ const admissionSite: AdmissionSiteContext = boot.runSync("admission-site", () =>
         record: (entry) => recordLanguageCheckSpend(crossAccountPool(pool, "X30"), entry)
       },
       daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
+      // NV-47: the SITE_DAY room's own measure (spend plus counted holds), and the person's count of paid checks.
+      siteHeldMicros: (day) => new PostgresModelSpendStore(pool).readSiteCountedHoldsMicros(day),
+      ownerBudget: (ownerScope) => admissionLimiter.decide("languageChecks", ownerScope, new Date()),
       report: (line) => console.error(JSON.stringify(line))
     }),
     // CR-5: one key for every API process of this deployment, derived from the blind-index key loaded above.
@@ -749,6 +789,10 @@ const askClarify = await boot.run("ask-clarify", async () => createAskClarify({
     // The route's own recorder goes unused: each call's charge is the person's (`record`, below). The probe above stands for this one.
     spend: { writerPresent: async () => askClarifyWriter, record: async () => undefined },
     daySpentMicros: (day) => new PostgresModelSpendStore(pool).readDaySpentMicros(day),
+    // The clarify call's day pot stays what it was: the day's spend alone, without the site's counted holds that the
+    // language check's pot adds. Its transport never asks the language check's per-person budget, so none is given.
+    siteHeldMicros: async () => 0,
+    ownerBudget: () => ({ allowed: false, reason: "LIMIT" }),
     report: (line) => console.error(JSON.stringify(line))
   })),
   record: (entry) => recordAskClarifyCharge(crossAccountPool(pool, "X32"), entry),
@@ -818,6 +862,8 @@ const askRoomComposition = askRoomReadiness === undefined ? undefined : boot.run
     dailyCeilingMicros: runPolicy.dailyCeilingMicros,
     closeBasisPoints: band.closeBasisPoints,
     waitingLinePerPerson: band.waitingLinePerPerson,
+    // NV-43 (security audit run 3): with billing off, one owner's share of the site's day (the row's member, or half).
+    ownerDayShareMicros: ownerDayShareMicrosOf(runPolicy),
     // Side-by-side spec §9, §13 (plan C8): at most SITE_CONCURRENT_DEBATES debates across releases, and an ask
     // admitted while this release is not current waits in line; both read inside the room's spend-decision lock.
     // Side-by-side spec §13 (C14, Task S13): with the site version, the gate reads the activation pointer on a waiting
@@ -980,15 +1026,10 @@ const authenticationRiskSignals = new PostgresAuthenticationRiskSignalRepository
   recoveryPolicy.riskSignals.maximumEvaluatorSignals
 );
 const consumerRecoveryPolicy=await boot.run("consumer-recovery-policy",()=>readConsumerRecoveryPolicy(pool,environment.REGISTER_VERSION));
+const recoveryStartRepository = new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore);
 const recovery = new RecoveryStartService({
   consumerPrepare:(input,source)=>consumerRecovery.prepareStart(input,source),
   mailDispatch:{dispatchRecoveryMail:prepare=>registration.dispatchRecoveryMail(prepare)},
-  repository: new PostgresRecoveryStartRepository(pool,auditContextHasher,dekStore),
-  riskSignals:authenticationRiskSignals,
-  onRiskSignalFailure:(error)=>console.error(
-    "[RECOVERY_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
-  ),
-  blindIndexKey,
   enumerationFloorMs: authPolicy.verification.enumerationResponseFloorMs,
   publicResponsePolicy: recoveryPolicy.publicResponse
 });
@@ -1006,7 +1047,10 @@ const runKeyStore = boot.runSync("run-content-key-store", () =>
       const userId = resolved.rows[0]?.user_id;
       if (userId === undefined) throw new TypeError("OWNER_REF_UNRESOLVED");
       return userId;
-    }
+    },
+    undefined,
+    // NV-10: record-less run directories are skipped, not fatal; their count is logged once per change.
+    { onUnattributedEntries:createUnattributedEntriesReporter((line)=>console.error(line)) }
   ));
 // V4 start step, Task 39e (saved questions spec 2026-11-04 §3.1; owner answer S4 A): each question not started yet has a key of its own,
 // wrapped by the person's user key exactly as a debate's run key is, in its own saved-questions/ folder under the same root. It opens a
@@ -1087,6 +1131,10 @@ const sessions = await boot.run("session-service", () => SessionService.create({
   onRiskSignalFailure:(error)=>console.error(
     "[LOGIN_RISK_SIGNAL_PENDING]",riskSignalFailureIdentity(error)
   ),
+  // NV-04: the best-effort clear of the durable login TOTP round after a committed sign-in.
+  onTotpLockoutClearFailure:(error)=>console.error(
+    "[TOTP_LOGIN_LOCKOUT_CLEAR_PENDING]",riskSignalFailureIdentity(error)
+  ),
   dekStore,
   argon2: argon2Pool,
   authPolicy,
@@ -1104,7 +1152,7 @@ const passwordResetRepository=passwordResetPolicy?new PostgresPasswordResetRepos
 // COR-B1, V-12: the request path runs on the T1 login, the notification worker on the target: both are attested.
 if(passwordResetRepository)await boot.run("password-reset-role",()=>attestEveryRoute(()=>passwordResetRepository.assertRole()));
 const passwordReset=passwordResetRepository&&passwordResetPolicy?new PasswordResetService({repository:passwordResetRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,passwordResetPolicy,blindIndexKey,reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
-const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
+const passwordResetNotices=passwordResetRepository&&passwordResetPolicy?new PasswordResetNotificationWorker({repository:passwordResetRepository,users:dekStore,sender:new SendmailPasswordResetSender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate}),authPolicy,passwordResetPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)}):undefined;
 const triggerPasswordResetReconciliation=passwordResetNotices?createSingleFlightErasureReconciler(()=>passwordResetNotices.reconcile(100),()=>console.error("[PASSWORD_RESET_RECONCILIATION_PENDING]")):undefined;
 let passwordResetTimer:ReturnType<typeof setInterval>|undefined;
 const backupEmailRepository=backupEmailPolicy?new PostgresBackupEmailRepository(pool,auditContextHasher,environment.REGISTER_VERSION):undefined;
@@ -1114,8 +1162,8 @@ if(mfaRecoveryRepository)await boot.run("mfa-recovery-role",()=>attestEveryRoute
 const backupEmail=backupEmailRepository&&backupEmailPolicy?new BackupEmailService({repository:backupEmailRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:backupEmailPolicy}):undefined;
 const mfaRecovery=mfaRecoveryRepository&&mfaRecoveryPolicy?new MfaRecoveryService({repository:mfaRecoveryRepository,users:dekStore,argon2:argon2Pool,authPolicy,mfaPolicy,policy:mfaRecoveryPolicy,blindIndexKey}):undefined;
 const emailRecoverySender=new SendmailEmailRecoverySender({executable:environment.MAIL_SENDMAIL_PATH,from:environment.MAIL_FROM,publicAppUrl:environment.PUBLIC_APP_URL,timeoutMs:authPolicy.channel.transportTimeoutMs,gate:outboundMailGate});
-const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchRecoveryMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
-const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(async()=>{for(const worker of emailRecoveryWorkers)await worker.reconcile(100);},()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
+const emailRecoveryWorkers=[...(backupEmailRepository?[new EmailRecoveryNotificationWorker({flow:"backup_email",repository:backupEmailRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[]),...(mfaRecoveryRepository?[new EmailRecoveryNotificationWorker({flow:"mfa_recovery",repository:mfaRecoveryRepository,users:dekStore,sender:emailRecoverySender,authPolicy,dispatch:operation=>registration.dispatchNoticeMail(operation),reportDiagnostic:code=>console.error(`[${code}]`)})]:[])];
+const triggerEmailRecoveryReconciliation=emailRecoveryWorkers.length?createSingleFlightErasureReconciler(()=>reconcileEachIndependently(emailRecoveryWorkers,100),()=>console.error("[EMAIL_RECOVERY_RECONCILIATION_PENDING]")):undefined;
 let emailRecoveryTimer:ReturnType<typeof setInterval>|undefined;
 
 boot.hold({end:async()=>{await passwordResetNotices?.close();for(const worker of emailRecoveryWorkers)await worker.close();}});
@@ -1194,11 +1242,19 @@ const emailChange = new EmailChangeService({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
+  // NV-12: request and resend share one per-account budget of confirmation mails (the register's outbound limits).
+  sendLimit: {
+    maximumSends: authPolicy.verification.outboundSendMax,
+    windowMs: authPolicy.verification.outboundSendWindowMs
+  },
   mailDomainCheck
 });
 const legacyRunClaim=new PostgresLegacyRunClaimApplication(
-  new PostgresLegacyRunClaimRepository(pool,auditContextHasher)
+  new PostgresLegacyRunClaimRepository(pool,auditContextHasher),
+  LEGACY_RUN_CLAIM_ACCOUNT_POLICY
 );
+// NV-01: the claim route's own per-source ceiling (not the MFA limiter, whose source table would mix both routes).
+const legacyRunClaimSourceLimiter=new MfaVerificationLimiter(LEGACY_RUN_CLAIM_SOURCE_POLICY);
 /**
  * V4 start step, Task 36: THE ONE chosen paths store, on the runtime pool (its login holds debateai_runtime, the only role granted
  * core.record_start_paths and core.read_start_paths, 0159): the AskApplication seals a run's chosen paths through it (the START_PATHS
@@ -1241,7 +1297,7 @@ const application = new PostgresAskApplication(pool, dispatcher, {
 // Verdict story (spec 2026-09-26 §10): the owner reads stories through the
 // API's runtime pool; decryption uses the content encryption configured above.
 const storyRepository = new StoryRepository(pool);
-const publicationCipher = environment.PUBLICATION_ENABLED === "true"
+const publicationCipher = publicationCustody.keys
   ? boot.runSync("publication-key-store", () => new PublicationCipher(new FilePublicationKeyStore(
       environment.PUBLICATION_KEY_STORE_PATH!,corpusKeks!
     )))
@@ -1253,7 +1309,7 @@ const mapViews = new RepositoryAnswerMapViewApplication(
   new MapChoiceRepository(pool),
   runOwnerCheckFrom((text, values) => pool.query<{ owned?: boolean; run_id?: string }>(text, values))
 );
-const publications = publicationCipher === undefined
+const publicationKeyCustody = publicationCipher === undefined || !publicationCustody.cleanup
   ? undefined
   : new PostgresPublicationApplication(
       new PostgresPublicationRepository(pool, auditContextHasher),
@@ -1270,8 +1326,12 @@ const publications = publicationCipher === undefined
         readReports: (publicationRef) => new PostgresPublicPageRepository(pool).readReports(publicationRef),
         readOverlay: (publicationRef) => new PostgresPublicReviewRepository(pool).readOverlay(publicationRef),
         isHeld: (publicationRef) => new PostgresPublicReviewRepository(pool).isHeld(publicationRef)
-      }
+      },
+      // NV-07: a detected restore holds public reads until the owner releases the hold.
+      () => restoreFence?.publicReadsHeld() ?? false
     );
+// Public routes only when publication is served (NV-11); custody alone never serves a debate.
+const publications = environment.PUBLICATION_ENABLED === "true" ? publicationKeyCustody : undefined;
 // Side-by-side spec §4 (plan C3): the first read is awaited (a failure is recorded, never thrown), then it polls.
 await boot.run("release-watcher", () => releaseWatcher.start());
 /**
@@ -1291,7 +1351,7 @@ await boot.run("active-settings-version-check", () => checkActiveSettingsVersion
 let publicationCleanupTimer: ReturnType<typeof setInterval> | undefined;
 let publicPageTimer: ReturnType<typeof setInterval> | undefined;
 let publicReviewPurgeTimer: ReturnType<typeof setInterval> | undefined;
-if (publications !== undefined) {
+if (publicationKeyCustody !== undefined) {
   // Crash-orphan publication keys are claimed and removed before the process
   // can accept traffic. Both bounded outboxes continue reconciling while the
   // process is live; an item failure is reported only after later items in the
@@ -1306,22 +1366,31 @@ if (publications !== undefined) {
   // release is current, and the 30-second pass is gated, so a release that becomes current later cleans within a tick.
   if (releaseWatcher.ownIsCurrent()) {
     await boot.run("publication-key-cleanup", async () => {
-      await publications.reconcileKeyProvisionCleanup();
-      await publications.reconcileKeyCleanup();
+      await publicationKeyCustody.reconcileKeyProvisionCleanup();
+      await publicationKeyCustody.reconcileKeyCleanup();
     });
   }
   publicationCleanupTimer = gatedInterval(releaseWatcher, () => {
     void Promise.all([
-      publications.reconcileKeyProvisionCleanup(),
-      publications.reconcileKeyCleanup()
+      publicationKeyCustody.reconcileKeyProvisionCleanup(),
+      publicationKeyCustody.reconcileKeyCleanup()
     ]).catch(() => console.error("[PUBLICATION_KEY_CLEANUP_PENDING]"));
   },30_000);
 }
+if (environment.PUBLICATION_ENABLED !== "true") {
+  // NV-11: without custody nothing can destroy a publication key, so IF this database ever held publications, an
+  // erasure with publication history stalls (reported by the erasure attention line); say so once at boot.
+  if (publicationCipher === undefined) console.error("[PUBLICATION_CUSTODY_NOT_CONFIGURED]");
+  else if (!publicationCustody.cleanup) console.error("[PUBLICATION_KEY_CLEANUP_NOT_CONFIGURED]");
+}
+// C-1: before the erasure coordinator, which shreds an erased owner's support keys on this credential.
+const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support));
 const accountErasureRepository = new PostgresAccountErasureRepository(
   erasurePool,auditContextHasher,contentProvisionPool
 );
 const accountErasure = new AccountErasureCoordinator(
-  accountErasureRepository,dekStore,runKeyStore,publicationCipher,{
+  accountErasureRepository,dekStore,runKeyStore,publicationCipher,
+  new PostgresSupportShredRepository(supportPool),{
     readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
       'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
     )).rows[0]?.email_ciphertext ?? null,
@@ -1435,11 +1504,23 @@ const reconcileErasure = async ():Promise<void> => {
   // exists. Account cleanup runs last, so a same-cycle ACK can open the
   // authoritative SQL gate before any key destruction begins.
   try { await consumerSecurityNotices.reconcile(100); } catch { console.error('[CONSUMER_SECURITY_NOTICE_PENDING]'); }
-  await erasureNotifications.reconcile(100);
-  await accountErasure.reconcileRunKeyProvisionIntents(100);
-  try { await synthesisCheckErasure.reconcile(100); } catch { console.error('[SYNTHESIS_CHECK_ERASURE_PENDING]'); }
-  await privateErasure.reconcile(reconciliationSource(),100);
-  await accountErasure.reconcile(reconciliationSource(),100);
+  // K02 (NV-08): each stage has its own catch, so one failing stage (or one owner the intent trigger refuses) never
+  // skips the stages after it. The SQL gates (completion-notice readiness, PREPARE's intent and cleanup checks) are
+  // what order the stages safely; this order only lets a same-cycle ACK open the gate. A failed stage still makes
+  // the pass reject, so [ACCOUNT_ERASURE_RECONCILIATION_PENDING] keeps its meaning.
+  await runErasureReconcileChain([
+    { stage:"erasure-notice", work:()=>erasureNotifications.reconcile(100) },
+    { stage:"run-key-provision", work:()=>accountErasure.reconcileRunKeyProvisionIntents(100) },
+    // synthesis-flag S04: the synthesis-check erasures run first in this stage, under their own catch and line, so a
+    // failing pass of theirs neither holds the private erasures back nor fails the stage; the stage reports the private
+    // debates' outcomes, as before.
+    { stage:"private-run-erasure", work:async()=>{
+      let outcomes: Awaited<ReturnType<typeof privateErasure.reconcile>> = [];
+      try { await synthesisCheckErasure.reconcile(100); } catch { console.error('[SYNTHESIS_CHECK_ERASURE_PENDING]'); } await privateErasure.reconcile(reconciliationSource(),100).then((found)=>{ outcomes = found; });
+      return outcomes;
+    } },
+    { stage:"account-erasure", work:()=>accountErasure.reconcile(reconciliationSource(),100) }
+  ],(line)=>console.error(line));
 };
 const triggerErasureReconciliation=createSingleFlightErasureReconciler(
   reconcileErasure,
@@ -1448,8 +1529,15 @@ const triggerErasureReconciliation=createSingleFlightErasureReconciler(
 // Side-by-side spec §4 (plan C7): this timer and every background timer below run their work only while this release
 // is current (gatedInterval, unref'd); the post-listen one-shots run each time it becomes current (end of this file).
 const erasureReconcileTimer=gatedInterval(releaseWatcher,triggerErasureReconciliation,30_000);
+// NV-07: advance the restore fence every minute while current, so a copy taken now is caught at its restore.
+const triggerRestoreFenceAdvance=createSingleFlightErasureReconciler(
+  async ()=>{ if (restoreFence !== undefined) reportRestoreFence(await restoreFence.settle()); },
+  ()=>console.error("[RESTORE_FENCE_ADVANCE_PENDING]")
+);
+const restoreFenceTimer=gatedInterval(releaseWatcher,triggerRestoreFenceAdvance,60_000);
 const triggerAuthenticationRiskCleanup=createSingleFlightErasureReconciler(
   async ()=>{
+    try{await recoveryStartRepository.expireStaleBindings(100,10);}catch{console.error("[RECOVERY_BINDING_EXPIRY_PENDING]");}
     await authenticationRiskSignals.purgeExpired(recoveryPolicy.riskSignals.cleanupBatchMax);
   },
   ()=>console.error("[AUTHENTICATION_RISK_SIGNAL_CLEANUP_PENDING]")
@@ -1497,7 +1585,6 @@ const evaluatorDevMenuPool = environment.EVALUATOR_DEV_MENU_ENABLED === "true"
 const evaluatorDevMenu = evaluatorDevMenuPool !== undefined
   ? new PostgresEvaluatorDevMenuRepository(evaluatorDevMenuPool)
   : undefined;
-const supportPool = boot.hold(createPool(environment.SUPPORT_DATABASE_URL, API_DATABASE_POOLS.support));
 const supportKeys = await boot.run("support-keys", () => createSupportKeyPort({
   supportKekPath: environment.SUPPORT_KEK_PATH,
   // V-3: the support envelope carries no key label, so a row written before a
@@ -1914,7 +2001,9 @@ if (environment.DATA_EXPORT_STORE_PATH !== undefined) {
     () => app.runOnce(), () => console.error("[DATA_EXPORT_WORK_PENDING]"));
   dataExportTimer = gatedInterval(releaseWatcher, triggerDataExportWork, DATA_EXPORT_TICK_MS);
 }
-const admission = new AdmissionLimiter(admissionPolicy);
+// synthesis-flag S05's support sweep must sweep the routes' own limiter: the one limiter above (B10, NV-47), by the name
+// the sweep reads. A second AdmissionLimiter here would sweep counters no route ever charges.
+const admission = admissionLimiter;
 // V4 account memory (owner rulings N7 and N11, migration 0131): 0131's functions on the API's runtime pool, whose
 // principal holds debateai_billing_runtime (the only role granted them); each function checks run ownership itself.
 const accountMemory = accountMemoryStoreFrom((text, values) => pool.query(text, values));
@@ -2087,6 +2176,8 @@ const api = buildApi({
   // Auth API hardening 2026-10-09: sign-in and recovery-start proofs, each off until its UI widget ships.
   turnstileLoginRequired: environment.TURNSTILE_LOGIN_REQUIRED === "true",
   turnstileRecoveryRequired: environment.TURNSTILE_RECOVERY_REQUIRED === "true",
+  // NV-03: a loopback peer names the client only with this proof (ui-api-proof.ts).
+  uiApiProof,
   recovery,
   ...(passwordReset?{passwordReset}:{}),
   ...(backupEmail?{backupEmail}:{}),
@@ -2101,6 +2192,7 @@ const api = buildApi({
   staffPolicyVersion: environment.STAFF_ACCESS.policyVersion,
   ...(staffHttp === undefined ? {} : { staff: { ...staffHttp, publicationReviews: publicationReviewStaff } }),
   legacyRunClaim,
+  legacyRunClaimSourceLimiter,
   legal,
   emailChange,
   accountProfile,
@@ -2108,8 +2200,8 @@ const api = buildApi({
   // Side-by-side spec §6 (plan C5): the release header on every answer, and /readyz from the watcher's last read.
   releaseKey: environment.RELEASE_KEY,
   readiness: releaseWatcher,
-  // B10: the sealed admission budgets are always composed in production.
-  admission,
+  // B10: the sealed admission budgets are always composed in production (the one limiter above; NV-47 shares it).
+  admission: admissionLimiter,
   // B7a: the room read and, while billing is on, the usage read. Absent, the
   // room answers FITS and the usage route 404.
   ...(askRoom === undefined ? {} : { askRoom }),
@@ -2193,6 +2285,7 @@ const supportSweepTimer = gatedInterval(releaseWatcher, () => {
 }, SUPPORT_COUNTER_SWEEP_MS);
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
+api.addHook("onClose",async () => clearInterval(restoreFenceTimer));
 api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
@@ -2348,6 +2441,8 @@ if(triggerEmailRecoveryReconciliation)emailRecoveryTimer=gatedInterval(releaseWa
 // its rows in SQL, so a repeat is a restart's pass. The three runtimes' start() is idempotent and gates every one of
 // their ticks on the same watcher, so a release that is never current starts no billing, card or staff-alert work.
 endBecameCurrent = releaseWatcher.onBecameCurrent(() => {
+  // NV-07: a release that becomes current advances (and re-reads the hold of) the restore fence first.
+  triggerRestoreFenceAdvance();
   // Queue draining is deliberately background-only. A bounded sendmail timeout
   // can never hold readiness hostage, while the SQL ACK gate still prevents any
   // user-key destruction before completion delivery succeeds.

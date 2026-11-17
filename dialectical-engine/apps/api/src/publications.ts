@@ -26,6 +26,7 @@ import {
   type CryptoEnvelope
 } from "@debateai/crypto";
 import {
+  crossAccount,
   isRunContentLeaseHeld,
   PostgresPublicationRepository,
   type AuthSourceContext,
@@ -510,7 +511,9 @@ export class PostgresPublicationApplication implements PublicationApplication {
     /** Final fix wave P5: null (no release to compare with) reads an unparsable snapshot as before C14: not found. */
     private readonly releases: PublicSnapshotReleases | null = null,
     /** Decision 13: the page's copies; null: the snapshot alone. */
-    private readonly publicPage: PublicPageReader | null = null
+    private readonly publicPage: PublicPageReader | null = null,
+    /** NV-07: true while a detected restore holds public reads (owner releases it). */
+    private readonly publicReadsHeld: () => boolean = () => false
   ) {}
 
   /**
@@ -739,6 +742,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
     // Security review F2 (0171): a dig is never published, whoever calls; the database refuses its key's provision as well. Only a debate the
     // reader answers is the owner's and no dig goes on.
     if (await this.repository.readRunIsDig(input.runId, input.authenticated.userId, input.authenticated.ownerRef) !== false) return null;
+    // NV-46: a run that is already public is never judged (the transition would refuse it after the paid check).
+    const visibility = await this.repository.readOwnedVisibility(
+      input.runId, input.authenticated.userId, input.authenticated.ownerRef);
+    if (visibility === null || visibility.state === "PUBLISHED") return null;
     const pseudonym = await this.repository.readAuthorPseudonym(
       input.runId,
       input.authenticated.userId,
@@ -884,14 +891,19 @@ export class PostgresPublicationApplication implements PublicationApplication {
    * on the current site"); this release's own, an older one's, `legacy`, or a key that cannot be read or compared is the
    * old not found (null), with one content-free journal line (api.publication.snapshot_unreadable), since it is not a
    * newer release's data. The key is read only after the parse failed, inside the same content lease.
+   * Security fixes run 3, K10 (NV-21): the lease is SHARED, so readers never queue behind one another, and the snapshot
+   * read and the revalidation run on the lease's own connection, so a read holds one pooled connection, not two. Only
+   * key cleanup and erasure hold it exclusively; one that outlasts LEASE_LOCK_WAITS.sharedMs reads as not found, with
+   * one content-free journal line (api.publication.lease_contended).
    */
   async isUnderReview(publicationRef: string): Promise<boolean> {
     return this.publicPage?.isHeld?.(publicationRef) ?? false;
   }
 
   async readPublicDebate(publicationRef: string): Promise<PublicDebate | null> {
-    return this.repository.withContentLease(publicationRef,async () => {
-      const snapshot = await this.repository.readPublic(publicationRef);
+    if (this.publicReadsHeld()) return null;
+    return this.repository.withContentLease(publicationRef,async (client) => {
+      const snapshot = await this.repository.readPublic(publicationRef, client);
       if (snapshot === null) return null;
       let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
       let decrypted: unknown;
@@ -909,7 +921,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
           || claimed.published_at !== snapshot.createdAt.toISOString()) return null;
         // A concurrent unpublish can commit while decryption runs. Latest-wins
         // visibility is revalidated before any plaintext leaves the service.
-        if (!await this.repository.revalidatePublic(snapshot.runId, publicationRef)) return null;
+        if (!await this.repository.revalidatePublic(snapshot.runId, publicationRef, client)) return null;
       } catch {
         return null;
       } finally {
@@ -927,14 +939,25 @@ export class PostgresPublicationApplication implements PublicationApplication {
       }
       console.error(JSON.stringify({ event: "api.publication.snapshot_unreadable", id: publicationRef, releaseKey }));
       return null;
+    },"shared").catch((error: unknown) => {
+      if (error instanceof TypedDomainError && error.code === "PUBLICATION_LEASE_CONTENDED") {
+        console.error(JSON.stringify({ event: "api.publication.lease_contended", id: publicationRef }));
+        return null;
+      }
+      throw error;
     });
   }
 
-  /** The snapshot run's release key, or null when none is wired, there is no such run, or the read fails (P5). */
+  /**
+   * The snapshot run's release key, or null when none is wired, there is no such run, or the read fails (P5).
+   * Row-level security (X10, merge of security fixes run 3): the run is the author's, another account than the public
+   * reader's, so the read runs in the X10 frame, on the runtime pool's cross-account target; there NV-31's router runs
+   * it on the shared lease's own connection (taken on that target), so the read still holds one connection.
+   */
   async #runReleaseKey(runId: string): Promise<string | null> {
     const releases = this.releases;
     if (releases === null) return null;
-    return Promise.resolve().then(() => releases.readRunReleaseKey(runId)).catch(() => null);
+    return Promise.resolve().then(() => crossAccount("X10", () => releases.readRunReleaseKey(runId))).catch(() => null);
   }
 
   async list(limit: number, offset: number): Promise<Readonly<{
@@ -950,6 +973,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
     }>[];
     total: number;
   }>> {
+    if (this.publicReadsHeld()) return Object.freeze({ items: Object.freeze([]), total: 0 });
     const page = await this.repository.listPublicRefs(limit, offset);
     const items = [];
     for (const publicationRef of page.refs) {

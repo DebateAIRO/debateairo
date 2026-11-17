@@ -285,19 +285,22 @@ export function LegalVersionsBody({ legalCatalog }: { legalCatalog: MessageCatal
   return (
     <>
       <ol className="legalVersions">
-        {TERMS_VERSIONS.map(({ version, dateKey, noteKey, current, href }) => (
+        {TERMS_VERSIONS.map(({ version, noteKey, current, href }) => (
           <li className="legalVersionRow" key={version}>
             <span className="legalVersionNo">{version}</span>
             <div>
-              <div className="legalVersionHead">
-                <span className="legalVersionDate">{t(legalCatalog, dateKey)}</span>
-                {current ? <span className="legalVersionTag">{t(legalCatalog, "legal.versions.current")}</span> : null}
-              </div>
+              {current ? (
+                <div className="legalVersionHead">
+                  <span className="legalVersionTag">{t(legalCatalog, "legal.versions.current")}</span>
+                </div>
+              ) : null}
               <p>{t(legalCatalog, noteKey)}</p>
             </div>
-            <a className="legalVersionAction" href={href}>
-              {t(legalCatalog, "legal.versions.read")}
-            </a>
+            {href === null ? null : (
+              <a className="legalVersionAction" href={href}>
+                {t(legalCatalog, "legal.versions.read")}
+              </a>
+            )}
           </li>
         ))}
       </ol>

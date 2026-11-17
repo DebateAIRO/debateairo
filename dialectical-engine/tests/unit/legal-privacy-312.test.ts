@@ -26,8 +26,14 @@ import {
  * our side, and on your page until you start or leave.") is no longer true and goes; Task 83b's tab sentence keeps the
  * words only (S1 A), and its change-log sentence gives way to the new one.
  *
- * Every locale's draft is compared, line by line, with its last 3.11 text in the archive: two lines more (the new rows),
- * and only the sixteen lines below differ. The rest of the change log stays byte for byte, so `legal-report-button`'s
+ * 16 November 2026 (docs/legal/2026-11-16-deepinfra-perplexity-facts.md): 3.12, still unpublished, also names DeepInfra,
+ * the company that receives most of a debate's text. Section 5 gains a paragraph on it; the summary and sections 4 and 5
+ * no longer say flatly that the text "is not used to train models" but name the three companies whose terms rule it
+ * out and the one company for which that is not confirmed; section 5 says which transfer mechanism each relies on; and
+ * section 14's 3.12 entry gains a sentence. This is in all 35 languages.
+ *
+ * Every locale's draft is compared, line by line, with its last 3.11 text in the archive: two rows and one paragraph
+ * more, and only the lines below differ. The rest of the change log stays byte for byte, so `legal-report-button`'s
  * pin still finds 3.11, 3.10 and 3.9 on that line. English is pinned word for word; the 34 translations are drafts for
  * native readers, checked by their structure.
  */
@@ -55,6 +61,46 @@ const CHANGE_ENTRY =
 /** Saved-questions spec §4: the 3.12 entry's second sentence (it replaces Task 83b's). */
 const CHANGE_ENTRY_TAB =
   "Version 3.12 also says that, once you press Next, agree that the AIs may read your question and our check of it passes, your account keeps the question and what you do before you start, encrypted under keys specific to your account and to that question, with no time limit, until you start, delete it or close your account, up to 20 at a time; that the ask page lists them so you can pick one up or delete it; and that your question's words are also kept in this browser tab until you close it (sections 2, 3, 4, 6, 7, 9 and 10).";
+
+/** 16 November 2026: the summary, section 4's last paragraph, and section 5's new paragraph, Training and Transfers paragraphs (0-based line indexes, as below). */
+const SUMMARY = 23;
+const NO_PROFILING = 93;
+const DEEPINFRA_AT = 99;
+const TRAINING = 105;
+const TRANSFERS = 107;
+
+/** 16 November 2026: the 3.12 entry's third sentence. */
+const CHANGE_ENTRY_DEEPINFRA =
+  "Version 3.12 also names DeepInfra, the company that receives most of a debate's text, says that it passes one model's requests to a partner company, and says for which providers we have confirmed that their terms do not allow training on your content and which transfer mechanism each relies on (sections 4 and 5).";
+
+/** 16 November 2026: section 5's paragraph on DeepInfra, before the Perplexity paragraph. */
+const DEEPINFRA_PARAGRAPH =
+  "**Debate models through DeepInfra.** Most of a debate's text goes to DeepInfra, run by Deep Infra Inc. in the United States, which serves most of the AI models that write and judge a debate. DeepInfra runs these models on its own servers in the United States and, under its terms, does not store the text or train models on it. For one of the models it passes the requests to a partner company, which it does not name, under that company's own privacy terms; the Register gives that company an entry of its own, with the facts we have not confirmed yet. Like every AI provider, DeepInfra never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.";
+
+/**
+ * 16 November 2026: what each of the four lines said in 3.11 (and in 3.12 until then) and what it says now. Before, the
+ * policy said that the text "is not used to train models", that the Register shows whether this was confirmed "against
+ * our account" (nobody had), and that the Register names each provider's transfer mechanism, while DeepInfra's row said
+ * "[to confirm]".
+ */
+const NAMED_SWAPS: Readonly<Record<number, readonly [string, string]>> = {
+  [SUMMARY]: [
+    "Your questions go to AI providers listed in our Register; they are not used to train models.",
+    "Your questions go to the AI providers listed in our Register, mainly DeepInfra, in the United States. The terms of DeepInfra and Anthropic do not allow them to train models on what you write; section 5 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 5)."
+  ],
+  [NO_PROFILING]: [
+    "We do not use your content to train models, and we do not permit our providers to — section 5.",
+    "We do not use your content to train models, and the terms of DeepInfra and Anthropic do not allow them to; section 5 says for which company we have not confirmed this yet, and what the web search provider may do with the search phrases the models write."
+  ],
+  [TRAINING]: [
+    "We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Register shows, for each provider, whether we have confirmed this against our account, and when.",
+    "The terms of DeepInfra and Anthropic do not allow them to use your content to train or improve their models. We have checked this in the terms each of them publishes for its customers; the Register shows the result for each provider, and when we checked. We have not confirmed it for the partner company DeepInfra passes one model's requests to, and the Register says so. Web search is different, and the paragraph on Perplexity above says how."
+  ],
+  [TRANSFERS]: [
+    "The Register names the mechanism for each provider.",
+    "The Register names the mechanism for each provider: today DeepInfra, Anthropic and Perplexity each rely on the standard contractual clauses, which are part of their terms. Where we have not confirmed a provider's mechanism, the Register says so."
+  ]
+};
 
 /** Saved-questions spec §4: section 2's new row, after "Page settings and visits". */
 const SAVED_ROW =
@@ -286,7 +332,9 @@ const DATES: Readonly<Record<string, Readonly<{ eyebrow: string; line: string; u
  * Free paragraph, section 7's new row, section 9, section 10's Access, Erasure and Withdraw consent rows, section 14's log.
  * V4's 0157 (3.11 amended in place) adds section 2's moderation notices row and section 7's two rows, so the lines from
  * the Next paragraph on moved by one, and those from section 9 on by three. Section 7's drafting note left on
- * 15 November 2026 (see withoutNote), so the lines from section 9 on moved back by two.
+ * 15 November 2026 (see withoutNote), so the lines from section 9 on moved back by two. Section 5's paragraph on
+ * DeepInfra (16 November 2026: the paragraph and the blank line after it) moved the lines from the Perplexity paragraph
+ * on by two.
  */
 const EYEBROW = 4;
 const END_MARKER = 7;
@@ -297,33 +345,35 @@ const SENSITIVE_INFORMATION = 63;
 const CONTRACT = 75;
 const SENSITIVE_CONSENT = 84;
 const QUESTION_CHECK = 88;
-const FREE = 125;
-const SAVED_RETENTION_AT = 154;
-const SECURITY = 184;
-const ACCESS = 194;
-const ERASURE = 196;
-const WITHDRAW = 200;
-const CHANGE_LOG = 258;
+const FREE = 127;
+const SAVED_RETENTION_AT = 156;
+const SECURITY = 186;
+const ACCESS = 196;
+const ERASURE = 198;
+const WITHDRAW = 202;
+const CHANGE_LOG = 260;
 /**
  * Section 6's paragraph on flagged debates. A person cannot take their own public debate down, so English no longer
  * ends that paragraph's approval sentences with the leftover "you can take it down from Your debates"; the
  * translations still have it until they are brought up to date before release (English first).
  */
-const FLAGGED = 117;
+const FLAGGED = 119;
 /**
  * A public debate stays public after its author closes the account, and English says on what basis: section 4's
  * publishing row names the basis before and after closure, section 6's paragraph on the name says why the text stays
  * and that a person can object, and section 10's Objection row says the objection covers it. English only until the
  * translations are brought up to date before release; legal-public-debate-stays-public pins the wording.
+ * (The last two sit after section 5's DeepInfra paragraph, so they moved by two with it.)
  */
-const KEPT_AFTER_CLOSURE = [85, 127, 198];
+const KEPT_AFTER_CLOSURE = [85, 129, 200];
 /**
  * Web search is not under a no-training contract: the search provider's terms let it keep the search phrases the models
- * write. English says so where it promised that no provider trains on content: the summary, section 3's last
- * paragraph, section 5's web search paragraph and its paragraph on training and retention. English only until the
- * translations are brought up to date before release; legal-web-search-terms pins the wording.
+ * write. English says so in section 5's web search paragraph, and its no-training statements (the summary, section 4's
+ * last paragraph, section 5's paragraph on training and retention) name DeepInfra and Anthropic only. The translations
+ * still name Perplexity there, and keep the web search paragraph as it was, until they are brought up to date before
+ * release; legal-web-search-terms pins the English wording.
  */
-const WEB_SEARCH_TERMS = [23, 93, 99, 103];
+const WEB_SEARCH_PARAGRAPH = DEEPINFRA_AT + 2;
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /**
  * Annex B.6's paragraph (Asia-Pacific; Annex B.7 until Switzerland's part left, see withoutSwitzerland). Taiwan is
@@ -331,7 +381,7 @@ const TAKE_DOWN = "If you publish a flagged debate after our approval, you can t
  * paragraph no longer ends with Taiwan's part, in English and in the 34 translations alike: a closed country is
  * named in no language. Nothing else on the line changes.
  */
-const ASIA_PACIFIC = 288;
+const ASIA_PACIFIC = 290;
 const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
 /**
  * Annex B.3's paragraph (Canada and Quebec). Its Quebec part said that "the settings that keep your debates private
@@ -339,12 +389,17 @@ const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
  * 16 November 2026). In every language that one clause now says what section 6 says, in the words Terms 2.18's
  * Annex A.3 already uses there; nothing else on the line changes.
  */
-const QUEBEC = 276;
+const QUEBEC = 278;
 const QUEBEC_BEFORE = "the settings that keep your debates private are on by default";
 const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates on the Free plan are public, as section 6 says";
-/** The two new rows, each right after its table's "Page settings and visits" row. */
-const INSERTED = [SAVED_ROW_AT, SAVED_RETENTION_AT];
-const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];
+/**
+ * The two new rows, each right after its table's "Page settings and visits" row, and section 5's paragraph on DeepInfra
+ * with the blank line after it, right before the Perplexity paragraph.
+ */
+const INSERTED = [SAVED_ROW_AT, DEEPINFRA_AT, DEEPINFRA_AT + 1, SAVED_RETENTION_AT];
+/** The four lines whose statement on training or transfers now names the companies (English: Perplexity for transfers only). */
+const NAMED = [SUMMARY, NO_PROFILING, TRAINING, TRANSFERS];
+const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SUMMARY, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, NO_PROFILING, DEEPINFRA_AT, DEEPINFRA_AT + 1, TRAINING, TRANSFERS, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];
 /** Which approved change each of the other changed lines carries. */
 const SWAPPED_AT: Readonly<Record<number, keyof typeof SWAPS>> = {
   [SENSITIVE_INFORMATION]: "sensitiveInformation",
@@ -515,7 +570,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: two rows more, and only the sixteen lines differ from the last 3.11 text", (code) => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: two rows and one paragraph more, and only the listed lines differ from the last 3.11 text", (code) => {
     const sha256 = PRIOR[code]!;
     const archived = manifest().archive.PRIVACY?.[code]?.[sha256];
     expect(archived, `${code}: the prior text is in the archive index`).toEqual({ version: "3.11", path: `apps/ui/legal/archive/${code}/${sha256}.md` });
@@ -524,9 +579,9 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     const prior = withoutSwitzerland(code, lines(priorBytes.toString("utf8")));
     const next = lines(draftBytes(code).toString("utf8"));
 
-    expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
+    expect(next, `${code}: the line count is 3.11's, the two new rows, and the new paragraph with its blank line`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, ...WEB_SEARCH_TERMS] : [])].sort((a, b) => a - b));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, WEB_SEARCH_PARAGRAPH] : [])].sort((a, b) => a - b));
     // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
     const quebecBefore = prior[priorIndex(QUEBEC)]!;
     const quebecAfter = next[QUEBEC]!;
@@ -594,7 +649,15 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(draftBytes("en").toString("utf8")).not.toContain(QUEBEC_BEFORE);
     const priorLog = prior[priorIndex(CHANGE_LOG)]!;
     const tail = priorLog.slice(priorLog.indexOf("Version 3.11 replaced version 3.10:"));
-    expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${tail}`);
+    expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${CHANGE_ENTRY_DEEPINFRA} ${tail}`);
+    // 16 November 2026: the paragraph on DeepInfra, and the four lines that name the three companies.
+    expect([next[DEEPINFRA_AT], next[DEEPINFRA_AT + 1]]).toEqual([DEEPINFRA_PARAGRAPH, ""]);
+    expect(next[DEEPINFRA_AT + 2]!.startsWith("**Web search through Perplexity.**")).toBe(true);
+    for (const at of NAMED) expect(next[at], `line ${at}`).toBe(swapped(prior[priorIndex(at)]!, [NAMED_SWAPS[at]!]));
+    const text = draftBytes("en").toString("utf8");
+    expect(text).not.toContain("not used to train models");
+    expect(text).not.toContain("against our account");
+    expect(text).not.toContain("we do not permit our providers to");
   });
 
   it("English says the owner's answers S1 A, S3 A and S4 A", () => {
@@ -650,10 +713,18 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     // S1 A: no line keeps Task 83b's "after a site update your chosen paths".
     expect(text, `${code}: Task 83b's site-update clause is gone`).not.toContain(CLAUSE_83B[code]!);
 
-    // Section 14: Task 83's 3.12 entry, unchanged, then one sentence on the questions not started yet.
+    // Section 14: Task 83's 3.12 entry, unchanged, then one sentence on the questions not started yet, then (16 November
+    // 2026) one sentence on DeepInfra.
     const entry = entryOf(code);
     expect(entry.endsWith(gap), `${code}: the locale's gap before the 3.11 entry`).toBe(true);
-    const also = oneSentenceAfter(entry.slice(0, entry.length - gap.length), pins.entry, code, `${code}: the 3.12 entry`);
+    const whole = entry.slice(0, entry.length - gap.length);
+    const lastAt = lastSentenceStart(whole);
+    const named312 = whole.slice(lastAt);
+    expect(named312, `${code}: the last log sentence of 3.12 names DeepInfra`).toMatch(/^[^]*3\.12[^]*DeepInfra[^]*[.。।]$|^[^]*DeepInfra[^]*3\.12[^]*[.。।]$/u);
+    expect(named312, `${code}: it names no older version`).not.toMatch(/3\.11|3\.10|3\.9/u);
+    for (const section of [4, 5]) expect(named312.replace("3.12", ""), `${code}: it names section ${section}`).toMatch(new RegExp(`(^|\\D)${section}(\\D|$)`, "u"));
+    expect(whole.slice(0, lastAt).endsWith(gap), `${code}: the locale's gap before the DeepInfra sentence`).toBe(true);
+    const also = oneSentenceAfter(whole.slice(0, lastAt - gap.length), pins.entry, code, `${code}: the 3.12 entry`);
     expect(also, `${code}: the added log sentence names 3.12`).toMatch(/3\.12/u);
     expect(also, `${code}: the added log sentence names no older version`).not.toMatch(/3\.11|3\.10|3\.9/u);
     const named = also.replace("3.12", "");
@@ -664,7 +735,9 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     if (code === "en") {
       expect(also).toBe(CHANGE_ENTRY_TAB);
+      expect(named312).toBe(CHANGE_ENTRY_DEEPINFRA);
     } else {
+      expect(named312, `${code}: the DeepInfra log sentence is translated`).not.toBe(CHANGE_ENTRY_DEEPINFRA);
       expect(row, `${code}: section 2's row is translated`).not.toBe(SAVED_ROW);
       expect(kept, `${code}: section 7's row is translated`).not.toBe(SAVED_RETENTION_ROW);
       expect(said.slice(2).join(gap), `${code}: the Next sentences are translated`).not.toBe(sentencesOf(`${NEXT_SENTENCE} ${TAB_SENTENCE}`).slice(2).join(" "));
@@ -721,6 +794,41 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
+  // 16 November 2026: DeepInfra is named, and no line says flatly any more that the text is not used to train models.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: section 5 names DeepInfra, and four lines name the three companies", (code) => {
+    const next = lines(draftBytes(code).toString("utf8"));
+    const prior = priorLines(code);
+    // The new paragraph: a bold lead-in as its neighbour's, the brand and the company, then the Perplexity paragraph as it was.
+    const paragraph = next[DEEPINFRA_AT]!;
+    expect(paragraph, `${code}: a bold lead-in and nothing else in bold`).toMatch(/^\*\*[^*]+\*\*[^*]+$/u);
+    expect(paragraph, `${code}: the lead-in names DeepInfra`).toMatch(/^\*\*[^*]*DeepInfra[^*]*\*\*/u);
+    expect(paragraph, `${code}: the company`).toContain("Deep Infra Inc.");
+    expect(next[DEEPINFRA_AT + 1], `${code}: its own paragraph`).toBe("");
+    if (code !== "en") expect(next[WEB_SEARCH_PARAGRAPH], `${code}: the Perplexity paragraph follows, unchanged`).toBe(prior[priorIndex(WEB_SEARCH_PARAGRAPH)]);
+    expect(next[DEEPINFRA_AT + 2], `${code}: the Perplexity paragraph`).toMatch(/^\*\*[^*]*Perplexity[^*]*\*\*/u);
+    expect(sentencesOf(paragraph).length, `${code}: about as many sentences as the English`).toBeGreaterThanOrEqual(4);
+    if (code !== "en") expect(paragraph, `${code}: translated`).not.toBe(DEEPINFRA_PARAGRAPH);
+    // The four lines: one stretch of each changes, and only the new stretch names the three companies.
+    for (const at of NAMED) {
+      const now = next[at]!;
+      const was = prior[priorIndex(at)]!;
+      let head = 0;
+      while (head < Math.min(now.length, was.length) && now[head] === was[head]) head += 1;
+      let foot = 0;
+      while (foot < Math.min(now.length, was.length) - head && now.at(-1 - foot) === was.at(-1 - foot)) foot += 1;
+      const added = now.slice(head, now.length - foot);
+      const removed = was.slice(head, was.length - foot);
+      expect(head + foot, `${code}: line ${at} keeps the rest of its paragraph`).toBeGreaterThan(at === TRAINING ? 20 : was.length / 3);
+      expect(added.length, `${code}: line ${at} grows`).toBeGreaterThan(removed.length);
+      // English names Perplexity for the transfer mechanism only: its search terms do not forbid training (WEB_SEARCH_PARAGRAPH).
+      for (const name of code === "en" && at !== TRANSFERS ? ["DeepInfra", "Anthropic"] : ["DeepInfra", "Anthropic", "Perplexity"]) {
+        expect(added, `${code}: line ${at} names ${name}`).toContain(name);
+        expect(removed, `${code}: line ${at} did not name ${name}`).not.toContain(name);
+      }
+      if (code !== "en") expect(added, `${code}: line ${at} is translated`).not.toContain(NAMED_SWAPS[at]![1]);
+    }
+  });
+
   it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.12 for the draft's exact bytes", (code) => {
     const current = manifest().documents.PRIVACY?.[code];
     expect(current).toEqual({ version: "3.12", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
@@ -756,11 +864,12 @@ describe("the Register names the two jobs before a debate starts", () => {
   });
 
   // Whichever companies the API's targets reach, the clarifying questions stand on exactly one row (Anthropic's, else
-  // the support chat's) and what to look into on DeepInfra's and Anthropic's rows, else the support chat's.
+  // the support chat's) and what to look into on DeepInfra's and Anthropic's rows, else the support chat's. The
+  // company DeepInfra forwards one model to (16 November 2026) is one of the AIs that suggest what to look into.
   it.each([
-    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra"]],
-    ["targets on DeepInfra only", ["deepinfra"], ["support"], ["deepinfra", "support"]],
-    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"], ["claude"], ["claude", "deepinfra"]],
+    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra", "deepinfra-partner"]],
+    ["targets on DeepInfra only", ["deepinfra"], ["support"], ["deepinfra", "deepinfra-partner", "support"]],
+    ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"], ["claude"], ["claude", "deepinfra", "deepinfra-partner"]],
     ["a target on a host no catalogue row knows", ["host:api.acme.example"], ["support"], ["support"]]
   ] as const)("names the rows that do each job before a debate starts: %s", (_build, companies, clarifying, suggesting) => {
     const register = providerRegister(companies);

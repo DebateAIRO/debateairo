@@ -624,6 +624,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     for (const [failure, sentence] of [
       // Everyone served has the 14 days (owner's decision of 16 November 2026): the sentence names no place where they do not apply.
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_WINDOW_CLOSED"), "The 14-day withdrawal period has ended. You can still cancel at any time."],
+      // NV-45: a debate may still be using credit and more than a day of the window is left; nothing was written.
+      [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_DEBATE_RUNNING"), "A debate you started may still be using credit, so we can't tell yet how much you used. Please try again later. You still have more than a day to withdraw."],
       [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."]
     ] as const) {
       act(() => root.unmount());

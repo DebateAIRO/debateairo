@@ -119,7 +119,8 @@ describe("the sample names the paths ($15)", () => {
   it("a class with paths samples only runs whose receipt names that many; one without, only runs that name none", async () => {
     const withPaths = await sampleQuery(shaped(5));
     expect(withPaths.sql).toContain("AND COALESCE(run.envelope_basis->'shape'->>'paths', '') = $15");
-    expect(withPaths.params).toHaveLength(15);
+    // The paths are the 15th parameter; the per-owner cap and the two wall-stop lists follow them.
+    expect(withPaths.params).toHaveLength(18);
     expect(withPaths.params[14]).toBe("5");
     expect((await sampleQuery(shaped())).params[14]).toBe("");
     expect((await sampleQuery(BASE)).params[14]).toBe("");

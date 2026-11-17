@@ -27,6 +27,7 @@ function repository(overrides: Record<string, unknown> = {}) {
     prepareFinish: vi.fn(async () => ({ userId: USER, passwordHash: PASSWORD_HASH, notBefore: NOT_BEFORE, expiresAt: EXPIRES, ready: true })),
     finish: vi.fn(async () => "COMPLETED"),
     failure: vi.fn(async () => undefined),
+    recordFailure: vi.fn(async () => "PROOF_INVALID"),
     complete: vi.fn(async () => "COMPLETED"),
     ...overrides
   };
@@ -117,8 +118,10 @@ describe("finishing after the 24 hours with the finish link and the current pass
   it("counts a wrong password as a failed attempt and changes nothing", async () => {
     const { repo, service: s } = service();
     await expect(s.finish({ token: FINISH, password: "wrong password" }, request)).rejects.toThrow("MFA_RECOVERY_PROOF_INVALID");
-    expect(repo.failure).toHaveBeenCalledWith(finishHash, "finish", SOURCE);
-    expect(repo.risk).not.toHaveBeenCalled(); expect(repo.finish).not.toHaveBeenCalled();
+    // NV-15: the risk is read before the password, and the failure goes through the recorder (finish: no risk context).
+    expect(repo.risk).toHaveBeenCalledWith(finishHash, "finish");
+    expect(repo.recordFailure).toHaveBeenCalledWith(finishHash, "finish", SOURCE, null);
+    expect(repo.failure).not.toHaveBeenCalled(); expect(repo.finish).not.toHaveBeenCalled();
   });
   it("refuses before the 24 hours are over with its own reason, without checking the password", async () => {
     const repo = repository({ prepareFinish: vi.fn(async () => ({ userId: USER, passwordHash: PASSWORD_HASH, notBefore: NOT_BEFORE, expiresAt: EXPIRES, ready: false })) }), { argon2, service: s } = service(repo);
@@ -145,6 +148,8 @@ describe("a second recovery while one is already waiting", () => {
     const repo = exchanging(), { service: s } = service(repo);
     await expect(s.exchange({ token: LINK, password: "current password" }, request)).rejects.toThrow("MFA_RECOVERY_ALREADY_WAITING");
     expect(repo.linkWaiting).toHaveBeenCalledWith(linkHash);
+    // NV-15: the 409 is decided in the service, so it re-reads the risk (same fingerprint here) before answering.
+    expect(repo.risk).toHaveBeenCalledTimes(2);
     expect(repo.exchange).not.toHaveBeenCalled(); expect(repo.failure).not.toHaveBeenCalled();
   });
   it("tells nothing to a wrong password", async () => {

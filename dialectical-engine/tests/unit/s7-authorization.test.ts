@@ -62,6 +62,7 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   { route: "POST /v1/auth/age-check", auth: "public", origin: "trusted", resource: "identity", action: "age-check" },
   { route: "POST /v1/auth/register", auth: "public", origin: "trusted", resource: "identity", action: "register" },
   { route: "POST /v1/auth/verify-email", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
+  { route: "POST /v1/auth/verify-email/password", auth: "public", origin: "trusted", resource: "identity", action: "verify-email" },
   { route: "POST /v1/auth/resend-verification", auth: "public", origin: "trusted", resource: "identity", action: "resend-verification" },
   { route: "POST /v1/auth/recovery/start", auth: "public", origin: "trusted", resource: "identity", action: "start-recovery" },
   { route: "POST /v1/auth/mfa/totp/begin", auth: "public", origin:"trusted", session:"optional", resource: "identity", action: "begin-totp" },
@@ -398,7 +399,8 @@ describe("S7 deny-by-default authorization", () => {
     // V4 start step, Task 39e adds the five of the questions not started yet (GET and POST /v1/account/saved-questions, PUT, GET and
     // DELETE …/{id}): 210.
     // 0157 adds the statements of reasons (GET /v1/account/moderation-statements): 211 with the union.
-    expect(contractInventory.routes).toHaveLength(211);
+    // The verify that also sets the password (POST /v1/auth/verify-email/password) adds one: 212.
+    expect(contractInventory.routes).toHaveLength(212);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

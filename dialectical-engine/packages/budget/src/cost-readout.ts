@@ -155,10 +155,13 @@ export const COST_STEP_WORDS: Readonly<Record<string, string>> = Object.freeze({
   "POST_COMPOSE_R9:EVALUATOR": "checking the main answer",
   "REPAIR:STRUCTURE": "putting a broken reply back into its form",
   [COST_STEP_RUN_WITHOUT_CALL]: "inside a debate, with no call on record",
+  // A call that was sent and never answered is charged under a source of its own, with no call on record.
+  "RUN_UNANSWERED": "inside a debate, a call sent and never answered",
   "STORY": "the story",
   "STORY:STORYTELLER": "writing the story",
   "STORY:CHECKER": "checking the story",
   "STORY:CHARTS": "choosing the charts",
+  "STORY_UNANSWERED": "the story, a call sent and never answered",
   "PATH_REWRITE": "a dig: rewriting its path",
   "PATH_REWRITE:WRITER": "a dig: rewriting its path",
   "PATH_REWRITE:CHECKER": "a dig: checking the rewrite",
