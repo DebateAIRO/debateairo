@@ -75,6 +75,12 @@ describe("P10a Quaderno invoices", () => {
     const [sale] = h.tax.sales.filter((recorded) => recorded.chargeId === texas.chargeId);
     expect(sale?.customer).toMatchObject({ country: "US", region: "TX", postalCode: "75001" });
     expect(sale?.lines).toEqual([expect.objectContaining({ taxRateBasisPoints: 625 })]);
+    // Owner's decisions of 10 and 16 November 2026: a buyer in the United States has the 14 days too (the policy's
+    // `withdrawalDays`), so the confirmation email names them and carries the model withdrawal form beside the Terms.
+    const m1 = (await h.outboxRows(texas.subscriptionId)).find((row) => row.ref === `M1:${texas.subscriptionId}`);
+    expect(m1?.payload).toMatchObject({
+      template: "M1", recipient: "CUSTOMER", attachments: "ACCEPTED_TERMS,WITHDRAWAL_FORM", "param.withdrawalDays": "14"
+    });
     // Where Quaderno named no region (New York's ZIP, where the fakes are not registered), none is sent: never the
     // typed text.
     const newYork = await h.activate({ country: "US", cardCountry: "US", postalCode: "10001", region: "Texas" });

@@ -20,6 +20,7 @@ import {
   type PublicationKeyStore
 } from "../../packages/crypto/src/index.js";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { publicDebateOfStoredCopy } from "../../apps/api/src/public-tree.js";
 import { MadeByNewerReleaseError } from "../../apps/api/src/index.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import {
@@ -211,6 +212,8 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
   const cipher = new PublicationCipher(
     new MemoryPublicationKeyStore(loadKek(Buffer.alloc(32, 0xd2)))
   );
+  /** The publishing account as the public read finds it: its pseudonym, or null once the account is erased. */
+  const author: { pseudonym: string | null } = { pseudonym: "Stable Public Name" };
   let storedSnapshot: Readonly<{
     publicationRef: string;
     runId: string;
@@ -240,8 +243,9 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
     },
     abandonKeyProvision: async () => true,
     withContentLease: async <T>(_publicationRef: string, use: () => Promise<T>) => use(),
+    // The author's name comes with the snapshot's row, read from the account: `author.pseudonym`, null once it is gone.
     readPublic: async (publicationRef: string) =>
-      storedSnapshot?.publicationRef === publicationRef ? storedSnapshot : null,
+      storedSnapshot?.publicationRef === publicationRef ? { ...storedSnapshot, authorPseudonym: author.pseudonym } : null,
     listPublicRefs: async () => ({
       refs: storedSnapshot === null ? [] : [storedSnapshot.publicationRef],
       total: storedSnapshot === null ? 0 : 1
@@ -259,6 +263,7 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
   );
   return {
     application,
+    author,
     async storeLegacy(content: (publicationRef: string) => unknown = publicDebate) {
       const publicationRef = randomUUID();
       const prepared = await cipher.create(publicationRef, PUBLICATION_RUN_ID);
@@ -289,10 +294,12 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
       const prepared = await cipher.open(snapshot.publicationRef, snapshot.runId);
       try {
         const stored: unknown = prepared.decrypt(snapshot.contentCiphertext);
+        const debate = publicDebateOfStoredCopy(stored, author.pseudonym);
+        if (!debate.success) throw debate.error;
         return {
           transition,
           stored,
-          debate: PublicDebateSchema.parse(stored)
+          debate: debate.data
         };
       } finally {
         prepared.close();
@@ -1104,6 +1111,33 @@ describe("S8 publication crypto and projection", () => {
     expect.soft(read!.answer.nodes).toEqual(published.debate.answer.nodes);
     expect.soft(read!.answer.edges).toEqual(published.debate.answer.edges);
     expect(PublicDebateSchema.safeParse(read).success).toBe(true);
+  });
+
+  it("stores no author name: the page reads it from the account, and says \"a contributor\" once the account is gone", async () => {
+    const harness = publicationHarness();
+    const published = await harness.publish(answerWithTree());
+    expect(published.stored).not.toHaveProperty("author_pseudonym");
+    expect(JSON.stringify(published.stored)).not.toContain("Stable Public Name");
+    const ref = published.transition.public_ref;
+    await expect(harness.application.readPublicDebate(ref)).resolves.toMatchObject({ author_pseudonym: "Stable Public Name" });
+    expect((await harness.application.readPublicDebate(ref))!.author_name_gone).toBeUndefined();
+
+    harness.author.pseudonym = null;
+    const gone = await harness.application.readPublicDebate(ref);
+    expect(gone).toMatchObject({ public_ref: ref, author_pseudonym: "a contributor", author_name_gone: true });
+    expect((await harness.application.list(10, 0)).items[0]).toMatchObject({ public_ref: ref, author_pseudonym: "a contributor" });
+  });
+
+  it("never reads the name a copy stored before this rule holds: the account's while it lives, none once it is gone", async () => {
+    const harness = publicationHarness();
+    const publicationRef = await harness.storeLegacy((ref) => ({ ...publicDebate(ref), author_pseudonym: "Sealed Old Name" }));
+    harness.author.pseudonym = "Name On The Account";
+    await expect(harness.application.readPublicDebate(publicationRef)).resolves.toMatchObject({ author_pseudonym: "Name On The Account" });
+
+    harness.author.pseudonym = null;
+    const gone = await harness.application.readPublicDebate(publicationRef);
+    expect(gone).toMatchObject({ author_pseudonym: "a contributor", author_name_gone: true });
+    expect(JSON.stringify(gone)).not.toContain("Sealed Old Name");
   });
 
   it("lists each published model once in first-seen order", async () => {

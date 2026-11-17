@@ -61,9 +61,30 @@ export function correctedPiece<T>(value: T, corrections: readonly Readonly<{ poi
   return copy as T;
 }
 
+/** What the page shows in place of the first author's pseudonym once their account is gone; the page says it in its own language (`author_name_gone`). */
+const AUTHOR_GONE = "a contributor";
+
+/**
+ * What is stored for a public debate: the debate without its first author's name. The name is read from the account at each read
+ * (`publicDebateOfStoredCopy`), as a contribution's and a report's are, so erasing the account leaves no name in any stored copy.
+ */
+export function storedPublicCopyOf(debate: PublicDebate): Omit<PublicDebate, "author_pseudonym" | "author_name_gone"> {
+  const { author_pseudonym: _name, author_name_gone: _gone, ...stored } = debate;
+  return stored;
+}
+
+/**
+ * The debate a stored copy reads as: the copy with its first author's name as the account holds it now, or "a contributor" when
+ * the account is gone (`author` null). A copy stored before the name stopped being sealed still holds one; it is never read.
+ */
+export function publicDebateOfStoredCopy(stored: unknown, author: string | null) {
+  const { author_name_gone: _gone, ...copy } = isRecord(stored) ? stored : {};
+  return PublicDebateSchema.safeParse({ ...copy, author_pseudonym: author ?? AUTHOR_GONE, ...(author === null ? { author_name_gone: true } : {}) });
+}
+
 /** The page as it reads now: the first snapshot, then each copy in order, each with its corrections. A copy that does not open is left out, whatever it was. */
 export function mergedPublicDebate(firstSnapshot: PublicDebate, input: Readonly<{
-  updates: readonly PublicPageUpdateRead[]; reports: readonly PublicReportCopyRead[]; authorNameGone: boolean; overlay?: PublicReviewOverlay; open: (envelope: CryptoEnvelope) => unknown;
+  updates: readonly PublicPageUpdateRead[]; reports: readonly PublicReportCopyRead[]; overlay?: PublicReviewOverlay; open: (envelope: CryptoEnvelope) => unknown;
 }>): PublicDebate {
   const opened = (input.overlay?.corrections ?? []).map((correction) => {
     const text = input.open(correction.content);
@@ -100,7 +121,8 @@ export function mergedPublicDebate(firstSnapshot: PublicDebate, input: Readonly<
   }
   return PublicDebateSchema.parse({ ...snapshot,
     ...(input.overlay?.changed === true ? { changed_after_review: true } : {}),
-    ...(input.authorNameGone ? { author_pseudonym: "a contributor", author_name_gone: true } : {}),
+    // The author's name is the account's, never a correction's: a copy stored with a name in it may carry a correction on that name.
+    author_pseudonym: firstSnapshot.author_pseudonym,
     ...(contributions.length === 0 ? {} : { contributions }),
     ...(main === null ? {} : { main_answer_update: main }),
     ...(reports.length === 0 ? {} : { reports }) });
