@@ -316,7 +316,7 @@
       },
       "en": {
         "version": "3.12",
-        "sha256": "e7410c38b502d55e09c472200640c5dba41996e6fc28f6b18833f85293dc5196"
+        "sha256": "de33a632d914182e11b2d53a24f2605a53f8ff5ad832ff95b8f6d846a41755b3"
       },
       "es": {
         "version": "3.12",
@@ -458,7 +458,7 @@
       },
       "en": {
         "version": "2.18",
-        "sha256": "a9fdf0531fec860aeac953a4fce38ba0830a67a58ead35b69584e706ecd28115"
+        "sha256": "eca905c497cee2054372280d0519f9bad4839032a1da6ec0cdf6c5c12bb749ca"
       },
       "es": {
         "version": "2.18",
