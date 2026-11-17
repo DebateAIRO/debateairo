@@ -248,6 +248,34 @@ const ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED: Readonly<Record<string, string>> =
   "ledger.spend_waived_until(uuid)":
     "0168's bound of any run id: -infinity, infinity or a time, whether that debate's spend is set aside and until when"
 };
+
+/**
+ * The definers the security fixes of audit run 3 (0178) brought that either request login may EXECUTE and that none of the census's four lists truly holds. Each is called
+ * by the API itself, before a sign-in or from a timer, and asks nothing of the connection, so each reason says plainly what a request login can do with it. They are open,
+ * like the fifth list's, for a step of their own: the ones only a timer or the boot calls (the sweep, the two cleanups, the fence's two) belong to the marker, as 0171 moved
+ * the older loops, and the two attempt counters name an account no session yet stands for. Run 3's other five are in the lists their bodies belong to: its bounded resend
+ * asks the connection, and its password-setting consume, its two social definers and its bounded request are gated by the token, proof or state their older twins take.
+ */
+const ARRIVED_WITH_AUDIT_RUN_3_NOT_REVIEWED: Readonly<Record<string, string>> = {
+  "core.legacy_claim_admit(uuid,bigint,integer,bigint)":
+    "the old-debates claim's attempt counter takes the account and the limits it is handed and asks nothing: counts an attempt against any account and, handed a small limit, locks that account's claim for as long as it is told",
+  "core.legacy_claim_clear(uuid)":
+    "takes the account it is handed and asks nothing: deletes any account's attempt counter while no lock is in force, so its attempts count from nothing again",
+  "identity.totp_login_admit(uuid,uuid,integer,bigint,bigint)":
+    "the sign-in code's attempt counter takes the account, the factor and the limits it is handed and asks nothing: charges attempts to any account's factor until its cooldown, up to a day, refuses that person's own code",
+  "identity.totp_login_clear(uuid,uuid)":
+    "takes the account and the factor it is handed and asks nothing: sets any account's count of failed codes back to nothing, so a guesser's round never closes",
+  "identity.expire_stale_account_recovery_bindings(integer)":
+    "the one-minute sweep, no owner and no connection asked: closes up to 1,000 of any accounts' recovery bindings at a time, only ones open over an hour, which no live reset or pairing holds",
+  "identity.prune_consumer_passkey_challenges_evicting(integer)":
+    "the cleanup before a passkey begin takes the capacity it is handed and asks nothing: handed a small one, it gives up visitors' pending anonymous passkey challenges, not dead rows only, and their sign-ins fail",
+  "identity.prune_social_flows_evicting(integer)":
+    "the cleanup before a social begin takes the capacity it is handed and asks nothing: handed a small one, it gives up visitors' pending anonymous social sign-ins, not dead rows only",
+  "identity.restore_fence_begin_v1()":
+    "the settle's first statement, nothing asked: takes the fence row's lock for its transaction, and held open it makes every API's boot and one-minute settle wait",
+  "identity.restore_fence_settle_v1(text,text)":
+    "takes the host token it is handed and asks nothing: one that is not the row's reads as a restore, which signs every person and staff member out, closes every step-up, sign-in, email change and recovery in progress, and holds public reads until the owner releases them",
+};
 /** The ones in the identity schema that take an owner and that the billing role may call. The owner-keyed census below names them, so a new one that asks nothing still fails. */
 const ARRIVED_OWNER_TAKING = [
   "identity.count_public_reports(uuid,uuid)", "identity.create_saved_question(uuid,uuid,jsonb,jsonb)", "identity.delete_saved_question(uuid,uuid)",
@@ -2112,7 +2140,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "read_web_shown_quotes", "read_path_suggestions_of_run"] as const;
   /**
    * The census (D3 stage 6): EVERY SECURITY DEFINER function either request login (the production shapes api-runtime and
-   * api-authorization, measured below) may EXECUTE, each in exactly one of five named lists, so a new, a removed or a newly
+   * api-authorization, measured below) may EXECUTE, each in exactly one of six named lists, so a new, a removed or a newly
    * reachable definer fails. ASKS asks what the database sees for this connection (0171's identity.request_owner_matches or
    * 0131's page_memory_run_owned, 0130's rls context, a staff privilege token through staff.require_http_authority, the
    * login's cross-account marker, or 0040's lock of a request's own runs, which asks 0171's question of the owner it is handed:
@@ -2127,6 +2155,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
    * of 0156, 0157 and 0170, forty-three of 0158 to 0169), with what a request login can do with each: open, not hardened here. It asks
    * nothing of the connection, and one that starts to must move to ASKS. Ten of them are 0169's twins of writers this step moved to the
    * marker: the marker keeps the older writer, and a request login can still reach the same write through its twin (each reason says so).
+   * The sixth list, ARRIVED_WITH_AUDIT_RUN_3_NOT_REVIEWED (beside the fifth), names the nine the security fixes of audit run 3 brought the same way: open, not hardened.
    */
   const ASKS = /identity\.(?:request_owner_matches|page_memory_run_owned)\(|rls\.(?:context_owner_ref|context_user_id|session_credential_hash)\(|staff\.require_http_authority\(|pg_catalog\.pg_has_role\(session_user, 'debateai_rls_all_accounts', 'MEMBER'\)|core\.lock_owned_live_runs\(/u;
   const ASKS_CONNECTION = [
@@ -2176,6 +2205,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.read_team_limit_command(jsonb,text)", "staff.read_team_limit_page(jsonb,text)",
     "staff.read_team_page(jsonb,text,integer,timestamp with time zone,uuid)", "staff.read_threat_report(jsonb,text,uuid)",
     "staff.record_publication_review_copy(jsonb,text,uuid,uuid,uuid,integer,jsonb,jsonb,bytea)",
+    "identity.resend_email_change_bounded(uuid,uuid,text,timestamp with time zone,bigint,jsonb,integer,bigint,bigint)",
   ] as const;
   const GATED = [
     "billing.consume_withdrawal_grant(uuid,uuid,uuid,text)", "core.claim_legacy_runs(uuid,uuid,uuid,text,text,jsonb)",
@@ -2244,6 +2274,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)", "staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.step_up_prerequisite(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)",
+    // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
+    "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
+    "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",
+    "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",
   ] as const;
   const PUBLIC = [
     "core.latest_provider_probes(text[])", "core.read_current_release()", "core.read_release_state(text)", "core.resolve_run_ref(uuid)",
@@ -2323,6 +2357,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.claim_moderation_notices(integer)", "identity.claim_moderation_statements(integer)", "identity.claim_public_flag_mail(integer)",
     "identity.complete_moderation_notice(uuid,uuid,text)", "identity.delete_moderation_words_due()", "core.claim_carry_on_due(integer)"
   ] as const;
+  // The two such loops audit run 3 brought, in the sixth list: its cleanups, which give up live anonymous rows too, so they are not the dead-row prunes left alone above.
+  const ARRIVED_RUN_3_LOOP_WRITERS = ["identity.prune_consumer_passkey_challenges_evicting(integer)", "identity.prune_social_flows_evicting(integer)"] as const;
   /**
    * The relations either request login may INSERT, UPDATE or DELETE whose row security is off: each append-only (its mutation
    * and truncate guards refuse an UPDATE or a DELETE), content-free, and keyed by nothing an account owns, or the one-row
@@ -2883,7 +2919,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     } finally { for (const pool of opened) await pool.end().catch(() => undefined); }
   }, 300_000);
 
-  it("the census sees every definer either request login may EXECUTE: each asks the connection, is gated by a secret it is handed, is a public or site reader, is left alone on purpose, or came with the V4 merge and is named as not reviewed", async () => {
+  it("the census sees every definer either request login may EXECUTE: each asks the connection, is gated by a secret it is handed, is a public or site reader, is left alone on purpose, or came with the V4 merge or with audit run 3 and is named as not reviewed", async () => {
     const production = await logins!.production();
     const names = [production.url("api-runtime"), production.url("api-authorization")].map((url) => decodeURIComponent(new URL(url).username));
     const rows = (await database.pool.query<{ signature: string; source: string }>(`
@@ -2892,16 +2928,17 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
       WHERE p.prosecdef AND n.nspname NOT IN ('pg_catalog','information_schema')
         AND (has_function_privilege($1, p.oid, 'EXECUTE') OR has_function_privilege($2, p.oid, 'EXECUTE')) ORDER BY 1`,
     names)).rows;
-    // The five lists partition every reachable definer, each in exactly one, so a new, a removed or a newly reachable one fails.
-    const named = [...ASKS_CONNECTION, ...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE), ...Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED)];
+    // The six lists partition every reachable definer, each in exactly one, so a new, a removed or a newly reachable one fails.
+    const open = { ...ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED, ...ARRIVED_WITH_AUDIT_RUN_3_NOT_REVIEWED };
+    const named = [...ASKS_CONNECTION, ...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE), ...Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED), ...Object.keys(ARRIVED_WITH_AUDIT_RUN_3_NOT_REVIEWED)];
     expect(new Set(named).size, "a signature is in two lists").toBe(named.length);
     expect(rows.map((row) => row.signature)).toEqual([...named].sort());
-    // Each list is what it says: the asking ones ask the connection, and none of the other four does.
+    // Each list is what it says: the asking ones ask the connection, and none of the other five does.
     const source = new Map(rows.map((row) => [row.signature, row.source] as const));
     for (const signature of ASKS_CONNECTION) expect(ASKS.test(source.get(signature)!), signature).toBe(true);
-    for (const signature of [...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE), ...Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED)]) expect(ASKS.test(source.get(signature)!), signature).toBe(false);
+    for (const signature of [...GATED, ...PUBLIC, ...Object.keys(LEFT_ALONE), ...Object.keys(open)]) expect(ASKS.test(source.get(signature)!), signature).toBe(false);
     // And each one left alone, or not yet reviewed, says why.
-    for (const [signature, reason] of Object.entries({ ...LEFT_ALONE, ...ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED })) expect(reason.trim().length, signature).toBeGreaterThan(20);
+    for (const [signature, reason] of Object.entries({ ...LEFT_ALONE, ...open })) expect(reason.trim().length, signature).toBeGreaterThan(20);
     // Two that are no request login's at all now: 0151's flag settlement (the press settles on its system login, X38) and
     // 0128's threat report keepers (they name an account, and nothing calls them).
     expect(rows.map((row) => row.signature)).not.toContain("identity.settle_public_flag(uuid,text,text,text,text,integer,integer,numeric)");
@@ -3009,9 +3046,10 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
         AND (p.prosrc ~ 'INSERT INTO' OR p.prosrc ~ 'DELETE FROM' OR p.prosrc ~ 'UPDATE .* SET')
         AND p.prosrc NOT LIKE '%pg_has_role(session_user, ''debateai_rls_all_accounts''%' ORDER BY 1`,
     names)).rows.map((row) => row.signature);
-    expect(loops).toEqual([...LOOP_WRITERS, ...ARRIVED_LOOP_WRITERS].sort());
+    expect(loops).toEqual([...LOOP_WRITERS, ...ARRIVED_LOOP_WRITERS, ...ARRIVED_RUN_3_LOOP_WRITERS].sort());
     for (const signature of LOOP_WRITERS) expect(Object.keys(LEFT_ALONE), signature).toContain(signature);
     for (const signature of ARRIVED_LOOP_WRITERS) expect(Object.keys(ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED), signature).toContain(signature);
+    for (const signature of ARRIVED_RUN_3_LOOP_WRITERS) expect(Object.keys(ARRIVED_WITH_AUDIT_RUN_3_NOT_REVIEWED), signature).toContain(signature);
   }, 300_000);
 
   it("the relations either request login may INSERT, UPDATE or DELETE whose row security is off are these alone, each append-only or the one-row counter", async () => {

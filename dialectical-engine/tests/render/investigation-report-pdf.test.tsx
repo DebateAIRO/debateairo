@@ -1,6 +1,7 @@
 import { inflateSync } from "node:zlib";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ContractHttpError, InvestigationReportVersionSchema, type Answer, type InvestigationReports } from "@debateai/contract";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/ui/lib/aiDisclosure.js";
 import { loadNamespace } from "../../apps/ui/lib/i18n/server.js";
 import { buildInvestigationReportPdfModel, type FinishedInvestigationReport } from "../../apps/ui/lib/report/investigationReportModel.js";
 import { loadReportCatalogs, REPORT_UNPRINTABLE_LOCALES, type ReportCatalogs } from "../../apps/ui/lib/report/reportLanguage.js";
@@ -66,6 +67,12 @@ function drawnGlyphs(pdf: Buffer): string[] {
   return streams(pdf).flatMap((stream) => Array.from(stream.matchAll(/\[([^\]]*)\]\s*tj/gu)).flatMap((array) =>
     Array.from(array[1]!.matchAll(/<([0-9a-f]*)>/gu)).flatMap((hex) => hex[1]!.match(/.{4}/gu) ?? [])));
 }
+/** An Info dictionary entry's plain ASCII string: pdfkit writes each as its own object ("/Keywords 116 0 R"). */
+function infoString(raw: string, name: "Keywords"): string | null {
+  const reference = new RegExp(`/${name} (\\d+) 0 R`, "u").exec(raw);
+  if (reference === null) return null;
+  return new RegExp(`\\n${reference[1]} 0 obj\\n\\(([^)]*)\\)\\nendobj`, "u").exec(raw)?.[1] ?? null;
+}
 const embedded = (pdf: Buffer): string[] => [...new Set(Array.from(pdf.toString("latin1").matchAll(/\/BaseFont \/(?:[A-Z]{6}\+)?([A-Za-z0-9-]+)/gu), (match) => match[1]!))];
 
 const catalogsOf = (locale: string): Promise<ReportCatalogs> => loadReportCatalogs({ questionTag: locale, interfaceLocale: "en", load: loadNamespace });
@@ -81,6 +88,8 @@ describe("the report's PDF, in every script the report prints", () => {
     const raw = pdf.toString("latin1");
     expect(raw).toContain(`/URI (${LINK})`);
     expect(raw.match(/\/URI \(/gu)).toHaveLength(1);
+    // EU AI Act Art. 50(2): the document's metadata marks it AI-generated, in every language.
+    expect(infoString(raw, "Keywords")).toBe("AI-generated");
   }, 120_000);
 
   it("Arabic stays refused rather than printed with its dots in the wrong place", async () => {
@@ -253,6 +262,7 @@ describe("GET and HEAD /v4/debate/{id}/report/pdf", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toBe("application/pdf");
     expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get(AI_GENERATED_HEADER)).toBe(AI_GENERATED_HEADER_VALUE);
     expect(response.headers.get("content-disposition")).toContain("debate-should-the-city-build-a-pier-2026-10-31.pdf");
     expect(rendered!.question).toBe("Should the city build a pier?");
     expect(rendered!.version.report_version).toBe(2);
@@ -271,6 +281,7 @@ describe("GET and HEAD /v4/debate/{id}/report/pdf", () => {
   it("refuses without a session (401), with no finished version (404), and for another account's debate (404), in plain words", async () => {
     const noSession = await handleInvestigationReportRequest(input({ sessionCookie: null }));
     expect([noSession.status, await noSession.text()]).toEqual([401, "Sign in to download this report."]);
+    expect(noSession.headers.get(AI_GENERATED_HEADER)).toBeNull();
     const none = await handleInvestigationReportRequest(input({ client: () => reader({ readInvestigation: async () => reports({ versions: [], current: null, state: "OPEN" }) }) }));
     expect([none.status, await none.text()]).toEqual([404, "This report isn't available."]);
     const other = await handleInvestigationReportRequest(input({ client: () => reader({ readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "NOT_FOUND"); } }) }));
@@ -292,6 +303,7 @@ describe("GET and HEAD /v4/debate/{id}/report/pdf", () => {
     const head = await handleInvestigationReportHeadRequest(input({ render: async () => { made = true; return Buffer.from(""); } }));
     expect(head.status).toBe(200);
     expect(head.headers.get("content-type")).toBe("application/pdf");
+    expect(head.headers.get(AI_GENERATED_HEADER)).toBe(AI_GENERATED_HEADER_VALUE);
     expect(made).toBe(false);
   });
 });

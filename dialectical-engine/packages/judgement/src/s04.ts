@@ -99,15 +99,30 @@ const FATAL_FLAG_TYPE_SHAPE = /^[A-Za-z][A-Za-z0-9_-]*$/u;
 const FATAL_FLAG_TYPE_MAX_CHARS = 64;
 
 /**
+ * Drops leading and trailing "_"/"-" in one pass from each end (CodeQL js/polynomial-redos: the old edge-trim regex,
+ * whose second alternative is an end-anchored `[_-]` run, rescanned a long interior run from every start). Invariant:
+ * no regex that is end-anchored but not start-anchored reads more than 64 characters of a fatal-flag type. The
+ * folded identifier is ASCII, so code units are characters.
+ */
+function trimEdgeSeparators(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && (text.charCodeAt(start) === 95 || text.charCodeAt(start) === 45)) start += 1;
+  while (end > start && (text.charCodeAt(end - 1) === 95 || text.charCodeAt(end - 1) === 45)) end -= 1;
+  return text.slice(start, end);
+}
+
+/**
  * 2026-10-12 practice finding: judge models write fatal flags in plain words ("false dichotomy",
  * "ad hominem (imputed motive)"), and the old shape check refused the whole billed reply. The type is
  * folded before the check: trim; NFKD with combining marks dropped (ș, ă, î become s, a, i); each run
- * outside [A-Za-z0-9_-] becomes one "_"; edge "_"/"-" removed; "flag_" prefixed when no letter starts it;
- * cut to 64. The CASE is kept: caps match whenFatalType exactly. Empty folds to "" and is still refused.
+ * outside [A-Za-z0-9_-] becomes one "_"; edge "_"/"-" removed (by an index loop, never a regex on the uncut
+ * text); "flag_" prefixed when no letter starts it; cut to 64. The CASE is kept: caps match whenFatalType
+ * exactly. Empty folds to "" and is still refused.
  */
 function normaliseFatalFlagType(raw: string): string {
   const folded = raw.trim().normalize("NFKD").replace(/\p{M}/gu, "");
-  const identifier = folded.replace(/[^A-Za-z0-9_-]+/gu, "_").replace(/^[_-]+|[_-]+$/gu, "");
+  const identifier = trimEdgeSeparators(folded.replace(/[^A-Za-z0-9_-]+/gu, "_"));
   if (identifier === "") return "";
   const lettered = FATAL_FLAG_TYPE_SHAPE.test(identifier) ? identifier : `flag_${identifier}`;
   return lettered.slice(0, FATAL_FLAG_TYPE_MAX_CHARS).replace(/_+$/u, "");

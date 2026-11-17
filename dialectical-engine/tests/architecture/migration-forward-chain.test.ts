@@ -9,7 +9,7 @@ import type { PoolClient } from "pg";
 import { loadMigrationPlan } from "../../packages/db/src/migration-lineage.js";
 import { runOutsideTransactionStep, type ChainStep } from "../../packages/db/src/migration-forward-chain.js";
 import { MIGRATION_LOCK_TIMEOUT_MS } from "../../packages/db/src/migration-transaction.js";
-import { atStep, FORWARD_STEPS, n1Of, stepIndex, stepsLiteralFrom } from "../support/forward-chain-steps.js";
+import { atStep, FORWARD_STEPS, n1Of, outsideTransactionOf, stepIndex, stepsAfter, stepsLiteralFrom } from "../support/forward-chain-steps.js";
 
 /**
  * PR-54 (task N26n), PR-58 (task F10): NETOPIA's migration runs as the forward step 0111, chained after dev's 0110
@@ -114,8 +114,9 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
 
   it("gives each step the n1 header the tests' list says: none up to 0122, then expand or drained, each keeping the verifier but 0130", async () => {
     const plan = await loadMigrationPlan();
-    expect(plan.forwardChain.map(({ name, n1 }) => ({ name, expand: n1.expand, drained: n1.drained, keepsVerifier: n1.keepsVerifier })), CHAIN_LIST_HINT)
-      .toEqual(FORWARD_STEPS.map((name) => ({ name, ...n1Of(name) })));
+    expect(plan.forwardChain.map(({ name, n1 }) => ({ name, expand: n1.expand, drained: n1.drained, keepsVerifier: n1.keepsVerifier,
+      outsideTransaction: n1.outsideTransaction })), CHAIN_LIST_HINT)
+      .toEqual(FORWARD_STEPS.map((name) => ({ name, ...n1Of(name), outsideTransaction: outsideTransactionOf(name) })));
   });
 
   it("chains Part C's 0113 after dev's 0112: the recipe, 0112's manifest and the effective verifier 0112 keeps (0111's)", async () => {
@@ -562,6 +563,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     const plan = await loadMigrationPlan();
     const step = atStep(plan.forwardChain, "0127");
     expect(step?.name).toBe("0127_publication_review.sql");
+    expect(plan.forwardChain[plan.forwardChain.indexOf(step!) + 1]?.name).toBe("0128_threat_reports.sql");
     expect(step?.previousName).toBe("0126_synthesis_check.sql");
   });
 
@@ -580,7 +582,149 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step?.previousVerifierSha256).toBe(prior?.verifierSha256);
   });
 
-  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126 or 0128, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
+  
+
+  it("chains 0178 after 0177: the recipe, 0177's manifest and the effective verifier 0177 keeps (0130's)", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    const prior = plan.forwardChain[names.indexOf("0177_erased_owner_unlinked.sql")];
+    const step = plan.forwardChain[names.indexOf("0178_security_fixes_run3.sql")];
+    expect(names.indexOf("0178_security_fixes_run3.sql")).toBe(names.indexOf("0177_erased_owner_unlinked.sql") + 1);
+    expect(prior!.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    const manifest = JSON.parse((await bytesOf("lineage/security-fixes-run3-forward0178.json")).toString("utf8"));
+    expect(manifest).toEqual({
+      version: "security-fixes-run3-forward0178-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0177_erased_owner_unlinked.sql",
+        manifestSha256: sha256(await bytesOf("lineage/erased-owner-unlinked-forward0177.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql"))
+      },
+      migration: { name: "0178_security_fixes_run3.sql", sha256: sha256(await bytesOf("0178_security_fixes_run3.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) }
+    });
+    expect(step!.manifestSha256).toBe(sha256(await bytesOf("lineage/security-fixes-run3-forward0178.json")));
+    expect(step!.previousName).toBe(prior!.name);
+    expect(step!.previousManifestSha256).toBe(prior!.manifestSha256);
+    expect(step!.previousVerifierSha256).toBe(prior!.verifierSha256);
+    expect(step!.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-130.sql")).toString("utf8"));
+    expect(step!.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    // Its checks are its postcondition (one group per section); no supplemental verifier.
+    expect(step!.replayVerifierSql).toBeUndefined();
+    // One section per issue, each opened by its header line; NV-16 first, NV-50 last.
+    const sections = [...step!.sql.matchAll(/^-- ==== \[([A-Za-z0-9-]+)\] \S.* ====$/gmu)].map((match) => match[1]);
+    expect(sections.at(0)).toBe("NV-16");
+    expect(sections.at(-1)).toBe("NV-50");
+  });
+
+  it("widens the shared spend-source list in 0178 from 0158's, keeping every source the steps before it added (NV-50 after the V4 line)", async () => {
+    // The merge onto origin/dev 64ef40c21: 0126 and 0128 replace the shared list before 0131 runs, so NV-50's
+    // replacement must keep their SYNTHESIS_CHECK and QUESTION_CHECK or a later synthesis or question check is refused.
+    // On the V4 line the list was replaced again by 0134, 0136, 0137, 0144 and last by 0158, so 0178 keeps 0158's list
+    // whole, and no step between 0158 and 0178 replaces it.
+    const sources = (sql: string, notValid: boolean) => [...sql.matchAll(notValid
+      ? /ADD CONSTRAINT model_spend_spend_source_check\s+CHECK \(spend_source IN \(([^)]+)\)\) NOT VALID;/gu
+      : /ADD CONSTRAINT model_spend_spend_source_check CHECK \(spend_source IN \(([^)]+)\)\)/gu)].map((match) => match[1]!.match(/'[^']+'/gu));
+    const newest = sources((await bytesOf("0158_pre_start_charge.sql")).toString("utf8"), true);
+    const security = sources((await bytesOf("0178_security_fixes_run3.sql")).toString("utf8"), true);
+    expect(newest).toHaveLength(1);
+    expect(security).toHaveLength(1);
+    expect(security[0]).toEqual([...newest[0]!, "'RUN_UNANSWERED'", "'STORY_UNANSWERED'"]);
+    for (const name of stepsAfter("0158").filter((step) => step < "0178")) {
+      expect((await bytesOf(name)).toString("utf8"), name).not.toMatch(/ADD CONSTRAINT model_spend_spend_source_check/u);
+    }
+  });
+
+  it("documents 0178 as the step after 0177, with its manifest, its loader, its sections and the verifier it keeps", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The security fixes of audit run 3 (0178)"));
+    expect(section.startsWith("## The security fixes of audit run 3 (0178)")).toBe(true);
+    for (const needle of ["0177", "0178_security_fixes_run3.sql", "security-fixes-run3-forward0178.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0178.ts", "replayVerifierSql", "-- ==== [<issue id>] <short title> ====", "`SECTIONS`",
+      "MIGRATION_FORWARD0178_SECTIONS", "identity.mfa_recovery_start_bounded", "-- n1: expand", "MIGRATION_FORWARD0178_", "`STEPS`", "renumber",
+      "core.legacy_claim_admit", "identity.resend_email_change_bounded", "identity.totp_login_admit",
+      "identity.password_reset_start_guarded", "identity.create_social_account_v2", "identity.finish_social_callback_v2",
+      "erasure_reconcile.prepare_private_run_erasure", "SYNTHESIS_CHECK", "QUESTION_CHECK", "PRE_START"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "leaving its debates (0177, below) the sixty-seventh, the security fixes of audit run 3 (0178, below) the sixty-eighth, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first");
+  });
+
+  it("chains the three notice due indexes after 0178 as outside-transaction steps (NV-38)", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    const due = [
+      ["0179_password_reset_notice_due.sql", "password-reset-notice-due-forward0179", "password_reset_notice", "lineage/security-fixes-run3-forward0178.json"],
+      ["0180_backup_email_notice_due.sql", "backup-email-notice-due-forward0180", "backup_email_notice", "lineage/password-reset-notice-due-forward0179.json"],
+      ["0181_mfa_recovery_notice_due.sql", "mfa-recovery-notice-due-forward0181", "mfa_recovery_notice", "lineage/backup-email-notice-due-forward0180.json"]
+    ] as const;
+    const securityFixes = plan.forwardChain[names.indexOf("0178_security_fixes_run3.sql")]!;
+    expect(names.slice(names.indexOf("0178_security_fixes_run3.sql") + 1, names.indexOf("0178_security_fixes_run3.sql") + 4)).toEqual(due.map(([name]) => name));
+    let previous = securityFixes;
+    for (const [name, stem, table, previousManifest] of due) {
+      const step = plan.forwardChain[names.indexOf(name)]!;
+      expect(step.n1, name).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true,
+        concurrentIndex: { schema: "identity", table, name: `${table}_due` } });
+      expect(JSON.parse((await bytesOf(`lineage/${stem}.json`)).toString("utf8")), name).toEqual({
+        version: `${stem}-v1`,
+        baseRecipeSha256: plan.recipeSha256,
+        previous: { name: previous.name, manifestSha256: sha256(await bytesOf(previousManifest)), verifierSha256: securityFixes.verifierSha256 },
+        migration: { name, sha256: sha256(await bytesOf(name)) },
+        verifier: { path: securityFixes.verifierPath, sha256: securityFixes.verifierSha256 }
+      });
+      expect(step.manifestSha256).toBe(sha256(await bytesOf(`lineage/${stem}.json`)));
+      expect(step.previousName).toBe(previous.name);
+      expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+      expect(step.verifierSha256).toBe(securityFixes.verifierSha256);
+      expect(step.replayVerifierSql).toBeUndefined();
+      previous = step;
+    }
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## Recovery notice due indexes (0179-0181)"));
+    expect(section.startsWith("## Recovery notice due indexes (0179-0181)")).toBe(true);
+    for (const needle of [...due.flatMap(([name, stem]) => [name, `${stem}.json`]), "packages/db/src/migration-forward-concurrent-index.ts",
+      "packages/db/src/migration-forward0179.ts", "packages/db/src/migration-forward0180.ts", "packages/db/src/migration-forward0181.ts",
+      "-- n1: outside-transaction", "-- n1: keeps-verifier", "replayVerifierSql", "previous.manifestSha256", "MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID", "renumber"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+  });
+
+  it("chains the MFA recovery control user index 0182 after 0181 as an outside-transaction step (NV-15, NV-16)", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: the one index NV-15's account-level failure count and NV-16's per-destination start count both
+    // read by user_id, built concurrently after the three notice due indexes on the same shared loader.
+    expect(names.slice(-2)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    const securityFixes = plan.forwardChain[names.indexOf("0178_security_fixes_run3.sql")]!;
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true,
+      concurrentIndex: { schema: "identity", table: "mfa_recovery_control", name: "mfa_recovery_control_user_started" } });
+    expect(step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--"))).toEqual([
+      "CREATE INDEX CONCURRENTLY IF NOT EXISTS mfa_recovery_control_user_started ON identity.mfa_recovery_control(user_id,email_expires_at);"]);
+    expect(JSON.parse((await bytesOf("lineage/mfa-recovery-control-user-started-forward0182.json")).toString("utf8"))).toEqual({
+      version: "mfa-recovery-control-user-started-forward0182-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: previous.name, manifestSha256: sha256(await bytesOf("lineage/mfa-recovery-notice-due-forward0181.json")), verifierSha256: securityFixes.verifierSha256 },
+      migration: { name: step.name, sha256: sha256(await bytesOf(step.name)) },
+      verifier: { path: securityFixes.verifierPath, sha256: securityFixes.verifierSha256 }
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/mfa-recovery-control-user-started-forward0182.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.verifierSha256).toBe(securityFixes.verifierSha256);
+    expect(step.replayVerifierSql).toBeUndefined();
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The MFA recovery control user index (0182)"));
+    expect(section.startsWith("## The MFA recovery control user index (0182)")).toBe(true);
+    for (const needle of ["0182_mfa_recovery_control_user_started.sql", "mfa-recovery-control-user-started-forward0182.json",
+      "packages/db/src/migration-forward0182.ts", "packages/db/src/migration-forward-concurrent-index.ts", "MIGRATION_FORWARD0182_",
+      "identity.mfa_recovery_control_user_started", "-- n1: outside-transaction", "-- n1: keeps-verifier", "replayVerifierSql",
+      "previous.manifestSha256", "renumber"
+    ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, and the MFA recovery control user index (0182, below) the seventy-second");
+  });
+
+  it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
     const root = await mkdtemp(join(tmpdir(), "forward-chain-111-"));
     try {
       await mkdir(join(root, "packages/db/src"), { recursive: true });
@@ -740,6 +884,35 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       }, "MIGRATION_FORWARD0124_MANIFEST");
       // The same refusal when 0123's own manifest changes under 0124: 0123 stays valid, 0124 alone refuses.
       await refusal("lineage/side-by-side-releases-forward0123.json", (text) => `${text}\n`, "MIGRATION_FORWARD0124_MANIFEST");
+      // The security fixes 0178 changed by one character, its manifest bound to 0175 instead of 0177, and its sections out
+      // of step with the loader's list (the SQL re-digested in its manifest, so only the section check refuses).
+      await refusal("0178_security_fixes_run3.sql", (text) => text.replace("mfa_recovery_start_bounded", "mfa_recovery_start_boundeD"),
+        "MIGRATION_FORWARD0178_SOURCE_DIGEST");
+      const aiReadVerdictDigest = sha256(await bytesOf("lineage/statement-ai-read-verdict-forward0175.json"));
+      await refusal("lineage/security-fixes-run3-forward0178.json", (text) => {
+        const manifest = JSON.parse(text);
+        manifest.previous.name = "0175_statement_ai_read_verdict.sql";
+        manifest.previous.manifestSha256 = aiReadVerdictDigest;
+        return `${JSON.stringify(manifest, null, 2)}\n`;
+      }, "MIGRATION_FORWARD0178_MANIFEST");
+      // The same refusal when 0177's own manifest changes under 0178: 0177 reads its manifest by content and stays valid, 0178 alone refuses.
+      await refusal("lineage/erased-owner-unlinked-forward0177.json", (text) => `${text}\n`, "MIGRATION_FORWARD0178_MANIFEST");
+      {
+        const sqlPath = join(root, "migrations/0178_security_fixes_run3.sql");
+        const manifestPath = join(root, "migrations/lineage/security-fixes-run3-forward0178.json");
+        const [originalSql, originalManifest] = [await readFile(sqlPath, "utf8"), await readFile(manifestPath, "utf8")];
+        const changed = `${originalSql}\n-- ==== [NV-99] a section the loader does not list ====\n`;
+        const manifest = JSON.parse(originalManifest);
+        manifest.migration.sha256 = sha256(changed);
+        try {
+          await writeFile(sqlPath, changed);
+          await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          await expect(run()).rejects.toMatchObject({ stderr: expect.stringContaining("MIGRATION_FORWARD0178_SECTIONS") });
+        } finally {
+          await writeFile(sqlPath, originalSql);
+          await writeFile(manifestPath, originalManifest);
+        }
+      }
       // Side-by-side §5 (A6 review): 0123 without its `-- n1: keeps-verifier` line, its manifest re-digested so 0123's own
       // loader accepts the bytes: the header now says the verifier changes while the manifest names the one before, so
       // the chain refuses the disagreement (an older release trusts keeps-verifier when it accepts a database ahead).
@@ -1010,6 +1183,38 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth",
       "everyone told \"until the review ends\" hearing how it ended (0176, below) the sixty-sixth"));
+  });
+
+  it("chains an erased account's owner reference leaving its debates (0177) after 0176 with 0176's manifest and effective verifier, drained, amending no step", async () => {
+    const plan = await loadMigrationPlan();
+    const step = atStep(plan.forwardChain, "0177");
+    const previous = atStep(plan.forwardChain, "0176");
+    const manifest = JSON.parse((await bytesOf("lineage/erased-owner-unlinked-forward0177.json")).toString("utf8"));
+    expect(step?.name).toBe("0177_erased_owner_unlinked.sql");
+    expect(previous?.name).toBe("0176_moderation_final_outcome.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/moderation-final-outcome-forward0176.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0177_erased_owner_unlinked.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(manifest.amendsPostconditionsOf).toEqual([]);
+    expect(step?.amendsPostconditionsOf).toEqual([]);
+  });
+
+  it("documents an erased account's owner reference leaving its debates (0177) as the sixty-seventh chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## An erased account's owner reference leaves its debates (0177)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0176", "0177_erased_owner_unlinked.sql", "erased-owner-unlinked-forward0177.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0177.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "`identity.unlink_erased_owner_runs()`",
+      "`core.reject_mutation_except_erased_owner()`", "`billing.run_charge_scope`", "tests/integration/erased-owner-unlinked-0177.test.ts"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("everyone told \"until the review ends\" hearing how it ended (0176, below) the sixty-sixth",
+      "an erased account's owner reference leaving its debates (0177, below) the sixty-seventh"));
   });
 
   it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {

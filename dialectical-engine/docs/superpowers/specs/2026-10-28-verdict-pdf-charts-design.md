@@ -117,7 +117,52 @@ beside them, and none on the debates that do not.
 | Report model + drawing | `apps/ui/lib/report/reportTables.ts`, `ReportTable.tsx`, `ReportDocument.tsx` |
 | Sample | `story:sample-pdf <path> tables` (three phones) |
 
+## Chart relevance (2026-11-16)
+
+The first chart a real debate printed was "Point strength for claims about coding value": three bars, 98%, 98% and
+96.2%, for three points that said the same thing, under a question about cost per task and benchmark score. The debate
+stated no figures (its models would not invent prices), so the only measure left to the plan was a strength, and a
+strength was offered for any point. Nothing in code refused it: the need test had already found no figures, but the
+call still ran for the tables, and every check a chart met was about figures. The owner asked for the charts to show
+relevant data.
+
+**What a chart must now be** (builder's calls; the reply's form and the contract id `story.charts.v2` are unchanged)
+
+1. **A strength compares the answers.** On a chart with a strength axis every item is a position, each once
+   (`CHART_STRENGTH_NOT_ANSWER`). This is the intent's own wording, "the strength of competing positions". The plan's
+   check holds a new story to it. The report holds every stored story to it too, by the rule its list of points names a
+   position by (a point that argues about nothing else, `storyPositionIds`), so a chart stored before this change is
+   no longer printed.
+2. **One axis, one unit.** Two figures written with different currency or percent signs never share an axis
+   (`CHART_FIGURE_UNITS_DIFFER`): a price beside a percentage, dollars beside euros. A unit written in words is not
+   compared, because words inflect ("1 an", "5 ani") and one debate writes "12%" and "8 percent".
+3. **An axis compares something.** Figures that all state the same value are no chart (`CHART_NOTHING_TO_COMPARE`).
+4. **A scale word is read.** The number check wanted `value` equal to the number as written, so "$1.2 million" passed
+   only as 1.2 and was drawn beside "$800,000" at a millionth of its size; the correct 1,200,000 was refused. Where a
+   letter follows the number, `value` may be the written number times a power of ten from a thousand to a trillion.
+   Code reads no scale word of any language.
+5. **A name's number is not a figure.** `claimFigures` read "iPhone 14", "Galaxy S24" and "Reno 12" as the figures 14,
+   24 and 12: they opened the need test and were handed to the call as numbers to chart. A number glued to a letter
+   (S24, GPT-5, COVID-19), or following a name (iPhone 14, Windows 11), is left out.
+6. **The call is told all of it**: what a strength is charted for, that a name's number is no figure, one unit per
+   axis, and that `value` is the whole number a figure states.
+
+| Piece | Where |
+|---|---|
+| The strength rule, one unit per axis, a scale word, the wording | `packages/story/src/charts.ts` |
+| A name's number; the positions the charts are checked against (`sides`) | `packages/story/src/blocks.ts` |
+| The report's own strength rule | `apps/ui/lib/report/reportCharts.ts`, `apps/ui/lib/v3/storyWords.ts` (`storyPositionIds`) |
+
 ## Known limits
+
+- A debate that states no figures can still get one chart: the strengths of its answers side by side. With three
+  answers or more the ranking table already prints the same numbers.
+- Units written in words are not compared, so "7 years" beside "3 auditors" on one axis rests on the call's wording.
+- A plan may still give 1.2 for "$1.2 million" beside 800,000 for "$800,000": both state their text. The wording asks
+  for the whole number; code cannot tell which the model meant.
+- `claimFigures` reads names by form. In a language that capitalises every noun (German, "pro Jahr 500 Euro") it leaves
+  a real figure out of the need test and the `figures` field. It is never a check: a chart's figures are checked against
+  the claim itself.
 
 - The chart call has no length-guidance step and no thinking-level row of its own: on the private preview it is a
   STANDARD call (`previewCallTierOf`), with the storyteller's bound.

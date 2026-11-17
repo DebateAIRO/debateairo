@@ -8,7 +8,7 @@ import { parseCanonicalRegisterJson } from "@debateai/register";
 import type { StaffAccessApplication, StaffAuthentication } from "./access.js";
 import type { StaffAlertIntentProducer } from "./alerts.js";
 import { StaffAlertError } from "./alerts.js";
-import { correctedPiece, textPiecesOf } from "../public-tree.js";
+import { correctedPiece, publicDebateOfStoredCopy, textPiecesOf } from "../public-tree.js";
 
 /**
  * A PUBLIC DEBATE UNDER REVIEW over HTTP (plan 2026-10-31-r22-owner-changes decision 33; migration 0150). The two accounts of decision 24 only, the same authority and no other role. Every change needs that
@@ -201,7 +201,7 @@ export function registerPublicReviewRoutes(route: Route, service: () => PublicRe
           if (target === undefined) throw new PublicReviewHttpError(404, "PUBLIC_REVIEW_PIECE_UNKNOWN");
           const opened: unknown = cipher.decrypt(target);
           if (!textPiecesOf(opened).some((piece) => piece.pointer === input.pointer)) throw new PublicReviewHttpError(404, "PUBLIC_REVIEW_PIECE_UNKNOWN");
-          if (input.piece_kind === "SNAPSHOT" && !contract.PublicDebateSchema.safeParse(correctedPiece(opened, [{ pointer: input.pointer!, text }])).success) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
+          if (input.piece_kind === "SNAPSHOT" && !publicDebateOfStoredCopy(correctedPiece(opened, [{ pointer: input.pointer!, text }]), null).success) throw new PublicReviewHttpError(422, "STAFF_INPUT_INVALID");
           return cipher.encrypt({ text });
         });
       }

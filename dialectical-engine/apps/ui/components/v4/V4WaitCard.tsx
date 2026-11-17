@@ -122,7 +122,7 @@ function BackLink({ back, catalog }: Readonly<{ back: V4WaitCardBack; catalog: M
       {back.question.trim().length > 0 ? (
         <>
           {t(catalog, "v4.debate.backTo")}{" "}
-          <span className="v4DebBackQuestion" data-ai-generated="true">{back.question}</span>
+          <span className="v4DebBackQuestion">{back.question}</span>
         </>
       ) : t(catalog, "v4.debate.backToEarlier")}
     </Link>
@@ -174,7 +174,7 @@ export function V4WaitCard(props: V4WaitCardProps) {
           <>
             {inline ? null : <p className="v4Eyebrow">{t(catalog, "v4.debate.yourQuestion")}</p>}
             {/* The person's own words; on its own page the tab title follows this heading. */}
-            <Heading className="v4Serif v4WaitQuestion" data-ai-generated="true">{question}</Heading>
+            <Heading className="v4Serif v4WaitQuestion">{question}</Heading>
           </>
         )}
         <p className={`v4WaitState${highlighted ? " v4Highlight" : ""}`} role="status" data-wait-word="">

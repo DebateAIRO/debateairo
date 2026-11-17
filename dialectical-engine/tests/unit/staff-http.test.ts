@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { authorizationPolicyInventory, buildApi, type AskApplication } from "@debateai/api";
 import { contractInventory, staffContractInventory } from "@debateai/contract";
 import { StaffAccessService, staffTokenHash } from "../../apps/api/src/staff/access.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
 
 const account = testHttpIdentity("task7-http");
@@ -68,7 +69,7 @@ describe("minimal scoped staff HTTP boundary", () => {
 describe("staff second CSRF token on privileged mutations", () => {
   const staffToken = randomBytes(32).toString("base64url"), staffCsrf = randomBytes(32).toString("base64url");
   const otherToken = randomBytes(32).toString("base64url"), targetStaffId = "66666666-6666-4666-8666-666666666666";
-  function staffServer() {
+  function staffServerAccess(sessions: ReturnType<typeof testSessionApplication>) {
     const record = Object.freeze({
       context: Object.freeze({
         staffId: randomUUID(), userId: account.authenticated.userId, ordinarySessionId: account.authenticated.session.session_id,
@@ -82,9 +83,12 @@ describe("staff second CSRF token on privileged mutations", () => {
       readCurrentContext: async () => record, authorize: async () => true,
       readActionProof: async () => null, readInvitationContext: async () => null, readOwnerPossessionContext: async () => null
     };
+    return new StaffAccessService(repository as never, sessions);
+  }
+  function staffServer() {
     const sessions = testSessionApplication([account]);
     return buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2,
-      staffAccess: new StaffAccessService(repository as never, sessions) } as Parameters<typeof buildApi>[0]);
+      staffAccess: staffServerAccess(sessions) } as Parameters<typeof buildApi>[0]);
   }
   /** Valid ordinary session + ordinary CSRF + staff cookie; the staff CSRF header/cookie vary per case. */
   function headers(staff: Readonly<{ header?: string; cookie?: string }> = {}) {
@@ -95,6 +99,35 @@ describe("staff second CSRF token on privileged mutations", () => {
       ...(staff.header === undefined ? {} : { "x-staff-csrf-token": staff.header })
     };
   }
+  // EU AI Act Art. 50(2) (owner rule, 16 Nov 2026: "everything has to be machine-readable"): a team page that carries the
+  // AI check's findings is marked; an empty queue and a page with no AI word (the threat reports' count) are not.
+  it("marks the publication-review queue that lists the AI check's categories, and not a team page without AI content", async () => {
+    const reviewRef = "77777777-7777-4777-8777-777777777777";
+    let items: unknown[] = [{ review_ref: reviewRef, asked_at: "2026-11-16T09:00:00.000Z", ask_ordinal: 1, categories: ["TERRORISM"] }];
+    const sessions = testSessionApplication([account]);
+    const access = staffServerAccess(sessions);
+    const server = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, staffAccess: access,
+      staff: { access, sessions,
+        publicationReviews: { list: async () => ({ items, order: "ASKED_AT_ASC" }) },
+        threatReports: { repository: { countUnread: async () => 0 } } } } as never);
+    try {
+      const staffHeaders = headers();
+      const queue = await server.inject({ method: "GET", url: "/v1/admin/publication-reviews", headers: staffHeaders });
+      expect(queue.statusCode).toBe(200);
+      expect(queue.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
+      items = [];
+      const empty = await server.inject({ method: "GET", url: "/v1/admin/publication-reviews", headers: staffHeaders });
+      expect(empty.statusCode).toBe(200);
+      expect(empty.headers[AI_GENERATED_HEADER]).toBeUndefined();
+      const summary = await server.inject({ method: "GET", url: "/v1/admin/threat-reports/summary", headers: staffHeaders });
+      expect(summary.statusCode).toBe(200);
+      expect(summary.json()).toEqual({ unread: 0 });
+      expect(summary.headers[AI_GENERATED_HEADER]).toBeUndefined();
+    } finally {
+      await server.close();
+    }
+  });
+
   it.each([
     ["PATCH", `/v1/admin/team/${targetStaffId}/grants`],
     ["POST", `/v1/admin/team/${targetStaffId}/disable`]

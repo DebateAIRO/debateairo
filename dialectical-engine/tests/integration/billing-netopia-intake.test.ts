@@ -14,9 +14,11 @@ import { BillingJobQueries, BillingRepository, crossAccountPool, migrate, type P
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import { writeCardSaved } from "../../apps/api/src/billing/card-adoption.js";
 import { NETOPIA_NOTIFY_PATH } from "../../apps/api/src/billing/index.js";
-import { NetopiaNoticeIntake, type NetopiaIntakeMode, type NoticeArrival } from "../../apps/api/src/billing/netopia-intake.js";
+import {
+  NetopiaNoticeIntake, type NetopiaIntakeMode, type NoticeArrival, type NoticeQuarantineLimits
+} from "../../apps/api/src/billing/netopia-intake.js";
 import { NoticeSpool } from "../../apps/api/src/billing/notice-spool.js";
-import { openCardToken, sealCardToken } from "../../apps/api/src/billing/records.js";
+import { noticeQuarantineIdOf, openCardToken, sealCardToken } from "../../apps/api/src/billing/records.js";
 import { chargeEvent, newChargeId } from "../../apps/api/src/billing/rows.js";
 import { TimeShiftedCardPayments } from "../../apps/api/src/billing/time-shifted-payments.js";
 import { testBillingPlans, unusedAskApplication } from "../support/billingFixtures.js";
@@ -74,6 +76,8 @@ function intakeFor(options: Partial<{
   mode: NetopiaIntakeMode; keys: typeof KEYS; storeDown: true; paymentEnvironment: "sandbox" | "live"; clockOffsetMs: number;
   /** B3a: the first `insertPaymentNotice` throws (the database refused one write), every later one goes through. */
   insertFailsOnce: true; spool: NoticeSpool;
+  /** NV-44: the quarantine's caps, lowered for one case. */
+  quarantineLimits: NoticeQuarantineLimits;
 }> = {}) {
   const audit = recordingAudit();
   const kick = vi.fn();
@@ -93,14 +97,14 @@ function intakeFor(options: Partial<{
     repository: store, jobs, trust: (options.keys ?? KEYS).trust(POS), recordsKey: TEST_RECORDS_KEY,
     paymentEnvironment: options.paymentEnvironment ?? "sandbox", mode: options.mode ?? "ON", audit, kick,
     ...(options.clockOffsetMs === undefined ? {} : { clockOffsetMs: options.clockOffsetMs }),
-    ...(options.spool === undefined ? {} : { spool: options.spool })
+    ...(options.spool === undefined ? {} : { spool: options.spool }),
+    ...(options.quarantineLimits === undefined ? {} : { quarantineLimits: options.quarantineLimits })
   });
   return { intake, audit, kick };
 }
 
 /** An open charge of ours (a card check: no quote, nothing settled), its owner's customer created. */
-async function openCharge(environment: "sandbox" | "live" = "sandbox") {
-  const ownerRef = randomUUID();
+async function openCharge(environment: "sandbox" | "live" = "sandbox", ownerRef: string = randomUUID()) {
   const chargeId = newChargeId();
   const at = new Date("2026-10-06T08:00:00.000Z");
   const customerId = await repository.withTransaction(async (client: PoolClient) => {
@@ -593,5 +597,189 @@ describe("N9 the quarantine in keyset pages (ruling PR-30)", () => {
     const third = await page({ receivedAt: second[1]!.receivedAt, quarantineId: second[1]!.quarantineId });
     expect(third.map((row) => row.quarantineId)).toEqual(ids.slice(4));
     expect((await repository.quarantineSince(billingPool, at)).map((row) => row.quarantineId)).toEqual(ids);
+  });
+});
+
+describe("NV-44 the quarantine keeps only what could be NETOPIA's, once, within its caps", () => {
+  // Each case has its own day or hour (O4 is once an hour across all charges), apart from the rows above (2026-10-06,
+  // 2026-10-09): the day caps count [UTC midnight, the next midnight) only.
+  const LIMITS = { orderRows: 64, ownerDayRows: 64, dayRows: 2_000, dayBytes: 1 << 30 } as const;
+  const at = (iso: string): Date => new Date(iso);
+  const refusals = (audit: ReturnType<typeof intakeFor>["audit"]) => audit.events
+    .filter((entry) => entry.event === "billing.notice.quarantine_refused").map((entry) => entry.fields.cause);
+  const keptOn = async (day: string): Promise<number> => {
+    const start = new Date(`${day}T00:00:00.000Z`);
+    const [row] = await query<{ rows: number }>(
+      "SELECT count(*)::int AS rows FROM billing.notice_quarantine WHERE received_at >= $1 AND received_at < $2",
+      [start, new Date(start.getTime() + 86_400_000)]);
+    return row!.rows;
+  };
+  /** A second session holding the order's quarantine lock, as another API keeping a copy of that order would. */
+  const holdOrderLock = async (orderId: string): Promise<() => Promise<void>> => {
+    const holder = await database.pool.connect();
+    await holder.query("BEGIN");
+    await holder.query("SELECT pg_advisory_xact_lock(hashtextextended('debateai.billing.notice-quarantine:' || $1::text, 0))", [orderId]);
+    return async () => {
+      try {
+        await holder.query("ROLLBACK");
+      } finally {
+        holder.release();
+      }
+    };
+  };
+
+  it("keeps nothing of a message naming no order of ours (UNKNOWN_ORDER), and still answers 'retry'", async () => {
+    const { intake, audit } = intakeFor();
+    const charge = newChargeId();
+    const tool = `t-${randomUUID().replaceAll("-", "").slice(0, 30)}`;
+    for (const orderId of [charge, tool]) {
+      expect((await intake.receive(arrival(sign(body(orderId), WRONG_KEYS), at("2026-10-07T08:00:00.000Z")))).status).toBe(503);
+      expect(await quarantineFor(orderId)).toEqual([]);
+    }
+    expect(audit.events.slice(0, 2)).toEqual([
+      { event: "billing.notice.unverified", fields: { reason: "NOTICE_SIGNATURE_INVALID" } },
+      { event: "billing.notice.quarantine_refused", fields: { cause: "UNKNOWN_ORDER" } }
+    ]);
+    expect(refusals(audit)).toEqual(["UNKNOWN_ORDER", "UNKNOWN_ORDER"]);
+  });
+
+  it("keeps identical bytes once, under the id the records key derives from them, with no refusal line", async () => {
+    const { chargeId } = await openCharge();
+    const { intake, audit } = intakeFor();
+    const forged = sign(body(chargeId), WRONG_KEYS);
+    await intake.receive(arrival(forged, at("2026-10-07T09:00:00.000Z")));
+    expect((await intake.receive(arrival(forged, at("2026-10-07T09:05:00.000Z")))).status).toBe(503);
+    const rows = await quarantineFor(chargeId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.quarantine_id).toBe(noticeQuarantineIdOf(TEST_RECORDS_KEY, forged.rawBody, forged.header));
+    expect(refusals(audit)).toEqual([]);
+    expect(await ownerMails("O4", chargeId)).toHaveLength(1);
+  });
+
+  it("refuses a message past its order's cap (ORDER_FULL), and still emails the owner (O4) for it", async () => {
+    const { chargeId } = await openCharge();
+    const { intake, audit } = intakeFor({ quarantineLimits: { ...LIMITS, orderRows: 2 } });
+    for (const [status, iso] of [
+      [3, "2026-10-07T10:00:00.000Z"], [12, "2026-10-07T10:01:00.000Z"], [15, "2026-10-07T11:00:00.000Z"]
+    ] as const) {
+      expect((await intake.receive(arrival(sign(body(chargeId, { status }), WRONG_KEYS), at(iso)))).status).toBe(503);
+    }
+    expect(await quarantineFor(chargeId)).toHaveLength(2);
+    expect(refusals(audit)).toEqual(["ORDER_FULL"]);
+    expect((await ownerMails("O4", chargeId)).map((mail) => mail.ref).sort()).toEqual(["O4:2026-10-07T10", "O4:2026-10-07T11"]);
+  });
+
+  it("refuses an order's later card-less message on a full day (DAY_FULL), never another order's first", async () => {
+    const a = (await openCharge()).chargeId;
+    const b = (await openCharge()).chargeId;
+    const { intake, audit } = intakeFor({ quarantineLimits: { ...LIMITS, dayRows: 2 } });
+    await intake.receive(arrival(sign(body(a), WRONG_KEYS), at("2026-10-08T01:00:00.000Z")));
+    await intake.receive(arrival(sign(body(a, { status: 12, binding: undefined }), WRONG_KEYS), at("2026-10-08T01:01:00.000Z")));
+    await intake.receive(arrival(sign(body(a, { status: 15, binding: undefined }), WRONG_KEYS), at("2026-10-08T01:02:00.000Z")));
+    expect(await quarantineFor(a)).toHaveLength(2);
+    expect(refusals(audit)).toEqual(["DAY_FULL"]);
+    // B's first message, card-less, on a day that already holds 2: kept.
+    await intake.receive(arrival(sign(body(b, { binding: undefined }), WRONG_KEYS), at("2026-10-08T02:00:00.000Z")));
+    expect(await quarantineFor(b)).toHaveLength(1);
+    expect(refusals(audit)).toEqual(["DAY_FULL"]);
+    expect(await keptOn("2026-10-08")).toBe(3);
+    expect((await ownerMails("O4", a)).map((mail) => mail.ref)).toEqual(["O4:2026-10-08T01"]);
+    expect((await ownerMails("O4", b)).map((mail) => mail.ref)).toEqual(["O4:2026-10-08T02"]);
+  });
+
+  it("never refuses a message carrying a saved card for the day: a decline, then the paid retry on the same page (review r2, B2)", async () => {
+    const d = (await openCharge()).chargeId;
+    const { intake, audit } = intakeFor({ quarantineLimits: { ...LIMITS, dayRows: 1 } });
+    await intake.receive(arrival(sign(body(d, { status: 12, binding: undefined }), WRONG_KEYS), at("2026-10-01T01:00:00.000Z")));
+    const paid = sign(body(d, { status: 3 }), WRONG_KEYS);
+    await intake.receive(arrival(paid, at("2026-10-01T01:01:00.000Z")));
+    expect(await quarantineFor(d)).toHaveLength(2);
+    expect(refusals(audit)).toEqual([]);
+    // NETOPIA's copy of the paid message carries no card: the day's cap applies to it.
+    await intake.receive(arrival(sign(body(d, { status: 3, binding: undefined }), WRONG_KEYS), at("2026-10-01T01:02:00.000Z")));
+    expect(refusals(audit)).toEqual(["DAY_FULL"]);
+    expect(await quarantineFor(d)).toHaveLength(2);
+    expect(await keptOn("2026-10-01")).toBe(2);
+    expect((await quarantineFor(d)).map((row) => row.quarantine_id))
+      .toContain(noticeQuarantineIdOf(TEST_RECORDS_KEY, paid.rawBody, paid.header));
+  });
+
+  it("refuses an order's later card-less message past the day's ciphertext bytes (DAY_FULL)", async () => {
+    const c = (await openCharge()).chargeId;
+    const first = sign(body(c), WRONG_KEYS);
+    // The seal adds 1 + 12 + 16 bytes to the body and to the header (packages/crypto/src/records.ts).
+    const sealedBytes = (29 + first.rawBody.length) + (29 + Buffer.byteLength(first.header, "utf8"));
+    const { intake, audit } = intakeFor({ quarantineLimits: { ...LIMITS, dayBytes: sealedBytes + 1 } });
+    await intake.receive(arrival(first, at("2026-10-05T01:00:00.000Z")));
+    const [kept] = await quarantineFor(c);
+    expect(kept!.raw_ciphertext.length + kept!.header_ciphertext!.length).toBe(sealedBytes);
+    await intake.receive(arrival(sign(body(c, { status: 12, binding: undefined }), WRONG_KEYS), at("2026-10-05T01:01:00.000Z")));
+    expect(await quarantineFor(c)).toHaveLength(1);
+    expect(refusals(audit)).toEqual(["DAY_FULL"]);
+    expect(await keptOn("2026-10-05")).toBe(1);
+  });
+
+  it("refuses past one person's day (OWNER_DAY_FULL), first messages and cards included, but not another person's", async () => {
+    const owner = randomUUID();
+    const p = (await openCharge("sandbox", owner)).chargeId;
+    const q = (await openCharge("sandbox", owner)).chargeId;
+    const r = (await openCharge("sandbox", owner)).chargeId;
+    const other = (await openCharge()).chargeId;
+    const { intake, audit } = intakeFor({ quarantineLimits: { ...LIMITS, ownerDayRows: 2 } });
+    for (const [orderId, time] of [[p, "01:00"], [q, "01:01"], [r, "01:02"], [other, "01:03"]] as const) {
+      await intake.receive(arrival(sign(body(orderId), WRONG_KEYS), at(`2026-10-04T${time}:00.000Z`)));
+    }
+    const kept: number[] = [];
+    for (const orderId of [p, q, r, other]) kept.push((await quarantineFor(orderId)).length);
+    expect(kept).toEqual([1, 1, 0, 1]);
+    expect(refusals(audit)).toEqual(["OWNER_DAY_FULL"]);
+  });
+
+  it("refuses at once, never waiting, while another copy for the same order is being kept (BUSY), and keeps it later", async () => {
+    const k = (await openCharge()).chargeId;
+    const { intake, audit } = intakeFor();
+    const forged = sign(body(k), WRONG_KEYS);
+    const release = await holdOrderLock(k);
+    try {
+      const started = Date.now();
+      expect((await intake.receive(arrival(forged, at("2026-10-03T01:00:00.000Z")))).status).toBe(503);
+      expect(Date.now() - started).toBeLessThan(2_000);
+      expect(await quarantineFor(k)).toEqual([]);
+      expect(refusals(audit)).toEqual(["BUSY"]);
+      // O4 follows the order, not the keeping.
+      expect(await ownerMails("O4", k)).toHaveLength(1);
+    } finally {
+      await release();
+    }
+    await intake.receive(arrival(forged, at("2026-10-03T01:05:00.000Z")));
+    expect(await quarantineFor(k)).toHaveLength(1);
+    expect(refusals(audit)).toEqual(["BUSY"]);
+  });
+
+  it("refuses a message over its caps before any lock (ORDER_FULL, not BUSY)", async () => {
+    const l = (await openCharge()).chargeId;
+    const { intake, audit } = intakeFor({ quarantineLimits: { ...LIMITS, orderRows: 1 } });
+    await intake.receive(arrival(sign(body(l), WRONG_KEYS), at("2026-10-03T02:00:00.000Z")));
+    expect(await quarantineFor(l)).toHaveLength(1);
+    const release = await holdOrderLock(l);
+    try {
+      await intake.receive(arrival(sign(body(l, { status: 12 }), WRONG_KEYS), at("2026-10-03T02:01:00.000Z")));
+      expect(refusals(audit)).toEqual(["ORDER_FULL"]);
+    } finally {
+      await release();
+    }
+    expect(await quarantineFor(l)).toHaveLength(1);
+  });
+
+  it("keeps a message for a tool order of ours, and emails no one (guard)", async () => {
+    const orderId = `t-${randomUUID().replaceAll("-", "").slice(0, 30)}`;
+    await repository.withTransaction((client) => repository.insertToolOrder(client, {
+      orderId, paymentEnvironment: "sandbox", createdAt: at("2026-10-02T00:00:00.000Z"), purpose: "SANDBOX_RECORDING"
+    }));
+    const { intake, audit } = intakeFor();
+    await intake.receive(arrival(sign(body(orderId), WRONG_KEYS), at("2026-10-02T01:00:00.000Z")));
+    expect(await quarantineFor(orderId)).toHaveLength(1);
+    expect(await ownerMails("O4", orderId)).toEqual([]);
+    expect(refusals(audit)).toEqual([]);
   });
 });

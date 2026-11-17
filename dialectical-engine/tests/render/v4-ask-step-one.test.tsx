@@ -385,6 +385,8 @@ describe("Your maps (ask-d5 B, ask-f10, wait-f13, map-f34, dig-f30)", () => {
     expect(cards.map((card) => card.querySelector(".v4ShelfQuestion")?.textContent)).toEqual([
       "Is a four-day week good for workers?", "Will AI tutors replace homework help?", "Should countries build new nuclear power?"
     ]);
+    // Art. 50(2), the owner's "Never mark the question": the person's own questions are never marked as AI text.
+    for (const card of cards) expect(card.querySelector(".v4ShelfQuestion")?.closest("[data-ai-generated]")).toBeNull();
     expect(cards.map((card) => card.querySelector(".v4ShelfState")?.textContent)).toEqual([
       // journey-f22: one list of state words everywhere (the waiting card's lib/v4/stateWords.ts list); journey-f16: its
       // "Started 14:00" too (WHOLE-12).

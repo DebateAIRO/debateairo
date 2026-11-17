@@ -130,7 +130,9 @@ function MapCard({ map, catalog, locale, digsMax }: Readonly<{
   return (
     <li className="v4ShelfItem">
       <Link className="v4ShelfCard" href={mapHref(map.runId)} {...(map.kind === "PUBLIC_DIG" ? { "data-shelf-public-dig": "" } : {})}>
-        <span className="v4ShelfQuestion" dir="auto" data-ai-generated="true">{map.question}</span>
+        {/* Art. 50(2), the owner's "Never mark the question": the person's own question is never marked as AI text. A public dig's
+            card ("Dig: {its pick}") keeps its mark, as a dig's line under a card does (who wrote the pick is not known here). */}
+        <span className="v4ShelfQuestion" dir="auto" data-ai-generated={map.kind === "PUBLIC_DIG" ? "true" : undefined}>{map.question}</span>
         {map.bar === null ? null : <V4TrustBar counts={map.bar} catalog={catalog} />}
         <span className="v4ShelfMeta">
           {map.state === "WORKING" ? <span className="v4ShelfPulse" aria-hidden="true" /> : null}

@@ -164,11 +164,24 @@ describe("publication reviews staff surface", () => {
     expect(host.querySelector('section[data-review-detail="verdict"]')?.textContent).toContain("The synthesis to review.");
     expect(host.querySelector('[data-review-detail="verdict"]')?.textContent).toContain("Clear answer");
     expect(host.querySelector('[data-review-detail="verdict"]')?.textContent).not.toContain("SUPPORTED");
+    // Art. 50(2): the AIs' summary, verdict word and reversal point are marked; the site's label and buttons are not.
+    const verdict = host.querySelector('section[data-review-detail="verdict"]')!;
+    const line = (text: string) => [...verdict.querySelectorAll("p")].find((node) => node.textContent?.includes(text));
+    expect(line("The synthesis to review.")?.closest('[data-ai-generated="true"]')).not.toBeNull();
+    expect(line("A new argument")?.closest('[data-ai-generated="true"]')).not.toBeNull();
+    const verdictLine = line("Clear answer")!;
+    expect(verdictLine.closest("[data-ai-generated]")).toBeNull();
+    expect(verdictLine.querySelector('[data-ai-generated="true"]')?.textContent).toBe("Clear answer");
+    expect(verdict.querySelector("h2")?.closest("[data-ai-generated]")).toBeNull();
+    // The person's question heading the review is theirs.
+    expect(host.querySelector(".rvQuestion")?.closest("[data-ai-generated]")).toBeNull();
     await click(button(host, enPublic["public.honesty.close"]));
     await click(host.querySelector(".publicReadAction"));
     expect(host.querySelector("[role=dialog]")).toBeNull();
     expect(host.querySelector('section[data-review-detail="argument"]')?.getAttribute("aria-label")).toBe(enPublic["public.overview.read"]);
     expect(host.querySelector('section[data-review-detail="argument"]')?.textContent).toContain("The defeater claim attacking the position.");
+    const claim = [...host.querySelectorAll('section[data-review-detail="argument"] p')].find((node) => node.textContent === "The defeater claim attacking the position.");
+    expect(claim?.closest('[data-ai-generated="true"]')).not.toBeNull();
   });
 
   it("a snapshot with no verdict shows the unavailable badge alone in Details (REV-S02-p3 translation N4)", async () => {

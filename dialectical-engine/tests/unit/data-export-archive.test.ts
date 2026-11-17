@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { buildArchive, ARCHIVE_ENTRY_NAMES, archiveFilename } from "../../apps/api/src/data-export/archive.js";
 import { loadArchiveCatalog } from "../../apps/api/src/data-export/archive-catalog.js";
 import { README_EXCLUSION_LINES } from "../../apps/api/src/data-export/readme.js";
+import { AI_EXPORT_DISCLOSURE } from "../../apps/ui/lib/aiDisclosure.js";
 import { snapshotA } from "../fixtures/data-export/snapshot-a.js";
 import { readZip } from "../support/zip-reader.js";
 
@@ -19,6 +20,7 @@ const sections: Record<string, string[]> = {
   "support.json": ["sessions", "cases"],
   "activity.json": ["events"]
 };
+const AI_GENERATED_JSON = ["account.json", "debates.json", "support.json"];
 const archive = () => readZip(buildArchive(snapshotA, loadArchiveCatalog("en")).zip);
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
@@ -38,9 +40,11 @@ describe("data export archive", () => {
   it("A-3 has exactly the declared top-level keys", () => {
     const files = archive();
     for (const [name, keys] of Object.entries(sections)) {
-      expect(Object.keys(JSON.parse(files.find((item) => item.name === name)!.bytes.toString()))).toEqual(["format_version", "generated_at", ...keys]);
+      // EU AI Act Art. 50(2): the two files holding AI-generated content carry the export's ai_disclosure record.
+      const disclosed = AI_GENERATED_JSON.includes(name) ? ["ai_disclosure"] : [];
+      expect(Object.keys(JSON.parse(files.find((item) => item.name === name)!.bytes.toString()))).toEqual(["format_version", "generated_at", ...disclosed, ...keys]);
     }
-    expect(Object.keys(JSON.parse(files[1]!.bytes.toString()))).toEqual(["format_version", "generated_at", "entries"]);
+    expect(Object.keys(JSON.parse(files[1]!.bytes.toString()))).toEqual(["format_version", "generated_at", "entries", "ai_generated_entries"]);
   });
   it("A-4 manifest measures all nine other entries", () => {
     const files = archive();
@@ -55,7 +59,8 @@ describe("data export archive", () => {
       expect(row.sha256).toBe(hash(entry.bytes));
       if (entry.name.endsWith(".json")) {
         const data = JSON.parse(entry.bytes.toString());
-        const values = Object.entries(data).filter(([key]) => !["format_version", "generated_at"].includes(key)).map(([, value]) => value);
+        // The ai_disclosure record describes the file; it is not one of its records.
+        const values = Object.entries(data).filter(([key]) => !["format_version", "generated_at", "ai_disclosure"].includes(key)).map(([, value]) => value);
         expect(row.records).toBe(values.reduce((sum: number, value) => sum + (Array.isArray(value) ? value.length : value === null ? 0 : 1), 0));
       } else expect(row.records).toBeNull();
     }
@@ -98,6 +103,39 @@ describe("data export archive", () => {
     const data = JSON.parse(archive().find((entry) => entry.name === "debates.json")!.bytes.toString());
     expect(data.debates.map((entry: { role_rotation: unknown }) => entry.role_rotation)).toEqual(snapshotA.debates.debates.map((entry) => entry.role_rotation));
     expect(data.debates.map((entry: { role_rotation: unknown }) => entry.role_rotation === null)).toEqual([false, true, false]);
+  });
+
+  it("A-13 (EU AI Act Art. 50(2)) marks account.json, debates.json and support.json with the debate download's ai_disclosure scheme", () => {
+    const files = archive();
+    const parsed = (name: string) => JSON.parse(files.find((entry) => entry.name === name)!.bytes.toString("utf8"));
+    // debates.json: the very record the debate's JSON download carries, value for value.
+    expect(parsed("debates.json").ai_disclosure).toEqual(AI_EXPORT_DISCLOSURE);
+    // support.json: the same record, its scope naming what is generated there (the assistant's replies and case
+    // summaries), never the person's own messages.
+    expect(parsed("support.json").ai_disclosure).toEqual({
+      ...AI_EXPORT_DISCLOSURE,
+      scope: "Support assistant replies (session messages with role \"assistant\", also as copied into a case's transcript_snapshot) "
+        + "and case summaries; excludes the user's own messages, replies written by a person (case messages with role \"V\") and operational records."
+    });
+    // account.json: the AI's words among the questions not started yet; the readings' rows hold only times and kinds.
+    expect(parsed("account.json").ai_disclosure).toEqual({
+      ...AI_EXPORT_DISCLOSURE,
+      scope: "In questions_not_started: the AI's reading of each question (read_question), its clarifying questions and the "
+        + "answer options picked from them (answers), and its suggested paths (paths, other_suggestions) except those the user "
+        + "worded, which own_words lists; excludes the user's own question, typed answers and own words, and every other record. "
+        + "question_readings and before_start_readings record only when an AI ran and which kind, not what it wrote."
+    });
+    // Additive only: the recorded values are the snapshot's own, unaltered.
+    expect(parsed("debates.json").debates).toEqual(JSON.parse(JSON.stringify(snapshotA.debates.debates)));
+    expect(parsed("support.json").sessions).toEqual(JSON.parse(JSON.stringify(snapshotA.support.sessions)));
+    expect(parsed("account.json").questions_not_started).toEqual(JSON.parse(JSON.stringify(snapshotA.account.questions_not_started)));
+    expect(parsed("account.json").account).toEqual(JSON.parse(JSON.stringify(snapshotA.account.account)));
+    // No other data file says it holds generated content.
+    for (const name of Object.keys(sections).filter((item) => !AI_GENERATED_JSON.includes(item))) {
+      expect(Object.hasOwn(parsed(name), "ai_disclosure"), name).toBe(false);
+    }
+    // The manifest, for machines, lists the entries that hold AI-generated content, in the archive's order.
+    expect(parsed("manifest.json").ai_generated_entries).toEqual(["your-data.html", "account.json", "debates.json", "support.json"]);
   });
 
   it("A-8 names the ZIP from the UTC request date", () => {

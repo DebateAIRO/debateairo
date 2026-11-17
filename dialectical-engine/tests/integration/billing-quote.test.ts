@@ -87,7 +87,9 @@ describe("P8b the quote", () => {
   it("asks a US or Canadian buyer for the postal code and the state: a state alone is not enough (P2-M29, A31 (h))", async () => {
     geo.country = "US";
     const us = { country: "US", region: "NY", postalCode: "10001", city: "New York" } as const;
-    expect((await service().create(input(randomUUID(), us))).addressRequired).toBe(false);
+    // Owner's decision of 16 November 2026: a US quote carries the 14 days too (the policy's `withdrawalDays`; before
+    // the United States was on the policy's list it carried none).
+    expect(await service().create(input(randomUUID(), us))).toMatchObject({ addressRequired: false, withdrawalDays: 14 });
     expect(await service().create(input(randomUUID(), { ...us, postalCode: null }))).toMatchObject({ addressRequired: true, quote: { taxCountry: "US" } });
     expect((await service().create(input(randomUUID(), { ...us, region: null }))).addressRequired).toBe(true);
     // Quaderno is never sent a region (P4), so the postal code prices the sale.

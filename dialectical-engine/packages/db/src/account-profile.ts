@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from "pg";
-import type { AuditContextHasher, CryptoEnvelope } from "@debateai/crypto";
+import type { Argon2AuditPriority, AuditContextHasher, CryptoEnvelope } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
 import { MAIL_LOCALE_SETTING } from "./mail-locale.js";
 export interface ProfileSession {
@@ -15,7 +15,8 @@ export interface PhoneProfileRecord {
 export class ProfileTransactions {
   constructor(private readonly pool: Pool, private readonly audit: AuditContextHasher) {
   }
-  async audited<T>(source: AuthSourceContext, operation: (client: PoolClient, context: string) => Promise<T>): Promise<T> {
+  /** K09/NV-42: `priority` defaults to ordinary; only the social sign-in callback passes "login". */
+  async audited<T>(source: AuthSourceContext, operation: (client: PoolClient, context: string) => Promise<T>, priority: Argon2AuditPriority = "ordinary"): Promise<T> {
     const digest = (value: string) => {
       if (!/^[0-9a-f]{64}$/.test(value))
         throw new TypeError("AUDIT_CONTEXT_DIGEST_INVALID");
@@ -23,7 +24,7 @@ export class ProfileTransactions {
     };
     const normalize = (value: unknown, max: number) => (typeof value === "string" && value.trim() ? value.trim() : "unknown").slice(0, max);
     const context = JSON.stringify({
-      ipArgon2id: digest(await this.audit.hashSourceIp(normalize(source?.ip, 64))), userAgentArgon2id: digest(await this.audit.hashUserAgent(normalize(source?.userAgent, 256)))
+      ipArgon2id: digest(await this.audit.hashSourceIp(normalize(source?.ip, 64), priority)), userAgentArgon2id: digest(await this.audit.hashUserAgent(normalize(source?.userAgent, 256), priority))
     });
     const client = await this.pool.connect();
     try {

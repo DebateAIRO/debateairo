@@ -22,9 +22,11 @@ const PRODUCT_ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const MAIN = "apps/api/src/main.ts";
 const PREVIEW_BUDGET = "apps/api/src/preview-budget-estimate.ts";
 const PUBLIC_TREE = "apps/api/src/public-tree.ts";
+const PUBLICATIONS = "apps/api/src/publications.ts";
 
 /** PLAN S4.5, verbatim as a map: reader id → the apps/api/src files where its sites are. */
 const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  X10: [PUBLICATIONS],
   X11: [MAIN],
   X14: [MAIN],
   X18h: [MAIN],
@@ -44,14 +46,16 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
  * X14 the three PostgresStaffRepository constructions and, since the security review (0171), the staff runtime's alert mapping pool; X18h the key store's owner lookup; X21 the gate's two reads; since
  * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
- * review's repository and its two readers; since upload check Task 9, X29 the report press's seal under the public
+ * review's repository and its two readers; since the merge with the security fixes of audit run 3, X10 the public read's
+ * run release key (readPublicDebate's #runReleaseKey: the author's run, read on the shared lease's connection, NV-31);
+ * since upload check Task 9, X29 the report press's seal under the public
  * debate's own run; since the security review (0171), X38 the Report button's settlement, after its
  * judge, and the writers of the site's day a request pays for, each the marker's alone: X30 the language check's probe and record,
  * X31 the question check's, X32 the clarify charge's (its reservation stays the request login's) and X33 the synthesis check's
  * record; and X37 the ask-time discovery's writer of a provider's probe, the marker's alone too (its reader stays the request pool's).
  * The file-level map alone cannot see a site added under an id already mapped to that file.
  */
-const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1, X30: 2,
+const EXPECTED_SITE_COUNTS: Readonly<Record<string, number>> = Object.freeze({ X10: 1, X11: 3, X14: 4, X18h: 1, X21: 2, X27: 1, X28: 3, X29: 1, X30: 2,
   X31: 2, X32: 2, X33: 1, X37: 1, X38: 1 });
 
 /** PLAN S4.3: main.ts's three `setCrossAccountTarget(pool, target)` calls, in this order. */
@@ -172,7 +176,7 @@ async function crossAccountSites(): Promise<Sites> {
 }
 
 describe("row-level security S01 C4: the apps/api cross-account sites and the T1 pools' targets", () => {
-  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37 and X38 in main.ts, X21 in preview-budget-estimate.ts and X29 in public-tree.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1, 2 and 1 sites", async () => {
+  it("S4.5 every crossAccount(\"<id>\", …) and crossAccountPool(<pool>, \"<id>\") site in apps/api/src is exactly X11, X14, X18h, X27, X28, X30, X31, X32, X33, X37 and X38 in main.ts, X21 in preview-budget-estimate.ts, X29 in public-tree.ts and X10 in publications.ts, each id a literal, with 3, 4, 1, 1, 3, 2, 2, 2, 1, 1, 1, 2, 1 and 1 sites", async () => {
     const { map, counts, unpinnable } = await crossAccountSites();
     expect(unpinnable).toEqual([]);
     expect(map).toEqual(EXPECTED_SITES);

@@ -15,6 +15,7 @@ import {
   readAskClarifyReply, sweepAskClarifyReservations
 } from "../../apps/api/src/ask-clarify.js";
 import { AskRoom } from "../../apps/api/src/ask-room.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 import { hostedQuestionLanguageRoute } from "../../apps/api/src/question-language/boot.js";
 import { questionWithPurposeLines } from "../../apps/api/src/purpose-lines.js";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
@@ -434,6 +435,8 @@ describe("POST /v1/asks/clarify", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ source: "AI", questions: [], purpose: PURPOSE });
     expect(seen).toEqual([[IDENTITY.authenticated.ownerRef, QUESTION]]);
+    // EU AI Act Art. 50(2): the AI's questions carry the machine-readable mark.
+    expect(response.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
     await api.close();
   });
   it("with room in the pool, the call goes", async () => {
@@ -467,6 +470,7 @@ describe("POST /v1/asks/clarify", () => {
     const response = await post(api, question);
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ source: "NONE" });
+    expect(response.headers[AI_GENERATED_HEADER]).toBeUndefined();
     expect(seen).toEqual([]);
     await api.close();
   });

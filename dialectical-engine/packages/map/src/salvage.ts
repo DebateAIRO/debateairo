@@ -113,17 +113,27 @@ const MAP_ID_NAMING_KEYS: ReadonlySet<string> = new Set(["member_item_ids", "for
 /** Ruling W2: the answer check's own naming keys (engine 2 only); every other salvage keeps the set above, as at BASE. */
 const MAP_CHECK_ID_NAMING_KEYS: ReadonlySet<string> = new Set([...MAP_ID_NAMING_KEYS, "check_id"]);
 
+/** Drops leading and trailing "-" in one pass from each end (CodeQL js/polynomial-redos: an edge-anchored global "-"
+ *  run regex is quadratic on a long interior run). The folded id is ASCII, so code units are characters. */
+function trimEdgeHyphens(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text.charCodeAt(start) === 45) start += 1;
+  while (end > start && text.charCodeAt(end - 1) === 45) end -= 1;
+  return text.slice(start, end);
+}
+
 /**
  * An id as the map's schema writes ids (`mapId` in replies.ts: `^[a-z0-9][a-z0-9-]{0,23}$`), pre-flight PF-A31 (ruling
  * R6): compatibility-decomposed (NFKD), combining marks dropped (ț → t, ă → a), lower-cased, every run of other
- * characters (an underscore, a space, a dot, ß, …) one "-", leading and trailing "-" trimmed, then cut to
- * `MAP_LIMITS.idMaxChars` (24). A "-" left last by the cut is kept: the id pattern admits it, so a non-empty result
- * always passes it. An id with nothing left (only signs, like "???") is kept as written, so the schema refuses it as
- * before and the follow-up asks for it.
+ * characters (an underscore, a space, a dot, ß, …) one "-", leading and trailing "-" trimmed (an index loop, never
+ * a regex on the uncut id), then cut to `MAP_LIMITS.idMaxChars` (24). A "-" left last by the cut is kept: the id
+ * pattern admits it, so a non-empty result always passes it. An id with nothing left (only signs, like "???") is kept
+ * as written, so the schema refuses it as before and the follow-up asks for it.
  */
 function normalisedMapId(id: string): string {
-  const normalised = id.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase()
-    .replace(/[^a-z0-9-]+/gu, "-").replace(/^-+|-+$/gu, "").slice(0, MAP_LIMITS.idMaxChars);
+  const folded = id.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^a-z0-9-]+/gu, "-");
+  const normalised = trimEdgeHyphens(folded).slice(0, MAP_LIMITS.idMaxChars);
   return normalised === "" ? id : normalised;
 }
 

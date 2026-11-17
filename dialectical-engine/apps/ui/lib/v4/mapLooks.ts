@@ -1,6 +1,9 @@
 import type { PathRewrite } from "@debateai/contract";
+import { sameItemText } from "./askText.js";
 import { isFinishedRewrite, uniqueOpenQuestions } from "./mapModel.js";
-import { TRUST_WORDS, type DigTarget, type DigView, type TrustCounts, type TrustWord, type V4Map, type V4OpenQuestion, type V4Path } from "./types.js";
+import {
+  TRUST_WORDS, type DigTarget, type DigView, type TrustCounts, type TrustWord, type V4DigPick, type V4Map, type V4OpenQuestion, type V4Path
+} from "./types.js";
 
 /*
  * V4 screen review (owner picks of 3 Nov, OWNER-PICKS-2026-11-03.md): what the map's cards say and look like, worked out
@@ -205,8 +208,34 @@ export function cardLabel(line: string): string {
 export function firstByOf(target: DigTarget): "AI" | "PERSON" {
   if (target.kind !== "picks") return "AI";
   const first = target.picks[0];
-  if (first === undefined) return "AI";
-  if (first.kind === "OWN_VIEW") return "PERSON";
-  if (first.kind === "SUGGESTION") return first.text.trim() === first.suggestion.text.trim() ? "AI" : "PERSON";
+  return first === undefined ? "AI" : pickBy(first);
+}
+
+/** Who wrote one pick: the person (their own view, or their edit of a suggestion), or the AIs. */
+function pickBy(pick: V4DigPick): "AI" | "PERSON" {
+  if (pick.kind === "OWN_VIEW") return "PERSON";
+  if (pick.kind === "SUGGESTION") return pick.text.trim() === pick.suggestion.text.trim() ? "AI" : "PERSON";
   return "AI";
+}
+
+/** Who wrote each of a dig's questions, in askText.digTargetQuestions' order (the DigLink's `questions`), by firstByOf's rule. */
+export function questionsByOf(target: DigTarget): readonly ("AI" | "PERSON")[] {
+  if (target.kind === "path") return Object.freeze(["AI"]);
+  if (target.kind === "open") return Object.freeze(target.questions.map((): "AI" => "AI"));
+  return Object.freeze(target.picks.map(pickBy));
+}
+
+/**
+ * EU AI Act Art. 50(2), dig-f20 per item: whether the dig's question at `at` (its link's `questions`) was written by the AIs. The
+ * link's own record when the page has it (a dig started in this visit), else the dig's own answer naming each pick and who
+ * wrote it, else the link's `firstBy` for the first item; with none of these the item is taken as the AI text a dig link holds.
+ */
+export function digQuestionIsAi(dig: Pick<DigView, "link" | "picks">, at: number): boolean {
+  const by = dig.link.questionsBy?.[at];
+  if (by !== undefined) return by === "AI";
+  const text = dig.link.questions[at] ?? "";
+  const pick = (dig.picks ?? []).find((told) => sameItemText(told.text, text) || sameItemText(text, told.text));
+  if (pick !== undefined) return pick.by === "AI_SUGGESTION";
+  if (at === 0 && dig.link.firstBy !== undefined) return dig.link.firstBy === "AI";
+  return true;
 }

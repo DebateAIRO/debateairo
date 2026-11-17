@@ -13,6 +13,8 @@ describe("P2-08 authentication-risk lifecycle contract",()=>{
     expect(source).toContain("clearInterval(authenticationRiskCleanupTimer)");
     expect(source).toContain("triggerAuthenticationRiskCleanup();");
     expect(source).not.toContain("while (await authenticationRiskSignals.purgeExpired");
+    expect(source).toContain("const recoveryStartRepository = new PostgresRecoveryStartRepository(");
+    expect(source).toContain("try{await recoveryStartRepository.expireStaleBindings(100,10);}catch{console.error(\"[RECOVERY_BINDING_EXPIRY_PENDING]\");}");
   });
   it("binds the SQL retention interval to the sealed recovery-policy carrier",async()=>{
     const [migration,policy]=await Promise.all([

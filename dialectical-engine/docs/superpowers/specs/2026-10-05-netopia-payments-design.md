@@ -61,6 +61,11 @@ refusal 20 (not enough money) or our own failure, never more than twice in 24 ho
 (NETOPIA status 10) ends the plan by itself: the person gets one email, you get one email, and no command is needed
 (your decision of 24 October 2026, §2.13).
 
+The withdrawal's formula stayed the same through the switch to NETOPIA, and changed later for its own reason (the
+owner's decision of 16 November 2026, paid-plans spec §1.5): a withdrawal gives back the price times the share of the
+plan's credit not used, the days gone by no longer count, and everyone the site serves has the 14 days. With nothing
+used, a withdrawal now refunds the whole payment.
+
 ### 1.4 Refunds, while refunds by API are not built
 
 NETOPIA's API lists a refund call, but marks it "available at a future date", and none of NETOPIA's own plugins uses
@@ -71,10 +76,11 @@ partial refund recorded in the sandbox. Until then **you make refunds in NETOPIA
 1. When a refund is owed (for example, a withdrawal within 14 days), the site emails you at once: which payment,
    exactly how much, why, the deadline when there is one, and the one command to run once you have refunded.
 2. You refund exactly that amount in NETOPIA's admin, in one refund.
-3. **A full refund** (the whole payment) is recorded by the site itself as soon as NETOPIA reports it. **A partial
-   refund** (most withdrawals are partial) is recorded when you run the command from the email, because NETOPIA has not
-   said whether it reports partial refunds and their amount (N-8). Either way, the site then sends the customer's email
-   and issues the credit note by itself.
+3. **A full refund** (the whole payment) is recorded by the site itself as soon as NETOPIA reports it. Since the
+   owner's decision of 16 November 2026 that includes a withdrawal by a person who used none of the plan's credit.
+   **A partial refund** (a withdrawal after some of the credit was used) is recorded when you run the command from the
+   email, because NETOPIA has not said whether it reports partial refunds and their amount (N-8). Either way, the site
+   then sends the customer's email and issues the credit note by itself.
 4. The site reminds you of every refund still open, and every day once a withdrawal's deadline is three days away.
 
 Once the refund call is proven in the sandbox, the site makes refunds by itself, the way it did with xMoney.
@@ -1160,7 +1166,8 @@ SDD briefs) and C5 (the controller's review and records); §2.25 is the decision
 - **Only the price changes currency.** The AI credit and every cost envelope stay in US dollars, because that is what
   the AI companies charge us: `monthly_credit_micros`, the day and week caps, the cost envelopes, the budget package,
   the evaluator and the story policy keep `"USD"`. A6's prorated credit and the withdrawal's credit share are ratios
-  and do not change.
+  and do not change. (Since the owner's decision of 16 November 2026 the credit share is the only measure of a
+  withdrawal's refund, so the refund is the same share of the price in RON, EUR or USD.)
 
 #### 2.16.2 The price list in the register (`billingPlans` v2)
 

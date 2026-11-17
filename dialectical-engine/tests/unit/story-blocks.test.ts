@@ -101,6 +101,21 @@ describe("claimFigures: the figures a claim states, as it writes them", () => {
     expect(claimFigures("Output rose 12% in 2024, at 52 %.")).toEqual(["12%", "52 %"]);
     expect(claimFigures("No numbers here.")).toEqual([]);
   });
+
+  // Chart relevance (2026-11-16): the number in a name is not a figure the debate found.
+  it("leaves out a number that is part of a name", () => {
+    expect(claimFigures("The iPhone 14 is a close second to the Samsung Galaxy S24; the Oppo Reno 12 is the weakest.")).toEqual([]);
+    expect(claimFigures("Gemini's gpt-5.6 rival beat COVID-19 forecasts on Windows 11 and macOS 15.")).toEqual([]);
+    expect(claimFigures("The iPhone 14 gets about 6 years of updates and the Galaxy S24 gets 7 years.")).toEqual(["6 years", "7 years"]);
+  });
+
+  it("keeps a figure that only looks like a name: a price, a percentage, the first words of a sentence", () => {
+    expect(claimFigures("Samsung 45 %, Apple $5 and Oppo US$3.")).toEqual(["45 %", "$5", "$3"]);
+    expect(claimFigures("Roughly 30 people left. Over 40 teams stayed.")).toEqual(["30 people", "40 teams"]);
+    expect(claimFigures("It costs USD 500 a year, or CHF5 a day.")).toEqual(["500 a", "5 a"]);
+    // Hebrew glues a preposition to its number with a hyphen: still a figure.
+    expect(claimFigures("המחיר עלה ב-50 שקלים")).toEqual(["50 שקלים"]);
+  });
 });
 
 describe("storyBlockNeeds: the block call is made only when the debate holds something worth showing", () => {
@@ -117,6 +132,17 @@ describe("storyBlockNeeds: the block call is made only when the debate holds som
     ));
     expect(needs).toEqual({ figures: false, compare: false, prosCons: false, ranking: false });
     expect(storyBlockCallNeeded(needs)).toBe(false);
+  });
+
+  it("names with numbers in them are not figures: three phones argued in words hold no figures", () => {
+    const needs = storyBlockNeeds(material(
+      [
+        { id: "P1", place: 1, won: true, claim: "The Galaxy S24 is the most secure of the three." },
+        { id: "P2", place: 2, won: false, claim: "The iPhone 14 is the most secure of the three." }
+      ],
+      [{ id: "P3", known_by: "LOOKED_UP", attacks: ["P1"], claim: "The Oppo Reno 12 is the weakest, behind the iPhone 14." }]
+    ));
+    expect(needs.figures).toBe(false);
   });
 
   it("a v3 material that lists each position among the points counts it once", () => {
@@ -199,6 +225,30 @@ describe("readStoryBlocks: what the plan keeps", () => {
     expect(readStoryBlocks({ charts: [] }, CONTEXT)).toEqual({ form: null, charts: [], tables: [], dropped: [] });
     expect(readStoryBlocks({ tables: [] }, CONTEXT).dropped).toEqual(["CHART_SCHEMA"]);
   });
+});
+
+// Chart relevance (2026-11-16): the 30 October report printed "Point strength for claims about coding value", three
+// bars for three points that said the same thing. A strength is charted for the debate's answers and nothing else.
+describe("readStoryBlocks: a strength chart compares the answers", () => {
+  const strengths = (after: string, refs: readonly string[]): Record<string, unknown> => ({
+    after, kind: "bar", title: "How strong each case turned out", x: null,
+    y: { label: "Strength", source: "strength", log: false },
+    items: refs.map((ref) => ({ label: `Case ${ref}`, node_ref: ref, x: null, y: null })),
+    frontier: null
+  });
+
+  it("keeps the strengths of the positions side by side", () => {
+    const read = readStoryBlocks({ question_form: "pick-option", charts: [strengths("why.1", ["P1", "P2", "P3"])], tables: [] }, CONTEXT);
+    expect(read.dropped).toEqual([]);
+    expect(read.charts.map((chart) => chart.items.map((item) => item.node_ref))).toEqual([["P1", "P2", "P3"]]);
+  });
+
+  it.each(["pick-option", "yes-no", "is-it-true", "why-cause", "prediction", "how-much", "trend"])(
+    "drops the strengths of the points under a position, for a %s question", (form) => {
+      const read = readStoryBlocks({ question_form: form, charts: [strengths("why.2", ["P4", "P5"])], tables: [] }, CONTEXT);
+      expect(read.charts).toEqual([]);
+      expect(read.dropped).toEqual(["CHART_STRENGTH_NOT_ANSWER"]);
+    });
 });
 
 describe("storyRanking: code's own ranking of the answers", () => {

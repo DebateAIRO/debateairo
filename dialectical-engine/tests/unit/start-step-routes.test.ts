@@ -28,6 +28,7 @@ import {
 } from "../../apps/api/src/start-step/step.js";
 import { START_STREAM_DRAIN_POLL_MS, openStartStream, type StartStream } from "../../apps/api/src/start-step/stream.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication, testSessionHeaders } from "../support/httpSession.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 
 const IDENTITY = testHttpIdentity("start-step-routes");
 const OWNER = IDENTITY.authenticated.ownerRef;
@@ -108,12 +109,14 @@ type Over = Readonly<{
   offTeam?: boolean; pool?: () => Promise<Readonly<{ empty: boolean; funding: null }>>; draining?: () => boolean;
   timing?: Readonly<{ heartbeatMs?: number; streamMaxLifeMs?: number }>; run?: RunProjection | null;
 }>;
+/** The UI's proof: the edge's country is honoured only from a request that carries it. */
+const UI_PROOF = "s".repeat(43);
 function apiOver(key: StartStepKey, port: StartStepPort | undefined, over: Over = {}) {
   const sessions = { ...testSessionApplication([IDENTITY]), readSensitiveDataConsent: async () => over.consent ?? "given" as const };
   const application = { readRun: async (runId: string) => runId === PARENT_RUN ? over.run === undefined ? RUN : over.run : null } as unknown as AskApplication;
   const view: AdmissionView = Object.freeze({ registerVersion: over.version ?? ACTIVE, modelScorecardInForce: false });
   return buildApi({
-    application, sessions, allowedOrigin: TEST_APP_ORIGIN,
+    application, sessions, allowedOrigin: TEST_APP_ORIGIN, uiApiProof: Buffer.from(UI_PROOF),
     ...(over.port === null || port === undefined ? {} : { startStep: over.port ?? port }),
     ...(over.key === null ? {} : { startStepKey: over.key ?? key }),
     ...(over.version === null ? {} : { admissionView: async () => view }),
@@ -155,12 +158,14 @@ describe("POST /v1/asks/paths/lists", () => {
     const { port, seen } = portOf(key);
     const api = apiOver(key, port);
     try {
-      const response = await post(api, "lists", LISTS_BODY, { ...HEADERS, "cf-ipcountry": "RO" });
+      const response = await post(api, "lists", LISTS_BODY, { ...HEADERS, "cf-ipcountry": "RO", "x-debateai-ui-proof": UI_PROOF });
       expect(response.statusCode).toBe(200);
       expect(response.headers["content-type"]).toBe("text/event-stream");
       expect(response.headers["cache-control"]).toBe("no-store");
       expect(response.headers["x-content-type-options"]).toBe("nosniff");
       expect(response.headers["x-frame-options"]).toBe("DENY");
+      // EU AI Act Art. 50(2): a stream the step writes carries the AIs' lists; writeHead names the mark itself.
+      expect(response.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
       expect(namesOf(response.body)).toEqual(["check", "list", "end"]);
       expect(framesOf(response.body).at(-1)).toEqual({ event: "end", data: { reason: "DONE" } });
       expect(seen.lists).toHaveLength(1);
@@ -216,6 +221,7 @@ describe("POST /v1/asks/paths/lists", () => {
       expect(response.statusCode).toBe(200);
       expect(response.headers["content-type"]).toBe("text/event-stream");
       expect(framesOf(response.body)).toEqual([{ event: "none", data: { reason: "NOT_ASKED" } }, { event: "end", data: { reason: "NONE" } }]);
+      expect(response.headers[AI_GENERATED_HEADER]).toBeUndefined();
       expect(seen.lists).toEqual([]);
     } finally {
       await api.close();
@@ -372,6 +378,8 @@ describe("POST /v1/asks/paths/merge", () => {
       expect(response.headers["content-type"]).toBe("text/event-stream");
       expect(framesOf(response.body)).toEqual([{ event: "menu", data: { source: "CODE", menu: signedMenu(key, 1) } },
         { event: "end", data: { reason: "DONE" } }]);
+      // A code merge still carries the viewpoints the AIs' lists wrote.
+      expect(response.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
       expect(seen.merges[0]).toMatchObject({ question_line: Q, ownerScope: SCOPE, planKey: "premium", settingsVersion: ACTIVE });
     } finally {
       await api.close();
@@ -502,9 +510,11 @@ describe("POST /v1/asks/paths/combine and …/fit", () => {
       expect(combined.statusCode).toBe(200);
       expect(combined.headers["content-type"]).toContain("application/json");
       expect(combined.json()).toMatchObject({ source: "AI", title: "Queues and winters", question: "Do the queues and the winters decide it?" });
+      expect(combined.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
       expect(seen.combines[0]).toMatchObject({ ownerScope: SCOPE, planKey: "premium", settingsVersion: ACTIVE, digParent: null });
       const fitted = await post(api, "fit", fitBody(key));
       expect(fitted.json()).toEqual({ source: "AI", fits_key: "p1" });
+      expect(fitted.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
       expect(seen.fits[0]).toMatchObject({ own_text: "What the fishermen think of the pier", ownerScope: SCOPE, planKey: "premium" });
     } finally {
       await api.close();
@@ -545,6 +555,7 @@ describe("POST /v1/asks/paths/combine and …/fit", () => {
         const response = await post(api, path, body);
         expect(response.statusCode, path).toBe(status);
         expect(response.json(), path).toEqual({ error: code, message: code });
+        expect(response.headers[AI_GENERATED_HEADER], path).toBeUndefined();
       }
     } finally {
       await api.close();
@@ -569,6 +580,7 @@ describe("POST /v1/asks/paths/combine and …/fit", () => {
         const response = await post(api, path, body);
         expect(response.statusCode, `${path} ${reason}`).toBe(200);
         expect(response.json(), `${path} ${reason}`).toEqual({ source: "NONE", reason });
+        expect(response.headers[AI_GENERATED_HEADER], `${path} ${reason}`).toBeUndefined();
       } finally {
         await api.close();
       }

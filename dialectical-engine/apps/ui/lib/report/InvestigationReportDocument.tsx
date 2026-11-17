@@ -1,6 +1,7 @@
 import { Fragment, type JSX } from "react";
 import { Document, Link, Page, StyleSheet, Text, View, type Styles } from "@react-pdf/renderer";
 import { formatNumber } from "../i18n/translate.js";
+import { AI_GENERATED_KEYWORD, REPORT_PDF_VERSION } from "./pdfAiMark.js";
 import { REPORT_FONT_FAMILIES } from "./reportFonts.js";
 import { reportLineBreaker } from "./reportLineBreaks.js";
 import { reportLayout, reportPrintedText, type ReportLayout } from "./reportLayout.js";
@@ -224,8 +225,9 @@ export function InvestigationReportDocument({ model }: { model: InvestigationRep
       subject={model.metadataSubject}
       creator="Dialectical Engine"
       producer="Dialectical Engine"
-      keywords="AI-generated"
+      keywords={AI_GENERATED_KEYWORD}
       language={model.language}
+      pdfVersion={REPORT_PDF_VERSION}
     >
       <Page size="A4" style={[styles.page, look.page]}>
         <View style={styles.notice}><Words look={look} style={styles.noticeText} text={model.notAdvice} /></View>

@@ -4,7 +4,7 @@ import type { CryptoEnvelope } from "@debateai/crypto";
 /**
  * Public debates anyone can dig (migration 0137; plan 2026-10-31-r22-owner-changes decision 13), through 0137's definers only.
  * `PostgresPublicDebateRepository` runs on the API's own pool (debateai_billing_runtime); `PostgresPublicDebateRunnerRepository` on the runner's or
- * the scheduler's pool, and the API's for the public page's two reads (`readPageUpdates`, `isAuthorNameGone`: debateai_runtime, which the API's roles
+ * the scheduler's pool, and the API's for the public page's read (`readPageUpdates`: debateai_runtime, which the API's roles
  * inherit). Its other methods, which take no owner, need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler and
  * the API's system pool outside a request hold and the API's request login does not since 0171 (the security review, F5).
  *
@@ -19,7 +19,7 @@ import type { CryptoEnvelope } from "@debateai/crypto";
  *   PublicationCipher, keyId `publication-snapshot:<ref>:v1`), so the page outlives the digger's run key. The page shows the first
  *   snapshot, then `readPageUpdates` in order; a newer update of a path replaces the older on the page.
  * - The names: `contributor` is read live from the account, null once it went: the page says "a contributor". Same for the first
- *   author: `isAuthorNameGone` says the snapshot's sealed pseudonym must not be shown.
+ *   author: the snapshot holds no name, and `PostgresPublicationRepository.readPublic` reads it with the snapshot.
  * - A Free ask that showed the notice calls `recordFreeNotice`; only those debates ever go public. The sweep lists them
  *   (`readFreeToPublish`), runs the check, then `prepareFreePublication`, makes the key, and `publishFree`; a refusal is
  *   `refuseFree` (private for good); an unavailable check records nothing and the sweep tries again.
@@ -84,7 +84,7 @@ export class PostgresPublicDebateRepository {
 }
 
 /**
- * The runner's or the scheduler's pool. `readPageUpdates` and `isAuthorNameGone` are debateai_runtime's (the public page reads them on the API's
+ * The runner's or the scheduler's pool. `readPageUpdates` is debateai_runtime's (the public page reads it on the API's
  * request pool); the rest, `readContribution` included, need the cross-account marker (debateai_rls_all_accounts), which the runner, the scheduler
  * and the API's system pool outside a request hold and the API's request login does not (0171).
  */
@@ -115,10 +115,6 @@ export class PostgresPublicDebateRunnerRepository {
   async readPageUpdates(publicationRef: string): Promise<readonly PublicPageUpdateRead[]> {
     return (await this.pool.query<{ updates: PublicPageUpdateRead[] }>(
       "SELECT identity.read_public_debate_updates($1) AS updates", [publicationRef])).rows[0]!.updates;
-  }
-
-  async isAuthorNameGone(publicationRef: string): Promise<boolean> {
-    return (await this.pool.query<{ gone: boolean }>("SELECT identity.public_author_name_gone($1) AS gone", [publicationRef])).rows[0]!.gone;
   }
 
   /** The Free debates that finished and wait for their check. */

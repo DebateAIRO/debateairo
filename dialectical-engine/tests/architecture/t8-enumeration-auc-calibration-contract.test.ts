@@ -10,7 +10,14 @@ describe("T8 enumeration AUC calibration contract", () => {
       read("docs/missions/2026-08-17-accounts-privacy-security/reviews/T8-enumeration-auc-calibration-disposition.md")
     ]);
 
-    expect(registration).toContain("for (const concurrency of [1, 2, 3, 4, 8] as const)");
+    expect(registration).toContain(
+      "([1, 2, 3, 4, 8] as const).map((concurrency) => ({ concurrency, secondReading: false }))"
+    );
+    // A group over a bound gets one more reading, never more, and the final
+    // assertions below still hold every counted reading to the same bounds.
+    expect(registration).toContain("if (!secondReading && (auc > aucCeiling");
+    expect(registration).toContain("groups.push({ concurrency, secondReading: true });");
+    expect(registration.split("secondReading: true").length - 1).toBe(1);
     expect(registration).toContain("const waves = Math.max(4,Math.ceil(16/concurrency));");
     expect(registration).toContain("const sampleCountPerArm = concurrency * waves;");
     expect(registration).toContain("existing,sampleCountPerArm,0x53b0_0000 + concurrency * 2");

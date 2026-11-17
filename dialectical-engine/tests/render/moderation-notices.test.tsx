@@ -53,6 +53,9 @@ describe("the moderation notices page", () => {
     expect(text).not.toContain(pub["public.moderation.suspectedIntro"]);
     expect(text).toContain(pub["public.moderation.ground.HATE_SPEECH"]);
     expect(page.querySelector("blockquote")!.textContent).toBe("the words the check found");
+    // EU AI Act Art. 50(2): the quote is the AI check's copy of the published (AI-written) page; the intro is the site's own.
+    expect(page.querySelector("blockquote")!.getAttribute("data-ai-generated")).toBe("true");
+    expect(page.querySelector("blockquote")!.previousElementSibling!.closest('[data-ai-generated="true"]')).toBeNull();
   });
 
   it("a removal shows the facts staff typed; a correction lists its places; facts past twelve months say they were deleted; a step with no ground says so", async () => {

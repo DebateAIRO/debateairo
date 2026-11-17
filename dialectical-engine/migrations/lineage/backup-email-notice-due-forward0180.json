@@ -1,0 +1,17 @@
+{
+  "version": "backup-email-notice-due-forward0180-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0179_password_reset_notice_due.sql",
+    "manifestSha256": "7d3eb3c7653526c620b6a4e5eb3dd7a38278d44747b536873cbd36233cb202fe",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0180_backup_email_notice_due.sql",
+    "sha256": "000d9d5c6941395c3038febb17d2f5bc0c153b7d661363f308a8338ce28ac358"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

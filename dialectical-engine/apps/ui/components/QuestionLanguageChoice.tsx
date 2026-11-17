@@ -130,7 +130,7 @@ function QuestionLanguageChoiceDialog({
               className="sensitiveConsentStatement questionLanguageProposal"
               aria-label={t(catalog, "newDebate.languageCheck.proposalLabel")}
             >
-              <bdi lang={offer.main_language.code} dir="auto">{offer.proposed_question}</bdi>
+              <bdi lang={offer.main_language.code} dir="auto" data-ai-generated="true">{offer.proposed_question}</bdi>
             </blockquote>
           </div>
           <div className="policyFoot">

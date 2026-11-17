@@ -10,7 +10,7 @@
   "mail.M1.active": "Grazie. Il suo piano {plan} è ora attivo.",
   "mail.M1.price": "Paga {totalAmount} al mese, tasse incluse. Il piano si rinnova il {renewDate} e poi ogni mese finché non lo disdice.",
   "mail.M1.cancel": "Può disdire in qualsiasi momento nelle Impostazioni, oppure senza accedere da questa pagina: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Se risiede nell’UE, nel SEE o nel Regno Unito, può recedere entro {withdrawalDays} giorni. In tal caso paga solo la parte già utilizzata: la maggiore tra i giorni utilizzati e il credito utilizzato. Il modulo tipo di recesso è allegato a questa e-mail.",
+  "mail.M1.withdrawal": "Ovunque risieda, può recedere entro {withdrawalDays} giorni. In tal caso paga solo la parte del credito del piano che ha utilizzato; se non ne ha utilizzato nulla, le viene restituito l’intero prezzo. Il modulo tipo di recesso è allegato a questa e-mail.",
   "mail.M1.termsAttached": "I Termini che ha accettato sono allegati. La versione più recente è sempre disponibile su {termsUrl}",
   "mail.M1.termsCurrent": "I nostri Termini attuali sono online su {termsUrl}",
   "mail.M2.subject": "La sua ricevuta Dialectical Engine di {totalAmount}",

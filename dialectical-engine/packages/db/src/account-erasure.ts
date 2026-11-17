@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import {
+  isRunContentKeyRecordMissing,
   type AuditContextHasher,
   type CryptoEnvelope,
   decrypt,
@@ -25,6 +26,7 @@ import {
 } from "./erasure-page-memory.js";
 import { MAIL_LOCALE_SETTING, withMailLocale } from "./mail-locale.js";
 import { withPublicationContentLease } from "./publication-lease.js";
+import { LEASE_LOCK_WAITS } from "./pool-budget.js";
 
 const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   "identity.schedule_account_erasure(uuid,uuid,uuid,text)",
@@ -72,6 +74,16 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   FORGET_ERASED_DEBATE_PATH_SUGGESTIONS,
   // 0147: its copy of the public page, its check's pass, its climb's mark and an answer version under its key.
   FORGET_ERASED_DEBATE_PUBLIC_TREE
+] as const);
+/** K02 (0178): erasure capabilities in the erasure_reconcile schema, which the N-1 release (counting identity, core, serve) does not attest. Resolved by OID, never by text, on the attested pool; each entry lands with its 0178 section. */
+const ERASURE_RECONCILE_FUNCTION_SIGNATURES = Object.freeze([
+  "erasure_reconcile.fail_account_erasure_notification(uuid,uuid,text)",
+  "erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)",
+  "erasure_reconcile.account_erasure_preview(uuid)",
+  "erasure_reconcile.prepare_account_erasure(uuid,uuid[],uuid[],uuid[])"
+] as const);
+const ERASURE_ATTESTED_FUNCTION_SIGNATURES = Object.freeze([
+  ...ERASURE_FUNCTION_SIGNATURES, ...ERASURE_RECONCILE_FUNCTION_SIGNATURES
 ] as const);
 const ERASURE_FORBIDDEN_ROLES = Object.freeze([
   "public","debateai_runtime","debateai_authorization_runtime",
@@ -148,6 +160,8 @@ type ErasureRoleWitness = Readonly<{
   anySequencePrivilege: boolean;
   exactFunctionCount: number;
   forbiddenFunctionPrivilege: boolean;
+  forbiddenReconcilePrivilege: boolean;
+  reconcileFunctionCount: number;
   sensitiveHelperPrivilege:boolean;
   capabilityRoleLogin:boolean;
   capabilityRoleInherit:boolean;
@@ -166,22 +180,48 @@ type PrivateRunErasureManifest = Readonly<{
 const CONTENT_LEASE_NAMESPACE = "debateai:run-content-lease:v1:" as const;
 const NOTIFICATION_LEASE_NAMESPACE = "debateai:account-erasure-notification:v1:" as const;
 
+/** NV-10: the published owner of a run key, or null when its directory holds no published record (nothing usable). */
+async function recordedOwnerRef(runs: RunContentKeyStore, runId: string): Promise<string | null> {
+  try { return await runs.ownerRef(runId); }
+  catch (error) { if (isRunContentKeyRecordMissing(error)) return null; throw error; }
+}
+
+/**
+ * The account-erasure timer's run-content leases (PostgresAccountErasureRepository.prepare only), taken EXCLUSIVE in
+ * sorted run order. Each run's wait queues in PostgreSQL, so readers cannot starve a due erasure, but is bounded by a
+ * transaction-local lock_timeout of LEASE_LOCK_WAITS.exclusiveMs: the first timeout answers `wait.contended()` and the
+ * next cycle retries. The session locks outlive that transaction's COMMIT; lock_timeout does not. A private-debate
+ * delete request never comes here: it takes its run's lease in SQL, after its grant is checked, and never waits (NV-30).
+ */
 async function withErasureContentLeases<T>(
   pool: Pool,
   requestedRunIds: readonly string[],
-  use: (client: PoolClient) => Promise<T>
+  use: (client: PoolClient) => Promise<T>,
+  wait: Readonly<{ contended: () => T }>
 ): Promise<T> {
   const runIds = [...new Set(requestedRunIds)].sort();
   const client = await pool.connect();
   const acquired: string[] = [];
   let releaseFailure: unknown;
   try {
-    for (const runId of runIds) {
-      await client.query(
-        "SELECT pg_advisory_lock(hashtextextended($1,0))",
-        [`${CONTENT_LEASE_NAMESPACE}${runId}`]
-      );
-      acquired.push(runId);
+    await client.query("BEGIN");
+    try {
+      await client.query("SELECT set_config('lock_timeout',$1,true)",[`${LEASE_LOCK_WAITS.exclusiveMs}ms`]);
+      for (const runId of runIds) {
+        await client.query(
+          "SELECT pg_advisory_lock(hashtextextended($1,0))",
+          [`${CONTENT_LEASE_NAMESPACE}${runId}`]
+        );
+        acquired.push(runId);
+      }
+      await client.query("COMMIT");
+    } catch (error) {
+      // Session locks taken before a timeout survive the ROLLBACK; the finally below unlocks them.
+      await client.query("ROLLBACK").catch(() => undefined);
+      if (typeof error === "object" && error !== null && (error as { code?: unknown }).code === "55P03") {
+        return wait.contended();
+      }
+      throw error;
     }
     return await use(client);
   } finally {
@@ -246,10 +286,19 @@ async function readErasureRoleWitness(pool: Pool): Promise<ErasureRoleWitness> {
     any_sequence_privilege: boolean;
     exact_function_count: string;
     forbidden_function_privilege: boolean;
+    forbidden_reconcile_privilege: boolean;
+    reconcile_function_count: string;
     sensitive_helper_privilege:boolean;
     capability_role_login:boolean;
     capability_role_inherit:boolean;
   }>(`
+    WITH reconcile AS (
+      SELECT procedure.oid,namespace.nspname||'.'||procedure.proname||'('
+        ||replace(pg_catalog.oidvectortypes(procedure.proargtypes),', ',',')||')' AS signature
+      FROM pg_catalog.pg_proc AS procedure
+      JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
+      WHERE namespace.nspname='erasure_reconcile'
+    )
     SELECT session_user AS session_principal,current_user AS principal,
       role.rolsuper,role.rolcreaterole,role.rolcreatedb,role.rolreplication,
       role.rolbypassrls,
@@ -269,13 +318,15 @@ async function readErasureRoleWitness(pool: Pool): Promise<ErasureRoleWitness> {
           WHERE database.datname=current_database() AND database.datdba=role.oid)
         OR EXISTS (SELECT 1 FROM pg_catalog.pg_namespace AS namespace
           WHERE namespace.nspname=ANY(ARRAY[
-            'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator'
+            'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator',
+            'erasure_reconcile'
           ]) AND namespace.nspowner=role.oid)) AS owns_database_or_schema,
       EXISTS (
         SELECT 1 FROM pg_catalog.pg_class AS relation
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
         WHERE namespace.nspname=ANY(ARRAY[
-          'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator'
+          'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator',
+          'erasure_reconcile'
         ]) AND relation.relkind IN ('r','p')
           AND has_table_privilege(current_user,relation.oid,
             'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')
@@ -284,13 +335,14 @@ async function readErasureRoleWitness(pool: Pool): Promise<ErasureRoleWitness> {
         SELECT 1 FROM pg_catalog.pg_class AS relation
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=relation.relnamespace
         WHERE namespace.nspname=ANY(ARRAY[
-          'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator'
+          'identity','core','ledger','serve','scorecard','register','memory','evidence','evaluator',
+          'erasure_reconcile'
         ]) AND relation.relkind='S'
           AND has_sequence_privilege(current_user,relation.oid,'USAGE,SELECT,UPDATE')
       ) AS any_sequence_privilege,
       (SELECT count(*)::text FROM pg_catalog.pg_proc AS procedure
         JOIN pg_catalog.pg_namespace AS namespace ON namespace.oid=procedure.pronamespace
-        WHERE namespace.nspname=ANY(ARRAY['identity','core','serve'])
+        WHERE namespace.nspname=ANY(ARRAY['identity','core','serve','erasure_reconcile'])
           AND has_function_privilege(current_user,procedure.oid,'EXECUTE'))
         AS exact_function_count,
       EXISTS (
@@ -298,6 +350,13 @@ async function readErasureRoleWitness(pool: Pool): Promise<ErasureRoleWitness> {
         CROSS JOIN unnest($2::text[]) AS capability(signature)
         WHERE has_function_privilege(forbidden_role.role_name,capability.signature,'EXECUTE')
       ) AS forbidden_function_privilege,
+      EXISTS (
+        SELECT 1 FROM unnest($1::text[]) AS forbidden_role(role_name)
+        JOIN reconcile ON reconcile.signature=ANY($5::text[])
+        WHERE has_function_privilege(forbidden_role.role_name,reconcile.oid,'EXECUTE')
+      ) AS forbidden_reconcile_privilege,
+      (SELECT count(*)::text FROM reconcile WHERE reconcile.signature=ANY($5::text[])
+        AND has_function_privilege(current_user,reconcile.oid,'EXECUTE')) AS reconcile_function_count,
       EXISTS (
         SELECT 1 FROM unnest($3::text[]) AS forbidden_role(role_name)
         CROSS JOIN unnest($4::text[]) AS helper(signature)
@@ -311,7 +370,7 @@ async function readErasureRoleWitness(pool: Pool): Promise<ErasureRoleWitness> {
       AND capability.rolname='debateai_erasure_runtime'
   `, [ERASURE_FORBIDDEN_ROLES,ERASURE_FUNCTION_SIGNATURES,
     [...ERASURE_FORBIDDEN_ROLES,"debateai_erasure_runtime"],
-    ERASURE_SENSITIVE_HELPER_SIGNATURES]);
+    ERASURE_SENSITIVE_HELPER_SIGNATURES,ERASURE_RECONCILE_FUNCTION_SIGNATURES]);
   const row = result.rows[0];
   if (row === undefined) throw new TypeError("ERASURE_DATABASE_ROLE_ATTESTATION_FAILED");
   return Object.freeze({
@@ -330,6 +389,8 @@ async function readErasureRoleWitness(pool: Pool): Promise<ErasureRoleWitness> {
     anySequencePrivilege: row.any_sequence_privilege,
     exactFunctionCount: Number(row.exact_function_count),
     forbiddenFunctionPrivilege: row.forbidden_function_privilege,
+    forbiddenReconcilePrivilege: row.forbidden_reconcile_privilege,
+    reconcileFunctionCount: Number(row.reconcile_function_count),
     sensitiveHelperPrivilege:row.sensitive_helper_privilege,
     capabilityRoleLogin:row.capability_role_login,
     capabilityRoleInherit:row.capability_role_inherit
@@ -342,6 +403,7 @@ export async function assertAccountErasureDatabaseRole(
   const [runtime,witness,exactFunctions] = await Promise.all([
     runtimePool.query<{
       principal:string;capabilities:boolean[];sensitive_helpers:boolean[];
+      reconcile_schema_usage:boolean;
     }>(`
       SELECT current_user AS principal,ARRAY(
         SELECT has_function_privilege(current_user,capability.signature,'EXECUTE')
@@ -349,7 +411,9 @@ export async function assertAccountErasureDatabaseRole(
       ) AS capabilities,ARRAY(
         SELECT has_function_privilege(current_user,helper.signature,'EXECUTE')
         FROM unnest($2::text[]) AS helper(signature)
-      ) AS sensitive_helpers
+      ) AS sensitive_helpers,
+      COALESCE(has_schema_privilege(current_user,to_regnamespace('erasure_reconcile'),'USAGE'),false)
+        AS reconcile_schema_usage
     `,[ERASURE_FUNCTION_SIGNATURES,ERASURE_SENSITIVE_HELPER_SIGNATURES]),
     readErasureRoleWitness(erasurePool),
     Promise.all(ERASURE_FUNCTION_SIGNATURES.map(async (signature) =>
@@ -364,6 +428,7 @@ export async function assertAccountErasureDatabaseRole(
     || runtime.rows[0].capabilities.some(Boolean)
     || runtime.rows[0].sensitive_helpers.length!==ERASURE_SENSITIVE_HELPER_SIGNATURES.length
     || runtime.rows[0].sensitive_helpers.some(Boolean)
+    || runtime.rows[0].reconcile_schema_usage
     || witness.principal==="debateai_erasure_runtime"
     || witness.sessionPrincipal !== witness.principal
     || witness.superuser || witness.createRole || witness.createDatabase
@@ -372,13 +437,19 @@ export async function assertAccountErasureDatabaseRole(
     || witness.crossedRole || witness.dangerousBuiltinMember
     || witness.ownsDatabaseOrSchema || witness.anyTablePrivilege
     || witness.anySequencePrivilege || witness.forbiddenFunctionPrivilege
+    || witness.forbiddenReconcilePrivilege
+    || witness.reconcileFunctionCount!==ERASURE_RECONCILE_FUNCTION_SIGNATURES.length
     || witness.sensitiveHelperPrivilege || witness.capabilityRoleLogin
     || witness.capabilityRoleInherit
-    || witness.exactFunctionCount!==ERASURE_FUNCTION_SIGNATURES.length
+    || witness.exactFunctionCount!==ERASURE_ATTESTED_FUNCTION_SIGNATURES.length
     || exactFunctions.some((allowed)=>!allowed)) {
     throw new TypeError("ERASURE_DATABASE_ROLE_MUST_BE_ISOLATED");
   }
 }
+
+/** NV-02 (0178): FAILED re-queues the row with backoff; both DEAD_LETTERED results settle it (a DEAD: code and an audit event). */
+export type AccountErasureNotificationFailure =
+  | "FAILED" | "DEAD_LETTERED_RECIPIENT" | "DEAD_LETTERED_ATTEMPT_CAP" | "CONTENDED";
 
 export class PostgresAccountErasureRepository {
   constructor(
@@ -489,7 +560,7 @@ export class PostgresAccountErasureRepository {
       run_ids: string[];
       legacy_run_ids: string[];
       published_run_ids: string[];
-    }>("SELECT * FROM identity.account_erasure_preview($1)", [erasureId]);
+    }>("SELECT * FROM erasure_reconcile.account_erasure_preview($1)", [erasureId]);
     const row = result.rows[0];
     return row === undefined ? null : Object.freeze({
       userId: row.user_id,
@@ -509,11 +580,11 @@ export class PostgresAccountErasureRepository {
     return withErasureContentLeases(this.pool,expectedRunIds,(client) =>
       withScheduledMailLocale(client,erasureId,async () => {
         const result = await client.query<{ outcome: AccountErasureTransitionOutcome }>(
-          "SELECT identity.prepare_account_erasure($1,$2::uuid[],$3::uuid[],$4::uuid[]) AS outcome",
+          "SELECT erasure_reconcile.prepare_account_erasure($1,$2::uuid[],$3::uuid[],$4::uuid[]) AS outcome",
           [erasureId,expectedRunIds,expectedLegacyRunIds,expectedPublishedRunIds]
         );
         return result.rows[0]?.outcome ?? "NOT_FOUND";
-      }));
+      }),{ contended: () => "CONTENDED" as const });
   }
 
   async status(erasureId: string): Promise<AccountErasureStatus> {
@@ -604,12 +675,15 @@ export class PostgresAccountErasureRepository {
 
   async failNotification(
     messageId:string,claimToken:string,errorCode:string
-  ): Promise<boolean> {
-    const result = await this.pool.query<{ failed:boolean }>(
-      "SELECT identity.fail_account_erasure_notification($1,$2,$3) AS failed",
+  ): Promise<AccountErasureNotificationFailure> {
+    // NV-02 (0178): the fail that can settle a row (0040's identity fail keeps its grant for the release before).
+    const result = await this.pool.query<{ outcome:string|null }>(
+      "SELECT erasure_reconcile.fail_account_erasure_notification($1,$2,$3) AS outcome",
       [messageId,claimToken,errorCode]
     );
-    return result.rows[0]?.failed === true;
+    const outcome=result.rows[0]?.outcome;
+    return outcome==="FAILED" || outcome==="DEAD_LETTERED_RECIPIENT" || outcome==="DEAD_LETTERED_ATTEMPT_CAP"
+      ? outcome : "CONTENDED";
   }
 
   async completionNotificationsReady(erasureId:string): Promise<boolean> {
@@ -621,12 +695,13 @@ export class PostgresAccountErasureRepository {
   }
 
   async claimRunKeyProvisionCleanup(limit = 100): Promise<readonly RunKeyProvisionCleanup[]> {
+    // NV-08 (0178): the claim that skips owners the intent trigger refuses; 0040's core claim stays for the release before.
     const result = await this.runProvisionPool.query<{
       run_id: string;
       user_id: string;
       owner_ref: string;
       claim_token: string;
-    }>("SELECT * FROM core.claim_run_key_provision_cleanup($1)", [limit]);
+    }>("SELECT * FROM erasure_reconcile.claim_run_key_provision_cleanup($1)", [limit]);
     return Object.freeze(result.rows.map((row) => Object.freeze({
       runId: row.run_id,
       userId: row.user_id,
@@ -682,6 +757,19 @@ export const ACCOUNT_ERASURE_RECONCILE_STAGES = Object.freeze([
 ] as const);
 export type AccountErasureReconcileStage = typeof ACCOUNT_ERASURE_RECONCILE_STAGES[number];
 
+/** C-1: the os_user the erasure's support shred writes to support.shred_audit (an operator's shred writes their OS user). */
+export const ACCOUNT_ERASURE_SUPPORT_SHRED_ACTOR = "account-erasure";
+
+/**
+ * C-1: the support data plane's erasure facet (PostgresSupportShredRepository on the support data credential).
+ * Support transcripts, case replies and summaries are under per-session and per-case keys wrapped by the host
+ * support KEK, not the user DEK, so destroying the DEK alone leaves them readable.
+ */
+export type SupportErasurePort = Readonly<{
+  shredOwnerForErasure(ownerRef: string, actor: string, at: Date): Promise<unknown>;
+  liveOwnerKeyCount(ownerRef: string): Promise<number>;
+}>;
+
 export class AccountErasureCoordinator {
   constructor(
     private readonly repository: PostgresAccountErasureRepository,
@@ -689,6 +777,9 @@ export class AccountErasureCoordinator {
     private readonly runs: RunContentKeyStore,
     private readonly publications?: Pick<PublicationCipher,
       "destroy" | "exists" | "keyReadable">,
+    private readonly support?: SupportErasurePort,
+    // synthesis-flag S04 (threat reports): the email hold before any key is destroyed. After C-1's support port, which
+    // every composition passes; a composition with no hold passes `undefined` or nothing.
     private readonly options: Readonly<{
       readEmailCiphertext?: (userId: string) => Promise<CryptoEnvelope | null>;
       beforeKeyDestruction?: (input: Readonly<{ erasureId: string; userId: string; email: string }>) => Promise<void>;
@@ -750,7 +841,10 @@ export class AccountErasureCoordinator {
     if (cleanup === null) return "NOT_FOUND";
     // Every account alert is encrypted under the still-live user DEK. The
     // authoritative SQL gate is repeated by FINALIZE, but checking here keeps
-    // key destruction strictly after every supported channel ACK. This also
+    // key destruction strictly after every supported channel row is settled:
+    // ACKed after the transport accepted it, or dead-lettered by
+    // erasure_reconcile.fail_account_erasure_notification with a DEAD: code and an
+    // identity.account.erasure_notice_dead_lettered audit event (0178, NV-02). This also
     // prevents a cross-process SCHEDULED sender from retaining plaintext while
     // a later completion cycle shreds the key.
     if (!await this.repository.completionNotificationsReady(erasureId)) return "CONTENDED";
@@ -774,6 +868,9 @@ export class AccountErasureCoordinator {
     if ((cleanup.currentPublicationRefs.length > 0
         || cleanup.cleanupPublicationRefs.length > 0)
       && this.publications === undefined) return "INVALID_EVIDENCE";
+    // C-1: without the support port the owner's support keys can be neither shredded nor read back; destroy nothing.
+    const support = this.support;
+    if (support === undefined) return "INVALID_EVIDENCE";
     for (const publicationRef of cleanup.currentPublicationRefs) {
       // R22 decision 21: a current public debate outlives its account; its key is only checked, never destroyed here.
       const ok = await this.repository.withPublicationLease(publicationRef,async () =>
@@ -790,13 +887,15 @@ export class AccountErasureCoordinator {
     }
     const physicalRunIds = await this.runs.listByOwner(cleanup.ownerRef);
     for (const runId of cleanup.runIds) {
-      if (await this.runs.exists(runId)
-        && await this.runs.ownerRef(runId) !== cleanup.ownerRef) {
+      // NV-10: a record-less directory the manifest names is this owner's half-destroyed run; it is destroyed below.
+      const owner = await this.runs.exists(runId) ? await recordedOwnerRef(this.runs, runId) : null;
+      if (owner !== null && owner !== cleanup.ownerRef) {
         return "INVALID_EVIDENCE";
       }
     }
     for (const runId of physicalRunIds) {
-      if (await this.runs.ownerRef(runId) !== cleanup.ownerRef) return "INVALID_EVIDENCE";
+      const owner = await recordedOwnerRef(this.runs, runId);
+      if (owner !== null && owner !== cleanup.ownerRef) return "INVALID_EVIDENCE";
     }
     let destroyedRunKeyCount = 0;
     let alreadyAbsentRunKeyCount = 0;
@@ -812,6 +911,12 @@ export class AccountErasureCoordinator {
     if (savedQuestionKeys !== undefined) {
       for (const id of await savedQuestionKeys.listByOwner(cleanup.ownerRef)) await savedQuestionKeys.destroy(id);
     }
+    // C-1: before the user DEK goes, shred every support session and case key bound to this owner. NONE when the
+    // owner never opened a signed-in support session; ALREADY_SHREDDED on a retry or after an operator's manual
+    // shred. A throw leaves the erasure PREPARED (reconcile reports account-erasure-execute) and the next cycle retries.
+    await support.shredOwnerForErasure(
+      cleanup.ownerRef, ACCOUNT_ERASURE_SUPPORT_SHRED_ACTOR, new Date()
+    );
     const userDekResult = await this.users.destroy(cleanup.userId);
 
     // Non-vacuous durable-store readback: absence must hold for every physical
@@ -824,6 +929,8 @@ export class AccountErasureCoordinator {
     // A question key left (or made after the listing) stops the closing here; the next cycle destroys it, without the user key.
     if (savedQuestionKeys !== undefined
       && (await savedQuestionKeys.listByOwner(cleanup.ownerRef)).length !== 0) return "INVALID_EVIDENCE";
+    // C-1: the support readback, last before FINALIZE, so it also sees a session committed after a NONE shred.
+    if (await support.liveOwnerKeyCount(cleanup.ownerRef) !== 0) return "INVALID_EVIDENCE";
 
     const completedAt = new Date();
     let finalized: AccountErasureTransitionOutcome;
@@ -864,8 +971,9 @@ export class AccountErasureCoordinator {
     }[] = [];
     for (const intent of await this.repository.claimRunKeyProvisionCleanup(limit)) {
       try {
-        if (await this.runs.exists(intent.runId)
-          && await this.runs.ownerRef(intent.runId) !== intent.ownerRef) {
+        // NV-10: a record-less directory under this claimed intent is its own crash orphan; it is destroyed below.
+        const intentOwner = await this.runs.exists(intent.runId) ? await recordedOwnerRef(this.runs, intent.runId) : null;
+        if (intentOwner !== null && intentOwner !== intent.ownerRef) {
           outcomes.push({ runId: intent.runId, outcome: "INVALID_EVIDENCE" });
           continue;
         }
@@ -941,21 +1049,14 @@ export class PostgresPrivateRunErasureRepository {
     sessionId: string;
     grantTokenHash: string;
   }>): Promise<Readonly<{ outcome: PrivateRunErasureOutcome; erasureId: string | null }>> {
-    return withErasureContentLeases(this.pool,[input.runId],async (client) => {
-      const result = await client.query<{
-        outcome: PrivateRunErasureOutcome;
-        erasure_id: string | null;
-      }>(`
-        SELECT * FROM core.prepare_private_run_erasure($1,$2,$3,$4,$5)
-      `, [
-        input.runId,input.userId,input.ownerRef,input.sessionId,input.grantTokenHash
-      ]);
-      const row = result.rows[0];
-      return Object.freeze({
-        outcome: row?.outcome ?? "NOT_FOUND",
-        erasureId: row?.erasure_id ?? null
-      });
-    });
+    // NV-30 (0178): the grant is checked before any lock, and the named run's content lease is tried, never waited for,
+    // inside this one statement; contention answers CONTENDED to an authorized caller only and spends nothing.
+    const result = await this.pool.query<{ outcome: PrivateRunErasureOutcome; erasure_id: string | null }>(
+      "SELECT * FROM erasure_reconcile.prepare_private_run_erasure($1,$2,$3,$4,$5)",
+      [input.runId,input.userId,input.ownerRef,input.sessionId,input.grantTokenHash]
+    );
+    const row = result.rows[0];
+    return Object.freeze({ outcome: row?.outcome ?? "NOT_FOUND", erasureId: row?.erasure_id ?? null });
   }
 
   async resume(input: Readonly<{
@@ -1095,8 +1196,9 @@ export class PrivateRunErasureCoordinator {
     if (manifest === null) {
       return await this.repository.status(erasureId) === "CLEANED" ? "CLEANED" : "NOT_FOUND";
     }
-    if (await this.runs.exists(manifest.runId)
-      && await this.runs.ownerRef(manifest.runId) !== manifest.ownerRef) {
+    // NV-10: a record-less directory the private-erasure manifest names holds nothing usable; it is destroyed below.
+    const manifestOwner = await this.runs.exists(manifest.runId) ? await recordedOwnerRef(this.runs, manifest.runId) : null;
+    if (manifestOwner !== null && manifestOwner !== manifest.ownerRef) {
       return "INVALID_EVIDENCE";
     }
     if (manifest.cleanupPublicationRefs.length > 0 && this.publications === undefined) {

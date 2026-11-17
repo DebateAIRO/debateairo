@@ -32,6 +32,9 @@ const ask = (extra: Partial<AskRequest> = {}): AskRequest => ({ question_line: S
   as_of: "2026-11-05T00:00:00.000Z", steering_presets: [], plan_tier: "premium", steering_annotations: [], ...extra });
 
 type Over = Readonly<{ service?: "NONE"; outcome?: QuestionCheckOutcome }>;
+/** The UI's proof: the edge's country is honoured only from a request that carries it. */
+const UI_PROOF = "q".repeat(43);
+
 async function harness(over: Over = {}) {
   const store = new FakeSavedQuestionStore();
   const users = new MemoryUserDekStore();
@@ -48,7 +51,7 @@ async function harness(over: Over = {}) {
     readRunAnswer: async () => null
   } as unknown as AskApplication;
   const api = buildApi({
-    application, sessions: testSessionApplication([ANA, BEN]), allowedOrigin: TEST_APP_ORIGIN,
+    application, sessions: testSessionApplication([ANA, BEN]), allowedOrigin: TEST_APP_ORIGIN, uiApiProof: Buffer.from(UI_PROOF),
     questionCheck: { check: async () => over.outcome ?? { outcome: "PASS" as const } },
     startStepKey: KEY, admissionView: async () => VIEW,
     ...(over.service === "NONE" ? {} : { savedQuestions: service })
@@ -238,7 +241,7 @@ describe("refusals and limits", () => {
   it("a refused save answers its code: crisis words 422 with the country, a reading of another person 400", async () => {
     const h = await harness();
     const crisis = await h.send(ANA, "POST", BASE, { doc: savedDocOf(ANA_SIGNS, { page: { box: { text: "I want to kill myself tonight", placed: [] } } }) },
-      { "cf-ipcountry": "RO" });
+      { "cf-ipcountry": "RO", "x-debateai-ui-proof": UI_PROOF });
     expect(crisis.statusCode).toBe(422);
     expect(crisis.json()).toEqual({ error: "CRISIS_SUPPORT_OFFERED", message: "CRISIS_SUPPORT_OFFERED", country: "RO" });
     const invalid = await h.send(ANA, "POST", BASE, { doc: savedDocOf(BEN_SIGNS) });

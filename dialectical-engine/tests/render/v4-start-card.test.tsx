@@ -512,6 +512,12 @@ describe("notices, one at a time above the list (choose-f16, choose-f8)", () => 
     await act(async () => control!.outside({ type: "REMOVE", key: "kp07" }));
     await act(async () => control!.outside({ type: "SET_WIDTH", width: 5 }));
     expect(notice()).toBe("“Falling prices” moved to more to explore.");
+    // Art. 50(2): the AI's title is marked in the notice and in the live region, the sentence around it is not.
+    for (const line of [card()!.querySelector(".v4StartNotice p")!, card()!.querySelector(".v4StartSpoken")!]) {
+      expect(line.textContent).toBe("“Falling prices” moved to more to explore.");
+      expect(line.querySelector('[data-ai-generated="true"]')?.textContent).toBe("Falling prices");
+      expect(line.closest("[data-ai-generated]")).toBeNull();
+    }
   });
 
   it("split on a full list shows the fold notice, and a newer notice replaces it", async () => {
@@ -705,6 +711,10 @@ describe("your own path (spec §2 item 5; owner decision 2)", () => {
     await addOwn("  Cyber attacks on the grid  ");
     expect(fitOwn).toHaveBeenCalledWith("Cyber attacks on the grid");
     expect(cardText()).toContain("This fits “Security and weapons risks”. Add it there (no extra path) or make it its own path?");
+    // Art. 50(2): only the AI's path title is marked, not the card's sentence around it.
+    const message = card()!.querySelector(".v4StartOwnMessage")!;
+    expect(message.querySelector('[data-ai-generated="true"]')?.textContent).toBe("Security and weapons risks");
+    expect(message.closest("[data-ai-generated]")).toBeNull();
     await press(button("Add it there"));
     expect(actions).toEqual([{ type: "ADD_OWN", text: "Cyber attacks on the grid", intoPathKey: "kp03" }]);
     expect(latest!.paths[2]!.viewpoints.map((viewpoint) => viewpoint.question)).toContain("Cyber attacks on the grid");
@@ -769,6 +779,9 @@ describe("your own path (spec §2 item 5; owner decision 2)", () => {
     await press(button("Add to a path…"));
     expect(buttons("Path 1: Whole-system costs")).toHaveLength(1);
     expect(buttons("Path 5: Unproven designs and risk")).toHaveLength(1);
+    // Art. 50(2): the AI's title in each button is marked, "Path 1:" is the site's.
+    expect(button("Path 1: Whole-system costs").querySelector('[data-ai-generated="true"]')?.textContent).toBe("Whole-system costs");
+    expect(button("Path 1: Whole-system costs").closest("[data-ai-generated]")).toBeNull();
     await press(button("Path 3: Security and weapons risks"));
     expect(actions.at(-1)).toEqual({ type: "ADD_OWN", text: "Fish in the Danube", intoPathKey: "kp03" });
     expect(latest!.paths[2]!.viewpoints.at(-1)!.question).toBe("Fish in the Danube");

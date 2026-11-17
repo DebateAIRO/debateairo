@@ -1,10 +1,11 @@
 import { previewAskProxyCeiling } from "../../../lib/previewAskProxyCeiling.js";
+import { AI_GENERATED_HEADER } from "../../../lib/aiDisclosure.js";
 import {
   AGE_REFUSAL_COOKIE_MAX_AGE_SECONDS,
   AGE_REFUSAL_COOKIE_NAME,
   AGE_REFUSAL_COOKIE_VALUE
 } from "@debateai/contract";
-import { normalizeClientIp, TRUSTED_CLIENT_IP_HEADER } from "../../../trusted-client-ip.mjs";
+import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../../../trusted-client-ip.mjs";
 
 type ProxyContext = Readonly<{
   params: Promise<Readonly<{ path: string[] }>>;
@@ -47,7 +48,9 @@ const RESPONSE_HEADER_ALLOWLIST = Object.freeze([
   "retry-after",
   "vary",
   // Side-by-side spec §7 (plan C12): the API's release, which the browser compares with the page's.
-  "x-debateai-release"
+  "x-debateai-release",
+  // EU AI Act Art. 50(2): the API's machine-readable mark on a body that carries AI-generated content.
+  AI_GENERATED_HEADER
 ] as const);
 /** L3-F1: aligned with the API's Fastify bodyLimit (B5); the proxy never buffers more. */
 const MAX_PROXY_BODY_BYTES = 1_048_576;
@@ -145,7 +148,12 @@ function createUpstreamHeaders(request: Request): Headers {
   const cookie = filteredSessionCookies(request.headers.get("cookie"));
   if (cookie !== null) headers.set("cookie", cookie);
   const clientIp = behindOwnEdge() ? normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER)) : null;
-  if (clientIp !== null) headers.set("x-forwarded-for", clientIp);
+  if (clientIp !== null) {
+    headers.set("x-forwarded-for", clientIp);
+    // NV-03: the proof travels with the forwarded address: the API honours it only from a loopback peer that has one.
+    const proof = installedUiApiProof();
+    if (proof !== null) headers.set(UI_API_PROOF_HEADER, proof);
+  }
   return headers;
 }
 

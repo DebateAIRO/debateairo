@@ -28,6 +28,7 @@ import { ServeRepository } from "@debateai/serve";
 import type { Pool, PoolClient, QueryResult } from "pg";
 import type { PersonWindow } from "@debateai/budget";
 import type { AskBilling } from "../../apps/api/src/ask-billing.js";
+import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/api/src/ai-generated.js";
 import type { AskRoomPort, RoomDecision } from "../../apps/api/src/ask-room.js";
 import {
   QuestionLanguageChoiceNeeded, type QuestionLanguageLock, type QuestionLanguagePort
@@ -345,6 +346,8 @@ describe("submit with the question-language step (question-language spec 2026-10
     expect(offered.statusCode).toBe(409);
     expect(offered.json()).toEqual({ error: QUESTION_LANGUAGE_CHOICE_NEEDED, message: QUESTION_LANGUAGE_CHOICE_NEEDED, offer: OFFER });
     expect(QuestionLanguageChoiceNeededSchema.safeParse(offered.json()).success).toBe(true);
+    // EU AI Act Art. 50(2): the offer carries the AI's rewrite of the question (`proposed_question`), so it is marked.
+    expect(offered.headers[AI_GENERATED_HEADER]).toBe(AI_GENERATED_HEADER_VALUE);
     await offering.close();
     for (const code of ["QUESTION_LANGUAGE_CHECK_INVALID", "QUESTION_LANGUAGE_CHECK_EXPIRED", "QUESTION_LANGUAGE_CHOICE_MISMATCH"]) {
       const refusing = buildApi({ application: fixtureApplication(async () => { throw new AskRefusal(new TypedDomainError(code, code)); }),
@@ -354,6 +357,7 @@ describe("submit with the question-language step (question-language spec 2026-10
       expect(refused.statusCode, code).toBe(409);
       expect(refused.json()).toMatchObject({ error: code });
       expect(refused.headers["retry-after"], code).toBeUndefined();
+      expect(refused.headers[AI_GENERATED_HEADER], code).toBeUndefined();
       await refusing.close();
     }
   });

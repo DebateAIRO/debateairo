@@ -99,7 +99,8 @@ function Statement({ statement, catalog, locale }: Readonly<{ statement: Moderat
       {statement.quote !== null ? (
         <>
           <p>{t(catalog, "public.moderation.quoteIntro")}</p>
-          <blockquote dir="auto" className="setCardNote">{statement.quote}</blockquote>
+          {/* EU AI Act Art. 50(2): the AI check's copy of the published (AI-written) page; the API marks it too (ai-generated.ts). */}
+          <blockquote dir="auto" className="setCardNote" data-ai-generated="true">{statement.quote}</blockquote>
         </>
       ) : null}
       {statement.places.length > 0 ? (

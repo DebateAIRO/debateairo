@@ -137,6 +137,8 @@ function withdrawDoneText(catalog: MessageCatalog, locale: LocaleCode, refund: s
 function withdrawFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
   if (code === "WITHDRAWAL_WINDOW_CLOSED") return Object.freeze({ key: "billing.subscription.withdrawWindowClosed", reload: true });
+  // NV-45 (409): a debate may still be using credit and more than a day of the window is left; nothing was written.
+  if (code === "WITHDRAWAL_DEBATE_RUNNING") return Object.freeze({ key: "billing.subscription.withdrawDebateRunning", reload: false });
   // A timeout after P12d queued the refund: the refund may be under way, so say so and read the state again.
   if (outcomeUnknown(failure)) return STILL_CONFIRMING;
   // Any other answer (NOT_SUBSCRIBED: withdrawn or ended meanwhile): read the state again, blame nobody.

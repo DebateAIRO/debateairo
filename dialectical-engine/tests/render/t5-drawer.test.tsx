@@ -225,6 +225,12 @@ describe("the argument drawer from the keyboard (2026-10-22 keyboard audit)", ()
     const container = await render(drawer(debateNode, { scoring: twoRecommendations }));
     const summary = container.querySelector<HTMLElement>("details > summary")!;
     expect(summary.textContent).toBe("1 more recommendation");
+    // EU AI Act Art. 50(2): each recommendation's reason is marked as AI text, the site's words around it are not.
+    for (const reason of ["First, look this up.", "Then test it."]) {
+      const element = [...container.querySelectorAll("p, div")].find((node) => node.textContent === reason);
+      expect(element?.closest('[data-ai-generated="true"]'), reason).not.toBeNull();
+    }
+    expect(summary.closest("[data-ai-generated]")).toBeNull();
 
     const stops: Element[] = [];
     await act(async () => {

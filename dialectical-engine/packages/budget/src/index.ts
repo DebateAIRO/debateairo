@@ -60,6 +60,7 @@ export {
   decideRunCostEnvelope,
   isCostEnvelopePhase,
   projectedCallCeilingMicros,
+  projectedCallUsage,
   providerUsageUnreported,
   readReportedUsage,
   readUsageCounters,
@@ -151,6 +152,33 @@ export {
   type WebRolePrices
 } from "./web-estimate.js";
 
+/** The owner's cost read-out: where the money for AI calls went, by step, by job, by model and by run. */
+export {
+  COST_JOB_NONE,
+  COST_JOB_WORDS,
+  COST_READOUT_DEAREST_RUNS,
+  COST_READOUT_MAX_DAYS,
+  COST_STEP_RUN_WITHOUT_CALL,
+  COST_STEP_WEB_SEARCH,
+  COST_STEP_WORDS,
+  PostgresCostReadoutReader,
+  buildCostReadout,
+  callSiteFamily,
+  costJobCode,
+  costReadoutDollars,
+  costReadoutLastDays,
+  costReadoutSpan,
+  costStepCode,
+  renderCostReadout,
+  type CostReadout,
+  type CostReadoutGroup,
+  type CostReadoutLine,
+  type CostReadoutRunLine,
+  type CostReadoutRuns,
+  type CostReadoutScope,
+  type CostReadoutTotals
+} from "./cost-readout.js";
+
 /**
  * Budget spec 2026-09-28 §2.3 with the paid-plans spec §2.4.1 (B1): the room for
  * one scope, the admission over every scope, the running wall, and the person's
@@ -188,6 +216,8 @@ export {
 
 /** Budget spec 2026-09-28 §2.5 (B2): the estimate a hold and a room are decided with. */
 export {
+  BUDGET_WALL_STOP_KINDS,
+  BUDGET_WALL_STOP_REASONS,
   PostgresRecentRunUsageSource,
   RecentRunsCostEstimator,
   estimateFromSampleCosts,

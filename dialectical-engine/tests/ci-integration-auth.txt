@@ -67,6 +67,8 @@ tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts
 tests/integration/s9-dev-token-retirement-database.test.ts
+# NV-01: the legacy-run claim's per-account attempt budget (0178), concurrency included.
+tests/integration/nv01-legacy-claim-lockout-database.test.ts
 # The signed-in debate page's live stream (2026-10-11): one admission buys one open, session-checked stream.
 tests/integration/live-run-events.test.ts
 
@@ -130,3 +132,5 @@ tests/integration/public-review-ungrounded-door-0174.test.ts
 tests/integration/statement-ai-read-verdict-0175.test.ts
 # Everyone told "until the review ends" hears how it ended (0176): at a re-publish, what stays off or that it is back; at DECIDE, those of a dig taken out too.
 tests/integration/moderation-final-outcome-0176.test.ts
+# An erased account's owner reference leaves its debates (0177): what the seven guards refuse and allow, and what deleting the account row does.
+tests/integration/erased-owner-unlinked-0177.test.ts

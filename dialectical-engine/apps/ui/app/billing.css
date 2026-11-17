@@ -66,8 +66,8 @@
 .pricingCard h2 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 24px; line-height: normal; }
 .pricingCard > p { margin: 0; font-size: 14px; }
 .pricingCard .pricingPrice { font-size: 20px; font-weight: 600; }
-/* Terms §12: the total stays as plain to read as the price and its tax above it. */
-.pricingCard .pricingTotal { margin-top: -4px; font-size: 16px; font-weight: 600; }
+/* Terms §12: a card that cannot be priced yet says what it needs, in place of a price. */
+.pricingCard .pricingUnpriced { font-size: 15px; font-weight: 500; color: var(--muted); }
 .pricingNote,
 .billingNote { margin: 0; color: var(--muted); font-size: 13px; line-height: normal; }
 .pricingCard .pricingNote { font-size: 13px; }

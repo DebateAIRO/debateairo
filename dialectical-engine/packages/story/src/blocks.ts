@@ -36,10 +36,45 @@ const FIGURE_SPAN = /[$€£¥₹]\s?[-−]?\d(?:[\d.,'’  ]*\d)?|[-−]?\d(?:[
 /** A year standing alone ("in 2024") is a date, not a figure to compare. */
 const BARE_YEAR = /^(1[89]|20)\d\d$/u;
 
+/**
+ * Chart relevance (2026-11-16): the number in a name is not a figure the debate found. "iPhone 14", "Galaxy S24" and
+ * "Reno 12" once read as the figures 14, 24 and 12, were handed to the block call as numbers to chart, and passed the
+ * need test on their own. Two readings, both by form alone (no word list, so they hold in every language that writes
+ * names this way):
+ *  - glued: a letter or a digit directly before the number, a hyphen between them at most (S24, GPT-5, COVID-19, and
+ *    the second number of 10-15). Only the scripts that write a name and its number as one word: Hebrew glues a
+ *    preposition to its number, and Chinese and Japanese put no space before any number.
+ *  - after a name: a capital inside the word before it (iPhone 14, macOS 15), or a capitalised word that does not open
+ *    its sentence (Reno 12, Windows 11, Table 2).
+ * A currency code is not a name (USD 500, CHF5), and a number written with a currency or percent sign is always a figure.
+ * A reading of this kind can be wrong (German capitalises every noun: "pro Jahr 500 Euro" is left out). That costs
+ * little, because nothing here is a check: `claimFigures` feeds the need test and the call's `figures` field, and a
+ * chart's own figures are checked against the claim itself (charts.ts), whatever this reads.
+ */
+const NAME_LETTER = String.raw`[\p{sc=Latin}\p{sc=Cyrillic}\p{sc=Greek}]`;
+const GLUED_TO_NAME = new RegExp(String.raw`(?:${NAME_LETTER}|\p{N})[‐‑–]?$`, "u");
+const WORD_BEFORE = /(\p{L}[\p{L}\p{M}\p{N}'’]*)\s$/u;
+const CURRENCY_CODES: ReadonlySet<string> = new Set(Intl.supportedValuesOf("currency"));
+
+function followsName(before: string): boolean {
+  const word = WORD_BEFORE.exec(before);
+  if (word === null || CURRENCY_CODES.has(word[1]!)) return false;
+  if (/^.+\p{Lu}/u.test(word[1]!)) return true;
+  const opensSentence = /(?:^|[.!?:;…])$/u.test(before.slice(0, word.index).replace(/[\s"'“”‘’«»„(\[]+$/u, ""));
+  return /^\p{Lu}/u.test(word[1]!) && !opensSentence;
+}
+
 export function claimFigures(claim: string): readonly string[] {
   const figures: string[] = [];
   for (const match of claim.matchAll(FIGURE_SPAN)) {
-    const text = match[0].trim();
+    let text = match[0].trim();
+    const before = claim.slice(0, match.index);
+    if (!/^[$€£¥₹]/u.test(text)) {
+      if (GLUED_TO_NAME.test(before) && !CURRENCY_CODES.has(/\p{L}*$/u.exec(before)![0])) continue;
+      // A sign directly after a letter is a hyphen, not a minus (Hebrew "ב-50").
+      if (/^[-−]/u.test(text) && /\p{L}$/u.test(before)) text = text.slice(1);
+      if (/^\d/u.test(text) && !/[%‰]/u.test(text) && followsName(before)) continue;
+    }
     if (BARE_YEAR.test(text.split(/\s/u)[0]!) && !/[$€£¥₹%‰]/u.test(text)) continue;
     if (!figures.includes(text)) figures.push(text);
   }
@@ -115,8 +150,11 @@ export function storyRanking(material: Pick<StoryMaterial, "positions">, placeme
   return Object.freeze({ kind: "ranking", placement, rows });
 }
 
-/** What a table is checked against: the chart context, and which points argue for and against each position. */
-export interface StoryBlocksContext extends StoryChartsContext {
+/**
+ * What a table is checked against: the chart context, and which points argue for and against each position. The
+ * positions themselves are the keys of `sides`: one record of what the debate's answers are, for the tables and the charts.
+ */
+export interface StoryBlocksContext extends Omit<StoryChartsContext, "positions"> {
   readonly sides: StoryArgumentSides;
 }
 
@@ -213,7 +251,7 @@ export function readStoryBlocks(value: unknown, context: StoryBlocksContext): St
   const form = storyQuestionFormOf(reply.data.question_form);
   const menu = new Set<StoryBlockKind>(form === null ? STORY_BLOCK_KINDS : STORY_BLOCK_MENU[form]);
   const dropped: (StoryChartDropCode | StoryTableDropCode)[] = [];
-  const read = readStoryCharts({ charts: reply.data.charts }, context);
+  const read = readStoryCharts({ charts: reply.data.charts }, { ...context, positions: new Set(context.sides.keys()) });
   dropped.push(...read.dropped);
   const charts: StoryChart[] = [];
   for (const chart of read.charts) {

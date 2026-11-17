@@ -44,6 +44,8 @@ const EXPECTED: Readonly<Record<string, readonly string[]>> = Object.freeze({
   X23: [
     "packages/budget/src/model-spend.ts#admitNewRun",
     "packages/budget/src/model-spend.ts#readDaySpentMicros",
+    // Merge of dev into the security fixes of audit run 3: the site's counted holds are every account's too (the
+    // room's SITE_DAY measure, and NV-47's language-check room inside the ask's request).
     "packages/budget/src/model-spend.ts#readSiteCountedHoldsMicros"
   ],
   X24: ["packages/db/src/index.ts#readRoleRotationCounts"],

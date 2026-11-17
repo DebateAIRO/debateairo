@@ -13,11 +13,15 @@ const gitHead = () => readGitHead(dirname(fileURLToPath(import.meta.url)));
  * here: apps/ui/middleware.ts sets a per-request nonce policy and server.mjs
  * pre-sets the fail-closed fallback (F-08, L3-F3). Proxied /api responses get
  * the static API policy because the proxy's response allowlist drops the
- * upstream's own header.
+ * upstream's own header. COOP same-origin (NV-05): a cross-origin opener keeps
+ * no handle on any app document, whatever edge is in front.
  */
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   transpilePackages: ["@debateai/contract", "@debateai/kernel", "@debateai/legal-manifest"],
+  // EU AI Act Art. 50(2): lib/report/pdfAiMark.ts marks the report PDFs by wrapping pdfkit's metadata step. Next keeps
+  // @react-pdf/renderer external by default; pdfkit must be too, so both load Node's one copy of it, not a bundled second.
+  serverExternalPackages: ["pdfkit"],
   distDir: process.env.NEXT_DIST_DIR || ".next",
   env: { NEXT_PUBLIC_DEBATEAI_RELEASE_CODE: resolveBuildReleaseCode(process.env, gitHead) },
   // L3-F9: no framework fingerprint on responses.
@@ -36,6 +40,7 @@ const nextConfig = {
         headers: [
           { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
           { key: "X-Frame-Options", value: "DENY" },
+          { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "no-referrer" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
