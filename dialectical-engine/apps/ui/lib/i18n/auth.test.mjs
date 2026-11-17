@@ -45,6 +45,9 @@ const englishPath = join(root, "messages/en/auth.json");
 const visibleAttributes = new Set(["alt", "aria-label", "placeholder", "title"]);
 const allowedVisibleLiterals = new Set([
   "Dialectical Engine",
+  // Design Document v2: the auth card's wordmark sets "Engine" in its own span.
+  "Dialectical",
+  "Engine",
   "you@institution.edu",
   "XXXX-XXXX-XXXX-XXXX",
   "000000"

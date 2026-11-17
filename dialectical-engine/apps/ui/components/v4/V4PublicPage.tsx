@@ -139,13 +139,14 @@ function PublicAnswer({ debate, map, catalog, storyCatalog, storyLocale, locale 
   const headline = map.headline?.trim() ?? "";
   const summary = map.summary?.trim() ?? "";
   const fallback = (map.fallbackText ?? "").split(/\n\s*\n/u).map((paragraph) => paragraph.trim()).filter((paragraph) => paragraph.length > 0);
-  const lead = (at: number): string => (at === 0 ? "v4AnswerHeadline v4Serif" : "v4AnswerText");
+  // Design Document v2: the answer is running text in the display face (500, no tightening), not a heading.
+  const lead = (at: number): string => (at === 0 ? "v4AnswerHeadline v4Display" : "v4AnswerText");
   const update = debate.main_answer_update;
   const note = story?.reviewer_note?.text.trim() ?? "";
   const words = headline.length > 0 || summary.length > 0
     ? (
       <div data-ai-generated="true" lang={storyLocale} dir="auto" data-public-story>
-        {headline.length > 0 ? <p className="v4AnswerHeadline v4Serif">{headline}</p> : null}
+        {headline.length > 0 ? <p className="v4AnswerHeadline v4Display">{headline}</p> : null}
         {summary.length > 0 ? <p className="v4AnswerText">{summary}</p> : null}
       </div>
     )

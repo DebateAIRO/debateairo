@@ -80,9 +80,13 @@ const rejectedCopyCorpus = (sources) => normalizeRejectedCopy([
   ...sources.flatMap(({ path, source }) => assembledStrings(path, source))
 ].join("\n"));
 
-test("the language switcher is immediately before ModeToggle in all four headers", () => {
+test("the language switcher is immediately before ModeToggle in the headers that hold it, and in the footer where the top bar does not", () => {
+  // Design Document v2 (screens 3a and 8h, owner's instruction of 2026-11-16: the UI looks exactly like that document):
+  // the site's top bar and the sign-in bar draw no language switcher. Both variants of the footer hold it instead,
+  // so every page those bars are on can still change language.
+  assert.doesNotMatch(read("components/TopBar.tsx"), /LanguageSwitcher/);
+  assert.equal(read("components/SiteFooter.tsx").match(/<span className="siteFooterLang">\s*<LanguageSwitcher \/>\s*<\/span>/g)?.length ?? 0, 2);
   const expectedPlacements = new Map([
-    ["components/TopBar.tsx", 2],
     ["components/landing/LandingChrome.tsx", 1],
     ["app/debate/[id]/DebatePageClient.tsx", 1],
     ["components/support/Assistant.tsx", 1]

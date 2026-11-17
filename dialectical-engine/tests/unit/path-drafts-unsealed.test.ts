@@ -23,8 +23,12 @@ import { practiceShapeBlock, practiceShapeLines } from "../../tools/preview-prac
 
 const IDS = ["map.gap-paths.v1", "judge.path-root.unknown.v1", "judge.path-root.resolved.v1", "judge.path-root.unknown.sources.v1",
   "judge.path-root.resolved.sources.v1", "path.outcome.v1", "path.outcome-check.v1", "story.paths.v5", "story.paths-check.v5"];
-/** tests/unit/engine-contract-hash.test.ts's ENGINE_CONTRACT_HASH_SEALED: the engine seal as it stands until Task 92 seals the drafts. */
-const ENGINE_CONTRACT_HASH_SEALED = "24b33806d0e18b665bb530aa6a01e3e4c2af479b0004762cbdaefd237f70ada3";
+/**
+ * tests/unit/engine-contract-hash.test.ts's ENGINE_CONTRACT_HASH_SEALED: the engine seal as it stands until Task 92 seals the drafts.
+ * It moved twice on 17 Nov: for the clarifying call's version 3 (ask.clarify.v3), then for the report's three goal versions
+ * (report.answer.v5, report.answer.later.v5, report.answer-check.v4); none of the path steps' drafts was sealed with either.
+ */
+const ENGINE_CONTRACT_HASH_SEALED = "ca4bfa0a4b50a8336922af952a63b2faa541df9012b17d9bf054a2652c408988";
 const DRAFT_GROUPS = [PATH_GAP_DRAFT_CONTRACTS, PATH_ROOT_DRAFT_CONTRACTS, PATH_OUTCOME_DRAFT_CONTRACTS, PATH_FINAL_DRAFT_CONTRACTS];
 const DRAFTS = DRAFT_GROUPS.flat();
 /** Every answer-so-far call site: paths 1 to 8, the writer and the checker, rounds 1 and 2. */

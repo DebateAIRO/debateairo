@@ -139,13 +139,14 @@ test("ordinary top bar compacts without horizontal overflow at phone widths", ()
   );
 });
 
-test("auth headline keeps one size the phone breakpoint does not fight", () => {
+test("auth headline has the document's two fixed sizes: 28px, and 25px on a phone", () => {
   // The design document's auth screens are a fixed-width card, not a hero, so
-  // the headline has one size rather than a viewport clamp.
+  // the headline has fixed sizes rather than a viewport clamp: 28px on the
+  // card (8a) and 25px on a phone (8h).
   assert.match(styles, /\.authHeadline\s*\{[\s\S]*?font-size:\s*28px;[\s\S]*?\}/);
-  const phoneRules = styles.slice(styles.indexOf("@media (max-width: 640px)"));
-  const phoneHeadline = phoneRules.match(/\.authHeadline\s*\{([^}]*)\}/)?.[1] ?? "";
-  assert.doesNotMatch(phoneHeadline, /font-size:/);
+  const phoneHeadlines = [...styles.matchAll(/@media \(max-width: 640px\)[\s\S]*?\.authHeadline\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  assert.ok(phoneHeadlines.some((rule) => /font-size:\s*25px;/.test(rule)));
+  assert.doesNotMatch(styles, /\.authHeadline\s*\{[^}]*font-size:\s*clamp/);
 });
 
 test("desktop auth content is the document's 540px card", () => {

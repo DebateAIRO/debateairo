@@ -17,7 +17,7 @@ import { DEEPINFRA_PARTNER_PROVIDER, DEEPINFRA_PROVIDER, providerRegister } from
  * and the company DeepInfra forwards its one partner model to follows it in a row of its own, every fact "[to confirm]".
  */
 describe("the DeepInfra serving provider is disclosed when the API's targets reach it", () => {
-  it("names the serving company with the facts its published terms give, checked and dated", () => {
+  it("names the serving company with the facts its terms and data processing agreement state, checked and dated", () => {
     const register = providerRegister(["deepinfra"]);
     const entry = register.find((row) => row.key === "deepinfra");
     expect(entry).toBe(DEEPINFRA_PROVIDER);
@@ -28,7 +28,7 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
     expect(entry?.retentionKey).toBe("legal.providers.retentionDeepInfra");
     expect(entry?.zeroRetention).toBe("yes");
     expect(entry?.training).toBe("no");
-    expect(entry?.checkedOn).toBe("2026-11-16");
+    expect(entry?.checkedOn).toBe("2026-11-17");
     // Privacy 3.12: its models also write lists of what to look into before a debate starts.
     expect(entry?.purposes).toEqual(["arguments", "judging", "story", "suggestPaths"]);
     expect(entry?.purposesConfirmed).toBe(true);
@@ -71,7 +71,7 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
       expect(html).toContain('id="legal-provider-deepinfra"');
       expect(html).toContain("Deep Infra Inc.");
       expect(html).toContain("policy@deepinfra.com");
-      expect(html).toContain("2026-11-16");
+      expect(html).toContain("2026-11-17");
       expect(html).toContain(catalog["legal.providers.retentionDeepInfra"]);
       expect(html).toContain('id="legal-provider-deepinfra-partner"');
       for (const model of ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Z.AI"]) expect(html, model).not.toContain(model);

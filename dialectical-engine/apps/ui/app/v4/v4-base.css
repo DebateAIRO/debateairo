@@ -1,9 +1,20 @@
 /* V4 initial (2026-10-28): shared V4 styles. Colours and type come only from the site's tokens (app/globals.css), so the
    dark "chamber" mode follows without a second palette. Trust-word colours: Sure = ink, Sure for the case named = a
    softer ink, Still argued = gold hatching, Didn't hold = the accent outline (row D bar). */
+/* Design Document v2: on every V4 surface the accent is the blue brand colour, not the classic debate view's orange
+   "con" stance. The V4 sheets were written against --con-* as their accent tints, so the root remaps that family (and
+   the focus ring) onto the accent tokens of app/globals.css; both modes follow because those tokens are mode-bearing. */
+.v4Root {
+  /* The gold hatch of open ground (135deg hairlines of the gold border at 55%) and the "still argued" stripes. */
+  --v4-hatch: repeating-linear-gradient(135deg, color-mix(in srgb, var(--gold-border) 55%, transparent) 0 1px, transparent 1px 7px);
+  --v4-argued-stripes: repeating-linear-gradient(45deg, var(--gold) 0 3px, var(--gold-bg) 3px 5px);
+  --con: var(--accent); --con-line: var(--accent);
+  --con-text: var(--accent-text); --con-bg: var(--accent-bg); --con-border: var(--accent-border);
+  --focus: var(--accent); --focus-halo: var(--accent-halo);
+}
 .v4Root {
   --v4-sure: var(--ink);
-  --v4-case: var(--text-3);
+  --v4-case: var(--case-ink);
   --v4-argued: var(--gold);
   --v4-argued-soft: var(--gold-bg);
   --v4-fell: var(--con);
@@ -51,14 +62,18 @@
 .v4Root :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* :where keeps this reset at element weight, so every class below (.v4BtnPrimary's light text included) wins over it. */
 :where(.v4Root) button { font: inherit; color: inherit; }
+/* Design Document v2: eyebrows are the text face, 11px, .12em, upper case, in the accent. */
 .v4Eyebrow {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--t-micro);
-  letter-spacing: var(--ls-eyebrow);
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--con-text);
 }
-.v4Serif { font-family: var(--font-display); font-weight: var(--fw-display); }
+/* The display face. A heading takes .v4Serif (700, -.02em); running text in the display face (a question, an answer)
+   takes .v4Display, which is the face's lightest cut (500) with no tightening. */
+.v4Serif { font-family: var(--font-display); font-weight: var(--fw-display); letter-spacing: var(--ls-display); }
+.v4Display { font-family: var(--font-display); font-weight: 500; letter-spacing: 0; }
 .v4Muted { color: var(--text-2); }
 .v4Btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -67,18 +82,34 @@
 }
 .v4Btn:hover { background: var(--surface-2); }
 .v4Btn[disabled] { cursor: not-allowed; opacity: .55; }
-.v4BtnPrimary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
-.v4BtnPrimary:hover { background: var(--ink-hover); }
+/* Design Document v2: a primary button is the brand blue; the one forward action of a step is the orange call to action
+   (.v4Cta) with its 2px edge and hard 4px shadow, which it presses into. */
+.v4BtnPrimary { background: var(--brand); color: var(--on-brand); border-color: var(--brand); }
+.v4BtnPrimary:hover { background: color-mix(in srgb, var(--brand) 88%, var(--ink)); }
+.v4Cta {
+  min-height: 52px; padding: 0 26px; gap: 10px; border-radius: 16px;
+  background: var(--cta); color: var(--on-cta); border: 2px solid var(--cta-border); box-shadow: 0 4px 0 var(--cta-shadow);
+  font-size: 16px; font-weight: 700;
+  transition: transform 80ms ease, box-shadow 80ms ease;
+}
+.v4Cta:hover { background: color-mix(in srgb, var(--cta) 92%, var(--on-cta)); }
+.v4Cta:active:not([disabled]) { transform: translateY(3px); box-shadow: 0 1px 0 var(--cta-shadow); }
+@media (prefers-reduced-motion: reduce) { .v4Cta { transition: none; } }
+/* A call to action that cannot be pressed right now keeps its shape and loses its orange and its hard shadow. */
+.v4Cta[disabled], .v4Cta.v4DigWaiting, .v4Cta.v4DigWaiting:hover { box-shadow: 0 4px 0 var(--line-strong); border: 2px solid var(--line-strong); }
+/* The "hard" card: the answer, the question at the head of a map. 2px edge, a solid 5px shadow, a 22px corner. */
+.v4Hard { background: var(--surface); border: 2px solid var(--hard); box-shadow: 0 5px 0 var(--hard-shadow); border-radius: 22px; }
 .v4Link { color: var(--link); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 /* read-f16 (start step, Task 77): a chip may hold a long word (an AI's answer in German or Finnish on a 320 px phone); it wraps
    inside the screen instead of pushing past it. A short word is unchanged. */
 .v4Chip {
   display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; border-radius: var(--r-pill);
-  border: 1.5px solid var(--line-strong); background: var(--surface); cursor: pointer; font-weight: 600; font-size: var(--t-ui);
+  border: 2px solid var(--field-border); background: var(--surface); cursor: pointer; font-weight: 600; font-size: var(--t-ui);
   min-width: 0; max-width: 100%; overflow-wrap: anywhere;
 }
-.v4Chip[aria-pressed="true"], .v4Chip[aria-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
-.v4Card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); padding: 16px; }
+/* Design Document v2: a chosen chip is filled with the brand colour. */
+.v4Chip[aria-pressed="true"], .v4Chip[aria-checked="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.v4Card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); padding: 12px 14px; }
 .v4SrOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* The owner's answers of 5 Nov 2026 (question 15 and its follow-ups): on a phone every V4 header is ONE row.
    The brand shows its mark alone: its name and the "V4 preview" badge are hidden on screen but stay the link's name. Then
@@ -93,8 +124,13 @@
    draws those classes) and are that session's to remove. */
 @media (max-width: 767px) {
   header.v4Hdr { column-gap: 8px; }
+  .v4Hdr .v4HdrLead { flex: none; }
   .v4Hdr .v4HdrBrand { position: relative; flex: none; justify-content: center; min-inline-size: 44px; }
-  .v4Hdr .v4HdrName, .v4Hdr .v4HdrBadge {
+  /* Design Document v2: the phone's brand is the diamond mark; the wordmark and the header's links step back (the
+     brand and the account menu reach the same pages). */
+  .v4Hdr .v4HdrMark { display: block; }
+  .v4Hdr .v4HdrNav { display: none; }
+  .v4Hdr .v4HdrName {
     position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap;
     margin: -1px; padding: 0; border: 0;
   }

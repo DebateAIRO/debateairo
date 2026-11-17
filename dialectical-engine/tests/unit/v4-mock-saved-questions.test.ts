@@ -256,6 +256,11 @@ describe("V4 mock API: the #pickup scene (Task 80b)", () => {
     expect(doc.page.plan.undo.length).toBeGreaterThan(0);
     expect(doc.reading.end).toBe("READY");
     expect(doc.reading.clarify).not.toBeNull();
+    // Design Document v2 (16b): the seeded reading says the question back with a part for each of its two questions, as a reading
+    // saved from a reply with a sentence does, so Pick up shows "How we read your question" (the other seed has no questions, so none).
+    const seeded = doc.reading.clarify;
+    if (seeded === null || seeded.source !== "AI") throw new Error("the seeded reading holds an AI reply");
+    expect(seeded.restatement?.parts.flatMap((part) => ("about" in part ? [part.about] : []))).toEqual([0, "purpose"]);
     expect(step.mockStartRefOf(doc.reading.check.ref)?.plan).toBe("PLUS");
 
     const other = SavedQuestionReadSchema.parse(jsonOf(await call("GET", `${ROOT}/${saved.MOCK_PICKUP_IDS.needsReading}`)));

@@ -5,7 +5,7 @@ import {
 } from "react";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import {
-  cutText, PATH_PLAN_LIMITS, pathPlanReduce, type PathPlan, type PathPlanAction, type PathPlanRefusal, type PlanPath, type PlanViewpoint
+  cutText, isPicking, PATH_PLAN_LIMITS, pathPlanReduce, type PathPlan, type PathPlanAction, type PathPlanRefusal, type PlanPath, type PlanViewpoint
 } from "@/lib/v4/pathPlan";
 
 /*
@@ -15,15 +15,22 @@ import {
  *  - Clean rows (choose-d3): a number, the title and the question (the AIs' words marked as AI text; the person's never),
  *    "2 viewpoints together:" with the viewpoint chips (they wrap; a path holds any number of them, owner answer "Four per
  *    path" A, 5 Nov), the tag ("put together by us · Split", "combined by you · Split", "added by you", "Added when you
- *    widened", "new"), Rewrite and ⋯. There is no tick box: Space never ticks a path.
- *  - One tab stop per row, the row's button. ArrowUp / ArrowDown move between rows, ArrowRight / ArrowLeft into and out of
- *    the chips (mirrored right to left), Enter opens ⋯, Escape brings focus back. A row asking "Rewrite it for me / Keep my
- *    wording", and the inline editor, add their own stops while they show.
+ *    widened", "new"), Rewrite and ⋯.
+ *  - Design Document v2 (16b), which replaces the earlier "no tick box": on the choosing card (`ticks`) each row starts with
+ *    a tick box, "tick two to combine them". The box is the path's place in the plan's one selection (`plan.selected`):
+ *    ticking sends SELECT, unticking UNSELECT, so the boxes and "Combine with…" below always show the same picks. A ticked
+ *    row has the brand edge. The box is offered as "Combine with…" is: with two paths or more (else it is greyed). Space on
+ *    the box ticks it; Escape there unticks every box. With two or more ticked, the combine line (V4StartCombineBar) offers
+ *    Combine and Keep apart, and the rows press as usual. A dig's rows have no box.
+ *  - Two tab stops per row with a box (the box, then the row's button); one without. ArrowUp / ArrowDown move between
+ *    rows, ArrowRight / ArrowLeft into and out of the chips (mirrored right to left), Enter opens ⋯, Escape brings focus
+ *    back. A row asking "Rewrite it for me / Keep my wording", and the inline editor, add their own stops while they show.
  *  - ⋯ on a path: Rewrite · Combine with… (two paths or more) · Split apart (two viewpoints or more) · Move up · Move down ·
  *    Remove. ⋯ on a chip: Move to path N · Its own path · Remove.
- *  - Combine with… picks this path; the combine line (V4StartCombineBar) says what combining frees, every other row's
- *    button adds ", press to combine with it", and pressing one (Enter, Space, or a tap anywhere on it) picks it and
- *    combines. Escape or Cancel combines nothing and puts focus on the first row. A refused combine (a fifth of the
+ *  - Combine with… picks this path alone (its box is ticked, any other unticked); while exactly one path is picked, the
+ *    combine line (V4StartCombineBar) says what combining frees, every other row's button adds ", press to combine with
+ *    it", and pressing one (Enter, Space, or a tap anywhere on it but its box) picks it and combines. Ticking one box is the
+ *    same state. Escape or Cancel combines nothing and puts focus on the first row. A refused combine (a fifth of the
  *    person's own points, or the technical bound) is reported and the first path stays picked, so another can be pressed.
  *  - The snap (one of the six moves): paths joining when their combined question is written, and parting on Split apart,
  *    under 0.5 s on its token; with reduced motion at once, with the 1-second highlight.
@@ -50,10 +57,15 @@ export type StartPlanProps = Readonly<{
   dispatch(action: PathPlanAction): PathPlanRefusal | null;
   /** A refused change, with the action that was refused (the card says why, Task 73). */
   onRefusal(refusal: PathPlanRefusal, action: PathPlanAction): void;
-  /** The share after combining one path away and its change: startShareChange(step, paths, paths − 1) (owner answer Q7). */
+  /**
+   * The share after combining and its change: startShareChange(step, paths, paths − freed) (owner answer Q7), `freed` being
+   * the combine line's startCombineFrees(plan): one path, or one less than the paths ticked.
+   */
   share: Readonly<{ percent: number; delta: number }> | null;
   /** At most 600 px wide (choose-f6). */
   narrow: boolean;
+  /** Design Document v2 (16b): a tick box leads each row, "tick two to combine them" (the choosing card). Absent: no box (a dig's rows). */
+  ticks?: boolean;
 }>;
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
@@ -323,9 +335,12 @@ type RowProps = Readonly<{
   catalog: MessageCatalog;
   locale: string;
   narrow: boolean;
-  /** "Combine with…" is picking: this row is picked, or can be pressed to combine. */
+  /** "Combine with…" is picking (exactly one path is picked): this row is the one, or can be pressed to combine with it. */
   combining: boolean;
+  /** This path is in the plan's selection: its box is ticked and its edge is the brand's. */
   picked: boolean;
+  /** Design Document v2 (16b): the row's tick box; absent: none (a dig's rows). */
+  tick?: RowTick | undefined;
   selected: readonly string[];
   menu: ReactNode;
   chipMenu: Readonly<{ chipKey: string; node: ReactNode }> | null;
@@ -350,6 +365,13 @@ type RowProps = Readonly<{
   onChipDown?: ((event: ReactPointerEvent<HTMLButtonElement>, chipKey: string) => void) | undefined;
   /** Task 77: while something is dragged, what this row shows of it; null or absent: nothing is dragged. */
   drag?: RowDrag | null;
+}>;
+
+/** Design Document v2 (16b): a row's tick box: greyed when there is nothing to combine with, what a tick or untick sends, and its keys (Escape). */
+type RowTick = Readonly<{
+  disabled: boolean;
+  onChange(checked: boolean): void;
+  onKeyDown(event: KeyboardEvent<HTMLInputElement>): void;
 }>;
 
 /** Task 77: one row's part of a drag under way. */
@@ -379,7 +401,7 @@ function DropGap({ index, over, after }: Readonly<{ index: number; over: string 
 /** The tag line: the tag's words, "· Split" on a path put together, and "new" on a late idea; null when none of them. */
 function tagLine(path: PlanPath, catalog: MessageCatalog, onSplit: () => void): ReactNode {
   const parts: ReactNode[] = [];
-  if (path.tag !== null) parts.push(<span key="tag">{t(catalog, `v4.start.tag.${path.tag}`)}</span>);
+  if (path.tag !== null) parts.push(<span key="tag" className="v4StartRowTagWord">{t(catalog, `v4.start.tag.${path.tag}`)}</span>);
   if ((path.tag === "PUT_TOGETHER_BY_US" || path.tag === "COMBINED_BY_YOU") && path.viewpoints.length > 1) {
     parts.push(<button key="split" type="button" tabIndex={-1} className="v4Link v4StartRowSplit" onClick={onSplit}>{t(catalog, "v4.start.tag.split")}</button>);
   }
@@ -399,10 +421,10 @@ export function V4StartRow(props: RowProps) {
     n, count, title: path.title, viewpoints, state
   });
   const together = path.viewpoints.length > 1;
-  // In "Combine with…", a tap anywhere on another row presses it (its own buttons keep their own presses).
+  // In "Combine with…", a tap anywhere on another row presses it (its own buttons, and its tick box, keep their own presses).
   const onRowClick = combining && !picked
     ? (event: MouseEvent<HTMLLIElement>): void => {
-      if ((event.target as Element).closest("button, a, input, textarea, [role='menu']") !== null) return;
+      if ((event.target as Element).closest("button, a, input, label, textarea, [role='menu']") !== null) return;
       props.onPress();
     }
     : undefined;
@@ -420,84 +442,104 @@ export function V4StartRow(props: RowProps) {
     <li className={classes.join(" ")} data-path-key={path.key} onClick={onRowClick}>
       {gapBefore === undefined ? null : <DropGap index={gapBefore.index} over={gapBefore.over} after={false} />}
       {drag === null || drag.over === null || drag.over === "" ? null : <span className="v4StartDropLabel" aria-hidden="true">{drag.over}</span>}
-      <div className="v4StartRowHead">
-        {narrow || props.onGripDown === undefined ? null : (
-          <span className="v4StartRowGrip" aria-hidden="true" onPointerDown={props.onGripDown}>⋮⋮</span>
-        )}
-        <button
-          ref={props.rowRef}
-          type="button"
-          className="v4StartRowButton"
-          aria-label={label}
-          aria-haspopup={combining ? undefined : "menu"}
-          aria-expanded={combining ? undefined : props.menuOpen}
-          onClick={props.onPress}
-          onKeyDown={props.onRowKey}
-        >
-          <span className="v4StartRowNumber" aria-hidden="true">{n}</span>
-          <span className={narrow ? "v4StartRowTitle v4StartRowTitle--full" : "v4StartRowTitle"} dir="auto" data-ai-generated={aiMark(ai)}>
-            {path.title}
-          </span>
-        </button>
-        <div className="v4StartRowControls">
-          {narrow ? null : (
-            <button type="button" tabIndex={-1} className="v4Btn v4StartRowRewrite" onClick={props.onRewrite}>
-              {t(catalog, "v4.start.rewrite.open")}
-            </button>
+      {props.tick === undefined ? null : (
+        // Design Document v2 (16b): the 22px box; its label is only the press area around it (the box says its own name).
+        <label className="v4StartRowTick">
+          <input
+            type="checkbox"
+            checked={picked}
+            disabled={props.tick.disabled}
+            aria-label={t(catalog, "v4.start.row.tick", { n, title: path.title })}
+            onChange={(event) => props.tick?.onChange(event.target.checked)}
+            onKeyDown={props.tick.onKeyDown}
+          />
+        </label>
+      )}
+      <div className="v4StartRowBody">
+        <div className="v4StartRowHead">
+          {narrow || props.onGripDown === undefined ? null : (
+            <span className="v4StartRowGrip" aria-hidden="true" onPointerDown={props.onGripDown}>⋮⋮</span>
           )}
           <button
+            ref={props.rowRef}
             type="button"
-            tabIndex={-1}
-            className="v4Btn v4StartRowMore"
-            aria-label={t(catalog, "v4.start.row.more", { n })}
-            aria-haspopup="menu"
-            aria-expanded={props.menuOpen}
-            onClick={props.onMore}
+            className="v4StartRowButton"
+            aria-label={label}
+            aria-haspopup={combining ? undefined : "menu"}
+            aria-expanded={combining ? undefined : props.menuOpen}
+            onClick={props.onPress}
+            onKeyDown={props.onRowKey}
           >
-            <span aria-hidden="true">⋯</span>
+            <span className="v4StartRowNumber" aria-hidden="true">{n}</span>
+            <span className={narrow ? "v4StartRowTitle v4StartRowTitle--full" : "v4StartRowTitle"} dir="auto" data-ai-generated={aiMark(ai)}>
+              {path.title}
+            </span>
           </button>
-        </div>
-        {props.menu}
-      </div>
-      {props.editing
-        ? <V4StartRewrite path={path} n={n} catalog={catalog} onSave={props.onSave} onCancel={props.onCancelEdit} />
-        : <p className="v4StartRowQuestion" dir="auto" data-ai-generated={aiMark(ai)}>{path.question}</p>}
-      {path.wording === "WRITING" ? <p className="v4StartRowWriting">{t(catalog, "v4.start.writing")}</p> : null}
-      {path.askReword ? (
-        <div className="v4StartReword">
-          <p className="v4StartRewordLine">{t(catalog, "v4.start.reword.changed")}</p>
-          <div className="v4StartRewordActions">
-            <button type="button" className="v4Btn" onClick={() => props.onReword(false)}>{t(catalog, "v4.start.reword.rewrite")}</button>
-            <button type="button" className="v4Btn" onClick={() => props.onReword(true)}>{t(catalog, "v4.start.reword.keep")}</button>
+          <div className="v4StartRowControls">
+            {narrow ? null : (
+              <button type="button" tabIndex={-1} className="v4Btn v4StartRowRewrite" onClick={props.onRewrite}>
+                {/* Design Document v2 (16b): the small pencil before the word. */}
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 20h4L19 9l-4-4L4 16v4z" />
+                  <path d="M13.5 6.5l4 4" />
+                </svg>
+                {t(catalog, "v4.start.rewrite.open")}
+              </button>
+            )}
+            <button
+              type="button"
+              tabIndex={-1}
+              className="v4Btn v4StartRowMore"
+              aria-label={t(catalog, "v4.start.row.more", { n })}
+              aria-haspopup="menu"
+              aria-expanded={props.menuOpen}
+              onClick={props.onMore}
+            >
+              <span aria-hidden="true">⋯</span>
+            </button>
           </div>
+          {props.menu}
         </div>
-      ) : null}
-      {together ? (
-        <div className="v4StartRowTogether">
-          <p className="v4StartRowTogetherLine">{tPlural(catalog, "v4.start.row.together", path.viewpoints.length, locale)}</p>
-          <ul className="v4StartChips">
-            {path.viewpoints.map((viewpoint, chip) => (
-              <V4StartChip
-                key={viewpoint.key}
-                viewpoint={viewpoint}
-                n={chip + 1}
-                count={path.viewpoints.length}
-                path={n}
-                picked={selected.includes(viewpoint.key)}
-                catalog={catalog}
-                open={chipMenu?.chipKey === viewpoint.key}
-                onOpen={() => props.onChip(viewpoint.key)}
-                onKeyDown={(event) => props.onChipKey(event, chip)}
-                buttonRef={(element) => props.chipRef(viewpoint.key, element)}
-                onPointerDown={narrow || props.onChipDown === undefined ? undefined : (event) => props.onChipDown?.(event, viewpoint.key)}
-                dragged={drag?.chipKey === viewpoint.key}
-              />
-            ))}
-          </ul>
-          {chipMenu?.node ?? null}
-        </div>
-      ) : null}
-      {tagLine(path, catalog, props.onSplit)}
+        {props.editing
+          ? <V4StartRewrite path={path} n={n} catalog={catalog} onSave={props.onSave} onCancel={props.onCancelEdit} />
+          : <p className="v4StartRowQuestion" dir="auto" data-ai-generated={aiMark(ai)}>{path.question}</p>}
+        {path.wording === "WRITING" ? <p className="v4StartRowWriting">{t(catalog, "v4.start.writing")}</p> : null}
+        {path.askReword ? (
+          <div className="v4StartReword">
+            <p className="v4StartRewordLine">{t(catalog, "v4.start.reword.changed")}</p>
+            <div className="v4StartRewordActions">
+              <button type="button" className="v4Btn" onClick={() => props.onReword(false)}>{t(catalog, "v4.start.reword.rewrite")}</button>
+              <button type="button" className="v4Btn" onClick={() => props.onReword(true)}>{t(catalog, "v4.start.reword.keep")}</button>
+            </div>
+          </div>
+        ) : null}
+        {together ? (
+          <div className="v4StartRowTogether">
+            <p className="v4StartRowTogetherLine">{tPlural(catalog, "v4.start.row.together", path.viewpoints.length, locale)}</p>
+            <ul className="v4StartChips">
+              {path.viewpoints.map((viewpoint, chip) => (
+                <V4StartChip
+                  key={viewpoint.key}
+                  viewpoint={viewpoint}
+                  n={chip + 1}
+                  count={path.viewpoints.length}
+                  path={n}
+                  picked={selected.includes(viewpoint.key)}
+                  catalog={catalog}
+                  open={chipMenu?.chipKey === viewpoint.key}
+                  onOpen={() => props.onChip(viewpoint.key)}
+                  onKeyDown={(event) => props.onChipKey(event, chip)}
+                  buttonRef={(element) => props.chipRef(viewpoint.key, element)}
+                  onPointerDown={narrow || props.onChipDown === undefined ? undefined : (event) => props.onChipDown?.(event, viewpoint.key)}
+                  dragged={drag?.chipKey === viewpoint.key}
+                />
+              ))}
+            </ul>
+            {chipMenu?.node ?? null}
+          </div>
+        ) : null}
+        {tagLine(path, catalog, props.onSplit)}
+      </div>
       {gapAfter === undefined || at + 1 !== count ? null : <DropGap index={gapAfter.index} over={gapAfter.over} after />}
     </li>
   );
@@ -520,7 +562,12 @@ export function V4StartList(props: StartPlanProps) {
   const splitWish = useRef<Readonly<{ index: number; count: number }> | null>(null);
   const pathsBefore = useRef(plan.paths);
   const snapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const combining = plan.selected.length > 0;
+  // One selection for the tick boxes and "Combine with…". "Combine with…" picks its path (the next row pressed is
+  // combined with it); a ticked box is only a tick, as the design draws it, and two or more ticked get the combine
+  // line's Combine.
+  const anyPicked = plan.selected.length > 0;
+  const combining = isPicking(plan);
+  const canCombine = plan.paths.length > 1;
   // Task 77: the drag under way (drawn), how to end the one listening (null: none), and what it reads when it lands.
   const [drag, setDrag] = useState<DragView | null>(null);
   const dragEnd = useRef<((draw: boolean) => void) | null>(null);
@@ -634,7 +681,7 @@ export function V4StartList(props: StartPlanProps) {
         pressRow(path, at);
         break;
       case "Escape":
-        if (!combining) break;
+        if (!anyPicked) break;
         event.preventDefault();
         cancelCombine();
         break;
@@ -642,6 +689,16 @@ export function V4StartList(props: StartPlanProps) {
         break;
     }
   };
+  /** Design Document v2 (16b): a row's tick box. Ticking picks the path, unticking lets it go; Escape unticks every box. */
+  const tickOf = (path: PlanPath): RowTick => ({
+    disabled: !canCombine,
+    onChange: (checked) => { dispatch({ type: checked ? "SELECT" : "UNSELECT", key: path.key }); },
+    onKeyDown: (event) => {
+      if (event.key !== "Escape" || !anyPicked) return;
+      event.preventDefault();
+      cancelCombine();
+    }
+  });
   const onChipKey = (event: KeyboardEvent<HTMLButtonElement>, path: PlanPath, at: number, chip: number): void => {
     const forward = rightToLeft(event.currentTarget) ? "ArrowLeft" : "ArrowRight";
     const back = forward === "ArrowRight" ? "ArrowLeft" : "ArrowRight";
@@ -672,7 +729,7 @@ export function V4StartList(props: StartPlanProps) {
         break;
       case "Escape":
         event.preventDefault();
-        if (combining) cancelCombine();
+        if (anyPicked) cancelCombine();
         else rowButtons.current.get(path.key)?.focus();
         break;
       default:
@@ -807,13 +864,13 @@ export function V4StartList(props: StartPlanProps) {
       id: "rewrite", label: t(catalog, "v4.start.menu.rewrite"),
       onChoose: () => { setMenu(null); setEditing(path.key); }
     }];
-    if (plan.paths.length > 1) {
+    if (canCombine) {
       items.push({
         id: "combine", label: t(catalog, "v4.start.menu.combineWith"),
         onChoose: () => {
           setMenu(null);
           if (plan.selected.length > 0) dispatch({ type: "CLEAR_SELECTION" });
-          dispatch({ type: "SELECT", key: path.key });
+          dispatch({ type: "SELECT", key: path.key, picking: true });
           focusWish.current = { key: path.key };
         }
       });
@@ -883,6 +940,7 @@ export function V4StartList(props: StartPlanProps) {
           narrow={narrow}
           combining={combining}
           picked={plan.selected.includes(path.key)}
+          tick={props.ticks === true ? tickOf(path) : undefined}
           selected={plan.selected}
           menu={pathMenu(path, at)}
           chipMenu={chipMenu(path, at)}

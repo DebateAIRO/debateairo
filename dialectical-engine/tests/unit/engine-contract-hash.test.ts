@@ -62,10 +62,17 @@ const ENGINE_SEALED_IDS: readonly string[] = ["verdict.investigate.v1", "verdict
   "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2",
   // R22 clarify lane (decision 29; the instruction approved word for word, the answer form a draft): dynamic step 2's small call.
   "ask.clarify.v1",
+  // Design Document v2 (16b), sealed 17 Nov (the owner approved versions 2 and 3 as written): version 3 of the same call, which holds
+  // version 2's words and the sentence that says the question back. It sits beside version 1 in ASK_CLARIFY_SEALED_CONTRACTS, the list
+  // the API's version gate reads. Version 2 was never sealed by itself.
+  "ask.clarify.v3",
   // R22 report 2 (decision 26): the writer who may ask once, the later version's, the checker of "every path in the material".
   "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3",
   // The owner put back the v3 writer's lost first sentence.
   "report.answer.v4", "report.answer.later.v4",
+  // V4 start step, Tasks 50b and 50c, sealed 17 Nov (the owner approved both goal sentences as written): the writer, the later version's
+  // writer and the check that say how a stated goal fares across the paths. A group of their own, right after the v4 writers.
+  "report.answer.v5", "report.answer.later.v5", "report.answer-check.v4",
   // R22 public lane (decision 13; a draft wording, the owner's before switch-on): the AI check on a contribution to a public debate.
   "public.contribution-check.v1",
   // R22 decision 35: the AI check on a report of a public debate.
@@ -96,8 +103,12 @@ const R1D_ENGINE_CONTRACT_HASH = "b98a45d5933d82205d5c6514082d4151bfb8f3f45b3677
 // (60469207a7d5dfa9b690dbc2bffaa02b53f848f31b8db06c55e732f2e1a55e20, history). R22 clarify lane (decision 29): + dynamic step 2's small call.
 // R22 report 2 (decision 26): + the writer who may ask, its later version and the checker of "every path in the material"; then the
 // writer's v4 with the first sentence the owner put back. R22 public lane (decision 13): + the AI check on a contribution to a public debate
-// (e1e6168de89965c88917259fab98914b372dac6a4fe16c907ad9d9797aad613c, history). R22 decision 35: + the AI check on a report of a public debate (public.report-check.v1).
-const ENGINE_CONTRACT_HASH_SEALED = "24b33806d0e18b665bb530aa6a01e3e4c2af479b0004762cbdaefd237f70ada3";
+// (e1e6168de89965c88917259fab98914b372dac6a4fe16c907ad9d9797aad613c, history). R22 decision 35: + the AI check on a report of a public debate (public.report-check.v1)
+// (24b33806d0e18b665bb530aa6a01e3e4c2af479b0004762cbdaefd237f70ada3, history). Design Document v2 (16b), 2026-11-17: + ask.clarify.v3, right after
+// ask.clarify.v1 (the clarifying call's own sealed list); no other draft is sealed with it
+// (271729917bc1ece6434f70b38e6afdd724977ed906c11de6025b2166c70d6076, history). The same day: + the report's three goal versions
+// (report.answer.v5, report.answer.later.v5, report.answer-check.v4), right after the v4 writers; no other draft is sealed with them.
+const ENGINE_CONTRACT_HASH_SEALED = "ca4bfa0a4b50a8336922af952a63b2faa541df9012b17d9bf054a2652c408988";
 const SELECT = "SELECT value_json FROM register.register_row WHERE register_version=$1 AND row_key=$2";
 const runtime = { nodeVersion: "v26.8.2", pnpmVersion: "11.20.0", sourceRevision: "a".repeat(40), sourceTree: "b".repeat(40),
   operatorSha256: "c".repeat(64), observedAt: "2026-10-16T12:00:00.000Z" };

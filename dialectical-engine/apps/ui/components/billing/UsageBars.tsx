@@ -75,12 +75,31 @@ export function UsageBars({
   const line = internal !== null ? t(catalog,"billing.usage.internalLine",{dayPct:day === undefined ? "0" : pct(day),weekPct:week === undefined ? "0" : pct(week),grantPct:pct(month)}) : day !== undefined && week !== undefined
     ? t(catalog, "billing.usage.line", { dayPct: pct(day), weekPct: pct(week), monthPct: pct(month) })
     : t(catalog, "billing.usage.lineFree", { monthPct: pct(month) });
+  const title = t(catalog, internal === null ? "billing.usage.title" : "billing.usage.internalTitle");
+  // Design Document v2 (19c): a card with its title, then one row per window: the window's name, its percent and its
+  // reset over the bar. The one-line summary stays for a screen reader (it reads the whole state at once), so the
+  // row's own name and percent, which the meter already says, are not read twice.
   return (
-    <section className="usageBars" aria-label={t(catalog, internal === null ? "billing.usage.title" : "billing.usage.internalTitle")}>
+    <section className="usageBars" aria-label={title}>
+      <h2 className="usageTitle">{title}</h2>
       <p className="usageLine">{line}</p>
-      {internal === null ? null : <ResetSentence text={t(catalog,"billing.usage.expires",{time:RESET_TIME_MARK})} at={internal.expires_at} locale={locale}/> }
+      {internal === null ? null : <ResetSentence className="usageExpires" text={t(catalog,"billing.usage.expires",{time:RESET_TIME_MARK})} at={internal.expires_at} locale={locale}/> }
       {windows.map((window) => (
         <div className="usageBar" key={window.scope}>
+          <div className="usageHead">
+            <b className="usageLabel" aria-hidden="true">{t(catalog, labelKey(window.scope))}</b>
+            <span className="usageMeta">
+              <span className="usagePercent" aria-hidden="true">
+                {formatNumber(locale, window.percent / 100, { style: "percent", maximumFractionDigits: 0 })}
+              </span>
+              <ResetSentence
+                className="usageReset"
+                text={t(catalog, window.scope === "PERSON_GRANT" ? "billing.usage.expires" : "billing.usage.resets", { time: RESET_TIME_MARK })}
+                at={window.resets_at}
+                locale={locale}
+              />
+            </span>
+          </div>
           <div
             className="usageTrack"
             role="meter"
@@ -91,12 +110,6 @@ export function UsageBars({
           >
             <span className="usageFill" style={{ width: `${Math.min(window.percent, 100)}%` }} />
           </div>
-          <ResetSentence
-            className="usageReset"
-            text={t(catalog, window.scope === "PERSON_GRANT" ? "billing.usage.expires" : "billing.usage.resets", { time: RESET_TIME_MARK })}
-            at={window.resets_at}
-            locale={locale}
-          />
         </div>
       ))}
     </section>

@@ -2,6 +2,8 @@
    Turn 15 — legal pages and footer (design 15a / 15b / 15c)
    Tokens only: the design's page/railBg/hair/hairStrong/mute/hint/gold/shell/ink
    are --bg/--surface-2/--line/--line-strong/--muted/--text-2/--gold/--shell/--ink.
+   Design Document v2: headings are the display face at 700 with -.02em; every label
+   that was set in a mono face is the sans face; an inline link is the link colour.
    ============================================================ */
 
 /* The layout draws the one-line footer after every page; a page that renders the
@@ -40,7 +42,7 @@
 }
 .legalNavHead {
   padding: 0 12px 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .18em;
@@ -91,7 +93,7 @@
 .legalMain { max-width: 680px; min-width: 0; }
 .legalEyebrow {
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: .22em;
@@ -101,10 +103,10 @@
 .legalTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 40px;
   line-height: 1.08;
-  letter-spacing: -.025em;
+  letter-spacing: -.02em;
   text-wrap: balance;
 }
 .legalMeta {
@@ -124,7 +126,7 @@
 }
 .legalSectionNo {
   padding-top: 4px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 700;
   color: var(--gold-text);
@@ -133,8 +135,8 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -.01em;
+  font-weight: 700;
+  letter-spacing: -.02em;
 }
 .legalSection p,
 .legalIntro,
@@ -177,8 +179,8 @@
   margin: 36px 0 0;
   font-family: var(--font-display);
   font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -.01em;
+  font-weight: 700;
+  letter-spacing: -.02em;
 }
 .legalSubhead + .legalIntro { margin-top: 7px; }
 
@@ -197,11 +199,11 @@
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
 }
-.legalVersionNo { font-family: var(--font-display); font-size: 20px; font-weight: 600; }
+.legalVersionNo { font-family: var(--font-display); font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
 .legalVersionHead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .legalVersionDate { font-size: 12.5px; font-weight: 700; }
 .legalVersionTag {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .14em;
@@ -213,7 +215,7 @@
   padding-top: 5px;
   font-size: 11.5px;
   font-weight: 700;
-  color: var(--ink);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 3px;
   white-space: nowrap;
@@ -240,7 +242,7 @@
 }
 .legalTable thead th {
   padding-block: 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .14em;
@@ -248,7 +250,7 @@
   color: var(--muted);
 }
 .legalTable tbody th { font-weight: 700; color: var(--ink); }
-.legalTable code { font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--ink); }
+.legalTable code { font-family: var(--font-sans); font-size: 11px; font-weight: 700; color: var(--ink); }
 .legalCookieTable th:first-child { width: 190px; }
 .legalCookieTable td:nth-child(2) { width: 86px; }
 .legalCookieTable td:last-child { width: 90px; }
@@ -276,7 +278,7 @@
   .legalCookieTable td { padding: 2px 0; border: 0; }
 }
 .legalProviderEntry { margin-top: 28px; }
-.legalProviderEntry h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: var(--ink); }
+.legalProviderEntry h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
 .legalProviderEntry .legalTable { margin-top: 10px; }
 .legalProviderPurposes ul { margin: 0; padding-inline-start: 16px; }
 .legalAction { margin-top: 20px; }
@@ -287,7 +289,7 @@
 .legalFactNote { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
 .legalSection a,
 .legalFactTable a {
-  color: var(--ink);
+  color: var(--link);
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -320,10 +322,11 @@
   color: var(--text-2);
 }
 .siteFooterBrand { display: flex; align-items: center; gap: 10px; }
-.siteFooterBrandName { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+/* Design Document v2: the product's name is the wordmark: the display face, 700, -.03em. */
+.siteFooterBrandName { font-family: var(--font-display); font-size: 14px; font-weight: 700; letter-spacing: -.03em; color: var(--ink); }
 .siteFooterColumn { display: flex; flex-direction: column; gap: 9px; }
 .siteFooterHead {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .14em;
@@ -437,6 +440,8 @@
 }
 .siteFooterLine .siteFooterMadeIn::before { content: ""; height: 100%; }
 .siteFooterLine nav { margin-inline-start: auto; }
+/* Design Document v2: the footer line's language switcher follows the links; the nav before it takes the free room. */
+.siteFooterLine .siteFooterLang { margin-inline-start: 0; }
 .siteFooterLineLinks { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
 .siteFooterLine .siteFooterLink { font-size: 10.5px; font-weight: 600; }
 .siteFooterLine .siteFooterAnpc { padding: 2px 4px; border-radius: 6px; }

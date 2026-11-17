@@ -267,7 +267,7 @@ export async function v2FirstPathsOf(input: Readonly<{ set: StoredStartPathSet; 
 /**
  * The debate's step-2 lines (decisions 5 and 29), opened under its key, as the material's three fields; all null for an old debate. V4
  * start step, Task 50c: and whether the person said what they care about (the page's mark on the care answer, `pathsGoalStated`), which
- * picks the answer's goal drafts and never reaches the material.
+ * picks the answer's goal versions and never reaches the material.
  */
 async function purposeLinesOf(pool: Pool, runId: string, questionLine: string)
   : Promise<Readonly<{ place: string | null; time: string | null; purpose: string | null; goalStated: boolean }>> {

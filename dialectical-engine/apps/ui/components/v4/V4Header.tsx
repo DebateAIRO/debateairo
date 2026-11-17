@@ -6,6 +6,10 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { V4QuotaPill } from "./V4QuotaPill";
 import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
+import { allMapsHref } from "./V4MapShelf";
+
+/** Which of the header's pages the person is on: the ask page (and every page of a question), or "My questions". */
+export type V4HeaderPlace = "ask" | "questions";
 
 /*
  * V4 initial (spec "/v4", header everywhere): brand + badge to /v4 and the page's own extras.
@@ -25,12 +29,20 @@ import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
  *    the round account button (app/v4/v4-base.css). Question 18 A (no "Write my report" in the top bar while the bottom
  *    bar shows it) is built in the map's own report item (useMapReport's `bottomShowsReport`, V4BottomStack's
  *    `onReportShown`); only the map page's wiring of the two remains (V4DebateClient, the start-step session's).
+ * Design Document v2 (16 Nov 2026):
+ *  - The brand is the wordmark alone, "Dialectical Engine" in the display face with "Engine" in the brand colour; the
+ *    diamond mark stays only as the phone's one-row brand, and the "V4 preview" badge is gone.
+ *  - Beside it, the header's own links: Ask, My questions (signed-in people only, as the page is theirs) and How it
+ *    works. The link of the page the person is on is underlined in the brand colour and is `aria-current`. On a phone
+ *    the links step back (the one-row rule above); the brand and the account menu still reach the same pages.
  */
 
 export function V4Header({
-  catalog, classicHref = null, showQuota = true, session, children, after, onBrandClick
+  catalog, classicHref = null, showQuota = true, session, children, after, onBrandClick, place = "ask"
 }: Readonly<{
   catalog: MessageCatalog;
+  /** The page the header's links mark as the current one; a page of a question counts as "ask". */
+  place?: V4HeaderPlace;
   /** Accepted and unused (the 5 Nov reading-level ruling: no level in any header). */
   readingLevel?: ReadingLevel | null;
   /** Accepted and unused (the 5 Nov reading-level ruling: no header link carries a level). */
@@ -70,13 +82,24 @@ export function V4Header({
   const quotaHeld = showQuota && session === "CHECKING";
   return (
     <header className="v4Hdr">
-      <Link href="/v4" className="v4HdrBrand" onClick={onBrandClick}>
-        <span className="v4HdrMark" aria-hidden="true" />
-        {/* On a phone the name and the badge are hidden on screen (v4-base.css) and stay the link's name; the space keeps
-            the two words apart when it is read out (a flex row draws no space-only text). */}
-        <span className="v4HdrName">Dialectical Engine</span>{" "}
-        <span className="v4HdrBadge">{t(catalog, "v4.brand.badge")}</span>
-      </Link>
+      <div className="v4HdrLead">
+        <Link href="/v4" className="v4HdrBrand" onClick={onBrandClick}>
+          {/* On a phone the wordmark is hidden on screen (v4-base.css) and stays the link's name; the mark shows there. */}
+          <span className="v4HdrMark" aria-hidden="true" />
+          <span className="v4HdrName">Dialectical <span className="v4HdrNameAccent">Engine</span></span>
+        </Link>
+        <nav className="v4HdrNav" aria-label={t(catalog, "v4.header.nav.label")}>
+          <Link href="/v4" className="v4HdrNavLink" aria-current={place === "ask" ? "page" : undefined} onClick={onBrandClick}>
+            {t(catalog, "v4.header.nav.ask")}
+          </Link>
+          {session === "OUT" || session === "CHECKING" ? null : (
+            <a href={allMapsHref()} className="v4HdrNavLink" aria-current={place === "questions" ? "page" : undefined}>
+              {t(catalog, "v4.maps.menu")}
+            </a>
+          )}
+          <a href="/help" className="v4HdrNavLink">{t(catalog, "v4.header.nav.how")}</a>
+        </nav>
+      </div>
       <div className="v4HdrRight">
         <V4QuotaPill catalog={catalog} wanted={quotaWanted} hold={quotaHeld} />
         {children}

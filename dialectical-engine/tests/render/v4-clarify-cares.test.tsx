@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 /*
  * V4 start step, Task 76d (owner answers Q4 and Q5 of 4 Nov; read-d3, read-f8, read-f22, r2-5): what step 2 does with a version 2
- * reply of the clarifying call (sealed only through Task 92; here the server is stood in with one). The care question, "What do you
+ * reply of the clarifying call (its members come with the sealed version 3 since 17 Nov; here the server is stood in with one). The care question, "What do you
  * care about most?", shows last, after the question about what the answer is for, and is answered like any other: a tap puts the
  * AI's sentence in the question box ("What I care about is: keeping bills low.") and its {question, answer} in the purpose lines; it
  * counts in Free's cap of 3, muted like any other once the cap is reached. Each offered answer's sentence is the AI's own; the site's

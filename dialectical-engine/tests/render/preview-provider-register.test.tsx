@@ -369,7 +369,8 @@ describe("the Register words still exist in all 35 languages", () => {
         expect(catalog[key], `${locale} ${key}`).not.toContain("[");
       }
       // The numbers are facts: 30 days, 7 years for safety-check results, 55 days at Google, 30 days after the service ends at Perplexity.
-      expect(catalog["legal.providers.retentionPerplexity"], locale).toContain("30");
+      // English no longer gives Perplexity's 30 days: its search terms let it keep search phrases, and the row says that instead.
+      if (locale !== "en") expect(catalog["legal.providers.retentionPerplexity"], locale).toContain("30");
       for (const key of ["legal.providers.locationDeepInfra", "legal.providers.retentionDeepInfra", "legal.providers.deepinfraPartnerName"]) expect(catalog[key], `${locale} ${key}`).toContain("DeepInfra");
       for (const key of ["legal.providers.locationPerplexity", "legal.providers.retentionPerplexity"]) expect(catalog[key], `${locale} ${key}`).toContain("Perplexity");
       expect(catalog["legal.providers.retentionAnthropic"], locale).toMatch(/30[^0-9][\s\S]*7[^0-9]|30[^0-9][\s\S]*7$/);
@@ -394,9 +395,10 @@ describe("Perplexity, the models' web search provider, is always listed (owner, 
     }
   });
 
-  it("names the company and the search job, with the facts its API terms give, checked and dated", () => {
-    // docs/legal/2026-11-16-deepinfra-perplexity-facts.md: no training (API Terms 2.3.3); zero data retention is not the
-    // default and needs a written agreement; transfers under the standard contractual clauses (the addendum).
+  it("names the company and the search job, and says what its search terms allow, checked and dated", () => {
+    // docs/legal/2026-11-17-provider-contract-facts.md: the Search Addendum lets Perplexity keep search questions and
+    // results and use them to improve its products, and takes search out of the API Terms' zero-retention promise.
+    // docs/legal/2026-11-16-deepinfra-perplexity-facts.md: where it processes, the transfer basis and the contact.
     expect(PERPLEXITY_PROVIDER).toMatchObject({
       provider: "Perplexity",
       entity: "Perplexity AI, Inc.",
@@ -406,10 +408,10 @@ describe("Perplexity, the models' web search provider, is always listed (owner, 
       locationKey: "legal.providers.locationPerplexity",
       retentionKey: "legal.providers.retentionPerplexity",
       zeroRetention: "no",
-      training: "no",
+      training: "yes",
       basisKey: "legal.providers.sccBasis",
       contact: "legal-notices@perplexity.ai",
-      checkedOn: "2026-11-16"
+      checkedOn: "2026-11-17"
     });
     for (const catalog of [en, ro]) {
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(null)} />);
@@ -418,7 +420,7 @@ describe("Perplexity, the models' web search provider, is always listed (owner, 
       expect(section).toContain(escaped(catalog["legal.providers.purpose.search"]));
       expect(section).toContain(escaped(catalog["legal.providers.retentionPerplexity"]));
       expect(section).toContain('href="mailto:legal-notices@perplexity.ai"');
-      expect(section).toContain("2026-11-16");
+      expect(section).toContain("2026-11-17");
       expect(section).not.toContain("[");
     }
   });

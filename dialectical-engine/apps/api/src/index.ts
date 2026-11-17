@@ -4092,12 +4092,16 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     if (options.emailChange === undefined) return reply.status(503).send({ error: "EMAIL_CHANGE_UNAVAILABLE" });
     const settings = await options.emailChange.settings(emailChangeSession(authenticated));
     if (settings === null) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    // Design Document v2 (3a): the session's own pseudonym, for the top bar's identity pill. One the contract would not
+    // take (none, blank, too long) is left out, so the addresses are still read and the bar says "Account".
+    const pseudonym = AccountEmailSchema.shape.pseudonym.safeParse(settings.pseudonym ?? undefined);
     return reply.send(AccountEmailSchema.parse({
       email: settings.email,
       recovery_email: settings.recoveryEmail,
       pending: settings.pending === null ? null : {
         new_email: settings.pending.newEmail, expires_at: settings.pending.expiresAt.toISOString()
-      }
+      },
+      ...(pseudonym.success && pseudonym.data !== undefined ? { pseudonym: pseudonym.data } : {})
     }));
   });
   api.post("/v1/account/email/change", credentialRoutePolicy("POST /v1/account/email/change"),

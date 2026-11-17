@@ -4,12 +4,13 @@
 /* ---------- the four-shade bar (row D decision 2) ---------- */
 .v4Bar { display: flex; flex-direction: column; gap: 6px; min-width: 0; width: 100%; }
 .v4BarTrack { display: flex; gap: 2px; width: 100%; height: 6px; }
+.v4BarLarge { gap: 8px; }
 .v4BarLarge .v4BarTrack { height: 10px; }
-.v4BarEmpty { border: 1px dashed var(--line-strong); border-radius: 2px; }
+.v4BarEmpty { border: 1px solid var(--line-strong); border-radius: 2px; }
 .v4BarSeg { flex-basis: 0; min-width: 6px; border-radius: 1px; }
 .v4BarSure { background: var(--v4-sure); }
 .v4BarCase { background: var(--v4-case); }
-.v4BarArgued { background: repeating-linear-gradient(45deg, var(--v4-argued) 0 3px, var(--v4-argued-soft) 3px 5px); }
+.v4BarArgued { background: var(--v4-argued-stripes); }
 .v4BarFell { background: transparent; box-shadow: inset 0 0 0 1.5px var(--v4-fell); }
 .v4BarCounts { font-size: var(--t-ui); color: var(--text-2); }
 
@@ -17,7 +18,7 @@
 /* A card's note row wraps whole words onto a new line in a narrow card ("Open · A good place to start · Could change
    the answer"), never one word per line. */
 .v4MapNote { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: var(--t-meta); color: var(--text-2); }
-.v4MapStar { color: var(--gold); font-size: 15px; line-height: 1; }
+.v4MapStar { color: var(--gold); line-height: 1; }
 .v4MapNew { display: inline-flex; align-items: center; gap: 5px; font-size: var(--t-meta); font-weight: 700; color: var(--con-text); }
 .v4MapNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); flex: none; }
 .v4MapPulse {
@@ -47,14 +48,18 @@
 .v4MapEmpty { margin: 0; padding: 12px 0; }
 
 /* ---------- the map tree (D3) ---------- */
-.v4Map { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* Design Document v2: the map is three columns of cards and nothing between them: a row says which open questions belong
+   to which path. The trunk, branches and stubs below keep their places and take --v4-map-wire, which draws nothing. */
+.v4Map { --v4-map-wire: transparent; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 /* Wide maps scroll inside their own box, never the page (F §4.2: sideways scroll at about 1,024 px). */
-.v4MapScroll { overflow-x: auto; overflow-y: visible; padding: 4px 4px 10px; -webkit-overflow-scrolling: touch; }
+/* The box leaves room on every side for the selected card's outline and its 6px halo (the margins give the room back, so
+   the columns stay where they were). */
+.v4MapScroll { overflow-x: auto; overflow-y: visible; padding: 10px 10px 12px; margin: -6px -6px -2px; -webkit-overflow-scrolling: touch; }
 .v4MapCanvas { min-width: max-content; display: flex; flex-direction: column; gap: 10px; }
 .v4MapHeads {
-  display: grid; grid-template-columns: 196px 228px 236px; column-gap: 32px;
-  font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: var(--ls-eyebrow); text-transform: uppercase;
-  color: var(--text-3); overflow-wrap: break-word; hyphens: auto;
+  display: grid; grid-template-columns: 196px 236px 236px; column-gap: 32px;
+  font-family: var(--font-sans); font-size: var(--t-micro); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--con-text); overflow-wrap: break-word; hyphens: auto;
 }
 .v4MapBody { display: flex; align-items: flex-start; }
 /* V4 review map-f13: every column keeps its drawn width as a floor and grows only for a word that cannot break (up to a
@@ -67,25 +72,27 @@
 }
 /* The stub from the question card to the trunk of the paths. */
 .v4MapRootCol::after {
-  content: ""; position: absolute; top: 40px; inset-inline-end: -32px; width: 32px; border-top: 2px solid var(--line-strong);
+  content: ""; position: absolute; top: 40px; inset-inline-end: -32px; width: 32px; border-top: 2px solid var(--v4-map-wire);
 }
 .v4MapRootCol:has(+ .v4MapEmpty)::after { display: none; }
 
 .v4MapRoot, .v4MapPath, .v4MapOpenMain, .v4MapDig {
   display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; min-height: 44px;
-  text-align: start; cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35;
+  text-align: start; cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.5;
   overflow-wrap: break-word; hyphens: auto;
 }
+/* Design Document v2: the question is the one card filled with the brand colour, its words in the text face. */
 .v4MapRoot {
-  background: var(--ink); color: var(--surface); border: 0; border-radius: var(--r-card); padding: 12px 14px;
-  min-height: 80px;
+  background: var(--brand); color: var(--on-brand); border: 0; border-radius: var(--r-card); padding: 12px 14px;
+  min-height: 80px; gap: 8px;
 }
-.v4MapRoot .v4BarSure { background: var(--surface); }
-/* UI-12: on the dark card the softer-ink and outline segments need 3:1 against --ink in both modes; a surface/ink mix
-   stays apart from Sure (surface) and the --con-border outline keeps Didn't hold in the accent family. */
-.v4MapRoot .v4BarCase { background: color-mix(in srgb, var(--surface) 60%, var(--ink)); }
+.v4MapRoot:hover { background: color-mix(in srgb, var(--brand) 88%, var(--ink)); }
+/* On the brand-filled card Sure is the card's light shade, the case named the grey of --text-3, and Didn't hold keeps its
+   outline in the accent family's light edge. */
+.v4MapRoot .v4BarSure { background: var(--on-ink); }
+.v4MapRoot .v4BarCase { background: var(--text-3); }
 .v4MapRoot .v4BarFell { box-shadow: inset 0 0 0 1.5px var(--con-border); }
-.v4MapRoot .v4BarEmpty { border-color: var(--text-3); }
+.v4MapRoot .v4BarEmpty { border-color: color-mix(in srgb, var(--on-brand) 55%, transparent); }
 .v4MapRoot .v4MapNew { color: var(--gold-bg); }
 .v4MapRootTitle {
   font-size: 16px; line-height: 1.3;
@@ -95,7 +102,9 @@
   background: var(--surface); color: var(--text); border: 1.5px solid var(--line-strong); border-radius: 12px;
   padding: 9px 12px; min-height: 80px;
 }
-.v4MapPath:hover, .v4MapOpenMain:hover, .v4MapDig:hover { background: var(--surface-2); }
+/* A hover changes the colour under a card only, so open ground and a dig at work keep their hatching. */
+.v4MapPath:hover, .v4MapDig:hover { background-color: var(--surface-2); }
+.v4MapOpenMain:hover { background-color: color-mix(in srgb, var(--gold-border) 24%, transparent); }
 .v4MapPathTitle, .v4MapOpenTitle, .v4MapDigTitle {
   font-weight: 700; color: var(--text);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
@@ -109,26 +118,26 @@
 .v4MapBranches, .v4MapLeaves { list-style: none; margin: 0; padding: 0; }
 .v4MapBranches { margin-inline-start: 32px; display: flex; flex-direction: column; gap: 14px; }
 .v4MapBranch { position: relative; display: flex; align-items: flex-start; gap: 32px; padding-inline-start: 0; }
-.v4MapBranch > .v4MapPath { width: min-content; min-width: 228px; max-width: 300px; flex: none; }
+.v4MapBranch > .v4MapPath { width: min-content; min-width: 236px; max-width: 300px; flex: none; }
 .v4MapBranch::before, .v4MapLeaf::before {
   content: ""; position: absolute; inset-inline-start: -16px; top: -7px; bottom: -7px;
-  border-inline-start: 2px solid var(--line-strong);
+  border-inline-start: 2px solid var(--v4-map-wire);
 }
 .v4MapBranch:first-child::before { top: 40px; }
 .v4MapBranch:last-child::before { bottom: auto; height: 47px; }
 .v4MapBranch:first-child:last-child::before { display: none; }
 .v4MapBranch::after {
-  content: ""; position: absolute; inset-inline-start: -16px; top: 40px; width: 16px; border-top: 2px solid var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -16px; top: 40px; width: 16px; border-top: 2px solid var(--v4-map-wire);
 }
 .v4MapBranches > .v4MapBranch:first-child::after { inset-inline-start: -32px; width: 32px; }
 .v4MapBranches > .v4MapBranch:first-child:last-child::after { inset-inline-start: -32px; width: 32px; }
 
 .v4MapLeaves {
   position: relative; width: min-content; min-width: 236px; max-width: 310px; flex: none; display: flex;
-  flex-direction: column; gap: 10px;
+  flex-direction: column; gap: 8px;
 }
 .v4MapBranch > .v4MapLeaves::before {
-  content: ""; position: absolute; inset-inline-start: -32px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -32px; top: 30px; width: 16px; border-top: 2px dashed var(--v4-map-wire);
 }
 .v4MapLeaf { position: relative; }
 .v4MapLeaf::before { border-inline-start-style: dashed; inset-inline-start: -16px; }
@@ -136,14 +145,14 @@
 .v4MapLeaf:last-child::before { bottom: auto; height: 37px; }
 .v4MapLeaf:first-child:last-child::before { display: none; }
 .v4MapLeaf::after {
-  content: ""; position: absolute; inset-inline-start: -16px; top: 30px; width: 16px; border-top: 2px dashed var(--line-strong);
+  content: ""; position: absolute; inset-inline-start: -16px; top: 30px; width: 16px; border-top: 2px dashed var(--v4-map-wire);
 }
 /* The question's own open questions hang under its card in a short column. */
 .v4MapRootLeaves { padding-block: 14px 0; padding-inline: 22px 0; position: relative; }
 .v4MapRootLeaves:empty { display: none; }
 .v4MapRootLeaves::before {
   content: ""; position: absolute; inset-inline-start: 10px; top: 0; height: 44px;
-  border-inline-start: 2px dashed var(--line-strong);
+  border-inline-start: 2px dashed var(--v4-map-wire);
 }
 .v4MapRootLeaves .v4MapLeaves { min-width: 174px; max-width: 238px; }
 .v4MapRootLeaves .v4MapLeaf::before, .v4MapRootLeaves .v4MapLeaf::after { inset-inline-start: -12px; }
@@ -156,7 +165,7 @@
    trunk, branches and stubs are drawn in, as before. Browsers without subgrid keep the per-row widths above. */
 @supports (grid-template-columns: subgrid) {
   .v4MapCanvas {
-    display: grid; grid-template-columns: minmax(196px, min-content) minmax(228px, min-content) minmax(236px, min-content);
+    display: grid; grid-template-columns: minmax(196px, min-content) minmax(236px, min-content) minmax(236px, min-content);
     column-gap: 32px; row-gap: 10px;
   }
   .v4MapHeads, .v4MapBody { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; column-gap: normal; }
@@ -172,29 +181,37 @@
   .v4MapBranch > .v4MapLeaves { grid-column: 2; width: auto; }
 }
 
+/* Design Document v2: open ground is gold paper with the gold hatching and a solid 1.5px gold edge. Its kind ("Still
+   argued", with the star when it carries it) is the small gold line over the title; the star's words sit under it. */
 .v4MapOpen {
-  display: flex; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border);
-  border-radius: 12px;
+  display: flex; align-items: stretch; background-color: var(--gold-bg); background-image: var(--v4-hatch);
+  border: 1.5px solid var(--gold-border); border-radius: 12px;
 }
-.v4MapPicked { border-style: solid; border-color: var(--gold); }
+.v4MapPicked { border-color: var(--brand); }
 .v4MapOpenMain {
-  flex-direction: row; align-items: flex-start; gap: 8px; background: transparent; border: 0; border-radius: 12px;
-  padding-block: 8px; padding-inline: 12px 4px; color: var(--text); min-width: 0; flex: 1;
+  background: transparent; border: 0; border-radius: 12px;
+  padding-block: 9px; padding-inline: 12px 4px; color: var(--text); min-width: 0; flex: 1;
 }
 .v4MapOpenBody { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.v4MapOpenKind { font-size: var(--t-meta); font-weight: 700; color: var(--gold-text); }
+.v4MapOpenKind .v4MapStar { color: inherit; }
 .v4MapPick, .v4OutPick, .v4PanelPick {
   flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px;
   cursor: pointer;
 }
-.v4MapPick input, .v4OutPick input, .v4PanelPick input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.v4MapPick input, .v4OutPick input, .v4PanelPick input { width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: pointer; }
+/* Design Document v2: "+ N more" is a pill with the field's 2px edge; a dashed edge means "New" only. */
 .v4MapMore {
   font: inherit; font-size: var(--t-meta); font-weight: 600; color: var(--text-2); background: var(--surface);
-  border: 1px dashed var(--line-strong); border-radius: var(--r-pill); padding: 0 14px; min-height: 44px; cursor: pointer;
+  border: 2px solid var(--field-border); border-radius: var(--r-pill); padding: 0 14px; min-height: 44px; cursor: pointer;
 }
+.v4MapMore:hover { background: var(--surface-2); }
 .v4MapDig {
   background: var(--surface); color: var(--text); border: 1.5px solid var(--accent); border-radius: 12px; padding: 8px 12px;
 }
-.v4MapDigFAILED { border-color: var(--line-strong); border-style: dashed; }
+.v4MapDigFAILED { border-color: var(--line-strong); }
+/* Design Document v2: a dig's card says its state first ("Looking into it", with the working dot), then what it digs. */
+.v4MapDig > .v4MapNote { order: -1; }
 .v4MapDigHeadline {
   font-size: var(--t-meta); color: var(--text-2);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
@@ -206,7 +223,11 @@
 }
 .v4MapLegend li { display: inline-flex; align-items: center; gap: 6px; }
 .v4MapKey { display: inline-block; width: 18px; height: 8px; border-radius: 1px; }
-.v4MapKeyOpen { background: var(--gold-bg); border: 1.5px dashed var(--gold-border); height: 12px; border-radius: 3px; }
+.v4MapKeyOpen { background-color: var(--gold-bg); background-image: var(--v4-hatch); border: 1.5px solid var(--gold-border); height: 12px; border-radius: 3px; }
+/* Design Document v2: the marks of the ground come first, the four trust shades on a line of their own under them. */
+.v4Map > .v4MapLegend { margin-top: 6px; }
+.v4MapLegendBreak { flex-basis: 100%; height: 2px; }
+.v4MapLegend li.v4MapLegendBreak { display: block; }
 
 /* ---------- the phone outline (D7) ---------- */
 .v4Out { min-width: 0; }
@@ -221,37 +242,61 @@
   cursor: pointer; font: inherit; font-size: var(--t-ui); line-height: 1.35; border-radius: 12px; min-width: 0;
   hyphens: auto;
 }
-.v4OutRoot { background: var(--ink); color: var(--surface); border: 0; padding: 12px 14px; }
+.v4OutRoot { background: var(--brand); color: var(--on-brand); border: 0; padding: 12px 14px; }
 .v4OutRoot .v4MapNew { color: var(--gold-bg); }
+.v4OutRoot .v4BarSure { background: var(--on-ink); }
+.v4OutRoot .v4BarCase { background: var(--text-3); }
+.v4OutRoot .v4BarFell { box-shadow: inset 0 0 0 1.5px var(--con-border); }
+.v4OutRoot .v4BarEmpty { border-color: color-mix(in srgb, var(--on-brand) 55%, transparent); }
 .v4OutRootTitle { font-size: 15.5px; overflow-wrap: anywhere; }
 .v4OutPath { background: var(--surface); color: var(--text); border: 1.5px solid var(--line-strong); padding: 10px 12px; }
 .v4OutTitle { font-weight: 700; overflow-wrap: anywhere; }
 .v4OutMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .v4OutHere { font-size: var(--t-meta); font-weight: 600; color: var(--con-text); }
-.v4OutOpen { flex-direction: row; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border); border-radius: 12px; }
+.v4OutOpen { flex-direction: row; align-items: stretch; background-color: var(--gold-bg); background-image: var(--v4-hatch); border: 1.5px solid var(--gold-border); border-radius: 12px; }
 .v4OutOpen .v4OutMain { background: transparent; border: 0; padding-block: 8px; padding-inline: 0 12px; color: var(--text); flex: 1; }
 .v4OutDig .v4OutMain { background: var(--surface); color: var(--text); border: 1.5px solid var(--accent); padding: 8px 12px; }
-.v4OutSelected.v4OutRoot, .v4OutSelected.v4OutPath { outline: 2.5px solid var(--accent); outline-offset: 2px; }
+.v4OutSelected.v4OutRoot, .v4OutSelected.v4OutPath { outline: 2.5px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); }
 .v4OutSelected.v4OutOpen, .v4OutSelected.v4OutDig .v4OutMain { border-color: var(--accent); border-style: solid; }
 
 /* ---------- the panel (D3 right side) ---------- */
 .v4Panel { display: flex; flex-direction: column; gap: 16px; min-width: 0; overflow-wrap: anywhere; }
-.v4PanelCrumbs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; font-size: var(--t-ui); }
+/* Design Document v2: the way here is one small line: underlined links, a grey "›", the place itself in 600. A link keeps
+   its 44px touch height; the margins take that height back out of the line, so the line stays one line tall. */
+.v4PanelCrumbs ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; font-size: var(--t-ui); }
 .v4PanelCrumbs li { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-.v4PanelCrumbs li + li::before { content: "›"; content: "›" / ""; color: var(--text-3); }
-.v4PanelCrumbs .v4Link { font-weight: 600; min-height: 44px; text-decoration: none; }
-.v4PanelCrumbs [aria-current] { color: var(--text-2); }
-.v4PanelH2 { margin: 0; font-size: 19px; line-height: 1.3; font-weight: 700; }
-.v4Panel-root .v4PanelH2 { font-family: var(--font-display); font-weight: var(--fw-display); font-size: 21px; }
+.v4PanelCrumbs li + li::before { content: "›"; content: "›" / ""; color: var(--text-2); }
+.v4PanelCrumbs .v4Link { min-height: 44px; margin-block: -12px; text-align: start; }
+.v4PanelCrumbs [aria-current] { font-weight: 600; color: var(--text); }
+/* Design Document v2: the kind of place as an eyebrow, 6px over its heading; the heading in the display face, 700, 24px
+   (22px for an open question or a dig, whose words run longer). */
+.v4Panel > .v4Eyebrow { margin-bottom: -10px; }
+.v4PanelH2 {
+  margin: 0; font-family: var(--font-display); font-weight: var(--fw-display); letter-spacing: var(--ls-display);
+  font-size: 24px; line-height: 1.2;
+}
+.v4Panel-open .v4PanelH2, .v4Panel-dig .v4PanelH2 { font-size: 22px; }
 .v4PanelH2:focus { outline: none; }
 .v4PanelH2:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .v4PanelSection { display: flex; flex-direction: column; gap: 8px; }
-.v4PanelH3 {
-  margin: 0; font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase;
-  color: var(--con-text); font-weight: 500;
-}
+/* Design Document v2: a part of the panel is named in plain bold words ("What we found", "Where to dig from here"). */
+.v4PanelH3 { margin: 0; font-family: var(--font-sans); font-size: var(--t-body); font-weight: 700; color: var(--text); }
 .v4PanelText { margin: 0; }
-.v4PanelHeadline { margin: 0 0 6px; font-size: 18px; line-height: 1.35; }
+.v4PanelHeadline { margin: 0 0 6px; font-size: 18px; line-height: 1.25; }
+/* Design Document v2: "The answer here so far" is the hard card (.v4Hard, v4-base.css): its name small and grey, its words
+   in the display face at 17px, the 10px trust bar and "How sure" under them. */
+.v4PanelAnswer { gap: 8px; padding: 16px 18px; }
+.v4PanelAnswer > .v4PanelH3 { font-size: var(--t-ui); color: var(--text-2); }
+.v4PanelAnswer > .v4PanelText, .v4PanelAnswer > [data-ai-generated]:not(.v4PanelFallback) > .v4PanelText {
+  font-family: var(--font-display); font-weight: 500; font-size: 17px; line-height: 1.45;
+}
+.v4PanelAnswer > .v4PanelText.v4PathTrustWord { font-family: var(--font-sans); font-size: var(--t-ui); font-weight: 400; line-height: 1.5; color: var(--text-2); }
+.v4PanelAnswer > .v4PanelBar { margin-top: 4px; }
+/* An open question says why it is open in small grey lines under its heading, the star's line in gold. */
+.v4PanelAbout { gap: 6px; }
+.v4PanelAbout > .v4PanelText { font-size: var(--t-ui); color: var(--text-2); }
+.v4PanelAbout > .v4PanelText b { color: var(--text); }
+.v4PanelAbout > .v4PanelStarLine { color: var(--gold-text); font-weight: 700; }
 .v4PanelFallback { display: flex; flex-direction: column; gap: 8px; }
 /* "What we asked the AIs": the full question as sent, with the lines added from the person's choices. */
 .v4PanelSent, .v4PanelFirstAnswer { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
@@ -273,7 +318,7 @@
 .v4PanelGroups { display: flex; flex-direction: column; gap: 8px; }
 .v4PanelGroup { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); }
 .v4PanelGroup > summary {
-  list-style-position: inside; cursor: pointer; font-weight: 700; padding: 10px 14px; min-height: 44px;
+  list-style-position: inside; cursor: pointer; font-weight: 700; padding: 12px 14px; min-height: 44px;
   display: flex; align-items: center;
 }
 .v4PanelGroup > summary::-webkit-details-marker { display: none; }
@@ -285,33 +330,40 @@
 .v4PanelMark { flex: none; width: 5px; border-radius: 2px; align-self: stretch; }
 .v4PanelPointSURE .v4PanelMark { background: var(--v4-sure); }
 .v4PanelPointSURE_FOR_CASE .v4PanelMark { background: var(--v4-case); }
-.v4PanelPointSTILL_ARGUED .v4PanelMark { background: repeating-linear-gradient(45deg, var(--v4-argued) 0 3px, var(--v4-argued-soft) 3px 5px); }
+.v4PanelPointSTILL_ARGUED .v4PanelMark { background: var(--v4-argued-stripes); }
 .v4PanelPointDIDNT_HOLD .v4PanelMark { background: transparent; box-shadow: inset 0 0 0 1.5px var(--v4-fell); }
 .v4PanelPointDIDNT_HOLD .v4PanelPointText { text-decoration: line-through; text-decoration-color: var(--text-3); color: var(--text-2); }
-.v4PanelPointBody { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.v4PanelPointText { margin: 0; }
-.v4PanelBasis { margin: 0; font-size: var(--t-ui); color: var(--text-2); }
+.v4PanelPointBody { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.v4PanelPointText { margin: 0; font-size: 14.5px; }
+.v4PanelBasis { margin: 0; font-size: 13px; color: var(--text-2); }
 .v4PanelReasons ul, .v4PanelWhy { margin: 4px 0 0; padding-inline-start: 18px; font-size: var(--t-ui); color: var(--text-2); }
 .v4PanelWhy { color: var(--text); font-size: var(--t-body); display: flex; flex-direction: column; gap: 4px; }
 .v4PanelSmallHead { margin: 6px 0 0; font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
 .v4PanelUnchecked { margin: 0; font-size: var(--t-ui); }
 .v4PanelRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.v4PanelOpenRow { display: flex; align-items: stretch; background: var(--gold-bg); border: 1.5px dashed var(--gold-border); border-radius: 12px; }
+.v4PanelOpenRow { display: flex; align-items: stretch; background-color: var(--gold-bg); background-image: var(--v4-hatch); border: 1.5px solid var(--gold-border); border-radius: 12px; }
 .v4PanelRowBtn {
   display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; min-height: 44px;
   text-align: start; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 8px 12px;
   cursor: pointer; font: inherit; font-size: var(--t-ui); color: var(--text); width: 100%;
 }
 .v4PanelOpenRow .v4PanelRowBtn { background: transparent; border: 0; padding-inline-start: 0; }
-.v4PanelRowBtn:hover { background: var(--surface-2); }
+.v4PanelRowBtn:hover { background-color: var(--surface-2); }
+.v4PanelOpenRow .v4PanelRowBtn:hover { background-color: color-mix(in srgb, var(--gold-border) 24%, transparent); }
 .v4PanelRowTitle { font-weight: 700; }
+/* In the panel's list the star's words are a quiet grey line under the question. */
+.v4PanelRowBtn .v4MapStarWords { color: var(--text-2); font-weight: 400; }
 .v4PanelModeTag { display: inline-block; font-size: var(--t-meta); color: var(--text-2); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 0 8px; }
 .v4PanelDig {
   display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line-2);
 }
+/* Design Document v2: "How far to dig" in small grey 600 over the two pills (2px edge; the chosen one filled with the
+   brand colour, .v4Chip), then the orange call to action (.v4Cta) across the panel, and the share it uses in 12px grey. */
+.v4PanelModeLabel { margin: 0; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); }
 .v4PanelModes { display: flex; flex-wrap: wrap; gap: 8px; }
-.v4PanelModes .v4Chip { min-height: 44px; }
+.v4PanelModes .v4Chip { min-height: 44px; padding: 0 14px; }
 .v4PanelDigBtn { width: 100%; }
+.v4PanelDig .v4MoneyLine { font-size: var(--t-meta); color: var(--text-2); }
 .v4Panel .v4MapPulse { margin-inline-end: 6px; vertical-align: middle; }
 /* dig-f24: "Skip to the dig button" stays out of sight until it has the keyboard's focus. */
 .v4PanelSkip { align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; }
@@ -349,7 +401,7 @@
 .v4PathCardCompact > .v4PathCardMain { flex: 1 1 12em; min-width: 0; }
 /* journey-f2: the slow pulse ring of the "being looked into" look runs only while the AIs work; while the run waits, holds or
    is paused, the ring stands still (journey-f2's own still ring, the one it shows under reduced motion). */
-.v4PathCard.v4GroundLOOKING:not(.v4PathPulse)::after { animation: none; opacity: .6; }
+.v4PathCard.v4GroundLOOKING:not(.v4PathPulse)::after { animation: none; opacity: .5; }
 
 /* wait-d1 C: the quiet dots, one per point put forward (at most 6), all alike: grey; a dot being checked has a ring that
    slowly closes; a checked one is ink. Never a colour for or against, never a number. */
@@ -365,8 +417,8 @@
 .v4PathDotRing::after {
   content: ""; position: absolute; inset: -3px; border-radius: var(--r-dot);
   background: conic-gradient(var(--ink) var(--v4-ring), transparent 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), var(--ink) calc(100% - 1.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), var(--ink) calc(100% - 1.5px));
   animation: v4RingClose 8s ease-out 1 both;
 }
 @keyframes v4RingClose { from { --v4-ring: 20deg; } to { --v4-ring: 330deg; } }
@@ -412,7 +464,7 @@
 /* Reduced motion: the dot ring and the pulse stand still; every change is at once. */
 @media (prefers-reduced-motion: reduce) {
   .v4PathDotRing::after { animation: none; }
-  .v4PathCard.v4PathPulse::after { animation: none; opacity: .6; }
+  .v4PathCard.v4PathPulse::after { animation: none; opacity: .5; }
 }
 
 /* V4 start step, Task 62 (wait-d1, journey-d2, map-f4, wait-f9): what sits under the map's first card while the debate runs
@@ -423,7 +475,11 @@
 .v4RunChoosing { margin: 0; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
 .v4RunPhonePaths { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .v4RunPhoneRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.v4DebFirstCard { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* Design Document v2: the question at the head of a map that is still being made is the hard card. */
+.v4DebFirstCard {
+  display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px 18px;
+  border: 2px solid var(--hard); box-shadow: 0 5px 0 var(--hard-shadow); border-radius: 22px;
+}
 .v4DebNoPanel.v4DebLayout-desktop .v4DebMapCol, .v4DebNoPanel.v4DebLayout-laptop .v4DebMapCol { grid-column: 2 / -1; }
 .v4DebNoPanel.v4DebLayout-mid .v4DebMapCol { grid-column: 1 / -1; }
 .v4DebMoved { margin-block: 0 8px; }
@@ -461,7 +517,7 @@
 .v4PanelOtherPages > .v4OtherPages { margin-top: 4px; }
 .v4PanelOtherPagesHead {
   display: flex; align-items: center; min-height: 44px; cursor: pointer; list-style: none;
-  font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase; color: var(--con-text);
+  font-family: var(--font-sans); font-size: var(--t-body); font-weight: 700; color: var(--text);
 }
 .v4PanelOtherPagesHead::-webkit-details-marker { display: none; }
 .v4PanelOtherPagesHead::before { content: "▸"; content: "▸" / ""; margin-inline-end: 8px; color: var(--text-3); }
@@ -476,29 +532,38 @@
 /* Perplexity plan W3-4: choosing what to dig (V4DigSuggest.tsx). A path's suggestions on the tree and the outline, the
    panel's "Choose what to dig", edits and the person's own view. Phone first: nothing has a fixed width, text wraps, and
    every control keeps the 44px touch height. */
+/* Design Document v2: a suggested dig is a card with the field's 2px edge on the surface; picked, it is filled with the
+   brand colour and everything on it takes the brand's own text colour. Its kind is the small line over its words. */
 .v4Sug {
-  display: flex; align-items: stretch; background: var(--surface); border: 1.5px dashed var(--line-strong);
-  border-radius: 12px; min-width: 0;
+  display: flex; align-items: stretch; background: var(--surface); border: 2px solid var(--field-border);
+  border-radius: 12px; min-width: 0; color: var(--text);
 }
-.v4SugPicked { border-style: solid; border-color: var(--gold); }
+.v4SugPicked { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .v4SugMain {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; flex: 1; min-width: 0; min-height: 44px;
-  text-align: start; background: transparent; border: 0; border-radius: 12px; padding-block: 8px; padding-inline: 12px 4px; cursor: pointer;
-  font: inherit; font-size: var(--t-ui); color: var(--text); overflow-wrap: anywhere;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; flex: 1; min-width: 0; min-height: 44px;
+  text-align: start; background: transparent; border: 0; border-radius: 12px; padding-block: 10px; padding-inline: 12px 4px; cursor: pointer;
+  font: inherit; font-size: 14px; color: inherit; overflow-wrap: anywhere;
 }
-.v4SugKind { font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
+.v4SugKind { font-size: var(--t-meta); font-weight: 600; color: var(--text-3); }
+.v4SugPicked .v4SugKind { font-weight: 700; color: inherit; }
 .v4SugText { min-width: 0; }
+.v4SugPicked :is(.v4MapPick, .v4PanelPick) input { accent-color: var(--on-brand); }
 .v4SugAgain { width: 100%; }
 .v4Sugs { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .v4SugGroup { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .v4SugList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .v4SugRow {
   display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-block: 4px 8px; padding-inline: 0 10px; overflow-wrap: anywhere;
-  border: 1.5px dashed var(--line-strong); border-radius: 12px; background: var(--surface);
+  border: 2px solid var(--field-border); border-radius: 12px; background: var(--surface); color: var(--text);
 }
-.v4SugRow.v4SugPicked { border-style: solid; border-color: var(--gold); }
+.v4SugRow.v4SugPicked { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+/* On a picked card the links, the small tag and a refusal's line take the brand's text colour; a button and the text box
+   keep their own surface and ink. */
+.v4SugRow.v4SugPicked :is(.v4Link, .v4SugProblem) { color: inherit; }
+.v4SugRow.v4SugPicked .v4SugTag { color: inherit; border-color: currentColor; }
+.v4SugRow.v4SugPicked .v4Btn { color: var(--text); }
 .v4SugRowHead { display: flex; align-items: flex-start; gap: 0; min-width: 0; }
-.v4SugRowText { margin: 0; padding-top: 12px; font-size: var(--t-ui); min-width: 0; flex: 1; }
+.v4SugRowText { margin: 0; padding-top: 11px; font-size: 14px; min-width: 0; flex: 1; }
 .v4SugRowPlain { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; padding-inline-start: 12px; }
 .v4SugRowPlain .v4SugRowText { padding-top: 8px; }
 .v4SugRowPlain .v4Link { min-height: 44px; }
@@ -506,16 +571,21 @@
   display: inline-block; font-size: var(--t-meta); color: var(--text-2); border: 1px solid var(--line-strong);
   border-radius: var(--r-pill); padding: 0 8px;
 }
-.v4SugEdit { align-self: flex-start; min-height: 44px; margin-inline-start: 44px; }
+.v4SugEdit { align-self: flex-start; min-height: 44px; margin-inline-start: 44px; font-size: var(--t-ui); }
 .v4SugEditor { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding-inline-start: 12px; }
 .v4SugLabel { font-size: var(--t-ui); font-weight: 700; }
 .v4SugInput {
-  width: 100%; box-sizing: border-box; font: inherit; font-size: var(--t-body); color: var(--text); background: var(--surface);
-  border: 1px solid var(--line-strong); border-radius: 10px; padding: 8px 10px; resize: vertical; min-height: 5em;
+  width: 100%; box-sizing: border-box; font: inherit; font-size: var(--t-body); color: var(--text); background: var(--field);
+  border: 2px solid var(--field-border); border-radius: 12px; padding: 8px 10px; resize: vertical; min-height: 5em;
 }
 .v4SugEditorActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
 .v4SugEditorActions .v4Btn, .v4SugEditorActions .v4Link, .v4SugOwnOpen { min-height: 44px; }
 .v4SugOwnOpen { align-self: flex-start; }
+/* Design Document v2: "Add your own view" is a small underlined link under the suggestions, like "Change the wording". */
+.v4Sugs .v4SugOwnOpen, .v4Sugs .v4SugOwnOpen:hover {
+  padding: 0; border: 0; border-radius: 0; background: none; color: var(--link); font-size: var(--t-ui); font-weight: 400;
+  text-decoration: underline; text-underline-offset: 3px;
+}
 .v4SugProblem { margin: 0; font-size: var(--t-ui); color: var(--text); font-weight: 600; }
 .v4SugElsewhere {
   display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-inline-start: 3px solid var(--gold);
@@ -540,7 +610,7 @@
    Phone first: nothing has a fixed width, text wraps, and every control keeps the 44px touch height. */
 .v4RewriteNote { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--t-meta); color: var(--text-2); }
 .v4RewriteNoteREWRITTEN .v4RewriteNoteLine { color: var(--text); font-weight: 600; }
-.v4RewriteNoteBelow { font-style: italic; }
+.v4RewriteNoteBelow { color: var(--text-3); }
 .v4Rewrite {
   display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 10px 12px; overflow-wrap: anywhere;
   border-inline-start: 3px solid var(--line-strong); border-radius: 10px; border-start-start-radius: 0; border-end-start-radius: 0;
@@ -561,4 +631,4 @@
 }
 .v4RewriteToggle, .v4RewriteDigMap, .v4DigPageBack { align-self: flex-start; min-height: 44px; }
 .v4RewritePointWord { font-size: var(--t-meta); font-weight: 700; color: var(--text-2); }
-.v4RewriteBelow { margin: 0; font-style: italic; color: var(--text-2); }
+.v4RewriteBelow { margin: 0; color: var(--text-2); }

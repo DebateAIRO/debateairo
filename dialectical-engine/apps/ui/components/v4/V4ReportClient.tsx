@@ -958,8 +958,9 @@ function CheckedSection({ free, catalog }: Readonly<{ free: boolean; catalog: Me
   return (
     <section className="v4RepSection" aria-labelledby="v4-report-checked">
       <h2 id="v4-report-checked" className="v4RepH2">{t(catalog, "v4.report.checkedHeading")}</h2>
-      <p className="v4RepProse">{t(catalog, "v4.report.checkedSecondAi")}</p>
-      <p className="v4RepProse">{t(catalog, free ? "v4.report.checkedWordsIntroFree" : "v4.report.checkedWordsIntro")}</p>
+      {/* Design Document v2: the two lines before the words are small and quiet (13.5px, the second text colour). */}
+      <p className="v4RepNote">{t(catalog, "v4.report.checkedSecondAi")}</p>
+      <p className="v4RepNote">{t(catalog, free ? "v4.report.checkedWordsIntroFree" : "v4.report.checkedWordsIntro")}</p>
       <ul className="v4RepWords">
         {words.map((word) => (
           <li key={word} className="v4RepWord">

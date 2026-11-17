@@ -1,7 +1,7 @@
 import { AuthCatalogProvider } from '@/components/AuthShell';
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Fraunces, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Instrument_Sans } from "next/font/google";
 import { SiteFooter } from "@/components/SiteFooter";
 import { TopBar } from "@/components/TopBar";
 import { NewVersionNote } from "@/components/NewVersionNote";
@@ -26,50 +26,37 @@ import "./data-export.css";
 import { DocumentTitle } from "@/components/DocumentTitle";
 
 /*
+ * Design Document v2: Bricolage Grotesque is the display face (headings, the wordmark, the question and answer text) and
+ * Instrument Sans is the text face; the labels that used to be mono (eyebrows, counts, codes) are set in the text face
+ * too, so there is no third family. Bricolage keeps its optical-size axis, as the design does.
+ *
  * V4 review ask-f21: only the faces a first screen paints with are preloaded, so the browser stops warning "preloaded but
- * not used" on every load: the upright display and body faces, and the mono face (every first screen shows it: the classic
- * top bar's site name and eyebrows, the V4 header's badge and eyebrows). The italic faces still load when a page first
- * uses them (display: swap). Each italic is its own loader so it can skip the preload: next/font keeps the family's real
- * name in its @font-face rules (it hashes only class names), so the italic rules join the same "Fraunces" and "Plus
- * Jakarta Sans" families the variables name, and italic text keeps its true italic.
+ * not used" on every load: the upright display and body faces. The italic body face still loads when a page first uses
+ * it (display: swap). It is its own loader so it can skip the preload: next/font keeps the family's real name in its
+ * @font-face rules (it hashes only class names), so the italic rules join the same "Instrument Sans" family the variable
+ * names, and italic text keeps its true italic. Bricolage Grotesque has no italic.
  */
-const display = Fraunces({
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
+  axes: ["opsz"],
   style: ["normal"],
-  variable: "--font-fraunces",
+  variable: "--font-bricolage",
   display: "swap"
 });
 
-const displayItalic = Fraunces({
-  subsets: ["latin"],
-  axes: ["SOFT", "WONK", "opsz"],
-  style: ["italic"],
-  variable: "--font-fraunces-italic",
-  display: "swap",
-  preload: false
-});
-
-const sans = Plus_Jakarta_Sans({
+const sans = Instrument_Sans({
   subsets: ["latin"],
   style: ["normal"],
-  variable: "--font-jakarta",
+  variable: "--font-instrument",
   display: "swap"
 });
 
-const sansItalic = Plus_Jakarta_Sans({
+const sansItalic = Instrument_Sans({
   subsets: ["latin"],
   style: ["italic"],
-  variable: "--font-jakarta-italic",
+  variable: "--font-instrument-italic",
   display: "swap",
   preload: false
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-mono-src",
-  display: "swap"
 });
 
 async function requestLocale(): Promise<LocaleCode> {
@@ -115,7 +102,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html
       lang={locale}
       dir={localeDefinition.dir}
-      className={`${display.variable} ${displayItalic.variable} ${sans.variable} ${sansItalic.variable} ${mono.variable}`}
+      className={`${display.variable} ${sans.variable} ${sansItalic.variable}`}
       suppressHydrationWarning
     >
       <head>

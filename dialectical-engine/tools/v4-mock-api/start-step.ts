@@ -13,7 +13,9 @@
  *  - The room read's start step (How wide and each path count's share, made-up shares) and the room scenes `#siteupdated`,
  *    `#planfails` and `#planfailsall`, set by the switch `roomscene=` (a room read comes before any question is typed).
  *  - POST /v1/asks/clarify: version 2's members (each answer's sentence, the place question marked, "What do you care about most?"),
- *    the scenes `#none`, `#fail`, `#slow`, `#late`, `#purposeonly`, `#nopurpose`, and read-f1's reworded second reading.
+ *    the scenes `#none`, `#fail`, `#slow`, `#late`, `#purposeonly`, `#nopurpose`, and read-f1's reworded second reading. Design
+ *    Document v2 (16b): every AI reply also says the question back in one made-up sentence that fits its own questions (`restatement`,
+ *    with the answer the mock's AI assumed for each), so step 2 shows "How we read your question"; `#noread` leaves it out.
  *  - What the calls before Start add to the usage read (they count even without Start), and the counters `/__mock/state` shows.
  * Every body is the contract's (packages/contract) and is checked before it is sent; server.ts runs startStepSelfCheck at its start.
  */
@@ -23,7 +25,7 @@ import {
   AskClarifyRequestSchema, AskClarifyResponseSchema, FREE_PUBLIC_NOTICE_REQUIRED, SignedStartMenuSchema, START_PATHS_INVALID,
   START_PATHS_NARROWED, START_PATHS_STALE, START_STEP_LIMITS, StartCombineRequestSchema, StartCombineResponseSchema, StartFitRequestSchema,
   StartFitResponseSchema, StartListsEventSchema, StartListsRequestSchema, StartMergeEventSchema, StartMergeRequestSchema, startListNosOfMenu,
-  StartStepRoomSchema, type AskClarifyRequest, type AskClarifyResponse, type AskRequest, type ClarifyQuestion, type SignedStartList,
+  StartStepRoomSchema, type AskClarifyRequest, type AskClarifyResponse, type AskRequest, type ClarifyQuestion, type ClarifyRestatement, type SignedStartList,
   type SignedStartMenu, type StartAngle, type StartCombineRequest, type StartCombineResponse, type StartFitRequest, type StartFitResponse,
   type StartList, type StartListsEvent, type StartListViewpoint, type StartMenu, type StartMenuPath, type StartMenuViewpoint,
   type StartMergeEvent, type StartMergeRequest, type StartStepRoom
@@ -430,12 +432,62 @@ const PURPOSE: ClarifyQuestion = { text: "What do you want the answer for?", ans
 const CARES: ClarifyQuestion = { text: "What do you care about most?", answers: ["The cost", "Fairness", "Safety"],
   sentences: ["What I care about is: the cost.", "What I care about is: fairness.", "What I care about is: safety."] };
 
-/** The reply for a line, by the scene its end names: `#none` none; `#purposeonly` the purpose question alone; `#nopurpose` without it. */
+/**
+ * Design Document v2 (16b): how each made-up question reads inside the sentence that says the question back. `lead` and `tail` are
+ * the plain words around the answer's words; `phrases` are those words, one per answer of the question (BY_WHEN has WHEN's first
+ * two answers, so it takes WHEN's first two phrases); `assumed` is the answer the mock's AI assumed.
+ */
+type MockReading = Readonly<{ lead: string; phrases: readonly string[]; assumed: number; tail: string }>;
+const READINGS: ReadonlyMap<string, MockReading> = new Map([
+  [PLACE.text, { lead: "a question about ", phrases: ["Romania", "the EU as a whole", "any country, in general"], assumed: 2, tail: "" }],
+  [WHEN.text, { lead: "looking at ", phrases: ["the next 5 years", "the next 25 years", "the years up to 2035"], assumed: 1, tail: "" }],
+  [BY_WHEN.text, { lead: "looking at ", phrases: ["the next 5 years", "the next 25 years"], assumed: 1, tail: "" }],
+  [PURPOSE.text, { lead: "asked so that you can ", phrases: ["decide how to vote", "explain it to someone", "write about it"], assumed: 1, tail: "" }],
+  [CARES.text, { lead: "with ", phrases: ["the cost", "fairness", "safety"], assumed: 0, tail: " mattering most to you" }]
+]);
+/** The most of the question's own words the sentence quotes (a part of plain words holds at most clarifyRestatementTextMaxChars). */
+const RESTATED_WORDS_MAX = 240;
+
+/**
+ * Design Document v2 (16b): the made-up sentence for a reply's own questions: the question's words (its scene names taken off, cut
+ * at RESTATED_WORDS_MAX), then one part for each question the reply has, in the order the page shows them. For the default reply:
+ * "You asked: “…” We read it as a question about [any country, in general], looking at [the next 25 years], asked so that you can
+ * [explain it to someone], with [the cost] mattering most to you." Exported for the seeded pick-up (saved-questions.ts), whose
+ * saved reading carries its sentence as one saved from such a reply does.
+ */
+export function mockClarifyRestatement(line: string, reply: Extract<AskClarifyResponse, { source: "AI" }>): ClarifyRestatement {
+  const words = line.replace(/(?:\s*#[a-z]+)+\s*$/iu, "").trim() || line;
+  const quoted = words.length > RESTATED_WORDS_MAX ? `${words.slice(0, RESTATED_WORDS_MAX).trimEnd()}…` : words;
+  const asked: ReadonlyArray<Readonly<{ about: number | "purpose" | "cares"; question: ClarifyQuestion }>> = [
+    ...reply.questions.map((question, about) => ({ about, question })),
+    ...(reply.purpose === undefined ? [] : [{ about: "purpose" as const, question: reply.purpose }]),
+    ...(reply.cares === undefined ? [] : [{ about: "cares" as const, question: reply.cares }])
+  ];
+  const parts: ClarifyRestatement["parts"] = [];
+  let plain = `You asked: “${quoted}” We read it as `;
+  let first = true;
+  for (const { about, question } of asked) {
+    const reading = READINGS.get(question.text);
+    if (reading === undefined || reading.phrases.length !== question.answers.length) continue;
+    parts.push({ text: `${plain}${first ? "" : ", "}${reading.lead}` }, { about, phrases: [...reading.phrases], assumed: reading.assumed });
+    plain = reading.tail;
+    first = false;
+  }
+  parts.push({ text: first ? `You asked: “${quoted}”` : `${plain}.` });
+  return { parts };
+}
+
+/**
+ * The reply for a line, by the scene its end names: `#none` none; `#purposeonly` the purpose question alone; `#nopurpose` without it.
+ * Design Document v2 (16b): every AI reply carries its sentence (`restatement`), but under `#noread`, whose reply is the default
+ * one without it (step 2 then shows as it did before).
+ */
 function clarifyReplyOf(line: string, reworded: boolean): AskClarifyResponse {
   if (line.endsWith("#none")) return { source: "NONE" };
-  if (line.endsWith("#purposeonly")) return { source: "AI", questions: [], purpose: structuredClone(PURPOSE) };
-  const questions = structuredClone([PLACE, reworded ? BY_WHEN : WHEN]);
-  return { source: "AI", questions, ...(line.endsWith("#nopurpose") ? {} : { purpose: structuredClone(PURPOSE) }), cares: structuredClone(CARES) };
+  const questions = line.endsWith("#purposeonly") ? [] : structuredClone([PLACE, reworded ? BY_WHEN : WHEN]);
+  const reply: Extract<AskClarifyResponse, { source: "AI" }> = line.endsWith("#purposeonly") ? { source: "AI", questions, purpose: structuredClone(PURPOSE) }
+    : { source: "AI", questions, ...(line.endsWith("#nopurpose") ? {} : { purpose: structuredClone(PURPOSE) }), cares: structuredClone(CARES) };
+  return line.endsWith("#noread") ? reply : { ...reply, restatement: mockClarifyRestatement(line, reply) };
 }
 
 /** The first line whose reading had questions; a later, different line gets them reworded (read-f1). */
@@ -731,7 +783,7 @@ export function startStepSelfCheck(): number {
         own_text: "The cost would fall on the shops.", paths: menu.menu.paths.slice(0, 7).map((path) => ({ key: path.path_ref, title: path.title, question: path.question })) }));
     }
   }
-  for (const end of ["", " #none", " #purposeonly", " #nopurpose"]) {
+  for (const end of ["", " #none", " #purposeonly", " #nopurpose", " #noread"]) {
     for (const reworded of [false, true]) check(`clarify (${end || "default"}, reworded ${String(reworded)})`, AskClarifyResponseSchema, clarifyReplyOf(`${question}${end}`, reworded));
   }
   return count;

@@ -12,6 +12,12 @@ wholly "[to confirm]": `DEEPINFRA_PARTNER_PROVIDER`, the company DeepInfra forwa
 (Qwen3.8-Flash) to, which DeepInfra does not name. Fill it when DeepInfra says who it is, or remove it together with
 that model. The table below describes the rows as they stood on 30 September 2026.
 
+## 17 November 2026: both rows re-read against the contract documents
+
+`docs/legal/2026-11-17-provider-contract-facts.md`. DeepInfra's facts stand. Perplexity's row now says "Yes" to
+training: its Search Addendum lets it keep search questions and results and use them to improve its products. Both
+rows are dated `2026-11-17`.
+
 ## What changed
 
 - `/providers` now shows one table per provider with these rows: models, company, home country,

@@ -325,8 +325,9 @@ const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-
  * no answer. Its jobs are confirmed: every panel member writes and judges arguments, GLM writes the answer and the
  * verdict story, DeepSeek checks both (the first preview's GLM alone does all three).
  *
- * Checked 16 November 2026 against DeepInfra's Terms of Service (last modified 15 October 2026) and its trust centre
- * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`): all inference runs in data centres in the United States,
+ * Checked against DeepInfra's Terms of Service (last modified 15 October 2026) and its trust centre on 16 November
+ * 2026 (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`), and against the text of its Data Processing
+ * Agreement on 17 November 2026 (`docs/legal/2026-11-17-provider-contract-facts.md`): all inference runs in data centres in the United States,
  * with no other region; prompts and outputs are held in memory only while a request is processed, then deleted, and
  * the logs hold request metadata, never the text (Terms 7(b), every account); no training on customer data (Terms
  * 7(b)); the data processing agreement is part of the Terms (section 5) and carries the EU standard contractual
@@ -349,9 +350,10 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   retentionKey: "legal.providers.retentionDeepInfra",
   zeroRetention: "yes",
   training: "no",
+  // DeepInfra is not on the EU–US Data Privacy Framework list, so the clauses in its agreement are the only basis.
   basisKey: "legal.providers.sccBasis",
   contact: "policy@deepinfra.com",
-  checkedOn: "2026-11-16"
+  checkedOn: "2026-11-17"
 });
 
 /**
@@ -442,14 +444,17 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * is the US company behind the API. The runner calls its Search API (`POST https://api.perplexity.ai/search`,
  * `packages/providers/src/perplexity-search.ts`).
  *
- * Checked 16 November 2026 against Perplexity's API Terms of Service (last updated 23 January 2026), its Data
- * Processing Addendum (last updated 13 August 2026), its API privacy page and its trust centre
- * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`): no training of generative AI models on customer content
- * (API Terms 2.3.3); zero data retention is not the default and needs a written agreement, and none is on record;
- * no retention period is published for API requests, and the addendum deletes personal data within thirty days of
- * the end of the service; no processing region is named, and every subprocessor the trust centre lists is in the
- * United States; transfers under the EU standard contractual clauses (addendum section 11, Modules 2 and 3), with
- * no mention of the EU–US Data Privacy Framework. The contact is the address the API Terms give for notices.
+ * Perplexity's Search Addendum overrides its API Terms for that endpoint
+ * (`docs/legal/2026-11-17-provider-contract-facts.md`, read 17 November 2026): Perplexity may keep the search
+ * questions and results and use them for its own business, including to improve and develop its products, and the
+ * API Terms' promises of no training and of zero retention do not cover search. So this row says "Yes" to training
+ * and "No" to zero retention, unlike every model provider's row.
+ *
+ * The rest is from its Data Processing Addendum (last updated 13 August 2026), its API Terms and its trust centre
+ * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`, read 16 November 2026): no processing region is named,
+ * and every subprocessor the trust centre lists is in the United States; transfers under the EU standard
+ * contractual clauses (addendum section 11, Modules 2 and 3), with no mention of the EU–US Data Privacy Framework.
+ * The contact is the address the API Terms give for notices.
  */
 export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -462,10 +467,10 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   locationKey: "legal.providers.locationPerplexity",
   retentionKey: "legal.providers.retentionPerplexity",
   zeroRetention: "no",
-  training: "no",
+  training: "yes",
   basisKey: "legal.providers.sccBasis",
   contact: "legal-notices@perplexity.ai",
-  checkedOn: "2026-11-16"
+  checkedOn: "2026-11-17"
 });
 
 /**

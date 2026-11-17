@@ -30,7 +30,7 @@ const mocks = vi.hoisted(() => ({
 // layout resolves; outside Next's compiler its loaders are not callable.
 vi.mock("../../apps/ui/node_modules/next/font/google/index.js", () => {
   const font = () => ({ variable: "font-variable", className: "font-class", style: {} });
-  return { Fraunces: font, Plus_Jakarta_Sans: font, JetBrains_Mono: font };
+  return { Bricolage_Grotesque: font, Instrument_Sans: font };
 });
 vi.mock("@/lib/i18n/server", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../apps/ui/lib/i18n/server.js")>();

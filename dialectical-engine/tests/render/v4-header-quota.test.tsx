@@ -303,7 +303,7 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
       host.remove();
     }
     const css = readFileSync(resolve(import.meta.dirname, "../../apps/ui/app/v4/v4-quota.css"), "utf8").replace(/\/\*[\s\S]*?\*\//gu, "");
-    expect(css).toMatch(/\.v4HdrQuotaShare\[data-quota-wide\] \{[^}]*font-size: calc\(var\(--t-micro\) - 1px\);/u);
+    expect(css).toMatch(/\.v4HdrQuotaShare\[data-quota-wide\] \{[^}]*font-size: 10px;/u);
   });
 
   it("Free opens too: one bar, this month", async () => {
@@ -361,7 +361,8 @@ describe("the V4 header's quota circle (questions 14 B and 15, 5 Nov)", () => {
     // The browser check (5 Nov): in dark mode the bars' empty part was nearly invisible; each bar's track is drawn with
     // the ring's own track colour, so a bar reads as a share of a whole in both modes.
     const ringTrack = /\.v4HdrQuotaTrack \{ stroke: ([^;]+); \}/u.exec(css)?.[1];
-    expect(ringTrack).toBe("var(--line-strong)");
+    // Design Document v2: a grey track of its own, with the fill in the call-to-action orange.
+    expect(ringTrack).toBe("var(--track)");
     expect(/\.v4HdrQuotaBarTrack \{[^}]*background: ([^;]+);/u.exec(css)?.[1]).toBe(ringTrack);
   });
 

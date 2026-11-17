@@ -1,13 +1,16 @@
-/* V4 initial (2026-10-28): report styles (D5). An editorial, document-like page: serif headings, a narrow reading
-   column, generous spacing. Colours only from the site's tokens and the V4 tokens (v4-base.css). */
+/* V4 initial (2026-10-28): report styles (D5). An editorial, document-like page: display-face headings, a narrow reading
+   column, generous spacing. Colours only from the site's tokens and the V4 tokens (v4-base.css).
+   Design Document v2 (screen 18a): one reading column of 760px with 40px between its parts; the answer is the page's
+   one "hard" card (2px edge, solid 5px shadow, 22px corner); section headings are the display face at 700, -.02em. */
 .v4RepPage { display: flex; flex-direction: column; min-height: 100vh; }
 
 .v4RepActions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .v4RepActions .v4Btn { text-decoration: none; color: var(--text); }
-.v4RepActions .v4BtnPrimary { color: var(--surface); }
+.v4RepActions .v4BtnPrimary { color: var(--on-brand); }
 
-/* report-f12: the report's own header, one row: "← Back to the map" on the start side, the reading level and Share on the
-   end side. Small enough to stay one row at phone width; at the narrowest the back link's words shorten, never wrap. */
+/* report-f12: the report's own header, one row: "‹ Back to the map" on the start side, Share, Print and the round account
+   button on the end side. Small enough to stay one row at phone width; at the narrowest the back link's words shorten,
+   never wrap, and Print steps back into Share's list (it is always there too). */
 .v4RepHdr {
   display: flex; align-items: center; gap: 6px;
   padding: 6px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface);
@@ -37,10 +40,14 @@
   font-size: var(--t-meta); font-weight: 600; cursor: pointer;
 }
 .v4RepMenuButton:hover { background: var(--surface-sunken); }
+.v4RepMenuButton[aria-expanded="true"] { border-color: var(--accent); }
+/* Design Document v2: Print is a pill of its own beside Share. */
+.v4RepPrint { flex: none; }
+@media (max-width: 479px) { .v4RepPrint { display: none; } }
 .v4RepMenuList {
   position: absolute; z-index: 50; top: calc(100% + 6px); inset-inline-end: 0; min-width: 220px; max-width: calc(100vw - 32px);
   display: flex; flex-direction: column; gap: 2px; padding: 8px;
-  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-pop);
 }
 .v4RepMenuTitle { margin: 2px 8px 6px; font-size: var(--t-meta); color: var(--text-3); }
 .v4RepMenuItem {
@@ -56,6 +63,24 @@
   .v4RepMenuButton { padding: 0 14px; font-size: var(--t-ui); }
   .v4RepHdrStatus:not(:empty) { padding: 8px 32px; }
 }
+/* Design Document v2: on the report the four steps open the reading column (its width, its 32px sides, 36px above), as
+   dots with their names 22px apart and no line between them: a step behind is an ink dot, "Your report" the accent dot
+   with its name in bold ink. The marker itself is V4Steps (v4-debate.css); only its place and spacing here are the
+   report's. On a phone the names are hidden, so the current dot keeps that sheet's larger, ringed shape. A step is 24px
+   tall to press and its words 18px, so the column gives back 3px above and below the row. */
+.v4RepChrome .v4StepsTop { width: min(100%, calc(760px + 2 * var(--v4-gutter))); max-width: none; padding: 20px var(--v4-gutter) 0; }
+@media (min-width: 768px) {
+  .v4RepChrome .v4StepsTop { width: min(100%, 824px); padding: 33px 32px 0; }
+  .v4RepChrome .v4StepsList { gap: 4px 22px; font-size: 12px; color: var(--text-3); }
+  .v4RepChrome .v4StepsStep + .v4StepsStep::before { content: none; }
+  .v4RepChrome .v4StepsPlace { gap: 7px; white-space: nowrap; }
+  .v4RepChrome .v4StepsDone { color: var(--text-3); }
+  .v4RepChrome .v4StepsDone .v4StepsDot { background: var(--ink); border-color: var(--ink); }
+  .v4RepChrome .v4StepsHere { color: var(--ink); font-weight: 700; }
+  .v4RepChrome .v4StepsHere .v4StepsDot { width: 8px; height: 8px; box-shadow: none; }
+  .v4RepChrome .v4StepsLink { color: inherit; text-decoration: none; }
+  .v4RepChrome .v4StepsLink:hover { text-decoration: underline; text-underline-offset: 3px; }
+}
 
 /* report-f16: the report's space is held while it loads. */
 .v4RepLoading {
@@ -68,13 +93,25 @@
   display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 18px clamp(16px, 4vw, 24px);
   border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-2);
 }
-.v4RepCardTitle { font-family: var(--font-display); font-size: 19px; line-height: 1.35; color: var(--text-strong); }
+.v4RepCardTitle {
+  font-family: var(--font-display); font-weight: var(--fw-display); letter-spacing: var(--ls-display);
+  font-size: 19px; line-height: 1.35; color: var(--text-strong);
+}
 .v4RepCard:focus:not(:focus-visible), .v4RepStatusBox:focus:not(:focus-visible) { outline: none; }
-.v4RepStatusBox, .v4RepPressNote, .v4RepSlow, .v4RepDigMore { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.v4RepDigMoreLink { display: inline-flex; align-items: center; min-height: 44px; }
+.v4RepStatusBox, .v4RepPressNote, .v4RepSlow { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+/* With nothing to say the box is only where focus lands after a press: it takes no room between the versions and the report. */
+.v4RepStatusBox:empty { margin-top: -12px; }
+/* Design Document v2: the closing note, a quiet box (12px corner) saying that digging goes on from the map; its link
+   follows the words on the same line where there is room. */
+.v4RepDigMore {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; padding: 0 14px;
+  border-radius: 12px; background: var(--surface-2);
+}
+.v4RepDigMore .v4RepNote { padding: 12px 0; }
+.v4RepDigMoreLink { display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
 
 /* report-f3: the first debate's answer: open before any report, behind a closed row once one exists. */
-.v4RepFirstOpen, .v4RepFirstBody { display: flex; flex-direction: column; gap: 32px; }
+.v4RepFirstOpen, .v4RepFirstBody { display: flex; flex-direction: column; gap: 40px; }
 .v4RepFirstOpen .v4RepSent, .v4RepFirstBody .v4RepSent { margin-top: 0; }
 .v4RepFirst { border-top: 1px solid var(--line-2); padding-top: 8px; }
 .v4RepFirstSummary {
@@ -86,21 +123,26 @@
 /* Round 2 r2-13: words that are only for the screen, or only for paper. */
 .v4RepPrintOnly { display: none; }
 
+/* Design Document v2: the reading column is 760px of text between 32px sides, 24px under the steps, 72px at its foot. */
 .v4RepDoc {
-  width: min(100%, calc(72ch + 2 * var(--v4-gutter)));
+  width: min(100%, calc(760px + 2 * var(--v4-gutter)));
   margin: 0 auto;
-  padding: 36px var(--v4-gutter) 96px;
+  padding: 24px var(--v4-gutter) 72px;
   display: flex;
   flex-direction: column;
   gap: 40px;
   overflow-wrap: anywhere;
+}
+@media (min-width: 768px) {
+  .v4RepDoc { width: min(100%, 824px); padding: 21px 32px 72px; }
 }
 .v4RepDoc p, .v4RepDoc ul, .v4RepDoc ol, .v4RepDoc h1, .v4RepDoc h2, .v4RepDoc h3 { margin: 0; }
 
 .v4RepPrintBrand { display: none; }
 
 .v4RepTop { display: flex; flex-direction: column; gap: 12px; }
-.v4RepMeta { color: var(--text-3); }
+/* The public mark (journey-f20) and a dig still waited for sit close under the title, as the versions do. */
+.v4RepDoc > .v4PublicMark, .v4RepDoc > .v4RepDigWait { margin: -28px 0 0; }
 .v4RepTitle {
   /* R2TIME-8: anchors the hidden "Report:" prefix (.v4SrOnly) inside the heading. */
   position: relative;
@@ -114,19 +156,26 @@
 }
 
 .v4RepSection { display: flex; flex-direction: column; gap: 12px; }
-.v4RepH2 {
+/* Design Document v2: a section's heading is the display face at 700, -.02em, 26px, on the page's own 1.5 leading. */
+.v4RepH2, .v4RepVersionBody > .v4RepH3 {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: var(--fw-display);
+  letter-spacing: var(--ls-display);
   font-size: clamp(22px, 3vw, 26px);
-  line-height: 1.2;
+  line-height: 1.5;
   color: var(--text-strong);
 }
 .v4RepH3 {
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: var(--fw-display);
+  letter-spacing: var(--ls-display);
   font-size: 19px;
   line-height: 1.3;
+  color: var(--text-strong);
 }
+/* A written version's parts ("What would change the answer", "The paths we looked into", "Sources"…) are the report's
+   sections: each heading opens one, 40px under the part before it. */
+.v4RepVersionBody > .v4RepH3 { margin-top: 28px; }
 .v4RepProse { font-size: 16px; line-height: 1.65; }
 /* report-f14: padding and rule lines on the reading side (logical properties), for AI text in any direction. */
 .v4RepList { padding-inline-start: 22px; display: flex; flex-direction: column; gap: 8px; line-height: 1.6; }
@@ -143,25 +192,26 @@
   border-radius: var(--r-card);
   background: var(--surface-2);
 }
-.v4RepSentLabel { margin: 0; font-weight: 500; color: var(--text-3); }
+.v4RepSentLabel { margin: 0; font-weight: 400; }
 .v4RepSentText { white-space: pre-wrap; font-size: var(--t-ui); line-height: 1.55; color: var(--text-2); }
 
 /* DATA-2: the whole composed answer when no short answer was written. */
 .v4RepFallback, .v4RepAnswerText { display: flex; flex-direction: column; gap: 12px; }
 
-/* "The answer": the one card on the page, as in the prototype's "Our best answer". */
+/* "The answer": the one card on the page. Design Document v2: the "hard" card (2px edge, a solid 5px shadow, a 22px
+   corner); its eyebrow, then the answer in the display face at 500, 22px on 1.45. */
 .v4RepAnswer {
   background: var(--surface);
-  border: 1px solid var(--line-2);
-  border-radius: var(--r-panel);
-  box-shadow: var(--shadow-card);
+  border: 2px solid var(--hard);
+  border-radius: 22px;
+  box-shadow: 0 5px 0 var(--hard-shadow);
   padding: 24px clamp(18px, 4vw, 30px);
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.v4RepAnswerLabel { margin: 0; font-weight: 500; }
-.v4RepHeadline { font-family: var(--font-display); font-size: clamp(19px, 2.6vw, 22px); line-height: 1.45; }
+.v4RepAnswerLabel { margin: 0; font-weight: 400; }
+.v4RepHeadline { font-family: var(--font-display); font-weight: 500; font-size: clamp(19px, 2.6vw, 22px); line-height: 1.45; }
 .v4RepConfidence { border-top: 1px solid var(--line-2); padding-top: 14px; color: var(--text-2); font-size: 15px; }
 .v4RepConfidence b { color: var(--text); }
 
@@ -178,16 +228,16 @@
 .v4RepPath:last-child { border-bottom: 1px solid var(--line-2); }
 /* Round 2 r2-20: a path's ONE trust word (never an outcome tag), in the bar's colours. */
 .v4RepPathWord {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: var(--t-micro);
-  letter-spacing: var(--ls-eyebrow);
+  letter-spacing: .12em;
   text-transform: uppercase;
   color: var(--text-2);
 }
 .v4RepPathWord[data-trust="SURE"] { color: var(--v4-sure); }
 .v4RepPathWord[data-trust="STILL_ARGUED"] { color: var(--gold-text); }
 .v4RepPathWord[data-trust="DIDNT_HOLD"] { color: var(--con-text); }
-.v4RepPathLine { font-family: var(--font-display); font-size: 18px; line-height: 1.45; }
+.v4RepPathLine { font-family: var(--font-display); font-weight: 500; font-size: 18px; line-height: 1.45; }
 .v4RepPathSummary { color: var(--text-2); font-size: 15px; line-height: 1.55; }
 /* report-f3: a version's dig paths sit one step in per level, as in the PDF. */
 .v4RepPath[data-level="1"] { margin-inline-start: 14px; }
@@ -200,11 +250,17 @@
 .v4RepPathGroup { display: flex; flex-direction: column; }
 .v4RepPathGroup > .v4RepPath:last-child, .v4RepDugPaths > .v4RepPath:last-child { border-bottom: 0; }
 .v4RepPathGroup:last-child { border-bottom: 1px solid var(--line-2); }
-.v4RepDug { padding-bottom: 10px; }
+/* Design Document v2: "Updated by your dig" is the row's last line, 12px at 600 in the accent's text colour, 10px under the
+   bar. The line stays 44px tall to press, so the fold is drawn up into the row's foot by the room that leaves around its
+   words; opened, the paths dug later follow under it. */
+.v4RepDug { margin-top: -21px; padding-bottom: 5px; }
+.v4RepPathGroup > .v4RepDug:first-child { margin-top: 0; padding-top: 5px; border-top: 1px solid var(--line-2); }
 .v4RepDugSummary {
-  display: flex; align-items: center; min-height: 44px; margin-inline-start: 14px; cursor: pointer; color: var(--link);
-  font-size: var(--t-ui); text-decoration: underline; text-underline-offset: 3px;
+  display: flex; align-items: center; min-height: 44px; cursor: pointer; color: var(--con-text);
+  font-size: 12px; font-weight: 600; list-style: none;
 }
+.v4RepDugSummary::-webkit-details-marker { display: none; }
+.v4RepDugSummary:hover { text-decoration: underline; text-underline-offset: 3px; }
 /* What a dig changed, and "Your point of view": one look whether the view helped or not ("the same care"). */
 .v4RepChanged, .v4RepView { display: flex; flex-direction: column; gap: 6px; }
 .v4RepView { padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); }
@@ -215,7 +271,7 @@
 
 .v4RepPoints { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .v4RepPoint { display: flex; gap: 12px; font-size: 15px; line-height: 1.55; }
-.v4RepPointMark { flex: none; width: 4px; border-radius: 2px; background: var(--line-strong); }
+.v4RepPointMark { flex: none; width: 5px; border-radius: 2px; background: var(--line-strong); }
 .v4RepPoint[data-trust="SURE"] .v4RepPointMark { background: var(--v4-sure); }
 .v4RepPoint[data-trust="SURE_FOR_CASE"] .v4RepPointMark { background: var(--v4-case); }
 .v4RepPoint[data-trust="STILL_ARGUED"] .v4RepPointMark {
@@ -241,16 +297,17 @@
   gap: 8px;
   break-inside: avoid;
 }
-.v4RepDigQuestions { padding-inline-start: 20px; display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+/* Design Document v2: a dig's question is a plain line at 600 (no list mark); its state and its link are 13.5px. */
+.v4RepDigQuestions { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
 .v4RepDigMeta { color: var(--text-2); font-size: var(--t-ui); }
-.v4RepDigLink { display: inline-flex; align-items: center; min-height: 44px; }
+.v4RepDigLink { display: inline-flex; align-items: center; min-height: 44px; margin-block: -12px; font-size: var(--t-ui); }
 
 /* The long story at expert level. */
 .v4RepStory { display: flex; flex-direction: column; gap: 22px; }
 .v4RepStoryPart { display: flex; flex-direction: column; gap: 10px; }
 
 /* "How this was checked". */
-.v4RepWords { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.v4RepWords { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; font-size: 15px; }
 .v4RepWord { display: flex; gap: 12px; line-height: 1.55; }
 .v4RepWord b { white-space: nowrap; }
 
@@ -265,21 +322,36 @@
 }
 
 @media (max-width: 480px) {
-  .v4RepDoc { padding-top: 24px; gap: 32px; }
+  .v4RepDoc, .v4RepFirstOpen, .v4RepFirstBody { gap: 32px; }
+  .v4RepDoc > .v4PublicMark, .v4RepDoc > .v4RepDigWait { margin-top: -20px; }
   .v4RepWord { flex-direction: column; gap: 0; }
 }
 
 /* Print: a clean document — no site chrome, no buttons, black on white, no backgrounds. The QR tokens are the site's
    only mode-independent dark-on-light pair, so a page printed from the dark mode still comes out black on white. */
 /* R22 W5-1: the final report over the investigation, its versions (newest first) and its sources. */
-.v4RepVersions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+/* Design Document v2: the versions are one small line of links right under the title (an earlier one in the link colour,
+   underlined; the one shown at 600 in the strong text colour), with no heading on screen: the section's heading stays
+   for screen readers. Each link keeps its 44px press height; the list gives back the room that leaves around the words. */
+.v4RepInvestigation { margin-top: -28px; }
+.v4RepInvestigation > .v4RepH2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.v4RepVersions { list-style: none; padding: 0; margin-block: -12px; display: flex; flex-wrap: wrap; gap: 0 16px; font-size: var(--t-ui); }
 .v4RepVersion { min-height: 44px; background: none; border: 0; padding: 0; font: inherit; color: var(--link); cursor: pointer; }
 .v4RepVersion[aria-pressed="true"] { color: var(--text-strong); font-weight: 600; text-decoration: none; }
 .v4RepVersionBody, .v4RepVersionShown { display: flex; flex-direction: column; gap: 12px; }
+/* The version's own text starts 40px under the line that names it, and what follows the report keeps the same distance. */
+.v4RepVersionShown > .v4RepVersionBody { margin-top: 28px; }
+.v4RepVersionShown:not(:last-child) { margin-bottom: 28px; }
+/* A phone's parts are 32px apart, so the versions' line is drawn up by 20px to stay 12px under the title. */
+@media (max-width: 480px) {
+  .v4RepInvestigation { margin-top: -20px; }
+  .v4RepVersionShown > .v4RepVersionBody, .v4RepVersionBody > .v4RepH3 { margin-top: 20px; }
+  .v4RepVersionShown:not(:last-child) { margin-bottom: 20px; }
+}
 .v4RepVersionLine { color: var(--text-2); font-size: var(--t-ui); }
 .v4RepSources { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 14px; }
 .v4RepSource { display: flex; flex-direction: column; gap: 4px; padding-inline-start: 12px; border-inline-start: 2px solid var(--line-2); break-inside: avoid; }
-.v4RepSourceSite { font-family: var(--font-mono); font-size: var(--t-micro); color: var(--text-3); }
+.v4RepSourceSite { font-family: var(--font-sans); font-size: var(--t-meta); color: var(--text-3); }
 .v4RepSourceLine { color: var(--text-2); font-size: var(--t-ui); line-height: 1.55; }
 .v4RepSourceQuote { margin: 0; font-size: 15px; line-height: 1.55; }
 
@@ -300,16 +372,22 @@
     --bg: var(--qr-paper); --surface: var(--qr-paper); --surface-2: var(--qr-paper);
     --ink: var(--qr-ink); --text: var(--qr-ink); --text-strong: var(--qr-ink); --text-2: var(--qr-ink); --text-3: var(--qr-ink);
     --con-text: var(--qr-ink); --gold-text: var(--qr-ink); --link: var(--qr-ink);
-    --line-2: var(--qr-ink); --line-strong: var(--qr-ink);
+    --line-2: var(--qr-ink); --line-strong: var(--qr-ink); --hard: var(--qr-ink);
     background: var(--qr-paper);
     color: var(--qr-ink);
     min-height: 0;
   }
   .v4RepDoc { width: 100%; max-width: none; padding: 0; gap: 24px; font-size: 11pt; }
-  .v4RepPrintBrand { display: block; font-family: var(--font-display); font-size: 10pt; }
+  .v4RepPrintBrand { display: block; font-family: var(--font-display); font-weight: 700; letter-spacing: -.03em; font-size: 10pt; }
   .v4RepAnswer, .v4RepDig, .v4RepSent { box-shadow: none; background: none; border-radius: 0; }
   .v4RepSent { margin-top: 0; border: 0; border-inline-start: 2px solid var(--qr-ink); padding: 0; padding-inline-start: 12px; }
-  .v4RepAnswer { border: 1px solid var(--qr-ink); }
+  /* Design Document v2: on paper the answer keeps its 2px edge and its corner; the solid shadow is dropped. */
+  .v4RepAnswer { border: 2px solid var(--qr-ink); border-radius: 22px; }
+  /* The versions' line is not printed, so the report starts at the paper's own spacing; its parts sit closer together. */
+  .v4RepInvestigation, .v4RepVersionShown > .v4RepVersionBody { margin-top: 0; }
+  .v4RepVersionShown:not(:last-child) { margin-bottom: 0; }
+  .v4RepVersionBody > .v4RepH3 { margin-top: 12px; }
+  .v4RepH2, .v4RepVersionBody > .v4RepH3 { line-height: 1.2; }
   .v4RepDig { border: 0; border-inline-start: 2px solid var(--qr-ink); padding: 0; padding-inline-start: 12px; }
   .v4RepH2, .v4RepH3 { break-after: avoid; }
   .v4RepSection, .v4RepAnswer { break-inside: auto; }

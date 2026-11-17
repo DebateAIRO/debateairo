@@ -1,7 +1,10 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { costEnvelopeDay, languageCheckChargeMicros, type AskClarifyChargeEntry } from "@debateai/budget";
-import { AskClarifyResponseSchema, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse, type ClarifyQuestion } from "@debateai/contract";
-import { ASK_CLARIFY_SEALED_CONTRACTS, ASK_CLARIFY_V2_CONTRACT_ID, framedAskClarify } from "@debateai/judgement";
+import {
+  AskClarifyResponseSchema, ClarifyRestatementSchema, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse, type ClarifyQuestion,
+  type ClarifyRestatement, type ClarifyRestatementPart
+} from "@debateai/contract";
+import { ASK_CLARIFY_SEALED_CONTRACTS, ASK_CLARIFY_V2_CONTRACT_ID, ASK_CLARIFY_V3_CONTRACT_ID, framedAskClarify } from "@debateai/judgement";
 import {
   ANTHROPIC_MESSAGES_BASE_URL, ANTHROPIC_MESSAGES_PATH, PREVIEW_ANTHROPIC_MESSAGES_URL, appendFramedRejection, decodeModelJson, type PromptContract,
   type PromptPacket
@@ -119,13 +122,22 @@ const RECORD_FAILURES_IN_A_ROW = 3;
 const REQUEST_OWNER_MISMATCH = "REQUEST_OWNER_MISMATCH";
 
 /**
- * V4 start step, Task 76d: which version of the call is asked. "v2" only once its contract is sealed (Task 92 puts it in
- * ASK_CLARIFY_SEALED_CONTRACTS): its sentences, its place mark and its care question are read only then; until then a reply is read as
- * version 1's, whatever it carries.
+ * V4 start step, Task 76d: which version of the call is asked: the latest one on ASK_CLARIFY_SEALED_CONTRACTS. "v2": its sentences,
+ * its place mark and its care question are read only under version 2 or 3; under version 1 a reply is read as version 1's, whatever it
+ * carries. Design Document v2 (16b): "v3", version 2 and the sentence that says the question back, read only under version 3. Version 3
+ * is sealed (17 Nov, the owner's approval of versions 2 and 3 as written), so "v3" is what the API asks with; version 2 was never sealed
+ * by itself, and "v1" and "v2" are asked only over a list a test stands in.
  */
-export type AskClarifyVersion = "v1" | "v2";
+export type AskClarifyVersion = "v1" | "v2" | "v3";
 
-type Reading = Readonly<{ questions: readonly ClarifyQuestion[]; purpose: ClarifyQuestion | null; cares: ClarifyQuestion | null }>;
+/** Version 3: what a question says inside the sentence: one phrase per kept answer, and the place of the answer the AI assumed. */
+type Slot = Readonly<{ phrases: readonly string[]; assumed: number }>;
+type ReadQuestion = Readonly<{ question: ClarifyQuestion; slot: Slot | null }>;
+/** A question the sentence may name: by its number in the AI's own list ("1", "2", "3"), or "purpose" or "cares". */
+type Asked = ReadonlyMap<string, Readonly<{ about: number | "purpose" | "cares"; slot: Slot | null }>>;
+type Reading = Readonly<{
+  questions: readonly ClarifyQuestion[]; purpose: ClarifyQuestion | null; cares: ClarifyQuestion | null; restatement: ClarifyRestatement | null;
+}>;
 
 /** One line of AI text within `max` characters, or null. A copied placeholder ("<a short answer>") is no answer. */
 function lineOf(value: unknown, max: number): string | null {
@@ -138,16 +150,21 @@ function lineOf(value: unknown, max: number): string | null {
 /**
  * A usable question, at most the contract's answers, repeats dropped, or null (too few answers left, or no text). Version 2 (Task 76d):
  * with its sentences, each kept with its own answer (a repeat goes with its sentence); all or none, so a list of another length, or one
- * sentence that is no usable line, leaves the answers as today's pairs.
+ * sentence that is no usable line, leaves the answers as today's pairs. Version 3 (16b): and what the question says inside the sentence
+ * (`slot`), all or none too: one phrase for each answer the AI wrote, each kept answer's a usable line, and the number of the answer it
+ * assumes (1 for the first), which must be an answer that was kept. The phrases and the assumed place follow the kept answers.
  */
-function questionOf(value: unknown, version: AskClarifyVersion): ClarifyQuestion | null {
+function questionOf(value: unknown, version: AskClarifyVersion): ReadQuestion | null {
   if (typeof value !== "object" || value === null) return null;
-  const { text, answers, sentences } = value as { text?: unknown; answers?: unknown; sentences?: unknown };
+  const { text, answers, sentences, phrases, assumed } = value as { text?: unknown; answers?: unknown; sentences?: unknown; phrases?: unknown; assumed?: unknown };
   const asked = lineOf(text, WEB_CONTRACT_LIMITS.clarifyQuestionMaxChars);
   if (asked === null || !Array.isArray(answers)) return null;
-  const written: readonly unknown[] | null = version === "v2" && Array.isArray(sentences) && sentences.length === answers.length ? sentences : null;
+  const written: readonly unknown[] | null = version !== "v1" && Array.isArray(sentences) && sentences.length === answers.length ? sentences : null;
+  const worded: readonly unknown[] | null = version === "v3" && Array.isArray(phrases) && phrases.length === answers.length ? phrases : null;
   const seen = new Set<string>();
   const kept: string[] = [];
+  /** Where each kept answer stood in the AI's list. */
+  const places: number[] = [];
   const said: (string | null)[] = [];
   for (const [at, answer] of answers.entries()) {
     const line = lineOf(answer, WEB_CONTRACT_LIMITS.clarifyAnswerMaxChars);
@@ -155,53 +172,102 @@ function questionOf(value: unknown, version: AskClarifyVersion): ClarifyQuestion
     if (line === null || key === undefined || seen.has(key)) continue;
     seen.add(key);
     kept.push(line);
+    places.push(at);
     said.push(written === null ? null : lineOf(written[at], WEB_CONTRACT_LIMITS.clarifyQuestionMaxChars));
     if (kept.length === WEB_CONTRACT_LIMITS.clarifyAnswersMax) break;
   }
   if (kept.length < WEB_CONTRACT_LIMITS.clarifyAnswersMin) return null;
   const sentencesKept = said.filter((sentence): sentence is string => sentence !== null);
-  return { text: asked, answers: kept, ...(written !== null && sentencesKept.length === kept.length ? { sentences: sentencesKept } : {}) };
+  const question = { text: asked, answers: kept, ...(written !== null && sentencesKept.length === kept.length ? { sentences: sentencesKept } : {}) };
+  return { question, slot: slotOf(worded, assumed, places) };
+}
+
+/** Version 3: a question's phrases for its kept answers and the kept place of the answer the AI assumed, or null (see questionOf). */
+function slotOf(phrases: readonly unknown[] | null, assumed: unknown, places: readonly number[]): Slot | null {
+  if (phrases === null || typeof assumed !== "number" || !Number.isInteger(assumed)) return null;
+  const at = places.indexOf(assumed - 1);
+  const lines = places.map((place) => lineOf(phrases[place], WEB_CONTRACT_LIMITS.clarifyQuestionMaxChars));
+  if (at < 0 || !lines.every((line): line is string => line !== null)) return null;
+  return { phrases: lines, assumed: at };
+}
+
+/**
+ * Version 3 (Design Document v2, 16b): the AI's one-line sentence, with a marked place ("{1}", "{purpose}") for each question it
+ * depends on, as the reply's `restatement`: the plain words between the places as they stand, spaces included, and for each place
+ * its question's part. All or none: a place that names no kept question, or one without usable phrases and an assumed answer, a
+ * second place for one question, a brace that marks no place, plain words past a part's length, a copied placeholder or no text
+ * at all, and there is no sentence. The questions never depend on it.
+ */
+function restatementOf(value: unknown, asked: Asked): ClarifyRestatement | null {
+  if (typeof value !== "string") return null;
+  const line = value.replace(/\s+/gu, " ").trim();
+  if (line.length === 0 || (line.startsWith("<") && line.endsWith(">"))) return null;
+  const parts: ClarifyRestatementPart[] = [];
+  const used = new Set<string>();
+  // Split on the places: the pieces at even places are plain words, the others a place's name.
+  for (const [at, piece] of line.split(/\{([^{}]*)\}/u).entries()) {
+    if (at % 2 === 0) {
+      if (piece.length === 0) continue;
+      if (/[{}]/u.test(piece) || piece.length > WEB_CONTRACT_LIMITS.clarifyRestatementTextMaxChars) return null;
+      parts.push({ text: piece });
+      continue;
+    }
+    const name = piece.trim();
+    const place = asked.get(name);
+    if (place === undefined || place.slot === null || used.has(name)) return null;
+    used.add(name);
+    parts.push({ about: place.about, phrases: [...place.slot.phrases], assumed: place.slot.assumed });
+  }
+  const restatement = ClarifyRestatementSchema.safeParse({ parts });
+  return restatement.success ? restatement.data : null;
 }
 
 /**
  * The reply as code can read it (the slip order's first step): prose or fences around the JSON, a bad question dropped, a long list cut. Null: nothing readable.
  * Version 2 (Task 76d): the sentences, the place mark on the first question that carries it (a question of the AI's own, never the purpose
  * or the care question) and the care question, dropped when its words repeat another question's (the page keys answers by a question's words).
+ * Version 3 (16b): and the sentence that says the question back (restatementOf), over the questions that were kept.
  */
 export function readAskClarifyReply(text: string, version: AskClarifyVersion = "v1"): Reading | null {
   const decoded = decodeModelJson(text);
   if (!decoded.ok || typeof decoded.value !== "object" || decoded.value === null) return null;
-  const { questions, purpose, cares } = decoded.value as { questions?: unknown; purpose?: unknown; cares?: unknown };
+  const { questions, purpose, cares, restatement } = decoded.value as { questions?: unknown; purpose?: unknown; cares?: unknown; restatement?: unknown };
   if (!Array.isArray(questions) && purpose === undefined && (version === "v1" || cares === undefined)) return null;
-  const purposeQuestion = questionOf(purpose, version);
-  const seen = new Set<string>(purposeQuestion === null ? [] : [purposeQuestion.text.toLocaleLowerCase()]);
+  const purposeRead = questionOf(purpose, version);
+  const asked = new Map<string, Readonly<{ about: number | "purpose" | "cares"; slot: Slot | null }>>();
+  if (purposeRead !== null) asked.set("purpose", { about: "purpose", slot: purposeRead.slot });
+  const seen = new Set<string>(purposeRead === null ? [] : [purposeRead.question.text.toLocaleLowerCase()]);
   const kept: ClarifyQuestion[] = [];
   let placed = false;
-  for (const item of Array.isArray(questions) ? questions : []) {
-    const question = questionOf(item, version);
-    if (question === null || seen.has(question.text.toLocaleLowerCase())) continue;
-    seen.add(question.text.toLocaleLowerCase());
-    const where = version === "v2" && !placed && (item as { about_place?: unknown }).about_place === true;
+  for (const [at, item] of (Array.isArray(questions) ? questions : []).entries()) {
+    const read = questionOf(item, version);
+    if (read === null || seen.has(read.question.text.toLocaleLowerCase())) continue;
+    seen.add(read.question.text.toLocaleLowerCase());
+    const where = version !== "v1" && !placed && (item as { about_place?: unknown }).about_place === true;
     if (where) placed = true;
-    kept.push(where ? { ...question, about_place: true } : question);
+    // The sentence names a question by its number in the AI's own list; the reply's part names its place among the kept ones.
+    asked.set(String(at + 1), { about: kept.length, slot: read.slot });
+    kept.push(where ? { ...read.question, about_place: true } : read.question);
     if (kept.length === WEB_CONTRACT_LIMITS.clarifyQuestionsMax) break;
   }
-  const caresQuestion = version === "v2" ? questionOf(cares, version) : null;
-  const caresKept = caresQuestion === null || seen.has(caresQuestion.text.toLocaleLowerCase()) ? null : caresQuestion;
-  return Object.freeze({ questions: Object.freeze(kept), purpose: purposeQuestion, cares: caresKept });
+  const caresRead = version === "v1" ? null : questionOf(cares, version);
+  const caresKept = caresRead === null || seen.has(caresRead.question.text.toLocaleLowerCase()) ? null : caresRead;
+  if (caresKept !== null) asked.set("cares", { about: "cares", slot: caresKept.slot });
+  return Object.freeze({ questions: Object.freeze(kept), purpose: purposeRead?.question ?? null, cares: caresKept?.question ?? null,
+    restatement: version === "v3" ? restatementOf(restatement, asked) : null });
 }
 
 /**
  * The rest of the slip order (owner 2026-10-12): code reads the reply; a reply with no purpose question, or nothing readable, is asked again once
  * with a code and a path only. The owner's middle step, a smaller follow-up, saves nothing here: the whole reply is smaller than the turn it would
  * resend. If the second try still has no purpose question, the first try's other questions are kept.
- * Task 76d: `v2`, the sealed version 2 contract (null while only version 1 is sealed); with it, `earlier` is framed and the reply read as
- * version 2's. Without it, version 1's packet, byte for byte, whatever `earlier` says.
+ * Task 76d: `later`, the sealed version 2 or version 3 contract the call is asked with (null while only version 1 is sealed); with it,
+ * `earlier` is framed and the reply read as that version's. Without it, version 1's packet, byte for byte, whatever `earlier` says.
+ * 16b: a sentence code cannot use is no slip: it is never asked for again (the reading it came with stands, without it).
  */
-async function readWithRecovery(questionLine: string, earlier: AskClarifyEarlier | null, v2: PromptContract | null, transport: FastCheckTransport,
-  signal: AbortSignal): Promise<Reading | null> {
-  const version: AskClarifyVersion = v2 === null ? "v1" : "v2";
-  const packet: PromptPacket = framedAskClarify(questionLine, v2 === null ? {} : { contract: v2, ...(earlier === null ? {} : { earlier }) });
+async function readWithRecovery(questionLine: string, earlier: AskClarifyEarlier | null, later: PromptContract | null, version: AskClarifyVersion,
+  transport: FastCheckTransport, signal: AbortSignal): Promise<Reading | null> {
+  const packet: PromptPacket = framedAskClarify(questionLine, later === null ? {} : { contract: later, ...(earlier === null ? {} : { earlier }) });
   const first = readAskClarifyReply(await transport({ packet, signal }), version);
   if (first?.purpose !== null && first?.purpose !== undefined) return first;
   const again = appendFramedRejection(packet, first === null
@@ -231,13 +297,17 @@ export function createAskClarify(deps: Readonly<{
   deadlineMs?: number;
   newId?: () => string;
   /**
-   * V4 start step, Task 76d: the sealed contracts of the call (ASK_CLARIFY_SEALED_CONTRACTS, which Task 92 extends with version 2); a
-   * test stands in a list holding version 2. The call is asked with version 2 only once it is on this list.
+   * V4 start step, Task 76d: the sealed contracts of the call (ASK_CLARIFY_SEALED_CONTRACTS: version 1 and, since 17 Nov, version 3); a
+   * test stands in another list. The call is asked with version 3 (version 2 and the sentence, Design Document v2 16b) when that is on
+   * the list, else with version 2 when that is, else with version 1.
    */
   sealed?: readonly PromptContract[];
 }>): AskClarifyPort {
   const deadlineMs = deps.deadlineMs ?? ASK_CLARIFY_DEADLINE_MS;
-  const v2 = (deps.sealed ?? ASK_CLARIFY_SEALED_CONTRACTS).find((contract) => contract.contractId === ASK_CLARIFY_V2_CONTRACT_ID) ?? null;
+  const sealed = deps.sealed ?? ASK_CLARIFY_SEALED_CONTRACTS;
+  const later = sealed.find((contract) => contract.contractId === ASK_CLARIFY_V3_CONTRACT_ID)
+    ?? sealed.find((contract) => contract.contractId === ASK_CLARIFY_V2_CONTRACT_ID) ?? null;
+  const version: AskClarifyVersion = later === null ? "v1" : later.contractId === ASK_CLARIFY_V3_CONTRACT_ID ? "v3" : "v2";
   const cacheKey = randomBytes(32);
   const cache = new Map<string, Readonly<{ at: number; answer: AskClarifyResponse }>>();
   /**
@@ -317,10 +387,14 @@ export function createAskClarify(deps: Readonly<{
       controller.signal.addEventListener("abort", () => reject(new Error("ASK_CLARIFY_DEADLINE")), { once: true });
     });
     try {
-      const reading = await Promise.race([readWithRecovery(questionLine, earlier, v2, transport, controller.signal), abandoned]);
+      const reading = await Promise.race([readWithRecovery(questionLine, earlier, later, version, transport, controller.signal), abandoned]);
       if (reading === null || (reading.purpose === null && reading.questions.length === 0 && reading.cares === null)) return fallback("UNREADABLE");
-      const answer = AskClarifyResponseSchema.parse({ source: "AI", questions: reading.questions, ...(reading.purpose === null ? {} : { purpose: reading.purpose }),
-        ...(reading.cares === null ? {} : { cares: reading.cares }) });
+      const questions = { source: "AI", questions: reading.questions, ...(reading.purpose === null ? {} : { purpose: reading.purpose }),
+        ...(reading.cares === null ? {} : { cares: reading.cares }) };
+      // 16b: the sentence only adds to the reply. One the AI got wrong, or one the contract refuses, is left out and the questions answered.
+      const restated = reading.restatement === null ? null : AskClarifyResponseSchema.safeParse({ ...questions, restatement: reading.restatement });
+      if (version === "v3" && restated?.success !== true) deps.report({ event: "api.ask_clarify.restatement_none", code: "RESTATEMENT_UNUSABLE" });
+      const answer = restated?.success === true ? restated.data : AskClarifyResponseSchema.parse(questions);
       cache.set(key, Object.freeze({ at: now, answer }));
       if (cache.size > CACHE.entries) cache.delete(cache.keys().next().value!);
       return answer;

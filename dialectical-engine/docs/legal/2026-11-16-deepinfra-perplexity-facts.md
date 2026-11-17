@@ -75,7 +75,10 @@ The runner calls `POST https://api.perplexity.ai/search` (`packages/providers/sr
 | Contact | legal-notices@perplexity.ai, the address the API Terms give for notices (section 11.6). The privacy notice names VeraSafe as data protection officer and EU/UK representative (experts@verasafe.com); the trust centre shows grc@perplexity.ai | API Terms; https://www.perplexity.ai/hub/legal/privacy-policy (last updated 23 October 2026) |
 
 The API privacy page adds: "Certain APIs may be subject to product-specific terms". No terms specific
-to the Search API were found.
+to the Search API were found on 16 November. They were found the next day: the Search Addendum, which
+lets Perplexity keep search questions and results and use them to improve its products. The rows
+above on retention, zero data retention and training are replaced by
+`2026-11-17-provider-contract-facts.md`, and the page and the English texts follow that note.
 
 ## Still "[to confirm]"
 

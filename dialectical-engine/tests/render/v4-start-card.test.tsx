@@ -8,8 +8,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { StartStepRoomSchema, type StartMenu, type StartStepRoom } from "../../packages/contract/src/index.js";
 
 import {
-  V4StartAnswersFold, V4StartCard, startNoneLineKey, startRefusalLine, startWiderWidth
+  V4StartAnswersFold, V4StartCard, startNoneLineKey, startRefusalLine, startWiderWidth, type StartPlanActions
 } from "../../apps/ui/components/v4/V4StartCard.js";
+import { startCombineFrees, V4StartCombineBar } from "../../apps/ui/components/v4/V4StartCombineBar.js";
 import { startPathsShare, startShareChange, type MoneyLine } from "../../apps/ui/lib/v4/money.js";
 import {
   PATH_PLAN_LIMITS, pathPlanFromMenu, pathPlanReduce, pathPlanWithRevision, type PathPlan, type PathPlanAction
@@ -82,6 +83,8 @@ function Holder({ initial }: Readonly<{ initial: Stage }>) {
   const now = useRef<PathPlan | null>(initial.plan ?? null);
   const landed = useRef<readonly string[]>(keysOf(initial.plan ?? null));
   const [folded, setFolded] = useState(false);
+  /** Design Document v2 (16b): the card's own send and refusal notice, which the page hands to the combine line in its foot. */
+  const planActions = useRef<StartPlanActions | null>(null);
   const set = (next: PathPlan): void => {
     now.current = next;
     latest = next;
@@ -155,7 +158,22 @@ function Holder({ initial }: Readonly<{ initial: Stage }>) {
         narrow={stage.narrow ?? false}
         share={{ wider: stage.wider ?? null }}
         onPathsUsed={() => setFolded(true)}
+        planActions={planActions}
       />
+      {/* The page's foot, as V4AskClient mounts the combine line: outside the card, its changes sent the card's way. */}
+      {plan !== null && plan.selected.length > 0 && (stage.phase === "READY" || stage.phase === "STALE") ? (
+        <div className="testFoot">
+          <V4StartCombineBar
+            plan={plan}
+            catalog={CATALOG}
+            locale="en"
+            dispatch={(action) => (planActions.current?.dispatch ?? dispatch)(action)}
+            onRefusal={(refusal, action) => planActions.current?.onRefusal(refusal, action)}
+            share={startShareChange(room, plan.paths.length, plan.paths.length - startCombineFrees(plan))}
+            narrow={stage.narrow ?? false}
+          />
+        </div>
+      ) : null}
     </>
   );
 }
@@ -227,6 +245,12 @@ const spoken = (): string => card()!.querySelector<HTMLElement>(".v4StartSpoken"
 const places = (): HTMLElement[] => [...card()!.querySelectorAll<HTMLElement>(".v4StartPlace")];
 const rows = (): HTMLElement[] => [...card()!.querySelectorAll<HTMLElement>(".v4StartRow")];
 const rowButton = (n: number): HTMLButtonElement => rows()[n - 1]!.querySelector<HTMLButtonElement>(".v4StartRowButton")!;
+const tickBox = (n: number): HTMLInputElement => rows()[n - 1]!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+const ticked = (): number[] => rows().flatMap((one, at) => one.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked === true ? [at + 1] : []);
+const hint = (): string | null => card()!.querySelector<HTMLElement>(".v4StartCardHint")?.textContent ?? null;
+const foot = (): HTMLElement | null => host!.querySelector<HTMLElement>(".testFoot .v4StartCombineBar");
+/** A button of the combine line in the page's foot (the card's suggestions have a Combine and a Keep apart of their own). */
+const footButton = (name: string): HTMLButtonElement => [...foot()!.querySelectorAll<HTMLButtonElement>("button")].find((one) => one.textContent?.trim() === name)!;
 const notice = (): string | null => card()!.querySelector<HTMLElement>(".v4StartNotice p")?.textContent ?? null;
 /** Buttons on the card outside any ⋯ menu, by their visible words. */
 const buttons = (name: string): HTMLButtonElement[] =>
@@ -561,6 +585,98 @@ describe("notices, one at a time above the list (choose-f16, choose-f8)", () => 
   });
 });
 
+describe("tick two to combine them (Design Document v2, 16b)", () => {
+  it("the title's line ends with '5 paths · most important first · tick two to combine them', while the list shows", async () => {
+    await mount({ phase: "READING", progress: { answered: 1, of: 4 } });
+    expect(hint()).toBeNull();
+    await act(async () => control!.land(pathPlanFromMenu(NUCLEAR_MENU, 5, false)));
+    expect(hint()).toBe("5 paths · most important first · tick two to combine them");
+    // It sits on the title's line, and what the card said under the title is still said.
+    const head = card()!.querySelector<HTMLElement>(".v4StartCardHead")!;
+    expect([...head.children].map((one) => one.textContent)).toEqual(["What we'll look into", "5 paths · most important first · tick two to combine them"]);
+    expect(card()!.getAttribute("aria-labelledby")).toBe(head.querySelector("h2")!.id);
+    expect([...card()!.querySelectorAll(".v4StartCardLine")].map((one) => one.textContent)).toEqual(["Reloading this page reads your question again."]);
+    // The count follows the list.
+    await rowMenu(5, "Remove");
+    expect(hint()).toBe("4 paths · most important first · tick two to combine them");
+  });
+
+  it("one path: its count alone (no order, nothing to combine), and its box is greyed; Free keeps its line", async () => {
+    await ready(planAfter(pathPlanFromMenu(TWO_PATH_MENU, 5, false), (plan) => ({ type: "REMOVE", key: plan.paths[1]!.key })));
+    expect(hint()).toBe("1 path");
+    expect(tickBox(1).disabled).toBe(true);
+    await remount(pathPlanFromMenu(NUCLEAR_MENU, 3, true), { room: FREE, freePlan: true, questionsShown: false });
+    expect(hint()).toBe("3 paths · most important first · tick two to combine them");
+    expect(cardText()).toContain("Free looks into up to 3 paths.");
+  });
+
+  it("two ticked, then Combine in the page's foot: sent the card's way, with the written question's notice and spoken line", async () => {
+    await ready();
+    expect(rows().map((one) => one.querySelectorAll('input[type="checkbox"]').length)).toEqual([1, 1, 1, 1, 1]);
+    await press(tickBox(1));
+    // The first tick is the person's first act on a path (read-d4 A): the answered questions fold.
+    expect(host!.querySelector(".v4StartFold")).not.toBeNull();
+    await press(tickBox(2));
+    expect(ticked()).toEqual([1, 2]);
+    expect(foot()!.querySelector(".v4StartCombineBarLine")?.textContent).toBe("2 picked · Combining frees 1 path (about 3% of today).");
+    actions = [];
+    await press(footButton("Combine"));
+    expect(actions).toEqual([{ type: "COMBINE_SELECTED" }]);
+    expect(rows()).toHaveLength(4);
+    expect(ticked()).toEqual([]);
+    expect(foot()).toBeNull();
+    expect(hint()).toBe("4 paths · most important first · tick two to combine them");
+    expect(document.activeElement).toBe(rowButton(1));
+    await act(async () => control!.outside({
+      type: "COMBINE_WRITTEN", key: "p1", title: "Costs and a calm winter", question: "What would the costs be, and the lights in winter?", combineRef: "cmb.sig"
+    }));
+    expect(notice()).toBe("Combined. An AI wrote one question that covers them.");
+    expect(spoken()).toBe("Combined. 4 paths. About 15% of today's quota.");
+    // Undo gives the two paths back, unticked.
+    await press(button("Undo"));
+    expect(rows()).toHaveLength(5);
+    expect(ticked()).toEqual([]);
+  });
+
+  it("Keep apart in the page's foot unticks both and combines nothing", async () => {
+    await ready();
+    const before = latest!.paths;
+    await press(tickBox(2));
+    await press(tickBox(3));
+    actions = [];
+    await press(footButton("Keep apart"));
+    expect(actions).toEqual([{ type: "CLEAR_SELECTION" }]);
+    expect(latest!.paths).toBe(before);
+    expect(ticked()).toEqual([]);
+    expect(foot()).toBeNull();
+    expect(notice()).toBeNull();
+    expect(buttons("Undo")).toEqual([]);
+  });
+
+  it("a refused Combine says why in the card's notice, as a refused 'Combine with…' does; the two stay ticked", async () => {
+    const four = planAfter(fourOwnInFirst(pathPlanFromMenu(NUCLEAR_MENU, 5, false)),
+      { type: "REMOVE", key: "kp05" }, { type: "ADD_OWN", text: "Point five", intoPathKey: null });
+    await ready(four);
+    await press(tickBox(1));
+    await press(tickBox(5));
+    const before = latest!.paths;
+    await press(footButton("Combine"));
+    expect(notice()).toBe("A path holds up to four of your own points. Start a new path for this one.");
+    expect(spoken()).toBe("A path holds up to four of your own points. Start a new path for this one.");
+    expect(latest!.paths).toBe(before);
+    expect(ticked()).toEqual([1, 5]);
+    expect(foot()).not.toBeNull();
+  });
+
+  it("the hint's and the line's words, and the hint's quiet look", () => {
+    expect(CATALOG["v4.start.hint.order"]).toBe("most important first");
+    expect(CATALOG["v4.start.hint.tick"]).toBe("tick two to combine them");
+    expect(CATALOG["v4.start.combinePicked"]).toBe("{count} picked");
+    expect(CSS).toMatch(/\.v4StartCardHead\s*\{[^}]*flex-wrap: wrap; justify-content: space-between; align-items: baseline;/u);
+    expect(CSS).toMatch(/\.v4StartCardHint\s*\{[^}]*font-size: 14px; color: var\(--text-2\);/u);
+  });
+});
+
 describe("the answered clarifying questions fold (read-d4 A)", () => {
   it("fold into one line at the first change to a path; 'Show the questions' opens them; unanswered ones stay open", async () => {
     await ready();
@@ -580,7 +696,8 @@ describe("the answered clarifying questions fold (read-d4 A)", () => {
 describe("your own path (spec §2 item 5; owner decision 2)", () => {
   it("crisis words add nothing and ask no fit", async () => {
     await ready();
-    expect(card()!.querySelector("label")?.textContent).toBe("Add your own path");
+    // Design Document v2 (16b): the rows' tick boxes have (empty) labels of their own, so the own-path label is named by its class.
+    expect(card()!.querySelector(".v4StartOwnLabel")?.textContent).toBe("Add your own path");
     expect(cardText()).toContain("What else should the AIs look into?");
     await addOwn("I want to hurt myself");
     expect(offerIfCrisis).toHaveBeenCalledWith("I want to hurt myself");

@@ -214,7 +214,9 @@ describe("public debate navigation keyboard accessibility", () => {
       expect.soft(navigationStyle.justifyContent, "tabs stay grouped").toBe("flex-start");
       expect.soft(navigationStyle.gap, "group spacing").not.toBe("");
       expect.soft(countStyle.marginLeft, "count remains at the far edge").toBe("auto");
-      expect.soft(inactiveStyle.fontWeight, "inactive link control weight").toBe("600");
+      // Design Document v2 (screen 3a): both tabs are weight 700. The current tab is told apart by
+      // the background, foreground and shadow checked below, never by weight.
+      expect.soft(inactiveStyle.fontWeight, "inactive link control weight").toBe("700");
       expect.soft(inactiveStyle.padding, "inactive link control padding").not.toBe("0");
       expect.soft(inactiveStyle.borderRadius, "inactive link control shape").not.toBe("");
       expect.soft(activeStyle.backgroundColor, "current-state background").not.toBe(inactiveStyle.backgroundColor);

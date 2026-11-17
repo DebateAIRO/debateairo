@@ -508,7 +508,7 @@ const DEV_TLS_READY_UI: DevTlsUiProbe = Object.freeze({
   login: Object.freeze({
     statusCode: 200,
     contentType: "text/html; charset=utf-8",
-    body: "<html><body>Back to the graph.</body></html>"
+    body: "<html><body>Use a passkey, or your password and authenticator.</body></html>"
   }),
   session: Object.freeze({
     statusCode: 401,

@@ -239,7 +239,7 @@ describe("a deeper dig under the new path climbs to the main answer", () => {
 
 // V4 start step, Task 50c (follow-up to Task 50b; the owner, 4 Nov, "Always say it": "the main answer always says in one or two plain
 // sentences how a stated goal fares"): an update of the main answer after a dig says how the person's stated goal fares too. Nothing
-// earlier stored: Task 50b's draft report.answer.v5; a later version: the draft report.answer.later.v5; both checked by Task 50b's draft
+// earlier stored: Task 50b's report.answer.v5; a later version: report.answer.later.v5; both checked by Task 50b's
 // report.answer-check.v4. Whether a goal was stated is the ROOT's purpose lines' (the tree reads the closing's own material reader). Without
 // a goal, every byte is today's: the digests below were taken on this file's world before Task 50c changed any code (wave16-t50c-1.log
 // and -2.log).

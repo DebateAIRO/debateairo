@@ -31,7 +31,12 @@ describe("Support-visible global Account navigation",() => {
     const document = render("/");
     expect(linkByText(document,"+ New debate")?.getAttribute("href")).toBe("/new");
     expect(document.querySelector(".roleChip")).toBeNull();
-    expect(document.querySelector('a[aria-label="Settings"]')).toBeNull();
+    // Design Document v2 (screen 3a): the bar ends with a round gear to the settings. The stylesheet
+    // shows it only beside the account menu, so a signed-out visitor is not offered settings.
+    const gear = document.querySelector<HTMLAnchorElement>('a[aria-label="Settings"]');
+    expect(gear?.getAttribute("href")).toBe("/settings");
+    expect(gear?.classList.contains("topBarGear")).toBe(true);
+    expect(document.querySelectorAll('a[href="/settings"]').length).toBe(1);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

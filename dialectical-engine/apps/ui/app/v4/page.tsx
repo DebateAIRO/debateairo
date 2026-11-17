@@ -5,6 +5,7 @@ import { readCrisisCountryHint } from "@/lib/crisisLines";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { askAgainRunId } from "@/lib/v4/failedRun";
+import { pickUpIdOf } from "@/lib/v4/savedQuestion";
 import { parseReadingLevel } from "@/lib/v4/storage";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +27,7 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default async function V4AskPage({
   searchParams = Promise.resolve({})
 }: {
-  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[]; maps?: string | string[]; again?: string | string[] }>;
+  searchParams?: Promise<{ topic?: string | string[]; level?: string | string[]; maps?: string | string[]; again?: string | string[]; pickup?: string | string[] }>;
 }) {
   const requestedLocale = (await cookies()).get(LOCALE_COOKIE)?.value;
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
@@ -56,6 +57,8 @@ export default async function V4AskPage({
       initialLevel={parseReadingLevel(firstParam(query.level))}
       // Owner review 3 Nov (wait-f11): "Ask this again" names only the debate; its words are read back from the server.
       againRunId={askAgainRunId(firstParam(query.again))}
+      // Design Document v2 (18b): Pick up on "My questions" names only the saved question; the ask page reads it from the account.
+      pickUpId={pickUpIdOf(firstParam(query.pickup))}
     />
   );
 }

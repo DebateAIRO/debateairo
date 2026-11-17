@@ -86,15 +86,15 @@ const DEEPINFRA_PARAGRAPH =
 const NAMED_SWAPS: Readonly<Record<number, readonly [string, string]>> = {
   [SUMMARY]: [
     "Your questions go to AI providers listed in our Register; they are not used to train models.",
-    "Your questions go to the AI providers listed in our Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Perplexity do not allow them to train models on what you write; section 5 says for which company we have not confirmed this yet."
+    "Your questions go to the AI providers listed in our Register, mainly DeepInfra, in the United States. The terms of DeepInfra and Anthropic do not allow them to train models on what you write; section 5 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 5)."
   ],
   [NO_PROFILING]: [
     "We do not use your content to train models, and we do not permit our providers to — section 5.",
-    "We do not use your content to train models, and the terms of DeepInfra, Anthropic and Perplexity do not allow them to; section 5 says for which company we have not confirmed this yet."
+    "We do not use your content to train models, and the terms of DeepInfra and Anthropic do not allow them to; section 5 says for which company we have not confirmed this yet, and what the web search provider may do with the search phrases the models write."
   ],
   [TRAINING]: [
     "We use AI providers only under terms that do not allow them to use your content to train or improve their models; the Register shows, for each provider, whether we have confirmed this against our account, and when.",
-    "The terms of DeepInfra, Anthropic and Perplexity do not allow them to use your content to train or improve their models. We have checked this in the terms each of them publishes for its customers; the Register shows the result for each provider, and when we checked. We have not confirmed it for the partner company DeepInfra passes one model's requests to, and the Register says so."
+    "The terms of DeepInfra and Anthropic do not allow them to use your content to train or improve their models. We have checked this in the terms each of them publishes for its customers; the Register shows the result for each provider, and when we checked. We have not confirmed it for the partner company DeepInfra passes one model's requests to, and the Register says so. Web search is different, and the paragraph on Perplexity above says how."
   ],
   [TRANSFERS]: [
     "The Register names the mechanism for each provider.",
@@ -366,6 +366,14 @@ const FLAGGED = 119;
  * (The last two sit after section 5's DeepInfra paragraph, so they moved by two with it.)
  */
 const KEPT_AFTER_CLOSURE = [85, 129, 200];
+/**
+ * Web search is not under a no-training contract: the search provider's terms let it keep the search phrases the models
+ * write. English says so in section 5's web search paragraph, and its no-training statements (the summary, section 4's
+ * last paragraph, section 5's paragraph on training and retention) name DeepInfra and Anthropic only. The translations
+ * still name Perplexity there, and keep the web search paragraph as it was, until they are brought up to date before
+ * release; legal-web-search-terms pins the English wording.
+ */
+const WEB_SEARCH_PARAGRAPH = DEEPINFRA_AT + 2;
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /**
  * Annex B.6's paragraph (Asia-Pacific; Annex B.7 until Switzerland's part left, see withoutSwitzerland). Taiwan is
@@ -389,7 +397,7 @@ const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates
  * with the blank line after it, right before the Perplexity paragraph.
  */
 const INSERTED = [SAVED_ROW_AT, DEEPINFRA_AT, DEEPINFRA_AT + 1, SAVED_RETENTION_AT];
-/** The four lines whose statement on training or transfers now names DeepInfra, Anthropic and Perplexity. */
+/** The four lines whose statement on training or transfers now names the companies (English: Perplexity for transfers only). */
 const NAMED = [SUMMARY, NO_PROFILING, TRAINING, TRANSFERS];
 const CHANGED = [EYEBROW, END_MARKER, VERSION_LINE, SUMMARY, SAVED_ROW_AT, NEXT_LINE, SENSITIVE_INFORMATION, CONTRACT, SENSITIVE_CONSENT, QUESTION_CHECK, NO_PROFILING, DEEPINFRA_AT, DEEPINFRA_AT + 1, TRAINING, TRANSFERS, FREE, SAVED_RETENTION_AT, SECURITY, ACCESS, ERASURE, WITHDRAW, CHANGE_LOG];
 /** Which approved change each of the other changed lines carries. */
@@ -573,7 +581,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     expect(next, `${code}: the line count is 3.11's, the two new rows, and the new paragraph with its blank line`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE] : [])].sort((a, b) => a - b));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, WEB_SEARCH_PARAGRAPH] : [])].sort((a, b) => a - b));
     // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
     const quebecBefore = prior[priorIndex(QUEBEC)]!;
     const quebecAfter = next[QUEBEC]!;
@@ -796,7 +804,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect(paragraph, `${code}: the lead-in names DeepInfra`).toMatch(/^\*\*[^*]*DeepInfra[^*]*\*\*/u);
     expect(paragraph, `${code}: the company`).toContain("Deep Infra Inc.");
     expect(next[DEEPINFRA_AT + 1], `${code}: its own paragraph`).toBe("");
-    expect(next[DEEPINFRA_AT + 2], `${code}: the Perplexity paragraph follows, unchanged`).toBe(prior[priorIndex(DEEPINFRA_AT + 2)]);
+    if (code !== "en") expect(next[WEB_SEARCH_PARAGRAPH], `${code}: the Perplexity paragraph follows, unchanged`).toBe(prior[priorIndex(WEB_SEARCH_PARAGRAPH)]);
     expect(next[DEEPINFRA_AT + 2], `${code}: the Perplexity paragraph`).toMatch(/^\*\*[^*]*Perplexity[^*]*\*\*/u);
     expect(sentencesOf(paragraph).length, `${code}: about as many sentences as the English`).toBeGreaterThanOrEqual(4);
     if (code !== "en") expect(paragraph, `${code}: translated`).not.toBe(DEEPINFRA_PARAGRAPH);
@@ -812,7 +820,8 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
       const removed = was.slice(head, was.length - foot);
       expect(head + foot, `${code}: line ${at} keeps the rest of its paragraph`).toBeGreaterThan(at === TRAINING ? 20 : was.length / 3);
       expect(added.length, `${code}: line ${at} grows`).toBeGreaterThan(removed.length);
-      for (const name of ["DeepInfra", "Anthropic", "Perplexity"]) {
+      // English names Perplexity for the transfer mechanism only: its search terms do not forbid training (WEB_SEARCH_PARAGRAPH).
+      for (const name of code === "en" && at !== TRANSFERS ? ["DeepInfra", "Anthropic"] : ["DeepInfra", "Anthropic", "Perplexity"]) {
         expect(added, `${code}: line ${at} names ${name}`).toContain(name);
         expect(removed, `${code}: line ${at} did not name ${name}`).not.toContain(name);
       }
