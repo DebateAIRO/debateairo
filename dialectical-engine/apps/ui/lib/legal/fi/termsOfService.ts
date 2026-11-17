@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Peruuttaminen. Peruuta milloin tahansa kohdassa Asetukset → Tilaus yhdellä vahvistusnapsautuksella tai osoitteessa dezbatere.ro/cancel olevalla peruutussivulla, joka ei edellytä kirjautumista. Peruutus tulee voimaan kuluvan laskutuskauden lopussa, ja käyttöoikeutesi säilyy siihen asti. Emme tee peruuttamisesta tilaamista vaikeampaa." },
       { kind: "p", text: "Hinnanmuutokset tulevat voimaan vain tilauksen uusiutuessa. Ilmoitamme uudesta hinnasta sähköpostitse vähintään 30 päivää etukäteen ja liitämme mukaan peruutuslinkin. Jos maasi laki edellyttää nimenomaista suostumustasi hinnanmuutokseen, pyydämme sitä; muussa tapauksessa uusi hinta tulee seuraavasta uusimisesta alkaen sovellettavaksi, jos et ryhdy toimiin. Alueelliset säännöt kuvataan liitteessä A." },
       { kind: "p", text: "Epäonnistuneet maksut. Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi." },
-      { kind: "p", text: "Verot ja maksunsaaja. Hintamme näytetään ilman veroa, muodossa hinta + ALV (tai GST-vero tai myyntivero asuinpaikkasi mukaan). Laskutusosoitteesi mukainen vero lisätään kassalla, ja kassa näyttää ennen maksamista maksettavan kokonaissumman veroineen. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista." },
+      { kind: "p", text: "Verot ja maksunsaaja. Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista." },
       { kind: "p", text: "Maksutavat. Maksat kortilla. Hyväksymme Visa- ja Mastercard-kortit; American Express -kortteja emme hyväksy. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com), eikä korttisi koko numero koskaan päädy meille." },
       { kind: "p", text: "Toimitus. Dialectical Engine on verkkopalvelu, joten sinulle ei lähetetä mitään. Maksullisen tilauksesi ominaisuudet ovat käytettävissä tililläsi heti, kun maksusi on vahvistettu." },
       { kind: "p", text: "Takaisinveloitukset. Jos riitautat veloituksen kortinmyöntäjän kanssa, voimme keskeyttää maksulliset ominaisuudet riidan ratkaisemisen ajaksi. Emme peri tästä maksuja." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "f6ead5b879728969457d11cc52f71cef1d5082c11806a62eb12f05d5f908dff9",
+  sha256: "a4d0a909f5aa6d0a699dc1a7b10897f8de64b475696b3afc5de7b28b28e98066",
   eyebrow: "KÄYTTÖEHDOT · v2.18 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

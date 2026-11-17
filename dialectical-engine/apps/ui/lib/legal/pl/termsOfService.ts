@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Anulowanie. Możesz anulować w dowolnym momencie w sekcji Ustawienia → Subskrypcja jednym kliknięciem potwierdzającym albo na stronie anulowania pod adresem dezbatere.ro/cancel, która nie wymaga logowania. Anulowanie staje się skuteczne z końcem bieżącego okresu rozliczeniowego, a do tego czasu zachowujesz dostęp. Nie utrudniamy anulowania bardziej niż wykupienia subskrypcji." },
       { kind: "p", text: "Zmiany cen stają się skuteczne wyłącznie przy odnowieniu. Powiadomimy Cię pocztą elektroniczną o nowej cenie co najmniej 30 dni wcześniej, dołączając link do anulowania. Jeżeli prawo Twojego państwa wymaga wyraźnej zgody na zmianę ceny, poprosimy Cię o jej udzielenie; w przeciwnym razie, jeżeli nie podejmiesz żadnego działania, nowa cena będzie obowiązywać od kolejnego odnowienia. Załącznik A zawiera informacje o zasadach regionalnych." },
       { kind: "p", text: "Nieudane płatności. Jeżeli płatność nie powiedzie się, ponawiamy próbę przez 7 dni i przed obniżeniem planu Twojego konta do planu bezpłatnego wysyłamy ostrzeżenie pocztą elektroniczną. Nie usuwamy debat z powodu nieudanej płatności." },
-      { kind: "p", text: "Podatki i odbiorca płatności. Nasze ceny są podawane bez podatku, jako cena + VAT (lub GST albo podatek od sprzedaży, zależnie od miejsca zamieszkania). Podatek dla Twojego adresu rozliczeniowego jest doliczany na stronie płatności, która przed dokonaniem płatności pokazuje łączną kwotę do zapłaty wraz z podatkiem. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki." },
+      { kind: "p", text: "Podatki i odbiorca płatności. Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki." },
       { kind: "p", text: "Metody płatności. Płacisz kartą. Akceptujemy karty Visa i Mastercard; nie akceptujemy kart American Express. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com), a pełny numer Twojej karty nigdy do nas nie trafia." },
       { kind: "p", text: "Dostawa. Dialectical Engine to usługa online, więc nic nie jest do Ciebie wysyłane. Funkcje Twojego płatnego planu są dostępne na Twoim koncie, gdy tylko płatność zostanie potwierdzona." },
       { kind: "p", text: "Obciążenia zwrotne. Jeżeli zakwestionujesz obciążenie u wystawcy karty, możemy zawiesić funkcje płatne do czasu rozstrzygnięcia sporu. Nie pobieramy z tego tytułu opłat." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "364b357679a5a8509cee70b0ffcacc373ef249014c1561a7d42da70f084cc4bd",
+  sha256: "1cfda4e47cf0fc50112dcbeddc00387064d4d14546bcd8db4826dab3f26ae869",
   eyebrow: "WARUNKI ŚWIADCZENIA USŁUG · v2.18 · OBOWIĄZUJĄ OD 1 LISTOPADA 2026",
   title: "Na co wyrażasz zgodę",
   lede: "Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.",

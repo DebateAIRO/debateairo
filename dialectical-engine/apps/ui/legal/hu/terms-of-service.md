@@ -223,7 +223,7 @@ A Dialectical Engine ingyenes csomagot kínál. Három fizetős csomag lesz elé
 
 **Sikertelen fizetések.** Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit.
 
-**Adók és a fizetés kedvezményezettje.** Árainkat adó nélkül, ár + héa formában tüntetjük fel (az Ön lakóhelyétől függően a héa helyett az áruk és szolgáltatások adója vagy a forgalmi adó is lehet). A számlázási címére vonatkozó adót a fizetési oldalon adjuk hozzá, és a fizetési oldal fizetés előtt megmutatja az Ön által fizetendő végösszeget, adóval együtt. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
+**Adók és a fizetés kedvezményezettje.** Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért.
 
 **Fizetési módok.** Ön bankkártyával fizet. Visa és Mastercard kártyát fogadunk el; American Express kártyát nem fogadunk el. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel, és az Ön teljes kártyaszáma soha nem jut el hozzánk.
 

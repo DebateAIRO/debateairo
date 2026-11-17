@@ -223,7 +223,7 @@ Dialectical Engine ücretsiz bir plan sunar. **Plus**, **Pro** ve **Max** adlı 
 
 **Başarısız ödemeler.** Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz.
 
-**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlarımız vergi hariç olarak, fiyat + KDV (ya da yaşadığınız yere bağlı olarak GST veya satış vergisi) şeklinde gösterilir. Fatura adresiniz için geçerli vergi ödeme sayfasında eklenir ve ödeme sayfası, ödeme yapmadan önce size vergi dahil ödeyeceğiniz toplam tutarı gösterir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
+**Vergiler ve ödemeyi kime yaptığınız.** Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir.
 
 **Ödeme yöntemleri.** Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz.
 

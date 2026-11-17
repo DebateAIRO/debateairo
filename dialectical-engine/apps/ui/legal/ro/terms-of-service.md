@@ -223,7 +223,7 @@ Dialectical Engine oferă un plan gratuit. Vor fi disponibile trei planuri cu pl
 
 **Plăți nereușite.** Dacă o plată eșuează, reîncercăm timp de 7 zile și vă avertizăm prin e-mail înainte de a trece contul la planul gratuit. Nu vă ștergem dezbaterile din cauza unei plăți nereușite.
 
-**Taxe și beneficiarul plății.** Prețurile noastre sunt afișate fără taxe, ca preț + TVA (sau GST ori taxa pe vânzări, în funcție de locul în care locuiți). Taxa pentru adresa dumneavoastră de facturare se adaugă la plată, iar pagina de plată vă arată totalul de plată, cu taxe incluse, înainte să plătiți. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni.
+**Taxe și beneficiarul plății.** Prețurile includ TVA, GST sau taxa pe vânzări, în funcție de locul în care locuiți, iar acest lucru este afișat înainte de plată. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni.
 
 **Modalități de plată.** Plătiți cu cardul. Acceptăm Visa și Mastercard; nu acceptăm American Express. Plățile cu cardul sunt procesate de NETOPIA Payments (netopia-payments.com), iar numărul complet al cardului dumneavoastră nu ajunge niciodată la noi.
 

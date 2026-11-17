@@ -223,7 +223,7 @@ Dialectical Engine menawarkan paket gratis. Tiga paket berbayar, **Plus**, **Pro
 
 **Pembayaran gagal.** Jika pembayaran gagal, kami mencoba kembali selama 7 hari dan memperingatkan Anda melalui email sebelum menurunkan akun Anda ke paket gratis. Kami tidak menghapus debat Anda karena pembayaran gagal.
 
-**Pajak, dan pihak yang Anda bayar.** Harga kami ditampilkan sebelum pajak, sebagai harga + PPN (atau GST atau pajak penjualan, bergantung pada tempat tinggal Anda). Pajak untuk alamat penagihan Anda ditambahkan di halaman pembayaran, dan halaman pembayaran menampilkan total yang Anda bayar, termasuk pajak, sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini.
+**Pajak, dan pihak yang Anda bayar.** Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini.
 
 **Metode pembayaran.** Anda membayar dengan kartu. Kami menerima Visa dan Mastercard; kami tidak menerima American Express. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com), dan nomor kartu Anda yang lengkap tidak pernah sampai kepada kami.
 

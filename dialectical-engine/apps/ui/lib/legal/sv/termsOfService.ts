@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Uppsägning. Säg upp när som helst under Inställningar → Abonnemang med ett enda bekräftelseklick eller via uppsägningssidan på dezbatere.ro/cancel, som inte kräver att du loggar in. Uppsägningen träder i kraft vid slutet av den pågående faktureringsperioden, och du behåller åtkomsten fram till dess. Vi kommer inte att göra det svårare att säga upp än det var att teckna abonnemanget." },
       { kind: "p", text: "Prisändringar träder i kraft först vid en förnyelse. Vi underrättar dig minst 30 dagar i förväg via e-post och anger det nya priset samt en länk för uppsägning. Om lagen i ditt land kräver ditt uttryckliga samtycke till en prisändring begär vi det; i annat fall gäller det nya priset från nästa förnyelse om du inte gör något. Regionala regler anges i bilaga A." },
       { kind: "p", text: "Misslyckade betalningar. Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning." },
-      { kind: "p", text: "Skatter och vem du betalar till. Våra priser visas exklusive skatt, som pris + moms (eller GST eller omsättningsskatt, beroende på var du bor). Skatten för din faktureringsadress läggs till i kassan, och kassan visar det totalbelopp du betalar, inklusive skatt, innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor." },
+      { kind: "p", text: "Skatter och vem du betalar till. Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor." },
       { kind: "p", text: "Betalningssätt. Du betalar med kort. Vi tar emot Visa och Mastercard; vi tar inte emot American Express. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com), och ditt fullständiga kortnummer når aldrig fram till oss." },
       { kind: "p", text: "Leverans. Dialectical Engine är en onlinetjänst, så inget skickas till dig. Funktionerna i ditt avgiftsbelagda abonnemang är tillgängliga i ditt konto så snart din betalning har bekräftats." },
       { kind: "p", text: "Kortreklamationer. Om du bestrider en debitering hos din kortutgivare kan vi stänga av avgiftsbelagda funktioner medan tvisten handläggs. Vi tar inte ut någon avgift för detta." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "5362b74a472782f128d57f54d4d9adf3ef2f14f778bff7140688e9d136606e33",
+  sha256: "59df49a23a10f4299fc614b9191fdaf1e3ef3c372ff4a6983b1a0fe112b4393d",
   eyebrow: "ANVÄNDARVILLKOR · v2.18 · GÄLLER FRÅN 1 NOVEMBER 2026",
   title: "Vad du godkänner",
   lede: "Avtalet mellan dig och DMS Merchandise Shop S.R.L., på ett lättbegripligt språk. Nitton avsnitt och bilaga A — rulla till slutet.",

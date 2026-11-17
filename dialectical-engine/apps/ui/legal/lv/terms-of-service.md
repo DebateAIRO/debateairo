@@ -223,7 +223,7 @@ Dialectical Engine piedāvā bezmaksas plānu. Būs pieejami trīs maksas plāni
 
 **Neizdevušies maksājumi.** Ja maksājums neizdodas, mēs atkārtojam mēģinājumus 7 dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ.
 
-**Nodokļi un maksājuma saņēmējs.** Mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN (vai GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas). Jūsu norēķinu adresei piemērojamais nodoklis tiek pievienots norēķinu laikā, un pirms maksājuma veikšanas norēķinu lapā tiek parādīta jūsu maksājamā kopsumma, ieskaitot nodokļus. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
+**Nodokļi un maksājuma saņēmējs.** Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem.
 
 **Maksājumu veidi.** Jūs maksājat ar karti. Mēs pieņemam Visa un Mastercard kartes; American Express kartes mēs nepieņemam. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com), un pilns jūsu kartes numurs nekad nenonāk pie mums.
 

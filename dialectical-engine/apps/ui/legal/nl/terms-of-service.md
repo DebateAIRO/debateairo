@@ -223,7 +223,7 @@ Dialectical Engine biedt een gratis abonnement. Er zullen drie betaalde abonneme
 
 **Mislukte betalingen.** Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt.
 
-**Belastingen en aan wie u betaalt.** Onze prijzen worden getoond zonder belasting, als prijs + btw (of GST of omzetbelasting, afhankelijk van waar u woont). De belasting voor uw factuuradres wordt bij het afrekenen toegevoegd, en de afrekenpagina toont het totaal dat u betaalt, inclusief belasting, voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
+**Belastingen en aan wie u betaalt.** Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden.
 
 **Betaalmethoden.** U betaalt met een kaart. Wij accepteren Visa en Mastercard; American Express accepteren wij niet. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com), en uw volledige kaartnummer bereikt ons nooit.
 
