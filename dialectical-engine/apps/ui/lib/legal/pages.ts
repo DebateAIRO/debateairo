@@ -312,11 +312,28 @@ const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: strin
 ] as const);
 
 /**
- * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
- * rechecked 10 October 2026. Listed whenever the API's declared targets reach `api.deepinfra.com`
- * (company `deepinfra`, addition D24), and when the API gives no answer. Its jobs are confirmed: every
- * panel member writes and judges arguments, GLM writes the answer and the verdict story, DeepSeek
- * checks both (the first preview's GLM alone does all three).
+ * The one DeepInfra model DeepInfra does not run itself. Its model page carries a "Partner" tag ("This model is
+ * served by a partner. Your requests are forwarded to them. Their privacy policy applies"), and DeepInfra's trust
+ * centre names it among the partner models (read 16 November 2026: `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`).
+ * The other three have no tag and run on DeepInfra's own servers.
+ */
+const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-Flash"]);
+
+/**
+ * Serving company for the private preview's open-weight models, the main recipient of debate text. Listed whenever
+ * the API's declared targets reach `api.deepinfra.com` (company `deepinfra`, addition D24), and when the API gives
+ * no answer. Its jobs are confirmed: every panel member writes and judges arguments, GLM writes the answer and the
+ * verdict story, DeepSeek checks both (the first preview's GLM alone does all three).
+ *
+ * Checked 16 November 2026 against DeepInfra's Terms of Service (last modified 15 October 2026) and its trust centre
+ * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`): all inference runs in data centres in the United States,
+ * with no other region; prompts and outputs are held in memory only while a request is processed, then deleted, and
+ * the logs hold request metadata, never the text (Terms 7(b), every account); no training on customer data (Terms
+ * 7(b)); the data processing agreement is part of the Terms (section 5) and carries the EU standard contractual
+ * clauses; DeepInfra is not certified under the EU–US Data Privacy Framework. These facts cover the models DeepInfra
+ * runs itself: the location and retention sentences say so, and the partner model has its own row
+ * (`DEEPINFRA_PARTNER_PROVIDER`). The preview sends no batch request and asks for no longer prompt cache, the two
+ * features DeepInfra stores text for.
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -328,12 +345,35 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   // the person presses Next, before a debate starts.
   purposes: Object.freeze<ProviderPurpose[]>([...UNCHECKED_CLOUD.purposes, "suggestPaths"]),
   purposesConfirmed: true,
-  // Published terms exclude model training. Endpoint-specific retention and transfer facts
-  // remain explicitly unconfirmed until operational/contractual validation is complete.
+  locationKey: "legal.providers.locationDeepInfra",
+  retentionKey: "legal.providers.retentionDeepInfra",
+  zeroRetention: "yes",
   training: "no",
-  basisKey: "legal.providers.unconfirmed",
+  basisKey: "legal.providers.sccBasis",
   contact: "policy@deepinfra.com",
-  checkedOn: "2026-10-05"
+  checkedOn: "2026-11-16"
+});
+
+/**
+ * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_IDS`). DeepInfra names
+ * neither the company nor its terms, so the row is headed by what we know and every fact stays "[to confirm]": it
+ * receives debate text, and a legal page discloses rather than hides (ruling R20; the 10 October 2026 facts note:
+ * "that company receives debate text and needs its own row on the page"). Its jobs are the partner model's: a panel
+ * member that writes and judges arguments, and one of the AIs that suggest what to look into. Shown right after
+ * the DeepInfra row, whenever that row is shown. The row goes when the owner names the company and its terms are
+ * checked (then it becomes a checked row), or when no partner model is left in the line-up.
+ */
+export const DEEPINFRA_PARTNER_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "deepinfra-partner",
+  provider: null,
+  nameKey: "legal.providers.deepinfraPartnerName",
+  models: PREVIEW_DEEPINFRA_MODELS.filter(([id]) => DEEPINFRA_PARTNER_MODEL_IDS.has(id)).map(([, label]) => label).join(", "),
+  entity: "[…]",
+  homeCountryKey: "legal.providers.unconfirmed",
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "suggestPaths"]),
+  purposesConfirmed: true,
+  basisKey: "legal.providers.unconfirmed"
 });
 
 /**
@@ -399,8 +439,17 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * The web search provider the debate models ask questions through (owner, 2026-10-26: "our models will ask
  * questions via Perplexity"; Terms §8, Privacy Policy §5). Not one of the API's declared targets yet, so it is
  * listed on every answer rather than when the API names it (owner, 2026-10-27: always listed). Perplexity AI, Inc.
- * is the US company behind the API; every other fact stays "[to confirm]" until someone checks it against
- * Perplexity's API terms.
+ * is the US company behind the API. The runner calls its Search API (`POST https://api.perplexity.ai/search`,
+ * `packages/providers/src/perplexity-search.ts`).
+ *
+ * Checked 16 November 2026 against Perplexity's API Terms of Service (last updated 23 January 2026), its Data
+ * Processing Addendum (last updated 13 August 2026), its API privacy page and its trust centre
+ * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`): no training of generative AI models on customer content
+ * (API Terms 2.3.3); zero data retention is not the default and needs a written agreement, and none is on record;
+ * no retention period is published for API requests, and the addendum deletes personal data within thirty days of
+ * the end of the service; no processing region is named, and every subprocessor the trust centre lists is in the
+ * United States; transfers under the EU standard contractual clauses (addendum section 11, Modules 2 and 3), with
+ * no mention of the EU–US Data Privacy Framework. The contact is the address the API Terms give for notices.
  */
 export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -409,7 +458,14 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   models: "",
   entity: "Perplexity AI, Inc.",
   purposes: Object.freeze<ProviderPurpose[]>(["search"]),
-  purposesConfirmed: true
+  purposesConfirmed: true,
+  locationKey: "legal.providers.locationPerplexity",
+  retentionKey: "legal.providers.retentionPerplexity",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "legal-notices@perplexity.ai",
+  checkedOn: "2026-11-16"
 });
 
 /**
@@ -450,7 +506,8 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
  * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
  * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
  * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
- * then DeepInfra; each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
+ * then DeepInfra, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
+ * to (`DEEPINFRA_PARTNER_PROVIDER`); each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
  * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
  * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
@@ -461,9 +518,11 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const named = companies === null || companies.length === 0
     ? null
     : new Set(companies.filter((company) => typeof company === "string" && company.length > 0));
+  // The company DeepInfra forwards its partner model to receives debate text whenever DeepInfra does, so its
+  // unchecked row follows DeepInfra's own.
   const reviewed = REVIEWED_PROVIDER_COMPANIES
     .filter(([company]) => named === null || named.size === 0 || named.has(company))
-    .map(([, entry]) => entry);
+    .flatMap(([, entry]): ProviderRegisterEntry[] => entry === DEEPINFRA_PROVIDER ? [entry, DEEPINFRA_PARTNER_PROVIDER] : [entry]);
   const unchecked = named === null ? [] : [...named]
     .filter((company) => !REVIEWED_COMPANY_KEYS.has(company) && company !== PERPLEXITY_PROVIDER.key).sort()
     .map(uncheckedCompanyEntry);

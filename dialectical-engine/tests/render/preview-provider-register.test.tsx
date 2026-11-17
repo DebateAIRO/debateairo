@@ -8,6 +8,7 @@ import ro from "../../apps/ui/messages/ro/legal.json";
 import { LegalProvidersBody } from "../../apps/ui/components/legal/LegalBodies.js";
 import {
   ANTHROPIC_PREVIEW_PROVIDER,
+  DEEPINFRA_PARTNER_PROVIDER,
   DEEPINFRA_PROVIDER,
   GOOGLE_PREVIEW_PROVIDER,
   MODEL_PROVIDERS,
@@ -25,6 +26,10 @@ import {
  * names gets its checked row (Anthropic, then DeepInfra), an unknown host an unchecked row headed by its host name
  * (ruling R20), the support chat's model always last; no answer lists the whole reviewed catalogue. No row names a
  * model, in any of the 35 languages, and the hosted cloud rows (OpenAI, xAI, Google, the own-servers Qwen) never show.
+ *
+ * 16 November 2026 (docs/legal/2026-11-16-deepinfra-perplexity-facts.md): DeepInfra forwards one of its models to a
+ * partner company it does not name, so DeepInfra's row is always followed by that company's unchecked row
+ * (`deepinfra-partner`); DeepInfra's and Perplexity's rows carry the facts their published terms give.
  */
 const MODEL_NAMES = ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Claude Haiku 5.5", "Gemini"] as const;
 /** The labels every row shows, in order: the Privacy Policy §5 facts without the old models line. */
@@ -46,8 +51,14 @@ const NEW_KEYS = [
   "legal.providers.locationGoogle",
   "legal.providers.retentionAnthropic",
   "legal.providers.retentionGoogle",
-  "legal.providers.sccBasis"
+  "legal.providers.sccBasis",
+  "legal.providers.locationDeepInfra",
+  "legal.providers.retentionDeepInfra",
+  "legal.providers.deepinfraPartnerName",
+  "legal.providers.locationPerplexity",
+  "legal.providers.retentionPerplexity"
 ] as const;
+const PARTNER = "deepinfra-partner";
 const ACME = "host:api.acme.example";
 
 /** Text as React's static renderer escapes it. */
@@ -61,14 +72,14 @@ const catalogOf = (locale: string) =>
 
 /** Every company list the page can be built from, and the rows each gives. */
 const CASES: ReadonlyArray<readonly [label: string, companies: readonly string[] | null, keys: readonly string[]]> = [
-  ["anthropic + deepinfra", ["anthropic", "deepinfra"], ["claude", "deepinfra", "perplexity", "support"]],
-  ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", "perplexity", "support"]],
-  ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", "perplexity", "support"]],
+  ["anthropic + deepinfra", ["anthropic", "deepinfra"], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", PARTNER, "perplexity", "support"]],
   ["anthropic alone", ["anthropic"], ["claude", "perplexity", "support"]],
-  ["no answer", null, ["claude", "deepinfra", "perplexity", "support"]],
-  ["an empty answer", [], ["claude", "deepinfra", "perplexity", "support"]],
-  ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", ACME, "perplexity", "support"]],
-  ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", "perplexity", "support"]]
+  ["no answer", null, ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["an empty answer", [], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", PARTNER, ACME, "perplexity", "support"]],
+  ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", PARTNER, "perplexity", "support"]]
 ];
 
 describe("the rows are the companies the API answers (addition D24)", () => {
@@ -84,12 +95,15 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       else expect(entries.at(-1)).toEqual({ ...SUPPORT_PROVIDER, purposes: ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"] });
       if (keys.includes("claude")) expect(entries.find((entry) => entry.key === "claude")).toBe(ANTHROPIC_PREVIEW_PROVIDER);
       if (keys.includes("deepinfra")) expect(entries.find((entry) => entry.key === "deepinfra")).toBe(DEEPINFRA_PROVIDER);
+      // The partner's row stands right after DeepInfra's, and only when DeepInfra's is shown.
+      expect(keys.includes(PARTNER)).toBe(keys.includes("deepinfra"));
+      if (keys.includes(PARTNER)) expect(entries[keys.indexOf("deepinfra") + 1]).toBe(DEEPINFRA_PARTNER_PROVIDER);
     });
   }
 
   it("unknown hosts come after the reviewed rows, sorted, once each", () => {
     expect(keysOf(providerRegister(["host:b.example", "deepinfra", "host:a.example", "host:b.example", "anthropic"])))
-      .toEqual(["claude", "deepinfra", "host:a.example", "host:b.example", "perplexity", "support"]);
+      .toEqual(["claude", "deepinfra", PARTNER, "host:a.example", "host:b.example", "perplexity", "support"]);
   });
 
   it("every company the API's host table can name is a reviewed row, never an unchecked one", () => {
@@ -354,12 +368,16 @@ describe("the Register words still exist in all 35 languages", () => {
         expect(catalog[key]?.trim(), `${locale} ${key}`).not.toBe("");
         expect(catalog[key], `${locale} ${key}`).not.toContain("[");
       }
-      // The numbers are facts: 30 days, 7 years for safety-check results, 55 days at Google.
+      // The numbers are facts: 30 days, 7 years for safety-check results, 55 days at Google, 30 days after the service ends at Perplexity.
+      expect(catalog["legal.providers.retentionPerplexity"], locale).toContain("30");
+      for (const key of ["legal.providers.locationDeepInfra", "legal.providers.retentionDeepInfra", "legal.providers.deepinfraPartnerName"]) expect(catalog[key], `${locale} ${key}`).toContain("DeepInfra");
+      for (const key of ["legal.providers.locationPerplexity", "legal.providers.retentionPerplexity"]) expect(catalog[key], `${locale} ${key}`).toContain("Perplexity");
       expect(catalog["legal.providers.retentionAnthropic"], locale).toMatch(/30[^0-9][\s\S]*7[^0-9]|30[^0-9][\s\S]*7$/);
       expect(catalog["legal.providers.retentionGoogle"], locale).toContain("55");
       if (locale !== "en") {
         // Facts other than the brand names are translated, not copied from English.
         expect(catalog["legal.providers.retentionGoogle"], locale).not.toBe(en["legal.providers.retentionGoogle"]);
+        for (const key of NEW_KEYS.slice(-5)) expect(catalog[key], `${locale} ${key}`).not.toBe(en[key]);
       }
       // Addition D24: the models label is gone from every catalogue (nothing reads it any more).
       expect(Object.keys(catalog).filter((key) => key === "legal.providers.colModels"), locale).toEqual([]);
@@ -376,23 +394,32 @@ describe("Perplexity, the models' web search provider, is always listed (owner, 
     }
   });
 
-  it("names the company and the search job, and keeps every unchecked contract fact bracketed", () => {
+  it("names the company and the search job, with the facts its API terms give, checked and dated", () => {
+    // docs/legal/2026-11-16-deepinfra-perplexity-facts.md: no training (API Terms 2.3.3); zero data retention is not the
+    // default and needs a written agreement; transfers under the standard contractual clauses (the addendum).
     expect(PERPLEXITY_PROVIDER).toMatchObject({
       provider: "Perplexity",
       entity: "Perplexity AI, Inc.",
       homeCountryKey: "legal.providers.unitedStates",
       purposes: ["search"],
       purposesConfirmed: true,
-      zeroRetention: "unconfirmed",
-      training: "unconfirmed",
-      checkedOn: null
+      locationKey: "legal.providers.locationPerplexity",
+      retentionKey: "legal.providers.retentionPerplexity",
+      zeroRetention: "no",
+      training: "no",
+      basisKey: "legal.providers.sccBasis",
+      contact: "legal-notices@perplexity.ai",
+      checkedOn: "2026-11-16"
     });
     for (const catalog of [en, ro]) {
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(null)} />);
       const section = html.slice(html.indexOf('id="legal-provider-perplexity"'), html.indexOf('id="legal-provider-support"'));
       expect(section).toContain(">Perplexity</h2>");
       expect(section).toContain(escaped(catalog["legal.providers.purpose.search"]));
-      expect(section).toContain(escaped(catalog["legal.providers.notChecked"]));
+      expect(section).toContain(escaped(catalog["legal.providers.retentionPerplexity"]));
+      expect(section).toContain('href="mailto:legal-notices@perplexity.ai"');
+      expect(section).toContain("2026-11-16");
+      expect(section).not.toContain("[");
     }
   });
 });
