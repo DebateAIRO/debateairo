@@ -81,6 +81,7 @@ const STEPS: ReadonlyArray<readonly [name: string, n1: ForwardStepN1]> = [
   ["0174_public_review_ungrounded_door.sql", "drained"],
   ["0175_statement_ai_read_verdict.sql", "drained"],
   ["0176_moderation_final_outcome.sql", "drained"],
+  ["0177_erased_owner_unlinked.sql", "drained"],
   ["0178_security_fixes_run3.sql", "expand"],
   ["0179_password_reset_notice_due.sql", "expand, outside transaction"],
   ["0180_backup_email_notice_due.sql", "expand, outside transaction"],

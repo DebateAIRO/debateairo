@@ -1117,7 +1117,10 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
       expect(waitType).toBe("Lock");
       await severer.query(`DELETE FROM identity."user" WHERE user_id=$1`, [deleting.userId]);
       await severer.query("COMMIT");
-      await expect(claim).rejects.toThrow(/RUN_OWNERSHIP_OWNER_REF_NOT_ACTIVE/);
+      // The deletion gave the run an owner reference of its own, so the queued claim under the deleted
+      // account's reference is refused as a transfer of an encrypted run, one check before the
+      // "reference no longer active" refusal it met when the run still carried that reference.
+      await expect(claim).rejects.toThrow(/ENCRYPTED_RUN_OWNER_TRANSFER_REQUIRES_REWRAP/);
       await claimant.query("ROLLBACK");
     } finally {
       // Release the blocker first even if an assertion fails while the claim is pending.
@@ -1295,7 +1298,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
     expect(createdRunId).not.toBeNull();
   }, 60_000);
 
-  it("severs the identity mapping without changing immutable ownership history or retaining raw identity data", async () => {
+  it("severs the identity mapping: ownership history keeps all but the owner reference, each run gets its own, and no raw identity data stays", async () => {
     const auditHead = await database.pool.query<{ this_hash: Buffer }>(
       `SELECT parent.this_hash
        FROM identity.audit_event AS parent
@@ -1364,7 +1367,18 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
        ORDER BY event.at_seq`,
       [owned.runId, priorOwned.runId]
     );
-    expect(after.rows).toEqual(before.rows);
+    // Deleting the account replaces its owner reference on each run with a reference made for that run.
+    // Nothing else in the ownership history changes.
+    type OwnershipRow = { owner_ref: string } & Record<string, unknown>;
+    const withoutOwner = (rows: { payload: unknown }[]) => rows.map((row) => {
+      const { owner_ref: _ownerRef, ...rest } = row.payload as OwnershipRow;
+      return rest;
+    });
+    expect(withoutOwner(after.rows)).toEqual(withoutOwner(before.rows));
+    const ownersAfter = after.rows.map((row) => (row.payload as OwnershipRow).owner_ref);
+    expect(ownersAfter).toHaveLength(2);
+    expect(new Set(ownersAfter).size).toBe(2);
+    expect(ownersAfter).not.toContain(owner.ownerRef);
     const auditAfter = await database.pool.query<{ payload: unknown }>(
       `SELECT to_jsonb(event.*) AS payload FROM identity.audit_event AS event
        ORDER BY event.occurred_at,event.audit_id`
@@ -1393,7 +1407,7 @@ describe("S7 real PostgreSQL ownership and IDOR boundary", () => {
        ) AS immutable_rows`
     );
     const payload = immutable.rows[0]!.payload;
-    for (const forbidden of [owner.userId, owner.email, owner.pseudonym, owner.blindHex]) {
+    for (const forbidden of [owner.userId, owner.email, owner.pseudonym, owner.blindHex, owner.ownerRef]) {
       expect(payload).not.toContain(forbidden);
     }
     const deniedAfterErasure = await api.inject({

@@ -671,7 +671,7 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // erasure_reconcile attestation's comment names the security fixes' step by its number after the V4 line's steps (0178).
 // migrate() is the run-3 one (the migration lock tried every 50 ms; its slice, sha256 ceb877cc96cb…, as on the run-3
 // branch): the V4 line left migrate() as it was.
-const NATIVE_MIGRATE_MODULE_SHA256 = "289cee04cb41bcbf507dcd131a85d5f26d0cc4ae9ca23506eee3850d8abd1fb9";
+const NATIVE_MIGRATE_MODULE_SHA256 = "d734130fe784219cdebf4119771d108bf48827126731cbc1a8ee9fabc981c556";
 // Side-by-side releases A6 (2026-10-22, spec 2026-10-21 §5): the reviewed per-step transaction module, with its own
 // ordered controls (BEGIN, the step's 2 s lock wait, COMMIT, ROLLBACK and the rethrow after it, then the one retried
 // SQLSTATE). A6 review (2026-10-22): its doc gained one sentence (a step holds its locks until COMMIT; 2 s bounds each

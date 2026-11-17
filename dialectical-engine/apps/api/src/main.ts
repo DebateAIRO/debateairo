@@ -1324,7 +1324,6 @@ const publicationKeyCustody = publicationCipher === undefined || !publicationCus
       {
         readUpdates: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).readPageUpdates(publicationRef),
         readReports: (publicationRef) => new PostgresPublicPageRepository(pool).readReports(publicationRef),
-        authorNameGone: (publicationRef) => new PostgresPublicDebateRunnerRepository(pool).isAuthorNameGone(publicationRef),
         readOverlay: (publicationRef) => new PostgresPublicReviewRepository(pool).readOverlay(publicationRef),
         isHeld: (publicationRef) => new PostgresPublicReviewRepository(pool).isHeld(publicationRef)
       },

@@ -125,6 +125,10 @@ hidden, not removed from what is stored. The texts say it "is removed everywhere
 without it at erasure, or the texts say "is no longer shown". The first is the one that makes the text that stays
 anonymous in the sense Quebec's law asks for; see the re-identification analysis.
 
+Since 17 November 2026 the first holds, in a simpler form: the pseudonym is never written into the stored copy, and
+the page reads it from the account, so it goes when the account goes. A copy stored before that change still has it
+inside; the re-identification analysis, open point 1, says what closes that.
+
 ### The words on the pages
 
 - `newDebate.freePublicNotice` says "On the Free plan your question and its debate are public. Don't include personal

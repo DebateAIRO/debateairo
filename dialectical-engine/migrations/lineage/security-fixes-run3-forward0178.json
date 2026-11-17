@@ -2,13 +2,13 @@
   "version": "security-fixes-run3-forward0178-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0176_moderation_final_outcome.sql",
-    "manifestSha256": "68118d4764ff1cd10bc650678240b8bca6c7aa5959d259ad6716077f23fe5236",
+    "name": "0177_erased_owner_unlinked.sql",
+    "manifestSha256": "7f9e79e415afe541437aaee7119548510d089ab1fdffd3d1f8a8184836cc102f",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
     "name": "0178_security_fixes_run3.sql",
-    "sha256": "9491a05c2da7be85b85c510cf94dd57ef05deff5333daae985c409fb4d082d4d"
+    "sha256": "5451a7797f6b855b10cc29858e67d0913d85764f6707896230dd8771ceabc58b"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   EdgeSchema,
   NodeSchema,
-  PublicDebateSchema,
   type Answer,
   type Node,
   type PublicDebate
@@ -11,6 +10,7 @@ import {
 import type { PublicationCipher } from "@debateai/crypto";
 import type { PostgresPublicationRepository } from "@debateai/db";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { publicDebateOfStoredCopy } from "../../apps/api/src/public-tree.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 
 const FORBIDDEN_IDENTITY_CARRIERS = Object.freeze([
@@ -202,7 +202,10 @@ async function publishThroughProduct(answer: Answer): Promise<PublicDebate> {
   const cipher = {
     create: async () => ({
       encrypt(candidate: unknown) {
-        projectedDebates.push(PublicDebateSchema.parse(candidate));
+        // What is sealed holds no author name; it is read here as the page reads it, with the account's.
+        const read = publicDebateOfStoredCopy(candidate, "Stable Public Name");
+        if (!read.success) throw read.error;
+        projectedDebates.push(read.data);
         return {};
       },
       close() {}

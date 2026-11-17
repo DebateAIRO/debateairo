@@ -204,6 +204,11 @@ export type PublicSnapshotRecord = Readonly<{
   runId: string;
   contentCiphertext: CryptoEnvelope;
   createdAt: Date;
+  /**
+   * The first author's pseudonym, read from their account at this read; null once the account is gone. The stored copy
+   * never holds it, so erasing the account is what removes the name: nothing is left to rewrite.
+   */
+  authorPseudonym: string | null;
 }>;
 
 export type PublicationKeyProvisionCleanup = Readonly<{
@@ -620,14 +625,23 @@ export class PostgresPublicationRepository {
     executor: Pick<PoolClient, "query"> = this.pool
   ): Promise<PublicSnapshotRecord | null> {
     return crossAccount("X10", async () => {
+      // The author is the account of the debate's latest ownership record, the rule the publish transition checks.
       const result = await executor.query<{
         publication_ref: string;
         run_id: string;
         content_ciphertext: CryptoEnvelope;
         created_at: Date;
+        author_pseudonym: string | null;
       }>(`
         SELECT snapshot.publication_ref,snapshot.run_id,
-          snapshot.content_ciphertext,snapshot.created_at
+          snapshot.content_ciphertext,snapshot.created_at,
+          (SELECT identity_user.pseudonym
+           FROM identity."user" AS identity_user
+           WHERE identity_user.owner_ref=(
+             SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
+             WHERE ownership.run_id=snapshot.run_id
+             ORDER BY ownership.at_seq DESC LIMIT 1
+           )) AS author_pseudonym
         FROM serve.publication_snapshot AS snapshot
         WHERE snapshot.publication_ref=$1
           AND core.run_is_published(snapshot.run_id,snapshot.publication_ref)
@@ -637,7 +651,8 @@ export class PostgresPublicationRepository {
         publicationRef: row.publication_ref,
         runId: row.run_id,
         contentCiphertext: row.content_ciphertext,
-        createdAt: row.created_at
+        createdAt: row.created_at,
+        authorPseudonym: row.author_pseudonym
       });
     });
   }

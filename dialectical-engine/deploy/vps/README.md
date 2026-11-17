@@ -1826,7 +1826,7 @@ writes the new kind or the two columns, and its export still calls 0115's `ident
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
-This release adds five migrations after `0176_moderation_final_outcome.sql`, all `n1: expand`, so §5's migration step
+This release adds five migrations after `0177_erased_owner_unlinked.sql`, all `n1: expand`, so §5's migration step
 applies them while the older release keeps serving: `migrations/0178_security_fixes_run3.sql` (the run's new functions,
 one section per issue) and four index steps: `0179_password_reset_notice_due.sql`, `0180_backup_email_notice_due.sql`
 and `0181_mfa_recovery_notice_due.sql`, the pending-only due indexes of the three recovery mail outboxes (NV-38), and

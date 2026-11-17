@@ -37,7 +37,7 @@ import { NO_MAP_VIEWS, answerNodeIds, type MapViewReader } from "./map-views.js"
 import { TypedDomainError } from "@debateai/kernel";
 import type { AuthenticatedSession } from "./sessions.js";
 import { MadeByNewerReleaseError, madeByNewerRelease } from "./made-by-newer-release.js";
-import { mergedPublicDebate, type PublicReviewOverlay } from "./public-tree.js";
+import { mergedPublicDebate, publicDebateOfStoredCopy, storedPublicCopyOf, type PublicReviewOverlay } from "./public-tree.js";
 import { questionWithPurposeLines } from "./purpose-lines.js";
 import type { PublicationContentCheck } from "./publication-check/check.js";
 type LabeledNumber = Node["base_score"];
@@ -418,7 +418,6 @@ export type PublicationPublishResult =
 export type PublicPageReader = Readonly<{
   readUpdates(publicationRef: string): Promise<readonly PublicPageUpdateRead[]>;
   readReports(publicationRef: string): Promise<readonly PublicReportCopyRead[]>;
-  authorNameGone(publicationRef: string): Promise<boolean>;
   /** Decision 33: what the review changed. Null: not public now. */
   readOverlay?(publicationRef: string): Promise<PublicReviewOverlay | null>;
   isHeld?(publicationRef: string): Promise<boolean>;
@@ -560,7 +559,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       if (prepared.outcome !== "PREPARED" || prepared.grantTokenHash === null) return "NOT_WAITING";
       const cipher = await this.cipher.create(staged.publicationRef, input.runId);
       try {
-        const content = cipher.encrypt(staged.publicDebate);
+        const content = cipher.encrypt(storedPublicCopyOf(staged.publicDebate));
         const published = await input.store.publish({ runId: input.runId, publicationRef: staged.publicationRef, grantTokenHash: prepared.grantTokenHash, content, presentedAt: staged.occurredAt });
         if (published !== "PUBLISHED") await this.cipher.destroy(staged.publicationRef).catch(() => undefined);
         return published === "PUBLISHED" ? "PUBLISHED" : "NOT_WAITING";
@@ -611,10 +610,10 @@ export class PostgresPublicationApplication implements PublicationApplication {
     const reviewed = overlay.changed || overlay.corrections.length > 0;
     let prepared: Awaited<ReturnType<PublicationCipher["open"]>> | undefined;
     try {
-      const [updates, reports, authorNameGone] = await Promise.all([this.publicPage.readUpdates(publicationRef), this.publicPage.readReports(publicationRef), this.publicPage.authorNameGone(publicationRef)]);
+      const [updates, reports] = await Promise.all([this.publicPage.readUpdates(publicationRef), this.publicPage.readReports(publicationRef)]);
       prepared = await this.cipher.open(publicationRef, runId);
       const opener = prepared;
-      return mergedPublicDebate(snapshot, { updates, reports, authorNameGone, overlay, open: (envelope) => opener.decrypt(envelope) });
+      return mergedPublicDebate(snapshot, { updates, reports, overlay, open: (envelope) => opener.decrypt(envelope) });
     } catch (error) {
       console.error(JSON.stringify({ event: "api.publication.page_copies_unread", id: publicationRef, diagnostic: storyReadDiagnostic(error) }));
       if (reviewed) return null;
@@ -799,7 +798,8 @@ export class PostgresPublicationApplication implements PublicationApplication {
     }
     let transitionAttempted = false;
     try {
-      const contentCiphertext = prepared.encrypt(publicDebate);
+      // The stored copy holds no author name: the page reads it from the account, so erasing the account removes it.
+      const contentCiphertext = prepared.encrypt(storedPublicCopyOf(publicDebate));
       prepared.close();
       transitionAttempted = true;
       const published = await this.repository.publish({
@@ -927,7 +927,7 @@ export class PostgresPublicationApplication implements PublicationApplication {
       } finally {
         prepared?.close();
       }
-      const publicDebate = PublicDebateSchema.safeParse(decrypted);
+      const publicDebate = publicDebateOfStoredCopy(decrypted, snapshot.authorPseudonym);
       if (publicDebate.success) return this.#withPage(publicDebate.data, publicationRef, snapshot.runId);
       const releaseKey = await this.#runReleaseKey(snapshot.runId);
       if (releaseKey !== null && this.releases !== null && madeByNewerRelease(releaseKey, this.releases.ownReleaseKey)) {

@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
 /**
- * The security fixes of audit run 3 as one chain step after 0176, the last step of the V4 line (migrations/lineage/README.md):
+ * The security fixes of audit run 3 as one chain step after 0177, an erased account's owner reference leaving its debates (migrations/lineage/README.md):
  * one SQL file in sections, one per issue, each opened by `-- ==== [<issue id>] <short title> ====`. An `expand` step:
  * every section adds new objects and alters, replaces and revokes nothing older, except a statement its SQL marks with a
  * `-- n1: reviewed <reason>` line (NV-13 re-creates 0101's two origin constraint triggers on a new function, a binding no
@@ -19,7 +19,7 @@ const NAME='0178_security_fixes_run3.sql';
 const VERSION='security-fixes-run3-forward0178-v1';
 const MANIFEST_PATH='lineage/security-fixes-run3-forward0178.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-130.sql'; // README step 3: 0178 adds no billing relation or billing function, so it names the verifier in force (0130's, which 0131 to 0182 keep)
-const PREVIOUS='0176_moderation_final_outcome.sql';
+const PREVIOUS='0177_erased_owner_unlinked.sql';
 /**
  * Each section's objects, in the SQL file's section order (the loader refuses MIGRATION_FORWARD0178_SECTIONS when the
  * file's `-- ==== [<id>]` headers and this list disagree). A function is digested whole (owner, definer, path,
