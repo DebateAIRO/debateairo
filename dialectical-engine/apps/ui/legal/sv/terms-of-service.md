@@ -223,7 +223,7 @@ Dialectical Engine erbjuder ett kostnadsfritt abonnemang. Tre avgiftsbelagda abo
 
 **Misslyckade betalningar.** Om en betalning misslyckas försöker vi igen under 7 dagar och varnar dig via e-post innan vi nedgraderar ditt konto till det kostnadsfria abonnemanget. Vi raderar inte dina debatter på grund av en misslyckad betalning.
 
-**Skatter och vem du betalar till.** Våra priser visas exklusive skatt, som pris + moms (eller GST eller omsättningsskatt, beroende på var du bor). Skatten för din faktureringsadress läggs till i kassan, och kassan visar det totalbelopp du betalar, inklusive skatt, innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
+**Skatter och vem du betalar till.** Priserna inkluderar moms, GST eller omsättningsskatt, vilket beror på var du bor och visas innan du betalar. Säljaren är DMS Merchandise Shop S.R.L., som utfärdar din faktura och förblir ansvarig för tjänsten i sig och för dessa villkor.
 
 **Betalningssätt.** Du betalar med kort. Vi tar emot Visa och Mastercard; vi tar inte emot American Express. Kortbetalningar hanteras av NETOPIA Payments (netopia-payments.com), och ditt fullständiga kortnummer når aldrig fram till oss.
 

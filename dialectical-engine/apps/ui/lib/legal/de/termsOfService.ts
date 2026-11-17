@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Kündigung. Sie können jederzeit unter Einstellungen → Abonnement mit einem Bestätigungsklick oder über die Kündigungsseite unter dezbatere.ro/cancel, für die keine Anmeldung erforderlich ist, kündigen. Die Kündigung wird zum Ende des laufenden Abrechnungszeitraums wirksam; bis dahin behalten Sie den Zugang. Wir werden die Kündigung nicht schwieriger gestalten als den Abschluss des Abonnements." },
       { kind: "p", text: "Preisänderungen werden nur bei einer Verlängerung wirksam. Wir informieren Sie mindestens 30 Tage im Voraus per E-Mail über den neuen Preis und fügen einen Kündigungslink bei. Soweit das Recht Ihres Landes Ihre ausdrückliche Zustimmung zu einer Preisänderung verlangt, holen wir diese ein; andernfalls gilt der neue Preis ab der nächsten Verlängerung, wenn Sie nichts unternehmen. Anhang A weist auf regionale Vorschriften hin." },
       { kind: "p", text: "Fehlgeschlagene Zahlungen. Wenn eine Zahlung fehlschlägt, versuchen wir sie 7 Tage lang erneut und warnen Sie per E-Mail, bevor wir Ihr Konto auf den kostenlosen Tarif herabstufen. Wir löschen Ihre Debatten nicht wegen einer fehlgeschlagenen Zahlung." },
-      { kind: "p", text: "Steuern und Zahlungsempfänger. Unsere Preise werden ohne Steuern angezeigt, als Preis + MwSt. (oder GST oder Umsatzsteuer, je nach Ihrem Wohnort). Die Steuer für Ihre Rechnungsadresse wird beim Bezahlvorgang aufgeschlagen, und vor der Zahlung zeigt Ihnen der Bezahlvorgang den Gesamtbetrag, den Sie zahlen, einschließlich Steuern. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt." },
+      { kind: "p", text: "Steuern und Zahlungsempfänger. Die Preise enthalten Mehrwertsteuer, GST oder Umsatzsteuer; dies hängt von Ihrem Wohnort ab und wird vor der Zahlung angezeigt. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt." },
       { kind: "p", text: "Zahlungsarten. Sie bezahlen per Karte. Wir akzeptieren Visa und Mastercard; American Express akzeptieren wir nicht. Kartenzahlungen werden von NETOPIA Payments (netopia-payments.com) abgewickelt, und Ihre vollständige Kartennummer erreicht uns nie." },
       { kind: "p", text: "Lieferung. Dialectical Engine ist ein Online-Dienst; Ihnen wird also nichts zugesandt. Die Funktionen Ihres kostenpflichtigen Tarifs stehen in Ihrem Konto zur Verfügung, sobald Ihre Zahlung bestätigt ist." },
       { kind: "p", text: "Rückbuchungen. Wenn Sie eine Belastung bei Ihrem Kartenaussteller beanstanden, können wir kostenpflichtige Funktionen aussetzen, solange die Streitigkeit geklärt wird. Hierfür erheben wir keine Gebühren." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "93d8d825ae9ba9988716d04ec4d39324cbb094a90567ff8859622942b32f4ea2",
+  sha256: "2b0838accdfcfb48c0fa3a79421e2282c1a38b2ba120cdf97d7dee6956321ecf",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.18 · GÜLTIG AB 1. NOVEMBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",

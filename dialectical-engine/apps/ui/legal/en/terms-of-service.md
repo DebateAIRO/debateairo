@@ -223,7 +223,7 @@ Dialectical Engine offers a free plan. Three paid plans, **Plus**, **Pro** and *
 
 **Failed payments.** If a payment fails we retry for 7 days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed.
 
-**Taxes, and who you pay.** Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live). The tax for your billing address is added at checkout, and the checkout shows the total you pay, tax included, before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
+**Taxes, and who you pay.** Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms.
 
 **Payment methods.** You pay by card. We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments (netopia-payments.com), and your full card number never reaches us.
 

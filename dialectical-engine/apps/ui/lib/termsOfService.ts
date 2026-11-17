@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Cancelling. Cancel at any time from Settings → Subscription with one confirmation click, or through the cancellation page at dezbatere.ro/cancel, which does not require you to log in. Cancellation takes effect at the end of the current billing period, and you keep access until then. We will not make cancelling harder than subscribing was." },
       { kind: "p", text: "Price changes take effect only at a renewal. We give at least 30 days' notice by email with the new price and a cancellation link. Where the law of your country requires your express consent to a price change, we ask for it; otherwise, if you do nothing, the new price applies from the next renewal. Annex A notes regional rules." },
       { kind: "p", text: "Failed payments. If a payment fails we retry for 7 days and warn you by email before downgrading your account to the free plan. We do not delete your debates because a payment failed." },
-      { kind: "p", text: "Taxes, and who you pay. Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live). The tax for your billing address is added at checkout, and the checkout shows the total you pay, tax included, before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms." },
+      { kind: "p", text: "Taxes, and who you pay. Prices include VAT, GST or sales tax, which depends on where you live and is shown before you pay. The seller is DMS Merchandise Shop S.R.L., which issues your invoice and remains responsible for the service itself and for these Terms." },
       { kind: "p", text: "Payment methods. You pay by card. We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments (netopia-payments.com), and your full card number never reaches us." },
       { kind: "p", text: "Delivery. Dialectical Engine is an online service, so nothing is shipped to you. The features of your paid plan are available in your account as soon as your payment is confirmed." },
       { kind: "p", text: "Chargebacks. If you dispute a charge with your card issuer, we may suspend paid features while the dispute is resolved. We do not charge fees for this." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "1b88f26328329180d338031b12d772fd9ed15be3a8b452445a3f2c43c9291ed6",
+  sha256: "0f9d487ed54fe64c8ecd98b6bd764f0b8ad1557ffa6f5fe933ac394f39c0ccfd",
   eyebrow: "TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",
