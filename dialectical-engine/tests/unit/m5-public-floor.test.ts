@@ -10,6 +10,7 @@ import {
 } from "../../packages/crypto/src/index.js";
 import type { PostgresPublicationRepository } from "@debateai/db";
 import { PostgresPublicationApplication } from "../../apps/api/src/publications.js";
+import { publicDebateOfStoredCopy } from "../../apps/api/src/public-tree.js";
 import type { AuthenticatedSession } from "../../apps/api/src/sessions.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import { STORY_TEST_ANSWER_ID } from "../support/storyApiFixtures.js";
@@ -106,7 +107,10 @@ async function publishWith(answer: Answer, readAnswerFloor: FloorReader) {
   if (snapshot === null) throw new TypeError("FLOOR_TEST_SNAPSHOT_MISSING");
   const prepared = await cipher.open(snapshot.publicationRef, snapshot.runId);
   try {
-    return PublicDebateSchema.parse(prepared.decrypt(snapshot.contentCiphertext));
+    // The stored copy holds no author name; it is read as the page reads it, with the account's.
+    const read = publicDebateOfStoredCopy(prepared.decrypt(snapshot.contentCiphertext), "Stable Public Name");
+    if (!read.success) throw read.error;
+    return read.data;
   } finally {
     prepared.close();
   }

@@ -143,7 +143,8 @@ describe("P1a — billing tables are append-only and guarded", () => {
       FROM pg_catalog.pg_trigger AS trigger
       WHERE NOT trigger.tgisinternal AND trigger.tgenabled IN ('O','A')
         AND trigger.tgfoid = ANY(ARRAY['core.reject_truncate()'::regprocedure,
-          'billing.reject_mutation_unless_retention_purge()'::regprocedure])
+          'billing.reject_mutation_unless_retention_purge()'::regprocedure,
+          'billing.reject_charge_scope_mutation()'::regprocedure])
         AND trigger.tgrelid::regclass::text LIKE 'billing.%'
       GROUP BY trigger.tgrelid
     `)).rows;
@@ -151,6 +152,14 @@ describe("P1a — billing tables are append-only and guarded", () => {
     for (const relation of [...APPEND_ONLY, ...ENTITLEMENT_TABLES]) {
       expect(byRelation.get(relation), relation).toEqual(["reject_mutation", "reject_truncate"]);
     }
+    // One table has a mutation guard of its own: the usage row of a debate, whose owner reference
+    // is replaced when its account is erased. No other billing table uses that guard.
+    const ownGuard = (await database.pool.query<{ relation: string }>(`
+      SELECT trigger.tgrelid::regclass::text AS relation FROM pg_catalog.pg_trigger AS trigger
+      WHERE NOT trigger.tgisinternal
+        AND trigger.tgfoid = 'billing.reject_charge_scope_mutation()'::regprocedure
+    `)).rows;
+    expect(ownGuard).toEqual([{ relation: "billing.run_charge_scope" }]);
     expect(byRelation.get("billing.outbox")).toEqual(["reject_delete", "reject_truncate"]);
   });
 

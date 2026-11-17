@@ -367,7 +367,6 @@ export async function startR22World(options: R22WorldOptions = {}) {
     new PostgresPublicationRepository(apiPoolOf("publicationCleanup"), hasher), new RepositoryPublicationStoryReader(storyRepository), mapViews, { ownReleaseKey: environment.RELEASE_KEY, readRunReleaseKey: (runId) => application.readRunReleaseKey(runId) }, {
       readUpdates: (ref) => new PostgresPublicDebateRunnerRepository(apiPool).readPageUpdates(ref),
       readReports: (ref) => new PostgresPublicPageRepository(apiPool).readReports(ref),
-      authorNameGone: (ref) => new PostgresPublicDebateRunnerRepository(apiPool).isAuthorNameGone(ref),
       readOverlay: (ref) => new PostgresPublicReviewRepository(apiPool).readOverlay(ref),
       isHeld: (ref) => new PostgresPublicReviewRepository(apiPool).isHeld(ref)
     });
