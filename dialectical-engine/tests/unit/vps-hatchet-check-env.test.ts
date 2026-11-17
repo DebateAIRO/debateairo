@@ -73,7 +73,7 @@ describe("NV-51 deploy/vps/hatchet-check-env.mjs: the text", () => {
     ["a password followed by ' #x'", text(DB, GOOD_PAIR[0], `ADMIN_PASSWORD=${PASSWORD} #x`), "HATCHET_ENV_ADMIN_LINE_UNSAFE"],
     ["the good pair, then a YAML-style ADMIN_PASSWORD: x", text(DB, ...GOOD_PAIR, "ADMIN_PASSWORD: x"), "HATCHET_ENV_ADMIN_LINE_UNSAFE"],
     ["# ADMIN_PASSWORD=x beside a good pair", beside("# ADMIN_PASSWORD=x"), null],
-    ["a CR in the text", text(DB, ...GOOD_PAIR).replace("\n", "\r\n"), "HATCHET_ENV_TEXT_INVALID"],
+    ["a CR in the text", text(DB, ...GOOD_PAIR).replaceAll("\n", "\r\n"), "HATCHET_ENV_TEXT_INVALID"],
     ["a quote opened on one line and closed below the pair", text(DB, 'X="', ...GOOD_PAIR, '"'), "HATCHET_ENV_TEXT_INVALID"],
     ["a quote opened after a : key end", text(DB, 'X: "', ...GOOD_PAIR, '"'), "HATCHET_ENV_TEXT_INVALID"],
     ["a quote opened under a digit-led key", text(DB, '1X="', ...GOOD_PAIR, '"'), "HATCHET_ENV_TEXT_INVALID"],
