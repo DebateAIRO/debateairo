@@ -69,6 +69,24 @@ describe("the report model's charts", () => {
     expect(model.charts.map((chart) => chart.after)).toEqual(["long.2.1"]);
   });
 
+  // Chart relevance (2026-11-16): a story stored before the plan's check learned the rule may still hold such a chart.
+  it("leaves out a stored strength chart of a point: the report charts a strength for its positions only", () => {
+    const story = storyFixtureWithCharts("READY");
+    const charts = structuredClone(story.charts!);
+    // n-yes-pay supports n-yes: the list of points prints it as a point under that position.
+    charts[0]!.items[1]!.node_ref = "n-yes-pay";
+    const model = buildReportModel(STORY_FIXTURE_ANSWER, { ...story, charts }, GENERATED, ROMANIAN, null);
+    expect(model.charts.map((chart) => chart.after)).toEqual(["long.3.2"]);
+  });
+
+  it("leaves out a stored strength chart that shows one position twice", () => {
+    const story = storyFixtureWithCharts("READY");
+    const charts = structuredClone(story.charts!);
+    charts[0]!.items[1]!.node_ref = charts[0]!.items[0]!.node_ref;
+    const model = buildReportModel(STORY_FIXTURE_ANSWER, { ...story, charts }, GENERATED, ROMANIAN, null);
+    expect(model.charts.map((chart) => chart.after)).toEqual(["long.3.2"]);
+  });
+
   it("the scatter sample plots cost against score, both as the claims state them", () => {
     const model = buildReportModel(STORY_CHARTS_SAMPLE_ANSWER, storyChartsSample(), GENERATED, ENGLISH, null);
     const scatter = model.charts.find((chart) => chart.kind === "scatter")!;

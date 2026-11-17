@@ -358,6 +358,14 @@ const CHANGE_LOG = 260;
  * translations still have it until they are brought up to date before release (English first).
  */
 const FLAGGED = 119;
+/**
+ * A public debate stays public after its author closes the account, and English says on what basis: section 4's
+ * publishing row names the basis before and after closure, section 6's paragraph on the name says why the text stays
+ * and that a person can object, and section 10's Objection row says the objection covers it. English only until the
+ * translations are brought up to date before release; legal-public-debate-stays-public pins the wording.
+ * (The last two sit after section 5's DeepInfra paragraph, so they moved by two with it.)
+ */
+const KEPT_AFTER_CLOSURE = [85, 129, 200];
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /**
  * Annex B.6's paragraph (Asia-Pacific; Annex B.7 until Switzerland's part left, see withoutSwitzerland). Taiwan is
@@ -565,7 +573,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     expect(next, `${code}: the line count is 3.11's, the two new rows, and the new paragraph with its blank line`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED] : [])].sort((a, b) => a - b));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE] : [])].sort((a, b) => a - b));
     // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
     const quebecBefore = prior[priorIndex(QUEBEC)]!;
     const quebecAfter = next[QUEBEC]!;
