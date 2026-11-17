@@ -127,6 +127,7 @@ apps/api/src/email-mfa-recovery.ts
 apps/api/src/email-mfa-risk.ts
 apps/api/src/email-mfa-routes.ts
 apps/api/src/engine-ask.ts
+apps/api/src/erasure-reconcile-chain.ts
 apps/api/src/graceful-shutdown.ts
 apps/api/src/index.ts
 apps/api/src/investigation-report.ts
@@ -188,10 +189,13 @@ apps/api/src/recovery.ts
 apps/api/src/registration.ts
 apps/api/src/release-loops.ts
 apps/api/src/release-state.ts
+apps/api/src/restore-fence.ts
 apps/api/src/retention-purge.ts
 apps/api/src/risk-signal-identity.ts
 apps/api/src/run-continue.ts
+apps/api/src/run-event-streams.ts
 apps/api/src/run-event-tail.ts
+apps/api/src/run-key-store-report.ts
 apps/api/src/saved-questions/routes.ts
 apps/api/src/saved-questions/service.ts
 apps/api/src/saved-questions/store.ts
@@ -261,6 +265,7 @@ apps/api/src/synthesis-check/transport.ts
 apps/api/src/synthesis-check/verdict.ts
 apps/api/src/synthesis-check/worker.ts
 apps/api/src/turnstile.ts
+apps/api/src/ui-api-proof.ts
 apps/api/src/verification-email.ts
 apps/api/src/web-researched.ts
 apps/evaluator-worker/src/index.ts
@@ -377,6 +382,7 @@ apps/replay/src/index.ts
 apps/runner/src/answer-checker-sources.ts
 apps/runner/src/call-lane-gateway.ts
 apps/runner/src/call-scheduler.ts
+apps/runner/src/cost-readout-cli.ts
 apps/runner/src/debate-shape-boot.ts
 apps/runner/src/dev-api-environment-cli.ts
 apps/runner/src/dev-api-environment.ts
@@ -962,6 +968,7 @@ apps/ui/lib/report/reportLayout.ts
 apps/ui/lib/report/reportLineBreaks.ts
 apps/ui/lib/report/reportModel.ts
 apps/ui/lib/report/reportRenderGate.ts
+apps/ui/lib/report/reportRenderWorker.ts
 apps/ui/lib/report/reportRoute.ts
 apps/ui/lib/report/reportTables.ts
 apps/ui/lib/returnPath.ts
@@ -1095,6 +1102,7 @@ apps/ui/next-env.d.ts
 apps/ui/next.config.mjs
 apps/ui/release-edge.d.mts
 apps/ui/release-edge.mjs
+apps/ui/report-worker.mjs
 apps/ui/scripts/assert-production-auth-routes.mjs
 apps/ui/scripts/generate-legal-data.d.mts
 apps/ui/scripts/generate-legal-data.mjs
@@ -1130,6 +1138,7 @@ packages/billing-core/src/upgrade-credit.ts
 packages/billing-core/src/windows.ts
 packages/billing-core/src/withdrawal-deadline.ts
 packages/budget/src/cost-envelope.ts
+packages/budget/src/cost-readout.ts
 packages/budget/src/estimate.ts
 packages/budget/src/index.ts
 packages/budget/src/model-spend.ts
@@ -1243,6 +1252,7 @@ packages/db/src/map-roots.ts
 packages/db/src/migration-ahead.ts
 packages/db/src/migration-forward-auth-db-batch.ts
 packages/db/src/migration-forward-chain.ts
+packages/db/src/migration-forward-concurrent-index.ts
 packages/db/src/migration-forward0113.ts
 packages/db/src/migration-forward0114.ts
 packages/db/src/migration-forward0116.ts
@@ -1306,6 +1316,12 @@ packages/db/src/migration-forward0173.ts
 packages/db/src/migration-forward0174.ts
 packages/db/src/migration-forward0175.ts
 packages/db/src/migration-forward0176.ts
+packages/db/src/migration-forward0177.ts
+packages/db/src/migration-forward0178.ts
+packages/db/src/migration-forward0179.ts
+packages/db/src/migration-forward0180.ts
+packages/db/src/migration-forward0181.ts
+packages/db/src/migration-forward0182.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1336,6 +1352,7 @@ packages/db/src/recovery-candidate.ts
 packages/db/src/recovery-email.ts
 packages/db/src/recovery.ts
 packages/db/src/release-state.ts
+packages/db/src/restore-fence.ts
 packages/db/src/run-cost-substitution.ts
 packages/db/src/run-supersession.ts
 packages/db/src/run-wait.ts

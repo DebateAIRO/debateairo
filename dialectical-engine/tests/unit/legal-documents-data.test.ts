@@ -300,11 +300,91 @@ describe("legal documents — generated data", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
         "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, will be available; each unlocks the full model roster and lets you set the debate gauges yourself."
       );
-      expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's usage, however many days have passed"))).toBe(true);
+      expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's credit, however many days have passed"))).toBe(true);
+    });
+
+    it("gives everyone the 14-day withdrawal in section 13, refunded by the plan's credit not used (owner's decision of 16 November 2026)", () => {
+      // One rule for everyone, the EU included: the refund is the price paid times the share of the plan's credit
+      // not used. Days elapsed do not count: nothing used gives the full price back.
+      expect(texts(section(TERMS_OF_SERVICE, "13"))).toEqual([
+        "Wherever you live, you may withdraw from a paid subscription within 14 days of subscribing, without giving a reason."
+          + " Use the Withdraw from contract page at dezbatere.ro/withdraw, the model form in the confirmation email,"
+          + " or write to support@dezbatere.ro; we confirm receipt on a durable medium.",
+        "If you asked us to start the service immediately — by ticking the box at checkout — and then withdraw,"
+          + " you pay only for the share of the plan's credit you have used by then, however many days have passed,"
+          + " and we refund the rest of the price: if you have used 30% of the credit, we refund 70% of the price;"
+          + " if you have used none of it, we refund the full price."
+          + " You do not lose the right of withdrawal by using the service during the 14 days.",
+        "Annex A states any further withdrawal or cooling-off right that the law of your region gives you."
+          + " Statutory rights in your country always come first."
+      ]);
+      // The earlier text kept the right for the EU and the EEA and charged the days share, pro rata.
+      const withdrawal = texts(section(TERMS_OF_SERVICE, "13")).join("\n");
+      expect(withdrawal).not.toMatch(/pro[ -]rata|If you live in the EU or the EEA|If you live elsewhere|up to the day you withdraw|our refund policy otherwise/iu);
+      // Section 12 measures a cancellation refund the same way, so it no longer chooses between two refunds.
+      const refunds = texts(section(TERMS_OF_SERVICE, "12")).find((text) => text.startsWith("Statutory rights first."));
+      expect(refunds).toContain("Ask at support@dezbatere.ro; once we refund, the plan ends. A withdrawal under section 13 is refunded by the same measure. Usage limits on every plan");
+      const all = allTexts(TERMS_OF_SERVICE).join("\n");
+      expect(all).not.toContain("whichever refund is larger");
+      expect(all).not.toContain("measured by the plan's usage");
+    });
+
+    it("lets no part of Annex A take the 14-day withdrawal away (owner's decision of 16 November 2026)", () => {
+      const all = allTexts(TERMS_OF_SERVICE).join("\n");
+      for (const retired of ["No cooling-off right applies", "no statutory cooling-off", "no general cooling-off", "within 7 days"]) {
+        expect(all, retired).not.toContain(retired);
+      }
+      const applies = "the 14-day withdrawal right in section 13 applies to the paid plan";
+      // A.4, Australia and New Zealand.
+      expect(texts(section(TERMS_OF_SERVICE, "A.4"))[0]).toContain(
+        "The 14-day withdrawal right in section 13 applies to the paid plan; refund requests are handled at support@dezbatere.ro."
+      );
+      // A.5, Moldova, already named the right.
+      expect(texts(section(TERMS_OF_SERVICE, "A.5"))[0]).toContain("including the 14-day withdrawal right in section 13");
+      // A.6, Asia-Pacific: one paragraph, a part for each country.
+      const asiaPacific = texts(section(TERMS_OF_SERVICE, "A.6"));
+      expect(asiaPacific).toHaveLength(1);
+      const [singapore, japan, southKorea, ...rest] = asiaPacific[0]!.split(/ (?=Japan: |South Korea: )/u);
+      expect(rest).toEqual([]);
+      expect(singapore!.startsWith("Singapore: ")).toBe(true);
+      expect(singapore).toContain(`${applies}, and refund requests are handled at support@dezbatere.ro.`);
+      expect(japan!.startsWith("Japan: ")).toBe(true);
+      expect(japan).toContain(`${applies}, and refund requests are handled at support@dezbatere.ro;`);
+      expect(southKorea!.startsWith("South Korea: ")).toBe(true);
+      expect(southKorea).toContain(
+        "you may withdraw from a paid plan within 14 days of subscribing, as section 13 says, and the E-Commerce Act's withdrawal rules also apply;"
+      );
     });
 
     it("decodes the HTML-entity bracket of a placeholder verbatim", () => {
       expect(inlineText("&#91;x\\]")).toBe("[x]");
+    });
+
+    it("carries the credit example in section 13 and no 7-day window in Annex A.6, in every locale's draft (owner's decision of 16 November 2026)", () => {
+      // No translated wording is read, only figures: the rule in force gives the example "30 % used, 70 % back", which
+      // the text it replaced had in no language, and that text gave South Korea 7 days where every country now has 14.
+      // Every draft writes these figures in Western digits (the Arabic, Hebrew, Hindi, Japanese, Korean and Chinese
+      // ones too), and a figure is read as a whole number, so the sign after it (%, a space of any kind, 日, 일) and a
+      // longer number that holds its digits (17, 2030) play no part. The paragraphs are not counted: a language that
+      // lags the English text keeps its own structure until the release check ("English first",
+      // legal-documents-locale-complete).
+      const locales = readdirSync(resolve(process.cwd(), "apps/ui/legal")).filter((name) => /^[a-z]{2}$/.test(name));
+      expect(locales).toHaveLength(35);
+      const wholeNumbers = (text: string): string[] => text.match(/\d+/gu) ?? [];
+      for (const locale of locales) {
+        const draft = readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, "terms-of-service.md"), "utf8");
+        const withdrawal = /^## 13\.[^\n]*\n([\s\S]*?)^## 14\./mu.exec(draft)?.[1] ?? "";
+        for (const figure of ["14", "30", "70"]) {
+          expect(wholeNumbers(withdrawal), `${locale}: section 13 names ${figure}`).toContain(figure);
+        }
+        // Annex A.6 alone: up to the next heading, or to the end of the draft.
+        const asiaPacific = /^### A\.6[^\n]*\n([\s\S]*?)(?=^#{2,3} |(?![\s\S]))/mu.exec(draft)?.[1] ?? "";
+        expect(
+          wholeNumbers(asiaPacific).filter((figure) => figure === "14"),
+          `${locale}: A.6 names the 14 days for Singapore, Japan and South Korea`
+        ).toHaveLength(3);
+        expect(wholeNumbers(asiaPacific), `${locale}: A.6 keeps a 7-day window`).not.toContain("7");
+      }
     });
 
     it("carries no bracketed drafting note in any locale's current draft", () => {

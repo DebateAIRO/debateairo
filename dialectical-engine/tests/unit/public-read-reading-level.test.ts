@@ -69,7 +69,7 @@ describe("the public read carries the debate's reading level", () => {
 
   it("is served by GET /v1/public/debates/{id} with the page's copies merged in", async () => {
     const snapshot = snapshotOf(await publicBody(async () => "expert"));
-    const merged = mergedPublicDebate(snapshot, { updates: [], reports: [], authorNameGone: false, open: () => null });
+    const merged = mergedPublicDebate(snapshot, { updates: [], reports: [], open: () => null });
     expect(merged.reading_level).toBe("expert");
     const api = buildApi({
       application: {} as AskApplication, sessions: testSessionApplication([IDENTITY]), allowedOrigin: TEST_APP_ORIGIN,

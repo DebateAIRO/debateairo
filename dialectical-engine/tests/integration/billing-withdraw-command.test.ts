@@ -1,11 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
-import {
-  foldSubscription, microsToDecimal, withdrawalRefundMicros, withdrawalRefundPerPaymentMicros
-} from "@debateai/billing-core";
+import { foldSubscription, microsToDecimal } from "@debateai/billing-core";
 import { renderMail } from "@debateai/mail-templates";
-import { planById } from "@debateai/register";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
@@ -132,11 +129,10 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     expect(withdrawalOpenUntil({
       state, taxCountry: "RO", policy: testBillingPolicy, now: receivedAt, paymentEnvironment: "sandbox"
     })).not.toBeNull();
-    const expected = withdrawalRefundMicros({
-      paidTotalMicros: seeded.totalMicros, periodStart: seeded.periodStart, periodEnd: seeded.periodEnd,
-      now: receivedAt, creditSpentMicros: 0, monthlyCreditMicros: planById(testBillingPlans, "PLUS").monthlyCreditMicros
-    });
-    expect(expected).toBeGreaterThan(0);
+    // Owner's decision of 16 November 2026: nothing of the credit was used, so the whole 24.20 goes back, although
+    // the statement arrived on day 12 (the days no longer count).
+    const expected = 24_200_000;
+    expect(seeded.totalMicros).toBe(expected);
     expect(await recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt }))
       .toEqual({ kind: "REFUNDING", refundMicros: expected, currency: "USD" });
     expect((await rows().subscriptionEvents(seeded.subscriptionId)).at(-1)).toMatchObject({
@@ -168,13 +164,22 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     const receivedAt = new Date(now.getTime() - 60_000);
     const recorded = await recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt });
     expect(recorded).toMatchObject({ kind: "REFUNDING" });
+    // Nothing of the credit was used, so the request is the whole payment, 24.20 (owner's decision of 16 November 2026).
     const requestedMicros = (recorded as Readonly<{ refundMicros: number }>).refundMicros;
+    expect(requestedMicros).toBe(24_200_000);
+    expect(requestedMicros).toBe(seeded.totalMicros);
     const partMicros = 2_000_000;
-    expect(requestedMicros).toBeGreaterThan(partMicros);
     const owner = netopiaRefundDesk(database.pool);
     const ref = `${seeded.initialChargeId}:${seeded.providerPaymentId}`;
     const [job] = (await rows().claim(["PAYMENT_REFUND"], 50, "p14c-part", new Date())).filter((claimed) => claimed.ref === ref);
     expect(await owner.handle(job!, new Date())).toEqual({ kind: "DONE" });
+    // While all of it is open, the owner's reminder calls it the whole payment.
+    expect(await owner.remindOwnerRefunds(now)).toBeGreaterThan(0);
+    const [whole] = await emailOf("O2_REFUND_REMINDER", now.toISOString().slice(0, 10));
+    expect(String(whole!.payload["param.refundList"])).toContain(
+      `- charge ${seeded.initialChargeId}, NETOPIA payment ${seeded.providerPaymentId}:`
+        + " refund 24.20 USD (the whole payment), reason WITHDRAWAL"
+    );
     expect(await ownerRefundDone(owner, seeded.initialChargeId, partMicros))
       .toContain(`${microsToDecimal(requestedMicros - partMicros)} USD is still open`);
     expect(await refundedOf(seeded.initialChargeId)).toEqual([partMicros]);
@@ -183,12 +188,17 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     expect((await database.pool.query(
       "SELECT 1 FROM billing.outbox WHERE kind IN ('SMARTBILL_STORNO','QUADERNO_RECORD_REFUND') AND ref=$1", [ref]
     )).rowCount).toBe(0);
-    expect(await owner.remindOwnerRefunds(now)).toBeGreaterThan(0);
-    const [reminder] = await emailOf("O2_REFUND_REMINDER", now.toISOString().slice(0, 10));
-    expect(String(reminder!.payload["param.refundList"])).toContain(
+    // The label follows the amount still open: 22.20 of a 24.20 payment is a part of it, though the request was for
+    // the whole payment. Three days on, when the open refund is due in the reminder again (one reminder a day).
+    const later = new Date(now.getTime() + 3 * DAY);
+    expect(await owner.remindOwnerRefunds(later)).toBeGreaterThan(0);
+    const [reminder] = await emailOf("O2_REFUND_REMINDER", later.toISOString().slice(0, 10));
+    const refundList = String(reminder!.payload["param.refundList"]);
+    expect(refundList).toContain(
       `- charge ${seeded.initialChargeId}, NETOPIA payment ${seeded.providerPaymentId}:`
-        + ` refund ${microsToDecimal(requestedMicros - partMicros)} USD (part of the payment), reason WITHDRAWAL`
+        + " refund 22.20 USD (part of the payment), reason WITHDRAWAL"
     );
+    expect(refundList).not.toContain(`NETOPIA payment ${seeded.providerPaymentId}: refund 22.20 USD (the whole payment)`);
     // The rest recorded: M8 names the whole refund.
     expect(await ownerRefundDone(owner, seeded.initialChargeId, requestedMicros - partMicros)).toContain("Recorded.");
     expect((await m8Of(seeded.subscriptionId)).map((row) => row.payload))
@@ -358,9 +368,9 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
   }, 10_000);
 });
 
-describe("W6 Settings and the owner's command: each payment's own share (P2-I8) and the weekend roll (P2-I9)", () => {
+describe("W6 Settings and the owner's command: the refund after an upgrade, the day that does not count, and the weekend roll (P2-I9)", () => {
   /** The spend a withdrawal reads, the same for both paths. */
-  const spending = (spentMicros: number) => ({ readOwnerSpentMicros: async () => spentMicros });
+  const spending = (spentMicros: number) => ({ readWithdrawalSpend: async () => ({ spentMicros, liveRuns: 0 }) });
 
   /** P12d's Settings route at `at`: the signed-in session alone, no step-up (owner ruling 2026-11-04). */
   async function viaSettings(label: string, seed: (ownerRef: string) => Promise<SeededNetopiaSubscription>, at: Date, spentMicros: number) {
@@ -379,9 +389,9 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     };
   }
 
-  it("refunds the money-data reviewer's worked example per payment, the same in Settings and by the command", async () => {
+  it("refunds the money-data reviewer's worked example by the credit not used, the same in Settings and by the command", async () => {
     // Final review F1, on fixed dates: Romania, Plus from Wednesday 1 April 2026 09:00 UTC (a 30-day period, 24.20),
-    // Max quoted and paid on day 13 ((200 − 20) × 17/30 = 102.00 net, 123.42 with VAT), 3.00 of credit spent, and
+    // Max quoted and paid on day 13 ((200 − 20) × 17/30 = 102.00 net, 123.42 with VAT), 4.40 of credit spent, and
     // the withdrawal half a day later.
     const activatedAt = new Date("2026-04-01T09:00:00.000Z");
     const day13 = new Date(activatedAt.getTime() + 13 * DAY);
@@ -390,16 +400,16 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     const workedExample = async (ownerRef: string) => {
       const seeded = await seedNetopiaSubscription(database.pool, { ownerRef, planId: "PLUS", activatedAt, taxCountry: "RO" });
       expect([seeded.totalMicros, seeded.periodEnd]).toEqual([24_200_000, new Date("2026-05-01T09:00:00.000Z")]);
-      // seedPaidUpgrade quotes one minute before the payment, so the upgrade's coverage starts on day 13 exactly.
       await seedPaidUpgrade(database.pool, seeded, {
         at: new Date(day13.getTime() + 60_000), planId: "MAX", netMicros: 102_000_000, taxMicros: 21_420_000,
         providerPaymentId: String(transaction += 1), monthCreditOverrideMicros: 127_526_666
       });
       return seeded;
     };
-    // Plus gives back 13.31 (16.5 of its 30 days); Max gives back 123.42 × (1 − 4.40/127.53) = 119.16, on the made-up credits, because the
-    // credit share is larger than its half day of 17. Before W6 the whole 147.62 was charged 13.5 of 30 days: 81.19.
-    const expected = 132_470_000;
+    // Owner's decision of 16 November 2026: both payments, 24.20 + 123.42 = 147.62, times the credit not used, on the
+    // made-up credits 127.526666 − 4.40 of the 127.526666 in force after the upgrade: 142.5267…, floored to 142.52.
+    // (Before it, Plus gave back only 16.5 of its 30 days, 13.31, and the refund was 132.47.)
+    const expected = 142_520_000;
     const settings = await viaSettings("w6-worked", workedExample, withdrewAt, 4_400_000);
     expect(await settings.run()).toEqual({ refundMicros: expected, currency: "USD" });
     const command = await viaCommand(workedExample, withdrewAt, 4_400_000);
@@ -407,8 +417,8 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     for (const { seeded } of [settings, command]) {
       expect((await rows().subscriptionEvents(seeded.subscriptionId)).at(-1))
         .toMatchObject({ kind: "WITHDRAWN", data: { refund_micros: expected, withdrew_at: withdrewAt.toISOString() } });
-      // A4(b) unchanged: the newest payment (the upgrade) gives back first, the rest comes from Plus.
-      expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.providerPaymentId, expected - 123_420_000]]);
+      // A4(b) unchanged: the newest payment (the upgrade) gives back first, the rest, 19.10, comes from Plus.
+      expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.providerPaymentId, 19_100_000]]);
     }
   }, 20_000);
 
@@ -430,9 +440,9 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     const command = (seeded: SeededNetopiaSubscription, receivedAt: Date) =>
       recordOwnerWithdrawal({ ...stores(), ownerSpend: spending(3_300_000) }, { ownerRef: seeded.ownerRef, receivedAt });
 
-    // Plus gives back its credit share, 24.20 × (1 − 1/2) = 12.10 (smaller than its 17 of 30 days), and the
-    // upgrade, paid after the person had withdrawn, goes back whole: 128.26. Before C1 it kept the same credit share
-    // of the upgrade (58.08), and the refund was 70.18 of 140.36.
+    // Plus gives back its credit share, 24.20 × (1 − 1/2) = 12.10 (half of Plus's 6.60 was used when the statement
+    // arrived), and the upgrade, paid after the person had withdrawn, goes back whole, 116.16: 128.26 in all. Before C1
+    // it kept the same credit share of the upgrade (58.08), and the refund was 70.18 of 140.36.
     const after = await upgradedToMax({
       at: new Date(activatedAt.getTime() + 14 * DAY), netMicros: 96_000_000, taxMicros: 20_160_000,
       monthCreditOverrideMicros: 120_413_333
@@ -447,27 +457,68 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
       template: "M8_RECEIVED", "param.withdrawalDate": day13.toISOString(), "param.refundAmount": "128.26"
     })]);
 
-    // Control: a statement received after the upgrade is measured as before. Max paid half a day earlier, on day 12.5
-    // ((200 − 20) × 17.5/30 = 105.00 net, 127.05 with VAT), so at day 13 each payment gives back its own share, with
-    // Max's credit (A6's override) in force.
+    // Control: a statement received after the upgrade. Max paid half a day earlier, on day 12.5 ((200 − 20) × 17.5/30
+    // = 105.00 net, 127.05 with VAT), so at day 13 both payments were made before the person withdrew and both take
+    // the one credit share, with Max's credit (A6's override, 131.083333) in force: (24.20 + 127.05) × (131.083333 −
+    // 3.30) ÷ 131.083333 = 147.4422…, floored to 147.44.
     const upgradeAt = new Date(activatedAt.getTime() + 12.5 * DAY);
     const before = await upgradedToMax({
       at: upgradeAt, netMicros: 105_000_000, taxMicros: 22_050_000, monthCreditOverrideMicros: 131_083_333
     });
-    const expected = withdrawalRefundPerPaymentMicros({
-      payments: [
-        { paidMicros: 24_200_000, coverageStart: before.seeded.periodStart, coverageEnd: before.seeded.periodEnd },
-        // seedPaidUpgrade quotes one minute before the payment: the upgrade's coverage starts there.
-        { paidMicros: 127_050_000, coverageStart: new Date(upgradeAt.getTime() - 60_000), coverageEnd: before.seeded.periodEnd }
-      ],
-      now: day13, creditSpentMicros: 3_300_000, monthlyCreditMicros: 131_083_333
-    });
-    // Plus 24.20 × 17/30 = 13.71 (its days), Max 127.05 × 17 days of its 17.5 days and a minute = 123.41: 137.12.
-    expect(expected).toBe(137_120_000);
+    const expected = 147_440_000;
     expect(await command(before.seeded, day13)).toEqual({ kind: "REFUNDING", refundMicros: expected, currency: "USD" });
+    // Newest first: the upgrade's 127.05 whole, then 20.39 of Plus's 24.20.
     expect(await withdrawalRequests(before.upgradeChargeId)).toEqual([[before.upgradeTransactionId, 127_050_000]]);
-    expect(await withdrawalRequests(before.seeded.initialChargeId))
-      .toEqual([[before.seeded.providerPaymentId, expected - 127_050_000]]);
+    expect(await withdrawalRequests(before.seeded.initialChargeId)).toEqual([[before.seeded.providerPaymentId, 20_390_000]]);
+  }, 20_000);
+
+  it("refunds the same for the same credit used on day 1 and on day 13 of the window, in Settings and by the command", async () => {
+    // Owner's decision of 16 November 2026: the days gone by do not count. Romania, Plus (24.20) from Wednesday 1 April
+    // 2026 09:00 UTC; the window closes at the end of Wednesday 15 April, Bucharest time.
+    const activatedAt = new Date("2026-04-01T09:00:00.000Z");
+    const plus = (ownerRef: string) => seedNetopiaSubscription(database.pool, { ownerRef, planId: "PLUS", activatedAt, taxCountry: "RO" });
+    const day1 = new Date(activatedAt.getTime() + DAY);
+    const day13 = new Date(activatedAt.getTime() + 13 * DAY);
+    // 30 % of Plus's made-up 6.60 credit used (1.98): 24.20 × 4.62 ÷ 6.60 = 16.94 back. Under the rule before it, day 13
+    // gave back only 24.20 × 17/30 = 13.71.
+    const early = await (await viaSettings("credit-only-day1", plus, day1, 1_980_000)).run();
+    const late = await (await viaSettings("credit-only-day13", plus, day13, 1_980_000)).run();
+    expect(early).toEqual({ refundMicros: 16_940_000, currency: "USD" });
+    expect(late).toEqual(early);
+    expect(await (await viaCommand(plus, day1, 1_980_000)).run()).toEqual({ kind: "REFUNDING", refundMicros: 16_940_000, currency: "USD" });
+    expect(await (await viaCommand(plus, day13, 1_980_000)).run()).toEqual({ kind: "REFUNDING", refundMicros: 16_940_000, currency: "USD" });
+    // Nothing used: the whole price back on day 13 too.
+    expect(await (await viaSettings("credit-only-unused", plus, day13, 0)).run()).toEqual({ refundMicros: 24_200_000, currency: "USD" });
+  }, 20_000);
+
+  it("reads the credit used from the period's start to the moment the person withdrew, in Settings and by the command", async () => {
+    // The refund now turns on the credit used alone, so the interval it is read over is pinned: from the period's
+    // start (the activation, 1 April 2026 09:00 UTC) to the moment the person withdrew. For the owner's command that is
+    // the statement's arrival on day 13, not the day the command runs (the command's clock is today): what was spent
+    // between the two is not the person's to pay for.
+    const activatedAt = new Date("2026-04-01T09:00:00.000Z");
+    const plus = (ownerRef: string) => seedNetopiaSubscription(database.pool, { ownerRef, planId: "PLUS", activatedAt, taxCountry: "RO" });
+    const day13 = new Date(activatedAt.getTime() + 13 * DAY);
+    const reads: Array<readonly [string, Date, Date]> = [];
+    const counted = {
+      readWithdrawalSpend: async (ownerRef: string, from: Date, to: Date) => {
+        reads.push([ownerRef, from, to]);
+        return { spentMicros: 1_980_000, liveRuns: 0 };
+      }
+    };
+    // 30 % of Plus's made-up 6.60 credit used (1.98), 4.62 left: 24.20 × 4.62 ÷ 6.60 = 24.20 × 0.7 = 16.94 back.
+    const byCommand = await plus(randomUUID());
+    expect(byCommand.periodStart).toEqual(activatedAt);
+    expect(await recordOwnerWithdrawal({ ...stores(), ownerSpend: counted }, { ownerRef: byCommand.ownerRef, receivedAt: day13 }))
+      .toEqual({ kind: "REFUNDING", refundMicros: 16_940_000, currency: "USD" });
+    expect(reads).toEqual([[byCommand.ownerRef, activatedAt, day13]]);
+    // Settings withdraws now: the read ends at the route's clock (day 13 here).
+    reads.length = 0;
+    const identity = testHttpIdentity("credit-read-interval");
+    await plus(identity.authenticated.ownerRef);
+    const deps = subscriptionDeps(database.pool, { clock: () => day13, ownerSpend: counted });
+    expect(await withdraw(deps, { authenticated: identity.authenticated })).toEqual({ refundMicros: 16_940_000, currency: "USD" });
+    expect(reads).toEqual([[identity.authenticated.ownerRef, activatedAt, day13]]);
   }, 20_000);
 
   it("keeps a window whose 14th day is a Saturday open through Monday, in Settings and by the command", async () => {
@@ -479,7 +530,9 @@ describe("W6 Settings and the owner's command: each payment's own share (P2-I8) 
     const mondayEvening = new Date("2026-09-21T20:59:00.000Z");
     const tuesdayMidnight = new Date("2026-09-21T21:00:00.000Z");
     const refund = (await (await viaSettings("w6-monday", saturday, mondayEvening, 0)).run()).refundMicros;
-    expect(refund).toBeGreaterThan(0);
+    // Nothing used, so the whole price goes back on the 16th day too (the days gone by do not count): Plus in Romania
+    // is 20.00 + 21 % VAT (4.20) = 24.20, × 6.60 ÷ 6.60 of the credit left = 24.20.
+    expect(refund).toBe(24_200_000);
     expect(await (await viaCommand(saturday, mondayEvening, 0)).run()).toEqual({ kind: "REFUNDING", refundMicros: refund, currency: "USD" });
     await expect((await viaSettings("w6-tuesday", saturday, tuesdayMidnight, 0)).run())
       .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });

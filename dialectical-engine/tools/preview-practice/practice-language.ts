@@ -267,8 +267,10 @@ export function practiceLanguageOutcome(site: QuestionLanguage, eld: EldReading,
   const decision = decideAfterFast(site, eld, fast, questionLine, maxQuestionBytes);
   if (decision.kind === "LOCK") {
     // As the decider: a check skipped on purpose says so beside the lock's own code (hosted only; never on the preview).
+    // NV-47's owner-budget arm is unreachable here (the preview has no budget) but keeps the two mappings identical.
     const skipped = fast.kind !== "DOWN" ? null : fast.reason === "SKIPPED_DAY_POT" ? "FAST_CHECK_SKIPPED_DAY_POT"
-      : fast.reason === "SPEND_RECORD_DOWN" ? "FAST_CHECK_SPEND_RECORD_DOWN" : null;
+      : fast.reason === "SPEND_RECORD_DOWN" ? "FAST_CHECK_SPEND_RECORD_DOWN"
+      : fast.reason === "SKIPPED_OWNER_BUDGET" ? "FAST_CHECK_SKIPPED_OWNER_BUDGET" : null;
     return Object.freeze({ lock: decision.language.code, source: decision.source,
       recordCode: skipped === null ? decisionRecordCode(decision) : `${decisionRecordCode(decision)}:${skipped}`,
       offered: false, fastNeeded: true, proposedQuestion: null });

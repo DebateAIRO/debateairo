@@ -10,7 +10,7 @@
   "mail.M1.active": "Grazzi. Il-pjan {plan} tiegħek issa huwa attiv.",
   "mail.M1.price": "Tħallas {totalAmount} fix-xahar, taxxa inkluża. Il-pjan jiġġedded fl-{renewDate} u mbagħad kull xahar sakemm tikkanċellah.",
   "mail.M1.cancel": "Tista’ tikkanċella fi kwalunkwe ħin fis-Settings, jew mingħajr ma tidħol f’din il-paġna: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Jekk tgħix fl-UE, fiż-ŻEE jew fir-Renju Unit, tista’ tirtira fi żmien {withdrawalDays} jum. Imbagħad tħallas biss għall-parti diġà użata: l-akbar bejn il-jiem użati jew il-kreditu użat. Il-formola mudell għall-irtirar hija mehmuża ma’ din l-email.",
+  "mail.M1.withdrawal": "Tgħix fejn tgħix, tista’ tirtira fi żmien {withdrawalDays} jum. Imbagħad tħallas biss għas-sehem mill-kreditu tal-pjan li użajt; jekk ma użajt xejn minnu, tieħu lura l-prezz kollu. Il-formola mudell għall-irtirar hija mehmuża ma’ din l-email.",
   "mail.M1.termsAttached": "It-Termini li aċċettajt huma mehmuża. L-aħħar verżjoni tinsab dejjem fuq {termsUrl}",
   "mail.M1.termsCurrent": "It-Termini attwali tagħna jinsabu online fuq {termsUrl}",
   "mail.M2.subject": "Ir-riċevuta tiegħek ta’ Dialectical Engine għal {totalAmount}",

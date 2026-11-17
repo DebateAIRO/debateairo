@@ -10,7 +10,7 @@
   "mail.M1.active": "Tack. Ditt {plan}-abonnemang är nu aktivt.",
   "mail.M1.price": "Du betalar {totalAmount} i månaden, inklusive skatt. Abonnemanget förnyas den {renewDate} och därefter varje månad tills du säger upp det.",
   "mail.M1.cancel": "Du kan säga upp när som helst i Inställningar, eller utan att logga in på den här sidan: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Om du bor i EU, EES eller Storbritannien kan du ångra köpet inom {withdrawalDays} dagar. Du betalar då bara för den del som redan har använts: den största av andelen använda dagar och andelen använd kredit. Standardformuläret för utövande av ångerrätten bifogas detta e-postmeddelande.",
+  "mail.M1.withdrawal": "Oavsett var du bor kan du ångra köpet inom {withdrawalDays} dagar. Du betalar då bara för den andel av abonnemangets kredit som du har använt; har du inte använt något får du tillbaka hela priset. Standardformuläret för utövande av ångerrätten bifogas detta e-postmeddelande.",
   "mail.M1.termsAttached": "De villkor du godkände är bifogade. Den senaste versionen finns alltid på {termsUrl}",
   "mail.M1.termsCurrent": "Våra nuvarande villkor finns online på {termsUrl}",
   "mail.M2.subject": "Ditt Dialectical Engine-kvitto på {totalAmount}",

@@ -345,6 +345,7 @@ describe("W2-7 old answers read unchanged; the inventory and the no-number rule"
     // V4 start step, Task 30: the four calls before Start (POST /v1/asks/paths/{lists,merge,combine,fit}).
     // V4 start step, Task 39e: the five saved-question routes (GET/POST /v1/account/saved-questions, GET/PUT/DELETE …/{id}).
     // 0157: the statements of reasons (GET /v1/account/moderation-statements).
-    expect(contractInventory.routes).toHaveLength(211);
+    // The verify that also sets the password (POST /v1/auth/verify-email/password).
+    expect(contractInventory.routes).toHaveLength(212);
   });
 });

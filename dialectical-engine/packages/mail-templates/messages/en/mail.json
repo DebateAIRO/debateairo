@@ -10,7 +10,7 @@
   "mail.M1.active": "Thank you. Your {plan} plan is active now.",
   "mail.M1.price": "You pay {totalAmount} a month, tax included. The plan renews on {renewDate} and then every month until you cancel.",
   "mail.M1.cancel": "You can cancel at any time in Settings, or without signing in on this page: {cancelPageUrl}",
-  "mail.M1.withdrawal": "If you live in the EU, the EEA or the UK, you may withdraw within {withdrawalDays} days. You then pay only for the part already used: the larger of the days used or the credit used. The model withdrawal form is attached to this email.",
+  "mail.M1.withdrawal": "Wherever you live, you may withdraw within {withdrawalDays} days. You then pay only for the share of the plan's credit you have used; if you have used none, you get the full price back. The model withdrawal form is attached to this email.",
   "mail.M1.termsAttached": "The Terms you accepted are attached. The latest version is always at {termsUrl}",
   "mail.M1.termsCurrent": "Our current Terms are online at {termsUrl}",
   "mail.M2.subject": "Your Dialectical Engine receipt for {totalAmount}",

@@ -56,6 +56,7 @@ import {
   createLiveEventGate,
   createLiveRunState,
   liveTreeFromState,
+  readRecordedEvents,
   refreshTriggeredBy,
   startLiveEventStream,
   type LiveRunState } from "@/lib/v3/liveEvents";
@@ -1103,8 +1104,9 @@ export default function DebatePageClient({
       // (investigation gaps, cycle refusals, honesty/ledger events) render
       // without holding a live connection open.
       let active = true;
-      contractClient
-        .readEvents(runRef)
+      // Security fixes run 3 (NV-20): a full stream cap answers 429; the replay waits its Retry-After and reads again.
+      const replay = new AbortController();
+      readRecordedEvents(() => contractClient.readEvents(runRef), replay.signal)
         .then((events) => {
           if (!active) return;
           let state = createLiveRunState();
@@ -1130,6 +1132,7 @@ export default function DebatePageClient({
         });
       return () => {
         active = false;
+        replay.abort();
       };
     }
 

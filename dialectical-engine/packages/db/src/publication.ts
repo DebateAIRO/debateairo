@@ -1,11 +1,11 @@
-import type { Pool } from "pg";
+import type { Pool, PoolClient } from "pg";
 import {
   type AuditContextHasher,
   type CryptoEnvelope
 } from "@debateai/crypto";
 import type { AuthSourceContext } from "./identity.js";
-import { crossAccount } from "./account-context.js";
-import { withPublicationContentLease } from "./publication-lease.js";
+import { crossAccount, crossAccountPool } from "./account-context.js";
+import { withPublicationContentLease, type PublicationLeaseMode } from "./publication-lease.js";
 import { FLOOR_BASIS_INCOMPLETE_SQL } from "./serve-disclosure.js";
 
 const PUBLICATION_TRANSITION_SIGNATURE =
@@ -204,6 +204,11 @@ export type PublicSnapshotRecord = Readonly<{
   runId: string;
   contentCiphertext: CryptoEnvelope;
   createdAt: Date;
+  /**
+   * The first author's pseudonym, read from their account at this read; null once the account is gone. The stored copy
+   * never holds it, so erasing the account is what removes the name: nothing is left to rewrite.
+   */
+  authorPseudonym: string | null;
 }>;
 
 export type PublicationKeyProvisionCleanup = Readonly<{
@@ -239,8 +244,20 @@ export class PostgresPublicationRepository {
     private readonly auditContext: AuditContextHasher
   ) {}
 
-  withContentLease<T>(publicationRef: string,use: () => Promise<T>): Promise<T> {
-    return withPublicationContentLease(this.pool,[publicationRef],async () => use());
+  /**
+   * NV-21: `use` gets the lease's own connection, so a body that reads on it holds one pooled connection, not two.
+   * Row-level security S01 (X10): a shared lease is a public reader's, whose reads on that connection (readPublic,
+   * revalidatePublic) see other accounts' publications, so it is taken on the pool's cross-account target (api-system); a
+   * request's own login would see only its own rows there. A pool with no target (the runner, the evaluator, tests) is
+   * its own target. Exclusive leases (key cleanup, erasure, publish) stay on this pool.
+   */
+  withContentLease<T>(
+    publicationRef: string,
+    use: (client: PoolClient) => Promise<T>,
+    mode: PublicationLeaseMode = "exclusive"
+  ): Promise<T> {
+    const leasePool = mode === "shared" ? crossAccountPool(this.pool, "X10") : this.pool;
+    return withPublicationContentLease(leasePool,[publicationRef],async (lease) => use(lease.client),mode);
   }
 
   private async prepareAuditContext(source: AuthSourceContext): Promise<PreparedAuditContext> {
@@ -597,16 +614,34 @@ export class PostgresPublicationRepository {
     return result.rows[0]?.completed === true;
   }
 
-  async readPublic(publicationRef: string): Promise<PublicSnapshotRecord | null> {
+  /**
+   * NV-21: `executor` is the public read's lease connection (withContentLease, "shared"), so the read holds one pooled
+   * connection, not two. Row-level security S01 (X10): the statement runs inside the X10 frame, so on the pool it goes to
+   * the cross-account target; a shared lease is taken on that same target (withContentLease), so on its connection the
+   * read sees every account's published snapshot too.
+   */
+  async readPublic(
+    publicationRef: string,
+    executor: Pick<PoolClient, "query"> = this.pool
+  ): Promise<PublicSnapshotRecord | null> {
     return crossAccount("X10", async () => {
-      const result = await this.pool.query<{
+      // The author is the account of the debate's latest ownership record, the rule the publish transition checks.
+      const result = await executor.query<{
         publication_ref: string;
         run_id: string;
         content_ciphertext: CryptoEnvelope;
         created_at: Date;
+        author_pseudonym: string | null;
       }>(`
         SELECT snapshot.publication_ref,snapshot.run_id,
-          snapshot.content_ciphertext,snapshot.created_at
+          snapshot.content_ciphertext,snapshot.created_at,
+          (SELECT identity_user.pseudonym
+           FROM identity."user" AS identity_user
+           WHERE identity_user.owner_ref=(
+             SELECT ownership.owner_ref FROM core.run_ownership_event AS ownership
+             WHERE ownership.run_id=snapshot.run_id
+             ORDER BY ownership.at_seq DESC LIMIT 1
+           )) AS author_pseudonym
         FROM serve.publication_snapshot AS snapshot
         WHERE snapshot.publication_ref=$1
           AND core.run_is_published(snapshot.run_id,snapshot.publication_ref)
@@ -616,14 +651,19 @@ export class PostgresPublicationRepository {
         publicationRef: row.publication_ref,
         runId: row.run_id,
         contentCiphertext: row.content_ciphertext,
-        createdAt: row.created_at
+        createdAt: row.created_at,
+        authorPseudonym: row.author_pseudonym
       });
     });
   }
 
-  async revalidatePublic(runId: string, publicationRef: string): Promise<boolean> {
+  async revalidatePublic(
+    runId: string,
+    publicationRef: string,
+    executor: Pick<PoolClient, "query"> = this.pool
+  ): Promise<boolean> {
     return crossAccount("X10", async () => {
-      const result = await this.pool.query<{ published: boolean }>(`
+      const result = await executor.query<{ published: boolean }>(`
         SELECT core.run_is_published($1,$2) AS published
       `, [runId, publicationRef]);
       return result.rows[0]?.published === true;

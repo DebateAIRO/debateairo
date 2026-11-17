@@ -379,7 +379,7 @@ describe("P3-01 production database-principal manifest", () => {
           effectiveMemberships: [],
           ownsDatabases: ["debateai"],
           ownsSchemas: [
-            "audit_crypto_internal", "billing", "core", "evidence", "identity", "ledger", "legal",
+            "audit_crypto_internal", "billing", "core", "erasure_reconcile", "evidence", "identity", "ledger", "legal",
             "memory", "obs", "observation", "register", "rls", "scorecard", "serve", "support"
           ]
         });
@@ -539,7 +539,7 @@ describe("P3-01 production database-principal manifest", () => {
         { component: "apps/api", environmentKey: "DATA_EXPORT_DATABASE_URL", purpose: "DATA_EXPORT_WORKER", binding: "WIRED_WHEN_ENABLED", condition: "DATA_EXPORT_STORE_PATH set" },
         { component: "apps/api", environmentKey: "ERASURE_DATABASE_URL", purpose: "ACCOUNT_AND_PRIVATE_RUN_ERASURE", binding: "WIRED" },
         { component: "apps/api", environmentKey: "AUTHORIZATION_DATABASE_URL", purpose: "STEP_UP_SESSION_ROTATION", binding: "WIRED" },
-        { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true" },
+        { component: "apps/api", environmentKey: "PUBLICATION_CLEANUP_DATABASE_URL", purpose: "PUBLICATION_KEY_CLEANUP", binding: "WIRED_WHEN_ENABLED", condition: "PUBLICATION_ENABLED=true, or CORPUS_KEK_PATH, PUBLICATION_KEY_STORE_PATH and PUBLICATION_CLEANUP_DATABASE_URL all set" },
         { component: "apps/api", environmentKey: "SUPPORT_DATABASE_URL", purpose: "SUPPORT_DATA_PLANE", binding: "WIRED" },
         // V-3. `pnpm exec tsx apps/runner/src/rotate-kek-cli.ts` re-wraps
         // support.session_key and support.case_key under a new master key. It is
@@ -553,6 +553,10 @@ describe("P3-01 production database-principal manifest", () => {
         // writes (serve.serve_disclosure, serve.synthesis_round, ledger.raw_artifact);
         // no privilege is added.
         { component: "apps/runner:serve-disclosure-cli", environmentKey: "DATABASE_URL", purpose: "SERVE_DISCLOSURE_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:serve-disclosure" },
+        // The owner's cost read-out (`pnpm ops:cost-readout`) runs as the runner, with the runner's own EnvironmentFile,
+        // on a read-only connection, and only SELECTs rows that principal already reads and writes (ledger.model_spend,
+        // ledger.ledger_entry, ledger.raw_artifact); no privilege is added.
+        { component: "apps/runner:cost-readout-cli", environmentKey: "DATABASE_URL", purpose: "COST_READOUT_OPERATOR_REPORT", binding: "WIRED", condition: "package script ops:cost-readout" },
         // Side-by-side spec §13 (S14): check-version's runner half (`pnpm settings:check-runner <v>`) runs as the runner,
         // with that release's own runner.env, on a two-connection pool, and only reads (the register's rows); it writes
         // nothing, so no privilege is added.

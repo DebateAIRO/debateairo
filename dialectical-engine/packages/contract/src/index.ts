@@ -688,9 +688,8 @@ export type BillingPrices = z.infer<typeof BillingPricesSchema>;
 const BillingIso2Schema = z.string().regex(/^[A-Z]{2}$/);
 
 /**
- * Terms §12: "Our prices are shown before tax, as price + VAT (or GST or sales tax, depending on where you live)". The
- * tax the connection's country adds to every plan, as the tax engine the quote asks answers it for that country alone
- * (no address yet).
+ * Terms §12: "Prices include VAT, GST or sales tax, which depends on where you live". The tax the connection's country
+ * adds to every plan, as the tax engine the quote asks answers it for that country alone (no address yet).
  */
 export const BillingPlansTaxSchema = z.object({
   country: BillingIso2Schema,
@@ -2059,6 +2058,7 @@ export const contractInventory = Object.freeze({
     "POST /v1/auth/age-check",
     "POST /v1/auth/register",
     "POST /v1/auth/verify-email",
+    "POST /v1/auth/verify-email/password",
     "POST /v1/auth/resend-verification",
     "POST /v1/auth/recovery/start",
     "POST /v1/auth/recovery/prove",

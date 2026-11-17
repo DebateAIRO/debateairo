@@ -985,8 +985,8 @@ const QUADERNO = quadernoPricingFromKeyFile({
 /**
  * Terms §12, as GET /v1/billing/plans answers: the plans priced for the place asked (?country=, and in the US and
  * Canada ?postal_code=, checked by the kernel's own format as the API does), in that place's currency, each with its
- * total including that place's tax. Until the place is known no total is sent, and the pricing page shows each paid
- * plan's price before tax and asks for the country (Terms 2.15: price + VAT).
+ * total including that place's tax. Until the place is known no total is sent, and the pricing page shows no paid
+ * price and asks for the country (Terms §12: prices include the tax, never one before tax).
  */
 function billingPlans(countryParam: string | null, postalParam: string | null, quaderno?: QuadernoPriced | null) {
   const country = (countryParam ?? "").trim().toUpperCase();

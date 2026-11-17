@@ -312,11 +312,28 @@ const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: strin
 ] as const);
 
 /**
- * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
- * rechecked 10 October 2026. Listed whenever the API's declared targets reach `api.deepinfra.com`
- * (company `deepinfra`, addition D24), and when the API gives no answer. Its jobs are confirmed: every
- * panel member writes and judges arguments, GLM writes the answer and the verdict story, DeepSeek
- * checks both (the first preview's GLM alone does all three).
+ * The one DeepInfra model DeepInfra does not run itself. Its model page carries a "Partner" tag ("This model is
+ * served by a partner. Your requests are forwarded to them. Their privacy policy applies"), and DeepInfra's trust
+ * centre names it among the partner models (read 16 November 2026: `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`).
+ * The other three have no tag and run on DeepInfra's own servers.
+ */
+const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-Flash"]);
+
+/**
+ * Serving company for the private preview's open-weight models, the main recipient of debate text. Listed whenever
+ * the API's declared targets reach `api.deepinfra.com` (company `deepinfra`, addition D24), and when the API gives
+ * no answer. Its jobs are confirmed: every panel member writes and judges arguments, GLM writes the answer and the
+ * verdict story, DeepSeek checks both (the first preview's GLM alone does all three).
+ *
+ * Checked 16 November 2026 against DeepInfra's Terms of Service (last modified 15 October 2026) and its trust centre
+ * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`): all inference runs in data centres in the United States,
+ * with no other region; prompts and outputs are held in memory only while a request is processed, then deleted, and
+ * the logs hold request metadata, never the text (Terms 7(b), every account); no training on customer data (Terms
+ * 7(b)); the data processing agreement is part of the Terms (section 5) and carries the EU standard contractual
+ * clauses; DeepInfra is not certified under the EU–US Data Privacy Framework. These facts cover the models DeepInfra
+ * runs itself: the location and retention sentences say so, and the partner model has its own row
+ * (`DEEPINFRA_PARTNER_PROVIDER`). The preview sends no batch request and asks for no longer prompt cache, the two
+ * features DeepInfra stores text for.
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -328,12 +345,35 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   // the person presses Next, before a debate starts.
   purposes: Object.freeze<ProviderPurpose[]>([...UNCHECKED_CLOUD.purposes, "suggestPaths"]),
   purposesConfirmed: true,
-  // Published terms exclude model training. Endpoint-specific retention and transfer facts
-  // remain explicitly unconfirmed until operational/contractual validation is complete.
+  locationKey: "legal.providers.locationDeepInfra",
+  retentionKey: "legal.providers.retentionDeepInfra",
+  zeroRetention: "yes",
   training: "no",
-  basisKey: "legal.providers.unconfirmed",
+  basisKey: "legal.providers.sccBasis",
   contact: "policy@deepinfra.com",
-  checkedOn: "2026-10-05"
+  checkedOn: "2026-11-16"
+});
+
+/**
+ * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_IDS`). DeepInfra names
+ * neither the company nor its terms, so the row is headed by what we know and every fact stays "[to confirm]": it
+ * receives debate text, and a legal page discloses rather than hides (ruling R20; the 10 October 2026 facts note:
+ * "that company receives debate text and needs its own row on the page"). Its jobs are the partner model's: a panel
+ * member that writes and judges arguments, and one of the AIs that suggest what to look into. Shown right after
+ * the DeepInfra row, whenever that row is shown. The row goes when the owner names the company and its terms are
+ * checked (then it becomes a checked row), or when no partner model is left in the line-up.
+ */
+export const DEEPINFRA_PARTNER_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "deepinfra-partner",
+  provider: null,
+  nameKey: "legal.providers.deepinfraPartnerName",
+  models: PREVIEW_DEEPINFRA_MODELS.filter(([id]) => DEEPINFRA_PARTNER_MODEL_IDS.has(id)).map(([, label]) => label).join(", "),
+  entity: "[…]",
+  homeCountryKey: "legal.providers.unconfirmed",
+  purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "suggestPaths"]),
+  purposesConfirmed: true,
+  basisKey: "legal.providers.unconfirmed"
 });
 
 /**
@@ -399,8 +439,17 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * The web search provider the debate models ask questions through (owner, 2026-10-26: "our models will ask
  * questions via Perplexity"; Terms §8, Privacy Policy §5). Not one of the API's declared targets yet, so it is
  * listed on every answer rather than when the API names it (owner, 2026-10-27: always listed). Perplexity AI, Inc.
- * is the US company behind the API; every other fact stays "[to confirm]" until someone checks it against
- * Perplexity's API terms.
+ * is the US company behind the API. The runner calls its Search API (`POST https://api.perplexity.ai/search`,
+ * `packages/providers/src/perplexity-search.ts`).
+ *
+ * Checked 16 November 2026 against Perplexity's API Terms of Service (last updated 23 January 2026), its Data
+ * Processing Addendum (last updated 13 August 2026), its API privacy page and its trust centre
+ * (`docs/legal/2026-11-16-deepinfra-perplexity-facts.md`): no training of generative AI models on customer content
+ * (API Terms 2.3.3); zero data retention is not the default and needs a written agreement, and none is on record;
+ * no retention period is published for API requests, and the addendum deletes personal data within thirty days of
+ * the end of the service; no processing region is named, and every subprocessor the trust centre lists is in the
+ * United States; transfers under the EU standard contractual clauses (addendum section 11, Modules 2 and 3), with
+ * no mention of the EU–US Data Privacy Framework. The contact is the address the API Terms give for notices.
  */
 export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -409,7 +458,14 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   models: "",
   entity: "Perplexity AI, Inc.",
   purposes: Object.freeze<ProviderPurpose[]>(["search"]),
-  purposesConfirmed: true
+  purposesConfirmed: true,
+  locationKey: "legal.providers.locationPerplexity",
+  retentionKey: "legal.providers.retentionPerplexity",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.sccBasis",
+  contact: "legal-notices@perplexity.ai",
+  checkedOn: "2026-11-16"
 });
 
 /**
@@ -450,7 +506,8 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
  * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
  * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
  * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
- * then DeepInfra; each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
+ * then DeepInfra, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
+ * to (`DEEPINFRA_PARTNER_PROVIDER`); each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
  * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
  * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
@@ -461,9 +518,11 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   const named = companies === null || companies.length === 0
     ? null
     : new Set(companies.filter((company) => typeof company === "string" && company.length > 0));
+  // The company DeepInfra forwards its partner model to receives debate text whenever DeepInfra does, so its
+  // unchecked row follows DeepInfra's own.
   const reviewed = REVIEWED_PROVIDER_COMPANIES
     .filter(([company]) => named === null || named.size === 0 || named.has(company))
-    .map(([, entry]) => entry);
+    .flatMap(([, entry]): ProviderRegisterEntry[] => entry === DEEPINFRA_PROVIDER ? [entry, DEEPINFRA_PARTNER_PROVIDER] : [entry]);
   const unchecked = named === null ? [] : [...named]
     .filter((company) => !REVIEWED_COMPANY_KEYS.has(company) && company !== PERPLEXITY_PROVIDER.key).sort()
     .map(uncheckedCompanyEntry);
@@ -479,50 +538,54 @@ export function providerRegister(companies: readonly string[] | null): readonly 
 
 export type TermsVersion = Readonly<{
   version: string;
-  dateKey: string;
   noteKey: string;
   current: boolean;
-  href: string;
+  /** The text's page, or null for a version that was never published as a text of its own. */
+  href: string | null;
 }>;
 
 /**
- * Every published version of the terms, newest first. Each earlier row links to the exact text
- * that was current before the next revision.
+ * Every version of the terms, newest first, one row per number from 2.0 up. Each earlier row links to the exact text
+ * that was current before the next revision. The rows carry no effective date until go-live: the drafts' own
+ * "Effective …" lines are not in order (2.8 and 2.9 say 12 October, after 2.6's 24 October), so the page states none.
+ * 2.7 has no text: the synthesis-flag merge (#225) took the Terms from 2.6 straight to 2.8, and the charts clause first
+ * numbered 2.7 became 2.9, but the change history in the Terms names a 2.7, so its row says why there is nothing to read.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.18", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
-  { version: "2.17", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.18", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.17", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/63e8f9c271ed42c5466568999f4a35418b5011d8f31309dabb199f8927a30203" },
-  { version: "2.16", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.16", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70" },
-  { version: "2.15", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.15", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/765a7826b1045fabe77783e3a9bbe95a8f6dec9a48ff071e9c4a844a8317d925" },
-  { version: "2.14", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.14", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/94474fdb20bed511a590b6bc1c07750ed4e67b1c3dfb328d31638daaf233f6a7" },
-  { version: "2.13", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.13", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/9cad1a62f77eee42c46facba8a3c2e04c44afba940688ae5e06d3bf586808cfc" },
-  { version: "2.12", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.12", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b" },
-  { version: "2.11", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.11", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/58ae2f6196b823ec4e1316e1289861fe54b6c3663913fd9617aa0cfdde4b5bdd" },
-  { version: "2.10", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.10", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/bf864a74b185aadeabf37e7a4593830d66cab343388f64b88a01a38348dcd339" },
-  { version: "2.9", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.9", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/de0b1e1adaff7690436ef4fe09132b0998d33d2f206ec29be9127142c935e56f" },
-  { version: "2.8", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.8", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/160400ea25aee99085d012f1008af3ca2841148ae3349401a2ac5152278f6fb4" },
-  { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.7", noteKey: "legal.versions.unpublished.note", current: false, href: null },
+  { version: "2.6", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab" },
-  { version: "2.5", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.5", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/e6fe4e6897c5c4aa03214da2e79954c8903fe8fe2d3c2785a000357618d3b195" },
-  { version: "2.4", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.4", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/3f238233a301a4e98945d8164e1f5b7d0934d68f01adcdf421f8602e11ca2ef6" },
-  { version: "2.3", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.3", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/0535525218bb7c975ea4f8459bc2011a494efed363bee79d6382805ad5981f6c" },
-  { version: "2.2", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.2", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/fcffb706c7ab2dcbfa09594dd5b0686e274cc5ba3e3a4377573f5b771c07a660" },
-  { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.1", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/34bab40dea5ccdcaba5dc167106e8b6d9bdc08c676f82a2c84e68fd9809c8b0c" },
-  { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.0", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/0d1bc079eb2d5b054c1cfc7c0430f234ca5391bd6e6824ecc8958a294f6eaa0e" }
 ]);

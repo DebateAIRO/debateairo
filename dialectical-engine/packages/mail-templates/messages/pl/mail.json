@@ -10,7 +10,7 @@
   "mail.M1.active": "Dziękujemy. Państwa plan {plan} jest teraz aktywny.",
   "mail.M1.price": "Płacą Państwo {totalAmount} miesięcznie, z podatkiem. Plan odnawia się {renewDate}, a następnie co miesiąc, dopóki go Państwo nie anulują.",
   "mail.M1.cancel": "Mogą Państwo anulować w dowolnym momencie w Ustawieniach lub bez logowania na tej stronie: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Jeśli mieszkają Państwo w UE, EOG lub Wielkiej Brytanii, mogą Państwo odstąpić od umowy w ciągu {withdrawalDays} dni. Płacą Państwo wtedy tylko za już wykorzystaną część: większą z wykorzystanych dni lub wykorzystanego kredytu. Wzór formularza odstąpienia od umowy jest załączony do tej wiadomości.",
+  "mail.M1.withdrawal": "Niezależnie od miejsca zamieszkania mogą Państwo odstąpić od umowy w ciągu {withdrawalDays} dni. Płacą Państwo wtedy tylko za wykorzystaną część kredytu planu; jeśli nic Państwo nie wykorzystają, otrzymają Państwo zwrot całej ceny. Wzór formularza odstąpienia od umowy jest załączony do tej wiadomości.",
   "mail.M1.termsAttached": "Zaakceptowany przez Państwa Regulamin jest załączony. Najnowsza wersja jest zawsze dostępna pod adresem {termsUrl}",
   "mail.M1.termsCurrent": "Nasz aktualny Regulamin jest dostępny online pod adresem {termsUrl}",
   "mail.M2.subject": "Państwa potwierdzenie płatności Dialectical Engine na kwotę {totalAmount}",

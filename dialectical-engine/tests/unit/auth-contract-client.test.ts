@@ -315,6 +315,14 @@ describe("streamlined consumer auth boundary", () => {
     expect(document.components.schemas.RegisterRequestSchema?.additionalProperties).toBe(false);
     expect(inventory.resources).toHaveProperty("RegisterRequestSchema");
     expect(inventory.resources).toHaveProperty("ResendVerificationRequestSchema");
+    // NV-14 Revision 3: verify-email/password requires the token holder's password; verify-email keeps dev's
+    // published shape (no request body documented), as the frozen S04 route forwards the token only.
+    const verifyWithPassword = document.paths["/v1/auth/verify-email/password"].post;
+    expect(verifyWithPassword.requestBody?.content["application/json"].schema.$ref).toBe("#/components/schemas/VerifyEmailRequestSchema");
+    expect(document.components.schemas.VerifyEmailRequestSchema?.required).toEqual(["token", "password"]);
+    expect(document.components.schemas.VerifyEmailRequestSchema?.additionalProperties).toBe(false);
+    expect(inventory.resources).toHaveProperty("VerifyEmailRequestSchema");
+    expect(document.paths["/v1/auth/verify-email"].post.requestBody).toBeUndefined();
   });
 });
 

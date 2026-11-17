@@ -70,7 +70,9 @@ function closing(account: Readonly<{ userId: string; ownerRef: string }>, option
     readEmailCiphertext: async () => encrypt(accountKey, Buffer.from("asker@example.test"), aad),
     beforeKeyDestruction: async () => { order.push("hold"); }
   } : {};
-  const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined,
+  // The support port the erasure needs before any key goes: this account never opened a support session.
+  const noSupport = { shredOwnerForErasure: async () => "NONE", liveOwnerKeyCount: async () => 0 };
+  const coordinator = new AccountErasureCoordinator(repository as never, users as never, runs as never, undefined, noSupport,
     { ...hold, ...(options.questionKeys === undefined ? {} : { savedQuestionKeys: options.questionKeys }) });
   return { coordinator, order, finalized };
 }

@@ -93,7 +93,7 @@ export type BillingRouteDeps = Readonly<{
   plans?: BillingPlans;
   /** Part C: the connection's country for the plans' currency; absent, the rule's default. */
   geo?: GeoLookup;
-  /** Terms §12: the connection country's tax on the plans list; absent, the list's prices are before tax. */
+  /** Terms §12: the connection country's tax on the plans list; absent, the list carries no total and the page shows no price. */
   displayedTax?: DisplayedTaxPort;
   legal?: BillingLegalGate;
   /** P8b. */

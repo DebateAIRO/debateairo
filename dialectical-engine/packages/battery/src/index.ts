@@ -259,6 +259,11 @@ export interface DispatchableWorkItem {
   readonly workItemId: string;
 }
 
+/** NV-25: a READY item with its run's settings version, whose daily guard admits a re-send. */
+export interface ReadyWorkItem extends DispatchableWorkItem {
+  readonly registerVersion: number;
+}
+
 /**
  * What one claim renewal found (L4-F9 repair, ADR-0017 §3(c)'s permitted
  * heartbeat): the claim extended, the item settled (DONE or FAILED, so no copy
@@ -483,8 +488,9 @@ export class WorkItemRepository {
 
   /**
    * Spec §3 (plan B D4): this release's CLAIMED items whose claim has lapsed — a copy that died mid-debate — oldest
-   * first. The periodic re-send hands only these to Hatchet again; READY items stay with the API's stalled-start
-   * re-send, so a queued job is never sent twice.
+   * first. The five-minute lapsed re-send hands these to Hatchet again. READY items are not listed here: young ones stay
+   * with the API's stalled-start re-send, and (NV-25) one Hatchet gave up after its queue wait is re-sent by the
+   * separate stale-READY re-send (`listReady`), at most once per 35 minutes, so a merely queued job is not flooded.
    */
   async listLapsedClaimed(limit: number): Promise<readonly DispatchableWorkItem[]> {
     assertWorkLimit(limit, "Lapsed claim");
@@ -501,6 +507,29 @@ export class WorkItemRepository {
     return Object.freeze(result.rows.map((row) => Object.freeze({
       runId: row.run_id,
       workItemId: row.work_item_id
+    })));
+  }
+
+  /**
+   * NV-25: this release's READY items, oldest first, each with its run's settings version (runner-lapsed-resend.ts).
+   * As every other list here, the release that owns a run's work and its settings version are the ones it was last handed
+   * over to (`RELEASE_NOW`, `identity.run_settings_version_now`), and a month-paused debate's item is not listed, as
+   * `listDispatchable` leaves it out.
+   */
+  async listReady(limit: number): Promise<readonly ReadyWorkItem[]> {
+    assertWorkLimit(limit, "Ready work");
+    const result = await this.pool.query<{ work_item_id: string; run_id: string; register_version: number }>(
+      // The bigint version is cast by the database (an out-of-range one refuses), never coerced in JavaScript.
+      `SELECT item.work_item_id, item.run_id, identity.run_settings_version_now(run.run_id)::integer AS register_version
+       FROM core.work_item AS item
+       JOIN core.run AS run ON run.run_id = item.run_id AND ${RELEASE_NOW("run.run_id")} = $2
+       WHERE item.state = 'READY' AND ${NOT_MONTH_PAUSED("item.run_id")}
+       ORDER BY item.created_at_seq, item.work_item_id
+       LIMIT $1`,
+      [limit, this.#fence.releaseKey]
+    );
+    return Object.freeze(result.rows.map((row) => Object.freeze({
+      runId: row.run_id, workItemId: row.work_item_id, registerVersion: row.register_version
     })));
   }
 
