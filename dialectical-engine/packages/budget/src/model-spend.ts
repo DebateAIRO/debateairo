@@ -114,7 +114,7 @@ export type ModelSpendSource =
    */
   | "PUBLIC_REPORT"
   /**
-   * NV-50 (security audit run 3, migration 0177): an attempt the gateway SENT that was never charged by `recordCall`
+   * NV-50 (security audit run 3, migration 0178): an attempt the gateway SENT that was never charged by `recordCall`
    * (it timed out, its connection dropped, or its reply could not be stored), charged by `recordUnanswered` at its
    * reported usage or else its projected maximum. Its run's (or its story's) envelope and the site's day count it; no
    * person's window, hold or withdrawal does. It always names its run and its attempt, and carries no phase.
@@ -1592,7 +1592,7 @@ export class PostgresModelSpendStore implements ModelSpendStore {
       && entry.runId === null) {
       throw new TypedDomainError("MODEL_SPEND_RUN_REQUIRED", "A run, story or synthesis check charge must name its run");
     }
-    // NV-50 (migration 0177): an unanswered attempt's charge names the attempt it pays for. The CHECK
+    // NV-50 (migration 0178): an unanswered attempt's charge names the attempt it pays for. The CHECK
     // `model_spend_unanswered_names_its_attempt` says the same one layer lower.
     if (unanswered && (typeof entry.attemptId !== "string" || entry.attemptId === "")) {
       throw new TypedDomainError("MODEL_SPEND_ATTEMPT_REQUIRED", "An unanswered attempt's charge must name its attempt");

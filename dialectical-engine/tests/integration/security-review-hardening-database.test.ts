@@ -250,7 +250,7 @@ const ARRIVED_WITH_THE_V4_MERGE_NOT_REVIEWED: Readonly<Record<string, string>> =
 };
 
 /**
- * The definers the security fixes of audit run 3 (0177) brought that either request login may EXECUTE and that none of the census's four lists truly holds. Each is called
+ * The definers the security fixes of audit run 3 (0178) brought that either request login may EXECUTE and that none of the census's four lists truly holds. Each is called
  * by the API itself, before a sign-in or from a timer, and asks nothing of the connection, so each reason says plainly what a request login can do with it. They are open,
  * like the fifth list's, for a step of their own: the ones only a timer or the boot calls (the sweep, the two cleanups, the fence's two) belong to the marker, as 0171 moved
  * the older loops, and the two attempt counters name an account no session yet stands for. Run 3's other five are in the lists their bodies belong to: its bounded resend
@@ -2274,7 +2274,7 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)", "staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.step_up_prerequisite(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)",
-    // 0177's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
+    // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
     "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
     "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",
     "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",

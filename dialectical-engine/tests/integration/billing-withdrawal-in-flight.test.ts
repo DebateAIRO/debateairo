@@ -143,10 +143,9 @@ async function subscriber(label: string, input: Readonly<{ activatedAt: Date; cl
     // The route takes an empty body since the withdrawal asks no re-authentication; the seeded grant is never asked.
     headers: { "x-test-session": identity.rawSessionToken }, payload: {}
   });
-  /** The refund the withdrawal owes at `at` (the clock unless named) for `creditSpentMicros` of credit used. */
-  const refundAt = (creditSpentMicros: number, at: Date = input.clock) => withdrawalRefundMicros({
-    paidTotalMicros: seeded.totalMicros, periodStart: seeded.periodStart, periodEnd: seeded.periodEnd, now: at,
-    creditSpentMicros, monthlyCreditMicros: PLUS_CREDIT
+  /** The refund the withdrawal owes for `creditSpentMicros` of credit used; the day it is made does not count. */
+  const refundAt = (creditSpentMicros: number) => withdrawalRefundMicros({
+    paidMicros: seeded.totalMicros, creditSpentMicros, monthlyCreditMicros: PLUS_CREDIT
   });
   const withdrawn = async () => (await billing.subscriptionEvents(seeded.subscriptionId))
     .filter((event) => event.kind === "WITHDRAWN");
@@ -271,8 +270,8 @@ describe("NV-45 the credit used is read by when each call was SENT", () => {
     await prompt(run, after, new Date(arrival.getTime() + MINUTE));
     await chargeAt(run, 2_000_000, new Date(arrival.getTime() + MINUTE + 1_000), "RUN", after);
     const outcome = await person.byOwner(arrival);
-    expect(outcome.refundMicros).toBe(person.refundAt(1_000_000, arrival));
-    expect(person.refundAt(1_000_000, arrival)).toBeLessThan(person.refundAt(0, arrival));
+    expect(outcome.refundMicros).toBe(person.refundAt(1_000_000));
+    expect(person.refundAt(1_000_000)).toBeLessThan(person.refundAt(0));
     await person.api.close();
   });
 
@@ -283,7 +282,7 @@ describe("NV-45 the credit used is read by when each call was SENT", () => {
     const run = await ownedRun(person.ownerRef);
     await pin(run, person.ownerRef, new Date(arrival.getTime() - MINUTE));
     await claimedJob(run);
-    expect(await person.byOwner(arrival)).toMatchObject({ refundMicros: person.refundAt(0, arrival) });
+    expect(await person.byOwner(arrival)).toMatchObject({ refundMicros: person.refundAt(0) });
     expect(await person.withdrawn()).toHaveLength(1);
     await person.api.close();
   });

@@ -668,7 +668,7 @@ const NATIVE_ONCE_RECIPE_SHA256 = "3ad4ca844799fa0e498124250dba11683d0e305a2e357
 // checkout, and routeLeaseBodyQueries sends a body statement to a lease's client only while its own source is the
 // lease's (a crossAccount frame in a request's lease reaches the target). migrate() is unchanged.
 // The security fixes of audit run 3 brought onto the V4 line: the module carries both sides' lines above, and the
-// erasure_reconcile attestation's comment names the security fixes' step by its number after the V4 line's steps (0177).
+// erasure_reconcile attestation's comment names the security fixes' step by its number after the V4 line's steps (0178).
 // migrate() is the run-3 one (the migration lock tried every 50 ms; its slice, sha256 ceb877cc96cb…, as on the run-3
 // branch): the V4 line left migrate() as it was.
 const NATIVE_MIGRATE_MODULE_SHA256 = "289cee04cb41bcbf507dcd131a85d5f26d0cc4ae9ca23506eee3850d8abd1fb9";

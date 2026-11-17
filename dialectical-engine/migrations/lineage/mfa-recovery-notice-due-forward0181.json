@@ -1,14 +1,14 @@
 {
-  "version": "password-reset-notice-due-forward0178-v1",
+  "version": "mfa-recovery-notice-due-forward0181-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
-    "name": "0177_security_fixes_run3.sql",
-    "manifestSha256": "65a92eea4e744218879e295556d9dfbcc9f049bee7683482c774f9848dccef32",
+    "name": "0180_backup_email_notice_due.sql",
+    "manifestSha256": "2e8a749696d5cb72e2966483b46d13fae14e4ef051ae06e1c75939317c126498",
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
-    "name": "0178_password_reset_notice_due.sql",
-    "sha256": "3789fee9aa6cba26f046ebb6731a425c2d3d937e0c9d1579b76ca10e3d9253ec"
+    "name": "0181_mfa_recovery_notice_due.sql",
+    "sha256": "37eb2189f109135e45b1acd56583dd616fc621961c19b89bd49a5fa8d8ccacc1"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

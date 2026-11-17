@@ -10,13 +10,13 @@ base verifier).
 
 Every migration after 0110 is a forward step in an ordered chain anchored on 0110; 0111 (NETOPIA, PR-54, PR-58) is the
 first, the auth DB batch (0112, below) the second, Part C's prices (0113, below) the third, role rotation (0114,
-below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, the security fixes of audit run 3 (0177, below) the sixty-seventh, the three recovery notice due indexes (0178, 0179 and 0180, below) the sixty-eighth to seventieth, and the MFA recovery control user index (0181, below) the seventy-first. A step is added with new files only; NNNN is its number, the step before's number plus one:
+below) the fourth, the data export (0115, V-41) the fifth, the mail locale (0116, below) the sixth, the debate shape's map (0117, below) the seventh, the language check's site cost (0118, below) the eighth, the reclaim resume (0119, below) the ninth, the reply measures (0120, below) the tenth, the engine verdict (0121, below) the eleventh, the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth, the settings activation (0124, below) the fourteenth, the Italy-specific approval (0125, below) the fifteenth, the synthesis check (0126, below) the sixteenth, the publication review (0127, below) the seventeenth, the threat reports (0128, below) the eighteenth, the support answer scope (0129, below) the nineteenth, row-level security (0130, below) the twentieth, the V4 account memory (0131, below) the twenty-first, the web evidence store (0132, below) the twenty-second, the investigations (0133, below) the twenty-third, the dig model with the month pause (0134, below) the twenty-fourth, the dig picks (0135, below) the twenty-fifth, the investigation reports (0136, below) the twenty-sixth, the public debates (0137, below) the twenty-seventh, the tree updates (0138, below) the twenty-eighth, the passage retention (0139, below) the twenty-ninth, the funded spend kinds (0140, below) the thirtieth, the path suggestions (0141, below) the thirty-first, the team's one limit (0142, below) the thirty-second, the hand-over (0143, below) the thirty-third, the small AI's quota charge (0144, below) the thirty-fourth, the pages waiting after "Add to researched" (0145, below) the thirty-fifth, the Owner's allowances for team members (0146, below) the thirty-sixth, the public tree (0147, below) the thirty-seventh, an erased account keeping its public debates (0148, below) the thirty-eighth, a funded person's public report in the team's month (0149, below) the thirty-ninth, a public debate under review (0150, below) the fortieth, the Report button with the sealed originals' six months (0151, below) the forty-first and a reporter's own reports in their export with what the AI checks on public rows used (0152, below) the forty-second, a finished dig's mark (0153, below) the forty-third, Iceland and Liechtenstein in the Region list (0154, below) the forty-fourth, the owner's two writes on their own answer (0155, below) the forty-fifth, the moderation notice (0156, below) the forty-sixth, the moderation statements (0157, below) the forty-seventh, the small AIs before Start in the person's quota (0158, below) the forty-eighth, the chosen paths sealed per run (0159, below) the forty-ninth, the path results per run (0160, below) the fiftieth, the path progress per run (0161, below) the fifty-first, the saved questions (0162, below) the fifty-second, the carry-on digs without a live sign-in (0163, below) the fifty-third, a dig under the main question updating the main answer (0164, below) the fifty-fourth, a failed question giving back its path-list charge (0165, below) the fifty-fifth, a later main-answer version revising the newest one, whichever table holds it (0166, below) the fifty-sixth, a visitor's report of a public debate carried by a run of their own (0167, below) the fifty-seventh, a debate an update set aside continuing where it stopped (0168, below) the fifty-eighth, the runner reading which settings are switched on (0169, below) the fifty-ninth, the daily outbound mail limit (0170, below) the sixtieth, the security review's fixes in the database (0171, below) the sixty-first, the moderation notice fixes (0172, below) the sixty-second, the check's answer on a report a person already closed (0173, below) the sixty-third, 0150's staff review door without a ground closed to the runtime (0174, below) the sixty-fourth, the statement to a debate's author saying an AI read the report first only for a verdict (0175, below) the sixty-fifth, everyone told "until the review ends" hearing how it ended (0176, below) the sixty-sixth, the security fixes of audit run 3 (0178, below) the sixty-seventh, the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-eighth to seventieth, and the MFA recovery control user index (0182, below) the seventy-first. A step is added with new files only; NNNN is its number, the step before's number plus one:
 
 1. `migrations/NNNN_<name>.sql`: the SQL, forward-only and replayable.
 2. A manifest in `lineage/`, shaped like `billing-netopia-forward111.json`: its version, the recipe's SHA-256,
-   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0181: 0181,
-   `mfa-recovery-control-user-started-forward0181.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
-   0112 to 0129 keep; 0131 to 0181 keep 0130's),
+   `previous` = the name, manifest SHA-256 and EFFECTIVE verifier SHA-256 of the step before (after 0182: 0182,
+   `mfa-recovery-control-user-started-forward0182.json`, and `verify-effective-capabilities-130.sql`, which supersedes 0111's, which
+   0112 to 0129 keep; 0131 to 0182 keep 0130's),
    and its own migration and verifier. (0111's own `previous` is 0110: `auth-dev-preview-20261006-forward110.json`
    and the sealed `verify-effective-capabilities.sql`.)
 3. A new verifier `lineage/verify-effective-capabilities-NNNN.sql` only when the step adds billing relations or
@@ -750,7 +750,7 @@ changes something an earlier step's verifier pins must change that verifier thro
 cannot silently pass. The effective-capability verifier of the last applied step (after 0129: 0111's, which the batch,
 Part C's step, role rotation, the data export, the mail locale, the debate shape map, the language check's site cost,
 the reclaim resume, the reply measures, the engine verdict, the engine's map answer step, the side-by-side releases,
-the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133), the dig model (0134), the dig picks (0135), the investigation reports (0136), the public debates (0137), the tree updates (0138), the passage retention (0139), the funded spend kinds (0140), the path suggestions (0141), the team's one limit (0142), the hand-over (0143), the small AI's quota charge (0144), the pages waiting after "Add to researched" (0145), the public tree (0147), an erased account keeping its public debates (0148), a funded person's public report in the team's month (0149), a public debate under review (0150), the Report button with the sealed originals' six months (0151), a reporter's own reports in their export (0152), a finished dig's mark (0153), the security review's fixes (0171), the security fixes of audit run 3 (0177), the three recovery notice due indexes (0178 to 0180) and the MFA recovery control user index (0181) keep) still
+the settings activation, the Italy-specific approval, the synthesis check, the publication review, the threat reports and the support answer scope keep; after 0130: `verify-effective-capabilities-130.sql`, which the V4 account memory (0131), the web evidence store (0132), the investigations (0133), the dig model (0134), the dig picks (0135), the investigation reports (0136), the public debates (0137), the tree updates (0138), the passage retention (0139), the funded spend kinds (0140), the path suggestions (0141), the team's one limit (0142), the hand-over (0143), the small AI's quota charge (0144), the pages waiting after "Add to researched" (0145), the public tree (0147), an erased account keeping its public debates (0148), a funded person's public report in the team's month (0149), a public debate under review (0150), the Report button with the sealed originals' six months (0151), a reporter's own reports in their export (0152), a finished dig's mark (0153), the security review's fixes (0171), the security fixes of audit run 3 (0178), the three recovery notice due indexes (0179 to 0181) and the MFA recovery control user index (0182) keep) still
 runs at the end of every `migrate()`. A step that changes by design a field an earlier step's postcondition digests
 declares it (`amendsPostconditionsOf`, 0130 below): the earlier step is then compared against its latest recorded
 amendment instead of its receipt.
@@ -921,11 +921,11 @@ The sixty-fifth step (Q3 of the final review of 0172, 11 November 2026), after 0
 
 The sixty-sixth step (what was left of 0172's M3, the owner, 11 November 2026), after the statement to a debate's author saying an AI read the report first only for a verdict 0175 (which restates 0157's statement ground, untouched here): `0176_moderation_final_outcome.sql` with `moderation-final-outcome-forward0176.json` and `packages/db/src/migration-forward0176.ts` (`loadForward0176`, appended last to `STEPS`, `MIGRATION_FORWARD0176_` refusals), `-- n1: drained`, `-- n1: keeps-verifier`. 0157 tells each person whose dig or report left the public page with someone else's content (D7) that it is off "until a person puts it back or the review ends", at a hide and at a dig taken out (0150's rule: the rows written after that dig's first row and before its removal, and the reports asked for in that time, go too). 0172's M3 told them the end only at DECIDE, and only those told at the hide; a review that ended by putting the debate back (REPUBLISH) told them nothing, although what a removal took off and nobody put back stays off the page for good. The step restates 0172's `identity.queue_moderation_statements()` so that a re-publish tells each person told at its review's hide or at a dig taken out during it, once per kind of piece, either what stays off (`CONTRIBUTION_KEPT_OFF`, `REPORT_KEPT_OFF`, measured at the re-publish's own revision with 0150's rules: a dig the hide detached, a row or a report after a dig taken out and not put back since, a report the hide stopped; its ground the steps that keep it off) or that it is back (`CONTRIBUTION_BACK`, `REPORT_BACK`); a decision tells those of a dig taken out too (the debate's owner excepted, whose `DEBATE_DECIDED` says it all); neither tells a piece the review took out itself (it was told `CONTRIBUTION_REMOVED` or `REPORT_REMOVED`), and both wait, unseen and not raised, until every hide and dig taken out of the review has its own statements. It restates 0172's `identity.read_own_moderation_statements(uuid)` so that only the owner's and the person's own step's kinds (`DEBATE_HIDDEN`, `DEBATE_DECIDED`, `CONTRIBUTION_REMOVED`, `REPORT_REMOVED`, `CORRECTED`) carry the facts and their deleted flag, and swaps 0157's `moderation_statement_kind_check` again for the thirteen kinds (validated). The mail and the page give each final notice its country and its duration, and name the other content's rule as such (`mail.statement.groundIntroOther`, `public.moderation.groundIntroOther`); a BACK notice has no ground, source or routes. Drained because 0157's postcondition digests the two functions and the CHECK, declared as one amendment of 0157 (`function_definition` with `relations` and `constraints`); both functions keep their signatures and results, so the release before's sender and page still work beside it. Keeps-verifier because it adds no billing relation or billing function, so `lineage/verify-effective-capabilities-130.sql` stays in force; no `replayVerifierSql`: its checks are its postcondition digest (the two functions whole and the CHECK's definition) and the contract at the end of its file (each body by its digest, owner, settings and grants). Its tests are `tests/integration/moderation-final-outcome-0176.test.ts` and `tests/architecture/moderation-final-outcome-0176-contract.test.ts`. If a step numbered 0176 merges first, this step takes the next free number (every file and constant that carries it, its manifest's `previous` re-chained, its digests recomputed, the chain lists re-pinned).
 
-## The security fixes of audit run 3 (0177)
+## The security fixes of audit run 3 (0178)
 
 The sixty-seventh chain step, after 0176, the last step of the V4 line (security audit run 3, the fix branch's one database
-step): `0177_security_fixes_run3.sql`, `security-fixes-run3-forward0177.json`,
-`packages/db/src/migration-forward0177.ts` (`loadForward0177`, appended last to `STEPS`, `MIGRATION_FORWARD0177_*`
+step): `0178_security_fixes_run3.sql`, `security-fixes-run3-forward0178.json`,
+`packages/db/src/migration-forward0178.ts` (`loadForward0178`, appended last to `STEPS`, `MIGRATION_FORWARD0178_*`
 refusals). Every SQL change of the branch goes into this one file, in one section per issue, each opened by a line
 `-- ==== [<issue id>] <short title> ====` and holding only that issue's statements. Its header declares
 `-- n1: expand` and `-- n1: keeps-verifier`: every section only adds (new functions as `CREATE OR REPLACE FUNCTION` of
@@ -938,11 +938,11 @@ answers of `has_table_privilege` for grants it adds on an earlier step's table, 
 schema it creates, its `triggers`: the enabled flag and definition of a trigger it re-creates on an earlier step's
 table, and its `constraints`: the name, type and definition, without a trailing `NOT VALID`, of a constraint it adds
 on an earlier step's table, never that table whole), and the loader refuses
-`MIGRATION_FORWARD0177_SECTIONS` when the file's section headers and that list disagree. The fix branch built this step
+`MIGRATION_FORWARD0178_SECTIONS` when the file's section headers and that list disagree. The fix branch built this step
 and the four index steps after it as 0125 to 0129; `origin/dev` took 0125 to 0130 first, so they were renumbered to
 0131 to 0135 at the merge onto that dev (2026-10-29: every file and constant that carries the number, the manifests
 re-chained from 0130's, which also hands them 0130's verifier, and the chain lists re-pinned). The V4 line then took
-0131 to 0176, so the five steps moved again, to 0177 to 0181, when the branch was brought onto that dev: every file
+0131 to 0176, so the five steps moved again, to 0178 to 0182, when the branch was brought onto that dev: every file
 and constant that carries the number, the manifests re-chained from 0176's (whose verifier is still 0130's), and the
 step lines added to the tests' one list of the chain. Two statements changed: `[NV-50]`'s shared source list,
 rebuilt on the newest list (0158's) plus the two new sources, as the first renumber rebuilt it on 0128's; and
@@ -1124,34 +1124,34 @@ the connection is the account's own (`identity.request_owner_matches`), as 0171 
   maximum; the run's or story's envelope and the site's day count it, and no person reader does. The loader's
   `constraints` entry digests the new restriction only: the shared list stays unpinned (W-0117), and a later
   contract step validates both. It stays last because the pair takes ACCESS EXCLUSIVE on `ledger.model_spend` until
-  0177 commits, so every spend read and write of the release before waits for the rest of the step.
+  0178 commits, so every spend read and write of the release before waits for the rest of the step.
 
 While the branch is open, each issue inserts its section, its entry in `SECTIONS` (keeping every earlier entry) and
 its bullet above just before `[NV-50]`'s, which stays last, recomputes `migration.sha256` with the one-liner at the end of this file, and extends the
-chain's tests; once the step is applied anywhere, 0177 is never edited again. If `origin/dev` takes 0177 first,
+chain's tests; once the step is applied anywhere, 0178 is never edited again. If `origin/dev` takes 0178 first,
 renumber this step (rename every file and constant that carries the number, recompute the manifest, re-pin the chain
 lists).
 
-## Recovery notice due indexes (0178-0180)
+## Recovery notice due indexes (0179-0181)
 
-The sixty-eighth, sixty-ninth and seventieth chain steps, after the security fixes of audit run 3 (0177; security audit run
+The sixty-eighth, sixty-ninth and seventieth chain steps, after the security fixes of audit run 3 (0178; security audit run
 3, NV-38): the pending-only due indexes of the three recovery mail outboxes, in the shape 0103 gives
 `identity.password_recovery_notice` (`(available_at, created_at, notice_id) WHERE sent_at IS NULL AND dead_at IS NULL`),
 so that every claim on them, the release before's and this release's alike, reads only pending rows instead of the
 whole retained history:
 
-- `0178_password_reset_notice_due.sql`, `password-reset-notice-due-forward0178.json`,
-  `packages/db/src/migration-forward0178.ts` (`loadForward0178`, `MIGRATION_FORWARD0178_*` refusals):
+- `0179_password_reset_notice_due.sql`, `password-reset-notice-due-forward0179.json`,
+  `packages/db/src/migration-forward0179.ts` (`loadForward0179`, `MIGRATION_FORWARD0179_*` refusals):
   `identity.password_reset_notice_due`;
-- `0179_backup_email_notice_due.sql`, `backup-email-notice-due-forward0179.json`,
-  `packages/db/src/migration-forward0179.ts` (`loadForward0179`, `MIGRATION_FORWARD0179_*`):
-  `identity.backup_email_notice_due`;
-- `0180_mfa_recovery_notice_due.sql`, `mfa-recovery-notice-due-forward0180.json`,
+- `0180_backup_email_notice_due.sql`, `backup-email-notice-due-forward0180.json`,
   `packages/db/src/migration-forward0180.ts` (`loadForward0180`, `MIGRATION_FORWARD0180_*`):
+  `identity.backup_email_notice_due`;
+- `0181_mfa_recovery_notice_due.sql`, `mfa-recovery-notice-due-forward0181.json`,
+  `packages/db/src/migration-forward0181.ts` (`loadForward0181`, `MIGRATION_FORWARD0181_*`):
   `identity.mfa_recovery_notice_due`.
 
 Each header declares `-- n1: expand`, `-- n1: keeps-verifier` and `-- n1: outside-transaction`, and each body is ONE
-`CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON identity.<table> …`. They cannot be sections of 0177: `CREATE INDEX`
+`CREATE INDEX CONCURRENTLY IF NOT EXISTS <name> ON identity.<table> …`. They cannot be sections of 0178: `CREATE INDEX`
 without `CONCURRENTLY` on an existing table is refused in an expand step (step 7 above), and PostgreSQL refuses a
 concurrent build inside a transaction block, which every other step runs in. `CONCURRENTLY` takes SHARE UPDATE
 EXCLUSIVE only, so the release before keeps reading and writing the tables during a build. `migrate()` builds each
@@ -1161,32 +1161,32 @@ lock waits leaves an INVALID index, which the next run drops concurrently and bu
 loader, `packages/db/src/migration-forward-concurrent-index.ts` (`loadConcurrentIndexStep`): it checks the manifest as
 `loadForward0124` does, refuses `MIGRATION_FORWARD01NN_INDEX_DECLARATION` unless the header's index is the step's own,
 and has no `replayVerifierSql`: the postcondition is the index row whole (its definition, valid, ready, not unique, its
-owner). Each step keeps the verifier 0177 names (`verify-effective-capabilities-130.sql`), so its manifest names it as
+owner). Each step keeps the verifier 0178 names (`verify-effective-capabilities-130.sql`), so its manifest names it as
 both `previous.verifierSha256` and its own. A later index step on an existing table is one more such file, manifest and
-three-line loader on the shared one (NV-15's `mfa_recovery_control_user_started`, 0181 below, is the next).
+three-line loader on the shared one (NV-15's `mfa_recovery_control_user_started`, 0182 below, is the next).
 
 A test seed that applies steps with `applyForwardStep` inside one transaction (`tests/support/devLineage108.ts`,
-`seedDevLineageThroughStep`) cannot seed through 0178 or later: nothing builds the index, so the step is refused
-`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID`. Such a seed stops at 0177, or runs `runOutsideTransactionStep` first.
+`seedDevLineageThroughStep`) cannot seed through 0179 or later: nothing builds the index, so the step is refused
+`MIGRATION_OUTSIDE_TRANSACTION_INDEX_INVALID`. Such a seed stops at 0178, or runs `runOutsideTransactionStep` first.
 
-**Re-sealing after a 0177 change.** Each manifest's `previous.manifestSha256` is the SHA-256 of the manifest of the
-step before it, so any change to 0177 (a new section, then its `migration.sha256`) changes 0177's manifest and refuses
-0178 (`MIGRATION_FORWARD0178_MANIFEST`), and with it 0179, 0180 and 0181. After the last 0177 edit, recompute 0177's
-`migration.sha256`, then `previous.manifestSha256` of 0178, then of 0179, then of 0180, then of 0181 (NV-15's index
+**Re-sealing after a 0178 change.** Each manifest's `previous.manifestSha256` is the SHA-256 of the manifest of the
+step before it, so any change to 0178 (a new section, then its `migration.sha256`) changes 0178's manifest and refuses
+0179 (`MIGRATION_FORWARD0179_MANIFEST`), and with it 0180, 0181 and 0182. After the last 0178 edit, recompute 0178's
+`migration.sha256`, then `previous.manifestSha256` of 0179, then of 0180, then of 0181, then of 0182 (NV-15's index
 step, below; and of any later step after it), in that order. From the project root, this one command does all of it and prints
 each manifest it re-chained:
 
 ```
-node -e 'const fs=require("node:fs"),h=b=>require("node:crypto").createHash("sha256").update(b).digest("hex"),L="migrations/lineage/",all=fs.readdirSync(L).filter(f=>f.endsWith(".json")).map(f=>({f,m:JSON.parse(fs.readFileSync(L+f,"utf8"))})),put=e=>fs.writeFileSync(L+e.f,JSON.stringify(e.m,null,2)+"\n");let e=all.find(x=>x.m.migration?.name==="0177_security_fixes_run3.sql");e.m.migration.sha256=h(fs.readFileSync("migrations/"+e.m.migration.name));put(e);for(let n;(n=all.find(x=>x.m.previous?.name===e.m.migration.name));e=n){n.m.previous.manifestSha256=h(fs.readFileSync(L+e.f));put(n);console.log("re-chained",n.f);}'
+node -e 'const fs=require("node:fs"),h=b=>require("node:crypto").createHash("sha256").update(b).digest("hex"),L="migrations/lineage/",all=fs.readdirSync(L).filter(f=>f.endsWith(".json")).map(f=>({f,m:JSON.parse(fs.readFileSync(L+f,"utf8"))})),put=e=>fs.writeFileSync(L+e.f,JSON.stringify(e.m,null,2)+"\n");let e=all.find(x=>x.m.migration?.name==="0178_security_fixes_run3.sql");e.m.migration.sha256=h(fs.readFileSync("migrations/"+e.m.migration.name));put(e);for(let n;(n=all.find(x=>x.m.previous?.name===e.m.migration.name));e=n){n.m.previous.manifestSha256=h(fs.readFileSync(L+e.f));put(n);console.log("re-chained",n.f);}'
 ```
 
-If 0177 ever names a verifier of its own, set each later manifest's `previous.verifierSha256` and `verifier` to it too.
-If `origin/dev` takes 0178, 0179 or 0180 first, renumber these steps (rename every file and constant that carries the
+If 0178 ever names a verifier of its own, set each later manifest's `previous.verifierSha256` and `verifier` to it too.
+If `origin/dev` takes 0179, 0180 or 0181 first, renumber these steps (rename every file and constant that carries the
 number, recompute the manifests, re-pin the chain lists).
 
-## The MFA recovery control user index (0181)
+## The MFA recovery control user index (0182)
 
-The seventy-first chain step, after the recovery notice due indexes (0178-0180; security audit run 3, NV-15 and NV-16):
+The seventy-first chain step, after the recovery notice due indexes (0179-0181; security audit run 3, NV-15 and NV-16):
 `identity.mfa_recovery_control_user_started` on `identity.mfa_recovery_control (user_id, email_expires_at)`. NV-15's
 account-level count of unpaired link-password failures and its latest pairing (`identity.mfa_recovery_record_failure`)
 and NV-16's per-destination start count (`identity.mfa_recovery_start_bounded`) read the table by `user_id`, which no
@@ -1194,15 +1194,15 @@ other index leads with (the only one is 0112's partial `mfa_recovery_control_one
 (rows go only with erasure and the FK cascade). The second column bounds both counts' `email_expires_at` test. Neither
 plan's SQL changes: the index only serves their reads.
 
-- `0181_mfa_recovery_control_user_started.sql`, `mfa-recovery-control-user-started-forward0181.json`,
-  `packages/db/src/migration-forward0181.ts` (`loadForward0181`, `MIGRATION_FORWARD0181_*` refusals):
+- `0182_mfa_recovery_control_user_started.sql`, `mfa-recovery-control-user-started-forward0182.json`,
+  `packages/db/src/migration-forward0182.ts` (`loadForward0182`, `MIGRATION_FORWARD0182_*` refusals):
   `identity.mfa_recovery_control_user_started`.
 
-It is shaped like 0178-0180 (above): its header declares `-- n1: expand`, `-- n1: keeps-verifier` and
+It is shaped like 0179-0181 (above): its header declares `-- n1: expand`, `-- n1: keeps-verifier` and
 `-- n1: outside-transaction`, its body is ONE `CREATE INDEX CONCURRENTLY IF NOT EXISTS …`, its three-line loader runs on
 the shared `packages/db/src/migration-forward-concurrent-index.ts` (the postcondition is the index row whole, and there
 is no `replayVerifierSql`), and its manifest names 0130's verifier (`verify-effective-capabilities-130.sql`) as both
-`previous.verifierSha256` and its own. Its `previous` is 0180, so its `previous.manifestSha256` is the SHA-256 of
-`mfa-recovery-notice-due-forward0180.json`: a change to 0177 re-chains it too, and the one-liner of "Re-sealing after a
-0177 change" (above) walks to it by `previous.name`. If `origin/dev` takes 0181 first, renumber this step (rename every
+`previous.verifierSha256` and its own. Its `previous` is 0181, so its `previous.manifestSha256` is the SHA-256 of
+`mfa-recovery-notice-due-forward0181.json`: a change to 0178 re-chains it too, and the one-liner of "Re-sealing after a
+0177 change" (above) walks to it by `previous.name`. If `origin/dev` takes 0182 first, renumber this step (rename every
 file and constant that carries the number, recompute the manifest, re-pin the chain lists).

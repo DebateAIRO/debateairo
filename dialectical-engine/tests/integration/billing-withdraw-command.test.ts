@@ -501,9 +501,9 @@ describe("W6 Settings and the owner's command: the refund after an upgrade, the 
     const day13 = new Date(activatedAt.getTime() + 13 * DAY);
     const reads: Array<readonly [string, Date, Date]> = [];
     const counted = {
-      readOwnerSpentMicros: async (ownerRef: string, from: Date, to: Date) => {
+      readWithdrawalSpend: async (ownerRef: string, from: Date, to: Date) => {
         reads.push([ownerRef, from, to]);
-        return 1_980_000;
+        return { spentMicros: 1_980_000, liveRuns: 0 };
       }
     };
     // 30 % of Plus's made-up 6.60 credit used (1.98), 4.62 left: 24.20 × 4.62 ÷ 6.60 = 24.20 × 0.7 = 16.94 back.

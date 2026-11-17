@@ -1,12 +1,12 @@
--- 0180 · The MFA-recovery outbox's pending-only due index (security audit run 3, NV-38), in the shape 0103:434
--- gives identity.password_recovery_notice: every claim on identity.mfa_recovery_notice, the release before's and this
+-- 0179 · The password-reset outbox's pending-only due index (security audit run 3, NV-38), in the shape 0103:434
+-- gives identity.password_recovery_notice: every claim on identity.password_reset_notice, the release before's and this
 -- release's alike, then reads only pending rows, however much finished history the table keeps.
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
 -- n1: keeps-verifier
 -- n1: outside-transaction
---   expand               additive only: one new index on a table 0106 created. CONCURRENTLY takes SHARE UPDATE
+--   expand               additive only: one new index on a table 0104 created. CONCURRENTLY takes SHARE UPDATE
 --                        EXCLUSIVE only, so the release before keeps reading and writing the table during the build,
 --                        and its own claims use the index too (their predicates carry sent_at IS NULL AND dead_at IS
 --                        NULL).
@@ -17,4 +17,4 @@
 --                        wait, five tries, an INVALID leftover dropped concurrently before the build), then records
 --                        the step in a step transaction that refuses unless the index is valid and on this table
 --                        (packages/db/src/migration-forward-chain.ts runOutsideTransactionStep).
-CREATE INDEX CONCURRENTLY IF NOT EXISTS mfa_recovery_notice_due ON identity.mfa_recovery_notice (available_at,created_at,notice_id) WHERE sent_at IS NULL AND dead_at IS NULL;
+CREATE INDEX CONCURRENTLY IF NOT EXISTS password_reset_notice_due ON identity.password_reset_notice (available_at,created_at,notice_id) WHERE sent_at IS NULL AND dead_at IS NULL;

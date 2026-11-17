@@ -1822,17 +1822,17 @@ back the code needs no database step: the two columns, the three CHECKs and the 
 writes the new kind or the two columns, and its export still calls 0115's `identity.read_data_export_snapshot`, which
 0125 calls and does not replace.
 
-### Upgrading to the security fixes of audit run 3 (migrations 0177-0181)
+### Upgrading to the security fixes of audit run 3 (migrations 0178-0182)
 
 > Order: §5 "Side-by-side upgrades": the new checkout is the new release's folder, and this section's pin and restart lines mean that order's steps 3 and 9 to 12 (§5 "A new register version is a new release"). This section adds only what this release needs.
 
 This release adds five migrations after `0176_moderation_final_outcome.sql`, all `n1: expand`, so §5's migration step
-applies them while the older release keeps serving: `migrations/0177_security_fixes_run3.sql` (the run's new functions,
-one section per issue) and four index steps: `0178_password_reset_notice_due.sql`, `0179_backup_email_notice_due.sql`
-and `0180_mfa_recovery_notice_due.sql`, the pending-only due indexes of the three recovery mail outboxes (NV-38), and
-`0181_mfa_recovery_control_user_started.sql`, the per-account index of the MFA-recovery control table (NV-15, NV-16).
+applies them while the older release keeps serving: `migrations/0178_security_fixes_run3.sql` (the run's new functions,
+one section per issue) and four index steps: `0179_password_reset_notice_due.sql`, `0180_backup_email_notice_due.sql`
+and `0181_mfa_recovery_notice_due.sql`, the pending-only due indexes of the three recovery mail outboxes (NV-38), and
+`0182_mfa_recovery_control_user_started.sql`, the per-account index of the MFA-recovery control table (NV-15, NV-16).
 
-- **Apply 0177 in a quiet window, or with the API, the runner and any scheduler job stopped.** 0177 is one
+- **Apply 0178 in a quiet window, or with the API, the runner and any scheduler job stopped.** 0178 is one
   transaction, and it holds every lock it takes until its COMMIT. That COMMIT comes only after all of its sections,
   its verifier and postcondition, and every applied step's replay verifier and postcondition. Three sections take
   strong locks on tables the serving release uses all the time:
@@ -1842,24 +1842,24 @@ and `0180_mfa_recovery_notice_due.sql`, the pending-only due indexes of the thre
     `NOT VALID`), which takes ACCESS EXCLUSIVE on `ledger.model_spend`.
 
   Sign-in, sign-up, every money check and every charge wait behind these until the COMMIT. Each lock wait of the step
-  lasts at most 2 s and is tried five times; then the run fails with `MIGRATION_LOCK_TIMEOUT 0177_security_fixes_run3.sql`.
+  lasts at most 2 s and is tried five times; then the run fails with `MIGRATION_LOCK_TIMEOUT 0178_security_fixes_run3.sql`.
   A transaction of the serving release that already holds `ledger.model_spend` (a charge or a money check) and then
   touches `identity."user"` can deadlock with the step. PostgreSQL then ends one side with SQLSTATE 40P01, which is
   not retried (`packages/db/src/migration-transaction.ts` retries only 55P03). Either way the step rolls back whole
-  and nothing of 0177 remains: rerun `db:migrate` when traffic is quiet, or stop the API and the runner for the run.
+  and nothing of 0178 remains: rerun `db:migrate` when traffic is quiet, or stop the API and the runner for the run.
 - The four index steps build their indexes concurrently (`CREATE INDEX CONCURRENTLY`) while the serving release keeps
   writing. On a large table a build takes time.
 - Each build waits for every transaction that holds an older snapshot. A backup running at the same time, or a long or
   idle-in-transaction session, makes the build run out of its 2 s wait five times. The backup can be the nightly
   `deploy/vps/backup.sh`, or the online backup from §9 "The online backup before side-by-side migrations" if it starts
-  late. The run then ends with `MIGRATION_LOCK_TIMEOUT 0178_…` (or `0179_…`, `0180_…`, `0181_…`). Start the migrations after
+  late. The run then ends with `MIGRATION_LOCK_TIMEOUT 0179_…` (or `0180_…`, `0181_…`, `0182_…`). Start the migrations after
   `ONLINE_BACKUP_OK` and outside the nightly backup's window. If the run fails, rerun it after that transaction ends:
   the INVALID index is dropped and rebuilt.
 - Two runs of this release's `db:migrate` no longer deadlock, because each waits for the migration lock by trying it
   every 50 ms and holds no snapshot between tries. The older release's migrator still waits inside its lock statement,
   holding a snapshot, until this release's run releases the lock after its last step. So do not restart the older
-  release while this release's `db:migrate` runs, from its prologue to its last step, not only while 0178-0181 build.
-  An older migrator that starts waiting during the prologue, during 0177 or during an earlier build is still waiting
+  release while this release's `db:migrate` runs, from its prologue to its last step, not only while 0179-0182 build.
+  An older migrator that starts waiting during the prologue, during 0178 or during an earlier build is still waiting
   when the next build reaches its snapshot wait, so it is in that build's cycle. If the older release restarts anyway,
   the deadlock detector ends one side with SQLSTATE 40P01, which is not retried
   (`packages/db/src/migration-transaction.ts` retries only 55P03). For each build, the older migrator is in the cycle
@@ -1872,7 +1872,7 @@ and `0180_mfa_recovery_notice_due.sql`, the pending-only due indexes of the thre
     Its restart fails; restart it after this release's run ends.
 
   An older migrator that starts waiting after one build's snapshot wait has begun is not in that build's cycle. It is
-  in the next build's cycle (0179, 0180 or 0181), and by then it has waited longer than `deadlock_timeout`, so that build
+  in the next build's cycle (0180, 0181 or 0182), and by then it has waited longer than `deadlock_timeout`, so that build
   fails. In every case, rerun the side that failed.
 - After the run (read-only, as `postgres`): `SELECT indexrelid::regclass, indisvalid FROM pg_index WHERE indexrelid IN
   ('identity.password_reset_notice_due'::regclass,'identity.backup_email_notice_due'::regclass,'identity.mfa_recovery_notice_due'::regclass,'identity.mfa_recovery_control_user_started'::regclass);`
@@ -2418,7 +2418,7 @@ Limits:
   it.
 - Erased keys come back with the custody tree until they are re-erased; see "What erasure means for a
   backup".
-- **An artefact from before migration 0177 sets no hold.** The block prints `RESTORE_FENCE_CLEARED`,
+- **An artefact from before migration 0178 sets no hold.** The block prints `RESTORE_FENCE_CLEARED`,
   and the next release carrying NV-07 initialises without a hold. The custody restore can still bring
   back the keys of debates unpublished after the artefact time. So with such an artefact, the owner
   reconciles unpublishes and erasures **before any API starts**, and starts the API only once that is

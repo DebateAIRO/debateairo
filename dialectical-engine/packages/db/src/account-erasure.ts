@@ -75,7 +75,7 @@ const ERASURE_FUNCTION_SIGNATURES = Object.freeze([
   // 0147: its copy of the public page, its check's pass, its climb's mark and an answer version under its key.
   FORGET_ERASED_DEBATE_PUBLIC_TREE
 ] as const);
-/** K02 (0177): erasure capabilities in the erasure_reconcile schema, which the N-1 release (counting identity, core, serve) does not attest. Resolved by OID, never by text, on the attested pool; each entry lands with its 0177 section. */
+/** K02 (0178): erasure capabilities in the erasure_reconcile schema, which the N-1 release (counting identity, core, serve) does not attest. Resolved by OID, never by text, on the attested pool; each entry lands with its 0178 section. */
 const ERASURE_RECONCILE_FUNCTION_SIGNATURES = Object.freeze([
   "erasure_reconcile.fail_account_erasure_notification(uuid,uuid,text)",
   "erasure_reconcile.prepare_private_run_erasure(uuid,uuid,uuid,uuid,text)",
@@ -447,7 +447,7 @@ export async function assertAccountErasureDatabaseRole(
   }
 }
 
-/** NV-02 (0177): FAILED re-queues the row with backoff; both DEAD_LETTERED results settle it (a DEAD: code and an audit event). */
+/** NV-02 (0178): FAILED re-queues the row with backoff; both DEAD_LETTERED results settle it (a DEAD: code and an audit event). */
 export type AccountErasureNotificationFailure =
   | "FAILED" | "DEAD_LETTERED_RECIPIENT" | "DEAD_LETTERED_ATTEMPT_CAP" | "CONTENDED";
 
@@ -676,7 +676,7 @@ export class PostgresAccountErasureRepository {
   async failNotification(
     messageId:string,claimToken:string,errorCode:string
   ): Promise<AccountErasureNotificationFailure> {
-    // NV-02 (0177): the fail that can settle a row (0040's identity fail keeps its grant for the release before).
+    // NV-02 (0178): the fail that can settle a row (0040's identity fail keeps its grant for the release before).
     const result = await this.pool.query<{ outcome:string|null }>(
       "SELECT erasure_reconcile.fail_account_erasure_notification($1,$2,$3) AS outcome",
       [messageId,claimToken,errorCode]
@@ -695,7 +695,7 @@ export class PostgresAccountErasureRepository {
   }
 
   async claimRunKeyProvisionCleanup(limit = 100): Promise<readonly RunKeyProvisionCleanup[]> {
-    // NV-08 (0177): the claim that skips owners the intent trigger refuses; 0040's core claim stays for the release before.
+    // NV-08 (0178): the claim that skips owners the intent trigger refuses; 0040's core claim stays for the release before.
     const result = await this.runProvisionPool.query<{
       run_id: string;
       user_id: string;
@@ -844,7 +844,7 @@ export class AccountErasureCoordinator {
     // key destruction strictly after every supported channel row is settled:
     // ACKed after the transport accepted it, or dead-lettered by
     // erasure_reconcile.fail_account_erasure_notification with a DEAD: code and an
-    // identity.account.erasure_notice_dead_lettered audit event (0177, NV-02). This also
+    // identity.account.erasure_notice_dead_lettered audit event (0178, NV-02). This also
     // prevents a cross-process SCHEDULED sender from retaining plaintext while
     // a later completion cycle shreds the key.
     if (!await this.repository.completionNotificationsReady(erasureId)) return "CONTENDED";
@@ -1049,7 +1049,7 @@ export class PostgresPrivateRunErasureRepository {
     sessionId: string;
     grantTokenHash: string;
   }>): Promise<Readonly<{ outcome: PrivateRunErasureOutcome; erasureId: string | null }>> {
-    // NV-30 (0177): the grant is checked before any lock, and the named run's content lease is tried, never waited for,
+    // NV-30 (0178): the grant is checked before any lock, and the named run's content lease is tried, never waited for,
     // inside this one statement; contention answers CONTENDED to an authorized caller only and spends nothing.
     const result = await this.pool.query<{ outcome: PrivateRunErasureOutcome; erasure_id: string | null }>(
       "SELECT * FROM erasure_reconcile.prepare_private_run_erasure($1,$2,$3,$4,$5)",

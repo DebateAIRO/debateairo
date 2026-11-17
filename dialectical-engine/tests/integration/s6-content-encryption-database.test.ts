@@ -1914,7 +1914,7 @@ describe("S6 content encryption on disposable PostgreSQL", () => {
         "core.complete_run_key_provision_cleanup(uuid,uuid)",
         // 0123 §4 (side-by-side spec §4): the readmitted run's provision is the content role's alone too.
         "core.prepare_readmitted_run_key_provision(uuid,uuid)",
-        // NV-08 (0177): an EXECUTE-only grant here, with no USAGE on the schema, is refused by OID too.
+        // NV-08 (0178): an EXECUTE-only grant here, with no USAGE on the schema, is refused by OID too.
         "erasure_reconcile.claim_run_key_provision_cleanup(integer)"
       ] as const;
       for (const signature of provisionSignatures) {

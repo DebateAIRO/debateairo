@@ -292,7 +292,7 @@ export class PostgresSessionRepository {
 
   /**
    * NV-04: charge one login TOTP attempt to the (account, factor) budget before the code is checked
-   * (identity.totp_login_admit, 0177 [NV-04]). PostgreSQL errors propagate unchanged; the service maps a 23503
+   * (identity.totp_login_admit, 0178 [NV-04]). PostgreSQL errors propagate unchanged; the service maps a 23503
    * (the account removed after its challenge was read).
    */
   async admitTotpLoginAttempt(input: Readonly<{

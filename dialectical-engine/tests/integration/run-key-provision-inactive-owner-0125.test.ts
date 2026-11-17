@@ -20,7 +20,7 @@ import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js
  * NV-08 (security-audit run 3, K02). An expired orphan run-key provision intent whose owner is no longer in a state the
  * intent trigger admits (identity.enforce_active_user_child: pending_verification, pending_mfa, active) made 0040's
  * core.claim_run_key_provision_cleanup fail as a whole statement (55000 ACCOUNT_NOT_ACTIVE), so no other owner's orphan
- * was ever cleaned and the coordinator's reconcileRunKeyProvisionIntents rejected on every 30 s pass. 0177's
+ * was ever cleaned and the coordinator's reconcileRunKeyProvisionIntents rejected on every 30 s pass. 0178's
  * erasure_reconcile.claim_run_key_provision_cleanup skips such owners and claims everyone else. It lives in the new
  * schema erasure_reconcile, which the N-1 release's exact-count witnesses do not count, and the new release's
  * content-provision witness counts it by catalog OID, so a swapped pool still gets the bounded refusal.
@@ -215,7 +215,7 @@ describe("NV-08 · run-key provision cleanup skips owners the intent trigger ref
     });
   });
 
-  it("keeps the N-1 release's exact counts, and both releases' attestations hold on 0177", async () => {
+  it("keeps the N-1 release's exact counts, and both releases' attestations hold on 0178", async () => {
     const counts = (await database.pool.query<{ erasure: number; provision: number }>(`
       SELECT
         (SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
@@ -252,11 +252,11 @@ describe("NV-08 · run-key provision cleanup skips owners the intent trigger ref
     });
   });
 
-  it("digests the schema's ACL in 0177's postcondition, so a later grant on it is drift", async () => {
+  it("digests the schema's ACL in 0178's postcondition, so a later grant on it is drift", async () => {
     await database.pool.query("GRANT USAGE ON SCHEMA erasure_reconcile TO debateai_runtime");
     try {
       await expect(migrate(database.pool))
-        .rejects.toThrow("MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0177_security_fixes_run3.sql");
+        .rejects.toThrow("MIGRATION_FORWARD_CHAIN_POSTCONDITION_DRIFT 0178_security_fixes_run3.sql");
     } finally {
       await database.pool.query("REVOKE USAGE ON SCHEMA erasure_reconcile FROM debateai_runtime");
     }

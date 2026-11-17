@@ -64,13 +64,13 @@ The proposal emits each changed key, comparable old/new canonical value and sour
 
 **Verify never applies a database step.** `verifyNativeState` reads the ledger and the resolution table's logical names first (a lineage without that table counts as having none) and, when any numbered migration the source holds is recorded in neither (the list `loadMigrationPlan` checks for its source inventory: the recipe's sources, 0108, dev's 0110, which `migrate()` applies after 0108, and the chain after it: 0111, NETOPIA's billing tables, then 0112, the auth DB batch, 0113, Part C's prices per currency, and 0114, role rotation's pin table), refuses with `PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP` before `migrate()` runs, so nothing is written. A release that adds such a step needs the native operator's `apply-and-plan`, with the owner's yes, before that release's next start; until then `verify`, `publish` and every start (the lifecycle prestart runs `verify`) refuse. The native operator then prints that one line, `PREVIEW_NATIVE_VERIFY_PENDING_FORWARD_STEP: not applied yet: <steps>. …` (every other failure stays `PREVIEW_NATIVE_OPERATION_REFUSED`), and `publish` refuses before it writes a register version; after a refused start, run the native operator's `verify` to read it.
 
-**The recovery notice due indexes (0178-0180, security audit run 3 NV-38).** `apply-and-plan` applies them after 0177:
+**The recovery notice due indexes (0179-0181, security audit run 3 NV-38).** `apply-and-plan` applies them after 0178:
 three outside-transaction steps that build one index each concurrently (`CREATE INDEX CONCURRENTLY`) on the recovery
-mail outboxes while the serving release keeps writing; on a large table a build takes time. 0181 (NV-15, NV-16), the
+mail outboxes while the serving release keeps writing; on a large table a build takes time. 0182 (NV-15, NV-16), the
 MFA-recovery control table's per-account index `identity.mfa_recovery_control_user_started`, is one more such step after
 them and behaves the same way. Each build waits for every
 transaction that holds an older snapshot: a backup, or a long or idle-in-transaction session, makes it run out of its
-2 s wait five times, and the run ends `MIGRATION_LOCK_TIMEOUT 0178_…` (or `0179_…`, `0180_…`, `0181_…`); rerun it after that
+2 s wait five times, and the run ends `MIGRATION_LOCK_TIMEOUT 0179_…` (or `0180_…`, `0181_…`, `0182_…`); rerun it after that
 transaction ends (the INVALID index is dropped and rebuilt). Two runs of this release's migrator no longer deadlock:
 each tries the migration lock every 50 ms and holds no snapshot between tries. The older release's migrator still waits
 inside its lock statement holding a snapshot, and its prestart `verify` runs `migrate()`, so do not restart the older

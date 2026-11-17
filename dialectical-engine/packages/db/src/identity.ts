@@ -451,7 +451,7 @@ export class PostgresIdentityRepository {
   }
 
   /**
-   * NV-14 (0177): the same consume, which on every valid consume also writes the token holder's password hash and, on
+   * NV-14 (0178): the same consume, which on every valid consume also writes the token holder's password hash and, on
    * the pending_verification transition, deletes the account's provider links, in this one transaction.
    */
   async consumeVerificationSetPassword(input: {

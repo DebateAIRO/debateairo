@@ -409,10 +409,10 @@ describe("0123: the side-by-side releases step", () => {
       "the engine's map answer step (0122, below) the twelfth, the side-by-side releases (0123, below) the thirteenth");
   });
 
-  it("is the plan's step after 0122 and before 0124 (the settings activation, then the Italy-specific approval 0125, synthesis-flag's 0126-0129, row-level security 0130, the security fixes 0177, the due indexes 0178 to 0180 and the control user index 0181), with no supplemental verifier", async () => {
+  it("is the plan's step after 0122 and before 0124 (the settings activation, then the Italy-specific approval 0125, synthesis-flag's 0126-0129, row-level security 0130, the security fixes 0178, the due indexes 0179 to 0181 and the control user index 0182), with no supplemental verifier", async () => {
     const plan = await loadMigrationPlan();
     // The Italy-specific approval (0125) and synthesis-flag's 0126-0129 and row-level security's 0130 follow 0124 (merges of 2026-10-26 and 2026-10-28),
-    // then the security fixes of audit run 3 (0177), the due indexes (0178 to 0180) and the control user index (0181),
+    // then the security fixes of audit run 3 (0178), the due indexes (0179 to 0181) and the control user index (0182),
     // so the steps are found by name, not by the chain's end.
     const names = plan.forwardChain.map((step) => step.name);
     const at = names.indexOf("0123_side_by_side_releases.sql");
@@ -420,7 +420,7 @@ describe("0123: the side-by-side releases step", () => {
     expect(names[at - 1]).toBe("0122_engine_map_check.sql");
     expect(names[at + 1]).toBe("0124_settings_activation.sql");
     expect(names[at + 2]).toBe("0125_italy_specific_approval.sql");
-    expect(names.indexOf("0177_security_fixes_run3.sql")).toBeGreaterThan(names.indexOf("0130_row_level_security.sql"));
+    expect(names.indexOf("0178_security_fixes_run3.sql")).toBeGreaterThan(names.indexOf("0130_row_level_security.sql"));
     expect(plan.forwardChain[at]?.replayVerifierSql).toBeUndefined();
     expect(plan.forwardChain[at]?.verifierPath).toBe("lineage/verify-effective-capabilities-111.sql");
   });
