@@ -164,38 +164,39 @@ describe("S01-C4 debate tier stylesheet contract", () => {
     expect(declarations(".ndSelect select:disabled")).toBe("cursor: not-allowed;");
   });
 
+  // M2-M7 pin the token VALUES of the Design Document v2 palette (light first, dark second).
   test("M2 · the chosen option's colour tokens match the measured values in both modes", () => {
     expect(modeTokenValues(["--line-strong", "--shell"])).toEqual({
-      "--line-strong": ["rgba(41,38,31,.20)", "rgba(242,234,217,.18)"],
-      "--shell": ["#EFE9E0", "#221D17"],
+      "--line-strong": ["#D3D9E4", "#34405A"],
+      "--shell": ["#EEF1F6", "#232C3C"],
     });
   });
 
   test("M3 · the unchosen option's colour tokens match the measured values in both modes", () => {
     expect(modeTokenValues(["--line", "--core"])).toEqual({
-      "--line": ["rgba(41,38,31,.10)", "rgba(242,234,217,.09)"],
-      "--core": ["#FDFBF6", "#181410"],
+      "--line": ["#E3E7EF", "#263042"],
+      "--core": ["#FFFFFF", "#171E2B"],
     });
   });
 
   test("M4 · the chosen tier-name tokens match the measured values in both modes", () => {
     expect(modeTokenValues(["--ink", "--bg"])).toEqual({
-      "--ink": ["#29261F", "#F2EAD9"],
-      "--bg": ["#F9F6F1", "#14110E"],
+      "--ink": ["#121826", "#EEF2F8"],
+      "--bg": ["#F3F5F9", "#0E131D"],
     });
   });
 
   test("M5 · the unchosen tier-name token matches the measured values in both modes", () => {
-    expect(modeTokenValues(["--muted"])).toEqual({ "--muted": ["#6E675C", "#9C907A"] });
+    expect(modeTokenValues(["--muted"])).toEqual({ "--muted": ["#5E6779", "#8B95A8"] });
   });
 
   test("M6 · the promise token matches the measured values in both modes", () => {
-    expect(modeTokenValues(["--text-2"])).toEqual({ "--text-2": ["#555147", "#B5A88F"] });
+    expect(modeTokenValues(["--text-2"])).toEqual({ "--text-2": ["#4A5468", "#A7B1C2"] });
   });
 
   test("M7 · the model-id colour tokens match the measured values in both modes", () => {
     expect(modeTokenValues(["--text-3", "--m-gpt", "--m-claude", "--m-grok"])).toEqual({
-      "--text-3": ["#6E675C", "#9C907A"],
+      "--text-3": ["#5E6779", "#8B95A8"],
       "--m-gpt": ["#B4552D", "#B4552D"],
       "--m-claude": ["#8A63C9", "#8A63C9"],
       "--m-grok": ["#5F6670", "#5F6670"],

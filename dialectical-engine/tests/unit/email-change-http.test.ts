@@ -147,6 +147,71 @@ describe("Turn 14 change-email HTTP boundary", () => {
     await api.close();
   });
 
+  // Design Document v2 (3a): the top bar's identity pill names the account by its own pseudonym, carried by this read.
+  it("sends the session's own pseudonym with the addresses, asked of the session's own account only", async () => {
+    const settings = vi.fn<EmailChangeApplication["settings"]>(async () => ({
+      email: "ana.popescu@unibuc.ro", recoveryEmail: null, pending: null, pseudonym: "CobaltFalcon48"
+    }));
+    const api = buildApi({
+      application: application(), sessions: sessions(), emailChange: emailChange({ settings }), allowedOrigin: ORIGIN
+    });
+    const read = await api.inject({ method: "GET", url: "/v1/account/email", headers });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toEqual({
+      email: "ana.popescu@unibuc.ro", recovery_email: null, pending: null, pseudonym: "CobaltFalcon48"
+    });
+    // The route names no account of its own: the only one asked is the session's (no query, body or path names another).
+    const elsewhere = await api.inject({
+      method: "GET", url: "/v1/account/email?user_id=55555555-5555-4555-8555-555555555555", headers
+    });
+    expect(elsewhere.statusCode).toBe(200);
+    expect(settings.mock.calls).toEqual([[owner], [owner]]);
+    await api.close();
+  });
+
+  it.each([
+    ["none", null],
+    ["none (an application that reads none)", undefined],
+    ["a blank one", "   "],
+    ["one longer than the contract takes", "P".repeat(129)]
+  ])("leaves the pseudonym out, and still answers, when the account has %s", async (_label, pseudonym) => {
+    const api = buildApi({
+      application: application(), sessions: sessions(), allowedOrigin: ORIGIN,
+      emailChange: emailChange({
+        settings: async () => ({ email: "ana.popescu@unibuc.ro", recoveryEmail: null, pending: null,
+          ...(pseudonym === undefined ? {} : { pseudonym }) })
+      })
+    });
+    const read = await api.inject({ method: "GET", url: "/v1/account/email", headers });
+    expect(read.statusCode).toBe(200);
+    expect(read.json()).toEqual({ email: "ana.popescu@unibuc.ro", recovery_email: null, pending: null });
+    await api.close();
+  });
+
+  it("gives no pseudonym without a session, or once the session's account is gone", async () => {
+    const settings = vi.fn<EmailChangeApplication["settings"]>(async () => ({
+      email: "ana.popescu@unibuc.ro", recoveryEmail: null, pending: null, pseudonym: "CobaltFalcon48"
+    }));
+    const api = buildApi({
+      application: application(), sessions: sessions(), emailChange: emailChange({ settings }), allowedOrigin: ORIGIN
+    });
+    for (const anonymousHeaders of [
+      { origin: ORIGIN },
+      { origin: ORIGIN, cookie: `${SESSION_COOKIE_NAME}=${"x".repeat(43)}; ${CSRF_COOKIE_NAME}=${CSRF_TOKEN}` }
+    ]) {
+      const anonymous = await api.inject({ method: "GET", url: "/v1/account/email", headers: anonymousHeaders });
+      expect(anonymous.statusCode).toBe(401);
+      expect(anonymous.body).not.toContain("CobaltFalcon48");
+    }
+    expect(settings).not.toHaveBeenCalled();
+    // An erased or closed account: the application finds no live account for the session, and the read says only that.
+    settings.mockResolvedValueOnce(null);
+    const gone = await api.inject({ method: "GET", url: "/v1/account/email", headers });
+    expect(gone.statusCode).toBe(401);
+    expect(gone.json()).toEqual({ error: "SESSION_REQUIRED" });
+    await api.close();
+  });
+
   it("requests a change with CSRF and a grant, and maps each refusal to its status", async () => {
     const request = vi.fn<EmailChangeApplication["request"]>(async () => ({
       newEmail: "ana.popescu@icub.ro", expiresAt: EXPIRES

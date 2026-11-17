@@ -21,7 +21,12 @@ const COVERED = [
   ".dobFieldset .dobCell:focus-visible",
   ".supportComposer input:focus-visible",
   ".v4AskField:focus",
-  ".v4AskInput:focus"
+  ".v4AskInput:focus",
+  // the fields Design Document v2 gave the same border-and-shadow focus mark
+  ".v4StartRewriteField:focus",
+  ".v4StartOwnField:focus",
+  ".v4PubText:focus",
+  ".v4PubText:focus-visible"
 ];
 
 describe("a focus mark that survives forced colours", () => {
@@ -45,7 +50,7 @@ describe("a focus mark that survives forced colours", () => {
     const known = new Set([
       ".appMain:focus", "#page-content:focus:not([data-focus-parked])", ".policyBody .policySection:focus",
       ".crisisSupport .policyTitle:focus", ".questionRefusal .policyTitle:focus", ".splitFocusClaim:focus", ".splitFocusRootClaim:focus",
-      ".v4AskReadTitle:focus", '.authAlert[tabindex="-1"]:focus:not([data-focus-parked])', ".v4StartSheet:focus", ".v4StartMore:focus", ".v4PanelH2:focus",
+      ".v4AskReadTitle:focus", ".v4ReadAskedTitle:focus", ".v4StartWayAdded:focus", '.authAlert[tabindex="-1"]:focus:not([data-focus-parked])', ".v4StartSheet:focus", ".v4StartMore:focus", ".v4PanelH2:focus",
       ".v4StartSuggest:focus:not(:focus-visible)", ".v4RepCard:focus:not(:focus-visible)", ".v4RepStatusBox:focus:not(:focus-visible)",
       // ringed on the parent (.ndTopicBezel:has(...), .libComposer:has(...)) or on :focus-visible
       ".ndTopic:focus", ".libComposerInput:focus", ".languageSwitcherSearch input",

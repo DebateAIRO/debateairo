@@ -217,6 +217,7 @@ describe("S01 removal notice", () => {
 
   it("keeps the crisis dialog's existing markup byte for byte after number extraction", () => {
     const markup = renderToStaticMarkup(<CrisisSupportDialog catalog={home} locale="en" countryHint="US" onBack={() => {}} />);
-    expect(createHash("sha256").update(markup).digest("hex")).toBe("4cae9a164011f7100721f6e3cadce37fcf71ac824be35464196d5bf5613110a8");
+    // Design Document v2 (20b): the emergency line now comes first, above the country and its helplines; nothing else moved.
+    expect(createHash("sha256").update(markup).digest("hex")).toBe("813764ec0f1c9f9128e226105a6a6326a95595b0d978dcba0a3419abaf591fc0");
   });
 });

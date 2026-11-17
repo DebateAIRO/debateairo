@@ -71,8 +71,8 @@ function LibraryRow({
   // keyboard's ring and always read by a screen reader (keyboard audit 2026-11-12).
   const modelNames = models.map((model) => modelMeta(model, composeCatalog).name).join(", ");
   return (
-    <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined} style={{ background: "var(--shell)" }}>
-      <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
+    <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined}>
+      <div className="libRowCore" data-bezel="core">
         <div className="libRowBody">
           {flagged ? <div className="libFlag"><span className="libFlagMark" aria-hidden /><span className="libFlagLabel">{flagLabel ?? t(catalog, "home.flag.flagged")}</span></div> : null}
           <div className="libRowClaim">{claim}</div>

@@ -33,7 +33,7 @@ const EMPTY_DETAILS: BillingDetails = Object.freeze({ firstName: "", lastName: "
 const NO_MARKS: PaymentMarks = Object.freeze({ netopia: false, visa: false, mastercard: false });
 /** The fields a price needs, in page order: a refused "Show the full price" goes to the first one still wrong. */
 type CheckoutField = "country" | keyof BillingDetails | "region" | "city";
-const FIELD_ORDER: readonly CheckoutField[] = ["country", "firstName", "lastName", "phone", "street", "postalCode", "region", "city"];
+const FIELD_ORDER: readonly CheckoutField[] = ["country", "region", "firstName", "lastName", "phone", "city", "street", "postalCode"];
 const FIELD_REQUIRED = "billing.checkout.fieldRequired";
 const COMPANY_IDS = ["checkout-company-name", "checkout-company-vat", "checkout-company-address"] as const;
 
@@ -344,80 +344,89 @@ export function CheckoutFlow({
       <h1 id="checkout-title" className="setTitle">{t(catalog, "billing.checkout.title", { plan: name })}</h1>
       {/* noValidate: the browser's own bubbles would stop a press before askForPrice could explain it in the page. */}
       <form noValidate onSubmit={askForPrice}>
-        <div className="billingField">
-          <label htmlFor="checkout-country">{t(catalog, "billing.checkout.country")}</label>
-          <select id="checkout-country" value={country} onChange={(event) => { edited(); changeCountry(event.target.value); }} required
-            aria-invalid={Boolean(fieldError("country"))} aria-describedby={fieldError("country") ? "checkout-country-error" : undefined}>
-            <option value="" disabled>{t(catalog, "billing.checkout.country")}</option>
-            {countries.map((entry) => <option key={entry.code} value={entry.code}>{entry.label}</option>)}
-          </select>
-          {fieldError("country") ? <p id="checkout-country-error" className="authFieldError">{fieldError("country")}</p> : null}
+        {/* Design Document v2 (19b): the place first (the country, with its county or region beside it), then the payer. */}
+        <div className="billingGrid">
+          <div className="billingField">
+            <label htmlFor="checkout-country">{t(catalog, "billing.checkout.country")}</label>
+            <select id="checkout-country" value={country} onChange={(event) => { edited(); changeCountry(event.target.value); }} required
+              aria-invalid={Boolean(fieldError("country"))} aria-describedby={fieldError("country") ? "checkout-country-error" : undefined}>
+              <option value="" disabled>{t(catalog, "billing.checkout.country")}</option>
+              {countries.map((entry) => <option key={entry.code} value={entry.code}>{entry.label}</option>)}
+            </select>
+            {fieldError("country") ? <p id="checkout-country-error" className="authFieldError">{fieldError("country")}</p> : null}
+          </div>
+          {asksRegion ? (
+            <div className="billingField">
+              <label htmlFor="checkout-region">{t(catalog, romanian ? "billing.checkout.county" : "billing.checkout.region")}</label>
+              {romanian ? (
+                <select id="checkout-region" value={region} onChange={(event) => {
+                  const next = event.target.value;
+                  // A sector is no city outside Bucharest, and a city is no sector inside it.
+                  if ((next === BUCHAREST_COUNTY) !== (region === BUCHAREST_COUNTY)) setCity("");
+                  edited();
+                  setRegion(next);
+                }} autoComplete="address-level1" required
+                  aria-invalid={Boolean(fieldError("region"))} aria-describedby={fieldError("region") ? "checkout-region-error" : undefined}>
+                  <option value="" disabled>{t(catalog, "billing.checkout.county")}</option>
+                  {ROMANIA_COUNTIES.map((county) => <option key={county} value={county}>{county}</option>)}
+                </select>
+              ) : (
+                <input id="checkout-region" value={region} onChange={(event) => { edited(); setRegion(event.target.value); }} autoComplete="address-level1" required
+                  aria-invalid={Boolean(fieldError("region"))} aria-describedby={fieldError("region") ? "checkout-region-error" : undefined} />
+              )}
+              {fieldError("region") ? <p id="checkout-region-error" className="authFieldError">{fieldError("region")}</p> : null}
+            </div>
+          ) : null}
         </div>
         <h2 className="setSubtitle">{t(catalog, "billing.checkout.billingTitle")}</h2>
         <p className="billingNote">{t(catalog, "billing.checkout.billingNote")}</p>
-        <BillingDetailsFields catalog={catalog} idPrefix="checkout" values={details} postalOptional={postalOptional}
-          errors={{
-            firstName: fieldError("firstName"), lastName: fieldError("lastName"), phone: fieldError("phone"),
-            street: fieldError("street"), postalCode: fieldError("postalCode")
-          }}
-          onChange={(field, value) => { edited(); setDetails((current) => ({ ...current, [field]: value })); }} />
-        {asksRegion ? (
-          <div className="billingField">
-            <label htmlFor="checkout-region">{t(catalog, romanian ? "billing.checkout.county" : "billing.checkout.region")}</label>
-            {romanian ? (
-              <select id="checkout-region" value={region} onChange={(event) => {
-                const next = event.target.value;
-                // A sector is no city outside Bucharest, and a city is no sector inside it.
-                if ((next === BUCHAREST_COUNTY) !== (region === BUCHAREST_COUNTY)) setCity("");
-                edited();
-                setRegion(next);
-              }} autoComplete="address-level1" required
-                aria-invalid={Boolean(fieldError("region"))} aria-describedby={fieldError("region") ? "checkout-region-error" : undefined}>
-                <option value="" disabled>{t(catalog, "billing.checkout.county")}</option>
-                {ROMANIA_COUNTIES.map((county) => <option key={county} value={county}>{county}</option>)}
-              </select>
-            ) : (
-              <input id="checkout-region" value={region} onChange={(event) => { edited(); setRegion(event.target.value); }} autoComplete="address-level1" required
-                aria-invalid={Boolean(fieldError("region"))} aria-describedby={fieldError("region") ? "checkout-region-error" : undefined} />
-            )}
-            {fieldError("region") ? <p id="checkout-region-error" className="authFieldError">{fieldError("region")}</p> : null}
-          </div>
-        ) : null}
-        <div className="billingField">
-          <label htmlFor="checkout-city">{t(catalog, "billing.checkout.city")}</label>
-          {bucharest ? (
-            <select id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required
-              aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "checkout-city-error" : undefined}>
-              <option value="">{t(catalog, "billing.checkout.city")}</option>
-              {BUCHAREST_SECTORS.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
-            </select>
-          ) : (
-            <input id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required
-              aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "checkout-city-error" : undefined} />
-          )}
-          {fieldError("city") ? <p id="checkout-city-error" className="authFieldError">{fieldError("city")}</p> : null}
+        <div className="billingGrid">
+          <BillingDetailsFields catalog={catalog} idPrefix="checkout" values={details} postalOptional={postalOptional}
+            errors={{
+              firstName: fieldError("firstName"), lastName: fieldError("lastName"), phone: fieldError("phone"),
+              street: fieldError("street"), postalCode: fieldError("postalCode")
+            }}
+            onChange={(field, value) => { edited(); setDetails((current) => ({ ...current, [field]: value })); }}
+            cityField={(
+              <div className="billingField">
+                <label htmlFor="checkout-city">{t(catalog, "billing.checkout.city")}</label>
+                {bucharest ? (
+                  <select id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required
+                    aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "checkout-city-error" : undefined}>
+                    <option value="">{t(catalog, "billing.checkout.city")}</option>
+                    {BUCHAREST_SECTORS.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
+                  </select>
+                ) : (
+                  <input id="checkout-city" value={city} onChange={(event) => { edited(); setCity(event.target.value); }} autoComplete="address-level2" required
+                    aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "checkout-city-error" : undefined} />
+                )}
+                {fieldError("city") ? <p id="checkout-city-error" className="authFieldError">{fieldError("city")}</p> : null}
+              </div>
+            )} />
         </div>
-        <div className="billingActions">
-          <button type="button" className="setBtn" aria-expanded={companyOpen} onClick={() => { edited(); setCompanyOpen(!companyOpen); }}>
+        <p className="billingCompany">
+          <button type="button" className="billingLink" aria-expanded={companyOpen} onClick={() => { edited(); setCompanyOpen(!companyOpen); }}>
             {t(catalog, "billing.checkout.companyToggle")}
           </button>
-        </div>
+        </p>
         {companyOpen ? (
           <>
-            <div className="billingField">
-              <label htmlFor="checkout-company-name">{t(catalog, "billing.checkout.companyName")}</label>
-              <input id="checkout-company-name" value={companyName} onChange={(event) => { edited(); setCompanyName(event.target.value); }} autoComplete="organization"
-                aria-invalid={companyFieldInvalid(0)} aria-describedby={companyFieldInvalid(0) ? "checkout-company-error" : undefined} />
-            </div>
-            <div className="billingField">
-              <label htmlFor="checkout-company-vat">{t(catalog, "billing.checkout.companyVatId")}</label>
-              <input id="checkout-company-vat" value={vatId} onChange={(event) => { edited(); setVatId(event.target.value); }}
-                aria-invalid={companyFieldInvalid(1)} aria-describedby={companyFieldInvalid(1) ? "checkout-company-error" : undefined} />
-            </div>
-            <div className="billingField">
-              <label htmlFor="checkout-company-address">{t(catalog, "billing.checkout.companyAddress")}</label>
-              <input id="checkout-company-address" value={companyAddress} onChange={(event) => { edited(); setCompanyAddress(event.target.value); }} autoComplete="street-address"
-                aria-invalid={companyFieldInvalid(2)} aria-describedby={companyFieldInvalid(2) ? "checkout-company-error" : undefined} />
+            <div className="billingGrid">
+              <div className="billingField">
+                <label htmlFor="checkout-company-name">{t(catalog, "billing.checkout.companyName")}</label>
+                <input id="checkout-company-name" value={companyName} onChange={(event) => { edited(); setCompanyName(event.target.value); }} autoComplete="organization"
+                  aria-invalid={companyFieldInvalid(0)} aria-describedby={companyFieldInvalid(0) ? "checkout-company-error" : undefined} />
+              </div>
+              <div className="billingField">
+                <label htmlFor="checkout-company-vat">{t(catalog, "billing.checkout.companyVatId")}</label>
+                <input id="checkout-company-vat" value={vatId} onChange={(event) => { edited(); setVatId(event.target.value); }}
+                  aria-invalid={companyFieldInvalid(1)} aria-describedby={companyFieldInvalid(1) ? "checkout-company-error" : undefined} />
+              </div>
+              <div className="billingField billingFieldWide">
+                <label htmlFor="checkout-company-address">{t(catalog, "billing.checkout.companyAddress")}</label>
+                <input id="checkout-company-address" value={companyAddress} onChange={(event) => { edited(); setCompanyAddress(event.target.value); }} autoComplete="street-address"
+                  aria-invalid={companyFieldInvalid(2)} aria-describedby={companyFieldInvalid(2) ? "checkout-company-error" : undefined} />
+              </div>
             </div>
             {companyIncomplete ? <p id="checkout-company-error" className="billingNote" role="status">{t(catalog, "billing.checkout.companyIncomplete")}</p> : null}
           </>
@@ -464,7 +473,7 @@ export function CheckoutFlow({
           <div className="billingActions">
             <button
               type="button"
-              className="btn btnDark"
+              className="btn btnDark billingCta"
               disabled={busy}
               aria-disabled={!canContinue || undefined}
               aria-describedby={continueBlocker !== null ? "checkout-continue-hint" : undefined}

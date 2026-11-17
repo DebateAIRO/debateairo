@@ -163,28 +163,34 @@ export function CardChangeFlow({
         />
       ) : stored !== null && details !== null ? (
         <>
-          <div className="billingField">
-            <label htmlFor="card-country">{t(catalog, "billing.checkout.country")}</label>
-            <input id="card-country" value={countryName(locale, stored.country)} readOnly />
-          </div>
-          {stored.region !== null ? (
+          <div className="billingGrid">
             <div className="billingField">
-              <label htmlFor="card-region">{t(catalog, stored.country === "RO" ? "billing.checkout.county" : "billing.checkout.region")}</label>
-              <input id="card-region" value={stored.region} readOnly />
+              <label htmlFor="card-country">{t(catalog, "billing.checkout.country")}</label>
+              <input id="card-country" value={countryName(locale, stored.country)} readOnly />
             </div>
-          ) : null}
+            {stored.region !== null ? (
+              <div className="billingField">
+                <label htmlFor="card-region">{t(catalog, stored.country === "RO" ? "billing.checkout.county" : "billing.checkout.region")}</label>
+                <input id="card-region" value={stored.region} readOnly />
+              </div>
+            ) : null}
+          </div>
           <p className="billingNote">{t(catalog, "billing.card.taxPlaceNote")}</p>
-          <BillingDetailsFields catalog={catalog} idPrefix="card" values={details} postalOptional={postalOptional}
-            errors={{
-              firstName: fieldError("firstName"), lastName: fieldError("lastName"), phone: fieldError("phone"),
-              street: fieldError("street"), postalCode: fieldError("postalCode")
-            }}
-            onChange={(field, value) => setDetails({ ...details, [field]: value })} />
-          <div className="billingField">
-            <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
-            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required
-              aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "card-city-error" : undefined} />
-            {fieldError("city") ? <p id="card-city-error" className="authFieldError">{fieldError("city")}</p> : null}
+          <div className="billingGrid">
+            <BillingDetailsFields catalog={catalog} idPrefix="card" values={details} postalOptional={postalOptional}
+              errors={{
+                firstName: fieldError("firstName"), lastName: fieldError("lastName"), phone: fieldError("phone"),
+                street: fieldError("street"), postalCode: fieldError("postalCode")
+              }}
+              onChange={(field, value) => setDetails({ ...details, [field]: value })}
+              cityField={(
+                <div className="billingField">
+                  <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
+                  <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required
+                    aria-invalid={Boolean(fieldError("city"))} aria-describedby={fieldError("city") ? "card-city-error" : undefined} />
+                  {fieldError("city") ? <p id="card-city-error" className="authFieldError">{fieldError("city")}</p> : null}
+                </div>
+              )} />
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
           {total !== null && currency !== null ? (
@@ -196,7 +202,7 @@ export function CardChangeFlow({
               <div className="billingActions">
                 <button
                   type="button"
-                  className="btn btnDark"
+                  className="btn btnDark billingCta"
                   // Only a lock with a reason stays focusable; with no renewal terms loaded there is nothing to do or say.
                   disabled={busy || (!canStart && blocker === null)}
                   aria-disabled={blocker !== null || undefined}

@@ -2,7 +2,10 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { SAVED_QUESTION_LIMITS, type SavedQuestionSummary } from "@debateai/contract";
+import { V4UndoNote } from "@/components/v4/V4UndoNote";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
+import { DIG_UNDO_MS } from "@/lib/v4/digUndo";
+import type { WaitingDelete } from "@/lib/v4/useSavedQuestion";
 
 /*
  * V4 start step, Task 76f (owner cards "Where shown" and "How long"; answer S3 A; saved-questions spec 2026-11-04 §3.4): "Not
@@ -69,5 +72,40 @@ export function V4NotStarted(props: Readonly<{
         </button>
       )}
     </section>
+  );
+}
+
+/**
+ * Each Delete waiting out its Undo window (useSavedDeletes), in the shared Undo note ("Deleted “…”", Undo, the shrinking line);
+ * a note goes once its DELETE is sent. The same note and the same words on the ask page and on "My questions"; the page
+ * draws it right after "Not started yet".
+ */
+export function V4SavedDeleteNotes(props: Readonly<{
+  waiting: readonly WaitingDelete[];
+  catalog: MessageCatalog;
+  onUndo(id: string): void;
+  /** Keyboard focus came into a note (true) or left it (false): useSavedDeletes's `holdDelete`. */
+  onHold(id: string, held: boolean): void;
+}>) {
+  const { catalog } = props;
+  return (
+    <>
+      {props.waiting.filter((one) => !one.sent).map((one) => (
+        <V4UndoNote
+          key={one.item.id}
+          state="counting"
+          label={t(catalog, "v4.saved.deleted", { question: one.item.question })}
+          sendsAt={one.sendsAt}
+          durationMs={DIG_UNDO_MS}
+          onUndo={() => props.onUndo(one.item.id)}
+          onHold={(held) => props.onHold(one.item.id, held)}
+          undoLabel={t(catalog, "v4.start.undo")}
+          stillLine={t(catalog, "v4.saved.deleteStill")}
+          announce={t(catalog, "v4.saved.deleteAnnounce")}
+          sendingLine={t(catalog, "v4.saved.deleteStill")}
+          confirmedLine={t(catalog, "v4.saved.deleteStill")}
+        />
+      ))}
+    </>
   );
 }

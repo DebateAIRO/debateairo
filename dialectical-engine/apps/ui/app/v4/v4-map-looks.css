@@ -8,7 +8,7 @@
    --v4-look-* names below are looks (the hatching, the glow), not moves. */
 
 .v4Root {
-  --v4-look-hatch: repeating-linear-gradient(135deg, color-mix(in srgb, var(--gold-border) 55%, transparent) 0 1px, transparent 1px 7px);
+  --v4-look-hatch: var(--v4-hatch);
   --v4-look-glow: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
@@ -18,13 +18,19 @@
 .v4MapOpen.v4GroundOPEN, .v4OutOpen.v4GroundOPEN, .v4PanelOpenRow.v4GroundOPEN {
   border-style: solid; background-color: var(--gold-bg); background-image: var(--v4-look-hatch);
 }
-.v4MapPicked.v4GroundOPEN { border-color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
+/* Design Document v2: a picked open question keeps its gold paper and takes the brand colour's edge. */
+.v4MapPicked.v4GroundOPEN { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
 .v4GroundWord {
   display: inline-block; font-size: var(--t-micro); font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
   color: var(--gold-text); background: var(--surface); border: 1px solid var(--gold-border); border-radius: var(--r-pill);
   padding: 0 6px;
 }
-.v4MapStarWords { color: var(--gold-text); font-weight: 700; }
+/* Design Document v2: on the map, the outline and the panel, open ground is told by its hatching and by its kind line
+   (and by the key under the map); the word "Open" stays for screen readers. */
+:is(.v4MapOpen, .v4OutOpen, .v4PanelOpenRow) .v4GroundWord {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; padding: 0; border: 0;
+}
+.v4MapStarWords { font-size: var(--t-meta); color: var(--gold-text); font-weight: 700; }
 /* Being looked into: the same hatched paper with one slow pulse ring, never dashed. */
 .v4GroundLOOKING { border-style: solid; background-color: var(--surface); background-image: var(--v4-look-hatch); }
 .v4GroundLOOKING::after {
@@ -46,7 +52,8 @@
   height: 12px; border-radius: 3px; background-color: var(--surface); background-image: var(--v4-look-hatch);
   box-shadow: 0 0 0 1.5px var(--accent);
 }
-.v4MapKeyNew { height: 12px; border-radius: 3px; border: 1.5px dashed var(--accent); background: var(--surface); }
+/* Design Document v2: the key of "New" is the small accent dot. */
+.v4MapKeyNew { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); }
 
 /* Every trust word keeps its slot in the bar; an empty slot has no width (its gap is taken back). */
 .v4BarSlot { flex-basis: 0; min-width: 0; margin-inline-start: -2px; }
@@ -57,21 +64,16 @@
 /* ---------- r2-20 A / journey-f11: one trust word per path, three result tags, the "Holds" seal ---------- */
 .v4MapPathMeta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .v4MapPathMeta:empty { display: none; }
-.v4MapTrust {
-  display: inline-block; font-size: var(--t-micro); font-weight: 700; border-radius: var(--r-pill); padding: 1px 8px;
-  border: 1px solid var(--line-strong); color: var(--text-2); background: var(--surface-2);
-}
-.v4MapTrustSURE { color: var(--text); border-color: var(--ink); }
-.v4MapTrustSTILL_ARGUED { color: var(--gold-text); background: var(--gold-bg); border-color: var(--gold-border); }
-.v4MapTrustDIDNT_HOLD { color: var(--con-text); background: var(--con-bg); border-color: var(--con-border); }
+/* Design Document v2: under a path's bar its trust word and "Holds" are plain small words (12px, grey), never a pill;
+   the bar carries the shades. */
+.v4MapTrust { display: inline-block; font-size: var(--t-meta); color: var(--text-2); }
+.v4MapTrustSTILL_ARGUED { color: var(--gold-text); }
+.v4MapTrustDIDNT_HOLD { color: var(--con-text); }
 .v4ResultTag {
   display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: var(--t-micro); font-weight: 700;
   border-radius: var(--r-pill); padding: 1px 8px; border: 1px solid var(--accent); color: var(--con-text); background: var(--con-bg);
 }
-.v4MapSeal {
-  display: inline-flex; align-items: center; gap: 3px; font-size: var(--t-micro); font-weight: 700; color: var(--con-text);
-  border: 1.5px solid var(--accent); border-radius: var(--r-pill); padding: 0 7px; background: var(--surface);
-}
+.v4MapSeal { display: inline-flex; align-items: center; gap: 3px; font-size: var(--t-meta); color: var(--text-2); }
 .v4RewriteResult { margin: 0; display: flex; gap: 6px; align-items: baseline; font-weight: 700; color: var(--text); }
 .v4RewriteResultShape { color: var(--accent); }
 .v4RewriteAsked { margin: 0; color: var(--text-2); }
@@ -92,7 +94,7 @@
 @keyframes v4FlyIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 @media (prefers-reduced-motion: reduce) {
-  .v4GroundLOOKING::after { animation: none; opacity: .6; }
+  .v4GroundLOOKING::after { animation: none; opacity: .5; }
   /* The shared 1-second highlight (v4-base.css) in place of the turn-over. */
   .v4Reveal { animation: v4Highlight var(--v4-highlight-time) ease-out 1; }
   .v4MapDig.v4Reveal::before, .v4OutMain.v4Reveal::before { animation: none; opacity: 0; }
@@ -104,13 +106,16 @@
 }
 
 /* ---------- dig-f27: the paths a dig opened, under its card ---------- */
-.v4MapSprouts { list-style: none; margin-block: 6px 0; margin-inline: 12px 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* Design Document v2: a path a dig opened is a card of the column like the others (12px corner, the title in bold);
+   while it is new it carries the dashed accent edge and its small accent line (.v4GroundNEW). */
+.v4MapSprouts { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .v4MapSprout {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; min-height: 36px; text-align: start;
-  font: inherit; font-size: var(--t-meta); color: var(--text); background: var(--surface); border: 1px solid var(--line-2);
-  border-radius: 10px; padding: 6px 10px; cursor: pointer; overflow-wrap: anywhere;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; min-height: 44px; text-align: start;
+  font: inherit; font-size: var(--t-ui); color: var(--text); background: var(--surface); border: 1.5px solid var(--line-strong);
+  border-radius: 12px; padding: 9px 12px; cursor: pointer; overflow-wrap: anywhere;
 }
-.v4MapSproutTitle { font-weight: 600; }
+.v4MapSprout:hover { background-color: var(--surface-2); }
+.v4MapSproutTitle { font-weight: 700; }
 .v4OutSprouts { margin-inline-start: 12px; }
 
 /* ---------- map-f10: pick boxes, the skip link, the outline's folded legend ---------- */
@@ -120,7 +125,7 @@
 }
 .v4SkipLink:focus, .v4SkipLink:focus-visible {
   position: static; width: auto; height: auto; display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 8px;
-  padding: 0 14px; border-radius: var(--r-btn); background: var(--ink); color: var(--surface); font-weight: 600;
+  padding: 0 14px; border-radius: var(--r-btn); background: var(--brand); color: var(--on-brand); font-weight: 600;
 }
 .v4OutShades { border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); margin-bottom: 10px; }
 .v4OutShades > summary {
@@ -141,9 +146,9 @@
 [dir="rtl"] .v4OutFold[aria-expanded="false"] .v4OutFoldMark { transform: rotate(90deg); }
 
 /* ---------- map-f22: nothing hidden without a visible sign ---------- */
-.v4MapScrollMore { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent); }
+.v4MapScrollMore { -webkit-mask-image: linear-gradient(to right, var(--ink) calc(100% - 48px), transparent); mask-image: linear-gradient(to right, var(--ink) calc(100% - 48px), transparent); }
 /* A right-to-left map runs on to the left: the fade sits at that end. */
-[dir="rtl"] .v4MapScrollMore { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 48px), transparent); }
+[dir="rtl"] .v4MapScrollMore { -webkit-mask-image: linear-gradient(to left, var(--ink) calc(100% - 48px), transparent); mask-image: linear-gradient(to left, var(--ink) calc(100% - 48px), transparent); }
 .v4MapScrollHint { margin: 0; font-size: var(--t-meta); }
 /* V4B-M1 (keyboard audit 2026-11-12): the map and the outline are one Tab stop moved with the arrow keys; the line saying so
    shows only while one of their rows has the keyboard's ring (a press with the mouse shows none). Screen readers hear it on
@@ -193,8 +198,8 @@
   .v4MapFold .v4MapBranch { display: flex; }
 }
 /* A folded path keeps only what always shows, one line each. */
-.v4MapLeavesFolded .v4MapOpen .v4MapNote, .v4MapLeavesFolded .v4MapDig .v4Bar, .v4MapLeavesFolded .v4MapDigHeadline,
-.v4MapLeavesFolded .v4MapSprouts { display: none; }
+.v4MapLeavesFolded .v4MapOpenKind, .v4MapLeavesFolded .v4MapOpen .v4MapStarWords, .v4MapLeavesFolded .v4MapDig .v4Bar,
+.v4MapLeavesFolded .v4MapDigHeadline, .v4MapLeavesFolded .v4MapSprouts { display: none; }
 .v4MapLeavesFolded .v4MapOpenMain, .v4MapLeavesFolded .v4MapDig { min-height: 36px; padding-top: 4px; padding-bottom: 4px; }
 .v4DebLayout-laptop .v4DebGrid { grid-template-columns: 56px minmax(0, 1fr) 360px; }
 .v4DebLayout-laptop .v4DebPanelCol {
@@ -214,7 +219,8 @@
 .v4DebRail-notes .v4DebRailGoodTime { flex-direction: row; flex-wrap: wrap; align-items: center; padding: 6px 10px; }
 .v4DebRail-steps .v4DebRailSteps { flex-direction: row; flex-wrap: wrap; gap: 6px 14px; }
 .v4DebRail-steps { padding-top: 12px; border-top: 1px solid var(--line-2); }
-.v4DebRailOpen { margin: 0; font-weight: 600; color: var(--text); }
+/* Design Document v2: the one count is a plain grey line under a hairline. */
+.v4DebRailOpen { margin: 0; color: var(--text-2); }
 .v4DebRailDigDone { margin: 0; font-size: var(--t-ui); }
 
 /* map-f15: the one "Write my report" button, with its small "good time" mark. */
@@ -222,13 +228,15 @@
 .v4DebReportMark { flex: none; width: 9px; height: 9px; border-radius: var(--r-dot); background: var(--gold-bg); box-shadow: 0 0 0 2px var(--gold); }
 
 /* ---------- map-d1 / map-f2: the answer card ---------- */
+/* Design Document v2: the answer is a hard card: the 2px hard edge, its solid 5px shadow, the 22px corner. Its short
+   words are set in the display face at 17px; the long answer under a fold stays in the text face. */
 .v4AnswerCard {
-  min-width: 0; border: 1px solid var(--line-2); border-inline-start: 4px solid var(--accent); border-radius: var(--r-card);
+  min-width: 0; border: 2px solid var(--hard); box-shadow: 0 5px 0 var(--hard-shadow); border-radius: 22px;
   background: var(--surface);
 }
 .v4AnswerFoldLine {
   display: flex; align-items: center; gap: 6px; width: 100%; min-height: 48px; padding: 0 14px; background: none; border: 0;
-  text-align: start; cursor: pointer; font-size: var(--t-ui); color: var(--text);
+  text-align: start; cursor: pointer; font-size: var(--t-ui); color: var(--text); border-radius: 20px;
 }
 .v4AnswerFoldLine[hidden] { display: none; }
 .v4AnswerFoldLabel { font-weight: 700; flex: none; }
@@ -236,20 +244,23 @@
 /* The fold: one of the six moves (the shared fold token). */
 .v4AnswerFold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--v4-move-fold) var(--v4-ease-move); }
 .v4AnswerCardFolded .v4AnswerFold { grid-template-rows: 0fr; }
-.v4AnswerInner { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; padding: 0 16px; }
-.v4AnswerInner > :first-child { margin-top: 14px; }
-.v4AnswerInner > :last-child { margin-bottom: 14px; }
+.v4AnswerInner { min-height: 0; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 0 18px; }
+.v4AnswerInner > :first-child { margin-top: 16px; }
+.v4AnswerInner > :last-child { margin-bottom: 16px; }
 .v4AnswerHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .v4AnswerHead .v4Eyebrow { margin: 0; }
 .v4AnswerFoldBtn { min-height: 44px; font-size: var(--t-ui); }
 .v4AnswerHeadline {
-  margin: 0; font-size: 22px; line-height: 1.3; overflow-wrap: anywhere;
+  margin: 0; font-size: 22px; line-height: 1.2; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
 }
-.v4AnswerText { margin: 0; overflow-wrap: anywhere; }
+.v4AnswerText { margin: 0; overflow-wrap: anywhere; font-family: var(--font-display); font-weight: 500; font-size: 17px; line-height: 1.45; }
+.v4AnswerFallback .v4AnswerText, .v4AnswerMoreBody .v4AnswerText {
+  font-family: var(--font-sans); font-weight: 400; font-size: var(--t-body); line-height: 1.5;
+}
 .v4AnswerFallback { display: flex; flex-direction: column; gap: 8px; }
 .v4AnswerNote { margin: 0; font-size: var(--t-ui); }
-.v4AnswerSure { display: flex; }
+.v4AnswerSure { display: flex; margin-top: 4px; }
 .v4AnswerMore { border-top: 1px solid var(--line-2); padding-top: 4px; }
 .v4AnswerMore > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); }
 /* The browser check (4 Nov): "Read the whole answer" and "Earlier versions of the answer" show that they fold (a flex
@@ -297,8 +308,8 @@
 
 .v4PathList { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .v4PathListTitle {
-  margin: 0; font-family: var(--font-mono); font-size: var(--t-micro); letter-spacing: .14em; text-transform: uppercase;
-  color: var(--con-text); font-weight: 500;
+  margin: 0; font-family: var(--font-sans); font-size: var(--t-micro); letter-spacing: .12em; text-transform: uppercase;
+  color: var(--con-text); font-weight: 400;
 }
 .v4PathListRows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .v4PathListRow {

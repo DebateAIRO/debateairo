@@ -8,7 +8,7 @@ import { V4AccountMenu } from "./V4AccountMenu";
 import { V4Steps } from "./V4Steps";
 
 /*
- * report-f12 (owner screen review, 3 Nov 2026): the report's own header, ONE row. "← Back to the map" on the start side;
+ * report-f12 (owner screen review, 3 Nov 2026): the report's own header, ONE row. "‹ Back to the map" on the start side;
  * on the end side "Share" (Download PDF, Print, Copy link); no level menu (the owner's reading-level ruling, 5 Nov: the
  * level is chosen only when asking, so `level` and `onLevel` are accepted and change nothing here). No quota
  * share on the report (row D cut it), and no second brand row. It is built here rather than in the shared V4Header, so
@@ -18,6 +18,9 @@ import { V4Steps } from "./V4Steps";
  * pages). journey-f18 / read-f25: under the row, the four steps with "Your report" marked.
  * Owner's answers, 5 Nov 2026: question 12 B (journey-f19, "nowhere else"): "Open in the classic view" is in that account
  * menu only, once, just above "Sign out"; the report's foot link went. The level ruling: the menu's links carry no level.
+ * Design Document v2 (screen 18a): "‹ Back to the map", then Share and Print as two pills, then the account button. Print
+ * is Share's own Print choice, one press away (it stays in Share's list, which is where a narrow phone finds it). What a
+ * Share choice is doing is said right under the row; the four steps then open the reading column.
  */
 
 /** One Share choice. */
@@ -81,7 +84,6 @@ function HeaderMenu({ buttonLabel, buttonText, title, className, children }: Rea
         onClick={() => setOpen((value) => !value)}
       >
         <span>{buttonText}</span>
-        <span aria-hidden="true">▾</span>
       </button>
       {open ? (
         <div className="v4RepMenuList" id={listId} role="group" aria-label={title}>
@@ -109,6 +111,7 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
   /** Question 12 B: the debate's classic view, shown once in the account menu; absent or null: none (no such debate). */
   classicHref?: string | null;
 }>) {
+  const print = share.find((item) => item.id === "print");
   return (
     <div className="v4RepChrome">
       <header className="v4RepHdr">
@@ -117,7 +120,7 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
           // left), so narrow screens show the short "Map"; the link's name stays the full words on every screen. "Back to
           // your question" (map-f30) has no short form in the record, so it keeps its full words on a phone too.
           <Link className="v4RepHdrBack" href={backHref} aria-label={t(catalog, backKey)}>
-            <span className="v4RepHdrArrow" aria-hidden="true">←</span>
+            <span className="v4RepHdrArrow" aria-hidden="true">‹</span>
             <span className={backKey === "v4.report.backToMap" ? "v4RepHdrBackText v4RepHdrBackWide" : "v4RepHdrBackText"}>
               {t(catalog, backKey)}
             </span>
@@ -149,12 +152,15 @@ export function V4ReportHeader({ catalog, backHref, backKey = "v4.report.backToM
             ))}
           </HeaderMenu>
         )}
+        {print === undefined ? null : (
+          <button type="button" className="v4RepMenuButton v4RepPrint" data-report-print="" onClick={print.onSelect}>{print.label}</button>
+        )}
         <V4AccountMenu catalog={catalog} classicHref={classicHref} />
       </header>
+      <div className="v4RepHdrStatus" role="status">{status}</div>
       <div className="v4StepsTop">
         <V4Steps current="report" shape="line" {...(backHref === null ? {} : { hrefs: { map: backHref } })} catalog={catalog} />
       </div>
-      <div className="v4RepHdrStatus" role="status">{status}</div>
     </div>
   );
 }

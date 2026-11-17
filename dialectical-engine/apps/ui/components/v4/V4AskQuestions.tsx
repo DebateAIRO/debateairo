@@ -31,11 +31,21 @@ import type { V4Goal, V4GoalAnswer } from "@/lib/v4/types";
  * its question was, "Set aside: To 2035 · Put it back", whose button counts in Free's cap and waits, muted, like any answer. A
  * reading that brought nothing back keeps the earlier questions on screen as they were (`quiet`): no arrival, and the status line
  * says nothing new.
+ * Design Document v2 (16b): when the reading says the question back in one sentence, the answer the AI assumed for a question is
+ * drawn with a dashed edge and ends with "(our assumption)" while that question has no real answer; it is never pressed, and
+ * choosing any answer of the question takes the dashed look away. The question's group then has an id, which the sentence's link
+ * leads to. Without such a reading nothing here changes.
  * Nothing here is kept in the browser.
  */
 
 /** Task 76g (read-f1): an answer a new reading set aside, with its question and its place in the earlier list. */
 export type SetAsideAnswer = Readonly<{ given: V4GoalAnswer; question: ClarifyQuestion; at: number }>;
+
+/**
+ * Design Document v2 (16b): what the reading assumed for one question: the id its group takes (the sentence's link leads to it),
+ * the assumed answer as the question offers it, and that answer's words on its button ("To 2050 (our assumption)").
+ */
+export type AssumedAnswer = Readonly<{ groupId: string; answer: string; words: string }>;
 
 /** The longest answer a person types under "Other". */
 const OTHER_MAX = 120;
@@ -106,9 +116,11 @@ function HeldRow({ folding, onFolded }: Readonly<{ folding: boolean; onFolded():
  * a line to type on. Task 76h: "Other…" puts the cursor in its line (never on a restore), and Free's cap mutes what would be
  * a fourth answer without taking it out of the keyboard's order.
  */
-function QuestionBlock({ question, given, full, capId, move, onChange, inputId, otherLabel, otherInputLabel }: Readonly<{
+function QuestionBlock({ question, given, assumed, full, capId, move, onChange, inputId, otherLabel, otherInputLabel }: Readonly<{
   question: ClarifyQuestion;
   given: V4GoalAnswer | undefined;
+  /** Design Document v2 (16b): the answer the reading assumed for this question; undefined: none. */
+  assumed: AssumedAnswer | undefined;
   /** Free's cap (or, on any plan, the most answers an ask carries) is reached: only a question already answered (with words) can still change. */
   full: boolean;
   capId: string;
@@ -131,13 +143,16 @@ function QuestionBlock({ question, given, full, capId, move, onChange, inputId, 
     focusOther.current = false;
     otherField.current?.focus();
   }, [open]);
-  const muted = (isMuted: boolean) => (isMuted
-    ? { "aria-disabled": true as const, "aria-describedby": capId, className: "v4Chip v4ChipMuted" }
-    : { className: "v4Chip" });
+  const muted = (isMuted: boolean, guessed = false) => (isMuted
+    ? { "aria-disabled": true as const, "aria-describedby": capId, className: guessed ? "v4Chip v4ChipMuted v4ChipAssumed" : "v4Chip v4ChipMuted" }
+    : { className: guessed ? "v4Chip v4ChipAssumed" : "v4Chip" });
+  // Design Document v2 (16b): the assumption shows until the question has a real answer (an "Other…" with no words says nothing).
+  const assumedShown = assumed !== undefined && (given === undefined || !answerCounts(given));
   // read-f8 (ruling): an open "Other…" line with no words takes no typing while the cap is reached, as the muted buttons take no press.
   const locked = given !== undefined && given.other && full && !answerCounts(given);
   return (
     <div
+      id={assumed?.groupId}
       className={move === null ? "v4AskBlock" : move.held ? "v4AskBlock v4AskReveal" : "v4AskBlock v4AskArrive"}
       style={move === null ? undefined : { animationDelay: `${move.delayMs}ms` }}
       role="group"
@@ -148,11 +163,12 @@ function QuestionBlock({ question, given, full, capId, move, onChange, inputId, 
         {question.answers.map((answer) => {
           const pressed = given !== undefined && !given.other && given.answer === answer;
           const waits = capped && !pressed;
+          const guessed = assumedShown && assumed.answer === answer;
           return (
             <button
               key={answer}
               type="button"
-              {...muted(waits)}
+              {...muted(waits, guessed)}
               dir="auto"
               aria-pressed={pressed}
               onClick={(event) => {
@@ -160,7 +176,7 @@ function QuestionBlock({ question, given, full, capId, move, onChange, inputId, 
                 onChange(pressed ? null : { question: question.text, answer, other: false }, event.currentTarget);
               }}
             >
-              {answer}
+              {guessed ? assumed.words : answer}
             </button>
           );
         })}
@@ -206,7 +222,7 @@ function QuestionBlock({ question, given, full, capId, move, onChange, inputId, 
  * questions (with read-d4 A's fold of the answered ones) and Free's joined line.
  */
 export function V4AskQuestions({
-  clarify, questions, goal, planIsFree, seeded, onAnswer, fold, setAside = [], onPutBack, quiet = false, catalog, newDebateCatalog
+  clarify, questions, goal, planIsFree, seeded, onAnswer, fold, setAside = [], onPutBack, quiet = false, assumptions, catalog, newDebateCatalog
 }: Readonly<{
   /** The clarifying call (useAskClarify): its reply, whether the page waits for it and since when, and a fresh ask of the same line. */
   clarify: Readonly<{ reply: AskClarifyResponse | null; waiting: boolean; startedAt: number | null; retry(): void }>;
@@ -226,6 +242,11 @@ export function V4AskQuestions({
   onPutBack?(answer: SetAsideAnswer): void;
   /** Task 76g: the new reading brought nothing back and the earlier questions stay as they were: drawn at once, nothing new said. */
   quiet?: boolean;
+  /**
+   * Design Document v2 (16b): for each question the reading's sentence has a stretch for (by the question's words), the id its
+   * group takes and the answer the AI assumed. Absent: no group has an id and no answer is drawn as an assumption.
+   */
+  assumptions?: ReadonlyMap<string, Readonly<{ groupId: string; answer: string }>>;
   catalog: MessageCatalog;
   newDebateCatalog: MessageCatalog;
   locale: string;
@@ -305,11 +326,13 @@ export function V4AskQuestions({
   const folded = foldNow && answered.length > 0;
   const block = (question: ClarifyQuestion) => {
     const at = questions.indexOf(question);
+    const assumed = assumptions?.get(question.text);
     return (
       <QuestionBlock
         key={question.text}
         question={question}
         given={goal.answers.find((given) => given.question === question.text)}
+        assumed={assumed === undefined ? undefined : { ...assumed, words: t(catalog, "v4.read.assumedAnswer", { answer: assumed.answer }) }}
         full={full}
         capId={capId}
         move={moves?.[at] ?? null}

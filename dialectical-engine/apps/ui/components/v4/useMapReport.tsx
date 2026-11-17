@@ -274,7 +274,9 @@ export function useMapReport(input: MapReportInput): MapReport {
     );
     const mark = good ? <span className="v4DebReportMark" aria-hidden="true" /> : null;
     const goodWords = good ? <span className="v4SrOnly">{` · ${t(catalog, "v4.rail.goodTimeTitle")}`}</span> : null;
-    const className = `v4Btn v4BtnPrimary v4DebReportLink${good ? " v4DebReportGood" : ""}${atBottom}`;
+    // Design Document v2: "Write my report" is a plain outlined button; at a good time for the report it is filled with
+    // the brand colour (with its mark and its spoken words).
+    const className = `v4Btn${good ? " v4BtnPrimary" : ""} v4DebReportLink${good ? " v4DebReportGood" : ""}${atBottom}`;
     if (canAsk) {
       // Task 56c: while the report waits for the reset, the button stays here, greyed, with the line beside it (journey-f14). On a
       // phone whose bottom bar carries "Write my report" (question 18 A) this button is hidden, and the bar says the line instead.

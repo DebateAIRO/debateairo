@@ -11,7 +11,8 @@ const normalized = (path) => path.split(sep).join("/");
 const allowed = (path) => allowlist.some((entry) =>
   entry.endsWith("/**") ? path.startsWith(entry.slice(0, -3)) : path === entry
 );
-const brandOrToken = new Set(["Dialectical Engine", "dezbatere.ro", "Dialectical Engine", "AI"]);
+// Design Document v2: the wordmark sets "Engine" in its own span, so the brand name also arrives as its two halves.
+const brandOrToken = new Set(["Dialectical Engine", "dezbatere.ro", "Dialectical Engine", "AI", "Dialectical", "Engine"]);
 const visibleAttributes = new Set(["alt", "aria-label", "placeholder", "title"]);
 const labelTableName = /(?:label|copy|message|title|text|hint|placeholder)/i;
 

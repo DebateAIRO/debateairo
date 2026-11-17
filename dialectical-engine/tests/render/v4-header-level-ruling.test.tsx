@@ -129,12 +129,14 @@ describe("the reading-level ruling (5 Nov): no level in any header, and no link 
     expect(page.querySelector(".v4ShelfCard")).not.toBeNull();
     expect(server.levelReads).toBe(0);
     expect(server.levelSaves).toBe(0);
-    // Its header's only control is the round account button: no level menu or label of any kind.
-    expect([...page.querySelectorAll("header.v4Hdr button")].map((button) => button.className)).toEqual(["v4HdrAccountButton"]);
+    // Its header's controls are the quota circle and the round account button: no level menu or label of any kind.
+    expect([...page.querySelectorAll("header.v4Hdr button")].map((button) => button.className).filter((name) => name !== "v4HdrQuotaCircle")).toEqual(["v4HdrAccountButton"]);
     expect(page.querySelector("header.v4Hdr")!.textContent).not.toMatch(LEVEL_WORDS);
-    // journey-f19: no quota on All my maps.
-    expect(page.querySelector(".v4HdrQuotaCircle, .v4HdrQuotaHold")).toBeNull();
-    expect(hrefs(page)).toEqual(["/v4", `/v4/debate/${MAP}`, `/v4/debate/${DIG}`]);
+    // Design Document v2 (screen 18b) draws the quota circle on "My questions" too, and marks its link as the current page.
+    expect(page.querySelector(".v4HdrQuotaCircle, .v4HdrQuotaHold")).not.toBeNull();
+    expect(page.querySelector("nav.v4HdrNav a[aria-current=\"page\"]")!.textContent).toBe(CATALOG["v4.maps.menu"]);
+    // The brand, then the header's own links (Design Document v2), then the page's: its "new question" button (18b), then the maps.
+    expect(hrefs(page)).toEqual(["/v4", "/v4", "/v4?maps=all", "/help", "/v4", `/v4/debate/${MAP}`, `/v4/debate/${DIG}`]);
   });
 
   it("a level handed to All my maps or to the ask page's shelf goes on none of their links", async () => {
@@ -167,21 +169,31 @@ describe("question 15 (5 Nov): the phone header is one row", () => {
 
   it("on a phone the brand's name and badge are hidden on screen, the mark stays, and the row's controls never wrap to a second row", () => {
     expect(phoneAt).toBeGreaterThan(-1);
-    expect(rule(".v4Hdr .v4HdrName, .v4Hdr .v4HdrBadge")).toMatch(/position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect\(0 0 0 0\);/u);
+    expect(rule(".v4Hdr .v4HdrName")).toMatch(/position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect\(0 0 0 0\);/u);
+    // Design Document v2: the phone's brand is the diamond mark, and the header's links step back.
+    expect(rule(".v4Hdr .v4HdrMark")).toMatch(/display: block;/u);
+    expect(rule(".v4Hdr .v4HdrNav")).toMatch(/display: none;/u);
     expect(rule(".v4Hdr .v4HdrBrand")).toMatch(/flex: none;[\s\S]*min-inline-size: 44px;/u);
     expect(rule(".v4Hdr .v4HdrRight")).toMatch(/flex: 1 1 0; min-inline-size: 0; flex-wrap: nowrap;/u);
-    // The mark itself is never hidden, and the circle is the same at every size (no phone rule for it).
-    expect(phone).not.toMatch(/\.v4HdrMark|\.v4HdrQuota/u);
+    // The circle is the same at every size (no phone rule for it).
+    expect(phone).not.toMatch(/\.v4HdrQuota/u);
   });
 
-  it("the brand link keeps its whole name for screen readers ('Dialectical Engine V4 preview') and goes to /v4", async () => {
+  it("the brand link keeps its whole name for screen readers ('Dialectical Engine') and goes to /v4", async () => {
     const page = await mount(<V4Header catalog={CATALOG} session="OUT" />);
     const brand = page.querySelector<HTMLAnchorElement>("a.v4HdrBrand")!;
-    expect(brand.textContent).toBe(`Dialectical Engine ${CATALOG["v4.brand.badge"]}`);
+    expect(brand.textContent).toBe("Dialectical Engine");
+    expect(brand.querySelector(".v4HdrNameAccent")!.textContent).toBe("Engine");
     expect(brand.querySelector(".v4HdrMark")!.getAttribute("aria-hidden")).toBe("true");
     expect(brand.getAttribute("href")).toBe("/v4");
     // One row of controls: the brand, then the circle's place and the account's (signed out: no circle, Sign in).
     const header = page.querySelector("header.v4Hdr")!;
-    expect([...header.children].map((child) => child.className)).toEqual(["v4HdrBrand", "v4HdrRight"]);
+    expect([...header.children].map((child) => child.className)).toEqual(["v4HdrLead", "v4HdrRight"]);
+    // Design Document v2: the header's own links. Signed out there is no "My questions" (the page is a signed-in one).
+    const links = [...header.querySelectorAll<HTMLAnchorElement>("nav.v4HdrNav a")];
+    expect(links.map((link) => [link.textContent, link.getAttribute("href"), link.getAttribute("aria-current")])).toEqual([
+      [CATALOG["v4.header.nav.ask"], "/v4", "page"],
+      [CATALOG["v4.header.nav.how"], "/help", null]
+    ]);
   });
 });

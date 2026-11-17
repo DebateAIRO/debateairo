@@ -100,6 +100,10 @@ function harness(overrides: Partial<{ resendCooldownMs: number }> = {}) {
 }
 
 const session = (account: Account) => ({ userId: account.userId, sessionId: account.sessionId });
+// Design Document v2 (3a): the read also carries the account's own pseudonym. This file's pool is the authorization role
+// with no request session, so row-level security shows it no account row and the name reads as none; the name a real
+// request reads is tested in tests/integration/email-change-database.test.ts.
+const NO_SESSION_PSEUDONYM = Object.freeze({ pseudonym: null });
 
 async function expectCode(operation: Promise<unknown>, code: string): Promise<void> {
   await expect(operation).rejects.toBeInstanceOf(EmailChangeError);
@@ -121,7 +125,7 @@ describe("Turn 14 change-email service", () => {
     const account = await fixtureAccount("ana.popescu@unibuc.ro", "a.popescu@proton.me");
     const { service } = harness();
     await expect(service.settings(session(account))).resolves.toEqual({
-      email: "ana.popescu@unibuc.ro", recoveryEmail: "a.popescu@proton.me", pending: null
+      email: "ana.popescu@unibuc.ro", recoveryEmail: "a.popescu@proton.me", pending: null, ...NO_SESSION_PSEUDONYM
     });
   });
 
@@ -130,7 +134,7 @@ describe("Turn 14 change-email service", () => {
     const account = await fixtureAccount(`no-recovery.${randomUUID()}@example.test`, null);
     const { service } = harness();
     await expect(service.settings(session(account))).resolves.toEqual({
-      email: account.email, recoveryEmail: null, pending: null
+      email: account.email, recoveryEmail: null, pending: null, ...NO_SESSION_PSEUDONYM
     });
   });
 
@@ -153,7 +157,7 @@ describe("Turn 14 change-email service", () => {
     ]);
     await expect(service.settings(session(account))).resolves.toEqual({
       email: account.email, recoveryEmail: `recovery.${account.email}`,
-      pending: { newEmail: "ana.popescu@icub.ro", expiresAt: pending.expiresAt }
+      pending: { newEmail: "ana.popescu@icub.ro", expiresAt: pending.expiresAt }, ...NO_SESSION_PSEUDONYM
     });
   });
 

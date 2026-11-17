@@ -64,7 +64,8 @@ describe("SET-6 the subscription card (guard)", () => {
     await mountPlan();
     await press(button(EN["billing.subscription.cancel"]!));
     expectFocusOn(button(EN["billing.subscription.cancel"]!));
-    expect(nextTabStop()).toBe(button(EN["billing.subscription.withdraw"]!));
+    // Cancel closes the row of actions, and its confirm opens right under it.
+    expect(nextTabStop()).toBe(button(EN["billing.subscription.cancelYes"]!));
     plan.getBillingSubscription.mockResolvedValue({ subscription: subscription({ cancel_requested: true, renews_on: null, renewal_total: null, can_revoke_cancel: true }) });
     await press(button(EN["billing.subscription.cancelYes"]!));
     expect(plan.cancelSubscription).toHaveBeenCalledOnce();
@@ -127,6 +128,8 @@ describe("SET-6 the subscription card (guard)", () => {
     await mountPlan();
     await press(button(EN["billing.subscription.withdraw"]!));
     expectFocusOn(button(EN["billing.subscription.withdraw"]!));
+    // Once withdrawn there is nothing left to withdraw from: the withdrawal's block goes with its confirmation.
+    plan.getBillingSubscription.mockResolvedValue({ subscription: subscription({ withdrawal_open_until: null, withdrawal_last_day: null }) });
     await press(button(EN["billing.subscription.withdrawConfirm"]!));
     expect(plan.withdrawSubscription).toHaveBeenCalledOnce();
     expect(card().querySelector("[role=status]")).not.toBeNull();

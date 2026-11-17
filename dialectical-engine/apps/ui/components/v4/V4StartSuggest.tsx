@@ -132,6 +132,11 @@ export function V4StartSuggest(props: StartPlanProps) {
             onFocus={() => setFocused(id)}
             onBlur={(event) => onBlur(event, id)}
           >
+            {/* Design Document v2 (16b): a small lamp marks an offer. */}
+            <svg className="v4StartSuggestionIcon" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18h6M10 21h4" />
+              <path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1.3 1.7 1.5 2.5h5c.2-.8.7-1.7 1.5-2.5A6 6 0 0 0 12 3z" />
+            </svg>
             <p className="v4StartSuggestionLine">{line}</p>
             <div className="v4StartSuggestionActions">
               <button type="button" className="v4Btn" onClick={() => press(yes.action)}>{yes.label}</button>

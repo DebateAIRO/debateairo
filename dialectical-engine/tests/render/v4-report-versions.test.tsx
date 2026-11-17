@@ -694,8 +694,10 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     reports.load = vi.fn(async () => noInvestigation(runId));
     const node = await mountReport(runId);
     const row = node.querySelector(".v4RepHdr")!;
-    // ask-d6 A / journey-f19: the row ends in the V4 header's round account button.
-    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepShare", "v4HdrAccount"]);
+    // ask-d6 A / journey-f19: the row ends in the V4 header's round account button. Design Document v2: Print is a pill of
+    // its own beside Share (Share's list keeps its Print choice too).
+    expect([...row.children].map((child) => child.className)).toEqual(["v4RepHdrBack", "v4RepMenu v4RepShare", "v4RepMenuButton v4RepPrint", "v4HdrAccount"]);
+    expect(row.querySelector(".v4RepPrint")!.textContent).toBe(CATALOG["v4.report.print"]);
     // The level ruling (owner, 5 Nov; links since 9 Nov): a debate keeps its own level, read from the server, so no link on the
     // page carries one, though it was opened at ?level=background; the account menu gets none either.
     expect(row.querySelector(".v4RepHdrBack")!.getAttribute("href")).toBe(`/v4/debate/${runId}`);
@@ -706,7 +708,7 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     expect(node.querySelector(".v4RepMeta")!.textContent).toBe(CATALOG["v4.report.eyebrow"]);
     expect(node.querySelector(".v4RepMeta")!.textContent).not.toContain(CATALOG["v4.readingLevel.background"]);
     // Browser check (4 Nov): the full words, and the short word a phone shows instead; the name is the full sentence.
-    expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`←${CATALOG["v4.report.backToMap"]}${CATALOG["v4.report.backToMapShort"]}`);
+    expect(text(row.querySelector(".v4RepHdrBack"))).toBe(`‹${CATALOG["v4.report.backToMap"]}${CATALOG["v4.report.backToMapShort"]}`);
     expect(row.querySelector(".v4RepHdrBack")!.getAttribute("aria-label")).toBe(CATALOG["v4.report.backToMap"]);
     expect(row.querySelector(".v4RepHdrBackShort")!.getAttribute("aria-hidden")).toBe("true");
     // The reading-level ruling (5 Nov): the level is chosen only when asking; the report's header names none.

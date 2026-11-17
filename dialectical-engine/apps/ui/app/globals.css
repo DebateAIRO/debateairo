@@ -1,85 +1,99 @@
 /* ============================================================
-   Dialectical Engine — Terracotta / Chamber design token contract
+   Dialectical Engine — design token contract (Design Document v2:
+   the light "terracotta" mode is the root block, the dark "chamber" mode the block after it;
+   the mode names are kept from v1 because code and storage key on them)
    ============================================================ */
 
 :root {
   /* mode-bearing surfaces, text, and lines */
-  --bg: #F9F6F1; --surface: #FDFBF6; --surface-1: #FDFBF6;
-  --surface-2: #F4F0E8; --surface-sunken: #EFE9E0;
-  --shell: #EFE9E0; --core: #FDFBF6; --header-bg: rgba(251,249,244,.8);
-  --ink: #29261F; --ink-hover: #3A362D;
-  --text: #29261F; --text-strong: #1A1613; --text-2: #555147;
-  --text-3: #6E675C; --muted: #6E675C; --muted-2: #6E675C;
+  --bg: #F3F5F9; --surface: #FFFFFF; --surface-1: #FFFFFF;
+  --surface-2: #F7F8FB; --surface-sunken: #EEF1F6;
+  --shell: #EEF1F6; --core: #FFFFFF; --header-bg: #FFFFFF;
+  --ink: #121826; --ink-hover: #232B3D;
+  --text: #121826; --text-strong: #0B101B; --text-2: #4A5468;
+  --text-3: #5E6779; --muted: #5E6779; --muted-2: #5E6779;
   /* the mute tag pill: tint(mute, .1) and tint(mute, .4) — consent-ui S01 */
-  --muted-bg: rgba(110,103,92,.1); --muted-border: rgba(110,103,92,.4);
-  --line: rgba(41,38,31,.10); --line-2: rgba(41,38,31,.12); --line-strong: rgba(41,38,31,.20);
-  --grid-dot: rgba(41,38,31,.12);
+  --muted-bg: rgba(94,103,121,.1); --muted-border: rgba(94,103,121,.4);
+  --line: #E3E7EF; --line-2: #E3E7EF; --line-strong: #D3D9E4;
+  --grid-dot: rgba(18,24,38,.08);
 
   /* stance and reasoning accents */
-  --pro: #3F7466; --pro-text: #3F7365; --pro-line: #3F7466;
-  --pro-bg: #E6EBE5; --pro-border: #ADC2BA;
-  --con: #C15F3C; --con-text: #A55133; --con-line: #C15F3C;
-  --con-bg: #F6E8E0; --con-border: #E4B9A8;
-  --gold: #A8823E; --gold-text: #826530; --gold-line: #A5803D;
-  --gold-bg: #F3ECE0; --gold-border: #D9C8A9;
+  --pro: #2350D8; --pro-text: #2350D8; --pro-line: #2350D8;
+  --pro-bg: #E5EAFA; --pro-border: #A3B6EF;
+  --con: #E8701A; --con-text: #A84B05; --con-line: #DD6916;
+  --con-bg: #FCEEE4; --con-border: #F5C39F;
+  --gold: #FF8A2A; --gold-text: #A84B05; --gold-line: #E26600;
+  --gold-bg: #FFF3E8; --gold-border: #FFC08A;
   /* Turn 14 change-email pending pill: tint(gold, .10/.45); the Email card pill hover */
-  --eml-pending-bg: rgba(168,130,62,.1); --eml-pending-border: rgba(168,130,62,.45);
+  --eml-pending-bg: rgba(255,138,42,.1); --eml-pending-border: rgba(255,138,42,.45);
   --eml-pill-hover: rgba(128,120,104,.12);
-  --reasoning: #3D5A80; --reasoning-text: #3D5A80; --reasoning-line: #3D5A80;
-  --reasoning-bg: #E6E8E8; --reasoning-border: #ACB7C4;
+  --reasoning: #121826; --reasoning-text: #121826; --reasoning-line: #121826;
+  --reasoning-bg: #E3E3E5; --reasoning-border: #9B9EA4;
 
   /* review verdicts, status, and score bands */
-  --agree: #3E7A4E; --agree-text: #3C754B; --agree-bg: #E6ECE2; --agree-border: #ADC5AF;
-  --dispute: #B0432F; --dispute-text: #B0432F; --dispute-bg: #F4E5DE; --dispute-border: #DDAEA2;
-  --ok-dot: #3E7A4E; --ok-text: #3C754B; --ok-bg: #E6ECE2; --ok-border: #ADC5AF;
+  --agree: #2F7A47; --agree-text: #2F7A47; --agree-bg: #E7F3EA; --agree-border: #A9D2B4;
+  --dispute: #B42318; --dispute-text: #B42318; --dispute-bg: #FDECEA; --dispute-border: #F2B8B0;
+  --ok-dot: #2F7A47; --ok-text: #2F7A47; --ok-bg: #E7F3EA; --ok-border: #A9D2B4;
   /* locked-toggle track fill and accent edge: tint(ok, .28) and tint(ok, .55) — consent-ui S01 */
-  --ok-soft: rgba(62,122,78,.28); --ok-edge: rgba(62,122,78,.55);
-  --gen-dot: #A8823E; --gen-text: #826530; --gen-bg: #F3ECE0; --gen-border: #D9C8A9;
-  --score-strength-text: #3C754B; --score-strength-bg: #E6ECE2; --score-strength-border: #ADC5AF;
-  --score-uncertainty-text: #826530; --score-uncertainty-bg: #F3ECE0; --score-uncertainty-border: #D9C8A9;
-  --score-impact-text: #3D5A80; --score-impact-bg: #E6E8E8; --score-impact-border: #ACB7C4;
+  --ok-soft: rgba(47,122,71,.28); --ok-edge: rgba(47,122,71,.55);
+  --gen-dot: #FF8A2A; --gen-text: #A84B05; --gen-bg: #FFF3E8; --gen-border: #FFC08A;
+  --score-strength-text: #2F7A47; --score-strength-bg: #E7F3EA; --score-strength-border: #A9D2B4;
+  --score-uncertainty-text: #A84B05; --score-uncertainty-bg: #FFF3E8; --score-uncertainty-border: #FFC08A;
+  --score-impact-text: #121826; --score-impact-bg: #E3E3E5; --score-impact-border: #9B9EA4;
 
   /* model identity */
   --m-claude: #8A63C9; --m-gpt: #B4552D; --m-gemini: #3D6FB4;
   --m-grok: #5F6670; --m-qwen: #3F8E7C; --m-default: #888888;
-  --m-claude-bg: #EFE9F1; --m-claude-border: #CDBBE3;
-  --m-gpt-bg: #F4E7DE; --m-gpt-border: #DEB5A2;
-  --m-gemini-bg: #E6EAEE; --m-gemini-border: #ACC0DA;
-  --m-grok-bg: #EAE9E6; --m-grok-border: #BBBCBE;
-  --m-qwen-bg: #E6EEE7; --m-qwen-border: #ADCDC3;
-  --m-default-bg: #EFEDE9; --m-default-border: #CCCBC8;
+  --m-claude-bg: #F1ECF9; --m-claude-border: #CEBDE8;
+  --m-gpt-bg: #F6EBE6; --m-gpt-border: #E0B8A7;
+  --m-gemini-bg: #E8EEF6; --m-gemini-border: #AEC3E0;
+  --m-grok-bg: #ECEDEE; --m-grok-border: #BCBFC3;
+  --m-qwen-bg: #E8F1EF; --m-qwen-border: #AED0C8;
+  --m-default-bg: #F1F1F1; --m-default-border: #CDCDCD;
 
   /* brand and elevation */
-  --accent: #C15F3C; --link: #3D5A80; --focus: #C15F3C;
-  --focus-halo: rgba(193,95,60,.2);
-  --shadow-card: 0 18px 40px -20px rgba(41,38,31,.24);
-  --shadow-pop: 0 30px 60px -26px rgba(41,38,31,.32);
-  --shadow-drawer: -22px 0 54px -22px rgba(41,38,31,.32);
-  --shadow-chrome: 0 20px 46px -22px rgba(26,22,19,.26);
+  --accent: #2350D8; --link: #2350D8; --focus: #DD6916;
+  /* Design Document v2: the blue accent family (V4 surfaces remap --con-* onto it, see v4-base.css),
+     the brand wordmark colour, the orange call-to-action with its hard edge, and the "hard" card edge */
+  --accent-text: #2350D8; --accent-bg: #E8EDFC; --accent-border: #B9C7F0; --accent-halo: rgba(35,80,216,.18);
+  --brand: #2350D8; --on-brand: #FFFFFF; --on-ink: #FFFFFF;
+  --cta: #FF8A2A; --on-cta: #121826; --cta-border: #121826; --cta-shadow: #121826;
+  --hard: #121826; --hard-shadow: #121826;
+  --shadow-soft: 0 14px 32px -20px rgba(18,24,38,.22);
+  --case-ink: #7A8396; --chip: #EEF1F6; --track: #DCE1EA; --dashed: #7A8396;
+  --field: #F7F8FB; --field-border: #D3D9E4;
+  --focus-halo: rgba(232,112,26,.2);
+  --shadow-card: 0 18px 40px -24px rgba(18,24,38,.22);
+  --shadow-pop: 0 20px 44px -22px rgba(18,24,38,.3);
+  --shadow-drawer: -22px 0 54px -22px rgba(18,24,38,.3);
+  --shadow-chrome: 0 14px 32px -20px rgba(18,24,38,.22);
   --shadow-thumb: 0 1px 4px rgba(0,0,0,.3);
   /* the 10b toggle knob's own shadow — consent-ui S01. One pixel tighter than
      --shadow-thumb, which is the .ndSlider thumb's and belongs to another
      surface, so it is copied rather than re-valued (CODE-REV-S01-C3C4 r1 N3) */
   --shadow-knob: 0 1px 3px rgba(0,0,0,.3);
-  --shadow-tab: 0 6px 16px -8px rgba(41,38,31,.55);
+  --shadow-tab: 0 6px 16px -8px rgba(18,24,38,.55);
   /* a QR must stay dark-on-light for scanners in both modes */
   --qr-paper: #FFFFFF;
   --qr-ink: #111111;
   /* the consent dialogs' overlay: one wash for both modes, from artboard 10c — consent-ui S01 */
-  --scrim: rgba(10,8,6,.42);
-  --shadow-auth-card: 0 48px 90px -44px rgba(26,22,19,.5);
+  --scrim: rgba(11,16,27,.45);
+  --shadow-auth-card: 0 48px 90px -44px rgba(18,24,38,.5);
 
   /* mode-independent typography */
-  --font-display: var(--font-fraunces), "Fraunces", Georgia, serif;
-  --font-sans: var(--font-jakarta), "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-mono-src), "JetBrains Mono", ui-monospace, monospace;
+  --font-display: var(--font-bricolage), "Bricolage Grotesque", var(--font-instrument), "Instrument Sans", system-ui, sans-serif;
+  --font-sans: var(--font-instrument), "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Design Document v2 sets every former mono label (eyebrows, counts, codes) in the sans face */
+  --font-mono: var(--font-sans);
   --font-serif: var(--font-display);
   --t-hero: clamp(44px, 9.2vw, 118px); --t-display: clamp(30px, 4.4vw, 56px);
   --t-title: clamp(22px, 2.2vw, 28px); --t-lede: clamp(16px, 1.5vw, 19.5px);
   --t-body: 15.5px; --t-ui: 13.5px; --t-meta: 12px;
   --t-micro: 11px; --t-nano: 9.5px;
-  --lh-hero: 0.92; --ls-hero: -0.035em; --ls-eyebrow: 0.18em;
-  --fvs-display: "SOFT" 0, "WONK" 1; --fw-display: 480;
+  --lh-hero: 0.96; --ls-hero: -0.03em; --ls-eyebrow: 0.18em; --ls-display: -0.02em;
+  --fvs-display: normal; --fw-display: 700;
+  /* Design Document v2: the hard shadows follow the mode through their colour tokens */
+  --shadow-big: 0 5px 0 var(--hard-shadow); --lp-btn-shadow: 0 4px 0 var(--cta-shadow);
 
   /* mode-independent geometry */
   --r-card: 14px; --r-panel: 16px; --r-btn: 12px;
@@ -99,11 +113,10 @@
 
   /* landing page — the document ships two variants: Terracotta rides soft
      12-20px radii at display weight 480, Chamber the editorial variant */
-  --lp-raised: #EFE9E0;
+  --lp-raised: #EEF1F6;
   --lp-glass: rgba(255,255,255,0.6);
-  --lp-nav-shadow: 0 20px 46px -22px rgba(26,22,19,0.26);
-  --lp-btn-shadow: 0 20px 40px -20px rgba(26,22,19,0.42);
-  --lp-card-shadow: 0 30px 62px -30px rgba(41,38,31,0.24), 0 8px 20px -12px rgba(41,38,31,0.12);
+  --lp-nav-shadow: 0 20px 46px -22px rgba(18,24,38,0.26);
+  --lp-card-shadow: 0 30px 62px -30px rgba(18,24,38,0.24), 0 8px 20px -12px rgba(18,24,38,0.12);
   --lp-core-inset: inset 0 1px 0 rgba(255,255,255,0.85), inset 0 0 0 1px rgba(255,255,255,0.4);
   --lp-arrow-bg: rgba(255,255,255,0.14);
   --lp-arrow-border: rgba(255,255,255,0.26);
@@ -112,66 +125,72 @@
   --lp-r-btn: 12px;
   --lp-r-arrow: 9px;
   --lp-r-nav: 16px;
-  --lp-fw-display: 480;
-  --lp-ls-display: -0.035em;
+  --lp-fw-display: 700;
+  --lp-ls-display: -0.03em;
 }
 
 html[data-mode="chamber"] {
-  --bg: #14110E; --surface: #181410; --surface-1: #181410;
-  --surface-2: #171310; --surface-sunken: #221D17;
-  --shell: #221D17; --core: #181410; --header-bg: rgba(20,17,14,.7);
-  --ink: #F2EAD9; --ink-hover: #FFF8E8;
-  --text: #F2EAD9; --text-strong: #FFFFFF; --text-2: #B5A88F;
-  --text-3: #9C907A; --muted: #9C907A; --muted-2: #9C907A;
-  /* the mute tag pill: tint(mute, .14) and tint(mute, .5) — consent-ui S01 */
-  --muted-bg: rgba(156,144,122,.14); --muted-border: rgba(156,144,122,.5);
-  --line: rgba(242,234,217,.09); --line-2: rgba(242,234,217,.08); --line-strong: rgba(242,234,217,.18);
-  --grid-dot: rgba(242,234,217,.08);
+  --bg: #0E131D; --surface: #171E2B; --surface-1: #171E2B;
+  --surface-2: #121925; --surface-sunken: #232C3C;
+  --shell: #232C3C; --core: #171E2B; --header-bg: #171E2B;
+  --ink: #EEF2F8; --ink-hover: #FFFFFF;
+  --text: #EEF2F8; --text-strong: #FFFFFF; --text-2: #A7B1C2;
+  --text-3: #8B95A8; --muted: #8B95A8; --muted-2: #8B95A8;
+  /* the mute tag pill: tint(mute, .12) and tint(mute, .5) — consent-ui S01; .12 keeps --muted at 4.5:1 on it */
+  --muted-bg: rgba(139,149,168,.12); --muted-border: rgba(139,149,168,.5);
+  --line: #263042; --line-2: #263042; --line-strong: #34405A;
+  --grid-dot: rgba(238,242,248,.07);
 
-  --pro: #6E9E96; --pro-text: #6E9E96; --pro-line: #6E9E96;
-  --pro-bg: #262A25; --pro-border: #435953;
-  --con: #C8834F; --con-text: #C8834F; --con-line: #C8834F;
-  --con-bg: #34261A; --con-border: #704C30;
-  --gold: #C8A055; --gold-text: #C8A055; --gold-line: #C8A055;
-  --gold-bg: #342A1B; --gold-border: #705A33;
+  --pro: #7C9DFF; --pro-text: #7C9DFF; --pro-line: #7C9DFF;
+  --pro-bg: #27324D; --pro-border: #4A5E95;
+  --con: #FF9A45; --con-text: #FF9A45; --con-line: #FF9A45;
+  --con-bg: #3C322F; --con-border: #8B5C38;
+  --gold: #FF9A45; --gold-text: #FFB374; --gold-line: #FF9A45;
+  --gold-bg: #33241A; --gold-border: #8C4510;
   /* Turn 14 change-email pending pill: tint(gold, .13/.50) */
-  --eml-pending-bg: rgba(200,160,85,.13); --eml-pending-border: rgba(200,160,85,.5);
+  --eml-pending-bg: rgba(255,154,69,.13); --eml-pending-border: rgba(255,154,69,.5);
   --eml-pill-hover: rgba(128,120,104,.12);
-  --reasoning: #C8A055; --reasoning-text: #C8A055; --reasoning-line: #C8A055;
-  --reasoning-bg: #342A1B; --reasoning-border: #705A33;
+  --reasoning: #C9D3E3; --reasoning-text: #C9D3E3; --reasoning-line: #C9D3E3;
+  --reasoning-bg: #333B48; --reasoning-border: #707887;
 
-  --agree: #86B58D; --agree-text: #86B58D; --agree-bg: #2A2E24; --agree-border: #4F654F;
-  --dispute: #D67F65; --dispute-text: #D67F65; --dispute-bg: #36251E; --dispute-border: #774A3B;
-  --ok-dot: #86B58D; --ok-text: #86B58D; --ok-bg: #2A2E24; --ok-border: #4F654F;
+  --agree: #86B58D; --agree-text: #86B58D; --agree-bg: #1E2A22; --agree-border: #3F5A45;
+  --dispute: #FF8A7A; --dispute-text: #FF8A7A; --dispute-bg: #3A1F1F; --dispute-border: #7A3A35;
+  --ok-dot: #86B58D; --ok-text: #86B58D; --ok-bg: #1E2A22; --ok-border: #3F5A45;
   /* locked-toggle track fill and accent edge: tint(ok, .35) and tint(ok, .55) — consent-ui S01 */
   --ok-soft: rgba(134,181,141,.35); --ok-edge: rgba(134,181,141,.55);
-  --gen-dot: #C8A055; --gen-text: #C8A055; --gen-bg: #342A1B; --gen-border: #705A33;
-  --score-strength-text: #86B58D; --score-strength-bg: #2A2E24; --score-strength-border: #4F654F;
-  --score-uncertainty-text: #C8A055; --score-uncertainty-bg: #342A1B; --score-uncertainty-border: #705A33;
-  --score-impact-text: #C8A055; --score-impact-bg: #342A1B; --score-impact-border: #705A33;
+  --gen-dot: #FF9A45; --gen-text: #FFB374; --gen-bg: #33241A; --gen-border: #8C4510;
+  --score-strength-text: #86B58D; --score-strength-bg: #1E2A22; --score-strength-border: #3F5A45;
+  --score-uncertainty-text: #FFB374; --score-uncertainty-bg: #33241A; --score-uncertainty-border: #8C4510;
+  --score-impact-text: #C9D3E3; --score-impact-bg: #333B48; --score-impact-border: #707887;
 
   --m-claude: #8A63C9; --m-gpt: #B4552D; --m-gemini: #3D6FB4;
   --m-grok: #5F6670; --m-qwen: #3F8E7C; --m-default: #888888;
-  --m-claude-bg: #2A212E; --m-claude-border: #513C6D;
-  --m-gpt-bg: #311E15; --m-gpt-border: #66351F;
-  --m-gemini-bg: #1E232A; --m-gemini-border: #2B4262;
-  --m-grok-bg: #23211F; --m-grok-border: #3C3D40;
-  --m-qwen-bg: #1E2821; --m-qwen-border: #2C5146;
-  --m-default-bg: #2A2723; --m-default-border: #504E4C;
+  --m-claude-bg: #292944; --m-claude-border: #50407A;
+  --m-gpt-bg: #30272B; --m-gpt-border: #663A2C;
+  --m-gemini-bg: #1D2B41; --m-gemini-border: #2A4670;
+  --m-grok-bg: #232A36; --m-grok-border: #3B424E;
+  --m-qwen-bg: #1D3038; --m-qwen-border: #2B5654;
+  --m-default-bg: #292F3A; --m-default-border: #50535A;
 
-  --accent: #C8834F; --link: #C8A055; --focus: #C8834F;
-  --focus-halo: rgba(200,131,79,.32);
+  --accent: #7C9DFF; --link: #7C9DFF; --focus: #FF9A45;
+  --accent-text: #7C9DFF; --accent-bg: #24315A; --accent-border: #3D4F86; --accent-halo: rgba(124,157,255,.32);
+  --brand: #7C9DFF; --on-brand: #0E131D; --on-ink: #0E131D;
+  --cta: #FF9A45; --on-cta: #0E131D; --cta-border: #FF9A45; --cta-shadow: #8C4510;
+  --hard: #C9D3E3; --hard-shadow: #2E3A50;
+  --shadow-soft: 0 18px 40px -22px rgba(0,0,0,.8);
+  --case-ink: #8B95A8; --chip: #232C3C; --track: #2A3446; --dashed: #66738A;
+  --field: #121925; --field-border: #34405A;
+  --focus-halo: rgba(255,154,69,.32);
   --shadow-card: 0 22px 48px -22px rgba(0,0,0,.8);
-  --shadow-pop: 0 36px 70px -30px rgba(0,0,0,.9);
+  --shadow-pop: 0 24px 56px -24px rgba(0,0,0,.85);
   --shadow-drawer: -26px 0 62px -26px rgba(0,0,0,.9);
-  --shadow-chrome: 0 24px 52px -24px rgba(0,0,0,.85);
+  --shadow-chrome: 0 18px 40px -22px rgba(0,0,0,.8);
   --shadow-auth-card: 0 48px 90px -44px rgba(0,0,0,.85);
   --shadow-tab: 0 6px 16px -8px rgba(0,0,0,.75);
 
-  --lp-raised: #1D1915;
-  --lp-glass: rgba(29,25,21,0.66);
+  --lp-raised: #232C3C;
+  --lp-glass: rgba(23,30,43,0.66);
   --lp-nav-shadow: 0 26px 60px -24px rgba(0,0,0,0.85);
-  --lp-btn-shadow: 0 22px 46px -20px rgba(0,0,0,0.8);
   --lp-card-shadow: 0 60px 110px -40px rgba(0,0,0,0.9), 0 18px 44px -20px rgba(0,0,0,0.7);
   --lp-core-inset: inset 0 1px 0 rgba(255,255,255,0.06), inset 0 0 0 1px rgba(255,255,255,0.02);
   --lp-arrow-bg: rgba(0,0,0,0.14);
@@ -181,8 +200,8 @@ html[data-mode="chamber"] {
   --lp-r-btn: 999px;
   --lp-r-arrow: 999px;
   --lp-r-nav: 999px;
-  --lp-fw-display: 400;
-  --lp-ls-display: -0.045em;
+  --lp-fw-display: 700;
+  --lp-ls-display: -0.03em;
 }
 
 * {
@@ -260,10 +279,12 @@ select {
 }
 
 .supportWidgetToggle {
-  border: 1px solid var(--line-strong);
+  /* Design Document v2: an action pill — brand blue fill, page-coloured text */
+  border: 1px solid var(--pro);
   border-radius: var(--r-pill);
-  background: var(--accent);
-  color: var(--surface-1);
+  background: var(--pro);
+  color: var(--bg);
+  font-weight: 700;
   padding: 10px 18px;
   box-shadow: var(--shadow-pop);
   cursor: pointer;
@@ -383,7 +404,7 @@ select {
   height: 26px;
   transform: none;
   border: 1px solid var(--line-strong);
-  border-radius: 6px;
+  border-radius: 7px;
   background: transparent;
 }
 
@@ -620,9 +641,10 @@ select {
 
 .supportAgentIdentity h1 {
   margin: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 650;
+  font-weight: 700;
+  letter-spacing: -.02em;
   color: var(--text-strong);
 }
 
@@ -923,9 +945,10 @@ select {
   font: 500 12px/1.45 var(--font-sans);
 }
 
+/* Design Document v2: placeholders are the sans face, italic */
 .supportComposer input::placeholder {
   color: var(--muted);
-  font: italic 500 12px/1.45 var(--font-serif);
+  font: italic 400 12px/1.45 var(--font-sans);
 }
 
 .supportComposer input:focus-visible {
@@ -974,12 +997,13 @@ select {
   white-space: nowrap;
 }
 
+/* Design Document v2: primary actions are the brand blue with page-coloured text */
 .supportSend,
 .supportEscalation button {
   padding: 8px 14px;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--pro);
   border-radius: var(--r-pill);
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font: 700 9px/1 var(--font-sans);
   cursor: pointer;
@@ -1117,9 +1141,10 @@ select {
 
 .supportEscalation h2 {
   margin: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 700;
+  letter-spacing: -.02em;
 }
 
 .supportEscalation p {
@@ -1234,7 +1259,7 @@ select {
   width: 100%;
   min-height: 36px;
   padding: 10px 14px;
-  border: 1.5px solid var(--ink);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r-pill);
   background: transparent;
   color: var(--text);
@@ -1537,7 +1562,7 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
 /* Keyboard audit round 4 (E6): in forced colours (Windows High Contrast) a box-shadow is dropped and every border is
    painted the same, so these fields and buttons, whose only focus mark is a border colour and a shadow, showed none.
    There they get a system-colour outline; in normal colours nothing changes. (:root outranks the rules that take
-   their outline away, in this file and in v4-ask.css.) */
+   their outline away, in this file, in v4-ask.css and in the public page's public-lane.css.) */
 @media (forced-colors: active) {
   :root .authField input:focus,
   :root .authField input.authRecoveryInput:focus,
@@ -1548,7 +1573,11 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
   :root .dobFieldset .dobCell:focus-visible,
   :root .supportComposer input:focus-visible,
   :root .v4AskField:focus,
-  :root .v4AskInput:focus { outline: 2px solid Highlight; outline-offset: 1px; }
+  :root .v4AskInput:focus,
+  :root .v4StartRewriteField:focus,
+  :root .v4StartOwnField:focus,
+  :root .v4PubText:focus,
+  :root .v4PubText:focus-visible { outline: 2px solid Highlight; outline-offset: 1px; }
 }
 
 /* Hidden until it has keyboard focus, then shown over the top bar. */
@@ -1576,15 +1605,16 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
    When the landing is the document, the layout's global bar must not render above it. */
 .appShell:has([data-landing-section]) > .topBar { display: none; }
 
+/* Design Document v2 (3a, 4a): the classic bar is 58px on the header surface, its children 14px apart. */
 .topBar {
   display: flex;
   align-items: center;
-  gap: 18px;
-  height: 60px;
-  flex: 0 0 60px;
-  padding: 0 22px;
+  gap: 14px;
+  height: 58px;
+  flex: 0 0 58px;
+  padding: 0 20px;
   border-bottom: 1px solid var(--line);
-  background: var(--surface-2);
+  background: var(--header-bg);
   z-index: 30;
 }
 
@@ -1630,46 +1660,68 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
 .brand {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 14px;
   flex: 0 0 auto;
 }
 
+/* Design Document v2: the mark is a gold diamond in a 26px bordered box; the name sits over the domain. */
 .brandDiamond {
   width: 26px;
   height: 26px;
-  transform: rotate(45deg);
-  background: var(--ink);
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border: 1px solid var(--line-strong);
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
   flex: 0 0 auto;
 }
 
 .brandDiamondCore {
-  width: 8px;
-  height: 8px;
-  background: var(--bg);
-  border-radius: 1px;
+  width: 9px;
+  height: 9px;
+  transform: rotate(45deg);
+  background: var(--gold);
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
 }
 
 .brandName {
   display: block;
   font-weight: 700;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  line-height: 1;
+  font-size: 12.5px;
+  line-height: 1.15;
   white-space: nowrap;
   color: var(--text);
 }
 
 .brandDomain {
   display: block;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--muted-2);
-  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  color: var(--muted);
 }
+
+/* Design Document v2 (19a, 19b): the public bar's brand is the wordmark alone — display face, 700,
+   -.03em, "Engine" in the brand blue — with the page's address beside it. */
+.brandWordmark {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  color: var(--text);
+}
+.brandWordmarkAccent { color: var(--pro); }
+/* :where keeps this at the bar's own weight, so the phone rule further down still narrows it. */
+.topBar:where([data-chrome="public"]) { padding: 0 22px; }
+.brand[data-brand="wordmark"] { gap: 10px; align-items: baseline; }
+.brand[data-brand="wordmark"] .brandDomain { font-size: 10.5px; letter-spacing: 0; margin-inline-start: 14px; }
 
 .topBarContext {
   display: flex;
@@ -1681,14 +1733,14 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
 
 .topBarDivider {
   width: 1px;
-  height: 26px;
-  background: var(--line-2);
+  height: 22px;
+  background: var(--line);
 }
 
 .topBarTitle {
-  font-size: 13.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--muted);
   flex: 1 1 auto;
   contain: inline-size;
   min-width: 1em;
@@ -1700,10 +1752,36 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
 .topBarActions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   flex: 0 0 auto;
 }
 .topBarNewLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Design Document v2: "+ New debate" is a brand-blue pill; the account button an outlined pill;
+   a signed-out visitor's "Log in" is plain text (19a). */
+.topBarActions > .btnDark { padding: 7px 15px; border-radius: var(--r-pill); font-size: 11.5px; }
+.topBarActions .accountMenu > .btn { padding: 6px 13px; border-radius: var(--r-pill); background: transparent; font-size: 11px; }
+/* Design Document v2 (3a): the account control is the identity pill (a gold tint, a round face with the
+   account's initial, the 11px name), and a round gear to the settings follows the mode switch. The gear
+   shows only beside the pill, so a signed-out visitor is not offered settings. */
+.topBarActions .accountMenu > .topBarIdentity {
+  display: flex; align-items: center; gap: 8px; padding: 4px 13px 4px 5px;
+  border: 1px solid var(--eml-pending-border); border-radius: var(--r-pill); background: var(--eml-pending-bg);
+  color: var(--ink); font-family: var(--font-sans); cursor: pointer;
+}
+.topBarIdentityFace {
+  display: grid; place-items: center; flex: 0 0 auto; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--gold); color: var(--bg); font-size: 10.5px; font-weight: 800; line-height: 1;
+}
+.topBarIdentityName { font-size: 11px; font-weight: 700; white-space: nowrap; }
+.topBarGear {
+  display: none; place-items: center; flex: 0 0 auto; width: 30px; height: 30px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-pill); color: var(--muted);
+  font-size: 13px; line-height: 1; text-decoration: none;
+}
+.topBarActions:has(.accountMenu) > .topBarGear { display: grid; }
+.topBarIdentity:focus-visible, .topBarGear:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.topBarActions > .topBarSignIn { padding: 6px 2px; border-color: transparent; background: transparent; color: var(--text); font-size: 12.5px; font-weight: 600; }
+.topBarActions > .topBarSignIn:hover { background: transparent; text-decoration: underline; text-underline-offset: 4px; }
 @media (max-width: 769.98px) {
   .topBarActions > .topBarWide { display: none; }
   .topBarActions { flex: 0 1 auto; min-width: 0; }
@@ -1714,16 +1792,17 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
    Buttons, inputs, pills
    ============================================================ */
 
+/* Design Document v2: the plain button is outlined — a strong hairline on the card surface, 700. */
 .btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   font-family: var(--font-sans);
   font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-2);
-  background: var(--surface-2);
-  border: 1px solid var(--line-2);
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
   border-radius: var(--r-btn);
   padding: 7px 12px;
   cursor: pointer;
@@ -1741,13 +1820,15 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
   cursor: not-allowed;
 }
 
+/* Design Document v2: the filled action button ("+ New debate") is the brand blue with page-coloured text */
 .btnDark {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--core);
+  background: var(--pro);
+  border-color: var(--pro);
+  color: var(--bg);
+  font-weight: 700;
 }
 .btnDark:hover {
-  background: var(--ink-hover);
+  background: color-mix(in srgb, var(--pro) 88%, var(--ink));
 }
 
 .btnGhost {
@@ -1787,27 +1868,27 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
   background: var(--surface-2);
 }
 
+/* Design Document v2: the light/dark switch is a 30px round button on the shell surface. */
 .modeToggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 7px 11px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-pill);
-  background: var(--surface);
-  color: var(--text-2);
+  background: var(--shell);
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: var(--t-meta);
-  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
   white-space: nowrap;
   cursor: pointer;
   transition: background 0.18s, border-color 0.18s, color 0.18s;
 }
 .modeToggle:hover {
-  border-color: var(--con-border);
-  background: var(--con-bg);
-  color: var(--con-text);
+  background: var(--surface-sunken);
 }
 
 .btn:focus-visible,
@@ -1844,7 +1925,7 @@ a:focus-visible {
 .segment button[aria-pressed="true"] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 3px var(--line-strong);
+  box-shadow: var(--shadow-knob);
 }
 
 /* pills + badges */
@@ -1906,9 +1987,10 @@ a:focus-visible {
 .eyebrow {
   font-family: var(--font-mono);
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--accent);
+  letter-spacing: 0.18em;
+  color: var(--accent-text);
 }
 
 .metaLine {
@@ -1963,8 +2045,10 @@ a:focus-visible {
 .sessionHandoff h2 {
   margin-top: 6px;
   color: var(--text-strong);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.02em;
 }
 
 .sessionHandoff p:last-child {
@@ -2009,10 +2093,10 @@ a:focus-visible {
 .authTopBar {
   display: flex;
   align-items: center;
-  min-height: 60px;
-  padding: 0 28px;
+  min-height: 58px;
+  padding: 0 20px;
   border-bottom: 1px solid var(--line);
-  background: var(--bg);
+  background: var(--header-bg);
 }
 
 .authScreen {
@@ -2055,7 +2139,18 @@ a:focus-visible {
   border-radius: 7px;
 }
 .authBrandDiamond { width: 9px; height: 9px; transform: rotate(45deg); background: var(--gold); }
-.authBrandName { font-size: 12.5px; font-weight: 700; }
+/* Design Document v2 (8j, 8k): the card's brand is the wordmark alone, "Engine" in the brand blue.
+   The diamond mark is the phone's brand (8h), where the name drops back to the small sans label. */
+.authBrandMark { display: none; }
+.authBrandName {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.authBrandAccent { color: var(--pro); }
 
 .authIntro { max-width: none; }
 
@@ -2075,9 +2170,10 @@ a:focus-visible {
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 28px;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: normal;
+  text-wrap: pretty;
 }
 
 .authLede {
@@ -2098,7 +2194,7 @@ a:focus-visible {
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 7px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
 .authPanelCore {
   background: var(--core);
@@ -2205,7 +2301,7 @@ a:focus-visible {
   width: 72px;
   height: 40px;
   box-sizing: border-box;
-  padding: 0 22px;
+  padding: 0 22px 0 8px;
   border: 1px solid var(--line-strong);
   border-radius: 9px;
   outline: none;
@@ -2218,6 +2314,8 @@ a:focus-visible {
   text-align: center;
   transition: border-color 0.18s, box-shadow 0.18s;
 }
+/* The ▾ sits at the inline end, so right-to-left locales swap the two paddings. */
+.dobFieldset[dir="rtl"] .dobInput { padding: 0 8px 0 22px; }
 .dobFieldset .dobPart[data-part="y"] .dobInput { width: 96px; }
 .dobFieldset .dobInput[aria-invalid="true"] { border-color: var(--dispute); }
 .dobFieldset .dobInput:focus, 
@@ -2257,7 +2355,8 @@ a:focus-visible {
   border: 1px solid var(--line-strong);
   border-radius: 12px;
   background: var(--core);
-  box-shadow: var(--shadow-pop);
+  /* Design Document v2: the picker grid sits on the hard shadow */
+  box-shadow: var(--shadow-big);
 }
 .dobFieldset .dobPopover[data-anchor="end"] { inset-inline-start: auto; inset-inline-end: 0; }
 /* Keyboard audit, 12 Nov 2026: on the one-time age check the date is the card's only field, so the day grid hung below
@@ -2340,7 +2439,7 @@ a:focus-visible {
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 24px;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.25;
   text-wrap: pretty;
@@ -2390,6 +2489,7 @@ a:focus-visible {
   flex: 0 0 auto;
 }
 
+/* Design Document v2: the form's main action is the brand-blue pill with page-coloured text */
 .authPrimary {
   display: block;
   width: 100%;
@@ -2397,7 +2497,7 @@ a:focus-visible {
   padding: 11px;
   border: 0;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font-family: var(--font-sans);
   font-size: 12.5px;
@@ -2615,7 +2715,7 @@ a:focus-visible {
 
 /* "Don't get locked out": the one-time card after MFA set-up (recovery codes or a passkey, or Later). */
 .authLockout { display: flex; flex-direction: column; gap: 12px; }
-.authLockout h2 { margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35; }
+.authLockout h2 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
 .authLockout p { margin: 0; color: var(--text-2); font-size: 12px; line-height: 1.55; }
 .authLockoutActions { display: flex; flex-direction: column; gap: 8px; }
 
@@ -2685,8 +2785,10 @@ a:focus-visible {
 .authSuccessWarning h2 {
   margin: 0;
   color: var(--text-strong);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -.02em;
   line-height: 1.15;
 }
 
@@ -2761,8 +2863,8 @@ a:focus-visible {
 }
 
 .display {
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   letter-spacing: -0.02em;
   line-height: 1.12;
   color: var(--text-strong);
@@ -2778,10 +2880,11 @@ a:focus-visible {
   font-size: 26px;
 }
 
+/* Design Document v2: a lede is sans (3a: 13.5px/1.6 under the title) */
 .lede {
-  font-family: var(--font-serif);
-  font-size: 16px;
-  line-height: 1.5;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  line-height: 1.6;
   color: var(--text-2);
   margin: 12px 0 0;
   max-width: 600px;
@@ -2814,11 +2917,11 @@ a:focus-visible {
   transition: background 0.2s, color 0.2s;
 }
 .startBtn.ready {
-  color: var(--core);
-  background: var(--ink);
+  color: var(--bg);
+  background: var(--pro);
 }
 .startBtn.ready:hover {
-  background: var(--ink-hover);
+  background: color-mix(in srgb, var(--pro) 88%, var(--ink));
 }
 .startBtn:disabled {
   cursor: not-allowed;
@@ -2887,7 +2990,7 @@ a:focus-visible {
 .tab[aria-current="page"] {
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 1px 3px var(--line-strong);
+  box-shadow: var(--shadow-knob);
 }
 
 .recentList {
@@ -2909,14 +3012,14 @@ a:focus-visible {
 }
 .debateCard:hover {
   border-color: var(--line-strong);
-  box-shadow: 0 6px 20px -12px var(--line-strong);
+  box-shadow: var(--shadow-card);
 }
 .debateCardBody {
   flex: 1;
   min-width: 0;
 }
 .debateCardClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 16.5px;
   font-weight: 600;
   line-height: 1.3;
@@ -2960,8 +3063,8 @@ a:focus-visible {
   padding: 28px 22px;
   text-align: center;
   color: var(--muted);
-  font-family: var(--font-serif);
-  font-size: 15px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
 }
 
 /* ============================================================
@@ -3163,7 +3266,7 @@ a:focus-visible {
   height: 18px;
   border-radius: 50%;
   background: var(--core);
-  box-shadow: 0 1px 3px var(--line-strong);
+  box-shadow: var(--shadow-knob);
   transition: left 0.2s;
 }
 .switch[aria-checked="true"] .knob {
@@ -3196,9 +3299,10 @@ a:focus-visible {
   display: block;
 }
 .miniCard .big {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.02em;
   color: var(--text);
 }
 .miniCard .big small {
@@ -3259,9 +3363,10 @@ a:focus-visible {
 .debateTopTitle {
   flex: 1 1 auto;
   min-width: 0;
-  font-family: var(--font-serif);
-  font-size: 14.5px;
-  font-weight: 600;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 400;
+  font-style: italic;
   color: var(--text-strong);
   white-space: nowrap;
   overflow: hidden;
@@ -3814,7 +3919,7 @@ a:focus-visible {
   cursor: pointer;
 }
 .node[role="button"]:hover {
-  box-shadow: 0 8px 24px -10px var(--line-strong);
+  box-shadow: var(--shadow-card);
 }
 .node.selected {
   outline: 2px solid var(--focus);
@@ -3832,12 +3937,12 @@ a:focus-visible {
 }
 
 .nodeClaim {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  font-size: 15px;
-  line-height: 1.32;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15.5px;
+  line-height: 1.4;
   color: var(--text-strong);
-  letter-spacing: -0.005em;
+  letter-spacing: -.012em;
   overflow-wrap: anywhere;
 }
 .nodeClaim.root {
@@ -3947,8 +4052,9 @@ a:focus-visible {
 }
 
 .nodeProse {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.55;
   color: var(--text-2);
   margin-top: 9px;
@@ -4015,7 +4121,7 @@ a:focus-visible {
   opacity: 0.5;
 }
 .nodeEmptyText {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13.5px;
   font-style: italic;
   color: var(--text-3);
@@ -4032,7 +4138,7 @@ a:focus-visible {
   border: 1.5px solid;
   padding: 2px 9px;
   border-radius: var(--r-pill);
-  box-shadow: 0 2px 6px -3px var(--line-strong);
+  box-shadow: var(--shadow-knob);
   font-family: var(--font-mono);
   font-size: 9.5px;
   font-weight: 600;
@@ -4062,12 +4168,12 @@ a:focus-visible {
   padding: 0 28px;
 }
 .outlineRoot {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.25;
   color: var(--text-strong);
-  letter-spacing: -0.01em;
+  letter-spacing: -.02em;
   margin: 10px 0 26px;
 }
 .outlineRow {
@@ -4091,15 +4197,17 @@ a:focus-visible {
   white-space: nowrap;
 }
 .outlineClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15.5px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.012em;
   line-height: 1.35;
   color: var(--text);
 }
 .outlineBody {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.55;
   color: var(--text-2);
   margin-top: 5px;
@@ -4190,9 +4298,9 @@ a:focus-visible {
   color: var(--gold-text);
 }
 .synthCardClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 500;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -4223,8 +4331,9 @@ a:focus-visible {
   text-align: right;
 }
 .synthVerdictBody {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 14px;
+  font-weight: 500;
   line-height: 1.55;
   color: var(--core);
 }
@@ -4292,8 +4401,9 @@ a:focus-visible {
 .synthSectionList {
   margin: 0;
   padding-left: 17px;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--text-2);
 }
@@ -4360,16 +4470,17 @@ a:focus-visible {
    Inset, because it scrolls. Keyboard audit 2026-11-12. */
 .drawerBody:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .drawerClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 21px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.28;
-  letter-spacing: -0.01em;
+  letter-spacing: -.02em;
   color: var(--text-strong);
 }
 .drawerProse {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 14.5px;
+  font-weight: 500;
   line-height: 1.62;
   color: var(--text-2);
   margin-top: 13px;
@@ -4412,8 +4523,9 @@ a:focus-visible {
 .drawerScoringRationale p,
 .drawerPathDecision p {
   margin: 7px 0 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--text-2);
 }
@@ -4465,8 +4577,9 @@ a:focus-visible {
 }
 .drawerFindingText {
   margin-top: 4px;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.45;
   color: var(--text-2);
 }
@@ -4597,8 +4710,9 @@ a:focus-visible {
 
 .recommendationReason {
   color: var(--text-2);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -4606,8 +4720,9 @@ a:focus-visible {
 .recommendationsPanel p {
   margin: 0;
   color: var(--muted);
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
 }
 
 .drawerDivider {
@@ -4668,8 +4783,9 @@ a:focus-visible {
   text-transform: uppercase;
 }
 .historyCardBody {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 12.5px;
+  font-weight: 500;
   line-height: 1.52;
   color: var(--text-2);
   display: -webkit-box;
@@ -4706,7 +4822,7 @@ a:focus-visible {
   color: var(--pro-text);
 }
 .compareClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13px;
   font-weight: 600;
   line-height: 1.34;
@@ -4727,14 +4843,15 @@ a:focus-visible {
   padding: 4px 0 4px 13px;
 }
 .invFlaggedClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.012em;
   line-height: 1.36;
   color: var(--text-strong);
 }
 .invFlaggedSpan {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-style: italic;
   font-size: 12.5px;
   line-height: 1.5;
@@ -4773,8 +4890,9 @@ a:focus-visible {
   border: 1px solid;
 }
 .invFinalText {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--text-strong);
 }
@@ -4886,7 +5004,7 @@ a:focus-visible {
   margin-bottom: 8px;
 }
 .popQuote {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-style: italic;
   font-size: 12px;
   line-height: 1.42;
@@ -4979,7 +5097,7 @@ a:focus-visible {
   position: fixed;
   inset: 0;
   z-index: 70;
-  background: color-mix(in srgb, var(--ink) 40%, transparent);
+  background: var(--scrim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4993,7 +5111,7 @@ a:focus-visible {
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
   border-radius: 18px;
-  box-shadow: 0 30px 70px -24px var(--line-strong);
+  box-shadow: var(--shadow-pop);
   padding: 26px 28px;
   animation: de-popin 0.2s ease-out both;
 }
@@ -5004,10 +5122,10 @@ a:focus-visible {
   margin-bottom: 18px;
 }
 .modalTitle {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 22px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: -.02em;
   color: var(--text-strong);
   line-height: 1.2;
 }
@@ -5038,8 +5156,9 @@ a:focus-visible {
   margin-bottom: 2px;
 }
 .guideRowBody {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.5;
   color: var(--text-2);
 }
@@ -5067,7 +5186,7 @@ a:focus-visible {
   font-weight: 600;
   padding: 11px 18px;
   border-radius: 11px;
-  box-shadow: 0 14px 36px -14px var(--line-strong);
+  box-shadow: var(--shadow-pop);
 }
 .toastDot {
   width: 7px;
@@ -5195,6 +5314,9 @@ a:focus-visible {
   .topBarContext {
     display: none;
   }
+  /* The public bar keeps its wordmark on a phone, a size down, and drops the address. */
+  .topBar .brand[data-brand="wordmark"] .brandDomain { display: none; }
+  .topBar .brandWordmark { font-size: 18px; }
   .topBarActions {
     min-width: 0;
     gap: 6px;
@@ -5204,35 +5326,89 @@ a:focus-visible {
     padding-inline: 10px;
     white-space: nowrap;
   }
+  /* Design Document v2 (8h, 8i): on a phone the sign-up is a flat page. No card frame, no dotted
+     ground and no bezel: the brand row, the 25px headline and the fields sit on the page itself,
+     22px from the sides and 16px apart. */
   .authScreen {
     overflow-x: hidden;
+    padding: 10px 22px 40px;
   }
+  /* 8h: the brand row is the bar's own mark (24px mark, the 12.5px name, no address line), so it
+     stays the way home; the bar has no fill and no rule, and the card's second brand row is not shown. */
   .authTopBar {
-    min-height: 56px;
-    padding-inline: 20px;
+    min-height: 50px;
+    padding-inline: 22px;
+    gap: 8px;
+    border-bottom: 0;
+    background: transparent;
   }
+  .authTopBar .brand { gap: 9px; margin-inline-end: auto; }
+  .authTopBar .brandDiamond { width: 24px; height: 24px; }
+  .authTopBar .brandDiamondCore { width: 8px; height: 8px; }
+  .authTopBar .brandDomain { display: none; }
   .authColumn {
     padding: 40px 20px 64px;
   }
+  .authCard {
+    width: 100%;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  .authCardInner,
+  .authCardInner:has([data-form="signup"]) {
+    padding: 0;
+    background-image: none;
+  }
+  .authBrand { display: none; }
   .authHeadline {
-    margin-top: 14px;
+    margin-top: 4px;
+    font-size: 25px;
   }
   .authLede {
-    margin-top: 22px;
-    font-size: 17px;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  /* The form's panel loses its bezel; a panel that holds a notice (a refusal, "check your email")
+     keeps it, since that card is the whole screen. */
+  .authPanel:has(.authForm) {
+    margin-top: 16px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .authPanel:has(.authForm) > .authPanelCore {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
   .authForm,
+  .authForm[data-form="signup"] {
+    gap: 16px;
+    margin-top: 0;
+  }
   .authCheckEmail,
   .authSuccessWarning {
-    gap: 22px;
-    margin-top: 42px;
+    gap: 16px;
+    margin-top: 0;
   }
+  .authField label { font-size: 12px; }
   .authField input,
-  .authPrimary {
-    min-height: 58px;
+  .authField select {
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 10px;
+    font-size: 14px;
   }
-  /* 8h: 84/84/120 × 52. Inside the auth card's bezel a 375px screen leaves ~226px, so the
-     three keep that ratio and shrink together instead of wrapping the year onto a new line. */
+  .authPrimary {
+    min-height: 48px;
+  }
+  /* 8h: day and month 84 x 52, the year 120 x 52, 10px apart. */
   .dobFieldset .dobRow { gap: 10px; flex-wrap: nowrap; }
   .dobFieldset .dobPart { gap: 5px; flex: 0 1 84px; min-width: 0; }
   .dobFieldset .dobPart[data-part="y"] { flex: 0 1 120px; }
@@ -5416,12 +5592,12 @@ a:focus-visible {
   padding: 18px 20px;
 }
 .threadRootClaim {
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 21px;
   line-height: 1.28;
   color: var(--text-strong);
-  letter-spacing: -0.008em;
+  letter-spacing: -.015em;
   overflow-wrap: anywhere;
 }
 .threadStub {
@@ -5489,7 +5665,7 @@ a:focus-visible {
   border: 1.5px solid var(--line-2);
   border-left-width: 3px;
   border-radius: 10px;
-  box-shadow: 0 2px 11px -8px var(--line-strong);
+  box-shadow: var(--shadow-card);
   padding: 13px 16px;
   position: relative;
   transition: box-shadow 0.2s;
@@ -5498,20 +5674,21 @@ a:focus-visible {
   cursor: pointer;
 }
 .threadCard[role="button"]:hover {
-  box-shadow: 0 9px 24px -13px var(--line-strong);
+  box-shadow: var(--shadow-card);
 }
 .threadClaim {
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 15px;
   line-height: 1.34;
   color: var(--text-strong);
-  letter-spacing: -0.005em;
+  letter-spacing: -.012em;
   overflow-wrap: anywhere;
 }
 .threadBody {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13px;
+  font-weight: 500;
   line-height: 1.55;
   color: var(--text-2);
   margin-top: 7px;
@@ -5628,7 +5805,7 @@ a:focus-visible {
 .splitChipClaim {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 12.5px;
   font-weight: 500;
   color: var(--text-2);
@@ -5647,12 +5824,12 @@ a:focus-visible {
   padding: 18px 24px;
 }
 .splitFocusRootClaim {
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 20px;
   line-height: 1.3;
   color: var(--text-strong);
-  letter-spacing: -0.008em;
+  letter-spacing: -.015em;
 }
 .splitFocusMain {
   max-width: 680px;
@@ -5661,7 +5838,7 @@ a:focus-visible {
   border: 1.5px solid var(--line-2);
   border-left-width: 4px;
   border-radius: var(--r-card);
-  box-shadow: 0 10px 30px -14px var(--line-strong);
+  box-shadow: var(--shadow-card);
   padding: 17px 20px;
 }
 .splitFocusHead {
@@ -5671,17 +5848,18 @@ a:focus-visible {
   margin-bottom: 9px;
 }
 .splitFocusClaim {
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 18px;
   line-height: 1.3;
   color: var(--text-strong);
-  letter-spacing: -0.007em;
+  letter-spacing: -.015em;
   overflow-wrap: anywhere;
 }
 .splitFocusBody {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 13.5px;
+  font-weight: 500;
   line-height: 1.55;
   color: var(--text-2);
   margin-top: 9px;
@@ -5755,7 +5933,7 @@ a:focus-visible {
 }
 .splitPerspective:hover {
   border-color: var(--line-strong);
-  box-shadow: 0 6px 20px -12px var(--line-strong);
+  box-shadow: var(--shadow-card);
 }
 .splitPerspectiveBadge {
   font-family: var(--font-mono);
@@ -5766,9 +5944,10 @@ a:focus-visible {
   color: var(--text-3);
 }
 .splitPerspectiveClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.012em;
   line-height: 1.35;
   color: var(--text-strong);
   overflow-wrap: anywhere;
@@ -5848,7 +6027,7 @@ a:focus-visible {
   color: var(--con-text);
 }
 .splitColumnEmpty {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13.5px;
   font-style: italic;
   color: var(--text-3);
@@ -5862,7 +6041,7 @@ a:focus-visible {
   border: 1.5px solid var(--line-2);
   border-left-width: 3px;
   border-radius: 10px;
-  box-shadow: 0 2px 11px -8px var(--line-strong);
+  box-shadow: var(--shadow-card);
   padding: 12px 14px;
   position: relative;
 }
@@ -5873,12 +6052,12 @@ a:focus-visible {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-family: var(--font-serif);
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 14.5px;
   line-height: 1.34;
   color: var(--text-strong);
-  letter-spacing: -0.005em;
+  letter-spacing: -.012em;
   padding: 0;
   overflow-wrap: anywhere;
 }
@@ -5918,7 +6097,7 @@ a:focus-visible {
 .splitRebuttalClaim {
   flex: 1;
   min-width: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 12px;
   font-weight: 500;
   color: var(--text-2);
@@ -5930,7 +6109,7 @@ a:focus-visible {
   max-width: 560px;
   margin: 20px auto 0;
   text-align: center;
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 14px;
   font-style: italic;
   color: var(--text-3);
@@ -6007,7 +6186,7 @@ a:focus-visible {
   border: 1.5px solid var(--line-2);
   border-left-width: 4px;
   border-radius: var(--r-panel);
-  box-shadow: 0 4px 16px -10px var(--line-strong);
+  box-shadow: var(--shadow-card);
   padding: 14px 17px;
 }
 .mapReadoutHead {
@@ -6017,9 +6196,10 @@ a:focus-visible {
   margin-bottom: 7px;
 }
 .mapReadoutClaim {
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.012em;
   line-height: 1.4;
   color: var(--text-strong);
   overflow-wrap: anywhere;
@@ -6048,11 +6228,12 @@ a:focus-visible {
 }
 
 /* ============================================================
-   Landing page — the design document's "Landing page — final"
-   (Terracotta / Chamber). Values below are the document's own.
-   The document ships two variants: Terracotta rides soft 12–20px
-   radii at display weight 480; Chamber rides the "editorial"
-   variant — full pill radii, lighter display weight, wider track.
+   Landing page — the design document's "Landing page — final".
+   Design Document v2 does not redraw it, so it wears v2's own
+   language: display headings at 700 and -.03em, the orange call
+   to action with its hard edge, outlined secondary actions, and
+   the wordmark of the public top bar. The radii stay mode-bearing
+   tokens (soft 12–20px in light, full pills in dark).
    ============================================================ */
 
 .lpRoot {
@@ -6070,9 +6251,21 @@ a:focus-visible {
 }
 
 /* `.lpRoot a` is 0,2,0 — the button colours must match that specificity or
-   they lose to it and the labels inherit --ink (dark on dark). */
-.lpRoot a.lpCta { color: var(--bg); }
+   they lose to it and the labels inherit --ink. */
+.lpRoot a.lpCta { color: var(--on-cta); }
 .lpRoot a.lpCtaGhost { color: var(--ink); }
+
+/* Design Document v2: the nav wordmark is the public top bar's — display face, 700, -.03em,
+   "Engine" in the brand blue. */
+.lpWordmark {
+  font-family: var(--font-display);
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.lpWordmarkAccent { color: var(--pro); }
 
 /* Section rhythm. The document authors a fixed 1280px artboard; the vw terms
    below reach its exact padding at 1280 and shrink proportionally under it. */
@@ -6099,7 +6292,6 @@ a:focus-visible {
 .lpDisplay {
   font-family: var(--font-display);
   font-weight: var(--lp-fw-display);
-  font-variation-settings: var(--fvs-display);
   letter-spacing: var(--lp-ls-display);
   text-wrap: pretty;
   margin: 0;
@@ -6129,20 +6321,22 @@ a:focus-visible {
   text-wrap: pretty;
 }
 
-/* Buttons */
+/* Buttons. Design Document v2: the page's one call to action is the orange button — --cta fill,
+   --on-cta label, a 2px --cta-border edge and, on the hero and closing sizes, the hard drop. */
 .lpCta {
   display: inline-flex;
   align-items: center;
+  border: 2px solid var(--cta-border);
   border-radius: var(--lp-r-btn);
-  background: var(--ink);
-  color: var(--bg);
-  font-weight: 600;
+  background: var(--cta);
+  color: var(--on-cta);
+  font-weight: 700;
   transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.lpCtaNav { gap: 10px; padding: 8px 8px 8px 20px; font-size: 13.5px; }
+.lpCtaNav { gap: 10px; padding: 6px 6px 6px 18px; font-size: 13.5px; }
 .lpCtaLabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lpCtaHero { gap: 14px; padding: 12px 12px 12px 30px; font-size: 15.5px; box-shadow: var(--lp-btn-shadow); }
-.lpCtaClosing { gap: 14px; padding: 14px 14px 14px 34px; font-size: 16.5px; box-shadow: var(--lp-btn-shadow); }
+.lpCtaHero { gap: 14px; padding: 10px 10px 10px 28px; font-size: 15.5px; box-shadow: var(--lp-btn-shadow); }
+.lpCtaClosing { gap: 14px; padding: 12px 12px 12px 32px; font-size: 16.5px; box-shadow: var(--lp-btn-shadow); }
 .lpCtaNav:hover { transform: none; }
 .lpCtaHero:hover { transform: none; }
 .lpCtaClosing:hover { transform: none; }
@@ -6169,7 +6363,7 @@ a:focus-visible {
   border-radius: var(--lp-r-btn);
   border: 1px solid var(--line-strong);
   font-size: 15.5px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ink);
   transition: transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -6239,6 +6433,7 @@ a:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: 21px;
+  font-weight: 500;
   line-height: 1.35;
   letter-spacing: -0.01em;
 }
@@ -6308,14 +6503,14 @@ a:focus-visible {
 .lpCardClaim {
   margin: 0;
   font-family: var(--font-display);
-  font-weight: 400;
+  font-weight: 500;
   font-size: 19px;
   line-height: 1.5;
   letter-spacing: -0.012em;
   text-wrap: pretty;
   color: var(--ink);
 }
-.lpTurn { font-family: var(--font-display); font-size: 13px; color: var(--muted); letter-spacing: 0.04em; }
+.lpTurn { font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; }
 
 /* Chips */
 .lpChip {
@@ -6402,7 +6597,7 @@ a:focus-visible {
 }
 .lpLedgerNo { flex: 0 0 38px; font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
 .lpLedgerNo[data-stance="pro"] { color: var(--pro); }
-.lpLedgerNo[data-stance="con"] { color: var(--con); }
+.lpLedgerNo[data-stance="con"] { color: var(--con-text); }
 .lpLedgerNo[data-stance="reasoning"] { color: var(--reasoning); }
 .lpLedgerNo[data-stance="gold"] { color: var(--gold); }
 .lpLedgerTitle {
@@ -6410,8 +6605,8 @@ a:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 .lpLedgerBody { flex: 1; min-width: 220px; margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--muted); text-wrap: pretty; }
 
@@ -6460,7 +6655,7 @@ a:focus-visible {
 .setTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 30px;
   letter-spacing: -0.025em;
 }
@@ -6509,7 +6704,7 @@ a:focus-visible {
 
 /* Section heading above the session list */
 .setSectionHead { display: flex; align-items: center; gap: 12px; margin: 30px 0 12px; flex-wrap: wrap; }
-.setSectionTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; }
+.setSectionTitle { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 700; letter-spacing: -.02em; }
 .setSectionHint { margin: 0; font-size: 11px; color: var(--text-2); font-weight: 400; }
 
 /* Session list */
@@ -6593,7 +6788,8 @@ a:focus-visible {
   cursor: pointer;
   white-space: nowrap;
 }
-.setBtnPrimary { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 700; }
+/* Design Document v2: the card's main action is the brand blue with page-coloured text */
+.setBtnPrimary { background: var(--pro); border-color: var(--pro); color: var(--bg); font-weight: 700; }
 .setBtnQuiet { padding: 7px 15px; color: var(--muted); }
 .setBtnRevoke { padding: 6px 14px; font-size: 11px; color: var(--muted); }
 .setBtn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -6728,7 +6924,7 @@ a:focus-visible {
 .emlTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 28px;
   letter-spacing: -0.02em;
 }
@@ -6739,7 +6935,7 @@ a:focus-visible {
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 7px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
 .emlCore {
   background: var(--core);
@@ -6795,7 +6991,7 @@ a:focus-visible {
   padding: 11px;
   border: 0;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font-family: var(--font-sans);
   font-size: 12.5px;
@@ -6834,7 +7030,7 @@ a:focus-visible {
 .fleetTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 28px;
   letter-spacing: -0.02em;
 }
@@ -6844,7 +7040,7 @@ a:focus-visible {
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 7px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
 .fleetPanelCore {
   position: relative;
@@ -6890,19 +7086,20 @@ a:focus-visible {
 .ndTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 30px;
   letter-spacing: -0.025em;
 }
 
-/* The question sits in the approved bezel: shell around core. */
+/* The question sits in the approved bezel: shell around core.
+   Design Document v2: the composer rides the hard shadow. */
 .ndTopicBezel {
   margin-top: 20px;
   background: var(--shell);
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 7px;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-big);
 }
 .ndTopicCore {
   background: var(--core);
@@ -6921,6 +7118,7 @@ a:focus-visible {
   caret-color: var(--gold);
   font-family: var(--font-display);
   font-size: 17px;
+  font-weight: 500;
   line-height: 1.5;
   overflow: hidden;
   resize: none;
@@ -6928,7 +7126,8 @@ a:focus-visible {
 .ndTopic:focus { outline: none; }
 /* The field draws no ring of its own, so the bezel around it shows where the keyboard is. */
 .ndTopicBezel:has(.ndTopic:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
-.ndTopic::placeholder { color: var(--muted); }
+/* Design Document v2: placeholders are the sans face, italic */
+.ndTopic::placeholder { color: var(--muted); font-family: var(--font-sans); font-style: italic; font-weight: 400; }
 
 .ndCard {
   margin-top: 18px;
@@ -7122,11 +7321,12 @@ a:focus-visible {
 /* Decision 13: the Free notice is a legal line, before the Start press, never a muted hint. */
 .ndPublicNotice { margin: 18px 0 0; padding: 10px 14px; border-radius: var(--r-btn); background: var(--gold-bg); border-inline-start: 3px solid var(--gold); color: var(--text); font-size: 13.5px; }
 .ndActions { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+/* Design Document v2: "Start run →" is the brand-blue pill with page-coloured text */
 .ndStart {
   padding: 10px 22px;
   border: 0;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font-family: inherit;
   font-size: 12.5px;
@@ -7326,7 +7526,7 @@ a:focus-visible {
 .mfaTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 28px;
   letter-spacing: -0.02em;
 }
@@ -7427,7 +7627,7 @@ a:focus-visible {
   padding: 9px 15px;
   border: 0;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font-family: inherit;
   font-size: 11px;
@@ -7461,7 +7661,7 @@ a:focus-visible {
   border: 0;
   border-radius: 999px;
   background: var(--pro);
-  color: var(--core);
+  color: var(--bg);
   font-family: inherit;
   font-size: 11px;
   font-weight: 700;
@@ -7586,7 +7786,7 @@ a:focus-visible {
 .libTitle {
   margin: 12px 0 0;
   font-family: var(--font-display);
-  font-weight: 500;
+  font-weight: 700;
   font-size: 36px;
   letter-spacing: -0.025em;
 }
@@ -7599,14 +7799,14 @@ a:focus-visible {
   text-wrap: pretty;
 }
 
-/* The composer sits in the approved bezel. */
+/* The composer sits in the approved bezel. Design Document v2: it rides the hard shadow. */
 .libComposer {
   margin-top: 26px;
   background: var(--shell);
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   padding: 7px;
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-big);
 }
 .libComposerCore {
   background: var(--core);
@@ -7624,6 +7824,7 @@ a:focus-visible {
   caret-color: var(--gold);
   font-family: var(--font-display);
   font-size: 16px;
+  font-weight: 500;
   line-height: normal;
   overflow: hidden;
   resize: none;
@@ -7631,16 +7832,18 @@ a:focus-visible {
 .libComposerInput:focus { outline: none; }
 /* The field draws no ring of its own, so the bezel around it shows where the keyboard is. */
 .libComposer:has(.libComposerInput:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
-.libComposerInput::placeholder { font-style: italic; color: var(--muted); }
+/* Design Document v2: the placeholder is the sans face, italic */
+.libComposerInput::placeholder { font-family: var(--font-sans); font-style: italic; font-weight: 400; color: var(--muted); }
 
 .libComposerFoot { display: flex; align-items: center; margin-top: 22px; }
 .libComposerHint { margin: 0; font-size: 10.5px; color: var(--muted); }
 .libComposerSpacer { flex: 1; }
+/* Design Document v2: "Start debate →" is the brand-blue pill with page-coloured text */
 .libStart {
   padding: 8px 18px;
   border: 0;
   border-radius: 999px;
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font-family: inherit;
   font-size: 12px;
@@ -7656,7 +7859,7 @@ a:focus-visible {
   align-items: center;
   justify-content: flex-start;
   gap: 8px;
-  margin: 38px 0 14px;
+  margin: 32px 0 14px;
   padding-bottom: 0;
   border-bottom: 0;
 }
@@ -7668,12 +7871,13 @@ a:focus-visible {
   color: var(--muted);
   font-family: var(--font-sans);
   font-size: 11.5px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   cursor: pointer;
 }
 /* PDA-S03: the current tab must differ by more than colour, so it also carries
-   the heavier weight and a shadow the inactive tab does not have. */
+   the heavier weight and a shadow the inactive tab does not have. Design Document v2:
+   the current tab stays ink-filled. */
 .libTab[aria-current="page"] {
   border-color: var(--ink);
   /* background-color, not the background shorthand: the same in browsers (.libTab already sets the rest), and the
@@ -7691,22 +7895,17 @@ a:focus-visible {
 }
 
 .libList { display: flex; flex-direction: column; gap: 10px; }
-/* T3-C2-3 (V 2026-09-28): the row is the two-layer card of the tree — a shell
-   tray around a core body. The core keeps the former single box unchanged;
-   the shell radius is the core's 13px plus its 4px padding, so the corners
-   stay concentric. */
+/* Design Document v2 (3a): a library row is one box — the core's own fill, hairline, 13px radius
+   and 14px 18px padding. The link around it draws nothing; it carries the row's slide on hover. */
 .libRow {
   display: block;
-  background: var(--shell);
-  border: 1px solid var(--line);
-  border-radius: 17px;
-  padding: 4px;
+  border-radius: 13px;
   color: inherit;
   text-decoration: none;
   cursor: pointer;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.libRow:hover { transform: translateX(4px); border-color: var(--line-strong); }
+.libRow:hover { transform: translateX(4px); }
 .libRowCore {
   display: flex;
   align-items: center;
@@ -7788,7 +7987,7 @@ a:focus-visible {
 .libStatus[data-state="unsupported"] {
   border-color: color-mix(in srgb, var(--con) 42%, transparent);
   background: color-mix(in srgb, var(--con) 9%, transparent);
-  color: var(--con);
+  color: var(--con-text);
 }
 .libArrow { flex: 0 0 auto; color: var(--muted); }
 
@@ -7832,7 +8031,7 @@ a:focus-visible {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: 13.5px;
     font-style: italic;
     color: var(--muted);
@@ -7910,7 +8109,7 @@ a:focus-visible {
 }
 
 .debateTopBar .brand {
-  gap: 10px;
+  gap: 14px;
 }
 
 .debateTopBar .brandDiamond {
@@ -7932,20 +8131,19 @@ a:focus-visible {
 
 .debateTopBar .brandName {
   font-size: 12.5px;
-  letter-spacing: 0;
+  letter-spacing: -.01em;
 }
 
 .debateTopBar .brandDomain {
-  margin-top: 2px;
   font-size: 9.5px;
   letter-spacing: 0.08em;
 }
 
 .debateTopDivider {
   width: 1px;
-  height: 26px;
+  height: 22px;
   flex: 0 0 1px;
-  background: var(--line-2);
+  background: var(--line);
 }
 
 .debateTopClaim {
@@ -7953,10 +8151,11 @@ a:focus-visible {
   gap: 0;
 }
 
+/* Design Document v2: the question in the bar is the sans face, italic */
 .debateTopTitle {
   flex: 0 1 auto;
   max-width: 330px;
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: 13.5px;
   font-style: italic;
   font-weight: 400;
@@ -8024,7 +8223,7 @@ a:focus-visible {
   height: 30px;
   min-height: 30px;
   padding: 0;
-  border-color: var(--line);
+  border-color: var(--line-strong);
   border-radius: 50%;
   background: var(--shell);
   color: var(--ink);
@@ -8065,7 +8264,7 @@ a:focus-visible {
   box-shadow:
     0 0 0 4px var(--shell),
     0 0 0 5px var(--line),
-    0 4px 14px -10px var(--line-strong);
+    var(--shadow-card);
 }
 
 .threadCardWrap {
@@ -8149,14 +8348,14 @@ a:focus-visible {
 }
 
 .drawerScrim[data-drawer-scrim] {
-  background: color-mix(in srgb, var(--ink) 32%, transparent);
+  background: var(--scrim);
 }
 
 .drawer[data-drawer-panel] {
   width: min(440px, 100vw);
   background: var(--core);
   border-left-color: var(--line-strong);
-  box-shadow: -22px 0 55px color-mix(in srgb, var(--ink) 18%, transparent);
+  box-shadow: var(--shadow-drawer);
 }
 
 .drawer[data-drawer-panel] .drawerHead {
@@ -8441,7 +8640,7 @@ a:focus-visible {
   background: var(--shell);
   border: 1px solid var(--line-strong);
   border-radius: 16px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
   padding: 6px;
 }
 .nodeWrap[data-stance="pro"] {
@@ -8459,7 +8658,8 @@ a:focus-visible {
   --node-accent-bg: var(--reasoning-bg);
   --node-accent-border: var(--reasoning-border);
 }
-.nodeWrap[data-stance="root"] { --node-accent: var(--ink); }
+/* Design Document v2: the root claim's bezel is 7px and rides the hard shadow. */
+.nodeWrap[data-stance="root"] { --node-accent: var(--ink); padding: 7px; box-shadow: var(--shadow-big); }
 .node {
   overflow: hidden;
   border: 1px solid var(--line);
@@ -8482,6 +8682,7 @@ a:focus-visible {
   border-radius: 0 0 5px 5px;
   background: var(--node-accent, var(--ink));
 }
+.nodeStanceTab[data-stance="root"],
 .referenceStanceTab.root {
   left: 20px;
   width: 52px;
@@ -8619,10 +8820,11 @@ a:focus-visible {
   background: var(--shell);
   border: 1px solid var(--line-strong);
   border-radius: 16px;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-soft);
 }
+/* Design Document v2: the root and focus cards ride the hard shadow, like the canvas root. */
 .threadRootShell,
-.splitFocusShell { padding: 7px; }
+.splitFocusShell { padding: 7px; box-shadow: var(--shadow-big); }
 .threadRoot {
   position: relative;
   overflow: hidden;
@@ -8718,7 +8920,7 @@ a:focus-visible {
   background: var(--core);
 }
 .splitChipRole { border: 0; padding: 0; background: transparent !important; color: var(--ink) !important; font-family: var(--font-sans); font-size: 11.5px; letter-spacing: 0; text-transform: none; }
-.splitChipClaim { font-family: var(--font-sans); font-size: 11.5px; color: var(--muted); }
+.splitChipClaim { font-family: var(--font-sans); font-size: 11.5px; font-weight: 400; color: var(--muted); }
 .splitFocusShell { margin-bottom: 18px; }
 .splitFocusRoot,
 .splitFocusMain {
@@ -8868,7 +9070,7 @@ a:focus-visible {
 .synthInner { display: flex; flex-direction: column; gap: 12px; padding: 18px 16px; }
 .synthTitle {
   margin: 0;
-  font-family: var(--font-serif);
+  font-family: var(--font-display);
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0;
@@ -8893,7 +9095,7 @@ a:focus-visible {
 .synthCardClaim,
 .synthPro .synthCardClaim,
 .synthCon .synthCardClaim,
-.synthVerdictBody { color: var(--ink); font-size: 12.5px; font-weight: 400; line-height: 1.5; }
+.synthVerdictBody { color: var(--ink); font-size: 12.5px; font-weight: 500; line-height: 1.5; }
 .synthVerdictMeta { color: var(--muted); font-family: var(--font-sans); font-size: 9.5px; }
 .synthLean { margin-top: 10px; padding-top: 0; border: 0; }
 .synthLeanLabel,
@@ -8947,7 +9149,8 @@ a:focus-visible {
   border-radius: 999px;
   font-size: 11.5px;
 }
-.drawerReferenceActions .btnChallenge { padding-inline: 17px; border-color: var(--ink); background: var(--ink); color: var(--bg); }
+/* Design Document v2: the drawer's main action is the brand-blue pill with page-coloured text */
+.drawerReferenceActions .btnChallenge { padding-inline: 17px; border-color: var(--pro); background: var(--pro); color: var(--bg); }
 .drawerReferenceActions .btn:disabled { opacity: 1; }
 .drawer[data-drawer-panel] .drawerHistoryHead {
   gap: 10px;
@@ -8972,6 +9175,7 @@ a:focus-visible {
   color: var(--muted);
   font-family: var(--font-sans);
   font-size: 11px;
+  font-weight: 400;
   line-height: 1.5;
   -webkit-line-clamp: 2;
 }
@@ -9033,7 +9237,8 @@ a:focus-visible {
   border: 1px solid var(--line-strong);
   border-radius: 16px;
   background: var(--shell);
-  box-shadow: var(--shadow-pop);
+  /* Design Document v2: the verdict card rides the hard shadow, like the root claim */
+  box-shadow: var(--shadow-big);
 }
 
 .publicVerdictCore {
@@ -9114,7 +9319,7 @@ a:focus-visible {
   max-width: 790px;
   font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.5;
   letter-spacing: -.012em;
   text-wrap: pretty;
@@ -9294,7 +9499,8 @@ a:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -.008em;
   line-height: 1.5;
   text-wrap: pretty;
 }
@@ -9401,12 +9607,12 @@ a:focus-visible {
 .lpAiTransparency .aiNotice p { font-size: 12.5px; line-height: 1.7; }
 .libAiDisclosure { margin-top: 14px; }
 .ndAiDisclosure { margin-top: 16px; margin-bottom: 20px; }
-.debateAiDisclosure { flex: 0 0 auto; padding: 10px 20px; border-bottom: 1px solid var(--line); }
+.debateAiDisclosure { flex: 0 0 auto; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--header-bg); }
 .supportChatScroll > .aiNotice { margin-bottom: 16px; }
 .supportAssistantCompact > .aiNotice { margin: 0 0 12px; }
 .aiTransparencyPage article { width: min(100%, 760px); margin: 32px auto; }
-.aiTransparencyPage h1 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 42px); line-height: 1.15; }
-.aiTransparencyPage h2 { margin-top: 28px; font-size: 18px; }
+.aiTransparencyPage h1 { font-family: var(--font-display); font-size: clamp(28px, 5vw, 42px); font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.aiTransparencyPage h2 { margin-top: 28px; font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 .aiTransparencyPage p { line-height: 1.7; color: var(--text-2); }
 .aiTransparencyPage code { overflow-wrap: anywhere; }
 @media (max-width: 600px) {
@@ -9436,9 +9642,9 @@ a:focus-visible {
   margin: 0;
   font-family: var(--font-display);
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.35;
-  letter-spacing: -.01em;
+  letter-spacing: -.02em;
   color: var(--text-strong);
 }
 .publicStory .storySummary {
@@ -9629,9 +9835,9 @@ a:focus-visible {
   margin: 4px 0 0;
   font-family: var(--font-display);
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.3;
-  letter-spacing: -.01em;
+  letter-spacing: -.02em;
   color: var(--text-strong);
 }
 .storyPanelStory .storySummary { margin: 0; font-size: 14px; line-height: 1.65; color: var(--text); }
@@ -9674,16 +9880,16 @@ a:focus-visible {
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: 1px solid var(--ink);
+  border: 1px solid var(--pro);
   border-radius: var(--r-btn);
-  background: var(--ink);
-  color: var(--core);
+  background: var(--pro);
+  color: var(--bg);
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 700;
   text-decoration: none;
   white-space: nowrap;
 }
-.storyPanelDownload:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
+.storyPanelDownload:hover { background: color-mix(in srgb, var(--pro) 88%, var(--ink)); }
 .storyPanelDownload:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 @keyframes storyPanelPulse {
   0%, 100% { opacity: 1; }
@@ -9767,8 +9973,8 @@ a:focus-visible {
   line-height: 1.4;
   cursor: pointer;
 }
-.languageOfferSwitch { border-color: var(--ink); background: var(--ink); color: var(--core); }
-.languageOfferSwitch:hover { border-color: var(--ink-hover); background: var(--ink-hover); }
+.languageOfferSwitch { border-color: var(--pro); background: var(--pro); color: var(--bg); font-weight: 700; }
+.languageOfferSwitch:hover { background: color-mix(in srgb, var(--pro) 88%, var(--ink)); }
 .languageOfferDismiss:hover { border-color: var(--line-strong); color: var(--text); }
 .languageOfferSwitch:focus-visible,
 .languageOfferDismiss:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -9848,66 +10054,113 @@ a:focus-visible {
 }
 
 /* === sensitive-data consent (V, 2026-09-29) ===
-   The one-time screen before the first debate. It wears the legal-document modal's
-   frame (.policyScrim/.policyBezel/.policyCore/.policyHead/.policyFoot/.policyPrimary)
-   and adds only its body, its decline button and the line shown after a decline. */
-.sensitiveConsent {
+   The one-time screen before the first debate. It reuses the legal-document modal's
+   parts (.policyScrim/.policyBezel/.policyCore/.policyHead/.policyFoot/.policyPrimary)
+   and adds its body, its decline button and the line shown after a decline.
+   Design Document v2 (20a): one card on the core surface — a hairline, 16px corners, 28px of
+   padding, the hard shadow — holding a 14px column: the eyebrow in the accent text colour, the
+   26px title, the points, the agreement in a quiet box, the policy link, then "I agree" (the
+   brand-blue button, 44px) beside the outlined "I don't agree". The two-class selectors below
+   outrank the modal's own rules at the end of this file. */
+.policyBezel.sensitiveConsent {
   width: min(560px, calc(100vw - 32px));
+  padding: 0;
+  border-color: var(--line);
+  border-radius: 16px;
+  background: var(--core);
+  box-shadow: var(--shadow-big);
+  font-size: 14px;
+  line-height: 1.55;
 }
+.sensitiveConsent .policyCore {
+  gap: 14px;
+  padding: 28px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+}
+.sensitiveConsent .policyTab { display: none; }
+.sensitiveConsent .policyHead { padding: 0; border-bottom: 0; }
+.sensitiveConsent .policyHeadText { display: flex; flex-direction: column; gap: 14px; }
+.sensitiveConsent .policyEyebrow {
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.sensitiveConsent .policyTitle { margin: 0; font-size: 26px; line-height: 1.15; }
+.sensitiveConsent .policyLede { margin: 0; font-size: 14px; line-height: 1.55; }
 
 .sensitiveConsentBody {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .sensitiveConsentPoints {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
+  padding-left: 20px;
+  font-size: 14px;
   line-height: 1.55;
-  color: var(--text-2);
+  color: var(--ink);
 }
 
 .sensitiveConsentStatement {
-  margin: 16px 0 0;
+  margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: var(--r-btn);
-  background: var(--shell);
-  font-size: 13px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.55;
   color: var(--ink);
 }
 
 .sensitiveConsentLink {
-  display: inline-block;
-  margin-top: 12px;
-  font-size: 12px;
+  align-self: flex-start;
+  font-size: 13px;
   color: var(--link);
   text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .sensitiveConsentBody .authAlert {
-  margin-top: 14px;
+  margin: 0;
 }
 
+.sensitiveConsent .policyFoot {
+  justify-content: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+.sensitiveConsent .policyPrimary,
 .sensitiveConsentDecline {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 22px;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.sensitiveConsentDecline {
   appearance: none;
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
   background: none;
   color: var(--ink);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
 }
 
 .sensitiveConsentDecline:disabled {
@@ -9929,11 +10182,14 @@ a:focus-visible {
 }
 
 @media (max-width: 480px) {
+  .sensitiveConsent .policyCore {
+    padding: 22px 18px;
+  }
+  .sensitiveConsent .policyTitle {
+    font-size: 23px;
+  }
   .sensitiveConsent .policyFoot {
     flex-wrap: wrap;
-  }
-  .sensitiveConsent .policyFoot .policyFootSpacer {
-    display: none;
   }
   .sensitiveConsent .policyFoot button {
     flex: 1 1 100%;
@@ -9963,75 +10219,127 @@ a:focus-visible {
 /* Paid plans (spec 2026-09-29 §1.2, §2.10): usage bars, in percent, never money. */
 .usageBars { display: grid; gap: 10px; margin-top: 14px; }
 .usageLine { margin: 0; font-size: 13.5px; color: var(--text-2); }
-.usageBar { display: grid; gap: 4px; }
-.usageTrack { height: 6px; border-radius: 3px; background: var(--muted-bg); overflow: hidden; }
-.usageFill { display: block; height: 100%; background: var(--reasoning); }
+/* Design Document v2 (19c): an 8px pill track on the shell surface, filled in the accent. */
+.usageBar { display: grid; gap: 6px; }
+.usageTrack { height: 8px; border-radius: var(--r-pill); background: var(--shell); overflow: hidden; }
+.usageFill { display: block; height: 100%; border-radius: var(--r-pill); background: var(--accent); }
 .usageReset { font-size: 12px; color: var(--text-2); }
 /* === crisis support (V, 2026-09-30) ===
-   Help numbers instead of a debate when a question reads as a person in crisis. It wears the
-   legal-document modal's frame, like the consent screen, and keeps to calm ink: nothing on it
-   is red or alarming, and the call buttons are the largest things on it. */
-.crisisSupport {
+   Help numbers instead of a debate when a question reads as a person in crisis. It reuses the
+   legal-document modal's parts, like the consent screen, and the call buttons are the largest
+   things on it.
+   Design Document v2 (20b, and 20c for the refusal below): a flat panel in the page colour with
+   32px of padding and a 14px column — the eyebrow in the accent text colour, a 30px title, the
+   lede, the emergency line on the dispute tint, the country, each helpline as a card on the core
+   surface whose "Call …" is the brand-blue button (40px) beside outlined actions, then the quiet
+   lines and the outlined "Back to my question". The two-class selectors below outrank the
+   modal's own rules at the end of this file. */
+.policyBezel.crisisSupport,
+.policyBezel.questionRefusal {
+  padding: 0;
+  border-radius: 18px;
+  background: var(--bg);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.policyBezel.crisisSupport {
   width: min(600px, calc(100vw - 32px));
 }
+.crisisSupport .policyCore,
+.questionRefusal .policyCore {
+  gap: 14px;
+  padding: 32px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+}
+.crisisSupport .policyTab,
+.questionRefusal .policyTab { display: none; }
+.crisisSupport .policyHead,
+.questionRefusal .policyHead { padding: 0; border-bottom: 0; }
+.crisisSupport .policyHeadText,
+.questionRefusal .policyHeadText { display: flex; flex-direction: column; gap: 14px; }
+.crisisSupport .policyEyebrow {
+  font-size: 10.5px;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+}
+.crisisSupport .policyTitle { margin: 0; font-size: 30px; line-height: 1.12; }
+.crisisSupport .policyFoot,
+.questionRefusal .policyFoot {
+  justify-content: flex-start;
+  padding: 0;
+  border-top: 0;
+  background: transparent;
+}
+.crisisSupport .policyFootSpacer,
+.questionRefusal .policyFootSpacer { display: none; }
 
 .crisisSupportLede {
-  margin: 10px 0 0;
+  margin: 0;
   font-size: 14px;
-  line-height: 1.6;
-  color: var(--ink);
+  line-height: 1.55;
+  color: var(--text-2);
 }
 
 .crisisSupportBody {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
+.crisisSupportBody:empty { display: none; }
 
 .crisisSupportCountry {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--ink);
 }
 
 .crisisSupportCountry select {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   max-width: 280px;
-  padding: 8px 10px;
+  padding: 6px 12px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-btn);
-  background: var(--shell);
+  border-radius: 10px;
+  /* the page colour, not transparent: a native list of options takes the control's own ground */
+  background: var(--bg);
   color: var(--ink);
   font: inherit;
   font-size: 13px;
+  font-weight: 400;
 }
 
 .crisisSupportLines {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  margin: 14px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .crisisSupportLine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--line);
-  border-radius: var(--r-btn);
-  background: var(--shell);
+  border-radius: 14px;
+  background: var(--core);
 }
 
 .crisisSupportLineHead {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 6px 12px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .crisisSupportLineName {
@@ -10040,39 +10348,45 @@ a:focus-visible {
   color: var(--ink);
 }
 
+/* The line's facts read as one quiet sentence: "Free · Fri–Sun 19:00–07:00". */
 .crisisSupportLineTags {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: .06em;
-  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--muted);
 }
 
-.crisisSupportLineTags span {
-  padding: 2px 7px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-}
+.crisisSupportLineTags:empty { display: none; }
+.crisisSupportLineTags span + span::before { content: " · "; white-space: pre; }
 
 .crisisSupportLineActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px 14px;
-  margin-top: 12px;
+  gap: 8px;
+}
+
+.crisisSupportCall,
+.crisisSupportLineActions .crisisSupportAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-decoration: none;
 }
 
 .crisisSupportCall {
-  display: inline-block;
-  padding: 10px 18px;
-  border-radius: var(--r-pill);
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
+}
+
+.crisisSupportLineActions .crisisSupportAction {
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
 }
 
 .crisisSupportEmergencyCall {
@@ -10084,53 +10398,56 @@ a:focus-visible {
 
 .crisisSupportAction,
 .crisisSupportElsewhere {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--link);
   text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
 .crisisSupportNote {
-  margin: 14px 0 0;
+  margin: 0;
   font-size: 13px;
   line-height: 1.55;
   color: var(--ink);
 }
 
 .crisisSupportEmergency {
-  margin: 16px 0 0;
+  margin: 0;
   padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-btn);
-  background: var(--shell);
-  font-size: 13px;
+  border: 1px solid var(--dispute-border);
+  border-radius: 12px;
+  background: var(--dispute-bg);
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.55;
   color: var(--ink);
 }
 
 .crisisSupportElsewhere {
-  display: inline-block;
-  margin-top: 12px;
+  align-self: flex-start;
 }
 
 .crisisSupportFine {
-  margin: 14px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--text-2);
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 .crisisSupportBack {
-  padding: 10px 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 16px;
   appearance: none;
   border: 1px solid var(--line-strong);
-  border-radius: var(--r-pill);
+  border-radius: 12px;
   background: none;
   color: var(--ink);
   font: inherit;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
   cursor: pointer;
 }
 
@@ -10149,21 +10466,22 @@ a:focus-visible {
 }
 
 @media (max-width: 480px) {
-  .crisisSupportBody {
-    padding: 14px 16px 16px;
+  .crisisSupport .policyCore,
+  .questionRefusal .policyCore {
+    padding: 22px 18px;
+  }
+  .crisisSupport .policyTitle {
+    font-size: 26px;
   }
   .crisisSupportCountry {
     flex-wrap: wrap;
   }
   .crisisSupportCountry select {
+    flex: 1 1 auto;
     max-width: none;
   }
   .crisisSupportCall {
     flex: 1 1 100%;
-    text-align: center;
-  }
-  .crisisSupport .policyFoot .policyFootSpacer {
-    display: none;
   }
   .crisisSupport .policyFoot button {
     flex: 1 1 100%;
@@ -10171,11 +10489,19 @@ a:focus-visible {
 }
 /* === end crisis support === */
 
-/* Refusal and check-unavailable screens use the crisis modal's calm frame. */
-.questionRefusal {
-  width: min(680px, calc(100vw - 32px));
+/* Refusal and check-unavailable screens use the crisis panel's calm frame.
+   Design Document v2 (20c): a 12px column — the 28px title, the plain statement in ink, the two
+   reasons in the hint colour, the complaint route in a quiet box, then the outlined button. */
+.policyBezel.questionRefusal {
+  width: min(600px, calc(100vw - 32px));
   color: var(--ink);
 }
+.questionRefusal .policyCore,
+.questionRefusal .policyHeadText,
+.questionRefusal .crisisSupportBody { gap: 12px; }
+.questionRefusal .policyTitle { margin: 0; font-size: 28px; line-height: 1.12; }
+.questionRefusal .crisisSupportLede[data-part="not-started"] { color: var(--ink); }
+.questionRefusal .policyFoot { margin-top: 6px; }
 
 .questionRefusal .policyTitle:focus {
   outline: none;
@@ -10183,25 +10509,28 @@ a:focus-visible {
 
 .questionRefusalRule {
   margin: 0;
-  border-left: 2px solid var(--line-strong);
-  padding-left: 12px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
-  color: var(--ink);
-}
-
-.questionRefusalComplain {
-  margin: 14px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
   color: var(--text-2);
 }
 
-.harmHelpLine {
-  margin-top: 16px;
+.questionRefusalComplain {
+  margin: 0;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-radius: var(--r-btn);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.questionRefusalComplain .crisisSupportAction { font-size: inherit; }
+
+.harmHelpLine {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   color: var(--ink);
 }
 
@@ -10215,7 +10544,7 @@ a:focus-visible {
 .threatReportsList { list-style: none; margin: 16px 0 0; padding: 0; }
 .threatReportsRow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 5px 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
 .threatReportsKeptAt { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
-.threatReportsQuestion { margin: 16px 0 0; padding: 18px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: var(--surface-2); color: var(--ink); font-family: var(--font-display); font-size: 17px; line-height: 1.5; overflow-wrap: anywhere; }
+.threatReportsQuestion { margin: 16px 0 0; padding: 18px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: var(--surface-2); color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
 .threatReportsFacts { display: grid; gap: 9px; margin: 16px 0 0; }
 .threatReportsFacts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: baseline; gap: 12px; }
 .threatReportsFacts dt { color: var(--text-2); font-size: 11px; }
@@ -10270,6 +10599,10 @@ a:focus-visible {
   .topBarActions > .roleChip {
     display: none;
   }
+  /* The identity pill keeps its face; its name and the gear give up their width (the menu has Settings). */
+  .topBarActions .accountMenu > .topBarIdentity { padding: 4px; }
+  .topBarIdentityName { display: none; }
+  .topBarActions:has(.accountMenu) > .topBarGear { display: none; }
   /* A signed-out visitor's only way to sign in from this bar: it stays,
      compact and on one line, while "+ New debate" gives up width first. */
   .topBarActions > .topBarSignIn {
@@ -10542,11 +10875,12 @@ a:focus-visible {
   z-index: var(--z-consent-bar);
 }
 
+/* Design Document v2: the bar's bezel rides the hard shadow (10a draws it with shadowBig). */
 .consentBarBezel {
   background: var(--shell);
   border: 1px solid var(--line-strong);
   border-radius: var(--r-panel);
-  box-shadow: var(--shadow-pop);
+  box-shadow: var(--shadow-big);
   padding: 7px;
 }
 
@@ -10589,8 +10923,8 @@ a:focus-visible {
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 16px;
-  font-weight: 600;
-  letter-spacing: -.015em;
+  font-weight: 700;
+  letter-spacing: -.02em;
   margin-top: 7px;
 }
 
@@ -10637,7 +10971,8 @@ a:focus-visible {
    primary's `10px` + 0 border are both 10px of effective edge in the same row
    (CODE-REV-S01-C3C4 r1 N2). */
 .consentPrimary {
-  background: var(--ink);
+  /* Design Document v2: the primary action is the brand blue with page-coloured text */
+  background: var(--pro);
   border: none;
   border-radius: var(--r-pill);
   color: var(--bg);
@@ -10712,8 +11047,8 @@ a:focus-visible {
   color: var(--ink);
   font-family: var(--font-display);
   font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -.015em;
+  font-weight: 700;
+  letter-spacing: -.02em;
   margin-top: 9px;
 }
 
@@ -11065,8 +11400,8 @@ a:focus-visible {
   margin-top: 9px;
   font-family: var(--font-display);
   font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -.018em;
+  font-weight: 700;
+  letter-spacing: -.02em;
 }
 
 .policyLede {
@@ -11178,7 +11513,7 @@ a:focus-visible {
 .policySectionTitle {
   font-family: var(--font-display);
   font-size: 15.5px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -.012em;
 }
 
@@ -11250,12 +11585,13 @@ a:focus-visible {
   flex: 1;
 }
 
+/* Design Document v2: the modal's primary action is the brand blue with page-coloured text. */
 .policyPrimary {
   padding: 10px 18px;
   appearance: none;
   border: 0;
   border-radius: var(--r-pill);
-  background: var(--ink);
+  background: var(--pro);
   color: var(--bg);
   font: inherit;
   font-size: 12px;
@@ -11263,22 +11599,24 @@ a:focus-visible {
   cursor: pointer;
 }
 
-/* `.65` is MEASURED, not chosen: stepping alpha by 0.05 over the label and the face composited
-   on the footer's `--shell` ground gives .60 -> Terracotta 4.13 (fails 4.5:1), .65 -> 4.79 /
-   7.17, .70 -> 5.54 / 8.09. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most
-   dimmed value that a reader can still read. Every rung above is now ASSERTED, not just narrated,
-   in `tests/unit/consent-s02-style-contract.test.ts` (S02-S64) — the first version of this
-   comment said 5.61 at .70, which is what `Math.round` returns only if `1 - .70` is re-spelled
-   as the literal `.30`; the rung is a tie and the two spellings fall on opposite sides of it
-   (CODE-REV-S02-C8-r1 B1). */
+/* A locked button drops the brand blue for the ink face and is dimmed. `.6` is MEASURED, not
+   chosen: stepping alpha by 0.05 over the page-coloured label and the ink face composited on the
+   footer's `--shell` ground gives .55 -> light 3.88 (fails 4.5:1) / dark 5.83, .60 -> 4.54 / 6.66,
+   .65 -> 5.38 / 7.57. It is the smallest step clearing 4.5:1 in BOTH modes, i.e. the most dimmed
+   value that a reader can still read; the blue face cannot be dimmed and stay readable (at .65 it
+   gives 3.05 / 3.85). Every rung above is ASSERTED, not just narrated, in
+   `tests/unit/consent-s02-style-contract.test.ts` (S02-S64), with the arithmetic that ships:
+   `Math.round` per channel, `1 - alpha` spelled as written (CODE-REV-S02-C8-r1 B1). */
 .policyPrimary:disabled {
-  opacity: .65;
+  background: var(--ink);
+  opacity: .6;
   cursor: not-allowed;
 }
 
 /* Locked but still in the Tab order (aria-disabled, so its reason is heard): looks the same. */
 .policyPrimary[aria-disabled="true"] {
-  opacity: .65;
+  background: var(--ink);
+  opacity: .6;
   cursor: not-allowed;
 }
 

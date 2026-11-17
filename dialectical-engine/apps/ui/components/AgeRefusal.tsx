@@ -25,7 +25,7 @@ export function AgeRefusal({ catalog, focusTitle = false }: Readonly<{
             <span className="authBrandMark" aria-hidden="true">
               <span className="authBrandDiamond" />
             </span>
-            <span className="authBrandName">Dialectical Engine</span>
+            <span className="authBrandName">Dialectical <span className="authBrandAccent">Engine</span></span>
           </div>
           <div className="authPanel">
             <div className="authPanelCore ageRefusal">

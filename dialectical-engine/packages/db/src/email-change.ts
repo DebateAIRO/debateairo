@@ -99,6 +99,24 @@ export class PostgresEmailChangeRepository {
     });
   }
 
+  /**
+   * Design Document v2 (3a): the account's own pseudonym, the name the top bar's identity pill shows. Null for an account
+   * that is not active (erased, closed, unknown). The one method here that is no capability of migration 0079: a plain
+   * read of one column of the account's own row. Called inside the account's request, it runs as the request's login,
+   * which migration 0130's `rls_account` policy shows only the row of the account the request's session names, so it
+   * cannot answer for another account whatever id it is handed. The caller asks it only after `readSettings` found the
+   * session live.
+   */
+  async readOwnPseudonym(userId: string): Promise<string | null> {
+    const result = await this.pool.query<{ pseudonym: unknown }>(`
+      SELECT account.pseudonym
+      FROM identity."user" AS account
+      WHERE account.user_id=$1 AND account.state='active'
+    `, [userId]);
+    const pseudonym = result.rows[0]?.pseudonym;
+    return typeof pseudonym === "string" ? pseudonym : null;
+  }
+
   async request(input: Readonly<{
     userId: string;
     sessionId: string;

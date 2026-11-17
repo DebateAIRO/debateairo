@@ -308,7 +308,7 @@ function CanvasCard({
       stanceLine = "var(--reasoning-line)";
       break;
     case "root":
-      stanceLine = "var(--line-strong)";
+      stanceLine = "var(--ink)";
       break;
   }
   const generation = node.active_generation;
@@ -360,44 +360,22 @@ function CanvasCard({
     left: placed.x,
     top: placed.y,
     width: CARD_W,
-    opacity: (scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38) * lowStrengthDim,
-    background: "var(--shell)",
-    boxShadow: "var(--shadow-card)",
-    boxSizing: "border-box",
-    border: "1px solid var(--line-strong)",
-    borderRadius: "var(--r-card)",
-    padding: 4
+    opacity: (scoreFilterMatch ? (state === "abandoned" ? 0.58 : 1) : 0.38) * lowStrengthDim
   };
 
-  const innerStyle: CSSProperties = scrutiny
+  // Design Document v2 (1a): the bezel's look (shell, core, radii, padding, shadow) lives in the
+  // stylesheet (.nodeWrap / .node). Only what a state changes is set here.
+  const innerStyle: CSSProperties | undefined = scrutiny
     ? {
-        background: "var(--core)",
-        borderRadius: "var(--r-card)",
-        position: "relative",
         borderColor: scrutiny.color,
-        boxShadow: `0 0 0 4px ${scrutiny.bg}, var(--shadow-card)`
+        boxShadow: `0 0 0 4px ${scrutiny.bg}`
       }
-    : role === "root"
+    : role !== "root" && (state === "empty" || state === "abandoned" || state === "failed")
       ? {
-          background: "var(--core)",
-          borderRadius: "var(--r-card)",
-          position: "relative",
-          borderColor: "var(--line-2)",
-          boxShadow: "var(--shadow-card)"
+          background: "var(--surface-sunken)",
+          borderColor: "var(--line-2)"
         }
-      : state === "empty" || state === "abandoned" || state === "failed"
-        ? {
-            background: "var(--surface-sunken)",
-            borderRadius: "var(--r-card)",
-            position: "relative",
-            borderColor: "var(--line-2)"
-          }
-        : {
-            background: "var(--core)",
-            borderRadius: "var(--r-card)",
-            position: "relative",
-            borderColor: pal?.border
-          };
+      : undefined;
 
   function openIfDone() {
     if (state === "done" || state === "abandoned" || state === "failed") onOpenNode(node.id);
@@ -472,16 +450,7 @@ function CanvasCard({
           className="nodeStanceTab"
           data-stance={stance}
           aria-hidden="true"
-          style={{
-            display: "block",
-            position: "absolute",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: 3,
-            borderRadius: "var(--r-tab)",
-            background: stanceLine
-          }}
+          style={{ background: stanceLine }}
         />
         {scrutiny ? (
           <span className="scrutinyBadge" style={{ borderColor: scrutiny.color }}>

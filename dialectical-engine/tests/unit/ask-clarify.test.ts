@@ -34,6 +34,12 @@ const PREVIEW_CONFIG = parsePreviewProviderTestConfig(JSON.stringify({
 const HOSTED_KEY = "sk-ant-api03-ABCDEFGH12345678";
 /** Made up: the register's abuseLimits row gives the real ones to the running API. */
 const ASK_LIMITS = Object.freeze({ perHour: 11, perDay: 22 });
+/**
+ * Since 17 Nov the call is asked with version 3 (tests/unit/ask-clarify-v3.test.ts), whose reply may say the question back. The
+ * replies scripted in this file carry no such sentence, so every answered call also reports this one content-free line; the
+ * questions, the money and the limits are as they were.
+ */
+const NO_SENTENCE = "RESTATEMENT_UNUSABLE";
 
 function gateway(...replies: readonly (string | Error)[]) {
   const packets: PromptPacket[] = [];
@@ -187,7 +193,7 @@ describe("what one person can spend", () => {
     let last = await port.read(OWNER, "Question number 0?", null);
     for (let at = 1; last.source === "AI" && at < 500; at += 1) last = await port.read(OWNER, `Question number ${at}?`, null);
     expect(last).toEqual({ source: "NONE" });
-    expect(reports).toEqual(["RATE_LIMITED"]);
+    expect(reports).toEqual([...Array.from({ length: ASK_LIMITS.perHour }, () => NO_SENTENCE), "RATE_LIMITED"]);
     const spent = calls;
     expect(spent).toBe(ASK_LIMITS.perHour);
     expect(await port.read(OWNER, "One more question?", null)).toEqual({ source: "NONE" });
@@ -213,7 +219,7 @@ describe("what one person can spend", () => {
     now += 3_600_001;
     expect(await ask("Fourth question, past the day's limit?")).toBe("NONE");
     expect(calls).toBe(3);
-    expect(reports).toEqual(["RATE_LIMITED", "RATE_LIMITED"]);
+    expect(reports).toEqual([NO_SENTENCE, NO_SENTENCE, "RATE_LIMITED", NO_SENTENCE, "RATE_LIMITED"]);
     now += 86_400_001;
     expect(await ask("A question the next day?")).toBe("AI");
   });
@@ -316,7 +322,8 @@ describe("what one person can spend", () => {
     const { port, events, reports } = ledgerOf({ replies: [reply({ questions: [WHERE] })], reserve: async () => { reservations += 1; if (reservations === 2) throw refusedOwner(); } });
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
     expect(events).toEqual([`reserve charge-1 ${OWNER}`, "send", `record charge-1 ${OWNER}`, `reserve charge-2 ${OWNER}`]);
-    expect(reports).toEqual([]);
+    // The refused reservation reports nothing; the one line is the first reading's, which says no sentence.
+    expect(reports).toEqual([NO_SENTENCE]);
     // Remembered as any reading: the same text costs nothing again.
     expect(await port.read(OWNER, QUESTION, null)).toEqual({ source: "AI", questions: [WHERE] });
     expect(events.filter((event) => event === "send")).toHaveLength(1);
@@ -357,7 +364,7 @@ describe("what one person can spend", () => {
     expect((await port.read(OWNER, "Second question?", null)).source).toBe("AI");
     // The hour's two are spent, the refused one among them: no third call.
     expect(await port.read(OWNER, "Third question?", null)).toEqual({ source: "NONE" });
-    expect(reports).toEqual(["REQUEST_OWNER_MISMATCH", "RATE_LIMITED"]);
+    expect(reports).toEqual(["REQUEST_OWNER_MISMATCH", NO_SENTENCE, "RATE_LIMITED"]);
     expect(sends).toBe(1);
   });
 

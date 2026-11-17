@@ -666,10 +666,13 @@ describe("the CSS (Task 77's rules, ahead of time)", () => {
     expect(own).toMatch(/\.v4StartRow--named\s*\{/u);
   });
 
-  it("logical properties only, no px value above 44 outside the media queries, nothing dashed", () => {
+  it("logical properties only, no px value above 44 outside the media queries, dashed only on the two offers", () => {
     expect(own.length).toBeGreaterThan(100);
     expect(own).not.toMatch(/(?:^|[\s;{])(?:left|right|margin-left|margin-right|padding-left|padding-right)\s*:/mu);
-    expect(own).not.toMatch(/text-align:\s*(?:left|right)|float:|dashed/u);
+    expect(own).not.toMatch(/text-align:\s*(?:left|right)|float:/u);
+    // Design Document v2 (16b): another way to see it and a suggestion are offers, drawn with a dashed edge. Nothing else is dashed.
+    const dashed = [...own.matchAll(/([^{}]+)\{[^{}]*dashed[^{}]*\}/gu)].map((match) => match[1]!.trim());
+    expect(dashed).toEqual([".v4StartWay", ".v4StartSuggestion"]);
     const px = [...own.replace(/@media\s*\([^)]*\)/gu, "").matchAll(/(\d+(?:\.\d+)?)px/gu)].map((match) => Number(match[1]));
     expect(px.filter((value) => value > 44)).toEqual([]);
   });

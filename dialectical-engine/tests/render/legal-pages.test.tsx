@@ -686,7 +686,8 @@ describe("the model providers page lists the companies the API's targets reach (
     for (const entry of WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn !== null)) {
       expect(isUnverified(entry.entity), entry.key).toBe(false);
       expect(isUnverified(entry.contact), entry.key).toBe(false);
-      expect(entry.training, entry.key).toBe("no");
+      // Every checked model provider's terms forbid training; Perplexity's search terms let it use the search phrases.
+      expect(entry.training, entry.key).toBe(entry.key === "perplexity" ? "yes" : "no");
       expect(entry.zeroRetention, entry.key).not.toBe("unconfirmed");
       for (const key of [entry.retentionKey, entry.locationKey, entry.basisKey]) expect(isUnverified(legalEnglish[key as keyof typeof legalEnglish]), `${entry.key} ${key}`).toBe(false);
     }
@@ -696,7 +697,7 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    // Perplexity's row was checked against its API terms on 16 November 2026; only DeepInfra's unnamed partner is left.
+    // Perplexity's row is checked against its terms; only DeepInfra's unnamed partner is left.
     expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["deepinfra-partner"]);
   });
 

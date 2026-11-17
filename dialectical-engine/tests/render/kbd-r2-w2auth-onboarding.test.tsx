@@ -15,7 +15,7 @@ import { guardSettled, pressByKeyboard, startFocusGuard } from "./kbd-guard-harn
 const api = vi.hoisted(() => ({ pendingOnboardingStatus: vi.fn(), completePendingOnboarding: vi.fn() }));
 vi.mock("@/lib/consumerWebAuthn", () => ({ createConsumerWebAuthnBrowser: () => ({ supportsConditional: async () => false, authenticate: vi.fn(), register: vi.fn(), cancel: vi.fn() }) }));
 vi.mock("@/lib/i18n/I18nProvider", () => ({ useChromeI18n: () => ({ locale: "en", catalog: {} }) }));
-vi.mock("@/lib/mfaEnrollment", () => ({ takeFragmentToken: () => "t".repeat(43), verifyMfaEmail: async () => undefined, MfaEnrollmentHttpError: class extends Error {} }));
+vi.mock("@/lib/mfaEnrollment", () => ({ takeFragmentToken: () => "t".repeat(43), verifyMfaEmail: async () => undefined, verifyMfaEmailWithPassword: async () => undefined, MfaEnrollmentHttpError: class extends Error {} }));
 vi.mock("@/lib/api", async (original) => ({ ...await original<typeof import("../../apps/ui/lib/api")>(), contractClient: api }));
 import EnrollMfaPage from "../../apps/ui/app/enroll-mfa/page";
 import { OnboardingEvidence } from "../../apps/ui/components/auth/OnboardingEvidence";
@@ -69,6 +69,15 @@ function nextTabStop(from: Element): Element | undefined {
 it("AUTH-7: Continue on the age step of /enroll-mfa parks focus on the card, whose first thing is the set-up", async () => {
   api.completePendingOnboarding.mockResolvedValue(undefined);
   await mount(<EnrollMfaPage />);
+  // The mailed link first asks for the account's password; the age step follows it.
+  const password = document.querySelector<HTMLInputElement>("#verify-password")!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(password, "Inbox owner pass 1");
+    password.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  pressByKeyboard(button(auth["auth.continue"]));
+  await settled();
+  expect(document.activeElement).not.toBe(document.body);
   await fillBirth();
   pressByKeyboard(button(auth["auth.continue"]));
   await settled();

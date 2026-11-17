@@ -282,8 +282,9 @@ describe("a row's 'Rewrite it for me' / 'Keep my wording' (V4A-6)", () => {
   const asking = (): PathPlan => planAfter(pathPlanFromMenu(NUCLEAR_MENU, 5, false),
     { type: "REWRITE", key: "kp01", question: "Mine?" }, { type: "MOVE_CHIP", chipKey: "pt15", toPathKey: "kp01" });
 
-  // The guard's landing is good enough here: focus keeps the row's place (its <li>), and the row's own button is its first
-  // Tab stop, so the next Tab is on the row again.
+  // The guard's landing is good enough here: focus keeps the row's place (the row's body, the part around the two buttons;
+  // the tick box sits before it), and the row's own button is its first Tab stop, so the next Tab is on the row again.
+  const body = (): Element => rows()[0]!.querySelector(".v4StartRowBody")!;
   const firstStop = (within: Element): Element | undefined =>
     [...within.querySelectorAll<HTMLElement>("button, a[href], input, textarea")].find((one) => one.tabIndex >= 0);
 
@@ -291,16 +292,16 @@ describe("a row's 'Rewrite it for me' / 'Keep my wording' (V4A-6)", () => {
     await ready(asking());
     await keyPress(buttons("Keep my wording")[0]!);
     expect(buttons("Keep my wording")).toEqual([]);
-    expect(document.activeElement).toBe(rows()[0]);
-    expect(firstStop(rows()[0]!)).toBe(rowButton(1));
+    expect(document.activeElement).toBe(body());
+    expect(firstStop(body())).toBe(rowButton(1));
   });
 
   it("Rewrite it for me: the same, while its question is written", async () => {
     await ready(asking());
     await keyPress(buttons("Rewrite it for me")[0]!);
     expect(cardText()).toContain("Writing one question that covers them…");
-    expect(document.activeElement).toBe(rows()[0]);
-    expect(firstStop(rows()[0]!)).toBe(rowButton(1));
+    expect(document.activeElement).toBe(body());
+    expect(firstStop(body())).toBe(rowButton(1));
   });
 });
 

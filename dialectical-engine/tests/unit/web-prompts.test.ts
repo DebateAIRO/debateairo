@@ -2,7 +2,7 @@
 // by the owner as written on 2026-10-30. Each approved sentence is pinned here as an exact string, typed from the design
 // (never derived from the code), so any edit fails here first. The engine-1 judge seal and the answer writer's composer
 // seal do not move: every new contract is sealed by engineContractHash only.
-import { ASK_CLARIFY_PROMPT_CONTRACT } from "@debateai/judgement";
+import { ASK_CLARIFY_PROMPT_CONTRACT, ASK_CLARIFY_V3_PROMPT_CONTRACT } from "@debateai/judgement";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
@@ -46,7 +46,7 @@ import {
 import { PUBLIC_CONTRIBUTION_SEALED_CONTRACTS, PUBLIC_REPORT_CHECK_SEALED_CONTRACTS } from "@debateai/judgement";
 import { STORYTELLER_V4_CONTRACT_ID, storyContractForSources } from "@debateai/story";
 import { ENGINE_SEALED_CONTRACT_IDS, engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_WRITER_V4_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_GOAL_SEALED_CONTRACTS, REPORT_WRITER_V4_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "../../apps/runner/src/answer-checker-sources.js";
 
 const sha256 = (text: string) => createHash("sha256").update(text).digest("hex");
@@ -362,11 +362,14 @@ describe("the seals", () => {
       ...REPORT_OVERALL_SEALED_CONTRACTS,
       // R22: reader 1 v2, the panel's sources variant, the rewrite's v2 pair.
       ...WEB_R22_SEALED_CONTRACTS, ...PATH_REWRITE_V2_SEALED_CONTRACTS,
-      // R22 clarify lane (decision 29): dynamic step 2's small call.
-      ASK_CLARIFY_PROMPT_CONTRACT,
+      // R22 clarify lane (decision 29): dynamic step 2's small call; then its version 3 (Design Document v2 16b, sealed 17 Nov), which
+      // sits beside it in the call's own sealed list, so the ids before these two moved one place from the end.
+      ASK_CLARIFY_PROMPT_CONTRACT, ASK_CLARIFY_V3_PROMPT_CONTRACT,
       // R22 report 2 (decision 26).
       ...REPORT_DEEPER_SEALED_CONTRACTS,
       ...REPORT_WRITER_V4_SEALED_CONTRACTS,
+      // V4 start step, Tasks 50b and 50c (sealed 17 Nov): the three that say how a stated goal fares, after the v4 writers.
+      ...REPORT_GOAL_SEALED_CONTRACTS,
       // R22 public lane (decision 13): the AI check on a contribution.
       ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS,
       // R22 decision 35: the AI check on a report of a public debate.
@@ -395,8 +398,9 @@ describe("the seals", () => {
       "web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3",
       // R22 report lane (decision 4).
       "report.answer.v2", "report.answer.later.v2", "report.answer-check.v2",
-      "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1",
+      "web.read-all.v2", "judge.panel.length.sources.v1", "path-rewrite.writer.v2", "path-rewrite.checker.v2", "ask.clarify.v1", "ask.clarify.v3",
       "report.answer.v3", "report.answer.later.v3", "report.answer-check.v3", "report.answer.v4", "report.answer.later.v4",
+      "report.answer.v5", "report.answer.later.v5", "report.answer-check.v4",
       "public.contribution-check.v1", "public.report-check.v1"
     ]);
     expect(new Set(ENGINE_SEALED_CONTRACT_IDS).size).toBe(ENGINE_SEALED_CONTRACT_IDS.length);

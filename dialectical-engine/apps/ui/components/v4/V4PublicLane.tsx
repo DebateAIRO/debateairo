@@ -526,8 +526,9 @@ function DigBox({ path, catalog, locale }: Readonly<{ path: PublicPathView; cata
         {/* public-d3 A / journey-f8: the period, once, by the switch, only where the button names a share. */}
         {actions.periodLine === null ? null : <p className="v4PubHint" data-public-dig-share>{actions.periodLine}</p>}
         <div className="v4PubDigActions">
-          {/* journey-f13 / dig-f5: the map's words, "Dig into this · up to 3%" ("Dig into your picks" for more). */}
-          <button type="button" className="v4Btn v4BtnPrimary" disabled={actions.busy && !locked}
+          {/* journey-f13 / dig-f5: the map's words, "Dig into this · up to 3%" ("Dig into your picks" for more).
+              Design Document v2: the page's one forward step, so it is the orange call to action. */}
+          <button type="button" className="v4Btn v4Cta" disabled={actions.busy && !locked}
             aria-disabled={locked || checking || picked === 0 ? "true" : undefined}
             aria-describedby={picked === 0 ? `${ids}-why` : undefined} onClick={start} data-public-dig-start>
             {picksButtonLabel(Math.max(1, picked), actions.share, catalog, locale)}

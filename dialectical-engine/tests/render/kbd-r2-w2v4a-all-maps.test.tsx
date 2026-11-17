@@ -139,8 +139,10 @@ describe("'My questions' under the focus guard (V4A-12)", () => {
     await answer(false);
     await guardSettled();
     expect(document.activeElement, "the read landing does not move focus").toBe(area);
-    // The area holds nothing focusable before the cards: the next Tab is the first card.
-    const first = area.querySelector<HTMLElement>("a, button");
+    // "Try again" stood after the title's row (which holds "New") and before the cards. Tab carries on from where the
+    // pressed control was, and the first control after the title's row is the first card.
+    const head = area.querySelector(".v4MapsHead")!;
+    const first = [...area.querySelectorAll<HTMLElement>("a, button")].find((one) => !head.contains(one));
     expect(first).toBe(cards()[0]);
   });
 });
