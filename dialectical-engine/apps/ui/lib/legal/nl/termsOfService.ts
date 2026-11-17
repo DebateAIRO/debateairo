@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Opzeggen. Zeg te allen tijde via Instellingen → Abonnement op met één bevestigingsklik, of via de opzeggingspagina op dezbatere.ro/cancel, waarvoor u zich niet hoeft aan te melden. De opzegging wordt van kracht aan het einde van de lopende factureringsperiode en u behoudt tot dan toegang. Wij maken opzeggen niet moeilijker dan abonneren was." },
       { kind: "p", text: "Prijswijzigingen worden pas bij een verlenging van kracht. Wij stellen u ten minste 30 dagen van tevoren per e-mail in kennis van de nieuwe prijs en sturen een opzeggingslink mee. Wanneer het recht van uw land uw uitdrukkelijke toestemming voor een prijswijziging vereist, vragen wij u om die toestemming; anders geldt de nieuwe prijs vanaf de volgende verlenging als u niets doet. Bijlage A vermeldt regionale regels." },
       { kind: "p", text: "Mislukte betalingen. Als een betaling mislukt, proberen wij deze gedurende 7 dagen opnieuw uit te voeren en waarschuwen wij u per e-mail voordat wij uw account naar het gratis abonnement terugzetten. Wij verwijderen uw debatten niet omdat een betaling is mislukt." },
-      { kind: "p", text: "Belastingen en aan wie u betaalt. Onze prijzen worden getoond zonder belasting, als prijs + btw (of GST of omzetbelasting, afhankelijk van waar u woont). De belasting voor uw factuuradres wordt bij het afrekenen toegevoegd, en de afrekenpagina toont het totaal dat u betaalt, inclusief belasting, voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden." },
+      { kind: "p", text: "Belastingen en aan wie u betaalt. Prijzen zijn inclusief BTW, GST of omzetbelasting, afhankelijk van waar u woont; dit wordt getoond voordat u betaalt. De verkoper is DMS Merchandise Shop S.R.L., die uw factuur uitreikt en verantwoordelijk blijft voor de dienst zelf en voor deze Voorwaarden." },
       { kind: "p", text: "Betaalmethoden. U betaalt met een kaart. Wij accepteren Visa en Mastercard; American Express accepteren wij niet. Kaartbetalingen worden verwerkt door NETOPIA Payments (netopia-payments.com), en uw volledige kaartnummer bereikt ons nooit." },
       { kind: "p", text: "Levering. Dialectical Engine is een onlinedienst, dus er wordt niets naar u verzonden. De functies van uw betaalde abonnement zijn in uw account beschikbaar zodra uw betaling is bevestigd." },
       { kind: "p", text: "Terugboeking. Als u een afschrijving bij uw kaartuitgever betwist, kunnen wij betaalde functies opschorten terwijl het geschil wordt opgelost. Wij brengen hiervoor geen kosten in rekening." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "b65a848ea4e9d1cc490fc26e089f5a2a2d8022b896c454dae886d3be36458adb",
+  sha256: "beabe4162e58d92500719f98063ebb5fb161c52d80449e811ed456a85b62b21c",
   eyebrow: "SERVICEVOORWAARDEN · v2.18 · VAN KRACHT OP 1 NOVEMBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",

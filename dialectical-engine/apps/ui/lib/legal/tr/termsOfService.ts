@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "İptal. İstediğiniz zaman Ayarlar → Abonelik bölümünden tek bir teyit tıklamasıyla veya oturum açmanızı gerektirmeyen dezbatere.ro/cancel adresindeki iptal sayfasından iptal edebilirsiniz. İptal, mevcut faturalandırma döneminin sonunda hüküm doğurur ve o zamana kadar erişiminiz sürer. İptal işlemini abone olmaktan daha zor hâle getirmeyiz." },
       { kind: "p", text: "Fiyat değişiklikleri yalnızca yenilemede hüküm doğurur. Yeni fiyatı ve bir iptal bağlantısını içeren e-postayı en az 30 gün önceden göndeririz. Ülkenizin hukuku bir fiyat değişikliği için açık rızanızı gerektiriyorsa bunu isteriz; aksi takdirde hiçbir şey yapmazsanız yeni fiyat bir sonraki yenilemeden itibaren uygulanır. Bölgesel kurallar Ek A'da belirtilmiştir." },
       { kind: "p", text: "Başarısız ödemeler. Ödeme başarısız olursa 7 gün boyunca yeniden dener ve hesabınızı ücretsiz plana düşürmeden önce sizi e-postayla uyarırız. Ödeme başarısız olduğu için tartışmalarınızı silmeyiz." },
-      { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlarımız vergi hariç olarak, fiyat + KDV (ya da yaşadığınız yere bağlı olarak GST veya satış vergisi) şeklinde gösterilir. Fatura adresiniz için geçerli vergi ödeme sayfasında eklenir ve ödeme sayfası, ödeme yapmadan önce size vergi dahil ödeyeceğiniz toplam tutarı gösterir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir." },
+      { kind: "p", text: "Vergiler ve ödemeyi kime yaptığınız. Fiyatlara, yaşadığınız yere bağlı olan ve ödeme öncesinde gösterilen KDV, GST veya satış vergisi dahildir. Satıcı, faturanızı düzenleyen ve hizmetin kendisinden ve bu Koşullardan sorumlu olmaya devam eden DMS Merchandise Shop S.R.L.'dir." },
       { kind: "p", text: "Ödeme yöntemleri. Ödemeyi kartla yaparsınız. Visa ve Mastercard kabul ediyoruz; American Express kabul etmiyoruz. Kart ödemeleri NETOPIA Payments (netopia-payments.com) tarafından işlenir ve kartınızın tam numarası hiçbir zaman bize ulaşmaz." },
       { kind: "p", text: "Teslimat. Dialectical Engine çevrimiçi bir hizmettir; bu nedenle size hiçbir şey gönderilmez. Ücretli planınızın özellikleri, ödemeniz onaylanır onaylanmaz hesabınızda kullanıma açılır." },
       { kind: "p", text: "Ters ibrazlar. Kartı düzenleyen kuruluş nezdinde bir tahsilata itiraz ederseniz uyuşmazlık çözülene kadar ücretli özellikleri askıya alabiliriz. Bunun için ücret almayız." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "a7e2ba0f6f7fec18876c9f7ce902f0004028e2d067f15c83e8963de400ba7623",
+  sha256: "9696ed343a0b392005fe4850f96e3ac95f69554f7486a2dc3768f8e4206e82a1",
   eyebrow: "HİZMET KOŞULLARI · v2.18 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",

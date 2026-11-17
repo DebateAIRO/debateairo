@@ -223,7 +223,7 @@ Dialectical Engine propose une formule gratuite. Trois formules payantes, **Plus
 
 **Échecs de paiement.** En cas d’échec d’un paiement, nous le réessayons pendant 7 jours et vous avertissons par e-mail avant de rétrograder votre compte vers la formule gratuite. Nous ne supprimons pas vos débats en raison d’un échec de paiement.
 
-**Taxes et bénéficiaire de votre paiement.** Nos prix sont affichés hors taxes, sous la forme prix + TVA (ou TPS ou taxe sur les ventes, selon votre lieu de résidence). La taxe applicable à votre adresse de facturation est ajoutée lors du paiement, et la page de paiement affiche le total à payer, taxes comprises, avant que vous payiez. Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions.
+**Taxes et bénéficiaire de votre paiement.** Les prix incluent la TVA, la TPS ou la taxe sur les ventes, selon votre lieu de résidence, ce qui est indiqué avant votre paiement. Le vendeur est DMS Merchandise Shop S.R.L., qui établit votre facture et demeure responsable du service lui-même et des présentes Conditions.
 
 **Moyens de paiement.** Vous payez par carte. Nous acceptons Visa et Mastercard ; nous n’acceptons pas American Express. Les paiements par carte sont traités par NETOPIA Payments (netopia-payments.com), et le numéro complet de votre carte ne nous parvient jamais.
 

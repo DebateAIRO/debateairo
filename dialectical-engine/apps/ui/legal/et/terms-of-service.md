@@ -223,7 +223,7 @@ Dialectical Engine pakub tasuta paketti. Tulevikus on saadaval kolm tasulist pak
 
 **Ebaõnnestunud maksed.** Kui makse ebaõnnestub, proovime seda 7 päeva jooksul uuesti ning hoiatame teid e-posti teel enne konto tasuta paketile üleviimist. Me ei kustuta teie väitlusi makse ebaõnnestumise tõttu.
 
-**Maksud ja makse saaja.** Meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks (või GST või müügimaks, sõltuvalt teie elukohast). Teie arveldusaadressile kohalduv maks lisatakse kassas ning kassa näitab enne maksmist teie makstavat kogusummat koos maksudega. Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest.
+**Maksud ja makse saaja.** Hinnad sisaldavad käibemaksu, GST-d või müügimaksu, mis sõltub teie elukohast ja mida näidatakse enne maksmist. Müüja on DMS Merchandise Shop S.R.L., kes väljastab teie arve ja vastutab jätkuvalt teenuse enda ja käesolevate Tingimuste eest.
 
 **Makseviisid.** Maksate kaardiga. Aktsepteerime Visa ja Mastercardi kaarte; American Expressi kaarte me ei aktsepteeri. Kaardimakseid töötleb NETOPIA Payments (netopia-payments.com) ja teie kaardi täielik number ei jõua kunagi meieni.
 
