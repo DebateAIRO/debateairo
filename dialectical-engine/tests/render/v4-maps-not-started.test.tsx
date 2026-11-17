@@ -292,3 +292,67 @@ describe("Delete on My questions (the ask page's: the shared Undo note and its w
     expect(source).not.toMatch(/\.setItem\(|localStorage|sessionStorage|indexedDB|document\.cookie|history\.(?:pushState|replaceState)/u);
   });
 });
+
+describe("a Delete's note that ends its window with the keyboard on it hands focus on (as on the ask page)", () => {
+  it("focus goes to the Pick up of the line now where the deleted one was", async () => {
+    vi.useFakeTimers();
+    await mount();
+    await click(buttonNamed("Delete", lineOf(B.question))!);
+    expect(document.activeElement).toBe(buttonNamed("Undo", note()!));
+    await wait(DIG_UNDO_MS);
+    expect(note()).toBeNull();
+    expect(listed()).toEqual([C.question]);
+    expect(document.activeElement).toBe(buttonNamed("Pick up", lineOf(C.question)));
+  });
+
+  it("the last line deleted: focus goes to the line before it", async () => {
+    vi.useFakeTimers();
+    await mount();
+    await click(buttonNamed("Delete", lineOf(C.question))!);
+    await wait(DIG_UNDO_MS);
+    expect(document.activeElement).toBe(buttonNamed("Pick up", lineOf(B.question)));
+  });
+
+  it("a DELETE that fails brings the line back, and focus goes to it", async () => {
+    vi.useFakeTimers();
+    net.answer = (call) => call.method === "DELETE" ? net.json(503, { error: "UNAVAILABLE", message: "UNAVAILABLE" }) : undefined;
+    await mount();
+    await click(buttonNamed("Delete", lineOf(B.question))!);
+    await wait(DIG_UNDO_MS);
+    expect(listed()).toEqual([B.question, C.question]);
+    expect(document.activeElement).toBe(buttonNamed("Pick up", lineOf(B.question)));
+  });
+
+  it("the only kept question deleted: the block goes, and focus is on 'Show more' just above where it was", async () => {
+    vi.useFakeTimers();
+    net.list = [B];
+    await mount();
+    await click(buttonNamed("Delete", lineOf(B.question))!);
+    await wait(DIG_UNDO_MS);
+    expect(notStarted()).toBeNull();
+    expect(document.activeElement).toBe(host!.querySelector(".v4MapsMore"));
+  });
+
+  it("with no 'Show more', focus is on the last map instead", async () => {
+    vi.useFakeTimers();
+    shelf.more = false;
+    net.list = [B];
+    await mount();
+    await click(buttonNamed("Delete", lineOf(B.question))!);
+    await wait(DIG_UNDO_MS);
+    expect(notStarted()).toBeNull();
+    const cards = host!.querySelectorAll(".v4ShelfCard");
+    expect(document.activeElement).toBe(cards[cards.length - 1]);
+  });
+
+  it("focus moved on before the window ended: it stays where the person put it", async () => {
+    vi.useFakeTimers();
+    await mount();
+    await click(buttonNamed("Delete", lineOf(B.question))!);
+    const elsewhere = host!.querySelector<HTMLElement>(".v4MapsNew")!;
+    act(() => elsewhere.focus());
+    await wait(DIG_UNDO_MS);
+    expect(listed()).toEqual([C.question]);
+    expect(document.activeElement).toBe(elsewhere);
+  });
+});

@@ -88,6 +88,11 @@ export function AccountErasureControls({
   // Cancel on the security check, a scheduled deletion and its cancellation each remove (or disable) the focused
   // control: focus goes back to the control that started the step, or to the card's heading when it is gone.
   const heading = useRef<HTMLHeadingElement>(null);
+  const confirmationBox = useRef<HTMLInputElement>(null);
+  /* A phrase typed but not matching marks the box wrong once Schedule deletion was pressed with it (not while the
+     person is still typing it, round 4 review). The box's label already says what to type. */
+  const [attempted, setAttempted] = useState(false);
+  const mistyped = attempted && confirmation.trim() !== "" && !confirmed;
   const opener = useRef<HTMLElement | null>(null);
   const returnFocus = useRef(false);
   useEffect(() => {
@@ -129,7 +134,10 @@ export function AccountErasureControls({
 
   async function schedule(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
-    if (!confirmed || busy) return;
+    if (busy) return;
+    /* Keyboard audit round 4: Schedule deletion stays in the Tab order (aria-disabled) until the phrase is typed right;
+       a press goes to the box. */
+    if (!confirmed) { setAttempted(true); confirmationBox.current?.focus(); return; }
     rememberOpener();
     setConfirming(true);
   }
@@ -217,17 +225,18 @@ export function AccountErasureControls({
         <div><form noValidate onSubmit={(event) => void schedule(event)}>
           <div className="setCardRow">
             <div className="setField setFieldDanger">
-              <label htmlFor="account-deletion-confirmation">
+              <label htmlFor="account-deletion-confirmation" id="account-deletion-confirmation-label">
                 {t(catalog, "settings.erasure.typeConfirmation", { confirmation: confirmationPhrase })}
               </label>
               <input
                 id="account-deletion-confirmation"
+                ref={confirmationBox}
                 value={confirmation}
                 onChange={(event) => setConfirmation(event.target.value)}
                 autoComplete="off"
                 spellCheck={false}
                 placeholder={t(catalog, "settings.erasure.typeConfirmation", { confirmation: confirmationPhrase })}
-                required aria-invalid="false"
+                required aria-invalid={mistyped}
               />
             </div>
           </div>
@@ -235,7 +244,8 @@ export function AccountErasureControls({
             <button
               type="submit"
               className="setBtn setBtnDanger"
-              disabled={busy || !confirmed}
+              disabled={busy}
+              aria-disabled={!confirmed || undefined}
             >
               {busy
                 ? t(catalog, "settings.erasure.authorizing")

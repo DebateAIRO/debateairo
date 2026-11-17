@@ -123,6 +123,8 @@ export type MapReport = Readonly<{
   bottomStrip: ReactNode;
   /** Phone: "Write my report" in the pinned bar opens the strip there; absent while it cannot (it links, as before). */
   writeFromBar: (() => void) | undefined;
+  /** Phone (B4): the slim "Good time" line's "Write my report", for focus coming back after "Not yet" when it opened the strip. */
+  goodTimeRef: RefObject<HTMLElement | null>;
   /** Phone: the pinned bar's line while the report waits or is written (null otherwise). */
   barStatus: V4RailReport | null;
   /** The waiting card, or null when nothing waits. */
@@ -181,13 +183,19 @@ export function useMapReport(input: MapReportInput): MapReport {
   }, [stage.kind]);
   // The header's report button, or its link once the report waits, is written or stands (ACCESS-6: focus can go back to it).
   const headerRef = useRef<HTMLElement | null>(null);
+  // Keyboard audit round 4 (B4): on a phone the bottom strip opens from the pinned bar's job or from the slim "Good time" line's
+  // own "Write my report" (V4BottomStack's `goodTimeReportRef`). Not yet and Escape give focus back to the one that opened it.
+  const goodTimeRef = useRef<HTMLElement | null>(null);
+  const bottomFromGoodTime = useRef(false);
   const start = useReportStart({
     watch,
     runId: input.servedRunId ?? input.runId,
     canAsk,
     carryOn,
     waits: waitLine !== null,
-    focusOpener: (at: ReportStripPlace) => (at === "top" ? headerRef.current : input.barJobRef.current)?.focus()
+    focusOpener: (at: ReportStripPlace) => (at === "top"
+      ? headerRef.current
+      : (bottomFromGoodTime.current ? goodTimeRef.current : null) ?? input.barJobRef.current)?.focus()
   });
   // Task 56c: after a press refused until the reset, the strip says when (the server said this report is not the debate's first and
   // the debate is public); before the room is read again, the strip's plain reset line.
@@ -334,7 +342,14 @@ export function useMapReport(input: MapReportInput): MapReport {
     headerStrip: start.at === "top" ? strip("top") : null,
     bottomStrip: start.at === "bottom" ? strip("bottom") : null,
     // Task 56c: while the report waits, the bar's own greyed job says why and opens nothing.
-    writeFromBar: canAsk && start.at === null && waitLine === null ? () => start.open("bottom") : undefined,
+    writeFromBar: canAsk && start.at === null && waitLine === null
+      ? () => {
+        // Read before the strip opens and the line steps aside (a mouse press in Safari focuses nothing: the bar's job then).
+        bottomFromGoodTime.current = goodTimeRef.current !== null && document.activeElement === goodTimeRef.current;
+        start.open("bottom");
+      }
+      : undefined,
+    goodTimeRef,
     barStatus,
     waitCard: (
       <V4ReportWait

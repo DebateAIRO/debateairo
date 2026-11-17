@@ -18,6 +18,7 @@ import { SecurityEnrollment } from './auth/SecurityEnrollment';
 import { EphemeralCodes } from './auth/EphemeralCodes';
 import { useFormAnnouncer } from './auth/InlineFieldMessage';
 import { useDeadlineWarning } from './auth/timedStep';
+import { focusIsLost } from '@/lib/focusGuard';
 const providerName = (id: string) => id === 'google' ? 'Google' : id === 'apple' ? 'Apple' : id === 'facebook' ? 'Facebook' : 'X';
 export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, client = contractClient, resume: provided }: {
     catalog: MessageCatalog; authCatalog: MessageCatalog; publicCatalog: MessageCatalog; locale: LocaleCode; client?: ContractClient; resume?: SecurityResume | null;
@@ -57,8 +58,16 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     const pageTitle = useRef<HTMLHeadingElement>(null);
     const cardHeading = useRef<HTMLHeadingElement>(null);
     const errorMessage = useRef<HTMLParagraphElement>(null);
+    const card = useRef<HTMLElement>(null);
+    // Keyboard audit round 4: whether the expiry may take focus, read before the card goes (focus was in it, or nowhere).
+    const expiryTakesFocus = useRef(false);
     const opener = useRef<HTMLElement | null>(null);
+    // Keyboard audit 2026-11-12: an opener that leaves with its row (a removed method) hands focus to its list's heading,
+    // so the person carries on in that list; the page title is only the last resort.
+    const openerList = useRef<HTMLElement | null>(null);
     const returnFocus = useRef(false);
+    const recoveryCancelledLine = useRef<HTMLParagraphElement>(null);
+    const recoveryReturn = useRef(false);
     const [retry, setRetry] = useState<{ authorization: StepUpAuthorizationRequest; remove: boolean; email: string } | null>(null);
     const [expiredAt, setExpiredAt] = useState(0);
     const latest = useRef({ selected, removeRecovery, email });
@@ -95,7 +104,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     // The grant behind a resumed confirmation (WCAG 2.2.1); a set-up warns about its grant itself (`deadline`).
     const warning = useDeadlineWarning(held?.step_up_grant.expires_at ?? null, announcer.announce, t(authCatalog, 'auth.security.expiresSoon'));
     useEffect(() => {
-        if (expiredAt)
+        if (expiredAt && (expiryTakesFocus.current || focusIsLost()))
             errorMessage.current?.focus();
     }, [expiredAt]);
     useEffect(() => {
@@ -108,7 +117,14 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         returnFocus.current = false;
         const back = opener.current;
         if (back && back !== document.body && back.isConnected && !(back instanceof HTMLButtonElement && back.disabled)) back.focus();
-        else pageTitle.current?.focus();
+        else (openerList.current?.isConnected ? openerList.current : pageTitle.current)?.focus();
+    });
+    // Keyboard audit 2026-11-12: the banner goes with its Cancel button, so focus moves to the line that says it was
+    // cancelled (the page title when the recovery had already ended and there is nothing to say).
+    useEffect(() => {
+        if (!recoveryReturn.current || pendingRecovery) return;
+        recoveryReturn.current = false;
+        if (focusIsLost()) (recoveryCancelledLine.current ?? pageTitle.current)?.focus();
     });
     useEffect(() => {
         let current = true;
@@ -121,12 +137,12 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         const failed = t(catalog, 'settings.security.pendingRecovery.failed');
         try {
             await client.cancelPendingMfaRecovery();
-            if (active.current) { setPendingRecovery(null); setRecoveryCancelled(true); }
+            if (active.current) { recoveryReturn.current = true; setPendingRecovery(null); setRecoveryCancelled(true); }
         } catch (failure) {
             if (!active.current) return;
             // Nothing left to cancel: the recovery already ended (finished, cancelled elsewhere or expired). Read it again.
             if (failure instanceof ContractHttpError && failure.status === 409) {
-                try { const value = await client.pendingMfaRecovery(); if (active.current) { setPendingRecovery(value.pending); if (value.pending) setRecoveryError(failed); } }
+                try { const value = await client.pendingMfaRecovery(); if (active.current) { recoveryReturn.current = !value.pending; setPendingRecovery(value.pending); if (value.pending) setRecoveryError(failed); } }
                 catch { if (active.current) setRecoveryError(failed); }
             } else setRecoveryError(failed);
         } finally { recoveryFlight.current = false; if (active.current) setRecoveryBusy(false); }
@@ -156,6 +172,8 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     function choose(authorization: StepUpAuthorizationRequest, remove = false) {
         const focused = document.activeElement;
         opener.current = focused instanceof HTMLElement ? focused : null;
+        const list = focused instanceof HTMLElement ? focused.closest('section.setList')?.previousElementSibling : null;
+        openerList.current = list?.querySelector<HTMLElement>('h2.setSectionTitle') ?? null;
         cancel(); setNotice(null); setError(null); setSelected(authorization); setRemoveRecovery(remove);
     }
     /** Closes the card and gives focus back to the button that opened it (the page title when it is gone). */
@@ -164,6 +182,8 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
     // message, and keep what was chosen and typed for Try again.
     function expire(key: 'auth.security.expired' | 'auth.enroll.timedOut') {
         const { selected: action, removeRecovery: remove, email: typed } = latest.current;
+        // Focus elsewhere on the page stays where the person is: the alert says the time ran out.
+        expiryTakesFocus.current = !!card.current?.contains(document.activeElement) || focusIsLost();
         cancel();
         setNotice(null);
         setError(t(authCatalog, key));
@@ -245,7 +265,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             <p className="setStatus">{t(catalog, 'settings.security.pendingRecovery.keep')}</p>
             {recoveryError ? <p className="setError" role="alert">{recoveryError}</p> : null}
             <div className="setCardRow"><button type="button" className="setBtn setBtnRevoke" disabled={recoveryBusy} onClick={() => void cancelPendingRecovery()}>{t(catalog, 'settings.security.pendingRecovery.cancel')}</button></div>
-        </section> : recoveryCancelled ? <p className="setStatus" role="status">{t(catalog, 'settings.security.pendingRecovery.cancelled')}</p> : null}
+        </section> : recoveryCancelled ? <p className="setStatus" role="status" ref={recoveryCancelledLine} tabIndex={-1}>{t(catalog, 'settings.security.pendingRecovery.cancelled')}</p> : null}
         <SecurityActionResume catalog={authCatalog} settingsCatalog={catalog} publicCatalog={publicCatalog} locale={locale} client={client} onResume={receive}/>
         {notice ? <p className="setStatus" role="status">{notice}</p> : null}
         {/* Always mounted, so a new error is announced as a change; focus lands here when the grant runs out. */}
@@ -258,7 +278,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
         }}>{t(authCatalog, 'auth.onboarding.tryAgain')}</button></p> : null}
         <PhoneProfileCard catalog={catalog} authCatalog={authCatalog} client={client} resume={phoneResume} onUpdated={phoneUpdated}/>
         {returnToQuestion ? <p className="setListActions"><a className="setBtn setBtnPrimary" href="/new">{t(authCatalog, 'auth.continue')}</a></p> : null}
-        <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.enroll.securityTitle')}</h2></div>
+        <div className="setSectionHead"><h2 className="setSectionTitle" tabIndex={-1}>{t(authCatalog, 'auth.enroll.securityTitle')}</h2></div>
         <section className="setList">
             {methods && methods.recovery_codes_remaining === 0 && !methods.methods.some(method => method.type === 'passkey') ? <p className="setStatus" data-lockout-reminder>{t(catalog, 'settings.security.lockoutReminder')}</p> : null}
             {(methods?.methods ?? []).map(method => <div key={method.factor_id} className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{method.label ?? t(authCatalog, method.type === 'passkey' ? 'auth.passkey.use' : 'auth.login.useAuthenticatorCode')}</span>{!method.removable ? <p className="setSessionSeen">{t(catalog, 'settings.security.lastPath')}</p> : null}</div><button type="button" className="setBtn setBtnRevoke" data-remove-factor aria-label={removeMethodLabel(method)} disabled={busy || !method.removable} onClick={() => choose({ action: 'REMOVE_AUTH_METHOD', target_factor_id: method.factor_id })}>{t(catalog, 'settings.security.remove')}</button></div>)}
@@ -270,7 +290,7 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             <div className="setListActions"><button type="button" className="setBtn" disabled={busy || !methods} onClick={() => choose({ action: 'REGENERATE_RECOVERY_CODES' })}>{t(catalog, 'settings.security.regenerate')}</button></div>
             {codes ? <EphemeralCodes catalog={authCatalog} codes={codes}/> : null}
         </section>
-        <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.recovery.emailTitle')}</h2></div>
+        <div className="setSectionHead"><h2 className="setSectionTitle" tabIndex={-1}>{t(authCatalog, 'auth.recovery.emailTitle')}</h2></div>
         <section className="setList">
             <div className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{recovery?.email ?? '—'}</span>{recovery?.state === 'verified' ? <p className="setSessionSeen">{t(catalog, 'settings.email.verified')}</p> : null}{recovery?.pending ? <p className="setSessionSeen">{t(catalog, 'settings.email.pendingBadge')} · {recovery.pending.email}</p> : null}</div></div>
             <div className="setListActions">
@@ -279,14 +299,14 @@ export function SecuritySettings({ catalog, authCatalog, publicCatalog, locale, 
             </div>
         </section>
         <BackupEmailVerification locale={locale}/>
-        <div className="setSectionHead"><h2 className="setSectionTitle">{t(authCatalog, 'auth.social.methods')}</h2></div>
+        <div className="setSectionHead"><h2 className="setSectionTitle" tabIndex={-1}>{t(authCatalog, 'auth.social.methods')}</h2></div>
         <section className="setList">
             {(links?.providers ?? []).map(link => <div key={link.provider} className="setSessionRow"><div className="setSessionMain"><span className="setSessionDevice">{providerName(link.provider)}</span>{!link.removable ? <p className="setSessionSeen">{t(catalog, 'settings.security.lastPath')}</p> : null}</div><button type="button" className="setBtn setBtnRevoke" aria-label={t(catalog, 'settings.security.removeNamed', { method: providerName(link.provider) })} disabled={busy || !link.removable} onClick={() => choose({ action: 'UNLINK_PROVIDER', target_provider: link.provider })}>{t(catalog, 'settings.security.remove')}</button></div>)}
             <div className="setListActions">
                 {(providers?.providers ?? []).filter(provider => !links?.providers.some(link => link.provider === provider.id)).map(provider => <button type="button" className="setBtn" key={provider.id} disabled={busy || !links} onClick={() => choose({ action: 'LINK_PROVIDER', target_provider: provider.id })}>{t(authCatalog, 'auth.social.continue', { provider: provider.name })}</button>)}
             </div>
         </section>
-        {selected ? <section className="setCard" aria-labelledby="security-card-title">
+        {selected ? <section className="setCard" ref={card} aria-labelledby="security-card-title">
             <h2 className="setCardTitle" id="security-card-title" ref={cardHeading} tabIndex={-1}>{cardTitle(selected)}</h2>
             {warning ? <p className="setStatus">{t(authCatalog, 'auth.security.expiresSoon')}</p> : null}
             {selected.action === 'CHANGE_RECOVERY_EMAIL' ? <>{removeRecovery ? null : <div className="authField"><label htmlFor="security-recovery-email">{t(authCatalog, 'auth.recovery.emailTitle')}</label><input id="security-recovery-email" type="email" value={email} autoComplete="email" onChange={event => setEmail(event.target.value)}/></div>}

@@ -124,7 +124,8 @@ export function LibraryComposer({
             grow(event.currentTarget);
           }}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            // An Enter that commits an IME candidate is the input method's, not a Start (keyboard audit 2026-11-12).
+            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && event.keyCode !== 229) {
               event.preventDefault();
               void start();
             }

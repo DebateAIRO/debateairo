@@ -35,11 +35,16 @@ export type CookieBarProps = {
    * caller's ref and not the card's capture. The bar moves no focus itself: it only lends the node.
    */
   cardButtonRef?: RefObject<HTMLButtonElement | null>;
+  /**
+   * Attached to the bar itself, so the caller can measure how much of the window's foot it covers and keep focused
+   * controls clear of it (`useConsentBarRoom`, keyboard audit 12 Nov 2026). Lent, like the button: the bar measures nothing.
+   */
+  barRef?: RefObject<HTMLDivElement | null>;
 };
 
-export function CookieBar({ catalog, onAcknowledge, onOpenCard, cardButtonRef }: CookieBarProps) {
+export function CookieBar({ catalog, onAcknowledge, onOpenCard, cardButtonRef, barRef }: CookieBarProps) {
   return (
-    <div className="consentBar" role="region" aria-label={t(catalog, "consent.bar.label")}>
+    <div className="consentBar" role="region" aria-label={t(catalog, "consent.bar.label")} ref={barRef}>
       <div className="consentBarBezel">
         <div className="consentBarCore">
           <span className="consentTab" aria-hidden="true" />

@@ -381,7 +381,12 @@ describe("Task 79: a dig's picks become paths on the choosing step's rows (spec 
     await combineRows(0, 1);
     await answerCombine(0);
     expect(rowTitles()).toEqual(["T"]);
-    await act(async () => { document.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true })); });
+    // Keyboard audit round 4 (B7): the key is the rows' only with focus in them (or the panel column that holds them).
+    const row = digRows()[0]!.querySelector<HTMLElement>("button")!;
+    await act(async () => {
+      row.focus();
+      row.dispatchEvent(new KeyboardEvent("keydown", { key: "z", ctrlKey: true, bubbles: true, cancelable: true }));
+    });
     await settle();
     expect(rowTitles()).toEqual(["How much land is needed?", "What does storage cost?"]);
     await combineRows(0, 1);

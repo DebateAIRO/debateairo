@@ -119,7 +119,8 @@ describe("ruling 1: the delete-account phrase is the locale's own", () => {
         setter.call(input, value);
         input.dispatchEvent(new window.Event("input", { bubbles: true }));
       });
-      return !submit.disabled;
+      // Keyboard audit round 4 (D7): locked Schedule deletion stays in the Tab order (aria-disabled), not natively disabled.
+      return !submit.disabled && submit.getAttribute("aria-disabled") !== "true";
     };
     return { container, client, input, submit, type };
   }

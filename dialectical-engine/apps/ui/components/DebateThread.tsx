@@ -91,7 +91,9 @@ export function DebateThread({
   const rows = buildRows(root, collapsed);
 
   return (
-    <div className="thread scroll">
+    // A Tab stop of its own, like the Tree canvas: during a run its rows hold no control, so the
+    // keyboard could not scroll it (keyboard audit 2026-11-12).
+    <div className="thread scroll" tabIndex={0} role="region" aria-label={t(catalog, "chrome.thread")}>
       <div className="threadInner">
         <div className="threadRootShell">
           <div className="threadRoot">

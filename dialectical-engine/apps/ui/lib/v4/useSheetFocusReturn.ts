@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { focusIsLost, isFocusParked } from "@/lib/focusGuard";
 
 /*
  * The phone's Map sheet gives focus back to what opened it (the wave-2 browser check, 4 Nov; R2TIME-4/R2REG-4 before it).
@@ -43,13 +44,13 @@ export function useSheetFocusReturn(sheetOpen: boolean, openSheet: () => void): 
   }, [openSheet]);
   const openFromHere = useCallback((): void => {
     const active = typeof document === "undefined" ? null : document.activeElement;
-    opener.current = active instanceof HTMLElement && active !== document.body ? active : null;
+    opener.current = active instanceof HTMLElement && active !== document.body && !isFocusParked(active) ? active : null;
     openSheet();
   }, [openSheet]);
 
   useEffect(() => {
     if (wasOpen.current && !sheetOpen) {
-      if (document.activeElement === document.body || document.activeElement === null) {
+      if (focusIsLost()) {
         const was = opener.current;
         const back = was === "picks" ? picksButtonRef.current : was instanceof HTMLElement ? was : null;
         (back !== null && back.isConnected ? back : mapButtonRef.current)?.focus();

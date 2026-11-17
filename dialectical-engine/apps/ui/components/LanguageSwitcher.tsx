@@ -37,6 +37,24 @@ export type LanguageSwitcherOpener = Readonly<{
   anchor: RefObject<HTMLElement | null>;
 }>;
 
+/** How many columns the list is drawn in: two, or one at phone width (language-switcher.css). */
+function listColumns(panel: HTMLElement | null): number {
+  const grid = panel?.querySelector<HTMLElement>(".languageSwitcherGrid");
+  const drawn = grid === null || grid === undefined ? "" : getComputedStyle(grid).gridTemplateColumns;
+  if (drawn !== "" && drawn !== "none" && !drawn.includes("repeat(")) return drawn.trim().split(/\s+/).length;
+  return typeof window.matchMedia === "function" && window.matchMedia("(max-width: 560px)").matches ? 1 : 2;
+}
+
+/** Whether a text-box key (Home, End, Left, Right) belongs to the search box: with a modifier it always does; otherwise
+ *  while the box has any text. */
+function caretUses(event: KeyboardEvent, input: HTMLInputElement): boolean {
+  if (!["Home", "End", "ArrowLeft", "ArrowRight"].includes(event.key)) return false;
+  if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return true;
+  // While the box has text the four keys are the text's, wherever the caret is: sharing them by caret position let the
+  // ring move one way but not back (round 4 review). With the box empty they move through the list.
+  return input.value !== "";
+}
+
 export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitcherOpener }> = {}) {
   const { locale, catalog } = useChromeI18n();
   const current = getLocale(locale);
@@ -44,7 +62,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
   const listId = `${panelId}-list`;
   const rootRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 12, width: 470 });
+  const [position, setPosition] = useState<{ top: number; left: number; width: number; maxHeight?: number }>({ top: 0, left: 12, width: 470 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [ownOpen, setOwnOpen] = useState(false);
@@ -55,11 +73,15 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
   const [highlightedCode, setHighlightedCode] = useState<LocaleCode>(locale);
   // A pointer press is under way: the blur it causes is the person's own click, never a focus loss to repair.
   const pressed = useRef(false);
+  // The person is using keys in the list (it was opened from the keyboard, or a key was pressed in it): only then is
+  // the arrow keys' row ringed and scrolled into view. A person using a pointer sees the list as it always was.
+  const [keys, setKeys] = useState(false);
 
   const onOpenerClose = opener?.onClose;
   const close = useCallback((returnFocus = false): void => {
     setQuery("");
     setHighlightedCode(locale);
+    setKeys(false);
     if (onOpenerClose !== undefined) {
       onOpenerClose(returnFocus);
       return;
@@ -74,14 +96,18 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
     const place = () => {
       const rect = anchorRef.current?.getBoundingClientRect(); if (!rect) return;
       const width = Math.min(470, window.innerWidth - 24);
-      const height = panelRef.current?.offsetHeight ?? 424;
-      setPosition({ top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12)), left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width });
+      // Keyboard audit round 4 (E5): never taller than the window less 12px each side (the stylesheet holds the same
+      // limit), so the clamp below keeps the whole panel, and the arrow keys' row, inside the window.
+      const maxHeight = Math.max(0, window.innerHeight - 24);
+      const height = Math.min(panelRef.current?.offsetHeight ?? 424, maxHeight);
+      setPosition({ top: Math.max(12, Math.min(rect.bottom + 8, window.innerHeight - height - 12)), left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)), width, maxHeight });
     };
     place(); window.addEventListener("resize", place); window.addEventListener("scroll", place, true);
     searchRef.current?.focus();
     pressed.current = false;
     const onPointerDown = (event: PointerEvent) => {
       pressed.current = true;
+      setKeys(false);
       if (rootRef.current?.contains(event.target as Node) || panelRef.current?.contains(event.target as Node)) return;
       close(false);
     };
@@ -95,6 +121,14 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
     if (!filteredCodes.includes(highlightedCode)) setHighlightedCode(filteredCodes[0]);
   }, [filteredCodes, highlightedCode]);
 
+  // Focus stays in the search field, so the browser never scrolls the arrow keys' row into the list for us
+  // (keyboard audit 2026-11-12).
+  useEffect(() => {
+    if (!open || !keys) return;
+    const row = panelRef.current?.querySelector<HTMLElement>(`[id="${listId}-${highlightedCode}"]`);
+    if (typeof row?.scrollIntoView === "function") row.scrollIntoView({ block: "nearest" });
+  }, [open, keys, highlightedCode, listId]);
+
   function select(code: LocaleCode): void {
     writeLocaleCookie(code);
     // The chosen row (or the search field) unmounts before the reload lands: focus waits on the trigger, not <body>.
@@ -103,6 +137,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
   }
 
   function onKeyDown(event: KeyboardEvent): void {
+    if (!keys) setKeys(true);
     if (event.key === "Tab" && panelRef.current?.contains(event.target as Node)) {
       // The panel sits at the end of <body>, so Tab out of it would leave the page: it closes and the step starts
       // from the trigger instead (Tab then moves on past it; Shift+Tab stays on it, the panel's place in the order).
@@ -115,9 +150,16 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
       if (event.shiftKey) event.preventDefault();
       return;
     }
+    const columns = listColumns(panelRef.current);
+    const rtl = panelRef.current?.closest("[dir]")?.getAttribute("dir") === "rtl";
+    const listKeys = columns > 1
+      ? ["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight", "Home", "End", "Enter", "Escape"]
+      : ["ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"];
+    if (!listKeys.includes(event.key)) return;
+    // Keyboard audit round 4 (E8): Home/End and Left/Right are the search box's whenever its caret can use them.
+    if (event.target === searchRef.current && searchRef.current !== null && caretUses(event, searchRef.current)) return;
     const currentIndex = highlightedLocaleIndex(filteredCodes, highlightedCode);
-    const result = handleLanguageSwitcherKey(event.key, currentIndex, filtered.length);
-    if (!["ArrowDown", "ArrowUp", "Home", "End", "Enter", "Escape"].includes(event.key)) return;
+    const result = handleLanguageSwitcherKey(event.key, currentIndex, filtered.length, columns, rtl);
     if (event.key === "Enter" && event.target !== searchRef.current) return;
     event.preventDefault();
     if (result.close) {
@@ -155,10 +197,12 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
         aria-expanded={open}
         aria-haspopup="dialog"
         aria-controls={panelId}
-        onClick={() => {
+        onClick={(event) => {
           if (open) close(false);
           else {
             setHighlightedCode(locale);
+            // A press from the keyboard is a click with no pointer count.
+            setKeys(event.detail === 0);
             setOwnOpen(true);
           }
         }}
@@ -172,9 +216,10 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
       {open ? createPortal(
         <div
           ref={panelRef}
-          style={{ position: "fixed", top: position.top, left: position.left, right: "auto", bottom: "auto", width: position.width }}
+          style={{ position: "fixed", top: position.top, left: position.left, right: "auto", bottom: "auto", width: position.width, maxHeight: position.maxHeight }}
           id={panelId}
           className="languageSwitcherPanel"
+          data-keys={keys ? "true" : undefined}
           role="dialog"
           aria-modal="false"
           aria-label={t(catalog, "chrome.interfaceLanguage")}

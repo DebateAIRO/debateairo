@@ -5,6 +5,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import type { DigView, V4Map, V4Path, V4Selection } from "@/lib/v4/types";
 import { isRightToLeft } from "@/lib/v4/useMapKeys";
 import { digTitle, pathTitle, resolveSelection, shortText, TitleText, type ResolvedSelection, type Title } from "./V4MapTree";
+import { useRoomVariable } from "./V4UndoNote";
 import { V4TrustBar } from "./V4TrustBar";
 
 /*
@@ -96,8 +97,11 @@ export function V4WhereBar(props: Readonly<{
   const shown = map.paths.slice(0, MINIMAP_MAX);
   // Art. 50(2): the sentence is the site's; only the place's title, when an AI wrote it, is marked as AI text.
   const [placeBefore = "", placeAfter = ""] = t(catalog, "v4.phone.youAreIn", { place: PLACE_SLOT, n: level, total }).split(PLACE_SLOT);
+  // V4B-V1: it is pinned to the window's top, so the window keeps its height free above a focused control.
+  const [bar, setBar] = useState<HTMLDivElement | null>(null);
+  useRoomVariable(bar, "--v4-where-room");
   return (
-    <div className="v4WhereBar">
+    <div className="v4WhereBar" ref={setBar}>
       <p className="v4SrOnly" role="status">
         {placeBefore}<span data-ai-generated={last.title.ai ? "true" : undefined}>{last.title.text}</span>{placeAfter}
       </p>
@@ -164,7 +168,8 @@ export function V4PathList(props: Readonly<{
           const star = path.open.some((question) => question.star);
           return (
             <li key={path.id}>
-              <button type="button" className="v4PathListRow" onClick={(event) => props.onSelect(`path:${path.id}`, event.detail === 0)}>
+              {/* Keyboard audit round 4 (B2): `data-path` lets the page find a path's row when the run's list gives way to it. */}
+              <button type="button" className="v4PathListRow" data-path={path.id} onClick={(event) => props.onSelect(`path:${path.id}`, event.detail === 0)}>
                 <span className="v4PathListLabel">
                   {star ? <span className="v4MapStar" aria-hidden="true">★ </span> : null}
                   <TitleText title={pathTitle(path, catalog, 60)} catalog={catalog} />

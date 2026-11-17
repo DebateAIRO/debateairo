@@ -4,7 +4,7 @@ import { ContractHttpError, type ContractClient, type OnboardingRequirementsResp
 import { contractClient } from '@/lib/api';
 import { catalogLocale, type LocaleCode } from '@/lib/i18n/locales';
 import { t, type MessageCatalog } from '@/lib/i18n/translate';
-import { DateOfBirthField, EMPTY_DOB } from '@/components/DateOfBirthField';
+import { DateOfBirthField, EMPTY_DOB, firstFlaggedDobSelector } from '@/components/DateOfBirthField';
 import { resolveDobLocale } from '@/lib/dob/dobLocale';
 import { checkDob, dobToIso, meetsMinimumAge, type DobParts, type DobErrorCode } from '@debateai/kernel';
 import { loadClientLegalDocument } from '@/components/consent/useLegalDocument';
@@ -35,6 +35,14 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
     const [busy, setBusy] = useState(false);
     const [reload, setReload] = useState(0);
     const flight = useRef(false);
+    // Keyboard audit 2026-11-12 (AUTH-8): documents updated meanwhile are fixed only by Try again, above the form, so a
+    // stale save sends focus there. Any other failed save keeps it on Continue (the site's focus guard gives it back).
+    const tryAgain = useRef<HTMLButtonElement>(null);
+    const [staleFocus, setStaleFocus] = useState(0);
+    useEffect(() => {
+        if (staleFocus)
+            tryAgain.current?.focus();
+    }, [staleFocus]);
     const ready = useRef(onReady);
     ready.current = onReady;
     useEffect(() => {
@@ -80,7 +88,7 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
             const check = checkDob(birth);
             setBirthError(check.code === 'ok' ? null : check.code);
             if (check.code !== 'ok' || !meetsMinimumAge(birth)) {
-                form.querySelector<HTMLElement>('[name=dob-d]')?.focus();
+                form.querySelector<HTMLElement>(firstFlaggedDobSelector(birth, resolveDobLocale(locale).order))?.focus();
                 return;
             }
         }
@@ -103,8 +111,10 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
         }
         catch (failure) {
             const stale = failure instanceof ContractHttpError && failure.serverCode === 'LEGAL_DOCUMENT_STALE';
-            if (stale)
+            if (stale) {
                 setAccepted({ terms: false, privacy: false });
+                setStaleFocus(n => n + 1);
+            }
             setError(t(catalog, stale ? "auth.signUp.documentsUpdated" : "auth.onboarding.saveFailed"));
         }
         finally {
@@ -112,7 +122,7 @@ export function OnboardingEvidence({ authority, client = contractClient, locale,
             setBusy(false);
         }
     }
-    return <section>{error ? <div><p className="authFieldError" role="alert">{error}</p><button type="button" className="authSecondary" onClick={() => setReload(n => n + 1)}>{t(catalog, "auth.onboarding.tryAgain")}</button></div> : null}
+    return <section>{error ? <div><p className="authFieldError" role="alert">{error}</p><button ref={tryAgain} type="button" className="authSecondary" onClick={() => setReload(n => n + 1)}>{t(catalog, "auth.onboarding.tryAgain")}</button></div> : null}
  {!requirements || !documents ? <p role="status">{t(catalog, "auth.enroll.verifyingEmail")}</p> : <form className="authForm" method="post" action="/enroll-mfa" noValidate onSubmit={e => {
                 e.preventDefault();
                 void submit(e.currentTarget);

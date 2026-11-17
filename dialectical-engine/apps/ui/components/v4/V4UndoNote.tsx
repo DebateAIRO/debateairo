@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { DIG_UNDO_MS } from "@/lib/v4/digUndo";
+import { focusIsLost, isFocusParked } from "@/lib/focusGuard";
 
 /*
  * THE Undo note of the V4 pages: one look, one Undo window, one confirmation. It only shows and offers; whoever owns the
@@ -58,10 +59,34 @@ export type V4UndoNoteProps = Readonly<{
   returnFocus?: () => HTMLElement | null;
   /** An older note on a phone, folded to one line: its words and Undo, no line. */
   folded?: boolean;
+  /**
+   * Keyboard audit 2026-11-12 (V4C-13): told true when keyboard focus comes into the note and false when it leaves (or the
+   * note goes), so whoever times the note out can wait while someone is using it.
+   */
+  onHold?: (held: boolean) => void;
 }>;
 
+/**
+ * Keyboard audit 2026-11-12 (V4B-V1, WCAG 2.4.11): an element's real height as a room variable on the page root while it is
+ * on screen, so the window's scroll padding (v4-undo.css; V4WhereBar, V4DigUndoHost) keeps a focused control clear of it.
+ */
+export function useRoomVariable(element: HTMLElement | null, name: string): void {
+  useEffect(() => {
+    if (element === null) return;
+    const root = document.documentElement;
+    const set = (): void => root.style.setProperty(name, `${Math.ceil(element.getBoundingClientRect().height)}px`);
+    set();
+    const observer = typeof ResizeObserver === "function" ? new ResizeObserver(set) : null;
+    observer?.observe(element);
+    return () => {
+      observer?.disconnect();
+      root.style.removeProperty(name);
+    };
+  }, [element, name]);
+}
+
 function focusable(element: Element | null): element is HTMLElement {
-  return element instanceof HTMLElement && element !== document.body && element.isConnected;
+  return element instanceof HTMLElement && element !== document.body && !isFocusParked(element) && element.isConnected;
 }
 
 export function V4UndoNote(props: V4UndoNoteProps) {
@@ -103,11 +128,31 @@ export function V4UndoNote(props: V4UndoNoteProps) {
     if (!counted.current) return;
     counted.current = false;
     const active = document.activeElement;
-    const lost = active === null || active === document.body || (rootRef.current?.contains(active) ?? false);
+    const lost = focusIsLost() || (rootRef.current?.contains(active) ?? false);
     if (!lost) return;
     const target = focusable(backTo.current) ? backTo.current : now.returnFocus?.() ?? null;
     if (focusable(target)) target.focus();
   }, [state]);
+
+  // V4C-13: focus inside the note holds it; leaving it (or the note going away) lets it go.
+  const holding = useRef(false);
+  const hold = (held: boolean): void => {
+    if (holding.current === held) return;
+    holding.current = held;
+    latest.current.onHold?.(held);
+  };
+  useEffect(() => () => {
+    if (holding.current) latest.current.onHold?.(false);
+  }, []);
+  // A control that went away with focus on it fires no blur everywhere: after each draw, a hold with no focus inside ends.
+  useEffect(() => {
+    if (holding.current && !(rootRef.current?.contains(document.activeElement) ?? false)) hold(false);
+  });
+  const onFocus = (): void => hold(true);
+  const onBlur = (event: FocusEvent<HTMLDivElement>): void => {
+    const next = event.relatedTarget;
+    if (!(next instanceof Node) || !event.currentTarget.contains(next)) hold(false);
+  };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
     if (event.key !== "Escape" || state !== "counting") return;
@@ -123,6 +168,8 @@ export function V4UndoNote(props: V4UndoNoteProps) {
       ref={rootRef}
       className={`v4Undo v4Undo-${state}${folded ? " v4UndoFolded" : ""}`}
       onKeyDown={onKeyDown}
+      onFocus={onFocus}
+      onBlur={onBlur}
     >
       <span className="v4SrOnly" role="status">{spoken}</span>
       {state === "counting" || state === "sending" ? (

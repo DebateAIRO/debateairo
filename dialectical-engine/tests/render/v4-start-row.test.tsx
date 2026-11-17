@@ -607,12 +607,17 @@ describe("tick two to combine them (Design Document v2, 16b)", () => {
     await keyDown(box(2), "ArrowDown");
     expect(document.activeElement).toBe(box(2));
     await press(box(2));
-    // The row's keys: the arrows between rows, Enter and Space open ⋯ (Space on a row never ticks its path).
+    // The row's keys: the arrows between rows; Enter opens ⋯, and so does Space, through the button's own click when the
+    // key comes up (nothing takes its key-down, so no menu item is chosen by that click). Space on a row never ticks its path.
     actions = [];
     await focus(rowButton(2));
     await keyDown(rowButton(2), "ArrowDown");
     expect(document.activeElement).toBe(rowButton(3));
-    await keyDown(rowButton(3), " ");
+    const rowSpace = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    await act(async () => { rowButton(3).dispatchEvent(rowSpace); });
+    expect(rowSpace.defaultPrevented).toBe(false);
+    expect(menu()).toBeNull();
+    await press(rowButton(3));
     expect(label(menu()!)).toBe("More for path 3");
     expect(actions).toEqual([]);
     expect(ticked()).toEqual([]);

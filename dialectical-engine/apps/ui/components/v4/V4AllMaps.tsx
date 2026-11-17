@@ -9,6 +9,7 @@ import { V4Header } from "@/components/v4/V4Header";
 import { MapList, useMapShelf } from "@/components/v4/V4MapShelf";
 import { V4NotStarted, V4SavedDeleteNotes } from "@/components/v4/V4NotStarted";
 import { contractClient } from "@/lib/api";
+import { focusIsLost } from "@/lib/focusGuard";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { pickUpHref } from "@/lib/v4/savedQuestion";
 import type { ReadingLevel } from "@/lib/v4/types";
@@ -38,6 +39,16 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
   const { load, busy, retry } = useMapShelf({ enabled: true, want, catalog });
   const router = useRouter();
   const main = useRef<HTMLDivElement>(null);
+  // Keyboard audit 2026-11-12 (V4A-12): "Show more" is off while it reads (and goes when nothing more is left); once the
+  // cards come, focus goes to the first new one, the thing asked for, unless the person has moved on meanwhile.
+  const moreFrom = useRef<number | null>(null);
+  const shownCount = load.status === "READ" ? load.read.maps.length : 0;
+  useEffect(() => {
+    const from = moreFrom.current;
+    if (from === null || shownCount <= from) return;
+    moreFrom.current = null;
+    if (focusIsLost()) main.current?.querySelectorAll<HTMLElement>(".v4ShelfCard")[from]?.focus();
+  }, [shownCount]);
   const [saved, setSaved] = useState<readonly SavedQuestionSummary[]>([]);
   useEffect(() => {
     let live = true;
@@ -51,10 +62,17 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
     })();
     return () => { live = false; };
   }, []);
-  const { waiting, deleteSaved, undoDelete } = useSavedDeletes({
+  const { waiting, deleteSaved, undoDelete, holdDelete } = useSavedDeletes({
     client: contractClient,
     onGone: (id) => setSaved((now) => now.filter((one) => one.id !== id)),
-    lines: main
+    lines: main,
+    // The last kept question went with focus on its note: the control just above where the block was ("Show more", else
+    // the last map), or "New" on a page with no map.
+    whenEmpty: () => {
+      const cards = main.current?.querySelectorAll<HTMLElement>(".v4ShelfCard");
+      return main.current?.querySelector<HTMLElement>(".v4MapsMore:not(:disabled)") ?? cards?.[cards.length - 1]
+        ?? main.current?.querySelector<HTMLElement>(".v4MapsNew") ?? null;
+    }
   });
   // A question waiting out its Delete is not listed (Undo brings it back).
   const notStarted = useMemo(() => saved.filter((one) => !waiting.some((held) => held.item.id === one.id)), [saved, waiting]);
@@ -62,8 +80,8 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
     <>
       {/* journey-f19: the quota share shows only on the ask, choosing and map pages; My questions is none of them. */}
       <V4Header catalog={catalog} place="questions" />
-      {/* UI-4: the site layout already holds the page's one <main>. */}
-      <div ref={main} className="v4AskMain v4MapsMain">
+      {/* UI-4: the site layout already holds the page's one <main>. Keyboard audit 2026-11-12 (CHR1-4): the skip link comes here. */}
+      <div ref={main} className="v4AskMain v4MapsMain" id="page-content" tabIndex={-1}>
         {/* Design Document v2 (18b): the title, with "New" (a new question) at the end of its row. */}
         <div className="v4MapsHead">
           <h1 className="v4AskTitle v4Serif">{t(catalog, "v4.maps.title")}</h1>
@@ -87,14 +105,17 @@ function AllMapsView({ catalog, locale }: Readonly<{ catalog: MessageCatalog; lo
         ) : null}
         {load.status === "READ" && load.read.more ? (
           <div>
-            <button type="button" className="v4Link v4MapsMore" disabled={busy} aria-busy={busy} onClick={() => setWant((value) => value + ALL_MAPS_STEP)}>
+            <button type="button" className="v4Link v4MapsMore" disabled={busy} aria-busy={busy} onClick={() => {
+              moreFrom.current = shownCount;
+              setWant((value) => value + ALL_MAPS_STEP);
+            }}>
               {t(catalog, "v4.maps.more")}
             </button>
           </div>
         ) : null}
         {/* Design Document v2 (18b): the questions not started yet, then any Delete's shared Undo note (as on the ask page). */}
         <V4NotStarted items={notStarted} locale={locale} catalog={catalog} onPickUp={(id) => router.push(pickUpHref(id))} onDelete={deleteSaved} />
-        <V4SavedDeleteNotes waiting={waiting} catalog={catalog} onUndo={undoDelete} />
+        <V4SavedDeleteNotes waiting={waiting} catalog={catalog} onUndo={undoDelete} onHold={holdDelete} />
       </div>
     </>
   );

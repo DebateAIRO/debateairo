@@ -143,3 +143,39 @@ describe("keyboard: the home composer's Start", () => {
     expect(document.activeElement).toBe(claim);
   });
 });
+
+// Keyboard audit 2026-11-12 (CHR1-5): Enter that commits an IME candidate (Chinese, Japanese, Korean input) must
+// not start the debate with the half-typed question.
+describe("keyboard: Enter in the home composer during IME composition", () => {
+  async function mountComposer(): Promise<HTMLTextAreaElement> {
+    const container = document.createElement("div");
+    document.body.append(container);
+    root = createRoot(container);
+    const catalog = Object.freeze({ ...catalogue("home"), ...catalogue("chrome") });
+    await act(async () => root!.render(
+      <LibraryComposer catalog={catalog} newDebateCatalog={catalogue("newDebate")} roomCatalog={catalogue("newDebate")} locale="en" />
+    ));
+    await settle();
+    const claim = container.querySelector<HTMLTextAreaElement>("#library-claim")!;
+    await type(claim, "都市は中心部で車を禁止すべき");
+    return claim;
+  }
+  async function enter(claim: HTMLTextAreaElement, init: KeyboardEventInit, keyCode?: number): Promise<KeyboardEvent> {
+    const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true, ...init });
+    if (keyCode !== undefined) Object.defineProperty(event, "keyCode", { value: keyCode });
+    await act(async () => { claim.dispatchEvent(event); });
+    await settle();
+    return event;
+  }
+
+  it.each([["isComposing", { isComposing: true }, undefined], ["keyCode 229", {}, 229]] as const)("ignores Enter flagged by %s", async (_name, init, keyCode) => {
+    mocks.validateSession.mockReturnValue(new Promise<never>(() => undefined));
+    const claim = await mountComposer();
+    const event = await enter(claim, init, keyCode);
+    expect(event.defaultPrevented, "the IME keeps its own Enter").toBe(false);
+    expect(mocks.validateSession).not.toHaveBeenCalled();
+    expect(mocks.push).not.toHaveBeenCalled();
+    await enter(claim, {});
+    expect(mocks.validateSession, "a plain Enter still starts").toHaveBeenCalledOnce();
+  });
+});

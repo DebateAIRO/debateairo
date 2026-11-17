@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import {
   ContractHttpError, savedQuestionDocFits, type ContractClient, type SavedQuestionDoc, type SavedQuestionSummary
 } from "@debateai/contract";
+import { focusIsLost } from "../focusGuard.js";
 import { DIG_UNDO_MS } from "./digUndo.js";
 import { SAVE_PAUSE_MS } from "./savedQuestion.js";
 
@@ -263,6 +264,11 @@ export type WaitingDelete = Readonly<{ item: SavedQuestionSummary; sendsAt: numb
  * brings the line back and sends nothing; leaving the page meanwhile sends nothing. A DELETE that fails brings the line back
  * (nothing is tried again by itself); one that lands, or answers gone, takes it out of the page's list (`onGone`). After Undo
  * focus goes to the line's Delete inside `lines`, where it was before the note took it.
+ *
+ * A line that goes while the keyboard is on it hands focus on, so focus is never left on nothing: a Delete's note that ends
+ * its window with focus inside it (`holdDelete`, from the note), or a Pick up whose question turned out gone (`lineGoing`,
+ * before the page reads its list again). Focus goes to the Pick up of the line now in that place (the one before it at the
+ * end of the list), or to `whenEmpty` once no line is left; never when the person has moved focus elsewhere meanwhile.
  */
 export function useSavedDeletes(input: Readonly<{
   client: Pick<ContractClient, "deleteSavedQuestion">;
@@ -270,7 +276,17 @@ export function useSavedDeletes(input: Readonly<{
   onGone(id: string): void;
   /** The part of the page that holds "Not started yet". */
   lines: RefObject<HTMLElement | null>;
-}>): Readonly<{ waiting: readonly WaitingDelete[]; deleteSaved(item: SavedQuestionSummary): void; undoDelete(id: string): void }> {
+  /** Where focus goes when the last line went while it held focus. */
+  whenEmpty(): HTMLElement | null;
+}>): Readonly<{
+  waiting: readonly WaitingDelete[];
+  deleteSaved(item: SavedQuestionSummary): void;
+  undoDelete(id: string): void;
+  /** The Delete's note says whether keyboard focus is inside it. */
+  holdDelete(id: string, held: boolean): void;
+  /** The line of this question is about to go (its question is gone): if it holds focus, focus is handed on once it has. */
+  lineGoing(id: string): void;
+}> {
   const latest = useRef(input);
   latest.current = input;
   const [waiting, setWaiting] = useState<readonly WaitingDelete[]>([]);
@@ -286,12 +302,21 @@ export function useSavedDeletes(input: Readonly<{
     };
   }, []);
   const focusAfterUndo = useRef<string | null>(null);
+  // Where each deleted line stood, which note holds focus, and the place focus is owed once that line's fate is known.
+  const deletedAt = useRef(new Map<string, number>());
+  const heldNote = useRef<string | null>(null);
+  const owed = useRef<Readonly<{ id: string; at: number }> | null>(null);
+  const shownLines = (): HTMLElement[] => [...(latest.current.lines.current?.querySelectorAll<HTMLElement>(".v4NotStartedItem") ?? [])];
+  const lineAt = (id: string): number => shownLines().findIndex((one) => one.dataset.savedId === id);
 
   function deleteSaved(item: SavedQuestionSummary): void {
     if (waiting.some((one) => one.item.id === item.id)) return;
+    deletedAt.current.set(item.id, Math.max(0, lineAt(item.id)));
     setWaiting((now) => [...now, { item, sendsAt: Date.now() + DIG_UNDO_MS, sent: false }]);
     timers.current.set(item.id, setTimeout(() => {
       timers.current.delete(item.id);
+      if (heldNote.current === item.id) owed.current = { id: item.id, at: deletedAt.current.get(item.id) ?? 0 };
+      deletedAt.current.delete(item.id);
       setWaiting((now) => now.map((one) => one.item.id === item.id ? { ...one, sent: true } : one));
       void (async () => {
         let gone = true;
@@ -312,9 +337,40 @@ export function useSavedDeletes(input: Readonly<{
     if (timer === undefined) return;
     clearTimeout(timer);
     timers.current.delete(id);
+    deletedAt.current.delete(id);
     focusAfterUndo.current = id;
     setWaiting((now) => now.filter((one) => one.item.id !== id));
   }
+
+  function holdDelete(id: string, held: boolean): void {
+    if (held) heldNote.current = id;
+    else if (heldNote.current === id) heldNote.current = null;
+  }
+
+  function lineGoing(id: string): void {
+    const lines = shownLines();
+    const at = lines.findIndex((one) => one.dataset.savedId === id);
+    if (at >= 0 && lines[at]!.contains(document.activeElement)) owed.current = { id, at };
+  }
+
+  // After every draw: focus owed for a line is handed on once that line is settled (its DELETE answered, or its line gone
+  // from the list), and only while nothing holds focus.
+  useEffect(() => {
+    const wish = owed.current;
+    if (wish === null) return;
+    if (!focusIsLost()) {
+      // Still on the line (its new read has not come): wait for it; anywhere else, the person has moved on.
+      const onItsLine = shownLines().some((line) => line.dataset.savedId === wish.id && line.contains(document.activeElement));
+      if (!onItsLine) owed.current = null;
+      return;
+    }
+    // Its DELETE is still out: the line may yet come back.
+    if (waiting.some((one) => one.item.id === wish.id)) return;
+    owed.current = null;
+    const lines = shownLines();
+    const line = lines[Math.min(wish.at, lines.length - 1)];
+    (line?.querySelector<HTMLElement>(".v4NotStartedPickUp") ?? latest.current.whenEmpty())?.focus();
+  });
 
   // After Undo the line is back; focus goes to its Delete, where it was before the note took it.
   useEffect(() => {
@@ -325,5 +381,5 @@ export function useSavedDeletes(input: Readonly<{
     line?.querySelector<HTMLElement>(".v4NotStartedDelete")?.focus();
   }, [waiting]);
 
-  return { waiting, deleteSaved, undoDelete };
+  return { waiting, deleteSaved, undoDelete, holdDelete, lineGoing };
 }

@@ -401,6 +401,13 @@
   border-start-start-radius: 22px; border-start-end-radius: 22px;
 }
 .v4StartSheet:focus { outline: none; }
+/* Keyboard audit 2026-11-12 (V4A-16, WCAG 2.4.11): the window scrolls on this page (html), and while the bar is pinned it
+   keeps the bar's measured height (V4StartBar sets --v4-start-bar-room) free at its foot, so a control the keyboard reaches
+   scrolls clear of the bar, never under it. Not while the bar sits in the page: a text box has focus, step 1 on a computer,
+   or the cookie bar shows. */
+html:has(.v4StartBar:not(.v4StartBar--aside):not(.v4StartBar--next)):not(:has(.appShell .consentBar)) {
+  scroll-padding-block-end: max(calc(var(--v4-start-bar-room, 0px) + 8px), var(--v4-note-foot, 0px));
+}
 .v4StartSheetTitle { margin: 0; font-family: var(--font-display); font-size: 23px; line-height: 1.15; font-weight: var(--fw-display); letter-spacing: var(--ls-display); }
 .v4StartSheetDone { align-self: flex-start; min-height: 44px; border: 2px solid var(--field-border); background: transparent; font-size: 15px; font-weight: 700; }
 
@@ -498,6 +505,13 @@
 }
 .v4StartChip::after { content: ""; position: absolute; inset-inline: 0; inset-block: -7px; }
 .v4StartChip:hover, .v4StartChip[aria-expanded="true"] { background: var(--track); }
+/* Keyboard audit 2026-11-12 (V4A-18): the chips are no Tab stops (ArrowRight from the row reaches them); the line saying so
+   shows while the row or one of its chips has the keyboard's ring, never for a mouse. The row's button is described by it.
+   While the ring is anywhere in the list every row's line keeps its place, unseen, so the list grows once as the keyboard
+   enters it and never while moving inside it (wave-3 fix round, A4). */
+.v4StartChipsHint { display: none; margin: 0; font-size: var(--t-meta); color: var(--text-2); overflow-wrap: anywhere; }
+.v4StartList:has(:focus-visible) .v4StartChipsHint { display: block; visibility: hidden; }
+.v4StartList .v4StartRow:has(.v4StartRowButton:focus-visible, .v4StartChip:focus-visible) .v4StartChipsHint { visibility: visible; }
 /* A ticked row (Design Document v2, 16b), which is also the row picked for "Combine with…"; and, while one is picked, the
    rows that can be pressed to combine with it. */
 .v4StartRow--picked { border-color: var(--brand); box-shadow: 0 3px 0 var(--brand); }
@@ -703,7 +717,8 @@
 .v4StartWayActions .v4Btn:hover, .v4StartMoreAdd:hover { background: var(--chip); }
 /* The one-tap suggestions (spec §2 item 5), at most two; the list takes the focus after a press. */
 .v4StartSuggest { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.v4StartSuggest:focus { outline: none; }
+/* Keyboard audit 2026-11-12 (V4A-17): quiet for a pointer only; after a keyboard press the list shows the ring. */
+.v4StartSuggest:focus:not(:focus-visible) { outline: none; }
 .v4StartSuggestion {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-width: 0;
   padding-block: 12px; padding-inline: 18px 14px; background: var(--surface); border: 2px dashed var(--dashed); border-radius: 16px;
@@ -837,6 +852,10 @@
   grid-column: 1 / -1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
   line-height: 1.4; font-weight: 600; color: var(--ink); overflow-wrap: anywhere;
 }
+/* Keyboard audit 2026-11-12 (CSS-7): a keyboard cannot open the title, so while the keyboard's ring is anywhere in the list
+   every question shows whole: the list changes once as the keyboard enters it, never line by line as it moves down
+   (wave-3 fix round, A4). A screen reader already reads it whole: it is the line's text and describes both buttons. */
+.v4NotStartedList:has(:focus-visible) .v4NotStartedQuestion { display: block; -webkit-line-clamp: unset; overflow: visible; }
 .v4NotStartedDay { grid-column: 2; grid-row: 2; font-size: var(--t-meta); color: var(--text-2); white-space: nowrap; }
 .v4NotStartedActions { grid-column: 1; grid-row: 2; display: inline-flex; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: var(--t-ui); }
 .v4NotStartedPickUp, .v4NotStartedDelete, .v4NotStartedAll { min-block-size: 44px; display: inline-flex; align-items: center; }
