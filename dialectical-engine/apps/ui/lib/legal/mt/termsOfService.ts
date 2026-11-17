@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Kanċellazzjoni. Ikkanċella fi kwalunkwe ħin minn Issettjar → Abbonament bi klikk waħda ta’ konferma, jew permezz tal-paġna tal-kanċellazzjoni fuq dezbatere.ro/cancel, li ma titlobx li tidħol fil-kont. Il-kanċellazzjoni tidħol fis-seħħ fi tmiem il-perjodu ta’ fatturazzjoni attwali, u tibqa’ jkollok aċċess sa dak iż-żmien. Mhux se nagħmlu l-kanċellazzjoni aktar diffiċli milli kien l-abbonar." },
       { kind: "p", text: "Bidliet fil-prezz jidħlu fis-seħħ biss mat-tiġdid. Nagħtu avviż ta’ mill-inqas 30 jum bil-posta elettronika, li jinkludi l-prezz il-ġdid u ħolqa għall-kanċellazzjoni. Fejn il-liġi ta’ pajjiżek titlob il-kunsens espliċitu tiegħek għal bidla fil-prezz, nitolbuh; inkella, jekk ma tagħmel xejn, il-prezz il-ġdid japplika mit-tiġdid li jmiss. L-Anness A jinnota r-regoli reġjonali." },
       { kind: "p", text: "Ħlasijiet li jfallu. Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla." },
-      { kind: "p", text: "Taxxi, u lil min tħallas. Il-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT (jew GST jew taxxa fuq il-bejgħ, skont fejn tgħix). It-taxxa għall-indirizz tal-kontijiet tiegħek tiżdied fil-checkout, u l-checkout jurik it-total li se tħallas, bit-taxxa inkluża, qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini." },
+      { kind: "p", text: "Taxxi, u lil min tħallas. Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini." },
       { kind: "p", text: "Metodi ta’ ħlas. Tħallas bil-karta. Naċċettaw Visa u Mastercard; ma naċċettawx American Express. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com), u n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna." },
       { kind: "p", text: "Kunsinna. Dialectical Engine huwa servizz online, għalhekk xejn ma jintbagħatlek. Il-funzjonalitajiet tal-pjan bi ħlas tiegħek ikunu disponibbli fil-kont tiegħek hekk kif il-ħlas tiegħek jiġi kkonfermat." },
       { kind: "p", text: "Treġġigħ lura ta’ ħlasijiet. Jekk tikkontesta ħlas mal-emittent tal-karta tiegħek, nistgħu nissospendu l-funzjonalitajiet bi ħlas sakemm tissolva t-tilwima. Ma nitolbux tariffi għal dan." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "3a3b07c362e262e788ae410c17cfbd045a4d813c5a7d745b2fbbe6fa4b1fe8f4",
+  sha256: "93c19133b06aa56ff63c93948de0bc1c87b8888325e269e9274e1292ccece601",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.18 · EFFETTIVI 1 TA’ NOVEMBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

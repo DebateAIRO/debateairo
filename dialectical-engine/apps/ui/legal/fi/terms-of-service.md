@@ -223,7 +223,7 @@ Dialectical Engine tarjoaa maksuttoman tilauksen. Tarjolle tulee kolme maksullis
 
 **Epäonnistuneet maksut.** Jos maksu epäonnistuu, yritämme sitä uudelleen 7 päivän ajan ja varoitamme sinua sähköpostitse ennen tilisi muuttamista maksuttomaksi tilaukseksi. Emme poista väittelyitäsi epäonnistuneen maksun vuoksi.
 
-**Verot ja maksunsaaja.** Hintamme näytetään ilman veroa, muodossa hinta + ALV (tai GST-vero tai myyntivero asuinpaikkasi mukaan). Laskutusosoitteesi mukainen vero lisätään kassalla, ja kassa näyttää ennen maksamista maksettavan kokonaissumman veroineen. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista.
+**Verot ja maksunsaaja.** Hinnat sisältävät arvonlisäveron, GST-veron tai myyntiveron, mikä riippuu asuinpaikastasi ja näytetään ennen maksamista. Myyjä on DMS Merchandise Shop S.R.L., joka laatii laskusi ja vastaa edelleen itse palvelusta ja näistä käyttöehdoista.
 
 **Maksutavat.** Maksat kortilla. Hyväksymme Visa- ja Mastercard-kortit; American Express -kortteja emme hyväksy. Korttimaksut käsittelee NETOPIA Payments (netopia-payments.com), eikä korttisi koko numero koskaan päädy meille.
 

@@ -215,7 +215,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Hủy. Bạn có thể hủy bất kỳ lúc nào từ Cài đặt → Gói đăng ký bằng một lần nhấp xác nhận, hoặc qua trang hủy tại dezbatere.ro/cancel, không yêu cầu đăng nhập. Việc hủy có hiệu lực vào cuối kỳ thanh toán hiện tại và bạn tiếp tục được truy cập cho đến thời điểm đó. Chúng tôi sẽ không khiến việc hủy khó hơn việc đăng ký." },
       { kind: "p", text: "Thay đổi giá chỉ có hiệu lực vào lần gia hạn. Chúng tôi thông báo trước ít nhất 30 ngày qua email cùng giá mới và liên kết hủy. Khi pháp luật quốc gia của bạn yêu cầu sự đồng ý rõ ràng đối với thay đổi giá, chúng tôi sẽ yêu cầu sự đồng ý đó; trong trường hợp khác, nếu bạn không thực hiện hành động nào, giá mới áp dụng từ lần gia hạn tiếp theo. Phụ lục A nêu các quy tắc theo khu vực." },
       { kind: "p", text: "Thanh toán không thành công. Nếu một khoản thanh toán không thành công, chúng tôi thử lại trong 7 ngày và cảnh báo bạn qua email trước khi hạ tài khoản xuống gói miễn phí. Chúng tôi không xóa các cuộc tranh luận của bạn vì một khoản thanh toán không thành công." },
-      { kind: "p", text: "Thuế và bên bạn thanh toán. Giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT (hoặc GST hay thuế bán hàng, tùy thuộc nơi bạn sống). Thuế theo địa chỉ thanh toán của bạn được cộng thêm ở trang thanh toán, và trang thanh toán hiển thị tổng số tiền bạn phải trả, đã gồm thuế, trước khi bạn thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này." },
+      { kind: "p", text: "Thuế và bên bạn thanh toán. Giá đã bao gồm VAT, GST hoặc thuế bán hàng, tùy thuộc nơi bạn sống và được hiển thị trước khi thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này." },
       { kind: "p", text: "Phương thức thanh toán. Bạn thanh toán bằng thẻ. Chúng tôi chấp nhận Visa và Mastercard; chúng tôi không chấp nhận American Express. Thanh toán bằng thẻ được xử lý bởi NETOPIA Payments (netopia-payments.com), và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi." },
       { kind: "p", text: "Giao hàng. Dialectical Engine là một dịch vụ trực tuyến, vì vậy không có gì được gửi đến bạn. Các tính năng của gói trả phí sẽ có trong tài khoản của bạn ngay khi khoản thanh toán được xác nhận." },
       { kind: "p", text: "Yêu cầu hoàn tiền qua tổ chức phát hành thẻ. Nếu bạn tranh chấp một khoản phí với tổ chức phát hành thẻ, chúng tôi có thể đình chỉ các tính năng trả phí trong khi tranh chấp được giải quyết. Chúng tôi không thu phí cho việc này." },
@@ -371,7 +371,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "0f549ceaba2fdfb24c1654e740460b00a53bc7a394d8ec321abf287f0e5203b7",
+  sha256: "0d4192a587a3250b03b48df436012ec6103bfe5ad92a11d85e6d6d9f31be0498",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.18 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

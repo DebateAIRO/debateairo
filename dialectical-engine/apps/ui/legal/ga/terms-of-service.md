@@ -223,7 +223,7 @@ Ní thagann **athruithe praghais** i bhfeidhm ach tráth athnuachana. Tugaimid f
 
 **Íocaíochtaí teipthe.** Má theipeann ar íocaíocht, bainimid triail eile as ar feadh 7 lá agus tugaimid rabhadh duit ar ríomhphost sula n-íosghrádaímid do chuntas go dtí an plean saor in aisce. Ní scriosaimid do dhíospóireachtaí toisc gur theip ar íocaíocht.
 
-**Cánacha, agus cé leis a n-íocann tú.** Taispeántar ár bpraghsanna gan cháin, mar phraghas + CBL (nó GST nó cáin díolacháin, ag brath ar an áit ina bhfuil cónaí ort). Cuirtear leo ag an tseiceáil amach an cháin is infheidhme ar do sheoladh billeála, agus taispeánann an tseiceáil amach duit an tsuim iomlán a íocfaidh tú, cáin san áireamh, sula n-íocann tú. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo.
+**Cánacha, agus cé leis a n-íocann tú.** Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo.
 
 **Modhanna íocaíochta.** Íocann tú le cárta. Glacaimid le Visa agus Mastercard; ní ghlacaimid le American Express. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta, agus ní shroicheann uimhir iomlán do chárta muid riamh.
 
