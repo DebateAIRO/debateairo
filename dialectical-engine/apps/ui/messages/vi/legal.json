@@ -55,7 +55,7 @@
   "legal.versions.meta": "Mọi phiên bản chúng tôi đã công bố, xếp từ mới nhất đến cũ nhất",
   "legal.versions.current": "Hiện hành",
   "legal.versions.read": "Đọc",
-  "legal.versions.v2.date": "Có hiệu lực từ [ngày]",
+  "legal.versions.unpublished.note": "Không được công bố dưới dạng một văn bản riêng. Các thay đổi của phiên bản này nằm trong phiên bản 2.8.",
   "legal.versions.v2.note": "Đây là phiên bản được hiển thị cho bạn khi đăng ký.",
   "legal.versions.none": "Chưa có phiên bản cũ hơn nào được công bố. Khi các điều khoản này thay đổi, phiên bản bị thay thế vẫn được lưu lại để bạn có thể đọc tại đây.",
   "legal.privacyVersions.eyebrow": "Chính sách quyền riêng tư",

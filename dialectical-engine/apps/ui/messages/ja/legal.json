@@ -55,7 +55,7 @@
   "legal.versions.meta": "これまでに公開したすべての版を新しい順に掲載しています",
   "legal.versions.current": "現行版",
   "legal.versions.read": "閲覧する",
-  "legal.versions.v2.date": "発効日 [日付]",
+  "legal.versions.unpublished.note": "単独のテキストとしては公開されていません。この版の変更は第 2.8 版に含まれています。",
   "legal.versions.v2.note": "新規登録の際に表示される版です。",
   "legal.versions.none": "これより前に公開された版はありません。本規約が改定された場合も、改定前の版は引き続きこのページで閲覧できます。",
   "legal.privacyVersions.eyebrow": "プライバシーポリシー",

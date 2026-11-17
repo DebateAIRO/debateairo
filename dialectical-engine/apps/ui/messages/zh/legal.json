@@ -55,7 +55,7 @@
   "legal.versions.meta": "我们发布过的所有版本，按时间由新到旧排列",
   "legal.versions.current": "现行版本",
   "legal.versions.read": "阅读",
-  "legal.versions.v2.date": "生效日期 [日期]",
+  "legal.versions.unpublished.note": "未作为单独文本发布。其更改已包含在版本 2.8 中。",
   "legal.versions.v2.note": "您注册时看到的版本。",
   "legal.versions.none": "此前未发布过其他版本。本条款日后修改时，被取代的版本仍可在此查阅。",
   "legal.privacyVersions.eyebrow": "隐私政策",

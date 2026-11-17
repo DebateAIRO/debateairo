@@ -55,7 +55,7 @@
   "legal.versions.meta": "Kull verżjoni li ppubblikajna, bl-aktar reċenti l-ewwel",
   "legal.versions.current": "Attwali",
   "legal.versions.read": "Aqra",
-  "legal.versions.v2.date": "Fis-seħħ minn [data]",
+  "legal.versions.unpublished.note": "Ma ġietx ippubblikata bħala test għaliha. Il-bidliet tagħha huma parti mill-verżjoni 2.8.",
   "legal.versions.v2.note": "Il-verżjoni li tintwerielek meta tirreġistra.",
   "legal.versions.none": "Għadha ma ġiet ippubblikata ebda verżjoni preċedenti. Meta jinbidlu dawn it-termini, il-verżjoni li jissostitwixxu tibqa’ tista’ tinqara hawn.",
   "legal.privacyVersions.eyebrow": "Politika dwar il-privatezza",

@@ -55,7 +55,7 @@
   "legal.versions.meta": "Todas as versões que publicámos, da mais recente para a mais antiga",
   "legal.versions.current": "Em vigor",
   "legal.versions.read": "Ler",
-  "legal.versions.v2.date": "Em vigor desde [data]",
+  "legal.versions.unpublished.note": "Não foi publicada como texto próprio. As suas alterações fazem parte da versão 2.8.",
   "legal.versions.v2.note": "A versão que lhe é apresentada quando se regista.",
   "legal.versions.none": "Ainda não foi publicada nenhuma versão anterior. Quando estes termos forem alterados, a versão substituída continuará disponível para consulta aqui.",
   "legal.privacyVersions.eyebrow": "Política de Privacidade",
