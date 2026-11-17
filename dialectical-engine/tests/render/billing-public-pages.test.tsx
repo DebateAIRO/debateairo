@@ -77,7 +77,13 @@ describe("P21 the pages the card processor requires, on the colleague's legal pa
     expect(text).toContain(`${COMPANY.legalName} is also the seller of the paid plans`);
     expect(text).toContain("We accept Visa and Mastercard; we do not accept American Express. Card payments are processed by NETOPIA Payments. We never see or store your full card number.");
     expect(text).toContain("renews every month until you cancel");
-    expect(text).toContain("within 14 days of subscribing");
+    // Owner's decision of 16 November 2026: everyone may withdraw, and the refund is measured by the plan's credit used.
+    expect(text).toContain(
+      "Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, as section 13 of the Terms explains."
+        + " You get back the price minus the share of the plan's credit you have used."
+        + " Annex A of the Terms says what else the law gives you where you live."
+    );
+    expect(text).not.toMatch(/If you live in the EU or the EEA|For users elsewhere|the part already used/u);
     for (const href of [...BILLING_LINKS, "/terms#legal-section-13"]) {
       expect(notice.querySelector(`a[href="${href}"]`), href).not.toBeNull();
     }
@@ -92,7 +98,16 @@ describe("P21 the pages the card processor requires, on the colleague's legal pa
 
   it("/withdraw explains the right, sends the person to sign in and to Settings, and names the email route (Q-9)", async () => {
     const document = await page(WithdrawPage);
-    expect(document.body.textContent).toContain("within 14 days of subscribing");
+    // Owner's decision of 16 November 2026: the right is everyone's, and the refund is the price times the share of the
+    // plan's credit not used. Days elapsed do not count.
+    const paragraphs = [...document.querySelectorAll(".billingInner > p")].map((paragraph) => paragraph.textContent);
+    expect(paragraphs[0]).toBe("Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, without giving a reason.");
+    expect(paragraphs[1]).toBe(
+      "You get back the price minus the share of the plan's credit you have used, however many days have passed."
+        + " If you have used none, you get the full price back. The money goes back to your card, and the plan ends at once."
+    );
+    const body = document.querySelector(".billingInner")?.textContent ?? "";
+    expect(body).not.toMatch(/\b(?:EU|EEA|UK)\b|the larger of|days used/u);
     expect(document.querySelector('a[href="/login?next=%2Fsettings"]')).not.toBeNull();
     expect(document.querySelector('a[href="/settings"]')).not.toBeNull();
     // Terms §13 lets a consumer withdraw by the model form or any clear statement; the owner carries it out.

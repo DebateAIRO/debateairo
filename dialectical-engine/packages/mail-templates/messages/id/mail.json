@@ -10,7 +10,7 @@
   "mail.M1.active": "Terima kasih. Paket {plan} Anda kini aktif.",
   "mail.M1.price": "Anda membayar {totalAmount} per bulan, termasuk pajak. Paket diperpanjang pada {renewDate} dan kemudian setiap bulan hingga Anda membatalkannya.",
   "mail.M1.cancel": "Anda dapat membatalkan kapan saja di Pengaturan, atau tanpa masuk di halaman ini: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Jika Anda tinggal di UE, EEA, atau Inggris, Anda dapat menarik diri dalam {withdrawalDays} hari. Anda kemudian hanya membayar bagian yang sudah digunakan: yang lebih besar antara hari yang digunakan atau kredit yang digunakan. Formulir contoh penarikan terlampir pada email ini.",
+  "mail.M1.withdrawal": "Di mana pun Anda tinggal, Anda dapat menarik diri dalam {withdrawalDays} hari. Anda kemudian hanya membayar bagian kredit paket yang sudah Anda gunakan; jika Anda belum menggunakannya sama sekali, Anda menerima kembali harga penuh. Formulir contoh penarikan terlampir pada email ini.",
   "mail.M1.termsAttached": "Ketentuan yang Anda setujui terlampir. Versi terbaru selalu tersedia di {termsUrl}",
   "mail.M1.termsCurrent": "Ketentuan kami yang berlaku saat ini tersedia online di {termsUrl}",
   "mail.M2.subject": "Tanda terima Dialectical Engine Anda untuk {totalAmount}",

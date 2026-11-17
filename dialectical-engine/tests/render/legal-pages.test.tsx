@@ -242,6 +242,30 @@ describe("the legal notice states the company and seller details from one consta
     expect(view.textContent).toContain("Paid plans are not available yet.");
   });
 
+  it("gives everyone the 14-day withdrawal in section 05, before and after paid plans start (owner's decision of 16 November 2026)", () => {
+    const before = renderNotice("en").textContent ?? "";
+    expect(legalEnglish["legal.notice.s05.body"]).toBe(
+      "When paid plans start, you will have a 14-day right of withdrawal wherever you live, explained in section 13 of the Terms."
+        + " Annex A of the Terms says what else the law gives you where you live."
+    );
+    expect(before).toContain(legalEnglish["legal.notice.s05.body"]);
+    const paid = render(
+      <LegalNoticeBody legalCatalog={catalog("en", "legal")} chromeCatalog={catalog("en", "chrome")} locale="en" billingOn />
+    ).textContent ?? "";
+    // The refund is measured by the plan's credit used alone; days do not count.
+    expect(legalEnglish["legal.notice.s05.bodyPaid"]).toBe(
+      "Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, as section 13 of the Terms explains."
+        + " You get back the price minus the share of the plan's credit you have used."
+        + " Annex A of the Terms says what else the law gives you where you live."
+    );
+    expect(paid).toContain(legalEnglish["legal.notice.s05.bodyPaid"]);
+    expect(paid).not.toContain(legalEnglish["legal.notice.s05.body"]);
+    // Neither text keeps the right for the EU and the EEA alone, or the earlier refund wording.
+    for (const text of [before, paid]) {
+      expect(text).not.toMatch(/consumers in the EU and the EEA|If you live in the EU or the EEA|For users elsewhere|the part already used|days used/u);
+    }
+  });
+
   it("gives the Japanese page its statutory title, and every locale its own title", () => {
     expect(catalog("ja", "legal")["legal.notice.title"]).toBe("特定商取引法に基づく表記");
     expect(catalog("ja", "chrome")["chrome.legal.notice"]).toBe("特定商取引法に基づく表記");

@@ -10,7 +10,7 @@
   "mail.M1.active": "Paldies. Jūsu plāns {plan} tagad ir aktīvs.",
   "mail.M1.price": "Jūs maksājat {totalAmount} mēnesī, ieskaitot nodokļus. Plāns tiek atjaunots {renewDate} un pēc tam katru mēnesi, līdz jūs to atceļat.",
   "mail.M1.cancel": "Jūs varat atcelt jebkurā laikā iestatījumos vai bez pieteikšanās šajā lapā: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Ja dzīvojat ES, EEZ vai Apvienotajā Karalistē, jūs varat atteikties no līguma {withdrawalDays} dienu laikā. Tad jūs maksājat tikai par jau izmantoto daļu: lielāko no izmantoto dienu vai izmantotā kredīta daļas. Atteikuma veidlapas paraugs ir pievienots šim e-pastam.",
+  "mail.M1.withdrawal": "Lai kur dzīvotu, jūs varat atteikties no līguma {withdrawalDays} dienu laikā. Tad jūs maksājat tikai par izmantoto plāna kredīta daļu; ja kredīts nav izmantots nemaz, jūs saņemat atpakaļ pilnu cenu. Atteikuma veidlapas paraugs ir pievienots šim e-pastam.",
   "mail.M1.termsAttached": "Jūsu pieņemtie noteikumi ir pievienoti. Jaunākā versija vienmēr ir pieejama {termsUrl}",
   "mail.M1.termsCurrent": "Mūsu pašreizējie noteikumi ir pieejami tiešsaistē {termsUrl}",
   "mail.M2.subject": "Jūsu Dialectical Engine kvīts par {totalAmount}",

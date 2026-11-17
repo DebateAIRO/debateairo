@@ -10,7 +10,7 @@
   "mail.M1.active": "Dėkojame. Jūsų planas {plan} dabar aktyvus.",
   "mail.M1.price": "Mokate {totalAmount} per mėnesį, įskaitant mokesčius. Planas atnaujinamas {renewDate} ir vėliau kas mėnesį, kol jį atšauksite.",
   "mail.M1.cancel": "Galite atšaukti bet kada nustatymuose arba neprisijungę šiame puslapyje: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Jei gyvenate ES, EEE arba Jungtinėje Karalystėje, galite atsisakyti sutarties per {withdrawalDays} dienų. Tada mokate tik už jau panaudotą dalį: didesnę iš panaudotų dienų ar panaudoto kredito dalies. Sutarties atsisakymo formos pavyzdys pridėtas prie šio el. laiško.",
+  "mail.M1.withdrawal": "Kad ir kur gyventumėte, galite atsisakyti sutarties per {withdrawalDays} dienų. Tada mokate tik už tą plano kredito dalį, kurią panaudojote; jei kredito visai nepanaudojote, grąžinama visa kaina. Sutarties atsisakymo formos pavyzdys pridėtas prie šio el. laiško.",
   "mail.M1.termsAttached": "Jūsų priimtos sąlygos pridėtos. Naujausia versija visada pateikiama adresu {termsUrl}",
   "mail.M1.termsCurrent": "Mūsų dabartinės sąlygos pateikiamos internete adresu {termsUrl}",
   "mail.M2.subject": "Jūsų Dialectical Engine kvitas už {totalAmount}",

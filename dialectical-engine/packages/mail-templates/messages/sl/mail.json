@@ -10,7 +10,7 @@
   "mail.M1.active": "Hvala. Vaš paket {plan} je zdaj aktiven.",
   "mail.M1.price": "Plačujete {totalAmount} na mesec, z vključenim davkom. Paket se podaljša {renewDate} in nato vsak mesec, dokler ga ne prekličete.",
   "mail.M1.cancel": "Prekličete ga lahko kadar koli v Nastavitvah ali brez prijave na tej strani: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Če živite v EU, EGP ali Združenem kraljestvu, lahko odstopite od pogodbe v {withdrawalDays} dneh. Takrat plačate samo že porabljeni del: večjega od deleža porabljenih dni ali porabljenega dobroimetja. Vzorčni obrazec za odstop od pogodbe je priložen temu e-poštnemu sporočilu.",
+  "mail.M1.withdrawal": "Ne glede na to, kje živite, lahko odstopite od pogodbe v {withdrawalDays} dneh. Takrat plačate samo delež dobroimetja paketa, ki ste ga porabili; če niste porabili ničesar, vam vrnemo celotno ceno. Vzorčni obrazec za odstop od pogodbe je priložen temu e-poštnemu sporočilu.",
   "mail.M1.termsAttached": "Pogoji, ki ste jih sprejeli, so priloženi. Najnovejša različica je vedno na {termsUrl}",
   "mail.M1.termsCurrent": "Naši trenutni Pogoji so na spletu na {termsUrl}",
   "mail.M2.subject": "Vaše potrdilo Dialectical Engine za {totalAmount}",

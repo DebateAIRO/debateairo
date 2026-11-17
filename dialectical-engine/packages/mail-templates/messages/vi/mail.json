@@ -10,7 +10,7 @@
   "mail.M1.active": "Xin cảm ơn. Gói {plan} của quý vị hiện đã được kích hoạt.",
   "mail.M1.price": "Quý vị trả {totalAmount} mỗi tháng, đã bao gồm thuế. Gói sẽ được gia hạn vào {renewDate} và sau đó hằng tháng cho đến khi quý vị hủy.",
   "mail.M1.cancel": "Quý vị có thể hủy bất cứ lúc nào trong Cài đặt, hoặc không cần đăng nhập trên trang này: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Nếu quý vị sống ở EU, EEA hoặc Vương quốc Anh, quý vị có thể rút lại trong vòng {withdrawalDays} ngày. Khi đó quý vị chỉ trả cho phần đã dùng: phần lớn hơn giữa số ngày đã dùng hoặc tín dụng đã dùng. Mẫu đơn rút lại được đính kèm trong email này.",
+  "mail.M1.withdrawal": "Dù quý vị sống ở đâu, quý vị cũng có thể rút lại trong vòng {withdrawalDays} ngày. Khi đó quý vị chỉ trả cho phần tín dụng của gói mà quý vị đã dùng; nếu chưa dùng gì, quý vị được hoàn lại toàn bộ giá. Mẫu đơn rút lại được đính kèm trong email này.",
   "mail.M1.termsAttached": "Điều khoản mà quý vị đã chấp nhận được đính kèm. Phiên bản mới nhất luôn có tại {termsUrl}",
   "mail.M1.termsCurrent": "Điều khoản hiện hành của chúng tôi có trực tuyến tại {termsUrl}",
   "mail.M2.subject": "Biên lai Dialectical Engine của quý vị cho {totalAmount}",
