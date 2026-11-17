@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ContractHttpError, savedQuestionDocFits, type ContractClient, type SavedQuestionDoc } from "@debateai/contract";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import {
+  ContractHttpError, savedQuestionDocFits, type ContractClient, type SavedQuestionDoc, type SavedQuestionSummary
+} from "@debateai/contract";
+import { DIG_UNDO_MS } from "./digUndo.js";
 import { SAVE_PAUSE_MS } from "./savedQuestion.js";
 
 /*
@@ -244,4 +247,83 @@ export function useSavedQuestion(input: Readonly<{
   }, [send, clearTimer]);
 
   return { state, stopped, flush };
+}
+
+/** Task 76f: a saved question the account no longer holds (deleted, started, or its key gone) answers 404. */
+export function savedQuestionGone(error: unknown): boolean {
+  return error instanceof ContractHttpError && error.status === 404;
+}
+
+/** A delete waiting out its Undo window in the shared Undo note, then (`sent`) its answer. */
+export type WaitingDelete = Readonly<{ item: SavedQuestionSummary; sendsAt: number; sent: boolean }>;
+
+/**
+ * Task 76f (spec §3.6): Delete under "Not started yet", for the ask page and "My questions" alike. The line leaves the list at
+ * once (the page leaves out every `waiting` item) and the shared Undo note shows for DIG_UNDO_MS; then one DELETE. Undo before it
+ * brings the line back and sends nothing; leaving the page meanwhile sends nothing. A DELETE that fails brings the line back
+ * (nothing is tried again by itself); one that lands, or answers gone, takes it out of the page's list (`onGone`). After Undo
+ * focus goes to the line's Delete inside `lines`, where it was before the note took it.
+ */
+export function useSavedDeletes(input: Readonly<{
+  client: Pick<ContractClient, "deleteSavedQuestion">;
+  /** The account no longer holds this question: the page takes it out of the list it read. */
+  onGone(id: string): void;
+  /** The part of the page that holds "Not started yet". */
+  lines: RefObject<HTMLElement | null>;
+}>): Readonly<{ waiting: readonly WaitingDelete[]; deleteSaved(item: SavedQuestionSummary): void; undoDelete(id: string): void }> {
+  const latest = useRef(input);
+  latest.current = input;
+  const [waiting, setWaiting] = useState<readonly WaitingDelete[]>([]);
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    const held = timers.current;
+    return () => {
+      alive.current = false;
+      for (const timer of held.values()) clearTimeout(timer);
+      held.clear();
+    };
+  }, []);
+  const focusAfterUndo = useRef<string | null>(null);
+
+  function deleteSaved(item: SavedQuestionSummary): void {
+    if (waiting.some((one) => one.item.id === item.id)) return;
+    setWaiting((now) => [...now, { item, sendsAt: Date.now() + DIG_UNDO_MS, sent: false }]);
+    timers.current.set(item.id, setTimeout(() => {
+      timers.current.delete(item.id);
+      setWaiting((now) => now.map((one) => one.item.id === item.id ? { ...one, sent: true } : one));
+      void (async () => {
+        let gone = true;
+        try {
+          await latest.current.client.deleteSavedQuestion(item.id);
+        } catch (error) {
+          gone = savedQuestionGone(error);
+        }
+        if (!alive.current) return;
+        if (gone) latest.current.onGone(item.id);
+        setWaiting((now) => now.filter((one) => one.item.id !== item.id));
+      })();
+    }, DIG_UNDO_MS));
+  }
+
+  function undoDelete(id: string): void {
+    const timer = timers.current.get(id);
+    if (timer === undefined) return;
+    clearTimeout(timer);
+    timers.current.delete(id);
+    focusAfterUndo.current = id;
+    setWaiting((now) => now.filter((one) => one.item.id !== id));
+  }
+
+  // After Undo the line is back; focus goes to its Delete, where it was before the note took it.
+  useEffect(() => {
+    const id = focusAfterUndo.current;
+    if (id === null) return;
+    focusAfterUndo.current = null;
+    const line = [...(latest.current.lines.current?.querySelectorAll<HTMLElement>(".v4NotStartedItem") ?? [])].find((one) => one.dataset.savedId === id);
+    line?.querySelector<HTMLElement>(".v4NotStartedDelete")?.focus();
+  }, [waiting]);
+
+  return { waiting, deleteSaved, undoDelete };
 }

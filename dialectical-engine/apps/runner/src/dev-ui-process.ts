@@ -62,7 +62,7 @@ function isExactSessionDenial(response: HttpProbe): boolean {
 function isExactUiReadiness(response: DevelopmentUiProbe): boolean {
   return response.login.statusCode === 200
     && response.login.contentType.toLowerCase().startsWith("text/html")
-    && response.login.body.includes("Back to the graph.")
+    && response.login.body.includes("Use a passkey, or your password and authenticator.")
     && isExactSessionDenial(response.session);
 }
 

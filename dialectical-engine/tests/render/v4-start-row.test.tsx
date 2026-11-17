@@ -7,7 +7,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StartStepRoomSchema, type StartStepRoom } from "../../packages/contract/src/index.js";
 
-import { V4StartCombineBar } from "../../apps/ui/components/v4/V4StartCombineBar.js";
+import { startCombineFrees, V4StartCombineBar } from "../../apps/ui/components/v4/V4StartCombineBar.js";
 import { V4StartList, type StartPlanProps } from "../../apps/ui/components/v4/V4StartRow.js";
 import { startShareChange } from "../../apps/ui/lib/v4/money.js";
 import {
@@ -17,9 +17,12 @@ import { NUCLEAR_MENU } from "../support/v4-start-menu.js";
 
 /*
  * V4 start step, Task 72 (choose-d3, choose-f6, choose-f7, choose-d4, chat-quota-word-on-choosing-card; spec 2026-11-03 §2
- * item 5 and its keyboard paragraph): the path rows the person shapes before Start. Clean rows with no tick box: a number,
- * the title and question (the AIs' words marked as AI text), the viewpoint chips, the tag, Rewrite and ⋯. One tab stop per
- * row; the arrows move between rows and into the chips; Enter opens ⋯ and Escape brings focus back. "Combine with…" in ⋯
+ * item 5 and its keyboard paragraph): the path rows the person shapes before Start. Clean rows: a number,
+ * the title and question (the AIs' words marked as AI text), the viewpoint chips, the tag, Rewrite and ⋯. Design Document v2
+ * (16b), which replaces the earlier "no tick box": each row of the choosing card starts with a tick box, "tick two to combine
+ * them"; the boxes are the plan's one selection, the same that "Combine with…" picks into, and two ticked show the combine
+ * line's Combine and Keep apart. Two tab stops per row (the box, the row's button);
+ * the arrows move between rows and into the chips; Enter opens ⋯ and Escape brings focus back. "Combine with…" in ⋯
  * picks the path, the combine line says what combining frees (the true share after it, owner answer Q7), and the next row
  * pressed is combined with it. A path holds any number of viewpoints and at most four of the person's own points (owner
  * answer "Four per path" A, 5 Nov; Task 92c). On a phone the title takes the whole row and Rewrite lives only in ⋯.
@@ -44,7 +47,7 @@ let latest: PathPlan | null = null;
 let fromOutside: ((action: PathPlanAction) => void) | null = null;
 
 /** The hook's part, stood in: the plan in state, dispatch through the real model, the combine share from Task 69. */
-function Holder({ initial, narrow }: Readonly<{ initial: PathPlan; narrow: boolean }>) {
+function Holder({ initial, narrow, ticks }: Readonly<{ initial: PathPlan; narrow: boolean; ticks: boolean }>) {
   const [plan, setPlan] = useState(initial);
   const now = useRef(initial);
   const dispatch = (action: PathPlanAction): PathPlanRefusal | null => {
@@ -63,7 +66,9 @@ function Holder({ initial, narrow }: Readonly<{ initial: PathPlan; narrow: boole
   };
   const props: StartPlanProps = {
     plan, catalog: CATALOG, locale: "en", dispatch, onRefusal,
-    share: startShareChange(PLUS, plan.paths.length, plan.paths.length - 1), narrow
+    share: startShareChange(PLUS, plan.paths.length, plan.paths.length - startCombineFrees(plan)), narrow,
+    // The choosing card's rows have tick boxes; a dig's rows (no `ticks`) have none.
+    ...(ticks ? { ticks: true } : {})
   };
   return (
     <>
@@ -86,13 +91,13 @@ function stubMotion(): void {
   });
 }
 
-async function mount(initial: PathPlan = pathPlanFromMenu(NUCLEAR_MENU, 5, false), narrow = false): Promise<HTMLDivElement> {
+async function mount(initial: PathPlan = pathPlanFromMenu(NUCLEAR_MENU, 5, false), narrow = false, ticks = true): Promise<HTMLDivElement> {
   stubMotion();
   latest = initial;
   host = document.createElement("div");
   document.body.append(host);
   root = createRoot(host);
-  await act(async () => root!.render(<Holder initial={initial} narrow={narrow} />));
+  await act(async () => root!.render(<Holder initial={initial} narrow={narrow} ticks={ticks} />));
   return host;
 }
 
@@ -134,6 +139,10 @@ const label = (element: Element): string => element.getAttribute("aria-label") ?
 const pageButtons = (name: string, within: ParentNode = host!): HTMLButtonElement[] =>
   [...within.querySelectorAll<HTMLButtonElement>("button")].filter((one) => one.closest('[role="menu"]') === null && one.textContent?.trim() === name);
 const combineBar = (): HTMLElement | null => host!.querySelector<HTMLElement>(".v4StartCombineBar");
+/** Every tick box on the page (a native one, or anything with its role), and one row's. */
+const boxes = (): HTMLInputElement[] => [...host!.querySelectorAll<HTMLInputElement>('[role="checkbox"], input[type="checkbox"]')];
+const box = (n: number): HTMLInputElement => row(n).querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+const ticked = (): number[] => rows().flatMap((one, at) => one.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked === true ? [at + 1] : []);
 const keyDown = async (element: Element, key: string): Promise<void> => {
   await act(async () => { element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true })); });
 };
@@ -160,7 +169,7 @@ const tabStops = (within: Element): HTMLElement[] =>
   [...within.querySelectorAll<HTMLElement>("button, input, textarea, select, a[href], [tabindex]")]
     .filter((one) => one.tabIndex >= 0 && !one.hasAttribute("disabled"));
 
-describe("clean rows: number, words, chips and tag; no tick box", () => {
+describe("clean rows: a tick box, number, words, chips and tag", () => {
   it("five rows; path 3 holds its two chips and 'put together by us · Split'; the AIs' words are marked; no 'raised by'", async () => {
     await mount();
     expect(rows()).toHaveLength(5);
@@ -181,7 +190,10 @@ describe("clean rows: number, words, chips and tag; no tick box", () => {
     expect(row(1).textContent).not.toContain("together");
     expect(row(1).querySelector(".v4StartRowTag")).toBeNull();
     expect(text()).not.toMatch(/raised by/iu);
-    expect(host!.querySelectorAll('[role="checkbox"], input[type="checkbox"]')).toHaveLength(0);
+    // Design Document v2 (16b): one tick box per row, the first thing in it, none ticked.
+    expect(boxes()).toHaveLength(5);
+    for (const [at, one] of rows().entries()) expect(one.querySelector("input, button"), `row ${at + 1}`).toBe(box(at + 1));
+    expect(ticked()).toEqual([]);
     expect(text()).not.toMatch(/allowance/iu);
   });
 
@@ -213,9 +225,9 @@ describe("keyboard and screen reader", () => {
     expect(label(row(3).querySelector(".v4StartRowMore")!)).toBe("More for path 3");
   });
 
-  it("one tab stop per path, the row's button; the arrows move between rows and into and out of the chips", async () => {
+  it("two tab stops per path, its tick box and the row's button; the arrows move between rows and into and out of the chips", async () => {
     await mount();
-    for (const [at, one] of rows().entries()) expect(tabStops(one), `row ${at + 1}`).toEqual([rowButton(at + 1)]);
+    for (const [at, one] of rows().entries()) expect(tabStops(one), `row ${at + 1}`).toEqual([box(at + 1), rowButton(at + 1)]);
     await focus(rowButton(1));
     await keyDown(rowButton(1), "ArrowDown");
     expect(document.activeElement).toBe(rowButton(2));
@@ -309,6 +321,8 @@ describe("keyboard and screen reader", () => {
     expect(rows()).toHaveLength(1);
     await openMenu(1);
     expect(menuItems()).toEqual(["Rewrite", "Move up", "Move down", "Remove"]);
+    // With one path there is nothing to combine with: no "Combine with…", and its tick box is greyed.
+    expect(box(1).disabled).toBe(true);
     await press(menuItem("Remove"));
     expect(onRefusal).toHaveBeenCalledWith("LAST_PATH", { type: "REMOVE", key: "kp01" });
     expect(rows()).toHaveLength(1);
@@ -322,7 +336,7 @@ describe("Combine with… (choose-d3, choose-f7, owner answer Q7)", () => {
     expect(combineBar()).toBeNull();
     await openMenu(1);
     await press(menuItem("Combine with…"));
-    expect(actions).toEqual([{ type: "SELECT", key: "kp01" }]);
+    expect(actions).toEqual([{ type: "SELECT", key: "kp01", picking: true }]);
     expect(label(rowButton(1))).toMatch(/picked to combine$/u);
     expect(label(rowButton(1))).toBe("Path 1 of 5, Whole-system costs, 1 viewpoint, picked to combine");
     expect(label(rowButton(2))).toBe("Path 2 of 5, Keeping the lights on in a calm winter week, 1 viewpoint, not selected, press to combine with it");
@@ -333,7 +347,8 @@ describe("Combine with… (choose-d3, choose-f7, owner answer Q7)", () => {
     expect(combineBar()!.querySelector(".v4ShareChange")?.textContent).toBe("−3%");
     expect(text()).not.toMatch(/stays/iu);
     expect(text()).not.toMatch(/allowance/iu);
-    expect(host!.querySelectorAll('[role="checkbox"], input[type="checkbox"]')).toHaveLength(0);
+    // The picked path's box is the one ticked: the boxes and "Combine with…" are one selection.
+    expect(ticked()).toEqual([1]);
     actions = [];
     await focus(rowButton(2));
     await keyDown(rowButton(2), "Enter");
@@ -344,6 +359,7 @@ describe("Combine with… (choose-d3, choose-f7, owner answer Q7)", () => {
     expect(row(1).textContent).toContain("Writing one question that covers them…");
     expect(row(1).textContent).toContain("2 viewpoints together:");
     expect(combineBar()).toBeNull();
+    expect(ticked()).toEqual([]);
     expect(document.activeElement).toBe(rowButton(1));
     expect(onRefusal).not.toHaveBeenCalled();
   });
@@ -414,6 +430,260 @@ describe("Combine with… (choose-d3, choose-f7, owner answer Q7)", () => {
     expect(row(3).classList.contains("v4StartRow--snap")).toBe(true);
     expect(row(4).classList.contains("v4StartRow--snap")).toBe(true);
     expect(row(2).classList.contains("v4StartRow--snap")).toBe(false);
+  });
+});
+
+describe("tick two to combine them (Design Document v2, 16b)", () => {
+  it("each box says which path it ticks; ticking one picks the path and gives its row the brand edge, with no line yet", async () => {
+    await mount();
+    expect(boxes().map(label)).toEqual([
+      "Pick path 1 to combine: Whole-system costs",
+      "Pick path 2 to combine: Keeping the lights on in a calm winter week",
+      "Pick path 3 to combine: Security and weapons risks",
+      "Pick path 4 to combine: Using less power first",
+      "Pick path 5 to combine: Unproven designs and risk"
+    ]);
+    expect(boxes().every((one) => !one.disabled)).toBe(true);
+    await press(box(2));
+    expect(actions).toEqual([{ type: "SELECT", key: "kp02" }]);
+    expect(latest!.selected).toEqual(["kp02"]);
+    expect(ticked()).toEqual([2]);
+    expect(rows().map((one) => one.classList.contains("v4StartRow--picked"))).toEqual([false, true, false, false, false]);
+    // The row's own name and menu are as they were; its state says it is picked.
+    expect(label(rowButton(2))).toBe("Path 2 of 5, Keeping the lights on in a calm winter week, 1 viewpoint, picked to combine");
+    // One box ticked is only a tick, as the design draws it: no line, and the other rows keep their own press.
+    expect(combineBar()).toBeNull();
+    expect(label(rowButton(1))).toBe("Path 1 of 5, Whole-system costs, 1 viewpoint, not selected");
+    // Unticking lets it go.
+    await press(box(2));
+    expect(actions.at(-1)).toEqual({ type: "UNSELECT", key: "kp02" });
+    expect(latest!.selected).toEqual([]);
+    expect(ticked()).toEqual([]);
+    expect(combineBar()).toBeNull();
+    expect(label(rowButton(1))).toBe("Path 1 of 5, Whole-system costs, 1 viewpoint, not selected");
+    expect(latest!.paths.map((one) => one.key)).toEqual(["kp01", "kp02", "kp03", "kp04", "kp05"]);
+  });
+
+  it("two ticked: '2 picked · Combining frees 1 path (about 3% of today).' with Combine and Keep apart; the rows press as usual", async () => {
+    await mount();
+    await press(box(1));
+    await press(box(4));
+    expect(latest!.selected).toEqual(["kp01", "kp04"]);
+    expect(ticked()).toEqual([1, 4]);
+    expect(rows().map((one) => one.classList.contains("v4StartRow--picked"))).toEqual([true, false, false, true, false]);
+    const bar = combineBar()!;
+    expect(bar.querySelector(".v4StartCombineBarLine")?.textContent).toBe("2 picked · Combining frees 1 path (about 3% of today).");
+    expect(bar.querySelector(".v4StartCombineBarLine b")?.textContent).toBe("2 picked");
+    // The design's sentence names what combining frees; the grey "−3%" belongs to the "Combine with…" line.
+    expect(bar.querySelector(".v4ShareChange")).toBeNull();
+    expect([...bar.querySelectorAll("button")].map((one) => one.textContent)).toEqual(["Combine", "Keep apart"]);
+    expect(bar.textContent).not.toContain("Pick a path");
+    expect(text()).not.toMatch(/allowance|stays/iu);
+    // No row is "press to combine with it" now: a press on a row opens its ⋯, and combines nothing.
+    expect(rows().some((one) => one.classList.contains("v4StartRow--pickable"))).toBe(false);
+    expect(label(rowButton(2))).toBe("Path 2 of 5, Keeping the lights on in a calm winter week, 1 viewpoint, not selected");
+    actions = [];
+    await press(rowButton(2));
+    expect(label(menu()!)).toBe("More for path 2");
+    await press(row(3).querySelector<HTMLElement>(".v4StartRowQuestion")!);
+    expect(actions).toEqual([]);
+    expect(rows()).toHaveLength(5);
+  });
+
+  it("Combine combines the two, unticks them and puts focus on the combined path", async () => {
+    await mount();
+    await press(box(2));
+    await press(box(4));
+    actions = [];
+    await focus(pageButtons("Combine", combineBar()!)[0]!);
+    await press(pageButtons("Combine", combineBar()!)[0]!);
+    expect(actions).toEqual([{ type: "COMBINE_SELECTED" }]);
+    expect(onRefusal).not.toHaveBeenCalled();
+    expect(latest!.selected).toEqual([]);
+    expect(latest!.paths.map((one) => one.wording)).toEqual(["AI", "WRITING", "AI", "AI"]);
+    expect(rows()).toHaveLength(4);
+    expect(row(2).textContent).toContain("Writing one question that covers them…");
+    expect(row(2).textContent).toContain("2 viewpoints together:");
+    expect(ticked()).toEqual([]);
+    expect(combineBar()).toBeNull();
+    expect(document.activeElement).toBe(rowButton(2));
+  });
+
+  it("Keep apart unticks them and combines nothing; so does Escape on the line or on a box", async () => {
+    await mount();
+    const before = latest!.paths;
+    await press(box(1));
+    await press(box(2));
+    actions = [];
+    await press(pageButtons("Keep apart", combineBar()!)[0]!);
+    expect(actions).toEqual([{ type: "CLEAR_SELECTION" }]);
+    expect(latest!.selected).toEqual([]);
+    expect(latest!.paths).toBe(before);
+    expect(ticked()).toEqual([]);
+    expect(combineBar()).toBeNull();
+    expect(document.activeElement).toBe(rowButton(1));
+    await press(box(3));
+    await press(box(5));
+    actions = [];
+    await keyDown(pageButtons("Combine", combineBar()!)[0]!, "Escape");
+    expect(actions).toEqual([{ type: "CLEAR_SELECTION" }]);
+    expect(ticked()).toEqual([]);
+    await press(box(3));
+    await press(box(5));
+    actions = [];
+    await focus(box(5));
+    await keyDown(box(5), "Escape");
+    expect(actions).toEqual([{ type: "CLEAR_SELECTION" }]);
+    expect(ticked()).toEqual([]);
+    expect(latest!.paths).toBe(before);
+    expect(document.activeElement).toBe(rowButton(1));
+    // With nothing ticked, Escape on a box sends nothing.
+    actions = [];
+    await keyDown(box(5), "Escape");
+    expect(actions).toEqual([]);
+  });
+
+  it("the boxes and 'Combine with…' are one selection: ⋯ picks its path alone, and a box ticked first is combined by a row's press", async () => {
+    await mount();
+    // Two ticked, then "Combine with…" on a third: that path alone is picked, and the line asks for the other one.
+    await press(box(1));
+    await press(box(2));
+    await openMenu(4);
+    await press(menuItem("Combine with…"));
+    expect(latest!.selected).toEqual(["kp04"]);
+    expect(ticked()).toEqual([4]);
+    expect(combineBar()!.textContent).toContain("Combine “Using less power first” with… Pick a path.");
+    expect(pageButtons("Combine", combineBar()!)).toEqual([]);
+    // Ticking a second box there shows Combine and Keep apart; unticking it goes back to "Pick a path".
+    await press(box(5));
+    expect(ticked()).toEqual([4, 5]);
+    expect(combineBar()!.querySelector(".v4StartCombineBarLine")?.textContent).toBe("2 picked · Combining frees 1 path (about 3% of today).");
+    await press(box(5));
+    expect(ticked()).toEqual([4]);
+    expect(combineBar()!.textContent).toContain("Pick a path.");
+    // A box ticked, then another row pressed: combined with it, as after "Combine with…".
+    actions = [];
+    await focus(rowButton(1));
+    await keyDown(rowButton(1), "Enter");
+    expect(actions).toEqual([{ type: "SELECT", key: "kp01" }, { type: "COMBINE_SELECTED" }]);
+    expect(latest!.selected).toEqual([]);
+    expect(rows()).toHaveLength(4);
+    expect(ticked()).toEqual([]);
+    expect(combineBar()).toBeNull();
+  });
+
+  it("while one path is picked, a tap on another row's box ticks that box and does not combine", async () => {
+    await mount();
+    await openMenu(1);
+    await press(menuItem("Combine with…"));
+    actions = [];
+    await press(box(3));
+    expect(actions).toEqual([{ type: "SELECT", key: "kp03" }]);
+    expect(rows()).toHaveLength(5);
+    expect(ticked()).toEqual([1, 3]);
+    // The press area around the box is the box's, too.
+    await press(box(3).closest("label")!);
+    expect(actions.at(-1)).toEqual({ type: "UNSELECT", key: "kp03" });
+    expect(rows()).toHaveLength(5);
+  });
+
+  it("the keyboard: Tab reaches the box, Space ticks it, and the row's own keys are as they were", async () => {
+    await mount();
+    // A native tick box in the tab order, right before its row's button.
+    expect(box(2).tagName).toBe("INPUT");
+    expect(box(2).type).toBe("checkbox");
+    expect(box(2).tabIndex).toBe(0);
+    await focus(box(2));
+    expect(document.activeElement).toBe(box(2));
+    // Space is left to the browser (nothing here takes the key), whose own press of a tick box is a click (jsdom makes no click from a key).
+    const space = new KeyboardEvent("keydown", { key: " ", bubbles: true, cancelable: true });
+    await act(async () => { box(2).dispatchEvent(space); });
+    expect(space.defaultPrevented).toBe(false);
+    expect(actions).toEqual([]);
+    await press(box(2));
+    expect(ticked()).toEqual([2]);
+    expect(document.activeElement).toBe(box(2));
+    // The arrows on a box move nothing (they are the row button's keys).
+    await keyDown(box(2), "ArrowDown");
+    expect(document.activeElement).toBe(box(2));
+    await press(box(2));
+    // The row's keys: the arrows between rows, Enter and Space open ⋯ (Space on a row never ticks its path).
+    actions = [];
+    await focus(rowButton(2));
+    await keyDown(rowButton(2), "ArrowDown");
+    expect(document.activeElement).toBe(rowButton(3));
+    await keyDown(rowButton(3), " ");
+    expect(label(menu()!)).toBe("More for path 3");
+    expect(actions).toEqual([]);
+    expect(ticked()).toEqual([]);
+    await keyDown(menu()!, "Escape");
+    expect(document.activeElement).toBe(rowButton(3));
+  });
+
+  it("a third tick takes the line away, as the design draws it for exactly two; unticking one brings it back", async () => {
+    await mount();
+    await press(box(1));
+    await press(box(2));
+    expect(combineBar()).not.toBeNull();
+    await press(box(5));
+    expect(ticked()).toEqual([1, 2, 5]);
+    expect(combineBar()).toBeNull();
+    expect(rows()).toHaveLength(5);
+    await press(box(5));
+    expect(ticked()).toEqual([1, 2]);
+    expect(combineBar()!.querySelector(".v4StartCombineBarLine b")?.textContent).toBe("2 picked");
+  });
+
+  it("a refused Combine is reported with its action, nothing changes and the two stay ticked", async () => {
+    const own = (words: string) => (plan: PathPlan): PathPlanAction => ({ type: "ADD_OWN", text: words, intoPathKey: plan.paths[0]!.key });
+    const plan = planAfter(pathPlanFromMenu(NUCLEAR_MENU, 5, false),
+      own("Own point one"), own("Own point two"), own("Own point three"), own("Own point four"),
+      { type: "ADD_OWN", text: "Own point five", intoPathKey: "kp02" });
+    await mount(plan);
+    await press(box(1));
+    await press(box(2));
+    const picked = latest!.selected;
+    actions = [];
+    await press(pageButtons("Combine", combineBar()!)[0]!);
+    expect(actions).toEqual([{ type: "COMBINE_SELECTED" }]);
+    expect(onRefusal).toHaveBeenCalledWith("OWN_WORDS_FULL", { type: "COMBINE_SELECTED" });
+    expect(latest!.paths).toBe(plan.paths);
+    expect(latest!.selected).toEqual(picked);
+    expect(ticked()).toEqual([1, 2]);
+    expect(pageButtons("Keep apart", combineBar()!)).toHaveLength(1);
+  });
+
+  it("with no share the line says the count alone", async () => {
+    stubMotion();
+    host = document.createElement("div");
+    document.body.append(host);
+    root = createRoot(host);
+    const plan = planAfter(pathPlanFromMenu(NUCLEAR_MENU, 5, false), { type: "SELECT", key: "kp01" }, { type: "SELECT", key: "kp02" });
+    await act(async () => root!.render(
+      <V4StartCombineBar plan={plan} catalog={CATALOG} locale="en" dispatch={() => null} onRefusal={onRefusal} share={null} narrow={false} />
+    ));
+    expect(combineBar()!.querySelector(".v4StartCombineBarLine")?.textContent).toBe("2 picked");
+  });
+
+  it("startCombineFrees: one path for 'Combine with…', one less than the paths ticked after that", () => {
+    const menuPlan = pathPlanFromMenu(NUCLEAR_MENU, 5, false);
+    const pick = (...keys: string[]): PathPlan => keys.reduce<PathPlan>((plan, key) => pathPlanReduce(plan, { type: "SELECT", key }).plan, menuPlan);
+    expect(startCombineFrees(menuPlan)).toBe(1);
+    expect(startCombineFrees(pick("kp01"))).toBe(1);
+    expect(startCombineFrees(pick("kp01", "kp03"))).toBe(1);
+    expect(startCombineFrees(pick("kp01", "kp03", "kp05"))).toBe(2);
+  });
+
+  it("without `ticks` (a dig's rows) there is no box, and 'Combine with…' works as before", async () => {
+    await mount(pathPlanFromMenu(NUCLEAR_MENU, 5, false), false, false);
+    expect(boxes()).toEqual([]);
+    for (const [at, one] of rows().entries()) expect(tabStops(one), `row ${at + 1}`).toEqual([rowButton(at + 1)]);
+    await openMenu(1);
+    await press(menuItem("Combine with…"));
+    expect(boxes()).toEqual([]);
+    expect(row(1).classList.contains("v4StartRow--picked")).toBe(true);
+    await press(rowButton(2));
+    expect(rows()).toHaveLength(4);
   });
 });
 
@@ -567,7 +837,7 @@ describe("Rewrite, then 'Rewrite it for me / Keep my wording'", () => {
     expect(row(2).querySelector(".v4StartRewrite")).toBeNull();
     expect(document.activeElement).toBe(rowButton(2));
     await press(pageButtons("Rewrite", row(3))[0]!);
-    await keyDown(row(3).querySelector("input")!, "Escape");
+    await keyDown(row(3).querySelector(".v4StartRewrite input")!, "Escape");
     expect(row(3).querySelector(".v4StartRewrite")).toBeNull();
     expect(document.activeElement).toBe(rowButton(3));
   });
@@ -580,6 +850,8 @@ describe("on a phone (choose-f6)", () => {
     for (const one of rows()) expect(one.querySelector(".v4StartRowTitle")?.classList.contains("v4StartRowTitle--full")).toBe(true);
     await openMenu(1);
     expect(menuItems()[0]).toBe("Rewrite");
+    // Each row keeps its tick box, before its words.
+    expect(boxes()).toHaveLength(5);
     // No drag grip on a phone, and none here at all (Task 77 adds the mouse's drag).
     expect(host!.querySelector('[draggable="true"]')).toBeNull();
   });
@@ -598,6 +870,7 @@ describe("words and styles", () => {
       "v4.start.row.notSelected": "not selected",
       "v4.start.row.picked": "picked to combine",
       "v4.start.row.more": "More for path {n}",
+      "v4.start.row.tick": "Pick path {n} to combine: {title}",
       "v4.start.chip.a11y": "Viewpoint {n} of {count} in path {path}, {title}, {state}",
       "v4.start.tag.PUT_TOGETHER_BY_US": "put together by us",
       "v4.start.tag.COMBINED_BY_YOU": "combined by you",
@@ -610,7 +883,10 @@ describe("words and styles", () => {
       "v4.start.reword.keep": "Keep my wording",
       "v4.start.rewrite.title": "Title",
       "v4.start.rewrite.wording": "Your wording for path {n}",
-      "v4.start.combineWith.pick": "Combine “{title}” with… Pick a path."
+      "v4.start.combineWith.pick": "Combine “{title}” with… Pick a path.",
+      "v4.start.combinePicked": "{count} picked",
+      "v4.start.suggest.combineButton": "Combine",
+      "v4.start.suggest.keepApart": "Keep apart"
     };
     expect(Object.fromEntries(Object.keys(words).map((key) => [key, CATALOG[key]]))).toEqual(words);
     const rowKeys = Object.keys(CATALOG).filter((key) => /^v4\.start\.(?:row|tag|menu|chip|chipMenu|rewrite|reword|combineWith)\.|^v4\.start\.writing$/u.test(key));
@@ -628,6 +904,14 @@ describe("words and styles", () => {
     expect(block).toMatch(/\.v4StartRow--snap\s*\{[^}]*var\(--v4-move-snap\)/u);
     expect(block).toMatch(/\.v4StartChips\s*\{[^}]*flex-wrap: wrap/u);
     expect(block).not.toMatch(/(?:^|[\s;{])(?:left|right)\s*:|-(?:left|right)\b|text-align:\s*(?:left|right)|float:|dashed/mu);
+    // Design Document v2 (16b): the tick box is the browser's own, 22 px square in the brand colour, inside a 44 px press area;
+    // a ticked row has the brand edge and shadow; the two-ticked line's Combine is filled with the surface colour.
+    expect(block).toMatch(/\.v4StartRowTick input\s*\{[^}]*inline-size: 22px; block-size: 22px;[^}]*accent-color: var\(--brand\)/u);
+    expect(block).toMatch(/\.v4StartRowTick\s*\{[^}]*inline-size: 44px; min-block-size: 44px;/u);
+    expect(block).toMatch(/\.v4StartRow--picked\s*\{\s*border-color: var\(--brand\); box-shadow: 0 3px 0 var\(--brand\);/u);
+    expect(block).toMatch(/\.v4StartCombineBarGo\s*\{[^}]*border: 2px solid var\(--surface\); background: var\(--surface\); color: var\(--hard\);/u);
+    // Tokens only: no colour written out.
+    expect(block.replace(/\/\*[\s\S]*?\*\//gu, "")).not.toMatch(/#[0-9a-f]{3,8}\b|\brgba?\(|\bhsla?\(/iu);
     // Nothing is sized past a 44 px target in pixels, so the card fits a 320 px phone (Task 77's check, ahead of it).
     expect([...block.matchAll(/(\d+(?:\.\d+)?)px/gu)].map((match) => Number(match[1])).filter((value) => value > 44)).toEqual([]);
   });

@@ -391,6 +391,51 @@ describe("V4 mock API: the clarifying questions (Task 80)", () => {
     expect(reworded.questions.map((question) => question.text)).not.toContain("Over what time?");
     expect(reworded.cares).toEqual(first.cares);
   });
+
+  it("every AI reply says the question back in one sentence that fits its own questions (Design Document v2, 16b); #noread leaves it out", () => {
+    type Part = Readonly<{ text: string }> | Readonly<{ about: number | "purpose" | "cares"; phrases: readonly string[]; assumed: number }>;
+    const read = (line: string) => {
+      const reply = AskClarifyResponseSchema.parse(mock.mockClarify({ question_line: line }).body);
+      if (reply.source !== "AI") throw new Error("an AI reply");
+      const parts: readonly Part[] = reply.restatement?.parts ?? [];
+      const slots = parts.flatMap((part) => ("about" in part ? [part] : []));
+      const questionOf = (about: number | "purpose" | "cares") => about === "purpose" ? reply.purpose! : about === "cares" ? reply.cares! : reply.questions[about]!;
+      // The sentence as the page first shows it: each answer part by its assumed answer's words.
+      const sentence = parts.map((part) => ("about" in part ? part.phrases[part.assumed] : part.text)).join("");
+      return { reply, slots, questionOf, sentence };
+    };
+    const first = read(QUESTION);
+    expect(first.slots.map((slot) => slot.about)).toEqual([0, 1, "purpose", "cares"]);
+    for (const slot of first.slots) expect(slot.phrases).toHaveLength(first.questionOf(slot.about).answers.length);
+    expect(first.sentence).toBe(`You asked: “${QUESTION}” We read it as a question about any country, in general, looking at the next 25 years, `
+      + "asked so that you can explain it to someone, with the cost mattering most to you.");
+
+    // A scene's name is never quoted; each reply's sentence holds a part for each question it has, and no other.
+    const noPurpose = read(`${QUESTION} #nopurpose`);
+    expect(noPurpose.slots.map((slot) => slot.about)).toEqual([0, 1, "cares"]);
+    expect(noPurpose.sentence).not.toContain("#");
+    for (const slot of noPurpose.slots) expect(slot.phrases).toHaveLength(noPurpose.questionOf(slot.about).answers.length);
+    const purposeOnly = read(`${QUESTION} #purposeonly`);
+    expect(purposeOnly.slots.map((slot) => slot.about)).toEqual(["purpose"]);
+    expect(purposeOnly.sentence).toBe(`You asked: “${QUESTION}” We read it as asked so that you can explain it to someone.`);
+
+    // read-f1's reworded reading: "By when?" has two answers, so its part has two phrases.
+    const reworded = read("Should my town close its centre to cars on Sundays?");
+    const byWhen = reworded.slots.find((slot) => slot.about === 1)!;
+    expect(reworded.questionOf(1).text).toBe("By when?");
+    expect(byWhen.phrases).toEqual(["the next 5 years", "the next 25 years"]);
+
+    // A very long question is quoted cut, so every part of plain words stays within the contract's length.
+    const long = read(`Should the town ${"really ".repeat(200)}close its centre to cars?`);
+    expect(long.sentence).toContain("…” We read it as");
+
+    const noRead = read(`${QUESTION} #noread`);
+    expect(noRead.reply.restatement).toBeUndefined();
+    expect(noRead.reply.questions).toHaveLength(2);
+    expect(noRead.reply.cares?.text).toBe("What do you care about most?");
+    expect(mock.mockClarify({ question_line: `${QUESTION} #none` }).body).toEqual({ source: "NONE" });
+    expect(mock.mockClarify({ question_line: `${QUESTION} #fail` }).status).toBe(503);
+  });
 });
 
 describe("V4 mock API: server.ts serves the step (Task 80)", () => {

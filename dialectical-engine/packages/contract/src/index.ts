@@ -1362,7 +1362,10 @@ export const AccountEmailSchema = z.object({
   pending: z.object({
     new_email: EmailAddressSchema,
     expires_at: z.iso.datetime()
-  }).strict().nullable()
+  }).strict().nullable(),
+  // Design Document v2 (3a): the account's own pseudonym, the name the top bar's identity pill shows. Optional: a reply
+  // without it is still whole, and the bar then names the account by its generic word.
+  pseudonym: z.string().trim().min(1).max(128).optional()
 }).strict();
 export type AccountEmail = z.infer<typeof AccountEmailSchema>;
 export const EmailChangeRequestSchema = z.object({

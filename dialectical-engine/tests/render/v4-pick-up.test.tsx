@@ -248,7 +248,7 @@ async function settle(): Promise<void> {
   }
 }
 
-async function mount(): Promise<HTMLDivElement> {
+async function mount(pickUpId: string | null = null): Promise<HTMLDivElement> {
   host = document.createElement("div");
   document.body.append(host);
   watcher?.disconnect();
@@ -257,7 +257,7 @@ async function mount(): Promise<HTMLDivElement> {
   root = createRoot(host);
   await act(async () => root!.render(
     <V4AskClient catalog={CATALOG} homeCatalog={HOME} newDebateCatalog={NEW_DEBATE} billingCatalog={BILLING} locale="en"
-      crisisCountryHint={null} initialQuestion="" initialLevel="plain" />
+      crisisCountryHint={null} initialQuestion="" initialLevel="plain" pickUpId={pickUpId} />
   ));
   await settle();
   return host;
@@ -361,6 +361,28 @@ describe("Pick up: no AI call (owner card 'Where shown'; read-f23)", () => {
     expect(host!.querySelector(".v4StartBarWidths button[aria-pressed='true']")?.textContent).toBe("5 paths");
     expect(host!.querySelector(".v4AskMode button[aria-pressed='true']")?.textContent).toBe("Thorough");
     expect(host!.querySelector<HTMLInputElement>(".v4StartBarCarryOn input")!.checked).toBe(true);
+  });
+
+  it("a kept reading with its sentence (Design Document v2, 16b): the card says the question back, the kept answer drawn as the person's choice, no AI call", async () => {
+    const restated = { ...AI, restatement: { parts: [
+      { text: "You want to know how Romania keeps its power on " },
+      { about: 0, phrases: ["up to 2030", "up to 2050"], assumed: 0 },
+      { text: "." }
+    ] } } as const satisfies AskClarifyResponse;
+    keep(keptOf(shapedPlan(), { clarify: restated }));
+    await pickedUp();
+    noAiCall();
+    // The person's question heads the step and takes the focus; the card's title is the second heading.
+    expect(document.activeElement).toBe(host!.querySelector("h1.v4ReadAskedTitle"));
+    expect(host!.querySelector("h2.v4AskReadTitle")?.textContent).toBe(CATALOG["v4.read.title"]);
+    // The sentence is on screen where the box was, and its one stretch shows the answer the account kept, as her choice.
+    expect(host!.querySelector(".v4AskCard textarea")).toBeNull();
+    const stretches = [...host!.querySelectorAll<HTMLAnchorElement>(".v4ReadSentence a.v4ReadSlot")];
+    expect(stretches.map((stretch) => stretch.className)).toEqual(["v4ReadSlot v4ReadSlot--chosen"]);
+    expect(stretches[0]!.textContent).toBe("your choice: up to 2050");
+    expect(buttonNamed("Up to 2050.", host!)!.getAttribute("aria-pressed")).toBe("true");
+    expect(host!.querySelector(".v4ChipAssumed")).toBeNull();
+    expect(rows()).toHaveLength(5);
   });
 
   it("Start after Pick up sends the stored start_check and start_paths byte for byte, and the saved question's id", async () => {
@@ -522,6 +544,89 @@ describe("what Pick up can meet (spec §3.5, §3.10)", () => {
     expect(textCount(KEPT_LINE)).toBe(1);
     expect(window.history.state).toEqual({ __NA: true, tree: [1], v4ask: { step: "ask", words: Q } });
     noAiCall();
+  });
+});
+
+// Design Document v2 (18b): Pick up pressed on "My questions" arrives as `/v4?pickup=<id>` (app/v4/page.tsx hands the id on once
+// it reads as a saved question's). The ask page picks the question up once, as its own Pick up does, and the id leaves the address.
+describe("Pick up from My questions: /v4?pickup=<id>", () => {
+  const reads = (): number => accountCalls().filter((call) => call.method === "GET" && call.path === `${SAVED}/${PICKED}`).length;
+  const listReads = (): number => accountCalls().filter((call) => call.method === "GET" && call.path === SAVED).length;
+
+  it("opens step 2 as it was left with one read and no AI call; the address drops the id, and Back is step 1 at /v4", async () => {
+    keep();
+    window.history.replaceState({ __NA: true, tree: [1] }, "", `/v4?pickup=${PICKED}`);
+    await mount(PICKED);
+    await settle();
+    expect(onStepTwo()).toBe(true);
+    expect(reads()).toBe(1);
+    noAiCall();
+    expect(rows()).toHaveLength(5);
+    expect(box().value.endsWith("Until when? Up to 2050.")).toBe(true);
+    expect(window.history.state).toEqual({ __NA: true, tree: [1], v4ask: { step: "read", words: Q, savedId: PICKED } });
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/v4?step=2");
+    await browserBack();
+    expect(onStepTwo()).toBe(false);
+    expect(stepOneBox().value).toBe(Q);
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/v4");
+    expect(window.history.state).toEqual({ __NA: true, tree: [1], v4ask: { step: "ask", words: Q } });
+    // Once only: back on step 1 (the page's own Pick up is offered again) nothing is read by itself.
+    await settle();
+    expect(reads()).toBe(1);
+    noAiCall();
+  });
+
+  it("the id leaves the address as the read goes out, and another parameter of the address stays", async () => {
+    keep();
+    window.history.replaceState({ __NA: true, tree: [1] }, "", `/v4?level=expert&pickup=${PICKED}`);
+    let addressAtRead: string | null = null;
+    const fetchNow = net.fetch;
+    net.fetch = async (input, init) => {
+      if (new URL(String(input)).pathname === `${SAVED}/${PICKED}`) addressAtRead = `${window.location.pathname}${window.location.search}`;
+      return fetchNow(input, init);
+    };
+    try {
+      await mount(PICKED);
+      await settle();
+    } finally {
+      net.fetch = fetchNow;
+    }
+    expect(addressAtRead).toBe("/v4?level=expert");
+    expect(onStepTwo()).toBe(true);
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/v4?step=2&level=expert");
+  });
+
+  it("gone: step 1 stays, the list is read again, and the address no longer names it", async () => {
+    net.list = [];
+    window.history.replaceState({ __NA: true, tree: [1] }, "", `/v4?pickup=${PICKED}`);
+    await mount(PICKED);
+    await settle();
+    expect(onStepTwo()).toBe(false);
+    expect(reads()).toBe(1);
+    expect(listReads()).toBe(2);
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/v4");
+    expect(host!.querySelector(".v4NotStarted")).toBeNull();
+    noAiCall();
+  });
+
+  it("on a site with no start step (no Pick up is offered there) nothing is read and the address is left alone", async () => {
+    keep();
+    const { start_step: _step, ...withoutStep } = room();
+    server.roomAnswer = () => Promise.resolve(withoutStep);
+    window.history.replaceState({ __NA: true, tree: [1] }, "", `/v4?pickup=${PICKED}`);
+    await mount(PICKED);
+    await settle();
+    expect(onStepTwo()).toBe(false);
+    expect(accountCalls()).toEqual([]);
+    expect(window.location.search).toBe(`?pickup=${PICKED}`);
+  });
+
+  it("without the parameter (the id null) the page opens on step 1 and reads only the list", async () => {
+    keep();
+    await mount(null);
+    await settle();
+    expect(onStepTwo()).toBe(false);
+    expect(callNames(accountCalls())).toEqual([`GET ${SAVED}`]);
   });
 });
 

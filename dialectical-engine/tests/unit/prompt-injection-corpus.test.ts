@@ -3,7 +3,7 @@ import { Judge } from "@debateai/judgement";
 // V4 start step (Task 52): the path steps' hand-offs, each rendered by its shipped builder.
 import { framedJudgePromptForTest, type JudgeLeg } from "@debateai/judgement";
 // V4 start step (Task 76d, read-f1): the clarifying call's version 2 draft and its `earlier` field.
-import { ASK_CLARIFY_V2_DRAFT_CONTRACT, framedAskClarify } from "@debateai/judgement";
+import { ASK_CLARIFY_V2_DRAFT_CONTRACT, ASK_CLARIFY_V3_PROMPT_CONTRACT, framedAskClarify } from "@debateai/judgement";
 import {
   REPORT_ANSWER_V4_PROMPT_CONTRACT, STORY_PATHS_PROMPT_CONTRACT, storyContractForReader, storyContractInArgumentLanguage, storyPathsMaterial,
   type StoryPathsMaterialInput
@@ -995,12 +995,19 @@ const HAND_OFFS = [
     payloadIn: "views",
     render: (attack: string): readonly PromptPacket[] => [pathsMainAnswerPacket(attack)]
   },
-  // V4 start step (Task 76d, read-f1): the clarifying call's version 2 (a draft until Task 92 seals it) reads the questions it asked
+  // V4 start step (Task 76d, read-f1): the clarifying call's version 2 (never sealed by itself: version 3 holds its words) reads the questions it asked
   // of an earlier wording, with the person's answers. An answer typed under "Other…" is the person's own text, in a field of its own.
   {
     name: "ask:clarify.v2 (earlier — the person's earlier answers)",
     payloadIn: "earlier",
     render: (attack: string): readonly PromptPacket[] => [framedAskClarify(QUESTION, { contract: ASK_CLARIFY_V2_DRAFT_CONTRACT, earlier: {
+      questions: [{ text: "Over what time?", answers: ["The next 25 years", "Until 2030"] }], answers: [{ question: "Over what time?", answer: attack }] } })]
+  },
+  // Design Document v2 (16b): version 3 (sealed 17 Nov, the one the API asks with) reads the same field the same way.
+  {
+    name: "ask:clarify.v3 (earlier — the person's earlier answers)",
+    payloadIn: "earlier",
+    render: (attack: string): readonly PromptPacket[] => [framedAskClarify(QUESTION, { contract: ASK_CLARIFY_V3_PROMPT_CONTRACT, earlier: {
       questions: [{ text: "Over what time?", answers: ["The next 25 years", "Until 2030"] }], answers: [{ question: "Over what time?", answer: attack }] } })]
   }
 ] as const;
@@ -1078,7 +1085,8 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     // views (45 -> 46 and 33 -> 34, five paths: rows; views is no other row's payloadIn).
     // V4 start step (Task 76d, read-f1): 46 -> 47 and 34 -> 35, with the clarifying call's version 2 `earlier` (a new field name: the
     // person's answers to an earlier wording's questions, a typed "Other…" answer among them).
-    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(47);
+    // Design Document v2 (16b): 47 -> 48, the clarifying call's version 3 reading the same `earlier` (no new field name).
+    expect(HAND_OFFS.map(({ name }) => name)).toHaveLength(48);
     expect(new Set(HAND_OFFS.map(({ payloadIn }) => payloadIn)).size).toBe(35);
     // Every row's name says which lane it belongs to, so the count above cannot
     // be satisfied by three more copies of one lane.
@@ -1088,7 +1096,7 @@ describe("V-11 layer 4 — the injection corpus covers both languages and every 
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("map:"))).toHaveLength(7);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("start:"))).toHaveLength(5);
     expect(HAND_OFFS.filter(({ name }) => name.startsWith("paths:"))).toHaveLength(5);
-    expect(HAND_OFFS.filter(({ name }) => name.startsWith("ask:"))).toHaveLength(1);
+    expect(HAND_OFFS.filter(({ name }) => name.startsWith("ask:"))).toHaveLength(2);
   });
 
   /**

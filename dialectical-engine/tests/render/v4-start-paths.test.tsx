@@ -354,6 +354,41 @@ describe("the answers live in the question box (read-d3, chat-one-place-for-answ
   });
 });
 
+describe("tick two to combine them (Design Document v2, 16b)", () => {
+  it("the title's hint; two ticked put '2 picked' with Combine and Keep apart in the foot, above Start; Combine asks for one question", async () => {
+    await toStepTwo();
+    await toReady();
+    expect(host!.querySelector(".v4StartCardHint")?.textContent).toBe("5 paths · most important first · tick two to combine them");
+    const tick = (n: number): HTMLInputElement => rows()[n - 1]!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    const line = (): HTMLElement | null => host!.querySelector<HTMLElement>(".v4StartBar .v4StartCombineBar");
+    expect(rows().every((row) => row.querySelector('input[type="checkbox"]') !== null)).toBe(true);
+    expect(line()).toBeNull();
+    // One ticked is only a tick, as the design draws it: no line until a second is ticked.
+    await click(tick(1));
+    expect(line()).toBeNull();
+    await click(tick(2));
+    // This room's made-up shares: five paths about 12%, four about 10%.
+    expect(line()!.querySelector(".v4StartCombineBarLine")?.textContent).toBe("2 picked · Combining frees 1 path (about 2% of today).");
+    expect(line()!.compareDocumentPosition(startButton()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Keep apart: nothing asked, nothing ticked, five rows.
+    await click(buttonNamed("Keep apart", line()!)!);
+    expect(line()).toBeNull();
+    expect(rows().filter((row) => row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked)).toEqual([]);
+    expect(rows()).toHaveLength(5);
+    expect(server.combines).toHaveLength(0);
+    // Combine: one row being written, one combine asked, the ticks gone.
+    await click(tick(1));
+    await click(tick(2));
+    await click(buttonNamed("Combine", line()!)!);
+    expect(rows()).toHaveLength(4);
+    expect(server.combines).toHaveLength(1);
+    expect(line()).toBeNull();
+    expect(rows().filter((row) => row.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked)).toEqual([]);
+    expect(host!.querySelector(".v4StartCardHint")?.textContent).toBe("4 paths · most important first · tick two to combine them");
+    expect(document.activeElement).toBe(rows()[0]!.querySelector(".v4StartRowButton"));
+  });
+});
+
 describe("the questions' lines (r2-6, read-f5, read-f6, read-f8, choose-f15)", () => {
   it("clarify NONE: one calm status line, no heading, no Free line and no honest note", async () => {
     server.roomAnswer = () => Promise.resolve(FREE_ROOM);

@@ -7,6 +7,11 @@ import {
   type SavedQuestionStore
 } from "../../apps/api/src/saved-questions/store.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+// Design Document v2 (16b): the service over the real store (D13).
+import { SavedQuestionDocSchema, type AskClarifyResponse } from "@debateai/contract";
+import { MemorySavedQuestionKeyStore, generateDek } from "../../packages/crypto/src/index.js";
+import { createSavedQuestionService } from "../../apps/api/src/saved-questions/service.js";
+import { MemoryUserDekStore, newStartStepKey, savedDocOf, savedScopeOf, savedSigner } from "../support/saved-questions.js";
 
 /**
  * 0162 on real PostgreSQL (V4 start step, plan 2026-11-03 Task 39d; saved-questions spec 2026-11-04 §3.1, §3.14; owner answers S3 A, S4 A):
@@ -362,5 +367,42 @@ describe("0162 the store through the API's pool", () => {
     const limit = await store.list(full.ownerRef, 0).then(() => null, (error: unknown) => error);
     expect(limit).not.toBeInstanceOf(SavedQuestionAccountInvalidError);
     expect(limit).toMatchObject({ code: "22023", message: "SAVED_QUESTION_LIMIT_INVALID" });
+  });
+});
+
+describe("0162 a reading that says the question back (Design Document v2, 16b)", () => {
+  it("D13 the service over the real store: a clarifying reply saved with its restatement is read back as it was saved, and still READY", async () => {
+    const person = await account();
+    const key = newStartStepKey();
+    const users = new MemoryUserDekStore();
+    await users.store(person.userId, generateDek());
+    const service = createSavedQuestionService({ store, keys: new MemorySavedQuestionKeyStore(users), key, report: () => undefined });
+    const gate = { teamAdmits: true, consentGiven: async () => true, bindingOf: async () => ({ ownerScope: savedScopeOf(person), planKey: "premium" as const }) };
+    const clarify: AskClarifyResponse = {
+      source: "AI",
+      questions: [{ text: "Over what time?", answers: ["The next 25 years", "Until 2030"], sentences: ["I mean the next 25 years.", "I mean until 2030."] }],
+      purpose: { text: "What do you want the answer for?", answers: ["To vote on it", "To write about it"] },
+      restatement: { parts: [{ text: "You want to know whether the town should build a second pier " },
+        { about: 0, phrases: ["over the next 25 years", "by 2030"], assumed: 0 }, { text: ", " },
+        { about: "purpose", phrases: ["so that you can vote on it", "so that you can write about it"], assumed: 1 }, { text: "." }] }
+    };
+    const made = savedDocOf(savedSigner(key, person));
+    const doc = { ...made, reading: { ...made.reading, clarify } };
+    const written = await service.create(person, { doc }, gate);
+    expect(written.revision).toBe(1);
+    // What the database holds is sealed: no word of the sentence is in the row.
+    const row = (await database.pool.query<{ held: string }>("SELECT row_to_json(q)::text AS held FROM identity.saved_question q WHERE saved_question_id=$1", [written.id])).rows[0]!;
+    expect(row.held).not.toContain("second pier");
+    const read = await service.read(person, written.id, gate);
+    expect(read).toMatchObject({ id: written.id, revision: 1, state: "READY" });
+    expect(read!.doc).toEqual(doc);
+    expect(SavedQuestionDocSchema.parse(read!.doc).reading.clarify).toEqual(clarify);
+    // A second save (the person answered a question) keeps it too.
+    const again = await service.save(person, written.id, { revision: 1, doc }, gate);
+    expect(again.revision).toBe(2);
+    expect(SavedQuestionDocSchema.parse((await service.read(person, written.id, gate))!.doc).reading.clarify).toEqual(clarify);
+    // The contract's rule holds at the save: a part for a question the reply does not have is refused, and nothing is written.
+    const bad = { ...doc, reading: { ...doc.reading, clarify: { ...clarify, restatement: { parts: [{ about: 2, phrases: ["a", "b"], assumed: 0 }] } } } };
+    await expect(service.create(person, { doc: bad }, gate)).rejects.toMatchObject({ code: "MALFORMED_REQUEST" });
   });
 });

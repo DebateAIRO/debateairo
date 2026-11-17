@@ -118,6 +118,11 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
             </li>
           </ul>
         </nav>
+        {/* Design Document v2 (3a, 8h): the top bars draw no language switcher, so every page's footer line has it,
+            before the badge the line ends with (15b). */}
+        <span className="siteFooterLang">
+          <LanguageSwitcher />
+        </span>
         <AnpcSalBadge />
       </footer>
     );

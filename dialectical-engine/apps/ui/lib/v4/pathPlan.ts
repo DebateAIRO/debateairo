@@ -98,6 +98,11 @@ export type PathPlan = Readonly<{
   more: readonly PlanPath[];
   /** Path keys and chip keys picked to combine (never an Undo step). */
   selected: readonly string[];
+  /**
+   * Design Document v2 (16b): the path "Combine with…" is picking for, so the next row pressed joins it. A ticked box sets
+   * none: one box ticked is only a tick. It counts only while it is the one selected key (`isPicking`).
+   */
+  picking?: string;
   width: number;
   freePlan: boolean;
   undo: readonly PathPlanSnapshot[];
@@ -112,7 +117,7 @@ export type PathPlan = Readonly<{
 }>;
 /** MOVE_SELECTED stays in the model; no row sends it (Task 72). MOVE_CHIP's toPathKey is a path key, or "NEW". */
 export type PathPlanAction =
-  | { type: "SELECT" | "UNSELECT"; key: string }
+  | { type: "SELECT" | "UNSELECT"; key: string; picking?: true }
   | { type: "CLEAR_SELECTION" }
   | { type: "COMBINE_SELECTED" }
   | { type: "COMBINE_WRITTEN"; key: string; title: string; question: string; combineRef: string }
@@ -351,10 +356,17 @@ function widened(path: PlanPath): PlanPath {
   return isPersonPath(path) ? path : { ...path, tag: "ADDED_WHEN_WIDENED" };
 }
 
-function select(plan: PathPlan, key: string): PathPlanResult {
+/** "Combine with…" is picking: its path is the one selected key, so the next row pressed is combined with it. */
+export function isPicking(plan: PathPlan): boolean {
+  return plan.selected.length === 1 && plan.picking !== undefined && plan.picking === plan.selected[0];
+}
+
+function select(plan: PathPlan, key: string, picking: boolean): PathPlanResult {
   const onList = plan.paths.some((path) => path.key === key) || isChip(plan.paths, key);
-  if (!onList || plan.selected.includes(key)) return unchanged(plan);
-  return unchanged({ ...plan, selected: [...plan.selected, key] });
+  if (!onList) return unchanged(plan);
+  if (plan.selected.includes(key)) return picking && plan.picking !== key ? unchanged({ ...plan, picking: key }) : unchanged(plan);
+  const selected = [...plan.selected, key];
+  return unchanged(picking ? { ...plan, selected, picking: key } : { ...plan, selected });
 }
 
 function unselect(plan: PathPlan, key: string): PathPlanResult {
@@ -873,7 +885,7 @@ export function pathPlanOwnWords(plan: PathPlan): readonly string[] {
  */
 export function pathPlanReduce(plan: PathPlan, action: PathPlanAction): PathPlanResult {
   switch (action.type) {
-    case "SELECT": return select(plan, action.key);
+    case "SELECT": return select(plan, action.key, action.picking === true);
     case "UNSELECT": return unselect(plan, action.key);
     case "CLEAR_SELECTION": return plan.selected.length === 0 ? unchanged(plan) : unchanged({ ...plan, selected: [] });
     case "COMBINE_SELECTED": return combineSelected(plan);

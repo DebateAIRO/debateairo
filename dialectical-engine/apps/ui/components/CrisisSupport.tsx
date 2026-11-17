@@ -141,6 +141,12 @@ export function CrisisHelpNumbers({ catalog, locale, countryHint }: Readonly<{
   const options = crisisCountryOptions(locale);
   const entry = country === "" ? undefined : CRISIS_LINES[country];
   return <>
+    {/* Design Document v2 (20b): the emergency line comes first, above the country and its helplines. */}
+    <p className="crisisSupportEmergency" role="note">
+      {entry === undefined
+        ? t(catalog, "home.crisisSupport.emergencyAnywhere")
+        : withCallLink(t(catalog, "home.crisisSupport.emergency"), entry.emergency)}
+    </p>
     <label className="crisisSupportCountry">
       <span>{t(catalog, "home.crisisSupport.countryLabel")}</span>
       <select value={country} onChange={(event) => { visitorChoseCountry.current = true; setCountry(event.target.value); }}>
@@ -170,11 +176,6 @@ export function CrisisHelpNumbers({ catalog, locale, countryHint }: Readonly<{
       </ul>
     )}
 
-    <p className="crisisSupportEmergency" role="note">
-      {entry === undefined
-        ? t(catalog, "home.crisisSupport.emergencyAnywhere")
-        : withCallLink(t(catalog, "home.crisisSupport.emergency"), entry.emergency)}
-    </p>
     <a className="crisisSupportElsewhere" href={FIND_A_HELPLINE_URL} target="_blank" rel="noopener noreferrer">
       {t(catalog, "home.crisisSupport.elsewhere")}
     </a>

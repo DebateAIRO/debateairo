@@ -1,9 +1,11 @@
 // tests/unit/ask-clarify-v2-draft.test.ts
 // V4 start step, Task 76d (r2-7, read-f22, r2-5; owner answers Q4 and Q5 of 4 Nov; 4 Nov night read-f1): the clarifying call's
-// version 2, a draft the owner reads word for word before Task 92 seals it. Its instruction is version 1's, then the owner's own
-// words for the answer sentences and the place mark, then one drafted sentence for "What do you care about most?", then read-f1's
-// drafted sentence about the questions asked of an earlier wording. Until it is sealed the API asks with version 1, reads none of
-// version 2's members and frames no `earlier` field, byte for byte as today. The shapes widen only. Data is made up.
+// version 2. Its instruction is version 1's, then the owner's own words for the answer sentences and the place mark, then one
+// sentence for "What do you care about most?", then read-f1's sentence about the questions asked of an earlier wording. The owner
+// approved its wording with version 3's (17 Nov); version 3 holds every word of it and is the one that was sealed
+// (tests/unit/ask-clarify-v3.test.ts), so version 2 itself was never sealed and no call asks it. Its members are read under version
+// 3 as they are here: with version 1 alone on the sealed list the API asks with version 1, reads none of version 2's members and
+// frames no `earlier` field. The shapes widen only. Data is made up.
 import { describe, expect, it } from "vitest";
 import { buildApi, type AskApplication } from "@debateai/api";
 import {
@@ -86,9 +88,10 @@ describe("the version 2 draft (r2-7, Q4, Q5, read-f1)", () => {
     expect(form).not.toMatch(/Bucharest|Romania|bills/iu);
   });
 
-  it("is a draft: in the drafts' list, never in the sealed list or the engine's seal (Task 92 seals it)", () => {
+  it("was never sealed by itself: alone on the drafts' list, never in the sealed list or the engine's seal (version 3 holds its words)", () => {
+    // Design Document v2 (16b): version 3, sealed 17 Nov, is version 2 and one sentence more (tests/unit/ask-clarify-v3.test.ts).
     expect(ASK_CLARIFY_DRAFT_CONTRACTS).toEqual([ASK_CLARIFY_V2_DRAFT_CONTRACT]);
-    expect(ASK_CLARIFY_SEALED_CONTRACTS.map((contract) => contract.contractId)).toEqual([ASK_CLARIFY_CONTRACT_ID]);
+    expect(ASK_CLARIFY_SEALED_CONTRACTS.map((contract) => contract.contractId)).toEqual([ASK_CLARIFY_CONTRACT_ID, "ask.clarify.v3"]);
     expect(engineSealedContracts().map((contract) => contract.contractId)).not.toContain(ASK_CLARIFY_V2_CONTRACT_ID);
     expect(engineSealedContracts()).not.toContain(ASK_CLARIFY_V2_DRAFT_CONTRACT);
   });
@@ -148,16 +151,16 @@ describe("the reply's shape: version 2's members, only adds", () => {
   });
 });
 
-describe("the API before and after the seal", () => {
-  it("with version 1 sealed: asks with version 1, and a request with `earlier` frames the same material as one without it, byte for byte", async () => {
-    const without = gateway([JSON.stringify(V2_REPLY)]);
-    const withEarlier = gateway([JSON.stringify(V2_REPLY)]);
+describe("the API by what is on the sealed list", () => {
+  it("with version 1 alone on the list: asks with version 1, and a request with `earlier` frames the same material as one without it, byte for byte", async () => {
+    const without = gateway([JSON.stringify(V2_REPLY)], [ASK_CLARIFY_PROMPT_CONTRACT]);
+    const withEarlier = gateway([JSON.stringify(V2_REPLY)], [ASK_CLARIFY_PROMPT_CONTRACT]);
     const plainAnswer = await without.port.read(OWNER, QUESTION, null);
     const earlierAnswer = await withEarlier.port.read(OWNER, QUESTION, null, EARLIER);
     expect(readPromptFrame(withEarlier.packets[0]!).contractId).toBe(ASK_CLARIFY_CONTRACT_ID);
     expect(fieldsOf(withEarlier.packets[0]!)).toEqual(fieldsOf(without.packets[0]!));
     expect(fieldsOf(withEarlier.packets[0]!)).toEqual([{ name: "question", content: QUESTION }]);
-    // Version 2's members are read only once it is sealed: a reply that carries them reads as version 1's.
+    // Version 2's members are read only under a later version: a reply that carries them reads as version 1's.
     const v1 = { source: "AI", questions: [plain(WHERE), plain(WHEN)], purpose: plain(PURPOSE) };
     expect(plainAnswer).toEqual(v1);
     expect(earlierAnswer).toEqual(v1);
@@ -181,6 +184,17 @@ describe("the API before and after the seal", () => {
     const first = gateway([JSON.stringify(V2_REPLY)], [ASK_CLARIFY_PROMPT_CONTRACT, ASK_CLARIFY_V2_DRAFT_CONTRACT]);
     await first.port.read(OWNER, QUESTION, null);
     expect(fieldsOf(first.packets[0]!).map((field) => field.name)).toEqual(["question"]);
+  });
+
+  it("as shipped (version 3 sealed, no list stood in): `earlier` is framed and version 2's members are read, under version 3", async () => {
+    const { port, packets } = gateway([JSON.stringify(V2_REPLY)]);
+    const answer = await port.read(OWNER, QUESTION, null, EARLIER);
+    expect(readPromptFrame(packets[0]!).contractId).toBe("ask.clarify.v3");
+    const fields = fieldsOf(packets[0]!);
+    expect(fields.map((field) => field.name)).toEqual(["question", "earlier"]);
+    expect(JSON.parse(fields[1]!.content)).toEqual(EARLIER);
+    // A reply with no sentence is whole: the questions, the place mark and the care question stand.
+    expect(answer).toEqual({ source: "AI", questions: [WHERE, WHEN], purpose: PURPOSE, cares: CARES });
   });
 
   it("version 2's reader keeps each sentence with its answer, all or none; one place mark; a care question that repeats another goes", () => {
@@ -221,7 +235,7 @@ describe("POST /v1/asks/clarify with `earlier` (read-f1)", () => {
   const post = (api: ReturnType<typeof buildApi>, payload: unknown) =>
     api.inject({ method: "POST", url: "/v1/asks/clarify", headers, payload: payload as Record<string, unknown> });
 
-  it("hands `earlier` to the reading (which frames it only once version 2 is sealed); without it, none", async () => {
+  it("hands `earlier` to the reading (which frames it under version 2 or 3, never version 1); without it, none", async () => {
     const { api, seen } = apiOver();
     expect((await post(api, { question_line: QUESTION, earlier: EARLIER })).statusCode).toBe(200);
     expect((await post(api, { question_line: QUESTION })).statusCode).toBe(200);

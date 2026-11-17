@@ -35,7 +35,10 @@ test("Turn 1 tree uses the coded 392px card grid and compact card anatomy", () =
   // rows stay RED on purpose — they now read "ruled, not yet built" instead of
   // "two gates fighting". The build is ticketed as
   // F-T4-UI-8-REVIEW-VOCABULARY-CARD.
-  assert.match(css, /\.nodeWrap \{[\s\S]*?padding: 6px;/);
+  assert.match(css, /\.nodeWrap \{[\s\S]*?border-radius: 16px;[\s\S]*?padding: 6px;/);
+  assert.match(css, /\.nodeWrap\[data-stance="root"\] \{[^}]*padding: 7px;[^}]*box-shadow: var\(--shadow-big\);/);
+  assert.match(css, /\.nodeStanceTab,\s*\.referenceStanceTab \{[^}]*left: 15px;[^}]*width: 44px;[^}]*height: 4px;/);
+  assert.match(css, /\.nodeStanceTab\[data-stance="root"\],\s*\.referenceStanceTab\.root \{[^}]*left: 20px;[^}]*width: 52px;/);
   assert.match(css, /\.node \{[\s\S]*?border-radius: 11px;[\s\S]*?padding: 16px 15px 11px;/);
   assert.match(css, /\.nodeClaim \{[\s\S]*?font-size: 15\.5px;[\s\S]*?line-height: 1\.4;/);
 });

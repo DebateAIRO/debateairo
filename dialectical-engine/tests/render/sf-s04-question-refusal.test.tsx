@@ -152,7 +152,7 @@ describe("question refusal screens", () => {
       const rule = css.match(new RegExp(`\\.${className}\\s*\\{([^}]*)\\}`, "u"));
       expect(rule, className).not.toBeNull();
       expect(rule![1]).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/iu);
-      for (const color of rule![1]!.matchAll(/(?:color|background|border-color):\s*([^;]+);/gu)) expect(color[1]).toMatch(/var\(--(?:ink|text-2|line|line-strong|link|focus)\)/u);
+      for (const color of rule![1]!.matchAll(/(?:color|background|border-color):\s*([^;]+);/gu)) expect(color[1]).toMatch(/var\(--(?:ink|text-2|line|line-strong|link|focus|bg|surface-2)\)/u);
     }
   });
 });

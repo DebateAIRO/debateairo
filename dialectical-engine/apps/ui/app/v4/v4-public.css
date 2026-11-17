@@ -27,9 +27,11 @@
 
 /* The card under the path after the Undo window: being looked into (hatched, one slow ring), then a plain card. */
 .v4PubDigCard {
-  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line-2);
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1.5px solid var(--line-strong);
   border-radius: var(--r-btn); background: var(--surface); min-width: 0; overflow-wrap: anywhere;
 }
+/* Design Document v2: while it is looked into, the card's edge is the accent (over the map's hatching and slow ring). */
+.v4PubDigCard.v4GroundLOOKING { border-color: var(--accent); }
 .v4PubDigCardTitle { margin: 0; color: var(--text); font-size: 13.5px; }
 .v4PubDigStops { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--text-2); font-size: 12.5px; }
 .v4PubDigStop { display: inline-flex; align-items: center; gap: 6px; }
@@ -38,7 +40,8 @@
   border: 1.5px solid var(--line-strong); border-radius: var(--r-dot); font-size: 10px; line-height: 1;
 }
 .v4PubDigStopDone { color: var(--text); }
-.v4PubDigStopDone .v4PubDigStopMark { border-color: var(--ink); background: var(--ink); color: var(--surface); }
+/* Design Document v2: a stop that is reached is filled with the brand colour (the rail's done marks). */
+.v4PubDigStopDone .v4PubDigStopMark { border-color: var(--brand); background: var(--brand); color: var(--on-brand); }
 .v4PubDigOutcome { margin: 0; color: var(--text); font-size: 13.5px; font-weight: 700; }
 .v4PubDigChange { display: flex; flex-direction: column; gap: 4px; padding-inline-start: 10px; border-inline-start: 2px solid var(--line-2); }
 .v4PubDigChangeLine { margin: 0; color: var(--text); font-size: 13.5px; line-height: 1.5; }

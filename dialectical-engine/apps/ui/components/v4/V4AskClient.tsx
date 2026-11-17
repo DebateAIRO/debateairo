@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import {
-  askQuestionMaxBytes, ContractHttpError, detectCrisis, purposeAnswerSentence, SavedQuestionDocSchema, savedQuestionOwnWords, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse, type ClarifyQuestion, type PurposeLines,
+  askQuestionMaxBytes, detectCrisis, purposeAnswerSentence, SavedQuestionDocSchema, savedQuestionOwnWords, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse, type ClarifyQuestion, type PurposeLines,
   type QuestionLanguageOffer, type SavedQuestionDoc, type SavedQuestionRead, type SavedQuestionSummary
 } from "@debateai/contract";
 import { alreadyWaitingShown, RoomNotice } from "@/components/billing/RoomNotice";
@@ -15,15 +15,16 @@ import { V4MoneyLines } from "@/components/v4/V4DigSuggest";
 import { V4Header } from "@/components/v4/V4Header";
 import { V4LeaveQuestion } from "@/components/v4/V4LeaveQuestion";
 import { V4PendingMap } from "@/components/v4/V4PendingMap";
+import { V4ReadSentence } from "@/components/v4/V4ReadSentence";
 import { V4StartBar, type StartBarState } from "@/components/v4/V4StartBar";
 import { V4AskQuestions, type SetAsideAnswer } from "@/components/v4/V4AskQuestions";
-import { startWiderWidth, V4StartCard } from "@/components/v4/V4StartCard";
-import { V4StartCombineBar } from "@/components/v4/V4StartCombineBar";
+import { startWiderWidth, V4StartCard, type StartPlanActions } from "@/components/v4/V4StartCard";
+import { startCombineFrees, V4StartCombineBar } from "@/components/v4/V4StartCombineBar";
 import { V4Steps } from "@/components/v4/V4Steps";
 import { V4UndoNote } from "@/components/v4/V4UndoNote";
 import { V4MapSeed } from "@/components/v4/V4MapSeed";
 import { SHELF_MAX, useMapShelf, V4MapShelf } from "@/components/v4/V4MapShelf";
-import { V4NotStarted } from "@/components/v4/V4NotStarted";
+import { V4NotStarted, V4SavedDeleteNotes } from "@/components/v4/V4NotStarted";
 import { contractClient } from "@/lib/api";
 import type { AskRoom } from "@/lib/billing/room";
 import { catalogLocale, isLocale, type LocaleCode } from "@/lib/i18n/locales";
@@ -36,17 +37,18 @@ import {
 } from "@/lib/v4/askText";
 import { CARRY_ON_BUILT } from "@/lib/v4/carryOn";
 import { siteCountryOf, withSiteCountryFirst } from "@/lib/v4/clarifyPlace";
-import { DIG_CANCELLED_SHOWN_MS, DIG_UNDO_MS } from "@/lib/v4/digUndo";
+import { DIG_CANCELLED_SHOWN_MS } from "@/lib/v4/digUndo";
 import { foldTransform, type FoldRect } from "@/lib/v4/foldMove";
 import { buildV4PendingMap } from "@/lib/v4/mapModel";
 import {
   limitLine, startPathsShare, startPathsShareLine, startShareChange, startShareLine, startsWaitLine, usedUpLine, type MoneyLine
 } from "@/lib/v4/money";
-import { PATH_PLAN_LIMITS, pathPlanFromMenu, pathPlanFromPicks, pathPlanOwnWords, type PathPlan } from "@/lib/v4/pathPlan";
+import { isPicking, PATH_PLAN_LIMITS, pathPlanFromMenu, pathPlanFromPicks, pathPlanOwnWords, type PathPlan } from "@/lib/v4/pathPlan";
 import {
   boxChanged, boxDropped, boxLine, boxOf, boxOwnWords, boxPlace, boxRekey, boxRemove, boxTyped, type QuestionBox
 } from "@/lib/v4/questionBox";
-import { keptOfSaved, savedDocOf } from "@/lib/v4/savedQuestion";
+import { assumedAnswersOf, readParts, withAssumedAnswers, type ReadAbout } from "@/lib/v4/readRestatement";
+import { keptOfSaved, savedDocOf, withoutPickUp } from "@/lib/v4/savedQuestion";
 import { reloadPage, useSiteVersion } from "@/lib/v4/siteVersion";
 import { handOffStart } from "@/lib/v4/startHandOff";
 import { keptLineOf, startKeptOf, type V4StartKept, type V4StartReading } from "@/lib/v4/startKept";
@@ -64,7 +66,7 @@ import { useAskAgain } from "@/lib/v4/useAskAgain";
 import { handOffContinue, sameStoppedWords } from "@/lib/v4/failedRun";
 import { useAskClarify } from "@/lib/v4/useAskClarify";
 import { useLeaveSiteGuard } from "@/lib/v4/useLeaveGuard";
-import { useSavedQuestion } from "@/lib/v4/useSavedQuestion";
+import { savedQuestionGone, useSavedDeletes, useSavedQuestion } from "@/lib/v4/useSavedQuestion";
 import { useStartPaths } from "@/lib/v4/useStartPaths";
 import { useV4Ask } from "@/lib/v4/useV4Ask";
 
@@ -110,6 +112,12 @@ import { useV4Ask } from "@/lib/v4/useV4Ask";
  * step 2's history entry, never in the address); Start names it and removes it; "Not started yet" on step 1 lists the newest 5
  * with Pick up and Delete (the shared Undo window); Pick up and a reload on step 2 reopen it through the restore with no AI
  * call; the page asks before leaving only while the latest change is not saved, and the card's reload line goes meanwhile.
+ * Design Document v2 (16b), "How we read your question": when the clarifying reply says the question back in one sentence
+ * (`restatement`), step 2 shows the person's question as its heading (with "Edit my question" in Back's place) and that sentence
+ * in the card, where the box was (V4ReadSentence, lib/v4/readRestatement.ts); its stretches lead to their questions, and the
+ * answers the AI assumed are drawn as assumptions. "Use my words instead" shows the box, which also comes by itself whenever it
+ * has something to say. It is a view only: the box, the answers and what Start sends are exactly as before, and without such a
+ * reply step 2 is drawn as it always was.
  */
 
 /** The API's own floor for a question is a few words; Start waits for it (spec: "under 7 characters"). */
@@ -223,14 +231,6 @@ const NO_CLARIFY: AskClarifyResponse = Object.freeze({ source: "NONE" });
 
 /** Task 76f (saved-questions spec §3.3): a reading that was never checked (not offered, switched off, quota used up) is never saved. */
 const UNCHECKED_REASONS: ReadonlySet<string> = new Set(["NOT_ASKED", "OFF", "POOL_EMPTY"]);
-
-/** Task 76f: a saved question the account no longer holds (deleted, started, or its key gone) answers 404. */
-function savedQuestionGone(error: unknown): boolean {
-  return error instanceof ContractHttpError && error.status === 404;
-}
-
-/** A delete waiting out its Undo window in the shared Undo note, then (`sent`) its answer. */
-type WaitingDelete = Readonly<{ item: SavedQuestionSummary; sendsAt: number; sent: boolean }>;
 
 /**
  * Task 76g (read-f1): step 2's questions as shown, kept apart from the clarifying hook's reply so a new reading can keep them.
@@ -396,6 +396,7 @@ export function V4AskClient({
   crisisCountryHint,
   initialQuestion,
   againRunId = null,
+  pickUpId = null,
   kept = null
 }: Readonly<{
   catalog: MessageCatalog;
@@ -412,6 +413,11 @@ export function V4AskClient({
   initialLevel?: ReadingLevel | null;
   /** Owner review 3 Nov (wait-f11): "Ask this again" names the debate (`?again=`) whose question fills the box; null: none. */
   againRunId?: string | null;
+  /**
+   * "My questions" (Design Document v2, 18b) hands a saved question over by the address (`?pickup=`): the page picks it up
+   * once, as its own Pick up would, and takes the id out of the address. Absent or null: none.
+   */
+  pickUpId?: string | null;
   /**
    * V4 start step, Task 76e: step 2 as kept, opened at once by the page's restore (the same restore Task 76f calls with the
    * account's copy on Pick up and on a reload); one the page cannot read is ignored. Absent or null: the page opens as Task 76c says.
@@ -432,6 +438,7 @@ export function V4AskClient({
         initialQuestion={initialQuestion}
         session={session}
         againRunId={againRunId}
+        pickUpId={pickUpId}
         kept={kept}
       />
     )}</V4AskGate>
@@ -448,6 +455,7 @@ function V4AskForm({
   initialQuestion,
   session,
   againRunId,
+  pickUpId,
   kept: keptAtOpen
 }: Readonly<{
   catalog: MessageCatalog;
@@ -461,6 +469,8 @@ function V4AskForm({
   session: V4Session;
   /** Owner review 3 Nov (wait-f11): the debate whose question fills the box (`?again=`); null: none. */
   againRunId: string | null;
+  /** The saved question "My questions" handed over by the address (`?pickup=`); null: none. */
+  pickUpId: string | null;
   /** Task 76e: step 2 as kept, restored when the page opens; null: none. */
   kept: V4StartKept | null;
 }>) {
@@ -508,6 +518,8 @@ function V4AskForm({
   }, []);
   const pendingBox = useRef<HTMLDivElement>(null);
   const stepOne = useRef<HTMLDivElement>(null);
+  /** Design Document v2 (16b): the choosing card's own send and refusal notice, for the combine line in the page's foot. */
+  const cardActions = useRef<StartPlanActions | null>(null);
   const stepOneQuestion = useRef<HTMLDivElement>(null);
   // ASK-5: a rewrite the person accepted in the language pop-up, kept for the next Start while the text it replaced
   // (`basis`) is still what would be sent.
@@ -566,12 +578,12 @@ function V4AskForm({
   const [reopening, setReopening] = useState<Readonly<{ id: string; words: string }> | null>(null);
   const [savedList, setSavedList] = useState<readonly SavedQuestionSummary[] | null>(null);
   const [savedListReads, setSavedListReads] = useState(0);
-  const [waitingDeletes, setWaitingDeletes] = useState<readonly WaitingDelete[]>([]);
-  const deleteTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
-  useEffect(() => () => {
-    for (const timer of deleteTimers.current.values()) clearTimeout(timer);
-    deleteTimers.current.clear();
-  }, []);
+  // Delete and its Undo window are useSavedDeletes's, shared with "My questions" (spec §3.6).
+  const { waiting: waitingDeletes, deleteSaved, undoDelete } = useSavedDeletes({
+    client: contractClient,
+    onGone: (id) => setSavedList((now) => now === null ? now : now.filter((one) => one.id !== id)),
+    lines: stepOne
+  });
   const setSavedId = useCallback((id: string | null, revision: number | null = null) => {
     savedIdRef.current = id;
     setSavedIdState(id);
@@ -619,6 +631,10 @@ function V4AskForm({
   }, []);
   const boxField = useRef<HTMLTextAreaElement>(null);
   const stepTwo = useRef<HTMLDivElement>(null);
+  // Design Document v2 (16b): the person chose their own words ("Use my words instead") over the sentence that says the question
+  // back, until "Show how we read it" or a new reading; and that press puts the cursor in the box once it is drawn.
+  const [ownBox, setOwnBox] = useState(false);
+  const focusOwnBox = useRef(false);
   // Task 76c (choose-f21, answer Q3): the debate a started question became, when the page opened on its history entry; the
   // logo's own question (read-f2) and the link it holds; a Leave that lets the page go without the browser asking again; and
   // whether the page is still here (a send that ends after the person left touches no other page's entry).
@@ -864,6 +880,49 @@ function V4AskForm({
   const sentLine = accepted !== null && accepted.basis === boxWords ? accepted.text : boxWords;
   const quickLine = accepted !== null && accepted.basis === plain ? accepted.text : plain;
   const tooLong = byteLength(sentLine) > askQuestionMaxBytes();
+  // Design Document v2 (16b), "How we read your question": when the reply on screen says the question back in one sentence
+  // (`restatement`), step 2 shows the person's question as its heading and that sentence in the card, where the box was; the
+  // stretches that stand for an answer lead to their questions, whose assumed answers are drawn as assumptions. Start sends the
+  // box and the person's answers exactly as before and, with them, each assumption still showing, marked as assumed (pressStart).
+  // The box takes the sentence's place by "Use my words instead",
+  // and by itself whenever it has something to say that the sentence does not: words too short or too long to send, crisis
+  // words, a rewrite in force (whose own "Use my words instead" sits under the box), or anything in it the page did not put
+  // there (words typed in it, a card's question made the person's). The box's 1-second highlight needs no rule here: it is
+  // only ever put on a box that is on screen (answerQuestion). With no such reply, step 2 is as it was.
+  const readReply = clarifyReplyShown !== null && clarifyReplyShown.source === "AI" && clarifyReplyShown.restatement !== undefined
+    && shown.seen?.reply === clarifyReplyShown ? clarifyReplyShown : null;
+  const restated = readReply !== null;
+  // The box without the answers' sentences: the person's words, and anything they typed under them.
+  const bareBox = useMemo(() => box.placed.reduce((emptied, placed) => boxRemove(emptied, placed.key), box), [box]);
+  const boxAsRead = clarifyLine !== null && boxLine(bareBox) === boxLine(boxOwnWords(boxOf(""), clarifyLine));
+  const boxSays = !boxLongEnough || tooLong || boxCrisis || rewriteLine !== null || !boxAsRead;
+  const boxStands = !restated || ownBox || boxSays;
+  const readSentence = useMemo(() => (readReply === null ? [] : readParts(readReply, goal)), [readReply, goal]);
+  const readGroupId = (about: ReadAbout): string => `${ids}-about-${about}`;
+  // The questions draw the assumptions only while the sentence that explains them shows.
+  const readAssumptions = boxStands ? undefined : new Map(readSentence.flatMap((part) => (part.kind === "ANSWER"
+    ? [[part.question, { groupId: readGroupId(part.about), answer: part.assumedAnswer }] as const] : [])));
+  // The heading above the card: the person's words as the box has them now (the line read at Next until they change them).
+  const askedWords = ownWords(boxLine(bareBox)) || (readLine ?? "");
+  // The step's heading is the card's title or, with a sentence, the person's question above the card. When one takes the
+  // other's place while it holds the focus (the reading lands after the step opened), the focus goes to the new one.
+  const [headingRestated, setHeadingRestated] = useState(restated);
+  const headingHeldFocus = useRef(false);
+  if (headingRestated !== restated) {
+    setHeadingRestated(restated);
+    headingHeldFocus.current = typeof document !== "undefined" && readHeading.current !== null && document.activeElement === readHeading.current;
+  }
+  useBrowserLayoutEffect(() => {
+    if (!headingHeldFocus.current) return;
+    headingHeldFocus.current = false;
+    readHeading.current?.focus();
+  }, [restated]);
+  // "Use my words instead": the cursor goes into the box as soon as it is drawn.
+  useBrowserLayoutEffect(() => {
+    if (!focusOwnBox.current) return;
+    focusOwnBox.current = false;
+    boxField.current?.focus();
+  }, [ownBox]);
   // A press is busy from its consent until it is sent or comes back (its plan read, its Undo window, its send).
   const busy = ask.submitting || pending !== null || checkingPlan !== null;
   // W3-4 (the money rule, owner 31 Oct): before a new question, its share of today; when new starts wait for the day,
@@ -1257,6 +1316,7 @@ function V4AskForm({
       swapWords.current = null;
       setAnswersFolded(false);
       setRestored(null);
+      setOwnBox(false);
     }
     setStep("read");
     setNextPress("IDLE");
@@ -1307,6 +1367,9 @@ function V4AskForm({
     // Task 76g: an answer the person changes is theirs now; no sentence is held for its question any more.
     if (held.has(question.text)) setHeld((current) => withoutHeld(current, [question.text]));
     if (next === null || next.other || from === undefined) return;
+    // Design Document v2 (16b): while the sentence stands where the box was, the answer shows in the sentence itself; nothing
+    // flies to a box that is not on screen, and nothing brings the box out to be highlighted.
+    if (boxField.current === null) return;
     const sentence = answerSentence(next, [question]);
     if (sentence === null || flyAnswer(from, boxField.current, sentence)) return;
     if (boxFlashTimer.current !== null) clearTimeout(boxFlashTimer.current);
@@ -1365,7 +1428,11 @@ function V4AskForm({
       const menu = start.menu;
       beginPending({
         press, chosenBy, mode, carryOn: carryOnOffered && carryOn, line, basis: boxWords,
-        purposeLines: purposeLinesOfGoal(goalWithinPlan(goal, free ? "free" : "premium"), caresAsked),
+        // Design Document v2 (16b; owner answer of 17 Nov 2026): while the sentence is on screen, each assumption left unchanged goes
+        // with the answers, marked as assumed; with the person's own words in its place (boxStands), none does. On Free an
+        // assumption counts against the cap on choices as a choice does.
+        purposeLines: withAssumedAnswers(purposeLinesOfGoal(goalWithinPlan(goal, free ? "free" : "premium"), caresAsked),
+          boxStands ? [] : assumedAnswersOf(readSentence), free ? FREE_GOAL_CHOICES_MAX - goalChoiceCount(goalWithinPlan(goal, "free")) : undefined),
         handsOver: startRoom !== null,
         topPaths: chosenBy === "AIS" && start.phase === "READY" && menu !== null ? pathPlanFromMenu(menu.menu, start.width, free) : null,
         share: startPathsShareLine(start.sharePercent, free)
@@ -1448,6 +1515,7 @@ function V4AskForm({
     if (words === null) return;
     swapWords.current = null;
     setRewriteLine(null);
+    setOwnBox(false);
     // Task 76e: a fresh reading, so a restored step 2's questions are not seeded any more.
     setRestored(null);
     setAccepted(null);
@@ -1480,6 +1548,7 @@ function V4AskForm({
     setAccepted(null);
     swapWords.current = kept.plan.questionSwap?.original ?? null;
     setAnswersFolded(false);
+    setOwnBox(false);
     setBox(kept.box);
     setGoal(kept.sentGoal);
     setHeld(heldOfKept(kept.box, kept.sentGoal));
@@ -1560,6 +1629,19 @@ function V4AskForm({
     }
   }
 
+  // Design Document v2 (18b): Pick up pressed on "My questions" arrives as `/v4?pickup=<id>`. The page picks that question up
+  // once, as soon as it would offer Pick up itself (signed in, the start step on the site, step 1), and the id leaves the address
+  // at the same moment, so a reload does not pick it up again. Gone meanwhile: the list is read again, as for a press here.
+  const pickUpNow = useRef(pickUp);
+  pickUpNow.current = pickUp;
+  const pickedUpFromAddress = useRef(false);
+  useEffect(() => {
+    if (pickUpId === null || pickedUpFromAddress.current || !listOffered || !onStepOne) return;
+    pickedUpFromAddress.current = true;
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${withoutPickUp(window.location.search)}`);
+    void pickUpNow.current(pickUpId);
+  }, [pickUpId, listOffered, onStepOne]);
+
   // Task 76f (owner answer S1 A): a reload on step 2 whose entry names a saved question reopens it from the account, as Pick up
   // does, with no AI call; gone or unreadable (or crisis words), step 1 shows the entry's words and the entry is step 1's again
   // (Task 76c's rule).
@@ -1585,48 +1667,6 @@ function V4AskForm({
     })();
     return () => { live = false; };
   }, [reopening]);
-
-  /**
-   * Task 76f (spec §3.6): Delete. The line leaves the list at once and the shared Undo note shows for DIG_UNDO_MS; then one DELETE.
-   * Undo before it brings the line back and sends nothing; leaving the page meanwhile sends nothing. A DELETE that fails brings
-   * the line back (nothing is tried again by itself); one that answers gone takes it out of the list.
-   */
-  const focusAfterUndo = useRef<string | null>(null);
-  function deleteSaved(item: SavedQuestionSummary): void {
-    if (waitingDeletes.some((one) => one.item.id === item.id)) return;
-    setWaitingDeletes((now) => [...now, { item, sendsAt: Date.now() + DIG_UNDO_MS, sent: false }]);
-    deleteTimers.current.set(item.id, setTimeout(() => {
-      deleteTimers.current.delete(item.id);
-      setWaitingDeletes((now) => now.map((one) => one.item.id === item.id ? { ...one, sent: true } : one));
-      void (async () => {
-        let gone = true;
-        try {
-          await contractClient.deleteSavedQuestion(item.id);
-        } catch (error) {
-          gone = savedQuestionGone(error);
-        }
-        if (!alive.current) return;
-        if (gone) setSavedList((now) => now === null ? now : now.filter((one) => one.id !== item.id));
-        setWaitingDeletes((now) => now.filter((one) => one.item.id !== item.id));
-      })();
-    }, DIG_UNDO_MS));
-  }
-  function undoDelete(id: string): void {
-    const timer = deleteTimers.current.get(id);
-    if (timer === undefined) return;
-    clearTimeout(timer);
-    deleteTimers.current.delete(id);
-    focusAfterUndo.current = id;
-    setWaitingDeletes((now) => now.filter((one) => one.item.id !== id));
-  }
-  // After Undo the line is back; focus goes to its Delete, where it was before the note took it.
-  useEffect(() => {
-    const id = focusAfterUndo.current;
-    if (id === null) return;
-    focusAfterUndo.current = null;
-    const line = [...(stepOne.current?.querySelectorAll<HTMLElement>(".v4NotStartedItem") ?? [])].find((one) => one.dataset.savedId === id);
-    line?.querySelector<HTMLElement>(".v4NotStartedDelete")?.focus();
-  }, [waitingDeletes]);
 
   /**
    * Task 76g (read-f1): "Put it back". The answer comes back under its own question's words, as a block of its own after the new
@@ -1694,9 +1734,14 @@ function V4AskForm({
   // Task 76: the card's look-wider share (choose-f7) and the combine line's share (owner answer Q7, Task 72's handover).
   const widerWidth = plan === null ? null : startWiderWidth(startRoom?.widths ?? null, plan.width, freePlan);
   const widerShare = plan === null || widerWidth === null ? null : startShareChange(startRoom, plan.paths.length, widerWidth);
-  const combineLine = plan !== null && plan.selected.length > 0 && (start.phase === "READY" || start.phase === "STALE") ? (
-    <V4StartCombineBar plan={plan} catalog={catalog} locale={locale} dispatch={start.dispatch} onRefusal={() => undefined}
-      share={startShareChange(startRoom, plan.paths.length, plan.paths.length - 1)} narrow={narrow} />
+  // Design Document v2 (16b): with two paths ticked the line has Combine, so its changes go the card's way (`cardActions`):
+  // the card's notices follow them and a refused combine is said in the card. Its share counts every path combining frees.
+  // One box ticked shows no line; "Combine with…" picking, or exactly two ticked, does.
+  const combineLine = plan !== null && (plan.selected.length === 2 || isPicking(plan)) && (start.phase === "READY" || start.phase === "STALE") ? (
+    <V4StartCombineBar plan={plan} catalog={catalog} locale={locale}
+      dispatch={(action) => (cardActions.current?.dispatch ?? start.dispatch)(action)}
+      onRefusal={(refusal, action) => cardActions.current?.onRefusal(refusal, action)}
+      share={startShareChange(startRoom, plan.paths.length, plan.paths.length - startCombineFrees(plan))} narrow={narrow} />
   ) : null;
 
   // Task 76c (read-f2, choose-f2; answer Q2 A): what leaving would lose. On step 2's side: an answer picked, words typed in its
@@ -1880,21 +1925,7 @@ function V4AskForm({
   ) : null;
   // Each Delete waiting out its Undo window, in the shared Undo note ("Deleted “…”", Undo, the shrinking
   // line); it goes once the DELETE is sent.
-  const deleteNotes = waitingDeletes.filter((one) => !one.sent).map((one) => (
-    <V4UndoNote
-      key={one.item.id}
-      state="counting"
-      label={t(catalog, "v4.saved.deleted", { question: one.item.question })}
-      sendsAt={one.sendsAt}
-      durationMs={DIG_UNDO_MS}
-      onUndo={() => undoDelete(one.item.id)}
-      undoLabel={t(catalog, "v4.start.undo")}
-      stillLine={t(catalog, "v4.saved.deleteStill")}
-      announce={t(catalog, "v4.saved.deleteAnnounce")}
-      sendingLine={t(catalog, "v4.saved.deleteStill")}
-      confirmedLine={t(catalog, "v4.saved.deleteStill")}
-    />
-  ));
+  const deleteNotes = <V4SavedDeleteNotes waiting={waitingDeletes} catalog={catalog} onUndo={undoDelete} />;
   // Task 76f (spec §3.3, §3.4): why the account stopped keeping this question, above the bar: changed in another window, 20 already
   // kept, or signed out (the existing line, unless the card already says it); any other refusal stops saving quietly.
   const savedStopKey = save.stopped === "ELSEWHERE" ? "v4.saved.elsewhere" : save.stopped === "FULL" ? "v4.saved.full"
@@ -1956,6 +1987,34 @@ function V4AskForm({
       />
     </div>
   );
+  // Design Document v2 (16b): a stretch of the sentence leads to its question: the group comes into view and the focus goes to
+  // the answer the sentence showed (the chosen one, or the assumed one), else to the group's first button. The page moves
+  // there itself: following the link would add an entry to the tab's history, which holds the steps (Task 76c). Answered
+  // questions folded away (read-d4 A) open first.
+  const groupToShow = useRef<string | null>(null);
+  function showGroup(id: string): void {
+    const group = document.getElementById(id);
+    if (group === null) return;
+    if (typeof group.scrollIntoView === "function") group.scrollIntoView({ block: "center", behavior: lessMotion() ? "auto" : "smooth" });
+    const answer = group.querySelector<HTMLElement>('button[aria-pressed="true"]') ?? group.querySelector<HTMLElement>(".v4ChipAssumed")
+      ?? group.querySelector<HTMLElement>("button");
+    answer?.focus({ preventScroll: true });
+  }
+  function goToGroup(event: MouseEvent<HTMLAnchorElement>, id: string): void {
+    event.preventDefault();
+    if (answersFolded) {
+      groupToShow.current = id;
+      setAnswersFolded(false);
+      return;
+    }
+    showGroup(id);
+  }
+  useEffect(() => {
+    const id = groupToShow.current;
+    if (id === null || answersFolded) return;
+    groupToShow.current = null;
+    showGroup(id);
+  }, [answersFolded]);
   // Task 76h (read-f5, r2-6): the questions' one status line says "No extra questions for this one." when none come; never for
   // crisis words (a later flip of the patterns), whose line then says nothing.
   const clarifyShown = !clarify.waiting && questions.length === 0 && ask.flagsCrisis(clarifyLine ?? "") ? { ...clarify, reply: null } : clarify;
@@ -1983,15 +2042,6 @@ function V4AskForm({
             <h1 id={`${ids}-title`} className="v4AskTitle v4Serif">
               <label htmlFor={`${ids}-q`}>{t(catalog, "v4.ask.title")}</label>
             </h1>
-            {/* ask-d1: the one grey promise line under the title, for first visits only (its place held until known). */}
-            {promise === "NONE" ? null : (
-              <p
-                className="v4AskPromise v4Muted"
-                {...(promise === "HOLD" ? { "aria-hidden": "true" as const, style: { visibility: "hidden" as const } } : {})}
-              >
-                {t(catalog, "v4.ask.promise")}
-              </p>
-            )}
             {usedUp === null ? null : (
               <p id={`${ids}-usedup`} className="v4AskUsedUp" role="status">{t(catalog, usedUp.key, usedUp.values)}</p>
             )}
@@ -2017,6 +2067,17 @@ function V4AskForm({
             {reasonKey === null ? null : (
               <p id={`${ids}-why`} className="v4AskHint v4Muted v4AskWhy">{t(catalog, reasonKey)}</p>
             )}
+            {/* ask-d1: the one grey promise line, for first visits only (its place held until known). Design Document v2 (16a):
+                it reads under the box, and on a computer the Free notice under it (a phone keeps the notice in its pinned bar). */}
+            {promise === "NONE" ? null : (
+              <p
+                className="v4AskPromise v4Muted"
+                {...(promise === "HOLD" ? { "aria-hidden": "true" as const, style: { visibility: "hidden" as const } } : {})}
+              >
+                {t(catalog, "v4.ask.promise")}
+              </p>
+            )}
+            {narrow ? null : publicNotice}
           </div>
 
           {/* Task 75d (owner, 5 Nov, second round): the level choice is on every first screen, starting on Plain words; nothing is
@@ -2059,6 +2120,9 @@ function V4AskForm({
             {levelWhatOpen ? <p id={`${ids}-honest`} className="v4AskHint v4Muted">{t(catalog, "v4.ask.levelHonest")}</p> : null}
           </fieldset>
 
+          {/* Design Document v2 (16a): the seed of the map sits between the level choice and Next. */}
+          {firstVisit ? <V4MapSeed question={question} catalog={catalog} /> : null}
+
           {/* Task 75b (ask-d2 A, journey-d3 A): step 1's buttons through the bottom bar. On a phone Next sits pinned at the bottom
               like Start, with the Free notice and the lines under Next; on a computer it is one plain row under the level block.
               ask-d1 A, until the start-step's sign-in panel: signed out, both go to sign in, with the way back to this page. */}
@@ -2070,7 +2134,7 @@ function V4AskForm({
             narrow={narrow}
             textFocused={boxFocused}
             helpFirst={!signedOut && helpFirst}
-            publicNotice={publicNotice}
+            publicNotice={narrow ? publicNotice : null}
             next={signedOut
               ? { label: t(catalog, "v4.ask.continue"), disabled: false, busy: false, describedBy: `${ids}-signin`, href: signInHref,
                 linkRef: signInNext, onPress: (event) => { if (event !== undefined) helpBeforeSignIn(event as MouseEvent<HTMLAnchorElement>); } }
@@ -2112,7 +2176,6 @@ function V4AskForm({
             <V4NotStarted items={notStartedItems} locale={locale} catalog={catalog} onPickUp={(id) => void pickUp(id)} onDelete={deleteSaved} />
           ) : null}
           {deleteNotes}
-          {firstVisit ? <V4MapSeed question={question} catalog={catalog} /> : null}
           {/* Task 75d: no level rides the shelf's links; each map shows its debate at its own level (Task 76j: none is handed). */}
           <V4MapShelf load={shelf.load} catalog={catalog} locale={locale} />
         </div>
@@ -2124,52 +2187,105 @@ function V4AskForm({
           onFocus={(event) => setTextFocused(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)}
           onBlur={() => setTextFocused(false)}
         >
-          <div>
-            <button type="button" className="v4Link v4AskBack" onClick={toStepOne}>
-              <span aria-hidden="true">‹ </span>{t(catalog, "v4.common.back")}
-            </button>
-          </div>
+          {restated ? (
+            // Design Document v2 (16b): with a sentence that says the question back, the person's question heads the step, under
+            // a small label; "Edit my question" beside the label is the way back to step 1 (it does what Back does).
+            <div className="v4ReadAsked">
+              <div className="v4ReadAskedHead">
+                <span className="v4ReadAskedLabel">{t(catalog, "v4.read.questionLabel")}</span>
+                <button type="button" className="v4Link v4ReadEdit" onClick={toStepOne}>{t(catalog, "v4.read.editMyQuestion")}</button>
+              </div>
+              <h1 ref={readHeading} tabIndex={-1} className="v4ReadAskedTitle v4Serif" dir="auto">{askedWords}</h1>
+            </div>
+          ) : (
+            <div>
+              <button type="button" className="v4Link v4AskBack" onClick={toStepOne}>
+                <span aria-hidden="true">‹ </span>{t(catalog, "v4.common.back")}
+              </button>
+            </div>
+          )}
           <section className="v4Card v4AskCard" aria-labelledby={`${ids}-read`}>
-            <h1 id={`${ids}-read`} ref={readHeading} tabIndex={-1} className="v4AskReadTitle v4Serif">
-              {t(catalog, "v4.read.title")}
-            </h1>
+            {/* Design Document v2 (16b): the reading and its question box are the "hard" card; the questions follow on the page. */}
+            <div className="v4Hard v4AskRead">
+              {restated ? (
+                <div className="v4ReadHead">
+                  <h2 id={`${ids}-read`} className="v4AskReadTitle v4Serif">{t(catalog, "v4.read.title")}</h2>
+                  {boxStands ? null : <span className="v4ReadHint">{t(catalog, "v4.read.assumptionsHint")}</span>}
+                </div>
+              ) : (
+                <h1 id={`${ids}-read`} ref={readHeading} tabIndex={-1} className="v4AskReadTitle v4Serif">
+                  {t(catalog, "v4.read.title")}
+                </h1>
+              )}
 
-            <div className="v4AskBlock">
-              <label id={`${ids}-q2label`} className="v4AskLabel" htmlFor={`${ids}-q2`}>
-                {t(catalog, "v4.read.questionLabel")}
-              </label>
-              {/* Task 70b (read-d2): the box starts as the line read at Next; what is typed here joins it and is never read again.
-                  Task 76 (read-d3): the answers' sentences live here too; the box shows its text exactly as typed (a trailing line
-                  break stays: the wave-3 review), and Start sends it tidied (boxLine). Typing over a sentence unticks its answer. */}
-              <textarea
-                ref={boxField}
-                id={`${ids}-q2`}
-                className={boxFlash ? "v4AskField v4AskFieldSmall v4Highlight" : "v4AskField v4AskFieldSmall"}
-                rows={2}
-                dir="auto"
-                value={box.text}
-                onChange={(event) => {
-                  const next = boxTyped(box, event.target.value);
-                  const dropped = boxDropped(box, next);
-                  setBox(next);
-                  if (dropped.length > 0) {
-                    setGoal((current) => ({ ...current, answers: current.answers.filter((given) => !dropped.includes(given.question)) }));
-                    // Task 76g: a held sentence typed over is the person's now; ticking the answer again gives its own sentence.
-                    setHeld((current) => withoutHeld(current, dropped));
-                  }
-                }}
-                aria-labelledby={`${ids}-q2label`}
-                aria-describedby={stepTwoWhy}
-              />
-              {!boxLongEnough && !boxCrisis ? (
-                <p id={`${ids}-short2`} className="v4AskHint v4Muted">{t(catalog, "v4.ask.tooShort")}</p>
-              ) : null}
-              {tooLong ? <p id={`${ids}-long2`} className="v4AskRefusal" role="alert">{t(catalog, "v4.read.tooLong")}</p> : null}
-              {/* ask-f13: while a rewrite of Next is in force, the person's own words are one small link away. */}
-              {rewriteLine === null ? null : (
-                <p className="v4AskHint v4AskUseMine">
-                  <button type="button" className="v4Link" onClick={keepOwnWords}>{t(catalog, "v4.ask.useMyWords")}</button>
-                </p>
+              {boxStands ? null : <V4ReadSentence parts={readSentence} groupIdOf={readGroupId} onGoTo={goToGroup} catalog={catalog} />}
+              {!boxStands ? null : (
+                <div className="v4AskBlock">
+                  <label id={`${ids}-q2label`} className="v4AskLabel" htmlFor={`${ids}-q2`}>
+                    {t(catalog, "v4.read.questionLabel")}
+                  </label>
+                  {/* Task 70b (read-d2): the box starts as the line read at Next; what is typed here joins it and is never read again.
+                      Task 76 (read-d3): the answers' sentences live here too; the box shows its text exactly as typed (a trailing line
+                      break stays: the wave-3 review), and Start sends it tidied (boxLine). Typing over a sentence unticks its answer. */}
+                  <textarea
+                    ref={boxField}
+                    id={`${ids}-q2`}
+                    className={boxFlash ? "v4AskField v4AskFieldSmall v4Highlight" : "v4AskField v4AskFieldSmall"}
+                    rows={2}
+                    dir="auto"
+                    value={box.text}
+                    onChange={(event) => {
+                      const next = boxTyped(box, event.target.value);
+                      const dropped = boxDropped(box, next);
+                      setBox(next);
+                      if (dropped.length > 0) {
+                        setGoal((current) => ({ ...current, answers: current.answers.filter((given) => !dropped.includes(given.question)) }));
+                        // Task 76g: a held sentence typed over is the person's now; ticking the answer again gives its own sentence.
+                        setHeld((current) => withoutHeld(current, dropped));
+                      }
+                    }}
+                    aria-labelledby={`${ids}-q2label`}
+                    aria-describedby={stepTwoWhy}
+                  />
+                  {!boxLongEnough && !boxCrisis ? (
+                    <p id={`${ids}-short2`} className="v4AskHint v4Muted">{t(catalog, "v4.ask.tooShort")}</p>
+                  ) : null}
+                  {tooLong ? <p id={`${ids}-long2`} className="v4AskRefusal" role="alert">{t(catalog, "v4.read.tooLong")}</p> : null}
+                  {/* ask-f13: while a rewrite of Next is in force, the person's own words are one small link away. */}
+                  {rewriteLine === null ? null : (
+                    <p className="v4AskHint v4AskUseMine">
+                      <button type="button" className="v4Link" onClick={keepOwnWords}>{t(catalog, "v4.ask.useMyWords")}</button>
+                    </p>
+                  )}
+                </div>
+              )}
+              {/* Design Document v2 (16b): under the sentence, what its two lines mean and "Use my words instead"; under the
+                  box the person chose, the way back to the sentence. One button, so the focus stays on it across the change.
+                  A box that came by itself (it has something to say) has no way back until that is settled. */}
+              {!restated || (boxStands && boxSays) ? null : (
+                <div className="v4ReadLegend">
+                  {boxStands ? null : (
+                    <span key="assumed" className="v4ReadKey">
+                      <span className="v4ReadKeyLine v4ReadKeyLine--assumed" aria-hidden="true" />{t(catalog, "v4.read.ourAssumption")}
+                    </span>
+                  )}
+                  {boxStands ? null : (
+                    <span key="chosen" className="v4ReadKey">
+                      <span className="v4ReadKeyLine v4ReadKeyLine--chosen" aria-hidden="true" />{t(catalog, "v4.read.yourChoice")}
+                    </span>
+                  )}
+                  <button
+                    key="swap"
+                    type="button"
+                    className="v4ReadSwap"
+                    onClick={() => {
+                      focusOwnBox.current = !ownBox;
+                      setOwnBox(!ownBox);
+                    }}
+                  >
+                    {t(catalog, ownBox ? "v4.read.showReading" : "v4.read.useOwnWords")}
+                  </button>
+                </div>
               )}
             </div>
 
@@ -2190,6 +2306,7 @@ function V4AskForm({
               setAside={shown.setAside}
               onPutBack={putBack}
               quiet={shown.quiet}
+              {...(readAssumptions === undefined ? {} : { assumptions: readAssumptions })}
               catalog={catalog}
               newDebateCatalog={newDebateCatalog}
               locale={locale}
@@ -2214,6 +2331,7 @@ function V4AskForm({
               // Task 76e (owner, 4 Nov, "Hide the old line"): while the update banner shows, only the banner speaks. Task 76f (owner
               // answer S1 A): nor while the account keeps the question, since a reload then reopens step 2 from the account.
               hideReloadLine={site.updated || accountKeeps}
+              planActions={cardActions}
             />
           )}
 

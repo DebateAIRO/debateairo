@@ -379,20 +379,26 @@ describe("S02-C8 consent-ui style contract", () => {
 
   it("S02-S64 · the disabled `I have read it` clears 4.5:1 in both modes, computed here", () => {
     // The pinned value, and its derivation is a MEASUREMENT rather than a convention: stepping
-    // alpha by 0.05 over the composite below gives `.60` -> Terracotta 4.13 (fails 4.5) / Chamber
-    // 6.29, `.65` -> 4.79 / 7.17, `.70` -> 5.54 / 8.09. `.65` is the smallest 0.05 step clearing
-    // 4.5:1 in BOTH modes, i.e. the most dimmed — the most legibly disabled — value that still
-    // passes. Every one of those six numbers is ASSERTED at the end of this case, not narrated:
-    // the round-1 review found `5.61` in this sentence, where the arithmetic gives 5.54, because
-    // the only rung anything executed was the pinned one (`CODE-REV-S02-C8-r1` B1).
-    expectDecl(".policyPrimary:disabled", "opacity", ".65");
+    // alpha by 0.05 over the composite below gives `.55` -> Terracotta 3.88 (fails 4.5) / Chamber
+    // 5.83, `.60` -> 4.54 / 6.66, `.65` -> 5.38 / 7.57 under the Design Document v2 palette. `.6`
+    // is the smallest 0.05 step clearing 4.5:1 in BOTH modes, i.e. the most dimmed — the most
+    // legibly disabled — value that still passes. Every one of those six numbers is ASSERTED at
+    // the end of this case, not narrated: the round-1 review found a wrong figure in this
+    // sentence because the only rung anything executed was the pinned one (`CODE-REV-S02-C8-r1` B1).
+    expectDecl(".policyPrimary:disabled", "opacity", ".6");
     const alpha = Number.parseFloat(declsOf(".policyPrimary:disabled").get("opacity")!);
     expect(Number.isFinite(alpha)).toBe(true);
 
-    // The composite is only about the right colours while the button is painted from these two
-    // tokens, so the model is pinned beside the number it depends on.
-    expectDecl(".policyPrimary", "background", "var(--ink)");
+    // Design Document v2: the ENABLED button is the brand blue with a page-coloured label, and
+    // the locked one drops the blue for the ink face before it is dimmed (the blue face cannot be
+    // dimmed and stay readable). The composite is only about the right colours while the LOCKED
+    // button is painted from these two tokens, so the model is pinned beside the number it
+    // depends on — on both spellings of "locked".
+    expectDecl(".policyPrimary", "background", "var(--pro)");
     expectDecl(".policyPrimary", "color", "var(--bg)");
+    expectDecl(".policyPrimary:disabled", "background", "var(--ink)");
+    expectDecl('.policyPrimary[aria-disabled="true"]', "background", "var(--ink)");
+    expectDecl('.policyPrimary[aria-disabled="true"]', "opacity", ".6");
 
     // `opacity` composites the whole button — face and label together — over the footer's ground,
     // which is `--shell` (`.policyFoot`). `tests/support/contrast.ts` takes `#RRGGBB` only, so the
@@ -404,32 +410,35 @@ describe("S02-C8 consent-ui style contract", () => {
     // The selection is on the RATIO, never on its 2-dp rendering (N1r2; see `ratiosAt`).
     expect(failingAt(alpha)).toEqual([]);
 
-    // And the LADDER the sentence above narrates, executed rung by rung. `.60` is the rung that
-    // fails and is therefore the reason `.65` is pinned; `.70` is the rung whose figure round 1
-    // shipped wrong. A derivation written as prose beside an executable assertion is unexecuted
-    // prose, and this is what that cost.
-    expect(labelsAt(0.6)).toEqual(["Terracotta 4.13", "Chamber 6.29"]);
-    expect(labelsAt(0.65)).toEqual(["Terracotta 4.79", "Chamber 7.17"]);
-    expect(labelsAt(0.7)).toEqual(["Terracotta 5.54", "Chamber 8.09"]);
+    // And the LADDER the sentence above narrates, executed rung by rung. `.55` is the rung that
+    // fails and is therefore the reason `.6` is pinned. A derivation written as prose beside an
+    // executable assertion is unexecuted prose.
+    expect(labelsAt(0.55)).toEqual(["Terracotta 3.88", "Chamber 5.83"]);
+    expect(labelsAt(0.6)).toEqual(["Terracotta 4.54", "Chamber 6.66"]);
+    expect(labelsAt(0.65)).toEqual(["Terracotta 5.38", "Chamber 7.57"]);
 
-    // `.65` is the SMALLEST 0.05 step that clears 4.5:1 in both modes — the claim the pin rests
+    // `.6` is the SMALLEST 0.05 step that clears 4.5:1 in both modes — the claim the pin rests
     // on — so the rung below it must fail. Stated as a property, not as a number.
-    expect(ratiosAt(0.6).some(([, ratio]) => ratio < 4.5)).toBe(true);
+    expect(ratiosAt(0.55).some(([, ratio]) => ratio < 4.5)).toBe(true);
 
-    // THE BLIND WINDOW, executed rather than described (`CODE-REV-S02-C8 r2` N1r2, `t_e7801ab7`).
-    // This is the discriminator between "filter the ratio" and "filter its 2-dp rendering", and
-    // it is the only assertion in this file that can tell them apart: at `alpha = 0.4784`
-    // Chamber's true ratio is 4.498360 — BELOW 4.5, a real AA failure — and it PRINTS as
-    // `"4.50"`. Comparing the printed string lists Terracotta alone; comparing the number lists
-    // both, which is what a reader of a failure message needs. Independently recomputed here
-    // before it was written: Terracotta 2.927853, Chamber 4.498360.
-    expect(labelsAt(0.4784), "the blind window's printed rungs").toEqual([
-      "Terracotta 2.93",
+    // THE EDGE OF 4.5, executed rather than described (`CODE-REV-S02-C8 r2` N1r2, `t_e7801ab7`).
+    // The selection must be on the RATIO, never on its 2-dp rendering. Under the first palette
+    // one alpha gave a true ratio inside the blind window `[4.495, 4.5)`; under the Design
+    // Document v2 palette no alpha does (a scan of 200,000 alphas finds none: the composite moves
+    // in whole channel steps and jumps over the window). The two rungs nearest 4.5 are therefore
+    // pinned instead, one on each side, with the numbers recomputed before they were written:
+    // at `alpha = 0.46001` Chamber's true ratio is 4.504066 — it PRINTS as `"4.50"` and PASSES, so
+    // only Terracotta (2.988327) is listed; at `alpha = 0.59376` Terracotta's is 4.478337 — just
+    // BELOW 4.5, a real AA failure — and it alone is listed (Chamber 6.564993).
+    expect(labelsAt(0.46001), "the rungs printed at Chamber's edge").toEqual([
+      "Terracotta 2.99",
       "Chamber 4.50"
     ]);
-    expect(failingAt(0.4784), "a true ratio in [4.495, 4.5) is REPORTED as failing").toEqual([
-      "Terracotta 2.93",
-      "Chamber 4.50"
+    expect(failingAt(0.46001), "a true ratio of 4.504 prints as 4.50 and is NOT failing").toEqual([
+      "Terracotta 2.99"
+    ]);
+    expect(failingAt(0.59376), "a true ratio of 4.478 is REPORTED as failing").toEqual([
+      "Terracotta 4.48"
     ]);
   });
 

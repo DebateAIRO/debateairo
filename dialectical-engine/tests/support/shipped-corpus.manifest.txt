@@ -766,6 +766,7 @@ apps/ui/components/v4/V4PublicSession.tsx
 apps/ui/components/v4/V4QuestionShare.tsx
 apps/ui/components/v4/V4QuotaPill.tsx
 apps/ui/components/v4/V4Rail.tsx
+apps/ui/components/v4/V4ReadSentence.tsx
 apps/ui/components/v4/V4ReadyNote.tsx
 apps/ui/components/v4/V4ReportClient.tsx
 apps/ui/components/v4/V4ReportHeader.tsx
@@ -1051,6 +1052,7 @@ apps/ui/lib/v4/publicState.ts
 apps/ui/lib/v4/questionAddress.ts
 apps/ui/lib/v4/questionBox.ts
 apps/ui/lib/v4/quotaPulse.ts
+apps/ui/lib/v4/readRestatement.ts
 apps/ui/lib/v4/readyMoment.ts
 apps/ui/lib/v4/reportPaths.ts
 apps/ui/lib/v4/reportWriting.ts

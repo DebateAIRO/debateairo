@@ -82,11 +82,14 @@ describe("W5-1 Write my report: the closing", () => {
   });
 
   it("the five report contracts are sealed by the engine hash, appended last", () => {
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-23, -18)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
+    // 17 Nov: ask.clarify.v3 was sealed beside ask.clarify.v1 (after the v1 and v2 report contracts), then the three goal versions
+    // right after the v4 writers: the v1 and v2 slices moved four places from the end, the v3 and v4 slices three.
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-27, -22)).toEqual(["report.answer.v1", "report.answer.later.v1", "report.answer-check.v1",
       "report.story.v1", "report.story-check.v1"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-15, -12)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-7, -4)).toEqual(["report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"]);
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-4, -2)).toEqual(["report.answer.v4", "report.answer.later.v4"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-19, -16)).toEqual(["report.answer.v2", "report.answer.later.v2", "report.answer-check.v2"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-10, -7)).toEqual(["report.answer.v3", "report.answer.later.v3", "report.answer-check.v3"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-7, -5)).toEqual(["report.answer.v4", "report.answer.later.v4"]);
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-5, -2)).toEqual(["report.answer.v5", "report.answer.later.v5", "report.answer-check.v4"]);
   });
 
   it("F5: one fence and canary for the whole closing, so a step's second round opens with its first round's bytes", async () => {
@@ -339,7 +342,7 @@ describe("R22 the overall answer, the one module the report and the main-answer 
 
 // V4 start step, Task 50c (follow-up to Task 50b; the owner, 4 Nov, "Always say it", and Q4: "the final answer says how the person's goal
 // fares"): when the investigation's ROOT question carries the person's marked care answer, the report's answer says how that goal fares.
-// Version 1 asks Task 50b's draft report.answer.v5, a later version the draft report.answer.later.v5, both checked by Task 50b's draft
+// Version 1 asks Task 50b's report.answer.v5, a later version report.answer.later.v5, both checked by Task 50b's
 // report.answer-check.v4; the story and its check stay as they are (they follow the answer). Without a goal, every call's bytes are
 // today's: the digests below were taken on this file's world before Task 50c changed any code (wave16-t50c-1.log and -2.log).
 const GOAL_WRITER_SENTENCE = "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";

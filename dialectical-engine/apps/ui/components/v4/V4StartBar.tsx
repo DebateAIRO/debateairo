@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode, type RefObject } from "react";
 import type { StartStepRoom } from "@debateai/contract";
 import { t, tPlural, type MessageCatalog } from "@/lib/i18n/translate";
 import { SHARE_DELTA_SHOW_MS, shareDeltaLine, startPathsShareLine } from "@/lib/v4/money";
@@ -28,6 +28,9 @@ import { DIG_MODES, type DigMode, type ReadingLevel } from "@/lib/v4/types";
  * them; the lines above and a declined consent's line sit right before it (journey-d3 keeps the bar to about a quarter of the
  * screen, read-f9 keeps notices out of it). On a computer the same pieces are one plain row, no card ("On a computer, Next
  * sits right under the box"), the declined line right under Next, and the late lines after the row (ask-f16).
+ * Design Document v2 (16a, 16b): Next and Start are the orange call to action (.v4Cta). On a computer step 2's bar is the
+ * page's foot: what the person gets and the share (with a small meter of it) at the start, "How wide", the mode and Start
+ * at the end; the Free notice keeps its own line right above them.
  */
 
 /**
@@ -228,8 +231,17 @@ function StartBar(props: V4StartBarProps) {
   const deltaMark = deltaLine === null ? null
     : <span key={`${sharePercent}:${delta}`} className="v4ShareChange v4Highlight" aria-hidden="true" dir="ltr">{t(catalog, deltaLine.key, deltaLine.values)}</span>;
 
-  const youGet = pathCount === null ? t(catalog, "v4.read.youGet")
+  const youGetWords = pathCount === null ? t(catalog, "v4.read.youGet")
     : tPlural(catalog, level === "expert" ? "v4.start.youGetExpert" : "v4.start.youGet", pathCount, locale);
+  // Design Document v2: the line's lead ("You'll get:") is bold; the words are the catalogue's, unchanged.
+  const leadEnd = youGetWords.indexOf(":");
+  const youGet: ReactNode = leadEnd < 0 ? youGetWords : <><b>{youGetWords.slice(0, leadEnd + 1)}</b>{youGetWords.slice(leadEnd + 1)}</>;
+  // The share's meter (a picture of the number beside it, so hidden from screen readers).
+  const meter = sharePercent === null ? null : (
+    <span className="v4StartBarMeter" aria-hidden="true">
+      <span className="v4StartBarMeterFill" style={{ "--v4-share": `${Math.min(100, Math.max(0, sharePercent))}%` } as CSSProperties} />
+    </span>
+  );
 
   const pressable = helpFirst || state === "READY";
   const startWords = helpFirst ? t(catalog, "v4.start.start")
@@ -242,7 +254,7 @@ function StartBar(props: V4StartBarProps) {
     <button
       id={startId}
       type="button"
-      className="v4Btn v4BtnPrimary v4StartBarStart"
+      className="v4Btn v4BtnPrimary v4Cta v4StartBarStart"
       disabled={!pressable}
       aria-busy={!helpFirst && (state === "SENDING" || state === "WRITING_WAIT" || state === "CHECKING_PLAN")}
       onClick={() => {
@@ -250,6 +262,11 @@ function StartBar(props: V4StartBarProps) {
       }}
     >
       {startWords}
+      {pressable ? (
+        <svg className="v4StartBarArrow" aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 12h14M13 6l6 6-6 6" />
+        </svg>
+      ) : null}
     </button>
   );
 
@@ -272,11 +289,13 @@ function StartBar(props: V4StartBarProps) {
   const howWide = widthOptions.length > 1 ? (
     <div className="v4StartBarWidths" role="group" aria-label={t(catalog, "v4.start.howWide")}>
       <span className="v4StartBarLabel" aria-hidden="true">{t(catalog, "v4.start.howWide")}</span>
-      {widthOptions.map((option) => (
-        <button key={option} type="button" className="v4Chip" aria-pressed={option === width} onClick={() => onWidth(option)}>
-          {tPlural(catalog, "v4.start.pathCount", option, locale)}
-        </button>
-      ))}
+      <div className="v4StartBarSeg">
+        {widthOptions.map((option) => (
+          <button key={option} type="button" className="v4Chip" aria-pressed={option === width} onClick={() => onWidth(option)}>
+            {tPlural(catalog, "v4.start.pathCount", option, locale)}
+          </button>
+        ))}
+      </div>
     </div>
   ) : null;
 
@@ -311,13 +330,24 @@ function StartBar(props: V4StartBarProps) {
         <div className={`v4StartBar${aside}`}>
           {combineLine}
           {readyButton}
-          <p className="v4StartBarGet">{youGet}</p>
-          {share === null ? null : <p className="v4StartBarShare">{share}{deltaMark === null ? null : <>{" "}{deltaMark}</>}</p>}
-          {howWide === null && modeSwitch === null ? null : <div className="v4StartBarRow">{howWide}{modeSwitch}</div>}
           {publicNotice}
-          <div className="v4StartBarGo">
-            {startButton}
-            {justLink}
+          <div className="v4StartBarBody">
+            <div className="v4StartBarInfo">
+              <p className="v4StartBarGet">{youGet}</p>
+              {share === null ? null : (
+                <div className="v4StartBarShareRow">
+                  {meter}
+                  <p className="v4StartBarShare">{share}{deltaMark === null ? null : <>{" "}{deltaMark}</>}</p>
+                </div>
+              )}
+            </div>
+            <div className="v4StartBarSide">
+              {howWide === null && modeSwitch === null ? null : <div className="v4StartBarRow">{howWide}{modeSwitch}</div>}
+              <div className="v4StartBarGo">
+                {startButton}
+                {justLink}
+              </div>
+            </div>
           </div>
           {carryOnBox}
         </div>
@@ -429,7 +459,7 @@ function NextBar(props: V4NextBarProps) {
   const { catalog, justAnswer, next, declined, under, publicNotice, above, narrow, textFocused, helpFirst } = props;
   // ask-f3: crisis words keep Next and the link pressable, for the help screen alone, whatever greys them.
   const nextButton = (
-    <NextPress press={next} className="v4Btn v4BtnPrimary v4StartBarNext" pressable={helpFirst || !next.disabled} linkRef={next.linkRef}>
+    <NextPress press={next} className="v4Btn v4BtnPrimary v4Cta v4StartBarNext" pressable={helpFirst || !next.disabled} linkRef={next.linkRef}>
       {next.label}
     </NextPress>
   );

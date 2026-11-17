@@ -1,4 +1,4 @@
-import { SAVED_QUESTION_LIMITS, savedQuestionPartBytes, type SavedQuestionDoc } from "@debateai/contract";
+import { SAVED_QUESTION_LIMITS, SavedQuestionIdSchema, savedQuestionPartBytes, type SavedQuestionDoc } from "@debateai/contract";
 import { pathPlanChanged, type PathPlan, type PathPlanSnapshot } from "./pathPlan.js";
 import { startKeptOf, type V4StartKept, type V4StartReading, type V4StartWritten } from "./startKept.js";
 
@@ -11,6 +11,30 @@ import { startKeptOf, type V4StartKept, type V4StartReading, type V4StartWritten
 
 /** A change is saved about this long after the last one (an answer, typing, a plan action, How wide, the mode, the carry-on tick). */
 export const SAVE_PAUSE_MS = 1_000;
+
+/**
+ * "My questions" hands a saved question to the ask page by the address (`/v4?pickup=<id>`): only the id travels, and the ask
+ * page takes it out of the address as it picks the question up.
+ */
+export const PICK_UP_PARAM = "pickup";
+
+/** Pick up from another page: the ask page, told which of the account's saved questions to open. */
+export function pickUpHref(id: string): string {
+  return `/v4?${PICK_UP_PARAM}=${encodeURIComponent(id)}`;
+}
+
+/** The saved question `?pickup=` names, or null: a saved question's id as the API makes it; anything else is ignored. */
+export function pickUpIdOf(value: string | null | undefined): string | null {
+  return typeof value === "string" && SavedQuestionIdSchema.safeParse(value).success ? value : null;
+}
+
+/** `search` (an address's query) without the pick-up id, as the address's ending ("" or "?…"). */
+export function withoutPickUp(search: string): string {
+  const params = new URLSearchParams(search);
+  params.delete(PICK_UP_PARAM);
+  const rest = params.toString();
+  return rest.length === 0 ? "" : `?${rest}`;
+}
 
 type SavedPage = SavedQuestionDoc["page"];
 

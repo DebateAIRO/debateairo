@@ -559,6 +559,8 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
   return (
     // dig-f24: `id` is where "Skip to the dig button" lands (the block itself takes focus only when its button cannot).
     <section ref={block} className="v4PanelDig" {...(props.id === undefined ? {} : { id: props.id, tabIndex: -1 })}>
+      {/* Design Document v2: the switch's name is shown over it (the group itself keeps the same name for screen readers). */}
+      {panel.showDigModes === false ? null : <p className="v4PanelModeLabel" aria-hidden="true">{t(panel.catalog, "v4.panel.modeLabel")}</p>}
       {panel.showDigModes === false ? null : (
         <div className="v4PanelModes" role="group" aria-label={t(panel.catalog, "v4.panel.modeLabel")}>
           {DIG_MODES.map((mode) => (
@@ -582,7 +584,8 @@ function DigBlock(props: Readonly<{ target: DigTarget; panel: PanelProps; again?
         <button
           ref={button}
           type="button"
-          className={`v4Btn v4BtnPrimary v4PanelDigBtn${waiting || resting ? " v4DigWaiting" : ""}`}
+          // Design Document v2: the dig button is the panel's one orange call to action (.v4Cta, v4-base.css).
+          className={`v4Btn v4Cta v4PanelDigBtn${waiting || resting ? " v4DigWaiting" : ""}`}
           disabled={panel.digBusy}
           // report-d2 / journey-f14: while the report waits for digs or is written, digging rests, with its reason below.
           aria-disabled={starting !== null || waiting || resting ? "true" : undefined}
@@ -648,18 +651,30 @@ function usePinRoom(block: RefObject<HTMLElement | null>, shown: boolean): void 
   }, [block, shown]);
 }
 
+/** The large four-shade bar with its "How sure" line. */
+function PanelBar(props: Readonly<{ counts: TrustCounts; catalog: MessageCatalog }>) {
+  return (
+    <div className="v4PanelBar">
+      <V4TrustBar counts={props.counts} catalog={props.catalog} size="large" showCounts />
+    </div>
+  );
+}
+
+/**
+ * The bar, the findings and the unchecked line. Design Document v2: where "The answer here so far" is drawn as a card, the
+ * bar and "How sure" close that card (`bar: false` here, and the card draws PanelBar itself).
+ */
 function TrustSection(props: Readonly<{
   counts: TrustCounts;
   points: readonly V4Point[];
   unchecked: number;
   panel: PanelProps;
+  bar?: boolean;
 }>) {
   const { panel } = props;
   return (
     <>
-      <div className="v4PanelBar">
-        <V4TrustBar counts={props.counts} catalog={panel.catalog} size="large" showCounts />
-      </div>
+      {props.bar === false ? null : <PanelBar counts={props.counts} catalog={panel.catalog} />}
       <PointGroups points={props.points} level={panel.readingLevel} catalog={panel.catalog} locale={panel.locale} />
       {props.unchecked > 0
         ? <p className="v4PanelUnchecked v4Muted">{tPlural(panel.catalog, "v4.panel.unchecked", props.unchecked, panel.locale)}</p>
@@ -756,10 +771,11 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
       {/* R22 W5-1 (Q-D11): the current report version's answer first; the first debate's answer one click away.
           map-d1: with the answer card above the map, this panel shows the evidence only. */}
       {panel.answerOnTop === true ? null : panel.reportAnswer !== null && panel.reportAnswer !== undefined ? (
-        <Section title={t(catalog, "v4.investigation.fromReport", { n: panel.reportAnswer.version })} className="v4PanelReportAnswer">
+        <Section title={t(catalog, "v4.investigation.fromReport", { n: panel.reportAnswer.version })} className="v4PanelReportAnswer v4PanelAnswer v4Hard">
           <div data-ai-generated="true">
             {panel.reportAnswer.segments.map((segment, index) => <p key={index} className="v4PanelText">{segment}</p>)}
           </div>
+          <PanelBar counts={map.counts} catalog={catalog} />
           <details className="v4PanelFirstAnswer">
             <summary>{t(catalog, "v4.investigation.firstAnswer")}</summary>
             <div className="v4PanelFirstAnswerBody">
@@ -768,13 +784,15 @@ function RootBody(props: Readonly<{ panel: PanelProps }>) {
           </details>
         </Section>
       ) : (
-        <Section title={t(catalog, "v4.panel.answerRoot")}>
+        <Section title={t(catalog, "v4.panel.answerRoot")} className="v4PanelAnswer v4Hard">
           {firstAnswer}
+          <PanelBar counts={map.counts} catalog={catalog} />
         </Section>
       )}
       {picksTarget !== null ? <SkipToDig targetId={digId} catalog={catalog} /> : null}
       <V4WebNoteLine note={map.webNote} catalog={catalog} />
-      <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} />
+      {/* The bar closes the answer's card when the panel shows the answer; with the answer above the map it leads the findings. */}
+      <TrustSection counts={map.counts} points={map.points} unchecked={map.unchecked} panel={panel} bar={panel.answerOnTop === true} />
       {panel.readingLevel === "expert" && map.why.length > 0
         ? (
           <Section title={t(catalog, "v4.panel.why")}>
@@ -855,7 +873,7 @@ function BranchAbout(props: Readonly<{ branch: V4Branch; catalog: MessageCatalog
  * Task 61: where a chosen path came out. Being looked into: where its findings will show. Filled in: its answer so far (the
  * line, and its summary until a dig rewrote it), its trust word, what changed and the point-of-view line. Not finished: says so.
  */
-function BranchAnswer(props: Readonly<{ path: V4Path; branch: V4Branch; startingTop: ReactNode; catalog: MessageCatalog }>) {
+function BranchAnswer(props: Readonly<{ path: V4Path; branch: V4Branch; startingTop: ReactNode; bar: ReactNode; catalog: MessageCatalog }>) {
   const { path, branch, catalog } = props;
   if (branch.state === "LOOKING") {
     const title = pathTitle(path, catalog, HEADING_MAX);
@@ -868,7 +886,7 @@ function BranchAnswer(props: Readonly<{ path: V4Path; branch: V4Branch; starting
   }
   if (branch.state === "FAILED") {
     return (
-      <Section title={t(catalog, "v4.paths.answerSoFar")}>
+      <Section title={t(catalog, "v4.paths.answerSoFar")} className="v4PanelAnswer v4Hard">
         <p className="v4PanelText">{t(catalog, "v4.paths.failed")}</p>
         {props.startingTop}
       </Section>
@@ -879,9 +897,10 @@ function BranchAnswer(props: Readonly<{ path: V4Path; branch: V4Branch; starting
   const word = path.trust ?? null;
   return (
     <>
-      <Section title={t(catalog, "v4.paths.answerSoFar")}>
+      <Section title={t(catalog, "v4.paths.answerSoFar")} className="v4PanelAnswer v4Hard">
         <p className="v4PanelText" data-ai-generated="true">{line}</p>
         {summary === null ? null : <p className="v4PanelText" data-ai-generated="true">{summary}</p>}
+        {props.bar}
         {word === null ? null : (
           <p className="v4PanelText v4PathTrustWord">{t(catalog, "v4.paths.trustWord", { word: t(catalog, `v4.trust.${word}`) })}</p>
         )}
@@ -925,15 +944,18 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   const digPanel: PanelProps = deeper === undefined
     ? panel
     : { ...panel, onDig: (target: DigTarget) => (target.kind === "path" ? deeper(target.path.id) : panel.onDig(target)) };
+  // Design Document v2: the path's bar and its "How sure" line close the card of "The answer here so far".
+  const answerBar = found ? <PanelBar counts={path.counts} catalog={panel.catalog} /> : null;
   return (
     <>
       {branch === undefined ? null : <BranchAbout branch={branch} catalog={panel.catalog} />}
       {branch === undefined ? (
-        <Section title={t(panel.catalog, "v4.panel.answerHere")}>
+        <Section title={t(panel.catalog, "v4.panel.answerHere")} className="v4PanelAnswer v4Hard">
           <AnswerSoFar line={more ? line : null} catalog={panel.catalog} />
+          {answerBar}
           {startingTop}
         </Section>
-      ) : <BranchAnswer path={path} branch={branch} startingTop={startingTop} catalog={panel.catalog} />}
+      ) : <BranchAnswer path={path} branch={branch} startingTop={startingTop} bar={answerBar} catalog={panel.catalog} />}
       {run ? null : (
         <V4PathRewrite
           path={path}
@@ -948,7 +970,7 @@ function PathBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
       {run ? null : path.web !== undefined
         ? <V4SearchNote search={path.web.search} catalog={panel.catalog} />
         : <V4WebNoteLine note={panel.map.webNote} catalog={panel.catalog} />}
-      {found ? <TrustSection counts={path.counts} points={path.points} unchecked={path.unchecked} panel={panel} /> : null}
+      {found ? <TrustSection counts={path.counts} points={path.points} unchecked={path.unchecked} panel={panel} bar={false} /> : null}
       {!run && path.web !== undefined && path.web.otherPages.length > 0
         ? (
           // map-d4 A: "Other pages found ▸", folded, after the findings (paid plans only: Free searches nothing).
@@ -1036,10 +1058,10 @@ function OpenBody(props: Readonly<{ panel: PanelProps; resolved: Extract<Resolve
   const { counts, unchecked } = countTrust(points);
   return (
     <>
-      <Section title={t(panel.catalog, "v4.panel.answerHere")}>
+      <Section title={t(panel.catalog, "v4.panel.answerHere")} className="v4PanelAbout">
         <p className="v4PanelText"><b>{t(panel.catalog, dig === null ? "v4.panel.notYet" : "v4.panel.dugAlready")}</b></p>
         <p className="v4PanelText">{t(panel.catalog, `v4.panel.whyOpen.${question.kind}`)}</p>
-        {question.star ? <p className="v4PanelText">{t(panel.catalog, "v4.panel.star")}</p> : null}
+        {question.star ? <p className="v4PanelText v4PanelStarLine">{t(panel.catalog, "v4.panel.star")}</p> : null}
       </Section>
       {point !== null ? <TrustSection counts={counts} points={points} unchecked={unchecked} panel={panel} /> : null}
       {dig === null

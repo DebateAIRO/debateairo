@@ -67,7 +67,7 @@ export function V4ChangesBar(props: Readonly<{
           </p>
           <div className="v4DebChangesActions">
             {stops > 0 ? (
-              <button type="button" className="v4Btn" onClick={onSee}>
+              <button type="button" className="v4Btn v4DebChangesSee" onClick={onSee}>
                 {t(catalog, stops === 1 ? "v4.ready.seeIt" : "v4.ready.showMe")}
               </button>
             ) : null}

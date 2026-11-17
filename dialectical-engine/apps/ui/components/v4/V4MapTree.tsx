@@ -591,11 +591,12 @@ export function V4PathCard(props: Readonly<{
             {line.length > 0 && line !== branch?.title
               ? <span className="v4PathCardLine" data-ai-generated="true">{line}</span>
               : null}
+            {/* Design Document v2: the bar comes right under the title, the path's small words under the bar. */}
+            <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} word={path.trust ?? null} />
             <span className={compact ? "v4OutMeta" : "v4MapPathMeta"}>
               <TrustWordTag path={path} catalog={catalog} />
               {marks.seal ? <HoldsSeal catalog={catalog} /> : null}
             </span>
-            <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} word={path.trust ?? null} />
           </>
         )}
         {compact && props.selected ? <span className="v4OutHere">{t(catalog, "v4.outline.here")}</span> : null}
@@ -705,14 +706,16 @@ function OpenCard(props: Readonly<{
         aria-current={selected ? "true" : undefined}
         onClick={(event) => pieces.onSelect(id, viaKeyboard(event))}
       >
-        {question.star ? <span className="v4MapStar" aria-hidden="true">★</span> : null}
         <span className="v4MapOpenBody">
-          <span className="v4MapOpenTitle" data-ai-generated="true">{shortText(question.text)}</span>
-          <span className="v4MapNote">
+          {/* Design Document v2: the kind of open ground is the small gold line over the title, with the star when the
+              question carries it; the star's words follow the title. "Open" is said to screen readers (v4-map-looks.css). */}
+          <span className="v4MapOpenKind">
+            {question.star ? <span className="v4MapStar" aria-hidden="true">★ </span> : null}
             <OpenWord catalog={pieces.catalog} />
-            {question.star ? <span className="v4MapStarWords">{t(pieces.catalog, "v4.map.starHint")}</span> : null}
             <span>{openNote(question, picked, pieces.catalog)}</span>
           </span>
+          <span className="v4MapOpenTitle" data-ai-generated="true">{shortText(question.text)}</span>
+          {question.star ? <span className="v4MapStarWords">{t(pieces.catalog, "v4.map.starHint")}</span> : null}
           {pieces.changed.has(id) ? <NewDot catalog={pieces.catalog} /> : null}
           <LevelWords level={props.level} catalog={pieces.catalog} />
         </span>
@@ -1126,7 +1129,7 @@ export function V4MapTree(props: MapPiecesProps) {
                 aria-current={rootSelected ? "true" : undefined}
                 onClick={(event) => props.onSelect("root", viaKeyboard(event))}
               >
-                <span className="v4MapRootTitle v4Serif">{firstCardQuestion(map)}</span>
+                <span className="v4MapRootTitle">{firstCardQuestion(map)}</span>
                 {run ? null : <V4TrustBar counts={map.counts} unchecked={map.unchecked} catalog={catalog} />}
                 {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
                 <LevelWords level={1} catalog={catalog} />
@@ -1184,11 +1187,11 @@ export function V4MapTree(props: MapPiecesProps) {
                         >
                           {marks.tag !== null ? <ResultTag result={marks.tag} catalog={catalog} /> : null}
                           <TitleText className="v4MapPathTitle" title={pathTitle(path, catalog)} catalog={catalog} />
+                          <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} />
                           <span className="v4MapPathMeta">
                             <TrustWordTag path={path} catalog={catalog} />
                             {marks.seal ? <HoldsSeal catalog={catalog} /> : null}
                           </span>
-                          <V4TrustBar counts={path.counts} unchecked={path.unchecked} catalog={catalog} />
                           <V4RewriteCardNote path={path} catalog={catalog} locale={props.locale ?? "en"} digs={digs} />
                           {groundLeft ? (
                             <span className="v4MapGroundMark">
@@ -1221,19 +1224,24 @@ export function V4MapTree(props: MapPiecesProps) {
   );
 }
 
-/** The marks the map uses, in words (the tree's legend, and the outline's folded "What the shades mean"). */
+/**
+ * The marks the map uses, in words (the tree's legend, and the outline's folded "What the shades mean"). Design Document
+ * v2: the marks of the ground first (open, the star, a dig at work, new), then the four trust shades on a line of their
+ * own (the empty item between them only breaks the line; it is not read out).
+ */
 export function MapLegendItems(props: Readonly<{ catalog: MessageCatalog }>) {
   const { catalog } = props;
   return (
     <>
+      <li><span className="v4MapKey v4MapKeyOpen" aria-hidden="true" />{t(catalog, "v4.map.legendOpen")}</li>
+      <li><span className="v4MapStar" aria-hidden="true">★</span>{t(catalog, "v4.map.legendStar")}</li>
+      <li><span className="v4MapKey v4MapKeyLooking" aria-hidden="true" />{t(catalog, "v4.map.legendLooking")}</li>
+      <li><span className="v4MapKey v4MapKeyNew" aria-hidden="true" />{t(catalog, "v4.map.legendNew")}</li>
+      <li className="v4MapLegendBreak" aria-hidden="true" />
       <li><span className="v4MapKey v4BarSure" aria-hidden="true" />{t(catalog, "v4.trust.SURE")}</li>
       <li><span className="v4MapKey v4BarCase" aria-hidden="true" />{t(catalog, "v4.trust.SURE_FOR_CASE")}</li>
       <li><span className="v4MapKey v4BarArgued" aria-hidden="true" />{t(catalog, "v4.trust.STILL_ARGUED")}</li>
       <li><span className="v4MapKey v4BarFell" aria-hidden="true" />{t(catalog, "v4.trust.DIDNT_HOLD")}</li>
-      <li><span className="v4MapKey v4MapKeyOpen" aria-hidden="true" />{t(catalog, "v4.map.legendOpen")}</li>
-      <li><span className="v4MapKey v4MapKeyLooking" aria-hidden="true" />{t(catalog, "v4.map.legendLooking")}</li>
-      <li><span className="v4MapKey v4MapKeyNew" aria-hidden="true" />{t(catalog, "v4.map.legendNew")}</li>
-      <li><span className="v4MapStar" aria-hidden="true">★</span>{t(catalog, "v4.map.legendStar")}</li>
     </>
   );
 }

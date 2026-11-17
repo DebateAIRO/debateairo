@@ -128,22 +128,28 @@ export function CardChangeFlow({
         />
       ) : stored !== null && details !== null ? (
         <>
-          <div className="billingField">
-            <label htmlFor="card-country">{t(catalog, "billing.checkout.country")}</label>
-            <input id="card-country" value={countryName(locale, stored.country)} readOnly />
-          </div>
-          {stored.region !== null ? (
+          <div className="billingGrid">
             <div className="billingField">
-              <label htmlFor="card-region">{t(catalog, stored.country === "RO" ? "billing.checkout.county" : "billing.checkout.region")}</label>
-              <input id="card-region" value={stored.region} readOnly />
+              <label htmlFor="card-country">{t(catalog, "billing.checkout.country")}</label>
+              <input id="card-country" value={countryName(locale, stored.country)} readOnly />
             </div>
-          ) : null}
+            {stored.region !== null ? (
+              <div className="billingField">
+                <label htmlFor="card-region">{t(catalog, stored.country === "RO" ? "billing.checkout.county" : "billing.checkout.region")}</label>
+                <input id="card-region" value={stored.region} readOnly />
+              </div>
+            ) : null}
+          </div>
           <p className="billingNote">{t(catalog, "billing.card.taxPlaceNote")}</p>
-          <BillingDetailsFields catalog={catalog} idPrefix="card" values={details} postalOptional={postalOptional}
-            onChange={(field, value) => setDetails({ ...details, [field]: value })} />
-          <div className="billingField">
-            <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
-            <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required aria-invalid="false" />
+          <div className="billingGrid">
+            <BillingDetailsFields catalog={catalog} idPrefix="card" values={details} postalOptional={postalOptional}
+              onChange={(field, value) => setDetails({ ...details, [field]: value })}
+              cityField={(
+                <div className="billingField">
+                  <label htmlFor="card-city">{t(catalog, "billing.checkout.city")}</label>
+                  <input id="card-city" value={city} onChange={(event) => setCity(event.target.value)} autoComplete="address-level2" required aria-invalid="false" />
+                </div>
+              )} />
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
           {total !== null && currency !== null ? (
@@ -153,7 +159,7 @@ export function CardChangeFlow({
                 <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, total, currency) })}</span>
               </label>
               <div className="billingActions">
-                <button type="button" className="btn btnDark" disabled={!canStart} onClick={() => { void start(); }}>
+                <button type="button" className="btn btnDark billingCta" disabled={!canStart} onClick={() => { void start(); }}>
                   {t(catalog, "billing.card.checkCard")}
                 </button>
               </div>

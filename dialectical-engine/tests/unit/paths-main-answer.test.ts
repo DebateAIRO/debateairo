@@ -7,9 +7,9 @@
 // rounds on a paid plan and 1 on Free, every round under one fence. The material stays under the 100K line (the byte ladder, then
 // the real count near the line). The answer's segments map back to the run's nodes. R22's dossier keeps its bytes. Data made up.
 // Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"): when the person said what they care about (the purpose lines' marked
-// answer), the writer and the checker are the next versions, drafts until Task 92 seals them; otherwise the sealed two, as before.
+// answer), the writer and the checker are the next versions (sealed 17 Nov, the owner's "Approve both"); otherwise v4 and v3, as before.
 // Task 50c (the same answer, "Always say it"): the main answer's later versions (the update after a dig) and the person's report say it
-// too: report.answer.later.v5 (a draft) for a later version, checked by report.answer-check.v4; the seven-path byte line holds for both.
+// too: report.answer.later.v5 for a later version, checked by report.answer-check.v4; the seven-path byte line holds for both.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -25,7 +25,7 @@ import {
 import type { MainAnswerUpdateRead, MainAnswerUpdateRecord } from "@debateai/db";
 import {
   REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT,
-  REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_GOAL_DRAFT_CONTRACTS,
+  REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_V4_PROMPT_CONTRACT, REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_GOAL_SEALED_CONTRACTS,
   writeOverallAnswer, type ReportAnswerDraft
 } from "@debateai/story";
 import { engineSealedContracts } from "../../apps/runner/src/engine-contracts.js";
@@ -343,29 +343,35 @@ describe("runPathsMainAnswer", () => {
 // Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"; owner answer Q4): when the person said what they care about, the main
 // answer says, in one or two plain sentences, how that goal fares across the paths. The run knows it from the purpose lines' marked
 // answer (the page marks the answer to "What do you care about most?"), never from the words. The writer and the checker are then the
-// next versions, report.answer.v5 and report.answer-check.v4: drafts the owner reads word for word at Task 92 (sealed only there),
-// each the sealed version's words byte for byte with one drafted sentence at its end. Without a stated goal: the sealed two, as before.
+// next versions, report.answer.v5 and report.answer-check.v4: each the version before's words byte for byte with one sentence at its
+// end. The owner approved both sentences as written (17 Nov, "Approve both"), and the three goal contracts are sealed: a group of their
+// own in the engine's seal, right after the v4 writers. Without a stated goal: report.answer.v4 and report.answer-check.v3, as before.
 const GOAL_WRITER_SENTENCE = "If the question says what the person cares about, say in one or two plain sentences how that goal fares across the paths.";
 const GOAL_CHECKER_SENTENCE = "If the question says what the person cares about, the answer must say how that goal fares across the paths.";
 const CARES = Object.freeze({ question: "What do you care about most?", answer: "Keeping bills low" });
 const instructionOf = (request: ProviderCallRequest): string => request.packet.messages[0]!.content;
 
 describe("Task 50b: the person's stated goal", () => {
-  it("the two drafts: v4's writer and v3's check byte for byte, each with its one drafted sentence last; the forms as they were; unsealed", () => {
-    // Task 50c adds the later version's draft between them, so the list reads as the sealed groups do (writer, later writer, check).
-    expect(REPORT_GOAL_DRAFT_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v5", "report.answer.later.v5", "report.answer-check.v4"]);
-    expect(REPORT_GOAL_DRAFT_CONTRACTS).toEqual([REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT]);
-    expect(Object.isFrozen(REPORT_GOAL_DRAFT_CONTRACTS)).toBe(true);
+  it("the goal versions: v4's writer and v3's check byte for byte, each with its one sentence last; the forms as they were; sealed", () => {
+    // Task 50c adds the later version's writer between them, so the list reads as the other sealed groups do (writer, later writer, check).
+    expect(REPORT_GOAL_SEALED_CONTRACTS.map((contract) => contract.contractId)).toEqual(["report.answer.v5", "report.answer.later.v5", "report.answer-check.v4"]);
+    expect(REPORT_GOAL_SEALED_CONTRACTS).toEqual([REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT]);
+    expect(Object.isFrozen(REPORT_GOAL_SEALED_CONTRACTS)).toBe(true);
     expect(REPORT_ANSWER_V5_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`);
     expect(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.instruction}\n\n${GOAL_CHECKER_SENTENCE}`);
     expect(REPORT_ANSWER_V5_PROMPT_CONTRACT.answerForm).toBe(REPORT_ANSWER_V4_PROMPT_CONTRACT.answerForm);
     expect(REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT.answerForm).toBe(REPORT_ANSWER_CHECK_V3_PROMPT_CONTRACT.answerForm);
-    const sealed = engineSealedContracts().map((contract) => contract.contractId);
-    for (const contract of REPORT_GOAL_DRAFT_CONTRACTS) expect(sealed, contract.contractId).not.toContain(contract.contractId);
-    // Each drafted sentence is marked as the owner's to approve, and names no field, no snake_case word and no id a model could copy.
+    // Sealed: the three follow the v4 writers in the engine's seal, in the group's order, each once.
+    const engine = engineSealedContracts();
+    const at = engine.indexOf(REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT);
+    expect(at).toBeGreaterThan(-1);
+    expect(engine.slice(at + 1, at + 4)).toEqual([REPORT_ANSWER_V5_PROMPT_CONTRACT, REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT, REPORT_ANSWER_CHECK_V4_PROMPT_CONTRACT]);
+    for (const contract of REPORT_GOAL_SEALED_CONTRACTS) expect(engine.filter((sealed) => sealed.contractId === contract.contractId), contract.contractId).toHaveLength(1);
+    // Each sentence is marked as the owner's, approved as written, and names no field, no snake_case word and no id a model could copy.
     const source = readFileSync(join(process.cwd(), "packages/story/src/investigation-report.ts"), "utf8");
     for (const name of ["REPORT_WRITER_GOAL_SENTENCE", "REPORT_CHECKER_GOAL_CRITERION"]) {
-      expect(source, name).toMatch(new RegExp(`// OWNER WORDING — approve before switch-on[^\\n]*\\nexport const ${name} =`, "u"));
+      expect(source, name).toMatch(new RegExp(`// OWNER WORDING — approved as written, 17 Nov[^\\n]*\\nexport const ${name} =`, "u"));
+      expect(source, name).not.toMatch(new RegExp(`approve before switch-on[^\\n]*\\nexport const ${name} =`, "u"));
     }
     for (const sentence of [GOAL_WRITER_SENTENCE, GOAL_CHECKER_SENTENCE]) {
       expect(sentence).not.toMatch(/[A-Za-z]+_[A-Za-z]+/u);
@@ -472,16 +478,16 @@ describe("Task 50b: the person's stated goal", () => {
 
 // Task 50c (follow-up to Task 50b's review; the owner's "the main answer always says … how a stated goal fares" and Q4 "the final answer
 // says how the person's goal fares"): the main answer's later versions (the update after a dig) and the person's report say it too. One
-// more draft, report.answer.later.v5: the sealed report.answer.later.v4 byte for byte with Task 50b's one marked sentence last, the form
-// unchanged, checked by Task 50b's report.answer-check.v4; Task 92 seals it with Task 50b's two. The update and the report learn of the
+// more version, report.answer.later.v5: the sealed report.answer.later.v4 byte for byte with Task 50b's one marked sentence last, the form
+// unchanged, checked by Task 50b's report.answer-check.v4; sealed with Task 50b's two (17 Nov). The update and the report learn of the
 // goal from the ROOT debate's purpose lines (a dig's own are copies, Task 35).
 describe("Task 50c: the later answers say how the goal fares too", () => {
-  it("the later draft: report.answer.later.v4 byte for byte with Task 50b's one sentence last; the form as it was; unsealed", () => {
+  it("the later version: report.answer.later.v4 byte for byte with Task 50b's one sentence last; the form as it was; sealed", () => {
     expect(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.contractId).toBe("report.answer.later.v5");
     expect(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.instruction).toBe(`${REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction}\n\n${GOAL_WRITER_SENTENCE}`);
     expect(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT.answerForm).toBe(REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.answerForm);
     expect(Object.isFrozen(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT)).toBe(true);
-    expect(engineSealedContracts().map((contract) => contract.contractId)).not.toContain("report.answer.later.v5");
+    expect(engineSealedContracts()).toContain(REPORT_ANSWER_LATER_V5_PROMPT_CONTRACT);
     // The new sentence is Task 50b's marked one, the same constant, never a second copy of its words.
     const source = readFileSync(join(process.cwd(), "packages/story/src/investigation-report.ts"), "utf8");
     expect(source).toContain("[REPORT_ANSWER_LATER_V4_PROMPT_CONTRACT.instruction, REPORT_WRITER_GOAL_SENTENCE].join(\"\\n\\n\"), REPORT_ANSWER_V3_FORM)");
@@ -613,7 +619,7 @@ describe("seven full paths in \"中\"", () => {
     expect(update.recorded.map((record) => [record.outcome, record.rounds])).toEqual([["READY", 2]]);
     const writer = new Map(frameOf(requests[0]!.packet).fields.map((entry) => [entry.name, entry.content] as const));
     expect(JSON.parse(writer.get("earlier_report")!)).toMatchObject({ version: 1 });
-    // Review of Task 50c: the goal drafts rode the largest material the line allows: the dossier, its earlier answer beside it, was cut
+    // Review of Task 50c: the goal versions rode the largest material the line allows: the dossier, its earlier answer beside it, was cut
     // down the ladder to fit, and the writer read exactly that.
     const largest = dossierOf({ ...SEVEN_INPUT, earlier: Object.freeze({ version: 1, segments: Object.freeze([CJK.repeat(3000), CJK.repeat(3000)]) }) });
     expect(largest.ladderStep).toBeGreaterThan(1);
