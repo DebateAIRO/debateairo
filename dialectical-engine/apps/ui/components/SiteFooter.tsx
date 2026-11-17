@@ -50,6 +50,49 @@ function AnpcSalBadge() {
   );
 }
 
+const MADE_IN_HEART = "{heart}";
+const MADE_IN_FLAG = "{flag}";
+const MADE_IN_MARKS = /(\{heart\}|\{flag\})/;
+
+/**
+ * "Made with ♥ in Romania" plus the flag, in both footer shapes. The sentence is one catalogue value that says where the
+ * heart and the flag go, because their place in the sentence differs from language to language. Both are drawn: Windows
+ * shows a flag emoji as the letters "RO". A screen reader gets the plain sentence instead of the two pictures.
+ */
+function MadeInRomania() {
+  const { catalog } = useChromeI18n();
+  const parts = t(catalog, "chrome.footer.madeIn").split(MADE_IN_MARKS);
+  return (
+    <span className="siteFooterMadeIn">
+      <span aria-hidden>
+        {parts.map((part, index) => {
+          if (part === MADE_IN_HEART) {
+            return (
+              <svg key={index} className="siteFooterMadeInHeart" viewBox="0 0 24 24" focusable="false">
+                <path
+                  fill="currentColor"
+                  d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                />
+              </svg>
+            );
+          }
+          if (part === MADE_IN_FLAG) {
+            return (
+              <svg key={index} className="siteFooterMadeInFlag" viewBox="0 0 18 12" focusable="false">
+                <rect width="6" height="12" fill="#002B7F" />
+                <rect x="6" width="6" height="12" fill="#FCD116" />
+                <rect x="12" width="6" height="12" fill="#CE1126" />
+              </svg>
+            );
+          }
+          return part;
+        })}
+      </span>
+      <span className="srOnly">{t(catalog, "chrome.footer.madeInSpoken")}</span>
+    </span>
+  );
+}
+
 const NO_MARKS: PaymentMarks = Object.freeze({ netopia: false, visa: false, mastercard: false });
 
 /** Spec §2.18: NETOPIA's logo first, then the card marks; each brand name stays untranslated in every locale. */
@@ -78,9 +121,9 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
  * The site footer (design 15a/15b/15c), one component in two shapes:
  *
  * - `full` — marketing and legal pages: company block, PRODUCT and LEGAL columns, the CONSUMER
- *   PROTECTION row (ANPC's SAL badge), then the copyright line with the language switcher. On a
- *   phone the columns stack (15c) in CSS.
- * - `line` — every other screen: copyright, the seven legal links, cookie preferences and the
+ *   PROTECTION row (ANPC's SAL badge), then the copyright line with the made-in sentence and the
+ *   language switcher. On a phone the columns stack (15c) in CSS.
+ * - `line` — every other screen: copyright, the made-in sentence, the seven legal links, cookie preferences and the
  *   small SAL badge on one line, so the canvas keeps its room (15b).
  *
  * The root layout renders the `line` footer after every page; a page that renders the `full`
@@ -110,6 +153,7 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
     return (
       <footer className="siteFooterLine" aria-label={t(catalog, "chrome.footer.label")}>
         <span className="siteFooterCopyright">{copyright}</span>
+        <MadeInRomania />
         <nav aria-label={t(catalog, "chrome.legalPages")}>
           <ul className="siteFooterLineLinks">
             {legalLinks}
@@ -190,6 +234,7 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
       <PaymentMarksGroup marks={marks} />
       <div className="siteFooterBase">
         <span className="siteFooterCopyright">{copyright}</span>
+        <MadeInRomania />
         <a className="siteFooterLink siteFooterCredit" href={DBIP_URL}>
           {t(catalog, "chrome.footer.dbipCredit")}
         </a>

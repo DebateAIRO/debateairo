@@ -71,6 +71,8 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Proteção do consumidor",
+  "chrome.footer.madeIn": "Made with {heart} in Romania {flag}",
+  "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "Este site foi atualizado. Recarregue a página.",
   "chrome.release.reload": "Recarregar",
   "chrome.release.madeByNewer": "Este debate foi criado por uma versão mais recente deste site. Recarregue a página ou tente novamente dentro de alguns minutos."

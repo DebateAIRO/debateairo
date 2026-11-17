@@ -71,6 +71,8 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Varstvo potrošnikov",
+  "chrome.footer.madeIn": "Made with {heart} in Romania {flag}",
+  "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "Spletno mesto je bilo posodobljeno. Znova naložite stran.",
   "chrome.release.reload": "Znova naloži",
   "chrome.release.madeByNewer": "To razpravo je ustvarila novejša različica spletnega mesta. Znova naložite stran ali poskusite znova čez nekaj minut."

@@ -361,6 +361,14 @@
   border-top: 1px solid var(--line);
 }
 .siteFooterCopyright { font-size: 11px; color: var(--muted); }
+/* "Made with (heart) in Romania (flag)": the sentence stays on one line, so the heart and the flag keep
+   their place between its words in every language. */
+.siteFooterMadeIn { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.siteFooterMadeIn svg { display: inline-block; vertical-align: -1px; }
+.siteFooterMadeInHeart { width: 11px; height: 11px; color: var(--accent); }
+/* The hairline gives the flag an edge where a band is close to the page colour: blue on the dark theme,
+   yellow on the light one. */
+.siteFooterMadeInFlag { width: 16px; height: 11px; border-radius: 2px; box-shadow: 0 0 0 1px var(--line-strong); }
 .siteFooterLang { margin-inline-start: auto; }
 /* The switcher opens UP from the footer; the header copy opens down. */
 .siteFooterLang .languageSwitcherPanel {
@@ -410,7 +418,24 @@
   background: var(--surface-2);
   font-family: var(--font-sans);
 }
-.siteFooterLine .siteFooterCopyright { font-size: 10.5px; }
+.siteFooterLine .siteFooterCopyright,
+.siteFooterLine .siteFooterMadeIn { font-size: 10.5px; }
+/* On the one line the made-in sentence only uses room the links leave over. It sits in a slot one text line
+   tall that takes the free space; a sentence wider than the slot wraps under it, out of sight. So in no
+   language and at no width does it push a link or the SAL badge to a second row. The slot's end padding is
+   the gap before the links, and the equal negative margin keeps an empty slot from adding a second gap. */
+.siteFooterLine .siteFooterMadeIn {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  min-width: 0;
+  height: 15px;
+  line-height: 15px;
+  overflow: hidden;
+  padding-inline-end: 18px;
+  margin-inline-end: -18px;
+}
+.siteFooterLine .siteFooterMadeIn::before { content: ""; height: 100%; }
 .siteFooterLine nav { margin-inline-start: auto; }
 .siteFooterLineLinks { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
 .siteFooterLine .siteFooterLink { font-size: 10.5px; font-weight: 600; }
@@ -487,7 +512,18 @@
   }
   .siteFooterConsumer { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 20px; }
   .siteFooterConsumer .siteFooterAnpc img { height: 40px; }
-  .siteFooterBase { margin-top: 20px; padding-top: 14px; }
+  .siteFooterBase { flex-wrap: wrap; gap: 8px 14px; margin-top: 20px; padding-top: 14px; }
+  /* On a phone the made-in sentence takes the row under the copyright, whole; it breaks only if a
+     language's sentence is wider than the screen. */
+  .siteFooterMadeIn { flex-basis: 100%; white-space: normal; }
+  .siteFooterLine .siteFooterMadeIn {
+    display: block;
+    flex: 0 0 100%;
+    height: auto;
+    overflow: visible;
+    padding-inline-end: 0;
+    margin-inline-end: 0;
+  }
 
   .siteFooterLine { padding: 10px 16px; gap: 8px 18px; }
   .siteFooterLine nav { margin-inline-start: 0; }
