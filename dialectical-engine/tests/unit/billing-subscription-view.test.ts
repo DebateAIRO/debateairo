@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { withdrawalDeadline, type SubscriptionState } from "@debateai/billing-core";
 import { PlanIdSchema, SubscribedPlanIdSchema } from "@debateai/contract";
@@ -62,9 +63,39 @@ describe("P12b the subscription as the person sees it", () => {
     expect(open({}, "RO", new Date("2026-10-15T20:59:59.999Z"))).toEqual(new Date("2026-10-15T21:00:00.000Z"));
     expect(open({}, "RO", new Date("2026-10-15T21:00:00.000Z"))).toBeNull();
     expect(open({}, "DE", NOW)).toEqual(new Date("2026-10-15T22:00:00.000Z"));
-    expect(open({}, "US", NOW)).toBeNull();
+    // The list is still what opens the window: a tax country that is not on it (Brazil, which the site does not serve)
+    // has none, and neither has a plan with no tax country or one that is not ACTIVE.
+    expect(testBillingPolicy.withdrawalCountries).not.toContain("BR");
+    expect(open({}, "BR", NOW)).toBeNull();
     expect(open({}, null, NOW)).toBeNull();
     expect(open({ status: "PAST_DUE" }, "RO", NOW)).toBeNull();
+  });
+
+  it("opens the 14 days for every country the site serves, the United States and Japan among them (owner's decision of 16 November 2026)", () => {
+    const input = (taxCountry: string, now: Date) => ({
+      state: state(), taxCountry, policy: testBillingPolicy, now, paymentEnvironment: "sandbox" as const
+    });
+    // The fixture's list is the hosted example's, country for country.
+    const hosted = JSON.parse(readFileSync(
+      new URL("../../deploy/vps/register/hosted-register.example.json", import.meta.url), "utf8"
+    )) as { billingPolicy: { withdrawal_countries: string[] } };
+    expect(testBillingPolicy.withdrawalCountries).toEqual(hosted.billingPolicy.withdrawal_countries);
+    // Activated Thursday 1 October 09:00 UTC. A country with no zone of its own in `withdrawalDeadline` is counted
+    // on the Earth's extremes, in the buyer's favour: the day is read where it is latest (Kiritimati, UTC+14: still 1
+    // October), so the last day is 15 October, and the window closes at the last midnight on Earth (UTC−12).
+    for (const taxCountry of ["US", "JP"]) {
+      expect(withdrawalOpenUntil(input(taxCountry, NOW)), taxCountry).toEqual(new Date("2026-10-16T12:00:00.000Z"));
+      expect(withdrawalOpenUntil(input(taxCountry, new Date("2026-10-16T11:59:59.999Z"))), taxCountry)
+        .toEqual(new Date("2026-10-16T12:00:00.000Z"));
+      expect(withdrawalOpenUntil(input(taxCountry, new Date("2026-10-16T12:00:00.000Z"))), taxCountry).toBeNull();
+      expect(view({}, taxCountry)).toMatchObject({
+        withdrawal_open_until: "2026-10-16T12:00:00.000Z", withdrawal_last_day: "2026-10-15"
+      });
+    }
+    // Every listed country has the window on day 9, not only the two above.
+    for (const taxCountry of testBillingPolicy.withdrawalCountries) {
+      expect(withdrawalOpenUntil(input(taxCountry, NOW)), taxCountry).not.toBeNull();
+    }
   });
 
   it("rolls a 14th day on a Saturday or Sunday to the next Monday (W6, P2-I9: Regulation 1182/71 art. 3(4))", () => {

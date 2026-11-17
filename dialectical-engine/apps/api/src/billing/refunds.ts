@@ -320,7 +320,10 @@ export function disputeCommand(chargeId: string, outcome: "won" | "lost"): strin
   return hostCommand(`billing:dispute --charge ${chargeId} --outcome ${outcome}`);
 }
 
-/** One open owner refund, as the reminder lists it (owner-facing English; our ids, no customer data). */
+/**
+ * One open owner refund, as the reminder lists it (owner-facing English; our ids, no customer data). `whole` describes
+ * `openMicros`, the amount the line names: true only while what is still open is the payment's own amount.
+ */
 export type OwnerRefundLine = Readonly<{
   chargeId: string; providerPaymentId: string; reason: string; currency: string; openMicros: number; whole: boolean;
   requestedAt: Date; deadline: Date | null; seenRefunded: boolean;
@@ -954,7 +957,11 @@ export class RefundDesk {
       const last = await this.deps.repository.lastStatusRead(row.chargeId);
       lines.push(Object.freeze({
         chargeId: row.chargeId, providerPaymentId: row.providerPaymentId, reason: row.reason, currency: row.currency,
-        openMicros: row.requestedMicros - row.refundedMicros, whole: row.whole, requestedAt: row.requestedAt,
+        // The label is about the amount still open, as `wholePaymentOpen` reads it: a request for the whole payment
+        // (a withdrawal with no credit used asks for one, owner's decision of 16 November 2026) that the owner
+        // recorded a part of leaves a part open, not the whole payment.
+        openMicros: row.requestedMicros - row.refundedMicros, whole: row.whole && row.refundedMicros === 0,
+        requestedAt: row.requestedAt,
         deadline: await this.withdrawalDeadlineOf(intent),
         seenRefunded: last?.outcome === "REFUNDED" || last?.outcome === "VOIDED"
       }));
