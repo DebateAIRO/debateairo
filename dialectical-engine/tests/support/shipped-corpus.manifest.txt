@@ -377,6 +377,7 @@ apps/replay/src/index.ts
 apps/runner/src/answer-checker-sources.ts
 apps/runner/src/call-lane-gateway.ts
 apps/runner/src/call-scheduler.ts
+apps/runner/src/cost-readout-cli.ts
 apps/runner/src/debate-shape-boot.ts
 apps/runner/src/dev-api-environment-cli.ts
 apps/runner/src/dev-api-environment.ts
@@ -1126,6 +1127,7 @@ packages/billing-core/src/upgrade-credit.ts
 packages/billing-core/src/windows.ts
 packages/billing-core/src/withdrawal-deadline.ts
 packages/budget/src/cost-envelope.ts
+packages/budget/src/cost-readout.ts
 packages/budget/src/estimate.ts
 packages/budget/src/index.ts
 packages/budget/src/model-spend.ts

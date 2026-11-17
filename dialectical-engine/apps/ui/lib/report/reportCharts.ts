@@ -1,12 +1,17 @@
 import type { Answer, AnswerStory, StoryChart, StoryChartAxis, StoryChartFrontier } from "@debateai/contract";
 import { formatNumber, t, type MessageCatalog } from "../i18n/translate.js";
 import { contractNodesById } from "../v3/adapter.js";
+import { storyPositionIds } from "../v3/storyWords.js";
 
 /**
  * Charts in the verdict PDF (design 2026-10-28): the story's stored charts as the report prints them. Pure, so it is
  * tested without drawing a PDF. An AI model chose each chart and its words; every figure on it passed the number check
  * when the story was written (packages/story/src/charts.ts). A strength is never the model's: it is read here, from the
  * answer, the same number the list of points prints.
+ *
+ * Chart relevance (2026-11-16): a strength is charted for the debate's positions only, each once. The plan's check
+ * holds a new story to that (packages/story/src/charts.ts); the report holds every stored story to it, by the rule its
+ * list of points names a position by (a point that argues about nothing else, `storyPositionIds`).
  */
 
 /** Under every chart, in every language (owner decision 2026-10-28): the company's notice, never translated. */
@@ -97,12 +102,12 @@ function pointOrder(label: string): number {
 }
 
 /**
- * The report's charts, in story order. A chart that names a point the answer does not hold, or a strength the answer
- * does not record, is left out whole: a chart is printed complete or not at all.
+ * The report's charts, in story order. A chart that names a point the answer does not hold, a strength the answer does
+ * not record, or the strength of anything but a position, is left out whole: a chart is printed complete or not at all.
  */
 export function buildReportCharts(input: Readonly<{
   story: Pick<AnswerStory, "charts">;
-  answer: Pick<Answer, "nodes">;
+  answer: Pick<Answer, "nodes" | "edges">;
   /** Node id to the point's number in the list of points (P1…Pn). */
   numbers: ReadonlyMap<string, string>;
   locale: string;
@@ -111,12 +116,20 @@ export function buildReportCharts(input: Readonly<{
   listWords: (items: readonly string[]) => string;
 }>): readonly ReportChart[] {
   const nodes = contractNodesById(input.answer);
+  const positions = storyPositionIds(input.answer.nodes, input.answer.edges);
   const charts: ReportChart[] = [];
   for (const chart of input.story.charts ?? []) {
-    const built = reportChart(chart, nodes, input);
+    const built = comparesPositions(chart, positions) ? reportChart(chart, nodes, input) : null;
     if (built !== null) charts.push(built);
   }
   return Object.freeze(charts);
+}
+
+/** A chart with a strength axis compares positions, each once; a chart of figures alone compares whatever it names. */
+function comparesPositions(chart: StoryChart, positions: ReadonlySet<string>): boolean {
+  if (chart.x?.source !== "strength" && chart.y.source !== "strength") return true;
+  return chart.items.every((item) => positions.has(item.node_ref))
+    && new Set(chart.items.map((item) => item.node_ref)).size === chart.items.length;
 }
 
 function reportChart(

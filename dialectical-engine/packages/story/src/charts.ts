@@ -14,8 +14,13 @@ import { STORY_BLOCK_MENU, STORY_QUESTION_FORMS, STORY_QUESTION_FORM_MEANINGS } 
  * a chart call that fails, or a plan with nothing valid in it, leaves the story exactly as it is, with no charts.
  *
  * Two kinds of measure. A `figure` is a number a point's claim states, copied character for character (its `text`)
- * with the number it states (its `value`). A `strength` is the engine's own score for the point: the model never
+ * with the number it states (its `value`). A `strength` is the engine's own score for a position: the model never
  * writes one, and the PDF reads it from the answer, the same number the report's list of points prints.
+ *
+ * CHART RELEVANCE (2026-11-16). The first charts printed were bars of the strengths of three points that said the same
+ * thing, under a question about prices and benchmark scores: the debate stated no figures, and a strength was offered
+ * for any point. A chart now has to compare something. A strength is charted for the debate's answers only, each once;
+ * one axis holds one unit and more than one value; a figure written with a scale word states the whole number.
  */
 
 /** v2 (data blocks, 2026-10-30): the reply also names the kind of question and may plan tables. */
@@ -28,10 +33,13 @@ export const STORY_CHARTS_CALL_SITE_KEY = "STORY:CHARTS:1" as const;
  * OWNER WORDING (design 2026-10-28, data blocks 2026-10-30). The instruction half: name the kind of question, then show
  * the comparisons the debate makes in the block that suits each, from what the debate states and nothing else. Code ran
  * this call only because the debate holds figures, options or arguments for and against worth showing.
+ * Chart relevance (2026-11-16, builder's wording): what a strength is charted for, what a figure is, one unit per axis.
+ * The reply's form is unchanged, so the contract keeps its id; its hash changes with the words.
  */
 export const STORY_CHARTS_INSTRUCTION = `You add charts and tables to a finished report about a debate. The report_text field holds the report's text: the reasons in why.reasons and the long version in long.sections, each paragraph with the ids of the points it rests on. The positions and points fields hold the debate's positions and points, each with its claim. The figures field lists, for each point or position whose claim states numbers, those numbers as the claim writes them.
 First name the kind of question the debate answers. A question about right and wrong, a relationship or feeling, taste, the meaning of a work, what a word covers, what would have happened, a private person, or a single fact is answered in words: its report gets no chart and no table.
-For every other kind, show the comparisons the debate makes in the block that suits them. Options compared on two or more things (such as price, years of updates and encryption) make a comparison table, one row per option and one column per thing compared. Points that argue for and against a position make a pros and cons list. One measure across three or more things makes a bar chart; two measures that cover the same three or more things, such as the price and the test score of several products, make a scatter chart. A measure is either the figures the claims state (source "figure") or how strong each point or position turned out in the debate (source "strength").
+For every other kind, show the comparisons the debate makes in the block that suits them. Options compared on two or more things (such as price, years of updates and encryption) make a comparison table, one row per option and one column per thing compared. Points that argue for and against a position make a pros and cons list. One measure across three or more things makes a bar chart; two measures that cover the same three or more things, such as the price and the test score of several products, make a scatter chart. A measure is either the figures the claims state (source "figure") or how strong each position turned out in the debate (source "strength"). Strength compares the debate's positions, its competing answers, with one another: never chart the strength of the points argued for or against them.
+A chart shows the things the question asks about, measured by what the debate found out about them. Every figure on one axis measures the same thing in the same unit: never a price beside a percentage or a count. A number that is part of a name, such as the 14 of iPhone 14, is not a figure. When the claims state no figures that can be compared, the report gets no chart of figures.
 Use only what the debate states. Never invent, estimate, convert, round or add up a number, and never put words in a claim: every figure, cell and list entry is copied character for character from the claim of the point it cites. When the claims do not say something a table asks, leave that cell null. A block that repeats a single number, compares things that do not belong together, or decorates a paragraph is worse than none.`;
 
 const STORY_QUESTION_FORM_LINES = STORY_QUESTION_FORMS.map((form) => {
@@ -70,8 +78,8 @@ The kinds of question, each with the blocks its report may carry:
 ${STORY_QUESTION_FORM_LINES}
 Only the blocks a kind lists are kept; for a kind with no block, charts and tables are empty lists.
 charts has 0 to ${String(STORY_CHART_LIMITS.maxCharts)} entries and tables 0 to ${String(STORY_TABLE_LIMITS.maxTables - 1)}, and at most one chart or table goes after any one paragraph. A bar chart has "x": null and ${String(STORY_CHART_LIMITS.minItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items, and plots y for each item. A scatter chart has both axes, two different measures, and ${String(STORY_CHART_LIMITS.minScatterItems)} to ${String(STORY_CHART_LIMITS.maxItems)} items.
-Each node_ref is copied exactly from an id in the points field or the positions field, and the paragraph the chart goes after lists that id in its node_refs. Several items may share one node_ref when one claim states figures for several things.
-On an axis whose source is "figure", each item's value for that axis is an object: "text" is copied character for character from the claim of that item's node_ref (the number with its unit or sign exactly as the claim writes it, such as $0.15 or 52 %), and "value" is that same number as a JSON number, in the unit the axis label names. On an axis whose source is "strength", and on the x of a bar chart, each item's value is null: code fills in the strengths.
+Each node_ref is copied exactly from an id in the points field or the positions field, and the paragraph the chart goes after lists that id in its node_refs. Several items may share one node_ref when one claim states figures for several things. On a chart with an axis whose source is "strength", every item's node_ref is an id from the positions field, and no position appears twice.
+On an axis whose source is "figure", each item's value for that axis is an object: "text" is copied character for character from the claim of that item's node_ref (the number with its unit or sign exactly as the claim writes it, such as $0.15 or 52 %), and "value" is the number that text states, as a JSON number: 0.15 for $0.15, 52 for 52 %, 1200000 for 1.2 million. Every figure on one axis is in the unit the axis label names, the values on it are not all the same, and figures written in different units (a price and a percentage, dollars and euros) never share an axis. On an axis whose source is "strength", and on the x of a bar chart, each item's value is null: code fills in the strengths.
 "log" is true only when the axis's values are all above zero and span more than a hundredfold.
 "frontier" is null on a bar chart. On a scatter chart, when a reader would want the best of both measures (a lower price and a higher score, say), it says which end of each axis is better, "lower" or "higher", and the report draws a line through the items nothing else beats on both; otherwise it is null.
 A comparison table has ${String(STORY_TABLE_LIMITS.minColumns)} to ${String(STORY_TABLE_LIMITS.maxColumns)} columns and ${String(STORY_TABLE_LIMITS.minRows)} to ${String(STORY_TABLE_LIMITS.maxRows)} rows, and each row has exactly one cell per column. A cell's "text" is copied character for character from the claim of its node_ref, at most ${String(STORY_TABLE_LIMITS.cellMaxChars)} characters, and says that row's option on that column's thing; a cell no claim states is null.
@@ -106,6 +114,11 @@ export interface StoryChartsContext {
   readonly claims: ReadonlyMap<string, string>;
   /** The material's scores as a story might print them (`StoryMaterialIndex.scoreTexts`): never in a title or label. */
   readonly scoreTexts: ReadonlySet<string>;
+  /**
+   * Chart relevance (2026-11-16): the debate's positions, its competing answers, by the short reference the model
+   * reads. A strength is charted for these and for nothing else (design 2026-10-28, "the strength of competing positions").
+   */
+  readonly positions: ReadonlySet<string>;
 }
 
 /** Why a chart was left out: a code, never the model's text. */
@@ -122,6 +135,9 @@ export type StoryChartDropCode =
   | "CHART_FIGURE_NOT_IN_CLAIM"
   | "CHART_FIGURE_MISMATCH"
   | "CHART_FIGURE_OUT_OF_RANGE"
+  | "CHART_FIGURE_UNITS_DIFFER"
+  | "CHART_NOTHING_TO_COMPARE"
+  | "CHART_STRENGTH_NOT_ANSWER"
   | "CHART_LOG_NOT_POSITIVE"
   | "CHART_LABEL_REPEATED"
   | "CHART_TEXT_CHARACTERS"
@@ -185,6 +201,23 @@ function sameNumber(a: number, b: number): boolean {
   return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
 }
 
+/**
+ * Chart relevance (2026-11-16): a figure written with a scale word ("1.2 million", "5k", "3 Mrd.") states the whole
+ * number. The words differ in every language, so code reads none of them: where a letter follows the number, the plan's
+ * value may be the written number times a power of ten from a thousand to a trillion. Without one, an axis that held
+ * "$1.2 million" beside "$800,000" could only be drawn wrong (1.2 against 800,000) or not at all.
+ */
+const SCALE_WORD_FOLLOWS = /\d\s?\p{L}/u;
+const SCALE_POWERS = Object.freeze([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+
+/** Whether `text` states `value`: as it writes the number, or scaled by the word that follows it. */
+function figureStates(text: string, value: number): boolean {
+  const readings = figureReadings(text);
+  if (readings.some((reading) => sameNumber(reading, value))) return true;
+  return SCALE_WORD_FOLLOWS.test(text)
+    && readings.some((reading) => SCALE_POWERS.some((power) => sameNumber(reading * 10 ** power, value)));
+}
+
 /** The figure is in the claim, character for character, and it states the number the plan gives it. */
 function figureIssue(figure: StoryChartFigure | null, claim: string): StoryChartDropCode | null {
   if (figure === null) return "CHART_FIGURE_MISSING";
@@ -194,7 +227,25 @@ function figureIssue(figure: StoryChartFigure | null, claim: string): StoryChart
     return "CHART_FIGURE_OUT_OF_RANGE";
   }
   if (!normalised(claim).includes(normalised(figure.text))) return "CHART_FIGURE_NOT_IN_CLAIM";
-  return figureReadings(figure.text).some((reading) => sameNumber(reading, figure.value)) ? null : "CHART_FIGURE_MISMATCH";
+  return figureStates(figure.text, figure.value) ? null : "CHART_FIGURE_MISMATCH";
+}
+
+/** The currency, percent and per-mille signs a figure is written with, each once: "$" for "US$1.2 million", "%" for "8 %". */
+function figureSigns(text: string): string {
+  return [...new Set(text.match(/[\p{Sc}%‰‱]/gu) ?? [])].sort().join("");
+}
+
+/**
+ * Chart relevance (2026-11-16): what one axis's figures must have in common to be a comparison at all.
+ *  - One unit. Two figures written with different signs (a price and a percentage, dollars and euros) are different
+ *    measures. A unit in words is not compared: "8 percent" and "12%" agree, and words inflect in every language.
+ *  - More than one value. An axis that repeats a single number compares nothing.
+ */
+function axisIssue(figures: readonly StoryChartFigure[]): StoryChartDropCode | null {
+  if (new Set(figures.map((figure) => figureSigns(figure.text)).filter((signs) => signs !== "")).size > 1) {
+    return "CHART_FIGURE_UNITS_DIFFER";
+  }
+  return figures.every((figure) => sameNumber(figure.value, figures[0]!.value)) ? "CHART_NOTHING_TO_COMPARE" : null;
 }
 
 function escaped(text: string): string {
@@ -221,6 +272,12 @@ function checkedChart(chart: StoryChart, context: StoryChartsContext, scores: Re
   if (texts.some((text) => FORBIDDEN_CHARACTERS.test(text))) return "CHART_TEXT_CHARACTERS";
   if (scores !== null && texts.some((text) => scores.test(text))) return "CHART_TEXT_SCORE_VALUE";
   if (new Set(chart.items.map((item) => normalised(item.label))).size !== chart.items.length) return "CHART_LABEL_REPEATED";
+  // A strength compares the debate's answers with one another, each once: never the points argued under them.
+  if ([chart.x, chart.y].some((axis) => axis !== null && axis.source === "strength")
+    && (chart.items.some((item) => !context.positions.has(item.node_ref))
+      || new Set(chart.items.map((item) => item.node_ref)).size !== chart.items.length)) {
+    return "CHART_STRENGTH_NOT_ANSWER";
+  }
   const cited = new Set(paragraph.node_refs);
   const items: StoryChart["items"][number][] = [];
   for (const item of chart.items) {
@@ -237,6 +294,11 @@ function checkedChart(chart: StoryChart, context: StoryChartsContext, scores: Re
       if (axis.log && figure!.value <= 0) return "CHART_LOG_NOT_POSITIVE";
     }
     items.push({ label: item.label, node_ref: item.node_ref, x, y });
+  }
+  for (const figures of [items.map((item) => item.x), items.map((item) => item.y)]) {
+    // Every figure of a figure axis passed its own check above, so an axis holds all of its figures or none.
+    const issue = figures.every((figure) => figure !== null) ? axisIssue(figures) : null;
+    if (issue !== null) return issue;
   }
   return { ...chart, items };
 }

@@ -1314,6 +1314,14 @@
           "condition": "package script ops:serve-disclosure"
         },
         {
+          "component": "apps/runner:cost-readout-cli",
+          "sourceFile": "apps/runner/src/cost-readout-cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "COST_READOUT_OPERATOR_REPORT",
+          "binding": "WIRED",
+          "condition": "package script ops:cost-readout"
+        },
+        {
           "component": "apps/runner:settings-check-cli",
           "sourceFile": "apps/runner/src/settings-check-cli.ts",
           "environmentKey": "DATABASE_URL",
