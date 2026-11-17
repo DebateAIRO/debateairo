@@ -2849,6 +2849,90 @@ describe("DPD-S01 delete public debates at account erasure", () => {
     )).rowCount).toBe(0);
   },240_000);
 
+  // The account's owner reference is also on the records kept for the law (the acceptance record, the billing tables). The erasure
+  // that deletes the account gives each of its debates a reference of its own, so no kept debate still names the account's.
+  it("after the real erasure, the owner reference is only on the records kept for the law; each kept debate has a reference of its own",async ()=>{
+    /** Every table with a row whose text holds `needle`, with the columns that hold it. */
+    async function holding(needle:string):Promise<Record<string,string[]>> {
+      const tables=(await database.pool.query<{ schema:string;name:string }>(`
+        SELECT table_schema AS schema,table_name AS name FROM information_schema.tables
+        WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema')
+        ORDER BY table_schema,table_name
+      `)).rows;
+      expect(tables.length).toBeGreaterThan(50);
+      const found:Record<string,string[]>={};
+      for (const table of tables) {
+        const rows=(await database.pool.query<{ row:Record<string,unknown> }>(
+          `SELECT to_jsonb(t) AS row FROM "${table.schema}"."${table.name}" AS t WHERE to_jsonb(t)::text LIKE $1`,[`%${needle}%`]
+        )).rows;
+        if (rows.length===0) continue;
+        found[`${table.schema}.${table.name}`]=[...new Set(rows.flatMap(({ row })=>
+          Object.entries(row).filter(([,value])=>JSON.stringify(value).includes(needle)).map(([column])=>column)))].sort();
+      }
+      return found;
+    }
+    const fixture=await identityWithGrant("owner-unlinked");
+    const { identity }=fixture;
+    await database.pool.query(`
+      INSERT INTO legal.acceptance (acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id)
+      VALUES ($1,$2,'TERMS','2.17',$3,'en','SIGN_UP',now(),$4,'aaaaaaaaaaaaaaaa')
+    `,[randomUUID(),identity.ownerRef,"a".repeat(64),Buffer.alloc(30)]);
+    await database.pool.query(
+      "INSERT INTO billing.customer (customer_id,owner_ref,created_at,created_locale) VALUES ($1,$2,now(),'en')",[randomUUID(),identity.ownerRef]
+    );
+    const entitlementEventId=randomUUID();
+    await database.pool.query(`
+      INSERT INTO billing.entitlement_event (event_id,owner_ref,plan_id,effective_at,period_anchor_at,cause,subscription_id,month_credit_override_micros,paid_through)
+      VALUES ($1,$2,'FREE',now(),now(),'SIGNED_UP_FREE',NULL,NULL,NULL)
+    `,[entitlementEventId,identity.ownerRef]);
+    const debates=[await publish(identity,"owner-unlinked-1"),await publish(identity,"owner-unlinked-2")];
+    // The usage row admission writes for an account's run when billing is on (apps/api/src/ask-room.ts): the run beside the owner reference.
+    for (const debate of debates) await database.pool.query(`
+      INSERT INTO billing.run_charge_scope (run_id,owner_ref,plan_id,entitlement_event_id,admitted_at) VALUES ($1,$2,'FREE',$3,now())
+    `,[debate.runId,identity.ownerRef,entitlementEventId]);
+    expect(await holding(identity.ownerRef)).toEqual({
+      "billing.customer":["owner_ref"],"billing.entitlement_event":["owner_ref"],"billing.run_charge_scope":["owner_ref"],
+      "core.run":["asker_id"],"core.run_ownership_event":["owner_ref"],"identity.user":["owner_ref"],"legal.acceptance":["owner_ref"]
+    });
+
+    const scheduled=(await schedule(fixture,false))!;
+    await due(identity.userId);
+    expect(await clean(scheduled.erasureId)).toBe("CLEANED");
+
+    // What still names the reference is what the law asks to keep, and none of it names a debate.
+    expect(await holding(identity.ownerRef)).toEqual({
+      "billing.customer":["owner_ref"],"billing.entitlement_event":["owner_ref"],
+      "legal.acceptance":["owner_ref"],"legal.account_closure":["owner_ref"]
+    });
+    expect(await holding(entitlementEventId)).toEqual({ "billing.entitlement_event":["event_id"] });
+    // Each debate: one new reference in all of its rows, held by no account and by nothing else in the database.
+    const fresh:string[]=[];
+    for (const debate of debates) {
+      const row=(await database.pool.query<{ asker_id:string;event_owner:string;scope_owner:string;scope_event:string;plan_id:string }>(`
+        SELECT run.asker_id,event.owner_ref::text AS event_owner,scope.owner_ref::text AS scope_owner,
+          scope.entitlement_event_id::text AS scope_event,scope.plan_id
+        FROM core.run AS run JOIN core.run_ownership_event AS event USING (run_id) JOIN billing.run_charge_scope AS scope USING (run_id)
+        WHERE run.run_id=$1
+      `,[debate.runId])).rows;
+      expect(row).toHaveLength(1);
+      const reference=row[0]!.event_owner;
+      expect(reference).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u);
+      expect(row[0]).toMatchObject({ asker_id:`owner:${reference}`,scope_owner:reference,plan_id:"FREE" });
+      expect(Object.keys(await holding(reference)).sort()).toEqual(["billing.run_charge_scope","core.run","core.run_ownership_event"]);
+      expect(await holding(row[0]!.scope_event)).toEqual({ "billing.run_charge_scope":["entitlement_event_id"] });
+      expect((await database.pool.query('SELECT 1 FROM identity."user" WHERE owner_ref=$1',[reference])).rowCount).toBe(0);
+      fresh.push(reference,row[0]!.scope_event);
+      // Owned by nobody, and the page still reads.
+      expect((await database.pool.query<{ owned:boolean }>(
+        "SELECT core.run_is_owned_by($1,$2,NULL) AS owned",[debate.runId,reference]
+      )).rows[0]!.owned).toBe(false);
+      const read=await publicRead(debate.ref);
+      expect(read.statusCode).toBe(200);
+      expect(JSON.parse(read.body)).toMatchObject({ public_ref:debate.ref,author_pseudonym:"a contributor",author_name_gone:true });
+    }
+    expect(new Set([...fresh,identity.ownerRef,entitlementEventId]).size).toBe(6);
+  },240_000);
+
   it("DPD-S01 R23 a remove request with no public debate commits with counts (0, 0)",async ()=>{
     const fixture=await identityWithGrant("empty");
     const scheduled=await schedule(fixture,true);

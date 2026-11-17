@@ -39,7 +39,13 @@ it("preserves original charge bytes and mutation/truncate guards across additive
   await migrate(database.pool);
   expect((await database.pool.query('SELECT name,applied_at FROM public.debateai_schema_migration WHERE name=ANY($1::text[]) ORDER BY name',[auth106])).rows).toEqual(installedLedger);
   expect(await bytes()).toEqual(beforeBytes);
-  expect(await guards(beforeGuards.map(row => row.tgname as string))).toEqual(beforeGuards);
+  // A later step gives this table a mutation guard of its own, which lets account erasure replace the
+  // owner reference and nothing else. The trigger keeps its name, timing and events; every other guard is as before.
+  const chainGuards = beforeGuards.map(row => row.tgname === 'reject_mutation'
+    ? { ...row, definition: (row.definition as string).replace('billing.reject_mutation_unless_retention_purge()', 'billing.reject_charge_scope_mutation()') }
+    : row);
+  expect(chainGuards).not.toEqual(beforeGuards);
+  expect(await guards(beforeGuards.map(row => row.tgname as string))).toEqual(chainGuards);
   const repository = new EntitlementRepository(database.pool);
   expect(await repository.readRunFundingBasis(runId)).toEqual({ kind: "SUBSCRIPTION", planId: "PLUS", entitlementEventId: eventId });
   expect((await database.pool.query("SELECT funding_kind,internal_grant_id,internal_grant_event_id FROM billing.run_charge_scope WHERE run_id=$1", [runId])).rows[0])
@@ -53,7 +59,7 @@ it("preserves original charge bytes and mutation/truncate guards across additive
   expect((await database.pool.query("SELECT name,applied_at FROM public.debateai_schema_migration ORDER BY name")).rows).toEqual(ledger);
   expect((await database.pool.query('SELECT * FROM public.debateai_schema_migration_resolution')).rows).toEqual(receipts);
   expect(await bytes()).toEqual(beforeBytes);
-  expect(await guards(beforeGuards.map(row => row.tgname as string))).toEqual(beforeGuards);
+  expect(await guards(beforeGuards.map(row => row.tgname as string))).toEqual(chainGuards);
   await expect(database.pool.query("UPDATE billing.run_charge_scope SET plan_id='MAX' WHERE run_id=$1", [runId])).rejects.toThrow();
   await expect(database.pool.query("TRUNCATE billing.run_charge_scope")).rejects.toThrow();
 });

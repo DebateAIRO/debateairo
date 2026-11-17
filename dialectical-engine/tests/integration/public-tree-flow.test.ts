@@ -610,6 +610,85 @@ describe("digs after the author leaves (decision 22)", () => {
     expect(await versionsOf("SELECT settings_version FROM identity.public_report WHERE publication_ref=$1", [debate.ref])).toEqual([PIECE_VERSION]);
   });
 
+  // The account's owner reference is on the records kept for the law after erasure (the acceptance record, the billing tables). Deleting the
+  // account gives each of its debates a reference of its own (0177), so a kept debate cannot be joined to those records or to its sibling.
+  it("after the author leaves, neither of her two public debates holds a value that a kept legal or billing record holds, nor one the other holds; both pages read and a stranger's dig works", async () => {
+    const [ana, dan, eve] = [await account(), await account(), await account()];
+    const debates = [await publishedDebate(ana), await publishedDebate(ana)];
+    // Another account's debate, made the same way: what every debate of this file holds (the fixture's fixed ids) is no link between Ana's two.
+    const control = await publishedDebate(dan);
+    // What the law asks to keep about Ana, and the usage row admission writes for each run when billing is on.
+    const entitlementOf = new Map<string, string>();
+    for (const who of [ana, dan]) {
+      const eventId = randomUUID();
+      entitlementOf.set(who.ownerRef, eventId);
+      await database.pool.query(`INSERT INTO billing.entitlement_event (event_id,owner_ref,plan_id,effective_at,period_anchor_at,cause,subscription_id,month_credit_override_micros,paid_through)
+        VALUES ($1,$2,'FREE',now(),now(),'SIGNED_UP_FREE',NULL,NULL,NULL)`, [eventId, who.ownerRef]);
+      await database.pool.query("INSERT INTO billing.customer (customer_id,owner_ref,created_at,created_locale) VALUES ($1,$2,now(),'en')", [randomUUID(), who.ownerRef]);
+      await database.pool.query(`INSERT INTO legal.acceptance (acceptance_id,owner_ref,kind,document_version,document_sha256,locale,surface,accepted_at,evidence_ciphertext,key_id)
+        VALUES ($1,$2,'TERMS','2.17',$3,'en','SIGN_UP',now(),$4,'aaaaaaaaaaaaaaaa')`, [randomUUID(), who.ownerRef, "a".repeat(64), Buffer.alloc(30)]);
+    }
+    for (const [debate, who] of [[debates[0]!, ana], [debates[1]!, ana], [control, dan]] as const) await database.pool.query(
+      "INSERT INTO billing.run_charge_scope (run_id,owner_ref,plan_id,entitlement_event_id,admitted_at) VALUES ($1,$2,'FREE',$3,now())", [debate.root, who.ownerRef, entitlementOf.get(who.ownerRef)]);
+
+    /** Every row of every table, as text. */
+    async function everyRow(): Promise<ReadonlyArray<Readonly<{ table: string; text: string }>>> {
+      const tables = (await database.pool.query<{ schema: string; name: string }>(`SELECT table_schema AS schema, table_name AS name FROM information_schema.tables
+        WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') ORDER BY 1,2`)).rows;
+      const rows: { table: string; text: string }[] = [];
+      for (const table of tables) for (const row of (await database.pool.query<{ text: string }>(`SELECT to_jsonb(t)::text AS text FROM "${table.schema}"."${table.name}" AS t`)).rows)
+        rows.push({ table: `${table.schema}.${table.name}`, text: row.text });
+      return rows;
+    }
+    /** The identifiers in a text: every uuid and every 64-digit hash. */
+    const identifiersIn = (text: string): string[] => text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?<![0-9a-f])[0-9a-f]{64}(?![0-9a-f])/gu) ?? [];
+    type Debate = Readonly<{ root: string; ref: string }>;
+    /** Every identifier in every row that names the debate (its run or its public reference), the debate's own usage row included. */
+    const valuesOn = (rows: Awaited<ReturnType<typeof everyRow>>, debate: Debate) =>
+      new Set(rows.filter((row) => row.text.includes(debate.root) || row.text.includes(debate.ref)).flatMap((row) => identifiersIn(row.text)));
+    /** Every identifier on a legal or billing row, the usage rows of the debates themselves left out (their values are the debates' own). */
+    const keptValues = (rows: Awaited<ReturnType<typeof everyRow>>, own: readonly Debate[]) =>
+      new Set(rows.filter((row) => (row.table.startsWith("legal.") || row.table.startsWith("billing.")) && !own.some((debate) => row.text.includes(debate.root)))
+        .flatMap((row) => identifiersIn(row.text)));
+    const shared = (left: ReadonlySet<string>, right: ReadonlySet<string>, ...except: ReadonlySet<string>[]) =>
+      [...left].filter((value) => right.has(value) && !except.some((set) => set.has(value))).sort();
+
+    // Before she leaves the join is there: each debate reaches her kept records, and the two share her reference and her entitlement event.
+    const before = await everyRow();
+    for (const debate of debates) expect(shared(valuesOn(before, debate), keptValues(before, debates))).toEqual([ana.ownerRef, entitlementOf.get(ana.ownerRef)!].sort());
+    // (They also share her user id and her session, on rows that go with the account.)
+    expect(shared(valuesOn(before, debates[0]!), valuesOn(before, debates[1]!), valuesOn(before, control)))
+      .toEqual([ana.ownerRef, entitlementOf.get(ana.ownerRef)!, ana.userId, ana.sessionId].sort());
+
+    for (const debate of debates) await authorLeaves(ana, debate.root);
+
+    const after = await everyRow();
+    // Her kept records are still hers.
+    expect([...new Set(after.filter((row) => row.text.includes(ana.ownerRef)).map((row) => row.table))].sort())
+      .toEqual(["billing.customer", "billing.entitlement_event", "legal.acceptance", "legal.account_closure"]);
+    // No value on either debate is on a kept legal or billing row, and the two share none.
+    for (const debate of debates) expect(shared(valuesOn(after, debate), keptValues(after, debates))).toEqual([]);
+    expect(shared(valuesOn(after, debates[0]!), valuesOn(after, debates[1]!), valuesOn(after, control))).toEqual([]);
+    // Dan's debate is as it was.
+    expect(shared(valuesOn(after, control), keptValues(after, [control]))).toEqual([dan.ownerRef, entitlementOf.get(dan.ownerRef)!].sort());
+
+    // Both pages read and say "a contributor".
+    for (const debate of debates) {
+      const shown = await page(debate.ref);
+      expect(shown.public_ref).toBe(debate.ref);
+      expect(shown.author_pseudonym).toBe("a contributor");
+      expect(shown.author_name_gone).toBe(true);
+    }
+    // A stranger digs on one: allowed, on the page under their name.
+    const world = vendors();
+    const run = await dig(eve, debates[0]!, world);
+    await settleAll(world);
+    expect(await new PostgresPublicDebateRunnerRepository(runner).readContribution(run)).toMatchObject({ outcome: "ALLOWED" });
+    expect((await page(debates[0]!.ref)).contributions!.filter((entry) => entry.contributor === pseudonymOf(eve))).toHaveLength(1);
+    // The dig added Eve's rows beside the debate, and nothing of Ana's came back.
+    expect((await everyRow()).filter((row) => row.text.includes(ana.ownerRef)).map((row) => row.table).filter((table) => !table.startsWith("legal.") && !table.startsWith("billing."))).toEqual([]);
+  });
+
   it("with the author gone and no dig's key alive, a report is carried by a run of the writer's own, made for it (Task 56h); a dig still works after it", async () => {
     const [ana, eve] = [await account(), await account()];
     const debate = await publishedDebate(ana);

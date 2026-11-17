@@ -1012,6 +1012,38 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "everyone told \"until the review ends\" hearing how it ended (0176, below) the sixty-sixth"));
   });
 
+  it("chains an erased account's owner reference leaving its debates (0177) after 0176 with 0176's manifest and effective verifier, drained, amending no step", async () => {
+    const plan = await loadMigrationPlan();
+    const step = atStep(plan.forwardChain, "0177");
+    const previous = atStep(plan.forwardChain, "0176");
+    const manifest = JSON.parse((await bytesOf("lineage/erased-owner-unlinked-forward0177.json")).toString("utf8"));
+    expect(step?.name).toBe("0177_erased_owner_unlinked.sql");
+    expect(previous?.name).toBe("0176_moderation_final_outcome.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/moderation-final-outcome-forward0176.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0177_erased_owner_unlinked.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: false, drained: true, keepsVerifier: true });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(manifest.amendsPostconditionsOf).toEqual([]);
+    expect(step?.amendsPostconditionsOf).toEqual([]);
+  });
+
+  it("documents an erased account's owner reference leaving its debates (0177) as the sixty-seventh chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## An erased account's owner reference leaves its debates (0177)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0176", "0177_erased_owner_unlinked.sql", "erased-owner-unlinked-forward0177.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0177.ts", "`STEPS`", "`-- n1: drained`", "`-- n1: keeps-verifier`", "`identity.unlink_erased_owner_runs()`",
+      "`core.reject_mutation_except_erased_owner()`", "`billing.run_charge_scope`", "tests/integration/erased-owner-unlinked-0177.test.ts"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("everyone told \"until the review ends\" hearing how it ended (0176, below) the sixty-sixth",
+      "an erased account's owner reference leaving its debates (0177, below) the sixty-seventh"));
+  });
+
   it("chains the V4 account memory 0131 after row-level security 0130 with 0130's manifest and effective verifier", async () => {
     const plan = await loadMigrationPlan();
     const step = atStep(plan.forwardChain, "0131");
