@@ -142,8 +142,9 @@ invites the guess that the asker has that matter. With no name it attaches to no
      is a guess from closeness, not a join, and it does not come from the usage row (its time is the debate's own
      start, which the debate's rows hold anyway). To lower it: keep kept records' times less exact, for example to
      the day. Not built; for counsel and the owner to weigh under "linking".
-   - **Whether the law asks for more.** The owner chose to keep the usage row without the customer. Whether tax or
-     consumer law asks that each debate's usage stay attributable to the customer was not answered and is for counsel.
+   - **Whether the law asks for more.** The owner chose to keep the usage row without the customer, for every debate
+     of an erased account, private ones too. Whether tax or consumer law asks that each debate's usage stay
+     attributable to the customer was not answered and is for counsel.
 
    Backups (point 3) hold the old reference until they rotate, as they hold the account.
 
