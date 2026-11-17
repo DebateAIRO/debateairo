@@ -210,7 +210,8 @@ describe("terms of service modal — rendered", () => {
       expect(number.style.getPropertyValue("--accent")).toBe(`var(${token})`);
     }
     // 131 until Switzerland's part (Annex A.5, one paragraph) left on 14 November 2026.
-    expect(dialog().querySelectorAll(".policyText").length).toBe(130);
+    // 131 again since section 8 gained its paragraph on DeepInfra on 16 November 2026.
+    expect(dialog().querySelectorAll(".policyText").length).toBe(131);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 
