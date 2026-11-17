@@ -479,50 +479,54 @@ export function providerRegister(companies: readonly string[] | null): readonly 
 
 export type TermsVersion = Readonly<{
   version: string;
-  dateKey: string;
   noteKey: string;
   current: boolean;
-  href: string;
+  /** The text's page, or null for a version that was never published as a text of its own. */
+  href: string | null;
 }>;
 
 /**
- * Every published version of the terms, newest first. Each earlier row links to the exact text
- * that was current before the next revision.
+ * Every version of the terms, newest first, one row per number from 2.0 up. Each earlier row links to the exact text
+ * that was current before the next revision. The rows carry no effective date until go-live: the drafts' own
+ * "Effective …" lines are not in order (2.8 and 2.9 say 12 October, after 2.6's 24 October), so the page states none.
+ * 2.7 has no text: the synthesis-flag merge (#225) took the Terms from 2.6 straight to 2.8, and the charts clause first
+ * numbered 2.7 became 2.9, but the change history in the Terms names a 2.7, so its row says why there is nothing to read.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.18", dateKey: "legal.versions.v2.date", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
-  { version: "2.17", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.18", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.17", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/63e8f9c271ed42c5466568999f4a35418b5011d8f31309dabb199f8927a30203" },
-  { version: "2.16", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.16", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70" },
-  { version: "2.15", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.15", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/765a7826b1045fabe77783e3a9bbe95a8f6dec9a48ff071e9c4a844a8317d925" },
-  { version: "2.14", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.14", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/94474fdb20bed511a590b6bc1c07750ed4e67b1c3dfb328d31638daaf233f6a7" },
-  { version: "2.13", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.13", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/9cad1a62f77eee42c46facba8a3c2e04c44afba940688ae5e06d3bf586808cfc" },
-  { version: "2.12", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.12", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b" },
-  { version: "2.11", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.11", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/58ae2f6196b823ec4e1316e1289861fe54b6c3663913fd9617aa0cfdde4b5bdd" },
-  { version: "2.10", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.10", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/bf864a74b185aadeabf37e7a4593830d66cab343388f64b88a01a38348dcd339" },
-  { version: "2.9", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.9", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/de0b1e1adaff7690436ef4fe09132b0998d33d2f206ec29be9127142c935e56f" },
-  { version: "2.8", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.8", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/160400ea25aee99085d012f1008af3ca2841148ae3349401a2ac5152278f6fb4" },
-  { version: "2.6", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.7", noteKey: "legal.versions.unpublished.note", current: false, href: null },
+  { version: "2.6", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab" },
-  { version: "2.5", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.5", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/e6fe4e6897c5c4aa03214da2e79954c8903fe8fe2d3c2785a000357618d3b195" },
-  { version: "2.4", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.4", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/3f238233a301a4e98945d8164e1f5b7d0934d68f01adcdf421f8602e11ca2ef6" },
-  { version: "2.3", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.3", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/0535525218bb7c975ea4f8459bc2011a494efed363bee79d6382805ad5981f6c" },
-  { version: "2.2", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.2", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/fcffb706c7ab2dcbfa09594dd5b0686e274cc5ba3e3a4377573f5b771c07a660" },
-  { version: "2.1", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.1", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/34bab40dea5ccdcaba5dc167106e8b6d9bdc08c676f82a2c84e68fd9809c8b0c" },
-  { version: "2.0", dateKey: "legal.versions.v2.date", noteKey: "legal.archive.meta", current: false,
+  { version: "2.0", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/0d1bc079eb2d5b054c1cfc7c0430f234ca5391bd6e6824ecc8958a294f6eaa0e" }
 ]);

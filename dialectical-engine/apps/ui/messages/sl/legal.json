@@ -55,7 +55,7 @@
   "legal.versions.meta": "Vse različice, ki smo jih objavili, od najnovejše naprej",
   "legal.versions.current": "Veljavna",
   "legal.versions.read": "Preberi",
-  "legal.versions.v2.date": "Velja od [datum]",
+  "legal.versions.unpublished.note": "Ni bila objavljena kot samostojno besedilo. Njene spremembe so del različice 2.8.",
   "legal.versions.v2.note": "Različica, ki vam jo prikažemo ob registraciji.",
   "legal.versions.none": "Prejšnja različica še ni bila objavljena. Ko se ti pogoji spremenijo, bo različica, ki jo nadomestijo, tukaj še naprej na voljo za branje.",
   "legal.privacyVersions.eyebrow": "Pravilnik o zasebnosti",

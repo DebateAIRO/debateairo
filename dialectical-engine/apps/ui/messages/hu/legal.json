@@ -55,7 +55,7 @@
   "legal.versions.meta": "Minden általunk közzétett változat, a legújabbtól kezdve",
   "legal.versions.current": "Hatályos",
   "legal.versions.read": "Elolvasás",
-  "legal.versions.v2.date": "Hatályos: [dátum]",
+  "legal.versions.unpublished.note": "Nem jelent meg önálló szövegként. A változtatásai a 2.8. változat részei.",
   "legal.versions.v2.note": "Ezt a változatot látja a regisztrációkor.",
   "legal.versions.none": "Korábbi változatot még nem tettünk közzé. Ha ezek a feltételek módosulnak, az általuk felváltott változat itt továbbra is olvasható marad.",
   "legal.privacyVersions.eyebrow": "Adatvédelmi szabályzat",

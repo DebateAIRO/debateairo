@@ -389,23 +389,36 @@ describe("the archive of every published Terms and Privacy text (paid plans L2, 
 describe("the /terms/versions list and the archive agree (paid plans L2, rulings Q-3 and R3-4)", () => {
   // PR #42's page (apps/ui/app/terms/versions/page.tsx) renders TERMS_VERSIONS; its rows keep their editorial
   // date and note, and the ARCHIVE decides which versions they are, so a published version cannot go missing.
-  type TermsVersionRow = Readonly<{ version: string; current: boolean; href: string }>;
+  // A row with no link (href null) is a version the change history in the Terms names but that was never published as
+  // a text of its own (2.7: the synthesis-flag merge took the Terms from 2.6 straight to 2.8); the archive holds none.
+  type TermsVersionRow = Readonly<{ version: string; current: boolean; href: string | null }>;
   let TERMS_VERSIONS: ReadonlyArray<TermsVersionRow> = [];
   beforeAll(async () => {
     // pages.ts (PR #42) uses extensionless imports that NodeNext rejects (TS2835); load it at run time like t9-mode-tokens does.
     ({ TERMS_VERSIONS } = await vi.importActual<{ TERMS_VERSIONS: ReadonlyArray<TermsVersionRow> }>("../../apps/ui/lib/legal/pages.js"));
   });
 
-  it("lists every archived Terms version exactly once, newest first, and nothing the archive never held", () => {
+  it("lists every archived Terms version exactly once, newest first, and links nothing the archive never held", () => {
     const archivedVersions = [...new Set(legalArchive("TERMS", "en").map((entry) => entry.version))];
     expect(archivedVersions.length).toBeGreaterThan(0);
-    expect(TERMS_VERSIONS.map((row) => row.version)).toEqual(archivedVersions);
+    expect(TERMS_VERSIONS.filter((row) => row.href !== null).map((row) => row.version)).toEqual(archivedVersions);
+  });
+
+  it("gives a row no link only for a version the archive never held and the Terms' change history names", () => {
+    const history = readFileSync(resolve(process.cwd(), "apps/ui/legal/en/terms-of-service.md"), "utf8");
+    const archived = new Set(legalArchive("TERMS", "en").map((entry) => entry.version));
+    for (const row of TERMS_VERSIONS.filter((item) => item.href === null)) {
+      expect(row.current, row.version).toBe(false);
+      expect(archived.has(row.version), row.version).toBe(false);
+      expect(history, row.version).toMatch(new RegExp(`replaced version ${row.version.replace(".", "\\.")}\\b`));
+    }
   });
 
   it("marks exactly the version in force as current, linked to /terms, and links every other to its archived text", () => {
     const current = currentDocument("TERMS", "en")!;
     expect(TERMS_VERSIONS.filter((row) => row.current).map((row) => row.version)).toEqual([current.version]);
     for (const row of TERMS_VERSIONS) {
+      if (row.href === null) continue;
       if (row.current) {
         expect(row.href, row.version).toBe("/terms");
         continue;

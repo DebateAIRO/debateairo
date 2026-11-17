@@ -55,7 +55,7 @@
   "legal.versions.meta": "Alle versioner, vi har offentliggjort, med den nyeste først",
   "legal.versions.current": "Gældende",
   "legal.versions.read": "Læs",
-  "legal.versions.v2.date": "Gældende fra [dato]",
+  "legal.versions.unpublished.note": "Ikke offentliggjort som en selvstændig tekst. Dens ændringer indgår i version 2.8.",
   "legal.versions.v2.note": "Den version, du får vist, når du tilmelder dig.",
   "legal.versions.none": "Der er endnu ikke offentliggjort nogen tidligere version. Når vilkårene ændres, kan den version, de erstatter, fortsat læses her.",
   "legal.privacyVersions.eyebrow": "Privatlivspolitik",

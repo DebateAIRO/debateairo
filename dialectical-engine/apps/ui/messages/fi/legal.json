@@ -55,7 +55,7 @@
   "legal.versions.meta": "Kaikki julkaisemamme versiot uusimmasta alkaen",
   "legal.versions.current": "Voimassa",
   "legal.versions.read": "Lue",
-  "legal.versions.v2.date": "Voimassa [päivämäärä] alkaen",
+  "legal.versions.unpublished.note": "Ei julkaistu omana tekstinään. Sen muutokset sisältyvät versioon 2.8.",
   "legal.versions.v2.note": "Versio, joka näytetään sinulle rekisteröityessäsi.",
   "legal.versions.none": "Aiempia versioita ei ole julkaistu. Kun näitä ehtoja muutetaan, korvattu versio pysyy luettavissa täällä.",
   "legal.privacyVersions.eyebrow": "Tietosuojakäytäntö",

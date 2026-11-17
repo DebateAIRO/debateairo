@@ -55,7 +55,7 @@
   "legal.versions.meta": "Kõik meie avaldatud versioonid, uusim eespool",
   "legal.versions.current": "Kehtiv",
   "legal.versions.read": "Lugege",
-  "legal.versions.v2.date": "Kehtib alates [kuupäev]",
+  "legal.versions.unpublished.note": "Ei avaldatud eraldi tekstina. Selle muudatused on osa versioonist 2.8.",
   "legal.versions.v2.note": "Versioon, mida teile registreerumisel näidatakse.",
   "legal.versions.none": "Varasemaid versioone ei ole avaldatud. Kui need tingimused muutuvad, jääb asendatud versioon siin loetavaks.",
   "legal.privacyVersions.eyebrow": "Privaatsuspoliitika",

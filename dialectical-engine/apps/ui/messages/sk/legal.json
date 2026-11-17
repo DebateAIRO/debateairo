@@ -55,7 +55,7 @@
   "legal.versions.meta": "Všetky verzie, ktoré sme zverejnili, od najnovšej",
   "legal.versions.current": "Aktuálna",
   "legal.versions.read": "Prečítať",
-  "legal.versions.v2.date": "Účinné od [dátum]",
+  "legal.versions.unpublished.note": "Nebola zverejnená ako samostatný text. Jej zmeny sú súčasťou verzie 2.8.",
   "legal.versions.v2.note": "Verzia, ktorá sa vám zobrazí pri registrácii.",
   "legal.versions.none": "Zatiaľ nebola zverejnená žiadna staršia verzia. Keď sa tieto podmienky zmenia, nahradenú verziu si tu budete môcť aj naďalej prečítať.",
   "legal.privacyVersions.eyebrow": "Zásady ochrany osobných údajov",

@@ -55,7 +55,7 @@
   "legal.versions.meta": "كل نسخة نشرناها، من الأحدث إلى الأقدم",
   "legal.versions.current": "الحالية",
   "legal.versions.read": "قراءة",
-  "legal.versions.v2.date": "سارية اعتبارًا من [التاريخ]",
+  "legal.versions.unpublished.note": "لم تُنشر نصًّا قائمًا بذاته. تغييراتها جزء من النسخة 2.8.",
   "legal.versions.v2.note": "النسخة التي تُعرض عليك عند التسجيل.",
   "legal.versions.none": "لم تُنشر أي نسخة سابقة بعد. وعندما تتغير هذه الشروط، تبقى النسخة المستبدَلة متاحة للقراءة هنا.",
   "legal.privacyVersions.eyebrow": "سياسة الخصوصية",
