@@ -40,6 +40,20 @@ minimumReleaseAge: 10080
 # Note that adding one at all is forbidden by the security mission's constraint 12: a version
 # younger than 7 days is reported as BLOCKED, not excluded.
 
+# Advisories `pnpm audit` passes over. Empty is the resting state: an advisory is listed only while
+# no patched version exists to move to, under a `drop after YYYY-MM-DD` comment, and
+# tests/architecture/dependency-floors.test.ts fails when that comment is missing and on the day
+# after that date.
+auditConfig:
+  ignoreGhsas:
+    # picomatch <=4.0.7, a slow regular expression on a crafted glob pattern. The patched version,
+    # 4.0.8, was not published on 2026-11-17, so there is no floor to raise yet. picomatch reaches
+    # this project only through vitest, the test runner, which matches patterns written in this
+    # repository. When 4.0.8 is out and seven days old, add the floor `picomatch@<4.0.8` to the
+    # overrides below and delete this entry.
+    # drop after 2026-12-01
+    - GHSA-fc5q-39xc-vjpf
+
 # F-02 (2026-09-01 security hardening, task B1): dependency floors for the advisories
 # reachable through next (postcss, sharp, nanoid) and any transitive esbuild (0.24.3 was never
 # published, so the <0.24.3 range is lifted straight to 0.28.1, the version tsx already uses).

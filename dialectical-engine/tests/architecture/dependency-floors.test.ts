@@ -145,8 +145,13 @@ type CooldownExclusion = { entry: string; dropAfter: string | undefined };
  * than no reader: it goes green over exactly the entry it was written to catch.
  */
 function cooldownExclusions(text: string): CooldownExclusion[] {
+  return datedEntries(text, "minimumReleaseAgeExclude");
+}
+
+/** The sequence items under the top-level `key`, nested lists included, each with the date that governs it. */
+function datedEntries(text: string, key: string): CooldownExclusion[] {
   const lines = text.split("\n");
-  const start = lines.findIndex((line) => /^minimumReleaseAgeExclude:[ \t]*$/.test(line));
+  const start = lines.findIndex((line) => line.replace(/[ \t]+$/, "") === `${key}:`);
   const found: CooldownExclusion[] = [];
   if (start === -1) return found;
   let dropAfter: string | undefined;
@@ -170,7 +175,11 @@ function cooldownExclusions(text: string): CooldownExclusion[] {
  * says when that time runs out.
  */
 function expiredCooldownExclusions(text: string, today: string): string[] {
-  return cooldownExclusions(text).flatMap(({ entry, dropAfter }) => {
+  return expiredEntries(cooldownExclusions(text), today);
+}
+
+function expiredEntries(entries: CooldownExclusion[], today: string): string[] {
+  return entries.flatMap(({ entry, dropAfter }) => {
     if (dropAfter === undefined) return [`${entry}: no "drop after YYYY-MM-DD" comment above it`];
     if (dropAfter < today) return [`${entry}: its exclusion expired on ${dropAfter}`];
     return [];
@@ -265,5 +274,36 @@ describe("the cooldown-exclusion reader (V-18, the mechanism)", () => {
   it("holds a range or a pattern to the exact-pin rule the live case applies", () => {
     const entries = cooldownExclusions(workspaceWith("  # drop after 2026-12-01\n  - 'next@^15.5.0'\n  - next@15.5.25"));
     expect(entries.map(({ entry }) => EXACT_PIN.test(entry))).toEqual([false, true]);
+  });
+});
+
+/** The advisories `auditConfig` tells `pnpm audit` to pass over, each with the `drop after` date that governs it. */
+const auditExceptions = (text: string): CooldownExclusion[] => datedEntries(text, "auditConfig");
+const ADVISORY_ID = /^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/;
+
+// An advisory with no patched version turns the audit red on every pull request, with nothing to upgrade to.
+// Passing over it is allowed only while that lasts: by its id, under a date, so the exception cannot outlive its
+// reason without this file going red.
+describe("advisories the dependency audit passes over", () => {
+  it("passes over one advisory today: picomatch's, whose patched version does not exist yet", () => {
+    expect(auditExceptions(workspace).map(({ entry }) => entry)).toEqual(["GHSA-fc5q-39xc-vjpf"]);
+    // The exception goes when the version does: a lockfile that has moved past 4.0.7 fails here.
+    expect(resolvedVersions("picomatch")).toEqual(["4.0.7"]);
+  });
+
+  it("names each one by its GitHub advisory id, under an unexpired `drop after YYYY-MM-DD` comment", () => {
+    const exceptions = auditExceptions(workspace);
+    for (const { entry } of exceptions) expect(entry).toMatch(ADVISORY_ID);
+    expect(expiredEntries(exceptions, new Date().toISOString().slice(0, 10))).toEqual([]);
+  });
+
+  it("reads the list under its nested key, and names an entry with no date or with a date that has passed", () => {
+    const dated = "auditConfig:\n  ignoreGhsas:\n    # why\n    # drop after 2026-12-01\n    - GHSA-fc5q-39xc-vjpf\noverrides:\n  a: 1\n";
+    expect(auditExceptions(dated)).toEqual([{ entry: "GHSA-fc5q-39xc-vjpf", dropAfter: "2026-12-01" }]);
+    expect(expiredEntries(auditExceptions(dated), "2026-12-01")).toEqual([]);
+    expect(expiredEntries(auditExceptions(dated), "2026-12-02")).toEqual(["GHSA-fc5q-39xc-vjpf: its exclusion expired on 2026-12-01"]);
+    const undated = "auditConfig:\n  ignoreGhsas:\n    - GHSA-fc5q-39xc-vjpf\n";
+    expect(expiredEntries(auditExceptions(undated), "2026-11-17")).toEqual(['GHSA-fc5q-39xc-vjpf: no "drop after YYYY-MM-DD" comment above it']);
+    expect(auditExceptions("overrides:\n  a: 1\n")).toEqual([]);
   });
 });
