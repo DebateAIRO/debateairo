@@ -56,7 +56,7 @@ function isExactSessionDenial(response) {
 function isExactUiReadiness(response) {
   return response.login.statusCode === 200
     && response.login.contentType.toLowerCase().startsWith("text/html")
-    && response.login.body.includes("Back to the graph.")
+    && response.login.body.includes("Use a passkey, or your password and authenticator.")
     && isExactSessionDenial(response.session);
 }
 
