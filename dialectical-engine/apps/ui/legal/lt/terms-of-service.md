@@ -225,7 +225,7 @@ Dialectical Engine siūlo nemokamą planą. Bus prieinami trys mokami planai, **
 
 **Nepavykę mokėjimai.** Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname.
 
-**Mokesčiai ir kam mokate.** Mūsų kainos rodomos be mokesčių, kaip kaina + PVM (arba GST ar pardavimo mokestis, priklausomai nuo jūsų gyvenamosios vietos). Jūsų atsiskaitymo adresui taikomas mokestis pridedamas apmokėjimo metu, o atsiskaitymo puslapyje prieš jums mokant parodoma bendra mokėtina suma su mokesčiais. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
+**Mokesčiai ir kam mokate.** Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas.
 
 **Mokėjimo būdai.** Mokate kortele. Priimame Visa ir Mastercard korteles; American Express kortelių nepriimame. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com), o visas jūsų kortelės numeris niekada nepasiekia mūsų.
 

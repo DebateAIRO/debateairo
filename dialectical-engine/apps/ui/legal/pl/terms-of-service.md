@@ -225,7 +225,7 @@ Dialectical Engine oferuje plan bezpłatny. Dostępne będą trzy płatne plany,
 
 **Nieudane płatności.** Jeżeli płatność nie powiedzie się, ponawiamy próbę przez 7 dni i przed obniżeniem planu Twojego konta do planu bezpłatnego wysyłamy ostrzeżenie pocztą elektroniczną. Nie usuwamy debat z powodu nieudanej płatności.
 
-**Podatki i odbiorca płatności.** Nasze ceny są podawane bez podatku, jako cena + VAT (lub GST albo podatek od sprzedaży, zależnie od miejsca zamieszkania). Podatek dla Twojego adresu rozliczeniowego jest doliczany na stronie płatności, która przed dokonaniem płatności pokazuje łączną kwotę do zapłaty wraz z podatkiem. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki.
+**Podatki i odbiorca płatności.** Ceny obejmują VAT, GST lub podatek od sprzedaży, zależnie od miejsca zamieszkania, co zostaje wskazane przed dokonaniem płatności. Sprzedawcą jest DMS Merchandise Shop S.R.L., który wystawia fakturę i pozostaje odpowiedzialny za samą usługę oraz za niniejsze Warunki.
 
 **Metody płatności.** Płacisz kartą. Akceptujemy karty Visa i Mastercard; nie akceptujemy kart American Express. Płatności kartą obsługuje NETOPIA Payments (netopia-payments.com), a pełny numer Twojej karty nigdy do nas nie trafia.
 

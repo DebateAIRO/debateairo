@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "取消。 您可随时通过设置 → 订阅，点击一次确认即可取消，亦可通过 dezbatere.ro/cancel 的取消页面取消，该页面无需登录。取消于当前计费周期结束时生效，您可继续使用至该时点。我们不会使取消流程比订阅流程更为困难。" },
       { kind: "p", text: "价格变更仅在续订时生效。我们至少提前 30 天通知，通过电子邮件告知新价格并提供取消链接。如果您所在国家的法律要求您明确同意价格变更，我们会征求您的同意；否则，如您不采取任何行动，新价格将从下一次续订起适用。附件 A 说明区域性规则。" },
       { kind: "p", text: "付款失败。 如果付款失败，我们会在 7 天内重试，并在将您的账户降级为免费方案前通过电子邮件发出警告。我们不会因付款失败而删除您的辩论。" },
-      { kind: "p", text: "税费及收款方。 我们的价格以不含税的形式显示，即价格 + 增值税（或商品及服务税、销售税，具体取决于您的居住地）。适用于您账单地址的税费会在结账时加收，结账页面会在您付款前显示含税的应付总额。卖方为 DMS Merchandise Shop S.R.L.，由其开具发票，并继续对服务本身及本条款负责。" },
+      { kind: "p", text: "税费及收款方。 价格包含增值税、商品及服务税或销售税，具体取决于您的居住地，并会在付款前显示。卖方为 DMS Merchandise Shop S.R.L.，由其开具发票，并继续对服务本身及本条款负责。" },
       { kind: "p", text: "付款方式。 您以银行卡付款。我们接受 Visa 和 Mastercard；不接受 American Express。银行卡付款由 NETOPIA Payments（netopia-payments.com）处理，您的完整卡号绝不会传到我们这里。" },
       { kind: "p", text: "交付。 Dialectical Engine 是在线服务，因此不会向您寄送任何物品。付款一经确认，您付费方案的功能即可在您的账户中使用。" },
       { kind: "p", text: "拒付。 如果您向发卡机构提出交易争议，我们可以在争议解决期间暂停付费功能。我们不会为此收取费用。" },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "f49d31a35bd2fc86c4e4699bb92a53361ea81d4e1ab775834fc2d023f7b25322",
+  sha256: "b60404fc3f3b8a589c7a418d439f11602db58b5eaecf90750b2bae03616e90fc",
   eyebrow: "服务条款 · v2.18 · 生效日期 2026 年 11 月 1 日",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",

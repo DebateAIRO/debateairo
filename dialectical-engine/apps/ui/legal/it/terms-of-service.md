@@ -225,7 +225,7 @@ Dialectical Engine offre un piano gratuito. Saranno disponibili tre piani a paga
 
 **Pagamenti non riusciti.** Se un pagamento non va a buon fine, riproviamo per 7 giorni e ti avvertiamo tramite email prima di riportare il tuo account al piano gratuito. Non cancelliamo i tuoi dibattiti a causa di un pagamento non riuscito.
 
-**Imposte e soggetto a cui effettui il pagamento.** I nostri prezzi sono indicati al netto delle imposte, come prezzo + IVA (o GST o imposta sulle vendite, a seconda del luogo in cui vivi). L'imposta per il tuo indirizzo di fatturazione viene aggiunta al momento del pagamento, e la pagina di pagamento ti mostra il totale da pagare, imposte incluse, prima che tu paghi. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
+**Imposte e soggetto a cui effettui il pagamento.** I prezzi includono IVA, GST o imposta sulle vendite, a seconda del luogo in cui vivi, e ciò viene indicato prima del pagamento. Il venditore è DMS Merchandise Shop S.R.L., che emette la tua fattura e resta responsabile del servizio stesso e delle presenti Condizioni.
 
 **Metodi di pagamento.** Paghi con carta. Accettiamo Visa e Mastercard; non accettiamo American Express. I pagamenti con carta sono elaborati da NETOPIA Payments (netopia-payments.com) e il numero completo della tua carta non arriva mai a noi.
 

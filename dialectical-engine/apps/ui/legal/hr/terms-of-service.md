@@ -225,7 +225,7 @@ Dialectical Engine nudi besplatni plan. Bit će dostupna tri plaćena plana, **P
 
 **Neuspjela plaćanja.** Ako plaćanje ne uspije, ponovno ga pokušavamo provesti tijekom 7 dana i upozoravamo vas e-poštom prije prebacivanja vašeg računa na besplatni plan. Ne brišemo vaše rasprave zbog neuspjelog plaćanja.
 
-**Porezi i kome plaćate.** Naše cijene prikazane su bez poreza, kao cijena + PDV (ili GST odnosno porez na promet, ovisno o tome gdje živite). Porez za vašu adresu za naplatu dodaje se na naplati, gdje vam se prije plaćanja prikazuje ukupan iznos za plaćanje s uključenim porezom. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete.
+**Porezi i kome plaćate.** Cijene uključuju PDV, GST ili porez na promet, što ovisi o tome gdje živite i prikazuje se prije plaćanja. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete.
 
 **Načini plaćanja.** Plaćate karticom. Prihvaćamo Visa i Mastercard; ne prihvaćamo American Express. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com), a puni broj vaše kartice nikada ne dolazi do nas.
 

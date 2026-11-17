@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Cealú. Cealaigh am ar bith ó Socruithe → Síntiús le clic deimhnithe amháin, nó tríd an leathanach cealaithe ag dezbatere.ro/cancel, nach gceanglaíonn ort síniú isteach. Tagann an cealú i bhfeidhm ag deireadh na tréimhse billeála reatha, agus coimeádann tú rochtain go dtí sin. Ní dhéanfaimid cealú níos deacra ná mar a bhí liostáil." },
       { kind: "p", text: "Ní thagann athruithe praghais i bhfeidhm ach tráth athnuachana. Tugaimid fógra 30 lá ar a laghad ar ríomhphost leis an bpraghas nua agus nasc cealaithe. Sa chás ina gceanglaíonn dlí do thíre orainn do thoiliú sainráite a fháil le hathrú praghais, iarraimid é; murach sin, mura ndéanann tú aon ní, beidh feidhm ag an bpraghas nua ón gcéad athnuachan eile. Luaitear rialacha réigiúnacha in Iarscríbhinn A." },
       { kind: "p", text: "Íocaíochtaí teipthe. Má theipeann ar íocaíocht, bainimid triail eile as ar feadh 7 lá agus tugaimid rabhadh duit ar ríomhphost sula n-íosghrádaímid do chuntas go dtí an plean saor in aisce. Ní scriosaimid do dhíospóireachtaí toisc gur theip ar íocaíocht." },
-      { kind: "p", text: "Cánacha, agus cé leis a n-íocann tú. Taispeántar ár bpraghsanna gan cháin, mar phraghas + CBL (nó GST nó cáin díolacháin, ag brath ar an áit ina bhfuil cónaí ort). Cuirtear leo ag an tseiceáil amach an cháin is infheidhme ar do sheoladh billeála, agus taispeánann an tseiceáil amach duit an tsuim iomlán a íocfaidh tú, cáin san áireamh, sula n-íocann tú. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo." },
+      { kind: "p", text: "Cánacha, agus cé leis a n-íocann tú. Áirítear CBL, GST nó cáin díolacháin sna praghsanna, rud a bhraitheann ar an áit ina bhfuil cónaí ort agus a thaispeántar sula n-íocann tú. Is é DMS Merchandise Shop S.R.L. an díoltóir, a eisíonn do shonrasc agus a fhanann freagrach as an tseirbhís féin agus as na Téarmaí seo." },
       { kind: "p", text: "Modhanna íocaíochta. Íocann tú le cárta. Glacaimid le Visa agus Mastercard; ní ghlacaimid le American Express. Próiseálann NETOPIA Payments (netopia-payments.com) íocaíochtaí cárta, agus ní shroicheann uimhir iomlán do chárta muid riamh." },
       { kind: "p", text: "Seachadadh. Is seirbhís ar líne é Dialectical Engine, mar sin ní sheoltar aon rud chugat. Bíonn gnéithe do phlean íoctha ar fáil i do chuntas a luaithe a dheimhnítear d'íocaíocht." },
       { kind: "p", text: "Aisghairmeacha íocaíochta. Má dhéanann tú agóid i gcoinne muirir le d'eisitheoir cárta, féadfaimid gnéithe íoctha a chur ar fionraí fad a réitítear an díospóid. Ní ghearraimid táillí as seo." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "7bf17a63b1796c3b7de3a7502612d1947e12d55997c0448f250e33607cd5d125",
+  sha256: "fb8c17c9609d42c01a4835e758fe6fc57c1d7fa43f9767c7cc14b71e8bce3840",
   eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.18 · I bhFEIDHM 1 SAMHAIN 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",

@@ -225,7 +225,7 @@ Dialectical Engine ponuja brezplačen paket. Na voljo bodo trije plačljivi pake
 
 **Neuspela plačila.** Če plačilo ne uspe, ga ponovno poskušamo izvesti 7 dni in vas po e-pošti opozorimo, preden vaš račun prestavimo na brezplačni paket. Vaših razprav zaradi neuspelega plačila ne izbrišemo.
 
-**Davki in prejemnik plačila.** Naše cene so prikazane brez davka, kot cena + DDV (ali GST oziroma prometni davek, odvisno od kraja, kjer živite). Davek za vaš naslov za račun se doda v blagajni, ki vam pred plačilom prikaže skupni znesek za plačilo z vključenim davkom. Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje.
+**Davki in prejemnik plačila.** Cene vključujejo DDV, GST ali prometni davek, kar je odvisno od kraja, kjer živite, in je prikazano pred plačilom. Prodajalec je DMS Merchandise Shop S.R.L., ki vam izda račun in ostaja odgovoren za samo storitev in za te Pogoje.
 
 **Načini plačila.** Plačate s kartico. Sprejemamo kartice Visa in Mastercard; kartic American Express ne sprejemamo. Plačila s kartico obdeluje NETOPIA Payments (netopia-payments.com), celotna številka vaše kartice pa nikoli ne pride do nas.
 

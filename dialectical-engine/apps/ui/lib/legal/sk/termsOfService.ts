@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Zrušenie. Program môžete kedykoľvek zrušiť v ponuke Nastavenia → Predplatné jedným potvrdzovacím kliknutím alebo prostredníctvom stránky na zrušenie na adrese dezbatere.ro/cancel, ktorá nevyžaduje prihlásenie. Zrušenie nadobúda účinnosť na konci aktuálneho fakturačného obdobia a dovtedy vám prístup zostáva. Zrušenie predplatného nebude náročnejšie než jeho uzavretie." },
       { kind: "p", text: "Zmeny cien nadobúdajú účinnosť až pri obnovení. Najmenej 30 dní vopred vás upozorníme e-mailom, ktorý obsahuje novú cenu a odkaz na zrušenie. Ak právo vašej krajiny vyžaduje váš výslovný súhlas so zmenou ceny, požiadame vás oň; inak sa v prípade vašej nečinnosti nová cena uplatní od nasledujúceho obnovenia. Regionálne pravidlá uvádza príloha A." },
       { kind: "p", text: "Neúspešné platby. Ak platba zlyhá, budeme ju opakovať počas 7 dní a pred prevedením účtu na bezplatný program vás upozorníme e-mailom. Pre neúspešnú platbu vaše debaty nemažeme." },
-      { kind: "p", text: "Dane a komu platíte. Naše ceny zobrazujeme bez dane, v tvare cena + DPH (alebo GST či daň z predaja v závislosti od miesta vášho bydliska). Daň pre vašu fakturačnú adresu sa pripočíta v pokladni a pokladňa vám pred zaplatením ukáže celkovú sumu na úhradu vrátane dane. Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky." },
+      { kind: "p", text: "Dane a komu platíte. Ceny zahŕňajú DPH, GST alebo daň z predaja v závislosti od miesta vášho bydliska, čo sa zobrazí pred zaplatením. Predávajúcim je DMS Merchandise Shop S.R.L., ktorá vystavuje vašu faktúru a zostáva zodpovedná za samotnú službu a za tieto Podmienky." },
       { kind: "p", text: "Platobné metódy. Platíte kartou. Prijímame karty Visa a Mastercard; karty American Express neprijímame. Platby kartou spracúva NETOPIA Payments (netopia-payments.com) a celé číslo vašej karty sa k nám nikdy nedostane." },
       { kind: "p", text: "Dodanie. Dialectical Engine je online služba, preto vám nič nezasielame. Funkcie vášho plateného programu sú vo vašom účte k dispozícii hneď, ako je platba potvrdená." },
       { kind: "p", text: "Spätné zúčtovanie. Ak platbu napadnete u vydavateľa karty, môžeme platené funkcie počas riešenia sporu pozastaviť. Neúčtujeme za to žiadne poplatky." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "234f7de523954b59ef97c83c4eaaa31f51d2835bdbfe0eee420de129ff5e8d42",
+  sha256: "89bc6a31d46f87f7a9cd77c0a90466793b6b483be0c016bc0c10942a99944ed3",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.18 · ÚČINNÉ OD 1. NOVEMBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

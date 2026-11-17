@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Anularea. Anulați oricând din Setări → Abonament, printr-un singur clic de confirmare, sau prin pagina de anulare de la dezbatere.ro/cancel, care nu vă impune să vă autentificați. Anularea produce efecte la sfârșitul perioadei curente de facturare, iar până atunci vă păstrați accesul. Nu vom face anularea mai dificilă decât a fost abonarea." },
       { kind: "p", text: "Modificările de preț produc efecte numai la o reînnoire. Vă notificăm prin e-mail cu cel puțin 30 de zile înainte, comunicând noul preț și un link de anulare. Atunci când legislația țării dumneavoastră impune consimțământul expres pentru o modificare de preț, vi-l solicităm; în caz contrar, dacă nu luați nicio măsură, noul preț se aplică de la următoarea reînnoire. Anexa A menționează normele regionale." },
       { kind: "p", text: "Plăți nereușite. Dacă o plată eșuează, reîncercăm timp de 7 zile și vă avertizăm prin e-mail înainte de a trece contul la planul gratuit. Nu vă ștergem dezbaterile din cauza unei plăți nereușite." },
-      { kind: "p", text: "Taxe și beneficiarul plății. Prețurile noastre sunt afișate fără taxe, ca preț + TVA (sau GST ori taxa pe vânzări, în funcție de locul în care locuiți). Taxa pentru adresa dumneavoastră de facturare se adaugă la plată, iar pagina de plată vă arată totalul de plată, cu taxe incluse, înainte să plătiți. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni." },
+      { kind: "p", text: "Taxe și beneficiarul plății. Prețurile includ TVA, GST sau taxa pe vânzări, în funcție de locul în care locuiți, iar acest lucru este afișat înainte de plată. Vânzătorul este DMS Merchandise Shop S.R.L., care emite factura dumneavoastră și rămâne responsabil pentru serviciul în sine și pentru acești Termeni." },
       { kind: "p", text: "Modalități de plată. Plătiți cu cardul. Acceptăm Visa și Mastercard; nu acceptăm American Express. Plățile cu cardul sunt procesate de NETOPIA Payments (netopia-payments.com), iar numărul complet al cardului dumneavoastră nu ajunge niciodată la noi." },
       { kind: "p", text: "Livrare. Dialectical Engine este un serviciu online, așa că nu vă expediem nimic. Funcțiile planului cu plată devin disponibile în contul dumneavoastră imediat ce plata este confirmată." },
       { kind: "p", text: "Refuzuri la plată. Dacă contestați o plată la emitentul cardului, putem suspenda funcțiile cu plată până la soluționarea contestației. Nu percepem comisioane pentru aceasta." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "88fefe02cb0d36865b248adbc4b152156da0a1b3571b13ac6092252e6dfc5a28",
+  sha256: "4775f2c77fcfc8234312032a5a8fcb72c5ab023f8bff8c21432d43ea7c764383",
   eyebrow: "TERMENII SERVICIULUI · v2.18 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",

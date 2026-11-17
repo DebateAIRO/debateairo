@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Lemondás. Bármikor lemondhatja előfizetését a Beállítások → Előfizetés menüpontban egyetlen megerősítő kattintással, vagy a dezbatere.ro/cancel címen elérhető lemondási oldalon, amelyhez nem kell bejelentkeznie. A lemondás az aktuális számlázási időszak végén lép hatályba, addig pedig megmarad a hozzáférése. A lemondást nem tesszük nehezebbé az előfizetésnél." },
       { kind: "p", text: "Az árváltozások kizárólag megújításkor lépnek hatályba. Legalább 30 nappal korábban e-mailben értesítjük Önt az új árról, és lemondási hivatkozást biztosítunk. Ha az Ön országának joga kifejezett hozzájárulását követeli meg egy árváltozáshoz, azt kérjük Öntől; egyébként, ha nem tesz semmit, az új ár a következő megújítástól alkalmazandó. A regionális szabályokat az A. melléklet ismerteti." },
       { kind: "p", text: "Sikertelen fizetések. Ha egy fizetés sikertelen, 7 napig újra megkíséreljük, és e-mailben figyelmeztetjük Önt, mielőtt fiókját ingyenes csomagra állítanánk vissza. Sikertelen fizetés miatt nem töröljük vitáit." },
-      { kind: "p", text: "Adók és a fizetés kedvezményezettje. Árainkat adó nélkül, ár + héa formában tüntetjük fel (az Ön lakóhelyétől függően a héa helyett az áruk és szolgáltatások adója vagy a forgalmi adó is lehet). A számlázási címére vonatkozó adót a fizetési oldalon adjuk hozzá, és a fizetési oldal fizetés előtt megmutatja az Ön által fizetendő végösszeget, adóval együtt. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért." },
+      { kind: "p", text: "Adók és a fizetés kedvezményezettje. Az árak tartalmazzák a héát, az áruk és szolgáltatások adóját vagy a forgalmi adót; ez az Ön lakóhelyétől függ, és a fizetés előtt megjelenik. Az eladó a DMS Merchandise Shop S.R.L., amely kiállítja az Ön számláját, és felelős marad magáért a szolgáltatásért, valamint e Feltételekért." },
       { kind: "p", text: "Fizetési módok. Ön bankkártyával fizet. Visa és Mastercard kártyát fogadunk el; American Express kártyát nem fogadunk el. A kártyás fizetéseket a NETOPIA Payments (netopia-payments.com) dolgozza fel, és az Ön teljes kártyaszáma soha nem jut el hozzánk." },
       { kind: "p", text: "Szállítás. A Dialectical Engine online szolgáltatás, így semmit sem szállítunk ki Önnek. Fizetős csomagjának funkciói a fizetés megerősítése után azonnal elérhetők a fiókjában." },
       { kind: "p", text: "Visszaterhelések. Ha Ön vitat egy terhelést a kártyakibocsátójánál, a vita rendezéséig felfüggeszthetjük a fizetős funkciókat. Ezért nem számítunk fel díjat." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "64a88be70f6814b6c074826a2d867492a96996a4a4e0d037cc64c5810e4de945",
+  sha256: "3ef8e534291c507a70945f4a9ed39409ff65c1c8ab6f3b0261476c3e95d9d349",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.18 · HATÁLYOS 2026. NOVEMBER 1.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

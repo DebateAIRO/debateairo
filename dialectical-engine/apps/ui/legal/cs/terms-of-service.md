@@ -225,7 +225,7 @@ Dialectical Engine nabízí bezplatný tarif. K dispozici budou tři placené ta
 
 **Neúspěšné platby.** Pokud platba selže, budeme její provedení opakovat po dobu 7 dnů a před převedením účtu na bezplatný tarif vás upozorníme e-mailem. Kvůli neúspěšné platbě vaše debaty nemažeme.
 
-**Daně a komu platíte.** Naše ceny zobrazujeme bez daně, ve tvaru cena + DPH (nebo GST či daň z prodeje v závislosti na místě vašeho bydliště). Daň pro vaši fakturační adresu se připočítá v pokladně a pokladna vám před zaplacením ukáže celkovou částku k úhradě včetně daně. Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky.
+**Daně a komu platíte.** Ceny zahrnují DPH, GST nebo daň z prodeje v závislosti na místě vašeho bydliště, což se zobrazí před zaplacením. Prodejcem je DMS Merchandise Shop S.R.L., která vystavuje vaši fakturu a zůstává odpovědná za samotnou službu a za tyto Podmínky.
 
 **Platební metody.** Platíte kartou. Přijímáme karty Visa a Mastercard; karty American Express nepřijímáme. Platby kartou zpracovává NETOPIA Payments (netopia-payments.com) a celé číslo vaší karty se k nám nikdy nedostane.
 

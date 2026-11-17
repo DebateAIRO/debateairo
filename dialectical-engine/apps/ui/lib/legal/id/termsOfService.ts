@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Pembatalan. Batalkan kapan saja dari Pengaturan → Langganan dengan satu kali klik konfirmasi, atau melalui halaman pembatalan di dezbatere.ro/cancel, yang tidak mengharuskan Anda masuk. Pembatalan berlaku pada akhir periode penagihan berjalan, dan Anda tetap memiliki akses hingga saat itu. Kami tidak akan mempersulit pembatalan dibandingkan proses berlangganan." },
       { kind: "p", text: "Perubahan harga hanya berlaku pada saat perpanjangan. Kami memberikan pemberitahuan sekurang-kurangnya 30 hari sebelumnya melalui email yang mencantumkan harga baru dan tautan pembatalan. Jika hukum negara Anda mewajibkan persetujuan tegas atas perubahan harga, kami memintanya; jika tidak, apabila Anda tidak melakukan apa pun, harga baru berlaku sejak perpanjangan berikutnya. Lampiran A mencantumkan aturan regional." },
       { kind: "p", text: "Pembayaran gagal. Jika pembayaran gagal, kami mencoba kembali selama 7 hari dan memperingatkan Anda melalui email sebelum menurunkan akun Anda ke paket gratis. Kami tidak menghapus debat Anda karena pembayaran gagal." },
-      { kind: "p", text: "Pajak, dan pihak yang Anda bayar. Harga kami ditampilkan sebelum pajak, sebagai harga + PPN (atau GST atau pajak penjualan, bergantung pada tempat tinggal Anda). Pajak untuk alamat penagihan Anda ditambahkan di halaman pembayaran, dan halaman pembayaran menampilkan total yang Anda bayar, termasuk pajak, sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini." },
+      { kind: "p", text: "Pajak, dan pihak yang Anda bayar. Harga mencakup PPN, GST, atau pajak penjualan, yang bergantung pada tempat tinggal Anda dan ditampilkan sebelum Anda membayar. Penjualnya adalah DMS Merchandise Shop S.R.L., yang menerbitkan faktur Anda dan tetap bertanggung jawab atas layanan itu sendiri serta Ketentuan ini." },
       { kind: "p", text: "Metode pembayaran. Anda membayar dengan kartu. Kami menerima Visa dan Mastercard; kami tidak menerima American Express. Pembayaran kartu diproses oleh NETOPIA Payments (netopia-payments.com), dan nomor kartu Anda yang lengkap tidak pernah sampai kepada kami." },
       { kind: "p", text: "Pengiriman. Dialectical Engine adalah layanan daring, jadi tidak ada yang dikirimkan kepada Anda. Fitur paket berbayar Anda tersedia di akun Anda segera setelah pembayaran Anda dikonfirmasi." },
       { kind: "p", text: "Sanggahan transaksi. Jika Anda menyanggah suatu tagihan kepada penerbit kartu, kami dapat menangguhkan fitur berbayar selama sengketa diselesaikan. Kami tidak mengenakan biaya untuk hal ini." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "a02993554c7d5d38ac83e027ad28744f8739db42e8ffbedfb17f502e5c33218e",
+  sha256: "67a9f42a2adeab9c1cb3d6a90f765d18af6ee602094294577b983cbb7a497370",
   eyebrow: "KETENTUAN LAYANAN · v2.18 · BERLAKU 1 NOVEMBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

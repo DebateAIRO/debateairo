@@ -225,7 +225,7 @@ Dialectical Engine cung cấp một gói miễn phí. Ba gói trả phí, **Plus
 
 **Thanh toán không thành công.** Nếu một khoản thanh toán không thành công, chúng tôi thử lại trong 7 ngày và cảnh báo bạn qua email trước khi hạ tài khoản xuống gói miễn phí. Chúng tôi không xóa các cuộc tranh luận của bạn vì một khoản thanh toán không thành công.
 
-**Thuế và bên bạn thanh toán.** Giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT (hoặc GST hay thuế bán hàng, tùy thuộc nơi bạn sống). Thuế theo địa chỉ thanh toán của bạn được cộng thêm ở trang thanh toán, và trang thanh toán hiển thị tổng số tiền bạn phải trả, đã gồm thuế, trước khi bạn thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này.
+**Thuế và bên bạn thanh toán.** Giá đã bao gồm VAT, GST hoặc thuế bán hàng, tùy thuộc nơi bạn sống và được hiển thị trước khi thanh toán. Bên bán là DMS Merchandise Shop S.R.L., đơn vị phát hành hóa đơn cho bạn và tiếp tục chịu trách nhiệm về bản thân dịch vụ cũng như các Điều khoản này.
 
 **Phương thức thanh toán.** Bạn thanh toán bằng thẻ. Chúng tôi chấp nhận Visa và Mastercard; chúng tôi không chấp nhận American Express. Thanh toán bằng thẻ được xử lý bởi NETOPIA Payments (netopia-payments.com), và số thẻ đầy đủ của bạn không bao giờ đến được với chúng tôi.
 

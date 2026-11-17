@@ -225,7 +225,7 @@ Dialectical Engine toffri pjan bla ħlas. Se jkunu disponibbli tliet pjanijiet b
 
 **Ħlasijiet li jfallu.** Jekk ħlas ifalli nerġgħu nippruvaw għal 7 ijiem u nwissuk bil-posta elettronika qabel inniżżlu l-kont tiegħek għall-pjan bla ħlas. Ma nħassrux id-dibattiti tiegħek għax ħlas ikun falla.
 
-**Taxxi, u lil min tħallas.** Il-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT (jew GST jew taxxa fuq il-bejgħ, skont fejn tgħix). It-taxxa għall-indirizz tal-kontijiet tiegħek tiżdied fil-checkout, u l-checkout jurik it-total li se tħallas, bit-taxxa inkluża, qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
+**Taxxi, u lil min tħallas.** Il-prezzijiet jinkludu l-VAT, il-GST jew it-taxxa fuq il-bejgħ, li tiddependi minn fejn tgħix u tintwera qabel ma tħallas. Il-bejjiegħ huwa DMS Merchandise Shop S.R.L., li joħroġlok il-fattura u jibqa’ responsabbli għas-servizz innifsu u għal dawn it-Termini.
 
 **Metodi ta’ ħlas.** Tħallas bil-karta. Naċċettaw Visa u Mastercard; ma naċċettawx American Express. Il-ħlasijiet bil-karta jiġu pproċessati minn NETOPIA Payments (netopia-payments.com), u n-numru sħiħ tal-karta tiegħek qatt ma jasal għandna.
 

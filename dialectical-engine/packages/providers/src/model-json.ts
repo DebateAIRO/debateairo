@@ -258,6 +258,41 @@ function parsed(text: string): { readonly value: unknown } | null {
 }
 
 /**
+ * CI-1b (model text is untrusted): whether `text` is certain not to be strict JSON, found in one pass that throws
+ * nothing. A reply that opens with prose can hold 100 000 object spans, none of which decodes; `JSON.parse` answers each
+ * with a thrown SyntaxError, and building 100 000 of them is most of that reply's reading time (0.35 s of 0.5 s on the
+ * Mac, over the 2 s bound on a busy CI runner, 17 Nov). True ONLY for a text `JSON.parse` refuses, by one of three
+ * necessary conditions of the JSON grammar; false says nothing, and the caller still parses:
+ *  · outside a string, a character JSON never has there (only brackets, `:`, `,`, the four blanks, and the characters
+ *    of numbers and of `true`, `false`, `null` can stand there);
+ *  · a closing bracket that does not close the bracket open before it, or a bracket still open at the end;
+ *  · a string still open at the end.
+ * A string is read as JSON reads it: from a straight quote to the next one not behind a backslash.
+ */
+const JSON_BARE_CHARACTERS = new Set("{}[]:, \t\n\r0123456789-+.eEtrufalsn");
+function cannotBeStrictJson(text: string): boolean {
+  const open: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index]!;
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+    if (character === "\"") inString = true;
+    else if (character === "{") open.push("}");
+    else if (character === "[") open.push("]");
+    else if (character === "}" || character === "]") {
+      if (open.pop() !== character) return true;
+    } else if (!JSON_BARE_CHARACTERS.has(character)) return true;
+  }
+  return inString || open.length > 0;
+}
+
+/**
  * (iii) The one object the reply holds. A reply that itself opens with an object keeps that object (only the
  * prose after it is dropped): a member object further on is never taken in its place. A reply that opens with
  * prose gives the LAST complete top-level object that decodes as an object.
@@ -272,6 +307,7 @@ function outermostObject(content: string): { readonly value: unknown } | null {
   }
   let last: { readonly value: unknown } | null = null;
   for (const span of modelJsonObjectSpans(text)) {
+    if (cannotBeStrictJson(span)) continue;
     const candidate = parsed(span);
     if (candidate !== null && isPlainObject(candidate.value)) last = candidate;
   }
@@ -296,13 +332,14 @@ function nextSignificant(text: string, from: number): number {
 function escapeInnerQuotes(text: string): string | null {
   type Container = { kind: "object" | "array"; expectKey: boolean };
   const stack: Container[] = [];
+  // The result is the text itself with a backslash before each escaped quote, so it is copied in whole runs, from
+  // `copied` to the next escaped quote (CI-1b: one character at a time made a long reply's reading mostly memory work).
   let out = "";
-  let changed = false;
+  let copied = 0;
   let index = 0;
   while (index < text.length) {
     const character = text[index]!;
     if (character !== "\"") {
-      out += character;
       const top = stack.at(-1);
       if (character === "{") stack.push({ kind: "object", expectKey: true });
       else if (character === "[") stack.push({ kind: "array", expectKey: false });
@@ -314,21 +351,20 @@ function escapeInnerQuotes(text: string): string | null {
     }
     const top = stack.at(-1);
     const isKey = top?.kind === "object" && top.expectKey;
-    out += "\"";
     index += 1;
     let escaped = false;
     for (; index < text.length; index += 1) {
       const inner = text[index]!;
-      if (escaped) { escaped = false; out += inner; continue; }
-      if (inner === "\\") { escaped = true; out += inner; continue; }
-      if (inner !== "\"") { out += inner; continue; }
+      if (escaped) { escaped = false; continue; }
+      if (inner === "\\") { escaped = true; continue; }
+      if (inner !== "\"") continue;
       if (isKey || closesValue(text, index + 1, top?.kind ?? null)) break;
-      out += "\\\"";
-      changed = true;
+      out += `${text.slice(copied, index)}\\`;
+      copied = index;
     }
-    if (index < text.length) { out += "\""; index += 1; }
+    if (index < text.length) index += 1;
   }
-  return changed ? out : null;
+  return copied > 0 ? `${out}${text.slice(copied)}` : null;
 }
 
 /** Whether JSON can go on after a value that a quote just before `from` would end, inside `container`. */
@@ -631,7 +667,17 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
   const ends: StringEnd[] = [];
   type Container = { kind: "object" | "array"; expectKey: boolean };
   const stack: Container[] = [];
+  /**
+   * The cleaned text. Whatever the pass leaves as it is stays in the text and is copied in whole runs: `kept` is where
+   * the run not yet copied starts, and `write` copies it up to `to`, writes `changed` in place of the text from `to` to
+   * `next`, and starts the next run there (CI-1b: one character at a time made a long reply's reading mostly memory work).
+   */
   let out = "";
+  let kept = 0;
+  const write = (to: number, changed: string, next: number): void => {
+    out += kept < to ? `${text.slice(kept, to)}${changed}` : changed;
+    kept = next;
+  };
   let index = 0;
   /** A value may start here: after an object's `:`, a list's `[` or a list's item-separating `,`, blanks only since. */
   let valueSlot = false;
@@ -667,7 +713,7 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
             made.add("RAW_LINE_BREAK");
           } else body += inner;
         }
-        out += `"${body}"`;
+        write(index, `"${body}"`, close + 1);
         made.add("QUOTE_DELIMITERS_STRAIGHTENED");
         // Its end is the rule's own (a closing quote followed by `,` `}` or `]`), so it passes the word check.
         ends.push({ inObject: true, inArray: true, scanKey: false, scanInArray: top?.kind === "array" });
@@ -682,7 +728,10 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
     }
     if (character === "\"") {
       const isKey = top?.kind === "object" && top.expectKey;
-      let body = "";
+      // The string's body with its raw breaks escaped: `escapedBody` up to the last raw break, then the text itself from
+      // `plain`. With no raw break it is the text's own slice, and the string is left in the run to copy.
+      let escapedBody = "";
+      let plain = index + 1;
       let escaped = false;
       let rawBreak = false;
       /** CLOSING_QUOTE_STRAIGHTENED: the first ” that may close this text value, the body before it and its raw breaks. */
@@ -690,18 +739,18 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
       let cursor = index + 1;
       for (; cursor < text.length; cursor += 1) {
         const inner = text[cursor]!;
-        if (escaped) { escaped = false; body += inner; continue; }
-        if (inner === "\\") { escaped = true; body += inner; continue; }
+        if (escaped) { escaped = false; continue; }
+        if (inner === "\\") { escaped = true; continue; }
         if (inner === "\"") break;
         if (inner === "\n" || inner === "\r" || inner === "\t") {
-          body += inner === "\n" ? "\\n" : inner === "\r" ? "\\r" : "\\t";
+          escapedBody += `${text.slice(plain, cursor)}${inner === "\n" ? "\\n" : inner === "\r" ? "\\r" : "\\t"}`;
+          plain = cursor + 1;
           rawBreak = true;
           continue;
         }
         if (closing === null && !isKey && inner === TYPOGRAPHIC_CLOSING_QUOTE && closesAtLineEnd(text, cursor + 1)) {
-          closing = { at: cursor, body, rawBreak };
+          closing = { at: cursor, body: `${escapedBody}${text.slice(plain, cursor)}`, rawBreak };
         }
-        body += inner;
       }
       // Task 91j E1: the text cannot end where it would (no straight quote left, or one that cannot end a value here), so
       // the ” at its line end closes it, made straight. No other character changes.
@@ -709,15 +758,22 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
         || !(top?.kind === "array" ? innerQuoteEnd(text, cursor + 1).inArray : innerQuoteEnd(text, cursor + 1).inObject))) {
         if (closing.rawBreak) made.add("RAW_LINE_BREAK");
         made.add("CLOSING_QUOTE_STRAIGHTENED");
-        out += `"${closing.body}"`;
+        write(index, `"${closing.body}"`, closing.at + 1);
         // Its end is the rule's own (a closing quote at a line end, beside `,` `}` or `]`), so it passes the word check.
         ends.push({ inObject: true, inArray: true, scanKey: false, scanInArray: top?.kind === "array" });
         index = closing.at + 1;
         continue;
       }
       if (rawBreak) made.add("RAW_LINE_BREAK");
-      if (cursor >= text.length) { out += `"${body}`; index = cursor; continue; }
-      const movesColon = isKey && body.length > 1 && body.endsWith(":") && text[nextSignificant(text, cursor + 1)] !== ":";
+      const body = rawBreak ? `${escapedBody}${text.slice(plain, cursor)}` : null;
+      if (cursor >= text.length) {
+        if (body !== null) write(index, `"${body}`, cursor);
+        index = cursor;
+        continue;
+      }
+      // The body ends with ":" exactly when the text does there (an escaped raw break ends in a letter).
+      const movesColon = isKey && text[cursor - 1] === ":" && (body ?? text.slice(index + 1, cursor)).length > 1
+        && text[nextSignificant(text, cursor + 1)] !== ":";
       ends.push({ ...innerQuoteEnd(text, cursor + 1), scanKey: isKey, scanInArray: top?.kind === "array" });
       const comma = nextSignificant(text, cursor + 1);
       const opener = nextSignificant(text, comma + 1);
@@ -725,11 +781,11 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
         beforeTypographicItem.push({ end: ends.length - 1, quote: cursor, opener });
       }
       if (movesColon) {
-        out += `"${body.slice(0, -1)}":`;
+        write(index, `"${(body ?? text.slice(index + 1, cursor)).slice(0, -1)}":`, cursor + 1);
         made.add("KEY_COLON_MOVED");
         top!.expectKey = false;
-      } else {
-        out += `"${body}"`;
+      } else if (body !== null) {
+        write(index, `"${body}"`, cursor + 1);
       }
       index = cursor + 1;
       continue;
@@ -737,20 +793,21 @@ function syntaxClean(text: string): Readonly<{ text: string; made: ReadonlySet<M
     const tokenEnd = modelTokenEnd(text, index);
     if (tokenEnd !== null) {
       made.add("MODEL_TOKEN_DROPPED");
+      write(index, "", tokenEnd);
       index = tokenEnd;
       continue;
     }
     if (character === ",") {
       const next = nextSignificantPastTokens(text, index + 1);
-      if (next === "}" || next === "]") { made.add("TRAILING_COMMA"); index += 1; continue; }
+      if (next === "}" || next === "]") { made.add("TRAILING_COMMA"); write(index, "", index + 1); index += 1; continue; }
       if (top?.kind === "object") top.expectKey = true;
     } else if (character === "{") stack.push({ kind: "object", expectKey: true });
     else if (character === "[") stack.push({ kind: "array", expectKey: false });
     else if (character === "}" || character === "]") stack.pop();
     else if (character === ":" && top?.kind === "object") top.expectKey = false;
-    out += character;
     index += 1;
   }
+  out = kept === 0 ? text : `${out}${text.slice(kept)}`;
   if (beforeTypographicItem.some((item) => straightened.has(item.opener))) {
     const lastEnd = lastListItemEnd(text);
     for (const item of beforeTypographicItem) {

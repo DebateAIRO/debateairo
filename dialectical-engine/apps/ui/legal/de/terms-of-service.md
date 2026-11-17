@@ -225,7 +225,7 @@ Dialectical Engine bietet einen kostenlosen Tarif an. Drei kostenpflichtige Tari
 
 **Fehlgeschlagene Zahlungen.** Wenn eine Zahlung fehlschlägt, versuchen wir sie 7 Tage lang erneut und warnen Sie per E-Mail, bevor wir Ihr Konto auf den kostenlosen Tarif herabstufen. Wir löschen Ihre Debatten nicht wegen einer fehlgeschlagenen Zahlung.
 
-**Steuern und Zahlungsempfänger.** Unsere Preise werden ohne Steuern angezeigt, als Preis + MwSt. (oder GST oder Umsatzsteuer, je nach Ihrem Wohnort). Die Steuer für Ihre Rechnungsadresse wird beim Bezahlvorgang aufgeschlagen, und vor der Zahlung zeigt Ihnen der Bezahlvorgang den Gesamtbetrag, den Sie zahlen, einschließlich Steuern. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt.
+**Steuern und Zahlungsempfänger.** Die Preise enthalten Mehrwertsteuer, GST oder Umsatzsteuer; dies hängt von Ihrem Wohnort ab und wird vor der Zahlung angezeigt. Verkäuferin ist die DMS Merchandise Shop S.R.L., die Ihre Rechnung ausstellt und weiterhin für den Dienst selbst und für diese Nutzungsbedingungen verantwortlich bleibt.
 
 **Zahlungsarten.** Sie bezahlen per Karte. Wir akzeptieren Visa und Mastercard; American Express akzeptieren wir nicht. Kartenzahlungen werden von NETOPIA Payments (netopia-payments.com) abgewickelt, und Ihre vollständige Kartennummer erreicht uns nie.
 

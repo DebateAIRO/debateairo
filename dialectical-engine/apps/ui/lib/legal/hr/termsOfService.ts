@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Otkazivanje. Otkažite u bilo kojem trenutku u odjeljku Postavke → Pretplata jednim klikom za potvrdu ili putem stranice za otkazivanje na dezbatere.ro/cancel, za koju se ne morate prijaviti. Otkazivanje stupa na snagu na kraju tekućeg obračunskog razdoblja, a do tada zadržavate pristup. Otkazivanje nećemo učiniti težim od pretplate." },
       { kind: "p", text: "Promjene cijena stupaju na snagu tek pri obnavljanju. Obavještavamo vas najmanje 30 dana unaprijed e-poštom koja sadržava novu cijenu i poveznicu za otkazivanje. Ako pravo vaše države zahtijeva vašu izričitu privolu na promjenu cijene, tražimo je; u suprotnom, ako ništa ne učinite, nova se cijena primjenjuje od sljedećeg obnavljanja. Prilog A navodi regionalna pravila." },
       { kind: "p", text: "Neuspjela plaćanja. Ako plaćanje ne uspije, ponovno ga pokušavamo provesti tijekom 7 dana i upozoravamo vas e-poštom prije prebacivanja vašeg računa na besplatni plan. Ne brišemo vaše rasprave zbog neuspjelog plaćanja." },
-      { kind: "p", text: "Porezi i kome plaćate. Naše cijene prikazane su bez poreza, kao cijena + PDV (ili GST odnosno porez na promet, ovisno o tome gdje živite). Porez za vašu adresu za naplatu dodaje se na naplati, gdje vam se prije plaćanja prikazuje ukupan iznos za plaćanje s uključenim porezom. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete." },
+      { kind: "p", text: "Porezi i kome plaćate. Cijene uključuju PDV, GST ili porez na promet, što ovisi o tome gdje živite i prikazuje se prije plaćanja. Prodavatelj je DMS Merchandise Shop S.R.L., koji vam izdaje račun i ostaje odgovoran za samu uslugu i za ove Uvjete." },
       { kind: "p", text: "Načini plaćanja. Plaćate karticom. Prihvaćamo Visa i Mastercard; ne prihvaćamo American Express. Plaćanja karticom obrađuje NETOPIA Payments (netopia-payments.com), a puni broj vaše kartice nikada ne dolazi do nas." },
       { kind: "p", text: "Isporuka. Dialectical Engine je internetska usluga pa vam se ništa ne šalje. Značajke vašeg plaćenog plana dostupne su na vašem računu čim plaćanje bude potvrđeno." },
       { kind: "p", text: "Osporavanje kartičnih transakcija. Ako osporite terećenje kod izdavatelja kartice, možemo suspendirati plaćene značajke dok se spor ne riješi. Za to ne naplaćujemo naknade." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "a15f81bf46769233de97225ce9c1c3789e74b345e36aec99bb4633d2d850de7d",
+  sha256: "f773bea7187639f709cb03c710dc4133fc92af8b2e88306a677e74e593b198c1",
   eyebrow: "UVJETI KORIŠTENJA · v2.18 · NA SNAZI OD 1. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",

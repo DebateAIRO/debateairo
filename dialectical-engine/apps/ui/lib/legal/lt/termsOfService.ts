@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Atšaukimas. Galite bet kada atšaukti pasirinkę Nustatymai → Prenumerata ir vienu spustelėjimu patvirtinę arba naudodamiesi atšaukimo puslapiu adresu dezbatere.ro/cancel, prie kurio prisijungti nereikia. Atšaukimas įsigalioja einamojo atsiskaitymo laikotarpio pabaigoje, o iki tol prieiga išlieka. Atšaukimo nepadarysime sudėtingesnio, nei buvo prenumerata." },
       { kind: "p", text: "Kainos pakeitimai įsigalioja tik atnaujinus planą. Apie naują kainą ir atšaukimo nuorodą pranešame el. paštu bent prieš 30 dienų. Kai pagal jūsų šalies teisę kainai pakeisti būtinas aiškus jūsų sutikimas, jo paprašome; kitais atvejais, jei nieko nedarote, nauja kaina taikoma nuo kito atnaujinimo. Regioninės taisyklės nurodytos A priede." },
       { kind: "p", text: "Nepavykę mokėjimai. Jei mokėjimas nepavyksta, 7 dienas bandome dar kartą ir prieš pakeisdami paskyrą į nemokamą planą įspėjame jus el. paštu. Debatų dėl nepavykusio mokėjimo neištriname." },
-      { kind: "p", text: "Mokesčiai ir kam mokate. Mūsų kainos rodomos be mokesčių, kaip kaina + PVM (arba GST ar pardavimo mokestis, priklausomai nuo jūsų gyvenamosios vietos). Jūsų atsiskaitymo adresui taikomas mokestis pridedamas apmokėjimo metu, o atsiskaitymo puslapyje prieš jums mokant parodoma bendra mokėtina suma su mokesčiais. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas." },
+      { kind: "p", text: "Mokesčiai ir kam mokate. Į kainas įskaičiuotas PVM, GST ar pardavimo mokestis, priklausantis nuo jūsų gyvenamosios vietos ir parodomas prieš jums mokant. Pardavėjas yra DMS Merchandise Shop S.R.L., kuris išrašo jūsų sąskaitą faktūrą ir išlieka atsakingas už pačią paslaugą bei šias Sąlygas." },
       { kind: "p", text: "Mokėjimo būdai. Mokate kortele. Priimame Visa ir Mastercard korteles; American Express kortelių nepriimame. Mokėjimus kortele tvarko NETOPIA Payments (netopia-payments.com), o visas jūsų kortelės numeris niekada nepasiekia mūsų." },
       { kind: "p", text: "Pristatymas. Dialectical Engine yra internetinė paslauga, todėl jums nieko nesiunčiame. Jūsų mokamo plano funkcijos jūsų paskyroje tampa prieinamos iškart, kai mokėjimas patvirtinamas." },
       { kind: "p", text: "Mokėjimo grąžinimo ginčai. Jei mokėjimą užginčijate savo kortelės išdavėjui, kol ginčas sprendžiamas, galime sustabdyti mokamas funkcijas. Už tai mokesčių netaikome." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "a6d00be0446f875930cdac8cee5e6739c7d3dc37d26c3a5c6e9e35947377c0db",
+  sha256: "17f12a882fc2be3805bbfefec62e2c5a10e2f9f884aebc7bdf2e6cd6f2c47e1e",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.18 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

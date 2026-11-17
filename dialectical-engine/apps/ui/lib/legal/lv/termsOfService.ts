@@ -216,7 +216,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
       { kind: "p", text: "Atcelšana. Abonementu varat atcelt jebkurā laikā sadaļā Iestatījumi → Abonements ar vienu apstiprinājuma klikšķi vai atcelšanas lapā dezbatere.ro/cancel, kurā nav jāpierakstās. Atcelšana stājas spēkā pašreizējā norēķinu perioda beigās, un līdz tam jūs saglabājat piekļuvi. Mēs nepadarīsim atcelšanu sarežģītāku par abonēšanu." },
       { kind: "p", text: "Cenas izmaiņas stājas spēkā tikai atjaunošanas brīdī. Mēs vismaz 30 dienu iepriekš pa e-pastu paziņojam jauno cenu un nosūtām atcelšanas saiti. Ja jūsu valsts tiesību akti prasa nepārprotamu piekrišanu cenas izmaiņām, mēs to lūdzam; citādi, ja neko nedarāt, jaunā cena tiek piemērota no nākamās atjaunošanas. A pielikumā norādīti reģionālie noteikumi." },
       { kind: "p", text: "Neizdevušies maksājumi. Ja maksājums neizdodas, mēs atkārtojam mēģinājumus 7 dienas un pirms jūsu konta pazemināšanas uz bezmaksas plānu brīdinām jūs pa e-pastu. Mēs nedzēšam jūsu debates neizdevušās apmaksas dēļ." },
-      { kind: "p", text: "Nodokļi un maksājuma saņēmējs. Mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN (vai GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas). Jūsu norēķinu adresei piemērojamais nodoklis tiek pievienots norēķinu laikā, un pirms maksājuma veikšanas norēķinu lapā tiek parādīta jūsu maksājamā kopsumma, ieskaitot nodokļus. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem." },
+      { kind: "p", text: "Nodokļi un maksājuma saņēmējs. Cenās ir iekļauts PVN, GST vai tirdzniecības nodoklis atkarībā no jūsu dzīvesvietas, un tas tiek parādīts pirms maksājuma veikšanas. Pārdevējs ir DMS Merchandise Shop S.R.L., kas izsniedz jūsu rēķinu un paliek atbildīgs par pašu pakalpojumu un šiem Noteikumiem." },
       { kind: "p", text: "Maksājumu veidi. Jūs maksājat ar karti. Mēs pieņemam Visa un Mastercard kartes; American Express kartes mēs nepieņemam. Kartes maksājumus apstrādā NETOPIA Payments (netopia-payments.com), un pilns jūsu kartes numurs nekad nenonāk pie mums." },
       { kind: "p", text: "Piegāde. Dialectical Engine ir tiešsaistes pakalpojums, tāpēc jums nekas netiek nosūtīts. Jūsu maksas plāna funkcijas jūsu kontā ir pieejamas, tiklīdz maksājums ir apstiprināts." },
       { kind: "p", text: "Maksājumu apstrīdēšana. Ja apstrīdat maksājumu pie savas kartes izdevēja, mēs varam apturēt maksas funkcijas, kamēr strīds tiek atrisināts. Par to mēs neiekasējam maksu." },
@@ -372,7 +372,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "bed72f88b44f2dbaa9ecac398ae775ab723fa57e72caae03c038e977528414bb",
+  sha256: "1b822d04b9f417f50aea022ab1a762818f5715062e69d3ae9e881bf6b40a0c33",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.18 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
