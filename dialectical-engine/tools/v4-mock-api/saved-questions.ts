@@ -24,7 +24,7 @@ import {
   type SavedQuestionWritten, type SignedStartMenu
 } from "../../packages/contract/src/index.js";
 import { pathPlanCombineMembers, pathPlanFromMenu, pathPlanReduce, type PathPlan, type PathPlanAction } from "../../apps/ui/lib/v4/pathPlan.js";
-import { mockStartCombine, mockStartListsScript, mockStartMenu, mockStartRefOf, type StartMockPlan } from "./start-step.js";
+import { mockClarifyRestatement, mockStartCombine, mockStartListsScript, mockStartMenu, mockStartRefOf, type StartMockPlan } from "./start-step.js";
 
 /** The scenes of the questions not started yet, as the click-test names them. */
 export const MOCK_SAVED_SCENES = Object.freeze(["#pickup"] as const);
@@ -107,7 +107,12 @@ const WHEN: ClarifyQuestion = { text: "Over what time?", answers: ["The next 5 y
   sentences: ["I mean the next 5 years.", "I mean the next 25 years.", "I mean up to 2035."] };
 const PURPOSE: ClarifyQuestion = { text: "What do you want the answer for?", answers: ["To decide how to vote", "To explain it to someone", "To write about it"],
   sentences: ["I want it to decide how to vote.", "I want to explain it to someone.", "I want to write about it."] };
-const PICKUP_CLARIFY: AskClarifyResponse = { source: "AI", questions: [WHEN], purpose: PURPOSE };
+const PICKUP_QUESTIONS: Extract<AskClarifyResponse, { source: "AI" }> = { source: "AI", questions: [WHEN], purpose: PURPOSE };
+/**
+ * Design Document v2 (16b): the reply as it was shown, with its sentence (WHEN and PURPOSE are the clarifying mock's own questions,
+ * so it words them as a fresh reading does). Pick up then shows "How we read your question" with both answers as her choices.
+ */
+const PICKUP_CLARIFY: AskClarifyResponse = { ...PICKUP_QUESTIONS, restatement: mockClarifyRestatement(PICKUP_LINE, PICKUP_QUESTIONS) };
 /** The two answers she tapped: each question with its answer and the sentence it put into the question box. */
 const PICKUP_ANSWERS = Object.freeze([
   { question: WHEN, at: 1 },

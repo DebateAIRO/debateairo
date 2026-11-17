@@ -126,7 +126,7 @@ export function openingsMaxInFlightDefault(arms: readonly OpeningsArm[]): number
 export const OPENINGS_DRY_CLARIFY_MS: readonly number[] = Object.freeze([2_400, 3_100, 2_800, 3_600, 2_200, 4_100, 2_600, 3_300,
   2_900, 3_800, 4_400, 2_500]);
 
-/** The hash of the contract a start-step call sends, as the API's transport records it (the drafts are sealed by Task 92). */
+/** The hash of the contract a start-step call sends, as the API's transport records it (the start step's drafts are sealed by Task 92). */
 const startContractHashOf = (contract: PromptContract): string =>
   createHash("sha256").update(promptContractFingerprintText(contract), "utf8").digest("hex");
 

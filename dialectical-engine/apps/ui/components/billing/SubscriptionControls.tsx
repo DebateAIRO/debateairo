@@ -307,19 +307,19 @@ export function SubscriptionControls({
   }
 
   return (
-    <section className="setCard" aria-labelledby="subscription-heading">
+    <section className="setCard subCard" aria-labelledby="subscription-heading">
       <h2 className="setCardTitle" id="subscription-heading">{t(catalog, "billing.subscription.title")}</h2>
       {live === null ? (
         <>
           <p className="setCardHint">{t(catalog, "billing.subscription.free")}</p>
           <div className="setCardRow">
-            <a className="setBtn" href="/pricing">{t(catalog, "billing.subscription.choosePlan")}</a>
+            <a className="setBtn subBtnPrimary" href="/pricing">{t(catalog, "billing.subscription.choosePlan")}</a>
           </div>
         </>
       ) : null}
       {live !== null ? (
         <>
-          <p className="setCardHint">{t(catalog, "billing.subscription.plan", { plan: planName(catalog, live.plan_id) })}</p>
+          <p className="setCardHint subPlan">{t(catalog, "billing.subscription.plan", { plan: planName(catalog, live.plan_id) })}</p>
           {live.status === "PAST_DUE" ? <p className="setCardNote">{t(catalog, "billing.subscription.pastDue")}</p> : null}
           {live.status === "SUSPENDED" ? <p className="setCardNote">{t(catalog, "billing.subscription.suspended")}</p> : null}
           {live.cancel_requested && paused
@@ -340,7 +340,7 @@ export function SubscriptionControls({
           ) : null}
           <div className="setCardRow">
             {live.status === "ACTIVE" && !live.cancel_requested ? (
-              <button type="button" className="setBtn" disabled={busy} onClick={() => setPanel(panel === "CHANGE" ? "NONE" : "CHANGE")}>
+              <button type="button" className="setBtn subBtnPrimary" disabled={busy} onClick={() => setPanel(panel === "CHANGE" ? "NONE" : "CHANGE")}>
                 {t(catalog, "billing.subscription.changePlan")}
               </button>
             ) : null}
@@ -363,11 +363,6 @@ export function SubscriptionControls({
                 {t(catalog, "billing.subscription.cancel")}
               </button>
             )}
-            {withdrawOpen ? (
-              <button type="button" className="setBtn" disabled={busy} onClick={() => setPanel("WITHDRAW")}>
-                {t(catalog, "billing.subscription.withdraw")}
-              </button>
-            ) : null}
           </div>
           {panel === "CHANGE" ? (
             <div className="setCardRow">
@@ -390,7 +385,7 @@ export function SubscriptionControls({
             </div>
           ) : null}
           {downgrade !== null ? (
-            <div>
+            <div className="subPanel">
               {/* Ruling Q-7: the lower plan's net price from GET /v1/billing/plans, "+ tax", from the renewal date. */}
               <p className="setCardNote">{t(catalog, "billing.subscription.downgradeConfirm", {
                 plan: planName(catalog, downgrade.planId), price: formatMoney(locale, downgrade.netPrice, downgrade.currency), date: nextRenewalText
@@ -406,7 +401,7 @@ export function SubscriptionControls({
             </div>
           ) : null}
           {upgrade !== null ? (
-            <div>
+            <div className="subPanel">
               <p className="billingTotal">{t(catalog, "billing.subscription.upgradeQuote", {
                 total: formatMoney(locale, upgrade.quote.total, upgrade.quote.currency), date: date(upgrade.quote.renews_on),
                 plan: planName(catalog, upgrade.planId),
@@ -420,7 +415,7 @@ export function SubscriptionControls({
                 <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, upgrade.quote.recurring_total, upgrade.quote.currency) })}</span>
               </label>
               <div className="setCardRow">
-                <button type="button" className="setBtn" disabled={busy || !upgradeAgreed || renewalConsent === null}
+                <button type="button" className="setBtn subBtnPrimary" disabled={busy || !upgradeAgreed || renewalConsent === null}
                   onClick={() => { void run(async () => {
                     if (renewalConsent === null) return;
                     let started: Awaited<ReturnType<SubscriptionClient["upgradeSubscription"]>>;
@@ -459,7 +454,7 @@ export function SubscriptionControls({
             />
           ) : null}
           {panel === "CANCEL" ? (
-            <div>
+            <div className="subPanel">
               {/* PAST_DUE: P12 ends access at once and the retries stop; there is no paid-through date to promise. Once
                   the period end has passed (ruling Q-1's grace, or a postponed renewal), P12 ends an ACTIVE plan today
                   too, as M7 says; before that, it runs to the next renewal. */}
@@ -480,13 +475,24 @@ export function SubscriptionControls({
               </div>
             </div>
           ) : null}
-          {panel === "WITHDRAW" ? (
-            <form onSubmit={withdraw}>
-              <p className="setCardNote">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
-              <div className="setCardRow">
-                <button type="submit" className="setBtn" disabled={busy}>{t(catalog, "billing.subscription.withdrawConfirm")}</button>
-              </div>
-            </form>
+          {/* Design Document v2 (19c): the withdrawal is its own block above a rule: the link, then until when and what
+              comes back. The confirmation opens under them. */}
+          {withdrawOpen || panel === "WITHDRAW" ? (
+            <div className="subBlock" data-subscription-withdraw>
+              {withdrawOpen ? (
+                <button type="button" className="subLink" disabled={busy} onClick={() => setPanel("WITHDRAW")}>
+                  {t(catalog, "billing.subscription.withdraw")}
+                </button>
+              ) : null}
+              <p className="subHint">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
+              {panel === "WITHDRAW" ? (
+                <form onSubmit={withdraw}>
+                  <div className="setCardRow">
+                    <button type="submit" className="setBtn" disabled={busy}>{t(catalog, "billing.subscription.withdrawConfirm")}</button>
+                  </div>
+                </form>
+              ) : null}
+            </div>
           ) : null}
         </>
       ) : null}
@@ -494,17 +500,19 @@ export function SubscriptionControls({
         <p className="setStatus" role="status">{message.linksHome ? <a href="/">{message.text}</a> : message.text}</p>
       ) : null}
       {invoices !== null ? (
-        <div>
+        <div className="subBlock subInvoices">
           <h3 className="setCardTitle">{t(catalog, "billing.subscription.invoices")}</h3>
           {invoices.length === 0 ? <p className="setCardHint">{t(catalog, "billing.subscription.noInvoices")}</p> : (
             <ul className="setInvoiceList">
               {invoices.map((invoice) => (
                 <li key={`${invoice.kind}:${invoice.number}`}>
-                  {t(catalog, "billing.subscription.invoiceRow", {
-                    number: invoice.number, date: formatLongDate(locale, invoice.issued_on), total: formatMoney(locale, invoice.total, invoice.currency)
-                  })}
-                  {invoice.kind === "CREDIT_NOTE" ? <> · {t(catalog, "billing.subscription.creditNote")}</> : null}
-                  {invoice.url !== null ? <> · <a href={invoice.url} rel="noopener noreferrer" target="_blank">{t(catalog, "billing.subscription.openInvoice")}</a></> : null}
+                  <span>
+                    {t(catalog, "billing.subscription.invoiceRow", {
+                      number: invoice.number, date: formatLongDate(locale, invoice.issued_on), total: formatMoney(locale, invoice.total, invoice.currency)
+                    })}
+                    {invoice.kind === "CREDIT_NOTE" ? <> · {t(catalog, "billing.subscription.creditNote")}</> : null}
+                  </span>
+                  {invoice.url !== null ? <a href={invoice.url} rel="noopener noreferrer" target="_blank">{t(catalog, "billing.subscription.openInvoice")}</a> : null}
                 </li>
               ))}
             </ul>

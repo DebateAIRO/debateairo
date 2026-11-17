@@ -621,7 +621,9 @@ describe("the approved wording, word for word (OWNER WORDING: a change is a new 
   it("the planner v3, and v2 sealed beside it with only those two phrases different", () => {
     expect(WEB_DIG_PLANNER_V3_INSTRUCTION).toBe(PLANNER_V3);
     expect(WEB_DIG_PLANNER_V2_INSTRUCTION).toBe(PLANNER_V3.replace("write two searches", "write up to two searches").replace("write two more searches", "write up to two more searches"));
-    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-18, -15)).toEqual(["web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3"]);
+    // 17 Nov: ask.clarify.v3 was sealed beside ask.clarify.v1 and the report's three goal versions after the v4 writers, all after
+    // these three: they moved four places from the end.
+    expect(ENGINE_SEALED_CONTRACT_IDS.slice(-22, -19)).toEqual(["web.plan-dig.v2", "web.suggest-dig.v1", "web.plan-dig.v3"]);
     expect(ENGINE_SEALED_CONTRACT_IDS).toContain("web.plan-dig.v1");
   });
   it("the suggestions", () => {

@@ -8,7 +8,7 @@
 // A dig of a path left out before Start ("+ N more") is a new first-level path. An R22 debate's dossier keeps its shape.
 // Task 55e (spec §4.4): that dig updates the main answer (trigger PATH_ADDED), a deeper dig under the new path climbs to the main
 // answer, and the tree's sweep writes the update a runner left undone.
-// Review of Task 50c: the ROOT's care mark, read from the database, makes the update a dig causes and the next report ask the goal drafts.
+// Review of Task 50c: the ROOT's care mark, read from the database, makes the update a dig causes and the next report ask the goal versions.
 // Integration suites are skipped by the CI gate: run this file by hand, alone. Every name, question and page is made up.
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { StoryBodySchema, type PathOutcome, type PurposeLines } from "@debateai/contract";
@@ -513,7 +513,7 @@ describe("reports and answer updates on a path debate (Task 55b)", () => {
     const after = await versionsOf(parent.rootId);
     expect(after.slice(0, before.length)).toEqual(before);
     expect(after.slice(before.length)).toEqual([{ trigger_kind: "PATH_ADDED", trigger_id: goalId, trigger_run_id: goalId, outcome: "READY" }]);
-    // The next report version: the answer asks the goal drafts, the story and its check are today's.
+    // The next report version: the answer asks the goal versions, the story and its check are today's.
     expect(await closeAgain(parent.investigationId)).toBeGreaterThan(1);
     const report = await writeReport(parent.rootId, parent.investigationId);
     expect(report.vendors.haiku.requests.map((request) => contractOf(request.packet))).toEqual(["report.answer.later.v5", "report.story.v1"]);

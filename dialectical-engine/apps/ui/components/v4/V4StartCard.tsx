@@ -40,6 +40,11 @@ import { V4StartWays } from "./V4StartWays";
  * "Make this my question" is sent from here with the line the check read at Next (the server compares that line), then the
  * page puts the card's question in the box. Every change goes through the hook's dispatch (the path plan model). Nothing here
  * fetches, stores or keeps anything in the browser.
+ * Design Document v2 (16b): while the list shows, the title's line ends with a quiet hint, "5 paths · most important first ·
+ * tick two to combine them" (with one path, its count alone: there is no order and nothing to combine); the Free line and
+ * the reload line stay under it. The rows have tick boxes (`ticks`). The combine line sits in the page's foot, outside the
+ * card, so the card hands the page its own way to send a change and to say a refusal (`planActions`): Combine and Keep apart
+ * there then go the rows' way, and a refused combine is said in the card's notice.
  */
 
 /** A share and its change, as Task 69's startShareChange gives it. */
@@ -327,7 +332,15 @@ export type V4StartCardProps = Readonly<{
    * speaks; Task 76f adds its own reason. Absent or false: the reload line shows as Task 73 says.
    */
   hideReloadLine?: boolean;
+  /**
+   * Design Document v2 (16b): filled by the card while the list shows (else null) with its own send and its own refusal
+   * notice, for the combine line the page draws in its foot (V4StartCombineBar).
+   */
+  planActions?: { current: StartPlanActions | null };
 }>;
+
+/** How the card sends a change of the plan and says a refusal: what the combine line in the page's foot goes through. */
+export type StartPlanActions = Pick<StartPlanProps, "dispatch" | "onRefusal">;
 
 /** One notice above the list; `undoAt`: its own Undo shows while the plan's Undo stack is this deep (narrowing's). */
 type Notice = Readonly<{ text: string; undoAt: number | null }>;
@@ -367,6 +380,15 @@ export function V4StartCard(props: V4StartCardProps) {
     setNotice({ text, undoAt: null });
     setSpoken(text);
   };
+
+  // Design Document v2 (16b): the page's combine line (in its foot) sends its changes, and says its refusals, the card's way.
+  // Set after every draw (the send and the notice read this draw's plan and words), and emptied when the card goes.
+  const planActions = props.planActions;
+  useEffect(() => {
+    if (planActions === undefined) return undefined;
+    planActions.current = listShown ? { dispatch: send, onRefusal } : null;
+    return () => { planActions.current = null; };
+  });
 
   // What a change to the list says, one notice at a time (choose-f16).
   const planBefore = useRef(plan);
@@ -460,7 +482,12 @@ export function V4StartCard(props: V4StartCardProps) {
   const missing = missingLine(start, catalog, props.quotaLine);
   const undoCount = plan?.undo.length ?? 0;
   // Task 74: what the rows, "Another way to see it", the suggestions and "+ N more" share; their changes go through `send`.
-  const parts: StartPlanProps | null = listShown ? { plan, catalog, locale, dispatch: send, onRefusal, share: null, narrow } : null;
+  const parts: StartPlanProps | null = listShown ? { plan, catalog, locale, dispatch: send, onRefusal, share: null, narrow, ticks: true } : null;
+  // Design Document v2 (16b): the title's hint. With one path there is no order to speak of and nothing to combine.
+  const hint = parts === null ? null : [
+    tPlural(catalog, "v4.start.pathCount", parts.plan.paths.length, locale),
+    ...(parts.plan.paths.length > 1 ? [t(catalog, "v4.start.hint.order"), t(catalog, "v4.start.hint.tick")] : [])
+  ].join(" · ");
   const fullChoice = (request: StartFullRequest): ReactNode => parts === null ? null : (
     <V4StartFullChoice plan={parts.plan} widths={widths} catalog={catalog} wider={share.wider} send={send} request={request} />
   );
@@ -475,7 +502,10 @@ export function V4StartCard(props: V4StartCardProps) {
   };
   return (
     <section className="v4StartCard" aria-labelledby={titleId}>
-      <h2 id={titleId} className="v4AskSubTitle v4StartCardTitle">{t(catalog, "v4.start.title")}</h2>
+      <div className="v4StartCardHead">
+        <h2 id={titleId} className="v4AskSubTitle v4StartCardTitle">{t(catalog, "v4.start.title")}</h2>
+        {hint === null ? null : <p className="v4StartCardHint">{hint}</p>}
+      </div>
       {freePlan && !props.questionsShown
         ? <p className="v4StartCardLine">{tPlural(catalog, "v4.start.freeLine", PATH_PLAN_LIMITS.freePathsMax, locale)}</p>
         : null}

@@ -58,7 +58,11 @@ describe("N19 the card pages' top bar is the site's own", () => {
       expect(account?.getAttribute("href")).toBe("/settings");
       expect(newDebate?.getAttribute("href")).toBe("/new");
       expect(security?.getAttribute("href")).toBe("/settings/security");
-      expect(document.querySelectorAll("a").length).toBe(4);
+      // Design Document v2 (screen 3a): the bar ends with the gear to the settings, its fifth link.
+      const gear = document.querySelector<HTMLAnchorElement>("a.topBarGear");
+      expect(gear?.getAttribute("href")).toBe("/settings");
+      expect(gear?.getAttribute("aria-label")).toBe("Settings");
+      expect(document.querySelectorAll("a").length).toBe(5);
       // No card page is special any more (spec 2026-10-05 §2.18): the brand and New debate use next/link everywhere.
       expect([brand, newDebate].every(link => link?.getAttribute("data-client-navigation") === "next/link")).toBe(true);
       // The account menu's exits are always full-document navigations (dev's account menu), on every page.

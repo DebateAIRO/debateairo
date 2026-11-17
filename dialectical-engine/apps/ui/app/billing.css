@@ -1,31 +1,206 @@
 /* Paid plans (spec 2026-09-29 §2.10): pricing, checkout, the subscription card, cancel and withdraw.
    Design tokens only; no colour literal. The legal pages and the site footer are styled by the colleague's
    app/legal.css (PR #42, R3-4); no class of it is redefined here. */
+/* Design Document v2, Turn 19 (19a Pricing, 19b Checkout, 19c Subscription). These pages are outside .v4Root, so the
+   blue accent is --accent-text / --pro and the page colour on a filled button is --bg. The shared classes these
+   screens borrow (.setEyebrow, .setTitle, .setLede, .btn, .btnDark, .setBtn, .setCard*, .setStatus, .usage*, the region
+   picker's trigger) are restyled here under a billing class, never in globals.css. */
+
+/* The column carries the page's padding, so the full footer under it runs edge to edge. */
 .pricingPage,
-.billingPage { padding: 48px 22px 64px; }
+.billingPage { display: flex; flex-direction: column; }
 .pricingInner,
-.billingInner { max-width: 1040px; margin: 0 auto; }
-.billingInner.narrow { max-width: 680px; }
+.billingInner { flex: 1 0 auto; width: 100%; max-width: 1084px; margin: 0 auto; padding: 48px 22px 64px; color: var(--ink); font-family: var(--font-sans); line-height: normal; }
+.billingInner.narrow { max-width: 664px; padding: 44px 22px 56px; font-size: 14px; }
+
+/* The eyebrow, the title and the lead. */
+.pricingInner .setEyebrow,
+.billingInner .setEyebrow { margin: 0; font-family: var(--font-sans); font-size: 11px; font-weight: 700; letter-spacing: .18em; line-height: normal; color: var(--accent-text); }
+.pricingInner .setTitle,
+.billingInner .setTitle { margin: 10px 0 10px; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 44px; line-height: 1.08; color: var(--ink); }
+.billingInner.narrow .setTitle { margin-bottom: 18px; font-size: 36px; line-height: 1.1; }
+.pricingInner .setTitle:first-child,
+.billingInner .setTitle:first-child { margin-top: 0; }
+.pricingInner .setLede { margin: 0; max-width: 620px; font-size: 16px; line-height: normal; color: var(--text-2); }
+.billingInner .setLede { margin: 0; max-width: none; font-size: 14px; line-height: 1.55; color: var(--text-2); }
+.billingInner .setSubtitle { margin: 26px 0 4px; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 20px; line-height: normal; }
+.billingInner :where(p) { margin: 12px 0 0; line-height: 1.55; }
+.pricingInner a:not(.btn),
+.billingInner a:not(.btn):not(.setBtn) { color: var(--link); font-weight: 600; text-decoration: underline; }
+
+/* Buttons. Outlined is the plain one; .btnDark is the blue fill with the page colour on it; .billingCta is the orange
+   call to action of a paying step (52px, a 2px edge and a hard 4px shadow it presses into). */
+.pricingInner .btn,
+.billingInner .btn,
+.billingInner .setBtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 6px 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--core); color: var(--ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; line-height: 1.2; text-align: center; text-decoration: none; white-space: normal; cursor: pointer; }
+.pricingInner .btn:hover,
+.billingInner .btn:hover,
+.billingInner .setBtn:hover { background: var(--surface-2); }
+.pricingInner .btnDark,
+.billingInner .btnDark,
+.billingInner .setBtn[aria-pressed="true"] { background: var(--pro); border-color: var(--pro); color: var(--bg); }
+.pricingInner .btnDark:hover,
+.billingInner .btnDark:hover { background: color-mix(in srgb, var(--pro) 88%, var(--ink)); }
+.pricingInner .btn:disabled,
+.pricingInner .btn[aria-disabled="true"],
+.billingInner .btn:disabled,
+.billingInner .btn[aria-disabled="true"],
+.billingInner .setBtn:disabled { opacity: .55; cursor: not-allowed; }
+.billingInner .billingCta,
+.pricingCard[data-plan="PRO"] .btn { min-height: 52px; padding: 0 26px; gap: 10px; border: 2px solid var(--cta-border); border-radius: 16px; background: var(--cta); color: var(--on-cta); box-shadow: 0 4px 0 var(--cta-shadow); font-size: 16px; font-weight: 700; transition: transform 80ms ease, box-shadow 80ms ease; }
+.billingInner .billingCta:hover,
+.pricingCard[data-plan="PRO"] .btn:hover { background: color-mix(in srgb, var(--cta) 92%, var(--on-cta)); }
+.billingInner .billingCta:active:not(:disabled):not([aria-disabled="true"]),
+.pricingCard[data-plan="PRO"] .btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--cta-shadow); }
+/* A call to action that cannot be pressed yet keeps its shape and loses its hard edge and shadow. */
+.billingInner .billingCta:disabled,
+.billingInner .billingCta[aria-disabled="true"] { border-color: var(--line-strong); box-shadow: 0 4px 0 var(--line-strong); }
+@media (prefers-reduced-motion: reduce) {
+  .billingInner .billingCta,
+  .pricingCard[data-plan="PRO"] .btn { transition: none; }
+}
+
+/* 19a: the plan cards. */
 .pricingGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 28px; }
 .pricingCard { display: flex; flex-direction: column; gap: 10px; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); }
-.pricingCard h2 { margin: 0; font-family: var(--font-display); font-size: 24px; }
-.pricingPrice { margin: 0; font-size: 20px; font-weight: 600; }
+.pricingCard h2 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 24px; line-height: normal; }
+.pricingCard > p { margin: 0; font-size: 14px; }
+.pricingCard .pricingPrice { font-size: 20px; font-weight: 600; }
 /* Terms §12: the total stays as plain to read as the price and its tax above it. */
-.pricingTotal { margin: -4px 0 0; font-size: 16px; font-weight: 600; }
+.pricingCard .pricingTotal { margin-top: -4px; font-size: 16px; font-weight: 600; }
 .pricingNote,
-.billingNote { margin: 0; color: var(--muted); font-size: 13px; }
-.pricingCard .btn { margin-top: auto; text-align: center; }
-.pricingFaq { margin-top: 40px; }
-.pricingFaq h3 { margin: 18px 0 4px; font-size: 16px; }
-.billingField { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
-.billingField input,
-.billingField select { padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); color: var(--ink); }
-.billingTotal { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--gold-bg); }
-.billingConsent { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; }
-.billingError { margin-top: 14px; color: var(--dispute-text); }
-.billingStatus { margin-top: 18px; }
-.billingCardFrame { min-height: 180px; margin-top: 12px; }
-.billingActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.billingNote { margin: 0; color: var(--muted); font-size: 13px; line-height: normal; }
+.pricingCard .pricingNote { font-size: 13px; }
+.pricingGrid + .pricingNote { margin-top: 14px; }
+/* The card's button is pinned to its foot: Free outlined, Plus and Max the blue fill, Pro the orange call to action
+   (the .billingCta recipe above, by the card's data-plan). */
+.pricingCard .btn { display: flex; margin-top: auto; min-height: 0; padding: 11px; background: transparent; }
+.pricingCard .btnDark { padding: 10px; border-color: transparent; background: var(--pro); }
+.pricingFaq { margin-top: 40px; max-width: 680px; }
+.pricingFaq h2 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 22px; line-height: normal; }
+.pricingFaq h3 { margin: 18px 0 4px; font-family: var(--font-sans); font-size: 16px; font-weight: 700; line-height: normal; }
+.pricingFaq p { margin: 0; font-size: 14px; color: var(--text-2); }
+.pricingFaq .billingActions { gap: 10px 18px; margin-top: 18px; font-size: 13px; }
+
 /* Terms §12: the place the cards are priced for (the country, and the US or Canadian postal code). */
 .pricingPlace { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 24px; }
 .pricingPlace .billingField { margin-top: 0; min-width: min(100%, 220px); }
+.pricingPlace .regionField { min-width: min(100%, 220px); }
+.pricingPlace .regionField > label { display: block; margin: 0 0 6px; color: var(--ink); font-family: var(--font-sans); font-size: 13px; font-weight: 600; }
+/* The picker's trigger reads as the design's plain field: the country's name and the chevron. */
+.pricingPlace .regionTrigger { gap: 10px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); color: var(--ink); font-size: 13px; font-weight: 500; }
+.pricingPlace .regionTrigger[aria-expanded="true"] { border-color: var(--accent); }
+.pricingPlace .regionName { font-weight: 500; }
+.pricingPlace .regionFlag,
+.pricingPlace .regionPath { display: none; }
+.pricingPlace .regionChevron { color: var(--muted); font-size: 13px; }
+
+/* Fields: the label over its control; a pair to a row in .billingGrid, the street and a company's address on a row of
+   their own. */
+.billingField { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin-top: 14px; font-size: 13px; font-weight: 600; }
+.billingField > label { color: var(--ink); }
+.billingField input,
+.billingField select { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg); color: var(--ink); font-family: var(--font-sans); font-size: 13px; font-weight: 500; line-height: normal; }
+.billingField input:focus-visible,
+.billingField select:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.billingField input[aria-invalid="true"],
+.billingField select[aria-invalid="true"] { border-color: var(--dispute-text); }
+.billingField input[readonly] { background: var(--shell); color: var(--text-2); }
+.billingField .authFieldError { margin: 0; font-size: 12px; font-weight: 600; line-height: 1.4; color: var(--dispute-text); }
+.billingGrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+.billingGrid > .billingField { margin-top: 0; }
+.billingGrid > .billingFieldWide { grid-column: 1 / -1; }
+.billingInner form > .billingGrid:first-child { margin-top: 0; }
+.billingGrid + .billingNote,
+.billingActions + .billingNote { margin-top: 12px; }
+.billingCompany { margin: 14px 0 0; }
+.billingLink { padding: 0; border: 0; background: none; color: var(--link); font-family: var(--font-sans); font-size: 13px; font-weight: 600; text-align: start; text-decoration: underline; cursor: pointer; }
+.billingLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* 19b: the total, the two agreements, the way on. */
+.billingTotal { margin: 18px 0 0; padding: 14px 16px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--gold-bg); font-size: 14px; line-height: 1.55; }
+.billingConsent { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 13.5px; line-height: 1.5; }
+.billingConsent + .billingConsent { margin-top: 12px; }
+.billingConsent > p { flex: 1; min-width: 0; margin: 0; line-height: 1.5; }
+/* The box: 16px, a 4px corner; ticked is the blue fill with the page-coloured tick. */
+.billingConsent input[type="checkbox"] { appearance: none; -webkit-appearance: none; display: grid; place-items: center; flex: none; width: 16px; height: 16px; margin: 2px 0 0; border: 1.5px solid var(--line-strong); border-radius: 4px; background: transparent; cursor: pointer; }
+.billingConsent input[type="checkbox"]::before { content: "\2713"; font-family: var(--font-sans); font-size: 11px; line-height: 1; color: var(--bg); opacity: 0; }
+.billingConsent input[type="checkbox"]:checked { border-color: var(--pro); background: var(--pro); }
+.billingConsent input[type="checkbox"]:checked::before { opacity: 1; }
+.billingConsent input[type="checkbox"]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.billingError { margin: 14px 0 0; color: var(--dispute-text); }
+.billingStatus { margin: 18px 0 0; }
+.billingCardFrame { min-height: 180px; margin-top: 12px; }
+.billingActions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 18px 0 0; }
+
+/* 19c: the Subscription card in Settings. */
+.setCard.subCard { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); color: var(--ink); font-size: 14px; line-height: normal; }
+.subCard > .setCardTitle { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 21px; line-height: normal; }
+.subCard .setCardHint { margin: 0; font-size: 14px; line-height: normal; color: var(--text-2); }
+.subCard .subPlan { font-weight: 600; color: var(--ink); }
+.subCard .setStatus { margin: 0; font-size: 14px; line-height: normal; color: var(--text-2); }
+.subCard .setCardNote { margin: 0; font-size: 13px; font-style: normal; line-height: 1.5; color: var(--muted); }
+.subCard .setCardRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+/* The actions: "Change plan" is the blue fill; the others are outlined. */
+.subCard .setBtn { display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 6px 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: transparent; color: var(--ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; line-height: 1.2; text-align: center; text-decoration: none; white-space: normal; cursor: pointer; }
+.subCard .setBtn:hover { background: var(--surface-2); }
+.subCard .subBtnPrimary { background: var(--pro); border-color: var(--pro); color: var(--bg); }
+.subCard .subBtnPrimary:hover { background: color-mix(in srgb, var(--pro) 88%, var(--ink)); }
+.subCard .setBtn:disabled { opacity: .55; cursor: not-allowed; }
+.subCard .setBtn:focus-visible,
+.subCard .subLink:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.subCard a:not(.setBtn) { color: var(--link); text-decoration: underline; }
+/* A question the card asks before it acts (a change, a cancel): its sentence, then its buttons. */
+.subPanel { display: flex; flex-direction: column; gap: 10px; }
+.subPanel .setCardRow,
+.subBlock .setCardRow { margin-top: 0; }
+.subCard .billingTotal,
+.subCard .billingStatus { margin: 0; }
+.subCard .billingConsent { margin-top: 0; }
+/* The withdrawal and the invoices, each above a rule. */
+.subBlock { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
+.subInvoices { gap: 8px; }
+.subBlock .setCardTitle { margin: 0; font-family: var(--font-sans); font-size: 14px; font-weight: 700; letter-spacing: 0; line-height: normal; }
+.subBlock .setCardHint { font-size: 13px; color: var(--muted); }
+.subLink { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--link); font-family: var(--font-sans); font-size: 14px; font-weight: 600; text-align: start; text-decoration: underline; cursor: pointer; }
+.subLink:disabled { opacity: .55; cursor: not-allowed; }
+.subHint { margin: 0; font-size: 13px; color: var(--muted); }
+.subCard .setInvoiceList { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.subCard .setInvoiceList li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; font-size: 13px; }
+.subCard .setInvoiceList li > span { min-width: 0; overflow-wrap: anywhere; }
+.subCard .setInvoiceList a { flex: none; }
+
+/* 19c: "Your plan's usage" (spec 2026-09-29 §1.2, §2.10): percent, never money. A card; one row per window, its name
+   and "22% · Resets 00:00" over an 8px pill track. */
+section.usageBars { position: relative; display: flex; flex-direction: column; gap: 14px; margin-top: 18px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--core); color: var(--ink); font-family: var(--font-sans); font-size: 14px; line-height: normal; }
+.usageBars .usageTitle { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 21px; line-height: normal; }
+/* The one-line summary is for a screen reader; the rows show the same to the eye. */
+.usageBars .usageLine { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.usageBars .usageExpires { font-size: 13px; color: var(--muted); }
+.usageBars .usageBar { display: flex; flex-direction: column; gap: 6px; }
+.usageBars .usageHead { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13px; }
+.usageBars .usageLabel { font-weight: 700; }
+.usageBars .usageMeta,
+.usageBars .usageReset { font-size: 13px; color: var(--muted); text-align: end; }
+.usageBars .usageMeta > .usageReset::before { content: " · "; }
+.usageBars .usageTrack { height: 8px; border-radius: 999px; background: var(--shell); overflow: hidden; }
+.usageBars .usageFill { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+
+/* Phone: one column, the same cards and buttons. Fields are 16px so the phone does not zoom into them. */
+@media (max-width: 600px) {
+  .pricingInner,
+  .billingInner { padding: 32px 16px 48px; }
+  .billingInner.narrow { padding: 28px 16px 44px; }
+  .pricingInner .setTitle { font-size: 32px; }
+  .billingInner.narrow .setTitle { font-size: 28px; }
+  .billingGrid { grid-template-columns: minmax(0, 1fr); }
+  .billingField input,
+  .billingField select { font-size: 16px; }
+  .pricingPlace .regionField,
+  .pricingPlace .billingField,
+  .pricingPlace > .btn { flex: 1 1 100%; }
+  .billingActions > .billingCta { flex: 1 1 100%; }
+  .setCard.subCard,
+  section.usageBars { padding: 18px 16px; }
+  .subCard .setInvoiceList li { flex-wrap: wrap; gap: 2px 14px; }
+}

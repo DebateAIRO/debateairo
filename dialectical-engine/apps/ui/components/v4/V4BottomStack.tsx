@@ -284,7 +284,8 @@ export function V4BottomStack(props: Readonly<{
             <button
               ref={props.jobRef as RefObject<HTMLButtonElement | null> | undefined}
               type="button"
-              className={`v4Btn v4BtnPrimary v4DebPhoneDig${job.waiting === true ? " v4DigWaiting" : ""}`}
+              // Design Document v2: the bar's dig button is the orange call to action (.v4Cta, v4-base.css).
+              className={`v4Btn v4Cta v4DebPhoneDig${job.waiting === true ? " v4DigWaiting" : ""}`}
               aria-disabled={job.waiting === true ? "true" : undefined}
               aria-describedby={job.waiting === true && job.reason !== undefined ? reasonId : undefined}
               onClick={() => {

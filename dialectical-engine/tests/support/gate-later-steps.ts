@@ -30,6 +30,9 @@ export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Obj
   "report.answer.later.v1": "REPORT_ANSWER", "report.answer.later.v2": "REPORT_ANSWER", "report.answer.later.v3": "REPORT_ANSWER", "report.answer.later.v4": "REPORT_ANSWER",
   "report.answer-check.v1": "REPORT_ANSWER_CHECK", "report.answer-check.v2": "REPORT_ANSWER_CHECK", "report.answer-check.v3": "REPORT_ANSWER_CHECK",
   "report.story.v1": "REPORT_STORY", "report.story-check.v1": "REPORT_STORY_CHECK",
+  // V4 start step, Tasks 50b and 50c (sealed 17 Nov): the three that say how a stated goal fares. Their forms are the versions before
+  // them, so the same defaults answer them.
+  "report.answer.v5": "REPORT_ANSWER", "report.answer.later.v5": "REPORT_ANSWER", "report.answer-check.v4": "REPORT_ANSWER_CHECK",
   "public.contribution-check.v1": "CONTRIBUTION_CHECK", "public.report-check.v1": "PUBLIC_REPORT_CHECK",
   "ask.clarify.v1": "ASK_CLARIFY",
   "question.start-check.v2": "QUESTION_CHECK",
@@ -45,9 +48,12 @@ export const LATER_CONTRACT_KINDS: Readonly<Record<string, LaterGateKind>> = Obj
   // (the stand-in coverage's stale-row check proves it), so this row, not the debate map's script, answers it.
   "map.gap-paths.v1": "PATH_GAP", "path.outcome.v1": "PATH_OUTCOME_WRITER", "path.outcome-check.v1": "PATH_OUTCOME_CHECKER",
   "story.paths.v5": "STORY_PATHS", "story.paths-check.v5": "STORY_PATHS_CHECK",
-  // V4 start step (Task 76d): the clarifying call's version 2 (a draft until Task 92 seals it). Version 1's reply is version 2's too
+  // V4 start step (Task 76d): the clarifying call's version 2 (never sealed by itself: version 3 holds its words). Version 1's reply is version 2's too
   // (its sentences, place mark and care question are optional), so the same default answers it.
-  "ask.clarify.v2": "ASK_CLARIFY"
+  "ask.clarify.v2": "ASK_CLARIFY",
+  // Design Document v2 (16b): version 3, version 2 and the sentence that says the question back (sealed 17 Nov: the version the API
+  // asks with). A reply without the sentence is whole (code then sends the questions alone), so the same default answers it.
+  "ask.clarify.v3": "ASK_CLARIFY"
 });
 
 const LATER_PROSE = Object.freeze({

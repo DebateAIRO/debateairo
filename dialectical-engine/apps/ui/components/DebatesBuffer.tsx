@@ -68,8 +68,8 @@ function LibraryRow({
 }) {
   const [byBefore, byAfter] = t(catalog, "home.by", { name: "\u0000" }).split("\u0000");
   return (
-    <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined} style={{ background: "var(--shell)" }}>
-      <div className="libRowCore" data-bezel="core" style={{ background: "var(--core)" }}>
+    <Link className="libRow" href={href} data-library-row data-bezel="shell" data-flagged={flagged ? "true" : undefined}>
+      <div className="libRowCore" data-bezel="core">
         <div className="libRowBody">
           {flagged ? <div className="libFlag"><span className="libFlagMark" aria-hidden /><span className="libFlagLabel">{flagLabel ?? t(catalog, "home.flag.flagged")}</span></div> : null}
           <div className="libRowClaim">{claim}</div>

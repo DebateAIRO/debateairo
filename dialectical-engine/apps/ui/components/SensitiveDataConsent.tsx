@@ -168,11 +168,8 @@ export function SensitiveDataConsentDialog({
               <div className="authAlert" role="alert">{t(catalog, "home.sensitiveConsent.failed")}</div>
             ) : null}
           </div>
+          {/* Design Document v2 (20a): "I agree" leads, the outlined "I don't agree" follows, both at the start. */}
           <div className="policyFoot">
-            <span className="policyFootSpacer" />
-            <button type="button" className="sensitiveConsentDecline" onClick={onDecline} disabled={busy}>
-              {t(catalog, "home.sensitiveConsent.decline")}
-            </button>
             <button
               type="button"
               className="policyPrimary"
@@ -181,6 +178,9 @@ export function SensitiveDataConsentDialog({
               ref={(node) => { agreeRef.current = node; }}
             >
               {t(catalog, "home.sensitiveConsent.agree")}
+            </button>
+            <button type="button" className="sensitiveConsentDecline" onClick={onDecline} disabled={busy}>
+              {t(catalog, "home.sensitiveConsent.decline")}
             </button>
           </div>
         </div>

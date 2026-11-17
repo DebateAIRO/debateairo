@@ -372,20 +372,22 @@ describe("card anatomy", () => {
       const core = shell?.querySelector<HTMLElement>(':scope > [data-bezel="core"]');
       const tab = core?.querySelector<HTMLElement>(`.nodeStanceTab[data-stance="${stance}"]`);
 
+      // Design Document v2 (1a): the bezel's look (shell and core fills, radii, padding, shadow,
+      // the tab's 44 x 4 shape) is the stylesheet's (.nodeWrap, .node, .nodeStanceTab), pinned in
+      // debateReferenceDesign.views.source-test.mjs. Nothing inline may override it.
       expect(shell, `${stance} shell`).not.toBeNull();
-      expect(shell?.style.background).toBe("var(--shell)");
-      expect(shell?.style.borderRadius).toBe("var(--r-card)");
-      expect(shell?.style.boxShadow).toBe("var(--shadow-card)");
-      expect(shell?.style.padding).toBe("4px");
+      expect(shell?.classList.contains("nodeWrap")).toBe(true);
+      for (const property of ["background", "borderRadius", "boxShadow", "padding", "border"] as const) {
+        expect(shell?.style[property], `${stance} shell inline ${property}`).toBe("");
+      }
       expect(core, `${stance} core`).not.toBeNull();
-      expect(core?.style.background).toBe("var(--core)");
-      expect(core?.style.borderRadius).toBe("var(--r-card)");
+      expect(core?.classList.contains("node")).toBe(true);
+      expect(core?.style.background).toBe("");
+      expect(core?.style.borderRadius).toBe("");
       expect(tab, `${stance} stance tab`).not.toBeNull();
-      expect(tab?.style.position).toBe("absolute");
-      expect(tab?.style.top).toBe("0px");
-      expect(tab?.style.left).toBe("0px");
-      expect(tab?.style.height).toBe("3px");
-      expect(tab?.style.borderRadius).toBe("var(--r-tab)");
+      for (const property of ["position", "top", "left", "width", "height", "borderRadius"] as const) {
+        expect(tab?.style[property], `${stance} tab inline ${property}`).toBe("");
+      }
       expect(tab?.style.background).toBe(`var(--${stance}-line)`);
     }
 
@@ -400,7 +402,7 @@ describe("card anatomy", () => {
       '[data-bezel="shell"][data-stance="root"] .nodeStanceTab[data-stance="root"]'
     );
     expect(rootTab, "root stance tab").not.toBeNull();
-    expect(rootTab?.style.background).toBe("var(--line-strong)");
+    expect(rootTab?.style.background).toBe("var(--ink)");
     expect(rootTab?.style.background).not.toBe(reasoningTab?.style.background);
   });
 
@@ -532,7 +534,8 @@ describe("card anatomy", () => {
       `[data-node-id="${nodeId}"] > [data-bezel="core"]`
     )?.style.background;
 
-    expect(coreFill("node:healthy")).toBe("var(--core)");
+    // Design Document v2 (1a): a healthy core's --core fill is the stylesheet's (.node).
+    expect(coreFill("node:healthy")).toBe("");
     for (const nodeId of ["node:empty", "node:abandoned", "node:failed"]) {
       expect(coreFill(nodeId), nodeId).toBe("var(--surface-sunken)");
       expect(coreFill(nodeId), nodeId).not.toBe(coreFill("node:healthy"));

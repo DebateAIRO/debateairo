@@ -6,6 +6,8 @@
 
 .v4WaitBlock { width: 100%; max-width: 640px; align-self: flex-start; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .v4WaitCard { display: flex; flex-direction: column; gap: 12px; padding: 28px; min-width: 0; }
+/* Design Document v2: the waiting card is the hard card (the 2px hard edge, its solid 5px shadow, the 22px corner). */
+.v4Card.v4WaitCard { border: 2px solid var(--hard); box-shadow: 0 5px 0 var(--hard-shadow); border-radius: 22px; }
 .v4WaitCardInline { padding: 0; }
 .v4WaitCard p { margin: 0; }
 .v4WaitQuestion {
@@ -39,7 +41,7 @@
 .v4ChoiceChips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 .v4ChoiceChip {
   display: inline-flex; align-items: center; min-height: 28px; max-width: 100%; padding: 4px 10px;
-  border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--surface-2);
+  border-radius: var(--r-pill); border: 0; background: var(--chip);
   font-size: var(--t-ui); overflow-wrap: anywhere;
 }
 

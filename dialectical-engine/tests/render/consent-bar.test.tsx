@@ -396,7 +396,8 @@ describe("S01 the cookie notice bar (10a)", () => {
       "border: 1px solid var(--line-strong)",
       "border-radius: var(--r-panel)",
       "padding: 7px",
-      "box-shadow: var(--shadow-pop)"
+      // Design Document v2: the bar's bezel rides the hard shadow.
+      "box-shadow: var(--shadow-big)"
     ]);
     expectDeclarations(base, ".consentBarCore", [
       "background: var(--core)",

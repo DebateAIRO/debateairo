@@ -62,7 +62,7 @@ export function AuthShell({
             <span className="authBrandMark" aria-hidden="true">
               <span className="authBrandDiamond" />
             </span>
-            <span className="authBrandName">Dialectical Engine</span>
+            <span className="authBrandName">Dialectical <span className="authBrandAccent">Engine</span></span>
           </div>
           <header className="authIntro">
             <p className="authEyebrow">{eyebrow}</p>

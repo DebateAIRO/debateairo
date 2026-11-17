@@ -20,17 +20,9 @@ export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Ele
       }}
     >
       <div className="lpNav">
-        <a
-          href="/"
-          style={{
-            fontFamily: "var(--font-display)",
-            fontWeight: 600,
-            fontSize: "19px",
-            letterSpacing: "-.02em",
-            fontVariationSettings: "var(--fvs-display)"
-          }}
-        >
-          Dialectical Engine
+        {/* Design Document v2: the wordmark of the public top bar, "Engine" in the brand colour. */}
+        <a href="/" className="lpWordmark">
+          Dialectical <span className="lpWordmarkAccent">Engine</span>
         </a>
         <nav aria-label={t(catalog, "chrome.landingNavigation")} className="lpNavLinks">
           <a href="#method">{t(catalog, "chrome.method")}</a>

@@ -41,7 +41,7 @@ import { fitDossierToTokenLine } from "./token-line.js";
  *
  * Task 50b (owner, 4 Nov, "Goal in answer": "Always say it"): when the person said what they care about (`goalStated`, read from the
  * run's purpose lines by `pathsGoalStated`), the writer and the checker are the next versions, report.answer.v5 and
- * report.answer-check.v4 (Task 50b's drafts, sealed only through Task 92): the same words with one sentence each, that the answer says
+ * report.answer-check.v4 (Task 50b's, sealed 17 Nov on the owner's approval): the same words with one sentence each, that the answer says
  * how that goal fares across the paths. The material, the calls and the money are the same.
  */
 

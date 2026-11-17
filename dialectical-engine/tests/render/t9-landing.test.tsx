@@ -206,7 +206,9 @@ describe("T9-C2 chrome labels & CTAs", () => {
     const wordmark = [...chrome!.querySelectorAll<HTMLAnchorElement>("a")]
       .find((candidate) => candidate.textContent?.trim() === "Dialectical Engine");
     expect(wordmark).toBeDefined();
-    expect(wordmark?.style.fontFamily).toBe("var(--font-display)");
+    // Design Document v2: the wordmark is the public top bar's, drawn by a class, with "Engine" in its own span.
+    expect(wordmark?.classList.contains("lpWordmark")).toBe(true);
+    expect(wordmark?.querySelector(".lpWordmarkAccent")?.textContent).toBe("Engine");
   });
 
   it("renders the chrome primary CTA with the exact safe return target", async () => {

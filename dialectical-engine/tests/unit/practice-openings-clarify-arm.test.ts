@@ -11,7 +11,7 @@ import { Socket } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ASK_CLARIFY_CONTRACT_ID, ASK_CLARIFY_INSTRUCTION } from "@debateai/judgement";
+import { ASK_CLARIFY_INSTRUCTION, ASK_CLARIFY_V3_CONTRACT_ID } from "@debateai/judgement";
 import { mapPromptContractHash } from "@debateai/map";
 import {
   createPreviewBudgetRpcPort,
@@ -205,10 +205,10 @@ describe("practice openings, arm Q: the clarifying call timed per question (Task
       expect(Object.keys(line).sort()).toEqual(FIVE_FIELDS);
       expect(Number.isInteger(line.ms) && line.ms >= 0).toBe(true);
     }
-    // Only the clarifying calls were sent (runClarifyArm runs arm Q alone, whatever `arms` says): each on Haiku, the sealed contract, the
-    // step's token room; the unreadable one twice. No DeepInfra call.
+    // Only the clarifying calls were sent (runClarifyArm runs arm Q alone, whatever `arms` says): each on Haiku, the sealed contract the
+    // API asks with (version 3 since 17 Nov), the step's token room; the unreadable one twice. No DeepInfra call.
     expect(gates.asked.map((call) => [call.model, call.contractId, call.maxTokens]))
-      .toEqual(Array.from({ length: 4 }, () => [HAIKU, ASK_CLARIFY_CONTRACT_ID, ASK_CLARIFY_MODEL_SETTINGS.maxOutputTokens]));
+      .toEqual(Array.from({ length: 4 }, () => [HAIKU, ASK_CLARIFY_V3_CONTRACT_ID, ASK_CLARIFY_MODEL_SETTINGS.maxOutputTokens]));
     expect(ASK_CLARIFY_MODEL_SETTINGS.model).toBe(HAIKU);
     expect(gates.asked.filter((call) => call.question === unreadableLine)).toHaveLength(2);
     expect(wire.map((event) => [event.gate, event.model, event.outcome])).toEqual(Array.from({ length: 4 }, () => ["anthropic", HAIKU, "VENDOR_OK"]));

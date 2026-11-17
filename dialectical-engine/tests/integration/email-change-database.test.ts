@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { Pool, PoolClient } from "pg";
 import { migrate, PostgresEmailChangeRepository, PostgresSessionRepository, type LoginIdentityRecord } from "@debateai/db";
 import type { AuditContextHasher, CryptoEnvelope } from "../../packages/crypto/src/index.js";
+import { inAccountRequest, loginApiPools, seedSessionAccount } from "../support/rls-logins.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 // Turn 14 — change email. The repository is the only door: every capability is
@@ -393,6 +394,27 @@ describe("Turn 14 change email on real PostgreSQL", () => {
       FROM identity.step_up_grant WHERE session_id=$1
     `, [account.sessionId]);
     expect(grant.rows).toEqual([{ action: "CHANGE_EMAIL", target_account_id: account.userId, consumed: true }]);
+  });
+
+  // Design Document v2 (3a): the top bar's identity pill. The read runs on the API's own authorization login, inside the
+  // account's request, as apps/api/src/main.ts runs it.
+  it("reads the account's own pseudonym on the API's login, and no other account's whatever id it is handed", async () => {
+    const repository = new PostgresEmailChangeRepository((await loginApiPools(database)).authorization, fakeAuditHasher);
+    const ana = await seedSessionAccount(database.pool, "pill-ana");
+    const bob = await seedSessionAccount(database.pool, "pill-bob");
+    const anaPseudonym = `pseudo-pill-ana-${ana.userId.slice(0, 8)}`;
+    await expect(inAccountRequest(ana.token, () => repository.readOwnPseudonym(ana.userId))).resolves.toBe(anaPseudonym);
+    await expect(inAccountRequest(bob.token, () => repository.readOwnPseudonym(bob.userId)))
+      .resolves.toBe(`pseudo-pill-bob-${bob.userId.slice(0, 8)}`);
+    // Another account's id inside Ana's request: the database shows this login Ana's row only.
+    await expect(inAccountRequest(ana.token, () => repository.readOwnPseudonym(bob.userId))).resolves.toBeNull();
+    // No session, a revoked one, an expired one: no account, so no row.
+    for (const token of [null, ana.revokedToken, ana.expiredToken]) {
+      await expect(inAccountRequest(token, () => repository.readOwnPseudonym(ana.userId))).resolves.toBeNull();
+    }
+    // An account that is no longer active has no name to show, live session or not.
+    await database.pool.query(`UPDATE identity."user" SET state='suspended' WHERE user_id=$1`, [ana.userId]);
+    await expect(inAccountRequest(ana.token, () => repository.readOwnPseudonym(ana.userId))).resolves.toBeNull();
   });
 
   it("keeps the request table behind the capabilities for every runtime role", async () => {

@@ -359,9 +359,11 @@ describe("lists", () => {
     expect(publicList.body.textContent).not.toContain("Should cities price road congestion?");
   });
 
-  it("renders every library row as a shell/core bezel", async () => {
-    // PROPERTY (T3-C2-3): every row in both routed lists has a shell wrapper
-    // and one direct core body, using the shared T1 bezel vocabulary.
+  it("renders every library row as a link around one core box", async () => {
+    // PROPERTY (T3-C2-3, as Design Document v2 screen 3a draws it): every row in both routed lists
+    // is a link wrapper with one direct core body. The box is the core's alone and comes from the
+    // stylesheet (.libRowCore, pinned in debateReferenceDesign.source-test.mjs): nothing inline
+    // gives the wrapper a second, tray layer.
     for (const selected of ["yours", "public"] as const) {
       const rendered = await renderRoute("t".repeat(43), selected);
       const rows = [...rendered.querySelectorAll<HTMLElement>('[data-library-row][data-bezel="shell"]')];
@@ -370,10 +372,11 @@ describe("lists", () => {
       for (const row of rows) {
         const core = row.querySelector<HTMLElement>(':scope > [data-bezel="core"]');
 
-        expect(row.style.background).toBe("var(--shell)");
+        expect(row.classList.contains("libRow")).toBe(true);
+        expect(row.style.background).toBe("");
         expect(core).not.toBeNull();
-        expect(core?.style.background).toBe("var(--core)");
-        expect(core?.style.background).not.toBe(row.style.background);
+        expect(core?.classList.contains("libRowCore")).toBe(true);
+        expect(core?.style.background).toBe("");
       }
     }
   });

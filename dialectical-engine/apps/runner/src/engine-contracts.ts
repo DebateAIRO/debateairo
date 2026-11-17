@@ -7,7 +7,7 @@ import {
 import { MAP_ENGINE_CONTRACT_NAMES, mapEnginePromptContracts } from "@debateai/map";
 import { promptContractFingerprintText, type PromptContract } from "@debateai/providers";
 import { SYNTHESIZER_LENGTH_READER_SOURCES_PROMPT_CONTRACT, SYNTHESIZER_LENGTH_SOURCES_PROMPT_CONTRACT } from "@debateai/serve";
-import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_WRITER_V4_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
+import { INVESTIGATION_REPORT_SEALED_CONTRACTS, PATH_REWRITE_SEALED_CONTRACTS, PATH_REWRITE_V2_SEALED_CONTRACTS, REPORT_DEEPER_SEALED_CONTRACTS, REPORT_GOAL_SEALED_CONTRACTS, REPORT_WRITER_V4_SEALED_CONTRACTS, REPORT_OVERALL_SEALED_CONTRACTS } from "@debateai/story";
 import { EVALUATOR_SOURCES_SEALED_CONTRACTS } from "./answer-checker-sources.js";
 
 /**
@@ -77,13 +77,18 @@ export function engineSealedContracts(): readonly PromptContract[] {
     ...WEB_R22_SEALED_CONTRACTS,
     ...PATH_REWRITE_V2_SEALED_CONTRACTS,
     // R22 clarify lane (plan 2026-10-31 decision 29, the instruction approved word for word; the answer form a draft): dynamic step 2's small
-    // call, which the API makes before a debate exists. It is sealed with the engine's so no release changes it unseen.
+    // call, which the API makes before a debate exists. It is sealed with the engine's so no release changes it unseen. Since 17 Nov the
+    // list holds version 3 too (Design Document v2 16b: version 2's words and the sentence that says the question back), the one asked.
     ...ASK_CLARIFY_SEALED_CONTRACTS,
     // R22 report 2 (plan 2026-10-31 decision 26): the writer who may ask once for deeper paths, the later version's, and the
     // checker of "every path in the material". The v2 three stay sealed, unused.
     ...REPORT_DEEPER_SEALED_CONTRACTS,
     // The owner put back the v3 writer's lost first sentence: v4, its later version. The v3 two stay sealed, unused.
     ...REPORT_WRITER_V4_SEALED_CONTRACTS,
+    // V4 start step, Tasks 50b and 50c (the owner approved both goal sentences as written, 17 Nov): the writer, the later version's
+    // writer and the check that say how a stated goal fares across the paths. The v4 two and the v3 check stay sealed, and are asked
+    // when the person stated no goal.
+    ...REPORT_GOAL_SEALED_CONTRACTS,
     // R22 public lane (plan 2026-10-31 decision 13; wording approved by the owner, 1 Nov): the AI check on a contribution to a public debate.
     ...PUBLIC_CONTRIBUTION_SEALED_CONTRACTS,
     // R22 decision 35 (draft wording, the owner's): the AI check on a report of a public debate.

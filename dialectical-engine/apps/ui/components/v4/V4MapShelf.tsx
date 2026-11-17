@@ -118,7 +118,7 @@ function DigLine({ dig, catalog, locale }: Readonly<{ dig: ShelfDig; catalog: Me
         <span className="v4ShelfDigText" dir="auto" data-ai-generated="true">
           {t(catalog, dig.more ? "v4.maps.digMore" : "v4.maps.dig", { pick: dig.pick })}
         </span>
-        <span className="v4ShelfDigState">{shelfStateText(dig.state, null, catalog, locale, dig.pause)}</span>
+        <span className="v4ShelfDigState" data-state={dig.state}>{shelfStateText(dig.state, null, catalog, locale, dig.pause)}</span>
       </Link>
     </li>
   );
@@ -136,7 +136,7 @@ function MapCard({ map, catalog, locale, digsMax }: Readonly<{
           {map.state === "WORKING" ? <span className="v4ShelfPulse" aria-hidden="true" /> : null}
           {/* public-f17: a question paused at the month wall has the still pause mark, never the pulse. */}
           {map.state === "PAUSED" ? <span className="v4PauseDot" aria-hidden="true" /> : null}
-          <span className="v4ShelfState">{shelfStateText(map.state, map.startedAt, catalog, locale, map.pause)}</span>
+          <span className="v4ShelfState" data-state={map.state}>{shelfStateText(map.state, map.startedAt, catalog, locale, map.pause)}</span>
           {map.changed ? (
             <span className="v4ShelfNew"><span className="v4ShelfNewDot" aria-hidden="true" />{t(catalog, "v4.maps.new")}</span>
           ) : null}

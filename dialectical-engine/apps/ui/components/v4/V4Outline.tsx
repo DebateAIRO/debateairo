@@ -246,7 +246,7 @@ export function V4Outline(props: MapPiecesProps) {
             onClick={(event) => props.onSelect("root", viaKeyboard(event))}
           >
             {/* V4 start step, Task 62 (r2-8): a path debate's question as it was sent, its answers sentences in it. */}
-            <span className="v4OutRootTitle v4Serif" data-ai-generated="true">{firstCardQuestion(map)}</span>
+            <span className="v4OutRootTitle" data-ai-generated="true">{firstCardQuestion(map)}</span>
             {props.changed.has("root") ? <NewDot catalog={catalog} /> : null}
             <LevelWords level={1} catalog={catalog} />
           </button>

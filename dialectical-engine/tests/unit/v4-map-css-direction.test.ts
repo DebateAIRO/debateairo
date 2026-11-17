@@ -73,7 +73,8 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
   });
 
   it("keep each column's drawn width as a floor and let it grow, within a cap, for a word that cannot break", () => {
-    for (const [selector, floor] of [[".v4MapRootCol", 196], [".v4MapBranch > .v4MapPath", 228], [".v4MapLeaves", 236]] as const) {
+    // Design Document v2 draws the path column as wide as the open questions' column: 236 px.
+    for (const [selector, floor] of [[".v4MapRootCol", 196], [".v4MapBranch > .v4MapPath", 236], [".v4MapLeaves", 236]] as const) {
       const declarations = rule(selector);
       expect(declarations, selector).toMatch(/width: min-content;/u);
       expect(declarations, selector).toMatch(new RegExp(`min-width: ${floor}px;`, "u"));
@@ -96,7 +97,7 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     };
     // One grid: each column is its drawn width at least, and grows only as far as its widest card needs (within the caps).
     expect(inBlock(".v4MapCanvas")).toMatch(
-      /grid-template-columns: minmax\(196px, min-content\) minmax\(228px, min-content\) minmax\(236px, min-content\);[\s\S]*column-gap: 32px;/u);
+      /grid-template-columns: minmax\(196px, min-content\) minmax\(236px, min-content\) minmax\(236px, min-content\);[\s\S]*column-gap: 32px;/u);
     // The headings, the body, the paths and every path's row use those same columns, with the same gap (no gap of their own).
     for (const selector of [".v4MapHeads, .v4MapBody", ".v4MapBranches", ".v4MapBranch"]) {
       expect(inBlock(selector), selector).toMatch(/grid-template-columns: subgrid;[\s\S]*column-gap: normal;/u);
@@ -107,7 +108,7 @@ describe("the V4 map's styles follow the reading direction (map-f13)", () => {
     expect(inBlock(".v4MapBranch > .v4MapLeaves")).toMatch(/grid-column: 2; width: auto;/u);
     expect(inBlock(".v4MapRootCol")).toMatch(/width: auto;/u);
     // The fixed heading widths are gone from the grid (the per-row floors above stay for browsers without subgrid).
-    expect(block).not.toMatch(/196px 228px 236px/u);
+    expect(block).not.toMatch(/196px 236px 236px/u);
   });
 
   it("leave the laptop's two folded columns (map-d3) out of that grid, so open questions still hang under their path", () => {

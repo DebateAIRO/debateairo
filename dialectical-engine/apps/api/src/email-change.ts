@@ -44,6 +44,8 @@ export interface EmailSettings {
   readonly email: string;
   readonly recoveryEmail: string | null;
   readonly pending: Readonly<{ newEmail: string; expiresAt: Date }> | null;
+  /** Design Document v2 (3a): the account's own pseudonym, for the top bar's identity pill. Null or absent: the account has none to show. */
+  readonly pseudonym?: string | null;
 }
 
 export interface EmailChangePending {
@@ -52,7 +54,7 @@ export interface EmailChangePending {
 }
 
 type Repository = Pick<PostgresEmailChangeRepository,
-  "readSettings" | "request" | "resend" | "cancelOwn" | "cancelByToken" | "confirm">;
+  "readSettings" | "readOwnPseudonym" | "request" | "resend" | "cancelOwn" | "cancelByToken" | "confirm">;
 
 // The service's own timings, used when the caller passes none (the running API passes none).
 // Module-private: the source-purity law (tools/orphan-audit auditSourceRules) refuses an exported
@@ -120,6 +122,8 @@ export class EmailChangeService {
   async settings(session: EmailChangeSession): Promise<EmailSettings | null> {
     const record = await this.dependencies.repository.readSettings(session);
     if (record === null) return null;
+    // Asked only now: `readSettings` found the session live and its account active. The session's own account, no other.
+    const pseudonym = await this.dependencies.repository.readOwnPseudonym(session.userId);
     return this.withDek(session.userId, (dek) => Object.freeze({
       email: this.open(dek, session.userId, record.emailCiphertext, "user.email_ciphertext"),
       recoveryEmail: record.recoveryEmailCiphertext === null ? null
@@ -127,7 +131,8 @@ export class EmailChangeService {
       pending: record.pending === null ? null : Object.freeze({
         newEmail: this.open(dek, session.userId, record.pending.newEmailCiphertext, "user.email_ciphertext"),
         expiresAt: record.pending.expiresAt
-      })
+      }),
+      pseudonym
     }));
   }
 

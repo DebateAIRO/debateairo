@@ -287,7 +287,7 @@ const SESSION = Object.freeze({
   provisional_identity_model: false
 });
 /** ask-d6 A: the account's address, read by the V4 header for the round button's initial ("M"). */
-const ACCOUNT_EMAIL = Object.freeze({ email: "maria@example.com", recovery_email: null, pending: null });
+const ACCOUNT_EMAIL = Object.freeze({ email: "maria@example.com", recovery_email: null, pending: null, pseudonym: "CobaltFalcon4821" });
 const ENGLISH = Object.freeze({ tag: "en", name: "English" });
 /** The premium roster, read from the contract (the same ids the fixture's makers use). */
 const MODELS: readonly string[] = Object.freeze([...C.PLAN_TIER_ROSTERS.premium]);
@@ -1184,7 +1184,7 @@ function investigationReports(investigation: Investigation) {
 // 0157 (D1): one statement of reasons, so Settings' notices page has something to show: a staff hide of the seeded debate, on a report, held for review.
 const MODERATION_STATEMENTS = Object.freeze({ statements: [{ statement_id: "57a7e000-0000-4000-8000-000000000001", kind: "DEBATE_HIDDEN", public_ref: PUBLIC_REF,
   happened_at: "2026-11-05T10:00:00.000Z", piece_kind: null, hidden_now: true,
-  ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false },
+  ground: { recorded: true, interim: true, grounds: ["REVIEW_HOLD"], suspected: ["HATE_SPEECH"], sources: ["REPORT_BUTTON"], automated_detection: true, automated_decision: false, law: null },
   facts: [], facts_deleted: false, quote: null, places: [] }] });
 
 function startupCheck(): number {

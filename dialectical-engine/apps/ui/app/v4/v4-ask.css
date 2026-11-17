@@ -1,33 +1,45 @@
 /* V4 initial (2026-10-28): ask styles (D1 Ask, D2 How we read your question) and the shared V4 header. Tokens only. */
 
-/* ---- V4Header (every V4 page) ---- */
+/* ---- V4Header (every V4 page) ----
+   Design Document v2: a white bar with a hairline under it. The wordmark (display face, 700, 24px, "Engine" in the brand
+   colour) and the header's links sit at the start; the quota circle, the page's extras and the round account button at
+   the end. The link of the current page carries a 2px brand underline. */
 .v4Hdr {
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px;
-  padding: 10px var(--v4-gutter); border-bottom: 1px solid var(--line-2); background: var(--surface);
+  padding: 10px var(--v4-gutter); border-bottom: 1px solid var(--line); background: var(--surface);
 }
+.v4HdrLead { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 28px; min-height: 44px; min-width: 0; }
 .v4HdrBrand {
   display: inline-flex; align-items: center; gap: 10px; min-height: 44px;
   color: var(--ink); text-decoration: none;
 }
+/* The diamond mark is the phone's brand only (v4-base.css); wider screens show the wordmark. */
 .v4HdrMark {
-  width: 18px; height: 18px; flex: none; background: var(--accent);
+  display: none; width: 18px; height: 18px; flex: none; background: var(--brand);
   clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
 }
-.v4HdrName { font-family: var(--font-display); font-weight: 500; font-size: 18px; line-height: 1.1; }
-.v4HdrBadge {
-  font-family: var(--font-mono); font-size: var(--t-micro); color: var(--text-3);
-  border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap;
+.v4HdrName {
+  font-family: var(--font-display); font-weight: 700; font-size: 24px; line-height: 1.1; letter-spacing: -.03em;
+  white-space: nowrap;
 }
+.v4HdrNameAccent { color: var(--brand); }
+.v4HdrNav { display: flex; flex-wrap: wrap; gap: 0 24px; font-size: 15px; font-weight: 700; }
+.v4HdrNavLink {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0; color: var(--text-2); text-decoration: none;
+  border-bottom: 2px solid transparent; border-top: 2px solid transparent;
+}
+.v4HdrNavLink:hover { color: var(--ink); }
+.v4HdrNavLink[aria-current="page"] { color: var(--ink); border-bottom-color: var(--brand); }
 .v4HdrRight { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; }
 /* ask-d6 A: the round account button ends the row. Its place is held from the first paint (44 px), so nothing moves when
    the session is known; signed out, "Sign in" takes it. The menu itself is the site's account menu (globals.css). */
 .v4HdrAccount { display: inline-flex; align-items: center; justify-content: flex-end; min-width: 44px; min-height: 44px; }
 .v4HdrAccountButton {
   display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0;
-  border: 1px solid var(--line-strong); border-radius: var(--r-dot); background: var(--surface-2); cursor: pointer;
-  color: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 18px; line-height: 1;
+  border: 1px solid var(--line); border-radius: var(--r-dot); background: var(--surface); cursor: pointer;
+  color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 17px; line-height: 1;
 }
-.v4HdrAccountButton:hover { background: var(--surface-sunken); }
+.v4HdrAccountButton:hover { background: var(--surface-2); border-color: var(--line-strong); }
 .v4HdrAccountButton[aria-expanded="true"] { border-color: var(--accent); }
 /* No initial to show (the address could not be read): a plain head-and-shoulders mark. */
 .v4HdrAccountMark { position: relative; width: 18px; height: 18px; }
@@ -37,34 +49,50 @@
 /* ask-d1: a signed-out visitor's "Sign in", at the end of the header. */
 .v4HdrSignIn { font-size: var(--t-ui); font-weight: 600; display: inline-flex; align-items: center; min-height: 44px; }
 @media (min-width: 768px) {
-  .v4Hdr { padding: 12px 32px; }
+  .v4Hdr { padding: 10px 40px; }
 }
 
 /* ---- /v4 page ---- */
+/* Design Document v2 (16a, 18b): one 820px column, 48px above and 56px below, 28px between its blocks. */
 .v4AskMain {
   width: 100%; max-width: 820px; margin: 0 auto;
   padding: 32px var(--v4-gutter) 56px;
   display: flex; flex-direction: column; gap: 24px;
 }
 @media (min-width: 768px) {
-  .v4AskMain { padding: 64px 32px 80px; gap: 28px; }
+  .v4AskMain { padding: 48px 32px 56px; gap: 28px; }
+}
+/* Design Document v2 (16a): on the ask pages the four steps (V4Steps, drawn by v4-debate.css) are a plain row of names,
+   22px apart, with no line between them; each has an 8px dot, the step the person is on a filled accent dot and its name
+   in bold ink. A phone keeps the dots alone, where the larger ringed dot still tells "here" apart without a name. */
+@media (min-width: 768px) {
+  .v4AskMain .v4Steps-line .v4StepsList { gap: 4px 22px; }
+  .v4AskMain .v4Steps-line .v4StepsStep + .v4StepsStep::before { content: none; }
+  .v4AskMain .v4Steps-line .v4StepsPlace { gap: 7px; white-space: nowrap; }
+  .v4AskMain .v4Steps-line .v4StepsAhead .v4StepsDot { background: transparent; }
+  .v4AskMain .v4Steps-line .v4StepsHere { color: var(--ink); }
+  .v4AskMain .v4Steps-line .v4StepsHere .v4StepsDot { width: 8px; height: 8px; background: var(--accent); box-shadow: none; }
 }
 .v4AskQuestion { display: flex; flex-direction: column; gap: 14px; }
 .v4AskTitle { margin: 0; font-size: clamp(28px, 4.4vw, 40px); line-height: 1.1; letter-spacing: -0.01em; }
 .v4AskTitle label { cursor: text; }
+/* Design Document v2: the question box is the page's one field: the display face at its lightest cut, a 2px brand edge
+   with the accent halo around it, on the field paper. With focus the halo grows. */
 .v4AskField {
   width: 100%; min-height: 120px; resize: vertical;
-  font-family: var(--font-display); font-weight: var(--fw-display); font-size: clamp(19px, 2.6vw, 24px); line-height: 1.35;
-  color: var(--ink); background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--r-panel);
-  padding: 16px 18px; box-shadow: var(--shadow-card);
+  font-family: var(--font-display); font-weight: 500; font-size: clamp(19px, 2.6vw, 24px); line-height: 1.35;
+  color: var(--ink); background: var(--field); border: 2px solid var(--brand); border-radius: 16px;
+  padding: 16px 18px; box-shadow: 0 0 0 3px var(--accent-halo);
 }
-.v4AskField:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
-.v4AskFieldSmall { min-height: 72px; font-size: 19px; box-shadow: none; }
+.v4AskField:focus { outline: none; box-shadow: 0 0 0 5px var(--accent-halo); }
+/* Step 2's question box sits inside the "How we read your question" card: a quieter field, its edge turning brand with focus. */
+.v4AskFieldSmall { min-height: 72px; font-size: 19px; border-color: var(--field-border); border-radius: var(--r-btn); box-shadow: none; }
+.v4AskFieldSmall:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--accent-halo); }
 .v4AskField::placeholder, .v4AskInput::placeholder { color: var(--text-3); }
 .v4AskHint { margin: 0; font-size: var(--t-ui); }
 
 .v4AskLevels { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-.v4AskLegend { padding: 0; margin-bottom: 8px; font-weight: 700; font-size: 15px; }
+.v4AskLegend { padding: 0; margin-bottom: 12px; font-weight: 700; font-size: 15px; }
 .v4AskChips { display: flex; flex-wrap: wrap; gap: 8px 10px; }
 .v4AskChips .v4Chip { min-height: 44px; }
 .v4AskSample {
@@ -101,43 +129,48 @@
   margin: 0; padding: 10px 14px; border-radius: var(--r-btn);
   background: var(--surface-2); border-inline-start: 3px solid var(--line-strong); color: var(--text); font-size: var(--t-ui);
 }
-/* ask-f19: 3 lines to about 8 (line-height 1.35, padding 2 x 16px, border 2 x 1.5px), then the words scroll inside. */
-.v4AskFieldGrow { resize: none; overflow-y: auto; min-height: calc(4.05em + 35px); max-height: calc(10.8em + 35px); }
-/* ask-f15: the level chips are native radios; the circle hides, the chip shows the choice and the keyboard focus. */
+/* ask-f19: 3 lines to about 8 (line-height 1.35, padding 2 x 16px, border 2 x 2px), then the words scroll inside. */
+.v4AskFieldGrow { resize: none; overflow-y: auto; min-height: calc(4.05em + 36px); max-height: calc(10.8em + 36px); }
+/* ask-f15: the level chips are native radios; the circle hides, the chip shows the choice and the keyboard focus.
+   Design Document v2: three equal pills in one row; the chosen one is filled with the brand colour. */
 .v4AskLevelChip { position: relative; }
-.v4AskLevelChip[data-checked="true"] { background: var(--con-bg); border-color: var(--accent); }
+.v4AskLevelChip[data-checked="true"] { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
 .v4AskLevelInput { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .v4AskLevelChip:has(.v4AskLevelInput:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* ask-d1 D: the seed of the map (first visits). Nothing in it moves. */
+/* ask-d1 D: the seed of the map (first visits). Nothing in it moves.
+   Design Document v2: the question is a small "hard" card (2px edge, a solid 5px shadow, an 18px corner); a thin broken
+   bracket runs from it to three faint cards of open ground. */
 .v4Seed { margin: 0; display: flex; flex-direction: column; gap: 12px; max-width: 520px; }
-.v4SeedPicture { display: flex; flex-direction: column; align-items: stretch; }
+.v4SeedPicture { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
 .v4SeedRoot {
   position: relative; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px;
-  background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--r-card); box-shadow: var(--shadow-card);
+  background: var(--surface); border: 2px solid var(--hard); border-radius: 18px; box-shadow: 0 5px 0 var(--hard-shadow);
 }
 .v4SeedLabel { color: var(--text-3); }
 .v4SeedWords {
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-  font-family: var(--font-display); font-size: 17px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere;
+  font-family: var(--font-display); font-weight: 500; font-size: 17px; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere;
 }
 .v4SeedWordsEmpty { min-height: 1.35em; }
 .v4SeedBranches { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding-top: 18px; }
 .v4SeedBranches::before {
   content: ""; position: absolute; top: 0; inset-inline: 16.6% 16.6%; height: 9px;
-  border: 1px dashed var(--line-strong); border-bottom: 0; border-radius: 6px 6px 0 0; opacity: .7;
+  border: 1px dashed var(--line-strong); border-bottom: 0; border-radius: 6px 6px 0 0;
 }
 /* The owner's answers of 5 Nov (question 22 A): journey-f2's "Open" look, as on the map (v4-map-looks.css .v4GroundOPEN):
    hatched gold paper, a solid gold edge, still faint; the star, the "?" and the word "Open" wrap at 375 px. */
 .v4SeedOpen {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 6px; min-height: 52px; min-width: 0;
   padding: 6px; border: 1.5px solid var(--gold-border); border-radius: var(--r-card); background-color: var(--gold-bg);
-  background-image: var(--v4-look-hatch); color: var(--text-3); opacity: .75; font-weight: 700;
+  background-image: var(--v4-look-hatch); color: var(--text-3); opacity: .8; font-weight: 700;
 }
 .v4SeedStar { color: var(--gold); }
 .v4SeedCaption { font-size: var(--t-ui); }
 
 /* ---- "Your maps" (ask-d5 B, ask-f10, ask-f20, wait-f13, map-f34, dig-f30) ---- */
+/* Design Document v2 (18b): two columns of question cards (surface, a hairline, a 14px corner); each question's digs
+   hang under its card from a 2px line at the start edge. */
 .v4Shelf { border-top: 1px solid var(--line-2); padding-top: 20px; display: flex; flex-direction: column; gap: 12px; }
 .v4ShelfTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; color: var(--text-2); }
 .v4ShelfList {
@@ -164,8 +197,12 @@
   animation: v4MapPulse 1.6s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) { .v4ShelfPulse { animation: none; } }
-.v4ShelfNew { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--con-text); }
+/* Design Document v2: the "New" mark (an accent dot and the bold word) leads the line; a paused question has a still
+   accent ring; a question that did not finish says so in the dispute colour. */
+.v4ShelfNew { order: -1; display: inline-flex; align-items: center; gap: 5px; font-weight: 700; color: var(--con-text); }
 .v4ShelfNewDot { width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent); }
+.v4ShelfMeta .v4PauseDot { width: 10px; height: 10px; border-color: var(--accent); }
+.v4ShelfState[data-state="FAILED"], .v4ShelfDigState[data-state="FAILED"] { color: var(--dispute-text); }
 .v4ShelfDigs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .v4ShelfDig {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-height: 44px; padding: 8px 12px;
@@ -173,70 +210,119 @@
   color: var(--link); text-decoration: none; font-size: var(--t-ui);
 }
 .v4ShelfDig:hover .v4ShelfDigText { text-decoration: underline; }
-.v4ShelfDigText { min-width: 0; flex: 1 1 12em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v4ShelfDigState { font-size: var(--t-meta); color: var(--text-2); }
+.v4ShelfDigText {
+  min-width: 0; flex: 1 1 12em; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.v4ShelfDigState { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-meta); color: var(--text-2); }
+/* A dig being looked into has the still accent dot before its word (the card's own dot is the one that pulses). */
+.v4ShelfDigState[data-state="WORKING"]::before {
+  content: ""; flex: none; width: 8px; height: 8px; border-radius: var(--r-dot); background: var(--accent);
+}
 .v4ShelfAll { align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
+/* "My questions" (18b): the 40px title with the brand-filled "New" at the end of its row; "Show more" is a plain link. */
 .v4MapsMain { gap: 20px; }
+.v4MapsMain .v4AskTitle { letter-spacing: var(--ls-display); min-width: 0; overflow-wrap: anywhere; }
+.v4MapsHead { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-width: 0; }
+.v4MapsNew { flex: none; padding: 0 22px; font-weight: 600; text-decoration: none; }
+.v4MapsMore { align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; font-size: var(--t-ui); }
+.v4MapsMore[disabled] { color: var(--text-3); cursor: progress; text-decoration: none; }
 
 /* D2 */
-.v4AskMainRead { gap: 16px; padding-bottom: 0; }
-.v4AskBack { font-size: var(--t-ui); min-height: 44px; }
-.v4AskCard { display: flex; flex-direction: column; gap: 22px; padding: 20px 16px; }
+/* Design Document v2 (16b): step 2 runs the full width of the page, so its foot bar can; the words keep to a 1000px
+   column with 40px at each side (--v4-read-pad, which the bar reads for its own sides). 44px lie between its sections. */
+.v4AskMainRead { --v4-read-pad: var(--v4-gutter); max-width: none; gap: 22px; padding-block: 24px 0; padding-inline: var(--v4-read-pad); }
 @media (min-width: 768px) {
-  .v4AskCard { padding: 28px 28px 24px; }
+  .v4AskMainRead { --v4-read-pad: max(40px, calc((100vw - 1000px) / 2 + 40px)); padding-block: 40px 0; gap: 22px; }
 }
-.v4AskReadTitle { margin: 0; font-size: clamp(24px, 3vw, 30px); line-height: 1.15; }
+.v4AskMainRead > .v4StartCard { margin-block-start: 22px; }
+.v4AskMainRead > .v4StartBar { margin-block-start: 34px; }
+.v4AskBack { min-height: 44px; font-size: 13px; font-weight: 700; color: var(--brand); text-decoration: none; }
+.v4AskBack:hover { text-decoration: underline; }
+/* The section that holds the reading and its questions draws no box of its own: the "hard" card inside it does
+   (.v4AskRead: 2px edge, a solid 5px shadow, a 22px corner), and the questions follow on the page. */
+.v4AskCard { display: flex; flex-direction: column; gap: 22px; padding: 0; background: none; border: 0; border-radius: 0; }
+.v4AskRead { display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 18px 16px 16px; }
+@media (min-width: 768px) {
+  .v4AskRead { padding: 22px 24px 20px; }
+}
+.v4AskReadTitle { margin: 0; font-size: 23px; line-height: 1.15; }
 .v4AskReadTitle:focus { outline: none; }
-.v4AskSubTitle { margin: 6px 0 0; font-size: 17px; font-weight: 700; }
-.v4AskOptional { font-weight: 500; font-size: var(--t-ui); }
+/* Design Document v2 (16b), "How we read your question": when the reading says the question back in one sentence, the
+   person's question heads the step (a small label with "Edit my question" beside it, then the question in the display
+   face, 42px), and the hard card holds the title with its hint, the sentence, and what its two lines mean. A stretch
+   of the sentence that stands for an answer is a link to its question: our assumption has a dotted ink line under it,
+   the person's choice is bold in the brand colour over a solid line. On a phone the question drops to 28px. */
+.v4ReadAsked { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4ReadAskedHead { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-width: 0; }
+.v4ReadAskedLabel { font-size: 13px; font-weight: 700; color: var(--text-2); }
+.v4ReadEdit { min-height: 36px; margin-block: -9px; font-size: 13px; font-weight: 700; color: var(--brand); }
+.v4ReadAskedTitle {
+  margin: 0; font-size: 42px; line-height: 1.06; letter-spacing: -.035em; text-wrap: balance; min-width: 0; overflow-wrap: anywhere;
+}
+.v4ReadAskedTitle:focus { outline: none; }
+.v4ReadHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; min-width: 0; }
+.v4ReadHint { font-size: 13.5px; color: var(--text-2); }
+.v4ReadSentence { margin: 0; font-size: 19px; line-height: 1.75; text-wrap: pretty; min-width: 0; overflow-wrap: anywhere; }
+.v4ReadSlot {
+  text-decoration-line: underline; text-decoration-thickness: 2px; text-underline-offset: 6px; border-radius: 4px;
+}
+.v4ReadSlot--assumed { color: inherit; text-decoration-style: dotted; text-decoration-color: var(--ink); }
+.v4ReadSlot--chosen { color: var(--brand); font-weight: 700; text-decoration-style: solid; text-decoration-color: var(--brand); }
+.v4ReadLegend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 22px; font-size: 13.5px; color: var(--text-2); min-width: 0; }
+.v4ReadKey { display: flex; align-items: center; gap: 8px; }
+.v4ReadKeyLine { inline-size: 28px; border-block-end: 2px dotted var(--ink); }
+.v4ReadKeyLine--chosen { border-block-end: 2px solid var(--brand); }
+.v4ReadSwap {
+  min-height: 36px; padding: 0; border: 0; background: transparent; font-size: 13.5px; font-weight: 700; color: var(--brand);
+  cursor: pointer;
+}
+.v4ReadSwap:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 640px) {
+  .v4ReadAskedTitle { font-size: 28px; line-height: 1.1; letter-spacing: -.03em; }
+}
+/* A section's heading on step 2: the display face, 27px, tight. */
+.v4AskSubTitle {
+  margin: 0; font-family: var(--font-display); font-weight: var(--fw-display); font-size: clamp(22px, 3.4vw, 27px);
+  line-height: 1.1; letter-spacing: -.025em; min-width: 0; overflow-wrap: anywhere;
+}
+.v4AskOptional { font-family: var(--font-sans); font-weight: 400; font-size: 14px; letter-spacing: 0; }
 .v4AskBlock { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 /* read-f16 (Task 77): a question's title may hold a long word; it wraps inside the screen. */
-.v4AskLabel { font-weight: 600; font-size: 15px; min-width: 0; overflow-wrap: anywhere; }
-.v4AskLabelSmall { font-size: var(--t-ui); color: var(--text-2); }
+.v4AskLabel { font-weight: 700; font-size: 16px; line-height: 1.4; min-width: 0; overflow-wrap: anywhere; }
+.v4AskRead .v4AskLabel { font-size: 13px; color: var(--text-2); }
+.v4AskLabelSmall { font-size: 14px; font-weight: 700; color: var(--text-2); }
+.v4AskUseMine .v4Link { min-height: 36px; font-weight: 700; color: var(--brand); text-decoration: none; }
+.v4AskUseMine .v4Link:hover { text-decoration: underline; }
+/* An answer to one of the questions: a 44px pill, bold, with a 2px edge; chosen, it fills with the brand colour (v4-base.css). */
+.v4AskBlock .v4AskChips { gap: 10px; }
+.v4AskBlock .v4Chip { padding: 6px 16px; border-radius: 22px; font-size: 15px; font-weight: 700; }
+/* Design Document v2 (16b): the answer the reading assumed, while its question has no chosen answer: a dashed edge on the
+   surface (its words end with "(our assumption)"). It is not pressed; a chosen answer is filled, as ever. */
+.v4Chip.v4ChipAssumed { border-style: dashed; border-color: var(--text-2); }
 .v4AskInline { display: flex; flex-direction: column; gap: 6px; max-width: 420px; }
 .v4AskInput {
-  width: 100%; min-height: 44px; padding: 10px 14px; font: inherit; color: var(--ink);
-  background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--r-btn);
+  width: 100%; min-height: 44px; padding: 10px 14px; font: inherit; font-size: 15px; color: var(--ink);
+  background: var(--field); border: 1px solid var(--field-border); border-radius: var(--r-btn);
 }
-.v4AskInput:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--focus-halo); }
+.v4AskInput:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--accent-halo); }
 .v4AskInput[disabled] { background: var(--surface-2); }
-.v4AskSent {
-  margin: 0; padding: 14px 16px; white-space: pre-wrap; overflow-wrap: anywhere;
-  background: var(--surface-2); border: 1px dashed var(--line-strong); border-radius: var(--r-btn);
-  font-size: 15px; color: var(--ink);
-}
-
-/* D2 bottom bar: sticky, so Start stays in reach on phones. */
-.v4AskBar {
-  position: sticky; bottom: 0; z-index: 20;
-  margin: 8px calc(-1 * var(--v4-gutter)) 0;
-  padding: 12px var(--v4-gutter) calc(12px + env(safe-area-inset-bottom, 0px));
-  display: flex; flex-direction: column; gap: 10px;
-  background: var(--surface); border-top: 1px solid var(--line-2); box-shadow: var(--shadow-chrome);
-}
-@media (min-width: 768px) {
-  .v4AskBar { margin: 8px 0 24px; padding: 14px 20px; border: 1px solid var(--line-2); border-radius: var(--r-card); }
-}
-.v4AskBarGet { margin: 0; font-size: var(--t-ui); color: var(--text-2); }
-.v4AskBarRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.v4AskMode {
-  display: inline-flex; padding: 3px; gap: 2px;
-  border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface-2);
-}
+/* The two-way switch of the bar (Quick look / Thorough): a segmented control on the chip paper; the chosen side is a
+   small surface card with the hard 2px edge. */
+.v4AskMode { display: inline-flex; padding: 4px; gap: 4px; border-radius: 14px; background: var(--chip); }
 .v4AskMode button {
-  min-height: 44px; padding: 0 14px; border: 0; border-radius: var(--r-pill); background: none;
-  cursor: pointer; font-size: var(--t-ui); font-weight: 600; color: var(--text-2);
+  min-height: 40px; padding: 0 12px; border: 2px solid transparent; border-radius: 10px; background: transparent;
+  cursor: pointer; font-size: 15px; font-weight: 700; color: var(--text-2);
 }
-.v4AskMode button[aria-pressed="true"] { background: var(--ink); color: var(--surface); }
+.v4AskMode button[aria-pressed="true"] { border-color: var(--hard); background: var(--surface); color: var(--ink); }
 /* Start step, Task 77 (read-f16): the old D2 Start button's rule went (it was placed by the left edge); nothing draws it since
    the bottom bar (Task 75's V4StartBar). This file places everything by start and end. */
 
-/* C4: the site's cookie bar (.consentBar, fixed at the bottom, z above this page) would cover the sticky D2 bar and
-   Start. While it shows, the D2 bar sits in the page flow instead, and the page gets room at the bottom so Start can
+/* C4: the site's cookie bar (.consentBar, fixed at the bottom, z above this page) would cover the sticky bar and
+   Start. While it shows, the bar sits in the page flow instead, and the page gets room at the bottom so Start can
    scroll clear of the cookie bar. Scoped to this page; globals.css is not touched. */
-.appShell:has(.consentBar) .v4AskBar { position: static; }
-/* V4 start step, Task 75 (ask-d2, 4 Nov night): the same for the new bottom bar, on both steps; the page's bottom room
-   below is the same .v4AskMain room. */
+/* V4 start step, Task 75 (ask-d2, 4 Nov night): the bottom bar, on both steps; the page's bottom room below is the
+   same .v4AskMain room. */
 .appShell:has(.consentBar) .v4StartBar { position: static; }
 .appShell:has(.consentBar) .v4AskMain { padding-bottom: 340px; }
 @media (min-width: 720px) {
@@ -244,46 +330,64 @@
 }
 
 /* ---- V4 start step — Task 75: the bottom bar (V4StartBar; read-d5, choose-f16, read-f9, choose-f14, r2-2) ---- */
-/* Sticky at the bottom, so Start stays in reach; logical properties only (Task 77's right-to-left check). */
+/* Sticky at the bottom, so Start stays in reach; logical properties only (Task 77's right-to-left check).
+   Design Document v2 (16b): the foot of the page, from edge to edge: surface, a hairline above it, its words in the
+   page's column (--v4-read-pad, step 2's side room; a phone's gutter otherwise). What the person gets and the share of
+   the quota with its small meter sit at the start; "How wide" and the orange Start at the end. */
 .v4StartBar {
   position: sticky; inset-block-end: 0; z-index: 20; min-width: 0;
-  margin-block: 8px 0; margin-inline: calc(-1 * var(--v4-gutter));
-  padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); padding-inline: var(--v4-gutter);
+  margin-block: 8px 0; margin-inline: calc(-1 * var(--v4-read-pad, var(--v4-gutter)));
+  padding-block: 14px calc(18px + env(safe-area-inset-bottom, 0px)); padding-inline: var(--v4-read-pad, var(--v4-gutter));
   display: flex; flex-direction: column; gap: 10px;
-  background: var(--surface); border-block-start: 1px solid var(--line-2); box-shadow: var(--shadow-chrome);
+  background: var(--surface); border-block-start: 1px solid var(--line);
 }
 /* read-f9: while a text box has focus, the bar sits in the page, so the keyboard never covers the words being typed. */
 .v4StartBar--aside { position: static; }
-@media (min-width: 768px) {
-  .v4StartBar:not(.v4StartBar--phone):not(.v4StartBar--next) {
-    margin-block: 8px 24px; margin-inline: 0; padding: 14px 20px;
-    border: 1px solid var(--line-2); border-radius: var(--r-card);
-  }
+.v4StartBarBody { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; min-width: 0; }
+.v4StartBarInfo { flex: 1 1 23.75rem; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.v4StartBarSide { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; min-width: 0; }
+.v4StartBarGet, .v4StartBarShare { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.v4StartBarGet { font-size: var(--t-body); line-height: 1.45; color: var(--text); }
+.v4StartBarShare { font-size: var(--t-ui); color: var(--text-2); font-variant-numeric: tabular-nums; }
+/* The share's meter: a thin track, this question's part of the quota in the call-to-action orange. Nothing in it moves. */
+.v4StartBarShareRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0; }
+.v4StartBarMeter {
+  display: flex; flex: none; inline-size: min(100%, 12.5rem); block-size: 8px; border-radius: 4px; overflow: hidden;
+  background: var(--track);
 }
-.v4StartBarGet, .v4StartBarShare { margin: 0; font-size: var(--t-ui); color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
-.v4StartBarShare { color: var(--text); font-variant-numeric: tabular-nums; }
+.v4StartBarMeterFill { inline-size: var(--v4-share, 0%); background: var(--cta); }
 /* read-d5: the share's number rolls to its new value (the "roll" move); with reduced motion the token makes it instant and
    the page gives the number the 1-second highlight instead. */
 .v4StartShareNumber { display: inline-block; }
 .v4StartRoll { animation: v4StartRoll var(--v4-move-roll) var(--v4-ease-move) 1; }
 @keyframes v4StartRoll { from { transform: translateY(60%); opacity: 0; } }
 .v4StartBarRow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-width: 0; }
-.v4StartBarWidths { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
-.v4StartBarWidths .v4Chip { min-height: 44px; }
-.v4StartBarLabel { font-size: var(--t-ui); font-weight: 600; color: var(--text-2); }
+.v4StartBarWidths { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.v4StartBarLabel { font-size: 14px; font-weight: 700; color: var(--text-2); }
+/* "How wide": a segmented control on the chip paper; the chosen width is a small surface card with the hard 2px edge. */
+.v4StartBarSeg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 14px; background: var(--chip); min-width: 0; }
+.v4StartBarSeg .v4Chip {
+  justify-content: center; min-height: 40px; min-width: 44px; padding: 0 12px; border-color: transparent; border-radius: 10px;
+  background: transparent; color: var(--text-2); font-size: 15px; font-weight: 700;
+}
+.v4StartBarSeg .v4Chip[aria-pressed="true"] { border-color: var(--hard); background: var(--surface); color: var(--ink); }
 .v4StartBarGo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; min-width: 0; }
-.v4StartBarStart { min-height: 44px; padding-inline: 26px; font-size: 16px; }
+/* Start never goes under a 44 px target. Design Document v2 (16b): in the bar it is the page's call to action (.v4Cta,
+   v4-base.css), a size up from Next (3.5rem is 56 px). */
+.v4StartBarStart { min-height: 44px; padding-inline: 26px; font-size: 17px; }
+.v4StartBar .v4StartBarStart { min-height: 3.5rem; }
 .v4StartBarStart[aria-busy="true"] { cursor: progress; }
+.v4StartBarArrow { flex: none; }
 .v4StartBarJust[aria-disabled="true"] { color: var(--text-3); cursor: not-allowed; text-decoration: none; }
 /* read-f24: the carry-on box is low and small. */
 .v4StartBarCarryOn { display: flex; align-items: center; gap: 8px; min-height: 44px; font-size: var(--t-meta); color: var(--text-2); }
-.v4StartBarCarryOn input { inline-size: 18px; block-size: 18px; margin: 0; flex: none; }
-.v4StartBarReady { align-self: flex-start; min-height: 44px; font-size: var(--t-ui); font-weight: 600; }
+.v4StartBarCarryOn input { inline-size: 18px; block-size: 18px; margin: 0; flex: none; accent-color: var(--brand); }
+.v4StartBarReady { align-self: flex-start; min-height: 44px; font-size: var(--t-ui); font-weight: 700; color: var(--brand); text-decoration: none; }
 /* Phone (choose-f16): line 1 (count · mode · share, then "Options ⌃") and a full-width Start; nothing more is pinned. */
-.v4StartBar--phone { gap: 8px; }
+.v4StartBar--phone { gap: 8px; padding-block: 12px calc(12px + env(safe-area-inset-bottom, 0px)); }
 .v4StartBarLine { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
 .v4StartBarLineText { flex: 1 1 0; min-width: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
-.v4StartBarOptions { min-height: 44px; font-size: var(--t-ui); font-weight: 600; text-decoration: none; }
+.v4StartBarOptions { min-height: 44px; font-size: var(--t-ui); font-weight: 700; color: var(--brand); text-decoration: none; }
 .v4StartBar--phone .v4StartBarGo { display: block; }
 .v4StartBar--phone .v4StartBarStart { inline-size: 100%; }
 .v4StartBar--slim { padding-block-start: 8px; }
@@ -292,13 +396,13 @@
 .v4StartSheet {
   position: fixed; inset-inline: 0; inset-block-end: 0; z-index: 40; max-block-size: 80vh; overflow-y: auto;
   display: flex; flex-direction: column; gap: 14px; min-width: 0;
-  padding-block: 16px calc(16px + env(safe-area-inset-bottom, 0px)); padding-inline: var(--v4-gutter);
-  background: var(--surface); border-block-start: 1px solid var(--line-2); box-shadow: var(--shadow-pop);
-  border-start-start-radius: var(--r-card); border-start-end-radius: var(--r-card);
+  padding-block: 18px calc(16px + env(safe-area-inset-bottom, 0px)); padding-inline: var(--v4-gutter);
+  background: var(--surface); border-block-start: 2px solid var(--hard); box-shadow: var(--shadow-pop);
+  border-start-start-radius: 22px; border-start-end-radius: 22px;
 }
 .v4StartSheet:focus { outline: none; }
-.v4StartSheetTitle { margin: 0; font-size: 17px; font-weight: 700; }
-.v4StartSheetDone { align-self: flex-start; min-height: 44px; }
+.v4StartSheetTitle { margin: 0; font-family: var(--font-display); font-size: 23px; line-height: 1.15; font-weight: var(--fw-display); letter-spacing: var(--ls-display); }
+.v4StartSheetDone { align-self: flex-start; min-height: 44px; border: 2px solid var(--field-border); background: transparent; font-size: 15px; font-weight: 700; }
 
 /* ---- V4 start step — Task 75b: step 1 (ask-d2 A "Steps aside", journey-d3 A, r2-4, ask-f8) ---- */
 /* On a computer Next sits right under the box: one plain row, no border, no shadow, no card look, in the page. */
@@ -307,14 +411,16 @@
   flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px 20px;
 }
 /* On a phone the pinned element holds the Free notice, a full-width Next, "Just answer it" and the grey line. */
-.v4StartBar--nextPhone { align-items: stretch; gap: 6px; }
+.v4StartBar--nextPhone { align-items: stretch; gap: 10px; }
+.v4StartBarNext { text-decoration: none; }
 .v4StartBar--nextPhone .v4StartBarNext { inline-size: 100%; justify-content: center; }
 .v4StartBar--nextPhone > .v4AskUnderNext, .v4StartBar--nextPhone > .v4AskSignInFirst { flex-basis: auto; order: 0; }
 /* The level choice: one row of three pills, one changing sentence, one grey line with "What does it change?". */
 .v4AskLevelRow { flex-wrap: nowrap; gap: 8px; min-width: 0; }
 .v4AskLevelRow .v4AskLevelChip { flex: 1 1 0; min-width: 0; justify-content: center; text-align: center; overflow-wrap: anywhere; }
 .v4AskLevelKept { overflow-wrap: anywhere; }
-.v4AskLevelWhat { min-height: 44px; font-size: var(--t-ui); }
+/* The link keeps its 44 px target without making the grey line taller. */
+.v4AskLevelWhat { min-height: 44px; margin-block: -12px; margin-inline-start: 8px; font-size: var(--t-ui); }
 
 /* ---- Start's Undo window: the card folds into the map's first card ---- */
 /* The map's first card grows from where the card was (the page sets its first transform inline, from the top left), then
@@ -323,69 +429,136 @@
 .v4FoldMoving { transition: transform var(--v4-move-fold) var(--v4-ease-move); transform-origin: 0 0; }
 
 /* ---- V4 start step — P3: the choosing card (Task 72: the path rows; choose-d3, choose-f6) ---- */
-/* Clean rows with no tick box; text may wrap anywhere; targets at least 44 px; logical properties only (Task 77 checks). */
+/* Clean rows; text may wrap anywhere; targets at least 44 px; logical properties only (Task 77 checks).
+   Design Document v2 (16b): each path is a surface row with an 18px corner and a clear 2px edge; its number and title in
+   bold 17px, its question under them in the second ink; Rewrite and the dots are quiet buttons with no edge. A row that
+   is ticked, or picked for "Combine with…", takes the brand edge and a solid 3px brand shadow. */
 .v4StartList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* Design Document v2 (16b): the row is a line of two, its tick box (the choosing card's rows) and its words in a column. */
 .v4StartRow {
-  position: relative; min-width: 0; display: flex; flex-direction: column; gap: 6px;
-  padding-block: 12px; padding-inline: 14px;
-  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card);
+  position: relative; min-width: 0; display: flex; align-items: flex-start; gap: 14px;
+  padding-block: 6px 16px; padding-inline: 18px 12px;
+  background: var(--surface); border: 2px solid transparent; border-radius: 18px;
 }
+.v4StartRowBody { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+/* Design Document v2 (16b): the tick box, "tick two to combine them": the browser's own box, 22px, in the brand colour, level
+   with the title's first line. Its label is the 44px press area around it, drawn out past the box so the box itself starts
+   at the row's edge and the words 14px after it. */
+.v4StartRowTick {
+  flex: none; display: flex; align-items: flex-start; justify-content: center; inline-size: 44px; min-block-size: 44px;
+  margin-inline: -11px; padding-block-start: 12px; cursor: pointer;
+}
+.v4StartRowTick input { flex: none; inline-size: 22px; block-size: 22px; margin: 0; accent-color: var(--brand); cursor: pointer; }
+.v4StartRowTick:has(input:disabled), .v4StartRowTick input:disabled { cursor: not-allowed; }
+/* A dig's rows (V4DigPaths) lie on the surface itself, so there their edge is a hairline colour. */
+:where(.v4DigPaths) .v4StartRow { border-color: var(--line-2); }
 .v4StartRowHead { position: relative; display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
 .v4StartRowButton {
-  flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: baseline; gap: 10px;
-  padding: 0; border: 0; background: none; cursor: pointer; text-align: start;
+  flex: 1 1 0; min-width: 0; min-height: 44px; display: flex; align-items: baseline; gap: 5px;
+  padding-block: 10px 11px; padding-inline: 0; border: 0; background: none; cursor: pointer; text-align: start;
+  font-size: 17px; font-weight: 700; line-height: 1.35;
 }
-.v4StartRowNumber { flex: none; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text-3); }
-.v4StartRowTitle { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-.v4StartRowControls { display: flex; flex: none; align-items: center; gap: 6px; }
-.v4StartRowRewrite, .v4StartRowMore { min-height: 44px; min-width: 44px; padding-inline: 12px; }
+.v4StartRowNumber { flex: none; font-variant-numeric: tabular-nums; font-weight: 700; }
+.v4StartRowNumber::after { content: "."; }
+.v4StartRowTitle { min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
+.v4StartRowControls { display: flex; flex: none; align-items: center; gap: 2px; }
+.v4StartRowRewrite, .v4StartRowMore { min-height: 44px; min-width: 44px; padding-inline: 10px; }
+.v4StartRowControls .v4Btn { border: 0; border-radius: 10px; background: transparent; color: var(--text-2); font-size: 14px; font-weight: 700; gap: 6px; }
+.v4StartRowControls .v4Btn:hover, .v4StartRowControls .v4Btn[aria-expanded="true"] { background: var(--chip); color: var(--ink); }
+.v4StartRowMore > span { font-size: 22px; line-height: 1; }
 .v4StartRowQuestion, .v4StartRowWriting, .v4StartRewordLine, .v4StartRowTogetherLine, .v4StartRowTag {
   margin: 0; min-width: 0; overflow-wrap: anywhere;
 }
-.v4StartRowQuestion { color: var(--text-2); }
-.v4StartRowWriting { font-size: var(--t-meta); font-style: italic; color: var(--text-2); }
-.v4StartRowTogetherLine, .v4StartRowTag { font-size: var(--t-meta); color: var(--text-3); }
-.v4StartRowSplit { min-height: 44px; font-size: var(--t-meta); }
-.v4StartRowNew { font-weight: 600; color: var(--con-text); }
-/* The chips wrap: a path holds any number of viewpoints (owner answer "Four per path" A, 5 Nov). */
-.v4StartRowTogether { position: relative; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.v4StartChips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+/* The question starts right under the title's line, beside the buttons' room. */
+.v4StartRowQuestion { margin-block-start: -11px; font-size: 15px; line-height: 1.5; color: var(--text-2); }
+.v4StartRowWriting, .v4StartRewordLine { font-size: var(--t-ui); color: var(--text-2); }
+.v4StartRowTogetherLine { font-size: var(--t-ui); color: var(--text-2); }
+/* The tag: its words in a small brand pill; "Split" beside it is a small outlined button, its target still 44 px tall. */
+.v4StartRowTag { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--t-ui); color: var(--text-2); }
+.v4StartRowTagWord {
+  display: inline-flex; align-items: center; min-height: 26px; padding-block: 2px; padding-inline: 10px; border-radius: 13px;
+  background: var(--brand); color: var(--on-brand); font-size: 12.5px; font-weight: 700;
+}
+.v4StartRowSplit {
+  position: relative; display: inline-flex; align-items: center; min-height: 36px; padding-inline: 12px;
+  border: 2px solid var(--field-border); border-radius: 10px; background: transparent; color: var(--ink);
+  font-size: var(--t-ui); font-weight: 700; text-decoration: none;
+}
+.v4StartRowSplit::after { content: ""; position: absolute; inset-inline: 0; inset-block: -6px; }
+.v4StartRowSplit:hover { border-color: var(--hard); }
+.v4StartRowNew { font-weight: 700; color: var(--con-text); }
+/* The chips wrap: a path holds any number of viewpoints (owner answer "Four per path" A, 5 Nov). Their line and they
+   share one wrapping row; each is a low pill on the chip paper, its target still 44 px tall. */
+.v4StartRowTogether { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; margin-block-start: 4px; }
+.v4StartChips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 .v4StartChipItem { min-width: 0; max-inline-size: 100%; }
-.v4StartChip { min-height: 44px; min-width: 0; max-inline-size: 100%; text-align: start; overflow-wrap: anywhere; font-weight: 500; }
-/* "Combine with…": the picked row, and the rows that can be pressed to combine with it. */
-.v4StartRow--picked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.v4StartChip {
+  position: relative; min-height: 30px; min-width: 0; max-inline-size: 100%; padding-block: 4px; padding-inline: 12px;
+  border: 0; border-radius: 15px; background: var(--chip); text-align: start; overflow-wrap: anywhere; font-weight: 700;
+}
+.v4StartChip::after { content: ""; position: absolute; inset-inline: 0; inset-block: -7px; }
+.v4StartChip:hover, .v4StartChip[aria-expanded="true"] { background: var(--track); }
+/* A ticked row (Design Document v2, 16b), which is also the row picked for "Combine with…"; and, while one is picked, the
+   rows that can be pressed to combine with it. */
+.v4StartRow--picked { border-color: var(--brand); box-shadow: 0 3px 0 var(--brand); }
 .v4StartRow--pickable { cursor: pointer; }
-.v4StartRow--pickable:hover { background: var(--surface-2); }
+.v4StartRow--pickable:hover { border-color: var(--accent-border); }
 /* The snap (one of the six moves) on its token; under reduced motion the page gives the 1-second highlight instead. */
 .v4StartRow--snap { animation: v4StartSnap var(--v4-move-snap) var(--v4-ease-move) 1; }
 @keyframes v4StartSnap { from { transform: scale(.97); opacity: .6; } }
-/* The ⋯ menus, under their opener's line, at its end (a row's line, or its chips). */
+/* The ⋯ menus, under their opener's line, at its end (a row's line, or its chips): a small hard card. */
 .v4StartMenu {
   position: absolute; inset-inline-end: 0; inset-block-start: 100%; z-index: 30; inline-size: max-content; max-inline-size: 100%;
-  display: flex; flex-direction: column; padding-block: 6px;
-  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-btn); box-shadow: var(--shadow-pop);
+  display: flex; flex-direction: column; padding-block: 6px; overflow: hidden;
+  background: var(--surface); border: 2px solid var(--hard); border-radius: 14px; box-shadow: 0 4px 0 var(--hard-shadow);
 }
 .v4StartMenuItem {
   min-height: 44px; padding-inline: 14px; border: 0; background: none; cursor: pointer; text-align: start; overflow-wrap: anywhere;
+  font-size: 15px; font-weight: 600;
 }
-.v4StartMenuItem:hover, .v4StartMenuItem:focus { background: var(--surface-2); }
+.v4StartMenuItem:hover, .v4StartMenuItem:focus { background: var(--chip); }
 .v4StartMenuItem[aria-disabled="true"] { color: var(--text-3); cursor: not-allowed; }
 /* Rewrite in place, and "Rewrite it for me / Keep my wording". */
 .v4StartRewrite, .v4StartReword { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.v4StartRewriteLabel { font-size: var(--t-ui); font-weight: 600; }
+.v4StartRewriteLabel { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .v4StartRewriteField {
-  min-width: 0; min-height: 44px; padding-block: 8px; padding-inline: 12px; font: inherit; color: var(--text);
-  background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--r-btn);
+  min-width: 0; min-height: 44px; padding-block: 10px; padding-inline: 14px; font: inherit; font-size: 15px; color: var(--ink);
+  background: var(--field); border: 1px solid var(--field-border); border-radius: var(--r-btn);
 }
+.v4StartRewriteField:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--accent-halo); }
 .v4StartRewriteWording { resize: vertical; }
-.v4StartRewriteActions, .v4StartRewordActions { display: flex; flex-wrap: wrap; gap: 8px; }
-/* The combine line, above a slimmer Start bar. */
-.v4StartCombineBar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; }
+.v4StartRewriteActions, .v4StartRewordActions { display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: 4px; }
+/* The combine line: a band in the hard ink, its words and its button in the surface colour. Above a slimmer Start bar it
+   runs across the foot, from edge to edge; in a dig's panel it is a band of its own. */
+.v4StartCombineBar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; min-width: 0;
+  padding-block: 12px; padding-inline: 16px; border-radius: var(--r-btn);
+  background: var(--hard); color: var(--surface); font-size: 15px; line-height: 1.45;
+}
+.v4StartBar .v4StartCombineBar {
+  margin-inline: calc(-1 * var(--v4-read-pad, var(--v4-gutter))); padding-inline: var(--v4-read-pad, var(--v4-gutter)); border-radius: 0;
+}
+.v4StartBar > .v4StartCombineBar:first-child { margin-block-start: -14px; }
+.v4StartBar--slim > .v4StartBarCombine:first-child { margin-block-start: -8px; }
 .v4StartCombineBarPick, .v4StartCombineBarFrees { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.v4StartCombineBarPick { flex: 1 1 100%; font-weight: 600; }
-.v4StartCombineBarFrees { font-size: var(--t-ui); color: var(--text-2); }
+.v4StartCombineBarPick { flex: 1 1 100%; font-weight: 700; }
+.v4StartCombineBarFrees { flex: 1 1 12em; color: inherit; }
+.v4StartCombineBar .v4ShareChange { color: inherit; }
+.v4StartCombineBarCancel { border: 2px solid var(--surface); background: transparent; color: var(--surface); font-size: 15px; font-weight: 700; }
+.v4StartCombineBarCancel:hover { background: var(--surface); color: var(--hard); }
+.v4StartCombineBar :focus-visible { outline-color: var(--surface); }
+/* Design Document v2 (16b): two paths ticked. "2 picked · Combining frees 1 path", the count in bold, then two buttons with
+   the surface colour's 2px edge: Combine filled with it (its word in the hard ink), Keep apart see-through. */
+.v4StartCombineBar--ticked { row-gap: 10px; }
+.v4StartCombineBarLine { flex: 1 1 21.25rem; margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.v4StartCombineBarActions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+.v4StartCombineBarActions .v4Btn { padding-inline: 16px; }
+.v4StartCombineBarGo { border: 2px solid var(--surface); background: var(--surface); color: var(--hard); font-size: 15px; font-weight: 700; }
+.v4StartCombineBarGo:hover { background: var(--surface-2); }
 /* Phone (choose-f6): the title takes the whole row; the controls sit on a line under it. */
+.v4StartRow--narrow { padding-block-start: 10px; }
 .v4StartRow--narrow .v4StartRowHead { flex-direction: column; align-items: stretch; }
+.v4StartRow--narrow .v4StartRowQuestion { margin-block-start: 0; }
 .v4StartRowTitle--full { flex: 1 1 100%; inline-size: 100%; }
 .v4StartRow--narrow .v4StartRowControls { justify-content: flex-end; }
 /* ---- V4 start step — Task 77: drag with a mouse, drop labels, the phone, right to left (choose-d3, choose-f6, choose-f17) ---- */
@@ -398,133 +571,185 @@
 }
 .v4StartRowGrip:hover { color: var(--text-2); }
 @media (max-width: 600px) { .v4StartRowGrip { display: none; } }
+/* Beside the grip, what follows the title's line starts under the title (the grip's 24 px and the line's 8 px gap). */
+.v4StartRow:has(.v4StartRowGrip) .v4StartRowBody > :is(.v4StartRowQuestion, .v4StartRowWriting, .v4StartReword, .v4StartRowTogether, .v4StartRowTag, .v4StartRewrite) {
+  margin-inline-start: 32px;
+}
 .v4StartList--dragging { cursor: grabbing; user-select: none; }
 .v4StartList--dragging * { cursor: grabbing; }
 .v4StartRow--dragged, .v4StartChip--dragged { opacity: .55; }
-.v4StartRow--drop { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.v4StartRow--drop { border-color: var(--accent); box-shadow: 0 3px 0 var(--accent); }
 .v4StartGap {
-  position: absolute; inset-inline: 0; inset-block-start: -16px; block-size: 20px; z-index: 2; min-width: 0;
+  position: absolute; inset-inline: 0; inset-block-start: -17px; block-size: 20px; z-index: 2; min-width: 0;
   display: flex; align-items: center; justify-content: center;
 }
-.v4StartGap--after { inset-block-start: auto; inset-block-end: -16px; }
+.v4StartGap--after { inset-block-start: auto; inset-block-end: -17px; }
 .v4StartGap--over::before {
   content: ""; position: absolute; inset-inline: 0; inset-block-start: 9px; block-size: 2px; border-radius: 1px; background: var(--accent);
 }
 .v4StartDropLabel {
   position: relative; z-index: 1; min-width: 0; max-inline-size: 100%; overflow-wrap: anywhere; pointer-events: none;
-  padding-block: 2px; padding-inline: 10px; border: 1px solid var(--accent); border-radius: var(--r-pill);
-  background: var(--surface); color: var(--con-text); font-size: var(--t-meta); font-weight: 600;
+  padding-block: 2px; padding-inline: 10px; border: 2px solid var(--accent); border-radius: var(--r-pill);
+  background: var(--surface); color: var(--con-text); font-size: var(--t-meta); font-weight: 700;
 }
 .v4StartRow > .v4StartDropLabel { position: absolute; inset-block-end: 6px; inset-inline-end: 8px; max-inline-size: calc(100% - 16px); }
 /* ---- V4 start step — P3: the card (Task 73: the waiting band, why a list is missing, notices, your own path) ---- */
 /* Logical properties only, no px value above 44 (Task 77 checks); the places are the only dashed thing (owner answer Q6). */
-.v4StartCard { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v4StartCard { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .v4StartCardTitle { overflow-wrap: anywhere; }
+/* Design Document v2 (16b): the title and, at the end of its line (under it when there is no room), the quiet hint:
+   "5 paths · most important first · tick two to combine them". */
+.v4StartCardHead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; min-width: 0; }
+.v4StartCardHint { margin: 0; min-width: 0; overflow-wrap: anywhere; font-size: 14px; color: var(--text-2); }
 .v4StartCardLine, .v4StartMissing, .v4StartNarrowed, .v4StartLate, .v4StartFold, .v4StartPlacesMore {
   margin: 0; min-width: 0; overflow-wrap: anywhere;
 }
-.v4StartCardLine, .v4StartLate, .v4StartPlacesMore { font-size: var(--t-meta); color: var(--text-3); }
+.v4StartCardLine { font-size: 14px; color: var(--text-2); }
+.v4StartLate, .v4StartPlacesMore { font-size: var(--t-ui); color: var(--text-2); }
 /* The waiting band: low paper, like unmapped ground; the question's dot at its start edge, one dot per AI. */
 .v4StartBand {
   display: flex; flex-direction: column; gap: 10px; min-width: 0;
-  padding-block: 14px; padding-inline: 14px; background: var(--surface-sunken); border-radius: var(--r-card);
+  padding-block: 16px; padding-inline: 18px; background: var(--surface-sunken); border-radius: 18px;
 }
 .v4StartBandTrack { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .v4StartBandQuestion { flex: none; inline-size: 12px; block-size: 12px; border-radius: 50%; background: var(--ink); }
 .v4StartDots { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
-.v4StartDot { inline-size: 8px; block-size: 8px; border-radius: 50%; background: var(--line-strong); }
-.v4StartDot--lit { background: var(--accent); }
+.v4StartDot { inline-size: 8px; block-size: 8px; border-radius: 50%; border: 1.5px solid var(--line-strong); }
+.v4StartDot--lit { background: var(--accent); border-color: var(--accent); }
 .v4StartBandStatus { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text-2); }
 .v4StartBandCount { color: var(--text-3); }
 .v4StartPlaces { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-/* A place the size of a real row: its padding and its 44 px line. */
-.v4StartPlace { min-block-size: 44px; padding-block: 12px; border-radius: var(--r-card); border: 1.5px solid transparent; }
-.v4StartPlace--dashed { border-style: dashed; border-color: var(--line-strong); }
+/* A place the size of a real row: its padding and its 44 px line, its corner and its 2px edge. */
+.v4StartPlace { min-block-size: 44px; padding-block: 16px; border-radius: 18px; border: 2px solid transparent; }
+.v4StartPlace--dashed { border-style: dashed; border-color: var(--dashed); }
 /* At READY the band clears (the "clear" move, under 0.5 s; instant with reduced motion through its token). */
-.v4StartRows { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.v4StartRows { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .v4StartRows--clear { animation: v4StartClear var(--v4-move-clear) var(--v4-ease-move) 1; }
 @keyframes v4StartClear { from { opacity: .4; background-color: var(--surface-sunken); } }
 /* One notice at a time above the list (choose-f16), with narrowing's own Undo. */
 .v4StartNotice {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0;
-  padding-block: 8px; padding-inline: 12px; background: var(--surface-2); border-radius: var(--r-btn);
+  padding-block: 10px; padding-inline: 14px; background: var(--surface-2); border-radius: var(--r-btn);
 }
 .v4StartNotice p { margin: 0; flex: 1 1 0; min-width: 0; overflow-wrap: anywhere; }
 .v4StartNoticeUndo, .v4StartUndo, .v4StartFoldShow { min-height: 44px; }
 .v4StartTools { display: flex; justify-content: flex-end; }
 /* Your own path, its fit and the full-list choice. */
 .v4StartOwn { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.v4StartOwnLabel { font-weight: 600; }
+.v4StartOwnLabel { font-size: 14px; font-weight: 700; color: var(--text-2); }
 .v4StartOwnHint, .v4StartOwnMessage { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.v4StartOwnHint { font-size: var(--t-meta); color: var(--text-3); }
-.v4StartOwnRow { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.v4StartOwnHint { font-size: var(--t-ui); color: var(--text-3); }
+.v4StartOwnRow { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .v4StartOwnField {
-  flex: 1 1 0; min-width: 0; min-height: 44px; padding-block: 8px; padding-inline: 12px; font: inherit; color: var(--text);
-  background: var(--surface); border: 1.5px solid var(--line-strong); border-radius: var(--r-btn); resize: vertical;
+  flex: 1 1 0; min-width: 0; min-height: 44px; padding-block: 10px; padding-inline: 14px; font: inherit; font-size: 15px; color: var(--ink);
+  background: var(--field); border: 1px solid var(--field-border); border-radius: var(--r-btn); resize: vertical;
 }
+.v4StartOwnField:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--accent-halo); }
 .v4StartOwnAdd, .v4StartOwnPick { min-height: 44px; }
 .v4StartOwnPick { text-align: start; overflow-wrap: anywhere; }
 .v4StartOwnChoice { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+/* Design Document v2 (16b): the card's own buttons are 44 px, bold, with a 2px edge on a clear ground; the one that
+   says yes (Save, a suggestion's first button) is filled with the brand colour. */
+.v4StartRewriteActions .v4Btn, .v4StartRewordActions .v4Btn, .v4StartSuggestionActions .v4Btn, .v4StartFullButtons .v4Btn,
+.v4StartOwnChoice .v4Btn, .v4StartOwnAdd, .v4StartNoticeUndo, .v4StartUndo {
+  padding-inline: 16px; border: 2px solid var(--field-border); background: transparent; color: var(--ink); font-size: 15px; font-weight: 700;
+}
+.v4StartRewriteActions .v4Btn:hover, .v4StartRewordActions .v4Btn:hover, .v4StartSuggestionActions .v4Btn:hover, .v4StartFullButtons .v4Btn:hover,
+.v4StartOwnChoice .v4Btn:hover, .v4StartOwnAdd:hover, .v4StartNoticeUndo:hover, .v4StartUndo:hover { border-color: var(--hard); }
+.v4StartRewriteActions .v4BtnPrimary, .v4StartSuggestionActions .v4Btn:first-child,
+.v4StartRewriteActions .v4BtnPrimary:hover, .v4StartSuggestionActions .v4Btn:first-child:hover {
+  border-color: var(--brand); background: var(--brand); color: var(--on-brand);
+}
 
 /* ---- V4 start step — P3: more to explore, another way to see it, suggestions (Task 74; choose-f18, choose-f6, choose-f7) ---- */
-/* Logical properties only, no px value above 44 outside the media queries (Task 77 checks); nothing here is dashed. */
+/* Logical properties only, no px value above 44 outside the media queries (Task 77 checks).
+   Design Document v2 (16b): a way to see the question and a suggestion are offers, not yet part of the plan, so each is a
+   surface card with a broken 2px edge; a way that was added takes the solid brand edge. */
 /* "Another way to see it" (spec §2 item 4): the cards side by side, snapping as they scroll; on a phone each takes most of the row. */
-.v4StartWaysBlock { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.v4StartWaysTitle { margin: 0; font-size: var(--t-ui); font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
+.v4StartWaysBlock { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.v4StartWaysTitle {
+  margin: 0; font-family: var(--font-display); font-size: 20px; line-height: 1.15; font-weight: var(--fw-display);
+  letter-spacing: var(--ls-display); color: var(--ink); overflow-wrap: anywhere;
+}
 .v4StartWays {
-  list-style: none; margin: 0; padding: 0; display: flex; gap: 10px; min-width: 0;
+  list-style: none; margin: 0; padding: 0; display: flex; gap: 16px; min-width: 0;
   overflow-x: auto; scroll-snap-type: inline mandatory; overscroll-behavior-inline: contain;
 }
-.v4StartWay { flex: 1 1 0; min-width: 0; scroll-snap-align: start; display: flex; flex-direction: column; gap: 6px;
-  padding-block: 12px; padding-inline: 14px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); }
+.v4StartWay { flex: 1 1 0; min-width: 0; scroll-snap-align: start; display: flex; flex-direction: column; gap: 10px;
+  padding-block: 18px; padding-inline: 18px; background: var(--surface); border: 2px dashed var(--dashed); border-radius: 18px; }
+.v4StartWay:has(.v4StartWayAdded) { border-style: solid; border-color: var(--brand); }
 @media (max-width: 600px) { .v4StartWay { flex: 0 0 85%; } }
-.v4StartWayKind { margin: 0; font-size: var(--t-meta); font-weight: 600; color: var(--text-3); overflow-wrap: anywhere; }
+.v4StartWayKind { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); overflow-wrap: anywhere; }
 .v4StartWaySentence, .v4StartWayAdded, .v4StartWaySwapped, .v4StartWayNoRoom { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.v4StartWayAdded { font-weight: 600; }
+.v4StartWaySentence { font-size: 16px; line-height: 1.5; }
+/* "Added as its own path": the brand-filled mark where the card's button was. */
+.v4StartWayAdded {
+  align-self: flex-start; margin-block-start: auto; display: inline-flex; align-items: center; min-height: 44px;
+  padding-block: 6px; padding-inline: 14px; border-radius: var(--r-btn); background: var(--brand); color: var(--on-brand);
+  font-size: 14.5px; font-weight: 700;
+}
+.v4StartWayAdded:focus { outline: none; }
+.v4StartWaySwapped { font-size: var(--t-ui); font-weight: 700; color: var(--con-text); }
 .v4StartWayNoRoom { font-size: var(--t-ui); color: var(--text-2); }
 .v4StartWayActions { display: flex; flex-wrap: wrap; gap: 8px; margin-block-start: auto; min-width: 0; }
+.v4StartWayAdded ~ .v4StartWayActions { margin-block-start: 0; }
 .v4StartWayActions .v4Btn, .v4StartSuggestionActions .v4Btn, .v4StartFullButtons .v4Btn, .v4StartMoreOpen, .v4StartMoreAdd, .v4StartMoreDone {
   min-height: 44px; text-align: start; overflow-wrap: anywhere;
 }
+/* A card's own button, and an idea's in the drawer: the hard 2px edge on the surface. */
+.v4StartWayActions .v4Btn, .v4StartMoreAdd {
+  padding-inline: 14px; border: 2px solid var(--hard); background: var(--surface); color: var(--ink); font-size: 14.5px; font-weight: 700;
+}
+.v4StartWayActions .v4Btn:hover, .v4StartMoreAdd:hover { background: var(--chip); }
 /* The one-tap suggestions (spec §2 item 5), at most two; the list takes the focus after a press. */
 .v4StartSuggest { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .v4StartSuggest:focus { outline: none; }
 .v4StartSuggestion {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-width: 0;
-  padding-block: 8px; padding-inline: 12px; background: var(--surface-2); border-radius: var(--r-btn);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; min-width: 0;
+  padding-block: 12px; padding-inline: 18px 14px; background: var(--surface); border: 2px dashed var(--dashed); border-radius: 16px;
 }
-.v4StartSuggestionLine { margin: 0; flex: 1 1 100%; min-width: 0; overflow-wrap: anywhere; }
+.v4StartSuggestionIcon { flex: none; color: var(--brand); }
+.v4StartSuggestionLine { margin: 0; flex: 1 1 22.5rem; min-width: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
 .v4StartSuggestionActions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
 /* choose-f6: hovering or focusing a suggestion outlines the paths it names. */
 .v4StartRow--named { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* "+ N more to explore" and its drawer: on a computer a panel at the end side, so the list stays readable beside it; at 600 px
-   or less a full-screen sheet. It appears at once (sliding is not one of the six moves). */
-.v4StartMoreOpen { align-self: flex-start; }
+   or less a full-screen sheet. It appears at once (sliding is not one of the six moves). The opener is a quiet brand-coloured
+   button with no edge; the drawer has the hard 2px edge at its start side. */
+.v4StartMoreOpen {
+  align-self: flex-start; padding-inline: 14px; border: 0; background: transparent; color: var(--brand); font-size: 15px; font-weight: 700;
+}
+.v4StartMoreOpen:hover { background: var(--chip); }
 .v4StartMore {
   position: fixed; inset-block: 0; inset-inline-end: 0; z-index: 40; inline-size: min(26rem, 100%); overflow-y: auto;
   display: flex; flex-direction: column; gap: 14px; min-width: 0;
-  padding-block: 16px calc(16px + env(safe-area-inset-bottom, 0px)); padding-inline: var(--v4-gutter);
-  background: var(--surface); border-inline-start: 1px solid var(--line-2); box-shadow: var(--shadow-pop);
+  padding-block: 18px calc(16px + env(safe-area-inset-bottom, 0px)); padding-inline: var(--v4-gutter);
+  background: var(--bg); border-inline-start: 2px solid var(--hard); box-shadow: var(--shadow-pop);
 }
 @media (max-width: 600px) { .v4StartMore { inset: 0; width: 100%; } }
 .v4StartMore:focus { outline: none; }
 .v4StartMore--sheet { border-inline-start: 0; }
 .v4StartMoreTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
-.v4StartMoreHead { margin: 0; min-width: 0; font-size: 17px; font-weight: 700; overflow-wrap: anywhere; }
-.v4StartMoreStatus { margin: 0; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.v4StartMoreHead {
+  margin: 0; min-width: 0; font-family: var(--font-display); font-size: 23px; line-height: 1.15; font-weight: var(--fw-display);
+  letter-spacing: var(--ls-display); overflow-wrap: anywhere;
+}
+.v4StartMoreDone { padding-inline: 16px; border: 2px solid var(--field-border); background: transparent; font-size: 15px; font-weight: 700; }
+.v4StartMoreDone:hover { border-color: var(--hard); }
+.v4StartMoreStatus { margin: 0; min-width: 0; font-weight: 700; overflow-wrap: anywhere; }
 .v4StartMoreSection, .v4StartMoreGroup { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.v4StartMoreSectionTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; }
-.v4StartMoreGroupTitle { margin: 0; font-size: var(--t-meta); font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
-.v4StartMoreList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.v4StartMoreSectionTitle { margin: 0; font-size: 16px; font-weight: 700; }
+.v4StartMoreGroupTitle { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-2); overflow-wrap: anywhere; }
+.v4StartMoreList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .v4StartMoreIdea {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0;
-  padding-block: 10px; padding-inline: 12px; border: 1px solid var(--line-2); border-radius: var(--r-card);
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0;
+  padding-block: 14px; padding-inline: 16px; background: var(--surface); border: 2px solid transparent; border-radius: 18px;
 }
 .v4StartMoreIdeaArea, .v4StartMoreIdeaHead, .v4StartMoreIdeaQuestion { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.v4StartMoreIdeaArea { font-size: var(--t-meta); color: var(--text-3); }
-.v4StartMoreIdeaTitle { font-weight: 600; }
-.v4StartMoreIdeaQuestion { font-size: var(--t-ui); color: var(--text-2); }
-.v4StartMoreNew { font-weight: 600; color: var(--con-text); }
+.v4StartMoreIdeaArea { font-size: 13px; font-weight: 700; color: var(--text-2); }
+.v4StartMoreIdeaTitle { font-size: 16px; font-weight: 700; }
+.v4StartMoreIdeaQuestion { font-size: 15px; line-height: 1.5; color: var(--text-2); }
+.v4StartMoreNew { font-weight: 700; color: var(--con-text); }
 /* A full list's choice for an idea or a card (choose-f7), under it. */
 .v4StartFull { display: flex; flex-direction: column; gap: 6px; min-width: 0; align-self: stretch; }
 .v4StartFullLine, .v4StartFullError { margin: 0; min-width: 0; font-size: var(--t-ui); overflow-wrap: anywhere; }
@@ -567,9 +792,9 @@
 }
 .v4AskHeldFold { grid-template-rows: 0fr; opacity: 0; }
 .v4AskHeldInner { min-block-size: 0; overflow: hidden; display: flex; flex-direction: column; gap: 10px; }
-.v4AskHeldBar { inline-size: 40%; block-size: 12px; border-radius: 6px; background: var(--surface-2); }
-.v4AskHeldPills { display: flex; flex-wrap: wrap; gap: 8px 10px; }
-.v4AskHeldPill { inline-size: 6em; block-size: 44px; border-radius: var(--r-pill); border: 1.5px solid var(--line-2); }
+.v4AskHeldBar { inline-size: 40%; block-size: 12px; border-radius: 6px; background: var(--chip); }
+.v4AskHeldPills { display: flex; flex-wrap: wrap; gap: 10px; }
+.v4AskHeldPill { inline-size: 6em; block-size: 44px; border-radius: 22px; border: 2px solid var(--line-2); }
 /* The questions, with the card's own gaps (the answered ones' fold included); their arrival. */
 .v4AskQuestions { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
 .v4AskQuestions .v4StartFoldBox:not([hidden]) { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
@@ -593,22 +818,32 @@
 .v4AskPutBack[aria-disabled="true"] { color: var(--text-3); cursor: not-allowed; text-decoration: none; }
 
 /* ---- V4 start step — Task 76f: "Not started yet" (owner card "Where shown"; answer S3 A) ---- */
-/* Under the question box and its lines, above "Your maps", in the shelf's quiet look. Each line: the question on one line, cut with
-   "…" (the whole question is its title), the day it was saved, then Pick up and Delete as full touch targets. On a phone the two
-   buttons wrap under the question. Logical properties only (Task 77's right-to-left check). */
-.v4NotStarted { border-block-start: 1px solid var(--line-2); padding-block-start: 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+/* Under the question box and its lines, above "Your maps", in the shelf's quiet look.
+   Design Document v2 (16a, 18b): each kept question is a small card like the shelf's (surface, a hairline, a 14px corner):
+   the question, cut after two lines (the whole question is its title), then Pick up in the link colour and bold, Delete in
+   the second ink, and the day it was saved at the end of that line. The two buttons keep their 44 px targets without making
+   the card taller. Logical properties only (Task 77's right-to-left check). */
+.v4NotStarted { border-block-start: 1px solid var(--line-2); padding-block-start: 20px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .v4NotStartedTitle { margin: 0; font-size: var(--t-ui); font-weight: 700; color: var(--text-2); }
-.v4NotStartedList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.v4NotStartedItem { display: flex; flex-wrap: wrap; align-items: center; gap: 0 12px; min-width: 0; }
-.v4NotStartedQuestion {
-  flex: 1 1 12em; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 600; color: var(--ink);
+.v4NotStartedList {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17.5rem), 1fr)); align-items: start;
 }
-.v4NotStartedDay { font-size: var(--t-meta); color: var(--text-2); white-space: nowrap; }
-.v4NotStartedActions { display: inline-flex; gap: 4px 16px; }
+.v4NotStartedItem {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px 12px; min-width: 0;
+  padding-block: 12px; padding-inline: 14px; background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card);
+}
+.v4NotStartedQuestion {
+  grid-column: 1 / -1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  line-height: 1.4; font-weight: 600; color: var(--ink); overflow-wrap: anywhere;
+}
+.v4NotStartedDay { grid-column: 2; grid-row: 2; font-size: var(--t-meta); color: var(--text-2); white-space: nowrap; }
+.v4NotStartedActions { grid-column: 1; grid-row: 2; display: inline-flex; flex-wrap: wrap; gap: 0 14px; min-width: 0; font-size: var(--t-ui); }
 .v4NotStartedPickUp, .v4NotStartedDelete, .v4NotStartedAll { min-block-size: 44px; display: inline-flex; align-items: center; }
-.v4NotStartedAll { align-self: flex-start; }
+.v4NotStartedPickUp, .v4NotStartedDelete { margin-block: -12px; text-decoration: none; }
+.v4NotStartedPickUp { color: var(--link); font-weight: 600; }
+.v4NotStartedDelete { color: var(--text-2); }
+.v4NotStartedPickUp:hover, .v4NotStartedDelete:hover { text-decoration: underline; }
+.v4NotStartedAll { align-self: flex-start; font-size: var(--t-ui); }
 /* The lines that say why the account stopped keeping this question (another window, 20 kept, signed out): plain notices. */
 .v4AskSavedStopped { color: var(--text); overflow-wrap: anywhere; }
-@media (max-width: 600px) {
-  .v4NotStartedQuestion { flex-basis: 100%; }
-}

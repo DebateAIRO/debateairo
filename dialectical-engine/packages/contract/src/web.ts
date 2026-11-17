@@ -60,6 +60,9 @@ export const WEB_CONTRACT_LIMITS = Object.freeze({
   clarifyAnswersMin: 2,
   clarifyAnswersMax: 4,
   clarifyAnswerMaxChars: 120,
+  /** Design Document v2 (16b): the question said back in one sentence. Its parts, and how long a stretch of plain words may be. */
+  clarifyRestatementPartsMax: 24,
+  clarifyRestatementTextMaxChars: 500,
   /** The person's own angles on the ask page (step 2), each one line. */
   anglesMax: 5,
   /** The main answer's automatic versions served with it, newest last (decision 3). */
@@ -792,8 +795,15 @@ const PurposeLineSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.purpo
  * V4 start step, Task 50b (owner answer Q4; "Goal in answer": "Always say it"): `cares`, on the answer to "What do you care about most?"
  * (the clarifying call's `cares` question, an offered or a typed answer), set by the page at Start; the run reads a stated goal from it,
  * never from the words. Absent on every other answer, and on every line stored before (a widening only).
+ * Design Document v2 (16b; owner answer of 17 Nov 2026: "apply them"): `assumed`, on an answer the person did not give: the answer the
+ * reading assumed for a question they left as it was, sent by the page at Start while the sentence that shows it is on screen. The
+ * question's own text never says it (the page writes only the person's answers into the question), so the investigation reads it as a
+ * line of its own (`purposeLinesUnsaid`). An assumed answer is never a stated goal: it never carries `cares`. Absent on every answer
+ * the person gave, and on every line stored before (a widening only).
  */
-export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema, cares: z.literal(true).optional() }).strict();
+export const PurposeAnswerSchema = z.object({ question: PurposeLineSchema, answer: PurposeLineSchema, cares: z.literal(true).optional(),
+  assumed: z.literal(true).optional() }).strict()
+  .refine((answer) => answer.assumed !== true || answer.cares !== true, { message: "an assumed answer is not a stated goal", path: ["cares"] });
 export type PurposeAnswer = z.infer<typeof PurposeAnswerSchema>;
 
 /**
@@ -831,11 +841,13 @@ export function purposeAnswerSentence(answer: PurposeAnswer): string {
  * V4 start step, Task 36 (read-d3): with `answersSaid`, the line already says every answer (the v2 page writes each one into the
  * question as a sentence, which the person may then reword or take out), so `answers` are left out as said; the other lines are read
  * as before. Without it, today's lines, byte for byte.
+ * Design Document v2 (16b): an `assumed` answer is one the page never wrote into the question, so it is read as a line of its own
+ * even with `answersSaid`; that is how an assumption the person left unchanged reaches the question check and the investigation.
  */
 export function purposeLinesUnsaid(questionLine: string, lines: PurposeLines | null | undefined,
   options?: Readonly<{ answersSaid?: true }>): readonly string[] {
   if (lines === null || lines === undefined) return Object.freeze([]);
-  const answers = options?.answersSaid === true ? [] : (lines.answers ?? []).map(purposeAnswerSentence);
+  const answers = (lines.answers ?? []).filter((answer) => options?.answersSaid !== true || answer.assumed === true).map(purposeAnswerSentence);
   const all = [lines.place, lines.time, lines.purpose, ...answers, lines.matters, ...(lines.angles ?? [])];
   return Object.freeze(all.filter((line): line is string => line !== undefined && !questionLine.includes(line)));
 }
@@ -871,7 +883,7 @@ const ClarifyAnswerSchema = z.string().trim().min(1).max(WEB_CONTRACT_LIMITS.cla
 
 /**
  * Decision 29: one question to the person, with the answers to choose from. "Other" is the page's own, never the AI's.
- * V4 start step, Task 76d (owner answer Q5; version 2 of the call, sealed only through Task 92): `sentences`, the small AI's own sentence
+ * V4 start step, Task 76d (owner answer Q5; version 2 of the call, asked since 17 Nov inside the sealed version 3): `sentences`, the small AI's own sentence
  * for each answer, in the person's voice ("I mean the next 25 years."), exactly one per answer and in the same order; `about_place`, on
  * the one question that asks where (the page puts the site's country first among its answers). Both are absent from a version 1 reply.
  */
@@ -886,7 +898,7 @@ export type ClarifyQuestion = z.infer<typeof ClarifyQuestionSchema>;
 
 /**
  * read-f1 (Task 76d): the questions the page showed for an earlier wording of the question (the AI's, the purpose question and the care
- * question) and the answers the person gave them. The API reads it only once version 2 of the call is sealed.
+ * question) and the answers the person gave them. The API reads it under version 2's words, which the sealed version 3 holds.
  */
 export const AskClarifyEarlierSchema = z.object({
   questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax + 2),
@@ -899,16 +911,60 @@ export const AskClarifyRequestSchema = z.object({ question_line: z.string().trim
 export type AskClarifyRequest = z.infer<typeof AskClarifyRequestSchema>;
 
 /**
+ * Design Document v2 (16b), "How we read your question": the question said back in one sentence, in parts. A part is plain words
+ * (`text`, kept as sent: its spaces join the parts, so nothing here is trimmed), or the words that stand for one clarifying
+ * question's answer: `about` names the question (its place in `questions`, or the purpose or the care question), `phrases` holds the
+ * words for each of that question's answers, one per answer and in the same order, and `assumed` is the place of the answer the AI
+ * assumed, whose phrase the page shows until the person chooses an answer.
+ */
+export const ClarifyRestatementPartSchema = z.union([
+  z.object({ text: z.string().min(1).max(WEB_CONTRACT_LIMITS.clarifyRestatementTextMaxChars) }).strict(),
+  z.object({
+    about: z.union([z.number().int().min(0).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax - 1), z.literal("purpose"), z.literal("cares")]),
+    phrases: z.array(ClarifyTextSchema).min(WEB_CONTRACT_LIMITS.clarifyAnswersMin).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax),
+    assumed: z.number().int().min(0).max(WEB_CONTRACT_LIMITS.clarifyAnswersMax - 1)
+  }).strict()
+]);
+export type ClarifyRestatementPart = z.infer<typeof ClarifyRestatementPartSchema>;
+/** A part of the sentence that stands for one question's answer. */
+export type ClarifyRestatementSlot = Extract<ClarifyRestatementPart, { about: unknown }>;
+export const ClarifyRestatementSchema = z.object({
+  parts: z.array(ClarifyRestatementPartSchema).min(1).max(WEB_CONTRACT_LIMITS.clarifyRestatementPartsMax)
+}).strict();
+export type ClarifyRestatement = z.infer<typeof ClarifyRestatementSchema>;
+
+/**
  * The questions for step 2. `AI`: up to three questions and the one about what the answer is for (absent only when the AI would not write it, even
  * asked twice). `NONE`: no AI read the question (it failed, it was too slow, the person's pool or limit is spent, or this deployment has no paid AI):
  * the page shows no questions, only the person's own-words boxes, and they carry on.
  * V4 start step, Task 76d (owner answer Q4): version 2's `cares`, the question "What do you care about most?" with 2 to 4 answers; the page
  * shows it last. It counts as a question of its own.
+ * Design Document v2 (16b): `restatement`, the question said back in one sentence. Each of its answer parts names a question this reply
+ * has, with one phrase per answer of that question and an assumed answer among them, and a question has at most one part. The page
+ * shows the assumptions and, at Start, sends each one the person left unchanged as an answer marked `assumed` (`PurposeAnswerSchema`),
+ * while the sentence is on screen; with the person's own words in its place it sends none. A reply without it is whole, and the page
+ * then shows step 2 as it did before.
  */
 export const AskClarifyResponseSchema = z.discriminatedUnion("source", [
   z.object({ source: z.literal("AI"), questions: z.array(ClarifyQuestionSchema).max(WEB_CONTRACT_LIMITS.clarifyQuestionsMax), purpose: ClarifyQuestionSchema.optional(),
-    cares: ClarifyQuestionSchema.optional() }).strict()
-    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined || reply.cares !== undefined, { message: "at least one question" }),
+    cares: ClarifyQuestionSchema.optional(), restatement: ClarifyRestatementSchema.optional() }).strict()
+    .refine((reply) => reply.questions.length > 0 || reply.purpose !== undefined || reply.cares !== undefined, { message: "at least one question" })
+    .superRefine((reply, context) => {
+      const seen = new Set<number | "purpose" | "cares">();
+      (reply.restatement?.parts ?? []).forEach((part, at) => {
+        if (!("about" in part)) return;
+        const path = ["restatement", "parts", at];
+        const question = part.about === "purpose" ? reply.purpose : part.about === "cares" ? reply.cares : reply.questions[part.about];
+        if (question === undefined) {
+          context.addIssue({ code: "custom", message: "a part names a question of this reply", path: [...path, "about"] });
+          return;
+        }
+        if (seen.has(part.about)) context.addIssue({ code: "custom", message: "one part per question", path: [...path, "about"] });
+        seen.add(part.about);
+        if (part.phrases.length !== question.answers.length) context.addIssue({ code: "custom", message: "one phrase per answer", path: [...path, "phrases"] });
+        if (part.assumed >= part.phrases.length) context.addIssue({ code: "custom", message: "the assumed answer is one of the answers", path: [...path, "assumed"] });
+      });
+    }),
   z.object({ source: z.literal("NONE") }).strict()
 ]);
 export type AskClarifyResponse = z.infer<typeof AskClarifyResponseSchema>;
