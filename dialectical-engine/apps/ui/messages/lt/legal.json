@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Bet kuri šalis, kurioje Google arba Google vardu dirbančios įmonės turi objektų",
   "legal.providers.retentionAnthropic": "Ištrinama per 30 dienų. Saugoma iki 2 metų, jei Anthropic saugumo patikros pažymi prašymą kaip piktnaudžiavimą, ir ilgiau tik tada, kai to reikalauja įstatymas. Tų saugumo patikrų rezultatai gali būti saugomi iki 7 metų",
   "legal.providers.retentionGoogle": "Saugoma 55 dienas, tik tam, kad būtų aptiktas ir sustabdytas piktnaudžiavimas, ir kai to reikalauja įstatymas",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "ES standartinės sutarčių sąlygos (Europos Komisijos pavyzdinė sutartis duomenims siųsti už ES ribų)",
   "legal.health.eyebrow": "JAV vartotojų sveikatos duomenys",
   "legal.health.title": "Vartotojų sveikatos duomenų privatumo politika",

@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "أي دولة توجد فيها منشآت لـ Google أو لشركات تعمل لصالحها",
   "legal.providers.retentionAnthropic": "يُحذف خلال 30 يومًا. ويُحتفظ به لمدة تصل إلى سنتين إذا صنّفت فحوصات السلامة لدى Anthropic طلبًا ما على أنه إساءة استخدام، ولا يُحتفظ به لفترة أطول إلا عندما يقتضي القانون ذلك. وقد يُحتفظ بنتائج فحوصات السلامة تلك لمدة تصل إلى 7 سنوات",
   "legal.providers.retentionGoogle": "يُحتفظ به لمدة 55 يومًا، فقط لرصد إساءة الاستخدام ومنعها، وعندما يقتضي القانون ذلك",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "البنود التعاقدية القياسية للاتحاد الأوروبي (العقد النموذجي الذي أعدّته المفوضية الأوروبية لإرسال البيانات خارج الاتحاد الأوروبي)",
   "legal.health.eyebrow": "بيانات صحة المستهلك في الولايات المتحدة",
   "legal.health.title": "سياسة خصوصية بيانات صحة المستهلك",

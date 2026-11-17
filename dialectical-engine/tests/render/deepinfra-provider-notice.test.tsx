@@ -13,15 +13,17 @@ import { DEEPINFRA_PROVIDER, providerRegister } from "../../apps/ui/lib/legal/pa
  * does not name a company that receives nothing.
  */
 describe("the DeepInfra serving provider is disclosed when the API's targets reach it", () => {
-  it("names the serving company without inventing transfer or retention facts", () => {
+  it("names the serving company with the facts its terms and data processing agreement state", () => {
     const register = providerRegister(["deepinfra"]);
     const entry = register.find((row) => row.key === "deepinfra");
     expect(entry).toBe(DEEPINFRA_PROVIDER);
     expect(entry?.provider).toBe("DeepInfra");
     expect(entry?.entity).toBe("Deep Infra Inc.");
-    expect(entry?.basisKey).toBe("legal.providers.unconfirmed");
-    expect(entry?.locationKey).toBe("legal.providers.unconfirmed");
-    expect(entry?.zeroRetention).toBe("unconfirmed");
+    expect(entry?.basisKey).toBe("legal.providers.sccBasis");
+    expect(entry?.locationKey).toBe("legal.providers.unitedStates");
+    expect(entry?.retentionKey).toBe("legal.providers.retentionDeepInfra");
+    expect(entry?.zeroRetention).toBe("yes");
+    expect(entry?.training).toBe("no");
     // Privacy 3.12: its models also write lists of what to look into before a debate starts.
     expect(entry?.purposes).toEqual(["arguments", "judging", "story", "suggestPaths"]);
     expect(entry?.purposesConfirmed).toBe(true);
@@ -37,7 +39,7 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
       expect(html).toContain('id="legal-provider-deepinfra"');
       expect(html).toContain("Deep Infra Inc.");
       expect(html).toContain("policy@deepinfra.com");
-      expect(html).toContain("2026-10-05");
+      expect(html).toContain("2026-11-17");
       for (const model of ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Z.AI"]) expect(html, model).not.toContain(model);
     });
   }

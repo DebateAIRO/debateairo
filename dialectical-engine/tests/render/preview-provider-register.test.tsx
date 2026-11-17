@@ -376,23 +376,31 @@ describe("Perplexity, the models' web search provider, is always listed (owner, 
     }
   });
 
-  it("names the company and the search job, and keeps every unchecked contract fact bracketed", () => {
+  it("names the company and the search job, and says what its search terms allow", () => {
     expect(PERPLEXITY_PROVIDER).toMatchObject({
       provider: "Perplexity",
       entity: "Perplexity AI, Inc.",
       homeCountryKey: "legal.providers.unitedStates",
       purposes: ["search"],
       purposesConfirmed: true,
-      zeroRetention: "unconfirmed",
-      training: "unconfirmed",
-      checkedOn: null
+      // Its search terms let it keep search questions and use them to improve its products.
+      retentionKey: "legal.providers.retentionPerplexity",
+      zeroRetention: "no",
+      training: "yes",
+      basisKey: "legal.providers.sccBasis",
+      // Its terms name no place of processing and no privacy contact for API customers.
+      locationKey: "legal.providers.unconfirmed",
+      contact: "[…]",
+      checkedOn: "2026-11-17"
     });
     for (const catalog of [en, ro]) {
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(null)} />);
       const section = html.slice(html.indexOf('id="legal-provider-perplexity"'), html.indexOf('id="legal-provider-support"'));
       expect(section).toContain(">Perplexity</h2>");
       expect(section).toContain(escaped(catalog["legal.providers.purpose.search"]));
-      expect(section).toContain(escaped(catalog["legal.providers.notChecked"]));
+      expect(section).toContain(escaped(catalog["legal.providers.retentionPerplexity"]));
+      expect(section).toContain("2026-11-17");
+      expect(section).not.toContain(escaped(catalog["legal.providers.notChecked"]));
     }
   });
 });

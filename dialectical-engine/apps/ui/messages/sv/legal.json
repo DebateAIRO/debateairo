@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Alla länder där Google eller företag som arbetar för Google har anläggningar",
   "legal.providers.retentionAnthropic": "Raderas inom 30 dagar. Sparas i upp till 2 år om Anthropics säkerhetskontroller markerar en begäran som missbruk, och längre endast när lagen kräver det. Resultaten av dessa säkerhetskontroller kan sparas i upp till 7 år",
   "legal.providers.retentionGoogle": "Sparas i 55 dagar, enbart för att upptäcka och stoppa missbruk och när lagen kräver det",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "EU:s standardavtalsklausuler (Europeiska kommissionens modellavtal för överföring av uppgifter utanför EU)",
   "legal.health.eyebrow": "Konsumenthälsouppgifter i USA",
   "legal.health.title": "Integritetspolicy för konsumenthälsouppgifter",

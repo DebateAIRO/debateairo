@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Każdy kraj, w którym Google lub firmy dla niego pracujące mają obiekty",
   "legal.providers.retentionAnthropic": "Usuwane w ciągu 30 dni. Przechowywane do 2 lat, jeśli kontrole bezpieczeństwa Anthropic oznaczą żądanie jako nadużycie, a dłużej tylko wtedy, gdy wymaga tego prawo. Wyniki tych kontroli bezpieczeństwa mogą być przechowywane do 7 lat",
   "legal.providers.retentionGoogle": "Przechowywane przez 55 dni, wyłącznie w celu wykrywania i powstrzymywania nadużyć i gdy wymaga tego prawo",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "Standardowe klauzule umowne UE (wzorcowa umowa Komisji Europejskiej dotycząca przesyłania danych poza UE)",
   "legal.health.eyebrow": "Dane dotyczące zdrowia konsumentów w USA",
   "legal.health.title": "Polityka prywatności danych dotyczących zdrowia konsumentów",

@@ -312,11 +312,19 @@ const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: strin
 ] as const);
 
 /**
- * Serving company for the private preview's open-weight models; terms reviewed 5 October 2026 and
- * rechecked 10 October 2026. Listed whenever the API's declared targets reach `api.deepinfra.com`
- * (company `deepinfra`, addition D24), and when the API gives no answer. Its jobs are confirmed: every
- * panel member writes and judges arguments, GLM writes the answer and the verdict story, DeepSeek
- * checks both (the first preview's GLM alone does all three).
+ * Serving company for the open-weight models. Its facts are read from DeepInfra's Terms of Service (sections 5 and
+ * 7(b)), its Data Processing Agreement and its trust centre (`docs/legal/2026-11-17-provider-contract-facts.md`):
+ * the agreement is accepted with the Terms and carries the EU standard contractual clauses; the models DeepInfra
+ * hosts run in the United States only; prompts and answers are held in memory while a request is answered and then
+ * deleted; nothing is used for training.
+ *
+ * Those facts cover only the models DeepInfra hosts itself. A model its page tags "Partner" runs at another company,
+ * under that company's rules, and DeepInfra does not name the company. The retention text says so in brackets for as
+ * long as the line-up holds such a model, so the row never promises more than the contract does.
+ *
+ * Listed whenever the API's declared targets reach `api.deepinfra.com` (company `deepinfra`), and when the API gives
+ * no answer. Its jobs are confirmed: every panel member writes and judges arguments, GLM writes the answer and the
+ * verdict story, DeepSeek checks both.
  */
 export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -328,12 +336,14 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   // the person presses Next, before a debate starts.
   purposes: Object.freeze<ProviderPurpose[]>([...UNCHECKED_CLOUD.purposes, "suggestPaths"]),
   purposesConfirmed: true,
-  // Published terms exclude model training. Endpoint-specific retention and transfer facts
-  // remain explicitly unconfirmed until operational/contractual validation is complete.
+  locationKey: "legal.providers.unitedStates",
+  retentionKey: "legal.providers.retentionDeepInfra",
+  zeroRetention: "yes",
   training: "no",
-  basisKey: "legal.providers.unconfirmed",
+  // DeepInfra is not on the EU–US Data Privacy Framework list, so the clauses in its agreement are the only basis.
+  basisKey: "legal.providers.sccBasis",
   contact: "policy@deepinfra.com",
-  checkedOn: "2026-10-05"
+  checkedOn: "2026-11-17"
 });
 
 /**
@@ -399,8 +409,14 @@ export const GOOGLE_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * The web search provider the debate models ask questions through (owner, 2026-10-26: "our models will ask
  * questions via Perplexity"; Terms §8, Privacy Policy §5). Not one of the API's declared targets yet, so it is
  * listed on every answer rather than when the API names it (owner, 2026-10-27: always listed). Perplexity AI, Inc.
- * is the US company behind the API; every other fact stays "[to confirm]" until someone checks it against
- * Perplexity's API terms.
+ * is the US company behind the API.
+ *
+ * We call its search endpoint (`/search`), and Perplexity's Search Addendum overrides its API terms for that
+ * endpoint (`docs/legal/2026-11-17-provider-contract-facts.md`): Perplexity may keep the search questions and
+ * results and use them for its own business, including to improve and develop its products, and its zero-retention
+ * promise does not cover search. So this row says "Yes" to training and "No" to zero retention, unlike every model
+ * provider's row. Its Data Processing Addendum carries the EU standard contractual clauses. Its terms name no place
+ * of processing and no privacy contact for API customers, so those two facts stay "[to confirm]".
  */
 export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
@@ -409,7 +425,12 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
   models: "",
   entity: "Perplexity AI, Inc.",
   purposes: Object.freeze<ProviderPurpose[]>(["search"]),
-  purposesConfirmed: true
+  purposesConfirmed: true,
+  retentionKey: "legal.providers.retentionPerplexity",
+  zeroRetention: "no",
+  training: "yes",
+  basisKey: "legal.providers.sccBasis",
+  checkedOn: "2026-11-17"
 });
 
 /**

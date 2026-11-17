@@ -611,10 +611,9 @@ describe("the model providers page lists the companies the API's targets reach (
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
     const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
-    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example", "perplexity"]);
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["host:api.acme.example"]);
     for (const entry of uncheckedRows) {
-      // Perplexity's company is known (owner, 2026-10-26); its contract facts are not checked yet.
-      if (entry.key !== "perplexity") expect(isUnverified(entry.entity)).toBe(true);
+      expect(isUnverified(entry.entity)).toBe(true);
       expect(isUnverified(entry.contact)).toBe(true);
       expect(entry.training).toBe("unconfirmed");
       expect(entry.zeroRetention).toBe("unconfirmed");
@@ -627,7 +626,7 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["perplexity"]);
+    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual([]);
   });
 
   it("shows every register label in every locale's catalogue", () => {

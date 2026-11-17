@@ -317,6 +317,13 @@ const FLAGGED = 117;
  * translations are brought up to date before release; legal-public-debate-stays-public pins the wording.
  */
 const KEPT_AFTER_CLOSURE = [85, 127, 198];
+/**
+ * Web search is not under a no-training contract: the search provider's terms let it keep the search phrases the models
+ * write. English says so where it promised that no provider trains on content: the summary, section 3's last
+ * paragraph, section 5's web search paragraph and its paragraph on training and retention. English only until the
+ * translations are brought up to date before release; legal-web-search-terms pins the wording.
+ */
+const WEB_SEARCH_TERMS = [23, 93, 99, 103];
 const TAKE_DOWN = "If you publish a flagged debate after our approval, you can take it down from Your debates.";
 /**
  * Annex B.6's paragraph (Asia-Pacific; Annex B.7 until Switzerland's part left, see withoutSwitzerland). Taiwan is
@@ -519,7 +526,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
     expect(next, `${code}: the line count is 3.11's and the two new rows`).toHaveLength(prior.length + INSERTED.length);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE] : [])].sort((a, b) => a - b));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, ...WEB_SEARCH_TERMS] : [])].sort((a, b) => a - b));
     // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
     const quebecBefore = prior[priorIndex(QUEBEC)]!;
     const quebecAfter = next[QUEBEC]!;

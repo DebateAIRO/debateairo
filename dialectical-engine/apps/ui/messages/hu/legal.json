@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Bármely ország, ahol a Google vagy a számára dolgozó vállalatok létesítményekkel rendelkeznek",
   "legal.providers.retentionAnthropic": "30 napon belül törlik. Legfeljebb 2 évig őrzik, ha az Anthropic biztonsági ellenőrzései visszaélésként jelölik meg a kérést, és ennél tovább csak akkor, ha a törvény ezt előírja. Ezeknek a biztonsági ellenőrzéseknek az eredményeit legfeljebb 7 évig őrizhetik meg",
   "legal.providers.retentionGoogle": "55 napig őrzik, kizárólag a visszaélések felderítése és megállítása céljából és ha a törvény ezt előírja",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "Az EU általános szerződési feltételei (az Európai Bizottság mintaszerződése az adatok EU-n kívülre történő küldéséhez)",
   "legal.health.eyebrow": "Amerikai fogyasztói egészségügyi adatok",
   "legal.health.title": "Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi szabályzat",

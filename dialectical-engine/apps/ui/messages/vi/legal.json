@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Bất kỳ quốc gia nào có cơ sở của Google hoặc của các công ty làm việc cho Google",
   "legal.providers.retentionAnthropic": "Được xóa trong vòng 30 ngày. Được giữ tối đa 2 năm nếu các kiểm tra an toàn của Anthropic đánh dấu một yêu cầu là lạm dụng, và chỉ giữ lâu hơn khi pháp luật yêu cầu. Kết quả của những kiểm tra an toàn đó có thể được giữ tối đa 7 năm",
   "legal.providers.retentionGoogle": "Được giữ 55 ngày, chỉ để phát hiện và ngăn chặn lạm dụng và khi pháp luật yêu cầu",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "Các điều khoản hợp đồng tiêu chuẩn của EU (mẫu hợp đồng của Ủy ban Châu Âu để gửi dữ liệu ra ngoài EU)",
   "legal.health.eyebrow": "Dữ liệu sức khỏe người tiêu dùng tại Hoa Kỳ",
   "legal.health.title": "Chính sách quyền riêng tư về dữ liệu sức khỏe người tiêu dùng",

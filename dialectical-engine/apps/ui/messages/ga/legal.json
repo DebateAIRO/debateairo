@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Aon tír ina bhfuil saoráidí ag Google nó ag cuideachtaí a oibríonn do Google",
   "legal.providers.retentionAnthropic": "Scriostar laistigh de 30 lá. Coinnítear suas le 2 bhliain má mharcálann seiceálacha sábháilteachta Anthropic iarratas mar mhí-úsáid, agus níos faide ach amháin nuair a éilíonn an dlí é. Féadfar torthaí na seiceálacha sábháilteachta sin a choinneáil suas le 7 mbliana",
   "legal.providers.retentionGoogle": "Coinnítear ar feadh 55 lá, chun mí-úsáid a bhrath agus a stopadh amháin, agus nuair a éilíonn an dlí é",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "Clásail chaighdeánacha chonarthacha an AE (conradh samhlach an Choimisiúin Eorpaigh chun sonraí a sheoladh lasmuigh den AE)",
   "legal.health.eyebrow": "Sonraí sláinte tomhaltóirí sna Stáit Aontaithe",
   "legal.health.title": "Beartas príobháideachais sonraí sláinte tomhaltóirí",

@@ -153,6 +153,8 @@
   "legal.providers.locationGoogle": "Mikä tahansa maa, jossa Googlella tai Googlelle työskentelevillä yrityksillä on toimipisteitä",
   "legal.providers.retentionAnthropic": "Poistetaan 30 päivän kuluessa. Säilytetään enintään 2 vuotta, jos Anthropicin turvatarkistukset merkitsevät pyynnön väärinkäytöksi, ja pidempään vain, kun laki sitä edellyttää. Näiden turvatarkistusten tulokset voidaan säilyttää enintään 7 vuotta",
   "legal.providers.retentionGoogle": "Säilytetään 55 päivää, vain väärinkäytösten havaitsemiseksi ja pysäyttämiseksi sekä silloin, kun laki sitä edellyttää",
+  "legal.providers.retentionDeepInfra": "Not stored: held in memory only while the request is answered, then deleted. This covers the models DeepInfra runs on its own servers. [One model we reach through DeepInfra runs at a partner company of DeepInfra's instead, under that partner's own rules. Which company, where and for how long: to confirm]",
+  "legal.providers.retentionPerplexity": "No time limit stated. It receives only the short search phrases the models write, with nothing that says who you are. Its terms let it keep those phrases and the results, and use them for its own business, such as improving its search",
   "legal.providers.sccBasis": "EU:n vakiosopimuslausekkeet (Euroopan komission mallisopimus tietojen lähettämiseksi EU:n ulkopuolelle)",
   "legal.health.eyebrow": "Kuluttajien terveystiedot Yhdysvalloissa",
   "legal.health.title": "Kuluttajien terveystietoja koskeva tietosuojakäytäntö",
