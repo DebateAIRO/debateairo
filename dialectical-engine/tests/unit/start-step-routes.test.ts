@@ -109,12 +109,14 @@ type Over = Readonly<{
   offTeam?: boolean; pool?: () => Promise<Readonly<{ empty: boolean; funding: null }>>; draining?: () => boolean;
   timing?: Readonly<{ heartbeatMs?: number; streamMaxLifeMs?: number }>; run?: RunProjection | null;
 }>;
+/** The UI's proof: the edge's country is honoured only from a request that carries it. */
+const UI_PROOF = "s".repeat(43);
 function apiOver(key: StartStepKey, port: StartStepPort | undefined, over: Over = {}) {
   const sessions = { ...testSessionApplication([IDENTITY]), readSensitiveDataConsent: async () => over.consent ?? "given" as const };
   const application = { readRun: async (runId: string) => runId === PARENT_RUN ? over.run === undefined ? RUN : over.run : null } as unknown as AskApplication;
   const view: AdmissionView = Object.freeze({ registerVersion: over.version ?? ACTIVE, modelScorecardInForce: false });
   return buildApi({
-    application, sessions, allowedOrigin: TEST_APP_ORIGIN,
+    application, sessions, allowedOrigin: TEST_APP_ORIGIN, uiApiProof: Buffer.from(UI_PROOF),
     ...(over.port === null || port === undefined ? {} : { startStep: over.port ?? port }),
     ...(over.key === null ? {} : { startStepKey: over.key ?? key }),
     ...(over.version === null ? {} : { admissionView: async () => view }),
@@ -156,7 +158,7 @@ describe("POST /v1/asks/paths/lists", () => {
     const { port, seen } = portOf(key);
     const api = apiOver(key, port);
     try {
-      const response = await post(api, "lists", LISTS_BODY, { ...HEADERS, "cf-ipcountry": "RO" });
+      const response = await post(api, "lists", LISTS_BODY, { ...HEADERS, "cf-ipcountry": "RO", "x-debateai-ui-proof": UI_PROOF });
       expect(response.statusCode).toBe(200);
       expect(response.headers["content-type"]).toBe("text/event-stream");
       expect(response.headers["cache-control"]).toBe("no-store");

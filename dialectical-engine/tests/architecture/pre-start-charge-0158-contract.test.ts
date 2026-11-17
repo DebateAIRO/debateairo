@@ -101,7 +101,9 @@ describe("0158: the small AIs before Start in the person's quota", () => {
     expect(actual).toEqual(declared);
     expect(read("tests/support/shipped-corpus.manifest.txt").split("\n")).toContain("packages/db/src/migration-forward0158.ts");
     expect(read("tests/ci-integration-auth.txt").split("\n")).toContain("tests/integration/pre-start-charge-database.test.ts");
-    expect(read("packages/budget/src/model-spend.ts").match(/identity\.read_pre_start_spent/gu)).toHaveLength(2);
+    // The person's window readers (readOwnerSpentMicros and the money rule's batch reader) and the withdrawal's credit used
+    // (readWithdrawalSpend), which counts what a person's windows count.
+    expect(read("packages/budget/src/model-spend.ts").match(/identity\.read_pre_start_spent/gu)).toHaveLength(3);
     expect(read("packages/db/src/data-export.ts")).toContain("identity.read_data_export_pre_start($1,$2) pre_start_calls");
   });
 

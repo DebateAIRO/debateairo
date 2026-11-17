@@ -169,10 +169,12 @@ describe("POST /v1/auth/register behind the age gate", () => {
 
   it("records the edge country when one is reported, and nothing when it is unknown", async () => {
     const { app, sources } = registrationSpy();
-    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN });
+    // NV-03: the edge country is honoured only from the proven UI.
+    const proof = "a".repeat(43);
+    const api = buildApi({ application: askApplication(), turnstile: passedTurnstile, registration: app, allowedOrigin: TEST_APP_ORIGIN, uiApiProof: Buffer.from(proof) });
     try {
-      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "RO" }, payload: body("1990-01-01") });
-      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "XX" }, payload: body("1990-01-01") });
+      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "RO", "x-debateai-ui-proof": proof }, payload: body("1990-01-01") });
+      await api.inject({ method: "POST", url: "/v1/auth/register", headers: { origin: TEST_APP_ORIGIN, "cf-ipcountry": "XX", "x-debateai-ui-proof": proof }, payload: body("1990-01-01") });
       expect(sources.map((source) => source.countryCode)).toEqual(["RO", undefined]);
       expect(sources[1]).not.toHaveProperty("countryCode");
     } finally {

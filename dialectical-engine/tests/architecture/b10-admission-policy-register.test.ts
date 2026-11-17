@@ -45,6 +45,10 @@ describe("B10 sealed admission-policy register row", () => {
       staffRequests: null,
       // Owner ruling 2026-11-09: the start step's budget joins the deployment row only.
       startStepCalls: null,
+      // NV-46: the parser's default; the sealed row carries no such member.
+      publishChecks: { key: "owner", limit: 10, windowMs: 86_400_000, capacity: 196_608 },
+      // NV-47: the parser's default; the sealed row carries no such member.
+      languageChecks: { key: "owner", limit: 120, windowMs: 86_400_000, capacity: 196_608 },
       sourceRef: ADMISSION_POLICY_REGISTER_ROW.sourceRef
     });
     expect(Object.isFrozen(policy)).toBe(true);

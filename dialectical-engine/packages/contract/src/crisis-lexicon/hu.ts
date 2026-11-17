@@ -6,7 +6,7 @@ import type { CrisisLexicon, CrisisPattern } from "./types.js";
 const MYSELF = String.raw`magam(?:at)?`;
 // After "élni" (to live): a place, a manner or an object means it is not about staying alive
 // ("nem akarok Budapesten élni", "nem akarok élni ezzel a lehetőséggel").
-const NOT_A_PLACE = String.raw`(?! (?:tovabb |tobbe |mar |sem )?(?:[a-z]*(?:ban|ben|val|vel|nal|nel|hon|on|en|ott|ett|ert|nelkul)\b|itt\b|ott\b|igy\b|ugy\b|olyan|egy\b|abban|ebben|ezzel|azzal|ezekkel|azokkal|a\b|az\b))`;
+const NOT_A_PLACE = String.raw`(?! (?:tovabb |tobbe |mar |sem )?(?:[a-z]{0,32}(?:ban|ben|val|vel|nal|nel|hon|on|en|ott|ett|ert|nelkul)\b|itt\b|ott\b|igy\b|ugy\b|olyan|egy\b|abban|ebben|ezzel|azzal|ezekkel|azokkal|a\b|az\b))`;
 // People close to the writer, with the possessive suffix, for `other-person`.
 const CLOSE = String.raw`(?:legjobb )?(?:baratom|baratnom|baratnem|haverom|pasim|csajom|parom|ferjem|felesegem|fiam|lanyom|batyam|ocsem|noverem|hugom|testverem|anyam|anyukam|apam|apukam|gyerekem|gyermekem|osztalytarsam|kollegam|kolleganom|lakotarsam|szobatarsam|unokatestverem|unokam|tanitvanyom|diakom|kamasz fiam|kamasz lanyom)`;
 const AT_RISK = String.raw`(?:meg akarja olni magat|megoli magat\b(?! a munka| munkaval| a sok)|meg fogja olni magat|ongyilkos (?:akar lenni|lesz|lett volna|probalt lenni)|ongyilkossagot (?:akar elkovetni|kiserelt meg|tervez)|ongyilkossagi gondolatai|ongyilkos gondolatai|ongyilkossagrol (?:beszel|ir)|ongyilkossagon gondolkodik|vegezni akar magaval|vegez magaval|vagdossa magat|megvagja magat|onserto|(?:meg akar|szeretne) halni\b(?! otthon| bekeben| meltosaggal)|el akarja venni az eletet|veget akar vetni (?:az )?eletenek)`;
@@ -34,7 +34,7 @@ export const HU: CrisisLexicon = Object.freeze({
     { signal: "intent", pattern: String.raw`\b(?:az eletemnek nincs (?:semmi |mar )?ertelme|az eletem (?:ertelmetlen|nem er semmit)|ertelmetlen az eletem)\b` },
     { signal: "intent", pattern: String.raw`\bnelkulem\b.{0,30}\b(?:jobb|konnyebb)\b` },
     { signal: "intent", pattern: String.raw`\b(?:jobb|konnyebb) (?:lenne|volna|lesz)\b.{0,25}\bnelkulem\b` },
-    { signal: "intent", pattern: String.raw`\b(?:(?:mar )?nem birom (?:mar )?(?:tovabb)?\s*(?:$|[.!?,;])|nem birom (?:mar )?tovabb\b(?! [a-z]*t\b| a\b| az\b| ezt| azt))` },
+    { signal: "intent", pattern: String.raw`\b(?:(?:mar )?nem birom (?:mar )?(?:tovabb)?\s*(?:$|[.!?,;])|nem birom (?:mar )?tovabb\b(?! [a-z]{0,32}t\b| a\b| az\b| ezt| azt))` },
     // self-harm
     { signal: "self-harm", pattern: String.raw`\b(?:vagdosom|vagdostam|vagdosni akarom|karcolom|karcoltam) ${MYSELF}\b` },
     { signal: "self-harm", pattern: String.raw`\b(?:megvagom|megvagtam|vagom|egetem|megegettem|bantom|bantottam|szurkalom) (?:(?:szandekosan|direkt|megint|ujra) ${MYSELF}\b|${MYSELF}\b.{0,15}\b(?:szandekosan|direkt|megint|ujra|zsilettel|pengevel|kessel)\b)` },
@@ -59,7 +59,7 @@ export const HU: CrisisLexicon = Object.freeze({
     { signal: "method", pattern: String.raw`\b(?:meghalas|meghalasnak|ongyilkossag|ongyilkossagnak)\b.{0,10}\b(?:legfajdalommentesebb|leggyorsabb|legkonnyebb|legbiztosabb|legegyszerubb|fajdalommentes) (?:modja|modszere|modszerei|modjai)\b` },
     { signal: "method", pattern: String.raw`\b(?:ongyilkossagi|ongyilkos) (?:modszer|modszerek|modszert|terv|tervem|level|levelet|paktum)\b` },
     { signal: "method", pattern: String.raw`\bhalalos (?:adag|adagja|adagot|dozis|dozisa|dozist|mennyiseg|mennyisege)\b` },
-    { signal: "method", pattern: String.raw`\bhany (?:szem |darab |doboz |levél |level )?(?:[a-z]+ )?(?:tabletta|tablettat|gyogyszer|gyogyszert|altato|altatot|altatobol|szem|pirula|bogyo|paracetamol|xanax|rivotril|frontin|inzulin|mg|milligramm|gramm)\b.{0,40}\b(?:tuladagol|hogy meghaljak|halalos|a halalhoz|megol|meghalni|belehalok)` },
+    { signal: "method", pattern: String.raw`\bhany (?:szem |darab |doboz |levél |level )?(?:[a-z]{1,32} )?(?:tabletta|tablettat|gyogyszer|gyogyszert|altato|altatot|altatobol|szem|pirula|bogyo|paracetamol|xanax|rivotril|frontin|inzulin|mg|milligramm|gramm)\b.{0,40}\b(?:tuladagol|hogy meghaljak|halalos|a halalhoz|megol|meghalni|belehalok)` },
     { signal: "method", pattern: String.raw`\b(?:milyen magasrol|milyen magasbol|milyen magas)\b.{0,40}\b(?:meghaljak|meghalni|halalos|belehalok|megolje)\b` },
     { signal: "method", pattern: String.raw`\b(?:felakasztom|fel akarom akasztani|fel fogom akasztani|tuladagolom|tul akarom adagolni|megmergezem|meg akarom mergezni|lelovom|le akarom loni|agyonlovom|vizbe folytom) ${MYSELF}\b` },
     { signal: "method", pattern: String.raw`\b(?:a hidrol|hidrol|a tetorol|tetorol|az ablakbol|a toronyhazrol|a hazrol|az erkelyrol|a sziklarol|a blokk tetejerol)\b.{0,15}\b(?:leugrok|leugrom|le akarok ugrani|le fogok ugrani|ugrok le|ugrom le|vetem le magam)\b` },

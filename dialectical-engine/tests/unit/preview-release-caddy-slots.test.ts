@@ -79,14 +79,12 @@ const SNIPPET_LINES = [
   '\tlb_try_duration 12s',
   '\tlb_try_interval 250ms',
   '\thealth_uri /readyz',
-  '\thealth_interval 2s',
-  '\thealth_timeout 1s',
+  '\thealth_interval 1s',
+  '\thealth_timeout 3s',
   '\thealth_status 200',
   '\thealth_passes 1',
-  '\thealth_fails 1',
-  '\thealth_headers {',
-  `\t\tX-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}`,
-  '\t}',
+  '\thealth_fails 2',
+  // NV-55: no health_headers; the health check carries no secret.
   '}'
 ];
 

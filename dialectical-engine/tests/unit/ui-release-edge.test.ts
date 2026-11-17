@@ -13,6 +13,7 @@ import {
   installGracefulClose,
   noteUnusableApiBase,
   parseWebsiteReleaseKey,
+  READINESS_API_TIMEOUT_MS,
   releaseHeaderFor,
   resolveBuildReleaseCode
 } from "../../apps/ui/release-edge.mjs";
@@ -145,16 +146,22 @@ function fakeResponse(): { res: unknown; done: Promise<Answer> } {
   return { res, done };
 }
 
-function responder(apiAnswer: () => Promise<Response>, draining = () => false) {
+function responder(apiAnswer: () => Promise<Response>, draining = () => false, uiApiProof?: string | null) {
   const calls: string[] = [];
+  const sent: Headers[] = [];
   const respond = createReadinessResponder({
     apiBase: "http://127.0.0.1:8790",
     releaseKey: OWN,
-    fetch: (async (url: unknown) => { calls.push(String(url)); return apiAnswer(); }) as typeof fetch,
+    fetch: (async (url: unknown, init?: RequestInit) => {
+      calls.push(String(url));
+      sent.push(new Headers(init?.headers));
+      return apiAnswer();
+    }) as typeof fetch,
     timeoutMs: 50,
-    draining
-  });
-  return { respond, calls };
+    draining,
+    ...(uiApiProof === undefined ? {} : { uiApiProof })
+  } as Parameters<typeof createReadinessResponder>[0]);
+  return { respond, calls, sent };
 }
 
 type Respond = ReturnType<typeof createReadinessResponder>;
@@ -205,6 +212,27 @@ describe("createReadinessResponder", () => {
     }
   });
 
+  // NV-27: the shipped default, below Caddy's health_timeout 3s. Vitest's fake timers do not drive AbortSignal.timeout,
+  // so the late API is waited out in real time (about 2 s).
+  it("defaults its API wait to READINESS_API_TIMEOUT_MS, 2000 ms", async () => {
+    expect(READINESS_API_TIMEOUT_MS).toBe(2000);
+    let aborted = 0;
+    const startedAt = Date.now();
+    const late = createReadinessResponder({
+      apiBase: "http://127.0.0.1:8790",
+      releaseKey: OWN,
+      fetch: ((_url: unknown, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => { aborted = Date.now() - startedAt; reject(init.signal?.reason); });
+      })) as typeof fetch,
+      draining: () => false
+    });
+    const answer = await ask(late);
+    expect(answer.status).toBe(503);
+    expect(answer.body).toEqual({ ready: false, releaseKey: OWN, reasons: ["BOOTING"] });
+    expect(aborted).toBeGreaterThanOrEqual(1_900);
+    expect(aborted).toBeLessThan(3_000);
+  }, 10_000);
+
   it("says RELEASE_KEY_MISMATCH when its API is another release", async () => {
     const answer = await ask(responder(json(200, { ready: true, releaseKey: OTHER, reasons: [] })).respond);
     expect(answer.status).toBe(503);
@@ -249,6 +277,45 @@ describe("createReadinessResponder", () => {
       expect(respond({ method: "GET", url: "/readyz", headers } as never, res as never)).toBe(true);
       expect(await done).toMatchObject({ status: 200, body });
     }
+  });
+});
+
+describe("the UI-to-API proof on /readyz (NV-03)", () => {
+  const PROOF = "u".repeat(43);
+  const VERDICT = "x-debateai-ui-proof-verdict";
+  const withVerdict = (status: number, body: unknown, verdict: string | null) => async () => new Response(JSON.stringify(body), {
+    status, headers: { "content-type": "application/json", ...(verdict === null ? {} : { [VERDICT]: verdict }) }
+  });
+  const READY = { ready: true, releaseKey: OWN, reasons: [] };
+
+  it("sends the proof it holds on the API fetch", async () => {
+    const { respond, sent } = responder(withVerdict(200, READY, "accepted"), () => false, PROOF);
+    expect((await ask(respond)).status).toBe(200);
+    expect(sent.map((headers) => headers.get("x-debateai-ui-proof"))).toEqual([PROOF]);
+  });
+
+  it("is ready only when its API accepted the proof", async () => {
+    const accepted = await ask(responder(withVerdict(200, READY, "accepted"), () => false, PROOF).respond);
+    expect(accepted).toMatchObject({ status: 200, body: READY });
+    for (const verdict of ["refused", null]) {
+      const answer = await ask(responder(withVerdict(200, READY, verdict), () => false, PROOF).respond);
+      expect(answer, String(verdict)).toMatchObject({ status: 503, body: { ready: false, releaseKey: OWN, reasons: ["UI_API_PROOF_REFUSED"] } });
+    }
+  });
+
+  it("adds the reason once beside the API's own, and never beside RELEASE_KEY_MISMATCH", async () => {
+    const notCurrent = await ask(responder(withVerdict(503, { ready: false, releaseKey: OWN, reasons: ["NOT_CURRENT"] }, "refused"), () => false, PROOF).respond);
+    expect(notCurrent.body).toEqual({ ready: false, releaseKey: OWN, reasons: ["NOT_CURRENT", "UI_API_PROOF_REFUSED"] });
+    const other = await ask(responder(withVerdict(200, { ready: true, releaseKey: OTHER, reasons: [] }, "refused"), () => false, PROOF).respond);
+    expect(other.body).toEqual({ ready: false, releaseKey: OWN, reasons: ["RELEASE_KEY_MISMATCH"] });
+  });
+
+  it("without a proof: an API that holds one refuses the pair, and an API that holds none answers as before", async () => {
+    const refused = await ask(responder(withVerdict(200, READY, "refused"), () => false, null).respond);
+    expect(refused.body).toEqual({ ready: false, releaseKey: OWN, reasons: ["UI_API_PROOF_REFUSED"] });
+    const { respond, sent } = responder(withVerdict(200, READY, null), () => false, null);
+    expect(await ask(respond)).toMatchObject({ status: 200, body: READY });
+    expect(sent.map((headers) => headers.get("x-debateai-ui-proof"))).toEqual([null]);
   });
 });
 
@@ -396,6 +463,9 @@ describe("the website edge is wired", () => {
     expect(source).toMatch(/noteUnusableApiBase\(apiBase, \{ development \}\);/u);
     expect(at("noteUnusableApiBase(apiBase")).toBeLessThan(at("next({"));
     expect(at("installGracefulClose(")).toBeGreaterThan(at("server.listen(port, hostname)"));
+    // NV-27: the API wait is stated, below Caddy's 3 s probe timeout.
+    const responder = source.slice(at("createReadinessResponder({"));
+    expect(responder.slice(0, responder.indexOf("});"))).toContain("timeoutMs: READINESS_API_TIMEOUT_MS,");
   });
 
   it("the build stamps its release code and next.config inlines the same code for the browser", async () => {

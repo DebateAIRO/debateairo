@@ -70,10 +70,12 @@ export type BillingRuntimeDeps = Readonly<{
   reportPending: (code: string) => void;
   /**
    * R-35: inputs later tasks need, declared here once and passed by main.ts in the task that uses them:
-   * P12d the owner's spend (B3's `readOwnerSpentMicros`), P13 the sign-up blind-index key and the identity lookup,
+   * P12d the owner's spend (NV-45's `readWithdrawalSpend`), P13 the sign-up blind-index key and the identity lookup,
    * P16c the `taxAuthorities` row (P16a's `TaxAuthorities` type).
    */
-  ownerSpend?: Readonly<{ readOwnerSpentMicros(ownerRef: string, from: Date, to: Date): Promise<number> }>;
+  ownerSpend?: Readonly<{
+    readWithdrawalSpend(ownerRef: string, from: Date, withdrewAt: Date): Promise<Readonly<{ spentMicros: number; liveRuns: number }>>;
+  }>;
   blindIndexKey?: Uint8Array;
   /** The register's abuseLimits row (R22 decision 18). */
   cancelLinksPerDay?: number;

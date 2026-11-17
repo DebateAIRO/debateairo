@@ -81,7 +81,7 @@ function world(paid: boolean) {
     entitlements: { current: async () => ({ planId: "PLUS", monthCreditOverrideMicros: null }), append: async () => undefined },
     plans: testBillingPlans,
     policy: testBillingPolicy,
-    ownerSpend: { readOwnerSpentMicros: async () => 0 },
+    ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: 0, liveRuns: 0 }) },
     refunds: { requestAll: async () => undefined },
     audit: () => undefined,
     clock: () => WITHDREW,

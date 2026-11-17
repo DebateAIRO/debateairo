@@ -242,6 +242,7 @@ function publicationHarness(releases: ConstructorParameters<typeof PostgresPubli
       return true;
     },
     abandonKeyProvision: async () => true,
+    readOwnedVisibility: async () => ({ state: "PRIVATE", publicRef: null }),
     withContentLease: async <T>(_publicationRef: string, use: () => Promise<T>) => use(),
     // The author's name comes with the snapshot's row, read from the account: `author.pseudonym`, null once it is gone.
     readPublic: async (publicationRef: string) =>

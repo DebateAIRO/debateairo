@@ -9,9 +9,10 @@
  *
  * Each line is the step's file name and its n1 header (side-by-side spec §5, packages/db/src/migration-n1.ts). Steps up
  * to 0122 predate the header ("none"). From 0123 on a step is "expand" or "drained" and keeps the verifier in force,
- * except row-level security's 0130, which brings its own ("drained, own verifier").
+ * except row-level security's 0130, which brings its own ("drained, own verifier"). A step whose whole body is one
+ * concurrent index build also says `-- n1: outside-transaction`: "expand, outside transaction".
  */
-export type ForwardStepN1 = "none" | "expand" | "drained" | "drained, own verifier";
+export type ForwardStepN1 = "none" | "expand" | "expand, outside transaction" | "drained" | "drained, own verifier";
 
 const STEPS: ReadonlyArray<readonly [name: string, n1: ForwardStepN1]> = [
   ["0111_billing_netopia.sql", "none"],
@@ -80,7 +81,12 @@ const STEPS: ReadonlyArray<readonly [name: string, n1: ForwardStepN1]> = [
   ["0174_public_review_ungrounded_door.sql", "drained"],
   ["0175_statement_ai_read_verdict.sql", "drained"],
   ["0176_moderation_final_outcome.sql", "drained"],
-  ["0177_erased_owner_unlinked.sql", "drained"]
+  ["0177_erased_owner_unlinked.sql", "drained"],
+  ["0178_security_fixes_run3.sql", "expand"],
+  ["0179_password_reset_notice_due.sql", "expand, outside transaction"],
+  ["0180_backup_email_notice_due.sql", "expand, outside transaction"],
+  ["0181_mfa_recovery_notice_due.sql", "expand, outside transaction"],
+  ["0182_mfa_recovery_control_user_started.sql", "expand, outside transaction"]
 ];
 
 /** Every step's file name, in chain order. */
@@ -114,8 +120,12 @@ export function atStep<T>(chain: readonly T[], step: string): T {
 export function n1Of(step: string): Readonly<{ expand: boolean; drained: boolean; keepsVerifier: boolean }> {
   const n1 = STEPS[stepIndex(step)]![1];
   if (n1 === "none") return Object.freeze({ expand: false, drained: false, keepsVerifier: false });
-  return Object.freeze({ expand: n1 === "expand", drained: n1 !== "expand", keepsVerifier: n1 !== "drained, own verifier" });
+  const expand = n1 === "expand" || n1 === "expand, outside transaction";
+  return Object.freeze({ expand, drained: !expand, keepsVerifier: n1 !== "drained, own verifier" });
 }
+
+/** Whether the step's n1 header also says `-- n1: outside-transaction` (its whole body is one concurrent index build). */
+export const outsideTransactionOf = (step: string): boolean => STEPS[stepIndex(step)]![1] === "expand, outside transaction";
 
 /** The step's loader in packages/db/src/migration-forward-chain.ts: loadForward0132; the first steps kept older names. */
 export function loaderOf(step: string): string {

@@ -7,6 +7,8 @@ import {
   LIVE_STREAM_RECONNECT,
   liveReconnectDelay,
   liveTreeFromState,
+  readRecordedEvents,
+  RECORDED_REPLAY_RETRY,
   refreshTriggeredBy,
   startLiveEventStream
 } from "../../apps/ui/lib/v3/liveEvents.js";
@@ -367,5 +369,94 @@ describe("live stream loop (one open stream, honest back-off)", () => {
     await vi.advanceTimersByTimeAsync(1);
     expect(run.opened).toHaveLength(2);
     run.stop();
+  });
+});
+
+describe("settled replay retries a full stream cap (NV-20)", () => {
+  const rateLimited = (retryAfterMs: number | null = null) =>
+    new ContractHttpError("RATE_LIMITED", 429, "x", null, null, null, retryAfterMs);
+  function recordingSleep() {
+    const slept: number[] = [];
+    const sleep = async (ms: number, _signal: AbortSignal) => { slept.push(ms); };
+    return { slept, sleep };
+  }
+
+  it("waits the server's Retry-After after a 429 and reads again", async () => {
+    const { slept, sleep } = recordingSleep();
+    const read = vi.fn<() => Promise<readonly RunEvent[]>>()
+      .mockRejectedValueOnce(rateLimited(30_000))
+      .mockResolvedValueOnce([]);
+    await expect(readRecordedEvents(read, new AbortController().signal, sleep)).resolves.toEqual([]);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(slept).toEqual([30_000]);
+  });
+
+  it("waits the live loop's 60 s floor when the server names no wait, and at most 2 minutes", async () => {
+    const floor = recordingSleep();
+    await readRecordedEvents(
+      vi.fn<() => Promise<readonly RunEvent[]>>().mockRejectedValueOnce(rateLimited()).mockResolvedValueOnce([]),
+      new AbortController().signal, floor.sleep
+    );
+    expect(floor.slept).toEqual([LIVE_STREAM_RECONNECT.rateLimitedFloorMs]);
+    const capped = recordingSleep();
+    await readRecordedEvents(
+      vi.fn<() => Promise<readonly RunEvent[]>>().mockRejectedValueOnce(rateLimited(600_000)).mockResolvedValueOnce([]),
+      new AbortController().signal, capped.sleep
+    );
+    expect(capped.slept).toEqual([120_000]);
+    expect(RECORDED_REPLAY_RETRY).toEqual({ attempts: 3, capMs: 120_000 });
+  });
+
+  it("rejects with the third 429 after two waits", async () => {
+    const { slept, sleep } = recordingSleep();
+    const third = rateLimited(5_000);
+    const read = vi.fn<() => Promise<readonly RunEvent[]>>()
+      .mockRejectedValueOnce(rateLimited(5_000))
+      .mockRejectedValueOnce(rateLimited(5_000))
+      .mockRejectedValueOnce(third)
+      .mockResolvedValue([]);
+    await expect(readRecordedEvents(read, new AbortController().signal, sleep)).rejects.toBe(third);
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(slept).toEqual([5_000, 5_000]);
+  });
+
+  it("rejects any other failure at once, with no wait and one read", async () => {
+    const { slept, sleep } = recordingSleep();
+    const failure = new ContractHttpError("SERVER_FAILURE", 503, "x");
+    const read = vi.fn<() => Promise<readonly RunEvent[]>>().mockRejectedValueOnce(failure).mockResolvedValue([]);
+    await expect(readRecordedEvents(read, new AbortController().signal, sleep)).rejects.toBe(failure);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(slept).toEqual([]);
+  });
+
+  it("an abort during the wait rejects with the 429 and reads no more", async () => {
+    const controller = new AbortController();
+    const slept: number[] = [];
+    const sleep = async (ms: number, _signal: AbortSignal) => { slept.push(ms); controller.abort(); };
+    const failure = rateLimited(1_000);
+    const read = vi.fn<() => Promise<readonly RunEvent[]>>().mockRejectedValueOnce(failure).mockResolvedValue([]);
+    await expect(readRecordedEvents(read, controller.signal, sleep)).rejects.toBe(failure);
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(slept).toEqual([1_000]);
+  });
+
+  it("the default wait ends early on abort and leaves no abort listener behind", async () => {
+    vi.useFakeTimers({ now: 0 });
+    try {
+      const controller = new AbortController();
+      const added = vi.spyOn(controller.signal, "addEventListener");
+      const removed = vi.spyOn(controller.signal, "removeEventListener");
+      const read = vi.fn<() => Promise<readonly RunEvent[]>>().mockRejectedValueOnce(rateLimited(30_000)).mockResolvedValue([]);
+      const settled = readRecordedEvents(read, controller.signal).catch((error: unknown) => error);
+      await vi.advanceTimersByTimeAsync(10_000);
+      controller.abort();
+      expect(await settled).toBeInstanceOf(ContractHttpError);
+      expect(read).toHaveBeenCalledTimes(1);
+      expect(added).toHaveBeenCalledTimes(1);
+      expect(removed).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

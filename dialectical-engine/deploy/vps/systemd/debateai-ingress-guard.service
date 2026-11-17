@@ -1,0 +1,22 @@
+# deploy/vps/systemd/debateai-ingress-guard.service
+# NV-56. Docker publishes Hatchet's 8888 and 7077 on 127.0.0.1 only, but on some engines another host on the same
+# network could still reach them: by sending packets for 127.0.0.1 (Docker's DNAT runs before routing), or by routing
+# to the container's own bridge address. In the raw table, before Docker sees them, this drops every packet that does
+# not arrive on lo and is either for 127.0.0.0/8 or TCP to one of Hatchet's two published ports, on any Docker version.
+# Root, oneshot, before Docker (dockerd restarts the container at boot by itself); Docker requires it once enabled,
+# so a failed guard keeps Docker down. Never stop or restart it: that stops or restarts Docker. It removes nothing.
+[Unit]
+Description=DebateAI ingress guard (drop off-host packets for 127.0.0.0/8 and Hatchet's ports before Docker)
+Documentation=file:///opt/debateai/dialectical-engine/deploy/vps/README.md
+After=nftables.service ufw.service
+Before=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/bin/sh -c '/usr/sbin/iptables -w -t raw -C PREROUTING ! -i lo -d 127.0.0.0/8 -m comment --comment debateai-loopback-guard -j DROP 2>/dev/null || /usr/sbin/iptables -w -t raw -I PREROUTING 1 ! -i lo -d 127.0.0.0/8 -m comment --comment debateai-loopback-guard -j DROP'
+ExecStart=/bin/sh -c '/usr/sbin/iptables -w -t raw -C PREROUTING ! -i lo -p tcp -m multiport --dports 7077,8888 -m comment --comment debateai-hatchet-ports-guard -j DROP 2>/dev/null || /usr/sbin/iptables -w -t raw -I PREROUTING 1 ! -i lo -p tcp -m multiport --dports 7077,8888 -m comment --comment debateai-hatchet-ports-guard -j DROP'
+
+[Install]
+WantedBy=multi-user.target
+RequiredBy=docker.service
