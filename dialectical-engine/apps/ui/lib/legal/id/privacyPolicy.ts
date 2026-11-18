@@ -364,12 +364,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.12",
-  sha256: "7e92f38178e93e0ea6d4be470edb5a26bf59c0dc06bc04482b31e9341888d689",
-  eyebrow: "KEBIJAKAN PRIVASI · v3.12 · BERLAKU 4 NOVEMBER 2026",
+  version: "3.13",
+  sha256: "7da89e4ac4bd7928bc4ae4141b6f74c7df03a52ccd194c7ae977411b043fa86c",
+  eyebrow: "KEBIJAKAN PRIVASI · v3.13 · BERLAKU 19 NOVEMBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",
-  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.12",
+  endMarker: "AKHIR KEBIJAKAN · GDPR (EU) 2016/679 · v3.13",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Teks Kebijakan Privasi",
   sectionIdPrefix: "policy-section-",

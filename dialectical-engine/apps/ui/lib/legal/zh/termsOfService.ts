@@ -372,12 +372,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.18",
-  sha256: "6a38c9b196af4c2d3536a587c1b1d858885220c1890ffc3c963e7a06b4180487",
-  eyebrow: "服务条款 · v2.18 · 生效日期 2026 年 11 月 1 日",
+  version: "2.19",
+  sha256: "13917df87d8ee2697eced3843160ccd8246f01d96893257be29b61157f7943d3",
+  eyebrow: "服务条款 · v2.19 · 生效日期 2026 年 11 月 19 日",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",
-  endMarker: "服务条款结束 · v2.18",
+  endMarker: "服务条款结束 · v2.19",
   contact: "support@dezbatere.ro",
   bodyLabel: "服务条款正文",
   sectionIdPrefix: "terms-section-",

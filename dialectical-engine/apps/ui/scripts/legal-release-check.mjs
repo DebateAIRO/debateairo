@@ -5,8 +5,9 @@
  * reports anything.
  *
  * While work goes on, a change to the Terms of Service or the Privacy Policy is made in English only
- * (generate-legal-data.mjs, "English first"). Before a release, every language must be brought up to
- * date. This check says, in plain sentences, what is still missing:
+ * (generate-legal-data.mjs, "English first"). Before a release, every language the release offers
+ * (RELEASE_LEGAL_LOCALES) must be brought up to date; the others may lag, since nobody is shown or
+ * asked to accept them. This check says, in plain sentences, what is still missing in those languages:
  *   - which languages lag the English text of which document: their entry in
  *     apps/ui/legal/translated-from.json names another English text than the current one;
  *   - which up-to-date languages no longer match the English structure (legal-locale-check.mjs);
@@ -31,6 +32,7 @@ import {
   legalArchiveProblems,
   legalTranslationFollows,
   parseLegalTranslations,
+  RELEASE_LEGAL_LOCALES,
   renderLegalManifest
 } from "./generate-legal-data.mjs";
 import { assertLegalLocale } from "./legal-locale-check.mjs";
@@ -55,11 +57,13 @@ function languages(codes, verb) {
  * Every reason the repository is not ready for a release, as plain sentences, or [] when it is.
  * `readDraft(locale, kind)` gives a draft's text; `manifest` is the committed manifest (its `archive`
  * is the archive index); `translations` is the parsed record of translations; archive files are
- * read under `repoRoot`.
+ * read under `repoRoot`. `locales` names the languages to check, every language when left out; English,
+ * the text every other follows, is always checked. A language outside `locales` may lag and stay
+ * unarchived; the archive files and their index are checked whole either way.
  */
-export function legalReleaseProblems(repoRoot, { readDraft, manifest, translations }) {
+export function legalReleaseProblems(repoRoot, { readDraft, manifest, translations, locales = LOCALES.map(({ code }) => code) }) {
   const problems = [];
-  const codes = LOCALES.map(({ code }) => code).sort();
+  const codes = [...new Set(["en", ...locales])].sort();
   for (const { kind, key, name } of DOCUMENTS) {
     let english;
     try {
@@ -138,7 +142,12 @@ function main() {
   }
   if (manifest !== null && translations !== null) {
     try {
-      problems.push(...legalReleaseProblems(REPO_ROOT, { readDraft: readDraftFile, manifest, translations }));
+      problems.push(...legalReleaseProblems(REPO_ROOT, {
+        readDraft: readDraftFile,
+        manifest,
+        translations,
+        locales: RELEASE_LEGAL_LOCALES
+      }));
       const consentEntries = buildConsentManifestEntries({
         messagesRoot: resolve(REPO_ROOT, "apps/ui/messages"),
         locales: LOCALES.map(({ code }) => code)
@@ -150,7 +159,7 @@ function main() {
     }
   }
   if (problems.length === 0) {
-    process.stdout.write("Legal texts: ready for release. Every language follows the current English text, and the archive holds every current text.\n");
+    process.stdout.write(`Legal texts: ready for release. Every language this release offers (${RELEASE_LEGAL_LOCALES.join(", ")}) follows the current English text, and the archive holds their current texts.\n`);
     return;
   }
   process.stdout.write(`Legal texts: NOT ready for release (${problems.length} problem${problems.length === 1 ? "" : "s"}).\n`);

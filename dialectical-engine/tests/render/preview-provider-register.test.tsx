@@ -369,8 +369,10 @@ describe("the Register words still exist in all 35 languages", () => {
         expect(catalog[key], `${locale} ${key}`).not.toContain("[");
       }
       // The numbers are facts: 30 days, 7 years for safety-check results, 55 days at Google, 30 days after the service ends at Perplexity.
-      // English no longer gives Perplexity's 30 days: its search terms let it keep search phrases, and the row says that instead.
-      if (locale !== "en") expect(catalog["legal.providers.retentionPerplexity"], locale).toContain("30");
+      // English, and Romanian, which follows it for this release, no longer give Perplexity's 30 days: its search terms let
+      // it keep search phrases, and the row says that instead. The other languages still carry the older row.
+      if (locale !== "en" && locale !== "ro") expect(catalog["legal.providers.retentionPerplexity"], locale).toContain("30");
+      else expect(catalog["legal.providers.retentionPerplexity"], locale).not.toMatch(/\b30\b/u);
       for (const key of ["legal.providers.locationDeepInfra", "legal.providers.retentionDeepInfra", "legal.providers.deepinfraPartnerName"]) expect(catalog[key], `${locale} ${key}`).toContain("DeepInfra");
       for (const key of ["legal.providers.locationPerplexity", "legal.providers.retentionPerplexity"]) expect(catalog[key], `${locale} ${key}`).toContain("Perplexity");
       expect(catalog["legal.providers.retentionAnthropic"], locale).toMatch(/30[^0-9][\s\S]*7[^0-9]|30[^0-9][\s\S]*7$/);

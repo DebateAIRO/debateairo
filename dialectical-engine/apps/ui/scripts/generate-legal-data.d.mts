@@ -39,9 +39,14 @@ export function buildLegalManifest(
   archiveHistory?: LegalArchiveIndex,
   /** The re-acceptance floors; the DOCUMENTS config's when left out. Refused above a current draft. */
   floors?: Readonly<Partial<Record<LegalManifestKind, string | null>>>,
-  /** `archiveCurrent`: also list every current draft in the archive index (the release step's `--archive`). */
-  options?: Readonly<{ archiveCurrent?: boolean }>
+  /**
+   * `archiveCurrent`: also list the current drafts in the archive index (the release step's `--archive`), those of
+   * `archiveLocales` only (every language when it is left out; `--archive` passes RELEASE_LEGAL_LOCALES).
+   */
+  options?: Readonly<{ archiveCurrent?: boolean; archiveLocales?: readonly string[] }>
 ): LegalManifest;
+/** The languages whose legal texts this release offers: the release check and the archive step cover only these. */
+export const RELEASE_LEGAL_LOCALES: readonly string[];
 export function renderLegalManifest(manifest: LegalManifest): string;
 /** kind -> translated locale -> the English `{ version, sha256 }` that translation was translated from. */
 export type LegalTranslations = Readonly<Record<LegalManifestKind, Readonly<Record<string, Pair>>>>;

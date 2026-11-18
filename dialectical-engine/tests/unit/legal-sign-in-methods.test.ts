@@ -24,8 +24,7 @@ describe("sign-in methods, in the English legal texts", () => {
     for (const [name, text, swaps] of [["privacy-policy.md", privacy, PRIVACY_SIGN_IN_SWAPS], ["terms-of-service.md", terms, TERMS_SIGN_IN_SWAPS]] as const) {
       for (const [before, after] of swaps) {
         expect(text.split(after), name).toHaveLength(2);
-        // A change-history swap only appends a sentence, so its old text lives on inside the new one.
-        if (!after.includes(before)) expect(text, `${name}: the old wording is gone`).not.toContain(before);
+        expect(text, `${name}: the old wording is gone`).not.toContain(before);
       }
     }
   });
@@ -57,8 +56,25 @@ describe("sign-in methods, in the English legal texts", () => {
     for (const text of [terms, privacy]) expect(text).not.toContain("Facebook");
   });
 
-  it("each change history names the sign-in change", () => {
-    expect(terms).toContain("Version 2.18 also says how you can sign in:");
-    expect(privacy).toContain("Version 3.12 also says how you can sign in and what each way keeps:");
+  it("each change history names the sign-in change, in the entry of the version that brings it", () => {
+    expect(terms).toContain("Version 2.19 replaced version 2.18: section 6 says how you can sign in:");
+    expect(privacy).toContain("Version 3.13 replaced version 3.12: it says how you can sign in and what each way keeps:");
+    expect(terms).not.toContain("Version 2.18 also says how you can sign in");
+    expect(privacy).not.toContain("Version 3.12 also says how you can sign in");
+  });
+
+  it("says the recovery email address is optional, and that Settings shows the whole phone number only after you confirm it is you", () => {
+    // Sign-up never asks for a recovery address (apps/api/src/registration.ts: RegisterInput's recoveryEmail is optional,
+    // and social sign-up drops it); Settings adds one (apps/ui/components/EmailSettings.tsx).
+    expect(terms).toContain("You register with an email address, and you may add a recovery email address and a phone number;");
+    expect(terms).not.toContain("You register with an email address and a recovery email address");
+    const registration = readFileSync(resolve(root, "apps/api/src/registration.ts"), "utf8");
+    expect(registration).toContain("readonly recoveryEmail?: string | null;");
+    expect(registration).toContain('export type SocialRegisterInput = Omit<RegisterInput, "password" | "recoveryEmail">;');
+    // Settings masks the number to its last four digits (apps/api/src/account-profile.ts) and shows it whole only after a
+    // security confirmation (the READ_PHONE_PROFILE step-up in apps/ui/components/PhoneProfileCard.tsx).
+    expect(privacy).toContain("Settings shows only its last four digits unless you confirm it is you and ask to see the whole number;");
+    expect(readFileSync(resolve(root, "apps/api/src/account-profile.ts"), "utf8")).toContain("phone.slice(-4)");
+    expect(readFileSync(resolve(root, "apps/ui/components/PhoneProfileCard.tsx"), "utf8")).toContain("client.revealPhoneProfile(result.step_up_grant.token)");
   });
 });

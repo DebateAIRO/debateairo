@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.18 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v2.19 · EN VIGOR DESDE 19 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.18
+endMarker: FIN DE LOS TÉRMINOS · v2.19
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.18 · Effective 1 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 2.19 · Effective 19 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. En el plan gratuito, sus debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que los publique. Una vez públicos, cualquiera puede leer un debate, y sigue siendo público. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores, principalmente DeepInfra, en Estados Unidos. Las condiciones de DeepInfra, Anthropic y Perplexity no les permiten entrenar modelos con él; la sección 8 indica de qué empresa aún no lo hemos confirmado. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 

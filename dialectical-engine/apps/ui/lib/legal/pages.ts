@@ -557,7 +557,9 @@ export type TermsVersion = Readonly<{
  * numbered 2.7 became 2.9, but the change history in the Terms names a 2.7, so its row says why there is nothing to read.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.18", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.19", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.18", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/b598df6acbe610001b8740b17231d36f03912abbabebbe06dcf0eb5d960f3cac" },
   { version: "2.17", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/63e8f9c271ed42c5466568999f4a35418b5011d8f31309dabb199f8927a30203" },
   { version: "2.16", noteKey: "legal.archive.meta", current: false,

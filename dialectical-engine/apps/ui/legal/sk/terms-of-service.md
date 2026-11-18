@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.18 · ÚČINNÉ OD 1. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.19 · ÚČINNÉ OD 19. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.18
+endMarker: KONIEC PODMIENOK · v2.19
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.18 · Effective 1. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 2.19 · Effective 19. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov, najmä poskytovateľovi DeepInfra, v Spojených štátoch. Podmienky DeepInfra, Anthropic a Perplexity im nedovoľujú trénovať na ňom modely; časť 8 uvádza, pri ktorej spoločnosti sme to zatiaľ nepotvrdili. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 

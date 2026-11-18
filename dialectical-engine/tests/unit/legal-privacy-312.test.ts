@@ -11,6 +11,7 @@ import {
   providerRegister,
   SUPPORT_PROVIDER
 } from "../../apps/ui/lib/legal/pages.js";
+import { PRIVACY_RELEASE_SWAPS, withoutRelease } from "../support/legalRelease.js";
 import { PRIVACY_SIGN_IN_SWAPS, withoutSignIn } from "../support/legalSignIn.js";
 
 /**
@@ -34,7 +35,8 @@ import { PRIVACY_SIGN_IN_SWAPS, withoutSignIn } from "../support/legalSignIn.js"
  * out and the one company for which that is not confirmed; section 5 says which transfer mechanism each relies on; and
  * section 14's 3.12 entry gains a sentence. This is in all 35 languages.
  *
- * Every locale's draft is compared, line by line, with its last 3.11 text in the archive: two rows and one paragraph
+ * Every locale's draft that still has its 3.12 body (STILL_312: all but the translations brought up to 3.13 for the
+ * release) is compared, line by line, with its last 3.11 text in the archive: two rows and one paragraph
  * more, and only the lines below differ. The rest of the change log stays byte for byte, so `legal-report-button`'s
  * pin still finds 3.11, 3.10 and 3.9 on that line. English is pinned word for word; the 34 translations are drafts for
  * native readers, checked by their structure.
@@ -441,14 +443,55 @@ const priorIndex = (index: number): number => index - INSERTED.filter((row) => r
 const root = process.cwd();
 const draftBytes = (code: string): Buffer => readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"));
 /**
- * A draft's text for the checks against 3.11. English also says how you sign in (18 November 2026, English first; see
- * tests/support/legalSignIn.ts): those swaps are undone here, so the lines below compare as they did before, and
- * `legal-sign-in-methods` pins the new English. The manifest checks hash the file as it is (draftBytes).
+ * Privacy 3.13, effective 19 November 2026 (tests/support/legalRelease.ts): every draft's eyebrow, end marker and
+ * version line name 3.13 and the new date, and English's section 14 gains the 3.13 entry. Undone here, in each
+ * language's own date words (DATES, with the day 19 for 4), so the lines below still compare 3.12 with 3.11.
+ */
+const as312 = (code: string, text: string): string => {
+  const dates = DATES[code]!;
+  const on19 = (date: string): string => {
+    expect(date.match(/(?<!\d)4(?!\d)/gu), `${code}: the day stands once in "${date}"`).toHaveLength(1);
+    return date.replace(/(?<!\d)4(?!\d)/u, "19");
+  };
+  const all = lines(text);
+  const undo = (at: number, from: string, to: string, label: string): void => {
+    expect(all[at]!.split(from), `${code}: ${label} carries 3.13 once`).toHaveLength(2);
+    all[at] = all[at]!.replace(from, () => to);
+  };
+  undo(EYEBROW, ` v3.13 · `, ` v3.12 · `, "the eyebrow");
+  undo(EYEBROW, on19(dates.eyebrow), dates.eyebrow, "the eyebrow's date");
+  expect(all[END_MARKER], `${code}: the end marker`).toMatch(/ v3\.13$/u);
+  all[END_MARKER] = all[END_MARKER]!.replace(/v3\.13$/u, "v3.12");
+  undo(VERSION_LINE, `**Version 3.13 · Effective ${on19(dates.line)}`, `**Version 3.12 · Effective ${dates.line}`, "the version line");
+  return all.join("\n");
+};
+
+/**
+ * A draft's text for the checks against 3.11, with 3.13 undone (as312). English also says how you sign in (English
+ * first; see tests/support/legalSignIn.ts) and carries the 3.13 entry in section 14 (tests/support/legalRelease.ts):
+ * both are undone here, so the lines below compare as they did before, and `legal-sign-in-methods` and
+ * `legal-release-versions` pin the new English. The manifest checks hash the file as it is (draftBytes).
  */
 const draftText = (code: string): string => {
   const text = draftBytes(code).toString("utf8");
-  return code === "en" ? withoutSignIn(text, PRIVACY_SIGN_IN_SWAPS) : text;
+  return code === "en"
+    ? withoutSignIn(withoutRelease(text, PRIVACY_RELEASE_SWAPS), PRIVACY_SIGN_IN_SWAPS)
+    : as312(code, text);
 };
+
+/**
+ * The languages whose draft still has its 3.12 body under the 3.13 marks: English, whose release changes are undone
+ * above, and each translation that apps/ui/legal/translated-from.json does not record as translated from the current
+ * English text. A translation brought up to date for the release is a 3.13 text throughout, so the line-by-line checks
+ * against 3.11 below no longer describe it; `legal-documents-locale-complete` holds it to the English structure, and
+ * the release check (`legal-english-first`) to the current English text.
+ */
+const englishNow = createHash("sha256").update(draftBytes("en")).digest("hex");
+const translatedFrom = (JSON.parse(readFileSync(resolve(root, "apps/ui/legal/translated-from.json"), "utf8")) as {
+  PRIVACY: Record<string, { version: string; sha256: string }>;
+}).PRIVACY;
+const STILL_312 = LOCALES.map(({ code }) => code)
+  .filter((code) => code === "en" || translatedFrom[code]?.sha256 !== englishNow);
 const lines = (text: string): string[] => text.split("\n");
 const manifest = (): {
   documents: Record<string, Record<string, { version: string; sha256: string }>>;
@@ -601,7 +644,13 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: two rows and one paragraph more, and only the listed lines differ from the last 3.11 text", (code) => {
+  it("leaves out of the 3.12 line checks only French and Romanian, the translations brought up to 3.13 for the release", () => {
+    const left = LOCALES.map(({ code }) => code).filter((code) => !STILL_312.includes(code));
+    expect([...left].sort()).toEqual(["fr", "ro"]);
+    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "3.13", sha256: englishNow });
+  });
+
+  it.each(STILL_312.map((code) => [code]))("%s: two rows and one paragraph more, and only the listed lines differ from the last 3.11 text", (code) => {
     const sha256 = PRIOR[code]!;
     const archived = manifest().archive.PRIVACY?.[code]?.[sha256];
     expect(archived, `${code}: the prior text is in the archive index`).toEqual({ version: "3.11", path: `apps/ui/legal/archive/${code}/${sha256}.md` });
@@ -719,7 +768,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the new rows, the Next paragraph and the 3.12 entry", (code) => {
+  it.each(STILL_312.map((code) => [code]))("%s: the new rows, the Next paragraph and the 3.12 entry", (code) => {
     const pins = AS_83[code]!;
     const gap = sentenceGap(code);
     const text = draftText(code);
@@ -782,7 +831,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the other changed lines keep their shape", (code) => {
+  it.each(STILL_312.map((code) => [code]))("%s: the other changed lines keep their shape", (code) => {
     const next = lines(draftText(code));
     const prior = priorLines(code);
     const pair = (at: number): readonly [string, string] => [next[at]!, prior[priorIndex(at)]!];
@@ -832,7 +881,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   });
 
   // 16 November 2026: DeepInfra is named, and no line says flatly any more that the text is not used to train models.
-  it.each(LOCALES.map(({ code }) => [code]))("%s: section 5 names DeepInfra, and four lines name the three companies", (code) => {
+  it.each(STILL_312.map((code) => [code]))("%s: section 5 names DeepInfra, and four lines name the three companies", (code) => {
     const next = lines(draftText(code));
     const prior = priorLines(code);
     // The new paragraph: a bold lead-in as its neighbour's, the brand and the company, then the Perplexity paragraph as it was.
@@ -866,23 +915,18 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.12 for the draft's exact bytes", (code) => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.13 for the draft's exact bytes", (code) => {
     const current = manifest().documents.PRIVACY?.[code];
-    expect(current).toEqual({ version: "3.12", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
+    expect(current).toEqual({ version: "3.13", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
   });
 
-  // Tasks 83b and 83c: 3.12 was never published, so each earlier 3.12 draft leaves the archive, as the never-published
-  // 3.11 drafts did in 0bbaecc47 and d3bf346e5; the versions page lists one 3.12 text per language, the one that goes up.
-  // English first: the archive is brought up to date by the release step, not at every edit, so a draft changed since
-  // (an English edit whose translations lag) is not archived yet. The release check refuses to release it while the
-  // archive holds another text as 3.12 in that language.
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, the draft's once it is archived", (code) => {
+  // The archive holds one 3.12 text per language, the one the versions page lists. The texts changed after it took them,
+  // so the drafts carry 3.13 now and none of them is that archived 3.12 text.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, and the 3.13 draft is another", (code) => {
     const draft = createHash("sha256").update(draftBytes(code)).digest("hex");
     const archived = Object.entries(manifest().archive.PRIVACY?.[code] ?? {}).filter(([, entry]) => entry.version === "3.12");
     expect(archived).toHaveLength(1);
-    if (archived.some(([sha256]) => sha256 === draft)) {
-      expect(archived).toEqual([[draft, { version: "3.12", path: `apps/ui/legal/archive/${code}/${draft}.md` }]]);
-    }
+    expect(archived.map(([sha256]) => sha256)).not.toContain(draft);
   });
 });
 

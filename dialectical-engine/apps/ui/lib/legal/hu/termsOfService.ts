@@ -372,12 +372,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.18",
-  sha256: "a7c29276c45ed06f72780c61ed0f7a82cf9f67ddf5c40b00cc37690176c3da21",
-  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.18 · HATÁLYOS 2026. NOVEMBER 1.",
+  version: "2.19",
+  sha256: "a326f48438b6070c26754c00d3a413897638790743d499d33b8c7ea32c68ae73",
+  eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.19 · HATÁLYOS 2026. NOVEMBER 19.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",
-  endMarker: "A FELTÉTELEK VÉGE · v2.18",
+  endMarker: "A FELTÉTELEK VÉGE · v2.19",
   contact: "support@dezbatere.ro",
   bodyLabel: "A Szolgáltatási feltételek szövege",
   sectionIdPrefix: "terms-section-",

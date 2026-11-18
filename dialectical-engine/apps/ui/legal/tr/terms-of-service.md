@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.18 · YÜRÜRLÜK TARİHİ 1 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v2.19 · YÜRÜRLÜK TARİHİ 19 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.18
+endMarker: KOŞULLARIN SONU · v2.19
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.18 · Effective 1 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 2.19 · Effective 19 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına, ağırlıklı olarak Amerika Birleşik Devletleri'ndeki DeepInfra'ya iletilir. DeepInfra, Anthropic ve Perplexity'nin koşulları, bu metinle model eğitmelerine izin vermez; hangi şirket için bunu henüz teyit etmediğimizi bölüm 8 anlatır. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
