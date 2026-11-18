@@ -204,7 +204,11 @@ export function answersStillAsked(answers: readonly V4GoalAnswer[], questions: r
   return kept.length === answers.length ? answers : Object.freeze(kept);
 }
 
-/** ASK-1, a dig's framing only: its English sentences go only with an English page (all 35 locales load the English v4 file tonight). */
+/**
+ * A dig's framing only: its English sentences go only with an English page; any other page writes the dig without framing.
+ * The `v4.digText.*` and `v4.askText.*` templates are read back here to recognise the English form, so every catalogue,
+ * the Romanian one included, keeps them in English.
+ */
 function writesEnglish(locale: string): boolean {
   return isLocale(locale) && catalogLocale(locale) === "en";
 }

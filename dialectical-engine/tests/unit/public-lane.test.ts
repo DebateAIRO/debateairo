@@ -91,15 +91,18 @@ describe("the public page's words", () => {
   it("the briefed sentences, word for word", () => {
     for (const [key, words] of Object.entries(OWNER_WORDS)) expect(CATALOG[key], key).toBe(words);
   });
-  it("no refusal and no line of the lane says a number, a price or an engine word", () => {
-    const lane = Object.entries(CATALOG).filter(([key]) => key.startsWith("v4.public.") || key.startsWith("v4.contribution."));
+  it.each(["en", "ro"])("no refusal and no line of the lane says a number, a price or an engine word (%s)", (locale) => {
+    const lane = Object.entries(read(locale, "v4")).filter(([key]) => key.startsWith("v4.public.") || key.startsWith("v4.contribution."));
     expect(lane.length).toBeGreaterThan(20);
     for (const [key, line] of lane) {
       expect(line.replace(/\{[a-zA-Z]+\}/gu, ""), key).not.toMatch(/\d|[$€£]|\bscore|\bthreshold|\bcredit|\bpublic_|\b[A-Z_]{4,}\b/u);
     }
   });
-  it("these strings stay in English only: no other language has a v4 catalogue (owner N10)", () => {
-    expect(readdirSync(resolve(messages, "ro")).filter((name) => name === "v4.json")).toEqual([]);
+  it("Romanian has its own v4 catalogue; the other 33 languages have none and read the English one", () => {
+    const locales = readdirSync(messages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    const withV4 = locales.filter((locale) => readdirSync(resolve(messages, locale)).includes("v4.json"));
+    expect(withV4.sort()).toEqual(["en", "ro"]);
+    expect(locales.length - withV4.length).toBe(33);
   });
 });
 

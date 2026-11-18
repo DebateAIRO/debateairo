@@ -1029,7 +1029,7 @@
     "support": {
       "support.notice": "Mesajele dumneavoastră sunt trimise către Claude de la Anthropic, ca să vă poată răspunde. Nu păstrăm nimic din ce scrieți aici.",
       "support.humanAddress": "Pentru a ajunge la o persoană, scrieți la {address}. Acest chat nu vă poate transmite mesajul mai departe.",
-      "support.tooLong": "Mesajul tău este prea lung pentru chat. Scurtează-l și trimite-l din nou.",
+      "support.tooLong": "Mesajul este prea lung pentru chat. Scurtați-l și trimiteți-l din nou.",
       "support.helpUnavailable": "Ajutorul nu a putut fi încărcat. Reîncărcați pagina pentru a încerca din nou.",
       "support.escalateBody": "Acest chat nu păstrează nimic și nu vă poate transmite mesajul mai departe. Scrieți-ne și o persoană îl citește.",
       "support.agentLead": "Răspunde pe baza îndrumărilor publice despre produs, își citează sursa și vă arată adresa noastră de asistență atunci când nu poate ajuta.",
