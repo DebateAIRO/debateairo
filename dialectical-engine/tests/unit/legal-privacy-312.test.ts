@@ -11,6 +11,7 @@ import {
   providerRegister,
   SUPPORT_PROVIDER
 } from "../../apps/ui/lib/legal/pages.js";
+import { PRIVACY_SIGN_IN_SWAPS, withoutSignIn } from "../support/legalSignIn.js";
 
 /**
  * Privacy Policy 3.12 (V4 start step, plan Task 83; the owner's Day-1 answers 13 and 14 of 3 Nov 2026,
@@ -439,6 +440,15 @@ const priorIndex = (index: number): number => index - INSERTED.filter((row) => r
 
 const root = process.cwd();
 const draftBytes = (code: string): Buffer => readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"));
+/**
+ * A draft's text for the checks against 3.11. English also says how you sign in (18 November 2026, English first; see
+ * tests/support/legalSignIn.ts): those swaps are undone here, so the lines below compare as they did before, and
+ * `legal-sign-in-methods` pins the new English. The manifest checks hash the file as it is (draftBytes).
+ */
+const draftText = (code: string): string => {
+  const text = draftBytes(code).toString("utf8");
+  return code === "en" ? withoutSignIn(text, PRIVACY_SIGN_IN_SWAPS) : text;
+};
 const lines = (text: string): string[] => text.split("\n");
 const manifest = (): {
   documents: Record<string, Record<string, { version: string; sha256: string }>>;
@@ -569,7 +579,7 @@ const swapped = (line: string, swaps: readonly (readonly [string, string])[]): s
 const entryOf = (code: string): string => {
   const priorLog = priorLines(code)[priorIndex(CHANGE_LOG)]!;
   const tail = priorLog.slice(entryStart(priorLog, "3.11"));
-  const log = lines(draftBytes(code).toString("utf8"))[CHANGE_LOG]!;
+  const log = lines(draftText(code))[CHANGE_LOG]!;
   expect(log.endsWith(tail), `${code}: from the 3.11 entry to the end, the log is unchanged`).toBe(true);
   return log.slice(entryStart(log, "3.12"), log.length - tail.length);
 };
@@ -598,7 +608,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     const priorBytes = readFileSync(resolve(root, archived!.path));
     expect(createHash("sha256").update(priorBytes).digest("hex"), `${code}: the archived bytes`).toBe(sha256);
     const prior = withoutSwitzerland(code, lines(priorBytes.toString("utf8")));
-    const next = lines(draftBytes(code).toString("utf8"));
+    const next = lines(draftText(code));
 
     expect(next, `${code}: the line count is 3.11's, the two new rows, and the new paragraph with its blank line`).toHaveLength(prior.length + INSERTED.length);
     const rows = cookieRows(code);
@@ -649,7 +659,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   });
 
   it("English reads exactly as the owner approved", () => {
-    const next = lines(draftBytes("en").toString("utf8"));
+    const next = lines(draftText("en"));
     const prior = priorLines("en");
     expect(next[EYEBROW]).toBe("eyebrow: PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026");
     expect(next[END_MARKER]).toBe("endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.12");
@@ -663,17 +673,17 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     // The leftover take-down sentence goes, and nothing else on that line changes.
     expect(prior[priorIndex(FLAGGED)]!.split(TAKE_DOWN)).toHaveLength(2);
     expect(next[FLAGGED]).toBe(prior[priorIndex(FLAGGED)]!.replace(` ${TAKE_DOWN}`, ""));
-    expect(draftBytes("en").toString("utf8")).not.toContain(TAKE_DOWN);
+    expect(draftText("en")).not.toContain(TAKE_DOWN);
     // Taiwan's part goes from the end of the Asia-Pacific paragraph, and nothing before it changes.
     const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
     expect(asiaPacific.split(TAIWAN)).toHaveLength(2);
     expect(next[ASIA_PACIFIC]).toBe(asiaPacific.slice(0, asiaPacific.indexOf(TAIWAN)));
     expect(next[ASIA_PACIFIC]!.endsWith("as the Personal Information Protection Act requires.")).toBe(true);
-    expect(draftBytes("en").toString("utf8")).not.toContain("Taiwan");
+    expect(draftText("en")).not.toContain("Taiwan");
     // Quebec: Free debates are public there too, as section 6 says; nothing else in Annex B.3 changes.
     expect(prior[priorIndex(QUEBEC)]!.split(QUEBEC_BEFORE)).toHaveLength(2);
     expect(next[QUEBEC]).toBe(prior[priorIndex(QUEBEC)]!.replace(QUEBEC_BEFORE, QUEBEC_AFTER));
-    expect(draftBytes("en").toString("utf8")).not.toContain(QUEBEC_BEFORE);
+    expect(draftText("en")).not.toContain(QUEBEC_BEFORE);
     const priorLog = prior[priorIndex(CHANGE_LOG)]!;
     const tail = priorLog.slice(priorLog.indexOf("Version 3.11 replaced version 3.10:"));
     expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${CHANGE_ENTRY_DEEPINFRA} ${tail}`);
@@ -681,14 +691,14 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     expect([next[DEEPINFRA_AT], next[DEEPINFRA_AT + 1]]).toEqual([DEEPINFRA_PARAGRAPH, ""]);
     expect(next[DEEPINFRA_AT + 2]!.startsWith("**Web search through Perplexity.**")).toBe(true);
     for (const at of NAMED) expect(next[at], `line ${at}`).toBe(swapped(prior[priorIndex(at)]!, [NAMED_SWAPS[at]!]));
-    const text = draftBytes("en").toString("utf8");
+    const text = draftText("en");
     expect(text).not.toContain("not used to train models");
     expect(text).not.toContain("against our account");
     expect(text).not.toContain("we do not permit our providers to");
   });
 
   it("English says the owner's answers S1 A, S3 A and S4 A", () => {
-    const text = draftBytes("en").toString("utf8");
+    const text = draftText("en");
     const next = lines(text);
     const row = next[SAVED_ROW_AT]!;
     const kept = next[SAVED_RETENTION_AT]!;
@@ -712,7 +722,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   it.each(LOCALES.map(({ code }) => [code]))("%s: the new rows, the Next paragraph and the 3.12 entry", (code) => {
     const pins = AS_83[code]!;
     const gap = sentenceGap(code);
-    const text = draftBytes(code).toString("utf8");
+    const text = draftText(code);
     const next = lines(text);
 
     // Section 2's new row: three cells and a bold category, as its neighbours; section 7's new row names it.
@@ -773,7 +783,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   });
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the other changed lines keep their shape", (code) => {
-    const next = lines(draftBytes(code).toString("utf8"));
+    const next = lines(draftText(code));
     const prior = priorLines(code);
     const pair = (at: number): readonly [string, string] => [next[at]!, prior[priorIndex(at)]!];
     const grows = (now: string, was: string, label: string): void => {
@@ -823,7 +833,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
 
   // 16 November 2026: DeepInfra is named, and no line says flatly any more that the text is not used to train models.
   it.each(LOCALES.map(({ code }) => [code]))("%s: section 5 names DeepInfra, and four lines name the three companies", (code) => {
-    const next = lines(draftBytes(code).toString("utf8"));
+    const next = lines(draftText(code));
     const prior = priorLines(code);
     // The new paragraph: a bold lead-in as its neighbour's, the brand and the company, then the Perplexity paragraph as it was.
     const paragraph = next[DEEPINFRA_AT]!;
