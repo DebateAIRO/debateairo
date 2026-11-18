@@ -2,6 +2,7 @@ import { setGlobalProxyFromEnv } from 'node:http';
 import { refuse, withPrivateBytes } from './custody.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY, PREVIEW_SOCKET } from './turnstile-custody.mjs';
 import { PREVIEW_EGRESS_PROXY_URL } from './egress-proxy.mjs';
+import { namedRefusal } from './startup-refusals.mjs';
 const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUTHN_RP_ID','STAFF_INDEPENDENT_ALERT_CONFIG_PATH','STAFF_ALERT_OPERATOR_MODULE_PATH','STAFF_ALERT_OPERATOR_MODULE_SHA256',
  'INTERNAL_ALLOWANCE_POLICY_VERSION','INTERNAL_ALLOWANCE_CURRENCY','INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS','INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP','INTERNAL_ALLOWANCE_POLICY_SOURCE_REF'];
 /**
@@ -208,7 +209,12 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
    else if(BILLING_ONLY_KEYS.some(key=>configured[key]!==undefined))refuse();
   }
   return {environment:Object.freeze(environment),selectedRegisterVersion:String(normalized.REGISTER_VERSION),deploymentMode:normalized.DEPLOYMENT_MODE};
- }catch{refuse('PREVIEW_ENVIRONMENT_REFUSED');}
+ }catch(error){
+  // One message for every refusal, as before. A refusal of a closed, named form (startup-refusals.mjs) keeps its name in
+  // the cause, so the launcher can say which owner setting is wrong; it never carries a value.
+  const code=namedRefusal(error);
+  throw new TypeError('PREVIEW_ENVIRONMENT_REFUSED',code===undefined?undefined:{cause:code});
+ }
 }
 export async function readEnvironmentFile(path,custody) {
  return withPrivateBytes(path,{...custody,maxBytes:32768},raw=>parseEnvironmentText(new TextDecoder('utf8',{fatal:true}).decode(raw)));

@@ -5,6 +5,7 @@ import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from '
 import { afterRunnerReady,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
 import { loadTsxApi } from './tsx-api.mjs';
+import { startupRefusedLine } from './startup-refusals.mjs';
 /** The in-process readiness event apps/runner/src/runner-ready.ts announces (RUNNER_READY_PROCESS_EVENT). */
 export const RUNNER_READY_PROCESS_EVENT='debateai:runner-ready';
 /** The in-process event apps/runner/src/runner-retirement.ts emits when the runner retired itself (RUNNER_RETIRED_PROCESS_EVENT). */
@@ -101,7 +102,7 @@ export async function startRunner(argv,launch=launchRunner,{retiredSettleMs=RETI
  // Any refusal or later end ends this process: the runner's worker must not stay up unreported.
  const stop=installRunnerFailureCodes();
  let started;
- try{started=await launch(argv);}catch{process.stderr.write('PREVIEW_RUNNER_STARTUP_REFUSED\n');process.exit(1);}
+ try{started=await launch(argv);}catch(error){process.stderr.write(`${startupRefusedLine('PREVIEW_RUNNER_STARTUP_REFUSED',error)}\n`);process.exit(1);}
  let asked=false;
  const stopped=()=>{process.stdout.write('PREVIEW_RUNNER_STOPPED\n');process.exit(0);};
  // Listening replaces Node's default end on the signal; with no worker listening too, end here.
