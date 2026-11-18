@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Unde oferim Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Oferim Dialectical Engine persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia și Islanda), în Moldova, Statele Unite (cu excepția statului Tennessee), Canada, Australia, Noua Zeelandă, Singapore, Japonia și Coreea de Sud. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
+      { kind: "p", text: "Oferim Dialectical Engine persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia și Islanda), în Moldova, Statele Unite (cu excepția statelor Tennessee și Mississippi), Canada, Australia, Noua Zeelandă, Singapore, Japonia și Coreea de Sud. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Nu oferim Dialectical Engine persoanelor care locuiesc în Tennessee." },
+      { kind: "p", text: "Mississippi. Nu oferim Dialectical Engine persoanelor care locuiesc în Mississippi." },
       { kind: "p", text: "Notificări și eliminări. Imaginile intime distribuite fără consimțământ pot fi raportate prin e-mail la abuse@dezbatere.ro, fără un cont, și sunt eliminate în termen de 48 de ore de la o cerere valabilă. Reclamațiile privind drepturile de autor urmează procedura de raportare din secțiunea 10." },
       { kind: "p", text: "Dispoziții specifice statelor. California: se aplică condițiile de reînnoire automată din secțiunea 12; puteți anula online în orice moment; păstrăm consimțământul dumneavoastră cu privire la condițiile de reînnoire timp de cel puțin trei ani. New York: puteți anula în termen de 14 zile de la orice debitare la un preț majorat și puteți primi o rambursare proporțională. Texas și Nebraska: nu vindem date cu caracter personal sensibile. Washington: Informarea noastră privind confidențialitatea datelor de sănătate ale consumatorilor de la dezbatere.ro/privacy/us-health-data se aplică informațiilor referitoare la sănătate. Colorado: nicio componentă a serviciului nu ia decizii cu efecte semnificative cu privire la dumneavoastră. Politica noastră de confidențialitate, Anexa B.2, se referă la datele dumneavoastră și la drepturile privind confidențialitatea conferite de legislația statului dumneavoastră." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "8eaa0643ba08af51395fedd8553af7679083ed94f38fa7cd566aa74ef2fefffd",
+  sha256: "519d7c129ad93a62db575a86e0c9908033011d041b25b3e1b377d6e30d267928",
   eyebrow: "TERMENII SERVICIULUI · v2.18 · ÎN VIGOARE DE LA 1 NOIEMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",

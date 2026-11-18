@@ -48,7 +48,7 @@ Ezek az adatok folyamatosan elérhetők a webhelyen is: dezbatere.ro/legal. Mind
 
 ## 2. Hol kínáljuk a Dialectical Engine szolgáltatást
 
-A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia és Izland), Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán és Dél-Korea. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat.
+A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia és Izland), Moldova, Egyesült Államok (Tennessee és Mississippi állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán és Dél-Korea. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat.
 
 ## 3. E Feltételek elfogadása
 
@@ -334,6 +334,8 @@ E Feltételek törzsszövege Önnek szól. Ezen túlmenően: Ön a lakóhelye sz
 ### A.2 Egyesült Államok
 
 **Tennessee.** A Dialectical Engine szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek.
+
+**Mississippi.** A Dialectical Engine szolgáltatást nem kínáljuk a Mississippi államban élő személyeknek.
 
 **Értesítések és eltávolítások.** A hozzájárulás nélkül megosztott intim képfelvételeket az abuse@dezbatere.ro címre küldött e-mailben, fiók nélkül be lehet jelenteni, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 10. szakaszban ismertetett bejelentési úton kell benyújtani.
 

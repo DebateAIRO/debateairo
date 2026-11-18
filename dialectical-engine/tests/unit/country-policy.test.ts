@@ -72,15 +72,18 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
     expect(policy.tor).toBe("REFUSE");
   });
 
-  it("closes Tennessee by the Terms (owner's amendment of 8 October 2026) and leaves every other state on the US rule", () => {
+  it("closes Tennessee and Mississippi by the Terms (owner's amendment of 8 October 2026, decision of 18 November 2026) and leaves every other state on the US rule", () => {
     const excluded = { signup: false, pay: false, reason: "TERMS_EXCLUDED", blocked: false };
-    expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.us_states).toEqual({ TN: { signup: false, pay: false, reason: "TERMS_EXCLUDED" } });
-    expect(policy.usStates).toEqual({ TN: excluded });
+    const row = { signup: false, pay: false, reason: "TERMS_EXCLUDED" };
+    expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.us_states).toEqual({ TN: row, MS: row });
+    expect(policy.usStates).toEqual({ TN: excluded, MS: excluded });
     expect(declaredRegionRule(policy, { country: "US", usState: "TN" })).toEqual(excluded);
+    expect(declaredRegionRule(policy, { country: "US", usState: "MS" })).toEqual(excluded);
     expect(declaredRegionRule(policy, { country: "US", usState: "TX" })).toEqual(countryRule(policy, "US"));
     expect(declaredRegionRule(policy, { country: "RO", usState: null })).toEqual(countryRule(policy, "RO"));
     // A state is declared, never seen in an address: Tennessee does not touch new debates or IP sign-up.
     expect(policy.usStates.TN!.blocked).toBe(false);
+    expect(policy.usStates.MS!.blocked).toBe(false);
     expect(decideSignup(policy, { ipCountry: "US", tor: false })).toEqual({ kind: "ALLOW" });
   });
 
@@ -263,8 +266,8 @@ describe("countryPolicy v1 (paid plans G2, spec §1.5 and §2.3.3)", () => {
 
 /**
  * Payment region blocks (spec 2026-10-20 §2 and §7): the owner's launch list of 20 October 2026 without New Jersey,
- * which the owner opened on 4 November 2026, and Tennessee, which the Terms exclude (section 2, Annex A.2; the owner's
- * amendment of 8 October 2026), spelled out here on purpose (never derived from the code), so a changed code row
+ * which the owner opened on 4 November 2026, and Tennessee and Mississippi, which the Terms exclude (section 2, Annex
+ * A.2; the owner's amendment of 8 October 2026 and decision of 18 November 2026), spelled out here on purpose (never derived from the code), so a changed code row
  * fails this test.
  */
 const CLOSED = { pay: false, reason: "TAX_NOT_READY" } as const;
@@ -272,7 +275,7 @@ const LAUNCH_REGIONS = {
   "CA-SK": CLOSED, "CA-MB": CLOSED,
   "US-DC": CLOSED, "US-HI": CLOSED, "US-MD": CLOSED, "US-RI": CLOSED, "US-VT": CLOSED, "US-WV": CLOSED,
   "US-OH": { pay: false, reason: "TAX_NOT_READY", buyers: "business" },
-  "US-TN": { pay: false, reason: "TERMS_EXCLUDED" },
+  "US-TN": { pay: false, reason: "TERMS_EXCLUDED" }, "US-MS": { pay: false, reason: "TERMS_EXCLUDED" },
   "ES-CN": CLOSED, "ES-CE": CLOSED, "ES-ML": CLOSED,
   "FR-971": CLOSED, "FR-972": CLOSED, "FR-973": CLOSED, "FR-974": CLOSED, "FR-976": CLOSED,
   "FI-01": CLOSED, "GR-69": CLOSED, "IT-LIVIGNO": CLOSED, "IT-CAMPIONE": CLOSED, "DE-HELGOLAND": CLOSED, "DE-BUESINGEN": CLOSED
@@ -283,9 +286,9 @@ function invalidRegions(regions: unknown): string | undefined {
 }
 
 describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", () => {
-  it("carries exactly the owner's launch list of 20 October 2026 and Tennessee, every id a known region", () => {
+  it("carries exactly the owner's launch list of 20 October 2026, Tennessee and Mississippi, every id a known region", () => {
     expect(COUNTRY_POLICY_DEPLOYMENT_REGISTER_ROW.value.regions).toEqual(LAUNCH_REGIONS);
-    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(24);
+    expect(Object.keys(LAUNCH_REGIONS)).toHaveLength(25);
     for (const id of Object.keys(LAUNCH_REGIONS)) expect(PAYMENT_REGION_IDS, id).toContain(id);
   });
 
@@ -296,8 +299,9 @@ describe("countryPolicy regions (payment region blocks, spec 2026-10-20 §7)", (
     expect(regionRule(policy, "CA-SK")).toEqual(closed);
     expect(regionRule(policy, "ES-CN")).toEqual(closed);
     expect(regionRule(policy, "US-OH")).toEqual({ pay: false, reason: "TAX_NOT_READY", buyers: "business" });
-    // Tennessee is closed by the Terms, not by tax, and for every buyer.
+    // Tennessee and Mississippi are closed by the Terms, not by tax, and for every buyer.
     expect(regionRule(policy, "US-TN")).toEqual({ pay: false, reason: "TERMS_EXCLUDED", buyers: "all" });
+    expect(regionRule(policy, "US-MS")).toEqual({ pay: false, reason: "TERMS_EXCLUDED", buyers: "all" });
     // An open region, and a string that is no region id at all, have no rule: the country's rule decides.
     expect(regionRule(policy, "US-TX")).toBeNull();
     // New Jersey (the owner's amendment of 4 November 2026) is open again, so the US rule decides there too.

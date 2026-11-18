@@ -48,7 +48,7 @@ Rincian ini juga ditampilkan secara permanen di situs pada dezbatere.ro/legal. A
 
 ## 2. Tempat kami menawarkan Dialectical Engine
 
-Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia dan Islandia), Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, dan Korea Selatan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani.
+Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia dan Islandia), Moldova, Amerika Serikat (kecuali Tennessee dan Mississippi), Kanada, Australia, Selandia Baru, Singapura, Jepang, dan Korea Selatan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani.
 
 ## 3. Menerima Ketentuan ini
 
@@ -334,6 +334,8 @@ Bagian utama Ketentuan ini ditulis untuk Anda. Selain itu: Anda dapat mengajukan
 ### A.2 Amerika Serikat
 
 **Tennessee.** Kami tidak menawarkan Dialectical Engine kepada orang yang tinggal di Tennessee.
+
+**Mississippi.** Kami tidak menawarkan Dialectical Engine kepada orang yang tinggal di Mississippi.
 
 **Pemberitahuan dan penurunan konten.** Gambar intim tanpa persetujuan dapat dilaporkan melalui email ke abuse@dezbatere.ro, tanpa akun, dan dihapus dalam waktu 48 jam sejak permintaan yang sah. Pengaduan hak cipta diajukan melalui jalur pelaporan dalam bagian 10.
 

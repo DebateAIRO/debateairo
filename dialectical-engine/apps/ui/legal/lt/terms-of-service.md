@@ -48,7 +48,7 @@ Dialectical Engine valdo Rumunijoje registruota bendrovė **DMS Merchandise Shop
 
 ## 2. Kur siūlome Dialectical Engine
 
-Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje ir Islandijoje), Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje ir Pietų Korėjoje. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione.
+Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje ir Islandijoje), Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį ir Misisipę), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje ir Pietų Korėjoje. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione.
 
 ## 3. Sutikimas su šiomis Sąlygomis
 
@@ -334,6 +334,8 @@ Pagrindinė šių Sąlygų dalis parengta jums. Be to: galite iškelti bylą ša
 ### A.2 Jungtinės Amerikos Valstijos
 
 **Tenesis.** Dialectical Engine nesiūlome žmonėms, gyvenantiems Tenesyje.
+
+**Misisipė.** Dialectical Engine nesiūlome žmonėms, gyvenantiems Misisipėje.
 
 **Pranešimai ir turinio pašalinimas.** Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti el. paštu abuse@dezbatere.ro, neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių teikiami 10 skyriuje nustatyta pranešimų teikimo tvarka.
 

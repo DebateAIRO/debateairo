@@ -48,7 +48,7 @@ Dane te są również stale dostępne w serwisie pod adresem dezbatere.ro/legal.
 
 ## 2. Gdzie oferujemy Dialectical Engine
 
-Oferujemy Dialectical Engine osobom mieszkającym w Unii Europejskiej (27 państw) i Europejskim Obszarze Gospodarczym (Norwegia i Islandia), Mołdawii, Stanach Zjednoczonych (z wyjątkiem stanu Tennessee), Kanadzie, Australii, Nowej Zelandii, Singapurze, Japonii i Korei Południowej. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie.
+Oferujemy Dialectical Engine osobom mieszkającym w Unii Europejskiej (27 państw) i Europejskim Obszarze Gospodarczym (Norwegia i Islandia), Mołdawii, Stanach Zjednoczonych (z wyjątkiem stanów Tennessee i Missisipi), Kanadzie, Australii, Nowej Zelandii, Singapurze, Japonii i Korei Południowej. Nie oferujemy usługi w innych miejscach. Jeżeli mieszkasz poza tymi państwami, możesz mieć dostęp do serwisu, ale usługa nie jest do Ciebie kierowana, nie przyjmujemy od Ciebie płatności, a niniejsze Warunki i nasza Polityka prywatności nie są dostosowane do prawa Twojego państwa. Załącznik A określa zasady mające zastosowanie w każdym obsługiwanym przez nas regionie.
 
 ## 3. Akceptacja niniejszych Warunków
 
@@ -334,6 +334,8 @@ Część główna niniejszych Warunków została opracowana z myślą o Tobie. P
 ### A.2 Stany Zjednoczone
 
 **Tennessee.** Nie oferujemy Dialectical Engine osobom mieszkającym w stanie Tennessee.
+
+**Missisipi.** Nie oferujemy Dialectical Engine osobom mieszkającym w stanie Missisipi.
 
 **Zawiadomienia i usuwanie treści.** Intymny wizerunek udostępniony bez zgody można zgłosić e-mailem na adres abuse@dezbatere.ro, bez posiadania konta; zostanie on usunięty w ciągu 48 godzin od otrzymania ważnego żądania. Skargi dotyczące praw autorskich należy zgłaszać w sposób opisany w sekcji 10.
 

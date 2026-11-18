@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dialectical Engine'i nerelerde sunuyoruz",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda), Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da ve Güney Kore'de yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
+      { kind: "p", text: "Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda), Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee ve Mississippi hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da ve Güney Kore'de yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Dialectical Engine'i Tennessee'de yaşayan kişilere sunmuyoruz." },
+      { kind: "p", text: "Mississippi. Dialectical Engine'i Mississippi'de yaşayan kişilere sunmuyoruz." },
       { kind: "p", text: "Bildirimler ve kaldırmalar. Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın abuse@dezbatere.ro adresine e-posta ile bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 10. bölümdeki bildirim yolu üzerinden iletilir." },
       { kind: "p", text: "Eyalete özgü hükümler. Kaliforniya: 12. bölümdeki otomatik yenileme koşulları uygulanır; istediğiniz zaman çevrim içi iptal yapabilirsiniz; yenileme koşullarına verdiğiniz rızayı en az üç yıl saklarız. New York: artan fiyat üzerinden yapılan herhangi bir tahsilattan itibaren 14 gün içinde iptal edebilir ve orantılı geri ödeme alabilirsiniz. Teksas ve Nebraska: hassas kişisel veri satmayız. Washington: dezbatere.ro/privacy/us-health-data adresindeki Tüketici Sağlık Verileri Gizlilik Bildirimimiz sağlıkla ilgili bilgilere uygulanır. Colorado: hizmet sizin hakkınızda önemli sonuç doğuran kararlar almaz. Verileriniz ve eyalet gizlilik haklarınız Gizlilik Politikamızın Ek B.2'sinde ele alınır." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "4c0467728ab064fd153106c50f3f2d3e6d54fd6acf843c2e576f7bda5d4810a7",
+  sha256: "674cffea9310d1f3ede0fa0d01a73481bb3488075b205a0c644714a3f5872257",
   eyebrow: "HİZMET KOŞULLARI · v2.18 · YÜRÜRLÜK TARİHİ 1 KASIM 2026",
   title: "Kabul ettiğiniz hükümler",
   lede: "Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.",

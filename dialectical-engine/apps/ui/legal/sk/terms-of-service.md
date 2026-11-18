@@ -48,7 +48,7 @@ Tieto údaje sú tiež trvalo uvedené na webovej lokalite dezbatere.ro/legal. V
 
 ## 2. Kde službu Dialectical Engine ponúkame
 
-Službu Dialectical Engine ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko a Island), Moldavsko, Spojené štáty (okrem Tennessee), Kanada, Austrália, Nový Zéland, Singapur, Japonsko a Južná Kórea. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme.
+Službu Dialectical Engine ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko a Island), Moldavsko, Spojené štáty (okrem Tennessee a Mississippi), Kanada, Austrália, Nový Zéland, Singapur, Japonsko a Južná Kórea. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme.
 
 ## 3. Prijatie týchto Podmienok
 
@@ -333,6 +333,8 @@ Hlavná časť týchto Podmienok je určená pre vás. Ďalej platí: konanie m�
 ### A.2 Spojené štáty
 
 **Tennessee.** Dialectical Engine neponúkame osobám, ktoré žijú v Tennessee.
+
+**Mississippi.** Dialectical Engine neponúkame osobám, ktoré žijú v Mississippi.
 
 **Oznámenia a odstraňovanie.** Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť e-mailom na adrese abuse@dezbatere.ro a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa podávajú postupom podľa časti 10.
 

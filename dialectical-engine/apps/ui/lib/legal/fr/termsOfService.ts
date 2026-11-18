@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Pays dans lesquels nous proposons Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Nous proposons Dialectical Engine aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège et Islande), en Moldavie, aux États-Unis (Tennessee excepté), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon et en Corée du Sud. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
+      { kind: "p", text: "Nous proposons Dialectical Engine aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège et Islande), en Moldavie, aux États-Unis (Tennessee et Mississippi exceptés), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon et en Corée du Sud. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Nous ne proposons pas Dialectical Engine aux personnes qui résident au Tennessee." },
+      { kind: "p", text: "Mississippi. Nous ne proposons pas Dialectical Engine aux personnes qui résident au Mississippi." },
       { kind: "p", text: "Notifications et retraits. Les images intimes non consenties peuvent être signalées par e-mail à l’adresse abuse@dezbatere.ro, sans compte, et sont retirées dans les 48 heures suivant une demande valide. Les plaintes relatives au droit d’auteur suivent la procédure de signalement de la section 10." },
       { kind: "p", text: "Dispositions propres aux États. Californie : les conditions de renouvellement automatique de la section 12 s’appliquent ; vous pouvez résilier en ligne à tout moment ; nous conservons votre consentement aux conditions de renouvellement pendant au moins trois ans. New York : vous pouvez résilier dans les 14 jours suivant toute facturation à un prix augmenté et obtenir un remboursement au prorata. Texas et Nebraska : nous ne vendons pas de données à caractère personnel sensibles. Washington : notre Consumer Health Data Privacy Notice disponible à l’adresse dezbatere.ro/privacy/us-health-data s’applique aux informations liées à la santé. Colorado : le service ne prend aucune décision produisant des effets significatifs à votre égard. L’annexe B.2 de notre Politique de confidentialité couvre vos données et les droits en matière de vie privée que vous confère la loi de votre État." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "15683b817e3f6f94d60d245b608454a0255673cafdfc5ee9833294aaacc9fe44",
+  sha256: "95c1d1b53f178564c115e7218b02c0699db49bbfc513a00ea87d229713e1c919",
   eyebrow: "CONDITIONS D’UTILISATION · v2.18 · PRISE D’EFFET 1ER NOVEMBRE 2026",
   title: "Ce que vous acceptez",
   lede: "Le contrat entre vous et DMS Merchandise Shop S.R.L., en termes clairs. Dix-neuf sections et l’annexe A — faites défiler jusqu’à la fin.",

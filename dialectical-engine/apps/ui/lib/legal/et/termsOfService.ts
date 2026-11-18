@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kus me Dialectical Engine-d pakume",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra ja Island), Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis ja Lõuna-Koreas. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
+      { kind: "p", text: "Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra ja Island), Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee ja Mississippi), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis ja Lõuna-Koreas. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Me ei paku Dialectical Engine-d inimestele, kes elavad Tennessees." },
+      { kind: "p", text: "Mississippi. Me ei paku Dialectical Engine-d inimestele, kes elavad Mississippis." },
       { kind: "p", text: "Teated ja sisu eemaldamine. Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada e-kirjaga aadressil abuse@dezbatere.ro ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 10 kirjeldatud teatamiskanali kaudu." },
       { kind: "p", text: "Osariigipõhised sätted. California: kohaldatakse jaotise 12 automaatse uuendamise tingimusi; võite igal ajal veebis tühistada; säilitame teie nõusoleku uuendamistingimustega vähemalt kolm aastat. New York: võite 14 päeva jooksul pärast kõrgema hinnaga tasu võtmist tühistada ja saada proportsionaalse tagasimakse. Texas ja Nebraska: me ei müü tundlikke isikuandmeid. Washington: meie tarbija terviseandmete privaatsusteade aadressil dezbatere.ro/privacy/us-health-data kehtib tervisega seotud teabe kohta. Colorado: miski teenuses ei tee teie kohta oluliste tagajärgedega otsuseid. Teie andmeid ja teie osariigi seadustest tulenevaid privaatsusõigusi käsitleb meie Privaatsuspoliitika lisa B.2." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "487576bc2cd124296ae57bb2d8e839c6ed04b210620088aedba58eb5ec1ca2bf",
+  sha256: "edb194b7c966de2a6565ef6cc5e0b7b03986c99998ef9ec9884ce3fbe1001330",
   eyebrow: "TEENUSETINGIMUSED · v2.18 · KEHTIB ALATES 1. NOVEMBRIST 2026",
   title: "Millega te nõustute",
   lede: "Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.",

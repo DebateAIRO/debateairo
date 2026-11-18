@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kje ponujamo Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine ponujamo osebam, ki živijo v naslednjih državah in regijah: Evropska unija (27 držav) in Evropski gospodarski prostor (Norveška in Islandija), Moldavija, Združene države Amerike (razen zvezne države Tennessee), Kanada, Avstralija, Nova Zelandija, Singapur, Japonska in Južna Koreja. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
+      { kind: "p", text: "Dialectical Engine ponujamo osebam, ki živijo v naslednjih državah in regijah: Evropska unija (27 držav) in Evropski gospodarski prostor (Norveška in Islandija), Moldavija, Združene države Amerike (razen zveznih držav Tennessee in Mississippi), Kanada, Avstralija, Nova Zelandija, Singapur, Japonska in Južna Koreja. Drugje ga ne ponujamo. Če živite zunaj teh držav, boste morda lahko dostopali do spletnega mesta, vendar storitve ne usmerjamo k vam, od vas ne sprejemamo plačil, ti Pogoji in naš Pravilnik o zasebnosti pa niso prilagojeni pravu vaše države. Priloga A določa, kaj velja v vsaki regiji, v kateri ponujamo storitev." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Dialectical Engine ne ponujamo osebam, ki živijo v Tennesseeju." },
+      { kind: "p", text: "Mississippi. Dialectical Engine ne ponujamo osebam, ki živijo v Mississippiju." },
       { kind: "p", text: "Obvestila in odstranitve. Intimne posnetke brez privolitve je mogoče prijaviti po e-pošti na abuse@dezbatere.ro, brez računa, odstranijo pa se v 48 urah od veljavne zahteve. Pritožbe glede avtorskih pravic vložite po postopku iz razdelka 10." },
       { kind: "p", text: "Posebnosti zveznih držav. Kalifornija: veljajo pogoji samodejnega podaljšanja iz razdelka 12; prek spleta lahko kadar koli prekličete; vašo privolitev v pogoje podaljšanja hranimo najmanj tri leta. New York: v 14 dneh od vsake bremenitve po zvišani ceni lahko prekličete in prejmete sorazmerno vračilo. Teksas in Nebraska: občutljivih osebnih podatkov ne prodajamo. Washington: za zdravstvene podatke velja naše Obvestilo o zasebnosti zdravstvenih podatkov potrošnikov na dezbatere.ro/privacy/us-health-data. Kolorado: nič v storitvi ne sprejema odločitev z znatnimi posledicami za vas. Vaše podatke in vaše pravice glede zasebnosti po zakonodaji vaše zvezne države ureja naš Pravilnik o zasebnosti, Priloga B.2." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "1cd7a8d75ba4a3d949209167163095dd7597dbf8d139677115b6fbe9e6facc4f",
+  sha256: "351139aadd73c1b72eb5f003a801d235a84c41046d0cd5ab6882529fd53dc331",
   eyebrow: "POGOJI UPORABE · v2.18 · VELJAVNI OD 1. NOVEMBRA 2026",
   title: "S čim soglašate",
   lede: "Pogodba med vami in družbo DMS Merchandise Shop S.R.L. v razumljivem jeziku. Devetnajst razdelkov in Priloga A — pomaknite se do konca.",

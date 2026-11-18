@@ -13,7 +13,7 @@ const locales = readdirSync(MESSAGES, { withFileTypes: true })
 
 const REGION_KEY = "billing.checkout.regionUnavailable";
 const POSTCODE_KEY = "billing.checkout.postalCodeInvalid";
-/** A region the Terms exclude (Tennessee, the owner's choice of 3 November 2026): its own code and sentence. */
+/** A region the Terms exclude (Tennessee, the owner's choice of 3 November 2026; Mississippi, 18 November 2026): its own code and sentence. */
 const TERMS_EXCLUDED_KEY = "billing.checkout.regionTermsExcluded";
 
 describe("the closed-region and postal-code refusals have their own plain sentences", () => {
@@ -30,7 +30,7 @@ describe("the closed-region and postal-code refusals have their own plain senten
     const english = catalogue("en");
     expect(english[REGION_KEY]).toBe("Paid plans aren't available in your region yet. You can keep using the Free plan.");
     expect(english[POSTCODE_KEY]).toBe("Please check your postal code.");
-    expect(english[TERMS_EXCLUDED_KEY]).toBe("We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address.");
+    expect(english[TERMS_EXCLUDED_KEY]).toBe("We don't offer Dialectical Engine in Tennessee or Mississippi, so we can't take payment for this address.");
   });
 
   it("is present, non-empty and translated in all 35 locales", () => {

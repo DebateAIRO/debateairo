@@ -48,7 +48,7 @@ Nämä tiedot ovat myös pysyvästi nähtävillä sivustolla osoitteessa dezbate
 
 ## 2. Missä tarjoamme Dialectical Engine -palvelua
 
-Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja ja Islanti), Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa ja Etelä-Koreassa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan.
+Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja ja Islanti), Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä ja Mississippiä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa ja Etelä-Koreassa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan.
 
 ## 3. Näiden käyttöehtojen hyväksyminen
 
@@ -334,6 +334,8 @@ Näiden käyttöehtojen yleinen osa on laadittu sinua varten. Lisäksi: voit nos
 ### A.2 Yhdysvallat
 
 **Tennessee.** Emme tarjoa Dialectical Engine -palvelua henkilöille, jotka asuvat Tennesseessä.
+
+**Mississippi.** Emme tarjoa Dialectical Engine -palvelua henkilöille, jotka asuvat Mississippissä.
 
 **Ilmoitukset ja poistot.** Ilman suostumusta jaetusta intiimistä kuva-aineistosta voi ilmoittaa ilman tiliä sähköpostitse osoitteeseen abuse@dezbatere.ro, ja se poistetaan 48 tunnin kuluessa pätevästä pyynnöstä. Tekijänoikeusvalitukset käsitellään kohdassa 10 tarkoitetun ilmoitusreitin kautta.
 

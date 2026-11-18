@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Wo wir Dialectical Engine anbieten",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wir bieten Dialectical Engine Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen und Island), in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee), in Kanada, Australien, Neuseeland, Singapur, Japan und Südkorea leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
+      { kind: "p", text: "Wir bieten Dialectical Engine Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen und Island), in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee und Mississippi), in Kanada, Australien, Neuseeland, Singapur, Japan und Südkorea leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Wir bieten Dialectical Engine Personen, die in Tennessee leben, nicht an." },
+      { kind: "p", text: "Mississippi. Wir bieten Dialectical Engine Personen, die in Mississippi leben, nicht an." },
       { kind: "p", text: "Mitteilungen und Entfernung. Intime Abbildungen, die ohne Einwilligung veröffentlicht wurden, können ohne Konto per E-Mail an abuse@dezbatere.ro gemeldet werden und werden innerhalb von 48 Stunden nach Eingang eines wirksamen Antrags entfernt. Urheberrechtsbeschwerden folgen dem Meldeweg nach Abschnitt 10." },
       { kind: "p", text: "Bundesstaatsspezifische Regelungen. Kalifornien: Es gelten die Bestimmungen zur automatischen Verlängerung in Abschnitt 12; Sie können jederzeit online kündigen; wir bewahren Ihre Zustimmung zu den Verlängerungsbedingungen mindestens drei Jahre lang auf. New York: Sie können innerhalb von 14 Tagen nach jeder Abbuchung zu einem erhöhten Preis kündigen und eine anteilige Erstattung erhalten. Texas und Nebraska: Wir verkaufen keine sensiblen personenbezogenen Daten. Washington: Unser Datenschutzhinweis zu Verbrauchergesundheitsdaten unter dezbatere.ro/privacy/us-health-data gilt für gesundheitsbezogene Informationen. Colorado: Der Dienst trifft keine Entscheidungen mit erheblichen Folgen über Sie. Für Ihre Daten und Ihre Datenschutzrechte nach dem Recht der Bundesstaaten gilt unsere Datenschutzerklärung, Anhang B.2." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "d3098e18206c18b056f8941f7f958e510a94b6707c4e7b071eb7e52482f2c722",
+  sha256: "01e0b3f882c0097d60edcd9cc0f6ac1798eb59575191a97f9f7e16e722eee9c3",
   eyebrow: "NUTZUNGSBEDINGUNGEN · v2.18 · GÜLTIG AB 1. NOVEMBER 2026",
   title: "Womit Sie sich einverstanden erklären",
   lede: "Der Vertrag zwischen Ihnen und DMS Merchandise Shop S.R.L. in verständlicher Sprache. Neunzehn Abschnitte und Anhang A – scrollen Sie bis zum Ende.",
