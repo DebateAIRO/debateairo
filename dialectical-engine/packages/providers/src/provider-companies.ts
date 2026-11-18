@@ -12,10 +12,16 @@
  */
 import { isRefusedHostedProviderHost, type ProviderDiscoveryTarget } from "./index.js";
 
-/** Addition D24: the reviewed connections' hosts and the company each one is (lower case, no trailing dot). */
-export const PROVIDER_COMPANY_HOSTS: Readonly<Record<string, "anthropic" | "deepinfra">> = Object.freeze({
+/**
+ * Addition D24: the reviewed connections' hosts and the company each one is (lower case, no trailing dot). GPT runs on
+ * Amazon Bedrock in AWS's Stockholm region, eu-north-1 (owner, 18 November 2026): its OpenAI-compatible endpoint
+ * (`bedrock-mantle`) and its runtime endpoint are both Amazon's.
+ */
+export const PROVIDER_COMPANY_HOSTS: Readonly<Record<string, "amazon" | "anthropic" | "deepinfra">> = Object.freeze({
   "api.anthropic.com": "anthropic",
-  "api.deepinfra.com": "deepinfra"
+  "api.deepinfra.com": "deepinfra",
+  "bedrock-mantle.eu-north-1.api.aws": "amazon",
+  "bedrock-runtime.eu-north-1.amazonaws.com": "amazon"
 });
 
 /** The prefix of a company the table does not know, followed by its host name (ruling R20). */
@@ -29,7 +35,7 @@ function companyHostOf(baseUrl: string): string {
 }
 
 /**
- * Addition D24 item 2: the sorted, unique company keys the targets reach — `anthropic`, `deepinfra`, or
+ * Addition D24 item 2: the sorted, unique company keys the targets reach — `amazon`, `anthropic`, `deepinfra`, or
  * `host:<hostname>` for a public host the table does not know; a loopback or private host is omitted (it names no
  * outside company). The API computes it once at boot from its declared targets (`apps/api/src/main.ts`) and answers it
  * on `GET /v1/public/ai-providers`. Never throws for a parsed target (`parseProviderDiscoveryTargets` admits only an

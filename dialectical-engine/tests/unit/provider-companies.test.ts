@@ -59,6 +59,17 @@ describe("providerCompaniesOfTargets (addition D24)", () => {
     expect(providerCompaniesOfTargets(parsed)).toEqual(["deepinfra"]);
   });
 
+  it("GPT on Amazon Bedrock in Stockholm (owner, 18 November 2026) reaches Amazon, through either Bedrock endpoint", () => {
+    expect(providerCompaniesOfTargets([at("https://bedrock-mantle.eu-north-1.api.aws/openai/v1")])).toEqual(["amazon"]);
+    expect(providerCompaniesOfTargets([at("https://bedrock-runtime.eu-north-1.amazonaws.com/openai/v1")])).toEqual(["amazon"]);
+    expect(providerCompaniesOfTargets([at("https://Bedrock-Mantle.EU-North-1.api.aws./v1")])).toEqual(["amazon"]);
+    expect(providerCompaniesOfTargets([
+      at("https://bedrock-mantle.eu-north-1.api.aws/openai/v1"), at(PREVIEW_ANTHROPIC_BASE_URL), at(PREVIEW_DEEPINFRA_BASE_URL)
+    ])).toEqual(["amazon", "anthropic", "deepinfra"]);
+    // Another region is not the reviewed one: it shows as its own host until the owner names it.
+    expect(providerCompaniesOfTargets([at("https://bedrock-runtime.us-east-1.amazonaws.com/v1")])).toEqual(["host:bedrock-runtime.us-east-1.amazonaws.com"]);
+  });
+
   it("a loopback or private relay (local mode only) names no outside company", () => {
     for (const baseUrl of ["http://127.0.0.1:8794/v1", "http://[::1]:8443/v1", "http://localhost:8794/v1",
       "https://10.0.0.2:8443/v1", "https://192.168.1.4/v1", "http://relay.localhost:9000/v1"]) {
@@ -88,7 +99,7 @@ describe("providerCompaniesOfTargets (addition D24)", () => {
     const catalogue = pages.match(/const REVIEWED_PROVIDER_COMPANIES[^=]*= Object\.freeze\(\[([\s\S]*?)\]\s*as const\)/u)?.[1];
     expect(catalogue).toBeDefined();
     const keys = [...(catalogue ?? "").matchAll(/\["([a-z]+)",/gu)].map((match) => match[1]);
-    expect(keys).toEqual(["anthropic", "deepinfra"]);
+    expect(keys).toEqual(["anthropic", "amazon", "deepinfra"]);
     for (const company of new Set(Object.values(PROVIDER_COMPANY_HOSTS))) expect(keys, company).toContain(company);
   });
 });

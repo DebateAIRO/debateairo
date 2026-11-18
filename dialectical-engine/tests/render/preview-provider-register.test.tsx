@@ -7,6 +7,7 @@ import en from "../../apps/ui/messages/en/legal.json";
 import ro from "../../apps/ui/messages/ro/legal.json";
 import { LegalProvidersBody } from "../../apps/ui/components/legal/LegalBodies.js";
 import {
+  AMAZON_PROVIDER,
   ANTHROPIC_PREVIEW_PROVIDER,
   DEEPINFRA_PARTNER_PROVIDER,
   DEEPINFRA_PROVIDER,
@@ -23,16 +24,32 @@ import {
  * necessarely the models used [...] these need to be done automatically, so if we add a new provider, the page would
  * also list that"). The Model providers page is built from the companies the API's declared targets reach
  * (`GET /v1/public/ai-providers`, read by `readAiProviderCompanies`), not from a build flag: each reviewed company it
- * names gets its checked row (Anthropic, then DeepInfra), an unknown host an unchecked row headed by its host name
- * (ruling R20), the support chat's model always last; no answer lists the whole reviewed catalogue. No row names a
- * model, in any of the 35 languages, and the hosted cloud rows (OpenAI, xAI, Google, the own-servers Qwen) never show.
+ * names gets its row (Anthropic, Amazon, then DeepInfra), an unknown host an unchecked row headed by its host name
+ * (ruling R20), the support chat's model always last; no answer lists the whole reviewed catalogue. The hosted cloud
+ * rows (OpenAI, xAI, Google, the own-servers Qwen) never show.
  *
  * 16 November 2026 (docs/legal/2026-11-16-deepinfra-perplexity-facts.md): DeepInfra forwards one of its models to a
  * partner company it does not name, so DeepInfra's row is always followed by that company's unchecked row
  * (`deepinfra-partner`); DeepInfra's and Perplexity's rows carry the facts their published terms give.
+ *
+ * Owner, 18 November 2026 ("all models we use should not have the model number and type in their providers list"):
+ * each row that serves models names them by family, in every one of the 35 languages: DeepInfra GLM, DeepSeek, MiMo
+ * and Qwen (its partner Qwen); Amazon GPT; Anthropic and the support chat Claude Haiku. No version or variant ever shows.
  */
-const MODEL_NAMES = ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Claude Haiku 5.5", "Gemini"] as const;
-/** The labels every row shows, in order: the Privacy Policy §5 facts without the old models line. */
+const VERSIONED_MODEL_NAMES = ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Claude Haiku 5.5", "Gemini", "GPT-"] as const;
+/** The text of every models cell on a rendered page. */
+const modelsCells = (html: string, catalog: Record<string, string>): string[] =>
+  [...html.matchAll(new RegExp(`<th scope="row">${escaped(catalog["legal.providers.colModels"] ?? "missing")}</th><td>([\\s\\S]*?)</td>`, "gu"))]
+    .map((match) => match[1]!.replace(/<[^>]+>/gu, ""));
+/** The models line each row shows, by row key; a row not named here has none. */
+const MODELS_BY_KEY: Readonly<Record<string, string>> = {
+  claude: "Claude Haiku",
+  amazon: "GPT",
+  deepinfra: "GLM, DeepSeek, MiMo, Qwen",
+  "deepinfra-partner": "Qwen",
+  support: "Claude Haiku"
+};
+/** The fact labels every row shows, in order, after its models line (Privacy Policy §5). */
 const FACT_LABEL_KEYS = [
   "legal.providers.colEntity",
   "legal.providers.colCountry",
@@ -46,6 +63,9 @@ const FACT_LABEL_KEYS = [
   "legal.providers.colChecked"
 ] as const;
 const NEW_KEYS = [
+  "legal.providers.colModels",
+  "legal.providers.luxembourg",
+  "legal.providers.locationAwsStockholm",
   "legal.providers.ireland",
   "legal.providers.locationAnthropic",
   "legal.providers.locationGoogle",
@@ -76,8 +96,10 @@ const CASES: ReadonlyArray<readonly [label: string, companies: readonly string[]
   ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
   ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", PARTNER, "perplexity", "support"]],
   ["anthropic alone", ["anthropic"], ["claude", "perplexity", "support"]],
-  ["no answer", null, ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
-  ["an empty answer", [], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["no answer", null, ["claude", "amazon", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["an empty answer", [], ["claude", "amazon", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["amazon alone (GPT on Bedrock)", ["amazon"], ["amazon", "perplexity", "support"]],
+  ["amazon + anthropic + deepinfra, in any order", ["deepinfra", "amazon", "anthropic"], ["claude", "amazon", "deepinfra", PARTNER, "perplexity", "support"]],
   ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", PARTNER, ACME, "perplexity", "support"]],
   ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", PARTNER, "perplexity", "support"]]
 ];
@@ -98,6 +120,7 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       // The partner's row stands right after DeepInfra's, and only when DeepInfra's is shown.
       expect(keys.includes(PARTNER)).toBe(keys.includes("deepinfra"));
       if (keys.includes(PARTNER)) expect(entries[keys.indexOf("deepinfra") + 1]).toBe(DEEPINFRA_PARTNER_PROVIDER);
+      if (keys.includes("amazon")) expect(entries.find((entry) => entry.key === "amazon")).toBe(AMAZON_PROVIDER);
     });
   }
 
@@ -106,12 +129,50 @@ describe("the rows are the companies the API answers (addition D24)", () => {
       .toEqual(["claude", "deepinfra", PARTNER, "host:a.example", "host:b.example", "perplexity", "support"]);
   });
 
-  it("every company the API's host table can name is a reviewed row, never an unchecked one", () => {
+  it("every company the API's host table can name is a named catalogue row, never a bare host", () => {
     for (const company of new Set(Object.values(PROVIDER_COMPANY_HOSTS))) {
       const [row] = providerRegister([company]);
       expect(row?.key, company).not.toMatch(/^host:/u);
-      expect(row?.checkedOn, company).not.toBeNull();
-      expect(row?.purposesConfirmed, company).toBe(true);
+      expect(row?.provider, company).not.toBeNull();
+      expect(row?.models, company).not.toBe("");
+      // Anthropic and DeepInfra were checked against their terms; Amazon (owner, 18 November 2026) is not yet.
+      if (company !== "amazon") {
+        expect(row?.checkedOn, company).not.toBeNull();
+        expect(row?.purposesConfirmed, company).toBe(true);
+      }
+    }
+  });
+
+  it("the Amazon row names GPT, AWS's EEA company and the Stockholm region, and brackets every unchecked contract fact", () => {
+    expect(AMAZON_PROVIDER).toMatchObject({
+      key: "amazon",
+      provider: "Amazon Web Services",
+      models: "GPT",
+      entity: "Amazon Web Services EMEA SARL",
+      homeCountryKey: "legal.providers.luxembourg",
+      locationKey: "legal.providers.locationAwsStockholm",
+      purposesConfirmed: false,
+      retentionKey: "legal.providers.unconfirmed",
+      zeroRetention: "unconfirmed",
+      training: "unconfirmed",
+      basisKey: "legal.providers.unconfirmed",
+      contact: "[…]",
+      checkedOn: null
+    });
+    for (const host of ["bedrock-mantle.eu-north-1.api.aws", "bedrock-runtime.eu-north-1.amazonaws.com"]) {
+      expect(PROVIDER_COMPANY_HOSTS[host], host).toBe("amazon");
+    }
+    for (const catalog of [en, ro]) {
+      const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(["amazon"])} />);
+      const section = html.slice(html.indexOf('id="legal-provider-amazon"'), html.indexOf('id="legal-provider-perplexity"'));
+      expect(section).toContain(">Amazon Web Services</h2>");
+      expect(section).toContain("<bdi>GPT</bdi>");
+      expect(section).toContain("Amazon Web Services EMEA SARL");
+      expect(section).toContain(escaped(catalog["legal.providers.luxembourg"]));
+      expect(section).toContain(escaped(catalog["legal.providers.locationAwsStockholm"]));
+      expect(section).toContain(escaped(catalog["legal.providers.notChecked"]));
+      expect(section).toContain(escaped(catalog["legal.providers.purposesUnconfirmed"]));
+      expect(section).not.toContain("OpenAI");
     }
   });
 
@@ -167,25 +228,38 @@ describe("the rows are the companies the API answers (addition D24)", () => {
   });
 });
 
-describe("no row names a model, in any of the 35 languages (owner 2026-10-22: providers, not models)", () => {
+describe("each row names its model families, never a version, in all 35 languages (owner, 18 November 2026)", () => {
   it("has 35 locales", () => expect(locales).toHaveLength(35));
   for (const locale of locales) {
-    it(`${locale}: every case shows only the company facts, no model and no models line`, () => {
+    it(`${locale}: every case shows the models line first on a model row, then the company facts`, () => {
       const catalog = catalogOf(locale);
       for (const [label, companies, keys] of CASES) {
         const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(companies)} />);
-        for (const name of MODEL_NAMES) expect(html, `${locale} ${label} ${name}`).not.toContain(name);
-        // Each row's labels are exactly the ten fact labels: the models line is gone.
+        for (const name of VERSIONED_MODEL_NAMES) expect(html, `${locale} ${label} ${name}`).not.toContain(name);
+        // No models cell carries a version number or a variant name.
+        for (const cell of modelsCells(html, catalog)) expect(cell, `${locale} ${label}`).not.toMatch(/\d|Flash|Pro\b/u);
+        expect(modelsCells(html, catalog), `${locale} ${label}`).toEqual(keys.flatMap((key) => MODELS_BY_KEY[key] ?? []));
         const labels = [...html.matchAll(/<th scope="row">([\s\S]*?)<\/th>/gu)].map((match) => match[1]);
-        expect(labels, `${locale} ${label}`).toEqual(keys.flatMap(() => FACT_LABEL_KEYS.map((key) => escaped(catalog[key] ?? "missing"))));
+        expect(labels, `${locale} ${label}`).toEqual(keys.flatMap((key) => [
+          ...(MODELS_BY_KEY[key] === undefined ? [] : ["legal.providers.colModels"]),
+          ...FACT_LABEL_KEYS
+        ].map((labelKey) => escaped(catalog[labelKey] ?? "missing"))));
         expect(html.match(/class="legalProviderEntry"/gu)?.length ?? 0, `${locale} ${label}`).toBe(keys.length);
       }
     });
   }
-  it("English has no Models label at all", () => {
-    for (const [, companies] of CASES) {
-      expect(renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={providerRegister(companies)} />)).not.toMatch(/>Models</u);
+  it("names exactly the families the product runs, row by row", () => {
+    const entries = providerRegister(null);
+    expect(Object.fromEntries(entries.filter(({ models }) => models !== "").map(({ key, models }) => [key, models]))).toEqual(MODELS_BY_KEY);
+    const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={entries} />);
+    for (const [key, models] of Object.entries(MODELS_BY_KEY)) {
+      const start = html.indexOf(`id="legal-provider-${key}"`);
+      const section = html.slice(start, html.indexOf("</section>", start));
+      expect(section, key).toContain(`<th scope="row">Models</th><td><bdi>${models}</bdi></td>`);
     }
+    // Web search serves no model, so its row has no models line.
+    const perplexity = html.slice(html.indexOf('id="legal-provider-perplexity"'), html.indexOf('id="legal-provider-support"'));
+    expect(perplexity).not.toContain(">Models<");
   });
 });
 
@@ -380,8 +454,10 @@ describe("the Register words still exist in all 35 languages", () => {
         expect(catalog["legal.providers.retentionGoogle"], locale).not.toBe(en["legal.providers.retentionGoogle"]);
         for (const key of NEW_KEYS.slice(-5)) expect(catalog[key], `${locale} ${key}`).not.toBe(en[key]);
       }
-      // Addition D24: the models label is gone from every catalogue (nothing reads it any more).
-      expect(Object.keys(catalog).filter((key) => key === "legal.providers.colModels"), locale).toEqual([]);
+      if (locale !== "en") {
+        // The Stockholm location is translated too, not copied from English.
+        expect(catalog["legal.providers.locationAwsStockholm"], locale).not.toBe(en["legal.providers.locationAwsStockholm"]);
+      }
     });
   }
 });

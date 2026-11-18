@@ -195,7 +195,11 @@ export type ProviderRegisterEntry = Readonly<{
   /** The row heading: a brand name, or null when `nameKey` names the row. */
   provider: string | null;
   nameKey: string | null;
-  /** The models this company serves us: a reviewed fact the page no longer shows (addition D24: providers, not models). */
+  /**
+   * The model families this company serves us, without version numbers or variants (owner, 18 November 2026: the
+   * page names the models we use, by family, so a model upgrade never changes the page). Empty for a row that serves
+   * no model (web search, an unchecked company): the page then shows no models line.
+   */
   models: string;
   /** A message key when the value is prose, or null when the models fact is a brand name. */
   modelsKey: string | null;
@@ -283,7 +287,7 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "support",
   provider: null,
   nameKey: "legal.providers.supportName",
-  models: "Claude Haiku 5.5",
+  models: "Claude Haiku",
   modelsKey: null,
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
@@ -299,25 +303,20 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The four open-weight models DeepInfra serves on the private preview, each made by another company (named in
- * brackets). Kept as the DeepInfra row's `models` fact; the page no longer shows models (addition D24, owner
- * 2026-10-22: providers only, not the models). Facts checked against the vendors' published terms: see
- * `docs/legal/2026-10-10-preview-provider-facts.md`.
+ * The four open-weight model families DeepInfra serves (owner, 18 November 2026: MiMo, Qwen, DeepSeek and GLM come
+ * from DeepInfra), named by family only, without version numbers or variants. Facts checked against the vendors'
+ * published terms: see `docs/legal/2026-10-10-preview-provider-facts.md`.
  */
-const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
-  ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
-  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek-V4.1-Flash (DeepSeek)"],
-  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"],
-  ["Qwen/Qwen3.8-Flash", "Qwen3.8-Flash (Alibaba)"]
-] as const);
+const DEEPINFRA_MODEL_FAMILIES: readonly string[] = Object.freeze(["GLM", "DeepSeek", "MiMo", "Qwen"]);
 
 /**
- * The one DeepInfra model DeepInfra does not run itself. Its model page carries a "Partner" tag ("This model is
- * served by a partner. Your requests are forwarded to them. Their privacy policy applies"), and DeepInfra's trust
- * centre names it among the partner models (read 16 November 2026: `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`).
- * The other three have no tag and run on DeepInfra's own servers.
+ * The one DeepInfra model family DeepInfra does not run itself, named by family only like the rest. Its model page
+ * carries a "Partner" tag ("This model is served by a partner. Your requests are forwarded to them. Their privacy
+ * policy applies"), and DeepInfra's trust centre names it among the partner models (read 16 November 2026:
+ * `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`). The other three have no tag and run on DeepInfra's own
+ * servers. It stays in `DEEPINFRA_MODEL_FAMILIES` too: DeepInfra receives its requests before it forwards them.
  */
-const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-Flash"]);
+const DEEPINFRA_PARTNER_MODEL_FAMILIES: readonly string[] = Object.freeze(["Qwen"]);
 
 /**
  * Serving company for the private preview's open-weight models, the main recipient of debate text. Listed whenever
@@ -340,7 +339,7 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "deepinfra",
   provider: "DeepInfra",
-  models: PREVIEW_DEEPINFRA_MODELS.map(([, label]) => label).join(", "),
+  models: DEEPINFRA_MODEL_FAMILIES.join(", "),
   entity: "Deep Infra Inc.",
   // Privacy 3.12: its models are among the several companies' AIs that write the lists of what to look into when
   // the person presses Next, before a debate starts.
@@ -357,7 +356,7 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_IDS`). DeepInfra names
+ * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_FAMILIES`). DeepInfra names
  * neither the company nor its terms, so the row is headed by what we know and every fact stays "[to confirm]": it
  * receives debate text, and a legal page discloses rather than hides (ruling R20; the 10 October 2026 facts note:
  * "that company receives debate text and needs its own row on the page"). Its jobs are the partner model's: a panel
@@ -370,7 +369,7 @@ export const DEEPINFRA_PARTNER_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "deepinfra-partner",
   provider: null,
   nameKey: "legal.providers.deepinfraPartnerName",
-  models: PREVIEW_DEEPINFRA_MODELS.filter(([id]) => DEEPINFRA_PARTNER_MODEL_IDS.has(id)).map(([, label]) => label).join(", "),
+  models: DEEPINFRA_PARTNER_MODEL_FAMILIES.join(", "),
   entity: "[…]",
   homeCountryKey: "legal.providers.unconfirmed",
   purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "suggestPaths"]),
@@ -392,7 +391,7 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "claude",
   provider: "Anthropic",
-  models: "Claude Haiku 5.5",
+  models: "Claude Haiku",
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
   // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
@@ -409,6 +408,25 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   basisKey: "legal.providers.sccBasis",
   contact: "privacy@anthropic.com",
   checkedOn: "2026-10-10"
+});
+
+/**
+ * Amazon Bedrock, through which the product runs GPT (owner, 18 November 2026), in AWS's Stockholm region,
+ * eu-north-1 (owner, same day). Listed whenever the API's declared targets reach a Stockholm Bedrock host (company
+ * `amazon`, `PROVIDER_COMPANY_HOSTS`), and when the API gives no answer. An AWS customer in the EEA contracts with
+ * Amazon Web Services EMEA SARL in Luxembourg (AWS Customer Agreement). Nobody has checked Bedrock's terms for this
+ * use yet, so its jobs, retention, zero data retention, training, transfer basis and privacy contact stay
+ * "[to confirm]" and it has no `checkedOn` date.
+ */
+export const AMAZON_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "amazon",
+  provider: "Amazon Web Services",
+  models: "GPT",
+  entity: "Amazon Web Services EMEA SARL",
+  homeCountryKey: "legal.providers.luxembourg",
+  locationKey: "legal.providers.locationAwsStockholm",
+  basisKey: "legal.providers.unconfirmed"
 });
 
 /**
@@ -477,10 +495,12 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
  * Addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed automatically): the
  * reviewed catalogue, keyed by the company keys the API answers on `GET /v1/public/ai-providers`
  * (`providerCompaniesOfTargets`, `PROVIDER_COMPANY_HOSTS` in `@debateai/providers`), in the order the page shows
- * them. A person checks each row's facts; only the choice of rows is automatic.
+ * them. A person checks each row's facts; only the choice of rows is automatic. Amazon (GPT on Bedrock, owner
+ * 18 November 2026) is in the catalogue before its facts are checked, so it is named rather than shown as a bare host.
  */
 const REVIEWED_PROVIDER_COMPANIES = Object.freeze([
   ["anthropic", ANTHROPIC_PREVIEW_PROVIDER],
+  ["amazon", AMAZON_PROVIDER],
   ["deepinfra", DEEPINFRA_PROVIDER]
 ] as const);
 const REVIEWED_COMPANY_KEYS: ReadonlySet<string> = new Set(REVIEWED_PROVIDER_COMPANIES.map(([company]) => company));
@@ -510,12 +530,12 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
 /**
  * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
  * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
- * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
+ * companies its declared provider targets reach. Each reviewed company it names gets its row, Anthropic, Amazon,
  * then DeepInfra, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
  * to (`DEEPINFRA_PARTNER_PROVIDER`); each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
- * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
- * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
+ * page discloses rather than hides. Each row names its model families without versions (owner, 18 November 2026),
+ * so a model upgrade never changes the page, and the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
  * declared target reaches them. Perplexity (`PERPLEXITY_PROVIDER`) is always listed, just before the support chat's
  * model, and never twice. Never throws.
  */

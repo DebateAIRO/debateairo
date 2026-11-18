@@ -549,15 +549,15 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
-    // No answer from the API: every reviewed company (Anthropic and DeepInfra), not the hosted cloud rows. DeepInfra is
-    // followed by the company it forwards one model to (16 November 2026: that company receives debate text).
+    // No answer from the API: every reviewed company (Anthropic, Amazon and DeepInfra), not the hosted cloud rows.
+    // DeepInfra is followed by the company it forwards one model to (16 November 2026: that company receives debate text).
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual(["Anthropic", "DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Perplexity", "Support chat model"]);
+    expect(headings).toEqual(["Anthropic", "Amazon Web Services", "DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Perplexity", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
-  it("names Claude Haiku 5.5 as the support chat's model, with Anthropic's checked facts and no brackets", () => {
+  it("names Claude Haiku as the support chat's model, with Anthropic's checked facts and no brackets", () => {
     // Owner, 12 October 2026: the support chat runs on Claude Haiku 5.5 on Anthropic's API.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const support = [...view.querySelectorAll(".legalProviderEntry")].at(-1);
@@ -565,8 +565,9 @@ describe("the model providers page lists the companies the API's targets reach (
     const cells = Object.fromEntries([...(support?.querySelectorAll("tbody tr") ?? [])].map((row) => [
       row.querySelector("th")?.textContent, row.querySelector("td")?.textContent?.trim()
     ]));
-    // Addition D24: no models line; the support chat's model is named by its row heading's job, not a model name.
+    // Owner, 18 November 2026: the models line names the family, without version.
     expect(cells).toEqual({
+      "Models": "Claude Haiku",
       "Company": "Anthropic Ireland, Limited",
       "Home country": "Ireland",
       "What it receives, and why": "What you type in the support chat — to answer you",
@@ -592,9 +593,10 @@ describe("the model providers page lists the companies the API's targets reach (
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const entries = [...view.querySelectorAll(".legalProviderEntry")];
     expect(entries).toHaveLength(WITH_UNCHECKED.length);
-    for (const entry of entries) {
-      // Addition D24 (owner 2026-10-22): providers only, so no models line.
+    for (const [index, entry] of entries.entries()) {
+      // Owner, 18 November 2026: a row that serves models names them first; web search and an unchecked host do not.
       expect(texts(entry.querySelectorAll("tbody th"))).toEqual([
+        ...(WITH_UNCHECKED[index]!.models === "" ? [] : ["Models"]),
         "Company",
         "Home country",
         "What it receives, and why",
@@ -659,27 +661,31 @@ describe("the model providers page lists the companies the API's targets reach (
     ["no answer from the API (the whole reviewed catalogue)", null],
     ["targets on DeepInfra only", ["deepinfra"]],
     ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"]],
+    ["targets on Amazon, Anthropic and DeepInfra", ["amazon", "anthropic", "deepinfra"]],
     ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
-  ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
+  ] as const)("names Anthropic's Claude Haiku for both checks on exactly one row: %s", (_build, companies) => {
     const register = providerRegister(companies);
     for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions"] as const) {
       const rows = register.filter((entry) => entry.purposes.includes(purpose));
       expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });
+      expect(rows[0]).toMatchObject({ models: "Claude Haiku", entity: "Anthropic Ireland, Limited" });
     }
   });
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
-    const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
-    // DeepInfra's partner for one model (a company DeepInfra does not name) and a host no catalogue row knows.
-    expect(uncheckedRows.map(({ key }) => key)).toEqual(["deepinfra-partner", "host:api.acme.example"]);
+    const uncheckedRows = [...WITH_UNCHECKED, ...PROVIDER_REGISTER].filter(({ checkedOn }) => checkedOn === null)
+      .filter((entry, index, all) => all.findIndex(({ key }) => key === entry.key) === index);
+    // DeepInfra's partner for one model (a company DeepInfra does not name), a host no catalogue row knows, and Amazon:
+    // its EEA contracting company and the region the owner chose are known (18 November 2026), its contract facts are
+    // not checked yet.
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["deepinfra-partner", "host:api.acme.example", "amazon"]);
     for (const entry of uncheckedRows) {
-      expect(isUnverified(entry.entity)).toBe(true);
+      expect(isUnverified(entry.entity), entry.key).toBe(entry.key !== "amazon");
       expect(isUnverified(entry.contact)).toBe(true);
       expect(entry.training).toBe("unconfirmed");
       expect(entry.zeroRetention).toBe("unconfirmed");
       expect(entry.retentionKey).toBe("legal.providers.unconfirmed");
-      expect(entry.locationKey).toBe("legal.providers.unconfirmed");
+      expect(entry.locationKey).toBe(entry.key === "amazon" ? "legal.providers.locationAwsStockholm" : "legal.providers.unconfirmed");
       expect(entry.basisKey).toBe("legal.providers.unconfirmed");
     }
     // A row is filled and dated in the same change: no checked row keeps a bracketed contract fact.
@@ -697,8 +703,8 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    // Perplexity's row is checked against its terms; only DeepInfra's unnamed partner is left.
-    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["deepinfra-partner"]);
+    // Perplexity's row is checked against its terms; DeepInfra's unnamed partner and Amazon are left.
+    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["amazon", "deepinfra-partner"]);
   });
 
   it("shows every register label in every locale's catalogue", () => {
