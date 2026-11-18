@@ -110,8 +110,8 @@ const REGION_EXCLUDED: RegionRuleValue = Object.freeze({ pay: false, reason: "TE
  * can be blocked; since the owner's amendment of 2 October 2026, the United Kingdom: not offered for
  * now, to open after launch; since the owner's decision of 14 November 2026, Switzerland and
  * Liechtenstein (open for sign-up and payment from 4 November until then): not offered for now. They
- * are one VAT territory, its VAT is due from the first sale once the company's worldwide turnover is
- * CHF 100,000 a year, which it is, and registering needs a Swiss tax representative (CH_VAT in
+ * are one VAT territory, its VAT is due from the first sale once the company's worldwide turnover reaches
+ * CHF 100,000 a year, and registering needs a Swiss tax representative (CH_VAT in
  * tax-authorities.ts); the Terms and the Privacy Policy no longer name either. Turkey, Brazil, Indonesia and,
  * since the owner's amendment of 1 October 2026 (high risk, low benefit), Saudi Arabia, India, the
  * UAE, Mexico, Argentina, Colombia, Chile, Thailand and the Philippines, and, since the owner's

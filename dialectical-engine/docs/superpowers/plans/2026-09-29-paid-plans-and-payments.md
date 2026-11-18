@@ -29,7 +29,7 @@ These are copied from the spec. Every task includes them implicitly.
 **Plans and limits**
 
 - Plans are exactly FREE / PLUS / PRO / MAX. Net prices are the public ones. Monthly credit is the plan's limit.
-- Paid plans get a day cap of 2000 basis points and a week cap of 5000 basis points of the monthly credit. Free has only its monthly credit.
+- Paid plans get a day cap of <amount> basis points and a week cap of <amount> basis points of the monthly credit. Free has only its monthly credit.
 - Every person window has a finish edge of <amount> basis points (<amount>). The site day keeps <amount> (<amount>), and the close edge is <amount> (<amount>).
 - One waiting question per person.
 - Periods are anchored at the subscription instant (for Free, at account creation). A month runs from the anchor day-of-month, clamped to the month's end. A week is a 7-day block from the month start; a day is a 24-hour block from the month start. All in UTC.
@@ -17892,8 +17892,8 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
       entitlements,
       billingPlans: PLANS
     });
-    // PLUS's day cap is 20 % of <amount>: one dollar, spent.
-    await spendAs(owner, 1_000_000, new Date("2031-10-15T11:59:00.000Z"));
+    // PLUS's whole day cap, spent.
+    await spendAs(owner, <the plan's day cap>, new Date("2031-10-15T11:59:00.000Z"));
     const waitingRunId = await waitAs(room, owner, "premium");
     const { dispatched, dispatcher } = recording();
     const application = applicationWith(room, dispatcher);

@@ -95,7 +95,7 @@ Task 7 (README and S-8):
 - The pinned sentence sits on one line (pre-flight PF-D16).
 - S-8 keeps one working folder in the home folder from day 1, with a dated copy of `$P/compare` each day (pre-flight PF-D17).
 - S-8 checks that the story retells the answers note (pre-flight PF-D18).
-- Cost about $1.9 to $4.3 (up to about $6 with reruns), plus the fast check's $0.00013 a shape debate; the shape's room read from the first run's admission figures; the time names the call setting, the same for both arms; the exit-30 row names `SHAPE_NOT_EXERCISED` (and the blank line that split the exit table goes); one line lists the owners' separate switch-on steps; the C-TWO clause on `alsoRaised` (pre-flight PF-D19, PF-D10; pre-flight check 2026-10-14).
+- Cost: what each run's report says it spent, with room kept for reruns, plus the fast check on each shape debate; the shape's room read from the first run's admission figures; the time names the call setting, the same for both arms; the exit-30 row names `SHAPE_NOT_EXERCISED` (and the blank line that split the exit table goes); one line lists the owners' separate switch-on steps; the C-TWO clause on `alsoRaised` (pre-flight PF-D19, PF-D10; pre-flight check 2026-10-14).
 - The reasons list gains `MAP_ANSWERS_NOT_ARGUED` and `NO_MAP_STORED`; Step 4 expects 26 tests (pre-flight PF-D11, PF-D12, PF-D9).
 
 Task 7b (the question language):
@@ -2367,13 +2367,12 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 
 Money and time, within the owners' daily test budget:
 
-- **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
-  plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs
-  $0.10 to $0.30. The whole comparison is about $1.9 to $4.3 (four debates in each shape and day 1's formats),
-  spread over at least four days. A pair run again adds about $0.45 to $1, so keep room for reruns (up to about $6 in
-  all).
-- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends: about $4
-  DeepInfra and $0.90 Anthropic for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
+- **Cost per debate.** Each run's report gives what it spent ("spent by the gate's count" on each gate's line in
+  `report.md`). A new-shape debate also makes one fast language check by Haiku, on the Anthropic gate. The whole
+  comparison (four debates in each shape and day 1's formats) is spread over at least four days. Keep room in the
+  day's test budget for a pair run again.
+- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends, on both gates,
+  for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
   Then the report's first reason starts with `ADMISSION_REFUSED:`, and nothing but the AIs' health checks was spent.
   - The new shape's estimate may need more room (the map's merge and choose steps are each counted in full on both
     gates). Read the first new-shape run's admission figures before you plan the next day: whether it was admitted,
@@ -2381,7 +2380,7 @@ Money and time, within the owners' daily test budget:
   - Run that debate first thing the next Bucharest day, into the same folder.
   - Note in your own log that the pair was split over two days.
 - **Daily stop.** After every run, read the "spent by the gate's count" on each gate's line in `report.md`. Stop for
-  the day once the day's runs add up to $4.50 DeepInfra or $0.90 Anthropic. Haiku is the only AI on the Anthropic gate,
+  the day once the day's runs come close to the testing day's limit on either gate (the owner's figures). Haiku is the only AI on the Anthropic gate,
   so its line is Haiku's share.
 - **Time.** Both debates of a pair run with the same call setting: the same `--call-concurrency` value on both
   commands, or none on either. The commands below give none, so they use the register's own setting, which on today's
@@ -2465,12 +2464,12 @@ The whole bullet then reads, rewrapped only where an insertion lengthened a line
 (e) In "## Money and time (rough)", after the **debate** bullet, add:
 
 ```markdown
-- debate in the new shape (`--shape-policy`), depth 1: about $0.30 (spec 2026-10-12), with fewer calls than today's
-  shape, plus one fast language check by Haiku on the Anthropic gate (about $0.00013). Its start-of-debate estimate may
+- debate in the new shape (`--shape-policy`), depth 1: fewer calls than today's shape (the run's report gives what
+  it spent), plus one fast language check by Haiku on the Anthropic gate. Its start-of-debate estimate may
   need more room than today's shape (the map's merge and choose steps are each counted in full on both gates): read
   the first new-shape run's admission figures (S-8, "Room the estimate needs").
-- the whole-debate comparison (S-8): eight depth-1 debates over at least four days, about $1.9 to $4.3 in all with
-  day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
+- the whole-debate comparison (S-8): eight depth-1 debates over at least four days, with day 1's formats; keep room
+  in the day's test budget for a pair run again.
 ```
 
 (f) In "## Files", add these two bullets right after the bullet that names `practice-debate.ts` (pre-flight check 2026-10-14: no bullet starts with it; it is the bullet that starts `` - `practice-lanes.ts`, `practice-formats.ts` `` and ends `` `--transcript` file. ``):
@@ -3946,13 +3945,13 @@ echo "exit: $?"
    uploaded. NOT_PROVEN: run it again later the same day.
 3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
    question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
-   rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
+   rewrite used. It spends and takes about as long as one new-shape debate (1 to 2 hours).
 ```
 
 Then:
 - in item 4 (the old item 2), change "Then run the first pair on `ro-euro`" to "Day 2: run the first pair on `ro-euro`";
 - in the "**One pair a day after that:**" table, change the days 2, 3, 4 to 3, 4, 5;
-- in S-8's **Cost per debate** bullet, change "spread over at least four days" to "spread over at least five days" and add the sentence "The language mode costs under <amount> and the `lang-ro-en-mix` debate about $0.30, on day 1 after formats.";
+- in S-8's **Cost per debate** bullet, change "spread over at least four days" to "spread over at least five days" and add the sentence "The language mode and the `lang-ro-en-mix` debate run on day 1 after formats.";
 - in "## Money and time (rough)", change Task 7's "eight depth-1 debates over at least four days" to "eight depth-1 debates over at least five days, after day 1's language mode and `lang-ro-en-mix` debate".
 
 (d) In "Optional flags", at the end of the plain `- debate:` bullet (README ~445, after its `--register-next` sentences), add: `` `--site-language <code>`, `--language-choice use|keep` (default `keep`; see "The question language"; debate only, with a debate-shape row). `` Right after that bullet, add:
