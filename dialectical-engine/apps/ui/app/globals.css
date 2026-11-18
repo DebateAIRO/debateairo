@@ -239,6 +239,15 @@ select {
   color: inherit;
 }
 
+/* Design Document v2 has no mono face (--font-mono is the sans face): a code, pre, kbd or samp element with no rule of
+   its own takes the token's face, never the browser's own monospace (seen on /ai-transparency, 18 November 2026). */
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
+}
+
 /* custom scrollbars */
 .scroll::-webkit-scrollbar {
   width: 10px;

@@ -317,10 +317,11 @@ describe("renderReportPdf (spec §10)", () => {
     expect(Buffer.isBuffer(pdf)).toBe(true);
     expect(pdf.subarray(0, 5).toString("latin1")).toBe("%PDF-");
     const raw = pdf.toString("latin1");
-    // Both families are embedded: the serif headings and the sans text.
+    // Both families are embedded: the display headings and the text face (Design Document v2), and neither old face.
     expect(raw.match(/\/FontFile2/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(raw).toMatch(/\/BaseFont \/[A-Z]{6}\+Fraunces/);
-    expect(raw).toMatch(/\/BaseFont \/[A-Z]{6}\+PlusJakartaSans/);
+    expect(raw).toMatch(/\/BaseFont \/[A-Z]{6}\+BricolageGrotesque/);
+    expect(raw).toMatch(/\/BaseFont \/[A-Z]{6}\+InstrumentSans/);
+    expect(raw).not.toMatch(/\/BaseFont \/[A-Z]{6}\+Fraunces/);
     expect(raw.match(/\/Subtype \/Link/g)?.length ?? 0).toBeGreaterThan(10);
     // Every link is internal (a named destination in the appendix); no link leaves the file.
     expect(raw).not.toMatch(/\/URI\s*\(/);

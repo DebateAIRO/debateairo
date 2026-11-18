@@ -102,18 +102,18 @@ export function renderYourDataHtml(snapshot: ExportSnapshot, catalog: ArchiveCat
 <html lang="${escapeHtml(locale)}" dir="${locale === "ar" || locale === "he" ? "rtl" : "ltr"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(catalog["archive.pageTitle"])}</title>
 <style>
-:root{color-scheme:light;--bg:#F9F6F1;--surface:#FDFBF6;--text:#29261F;--text-2:#555147;--muted:#6E675C;--line:rgba(41,38,31,.10);--line-strong:rgba(41,38,31,.20);--gold-text:#826530;--gold-border:#D9C8A9;--agree-text:#3C754B;--dispute:#B0432F;--dispute-border:#DDAEA2}
+:root{color-scheme:light;--bg:#F3F5F9;--surface:#FFFFFF;--text:#121826;--text-2:#4A5468;--muted:#5E6779;--line:#E3E7EF;--line-strong:#D3D9E4;--gold-text:#A84B05;--gold-border:#FFC08A;--agree-text:#2F7A47;--dispute:#B42318;--dispute-border:#F2B8B0}
 body{margin:0;background:var(--bg);color:var(--text);font:16px/1.6 ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 main{max-width:720px;margin:0 auto;padding:48px 24px}
 header{padding-bottom:20px;border-bottom:1px solid var(--line-strong)}
-h1,h2,h3{font-family:Georgia,serif}h1{margin:0;font-size:30px;font-weight:500;line-height:1.25;letter-spacing:-.02em}header p{margin:10px 0 0;font-size:13px;color:var(--text-2)}
-section.account-section{margin-top:28px}section.debates-section{margin-top:32px}h2{margin:0 0 12px;font-size:20px;font-weight:600;line-height:1.25}
+h1,h2,h3{letter-spacing:-.02em}h1{margin:0;font-size:30px;font-weight:700;line-height:1.25;letter-spacing:-.02em}header p{margin:10px 0 0;font-size:13px;color:var(--text-2)}
+section.account-section{margin-top:28px}section.debates-section{margin-top:32px}h2{margin:0 0 12px;font-size:20px;font-weight:700;line-height:1.25}
 .account-card,article{background:var(--surface);border:1px solid var(--line);border-radius:14px}
 .account-card{padding:14px 18px}.pseudonym{margin:0 0 8px;font-size:15px;font-weight:700}
 dl{margin:0;display:grid;grid-template-columns:140px 1fr;row-gap:6px;font-size:14px}dt{color:var(--muted)}dd{margin:0}
 article{padding:18px 22px}article+article{margin-top:16px}
 .label{margin:18px 0 6px;font-size:12px;font-weight:700;color:var(--muted)}.label:first-child{margin-top:0}
-h3{margin:0;font-size:22px;font-weight:500;line-height:1.3}.meta{margin:8px 0 0;font-size:13px;color:var(--text-2)}article>.meta:first-child{margin-top:0}
+h3{margin:0;font-size:22px;font-weight:700;line-height:1.3}.meta{margin:8px 0 0;font-size:13px;color:var(--text-2)}article>.meta:first-child{margin-top:0}
 .pill{display:inline-block;padding:2px 10px;border:1px solid var(--gold-border);border-radius:999px;color:var(--gold-text);font-size:12px;font-weight:700;line-height:1.5}
 .pill.supported{border-color:var(--agree-text);color:var(--agree-text)}.pill.unsupported{border-color:var(--dispute-border);color:var(--dispute)}
 .answer{margin:10px 0 0;font-size:15px;line-height:1.6}.story-text{margin:0;font-size:15px;line-height:1.6}
@@ -121,7 +121,7 @@ h3{margin:0;font-size:22px;font-weight:500;line-height:1.3}.meta{margin:8px 0 0;
 ul{margin:0;padding-inline-start:20px;font-size:15px;line-height:1.55}li{margin:0 0 6px}
 .unreadable{margin:8px 0 0;font-size:15px;font-style:italic;color:var(--text-2)}.empty{margin:0;font-size:15px;color:var(--text-2)}
 footer{margin-top:32px;padding-top:16px;border-top:1px solid var(--line-strong);font-size:13px;color:var(--muted)}
-@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#14110E;--surface:#181410;--text:#F2EAD9;--text-2:#B5A88F;--muted:#9C907A;--line:rgba(242,234,217,.09);--line-strong:rgba(242,234,217,.18);--gold-text:#C8A055;--gold-border:#705A33;--agree-text:#86B58D;--dispute:#D67F65;--dispute-border:#774A3B}}
+@media (prefers-color-scheme: dark){:root{color-scheme:dark;--bg:#0E131D;--surface:#171E2B;--text:#EEF2F8;--text-2:#A7B1C2;--muted:#8B95A8;--line:#263042;--line-strong:#34405A;--gold-text:#FFB374;--gold-border:#8C4510;--agree-text:#86B58D;--dispute:#FF8A7A;--dispute-border:#7A3A35}}
 </style></head><body><main>
 <header><h1>${escapeHtml(catalog["archive.pageTitle"])}</h1><p>${escapeHtml(generated)}</p></header>
 <section class="account-section"><h2>${escapeHtml(catalog["archive.accountHeading"])}</h2><div class="account-card"><p class="pseudonym">${escapeHtml(pseudonym)}</p>

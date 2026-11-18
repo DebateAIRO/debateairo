@@ -63,8 +63,13 @@ describe("data export readable page", () => {
     expect(archiveHtml).toMatch(/<p class="label">Question<\/p>\s*<h3>MARK-Q2<\/h3>\s*<p class="meta">/);
     expect(archiveHtml).toMatch(/<p class="label verdict-label">Verdict<\/p>\s*<span class="pill contested" data-ai-generated="true">Close call<\/span>/);
     expect(archiveHtml).toMatch(/<footer>[^<]*README\.txt[^<]*<\/footer>/);
-    for (const token of ["#F9F6F1", "#FDFBF6", "#29261F", "#14110E", "#181410", "#F2EAD9", "#D9C8A9", "#705A33"]) {
+    // Design Document v2 (18 November 2026): the page carries the site's own light and dark colours, and none of the
+    // beige theme it replaced.
+    for (const token of ["#F3F5F9", "#FFFFFF", "#121826", "#0E131D", "#171E2B", "#EEF2F8", "#FFC08A", "#8C4510"]) {
       expect(archiveHtml).toContain(token);
+    }
+    for (const token of ["#F9F6F1", "#FDFBF6", "#29261F", "#14110E", "#181410", "#F2EAD9", "Georgia"]) {
+      expect(archiveHtml).not.toContain(token);
     }
   });
   it("H-9 uses the drawn short dates for the German account and debates", () => {
@@ -105,9 +110,9 @@ describe("data export readable page", () => {
       const block = style.match(new RegExp(`(?:^|[}\\n])${escaped}\\{([^}]*)\\}`))?.[1] ?? "";
       return Object.fromEntries(block.split(";").filter(Boolean).map((item) => item.split(":")));
     };
-    expect(declarations("h1")).toMatchObject({ "font-size": "30px", "font-weight": "500", "letter-spacing": "-.02em" });
-    expect(declarations("h2")).toMatchObject({ "font-size": "20px", "font-weight": "600" });
-    expect(declarations("h3")).toMatchObject({ "font-size": "22px", "font-weight": "500", "line-height": "1.3" });
+    expect(declarations("h1")).toMatchObject({ "font-size": "30px", "font-weight": "700", "letter-spacing": "-.02em" });
+    expect(declarations("h2")).toMatchObject({ "font-size": "20px", "font-weight": "700" });
+    expect(declarations("h3")).toMatchObject({ "font-size": "22px", "font-weight": "700", "line-height": "1.3" });
     expect(declarations(".label")).toMatchObject({ color: "var(--muted)", margin: "18px 0 6px" });
     expect(declarations(".label:first-child")["margin-top"]).toBe("0");
     expect(declarations("article>.meta:first-child")["margin-top"]).toBe("0");

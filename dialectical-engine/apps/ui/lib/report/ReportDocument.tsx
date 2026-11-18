@@ -17,28 +17,27 @@ import type { ReportRanking, ReportTableCell } from "./reportTables.js";
  * ReportModel and nothing else: every string is plain text, in the report's one
  * language, and the only links are the code-built internal ones to the entries
  * in the list of points ([Pn] citations, and point numbers the story's text
- * names). In a Latin-script report the serif family prints only the fixed part
- * titles; every model- or user-written string is set in the sans family, which
- * carries ș ț „ → and every Latin letter the report's languages use. A report
+ * names). In a Latin-script report the display family (Bricolage Grotesque Bold) prints only the fixed part
+ * titles; every model- or user-written string is set in the text family (Instrument Sans), which
+ * carries ș ț „ → and the Latin letters of every report language but Vietnamese (reportFonts.ts). A report
  * in another script sets everything in that script's Noto face, and every
  * character a face lacks comes from the next face in the list
  * (lib/report/reportFonts.ts; fonts.test.mjs checks the catalogues against it).
  */
-export const REPORT_FONT_SANS = REPORT_FONT_FAMILIES.sans;
-export const REPORT_FONT_SERIF = REPORT_FONT_FAMILIES.serif;
+export const REPORT_FONT_TEXT = REPORT_FONT_FAMILIES.text;
+export const REPORT_FONT_DISPLAY = REPORT_FONT_FAMILIES.display;
 
-// Print colours from the site's light palette (apps/ui/app/globals.css :root): --ink, --text-strong,
-// --text-2, --muted, --accent, --gold-bg, --gold-border and --link. LINE is a solid warm
-// hairline standing in for the translucent --line-strong, so it prints the same on any paper.
-const INK = "#29261F";
-const STRONG = "#1A1613";
-const TEXT_2 = "#555147";
-const MUTED = "#6E675C";
-const LINE = "#D9D3C8";
-const ACCENT = "#C15F3C";
-const NOTE_BG = "#F3ECE0";
-const NOTE_BORDER = "#D9C8A9";
-const LINK = "#3D5A80";
+// Print colours from the site's light palette (apps/ui/app/globals.css :root, Design Document v2): --ink,
+// --text-strong, --text-2, --muted, --line-strong, --accent, --gold-bg, --gold-border and --link.
+const INK = "#121826";
+const STRONG = "#0B101B";
+const TEXT_2 = "#4A5468";
+const MUTED = "#5E6779";
+const LINE = "#D3D9E4";
+const ACCENT = "#2350D8";
+const NOTE_BG = "#FFF3E8";
+const NOTE_BORDER = "#FFC08A";
+const LINK = "#2350D8";
 
 // Wide enough for the longest fate word in the report's languages, set in capitals ("A REZISTAT PARȚIAL"
 // wraps to two lines here), with a gutter before the path line.
@@ -57,7 +56,7 @@ const styles = StyleSheet.create({
   // (measured 2026-09-26). Line height is set on each text style instead, and every style that sets one
   // also sets its own fontSize: react-pdf resolves a unitless lineHeight against the fontSize in the SAME
   // style (18 when it has none), not the inherited one, so a bare lineHeight of 1.6 spaced 10.5pt text 29pt.
-  page: { paddingTop: 58, paddingBottom: 74, paddingHorizontal: 62, fontFamily: REPORT_FONT_SANS, fontSize: BODY, color: INK },
+  page: { paddingTop: 58, paddingBottom: 74, paddingHorizontal: 62, fontFamily: REPORT_FONT_TEXT, fontSize: BODY, color: INK },
 
   // Cover
   eyebrow: { fontWeight: 700, fontSize: 8, letterSpacing: 1.6, color: ACCENT, marginBottom: 12 },
@@ -71,12 +70,12 @@ const styles = StyleSheet.create({
   // The "not professional advice" notice: the disclosure's box, first on the page, above the eyebrow.
   notAdvice: { marginBottom: 16, paddingVertical: 7, paddingHorizontal: 11, borderWidth: 1, borderColor: LINE, borderRadius: 6 },
 
-  // Headings: the serif prints only the fixed part titles. Every heading-like line sits in an
+  // Headings: the display face prints only the fixed part titles. Every heading-like line sits in an
   // unbreakable View with minPresenceAhead (KeepWithNext): measured with 4.9.0's paginator, a Text alone
   // is left at the foot of a page when its own box straddles the page end, whatever minPresenceAhead says.
   headingBox: { marginTop: 26, marginBottom: 12, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: LINE },
   headingFirstBox: { marginBottom: 12, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: LINE },
-  heading: { fontFamily: REPORT_FONT_SERIF, fontWeight: 600, fontSize: 18, color: STRONG },
+  heading: { fontFamily: REPORT_FONT_DISPLAY, fontWeight: 700, fontSize: 18, color: STRONG },
   intro: { fontSize: 9.5, lineHeight: 1.5, color: MUTED, marginBottom: 12 },
   subheadingBox: { marginTop: 12, marginBottom: 5 },
   subheading: { fontWeight: 700, fontSize: BODY, color: STRONG },

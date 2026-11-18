@@ -2,16 +2,19 @@
  * The report's fonts (apps/ui/assets/fonts; SOURCES.md records where every file
  * comes from), and the faces a report picks from its language.
  *
- * - A Latin-script report keeps its look: Plus Jakarta Sans for the text and
- *   Fraunces for the fixed part titles.
+ * - A Latin-script report prints in the site's own faces (Design Document v2,
+ *   18 November 2026): Instrument Sans for the text and Bricolage Grotesque
+ *   Bold for the fixed part titles. Vietnamese is the exception: Instrument
+ *   Sans lacks most of its letters, so its text prints in Plus Jakarta Sans,
+ *   which has them all, rather than in two faces inside one word.
  * - Every other script prints in its own Noto face, headings in its bold.
  * - Text can mix scripts: a Russian story quotes an English product name, a
  *   Romanian one a Greek letter. So each face is followed by fallbacks, and
  *   react-pdf takes each character from the first face in the list that has
- *   it. Noto Sans (Latin, Cyrillic, Greek) and Plus Jakarta Sans (→ ≈ and the
- *   report's other symbols) always follow. A face for another script is added
- *   only when the report's text holds that script, so a Latin report never
- *   loads the large CJK files.
+ *   it. Noto Sans (Latin, Cyrillic, Greek) and Plus Jakarta Sans (≈, which
+ *   neither Instrument Sans nor Noto Sans has, and → for the Noto scripts)
+ *   always follow. A face for another script is added only when the report's
+ *   text holds that script, so a Latin report never loads the large CJK files.
  *
  * Nothing here imports react-pdf, so the choice can be tested on its own
  * (fonts.test.mjs checks every catalogue value against it).
@@ -19,8 +22,12 @@
 
 /** The names react-pdf knows the faces by. */
 export const REPORT_FONT_FAMILIES = Object.freeze({
+  /** Instrument Sans: a Latin-script report's text. */
+  text: "ReportText",
+  /** Bricolage Grotesque Bold: a Latin-script report's fixed part titles. */
+  display: "ReportDisplay",
+  /** Plus Jakarta Sans: Vietnamese text, and the symbols the other faces lack. */
   sans: "ReportSans",
-  serif: "ReportSerif",
   notoSans: "ReportNotoSans",
   hebrew: "ReportNotoHebrew",
   devanagari: "ReportNotoDevanagari",
@@ -34,7 +41,7 @@ export type ReportFontFamily = (typeof REPORT_FONT_FAMILIES)[keyof typeof REPORT
 export interface ReportFontFile {
   /** The file, relative to the fonts directory. */
   readonly file: string;
-  readonly fontWeight: 400 | 600 | 700;
+  readonly fontWeight: 400 | 700;
   readonly fontStyle: "normal" | "italic";
 }
 
@@ -52,12 +59,17 @@ function uprightOnly(regular: string, bold: string): readonly ReportFontFile[] {
 
 /** Only the weights and styles the report prints: regular, bold, and italic where the script has one. */
 export const REPORT_FONT_FACES: Readonly<Record<ReportFontFamily, readonly ReportFontFile[]>> = Object.freeze({
+  ReportText: Object.freeze([
+    face("instrument-sans/InstrumentSans-Regular.ttf", 400),
+    face("instrument-sans/InstrumentSans-Italic.ttf", 400, "italic"),
+    face("instrument-sans/InstrumentSans-Bold.ttf", 700)
+  ]),
+  ReportDisplay: Object.freeze([face("bricolage-grotesque/BricolageGrotesque-Bold.ttf", 700)]),
   ReportSans: Object.freeze([
     face("plus-jakarta-sans/PlusJakartaSans-Regular.ttf", 400),
     face("plus-jakarta-sans/PlusJakartaSans-Italic.ttf", 400, "italic"),
     face("plus-jakarta-sans/PlusJakartaSans-Bold.ttf", 700)
   ]),
-  ReportSerif: Object.freeze([face("fraunces/Fraunces9pt-SemiBold.ttf", 600)]),
   ReportNotoSans: Object.freeze([
     face("noto-sans/NotoSans-Regular.ttf", 400),
     face("noto-sans/NotoSans-Italic.ttf", 400, "italic"),
@@ -85,7 +97,7 @@ export function reportScript(locale: string): ReportScript {
   return SCRIPT_OF_LOCALE[locale] ?? "latin";
 }
 
-const { sans, serif, notoSans, hebrew, devanagari, simplifiedChinese, japanese, korean } = REPORT_FONT_FAMILIES;
+const { text, display, sans, notoSans, hebrew, devanagari, simplifiedChinese, japanese, korean } = REPORT_FONT_FAMILIES;
 
 /**
  * Each script's own face first, then the two that always follow. Arabic has
@@ -107,7 +119,7 @@ const { sans, serif, notoSans, hebrew, devanagari, simplifiedChinese, japanese, 
  * spelling.)
  */
 const PRIMARY_FACES: Readonly<Record<ReportScript, readonly ReportFontFamily[] | null>> = Object.freeze({
-  latin: [sans, notoSans],
+  latin: [text, notoSans, sans],
   cyrillicGreek: [notoSans, sans],
   hebrew: [notoSans, hebrew, sans],
   arabic: null,
@@ -122,6 +134,13 @@ const PRIMARY_FACES: Readonly<Record<ReportScript, readonly ReportFontFamily[] |
  * so a Japanese quotation in a Latin report takes its Han from the Japanese
  * face; Han alone takes the Simplified Chinese one, the largest.
  */
+/**
+ * The Latin-script languages whose own letters Instrument Sans lacks: their text prints in Plus Jakarta Sans, which
+ * has every one, so no word is set in two faces (fonts.test.mjs checks both halves for every interface locale).
+ */
+const LATIN_TEXT_IN_SANS: ReadonlySet<string> = new Set(["vi"]);
+const LATIN_SANS_FACES: readonly ReportFontFamily[] = Object.freeze([sans, notoSans]);
+
 const FALLBACK_FACES: readonly Readonly<{ script: RegExp; family: ReportFontFamily }>[] = Object.freeze([
   { script: /\p{Script=Hebrew}/u, family: hebrew },
   { script: /\p{Script=Devanagari}/u, family: devanagari },
@@ -135,8 +154,8 @@ export interface ReportFaces {
   readonly body: readonly ReportFontFamily[];
   /** The fixed part titles' faces. */
   readonly heading: readonly ReportFontFamily[];
-  /** Fraunces prints only its 600; every other heading is the text face's bold. */
-  readonly headingWeight: 600 | 700;
+  /** Every heading prints in a bold: Bricolage Grotesque's for a Latin-script report, the text face's otherwise. */
+  readonly headingWeight: 700;
 }
 
 /**
@@ -145,7 +164,7 @@ export interface ReportFaces {
  */
 export function reportFaces(locale: string, printed: string): ReportFaces {
   const script = reportScript(locale);
-  const primary = PRIMARY_FACES[script];
+  const primary = script === "latin" && LATIN_TEXT_IN_SANS.has(locale) ? LATIN_SANS_FACES : PRIMARY_FACES[script];
   if (primary === null) throw new RangeError(`REPORT_LOCALE_UNSUPPORTED: ${locale}`);
   const body = [...primary];
   for (const { script: pattern, family } of FALLBACK_FACES) {
@@ -153,6 +172,6 @@ export function reportFaces(locale: string, printed: string): ReportFaces {
   }
   const frozen = Object.freeze(body);
   return script === "latin"
-    ? Object.freeze({ body: frozen, heading: Object.freeze([serif, ...frozen]), headingWeight: 600 })
+    ? Object.freeze({ body: frozen, heading: Object.freeze([display, ...frozen]), headingWeight: 700 })
     : Object.freeze({ body: frozen, heading: frozen, headingWeight: 700 });
 }

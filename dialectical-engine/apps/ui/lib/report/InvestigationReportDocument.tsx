@@ -18,13 +18,13 @@ import type { InvestigationReportPdfModel, InvestigationReportPdfPath } from "./
  * flows across pages: a row may break between pages, each row keeps a little of itself ahead, and a deep path stops moving in at four steps.
  * Round 2 r2-20 (owner, 3 Nov 2026): the column beside a path holds its one trust word, never an outcome tag.
  */
-const INK = "#29261F";
-const STRONG = "#1A1613";
-const TEXT_2 = "#555147";
-const MUTED = "#6E675C";
-const LINE = "#D9D3C8";
-const ACCENT = "#C15F3C";
-const LINK = "#3D5A80";
+const INK = "#121826";
+const STRONG = "#0B101B";
+const TEXT_2 = "#4A5468";
+const MUTED = "#5E6779";
+const LINE = "#D3D9E4";
+const ACCENT = "#2350D8";
+const LINK = "#2350D8";
 const BODY = 10.5;
 /** The path's one trust word (r2-20), beside its line. */
 const PATH_WORD_COLUMN = 92;
@@ -37,14 +37,14 @@ const LEVEL_INDENT_STEPS = 4;
 const NEVER_BREAK_BETWEEN_RUNS = 10000;
 
 const styles = StyleSheet.create({
-  page: { paddingTop: 58, paddingBottom: 74, paddingHorizontal: 62, fontFamily: REPORT_FONT_FAMILIES.sans, fontSize: BODY, color: INK },
+  page: { paddingTop: 58, paddingBottom: 74, paddingHorizontal: 62, fontFamily: REPORT_FONT_FAMILIES.text, fontSize: BODY, color: INK },
   notice: { marginBottom: 18, paddingVertical: 7, paddingHorizontal: 11, borderWidth: 1, borderColor: LINE, borderRadius: 6 },
   noticeText: { fontSize: 8.5, lineHeight: 1.5, color: MUTED },
   eyebrow: { fontWeight: 700, fontSize: 8, letterSpacing: 1.6, color: ACCENT, marginBottom: 12 },
   question: { fontWeight: 700, fontSize: 21, lineHeight: 1.28, color: STRONG, marginBottom: 12 },
   meta: { fontSize: 9, lineHeight: 1.45, color: MUTED, marginBottom: 2 },
   headingBox: { marginTop: 24, marginBottom: 10, paddingBottom: 6, borderBottomWidth: 1, borderBottomColor: LINE },
-  heading: { fontFamily: REPORT_FONT_FAMILIES.serif, fontWeight: 600, fontSize: 16, color: STRONG },
+  heading: { fontFamily: REPORT_FONT_FAMILIES.display, fontWeight: 700, fontSize: 16, color: STRONG },
   lead: { fontWeight: 700, fontSize: 13, lineHeight: 1.4, color: STRONG, marginBottom: 8 },
   paragraph: { fontSize: BODY, lineHeight: 1.6, marginBottom: 9 },
   note: { fontSize: 9, lineHeight: 1.5, color: MUTED, marginBottom: 9 },

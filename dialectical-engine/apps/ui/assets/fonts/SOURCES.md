@@ -25,12 +25,35 @@ fails the test.
   one. The report prints the italic style in the regular face for scripts
   that have no italic.
 
+## The site's own faces, added 2026-11-18
+
+Bricolage Grotesque and Instrument Sans replaced Fraunces and Plus Jakarta Sans
+as a Latin-script report's faces (Design Document v2). Plus Jakarta Sans stays
+for Vietnamese text and for ≈. Fraunces is no longer vendored.
+
+- Both families are under the SIL Open Font License 1.1 and declare no Reserved
+  Font Name. Each file is the copyright holders' own static build, taken
+  unchanged from their repository at the pinned commit: no file is converted,
+  subset, renamed or instanced from a variable font, so none is a Modified
+  Version under the licence.
+- The git blob hash of each downloaded file equals the blob GitHub lists for
+  that path at the pinned commit.
+- The licence asks that the copyright notice and the licence text travel with
+  every copy of the fonts (condition 2): each family's `OFL.txt`, from the same
+  commit, sits beside its files and ships with them. The fonts are never sold
+  or offered on their own (condition 1). A PDF made with them is not itself
+  under the licence (condition 5).
+
 ## Files
 
 | File | Version | Source (pinned commit) | sha256 | Bytes |
 |---|---|---|---|---|
-| `fraunces/Fraunces9pt-SemiBold.ttf` | Fraunces | https://raw.githubusercontent.com/undercasetype/Fraunces/d6d385783609ceb11ac0f220f3abd9f1631c8a36/fonts/static/ttf/Fraunces9pt-SemiBold.ttf | 68a5bf2872cde75f01e98681ab1633e19f73ca6783932fdff2e5459755528cf5 | 64856 |
-| `fraunces/OFL.txt` | | https://raw.githubusercontent.com/google/fonts/23e54b51ddffbc7713c583748e3bd86f62b1fa4a/ofl/fraunces/OFL.txt | bdf4c22802eaf804f998195871c6b8938aac2ac14b2d78a8bd66a6f1eced833b | 4391 |
+| `bricolage-grotesque/BricolageGrotesque-Bold.ttf` | Bricolage Grotesque 1.001 | https://raw.githubusercontent.com/ateliertriay/bricolage/84745e5b96261ae5f8c6c856e262fe78d1d6efdd/fonts/ttf/BricolageGrotesque-Bold.ttf | f83cb3f1ddb91bdb02868eeddb4f817b326aef993f96fe6f8a3b40b0f31c689b | 116260 |
+| `bricolage-grotesque/OFL.txt` |  | https://raw.githubusercontent.com/ateliertriay/bricolage/84745e5b96261ae5f8c6c856e262fe78d1d6efdd/OFL.txt | 4b5a7d8f37f5602621c8a8d7358a6a2e71317e6c231c661e15aef0275d3e07ba | 4403 |
+| `instrument-sans/InstrumentSans-Regular.ttf` | Instrument Sans 1.000 | https://raw.githubusercontent.com/Instrument/instrument-sans/7fa22308a3d0c94ee2b3cd537a1196b65db34a3e/fonts/ttf/InstrumentSans-Regular.ttf | 69fd3f7c467c70c1f73b232812407f688f3d87dd7a801ea7281aa97d29cf53d5 | 86232 |
+| `instrument-sans/InstrumentSans-Italic.ttf` | Instrument Sans 1.000 | https://raw.githubusercontent.com/Instrument/instrument-sans/7fa22308a3d0c94ee2b3cd537a1196b65db34a3e/fonts/ttf/InstrumentSans-Italic.ttf | 7e6ebe089d1a62b73840f74fcfa477f2f5e43c4df5db18fb790908938e5aef96 | 87424 |
+| `instrument-sans/InstrumentSans-Bold.ttf` | Instrument Sans 1.000 | https://raw.githubusercontent.com/Instrument/instrument-sans/7fa22308a3d0c94ee2b3cd537a1196b65db34a3e/fonts/ttf/InstrumentSans-Bold.ttf | 735badeb8b2046cee6f5e1226412ab6c29db04accbca413af03d70e991dce10d | 87272 |
+| `instrument-sans/OFL.txt` |  | https://raw.githubusercontent.com/Instrument/instrument-sans/7fa22308a3d0c94ee2b3cd537a1196b65db34a3e/OFL.txt | 9e27a72ed30eb49a08678f6a5d6ed98ec7ba5368f541637ee0683ec9134ef966 | 4403 |
 | `plus-jakarta-sans/PlusJakartaSans-Regular.ttf` | Plus Jakarta Sans | https://raw.githubusercontent.com/tokotype/PlusJakartaSans/18d1cd2f7ea10481919d2f05c1f7064b7307fc26/fonts/ttf/PlusJakartaSans-Regular.ttf | bd6276d4060e3b1ebc45047469e0bb86b08f301ba681cdf1ceb6245ea10478d2 | 128972 |
 | `plus-jakarta-sans/PlusJakartaSans-Italic.ttf` | Plus Jakarta Sans | https://raw.githubusercontent.com/tokotype/PlusJakartaSans/18d1cd2f7ea10481919d2f05c1f7064b7307fc26/fonts/ttf/PlusJakartaSans-Italic.ttf | 140ae2bc35471386ca0a4a2a91cdae2f7ed600e70745a25293cc8db08754cd7c | 132492 |
 | `plus-jakarta-sans/PlusJakartaSans-Bold.ttf` | Plus Jakarta Sans | https://raw.githubusercontent.com/tokotype/PlusJakartaSans/18d1cd2f7ea10481919d2f05c1f7064b7307fc26/fonts/ttf/PlusJakartaSans-Bold.ttf | 5f5342ef76862b5b5365d1dff1a667629dfa484e388dd602552f647219c3870f | 128988 |
