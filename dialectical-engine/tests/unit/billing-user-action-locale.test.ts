@@ -71,6 +71,7 @@ function world(paid: boolean) {
     customerByOwner: async () => ({ customerId: CUSTOMER }),
     appendSubscriptionEvent: async () => undefined,
     consumeWithdrawalGrant: async () => true,
+    ownerErasureCommitted: async () => false,
     withTransaction: async (fn: (c: PoolClient) => Promise<unknown>) => fn(client),
     enqueue: async (_client: PoolClient, job: Enqueued) => { jobs.push(job); return randomUUID(); }
   };

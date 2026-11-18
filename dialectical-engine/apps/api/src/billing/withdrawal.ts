@@ -133,6 +133,11 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       || locked.state.planId !== before.planId || locked.state.currentPeriodStart?.getTime() !== periodStart.getTime()) {
       refuse(409, "NOT_SUBSCRIBED");
     }
+    // The credit used above is found through the account's usage rows, and those stop naming the account in the
+    // transaction that erases it (0177): read after that, it is zero and the whole price would go back. The plan ends
+    // with the erasure; the stop sweep only writes that down a few minutes later (W7), so the answer here is already
+    // the one given after it. Asked after the credit was read: an account still there now was there for that read.
+    if (await deps.billing.ownerErasureCommitted(ownerRef, client)) refuse(409, "NOT_SUBSCRIBED");
     await request.authorize(client);
     const { state } = locked;
     const charges: Array<ChargeRow & { events: ChargeEventRow[] }> = [];
