@@ -75,5 +75,8 @@
   "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "Diese Website wurde aktualisiert. Laden Sie die Seite neu.",
   "chrome.release.reload": "Neu laden",
-  "chrome.release.madeByNewer": "Diese Debatte wurde von einer neueren Version dieser Website erstellt. Laden Sie die Seite neu oder versuchen Sie es in ein paar Minuten noch einmal."
+  "chrome.release.madeByNewer": "Diese Debatte wurde von einer neueren Version dieser Website erstellt. Laden Sie die Seite neu oder versuchen Sie es in ein paar Minuten noch einmal.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

@@ -55,10 +55,15 @@ describe("BUG-03 home debates buffer", () => {
       "run:failed",
       "answer:served"
     ]);
-    expect(html).toContain('href="/debate/run:generating"');
+    // Rows open the V4 page, addressed by the run.
+    expect(html).toContain('href="/v4/debate/run%3Agenerating"');
     expect(html).toContain("The generating debate");
     expect(html).toContain("Generating");
-    expect(html).toContain('href="/debate/run:failed"');
+    expect(html).toContain('href="/v4/debate/run%3Afailed"');
+    // A served row's own id is its answer's; its V4 page is still addressed by the run. No row opens the classic view.
+    expect(html).toContain('href="/v4/debate/run%3Aserved"');
+    expect(html).not.toContain('href="/debate/');
+    expect(html).not.toContain("answer%3Aserved");
     // The row says what happened in plain words; the stored code is for operators only.
     expect(html).toContain("Something went wrong on our side before this debate began. Please ask again.");
     expect(html).not.toContain("RUN_SETUP_FAILED");

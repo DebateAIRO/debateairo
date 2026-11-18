@@ -75,5 +75,8 @@
   "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "האתר עודכן. טענו את הדף מחדש.",
   "chrome.release.reload": "טעינה מחדש",
-  "chrome.release.madeByNewer": "הדיון הזה נוצר בגרסה חדשה יותר של האתר. טענו את הדף מחדש, או נסו שוב בעוד כמה דקות."
+  "chrome.release.madeByNewer": "הדיון הזה נוצר בגרסה חדשה יותר של האתר. טענו את הדף מחדש, או נסו שוב בעוד כמה דקות.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

@@ -520,7 +520,9 @@ apps/ui/app/debate/[id]/page.tsx
 apps/ui/app/debate/[id]/report/route.ts
 apps/ui/app/enroll-mfa/layout.tsx
 apps/ui/app/enroll-mfa/page.tsx
+apps/ui/app/error.tsx
 apps/ui/app/export/page.tsx
+apps/ui/app/global-error.tsx
 apps/ui/app/help/page.tsx
 apps/ui/app/layout.tsx
 apps/ui/app/legal/page.tsx

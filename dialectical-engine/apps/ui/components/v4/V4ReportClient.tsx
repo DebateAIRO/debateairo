@@ -68,8 +68,8 @@ import {
  *    on. f19: "How sure we are" at every reading level.
  *
  * The owner's answers of 5 Nov 2026 (OPEN-OWNER-QUESTIONS-2026-11-04.md, "Your answers" and its follow-ups):
- *  - 12 B: "Open in the classic view" only in the header's account menu (journey-f19, "nowhere else"); the foot link and the
- *    small link under "Ask a new question" went.
+ *  - The page offers no "Open in the classic view": the foot link and the small link under "Ask a new question" went, and
+ *    the header's account menu is handed no classic address either (every debate on the main site is a V4 one).
  *  - 35 A: "Link copied." stays until the next Share choice, as the "Public" line's does (the copy-failed line already
  *    did). Each choice first clears the line, so a second "Link copied." is read out again.
  *  - The level ruling: a debate keeps the level it was asked at, and the line above the title says "Report" with no level.
@@ -643,7 +643,6 @@ function ReportBody({ id, locale, catalog }: Readonly<{
   const language = load.kind === "SERVED" ? load.language : null;
 
   const mapHref = `/v4/debate/${encodeURIComponent(target)}`;
-  const classicHref = `/debate/${encodeURIComponent(target)}`;
   // A new question picks its own level on the first screen (owner, 5 Nov: it starts on "Plain words"), so no ?level= here.
   const askHref = "/v4";
   // Owner review 3 Nov (map-f30): a debate that did not finish has no map; the way back is to its page, which offers
@@ -739,7 +738,8 @@ function ReportBody({ id, locale, catalog }: Readonly<{
       level={level}
       share={share}
       status={status}
-      classicHref={load.kind === "NOT_FOUND" ? null : classicHref}
+      // No classic-view link: on the main site every debate is a V4 one, so the account menu does not offer the older workspace.
+      classicHref={null}
     />
   );
 

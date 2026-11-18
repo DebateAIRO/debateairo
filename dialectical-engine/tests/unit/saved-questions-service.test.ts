@@ -355,6 +355,28 @@ describe("crisis words, the consent, the team and the switch", () => {
     expect(plan(clean).paths).toHaveLength(5);
   });
 
+  // The ask's caps on the check (crisisCheckTexts): one own text that spells past crisisCheckMaxChars() (ﷺ is 18 letters), or own
+  // words that together spell past crisisCheckRequestMaxChars() (ﬃ is three letters; twenty own paths of 3,000 each), are never
+  // checked in part: the crisis answer, nothing stored. A large document in ordinary words is still read in full and saved.
+  it.each([
+    ["an own path that spells past the check's cap", { plan: { paths: [savedOwnPath("p9", "\u{FDFA}".repeat(1_000))] } }],
+    ["own paths that together spell past the request's cap", { plan: { more: Array.from({ length: 20 },
+      (_, n) => savedOwnPath(`m${n}`, `${n}${"\u{FB03}".repeat(997)}`)) } }]
+  ])("%s: CRISIS_SUPPORT_OFFERED, nothing stored", async (_name, parts) => {
+    const w = await world();
+    const flood = savedDocOf(ANA_SIGNS, parts as never);
+    await expect(w.service.create(ANA, createBody(flood), gateFor(ANA))).rejects.toEqual(refusedWith("CRISIS_SUPPORT_OFFERED"));
+    expect(w.store.rows.size).toBe(0);
+  });
+
+  it("twenty own paths of 1,000 ordinary characters each are read in full and saved", async () => {
+    const w = await world();
+    const large = savedDocOf(ANA_SIGNS, { plan: { more: Array.from({ length: 20 },
+      (_, n) => savedOwnPath(`m${n}`, `${n} ${"Would new plants change the jobs in the region? ".repeat(20).slice(0, 990)}`)) } });
+    const { id } = await w.service.create(ANA, createBody(large), gateFor(ANA));
+    expect(await w.keys.listByOwner(ANA.ownerRef)).toEqual([id]);
+  });
+
   it("crisis words come before the consent and the team: a person in crisis never meets a refusal first", async () => {
     const w = await world();
     const crisis = savedDocOf(ANA_SIGNS, { page: { box: { text: SAVED_CRISIS, placed: [] } } });

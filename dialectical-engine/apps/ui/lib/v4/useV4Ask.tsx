@@ -509,6 +509,15 @@ export function useV4Ask(input: Readonly<{
           ? refused(t(now.catalog, "v4.askError.alreadyWaiting"), { code: "ALREADY_WAITING" })
           : refused(requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
       }
+      // A Start refused (422) because an AI the plan needs cannot be reached right now: nothing was started and nothing was
+      // used, so V4 says that plainly, instead of /new's "coordinator" sentence, which also offers a plan choice V4 does not have.
+      const failureKind = classifyRequestFailure("DEBATE_CREATE", exc).kind;
+      if (failureKind === "MODEL_UNAVAILABLE" || failureKind === "PLAN_TIER_UNAVAILABLE") {
+        return refused(t(now.catalog, "v4.askError.aisBusy"));
+      }
+      // A plan the server does not know (also a 422, so nothing was started): V4 offers no plan to choose, so its plain
+      // "nothing was started" line instead of /new's "Choose Free or Premium".
+      if (failureKind === "PLAN_TIER_INVALID") return refused(t(now.catalog, "v4.ask.failed"));
       return refused(requestFailureMessage("DEBATE_CREATE", exc, now.newDebateCatalog));
     } finally {
       submitFlight.current = false;

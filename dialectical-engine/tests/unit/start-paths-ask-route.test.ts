@@ -279,6 +279,32 @@ describe("crisis words anywhere the person wrote them come first", () => {
     expect([h.consentReads(), h.checked.length, h.submitted.length]).toEqual([0, 0, 0]);
     await h.api.close();
   });
+
+  // The question line's cap holds for every word typed on step 2 too (crisisCheckTexts): an own text whose spelling for the check
+  // passes crisisCheckMaxChars() (compatibility forms such as ﷺ, 18 letters each), or texts that together pass the request's cap,
+  // are never checked in part: help numbers, never a debate. The largest legal Start in ordinary words still goes (the body limit's
+  // test below).
+  it("an own text that spells past the check's cap: the same 422, before the consent read, nothing checked or submitted", async () => {
+    const h = apiOver();
+    const flood: StartPathChoice = { title: "Tonight", question: "What now?", members: [{ own_text: "\u{FDFA}".repeat(START_STEP_LIMITS.ownTextMaxChars) }] };
+    const response = await h.post(startAsk({}, { paths: [...FIVE.slice(0, 4), flood] }));
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+    expect([h.consentReads(), h.checked.length, h.submitted.length]).toEqual([0, 0, 0]);
+    await h.api.close();
+  });
+
+  it("own texts that together spell past the request's cap, each under its own: the same 422, nothing checked or submitted", async () => {
+    const h = apiOver();
+    // ﬃ spells as three letters: four own texts of 3,000 letters on each of seven paths, 84,000 in all.
+    const paths = Array.from({ length: 7 }, (_, p): StartPathChoice => ({ title: `Path ${p}`, question: `Question ${p}?`,
+      members: Array.from({ length: 4 }, (_, m) => ({ own_text: `${p}${m}${"\u{FB03}".repeat(998)}` })) }));
+    const response = await h.post(startAsk({}, { paths, width: 7 }));
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toBe(CRISIS_SUPPORT_OFFERED);
+    expect([h.consentReads(), h.checked.length, h.submitted.length]).toEqual([0, 0, 0]);
+    await h.api.close();
+  });
 });
 
 describe("refusals of the paths, each before the check and before submit", () => {

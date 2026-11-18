@@ -464,7 +464,9 @@ describe("POST /v1/asks/clarify", () => {
     ["with a pool that cannot be read", { pool: async () => { throw new Error("down"); } }, QUESTION],
     ["before the sensitive-data consent", { consent: "required" as const }, QUESTION],
     ["from a blocked country", { country: "COUNTRY_BLOCKED" }, QUESTION],
-    ["in the words of a person in crisis", {}, "I want to kill myself tonight"]
+    ["in the words of a person in crisis", {}, "I want to kill myself tonight"],
+    // The ask's cap on the check (crisisCheckTexts): a question that spells past it (ﷺ is 18 letters) is answered as a crisis would be.
+    ["in compatibility forms that spell past the crisis check's cap", {}, "\u{FDFA}".repeat(1_000)]
   ])("%s: no questions, and the words go to no model", async (_name, options, question) => {
     const { api, seen } = apiOver(options);
     const response = await post(api, question);
@@ -472,6 +474,15 @@ describe("POST /v1/asks/clarify", () => {
     expect(response.json()).toEqual({ source: "NONE" });
     expect(response.headers[AI_GENERATED_HEADER]).toBeUndefined();
     expect(seen).toEqual([]);
+    await api.close();
+  });
+  it("a long ordinary question near the byte bound is still read in full, and the call goes", async () => {
+    const { api, seen } = apiOver();
+    const question = "Should the town build a second pier for the ferry? ".repeat(160).trim();
+    expect(Buffer.byteLength(question, "utf8")).toBeGreaterThan(8_000);
+    expect(Buffer.byteLength(question, "utf8")).toBeLessThanOrEqual(8_192);
+    expect((await post(api, question)).json()).toEqual({ source: "AI", questions: [], purpose: PURPOSE });
+    expect(seen).toHaveLength(1);
     await api.close();
   });
   it("on the preview, off its team: no questions, and the words go to no model", async () => {

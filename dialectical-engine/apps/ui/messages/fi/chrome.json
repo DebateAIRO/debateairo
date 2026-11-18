@@ -75,5 +75,8 @@
   "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "Sivusto on päivitetty. Lataa sivu uudelleen.",
   "chrome.release.reload": "Lataa uudelleen",
-  "chrome.release.madeByNewer": "Tämän väittelyn teki sivuston uudempi versio. Lataa sivu uudelleen tai yritä muutaman minuutin kuluttua uudelleen."
+  "chrome.release.madeByNewer": "Tämän väittelyn teki sivuston uudempi versio. Lataa sivu uudelleen tai yritä muutaman minuutin kuluttua uudelleen.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

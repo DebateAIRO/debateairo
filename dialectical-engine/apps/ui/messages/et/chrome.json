@@ -75,5 +75,8 @@
   "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "Veebisait on uuendatud. Laadige leht uuesti.",
   "chrome.release.reload": "Laadige uuesti",
-  "chrome.release.madeByNewer": "Selle väitluse tegi veebisaidi uuem versioon. Laadige leht uuesti või proovige mõne minuti pärast veel kord."
+  "chrome.release.madeByNewer": "Selle väitluse tegi veebisaidi uuem versioon. Laadige leht uuesti või proovige mõne minuti pärast veel kord.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }
