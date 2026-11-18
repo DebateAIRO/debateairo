@@ -53,7 +53,8 @@ export function CheckoutFlow({
   client = contractClient,
   navigate = leaveFor,
   goToPayment = leaveForPayment,
-  paymentMarks = NO_MARKS
+  paymentMarks = NO_MARKS,
+  testMode = false
 }: Readonly<{
   planId: PaidPlanId;
   locale: LocaleCode;
@@ -64,6 +65,8 @@ export function CheckoutFlow({
   goToPayment?: (url: string) => void;
   /** Spec §2.18 (N25b): the marks the PAYMENT_MARKS_AVAILABLE setting names, read on the server by the page; none by default. */
   paymentMarks?: PaymentMarks;
+  /** True while the server's card payments run on NETOPIA's sandbox (the page reads it from the plans list); none by default. */
+  testMode?: boolean;
 }>) {
   // Empty until the first quote answers the connection's country (spec §1.3: pre-filled from the address).
   const [country, setCountry] = useState("");
@@ -470,6 +473,8 @@ export function CheckoutFlow({
           </label>
           <h2 className="setSubtitle">{t(catalog, "billing.checkout.cardTitle")}</h2>
           <p className="billingNote">{t(catalog, "billing.checkout.cardNote")}</p>
+          {/* Right above the button that leaves for NETOPIA's page, where a real card would otherwise be typed. */}
+          {testMode ? <p className="billingNote" role="note">{t(catalog, "billing.testMode.notice")}</p> : null}
           <div className="billingActions">
             <button
               type="button"

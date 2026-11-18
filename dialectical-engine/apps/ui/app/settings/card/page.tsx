@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { currentDocument } from "@debateai/legal-manifest";
 import { CardChangeFlow } from "@/components/billing/CardChangeFlow";
-import { billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
+import { billingState, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { readSessionCookie } from "@/lib/serverApi";
@@ -23,7 +23,8 @@ export default async function CardChangePage({
   const returnedChargeRef = typeof charge === "string" && CHARGE_REF.test(charge) ? charge : null;
   // Like /pricing and /checkout: billing off (or local mode) is "not found" for everyone, signed in or not, before
   // any redirect.
-  if (!(await billingIsOn())) notFound();
+  const billing = await billingState();
+  if (!billing.on) notFound();
   const sessionToken = readSessionCookie(cookieStore);
   const signIn = `/login?next=${encodeURIComponent(returnedChargeRef === null ? "/settings/card" : `/settings/card?charge=${returnedChargeRef}`)}`;
   if (sessionToken === null) redirect(signIn);
@@ -36,7 +37,8 @@ export default async function CardChangePage({
     <div className="screen scroll billingPage">
       <div className="billingInner narrow">
         <CardChangeFlow catalog={billingCatalog} locale={locale}
-          renewalConsent={currentDocument("CONSENT_RENEWAL", locale)} returnedChargeRef={returnedChargeRef} />
+          renewalConsent={currentDocument("CONSENT_RENEWAL", locale)} returnedChargeRef={returnedChargeRef}
+          testMode={billing.testMode} />
       </div>
     </div>
   );

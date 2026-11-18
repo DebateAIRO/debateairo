@@ -300,6 +300,8 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   // P8b onward add their members to this object literal.
   const routes: BillingRouteOptions = Object.freeze({
     plans: deps.plans, geo: deps.geo, legal: deps.legal, clock: deps.clock,
+    // The plans list names the payment system (sandbox or live), so the pages' test-mode note follows the server.
+    paymentEnvironment: deps.connectors.paymentEnvironment,
     // Terms §12: the plans list shows each country's price with its tax, from the tax engine the quote asks.
     displayedTax: new DisplayedTaxReader({
       tax: deps.connectors.tax, plans: deps.plans, policy: deps.policy, audit: deps.audit, clock: deps.clock

@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Inicie sessão e abra Definições, depois Subscrição, depois «Retrate-se do contrato aqui».",
   "billing.withdrawPage.byEmail": "Também pode enviar o modelo de formulário de livre resolução do seu e-mail de confirmação, ou qualquer declaração clara de que pretende resolver o contrato, para {email}. Executamo-la e confirmamos por e-mail.",
   "billing.withdrawPage.signIn": "Iniciar sessão",
-  "billing.withdrawPage.settings": "Abrir as Definições"
+  "billing.withdrawPage.settings": "Abrir as Definições",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

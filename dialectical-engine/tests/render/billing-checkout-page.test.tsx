@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   session: null as string | null,
   locale: "en",
   billingOn: true,
+  testMode: false,
   ageOwed: false,
   sessionLive: true,
   sessionCheckedWith: [] as string[],
@@ -32,6 +33,7 @@ vi.mock("next/headers", async () => {
 });
 vi.mock("@/lib/billing/serverBilling", () => ({
   billingIsOn: async () => mocks.billingOn,
+  billingState: async () => ({ on: mocks.billingOn, testMode: mocks.testMode }),
   sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; },
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
@@ -57,6 +59,7 @@ beforeEach(() => {
   mocks.session = null;
   mocks.locale = "en";
   mocks.billingOn = true;
+  mocks.testMode = false;
   mocks.ageOwed = false;
   mocks.sessionLive = true;
   mocks.sessionCheckedWith = [];
@@ -112,6 +115,15 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(html).toContain('src="/payment-marks/netopia.svg"');
     expect(html).toContain('src="/payment-marks/mastercard.svg"');
     expect(html).not.toContain('src="/payment-marks/visa.svg"');
+  });
+
+  it("tells the flow payments are test-only exactly while the plans list names NETOPIA's sandbox", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.testMode = true;
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    mocks.testMode = false;
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps.map((props) => props.testMode)).toEqual([true, false]);
   });
 
   it("is not found while billing is off, for the checkout and its return page alike", async () => {

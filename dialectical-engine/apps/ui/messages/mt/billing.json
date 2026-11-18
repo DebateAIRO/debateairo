@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Idħol u iftaħ Settings, imbagħad Abbonament, imbagħad “Irtira mill-kuntratt hawnhekk”.",
   "billing.withdrawPage.byEmail": "Tista’ wkoll tibgħat il-formola mudell għall-irtirar mill-email ta’ konferma tiegħek, jew kwalunkwe dikjarazzjoni ċara li qed tirtira, lil {email}. Inwettquha u nikkonfermawha bl-email.",
   "billing.withdrawPage.signIn": "Idħol fil-kont",
-  "billing.withdrawPage.settings": "Iftaħ l-Issettjar"
+  "billing.withdrawPage.settings": "Iftaħ l-Issettjar",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

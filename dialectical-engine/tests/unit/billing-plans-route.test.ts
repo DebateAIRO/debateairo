@@ -1,10 +1,14 @@
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { authorizationPolicyInventory, buildApi } from "@debateai/api";
 import { BillingPlansResponseSchema, contractInventory } from "@debateai/contract";
 import { TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW, taxAuthoritiesFromValue } from "@debateai/register";
 import type { AdmissionLimiter } from "../../apps/api/src/admission.js";
 import type { BillingAudit } from "../../apps/api/src/billing/audit.js";
+import { loadNetopiaConnectors, type TrustedKeyFileOwners } from "../../apps/api/src/billing/connectors.js";
 import { DisplayedTaxReader } from "../../apps/api/src/billing/displayed-tax.js";
 import { BILLING_ROUTE_PATHS, type BillingRouteOptions } from "../../apps/api/src/billing/index.js";
 import { createBillingRuntime, type BillingRuntimeDeps } from "../../apps/api/src/billing/runtime.js";
@@ -15,6 +19,7 @@ import {
 } from "../support/billingFixtures.js";
 import { COUNTRY_CODES } from "../../apps/ui/lib/billing/countries.js";
 import { FakeTaxEngine } from "../support/fake-tax-engine.js";
+import { testNetopiaKeys } from "../support/netopia-notice.js";
 import { startFakeQuaderno } from "../support/fake-quaderno.js";
 import { TEST_APP_ORIGIN } from "../support/httpSession.js";
 
@@ -583,6 +588,31 @@ describe("P8a the API root hands the billing runtime's routes to buildApi", () =
   });
 });
 
+/** The billing runtime as main.ts composes it, over the given pool and connectors; composing it starts nothing. */
+function composeRuntime(pool: BillingRuntimeDeps["pool"], connectors: BillingRuntimeDeps["connectors"]) {
+  return createBillingRuntime({
+    cancelLinksPerDay: 11,
+    pool,
+    connectors,
+    policy: testBillingPolicy,
+    plans: testBillingPlans,
+    countryPolicy: testCountryPolicy,
+    geo: { lookup: () => ({ country: "XX", tor: false }), close: () => undefined } as unknown as GeoLookup,
+    legal: { requiresReacceptance: async () => false },
+    dekStore: {} as unknown as BillingRuntimeDeps["dekStore"],
+    mail: undefined,
+    audit: () => undefined,
+    clock: () => new Date(),
+    reportPending: () => undefined,
+    ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: 0, liveRuns: 0 }) },
+    blindIndexKey: new Uint8Array(32),
+    identities: { ownerRefByEmailBlindIndex: async () => null },
+    taxAuthorities: taxAuthoritiesFromValue(
+      TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef
+    )
+  });
+}
+
 /**
  * Side-by-side uploads spec 2026-10-21 §4 (plan C task C7): the billing runtime's five timers (outbox 5 s, renewals
  * 60 s, the money check 10 min, the spool replay 10 min, the owner's daily jobs) and their immediate first passes run
@@ -596,30 +626,10 @@ describe("side-by-side C7 the billing runtime's loops run only while the release
     const touches = { count: 0 };
     const query = async () => { touches.count += 1; throw new Error("COUNTING_POOL_ANSWERS_NOTHING"); };
     const pool = { query, connect: query } as unknown as BillingRuntimeDeps["pool"];
-    const runtime = createBillingRuntime({
-      cancelLinksPerDay: 11,
-      pool,
-      connectors: {
-        payments: {}, noticeTrust: {}, paymentEnvironment: "sandbox", tax: {}, invoiceRo: {}, recordsKey: Buffer.alloc(32, 7),
-        ownerReportEmail: "owner@example.test", publicAppUrl: TEST_APP_ORIGIN
-      } as unknown as BillingRuntimeDeps["connectors"],
-      policy: testBillingPolicy,
-      plans: testBillingPlans,
-      countryPolicy: testCountryPolicy,
-      geo: { lookup: () => ({ country: "XX", tor: false }), close: () => undefined } as unknown as GeoLookup,
-      legal: { requiresReacceptance: async () => false },
-      dekStore: {} as unknown as BillingRuntimeDeps["dekStore"],
-      mail: undefined,
-      audit: () => undefined,
-      clock: () => new Date(),
-      reportPending: () => undefined,
-      ownerSpend: { readWithdrawalSpend: async () => ({ spentMicros: 0, liveRuns: 0 }) },
-      blindIndexKey: new Uint8Array(32),
-      identities: { ownerRefByEmailBlindIndex: async () => null },
-      taxAuthorities: taxAuthoritiesFromValue(
-        TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.value, TAX_AUTHORITIES_DEPLOYMENT_REGISTER_ROW.sourceRef
-      )
-    });
+    const runtime = composeRuntime(pool, {
+      payments: {}, noticeTrust: {}, paymentEnvironment: "sandbox", tax: {}, invoiceRo: {}, recordsKey: Buffer.alloc(32, 7),
+      ownerReportEmail: "owner@example.test", publicAppUrl: TEST_APP_ORIGIN
+    } as unknown as BillingRuntimeDeps["connectors"]);
     const drain = vi.spyOn(runtime.outbox, "drain").mockResolvedValue(0 as never);
     const renew = vi.spyOn(runtime.renewal, "runOnce").mockResolvedValue(undefined as never);
     const maintain = vi.spyOn(runtime.maintenance, "runOnce").mockResolvedValue(undefined as never);
@@ -669,5 +679,86 @@ describe("side-by-side C7 the billing runtime's loops run only while the release
       expect(drain).toHaveBeenCalledTimes(12);
       expect(renew).toHaveBeenCalledTimes(1);
     } finally { runtime.stop(); }
+  });
+});
+
+/**
+ * The pages' test-mode note: the plans list names the payment system this server's card payments go to, sandbox or
+ * live. It comes from NETOPIA_API_BASE_URL through the same connector the checkout pays through, and it is read at
+ * every request, so switching the server to live payments removes the note with no new release of the website.
+ */
+describe("GET /v1/billing/plans names the payment system, so the pages know when payments are test-only", () => {
+  const POS = ["PLAN", "0001", "0002", "0003", "0004"].join("-");
+  const NETOPIA_KEY = ["plans", "environment", "key", "fixture"].join("-");
+  const OWN: TrustedKeyFileOwners = Object.freeze({ ownerUid: process.getuid!(), apiUid: -1 });
+  const roots: string[] = [];
+  afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+  function netopiaFiles(): string {
+    const root = mkdtempSync(join(tmpdir(), "plans-environment-"));
+    chmodSync(root, 0o700);
+    roots.push(root);
+    writeFileSync(join(root, "netopia-api-key"), `${NETOPIA_KEY}\n`);
+    chmodSync(join(root, "netopia-api-key"), 0o600);
+    writeFileSync(join(root, "netopia-ipn-keys.pem"), testNetopiaKeys().publicPem);
+    chmodSync(join(root, "netopia-ipn-keys.pem"), 0o644);
+    return root;
+  }
+  const BASE_ANSWER = {
+    currency: "USD", place: { country: null, postal_code: null, status: "COUNTRY_NEEDED" }, tax: null, plans: [PLANS_ANSWER[1]]
+  };
+
+  it("lets the contract carry sandbox, live or nothing, and nothing else", () => {
+    expect(BillingPlansResponseSchema.parse({ ...BASE_ANSWER, environment: "sandbox" }).environment).toBe("sandbox");
+    expect(BillingPlansResponseSchema.parse({ ...BASE_ANSWER, environment: "live" }).environment).toBe("live");
+    // Optional: an older server's answer, or a test's hand-made one, still parses, and the pages show no note for it.
+    expect(BillingPlansResponseSchema.parse(BASE_ANSWER)).not.toHaveProperty("environment");
+    for (const environment of ["stage", "test", "LIVE", "", null, true]) {
+      expect(BillingPlansResponseSchema.safeParse({ ...BASE_ANSWER, environment }).success, String(environment)).toBe(false);
+    }
+  });
+
+  it("answers the payment system the route is given, and names none when it is given none", async () => {
+    for (const paymentEnvironment of ["sandbox", "live"] as const) {
+      const api = buildApi({ application: unusedAskApplication(), billing: { ...billing(), paymentEnvironment } });
+      const response = await api.inject({ method: "GET", url: "/v1/billing/plans" });
+      expect(response.statusCode, paymentEnvironment).toBe(200);
+      expect(response.json(), paymentEnvironment).toEqual({ ...BASE_ANSWER, plans: PLANS_ANSWER, environment: paymentEnvironment });
+      await api.close();
+    }
+    const api = buildApi({ application: unusedAskApplication(), billing: billing() });
+    const response = await api.inject({ method: "GET", url: "/v1/billing/plans" });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).not.toHaveProperty("environment");
+    await api.close();
+  });
+
+  it("says sandbox for NETOPIA's sandbox addresses and live for its live ones, as the checkout's own answer does", async () => {
+    const BASES: ReadonlyArray<readonly [string, "sandbox" | "live"]> = [
+      ["https://secure-sandbox.netopia-payments.com", "sandbox"], ["https://secure.sandbox.netopia-payments.com", "sandbox"],
+      ["https://secure.netopia-payments.com/api", "live"], ["https://secure.mobilpay.ro/pay", "live"]
+    ];
+    const query = async () => { throw new Error("PLANS_READ_TOUCHES_NO_DATABASE"); };
+    const pool = { query, connect: query } as unknown as BillingRuntimeDeps["pool"];
+    for (const [base, expected] of BASES) {
+      const root = netopiaFiles();
+      const netopia = loadNetopiaConnectors({
+        environment: {
+          netopiaApiBaseUrl: base, netopiaPosSignature: POS,
+          netopiaApiKeyPath: join(root, "netopia-api-key"), netopiaIpnKeysPath: join(root, "netopia-ipn-keys.pem"),
+          publicAppUrl: TEST_APP_ORIGIN
+        },
+        recordsKey: Buffer.alloc(32, 9), trustedKeyOwners: OWN
+      });
+      // The checkout answers `environment` from the payment port it pays through; the list must name the same system.
+      expect(netopia.payments.environment, base).toBe(expected);
+      const runtime = composeRuntime(pool, {
+        ...netopia, tax: {}, invoiceRo: {}, ownerReportEmail: "owner@example.test"
+      } as unknown as BillingRuntimeDeps["connectors"]);
+      const api = buildApi({ application: unusedAskApplication(), billing: runtime.routes });
+      const response = await api.inject({ method: "GET", url: "/v1/billing/plans" });
+      expect(response.statusCode, base).toBe(200);
+      expect(response.json<Record<string, unknown>>().environment, base).toBe(expected);
+      await api.close();
+    }
   });
 });

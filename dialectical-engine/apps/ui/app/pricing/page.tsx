@@ -28,10 +28,12 @@ function single(value: string | string[] | undefined): string | undefined {
 /**
  * The plans for a place (Terms §12: the prices include its tax): the country the visitor chose on this page, and in
  * the US and Canada the postal code, else the connection's country; with the currency that place pays in (spec
- * 2026-10-05 §2.16.1).
+ * 2026-10-05 §2.16.1). `testMode`: the answer says card payments run on NETOPIA's sandbox; an answer that names no
+ * environment shows no note.
  */
 async function readPlans(params: PlaceParams): Promise<Readonly<{
   currency: BillingCurrency; place: BillingPlansPlace; tax: BillingPlansTax | null; plans: readonly PricingPlan[];
+  testMode: boolean;
 }> | null> {
   const headerStore = await headers();
   const country = single(params.country);
@@ -46,7 +48,8 @@ async function readPlans(params: PlaceParams): Promise<Readonly<{
       currency: answer.currency,
       place: answer.place ?? NO_PLACE,
       tax: answer.place == null ? null : answer.tax,
-      plans: answer.plans.filter((plan): plan is PricingPlan => isBillingPlanId(plan.plan_id))
+      plans: answer.plans.filter((plan): plan is PricingPlan => isBillingPlanId(plan.plan_id)),
+      testMode: answer.environment === "sandbox"
     };
   } catch (failure) {
     // Billing off, or local mode: the route answers 404, and so does this page (spec §2.2 rule 1).
@@ -80,6 +83,8 @@ export default async function PricingPage({
         <p className="setEyebrow">{t(billingCatalog, "billing.pricing.eyebrow")}</p>
         <h1 className="setTitle">{t(billingCatalog, "billing.pricing.title")}</h1>
         <p className="setLede">{t(billingCatalog, "billing.pricing.lede")}</p>
+        {plans?.testMode === true
+          ? <p className="pricingNote" role="note">{t(billingCatalog, "billing.testMode.notice")}</p> : null}
         {plans === null
           ? <p className="billingError" role="status">{t(billingCatalog, "billing.pricing.unavailable")}</p>
           : (

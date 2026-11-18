@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Sínigh isteach agus oscail Socruithe, ansin Síntiús, ansin “Tarraing siar ón gconradh anseo”.",
   "billing.withdrawPage.byEmail": "Is féidir leat freisin an fhoirm tarraingthe siar shamplach ó do ríomhphost deimhnithe, nó aon ráiteas soiléir go bhfuil tú ag tarraingt siar, a sheoladh chuig {email}. Cuirimid i gcrích é agus deimhnímid é trí ríomhphost.",
   "billing.withdrawPage.signIn": "Sínigh isteach",
-  "billing.withdrawPage.settings": "Oscail na Socruithe"
+  "billing.withdrawPage.settings": "Oscail na Socruithe",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

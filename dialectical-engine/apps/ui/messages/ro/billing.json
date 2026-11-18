@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Autentificați-vă și deschideți Setări, apoi Abonament, apoi „Retrageți-vă din contract aici”.",
   "billing.withdrawPage.byEmail": "Puteți trimite și formularul-tip de retragere din e-mailul de confirmare, sau orice declarație clară că vă retrageți, la {email}. Noi o punem în aplicare și o confirmăm pe e-mail.",
   "billing.withdrawPage.signIn": "Autentificați-vă",
-  "billing.withdrawPage.settings": "Deschideți Setări"
+  "billing.withdrawPage.settings": "Deschideți Setări",
+  "billing.testMode.notice": "Mod de test: plățile de pe acest site nu sunt reale și nu se iau bani. Pe pagina de plată folosiți cardul de test 9900 0048 1022 5098 (orice dată de expirare din viitor, CVV 111), niciodată cardul dumneavoastră."
 }

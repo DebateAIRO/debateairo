@@ -13,9 +13,12 @@ export function LandingPage({
   catalog,
   lowestPaidPrice,
   tax = "UNPRICED",
-  footerBilling
+  footerBilling,
+  testModeNote = null
 }: {
   catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; footerBilling: SiteFooterBilling;
+  /** The test-mode note, already translated, while the server's card payments run on NETOPIA's sandbox; else none. */
+  testModeNote?: string | null;
 }): JSX.Element {
   return (
     <div className="lpRoot">
@@ -25,6 +28,7 @@ export function LandingPage({
       <LandingMethod catalog={catalog} />
       <LandingPricing
         catalog={catalog} lowestPaidPrice={lowestPaidPrice} tax={tax} billingOn={footerBilling.billingOn}
+        testModeNote={testModeNote}
       />
       <SiteFooter variant="full" billing={footerBilling} />
     </div>

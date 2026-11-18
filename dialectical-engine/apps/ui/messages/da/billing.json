@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Log ind og åbn Indstillinger, derefter Abonnement og derefter ”Fortryd aftale”.",
   "billing.withdrawPage.byEmail": "Du kan også sende standardfortrydelsesformularen fra din bekræftelsesmail, eller enhver tydelig erklæring om, at du fortryder, til {email}. Vi gennemfører det og bekræfter det pr. e-mail.",
   "billing.withdrawPage.signIn": "Log ind",
-  "billing.withdrawPage.settings": "Åbn Indstillinger"
+  "billing.withdrawPage.settings": "Åbn Indstillinger",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }
