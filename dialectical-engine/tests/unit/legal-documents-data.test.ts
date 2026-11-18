@@ -487,7 +487,7 @@ describe("legal documents — generated data", () => {
       expect(table.items.some((item) => /refused questions/i.test(item))).toBe(false);
       expect(table.items[8]!.startsWith("Page settings and visits — The reading level you choose on the debate pages;")).toBe(true);
       expect(table.items[0]!.startsWith("Account — Email address and recovery email address")).toBe(true);
-      expect(table.items[0]!.endsWith("— You, at registration")).toBe(true);
+      expect(table.items[0]!.endsWith("— You, at registration and in Settings; Google, Apple or X, if you sign in with one of them")).toBe(true);
     });
 
     it("reduces links and autolinks to their visible text", () => {
