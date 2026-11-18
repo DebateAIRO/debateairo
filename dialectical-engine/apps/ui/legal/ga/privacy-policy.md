@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.12 · I bhFEIDHM 4 SAMHAIN 2026
+eyebrow: BEARTAS PRÍOBHÁIDEACHAIS · v3.13 · I bhFEIDHM 19 SAMHAIN 2026
 title: An méid a stórálaimid, agus an fáth
 lede: Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.12
+endMarker: DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.13
 bodyLabel: Téacs an Bheartais Príobháideachais
 annexTitle: Iarscríbhinn B — Téarmaí príobháideachais réigiúnacha
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 FIANÁIN
 -->
 
-**Version 3.12 · Effective 4 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.13 · Effective 19 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/privacy/versions · Rialaitheoir: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Bailímid an méid atá de dhíth ar chuntas agus an méid a chlóscríobhann tú isteach i do dhíospóireachtaí. Seoltar an méid a scríobhann tú chuig an gcúntóir tacaíochta chuig a shamhail IS ionas gur féidir léi freagra a thabhairt duit, agus ní choinnímid aon ní de. Seoltar do cheisteanna chuig na soláthraithe IS atá liostaithe inár gClár, DeepInfra den chuid is mó, sna Stáit Aontaithe. Ní cheadaíonn téarmaí DeepInfra, Anthropic agus Perplexity dóibh samhlacha a oiliúint ar an méid a scríobhann tú; insíonn rannán 5 cén chuideachta nár dheimhnigh muid é seo fúithi go fóill. Stórálann ár soláthraí óstála do chuntas agus do dhíospóireachtaí i Londain, sa Ríocht Aontaithe; insíonn rannán 5 cá háit eile a dtéann do shonraí. Ar an bplean saor in aisce, bíonn díospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Scriosann scriosadh do chuntais na heochracha do do shonraí príobháideacha; fanann díospóireachtaí poiblí poiblí, agus baintear d'ainm cleite astu. Is féidir teagmháil a dhéanamh linn ag privacy@dezbatere.ro, agus is féidir le daoine a ainmnítear i ndíospóireacht teagmháil a dhéanamh linn gan cuntas a bheith acu.
 

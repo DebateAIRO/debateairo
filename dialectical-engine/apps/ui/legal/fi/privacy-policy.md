@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: TIETOSUOJAKÄYTÄNTÖ · v3.12 · VOIMASSA 4. MARRASKUUTA 2026 ALKAEN
+eyebrow: TIETOSUOJAKÄYTÄNTÖ · v3.13 · VOIMASSA 19. MARRASKUUTA 2026 ALKAEN
 title: Mitä säilytämme ja miksi
 lede: Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.
-endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.12
+endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.13
 bodyLabel: Tietosuojakäytännön teksti
 annexTitle: Liite B — Alueelliset tietosuojaehdot
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 EVÄSTEET
 -->
 
-**Version 3.12 · Effective 4. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.13 · Effective 19. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä kirjoitat väittelyihisi. Se, mitä kirjoitat tukipalveluavustajalle, välitetään sen tekoälymallille, jotta se voi vastata sinulle, emmekä säilytä siitä mitään. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille, pääasiassa DeepInfralle Yhdysvalloissa. DeepInfran, Anthropicin ja Perplexityn ehdot eivät salli niiden kouluttaa malleja sillä, mitä kirjoitat; osiossa 5 kerrotaan, minkä yrityksen osalta emme ole vielä vahvistaneet tätä. Säilytyspalveluntarjoajamme säilyttää tilisi ja väittelysi Lontoossa, Yhdistyneessä kuningaskunnassa; osiossa 5 kerrotaan, minne tietosi muuten päätyvät. Maksuttomassa tilauksessa väittelyt ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa yksityisten tietojesi avaimet; julkiset väittelyt pysyvät julkisina, ja nimimerkkisi poistetaan niistä. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat kirjoittaa meille ilman tiliä.
 

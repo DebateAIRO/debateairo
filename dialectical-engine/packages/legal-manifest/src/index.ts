@@ -20,7 +20,9 @@ import manifestJson from "./manifest.json" with { type: "json" };
  *     looking up the acceptance row's locale and sha256 (`archivedDocument`). The current texts are
  *     added by the release step (`pnpm run generate:legal:archive`), not at every edit: while work
  *     goes on, a current text, typically an English edit whose translations lag, may not be archived
- *     yet, and `pnpm run legal:release-check` refuses a release until every current text is.
+ *     yet, and `pnpm run legal:release-check` refuses a release until the current text of every
+ *     language the release offers is. A language the release does not offer is not archived, since
+ *     nobody is shown or asked to accept its text.
  * `tests/unit/legal-manifest.test.ts` pins that the committed file equals the generator's output,
  * so edit the draft or the catalogue and regenerate.
  */
@@ -122,7 +124,7 @@ function parseArchive(value: unknown): LegalManifestIndex["archive"] {
  * A current TERMS/PRIVACY text the archive does not hold yet is read: while work goes on the English
  * text changes first and is archived at release. That whatever a person accepts on the live site can
  * be attached later is the release check's to guarantee (apps/ui/scripts/legal-release-check.mjs),
- * which refuses a release while any current text is not archived.
+ * which refuses a release while a current text of a language the release offers is not archived.
  */
 export function parseLegalManifest(value: unknown): LegalManifestIndex {
   const root = record(value);

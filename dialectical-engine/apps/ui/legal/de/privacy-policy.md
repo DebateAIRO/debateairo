@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kurz gesagt
-eyebrow: DATENSCHUTZERKLÄRUNG · v3.12 · GÜLTIG AB 4. NOVEMBER 2026
+eyebrow: DATENSCHUTZERKLÄRUNG · v3.13 · GÜLTIG AB 19. NOVEMBER 2026
 title: Was wir speichern und warum
 lede: DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.
-endMarker: ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.12
+endMarker: ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.13
 bodyLabel: Text der Datenschutzerklärung
 annexTitle: Anhang B – Regionale Datenschutzbestimmungen
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.12 · Effective 4. November 2026 · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.13 · Effective 19. November 2026 · Frühere Fassungen unter dezbatere.ro/privacy/versions · Verantwortlicher: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wir erheben, was für ein Konto erforderlich ist und was Sie in Ihre Debatten eingeben. Was Sie dem Support-Assistenten schreiben, geht an dessen KI-Modell, damit es Ihnen antworten kann, und wir bewahren nichts davon auf. Ihre Fragen werden an die in unserem Verzeichnis aufgeführten KI-Anbieter übermittelt, hauptsächlich an DeepInfra in den Vereinigten Staaten. Die Bedingungen von DeepInfra, Anthropic und Perplexity erlauben es ihnen nicht, mit dem, was Sie schreiben, Modelle zu trainieren; Abschnitt 5 nennt, für welches Unternehmen wir dies noch nicht bestätigt haben. Unser Hostinganbieter speichert Ihr Konto und Ihre Debatten in London im Vereinigten Königreich; Abschnitt 5 nennt, wohin Ihre Daten sonst noch gelangen. Im kostenlosen Tarif sind Debatten nach Abschluss öffentlich, nach einer KI-Prüfung; im kostenpflichtigen Tarif sind sie privat, sofern Sie sie nicht veröffentlichen. Bei der Löschung Ihres Kontos werden die Schlüssel zu Ihren privaten Daten vernichtet; öffentliche Debatten bleiben öffentlich, und Ihr Pseudonym wird aus ihnen entfernt. Sie erreichen uns unter privacy@dezbatere.ro; in einer Debatte genannte Personen können uns auch ohne Konto schreiben.
 

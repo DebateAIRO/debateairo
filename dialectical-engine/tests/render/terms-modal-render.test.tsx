@@ -133,7 +133,7 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026"
+      "TERMS OF SERVICE · v2.19 · EFFECTIVE 19 NOVEMBER 2026"
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(
@@ -152,7 +152,7 @@ describe("terms of service modal — rendered", () => {
     expect(contacts.length).toBeGreaterThanOrEqual(1);
 
     const last = dialog().querySelector(".policyBody")!.lastElementChild!;
-    expect(last.textContent).toBe("END OF TERMS · v2.18");
+    expect(last.textContent).toBe("END OF TERMS · v2.19");
 
     const pdf = [...dialog().querySelectorAll("*")].filter(
       (element) => element.textContent?.trim() === "Download PDF"
@@ -212,7 +212,8 @@ describe("terms of service modal — rendered", () => {
     // 131 until Switzerland's part (Annex A.5, one paragraph) left on 14 November 2026.
     // 131 again since section 8 gained its paragraph on DeepInfra on 16 November 2026.
     // 132 since Annex A.2 gained its paragraph on Mississippi on 18 November 2026.
-    expect(dialog().querySelectorAll(".policyText").length).toBe(132);
+    // 133 since section 14's change history gained the 2.19 entry (Terms 2.19, effective 19 November 2026).
+    expect(dialog().querySelectorAll(".policyText").length).toBe(133);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 

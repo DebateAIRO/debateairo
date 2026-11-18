@@ -54,7 +54,7 @@ describe("Privacy Policy 3.8 says what it keeps beside the analytics it does not
     expect(paragraph.match(/[(（]/gu), `${code}: one bracketed example`).toHaveLength(1);
     expect(paragraph, `${code}: still the paragraph on analytics, bold mark included`).toMatch(/\*\*[^*]+\*\*/u);
     expect(await generatedParagraph(code), `${code}: the generated data`).toBe(paragraph.replaceAll("**", ""));
-    expect(markdown(code), `${code}: still version 3.12`).toMatch(/v3\.12 /u);
+    expect(markdown(code), `${code}: now version 3.13`).toMatch(/v3\.13 /u);
   });
 
   it("every one of the 35 languages", () => {

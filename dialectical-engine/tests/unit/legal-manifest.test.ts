@@ -85,7 +85,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
         const entry = currentDocument(kind, code);
         expect(entry, `${code}/${kind}`).not.toBeNull();
         expect(entry!.sha256).toBe(createHash("sha256").update(draftBytes(code, kind)).digest("hex"));
-        expect(entry!.version).toBe(kind === "TERMS" ? "2.18" : "3.12");
+        expect(entry!.version).toBe(kind === "TERMS" ? "2.19" : "3.13");
       }
     }
     expect(legalManifestLocales("TERMS")).toEqual([...CODES].sort());
@@ -153,7 +153,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
   it("refuses a re-acceptance floor above any locale's current version, in the package and in the generator", () => {
     const terms = currentDocument("TERMS", "en")!.version;
     const privacy = currentDocument("PRIVACY", "en")!.version;
-    expect([terms, privacy]).toEqual(["2.18", "3.12"]);
+    expect([terms, privacy]).toEqual(["2.19", "3.13"]);
     const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(readDraft, {}, committedArchive()))) as {
       reacceptance: Record<string, unknown>;
       documents: Record<string, Record<string, { version: string; sha256: string }>>;
@@ -162,7 +162,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     const withFloors = (floors: Record<string, unknown>) => ({
       ...structuredClone(manifest), reacceptance: { ...manifest.reacceptance, ...floors }
     });
-    for (const floors of [{ TERMS: "2.19" }, { TERMS: "3.0" }, { PRIVACY: "3.13" }, { TERMS: "2.1", PRIVACY: "4.0" }]) {
+    for (const floors of [{ TERMS: "2.20" }, { TERMS: "3.0" }, { PRIVACY: "3.14" }, { TERMS: "2.1", PRIVACY: "4.0" }]) {
       expect(() => parseLegalManifest(withFloors(floors)), JSON.stringify(floors)).toThrow("LEGAL_MANIFEST_INVALID");
     }
     for (const floors of [{ TERMS: "2.1" }, { TERMS: "2.2", PRIVACY: "3.3" }, { TERMS: "1.9", PRIVACY: "3.2" }, { PRIVACY: "2.10" }, { TERMS: "2.9", PRIVACY: "3.8" }]) {
@@ -180,7 +180,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
       .documents.TERMS.get("de")?.version).toBe("1.9");
 
     // The generator refuses the same configuration before it writes anything, by a code alone.
-    for (const floors of [{ TERMS: "2.19", PRIVACY: null }, { TERMS: null, PRIVACY: "3.13" }, { TERMS: "v2", PRIVACY: null }]) {
+    for (const floors of [{ TERMS: "2.20", PRIVACY: null }, { TERMS: null, PRIVACY: "3.14" }, { TERMS: "v2", PRIVACY: null }]) {
       expect(() => buildLegalManifest(readDraft, {}, committedArchive(), floors), JSON.stringify(floors))
         .toThrow(/^LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID$/u);
     }
@@ -269,10 +269,9 @@ describe("the checkout consent sentences in the manifest (paid plans L2, R-27)",
 describe("the archive of every published Terms and Privacy text (paid plans L2, ruling Q-3)", () => {
   // English first: the current texts are archived by the release step, not at every edit, so a current text may not be
   // archived yet while work goes on (an English edit whose translations lag). The release check refuses a release
-  // until every current text is (tests/unit/legal-english-first.test.ts). What the archive does hold is exact.
-  // Closing Taiwan (owner's decision of 12 November 2026) took its name out of every language at once, so until the
-  // release step archives the new texts no language's current text is archived; the loop then checks nothing, and
-  // the next test still checks every file the archive holds.
+  // until the current text of every language the release offers is (tests/unit/legal-english-first.test.ts); the
+  // other languages' current texts are not archived. What the archive does hold is exact: the loop checks each current
+  // text the archive holds, and the next test checks every file the archive holds.
   it("keeps a current draft's exact bytes under its sha256 once archived, and the manifest maps the hash to that file", () => {
     expect(LEGAL_ARCHIVE_ROOT).toBe("apps/ui/legal/archive");
     let archived = 0;
@@ -399,9 +398,13 @@ describe("the /terms/versions list and the archive agree (paid plans L2, rulings
   });
 
   it("lists every archived Terms version exactly once, newest first, and links nothing the archive never held", () => {
+    const current = currentDocument("TERMS", "en")!.version;
     const archivedVersions = [...new Set(legalArchive("TERMS", "en").map((entry) => entry.version))];
     expect(archivedVersions.length).toBeGreaterThan(0);
-    expect(TERMS_VERSIONS.filter((row) => row.href !== null).map((row) => row.version)).toEqual(archivedVersions);
+    // English first: the version in force joins the archive at the release step (pnpm run generate:legal:archive), so
+    // its row links to /terms whether or not the archive holds it yet; every earlier linked row is an archived version.
+    expect(TERMS_VERSIONS.filter((row) => row.href !== null && !row.current).map((row) => row.version))
+      .toEqual(archivedVersions.filter((version) => version !== current));
   });
 
   it("gives a row no link only for a version the archive never held and the Terms' change history names", () => {

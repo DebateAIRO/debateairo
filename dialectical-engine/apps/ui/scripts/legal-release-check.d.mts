@@ -6,5 +6,7 @@ export function legalReleaseProblems(
     readDraft: (locale: string, kind: LegalManifestKind) => string;
     manifest: LegalManifest;
     translations: LegalTranslations;
+    /** The languages to hold to the current English text (English is always checked); every language when left out. */
+    locales?: readonly string[];
   }>
 ): string[];

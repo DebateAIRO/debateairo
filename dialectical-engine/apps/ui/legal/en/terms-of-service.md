@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v2.19 · EFFECTIVE 19 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.18
+endMarker: END OF TERMS · v2.19
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.18 · Effective 1 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 2.19 · Effective 19 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to the AI providers listed in our Provider Register, mainly DeepInfra, in the United States. The terms of DeepInfra and Anthropic do not allow them to train models on it; section 8 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 8). Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -80,7 +80,7 @@ You submit a question or a claim. Dialectical Engine sends it to several third-p
 
 ## 6. Your account
 
-You register with an email address and a recovery email address, and you may add a phone number; we do not check that the number is yours, and you cannot sign in with it. You sign in with a passkey, which uses your device's usual face, fingerprint or PIN check, or with your password, or, where the sign-in page offers it, with your Google, Apple or X account. A password, or a Google, Apple or X account, is never enough on its own: you must also give a code from your authentication app, use a passkey or enter one of your recovery codes, and your account must always keep a passkey or an authentication app. If you sign in with Google, Apple or X, that company's own terms also apply between you and it. We give you a random **pseudonym**, which is the name shown on anything you publish. It cannot be changed. Keep your password, your passkeys, your authentication app and your recovery codes safe. You are responsible for activity under your account, except where it results from our failure.
+You register with an email address, and you may add a recovery email address and a phone number; we do not check that the number is yours, and you cannot sign in with it. You sign in with a passkey, which uses your device's usual face, fingerprint or PIN check, or with your password, or, where the sign-in page offers it, with your Google, Apple or X account. A password, or a Google, Apple or X account, is never enough on its own: you must also give a code from your authentication app, use a passkey or enter one of your recovery codes, and your account must always keep a passkey or an authentication app. If you sign in with Google, Apple or X, that company's own terms also apply between you and it. We give you a random **pseudonym**, which is the name shown on anything you publish. It cannot be changed. Keep your password, your passkeys, your authentication app and your recovery codes safe. You are responsible for activity under your account, except where it results from our failure.
 
 You may hold one account unless we agree otherwise. Do not share, sell or transfer it.
 
@@ -251,7 +251,9 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
-Version 2.18 replaced version 2.17: Annex A.3 says that, in Quebec too, debates on a paid plan are private by default and debates on the Free plan are public, as section 9 says; what we are liable for, and every right in these Terms, is unchanged. Version 2.18 also names DeepInfra, the company that receives most of a debate's text, says that it passes one model's requests to a partner company, and says for which providers we have confirmed that their terms do not allow training on your content (section 8). Version 2.18 also says how you can sign in: with a passkey, or with your password or, where the sign-in page offers it, your Google, Apple or X account, each followed by a second step; and that a phone number is optional and is not a way to sign in (section 6).
+Version 2.19 replaced version 2.18: section 6 says how you can sign in: with a passkey, or with your password or, where the sign-in page offers it, your Google, Apple or X account, each followed by a second step; and that a recovery email address and a phone number are optional, and a phone number is not a way to sign in. Version 2.19 also says that a public debate stays public after its author leaves, that this is a term of our contract with you, that nobody owns the page, and that a flagged debate you publish after our approval stays public like any other (section 9); that the licence you give when something of yours becomes public also lets us adapt it and lets others build on it, lasts after you close your account and cannot be withdrawn, except where the law says otherwise (section 9); what you agree to about your rights as the author of what you publish (section 9 and, for Canada, Annex A.3); that starting, steering or digging into a debate does not by itself make you the author of the text the AIs write (section 8); and that we hold the rights the law gives to the maker of the collection of public debates (section 16). Version 2.19 also names DeepInfra, the company that receives most of a debate's text, says that it passes one model's requests to a partner company, says for which providers we have confirmed that their terms do not allow training on your content, and says that the web search provider receives only the short search phrases the models write and that its terms let it keep and use them (section 8). Version 2.19 also says that prices include tax (section 12); that you may withdraw within 14 days wherever you live, and that a refund, when you cancel or withdraw, is measured by the share of the plan's credit you have used (sections 12 and 13, and Annex A); and that we offer Dialectical Engine in fewer places (section 2 and Annex A).
+
+Version 2.18 replaced version 2.17: Annex A.3 says that, in Quebec too, debates on a paid plan are private by default and debates on the Free plan are public, as section 9 says; what we are liable for, and every right in these Terms, is unchanged.
 
 Version 2.17 replaced version 2.16: section 10 says when an AI reads a report made with the Report button and when a person does, that the button asks for your good-faith statement, that we confirm a report and tell you our decision by email, and that statements of reasons are emailed and kept in your account; what we are liable for, and every right in these Terms, is unchanged.
 
