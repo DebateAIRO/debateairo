@@ -228,8 +228,8 @@ Dialectical Engine utilise 21 éléments, tous strictement nécessaires au servi
 | `__Host-debateai-csrf` | Fichier cookie | Empêche d’autres sites web de soumettre des formulaires en votre nom. | 14 jours |
 | `__Host-debateai-age-refusal` | Fichier cookie (HttpOnly) | Après le refus d’une vérification d’âge, empêche ce navigateur de réessayer pendant 30 jours. Il ne contient que le mot « refusé », aucune donnée personnelle. | 30 jours |
 | `debateai.locale` | Fichier cookie | Mémorise la langue d’interface que vous avez choisie, et définit la langue des e-mails que nous vous envoyons. | 1 an |
-| `__Host-debateai-staff` | Fichier cookie (HttpOnly) | Accès du personnel séparé | Jusqu’à 8 heures ; 15 minutes d’inactivité |
-| `__Host-debateai-staff-csrf` | Fichier cookie | Empêche d’autres sites web de soumettre des formulaires en votre nom. | Jusqu’à 8 heures ; 15 minutes d’inactivité |
+| `__Host-debateai-staff` | Fichier cookie (HttpOnly) | Accès séparé pour le personnel | Jusqu’à 8 heures ; expire après 15 minutes d’inactivité |
+| `__Host-debateai-staff-csrf` | Fichier cookie | Empêche d’autres sites web de soumettre des formulaires en votre nom. | Jusqu’à 8 heures ; expire après 15 minutes d’inactivité |
 | `__Host-debateai-password-reset` | Fichier cookie (HttpOnly) | Réinitialisation du mot de passe uniquement | Jusqu’à 30 minutes |
 | `__Host-debateai-password-reset-csrf` | Fichier cookie | Empêche d’autres sites web de soumettre des formulaires en votre nom. | Jusqu’à 30 minutes |
 | `__Host-debateai-mfa-recovery` | Fichier cookie (HttpOnly) | Récupération de l’authentificateur uniquement | Jusqu’à 299 secondes |
@@ -242,7 +242,7 @@ Dialectical Engine utilise 21 éléments, tous strictement nécessaires au servi
 | `debateai.languageOffer.dismissed` | Stockage de session | Retient, pour cet onglet, que vous avez décliné la proposition d’afficher un débat dans une autre langue. | Jusqu’à la fermeture de l’onglet |
 | `debateai.support.conversation.v2` | Stockage de session | Garde votre conversation avec l’aide à l’écran tant que l’onglet reste ouvert. Elle est effacée quand quelqu’un se connecte ou se déconnecte dans cet onglet. | Jusqu’à la fermeture de l’onglet |
 | `debateai.support.offered.v1` | Stockage de session | Retient, pour cet onglet, si le chat d’aide est proposé là où vous êtes : oui ou non, jamais votre pays, afin que la page ne pose la question qu’une fois par onglet. | Jusqu’à la fermeture de l’onglet |
-| `debateai.phone-completion-draft.v1` | Stockage de session | Question inachevée pendant l’étape du téléphone ; effacée lors d’un changement de session, d’une déconnexion ou d’un changement de propriétaire | 15 minutes ou jusqu’à l’effacement |
+| `debateai.phone-completion-draft.v1` | Stockage de session | Question inachevée pendant l’étape du téléphone ; effacée lors d’un changement de session, d’une déconnexion ou d’un changement de propriétaire | 15 minutes, ou moins s’il est effacé plus tôt |
 | `debateai.exportPending` | Stockage de session | Conserve dans cet onglet le lien d’exportation reçu par e-mail pour la connexion et une nouvelle tentative. | Jusqu’à la fermeture de l’onglet, la déconnexion, un nouveau lien, le premier téléchargement réussi ou un résultat de lien invalide ou de mauvais compte |
 | `debateai.exportLinkOutcome` | Stockage de session | Mémorise le message concernant le lien de téléchargement à afficher dans cet onglet. | Jusqu’à la fermeture de l’onglet, la déconnexion ou un nouveau lien |
 

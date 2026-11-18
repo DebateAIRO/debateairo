@@ -228,21 +228,21 @@ Dialectical Engine utiliza 21 elementos, todos estrictamente necesarios para el 
 | `__Host-debateai-csrf` | Archivo de cookie | Impide que otros sitios web envíen formularios en su nombre. | 14 días |
 | `__Host-debateai-age-refusal` | Archivo de cookie (HttpOnly) | Tras rechazarse una verificación de edad, impide que este navegador vuelva a intentarlo durante 30 días. Solo contiene la palabra «rechazado», ningún dato personal. | 30 días |
 | `debateai.locale` | Archivo de cookie | Recuerda el idioma de la interfaz que ha elegido y define el idioma de los correos electrónicos que le enviamos. | 1 año |
-| `__Host-debateai-staff` | Archivo de cookie (HttpOnly) | Acceso del personal separado | Hasta 8 horas; 15 minutos de inactividad |
-| `__Host-debateai-staff-csrf` | Archivo de cookie | Impide que otros sitios web envíen formularios en su nombre. | Hasta 8 horas; 15 minutos de inactividad |
+| `__Host-debateai-staff` | Archivo de cookie (HttpOnly) | Acceso separado para el personal | Hasta 8 horas; caduca tras 15 minutos de inactividad |
+| `__Host-debateai-staff-csrf` | Archivo de cookie | Impide que otros sitios web envíen formularios en su nombre. | Hasta 8 horas; caduca tras 15 minutos de inactividad |
 | `__Host-debateai-password-reset` | Archivo de cookie (HttpOnly) | Solo restablecimiento de contraseña | Hasta 30 minutos |
 | `__Host-debateai-password-reset-csrf` | Archivo de cookie | Impide que otros sitios web envíen formularios en su nombre. | Hasta 30 minutos |
 | `__Host-debateai-mfa-recovery` | Archivo de cookie (HttpOnly) | Solo recuperación del autenticador | Hasta 299 segundos |
 | `__Host-debateai-mfa-recovery-csrf` | Archivo de cookie | Impide que otros sitios web envíen formularios en su nombre. | Hasta 299 segundos |
-| `__Host-debateai-social-flow` | Archivo de cookie (HttpOnly) | Inicio breve mediante proveedor o enlace de cuenta | Hasta 5 minutos |
-| `__Host-debateai-social-apple` | Archivo de cookie (HttpOnly) | Inicio breve mediante proveedor o enlace de cuenta | Hasta 5 minutos |
-| `__Host-debateai-social-browser` | Archivo de cookie (HttpOnly) | Inicio breve mediante proveedor o enlace de cuenta | Hasta 5 minutos |
+| `__Host-debateai-social-flow` | Archivo de cookie (HttpOnly) | Proceso breve de inicio de sesión mediante proveedor o de vinculación de cuenta | Hasta 5 minutos |
+| `__Host-debateai-social-apple` | Archivo de cookie (HttpOnly) | Proceso breve de inicio de sesión mediante proveedor o de vinculación de cuenta | Hasta 5 minutos |
+| `__Host-debateai-social-browser` | Archivo de cookie (HttpOnly) | Proceso breve de inicio de sesión mediante proveedor o de vinculación de cuenta | Hasta 5 minutos |
 | `debateai.consent` | Almacenamiento local | Recuerda que ya ha visto el aviso de cookies, para que solo se muestre una vez. | Hasta que lo borre |
 | `debateai.mode` | Almacenamiento local | Si utiliza el modo de visualización claro u oscuro. | Hasta que lo borre |
 | `debateai.languageOffer.dismissed` | Almacenamiento de sesión | Recuerda, para esta pestaña, que rechazó la oferta de mostrar un debate en otro idioma. | Hasta que cierre la pestaña |
 | `debateai.support.conversation.v2` | Almacenamiento de sesión | Mantiene en pantalla su conversación con el chat de ayuda mientras la pestaña siga abierta. Se borra cuando alguien inicia o cierra sesión en esta pestaña. | Hasta que cierre la pestaña |
 | `debateai.support.offered.v1` | Almacenamiento de sesión | Recuerda, para esta pestaña, si el chat de ayuda se ofrece donde usted se encuentra: sí o no, nunca su país, de modo que la página pregunte solo una vez por pestaña. | Hasta que cierre la pestaña |
-| `debateai.phone-completion-draft.v1` | Almacenamiento de sesión | Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular | 15 minutos o hasta que se borre |
+| `debateai.phone-completion-draft.v1` | Almacenamiento de sesión | Pregunta sin terminar durante el paso del teléfono; borrada al cambiar sesión, cerrar sesión o cambiar titular | 15 minutos, o menos si se borra antes |
 | `debateai.exportPending` | Almacenamiento de sesión | Conserva en esta pestaña el enlace de exportación enviado por correo para iniciar sesión y volver a intentarlo. | Hasta cerrar la pestaña, cerrar sesión, abrir un enlace nuevo, completar la primera descarga o recibir un resultado de enlace no válido o cuenta incorrecta |
 | `debateai.exportLinkOutcome` | Almacenamiento de sesión | Recuerda qué mensaje sobre el enlace de descarga debe mostrarse en esta pestaña. | Hasta cerrar la pestaña, cerrar sesión o abrir un enlace nuevo |
 

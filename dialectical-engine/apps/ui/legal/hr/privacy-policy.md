@@ -228,8 +228,8 @@ Dialectical Engine koristi 21 stavku, sve strogo nužne za uslugu koju ste zatra
 | `__Host-debateai-csrf` | Kolačić | Sprječava druga web-mjesta da u vaše ime šalju obrasce. | 14 dana |
 | `__Host-debateai-age-refusal` | Kolačić (HttpOnly) | Nakon odbijene provjere dobi sprječava ovaj preglednik da pokuša ponovno tijekom 30 dana. Sadrži samo riječ „odbijeno”, bez osobnih podataka. | 30 dana |
 | `debateai.locale` | Kolačić | Pamti jezik sučelja koji ste odabrali i određuje jezik e-poruka koje vam šaljemo. | 1 godina |
-| `__Host-debateai-staff` | Kolačić (HttpOnly) | Odvojeni pristup osoblja | Do 8 sati; 15 minuta neaktivnosti |
-| `__Host-debateai-staff-csrf` | Kolačić | Sprječava druga web-mjesta da u vaše ime šalju obrasce. | Do 8 sati; 15 minuta neaktivnosti |
+| `__Host-debateai-staff` | Kolačić (HttpOnly) | Odvojeni pristup osoblja | Do 8 sati; istječe nakon 15 minuta neaktivnosti |
+| `__Host-debateai-staff-csrf` | Kolačić | Sprječava druga web-mjesta da u vaše ime šalju obrasce. | Do 8 sati; istječe nakon 15 minuta neaktivnosti |
 | `__Host-debateai-password-reset` | Kolačić (HttpOnly) | Samo ponovno postavljanje lozinke | Do 30 minuta |
 | `__Host-debateai-password-reset-csrf` | Kolačić | Sprječava druga web-mjesta da u vaše ime šalju obrasce. | Do 30 minuta |
 | `__Host-debateai-mfa-recovery` | Kolačić (HttpOnly) | Samo oporavak autentifikatora | Do 299 sekundi |
@@ -237,8 +237,8 @@ Dialectical Engine koristi 21 stavku, sve strogo nužne za uslugu koju ste zatra
 | `__Host-debateai-social-flow` | Kolačić (HttpOnly) | Kratka prijava preko pružatelja ili povezivanje računa | Do 5 minuta |
 | `__Host-debateai-social-apple` | Kolačić (HttpOnly) | Kratka prijava preko pružatelja ili povezivanje računa | Do 5 minuta |
 | `__Host-debateai-social-browser` | Kolačić (HttpOnly) | Kratka prijava preko pružatelja ili povezivanje računa | Do 5 minuta |
-| `debateai.consent` | Lokalna pohrana | Pamti da ste vidjeli obavijest o kolačićima, pa se prikazuje samo jednom. | Dok ga ne izbrišete |
-| `debateai.mode` | Lokalna pohrana | Upotrebljavate li svijetli ili tamni način prikaza. | Dok ga ne izbrišete |
+| `debateai.consent` | Lokalna pohrana | Pamti da ste vidjeli obavijest o kolačićima, pa se prikazuje samo jednom. | Dok je ne izbrišete |
+| `debateai.mode` | Lokalna pohrana | Upotrebljavate li svijetli ili tamni način prikaza. | Dok je ne izbrišete |
 | `debateai.languageOffer.dismissed` | Pohrana sesije | Pamti, za ovu karticu, da ste odbili ponudu da se rasprava prikaže na drugom jeziku. | Dok ne zatvorite karticu |
 | `debateai.support.conversation.v2` | Pohrana sesije | Drži vaš razgovor s pomoći na zaslonu dok je kartica otvorena. Briše se kada se bilo tko prijavi ili odjavi u ovoj kartici. | Dok ne zatvorite karticu |
 | `debateai.support.offered.v1` | Pohrana sesije | Pamti za ovu karticu nudi li se razgovor s pomoći ondje gdje se nalazite: da ili ne, nikada vaša država, pa stranica pita samo jednom po kartici. | Dok ne zatvorite karticu |

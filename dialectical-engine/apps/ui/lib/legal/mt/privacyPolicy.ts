@@ -267,7 +267,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         items: [
         "__Host-debateai-session — Fajl cookie (HttpOnly) — Iżżommok fil-kont. Tiġġedded sakemm tibqa’ tuża s-servizz. — 14-il jum",
         "__Host-debateai-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — 14-il jum",
-        "__Host-debateai-age-refusal — Fajl cookie (HttpOnly) — Wara li verifika tal-età tiġi rrifjutata, iżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. — 30 jum",
+        "__Host-debateai-age-refusal — Fajl cookie (HttpOnly) — Wara li verifika tal-età tiġi rrifjutata, iżżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. — 30 jum",
         "debateai.locale — Fajl cookie — Tiftakar il-lingwa tal-interfaċċja li għażilt, u tiddetermina l-lingwa tal-email li nibagħtulek. — 1 sena",
         "__Host-debateai-staff — Fajl cookie (HttpOnly) — Aċċess separat għall-persunal — Sa 8 sigħat; 15-il minuta ta’ inattività",
         "__Host-debateai-staff-csrf — Fajl cookie — Ma tħallix siti oħra jissottomettu formoli f’ismek. — Sa 8 sigħat; 15-il minuta ta’ inattività",
@@ -365,7 +365,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "0bde7300b4270bf8dbf5e83f1f447c18dca4f593d087ede8223cc4194d8d3681",
+  sha256: "ed29017b63dbb7210f9baf7aeb00c485dd878ce14e03e6c8a1d9916d739d0616",
   eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v3.12 · EFFETTIVA 4 TA’ NOVEMBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",

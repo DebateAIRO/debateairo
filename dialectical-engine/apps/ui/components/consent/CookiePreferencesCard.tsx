@@ -7,7 +7,7 @@ import { useHideOutside } from "@/components/dialogSurface";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /**
- * 10b — the storage card: a read-only list of the eight items Dialectical Engine stores.
+ * 10b — the storage card: a read-only list of every item Dialectical Engine stores (`LEGAL_INVENTORY`).
  *
  * One row per `LEGAL_INVENTORY` item, in INV order — the same list /cookies draws and the
  * R17 drift test guards (D-27) — each showing the name, its kind, its purpose and its

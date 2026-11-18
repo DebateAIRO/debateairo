@@ -228,8 +228,8 @@ A Dialectical Engine 21 elemet használ, amelyek mind feltétlenül szükségese
 | `__Host-debateai-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | 14 nap |
 | `__Host-debateai-age-refusal` | Süti (HttpOnly) | Elutasított életkor-ellenőrzés után 30 napig megakadályozza, hogy ez a böngésző újra próbálkozzon. Csak az „elutasítva” szót tartalmazza, személyes adatot nem. | 30 nap |
 | `debateai.locale` | Süti | Megjegyzi, milyen nyelvű felületet választott, és azt is, milyen nyelven írjuk az Önnek küldött e-maileket. | 1 év |
-| `__Host-debateai-staff` | Süti (HttpOnly) | Külön munkatársi hozzáférés | Legfeljebb 8 óra; 15 perc inaktivitás |
-| `__Host-debateai-staff-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | Legfeljebb 8 óra; 15 perc inaktivitás |
+| `__Host-debateai-staff` | Süti (HttpOnly) | Külön munkatársi hozzáférés | Legfeljebb 8 óra; 15 perc inaktivitás után lejár |
+| `__Host-debateai-staff-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | Legfeljebb 8 óra; 15 perc inaktivitás után lejár |
 | `__Host-debateai-password-reset` | Süti (HttpOnly) | Csak jelszó-visszaállítás | Legfeljebb 30 perc |
 | `__Host-debateai-password-reset-csrf` | Süti | Megakadályozza, hogy más webhelyek az Ön nevében küldjenek be űrlapokat. | Legfeljebb 30 perc |
 | `__Host-debateai-mfa-recovery` | Süti (HttpOnly) | Csak hitelesítő-helyreállítás | Legfeljebb 299 másodperc |
@@ -243,7 +243,7 @@ A Dialectical Engine 21 elemet használ, amelyek mind feltétlenül szükségese
 | `debateai.support.conversation.v2` | Munkamenet-tárhely | A képernyőn tartja a súgócsevegésben folytatott beszélgetését, amíg a lap nyitva van. Törlődik, amikor ezen a lapon bárki be- vagy kijelentkezik. | Amíg be nem zárja a lapot |
 | `debateai.support.offered.v1` | Munkamenet-tárhely | Megjegyzi ennél a lapnál, hogy kínáljuk-e a súgócsevegést ott, ahol Ön van: csak az igent vagy a nemet, az Ön országát soha, így az oldal laponként csak egyszer kérdez rá. | Amíg be nem zárja a lapot |
 | `debateai.phone-completion-draft.v1` | Munkamenet-tárhely | Befejezetlen kérdés a telefonos lépés alatt; munkamenetváltáskor, kijelentkezéskor vagy tulajdonosváltáskor törlődik | 15 perc vagy a korábbi törlésig |
-| `debateai.exportPending` | Munkamenet-tárhely | Ebben a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz. | A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig |
+| `debateai.exportPending` | Munkamenet-tárhely | Ezen a lapon megőrzi az e-mailben kapott exporthivatkozást a bejelentkezéshez és az újrapróbálkozáshoz. | A lap bezárásáig, kijelentkezésig, új hivatkozásig, az első sikeres letöltésig vagy érvénytelen hivatkozásra vagy téves fiókra vonatkozó eredményig |
 | `debateai.exportLinkOutcome` | Munkamenet-tárhely | Megjegyzi, melyik letöltési hivatkozással kapcsolatos üzenetet kell megjeleníteni ezen a lapon. | A lap bezárásáig, kijelentkezésig vagy új hivatkozásig |
 
 Minden Önnek sorba állított e-mail megőrzi az Ön által kiválasztott nyelvet, amíg el nem küldjük.

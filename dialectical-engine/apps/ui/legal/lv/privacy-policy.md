@@ -228,8 +228,8 @@ Dialectical Engine izmanto 21 elementu, kas visi ir absolūti nepieciešami jūs
 | `__Host-debateai-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | 14 dienas |
 | `__Host-debateai-age-refusal` | Sīkdatne (HttpOnly) | Pēc noraidītas vecuma pārbaudes 30 dienas neļauj šai pārlūkprogrammai mēģināt vēlreiz. Tajā ir tikai vārds “noraidīts”, nekādu personas datu. | 30 dienas |
 | `debateai.locale` | Sīkdatne | Atceras jūsu izvēlēto saskarnes valodu un nosaka arī valodu, kādā mēs jums sūtām e-pasta ziņojumus. | 1 gads |
-| `__Host-debateai-staff` | Sīkdatne (HttpOnly) | Atsevišķa personāla piekļuve | Līdz 8 stundām; 15 minūtes neaktivitātes |
-| `__Host-debateai-staff-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | Līdz 8 stundām; 15 minūtes neaktivitātes |
+| `__Host-debateai-staff` | Sīkdatne (HttpOnly) | Atsevišķa personāla piekļuve | Līdz 8 stundām; beidzas pēc 15 minūšu neaktivitātes |
+| `__Host-debateai-staff-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | Līdz 8 stundām; beidzas pēc 15 minūšu neaktivitātes |
 | `__Host-debateai-password-reset` | Sīkdatne (HttpOnly) | Tikai paroles atiestatīšana | Līdz 30 minūtēm |
 | `__Host-debateai-password-reset-csrf` | Sīkdatne | Neļauj citām vietnēm iesniegt veidlapas jūsu vārdā. | Līdz 30 minūtēm |
 | `__Host-debateai-mfa-recovery` | Sīkdatne (HttpOnly) | Tikai autentifikatora atkopšana | Līdz 299 sekundēm |

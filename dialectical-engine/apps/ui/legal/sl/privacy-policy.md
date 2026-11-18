@@ -228,8 +228,8 @@ Dialectical Engine uporablja 21 elementov, ki so vsi nujno potrebni za storitev,
 | `__Host-debateai-csrf` | Piškotek | Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. | 14 dni |
 | `__Host-debateai-age-refusal` | Piškotek (HttpOnly) | Po zavrnjenem preverjanju starosti temu brskalniku 30 dni preprečuje nov poskus. Vsebuje le besedo »zavrnjeno«, nobenih osebnih podatkov. | 30 dni |
 | `debateai.locale` | Piškotek | Zapomni si jezik vmesnika, ki ste ga izbrali, in nastavlja jezik e-poštnih sporočil, ki vam jih pošiljamo. | 1 leto |
-| `__Host-debateai-staff` | Piškotek (HttpOnly) | Ločen dostop osebja | Do 8 ur; 15 minut nedejavnosti |
-| `__Host-debateai-staff-csrf` | Piškotek | Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. | Do 8 ur; 15 minut nedejavnosti |
+| `__Host-debateai-staff` | Piškotek (HttpOnly) | Ločen dostop osebja | Do 8 ur; poteče po 15 minutah nedejavnosti |
+| `__Host-debateai-staff-csrf` | Piškotek | Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. | Do 8 ur; poteče po 15 minutah nedejavnosti |
 | `__Host-debateai-password-reset` | Piškotek (HttpOnly) | Samo ponastavitev gesla | Do 30 minut |
 | `__Host-debateai-password-reset-csrf` | Piškotek | Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. | Do 30 minut |
 | `__Host-debateai-mfa-recovery` | Piškotek (HttpOnly) | Samo obnovitev overitelja | Do 299 sekund |
@@ -241,8 +241,8 @@ Dialectical Engine uporablja 21 elementov, ki so vsi nujno potrebni za storitev,
 | `debateai.mode` | Lokalna shramba | Ali uporabljate svetli ali temni način prikaza. | Dokler ga ne izbrišete |
 | `debateai.languageOffer.dismissed` | Shramba seje | Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. | Dokler ne zaprete zavihka |
 | `debateai.support.conversation.v2` | Shramba seje | Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. | Dokler ne zaprete zavihka |
-| `debateai.support.offered.v1` | Shramba seje | Si zapomni za ta zavihek, ali je klepet za pomoč ponujen tam, kjer ste: da ali ne, nikoli vaše države, da stran vpraša samo enkrat na zavihek. | Dokler ne zaprete zavihka |
-| `debateai.phone-completion-draft.v1` | Shramba seje | Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika | 15 minut ali do predhodnega brisanja |
+| `debateai.support.offered.v1` | Shramba seje | Za ta zavihek si zapomni, ali je klepet za pomoč ponujen tam, kjer ste: da ali ne, nikoli vaše države, da stran vpraša samo enkrat na zavihek. | Dokler ne zaprete zavihka |
+| `debateai.phone-completion-draft.v1` | Shramba seje | Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika | 15 minut ali do zgodnejšega izbrisa |
 | `debateai.exportPending` | Shramba seje | V tem zavihku hrani povezavo za izvoz iz e-pošte za prijavo in ponovni poskus. | Do zaprtja zavihka, odjave, nove povezave, prvega uspešnega prenosa ali izida neveljavne povezave oziroma napačnega računa |
 | `debateai.exportLinkOutcome` | Shramba seje | Zapomni si, katero sporočilo o povezavi za prenos prikazati v tem zavihku. | Do zaprtja zavihka, odjave ali nove povezave |
 

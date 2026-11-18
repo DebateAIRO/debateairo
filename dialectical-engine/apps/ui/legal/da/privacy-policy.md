@@ -228,8 +228,8 @@ Dialectical Engine bruger 21 elementer, som alle er strengt nødvendige for den 
 | `__Host-debateai-csrf` | Cookiefil | Forhindrer andre websteder i at indsende formularer i dit navn. | 14 dage |
 | `__Host-debateai-age-refusal` | Cookiefil (HttpOnly) | Når en alderskontrol er afvist, forhindrer den denne browser i at prøve igen i 30 dage. Den indeholder kun ordet „afvist“ og ingen personoplysninger. | 30 dage |
 | `debateai.locale` | Cookiefil | Husker det brugerfladesprog, du har valgt, og bestemmer sproget i de e-mails, vi sender dig. | 1 år |
-| `__Host-debateai-staff` | Cookiefil (HttpOnly) | Separat medarbejderadgang | Op til 8 timer; 15 minutters inaktivitet |
-| `__Host-debateai-staff-csrf` | Cookiefil | Forhindrer andre websteder i at indsende formularer i dit navn. | Op til 8 timer; 15 minutters inaktivitet |
+| `__Host-debateai-staff` | Cookiefil (HttpOnly) | Separat medarbejderadgang | Op til 8 timer; udløber efter 15 minutters inaktivitet |
+| `__Host-debateai-staff-csrf` | Cookiefil | Forhindrer andre websteder i at indsende formularer i dit navn. | Op til 8 timer; udløber efter 15 minutters inaktivitet |
 | `__Host-debateai-password-reset` | Cookiefil (HttpOnly) | Kun nulstilling af adgangskode | Op til 30 minutter |
 | `__Host-debateai-password-reset-csrf` | Cookiefil | Forhindrer andre websteder i at indsende formularer i dit navn. | Op til 30 minutter |
 | `__Host-debateai-mfa-recovery` | Cookiefil (HttpOnly) | Kun gendannelse af autentifikatoren | Op til 299 sekunder |

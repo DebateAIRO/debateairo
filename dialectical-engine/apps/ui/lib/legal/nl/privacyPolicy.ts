@@ -267,10 +267,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         items: [
         "__Host-debateai-session — Cookiebestand (HttpOnly) — Houdt u aangemeld. Het cookie wordt verlengd zolang u de dienst gebruikt. — 14 dagen",
         "__Host-debateai-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — 14 dagen",
-        "__Host-debateai-age-refusal — Cookiebestand (HttpOnly) — Na een geweigerde leeftijdscontrole voorkomt deze dat deze browser het 30 dagen lang opnieuw probeert. Hij bevat alleen het woord ‘geweigerd’, geen persoonsgegevens. — 30 dagen",
+        "__Host-debateai-age-refusal — Cookiebestand (HttpOnly) — Na een geweigerde leeftijdscontrole voorkomt dit cookie dat deze browser het 30 dagen lang opnieuw probeert. Het bevat alleen het woord ‘geweigerd’, geen persoonsgegevens. — 30 dagen",
         "debateai.locale — Cookiebestand — Onthoudt de interfacetaal die u hebt gekozen, en bepaalt de taal van de e-mails die wij u sturen. — 1 jaar",
-        "__Host-debateai-staff — Cookiebestand (HttpOnly) — Afzonderlijke medewerkerstoegang — Tot 8 uur; 15 minuten inactiviteit",
-        "__Host-debateai-staff-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 8 uur; 15 minuten inactiviteit",
+        "__Host-debateai-staff — Cookiebestand (HttpOnly) — Afzonderlijke medewerkerstoegang — Tot 8 uur; verloopt na 15 minuten inactiviteit",
+        "__Host-debateai-staff-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 8 uur; verloopt na 15 minuten inactiviteit",
         "__Host-debateai-password-reset — Cookiebestand (HttpOnly) — Alleen wachtwoordreset — Tot 30 minuten",
         "__Host-debateai-password-reset-csrf — Cookiebestand — Voorkomt dat andere websites namens u formulieren verzenden. — Tot 30 minuten",
         "__Host-debateai-mfa-recovery — Cookiebestand (HttpOnly) — Alleen herstel van de authenticator — Tot 299 seconden",
@@ -290,7 +290,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
       },
       { kind: "p", text: "Elke e-mail die wij voor u in de wachtrij zetten, behoudt de taal die u had gekozen totdat wij hem verzenden." },
       { kind: "p", text: "Geen enkele andere partij verzamelt via Dialectical Engine informatie over uw onlineactiviteiten in de loop van de tijd en over verschillende websites heen." },
-      { kind: "p", text: "Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. Dialectical Engine volgt u niet, dus er is niets wat zo'n signaal kan uitschakelen: de dienst werkt hetzelfde met of zonder dat signaal." },
+      { kind: "p", text: "Browsers kunnen een „Do Not Track”-signaal of een vergelijkbaar signaal verzenden. Dialectical Engine volgt u niet, dus er valt voor zo'n signaal niets uit te schakelen: de dienst werkt hetzelfde met of zonder dat signaal." },
       { kind: "p", text: "Om deze items te weigeren, blokkeert of verwijdert u cookies en sitegegevens voor deze site in uw browserinstellingen. Wat er dan niet meer werkt: het aanmelden en het onthouden van uw keuzes voor taal en weergave; ook de cookiemelding wordt opnieuw getoond." }
     ]
   },
@@ -365,7 +365,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "9917ffc2c99229f61dd959afdf549fdd8e84ac9e89855507336c10d38fc7a145",
+  sha256: "4d7af87961924406640d86a05fbf796f582256c0f4ab6aae5bd1e9767101b478",
   eyebrow: "PRIVACYBELEID · v3.12 · VAN KRACHT OP 4 NOVEMBER 2026",
   title: "Wat wij opslaan en waarom",
   lede: "Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.",

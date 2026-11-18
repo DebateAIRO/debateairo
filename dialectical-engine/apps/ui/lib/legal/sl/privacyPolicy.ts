@@ -269,8 +269,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — Piškotek — Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. — 14 dni",
         "__Host-debateai-age-refusal — Piškotek (HttpOnly) — Po zavrnjenem preverjanju starosti temu brskalniku 30 dni preprečuje nov poskus. Vsebuje le besedo »zavrnjeno«, nobenih osebnih podatkov. — 30 dni",
         "debateai.locale — Piškotek — Zapomni si jezik vmesnika, ki ste ga izbrali, in nastavlja jezik e-poštnih sporočil, ki vam jih pošiljamo. — 1 leto",
-        "__Host-debateai-staff — Piškotek (HttpOnly) — Ločen dostop osebja — Do 8 ur; 15 minut nedejavnosti",
-        "__Host-debateai-staff-csrf — Piškotek — Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. — Do 8 ur; 15 minut nedejavnosti",
+        "__Host-debateai-staff — Piškotek (HttpOnly) — Ločen dostop osebja — Do 8 ur; poteče po 15 minutah nedejavnosti",
+        "__Host-debateai-staff-csrf — Piškotek — Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. — Do 8 ur; poteče po 15 minutah nedejavnosti",
         "__Host-debateai-password-reset — Piškotek (HttpOnly) — Samo ponastavitev gesla — Do 30 minut",
         "__Host-debateai-password-reset-csrf — Piškotek — Drugim spletnim mestom preprečuje, da bi v vašem imenu oddajala obrazce. — Do 30 minut",
         "__Host-debateai-mfa-recovery — Piškotek (HttpOnly) — Samo obnovitev overitelja — Do 299 sekund",
@@ -282,8 +282,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — Lokalna shramba — Ali uporabljate svetli ali temni način prikaza. — Dokler ga ne izbrišete",
         "debateai.languageOffer.dismissed — Shramba seje — Za ta zavihek si zapomni, da ste zavrnili ponudbo, da se razprava prikaže v drugem jeziku. — Dokler ne zaprete zavihka",
         "debateai.support.conversation.v2 — Shramba seje — Ohranja vaš pogovor s klepetom za pomoč na zaslonu, dokler je zavihek odprt. Izbriše se, ko se v tem zavihku kdor koli prijavi ali odjavi. — Dokler ne zaprete zavihka",
-        "debateai.support.offered.v1 — Shramba seje — Si zapomni za ta zavihek, ali je klepet za pomoč ponujen tam, kjer ste: da ali ne, nikoli vaše države, da stran vpraša samo enkrat na zavihek. — Dokler ne zaprete zavihka",
-        "debateai.phone-completion-draft.v1 — Shramba seje — Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika — 15 minut ali do predhodnega brisanja",
+        "debateai.support.offered.v1 — Shramba seje — Za ta zavihek si zapomni, ali je klepet za pomoč ponujen tam, kjer ste: da ali ne, nikoli vaše države, da stran vpraša samo enkrat na zavihek. — Dokler ne zaprete zavihka",
+        "debateai.phone-completion-draft.v1 — Shramba seje — Nedokončano vprašanje med telefonskim korakom; izbriše se ob spremembi seje, odjavi ali spremembi lastnika — 15 minut ali do zgodnejšega izbrisa",
         "debateai.exportPending — Shramba seje — V tem zavihku hrani povezavo za izvoz iz e-pošte za prijavo in ponovni poskus. — Do zaprtja zavihka, odjave, nove povezave, prvega uspešnega prenosa ali izida neveljavne povezave oziroma napačnega računa",
         "debateai.exportLinkOutcome — Shramba seje — Zapomni si, katero sporočilo o povezavi za prenos prikazati v tem zavihku. — Do zaprtja zavihka, odjave ali nove povezave"
         ]
@@ -365,7 +365,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "a2ec9618a1b5d381a0fe15ba291582791035cbf4aa4091732303100b0032f0e6",
+  sha256: "810675dde4062c7fc2b99bd77d05a8c4b9b2a27cf86cd12872e5c633a02d5f8e",
   eyebrow: "PRAVILNIK O ZASEBNOSTI · v3.12 · VELJA OD 4. NOVEMBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",

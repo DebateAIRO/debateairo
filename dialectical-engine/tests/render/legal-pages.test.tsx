@@ -512,6 +512,21 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(view.textContent).toContain(effect);
     for (const phrase of ["block or delete", "browser settings"]) expect(refuse?.toLowerCase(), phrase).toContain(phrase);
     for (const phrase of ["stops working", "signing in", "language", "display"]) expect(effect?.toLowerCase(), phrase).toContain(phrase);
+    // With site data blocked, `debateai.consent` cannot be kept, so the notice opens again (Privacy Policy §13 says the same).
+    expect(effect?.toLowerCase(), "the notice comes back").toContain("cookie notice");
+  });
+
+  it("makes only claims the inventory bears out: export link sent on download, no third-party cookies", () => {
+    // `debateai.exportPending` is a /cookies row whose "Sent to" is the server (ExportDownloadClient posts its token
+    // to download the export), so the storage intro may not say the items are never sent.
+    const exportRow = LEGAL_INVENTORY.find((item) => item.name === "debateai.exportPending");
+    expect(exportRow?.recipientKey).toBe("legal.cookies.recipient.server");
+    expect(english["legal.cookies.storageIntro"]).toMatch(/export-link item is sent to Dialectical Engine/);
+    // `__Host-debateai-social-apple` is SameSite=None (Apple's form_post callback), so the page cannot promise
+    // "no cross-site cookies"; every cookie is still first-party, which is what the meta line now says.
+    expect(english["legal.cookies.meta"]).not.toMatch(/cross-site/i);
+    expect(english["legal.cookies.meta"]).toMatch(/first-party/i);
+    expect(english["legal.cookies.meta"]).toMatch(/third-party/i);
   });
 
   it("renders both tables with no switch or checkbox, and a control that reopens the card", () => {

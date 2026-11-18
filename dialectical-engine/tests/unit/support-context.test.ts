@@ -113,7 +113,9 @@ describe("Support knowledge context", () => {
     // 2026-10-05: changed menu/article/recovery bytes have SOL evidence; unchanged legal entries retain OWNER signatures.
     // Prior 2026-09-29: the owner signed the catalogue with the seven Turn 15 legal pages.
     // DONE S05 r2: the words check pins the reviewed article and catalogue bytes.
-    expect(corpus.kbVersion).toBe("3be3e169d3bd1f1d43740a5fbdf33519120a9d2ecdfa23a03fc4ef26a4cb8c57");
+    // 2026-11-18 (cookie-copy): the owner signed the corrected privacy-consent pair (13 cookies, 8 storage items,
+    // Dialectical Engine, the notice showing again); its bytes, recovery rows and OWNER records moved the version.
+    expect(corpus.kbVersion).toBe("dcdc4dfdec46392ebd1397f828f8d8e47d49abcd8a63d15d7638f7712fc38815");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 
