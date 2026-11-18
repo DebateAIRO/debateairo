@@ -228,8 +228,8 @@ Dialectical Engine używa 21 elementów, z których wszystkie są bezwzględnie 
 | `__Host-debateai-csrf` | Plik cookie | Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. | 14 dni |
 | `__Host-debateai-age-refusal` | Plik cookie (HttpOnly) | Po odrzuconej weryfikacji wieku uniemożliwia tej przeglądarce ponowną próbę przez 30 dni. Zawiera tylko słowo „odrzucono”, żadnych danych osobowych. | 30 dni |
 | `debateai.locale` | Plik cookie | Zapamiętuje wybrany przez Ciebie język interfejsu i ustawia język wiadomości e-mail, które do Ciebie wysyłamy. | 1 rok |
-| `__Host-debateai-staff` | Plik cookie (HttpOnly) | Oddzielny dostęp personelu | Do 8 godzin; 15 minut bezczynności |
-| `__Host-debateai-staff-csrf` | Plik cookie | Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. | Do 8 godzin; 15 minut bezczynności |
+| `__Host-debateai-staff` | Plik cookie (HttpOnly) | Oddzielny dostęp personelu | Do 8 godzin; wygasa po 15 minutach bezczynności |
+| `__Host-debateai-staff-csrf` | Plik cookie | Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. | Do 8 godzin; wygasa po 15 minutach bezczynności |
 | `__Host-debateai-password-reset` | Plik cookie (HttpOnly) | Tylko resetowanie hasła | Do 30 minut |
 | `__Host-debateai-password-reset-csrf` | Plik cookie | Uniemożliwia innym witrynom wysyłanie formularzy w Twoim imieniu. | Do 30 minut |
 | `__Host-debateai-mfa-recovery` | Plik cookie (HttpOnly) | Tylko odzyskiwanie uwierzytelniacza | Do 299 sekund |

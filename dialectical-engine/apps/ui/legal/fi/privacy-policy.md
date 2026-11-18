@@ -228,8 +228,8 @@ Dialectical Engine käyttää 21 kohdetta, jotka kaikki ovat ehdottoman välttä
 | `__Host-debateai-csrf` | Eväste | Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. | 14 päivää |
 | `__Host-debateai-age-refusal` | Eväste (HttpOnly) | Kun ikätarkistus on hylätty, estää tätä selainta yrittämästä uudelleen 30 päivän ajan. Se sisältää vain sanan ”hylätty”, ei henkilötietoja. | 30 päivää |
 | `debateai.locale` | Eväste | Muistaa valitsemasi käyttöliittymän kielen ja määrää kielen, jolla lähetämme sinulle sähköpostit. | 1 vuosi |
-| `__Host-debateai-staff` | Eväste (HttpOnly) | Erillinen henkilöstön käyttöoikeus | Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä |
-| `__Host-debateai-staff-csrf` | Eväste | Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. | Enintään 8 tuntia; 15 minuuttia käyttämättömyyttä |
+| `__Host-debateai-staff` | Eväste (HttpOnly) | Erillinen henkilöstön käyttöoikeus | Enintään 8 tuntia; vanhenee 15 minuutin käyttämättömyyden jälkeen |
+| `__Host-debateai-staff-csrf` | Eväste | Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. | Enintään 8 tuntia; vanhenee 15 minuutin käyttämättömyyden jälkeen |
 | `__Host-debateai-password-reset` | Eväste (HttpOnly) | Vain salasanan palautus | Enintään 30 minuuttia |
 | `__Host-debateai-password-reset-csrf` | Eväste | Estää muita sivustoja lähettämästä lomakkeita sinun nimissäsi. | Enintään 30 minuuttia |
 | `__Host-debateai-mfa-recovery` | Eväste (HttpOnly) | Vain todentimen palautus | Enintään 299 sekuntia |

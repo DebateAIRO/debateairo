@@ -228,8 +228,8 @@ Dialectical Engine kasutab 21 üksust, mis kõik on teie tellitud teenuse jaoks 
 | `__Host-debateai-csrf` | Küpsis | Takistab teistel veebisaitidel teie nimel vorme esitamast. | 14 päeva |
 | `__Host-debateai-age-refusal` | Küpsis (HttpOnly) | Pärast tagasilükatud vanusekontrolli takistab see sellel brauseril 30 päeva jooksul uuesti proovimast. See sisaldab ainult sõna „tagasi lükatud“, mitte isikuandmeid. | 30 päeva |
 | `debateai.locale` | Küpsis | Jätab meelde teie valitud liidese keele ja määrab keele, milles me teile e-kirju saadame. | 1 aasta |
-| `__Host-debateai-staff` | Küpsis (HttpOnly) | Eraldi töötajate juurdepääs | Kuni 8 tundi; 15 minutit tegevusetust |
-| `__Host-debateai-staff-csrf` | Küpsis | Takistab teistel veebisaitidel teie nimel vorme esitamast. | Kuni 8 tundi; 15 minutit tegevusetust |
+| `__Host-debateai-staff` | Küpsis (HttpOnly) | Eraldi töötajate juurdepääs | Kuni 8 tundi; aegub pärast 15 minutit tegevusetust |
+| `__Host-debateai-staff-csrf` | Küpsis | Takistab teistel veebisaitidel teie nimel vorme esitamast. | Kuni 8 tundi; aegub pärast 15 minutit tegevusetust |
 | `__Host-debateai-password-reset` | Küpsis (HttpOnly) | Ainult parooli lähtestamine | Kuni 30 minutit |
 | `__Host-debateai-password-reset-csrf` | Küpsis | Takistab teistel veebisaitidel teie nimel vorme esitamast. | Kuni 30 minutit |
 | `__Host-debateai-mfa-recovery` | Küpsis (HttpOnly) | Ainult autentija taastamine | Kuni 299 sekundit |

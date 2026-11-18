@@ -228,8 +228,8 @@ Dialectical Engine använder 21 objekt, som alla är strikt nödvändiga för de
 | `__Host-debateai-csrf` | Kaka | Hindrar andra webbplatser från att skicka formulär i ditt namn. | 14 dagar |
 | `__Host-debateai-age-refusal` | Kaka (HttpOnly) | Efter en nekad ålderskontroll hindrar den den här webbläsaren från att försöka igen i 30 dagar. Den innehåller bara ordet ”nekad”, inga personuppgifter. | 30 dagar |
 | `debateai.locale` | Kaka | Kommer ihåg vilket gränssnittsspråk du har valt och anger språket för de e-postmeddelanden vi skickar dig. | 1 år |
-| `__Host-debateai-staff` | Kaka (HttpOnly) | Separat personalåtkomst | Upp till 8 timmar; 15 minuters inaktivitet |
-| `__Host-debateai-staff-csrf` | Kaka | Hindrar andra webbplatser från att skicka formulär i ditt namn. | Upp till 8 timmar; 15 minuters inaktivitet |
+| `__Host-debateai-staff` | Kaka (HttpOnly) | Separat personalåtkomst | Upp till 8 timmar; upphör efter 15 minuters inaktivitet |
+| `__Host-debateai-staff-csrf` | Kaka | Hindrar andra webbplatser från att skicka formulär i ditt namn. | Upp till 8 timmar; upphör efter 15 minuters inaktivitet |
 | `__Host-debateai-password-reset` | Kaka (HttpOnly) | Endast lösenordsåterställning | Upp till 30 minuter |
 | `__Host-debateai-password-reset-csrf` | Kaka | Hindrar andra webbplatser från att skicka formulär i ditt namn. | Upp till 30 minuter |
 | `__Host-debateai-mfa-recovery` | Kaka (HttpOnly) | Endast återställning av autentiseraren | Upp till 299 sekunder |

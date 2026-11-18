@@ -191,3 +191,50 @@ describe("the storage inventory of record equals what the product writes (SPEC-v
     expect([...scanWritten(new Map([["apps/ui/route.ts", route]])).written]).toEqual(["__Host-s"]);
   });
 });
+
+/**
+ * The counts in the cookie notice and in the /cookies storage intro are prose, not data, so nothing
+ * above keeps them true: the notice said "four cookies and four items" long after the inventory had
+ * grown to 13 and 8. Every locale writes its counts as digits, and this reads them back against
+ * `LEGAL_COOKIES` and `LEGAL_BROWSER_STORAGE`; a new row with no copy change turns this red.
+ */
+describe("the counts the copy states equal the inventory of record, in every locale", () => {
+  const messagesDir = join(process.cwd(), "apps/ui/messages");
+  const locales = readdirSync(messagesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const catalog = (locale: string, file: string): Record<string, string> =>
+    JSON.parse(readFileSync(join(messagesDir, locale, file), "utf8")) as Record<string, string>;
+  const englishLegal = catalog("en", "legal.json");
+  const kindOf = (kindKey: string) => englishLegal[kindKey];
+  const local = LEGAL_BROWSER_STORAGE.filter(({ kindKey }) => kindOf(kindKey) === "Local storage").length;
+  const session = LEGAL_BROWSER_STORAGE.filter(({ kindKey }) => kindOf(kindKey) === "Session storage").length;
+  /** The whole numbers a sentence states, in the order it states them. */
+  const numbersIn = (text: string) => (text.match(/\d+/g) ?? []).map(Number);
+
+  it("sorts every browser-storage row into local or session storage", () => {
+    expect(locales).toHaveLength(35);
+    expect(local + session).toBe(LEGAL_BROWSER_STORAGE.length);
+    expect(local).toBeGreaterThan(0);
+    expect(session).toBeGreaterThan(0);
+  });
+
+  it.each(locales)("%s: the cookie notice states the cookie and storage counts", (locale) => {
+    expect(numbersIn(catalog(locale, "consent.json")["consent.bar.body"]!).sort((a, b) => a - b)).toEqual(
+      [LEGAL_COOKIES.length, LEGAL_BROWSER_STORAGE.length].sort((a, b) => a - b)
+    );
+  });
+
+  it.each(locales)("%s: the /cookies storage intro states the storage, local and session counts", (locale) => {
+    expect(numbersIn(catalog(locale, "legal.json")["legal.cookies.storageIntro"]!).sort((a, b) => a - b)).toEqual(
+      [LEGAL_BROWSER_STORAGE.length, local, session].sort((a, b) => a - b)
+    );
+  });
+
+  it.each(locales)("%s: the What-we-store card states the total", (locale) => {
+    expect(numbersIn(catalog(locale, "consent.json")["consent.preferences.lede"]!)).toEqual([
+      LEGAL_COOKIES.length + LEGAL_BROWSER_STORAGE.length
+    ]);
+  });
+});

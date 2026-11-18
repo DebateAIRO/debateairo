@@ -347,8 +347,8 @@ function InventoryRow({ item, legalCatalog }: { item: LegalInventoryItem; legalC
 }
 
 /**
- * The cookie policy (`/cookies`): the eight stored items of record, the four cookies in one table and
- * the four browser-storage keys in another, then how to refuse them and what then stops working.
+ * The cookie policy (`/cookies`): the stored items of record, the cookies (`LEGAL_COOKIES`) in one table and
+ * the browser-storage keys (`LEGAL_BROWSER_STORAGE`) in another, then how to refuse them and what then stops working.
  */
 export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalog }) {
   const head = (

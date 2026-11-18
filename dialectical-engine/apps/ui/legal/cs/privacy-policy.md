@@ -228,8 +228,8 @@ Dialectical Engine používá 21 položek, všechny nezbytně nutné pro službu
 | `__Host-debateai-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | 14 dní |
 | `__Host-debateai-age-refusal` | Soubor cookie (HttpOnly) | Po zamítnuté kontrole věku zabrání tomuto prohlížeči pokusit se znovu po dobu 30 dní. Obsahuje jen slovo „zamítnuto“, žádné osobní údaje. | 30 dní |
 | `debateai.locale` | Soubor cookie | Pamatuje si, jaký jazyk rozhraní jste zvolili, a nastavuje jazyk e-mailů, které vám zasíláme. | 1 rok |
-| `__Host-debateai-staff` | Soubor cookie (HttpOnly) | Oddělený přístup pracovníků | Až 8 hodin; 15 minut nečinnosti |
-| `__Host-debateai-staff-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | Až 8 hodin; 15 minut nečinnosti |
+| `__Host-debateai-staff` | Soubor cookie (HttpOnly) | Oddělený přístup pracovníků | Až 8 hodin; vyprší po 15 minutách nečinnosti |
+| `__Host-debateai-staff-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | Až 8 hodin; vyprší po 15 minutách nečinnosti |
 | `__Host-debateai-password-reset` | Soubor cookie (HttpOnly) | Pouze obnovení hesla | Až 30 minut |
 | `__Host-debateai-password-reset-csrf` | Soubor cookie | Brání jiným webům v odesílání formulářů vaším jménem. | Až 30 minut |
 | `__Host-debateai-mfa-recovery` | Soubor cookie (HttpOnly) | Pouze obnova autentizátoru | Až 299 sekund |

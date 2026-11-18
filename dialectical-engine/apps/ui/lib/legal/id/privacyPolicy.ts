@@ -283,8 +283,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.languageOffer.dismissed — Penyimpanan sesi — Mengingat, untuk tab ini, bahwa Anda menolak tawaran untuk menampilkan debat dalam bahasa lain. — Sampai Anda menutup tab",
         "debateai.support.conversation.v2 — Penyimpanan sesi — Menjaga percakapan obrolan bantuan Anda tetap di layar selama tab masih terbuka. Percakapan dihapus saat seseorang masuk atau keluar di tab ini. — Sampai Anda menutup tab",
         "debateai.support.offered.v1 — Penyimpanan sesi — Mengingat, untuk tab ini, apakah obrolan bantuan ditawarkan di tempat Anda berada: ya atau tidak, tidak pernah negara Anda, sehingga halaman hanya bertanya sekali per tab. — Sampai Anda menutup tab",
-        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai lebih awal dihapus",
-        "debateai.exportPending — Penyimpanan sesi — Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi. — Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau hasil tautan tidak valid maupun akun yang salah",
+        "debateai.phone-completion-draft.v1 — Penyimpanan sesi — Pertanyaan belum selesai pada langkah telepon; dihapus saat sesi berubah, keluar, atau pemilik berubah — 15 menit atau sampai dihapus lebih awal",
+        "debateai.exportPending — Penyimpanan sesi — Menyimpan tautan ekspor dari email di tab ini untuk masuk dan mencoba lagi. — Hingga tab ditutup, keluar, tautan baru dibuka, unduhan pertama berhasil, atau muncul hasil tautan tidak valid atau akun yang salah",
         "debateai.exportLinkOutcome — Penyimpanan sesi — Mengingat pesan tautan unduhan yang perlu ditampilkan di tab ini. — Hingga tab ditutup, keluar, atau tautan baru dibuka"
         ]
       },
@@ -365,7 +365,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "b022bfd6aa0dfc8ec70760dcddfc56b99bb77b0ffe69ffc2c5458b8d033e1b10",
+  sha256: "7e92f38178e93e0ea6d4be470edb5a26bf59c0dc06bc04482b31e9341888d689",
   eyebrow: "KEBIJAKAN PRIVASI · v3.12 · BERLAKU 4 NOVEMBER 2026",
   title: "Apa yang kami simpan, dan alasannya",
   lede: "Hak Anda dan kewajiban kami berdasarkan GDPR (EU) 2016/679, dalam bahasa yang mudah dipahami. Empat belas bagian dan Lampiran B — gulir hingga akhir.",

@@ -107,11 +107,13 @@ function expectDeclarations(css: string, selector: string, declarations: string[
 }
 
 // PLAN §3 copy drafts, which DONE.md (V, 2026-09-29) adopted as the copy of record — the
-// canvas carries them verbatim. The body's apostrophe is ASCII U+0027.
+// canvas carries them verbatim, except the counts in BODY, which follow the /cookies inventory
+// (13 cookies, 8 storage items; tests/unit/cookie-inventory-drift.test.ts checks every locale).
+// The body's apostrophe is ASCII U+0027.
 const EYEBROW = "YOUR DATA, ON THE RECORD";
 const TITLE = "We store only what keeps the bench running.";
 const BODY =
-  "Four cookies and four items in your browser's storage, each needed for Dialectical Engine to work. Nothing optional, nothing shared with anyone else.";
+  "13 cookies and 8 items in your browser's storage, each needed for Dialectical Engine to work. Nothing optional, nothing shared with anyone else.";
 const LABEL = "Cookie notice";
 /**
  * The three controls in DOM order. DONE.md default (2) and its step 3 fix the order

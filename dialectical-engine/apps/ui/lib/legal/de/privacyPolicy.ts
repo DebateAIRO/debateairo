@@ -267,10 +267,10 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         items: [
         "__Host-debateai-session — Cookie-Datei (HttpOnly) — Hält Sie angemeldet. Das Cookie wird verlängert, solange Sie den Dienst nutzen. — 14 Tage",
         "__Host-debateai-csrf — Cookie-Datei — Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. — 14 Tage",
-        "__Host-debateai-age-refusal — Cookie-Datei (HttpOnly) — Nach einer abgelehnten Altersprüfung hindert er diesen Browser 30 Tage lang an einem neuen Versuch. Er enthält nur das Wort „abgelehnt“, keine personenbezogenen Daten. — 30 Tage",
+        "__Host-debateai-age-refusal — Cookie-Datei (HttpOnly) — Nach einer abgelehnten Altersprüfung hindert dieses Cookie den Browser 30 Tage lang an einem neuen Versuch. Es enthält nur das Wort „abgelehnt“, keine personenbezogenen Daten. — 30 Tage",
         "debateai.locale — Cookie-Datei — Speichert die von Ihnen gewählte Sprache der Benutzeroberfläche und legt die Sprache der E-Mails fest, die wir Ihnen senden. — 1 Jahr",
-        "__Host-debateai-staff — Cookie-Datei (HttpOnly) — Getrennter Mitarbeiterzugang — Bis zu 8 Stunden; 15 Minuten Inaktivität",
-        "__Host-debateai-staff-csrf — Cookie-Datei — Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. — Bis zu 8 Stunden; 15 Minuten Inaktivität",
+        "__Host-debateai-staff — Cookie-Datei (HttpOnly) — Getrennter Mitarbeiterzugang — Bis zu 8 Stunden; läuft nach 15 Minuten Inaktivität ab",
+        "__Host-debateai-staff-csrf — Cookie-Datei — Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. — Bis zu 8 Stunden; läuft nach 15 Minuten Inaktivität ab",
         "__Host-debateai-password-reset — Cookie-Datei (HttpOnly) — Nur Passwortzurücksetzung — Bis zu 30 Minuten",
         "__Host-debateai-password-reset-csrf — Cookie-Datei — Verhindert, dass andere Websites in Ihrem Namen Formulare absenden. — Bis zu 30 Minuten",
         "__Host-debateai-mfa-recovery — Cookie-Datei (HttpOnly) — Nur Wiederherstellung des Authentifikators — Bis zu 299 Sekunden",
@@ -365,7 +365,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "03aeedcf8aaabfb859652ef68c4c28dd568897e918f445c57796faac1aabb7b1",
+  sha256: "8891ee04bfcf11101022a7969f9c7496d3b8aec3ecadeb552d22d9044a03d5f5",
   eyebrow: "DATENSCHUTZERKLÄRUNG · v3.12 · GÜLTIG AB 4. NOVEMBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",

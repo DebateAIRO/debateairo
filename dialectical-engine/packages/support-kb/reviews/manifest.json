@@ -233,24 +233,24 @@
     {
       "id": "privacy-consent",
       "lang": "en",
-      "sha256": "0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f",
+      "sha256": "4b7a40ee59a03bfb6aed19b3a959b4db8048d75aec19d3f3908f5e8ef0eea885",
       "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
+      "reviewerSession": "2a26c595-52ab-425b-a334-89327d58f125 (Claude Code desktop, cookie-copy session; the owner answered the help-article question on 2026-11-18)",
+      "reviewedOn": "2026-11-18",
+      "evidence": "docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md",
       "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "ratifiedOn": "2026-11-18"
     },
     {
       "id": "privacy-consent",
       "lang": "ro",
-      "sha256": "a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6",
+      "sha256": "e56f0e678f2d1d55b04d2d8f7a1e51849212009db8f634c9d465e52018a97127",
       "reviewedBy": "OWNER",
-      "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-      "reviewedOn": "2026-10-01",
-      "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
+      "reviewerSession": "2a26c595-52ab-425b-a334-89327d58f125 (Claude Code desktop, cookie-copy session; the owner answered the help-article question on 2026-11-18)",
+      "reviewedOn": "2026-11-18",
+      "evidence": "docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md",
       "ratifiedBy": "V",
-      "ratifiedOn": "2026-10-01"
+      "ratifiedOn": "2026-11-18"
     },
     {
       "id": "product-identity",
@@ -438,7 +438,7 @@
     }
   ],
   "recovery": {
-    "componentFileSha256": "5e1db1d1e7c89bb805a90db24f4c036ae8be0df18a59263cf0964cc69d133c58",
+    "componentFileSha256": "e3da36cc9e366d4ac60493196ddd7f817ffbcb52f59b2979f965940403eef163",
     "components": [
       {
         "id": "account-access",
@@ -755,28 +755,28 @@
       {
         "id": "privacy-consent",
         "lang": "en",
-        "articleSha256": "0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f",
-        "modelProjectionSha256": "8ba452e770941a43e53f7131cb1513f34ee787755d71a8b1900e171e5fbe269e",
-        "fallbackSha256": "3fe7da1ecfe2848622b10234fac52d5283a30a4473a0adada8eb9e6555b24824",
+        "articleSha256": "4b7a40ee59a03bfb6aed19b3a959b4db8048d75aec19d3f3908f5e8ef0eea885",
+        "modelProjectionSha256": "152d4326ff7a99043e38bdacbdc74c63ab3d04179a75f59f751e5eadaf51d9d0",
+        "fallbackSha256": "c629bac06d9aa1472debd1ee0b442f2c7bb71f07872fd79ce2e27bd2f8c71f91",
         "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
+        "reviewerSession": "2a26c595-52ab-425b-a334-89327d58f125 (Claude Code desktop, cookie-copy session; the owner answered the help-article question on 2026-11-18)",
+        "reviewedOn": "2026-11-18",
+        "evidence": "docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md",
         "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "ratifiedOn": "2026-11-18"
       },
       {
         "id": "privacy-consent",
         "lang": "ro",
-        "articleSha256": "a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6",
-        "modelProjectionSha256": "e64bb25be8385d23793bf41fb6e5c9d439ae56e47b9568fc9fba0d13bd407b33",
-        "fallbackSha256": "d90423906e3d6502ae6585462f2a8e4fca9608c6c2bc99fba4be6e4c74ea0c4c",
+        "articleSha256": "e56f0e678f2d1d55b04d2d8f7a1e51849212009db8f634c9d465e52018a97127",
+        "modelProjectionSha256": "71a638afab059c57c52ea80e3a0dac381daac063dd0039c425ff434bd0f2cc33",
+        "fallbackSha256": "7b510da9840b2dbc9161ea095ccd4a0bd9d2cc7c2a68477084aec18f6708c2d3",
         "reviewedBy": "OWNER",
-        "reviewerSession": "6f8863c5-3b17-4860-99d7-b3543f7474c7 (Claude Code desktop, cookie-compliance orchestrator chat, V answered the V0-1 question on 2026-10-01)",
-        "reviewedOn": "2026-10-01",
-        "evidence": "docs/missions/cookie-compliance/OWNER-SIGNOFF-S02-support-kb.md",
+        "reviewerSession": "2a26c595-52ab-425b-a334-89327d58f125 (Claude Code desktop, cookie-copy session; the owner answered the help-article question on 2026-11-18)",
+        "reviewedOn": "2026-11-18",
+        "evidence": "docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md",
         "ratifiedBy": "V",
-        "ratifiedOn": "2026-10-01"
+        "ratifiedOn": "2026-11-18"
       },
       {
         "id": "product-identity",

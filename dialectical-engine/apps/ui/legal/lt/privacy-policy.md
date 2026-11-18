@@ -228,8 +228,8 @@ Dialectical Engine naudoja 21 elementą – visi jie yra griežtai būtini jūs�
 | `__Host-debateai-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | 14 dienų |
 | `__Host-debateai-age-refusal` | Slapukas (HttpOnly) | Atmetus amžiaus patikrą, 30 dienų neleidžia šiai naršyklei bandyti dar kartą. Jame yra tik žodis „atmesta“, jokių asmens duomenų. | 30 dienų |
 | `debateai.locale` | Slapukas | Įsimena jūsų pasirinktą sąsajos kalbą ir nustato kalbą, kuria rašome jums siunčiamus el. laiškus. | 1 metai |
-| `__Host-debateai-staff` | Slapukas (HttpOnly) | Atskira darbuotojų prieiga | Iki 8 valandų; 15 minučių neveiklumo |
-| `__Host-debateai-staff-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | Iki 8 valandų; 15 minučių neveiklumo |
+| `__Host-debateai-staff` | Slapukas (HttpOnly) | Atskira darbuotojų prieiga | Iki 8 valandų; baigiasi po 15 minučių neveiklumo |
+| `__Host-debateai-staff-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | Iki 8 valandų; baigiasi po 15 minučių neveiklumo |
 | `__Host-debateai-password-reset` | Slapukas (HttpOnly) | Tik slaptažodžio atkūrimas | Iki 30 minučių |
 | `__Host-debateai-password-reset-csrf` | Slapukas | Neleidžia kitoms svetainėms jūsų vardu pateikti formų. | Iki 30 minučių |
 | `__Host-debateai-mfa-recovery` | Slapukas (HttpOnly) | Tik autentifikatoriaus atkūrimas | Iki 299 sekundžių |

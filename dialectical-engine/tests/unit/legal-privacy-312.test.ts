@@ -6,6 +6,7 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import {
   ANTHROPIC_PREVIEW_PROVIDER,
   DEEPINFRA_PROVIDER,
+  LEGAL_INVENTORY,
   PROVIDER_PURPOSES,
   providerRegister,
   SUPPORT_PROVIDER
@@ -393,6 +394,26 @@ const QUEBEC = 278;
 const QUEBEC_BEFORE = "the settings that keep your debates private are on by default";
 const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates on the Free plan are public, as section 6 says";
 /**
+ * Section 13's Do Not Track paragraph. English says there is nothing for such a signal to switch off; the Greek said
+ * nothing could switch such a signal off, and the Dutch could be read that way. Those two translations now say what
+ * English says (cookie-copy review, 18 November 2026); no other language and nothing else on the line changes.
+ */
+const DO_NOT_TRACK = 252;
+/**
+ * Section 13's table. The cookie-copy review (18 November 2026) corrected rows of /cookies in several languages (an
+ * idle expiry that read as a second duration, "until the previous deletion", a recipient named "DebateAI", and the
+ * like), and each §13 row is bound to its /cookies strings (privacy-policy-cookie-table). So a §13 row may differ from
+ * 3.11, but only by being exactly that language's /cookies row: name, kind, purpose, lifetime.
+ */
+const cookieRows = (code: string): ReadonlySet<string> => {
+  const legal = JSON.parse(readFileSync(resolve(process.cwd(), "apps/ui/messages", code, "legal.json"), "utf8")) as Record<string, string>;
+  return new Set(LEGAL_INVENTORY.map((item) => `| \`${item.name}\` | ${legal[item.kindKey]} | ${legal[item.purposeKey]} | ${legal[item.lifeKey]} |`));
+};
+const DO_NOT_TRACK_FIXED: Readonly<Record<string, string>> = {
+  el: "οπότε ένα τέτοιο σήμα δεν έχει τίποτα να απενεργοποιήσει:",
+  nl: "dus er valt voor zo'n signaal niets uit te schakelen:"
+};
+/**
  * The two new rows, each right after its table's "Page settings and visits" row, and section 5's paragraph on DeepInfra
  * with the blank line after it, right before the Perplexity paragraph.
  */
@@ -580,8 +601,14 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     const next = lines(draftBytes(code).toString("utf8"));
 
     expect(next, `${code}: the line count is 3.11's, the two new rows, and the new paragraph with its blank line`).toHaveLength(prior.length + INSERTED.length);
-    const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && line === prior[priorIndex(index)] ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, WEB_SEARCH_PARAGRAPH] : [])].sort((a, b) => a - b));
+    const rows = cookieRows(code);
+    const syncedRows = next.flatMap((line, index) => (!INSERTED.includes(index) && line !== prior[priorIndex(index)] && rows.has(line) ? [index] : []));
+    expect(syncedRows.every((index) => prior[priorIndex(index)]!.startsWith("| `")), `${code}: only §13 cookie rows are synced`).toBe(true);
+    const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && (line === prior[priorIndex(index)] || syncedRows.includes(index)) ? [] : [index]));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, WEB_SEARCH_PARAGRAPH] : []), ...(code in DO_NOT_TRACK_FIXED ? [DO_NOT_TRACK] : [])].sort((a, b) => a - b));
+    // Section 13's Do Not Track paragraph: only el and nl change, and only to say the signal has nothing to switch off.
+    expect(next[DO_NOT_TRACK], `${code}: section 13's Do Not Track paragraph`).toContain("Do Not Track");
+    if (code in DO_NOT_TRACK_FIXED) expect(next[DO_NOT_TRACK], `${code}: the signal has nothing to switch off`).toContain(DO_NOT_TRACK_FIXED[code]);
     // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
     const quebecBefore = prior[priorIndex(QUEBEC)]!;
     const quebecAfter = next[QUEBEC]!;

@@ -269,8 +269,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "__Host-debateai-csrf — クッキー — 他のウェブサイトがお客様になりすましてフォームを送信することを防ぎます。 — 14日間",
         "__Host-debateai-age-refusal — クッキー (HttpOnly) — 年齢確認が拒否された後、このブラウザーが30日間再試行できないようにします。保存されるのは「拒否」という語だけで、個人データは含みません。 — 30日間",
         "debateai.locale — クッキー — お客様が選択したインターフェース言語を記憶し、当社がお送りするメールの言語も設定します。 — 1年間",
-        "__Host-debateai-staff — クッキー (HttpOnly) — 個別のスタッフアクセス — 最大8時間。15分間操作なし",
-        "__Host-debateai-staff-csrf — クッキー — 他のウェブサイトがお客様になりすましてフォームを送信することを防ぎます。 — 最大8時間。15分間操作なし",
+        "__Host-debateai-staff — クッキー (HttpOnly) — 個別のスタッフアクセス — 最大8時間。15分間操作がないと失効",
+        "__Host-debateai-staff-csrf — クッキー — 他のウェブサイトがお客様になりすましてフォームを送信することを防ぎます。 — 最大8時間。15分間操作がないと失効",
         "__Host-debateai-password-reset — クッキー (HttpOnly) — パスワードリセットのみ — 最大30分",
         "__Host-debateai-password-reset-csrf — クッキー — 他のウェブサイトがお客様になりすましてフォームを送信することを防ぎます。 — 最大30分",
         "__Host-debateai-mfa-recovery — クッキー (HttpOnly) — 認証器の復旧のみ — 最大299秒",
@@ -282,7 +282,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
         "debateai.mode — ローカルストレージ — ライトモードとダークモードのどちらを使用しているかを記憶します。 — お客様が消去するまで",
         "debateai.languageOffer.dismissed — セッションストレージ — このタブでは、議論を別の言語で表示するという提案をお断りになったことを記憶します。 — タブを閉じるまで",
         "debateai.support.conversation.v2 — セッションストレージ — タブを開いている間、ヘルプチャットでの会話を画面に表示したままにします。このタブで誰かがログインまたはログアウトすると消去されます。 — タブを閉じるまで",
-        "debateai.support.offered.v1 — セッションストレージ — このタブについて、お客様のいる場所でヘルプチャットが提供されているかどうかを記憶します。「はい」か「いいえ」のみで、お客様の国は決して記憶しないため、ページが確認するのはタブごとに一度だけです。 — タブを閉じるまで",
+        "debateai.support.offered.v1 — セッションストレージ — このタブについて、お客様のいる場所でヘルプチャットが提供されているかどうかを記憶し、ページが確認するのをタブごとに一度だけにします。記憶するのは「はい」か「いいえ」のみで、お客様の国は決して記憶しません。 — タブを閉じるまで",
         "debateai.phone-completion-draft.v1 — セッションストレージ — 電話の手続き中の未完了の質問。セッション変更、サインアウト、所有者変更時に削除 — 15分またはそれ以前の削除まで",
         "debateai.exportPending — セッションストレージ — メールで届いたエクスポートリンクを、ログインや再試行のためにこのタブに保持します。 — タブを閉じる、ログアウトする、新しいリンクを開く、最初のダウンロードが成功する、または無効なリンクか別のアカウントという結果になるまで",
         "debateai.exportLinkOutcome — セッションストレージ — このタブに表示するダウンロードリンクのメッセージを記憶します。 — タブを閉じる、ログアウトする、または新しいリンクを開くまで"
@@ -365,7 +365,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.12",
-  sha256: "33d554731d22e747761c6b6848637a9974fb822882f73cb53a0435f7933d1b9a",
+  sha256: "2fecba76f040fbdbeccf03e843d00ca40be538d9c7052ec79affc0dafb870de2",
   eyebrow: "プライバシーポリシー · v3.12 · 発効日 2026年11月4日",
   title: "当社が保存する情報とその理由",
   lede: "GDPR (EU) 2016/679に基づくお客様の権利と当社の義務を、わかりやすく説明します。全14節および附属書Bです。末尾までスクロールしてください。",

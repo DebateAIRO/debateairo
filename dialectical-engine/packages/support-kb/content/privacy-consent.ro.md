@@ -1,15 +1,15 @@
 ---
 id: privacy-consent
 lang: ro
-title: "Ce stochează DebateAI în browserul tău"
+title: "Ce stochează Dialectical Engine în browserul tău"
 status: shipped
 sources:
   - apps/ui/messages/ro/consent.json:8
   - apps/ui/messages/ro/consent.json:14
-  - apps/ui/messages/ro/legal.json:57
-  - apps/ui/messages/ro/legal.json:91
-  - apps/ui/messages/ro/legal.json:92
-  - apps/ui/messages/ro/chrome.json:63
+  - apps/ui/messages/ro/legal.json:75
+  - apps/ui/messages/ro/legal.json:110
+  - apps/ui/messages/ro/legal.json:111
+  - apps/ui/messages/ro/chrome.json:60
   - apps/ui/messages/ro/consent.json:2
   - apps/ui/components/consent/CookieBar.tsx:61
   - apps/ui/components/SiteFooter.tsx:49
@@ -19,9 +19,9 @@ sources:
   - apps/ui/app/privacy/page.tsx:9
   - apps/ui/app/terms/page.tsx:9
   - apps/ui/app/legal/page.tsx:9
-verified_against: "e089b63e9"
+verified_against: "2b42a8db6"
 ratified_by: ""
 ratified_on: ""
 ---
 
-DebateAI păstrează patru module cookie și patru elemente în spațiul de stocare al browserului tău, fiecare necesar pentru funcționarea serviciului. Nimic nu este opțional și nimic nu este partajat cu altcineva. Nu setăm cookie-uri analitice, publicitare sau de urmărire. Lista completă, cu durata de păstrare a fiecărui element, se află pe pagina „Cookie-uri” la `/cookies` și în cardul „Ce stocăm”. Cardul se deschide din notificarea privind modulele cookie, din controlul „Modulele cookie pe care le stocăm” din subsolul site-ului, din „Setări”, apoi „Confidențialitate”, pentru utilizatorii autentificați, la `/settings#consent-privacy-heading`, și din scurtătura „Modulele cookie pe care le stocăm” din panoul „Ajutor”. `/privacy`, `/terms`, `/cookies` și `/legal` sunt pagini ale acestui site. Nu există niciun comutator pentru dezactivarea acestor elemente. Ca să le refuzi, blochează sau șterge modulele cookie și datele site-ului pentru acest site din setările browserului tău; atunci autentificarea și memorarea limbii și a opțiunilor de afișare nu mai funcționează.
+Dialectical Engine păstrează 13 module cookie și 8 elemente în spațiul de stocare al browserului tău, fiecare necesar pentru funcționarea serviciului. Nimic nu este opțional și nimic nu este partajat cu altcineva. Nu setăm cookie-uri analitice, publicitare sau de urmărire. Lista completă, cu durata de păstrare a fiecărui element, se află pe pagina „Cookie-uri” la `/cookies` și în cardul „Ce stocăm”. Cardul se deschide din notificarea privind modulele cookie, din controlul „Modulele cookie pe care le stocăm” din subsolul site-ului, din „Setări”, apoi „Confidențialitate”, pentru utilizatorii autentificați, la `/settings#consent-privacy-heading`, și din scurtătura „Modulele cookie pe care le stocăm” din panoul „Ajutor”. `/privacy`, `/terms`, `/cookies` și `/legal` sunt pagini ale acestui site. Nu există niciun comutator pentru dezactivarea acestor elemente. Ca să le refuzi, blochează sau șterge modulele cookie și datele site-ului pentru acest site din setările browserului tău; atunci autentificarea și memorarea limbii și a opțiunilor de afișare nu mai funcționează, iar notificarea privind modulele cookie apare din nou.

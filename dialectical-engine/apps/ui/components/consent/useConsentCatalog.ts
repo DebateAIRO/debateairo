@@ -10,7 +10,7 @@ import legalMessages from "@/messages/en/legal.json";
 
 /**
  * The English fallback: the consent catalogue plus the 24 inventory strings of the legal
- * catalogue (kind, purpose and lifetime of the eight items), the same projection the root
+ * catalogue (kind, purpose and lifetime of every item in `LEGAL_INVENTORY`), the same projection the root
  * layout merges for every locale (D-28), so the storage card reads one string per item.
  * Built on first use, inside a function: `lib/i18n/catalogThreading.test.mjs` forbids a
  * module-level constant built from an English catalogue.

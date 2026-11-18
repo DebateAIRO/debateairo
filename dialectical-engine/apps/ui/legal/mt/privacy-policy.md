@@ -226,7 +226,7 @@ Dialectical Engine juża 21 element, ilkoll strettament meħtieġa għas-servizz
 |---|---|---|---|
 | `__Host-debateai-session` | Fajl cookie (HttpOnly) | Iżżommok fil-kont. Tiġġedded sakemm tibqa’ tuża s-servizz. | 14-il jum |
 | `__Host-debateai-csrf` | Fajl cookie | Ma tħallix siti oħra jissottomettu formoli f’ismek. | 14-il jum |
-| `__Host-debateai-age-refusal` | Fajl cookie (HttpOnly) | Wara li verifika tal-età tiġi rrifjutata, iżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. | 30 jum |
+| `__Host-debateai-age-refusal` | Fajl cookie (HttpOnly) | Wara li verifika tal-età tiġi rrifjutata, iżżomm lil dan il-browser milli jerġa’ jipprova għal 30 jum. Fih biss il-kelma “irrifjutat”, l-ebda data personali. | 30 jum |
 | `debateai.locale` | Fajl cookie | Tiftakar il-lingwa tal-interfaċċja li għażilt, u tiddetermina l-lingwa tal-email li nibagħtulek. | 1 sena |
 | `__Host-debateai-staff` | Fajl cookie (HttpOnly) | Aċċess separat għall-persunal | Sa 8 sigħat; 15-il minuta ta’ inattività |
 | `__Host-debateai-staff-csrf` | Fajl cookie | Ma tħallix siti oħra jissottomettu formoli f’ismek. | Sa 8 sigħat; 15-il minuta ta’ inattività |

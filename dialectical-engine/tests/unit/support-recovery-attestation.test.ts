@@ -102,6 +102,9 @@ const S05_R2_OWNER_REVIEW = Object.freeze({"reviewedBy": "OWNER", "reviewerSessi
 const S05_KEYS = new Set(["account-access.en", "account-access.ro", "ai-transparency.ro", "budget-tier-choice.ro",
   "debate-topic-and-description.ro", "debate-workspace-menus.ro", "getting-started-debate.ro", "guide-how-it-works.ro",
   "risk-tier-choice.ro", "support-cases.ro", "support-status-limits.en", "support-status-limits.ro", "unsupported-capabilities.ro"]);
+// cookie-copy (18 November 2026): the owner signed the corrected privacy-consent pair (13 cookies and 8 storage items,
+// the product named Dialectical Engine, the notice showing again), docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md.
+const COOKIE_COPY_OWNER_REVIEW = Object.freeze({"reviewedBy":"OWNER","reviewerSession":"2a26c595-52ab-425b-a334-89327d58f125 (Claude Code desktop, cookie-copy session; the owner answered the help-article question on 2026-11-18)","reviewedOn":"2026-11-18","evidence":"docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md","ratifiedBy":"V","ratifiedOn":"2026-11-18"});
 const S02_IDS = new Set(["privacy-consent", "settings-help-menus", "app-navigation", "account-settings"]);
 
 const QUALITY_REVIEW = Object.freeze({
@@ -175,8 +178,8 @@ const EXPECTED = [
   ["getting-started-debate", "ro", "1edec9fe3ae21b3f1f4ea59e6be3e4124be7b5332bf5b29e1e2d31977cd4deca", "33a8fc6a0bd1dd38de5e0bdea12600a422f00d7d0d4819c7bc182554e0d9d734", "a5d2d9f051896716213aabe9f48c97257778ded6cb054dec0d7b32d615549c4a"],
   ["guide-how-it-works", "en", "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5", "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528", "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265"],
   ["guide-how-it-works", "ro", "c396a00502bb96aaf7e981d20482a4068ba14f4d796fb1f8079162d3aa5b0568", "f34118491cc1fdfd73f1a810c00e6acd298928a51cb906710179ec8e644599b7", "cbf7d875d34bbb3a6a9ae338cb47a622340ddb3de3f6c1278336b1515d52a872"],
-  ["privacy-consent", "en", "0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f", "8ba452e770941a43e53f7131cb1513f34ee787755d71a8b1900e171e5fbe269e", "3fe7da1ecfe2848622b10234fac52d5283a30a4473a0adada8eb9e6555b24824"],
-  ["privacy-consent", "ro", "a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6", "e64bb25be8385d23793bf41fb6e5c9d439ae56e47b9568fc9fba0d13bd407b33", "d90423906e3d6502ae6585462f2a8e4fca9608c6c2bc99fba4be6e4c74ea0c4c"],
+  ["privacy-consent", "en", "4b7a40ee59a03bfb6aed19b3a959b4db8048d75aec19d3f3908f5e8ef0eea885", "152d4326ff7a99043e38bdacbdc74c63ab3d04179a75f59f751e5eadaf51d9d0", "c629bac06d9aa1472debd1ee0b442f2c7bb71f07872fd79ce2e27bd2f8c71f91"],
+  ["privacy-consent", "ro", "e56f0e678f2d1d55b04d2d8f7a1e51849212009db8f634c9d465e52018a97127", "71a638afab059c57c52ea80e3a0dac381daac063dd0039c425ff434bd0f2cc33", "7b510da9840b2dbc9161ea095ccd4a0bd9d2cc7c2a68477084aec18f6708c2d3"],
   ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
   ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
   ["public-answer-disclosure", "en", "61d56f01ff035362e1f914c60421fe1c782a3056ade12614b149f05ee76a13af", "60a27bba95e78ac17fc1216c033643bbe1d72f65165b52c11e648dbdc269edf5", "97aacd2bedecdd8d85d11d40e5d50f19133b40f208c19fe5596a275310ed2449"],
@@ -228,6 +231,8 @@ describe("production Support recovery attestation", () => {
         fallbackSha256,
         ...(id === "unpublish-a-debate" ? R22_UNPUBLISH_CHAT_REVIEW : R22_CHAT_IDS.has(id) ? R22_CHAT_REVIEW : ["support-cases","settings-help-menus","app-navigation","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
           ? S05_OWNER_REVIEW
+          : id === "privacy-consent"
+          ? COOKIE_COPY_OWNER_REVIEW
           : S02_IDS.has(id)
           ? S02_OWNER_REVIEW
           : id === "ai-transparency"
@@ -252,7 +257,7 @@ describe("production Support recovery attestation", () => {
       },
       recovery: {
         componentFileSha256:
-          "5e1db1d1e7c89bb805a90db24f4c036ae8be0df18a59263cf0964cc69d133c58",
+          "e3da36cc9e366d4ac60493196ddd7f817ffbcb52f59b2979f965940403eef163",
         components: expectedRows,
       },
     });
