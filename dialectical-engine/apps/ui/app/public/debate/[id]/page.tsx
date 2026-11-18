@@ -43,7 +43,7 @@ export default async function PublicDebatePage({ params }: { params: Promise<{ i
     loadNamespace(locale, "public"),
     loadNamespace(locale, "home"),
     loadNamespace(locale, "chrome"),
-    // Decision 13: the page's contributions, reports and dig box (English for R22, owner N10), and what the ask reads.
+    // The page's contributions, reports and dig box, and what the ask reads: Romanian has its own V4 catalogue, the other languages read English.
     loadNamespace(locale, "v4"),
     loadNamespace(locale, "newDebate")
   ]);
