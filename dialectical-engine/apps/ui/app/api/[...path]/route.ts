@@ -78,6 +78,11 @@ const PASSWORD_RESET_COOKIE_NAME = "__Host-debateai-password-reset";
 const PASSWORD_RESET_CSRF_COOKIE_NAME = "__Host-debateai-password-reset-csrf";
 const MFA_RECOVERY_COOKIE_NAME = "__Host-debateai-mfa-recovery";
 const MFA_RECOVERY_CSRF_COOKIE_NAME = "__Host-debateai-mfa-recovery-csrf";
+/** Social sign-in (apps/api/src/social-auth.ts): five-minute flow and continuation cookies; only the Apple flow cookie is SameSite=None (Apple's form_post callback). */
+const SOCIAL_FLOW_COOKIE_NAME = "__Host-debateai-social-flow";
+const SOCIAL_APPLE_FLOW_COOKIE_NAME = "__Host-debateai-social-apple";
+const SOCIAL_BROWSER_COOKIE_NAME = "__Host-debateai-social-browser";
+const SOCIAL_COOKIE_MAX_AGE_SECONDS = 300;
 const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
@@ -224,6 +229,18 @@ function lawfulSetCookie(value: string): boolean {
     const seconds=Number(match[1]),reset=name===PASSWORD_RESET_COOKIE_NAME||name===PASSWORD_RESET_CSRF_COOKIE_NAME;
     const expected=["Path=/",`Max-Age=${seconds}`,...(name===PASSWORD_RESET_COOKIE_NAME||name===MFA_RECOVERY_COOKIE_NAME?["HttpOnly"]:[]),"Secure","SameSite=Strict"];
     return (cookieValue===""?seconds===0:/^[A-Za-z0-9_-]{43}$/.test(cookieValue)&&seconds>0&&seconds<=(reset?1800:299))&&attributes.length===expected.length&&attributes.every((attribute,index)=>attribute===expected[index]);
+  }
+  if (name === SOCIAL_FLOW_COOKIE_NAME || name === SOCIAL_APPLE_FLOW_COOKIE_NAME || name === SOCIAL_BROWSER_COOKIE_NAME) {
+    // Exactly the API's socialCookie / clearedSocialCookie shapes.
+    if (value.split(";", 1)[0] !== pair) return false;
+    const cookieValue = pair.slice(pairSeparator + 1);
+    const attributes = members.slice(1);
+    const age = attributes[1]?.match(/^Max-Age=(0|[1-9][0-9]{0,2})$/u);
+    if (age === undefined || age === null) return false;
+    const seconds = Number(age[1]);
+    const expected = ["Path=/", `Max-Age=${seconds}`, "HttpOnly", "Secure", `SameSite=${name === SOCIAL_APPLE_FLOW_COOKIE_NAME ? "None" : "Lax"}`];
+    return (cookieValue === "" ? seconds === 0 : /^[A-Za-z0-9_-]{43}$/.test(cookieValue) && seconds > 0 && seconds <= SOCIAL_COOKIE_MAX_AGE_SECONDS)
+      && attributes.length === expected.length && attributes.every((attribute, index) => attribute === expected[index]);
   }
   if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
   const cookieValue = pair.slice(pairSeparator + 1);
