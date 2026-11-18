@@ -4,17 +4,17 @@ lang: en
 title: "Navigate Dialectical Engine"
 status: shipped
 sources:
-  - apps/ui/components/landing/LandingChrome.tsx:35
+  - apps/ui/components/landing/LandingChrome.tsx:37
   - apps/ui/components/TopBar.tsx:98
   - apps/ui/app/page.tsx:136
   - apps/ui/components/support/Assistant.tsx:106
   - apps/ui/components/SiteFooter.tsx:49
-verified_against: "e089b63e9"
+verified_against: "e4a6cf202"
 ratified_by: ""
 ratified_on: ""
 ---
 
-The landing page links to Method and Transcripts (the sample debate transcript). Pricing is an informational section, not a checkout. Start a round and New debate open the debate creator after sign-in; a signed-out visitor is taken to sign in first.
+The landing page links to Method and Pricing. Pricing is an informational section, not a checkout. Ask a question and New debate open the debate creator after sign-in; a signed-out visitor is taken to sign in first.
 
 Home is the debate library. Your debates is the signed-in visitor's private list, while Public debates is the published catalog. Support can explain these tabs and offer their fixed navigation, but it cannot read either visitor-specific list or invent a debate link. Account and Settings open account settings for a signed-in visitor. The theme control (☀/☾) changes only this browser's display.
 

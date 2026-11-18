@@ -29,9 +29,6 @@ export function LandingHero({ catalog }: { catalog: MessageCatalog }): JSX.Eleme
             →
           </span>
         </a>
-        <a className="lpCtaGhost" href="#transcripts">
-          {t(catalog, "home.readTranscript")}
-        </a>
       </div>
       <div className="lpAiDisclosure">
         <AiNotice catalog={catalog} variant="pill" body={<><strong>{t(catalog, "home.aiGeneratedLead")}</strong> {t(catalog, "home.aiGeneratedHero")}</>} />

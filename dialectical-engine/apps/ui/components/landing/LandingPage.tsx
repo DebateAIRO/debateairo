@@ -3,7 +3,6 @@ import { LandingChrome } from "./LandingChrome";
 import { LandingHero } from "./LandingHero";
 import { LandingMethod } from "./LandingMethod";
 import { LandingPricing } from "./LandingPricing";
-import { LandingSample } from "./LandingSample";
 import { SiteFooter } from "@/components/SiteFooter";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 import type { PricedTax } from "@/lib/billing/format";
@@ -21,7 +20,7 @@ export function LandingPage({
     <div className="lpRoot">
       <LandingChrome catalog={catalog} />
       <LandingHero catalog={catalog} />
-      <LandingSample catalog={catalog} />
+      {/* The sample exchange (LandingSample) showed an older debate with scores and model codes, so it is not shown. */}
       <LandingMethod catalog={catalog} />
       <LandingPricing
         catalog={catalog} lowestPaidPrice={lowestPaidPrice} tax={tax} billingOn={footerBilling.billingOn}

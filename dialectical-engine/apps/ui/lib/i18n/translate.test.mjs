@@ -6,7 +6,7 @@ import test from "node:test";
 import { formatDate, formatNumber, t, tPlural } from "./translate.ts";
 
 test("t falls back to English, interpolates known variables, and leaves unknown variables", () => {
-  assert.equal(t({}, "home.title"), "What should we debate?");
+  assert.equal(t({}, "home.title"), "What do you want to find out?");
   assert.equal(t({ greeting: "Hello, {name}; {unknown}" }, "greeting", { name: "Ada" }), "Hello, Ada; {unknown}");
   assert.equal(t({}, "missing.key"), "missing.key");
 });

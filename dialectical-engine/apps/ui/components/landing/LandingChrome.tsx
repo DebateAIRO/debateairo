@@ -26,7 +26,6 @@ export function LandingChrome({ catalog }: { catalog: MessageCatalog }): JSX.Ele
         </a>
         <nav aria-label={t(catalog, "chrome.landingNavigation")} className="lpNavLinks">
           <a href="#method">{t(catalog, "chrome.method")}</a>
-          <a href="#transcripts">{t(catalog, "chrome.transcripts")}</a>
           <a href="#pricing">{t(catalog, "chrome.pricing")}</a>
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
