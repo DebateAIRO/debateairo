@@ -650,6 +650,8 @@ describe("T9-C3 mode control and document guard", () => {
     expect(source).toContain("Bricolage_Grotesque, Instrument_Sans");
     expect(source).not.toMatch(/Fraunces|Plus_Jakarta_Sans|JetBrains_Mono|Source_Serif_4|Hanken_Grotesk/);
     expect(source).toContain('axes: ["opsz"]');
+    // The two preloaded faces preload Latin Extended too, where Romanian's ă, ș and ț are (the italic face preloads nothing).
+    expect(source.match(/subsets: \["latin", "latin-ext"\]/gu)).toHaveLength(2);
     expect(source).toContain('variable: "--font-bricolage"');
     expect(source).toContain('variable: "--font-instrument"');
     expect(source).toContain("<head>");

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CRISIS_SUPPORT_OFFERED, SAVED_QUESTION_LIMITS, SENSITIVE_DATA_CONSENT_REQUIRED, START_PATHS_STALE, SavedQuestionCreateSchema,
-  SavedQuestionDocSchema, SavedQuestionSaveSchema, detectCrisis, savedQuestionDocFits, savedQuestionOwnWords, savedQuestionTitleOf,
+  SavedQuestionDocSchema, SavedQuestionSaveSchema, crisisCheckTexts, savedQuestionDocFits, savedQuestionOwnWords, savedQuestionTitleOf,
   startListNosOfMenu, type SavedQuestionDoc, type SavedQuestionList, type SavedQuestionRead, type SavedQuestionRefusal,
   type SavedQuestionWritten
 } from "@debateai/contract";
@@ -132,8 +132,9 @@ export function createSavedQuestionService(deps: SavedQuestionServiceDeps): Save
     const raw = (body as Readonly<{ doc: SavedQuestionDoc }>).doc;
     const parsed = shape.data.doc;
     if (savedQuestionDocFits(raw) !== "FITS") return refused("SAVED_QUESTION_TOO_LARGE");
-    // Each text is bounded by its schema's cap, which keeps the check quick (as on POST /v1/asks); only the person's own words.
-    if (savedQuestionOwnWords(parsed).some((text) => detectCrisis(text).crisis)) return refused(CRISIS_SUPPORT_OFFERED);
+    // Only the person's own words, under the same caps as POST /v1/asks (crisisCheckTexts): each text spelled for the check, and
+    // all of them together, are bounded before any list runs; a text or a document past its cap is answered as a crisis would be.
+    if (crisisCheckTexts(savedQuestionOwnWords(parsed))) return refused(CRISIS_SUPPORT_OFFERED);
     if (!await gate.consentGiven()) return refused(SENSITIVE_DATA_CONSENT_REQUIRED);
     if (!gate.teamAdmits) return refused(PREVIEW_TEAM_ONLY);
     const binding = deps.key === undefined ? null : await gate.bindingOf();

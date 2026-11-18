@@ -118,8 +118,7 @@ import {
   type RunProjection,
   type Session,
   CRISIS_SUPPORT_OFFERED,
-  crisisCheckOverlong,
-  detectCrisis,
+  crisisCheckTexts,
   warmCrisisCheck,
   SENSITIVE_DATA_CONSENT_REQUIRED,
   SENSITIVE_DATA_NOTICE_VERSION,
@@ -4582,16 +4581,15 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // Only a question the API would accept is checked: a longer one is refused as malformed
     // below anyway, and checking 256 KB of text would hold the event loop for seconds. Trimmed
     // first, exactly as AskRequestSchema keeps it, so the limit measured here is the limit
-    // below: padding a crisis question past 8 KB with spaces must not skip the check. V4 start step, Task 36: the whole line, so
-    // words typed on step 2 are screened too, and then every word the person wrote there (their paths, own texts and rewrites,
-    // `startTextsOfBody`), with the same answer: their words go to no model, the question check's included.
-    // NV-28: the lists run over at most crisisCheckMaxChars() of the question as spelled for the check. No ordinary
-    // question within the 8 KB bound reaches it; one that does (compatibility forms such as ﷺ, which normalise to many
-    // letters) is never checked in part: it gets help numbers, never a debate, so a crisis phrase past the cap still
-    // meets help.
-    if ((Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES
-      && (crisisCheckOverlong(questionLine) || detectCrisis(questionLine).crisis))
-      || startTextsOfBody(request.body).some((text) => detectCrisis(text).crisis)) {
+    // below: padding a crisis question past 8 KB with spaces must not skip the check. The whole line, so words typed on step 2
+    // are screened too, and then every word the person wrote there (their paths, own texts and rewrites, `startTextsOfBody`),
+    // with the same answer: their words go to no model, the question check's included.
+    // The lists run over at most crisisCheckMaxChars() of any one text as spelled for the check, and at most
+    // crisisCheckRequestMaxChars() of all of them together. No ordinary question or Start reaches either; one that does
+    // (compatibility forms such as ﷺ, which normalise to many letters) is never checked in part: it gets help numbers, never a
+    // debate, so a crisis phrase past the cap still meets help (crisisCheckTexts).
+    const screenedLine = Buffer.byteLength(questionLine, "utf8") <= ASK_QUESTION_MAX_BYTES ? [questionLine] : [];
+    if (crisisCheckTexts([...screenedLine, ...startTextsOfBody(request.body)])) {
       return reply.status(422).send({
         error: CRISIS_SUPPORT_OFFERED, message: CRISIS_SUPPORT_OFFERED,
         country: edgeCountry(request.headers)
@@ -4827,8 +4825,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // their own words, so it is read for crisis words too); the reading frames them only once version 2 of the call is sealed.
     const earlier = body.data.earlier ?? null;
     const none = { source: "NONE" as const };
-    const mayAsk = options.askClarify !== undefined && !detectCrisis(question).crisis
-      && !(earlier?.answers ?? []).some((given) => detectCrisis(given.answer).crisis)
+    // The question and the answers are screened together under the same caps as the ask's (crisisCheckTexts): a text or a
+    // request past its cap is answered as a crisis would be, with no questions.
+    const mayAsk = options.askClarify !== undefined
+      && !crisisCheckTexts([question, ...(earlier?.answers ?? []).map((given) => given.answer)])
       && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
       && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
       && options.sessions?.readSensitiveDataConsent !== undefined
@@ -4863,7 +4863,9 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   const startStepAdmitted = (reply: FastifyReply, route: AuthorizationRoute, asker: AuthenticatedSession): boolean =>
     options.admission?.configured("startStepCalls") !== true || admitOrRefuse(reply, "startStepCalls", route, asker.ownerRef);
   const startFront = async (request: FastifyRequest, asker: AuthenticatedSession, ownWords: readonly string[]): Promise<StartFront> => {
-    const mayAsk = !ownWords.some((words) => detectCrisis(words).crisis)
+    // The person's words are screened together under the same caps as the ask's (crisisCheckTexts): a text or a request past
+    // its cap is answered as a crisis would be, none NOT_ASKED.
+    const mayAsk = !crisisCheckTexts(ownWords)
       && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
       && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
       && options.sessions?.readSensitiveDataConsent !== undefined

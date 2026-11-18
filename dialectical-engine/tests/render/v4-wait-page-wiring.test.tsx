@@ -30,8 +30,7 @@ vi.mock("@/lib/v4/money", async (original) => (await import("./v4-debate-harness
 /*
  * Owner's screen review, 3 Nov 2026, on today's debate page: the question's status is read through useWaitPolling
  * (wait-f19: rarely while the tab is hidden, at once when it is shown again or the connection returns). "Open in the
- * classic view" shows once (wait-f23): since the owner's answer 12 B (5 Nov; Task 76j's wiring) in the header's account menu
- * only, on the waiting and failed screens too.
+ * classic view" is not offered on the waiting and failed screens, in the header's account menu or on the screen.
  */
 let visibility: DocumentVisibilityState = "visible";
 const running = (runId: string): RunProjection => ({
@@ -92,26 +91,27 @@ describe("the debate page's checks while the question runs (wait-f19)", () => {
 });
 
 describe("Open in the classic view while the question waits (wait-f23)", () => {
-  // The owner's answers of 5 Nov, question 12 B (journey-f19): "Open in the classic view" in the account menu only. The page's
-  // own wiring (V4DebateClient, Task 76j) hands it to the header on every screen and to no body screen.
-  it("question 12 B: the header carries it on the waiting card, and the card does not; the map's header keeps it", async () => {
+  // "Open in the classic view" is offered nowhere on the map's pages: the page hands its header no classic address (null,
+  // the header's "none") on every screen, and no body screen draws one.
+  it("the waiting card's header is handed no classic view, and the card draws none; the map's header neither", async () => {
     const runId = crypto.randomUUID();
     harness.run = running(runId);
     await mountMap(1600, runId);
-    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(seen.headerLinks.at(-1)).toBeNull();
     expect(classicLinks()).toEqual([]);
     harness.run = null;
     await advance(5_000);
     await settle();
-    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(seen.headerLinks.at(-1)).toBeNull();
+    expect(classicLinks()).toEqual([]);
   });
 
-  it("question 12 B: the failed screen's header carries it and the screen does not", async () => {
+  it("the failed screen's header is handed no classic view, and the screen draws none", async () => {
     const runId = crypto.randomUUID();
     harness.run = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" };
     await mountMap(1600, runId);
     expect(page().textContent).toContain(CATALOG["v4.debate.failedTitle"]);
-    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(seen.headerLinks.at(-1)).toBeNull();
     expect(classicLinks()).toEqual([]);
   });
 });
@@ -130,7 +130,7 @@ describe("question 12 B on the screen itself: the failed screen draws no classic
   const classicIn = (box: HTMLElement): Element[] =>
     [...box.querySelectorAll("a")].filter((link) => link.textContent === CATALOG["v4.common.classicView"]);
 
-  it("the failed screen draws no classic link (the account menu holds it)", async () => {
+  it("the failed screen draws no classic link", async () => {
     const runId = crypto.randomUUID();
     const failed = { ...running(runId), state: "FAILED", terminal_reason: "RUN_DISCOVERED_PANEL_EMPTY_AT_CLAIM" } as RunProjection;
     // The screen must have drawn itself (so an empty box cannot pass), and still hold no classic-view link.

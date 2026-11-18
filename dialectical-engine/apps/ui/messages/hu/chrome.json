@@ -75,5 +75,8 @@
   "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "A weboldal frissült. Töltse be újra az oldalt.",
   "chrome.release.reload": "Újratöltés",
-  "chrome.release.madeByNewer": "Ezt a vitát a weboldal újabb verziója készítette. Töltse be újra az oldalt, vagy próbálja újra néhány perc múlva."
+  "chrome.release.madeByNewer": "Ezt a vitát a weboldal újabb verziója készítette. Töltse be újra az oldalt, vagy próbálja újra néhány perc múlva.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

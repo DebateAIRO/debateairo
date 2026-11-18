@@ -308,7 +308,8 @@ describe("crisis check before a debate starts", () => {
     const start = source.indexOf('api.post("/v1/asks"');
     expect(start).toBeGreaterThan(-1);
     const handler = source.slice(start, source.indexOf("\n  api.", start + 1));
-    const crisisAt = handler.indexOf("detectCrisis(questionLine)");
+    // The line and the person's other words are screened in one call (crisisCheckTexts), under the same caps.
+    const crisisAt = handler.indexOf("crisisCheckTexts([...screenedLine");
     expect(crisisAt).toBeGreaterThan(-1);
     const beforeCrisis = handler.slice(0, crisisAt).replace(/\/\/.*$/gm, "");
     expect(beforeCrisis).not.toMatch(/\bawait\b|\boptions\.|admitOrRefuse|parseRequest|reply\.status/);

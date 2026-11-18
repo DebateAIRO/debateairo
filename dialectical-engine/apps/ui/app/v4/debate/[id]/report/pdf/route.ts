@@ -13,7 +13,10 @@ export const dynamic = "force-dynamic";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** The same identity as the debate's own report: the session cookie, the browser's user-agent and the visitor address. */
+/**
+ * The same identity as the debate's own report: the session cookie, the browser's user-agent and the visitor address.
+ * Sec-Fetch-Site is passed raw, so a request another site started is refused before any read, as there.
+ */
 async function reportInput(request: Request, context: RouteContext): Promise<InvestigationReportRequestInput> {
   const { id } = await context.params;
   const cookieHeader = request.headers.get("cookie");
@@ -26,6 +29,7 @@ async function reportInput(request: Request, context: RouteContext): Promise<Inv
     interfaceLocale: interfaceLocaleFromCookieHeader(cookieHeader),
     now: new Date(),
     signal: request.signal,
+    fetchSite: request.headers.get("sec-fetch-site"),
     client: () => createServerContractClient(fetch, sessionCookie ?? undefined, userAgent, clientIp)
   };
 }

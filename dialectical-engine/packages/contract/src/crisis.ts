@@ -159,6 +159,38 @@ export function crisisCheckOverlong(text: string): boolean {
   return normalizeKeepingAccents(text).length > max || normalizeForCrisisCheck(text).length > max;
 }
 
+/**
+ * The most characters, spelled for the check, that one request may have the lists run over in all: its question line and
+ * every text of the person's beside it. Three times crisisCheckMaxChars(), which leaves room for the largest Start the
+ * contract allows in ordinary spelling (the 8 KB question line, and seven paths each with a 120-character title, a
+ * 1,000-character question and four own texts of 1,000 characters: 44,032 code units). Spelling never lengthens ordinary
+ * text, so only compatibility forms reach it. A function, not an exported number (the source-purity law).
+ */
+export function crisisCheckRequestMaxChars(): number {
+  return 3 * crisisCheckMaxChars();
+}
+
+/**
+ * The crisis check over every text one request screens, as the API answers the question line: true (answer as for a crisis:
+ * help numbers, no AI call, no debate) when a text reads as a person in crisis, when any one text spelled for the check is
+ * longer than crisisCheckMaxChars() (crisisCheckOverlong), or when all of them together are longer than
+ * crisisCheckRequestMaxChars(). A text or a request past its cap is never checked in part, so a crisis phrase past the cap
+ * still meets help. Every length is measured before any list runs, so a crafted request costs one spelling pass of at
+ * most the cap, not the lists over all of it.
+ */
+export function crisisCheckTexts(texts: readonly string[]): boolean {
+  const max = crisisCheckMaxChars();
+  const requestMax = crisisCheckRequestMaxChars();
+  let screened = 0;
+  for (const text of texts) {
+    const spelled = Math.max(normalizeKeepingAccents(text).length, normalizeForCrisisCheck(text).length);
+    if (spelled > max) return true;
+    screened += spelled;
+    if (screened > requestMax) return true;
+  }
+  return texts.some((text) => detectCrisis(text).crisis);
+}
+
 // V8 compiles a pattern separately for one-byte (Latin-1) and two-byte text: warm both.
 const WARM_SAMPLES = Object.freeze([
   normalizeForCrisisCheck("warm up the crisis check before anyone needs it ".repeat(15)),

@@ -1,5 +1,5 @@
 import {
-  AskRequestSchema, askQuestionMaxBytes, detectCrisis, DIG_SUGGESTION_KINDS, WEB_CONTRACT_LIMITS, type Answer, type AskRequest, type DigSuggestion,
+  AskRequestSchema, askQuestionMaxBytes, crisisCheckTexts, DIG_SUGGESTION_KINDS, WEB_CONTRACT_LIMITS, type Answer, type AskRequest, type DigSuggestion,
   type PathId, type Session
 } from "@debateai/contract";
 import type { CarryOnDue, StartPathsStore, StoredAsk } from "@debateai/db";
@@ -275,8 +275,9 @@ export async function runCarryOnToReport(due: CarryOnDue, ports: CarryOnPorts): 
   };
   for (const pick of picks) {
     const ask = carryOnDigAskOf({ stored, rootRunId: due.runId, pick, free: plan.free, now: new Date() });
-    // POST /v1/asks's first step: a question that reads as a person in crisis starts no debate.
-    if (detectCrisis(ask.question_line).crisis) return stopped("REFUSED", "CRISIS_SUPPORT_OFFERED");
+    // POST /v1/asks's first step, with its caps (crisisCheckTexts): a question that reads as a person in crisis, or is too long
+    // spelled for the check to be read in full, starts no debate.
+    if (crisisCheckTexts([ask.question_line])) return stopped("REFUSED", "CRISIS_SUPPORT_OFFERED");
     let room: CarryOnDigRoom | null;
     try {
       room = await ports.roomForDig(asker, ask);

@@ -18,7 +18,14 @@ import v4English from "../../apps/ui/messages/en/v4.json" with { type: "json" };
  *   debate just now." with Try again, instead of the grey outline staying (the Phase A click-through saw it stay over 60 s).
  */
 const mocks = vi.hoisted(() => ({
-  readPublicDebate: vi.fn(), readBillingUsage: vi.fn(async () => null as unknown), fetchImpl: null as typeof fetch | null
+  readPublicDebate: vi.fn(), readBillingUsage: vi.fn(async () => null as unknown), fetchImpl: null as typeof fetch | null,
+  /** The visitor's session cookie (43 characters, the cookie's grammar); null: signed out. */
+  session: "s".repeat(43) as string | null
+}));
+// The request's cookies: the session as `mocks.session` says, no language cookie (English).
+vi.mock("next/headers", () => ({
+  cookies: async () => ({ get: (name: string) => name === "__Host-debateai-session" && mocks.session !== null ? { value: mocks.session } : undefined }),
+  headers: async () => new Headers({ "user-agent": "vitest-render-browser" })
 }));
 vi.mock("@/lib/serverApi", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../apps/ui/lib/serverApi.js")>()),
@@ -39,6 +46,7 @@ const REF = "22222222-2222-4222-8222-222222222222";
 let root: Root | null = null;
 let host: HTMLDivElement | null = null;
 afterEach(async () => {
+  mocks.session = "s".repeat(43);
   await act(async () => root?.unmount());
   host?.remove();
   root = null;
@@ -101,7 +109,7 @@ describe("a debate that cannot be shown", () => {
     ["under review", "under-review", ({ ContractHttpError }: typeof import("@debateai/contract")) => new ContractHttpError("NOT_FOUND", 410, "x", "DEBATE_UNDER_REVIEW"), V4["v4.public.underReview"]],
     ["made by a newer version", "newer-release", ({ ContractHttpError }: typeof import("@debateai/contract")) => new ContractHttpError("NOT_FOUND", 409, "x", "MADE_BY_NEWER_RELEASE"),
       chromeEnglish["chrome.release.madeByNewer"]]
-  ])("%s: its one line inside the normal header, with the two ways on", async (_case, kind, failure, line) => {
+  ])("%s: its one line inside the normal header, with the two ways on for a signed-in visitor", async (_case, kind, failure, line) => {
     const html = renderToStaticMarkup((await pageFor(failure)).element);
     const page = new DOMParser().parseFromString(html, "text/html");
     const note = page.querySelector(`[data-public-note=${kind}]`)!;
@@ -112,6 +120,20 @@ describe("a debate that cannot be shown", () => {
     expect(page.querySelector('meta[name="robots"]')!.getAttribute("content")).toBe("noindex");
     // Nothing of the debate is shown.
     expect(html).not.toContain(REF);
+  });
+
+  // A signed-out visitor's "/" is the landing, which has no list of public debates: only the ask page is offered.
+  it.each([
+    ["under review", "under-review", ({ ContractHttpError }: typeof import("@debateai/contract")) => new ContractHttpError("NOT_FOUND", 410, "x", "DEBATE_UNDER_REVIEW")],
+    ["made by a newer version", "newer-release", ({ ContractHttpError }: typeof import("@debateai/contract")) => new ContractHttpError("NOT_FOUND", 409, "x", "MADE_BY_NEWER_RELEASE")]
+  ])("%s, signed out: no 'See other public debates', only 'Ask your own question'", async (_case, kind, failure) => {
+    mocks.session = null;
+    const html = renderToStaticMarkup((await pageFor(failure)).element);
+    const page = new DOMParser().parseFromString(html, "text/html");
+    const note = page.querySelector(`[data-public-note=${kind}]`)!;
+    const ways = [...note.querySelectorAll(".v4PubNoteWays a")].map((link) => [link.textContent, link.getAttribute("href")]);
+    expect(ways).toEqual([["Ask your own question", "/v4"]]);
+    expect(html).not.toContain("/?tab=public");
   });
 });
 

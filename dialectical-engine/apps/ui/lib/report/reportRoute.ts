@@ -288,7 +288,7 @@ async function readReportDisclosure(client: ReportReader, answerId: string): Pro
  * NV-26: the render gate's key — the signed-in owner the API names for this session (Session.asker_id), so one
  * account holds one place however many sessions it has. Never the cookie, and no fallback to it.
  */
-async function readRenderOwner(client: ReportReader): Promise<string> {
+async function readRenderOwner(client: Pick<ContractClient, "readSession">): Promise<string> {
   return (await client.readSession()).asker_id;
 }
 
@@ -438,7 +438,7 @@ export async function handleReportHeadRequest(input: ReportRequestInput): Promis
 
 /* ------------------------------------------------------------------- the final report's PDF (plan 2026-10-31 decision 17) */
 
-export type InvestigationReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readInvestigation">;
+export type InvestigationReportReader = Pick<ContractClient, "readAnswer" | "readRunAnswer" | "readRun" | "readInvestigation" | "readSession">;
 
 export type InvestigationReportRenderer = (input: Readonly<{
   question: string;
@@ -458,11 +458,14 @@ export type InvestigationReportRequestInput = Readonly<{
   supported?: (locale: string) => boolean;
   gate?: ReportRenderGate;
   signal?: AbortSignal;
+  /** The request's Sec-Fetch-Site, raw (null when absent); any value but same-origin or none is refused before any read, as the debate's report does. */
+  fetchSite?: string | null;
 }>;
 
 interface ReadyInvestigationReport {
   readonly kind: "ready";
-  readonly session: string;
+  /** The client the reads were made with (the owner's session); GET asks it for the owner, the render gate's key. */
+  readonly client: InvestigationReportReader;
   readonly question: string;
   readonly version: FinishedInvestigationReport;
   readonly questionTag: string | null;
@@ -474,17 +477,20 @@ interface ReadyInvestigationReport {
 /**
  * What GET and HEAD share, read with the owner's session: the debate's investigation and its current version (only a finished
  * one has a PDF; earlier versions stay on the page), the first debate's own question and its language. A language the fonts
- * cannot print yet is refused with the plain line, as the debate's own report (the page then offers its Print).
+ * cannot print yet is refused with the plain line, as the debate's own report (the page then offers its Print). As there, a
+ * request another site started (reportInitiatorAllowed) gets one fixed 403 first, before the session is looked at and before
+ * any read, so it says nothing of sign-in, ownership or readiness.
  */
 async function prepareInvestigationReport(input: InvestigationReportRequestInput): Promise<Refusal | ReadyInvestigationReport> {
-  const session = input.sessionCookie;
-  if (session === null) return refuse(401, input.interfaceLocale, signInLine);
+  if (!reportInitiatorAllowed(input.fetchSite)) return refuse(403, input.interfaceLocale, notAvailableLine);
+  if (input.sessionCookie === null) return refuse(401, input.interfaceLocale, signInLine);
+  let client: InvestigationReportReader;
   let question: string;
   let questionTag: string | null;
   let free: boolean;
   let version: FinishedInvestigationReport | undefined;
   try {
-    const client = input.client();
+    client = input.client();
     const answer = await readAnswerByIdOrRun(client, input.id);
     const read = await client.readInvestigation(answer.run_ref);
     const rootAnswer = read.root_run_id.toLowerCase() === answer.run_ref.toLowerCase() ? answer : await client.readRunAnswer(read.root_run_id);
@@ -499,10 +505,14 @@ async function prepareInvestigationReport(input: InvestigationReportRequestInput
   const locale = questionLocale(questionTag, input.interfaceLocale);
   if (version === undefined) return refuse(404, locale, notAvailableLine);
   if (!(input.supported ?? reportSupportedForLocale)(locale)) return refuse(404, locale, unsupportedLine);
-  return { kind: "ready", session, question, version, questionTag, locale, free };
+  return { kind: "ready", client, question, version, questionTag, locale, free };
 }
 
-/** GET: made in memory in the question's language, through the same gate as the debate's own report; nothing is stored. */
+/**
+ * GET: made in memory in the question's language, through the same gate as the debate's own report; nothing is stored. The
+ * gate is keyed by the owner the API names for this session, read once the report is known to be ready, so one account holds
+ * one place however many sessions or browsers it uses; never by the cookie. The PDF is still drawn on this process's own loop.
+ */
 export async function handleInvestigationReportRequest(input: InvestigationReportRequestInput): Promise<Response> {
   const load = input.load ?? loadNamespace;
   const prepared = await prepareInvestigationReport(input);
@@ -516,8 +526,15 @@ export async function handleInvestigationReportRequest(input: InvestigationRepor
     console.error("[INVESTIGATION_REPORT_CATALOGS_FAILED]");
     return textResponse(500, tryAgainLine(await refusalCatalog(load, prepared.locale)));
   }
+  let owner: string;
+  try {
+    owner = await readRenderOwner(prepared.client);
+  } catch (failure) {
+    const refusal = upstreamRefusal(failure, prepared.locale);
+    return textResponse(refusal.status, refusal.line(catalogs.publicCatalog));
+  }
   const gate = input.gate ?? processRenderGate;
-  const admission = await gate.admit(prepared.session, input.signal);
+  const admission = await gate.admit(owner, input.signal);
   if (admission.kind !== "admitted") return busyResponse(admission.kind === "busy" ? 429 : 503, gate, catalogs);
   let pdf: Buffer;
   try {
@@ -532,7 +549,10 @@ export async function handleInvestigationReportRequest(input: InvestigationRepor
   return new Response(new Uint8Array(pdf.buffer as ArrayBuffer, pdf.byteOffset, pdf.byteLength), { status: 200, headers: pdfHeaders(prepared.question, input.now) });
 }
 
-/** HEAD: GET's status and headers, the PDF never made. */
+/**
+ * HEAD: GET's status and headers, the PDF never made. Like the debate's report, it never reads the owner (only GET's render
+ * gate needs it), and a request from another site gets GET's fixed 403 before the session or any read.
+ */
 export async function handleInvestigationReportHeadRequest(input: InvestigationReportRequestInput): Promise<Response> {
   const prepared = await prepareInvestigationReport(input);
   if (prepared.kind === "refused") return new Response(null, { status: prepared.status, headers: textHeaders() });

@@ -9,8 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 /*
  * V4 start step, Task 78 (spec 2026-11-03 §4.5 "The classic view"; decision record: V4 replaces V3): `/new` redirects
  * to `/v4`, a topic handed in by a link going along (`/v4?topic=…`, the first one, cut at 4000 like the ask page's own
- * cut); "Open in the classic view" leaves the ask page; old debates' classic pages still open, and a debate's page still
- * offers its classic view.
+ * cut); "Open in the classic view" leaves the ask page; old debates' classic pages still open, and the header can still
+ * offer a classic view when a page hands it one (the map and report pages hand none).
  */
 const gate = vi.hoisted(() => ({ session: "IN" as "IN" | "OUT" }));
 vi.mock("@/components/v4/V4AskGate", () => ({ V4AskGate: ({ children }: { children: (session: string) => ReactNode }) => children(gate.session) }));
@@ -162,7 +162,7 @@ describe("Open in the classic view leaves the ask page", () => {
 });
 
 describe("old debates keep their classic view", () => {
-  it("the same header, handed a debate's classic address as a debate's page hands it, still offers it in its menu", async () => {
+  it("the same header, handed a debate's classic address, still offers it in its menu", async () => {
     const page = await mount(<V4Header catalog={CATALOG} readingLevel="plain" classicHref={`/debate/${RUN_ID}`} session="IN" />);
     const classic = (await menuItems(page)).filter((item) => item.textContent === CLASSIC);
     expect(classic.map((item) => item.getAttribute("href"))).toEqual([`/debate/${RUN_ID}`]);

@@ -37,9 +37,14 @@ import { SkipLink } from "@/components/SkipLink";
  * it (display: swap). It is its own loader so it can skip the preload: next/font keeps the family's real name in its
  * @font-face rules (it hashes only class names), so the italic rules join the same "Instrument Sans" family the variable
  * names, and italic text keeps its true italic. Bricolage Grotesque has no italic.
+ *
+ * The two preloaded faces preload their Latin Extended part too: Romanian's ă, ș and ț are there, not in the basic Latin
+ * part, so a Romanian page would otherwise draw them late, in the fallback face, on a first visit. next/font serves every
+ * part either way (`subsets` only chooses which files are preloaded), so the italic face, which preloads nothing, is left as
+ * it is.
  */
 const display = Bricolage_Grotesque({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   axes: ["opsz"],
   style: ["normal"],
   variable: "--font-bricolage",
@@ -47,7 +52,7 @@ const display = Bricolage_Grotesque({
 });
 
 const sans = Instrument_Sans({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   style: ["normal"],
   variable: "--font-instrument",
   display: "swap"
