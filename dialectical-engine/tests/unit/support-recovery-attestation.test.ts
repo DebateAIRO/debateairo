@@ -146,6 +146,17 @@ const R22_UNPUBLISH_CHAT_REVIEW = Object.freeze({
   ratifiedOn: "",
 });
 const R22_CHAT_IDS = new Set(["publish-a-debate", "delete-a-private-debate", "public-answer-disclosure"]);
+// The navigation article and its chat texts changed after the owner read them: the landing no longer links to a
+// sample transcript, and its button says Ask a question. Until the owner reads the new text, its records are SOL.
+const APP_NAVIGATION_EVIDENCE = "docs/missions/synthesis-flag/OWNER-SIGNOFF-S05-support-kb.md";
+const APP_NAVIGATION_CHAT_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "release-wording-2026-11-19 (the landing's Transcripts link was removed and Start a round became Ask a question; no separate editor read it and the owner has not read this chat text)",
+  reviewedOn: "2026-11-19",
+  evidence: APP_NAVIGATION_EVIDENCE,
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
 
 const GUIDE_IDS = new Set([
   "app-navigation",
@@ -160,8 +171,8 @@ const EXPECTED = [
   ["account-settings", "ro", "f887ccbfcc05fb99a095a451e6b2b872cdc3d85135a3e3eadd0496d80d10b21c", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958"],
   ["ai-transparency", "en", "b2d3c4dc1ee4d40d46a30861aede89faf2bf092e2800e6b978cdf0c66acc6388", "a84af8cfaea76ce84a29bd9f8d8fffbcd37457c61ffdca349af0dfaf18f1ae9e", "a116a35102a2208d4713e6df95e77148543f90cc5128e7374c869c4a2d2e32bd"],
   ["ai-transparency", "ro", "bcaa2f47d9ba78227bff74e32e4391b4a8e0020fd842ed7751068dfa81e56bf9", "e3dca4aa8b108fefec0add59ca8b216539a08d6352f558ffa869cf5772563a19", "914d0ea1afddcef9bae62c8741f3916d7c100337edca74fa8dbd32d4e1875604"],
-  ["app-navigation", "en", "19b071be3dcc43e9d0cdba3558a29d9ba78d573764aa915173e753fcf01b12a9", "62d5b79e6070a88f9a7c54e50a6781b7f73e484902a7e5c38878e79d2d9081d3", "5f72d0d447cb61481951585f2bc42d3a0c5450ab504c1c8204a0c1a78505360a"],
-  ["app-navigation", "ro", "38e7a627bc14a056935abb6cde12b76bd26237f7f317fca0f2cdf8e515f1ccdc", "26c2daccbcb5b797a3cb9dba4871a51086ec799d320540492aeb8d103e1497f9", "ce9355e41bd2e02b7197e69b09391bc44c4e3f5dfd57859ae54aca289df630c1"],
+  ["app-navigation", "en", "5abaed35b884dad5f2e6347b97e47bc00852c2703becf4b431d62e8feaf99482", "b01d868a22a45b301634464e927371f41dd3856ebe6f943d3c39df9e34ca5c30", "5f72d0d447cb61481951585f2bc42d3a0c5450ab504c1c8204a0c1a78505360a"],
+  ["app-navigation", "ro", "5eb00657e74fc590e0356cebbe24b0edad965ef7b8c8887896bc3d45bc2b9f75", "1b38d0bba1e67870e7fcb1862b6cc3dc7731f4ffc338f897115e78b14c9b906e", "ce9355e41bd2e02b7197e69b09391bc44c4e3f5dfd57859ae54aca289df630c1"],
   ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
   ["browse-public-debates", "ro", "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241", "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897", "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"],
   ["budget-tier-choice", "en", "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683", "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104", "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601"],
@@ -229,7 +240,7 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(id === "unpublish-a-debate" ? R22_UNPUBLISH_CHAT_REVIEW : R22_CHAT_IDS.has(id) ? R22_CHAT_REVIEW : ["support-cases","settings-help-menus","app-navigation","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
+        ...(id === "unpublish-a-debate" ? R22_UNPUBLISH_CHAT_REVIEW : id === "app-navigation" ? APP_NAVIGATION_CHAT_REVIEW : R22_CHAT_IDS.has(id) ? R22_CHAT_REVIEW : ["support-cases","settings-help-menus","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
           ? S05_OWNER_REVIEW
           : id === "privacy-consent"
           ? COOKIE_COPY_OWNER_REVIEW
@@ -257,7 +268,7 @@ describe("production Support recovery attestation", () => {
       },
       recovery: {
         componentFileSha256:
-          "e3da36cc9e366d4ac60493196ddd7f817ffbcb52f59b2979f965940403eef163",
+          "ecb9b0efe926e5d0ae624c7b0322ee827f3b4364082f6ee851e2cfda0227eac1",
         components: expectedRows,
       },
     });
@@ -273,6 +284,19 @@ describe("production Support recovery attestation", () => {
         reviewerSession: "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; the owner has not read this text)",
         reviewedOn: "2026-11-01",
         evidence: R22_SIGNOFF,
+      });
+    }
+    // The owner read app-navigation before the landing changed. Its records must not claim that reading for this text.
+    for (const lang of ["en", "ro"] as const) {
+      const record = corpus.reviewManifest.articles.find((article) => article.id === "app-navigation" && article.lang === lang);
+      expect(record).toEqual({
+        id: "app-navigation",
+        lang,
+        sha256: sha256(readFileSync(join(corpusDirectory, `app-navigation.${lang}.md`))),
+        reviewedBy: "SOL",
+        reviewerSession: "release-wording-2026-11-19 (the landing's Transcripts link was removed and Start a round became Ask a question; the owner has not read this text)",
+        reviewedOn: "2026-11-19",
+        evidence: APP_NAVIGATION_EVIDENCE,
       });
     }
     for (const id of R22_CHAT_IDS) {
@@ -302,7 +326,8 @@ describe("production Support recovery attestation", () => {
       previewReviewedCount: 21,
       ownerRatifiedCount: 2,
       recoveryReviewedCount: 23,
-      recoveryOwnerRatifiedCount: 6,
+      // app-navigation's chat texts are SOL until the owner reads them, so one owner-ratified pair fewer.
+      recoveryOwnerRatifiedCount: 5,
     });
 
     for (const [index, expected] of EXPECTED.entries()) {

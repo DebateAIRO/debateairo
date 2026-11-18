@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /*
  * Auth UI repair (2026-10-09), fix 3: a signed-out visitor had no way to sign in from the landing header
- * or the top bar, only "Start a round" (which happens to pass through /login). Signed-out visitors now see
+ * or the top bar, only the landing CTA (which happens to pass through /login). Signed-out visitors now see
  * a "Log in" link; signed-in visitors keep the account menu; while the session check is still running
  * neither shows, so a signed-in visitor never sees "Log in" flash.
  */
@@ -66,11 +66,11 @@ describe("signed-out visitors can sign in from the header", () => {
     expect(accountTrigger(host)).toBeNull();
   });
 
-  it("the landing header offers Log in beside Start a round", async () => {
+  it("the landing header offers Log in beside Ask a question", async () => {
     session.read = () => Promise.reject(new Error("SESSION_REQUIRED"));
     const host = await render(<LandingChrome catalog={{ ...home, ...chrome }} />);
     expect(logIn(host)?.getAttribute("href")).toBe("/login");
-    expect([...host.querySelectorAll("a")].some((link) => link.textContent?.includes("Start a round"))).toBe(true);
+    expect([...host.querySelectorAll("a")].some((link) => link.textContent?.includes("Ask a question"))).toBe(true);
   });
 });
 

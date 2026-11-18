@@ -135,12 +135,12 @@ describe("chrome", () => {
     // PROPERTY: the signed-in library composer exposes the T3 prompt, helper,
     // and submit copy as three distinct strings.
     const rendered = await renderSignedInRoute();
-    const input = rendered.querySelector<HTMLTextAreaElement>('textarea[aria-label="Debate claim"]');
+    const input = rendered.querySelector<HTMLTextAreaElement>('textarea[aria-label="Your question"]');
     const submit = rendered.querySelector<HTMLButtonElement>(".libStart");
 
-    expect(input?.placeholder).toBe("Type a debatable claim or question…");
-    expect(rendered.body.textContent).toContain("Models argue · you judge");
-    expect(submit?.textContent?.replace(/\s+/g, " ").trim()).toBe("Start debate →");
+    expect(input?.placeholder).toBe("Type your question…");
+    expect(rendered.body.textContent).toContain("You choose what the AIs look into");
+    expect(submit?.textContent?.replace(/\s+/g, " ").trim()).toBe("Next →");
   });
 
   it("mounts a working mode toggle in the signed-in TopBar", async () => {
@@ -196,12 +196,12 @@ describe("chrome", () => {
   });
 
   it("suppresses the TopBar in the real anonymous landing document", async () => {
-    // PROPERTY (T3-C1-4 P1): the real anonymous `/` branch emits all five
+    // PROPERTY: the real anonymous `/` branch emits all four
     // landing markers and suppresses the real global TopBar with display:none.
     const rendered = await renderRoute(null);
     const topBar = rendered.querySelector<HTMLElement>(".topBar");
 
-    expect(rendered.querySelectorAll("[data-landing-section]")).toHaveLength(5);
+    expect(rendered.querySelectorAll("[data-landing-section]")).toHaveLength(4);
     expect(topBar, "real anonymous TopBar").not.toBeNull();
     expect(rendered.defaultView!.getComputedStyle(topBar!).display).toBe("none");
   });

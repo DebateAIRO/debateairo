@@ -111,21 +111,29 @@ describe("reviewed Support recovery components", () => {
       ...policy,recoverySourceIds:["browse-public-debates"]
     })).toBeUndefined();
   });
-  it("uses the visible Transcripts label in both navigation drafts", () => {
+  it("names the landing's own labels in both navigation drafts, and no sample transcript", () => {
     const document = JSON.parse(readFileSync(new URL(
       "../../packages/support-kb/recovery/components.json",import.meta.url
     ),"utf8")) as { components: Array<Readonly<{ id:string;lang:string;modelProjection:string }>> };
-    // V-17 (V 2026-10-01): each text names the label its own language renders (chrome.transcripts).
-    for (const [lang,label] of [["en","Transcripts"],["ro","„Transcrieri”"]] as const) {
+    // Each text names the labels its own language renders (chrome.startRound, chrome.pricing). The landing shows no
+    // sample exchange, so neither text sends a visitor to a Transcripts link.
+    const chrome = (lang: string) => JSON.parse(readFileSync(new URL(
+      `../../apps/ui/messages/${lang}/chrome.json`,import.meta.url
+    ),"utf8")) as Record<string,string>;
+    for (const [lang,quote] of [["en",(label: string) => label],["ro",(label: string) => `„${label}”`]] as const) {
       const article = readFileSync(new URL(
         `../../packages/support-kb/content/app-navigation.${lang}.md`,import.meta.url
       ),"utf8");
       const component = document.components.find(({ id,lang: candidate }) =>
         id === "app-navigation" && candidate === lang)!;
-      expect(article).toContain(label);
-      expect(component.modelProjection).toContain(label);
-      expect(article).not.toMatch(/links to Method and a Sample debate|legături către Method și Sample debate/u);
-      expect(component.modelProjection).not.toMatch(/links to Method and a Sample debate|oferă Method și Sample debate/u);
+      for (const key of ["chrome.startRound","chrome.pricing"]) {
+        expect(article).toContain(quote(chrome(lang)[key]!));
+        expect(component.modelProjection).toContain(quote(chrome(lang)[key]!));
+      }
+      for (const retired of [chrome(lang)["chrome.transcripts"]!,"Start a round","Începeți o rundă","Sample debate"]) {
+        expect(article).not.toContain(retired);
+        expect(component.modelProjection).not.toContain(retired);
+      }
     }
   });
 

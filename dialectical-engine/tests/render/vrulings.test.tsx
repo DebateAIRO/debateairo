@@ -60,7 +60,7 @@ function catalogValue(locale: string, namespace: string, key: string): string {
 }
 
 const ENGLISH_PHRASE = "DELETE MY ACCOUNT";
-const ENGLISH_DESCRIPTION = "A reasoning instrument — several AI models argue a claim in a structured tree.";
+const ENGLISH_DESCRIPTION = "Ask a question. Several AIs from different companies look into it, and you see what holds up and what is still open.";
 
 beforeEach(() => {
   mocks.locale = "en";
