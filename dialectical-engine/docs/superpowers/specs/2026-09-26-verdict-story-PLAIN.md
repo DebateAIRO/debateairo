@@ -101,8 +101,8 @@ are never the reason.
 
 - **Money is set aside for the answer.** A debate may spend 70% of its money while it is argued. The
   last 30% is kept for writing the answer. Writing the answer may go up to 20% over the debate's
-  limit. Example: with a debate limit of <amount>, arguing may use $0.175, and the whole debate may
-  reach $0.30.
+  limit. Example: with a debate limit of <amount>, arguing may use 70% of it, and the whole debate
+  may reach 120% of it.
 - **A stop while arguing no longer skips the answer.** When the debate hits its limit (money, the
   number of calls, or a vendor that does not report what it charged), it stops arguing and writes
   the answer from what it has.
@@ -144,9 +144,9 @@ are never the reason.
    The runner goes first: it must never be older than the API. To roll back, the API goes first.
    The exact order is in `deploy/vps/README.md`, "Upgrading to the verdict-story release, and
    rolling it back".
-4. **The day must hold one full debate plus its story.** With today's values that is
-   $0.30 + $0.06 = $0.36. A daily limit below that is refused when you publish, and neither
-   service will start.
+4. **The day must hold one full debate plus its story.** The daily limit must be at least the
+   most one debate may reach plus the story's limit. A daily limit below that is refused when you
+   publish, and neither service will start.
 
 ## What is provisional
 

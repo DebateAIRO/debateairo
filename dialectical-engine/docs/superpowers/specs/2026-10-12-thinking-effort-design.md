@@ -266,7 +266,7 @@ change is needed. A unit test pins that the estimate is the same with and withou
   "same within chance".
 - **Budget:** the owner's standing test budget, <amount> DeepInfra and <amount> Haiku for the testing day, counting what other
   sessions already spent that day (read from both gates' day spend before starting). The run stops before the day's
-  total passes $4.75 / $0.95. Expected spend is about $1.5–2.5 DeepInfra and $0.2–0.4 Haiku.
+  total comes close to either gate's budget. Expected spend is well inside both.
 - **Output:**
   - the report table;
   - the labelled side-by-side page, published as a private page for the owner;

@@ -7,13 +7,12 @@ import type { Pool } from "pg";
  *
  * The room's estimate (packages/budget/src/estimate.ts, RecentRunsCostEstimator) samples the last 20 settled hosted
  * runs of the ask's settings class and answers their 75th percentile. Before this row, with fewer than 20 samples it
- * answered the run's maximum ($3.66 on the preview), so on a fresh site every room read said "close to your plan's
- * limit" and every premium Plus ask (day allowance $1.00) ran on the Free AIs. The owner ruled:
+ * answered the run's maximum, so on a fresh site every room read said "close to your plan's limit" and every premium
+ * Plus ask ran on the Free AIs, because the maximum was larger than a Plus day's allowance. The row holds:
  *  - `min_samples`: the history needed before the sample is trusted (5; at most the sample size, 20);
  *  - `start_micros_by_depth`: until then, the estimate is this figure for the ask's depth (depth 1 $0.30, depth 2
  *    $0.60, depth 3 $1.00), still capped at the run's maximum; a depth without a figure (the deepest ones today) answers the maximum.
- *    One figure for every plan and line-up (the careful side for smaller line-ups). Measured: a depth-1 debate of five
- *    AIs with its story cost $0.25 (R19 practice).
+ *    One figure for every plan and line-up (the careful side for smaller line-ups).
  * Money in USD micro-units, named on the row as costEnvelopePolicy names them.
  *
  * OPTIONAL in reading: a version without the row reads null, and the estimator then answers exactly as before (20
@@ -82,8 +81,7 @@ export async function readCostEstimateStartPolicy(
 export const COST_ESTIMATE_START_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   rowKey: COST_ESTIMATE_START_POLICY_ROW_KEY,
   sourceRef: "owner rulings 2026-10-22 (fresh-site estimate): trust the sample from five settled runs of a class; until"
-    + " then depth 1 $0.30, depth 2 $0.60, depth 3 $1.00, capped at the run's maximum; measured depth-1 five-AI debate"
-    + " with story $0.25 (R19 practice)",
+    + " then depth 1 $0.30, depth 2 $0.60, depth 3 $1.00, capped at the run's maximum",
   value: Object.freeze({
     kind: "COST_ESTIMATE_START_POLICY" as const,
     currency: "USD" as const,

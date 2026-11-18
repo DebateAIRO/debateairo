@@ -1963,7 +1963,7 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
   - repaired slips, a story served with reservation, slow AIs and one unbilled "too busy" are warnings.
 - **The match.** The changed rows the practice prints (and `register.codeNext` in `report.json`) must equal A8's
   `addedKeys` and `changedKeys`, except `nodeRuntimeVersion`: the server measures its source reference again.
-- R19's practice: PASS_WITH_WARNINGS, 33 minutes, $0.24 DeepInfra and $0.06 Anthropic, and the rows matched.
+- R19's practice: PASS_WITH_WARNINGS, 33 minutes, and the rows matched.
 
 ### B0. Preflight again, right before the downtime
 
