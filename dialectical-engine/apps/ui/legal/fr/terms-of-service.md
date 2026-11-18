@@ -48,7 +48,7 @@ Ces informations sont également affichées en permanence sur le site à l’adr
 
 ## 2. Pays dans lesquels nous proposons Dialectical Engine
 
-Nous proposons Dialectical Engine aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège et Islande), en Moldavie, aux États-Unis (Tennessee excepté), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon et en Corée du Sud. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons.
+Nous proposons Dialectical Engine aux personnes qui résident dans l’Union européenne (27 pays) et l’Espace économique européen (Norvège et Islande), en Moldavie, aux États-Unis (Tennessee et Mississippi exceptés), au Canada, en Australie, en Nouvelle-Zélande, à Singapour, au Japon et en Corée du Sud. Nous ne le proposons pas ailleurs. Si vous résidez en dehors de ces pays, il se peut que vous puissiez accéder au site, mais nous ne dirigeons pas le service vers vous, nous n’acceptons aucun paiement de votre part et les présentes Conditions ainsi que notre Politique de confidentialité ne sont pas adaptées au droit de votre pays. L’annexe A précise ce qui s’applique dans chaque région que nous desservons.
 
 ## 3. Acceptation des présentes Conditions
 
@@ -334,6 +334,8 @@ Le corps des présentes Conditions est rédigé pour vous. En outre : vous pouve
 ### A.2 États-Unis
 
 **Tennessee.** Nous ne proposons pas Dialectical Engine aux personnes qui résident au Tennessee.
+
+**Mississippi.** Nous ne proposons pas Dialectical Engine aux personnes qui résident au Mississippi.
 
 **Notifications et retraits.** Les images intimes non consenties peuvent être signalées par e-mail à l’adresse abuse@dezbatere.ro, sans compte, et sont retirées dans les 48 heures suivant une demande valide. Les plaintes relatives au droit d’auteur suivent la procédure de signalement de la section 10.
 

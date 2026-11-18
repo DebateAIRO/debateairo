@@ -48,7 +48,7 @@ Dawn id-dettalji jintwerew ukoll b’mod permanenti fuq is-sit fuq dezbatere.ro/
 
 ## 2. Fejn noffru Dialectical Engine
 
-Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja u l-Iżlanda), fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu.
+Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja u l-Iżlanda), fil-Moldova, fl-Istati Uniti (ħlief Tennessee u Mississippi), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu.
 
 ## 3. Aċċettazzjoni ta’ dawn it-Termini
 
@@ -334,6 +334,8 @@ Il-parti ewlenija ta’ dawn it-Termini nkitbet għalik. Barra minn hekk: tista�
 ### A.2 L-Istati Uniti
 
 **Tennessee.** Ma noffrux Dialectical Engine lil persuni li jgħixu fi Tennessee.
+
+**Mississippi.** Ma noffrux Dialectical Engine lil persuni li jgħixu fi Mississippi.
 
 **Avviżi u tneħħijiet.** Stampi intimi mhux kunsenswali jistgħu jiġu rrappurtati bl-email lil abuse@dezbatere.ro, mingħajr kont, u jitneħħew fi żmien 48 siegħa minn talba valida. Ilmenti dwar id-drittijiet tal-awtur jgħaddu mir-rotta tar-rapportar fit-taqsima 10.
 

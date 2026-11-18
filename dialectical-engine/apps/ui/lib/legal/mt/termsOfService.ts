@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Fejn noffru Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja u l-Iżlanda), fil-Moldova, fl-Istati Uniti (ħlief Tennessee), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
+      { kind: "p", text: "Noffru Dialectical Engine lil persuni li jgħixu fl-Unjoni Ewropea (27 pajjiż) u fiż-Żona Ekonomika Ewropea (in-Norveġja u l-Iżlanda), fil-Moldova, fl-Istati Uniti (ħlief Tennessee u Mississippi), fil-Kanada, fl-Awstralja, fiż-Żelanda l-Ġdida, f’Singapor, fil-Ġappun u fil-Korea t’Isfel. Ma noffruhiex band’oħra. Jekk tgħix barra dawk il-pajjiżi jaf tkun tista’ taċċessa s-sit, iżda aħna ma nindirizzawx is-servizz lilek, ma naċċettawx ħlas mingħandek, u dawn it-Termini u l-Politika dwar il-Privatezza tagħna mhumiex adattati għal-liġi ta’ pajjiżek. L-Anness A jistabbilixxi dak li japplika f’kull reġjun li naqdu." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Ma noffrux Dialectical Engine lil persuni li jgħixu fi Tennessee." },
+      { kind: "p", text: "Mississippi. Ma noffrux Dialectical Engine lil persuni li jgħixu fi Mississippi." },
       { kind: "p", text: "Avviżi u tneħħijiet. Stampi intimi mhux kunsenswali jistgħu jiġu rrappurtati bl-email lil abuse@dezbatere.ro, mingħajr kont, u jitneħħew fi żmien 48 siegħa minn talba valida. Ilmenti dwar id-drittijiet tal-awtur jgħaddu mir-rotta tar-rapportar fit-taqsima 10." },
       { kind: "p", text: "Speċifiku għall-istat. California: japplikaw it-termini tat-tiġdid awtomatiku fit-taqsima 12; tista’ tikkanċella fuq l-internet fi kwalunkwe ħin; inżommu l-kunsens tiegħek għat-termini tat-tiġdid għal mill-inqas tliet snin. New York: tista’ tikkanċella fi żmien 14-il jum minn kwalunkwe ħlas bi prezz miżjud u tirċievi ħlas lura pro rata. Texas u Nebraska: ma nbigħux data personali sensittiva. Washington: l-Avviż tagħna dwar il-Privatezza tad-Data tas-Saħħa tal-Konsumatur fuq dezbatere.ro/privacy/us-health-data japplika għal informazzjoni relatata mas-saħħa. Colorado: xejn fis-servizz ma jieħu deċiżjonijiet konsegwenzjali dwarek. Il-Politika dwar il-Privatezza tagħna, Anness B.2, tkopri d-data tiegħek u d-drittijiet tal-privatezza tal-istat tiegħek." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "f45384ceed386ea16e085d87d748c715b9d57f1b77412649a9793294e485b452",
+  sha256: "401ddbacf808f95bf412a4d9ef4a172fcdfe6a56e6d7cdaa59aba72f3f460f9e",
   eyebrow: "TERMINI TAS-SERVIZZ · v2.18 · EFFETTIVI 1 TA’ NOVEMBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",

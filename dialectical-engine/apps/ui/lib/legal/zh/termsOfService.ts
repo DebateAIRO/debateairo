@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dialectical Engine 的服务地域",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "我们向居住在欧盟（27 个成员国）及欧洲经济区（挪威和冰岛）、摩尔多瓦、美国（田纳西州除外）、加拿大、澳大利亚、新西兰、新加坡、日本和韩国的人士提供 Dialectical Engine。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
+      { kind: "p", text: "我们向居住在欧盟（27 个成员国）及欧洲经济区（挪威和冰岛）、摩尔多瓦、美国（田纳西州和密西西比州除外）、加拿大、澳大利亚、新西兰、新加坡、日本和韩国的人士提供 Dialectical Engine。我们不在其他地方提供本服务。如果您居住在这些国家以外，可能仍能访问网站，但本服务并非面向您提供；我们不接受您的付款，且本条款及《隐私政策》并未针对您所在国家的法律作相应调整。附件 A 规定了我们所服务各区域的适用内容。" }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "田纳西州。 我们不向居住在田纳西州的人士提供 Dialectical Engine。" },
+      { kind: "p", text: "密西西比州。 我们不向居住在密西西比州的人士提供 Dialectical Engine。" },
       { kind: "p", text: "通知和下架。 无需账户，即可通过电子邮件向 abuse@dezbatere.ro 举报未经同意的私密影像；我们会在收到有效请求后 48 小时内移除。著作权投诉应通过第 10 节所述的举报渠道提交。" },
       { kind: "p", text: "各州特别规定。 加利福尼亚州：适用第 12 节的自动续订条款；您可以随时在线取消；我们会将您对续订条款的同意至少保留三年。纽约州：您可在按提高后的价格收取任何费用后的 14 天内取消，并获得按比例计算的退款。得克萨斯州和内布拉斯加州：我们不出售敏感个人数据。华盛顿州：我们载于 dezbatere.ro/privacy/us-health-data 的《消费者健康数据隐私通知》适用于健康相关信息。科罗拉多州：本服务不会对您作出具有重大后果的决定。有关您的数据及您依据各州法律享有的隐私权利，见我们《隐私政策》的附件 B.2。" }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "80ed15baad503db93ebe81bff44d29dea14c0b6e3b11495ba25394fb940d1a60",
+  sha256: "6a38c9b196af4c2d3536a587c1b1d858885220c1890ffc3c963e7a06b4180487",
   eyebrow: "服务条款 · v2.18 · 生效日期 2026 年 11 月 1 日",
   title: "您同意的内容",
   lede: "以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。",

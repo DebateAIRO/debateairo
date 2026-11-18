@@ -61,7 +61,7 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   ADMISSION_RATE_LIMITED: RATE_LIMITED,
   UPGRADE_PENDING: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
   PAYMENT_PROVIDER_UNAVAILABLE: Object.freeze({ key: "billing.checkout.formUnavailable", reload: false }),
-  // The stored billing address is in a region the Terms exclude (Tennessee): the quote refuses before any money moves.
+  // The stored billing address is in a region the Terms exclude (Tennessee, Mississippi): the quote refuses before any money moves.
   REGION_TERMS_EXCLUDED: Object.freeze({ key: "billing.checkout.regionTermsExcluded", reload: false })
 });
 

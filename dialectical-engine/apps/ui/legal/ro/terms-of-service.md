@@ -48,7 +48,7 @@ Aceste date sunt afișate permanent și pe site, la dezbatere.ro/legal. Puteți 
 
 ## 2. Unde oferim Dialectical Engine
 
-Oferim Dialectical Engine persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia și Islanda), în Moldova, Statele Unite (cu excepția statului Tennessee), Canada, Australia, Noua Zeelandă, Singapore, Japonia și Coreea de Sud. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim.
+Oferim Dialectical Engine persoanelor care locuiesc în Uniunea Europeană (27 de state) și în Spațiul Economic European (Norvegia și Islanda), în Moldova, Statele Unite (cu excepția statelor Tennessee și Mississippi), Canada, Australia, Noua Zeelandă, Singapore, Japonia și Coreea de Sud. Nu îl oferim în alte locuri. Dacă locuiți în afara acelor țări, este posibil să puteți accesa site-ul, însă serviciul nu vă este destinat, nu acceptăm plăți de la dumneavoastră, iar acești Termeni și Politica noastră de confidențialitate nu sunt adaptați legislației țării dumneavoastră. Anexa A stabilește ce se aplică în fiecare regiune pe care o deservim.
 
 ## 3. Acceptarea acestor Termeni
 
@@ -334,6 +334,8 @@ Corpul acestor Termeni este redactat pentru dumneavoastră. În plus: puteți in
 ### A.2 Statele Unite
 
 **Tennessee.** Nu oferim Dialectical Engine persoanelor care locuiesc în Tennessee.
+
+**Mississippi.** Nu oferim Dialectical Engine persoanelor care locuiesc în Mississippi.
 
 **Notificări și eliminări.** Imaginile intime distribuite fără consimțământ pot fi raportate prin e-mail la abuse@dezbatere.ro, fără un cont, și sunt eliminate în termen de 48 de ore de la o cerere valabilă. Reclamațiile privind drepturile de autor urmează procedura de raportare din secțiunea 10.
 

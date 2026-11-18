@@ -48,7 +48,7 @@ Disse oplysninger vises også permanent på webstedet på dezbatere.ro/legal. Du
 
 ## 2. Hvor vi tilbyder Dialectical Engine
 
-Vi tilbyder Dialectical Engine til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge og Island), Moldova, USA (undtagen Tennessee), Canada, Australien, New Zealand, Singapore, Japan og Sydkorea. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener.
+Vi tilbyder Dialectical Engine til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge og Island), Moldova, USA (undtagen Tennessee og Mississippi), Canada, Australien, New Zealand, Singapore, Japan og Sydkorea. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener.
 
 ## 3. Accept af disse vilkår
 
@@ -334,6 +334,8 @@ Hovedteksten i disse vilkår er skrevet til dig. Derudover gælder følgende: Du
 ### A.2 USA
 
 **Tennessee.** Vi tilbyder ikke Dialectical Engine til personer, der bor i Tennessee.
+
+**Mississippi.** Vi tilbyder ikke Dialectical Engine til personer, der bor i Mississippi.
 
 **Meddelelser og fjernelse.** Intime billeder uden samtykke kan anmeldes pr. e-mail til abuse@dezbatere.ro uden en konto og fjernes inden for 48 timer efter en gyldig anmodning. Klager over ophavsret følger anmeldelsesvejen i afsnit 10.
 

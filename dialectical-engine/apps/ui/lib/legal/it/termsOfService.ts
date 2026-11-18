@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dove offriamo Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Offriamo Dialectical Engine alle persone che vivono nell'Unione europea (27 Paesi) e nello Spazio economico europeo (Norvegia e Islanda), in Moldova, negli Stati Uniti (eccetto il Tennessee), in Canada, in Australia, in Nuova Zelanda, a Singapore, in Giappone e in Corea del Sud. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio." }
+      { kind: "p", text: "Offriamo Dialectical Engine alle persone che vivono nell'Unione europea (27 Paesi) e nello Spazio economico europeo (Norvegia e Islanda), in Moldova, negli Stati Uniti (eccetto il Tennessee e il Mississippi), in Canada, in Australia, in Nuova Zelanda, a Singapore, in Giappone e in Corea del Sud. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Non offriamo Dialectical Engine alle persone che vivono nel Tennessee." },
+      { kind: "p", text: "Mississippi. Non offriamo Dialectical Engine alle persone che vivono nel Mississippi." },
       { kind: "p", text: "Avvisi e rimozioni. Le immagini intime non consensuali possono essere segnalate per email all'indirizzo abuse@dezbatere.ro, senza un account, e vengono rimosse entro 48 ore da una richiesta valida. I reclami relativi al diritto d'autore seguono la procedura di segnalazione della sezione 10." },
       { kind: "p", text: "Disposizioni specifiche per Stato. California: si applicano le condizioni di rinnovo automatico di cui alla sezione 12; puoi disdire l'abbonamento online in qualsiasi momento; conserviamo il tuo consenso alle condizioni di rinnovo per almeno tre anni. New York: puoi disdire l'abbonamento entro 14 giorni da qualsiasi addebito a prezzo maggiorato e ricevere un rimborso proporzionale. Texas e Nebraska: non vendiamo dati personali sensibili. Washington: ai dati sanitari si applica la nostra Informativa sulla privacy dei dati sanitari dei consumatori all'indirizzo dezbatere.ro/privacy/us-health-data. Colorado: nulla nel servizio adotta decisioni con effetti significativi che ti riguardano. La nostra Informativa sulla privacy, Allegato B.2, riguarda i tuoi dati e i diritti in materia di privacy previsti dal tuo Stato." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "ee3a25eeb443b471a01775bc10ad891d0071d8acc44ee30b2ba370edc146c64d",
+  sha256: "007f4ee2ab272ce94bbd9582d0d75da2c75206bafebbcde32602d8a95417c387",
   eyebrow: "CONDIZIONI DI SERVIZIO · v2.18 · IN VIGORE DAL 1 NOVEMBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",

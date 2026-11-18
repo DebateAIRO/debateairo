@@ -48,7 +48,7 @@ Estos datos también figuran de forma permanente en el sitio web, en dezbatere.r
 
 ## 2. Dónde ofrecemos Dialectical Engine
 
-Ofrecemos Dialectical Engine a las personas que viven en la Unión Europea (27 países) y el Espacio Económico Europeo (Noruega e Islandia), Moldavia, Estados Unidos (salvo Tennessee), Canadá, Australia, Nueva Zelanda, Singapur, Japón y Corea del Sur. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio.
+Ofrecemos Dialectical Engine a las personas que viven en la Unión Europea (27 países) y el Espacio Económico Europeo (Noruega e Islandia), Moldavia, Estados Unidos (salvo Tennessee y Misisipi), Canadá, Australia, Nueva Zelanda, Singapur, Japón y Corea del Sur. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio.
 
 ## 3. Aceptación de estos Términos
 
@@ -334,6 +334,8 @@ El cuerpo de estos Términos está redactado para usted. Además: puede iniciar 
 ### A.2 Estados Unidos
 
 **Tennessee.** No ofrecemos Dialectical Engine a las personas que viven en Tennessee.
+
+**Misisipi.** No ofrecemos Dialectical Engine a las personas que viven en Misisipi.
 
 **Notificaciones y retiradas.** Las imágenes íntimas no consentidas pueden denunciarse por correo electrónico a abuse@dezbatere.ro, sin una cuenta, y se retirarán en un plazo de 48 horas desde una solicitud válida. Las reclamaciones por derechos de autor siguen la vía de denuncia de la sección 10.
 

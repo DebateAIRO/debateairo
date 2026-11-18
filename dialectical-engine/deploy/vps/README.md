@@ -3849,7 +3849,7 @@ People there can sign up and use Free; only paying is refused. To open one:
    only; deleting its entry opens it for them too.)
 3. Publish as in §14.4. The new version replaces the old one; a sealed version is never edited.
 
-Tennessee (`US-TN`, reason `TERMS_EXCLUDED`) is not a tax region: the Terms exclude it. Keep its entry while they do.
+Tennessee (`US-TN`) and Mississippi (`US-MS`), reason `TERMS_EXCLUDED`, are not tax regions: the Terms exclude them. Keep their entries while they do.
 
 The publish refuses a region id the code does not know, and a region entry with `signup` or `blocked`: a region
 never closes sign-up.

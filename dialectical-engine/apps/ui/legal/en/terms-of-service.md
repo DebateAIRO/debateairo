@@ -48,7 +48,7 @@ These details are also shown permanently on the site at dezbatere.ro/legal. You 
 
 ## 2. Where we offer Dialectical Engine
 
-We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway and Iceland), Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve.
+We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway and Iceland), Moldova, the United States (except Tennessee and Mississippi), Canada, Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve.
 
 ## 3. Accepting these Terms
 
@@ -334,6 +334,8 @@ The body of these Terms is written for you. In addition: you may bring proceedin
 ### A.2 United States
 
 **Tennessee.** We do not offer Dialectical Engine to people who live in Tennessee.
+
+**Mississippi.** We do not offer Dialectical Engine to people who live in Mississippi.
 
 **Notices and takedowns.** Non-consensual intimate imagery may be reported by email to abuse@dezbatere.ro, without an account, and is removed within 48 hours of a valid request. Copyright complaints go through the reporting route in section 10.
 

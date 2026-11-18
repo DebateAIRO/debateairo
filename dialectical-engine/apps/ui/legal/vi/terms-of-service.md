@@ -48,7 +48,7 @@ Những thông tin này cũng được hiển thị thường xuyên trên trang
 
 ## 2. Nơi chúng tôi cung cấp Dialectical Engine
 
-Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy và Iceland), Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản và Hàn Quốc. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ.
+Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy và Iceland), Moldova, Hoa Kỳ (trừ Tennessee và Mississippi), Canada, Australia, New Zealand, Singapore, Nhật Bản và Hàn Quốc. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ.
 
 ## 3. Chấp nhận các Điều khoản này
 
@@ -334,6 +334,8 @@ Phần nội dung chung của các Điều khoản này được soạn cho bạ
 ### A.2 Hoa Kỳ
 
 **Tennessee.** Chúng tôi không cung cấp Dialectical Engine cho những người sống tại Tennessee.
+
+**Mississippi.** Chúng tôi không cung cấp Dialectical Engine cho những người sống tại Mississippi.
 
 **Thông báo và gỡ bỏ.** Hình ảnh riêng tư không có sự đồng thuận có thể được báo cáo qua email tới abuse@dezbatere.ro mà không cần tài khoản, và được gỡ bỏ trong vòng 48 giờ kể từ khi nhận yêu cầu hợp lệ. Khiếu nại về quyền tác giả được xử lý theo kênh báo cáo tại mục 10.
 

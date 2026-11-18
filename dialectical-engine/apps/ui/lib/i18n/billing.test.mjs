@@ -178,7 +178,7 @@ test("the closed-region and postal-code refusals read exactly as the owner appro
   // BILLING_POSTCODE_INVALID (422): the postal code does not fit its country's format.
   assert.equal(english["billing.checkout.postalCodeInvalid"], "Please check your postal code.");
   // REGION_TERMS_EXCLUDED (403): the billing address is in a region the Terms exclude (the owner's choice of 3 Nov 2026).
-  assert.equal(english["billing.checkout.regionTermsExcluded"], "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address.");
+  assert.equal(english["billing.checkout.regionTermsExcluded"], "We don't offer Dialectical Engine in Tennessee or Mississippi, so we can't take payment for this address.");
 });
 
 test("Romanian names the order button as Terms §12 requires", () => {

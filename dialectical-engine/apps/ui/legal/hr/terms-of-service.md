@@ -48,7 +48,7 @@ Ti su podaci također trajno prikazani na mrežnom mjestu dezbatere.ro/legal. Uv
 
 ## 2. Gdje nudimo Dialectical Engine
 
-Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška i Island), Moldova, Sjedinjene Američke Države (osim savezne države Tennessee), Kanada, Australija, Novi Zeland, Singapur, Japan i Južna Koreja. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu.
+Dialectical Engine nudimo osobama koje žive u sljedećim državama i regijama: Europska unija (27 država) i Europski gospodarski prostor (Norveška i Island), Moldova, Sjedinjene Američke Države (osim saveznih država Tennessee i Mississippi), Kanada, Australija, Novi Zeland, Singapur, Japan i Južna Koreja. Ne nudimo ga drugdje. Ako živite izvan tih država, možda ćete moći pristupiti mrežnom mjestu, ali uslugu ne usmjeravamo prema vama, ne prihvaćamo plaćanje od vas, a ovi Uvjeti i naša Pravila o privatnosti nisu prilagođeni pravu vaše države. Prilog A utvrđuje što se primjenjuje u svakoj regiji u kojoj pružamo uslugu.
 
 ## 3. Prihvaćanje ovih Uvjeta
 
@@ -334,6 +334,8 @@ Opći dio ovih Uvjeta napisan je za vas. Dodatno: postupak možete pokrenuti pre
 ### A.2 Sjedinjene Američke Države
 
 **Tennessee.** Ne nudimo Dialectical Engine osobama koje žive u Tennesseeju.
+
+**Mississippi.** Ne nudimo Dialectical Engine osobama koje žive u Mississippiju.
 
 **Obavijesti i uklanjanja.** Intimne snimke objavljene bez privole mogu se prijaviti e-poštom na abuse@dezbatere.ro, bez računa, i uklanjaju se u roku od 48 sati od valjanog zahtjeva. Pritužbe zbog autorskih prava podnose se postupkom iz odjeljka 10.
 

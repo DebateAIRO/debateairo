@@ -48,7 +48,7 @@ Diese Angaben werden auch dauerhaft auf der Website unter dezbatere.ro/legal ang
 
 ## 2. Wo wir Dialectical Engine anbieten
 
-Wir bieten Dialectical Engine Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen und Island), in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee), in Kanada, Australien, Neuseeland, Singapur, Japan und Südkorea leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten.
+Wir bieten Dialectical Engine Personen an, die in der Europäischen Union (27 Staaten) und im Europäischen Wirtschaftsraum (Norwegen und Island), in der Republik Moldau, in den Vereinigten Staaten (außer Tennessee und Mississippi), in Kanada, Australien, Neuseeland, Singapur, Japan und Südkorea leben. Anderswo bieten wir den Dienst nicht an. Wenn Sie außerhalb dieser Länder leben, können Sie die Website möglicherweise aufrufen, aber wir richten den Dienst nicht an Sie, nehmen keine Zahlungen von Ihnen an, und diese Nutzungsbedingungen sowie unsere Datenschutzerklärung sind nicht an das Recht Ihres Landes angepasst. Anhang A legt fest, was in den einzelnen Regionen gilt, in denen wir den Dienst anbieten.
 
 ## 3. Zustimmung zu diesen Nutzungsbedingungen
 
@@ -334,6 +334,8 @@ Der allgemeine Teil dieser Nutzungsbedingungen ist für Sie abgefasst. Zusätzli
 ### A.2 Vereinigte Staaten
 
 **Tennessee.** Wir bieten Dialectical Engine Personen, die in Tennessee leben, nicht an.
+
+**Mississippi.** Wir bieten Dialectical Engine Personen, die in Mississippi leben, nicht an.
 
 **Mitteilungen und Entfernung.** Intime Abbildungen, die ohne Einwilligung veröffentlicht wurden, können ohne Konto per E-Mail an abuse@dezbatere.ro gemeldet werden und werden innerhalb von 48 Stunden nach Eingang eines wirksamen Antrags entfernt. Urheberrechtsbeschwerden folgen dem Meldeweg nach Abschnitt 10.
 

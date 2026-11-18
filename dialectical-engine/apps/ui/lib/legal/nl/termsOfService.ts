@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Waar wij Dialectical Engine aanbieden",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Wij bieden Dialectical Engine aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen en IJsland), Moldavië, de Verenigde Staten (behalve Tennessee), Canada, Australië, Nieuw-Zeeland, Singapore, Japan en Zuid-Korea. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
+      { kind: "p", text: "Wij bieden Dialectical Engine aan personen die wonen in de Europese Unie (27 landen) en de Europese Economische Ruimte (Noorwegen en IJsland), Moldavië, de Verenigde Staten (behalve Tennessee en Mississippi), Canada, Australië, Nieuw-Zeeland, Singapore, Japan en Zuid-Korea. Wij bieden de dienst nergens anders aan. Als u buiten die landen woont, kunt u de site mogelijk bereiken, maar wij richten de dienst niet op u, aanvaarden geen betaling van u en deze Voorwaarden en ons Privacybeleid zijn niet aangepast aan het recht van uw land. Bijlage A bepaalt wat in elke door ons bediende regio van toepassing is." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Aan personen die in Tennessee wonen, bieden wij Dialectical Engine niet aan." },
+      { kind: "p", text: "Mississippi. Aan personen die in Mississippi wonen, bieden wij Dialectical Engine niet aan." },
       { kind: "p", text: "Kennisgevingen en verwijderingen. Intieme beelden zonder toestemming kunnen zonder account worden gemeld per e-mail aan abuse@dezbatere.ro en worden binnen 48 uur na een geldig verzoek verwijderd. Auteursrechtklachten volgen de meldingsprocedure van hoofdstuk 10." },
       { kind: "p", text: "Per staat. Californië: de voorwaarden voor automatische verlenging in hoofdstuk 12 zijn van toepassing; u kunt te allen tijde online opzeggen; wij bewaren uw instemming met verlengingsvoorwaarden ten minste drie jaar. New York: u kunt binnen 14 dagen na elke afschrijving tegen een verhoogde prijs opzeggen en een terugbetaling naar rato ontvangen. Texas en Nebraska: wij verkopen geen gevoelige persoonsgegevens. Washington: onze Consumer Health Data Privacy Notice op dezbatere.ro/privacy/us-health-data is van toepassing op gezondheidsgerelateerde informatie. Colorado: niets in de dienst neemt beslissingen over u die aanzienlijke gevolgen hebben. Bijlage B.2 van ons Privacybeleid heeft betrekking op uw gegevens en uw privacyrechten in uw staat." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "9672f220e3e44e9586cbc9ddb7f6721ae10fb065528016dc88fa93539eb33704",
+  sha256: "d9310b48161b2399a8ce978f1a6c9d2592048eb413c459ff98af133f245ad49e",
   eyebrow: "SERVICEVOORWAARDEN · v2.18 · VAN KRACHT OP 1 NOVEMBER 2026",
   title: "Waarmee u instemt",
   lede: "De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.",
