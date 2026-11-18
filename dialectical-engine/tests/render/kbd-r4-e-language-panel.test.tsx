@@ -13,7 +13,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LanguageSwitcher } from "../../apps/ui/components/LanguageSwitcher.js";
 import { handleLanguageSwitcherKey } from "../../apps/ui/components/languageSwitcherState.js";
-import { filterLocales } from "../../apps/ui/lib/i18n/locales.js";
+import { filterLocales, OFFERED_LOCALE_PREFERENCES } from "../../apps/ui/lib/i18n/locales.js";
 import { rulesFor, stylesheet } from "./kbd-r4-e-css.js";
 
 let root: Root;
@@ -35,7 +35,8 @@ afterEach(async () => {
 
 const search = () => document.querySelector<HTMLInputElement>('[role="combobox"]')!;
 const panel = () => document.querySelector<HTMLElement>(".languageSwitcherPanel")!;
-const all = filterLocales("").map(({ code }) => code);
+// The panel lists only the offered languages (English US, English UK, Romanian): two drawn rows in two columns.
+const all = filterLocales("", OFFERED_LOCALE_PREFERENCES).map(({ code }) => code);
 const active = () => search().getAttribute("aria-activedescendant")!.split("-list-").at(-1);
 async function open(): Promise<void> {
   await act(async () => root.render(<LanguageSwitcher />));
@@ -123,8 +124,9 @@ describe("E8: the arrow keys follow the two columns", () => {
 
   it("with text in the search box, Home, End, Left and Right are always the text's; with it empty, the list's", async () => {
     await open();
-    await type("e", 1);
-    const matches = filterLocales("e").map(({ code }) => code);
+    // "n" is in all three offered rows (English, Română), so the filtered list still has more than two.
+    await type("n", 1);
+    const matches = filterLocales("n", OFFERED_LOCALE_PREFERENCES).map(({ code }) => code);
     expect(matches.length).toBeGreaterThan(2);
     const ringed = active();
     // Round 4 review: with the caret at the end, Right went to the list and Left to the caret, so the ring could move

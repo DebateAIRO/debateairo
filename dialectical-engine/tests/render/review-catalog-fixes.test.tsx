@@ -138,24 +138,25 @@ describe("review F1: the AI notice and the support banner read the namespace the
   });
 });
 
+// The interface offers English and Romanian only, so the pages below are read under the Romanian cookie.
 describe("review F2: the session check paints in the reader's language", () => {
-  const hebrewChecking = () => escapeHtml(catalogValue("he", "newDebate", "newDebate.checkingSession"));
+  const romanianChecking = () => escapeHtml(catalogValue("ro", "newDebate", "newDebate.checkingSession"));
   const englishChecking = () => escapeHtml(catalogValue("en", "newDebate", "newDebate.checkingSession"));
 
-  it("the debate page's AuthGate shows the Hebrew session check", async () => {
-    mocks.locale = "he";
+  it("the debate page's AuthGate shows the Romanian session check", async () => {
+    mocks.locale = "ro";
     const html = renderToStaticMarkup(
       await DebatePage({ params: Promise.resolve({ id: queuedRun.run_ref }) }) as ReactElement
     );
-    expect(html).toContain(hebrewChecking());
+    expect(html).toContain(romanianChecking());
     // MUT: drop catalog={newDebateCatalog} from <AuthGate> in DebatePageGate.tsx -> RED.
     expect(html).not.toContain(englishChecking());
   });
 
-  it("the settings page's AuthGate shows the Hebrew session check", async () => {
-    mocks.locale = "he";
+  it("the settings page's AuthGate shows the Romanian session check", async () => {
+    mocks.locale = "ro";
     const html = renderToStaticMarkup(await SettingsPage() as ReactElement);
-    expect(html).toContain(hebrewChecking());
+    expect(html).toContain(romanianChecking());
     // MUT: drop catalog={newDebateCatalog} from <AuthGate> in SettingsPageClient.tsx -> RED.
     expect(html).not.toContain(englishChecking());
   });
@@ -174,11 +175,11 @@ describe("review F5: /enroll-mfa and /verify-email are served with their auth ca
     return renderToStaticMarkup(await layout({ children: <EnrollMfaPage /> }) as ReactElement);
   }
 
-  it("paints the Hebrew enrolment copy on the first render, with no English in between", async () => {
+  it("paints the Romanian enrolment copy on the first render, with no English in between", async () => {
     for (const layout of [EnrollMfaLayout, VerifyEmailLayout]) {
-      const html = await firstPaint("he", layout);
+      const html = await firstPaint("ro", layout);
       for (const key of ["auth.signUp.eyebrow", "auth.enroll.securityTitle"]) {
-        expect(html).toContain(escapeHtml(catalogValue("he", "auth", key)));
+        expect(html).toContain(escapeHtml(catalogValue("ro", "auth", key)));
         // MUT: restore the lazy client loader (English until the chunk arrives) -> RED.
         expect(html).not.toContain(escapeHtml(catalogValue("en", "auth", key)));
       }
@@ -198,13 +199,12 @@ describe("review F5: /enroll-mfa and /verify-email are served with their auth ca
 
 describe("review Low: the 404 page is localized", () => {
   it("renders the not-found line and the way home from the reader's chrome catalogue", async () => {
-    mocks.locale = "he";
-    // Every non-en locale carries the English placeholder for chrome.notFound until
-    // the translation seat runs; a value the page could not invent proves the source.
-    mocks.overlay = { "he/chrome": { "chrome.notFound": "HE_NOT_FOUND_SENTINEL" } };
+    mocks.locale = "ro";
+    // A value the page could not invent proves the line comes from the reader's catalogue.
+    mocks.overlay = { "ro/chrome": { "chrome.notFound": "RO_NOT_FOUND_SENTINEL" } };
     const html = renderToStaticMarkup(await NotFound() as ReactElement);
-    expect(html).toContain("HE_NOT_FOUND_SENTINEL");
-    expect(html).toContain(`>${escapeHtml(catalogValue("he", "chrome", "chrome.library"))}<`);
+    expect(html).toContain("RO_NOT_FOUND_SENTINEL");
+    expect(html).toContain(`>${escapeHtml(catalogValue("ro", "chrome", "chrome.library"))}<`);
     expect(html).not.toContain(">Library<");
 
     mocks.locale = "en";

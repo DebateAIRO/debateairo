@@ -212,24 +212,30 @@ describe("ruling 1: native spellings of the same phrase are accepted (fluency re
 });
 
 describe("ruling 2: the meta description follows the reader's locale", () => {
-  it("returns the catalogue's description for he and de, and the brand title", async () => {
-    for (const locale of ["he", "de"] as const) {
-      mocks.locale = locale;
-      mocks.overlay = {};
-      expect(await generateMetadata()).toEqual({
-        title: "Dialectical Engine",
-        description: catalogValue(locale, "chrome", "chrome.metaDescription")
-      });
-      // Both carry the English placeholder today; a value the layout could not
-      // invent proves the description is read from the locale's catalogue.
-      mocks.overlay = { [`${locale}/chrome`]: { "chrome.metaDescription": `${locale.toUpperCase()}_META_SENTINEL` } };
-      expect((await generateMetadata()).description).toBe(`${locale.toUpperCase()}_META_SENTINEL`);
-    }
+  it("returns the catalogue's description for ro, the offered language besides English, and the brand title", async () => {
+    const locale = "ro";
+    mocks.locale = locale;
+    mocks.overlay = {};
+    expect(await generateMetadata()).toEqual({
+      title: "Dialectical Engine",
+      description: catalogValue(locale, "chrome", "chrome.metaDescription")
+    });
+    // A value the layout could not invent proves the description is read from the locale's catalogue.
+    mocks.overlay = { [`${locale}/chrome`]: { "chrome.metaDescription": "RO_META_SENTINEL" } };
+    expect((await generateMetadata()).description).toBe("RO_META_SENTINEL");
   });
 
   it("leaves the English metadata unchanged", async () => {
     expect(await generateMetadata()).toEqual({ title: "Dialectical Engine", description: ENGLISH_DESCRIPTION });
     mocks.locale = "not-a-locale";
     expect(await generateMetadata()).toEqual({ title: "Dialectical Engine", description: ENGLISH_DESCRIPTION });
+  });
+
+  it("gives English metadata for a catalogue language the site does not offer (he, de)", async () => {
+    for (const locale of ["he", "de"] as const) {
+      mocks.locale = locale;
+      mocks.overlay = { [`${locale}/chrome`]: { "chrome.metaDescription": `${locale.toUpperCase()}_META_SENTINEL` } };
+      expect(await generateMetadata()).toEqual({ title: "Dialectical Engine", description: ENGLISH_DESCRIPTION });
+    }
   });
 });

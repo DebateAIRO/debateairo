@@ -1,6 +1,6 @@
 import "server-only";
 
-import { DEFAULT_LOCALE, catalogLocale, isLocale, type CatalogLocaleCode } from "./locales";
+import { DEFAULT_LOCALE, catalogLocale, isCatalogLocale, type CatalogLocaleCode } from "./locales";
 import type { I18nNamespace } from "./I18nProvider";
 import type { MessageCatalog } from "./translate";
 
@@ -745,11 +745,16 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
     }
   });
 
+/**
+ * A namespace's catalogue in any of the 35 catalogue languages, not only the offered ones: the short story and the
+ * report of a debate argued in another language read their fixed words in that language. Pages pass their interface
+ * locale, which is already limited to the offered languages.
+ */
 export async function loadNamespace(
   locale: string,
   namespace: I18nNamespace
 ): Promise<MessageCatalog> {
-  const selectedLocale = catalogLocale(isLocale(locale) ? locale : DEFAULT_LOCALE);
+  const selectedLocale = catalogLocale(isCatalogLocale(locale) ? locale : DEFAULT_LOCALE);
   try {
     return (await LOADERS[selectedLocale][namespace]()).default;
   } catch {

@@ -107,13 +107,15 @@ describe("QuestionLanguageOffer", () => {
   });
 
   it("renders nothing on the server, so a dismissed offer never flashes on reload (fix round 1)", async () => {
-    expect(renderToString(<QuestionLanguageOffer questionLocale="it" interfaceLocale="en" catalog={chromeEnglish} />)).toBe("");
+    expect(renderToString(<QuestionLanguageOffer questionLocale="ro" interfaceLocale="en" catalog={chromeEnglish} />)).toBe("");
   });
 
+  // The site offers English and Romanian only, so every offer below is one of the two pairs: a Romanian debate on an
+  // English page, or an English debate on a Romanian page.
   it("stays hidden through hydration once dismissed, and never appears even for a moment", async () => {
-    sessionStorage.setItem(LANGUAGE_OFFER_DISMISSED_KEY, JSON.stringify(["es"]));
+    sessionStorage.setItem(LANGUAGE_OFFER_DISMISSED_KEY, JSON.stringify(["ro"]));
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const element = <QuestionLanguageOffer questionLocale="es" interfaceLocale="en" catalog={chromeEnglish} />;
+    const element = <QuestionLanguageOffer questionLocale="ro" interfaceLocale="en" catalog={chromeEnglish} />;
     const container = document.createElement("div");
     container.innerHTML = renderToString(element);
     document.body.append(container);
@@ -128,17 +130,28 @@ describe("QuestionLanguageOffer", () => {
 
   it("appears after hydration when it was not dismissed", async () => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-    const element = <QuestionLanguageOffer questionLocale="it" interfaceLocale="en" catalog={chromeEnglish} />;
+    const element = <QuestionLanguageOffer questionLocale="en" interfaceLocale="ro" catalog={chromeRomanian} />;
     const container = document.createElement("div");
     container.innerHTML = renderToString(element);
     document.body.append(container);
     await act(async () => { root = hydrateRoot(container, element); });
-    expect(container.querySelector(".languageOfferText")?.textContent).toBe("This debate is in Italian (Italiano). Show the page in Italian?");
+    expect(container.querySelector(".languageOfferText")?.textContent)
+      .toBe("Această dezbatere este în limba engleză (English). Afișați pagina în limba engleză?");
   });
 
   it("shows nothing when the locales agree, or the question's language is not known", async () => {
     expect(renderToStaticMarkup(<QuestionLanguageOffer questionLocale="en" interfaceLocale="en" catalog={chromeEnglish} />)).toBe("");
     expect(renderToStaticMarkup(<QuestionLanguageOffer questionLocale={null} interfaceLocale="en" catalog={chromeEnglish} />)).toBe("");
+  });
+
+  it("offers no switch to a language the site does not offer: a German or Italian debate keeps the page as it is", async () => {
+    for (const questionLocale of ["de", "it"] as const) {
+      const container = await mount(<QuestionLanguageOffer questionLocale={questionLocale} interfaceLocale="en" catalog={chromeEnglish} />);
+      expect(container.querySelector("section.languageOffer"), questionLocale).toBeNull();
+      await unmount();
+    }
+    const onRomanian = await mount(<QuestionLanguageOffer questionLocale="de" interfaceLocale="ro" catalog={chromeRomanian} />);
+    expect(onRomanian.querySelector("section.languageOffer")).toBeNull();
   });
 
   it("never uses the retired 'interface only' caption (dev decision D1)", async () => {
@@ -156,21 +169,22 @@ describe("QuestionLanguageOffer", () => {
     const again = await mount(<QuestionLanguageOffer questionLocale="ro" interfaceLocale="en" catalog={chromeEnglish} />);
     expect(again.querySelector("section.languageOffer")).toBeNull();
     await unmount();
-    const german = await mount(<QuestionLanguageOffer questionLocale="de" interfaceLocale="en" catalog={chromeEnglish} />);
-    expect(german.querySelector("section.languageOffer")).not.toBeNull();
+    // The other offered language is still offered: the dismissal is per language.
+    const english = await mount(<QuestionLanguageOffer questionLocale="en" interfaceLocale="ro" catalog={chromeRomanian} />);
+    expect(english.querySelector("section.languageOffer")).not.toBeNull();
     // Not a cookie: nothing about the choice reaches the server.
     expect(document.cookie).not.toContain("languageOffer");
   });
 
-  it("switches with dev's locale cookie (the same cookie the language switcher writes)", async () => {
+  it("switches with the locale cookie (the same cookie the language switcher writes)", async () => {
     // The reload that follows cannot be observed here: jsdom does not navigate,
     // and its Location is unforgeable, so it cannot be spied on either.
-    // French: a language this file has not dismissed (a dismissal also lasts in memory for the page's life).
-    const container = await mount(<QuestionLanguageOffer questionLocale="fr" interfaceLocale="en" catalog={chromeEnglish} />);
+    // English: an offered language this file has not dismissed (a dismissal also lasts in memory for the page's life).
+    const container = await mount(<QuestionLanguageOffer questionLocale="en" interfaceLocale="ro" catalog={chromeRomanian} />);
     const switchButton = container.querySelector<HTMLButtonElement>(".languageOfferSwitch")!;
-    expect(switchButton.textContent).toBe("Switch to French");
+    expect(switchButton.textContent).toBe("Treceți la limba engleză");
     await act(async () => switchButton.click());
-    expect(document.cookie).toContain(`${LOCALE_COOKIE}=fr`);
+    expect(document.cookie).toContain(`${LOCALE_COOKIE}=en`);
   });
 });
 

@@ -328,9 +328,17 @@ const SESSION_VALUE = "s".repeat(43);
 test("C03.1: a well-formed debateai.locale cookie reaches the upstream, beside the auth cookies", async () => {
   const alone = await forwardedHeadersFor({ cookie: "debateai.locale=ro" });
   assert.equal(alone.forwarded.get("cookie"), "debateai.locale=ro");
-  const beside = await forwardedHeadersFor({ cookie: `__Host-debateai-session=${SESSION_VALUE}; debateai.locale=de` });
+  const beside = await forwardedHeadersFor({ cookie: `__Host-debateai-session=${SESSION_VALUE}; debateai.locale=en-GB` });
   const pairs = beside.forwarded.get("cookie").split("; ").sort();
-  assert.deepEqual(pairs, [`__Host-debateai-session=${SESSION_VALUE}`, "debateai.locale=de"].sort());
+  assert.deepEqual(pairs, [`__Host-debateai-session=${SESSION_VALUE}`, "debateai.locale=en-GB"].sort());
+});
+
+test("a debateai.locale naming a language the site does not offer is dropped, so the mails stay in the page's English", async () => {
+  for (const unoffered of ["de", "fr", "he", "zz", "RO"]) {
+    const { forwarded, response } = await forwardedHeadersFor({ cookie: `__Host-debateai-session=${SESSION_VALUE}; debateai.locale=${unoffered}` });
+    assert.equal(response.status, 200, `an unoffered locale (${unoffered}) does not refuse the request`);
+    assert.equal(forwarded.get("cookie"), `__Host-debateai-session=${SESSION_VALUE}`, `the unoffered locale (${unoffered}) is not forwarded`);
+  }
 });
 
 test("C03.1: the first debateai.locale occurrence wins; a second occurrence is dropped", async () => {
