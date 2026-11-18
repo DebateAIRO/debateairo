@@ -72,9 +72,10 @@ type WrittenScan = { written: Set<string>; unresolved: string[] };
  * `document.cookie` — `${CONST}=` builders, literal `"set-cookie", "name=` pairs, and the names
  * `lawfulSetCookie` compares against, read from that function's body only; (4) the key of every
  * `.setItem(` call, whatever its receiver. A key that resolves to no string is `unresolved`.
+ * Constants resolve from `constantSources` (default: the scanned sources themselves).
  */
-function scanWritten(sources: ReadonlyMap<string, string>): WrittenScan {
-  const constants = stringConstants(sources);
+function scanWritten(sources: ReadonlyMap<string, string>, constantSources: ReadonlyMap<string, string> = sources): WrittenScan {
+  const constants = stringConstants(constantSources);
   const resolve = (token: string): string | undefined => {
     const trimmed = token.trim();
     const literal = /^["'`]([^"'`$]+)["'`]$/.exec(trimmed);
@@ -137,6 +138,20 @@ describe("the storage inventory of record equals what the product writes (SPEC-v
 
   it("every write site's key resolves to a string", () => {
     expect(scan.unresolved).toEqual([]);
+  });
+
+  it("every cookie the API sets is one the UI's /api proxy passes to the browser", () => {
+    // The browser reaches the API only through apps/ui/app/api/[...path]/route.ts; a cookie the API
+    // writes that lawfulSetCookie does not name is stripped there and never reaches the browser.
+    const sources = scannedSources(process.cwd());
+    const constants = stringConstants(sources);
+    const api = new Map([...sources].filter(([path]) => path.startsWith("apps/api/src/")));
+    const apiWritten = [...scanWritten(api, sources).written];
+    const route = sources.get("apps/ui/app/api/[...path]/route.ts") ?? "";
+    const body = /function lawfulSetCookie\b[\s\S]*?\n}\n/.exec(route)?.[0] ?? "";
+    const passed = new Set([...body.matchAll(/\b[A-Z][A-Z0-9_]*\b/g)].flatMap((token) => constants.get(token[0]) ?? []));
+    expect(apiWritten.length).toBeGreaterThan(0);
+    expect(apiWritten.filter((name) => !passed.has(name)).sort()).toEqual([]);
   });
   it("counts concrete MFA CSRF and both social flow producers without unrelated identifiers", () => {
     const sources=new Map([["apps/api/a.ts", 'const SOCIAL_FLOW_COOKIE="__Host-flow", UNUSED="__Host-unused"; const SOCIAL_APPLE_FLOW_COOKIE="__Host-apple";const n="__Host-mfa",csrfName=`${n}-csrf`;const socialCookie=(name:string,value:string)=>`${name}=${value}`;reply.header("set-cookie",[`${n}=v`,`${csrfName}=c`,socialCookie(provider===\'apple\'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,value)]);']]);
