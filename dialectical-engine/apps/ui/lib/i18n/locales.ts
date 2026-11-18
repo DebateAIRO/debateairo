@@ -74,22 +74,43 @@ export function legalLocale(locale: LocaleCode): CatalogLocaleCode {
   return catalogLocale(locale);
 }
 
-const localeCodes = new Set<string>([...LOCALES.map(({ code }) => code), "en-US", "en-GB"]);
+const catalogLocaleCodes = new Set<string>([...LOCALES.map(({ code }) => code), "en-US", "en-GB"]);
 
-export function isLocale(value: unknown): value is LocaleCode {
-  return typeof value === "string" && localeCodes.has(value);
+/**
+ * Whether a value names one of the 35 catalogue languages (or a regional English choice). Text that carries a language
+ * of its own, such as a debate argued in German, is tagged and read with this test, whatever the interface shows.
+ */
+export function isCatalogLocale(value: unknown): value is LocaleCode {
+  return typeof value === "string" && catalogLocaleCodes.has(value);
 }
 
+/**
+ * The interface languages the site offers. The other catalogues stay in the repository but are not offered: the
+ * language list does not show them, and a locale cookie naming one is read as English.
+ */
+export const OFFERED_LOCALE_CODES: readonly CatalogLocaleCode[] = Object.freeze(["en", "ro"]);
+
+/** Whether a value names an offered interface language: the test every page applies to the locale cookie. */
+export function isLocale(value: unknown): value is LocaleCode {
+  return isCatalogLocale(value) && OFFERED_LOCALE_CODES.includes(catalogLocale(value));
+}
+
+/** The rows of the language list: the offered languages, with English as its two regional choices. */
+export const OFFERED_LOCALE_PREFERENCES: readonly LocaleDefinition[] = Object.freeze(
+  LOCALE_PREFERENCES.filter(({ code }) => isLocale(code))
+);
+
+/** A language's definition (name, direction); any catalogue language is known here, so Arabic and Hebrew text stays right to left. */
 export function getLocale(value: unknown): LocaleDefinition {
-  const code = isLocale(value) ? value : DEFAULT_LOCALE;
+  const code = isCatalogLocale(value) ? value : DEFAULT_LOCALE;
   return LOCALE_PREFERENCES.find((candidate) => candidate.code === code)
     ?? LOCALES.find((candidate) => candidate.code === code) ?? LOCALES[5];
 }
 
-export function filterLocales(query: string): readonly LocaleDefinition[] {
+export function filterLocales(query: string, choices: readonly LocaleDefinition[] = LOCALE_PREFERENCES): readonly LocaleDefinition[] {
   const normalized = query.trim().toLowerCase();
-  if (normalized.length === 0) return LOCALE_PREFERENCES;
-  return LOCALE_PREFERENCES.filter(({ code, nativeName }) =>
+  if (normalized.length === 0) return choices;
+  return choices.filter(({ code, nativeName }) =>
     code.toLowerCase().includes(normalized) ||
     nativeName.toLowerCase().includes(normalized)
   );

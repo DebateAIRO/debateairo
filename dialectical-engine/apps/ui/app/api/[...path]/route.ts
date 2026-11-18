@@ -6,6 +6,7 @@ import {
   AGE_REFUSAL_COOKIE_VALUE
 } from "@debateai/contract";
 import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../../../trusted-client-ip.mjs";
+import { isLocale } from "../../../lib/i18n/locales.js";
 
 type ProxyContext = Readonly<{
   params: Promise<Readonly<{ path: string[] }>>;
@@ -87,9 +88,11 @@ const SOCIAL_COOKIE_NAMES = [SOCIAL_FLOW_COOKIE_NAME, SOCIAL_APPLE_FLOW_COOKIE_N
 const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
-/** C03.1 (R-09): the dropdown's language cookie, forwarded so the API resolves the mail language (R-06). */
+/**
+ * The language list's cookie, forwarded so the API writes its mails in the reader's language. Only an offered interface
+ * language travels: an older cookie naming another language shows English pages, so the API falls back to English too.
+ */
 const LOCALE_COOKIE_NAME = "debateai.locale";
-const LOCALE_COOKIE_PATTERN = /^[A-Za-z]{2}(-[A-Za-z]{2})?$/;
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
 const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
 /** DL1-F5c/DL3-F4: the case bearer, which used to travel in the path. */
@@ -177,9 +180,10 @@ function filteredSessionCookies(raw: string | null): string | null {
     const name = member.slice(0, index).trim();
     const rawValue = member.slice(index + 1);
     const value = name === STAFF_COOKIE_NAME || name === STAFF_CSRF_COOKIE_NAME ? rawValue : rawValue.trim();
-    // C03.1 (R-09): the first occurrence decides; a second one, or a malformed value, is dropped and never refuses the request.
+    // The first occurrence decides; a second one, a malformed value or a language the site does not offer is dropped and
+    // never refuses the request.
     if (name === LOCALE_COOKIE_NAME) {
-      if (!localeSeen && LOCALE_COOKIE_PATTERN.test(value)) selected.set(name, value);
+      if (!localeSeen && isLocale(value)) selected.set(name, value);
       localeSeen = true;
       continue;
     }
