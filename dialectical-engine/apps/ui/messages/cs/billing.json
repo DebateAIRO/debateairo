@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Přihlaste se a otevřete Nastavení, poté Předplatné a poté „Zde odstoupit od smlouvy“.",
   "billing.withdrawPage.byEmail": "Můžete také poslat vzorový formulář pro odstoupení od smlouvy z potvrzovacího e-mailu nebo jakékoli jasné prohlášení, že odstupujete, na adresu {email}. Odstoupení provedeme a potvrdíme e-mailem.",
   "billing.withdrawPage.signIn": "Přihlásit se",
-  "billing.withdrawPage.settings": "Otevřít Nastavení"
+  "billing.withdrawPage.settings": "Otevřít Nastavení",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

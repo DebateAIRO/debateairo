@@ -32,6 +32,7 @@ vi.mock("next/headers", () => ({
 // not a session, so the page asks P19's sessionConfirmed, as /checkout does.
 vi.mock("@/lib/billing/serverBilling", () => ({
   billingIsOn: async () => mocks.billingOn,
+  billingState: async () => ({ on: mocks.billingOn, testMode: false }),
   sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; }
 }));
 

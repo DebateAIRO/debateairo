@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Accedi e apri Impostazioni, poi Abbonamento, poi «Recedere dal contratto qui».",
   "billing.withdrawPage.byEmail": "Puoi anche inviare il modulo tipo di recesso allegato all’e-mail di conferma, o qualsiasi dichiarazione esplicita di recesso, a {email}. Lo eseguiamo e te lo confermiamo via e-mail.",
   "billing.withdrawPage.signIn": "Accedi",
-  "billing.withdrawPage.settings": "Apri le Impostazioni"
+  "billing.withdrawPage.settings": "Apri le Impostazioni",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

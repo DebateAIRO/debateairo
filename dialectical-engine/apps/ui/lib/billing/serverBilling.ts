@@ -2,20 +2,30 @@ import { headers } from "next/headers";
 import { ContractHttpError } from "@debateai/contract";
 import { createServerContractClient, readTrustedClientIp } from "../serverApi.js";
 
+/** What one plans read tells a billing page: whether billing is on, and whether card payments are test-only. */
+export type BillingState = Readonly<{ on: boolean; testMode: boolean }>;
+
 /**
  * P8a's public plans route answers 404 when billing is off or in local mode (spec §2.2 rule 1), and so does every
  * billing page that reads it. Any other failure keeps the page: its own calls then say "try again in a minute".
+ * `testMode` is true only when the answer names the sandbox: it is read from the running server at every request,
+ * so the test-mode note goes away by itself when the server is switched to live payments. A failed read or an answer
+ * that names no environment shows no note.
  */
-export async function billingIsOn(): Promise<boolean> {
+export async function billingState(): Promise<BillingState> {
   const headerStore = await headers();
   try {
-    await createServerContractClient(
+    const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
     ).getBillingPlans();
-    return true;
+    return { on: true, testMode: answer.environment === "sandbox" };
   } catch (failure) {
-    return !(failure instanceof ContractHttpError && failure.status === 404);
+    return { on: !(failure instanceof ContractHttpError && failure.status === 404), testMode: false };
   }
+}
+
+export async function billingIsOn(): Promise<boolean> {
+  return (await billingState()).on;
 }
 
 /**

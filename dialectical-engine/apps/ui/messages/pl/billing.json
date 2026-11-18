@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Zaloguj się i otwórz Ustawienia, potem Subskrypcja, potem „Odstąp od umowy tutaj”.",
   "billing.withdrawPage.byEmail": "Możesz też wysłać wzór formularza odstąpienia od umowy z e-maila z potwierdzeniem albo dowolne jasne oświadczenie, że odstępujesz od umowy, na adres {email}. Wykonamy je i potwierdzimy e-mailem.",
   "billing.withdrawPage.signIn": "Zaloguj się",
-  "billing.withdrawPage.settings": "Otwórz Ustawienia"
+  "billing.withdrawPage.settings": "Otwórz Ustawienia",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

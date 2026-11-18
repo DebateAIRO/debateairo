@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Logga in och öppna Inställningar, sedan Prenumeration, sedan ”Ångra avtalet här”.",
   "billing.withdrawPage.byEmail": "Du kan också skicka standardformuläret för utövande av ångerrätt från ditt bekräftelsemejl, eller något annat tydligt meddelande om att du ångrar dig, till {email}. Vi genomför det och bekräftar det via e-post.",
   "billing.withdrawPage.signIn": "Logga in",
-  "billing.withdrawPage.settings": "Öppna Inställningar"
+  "billing.withdrawPage.settings": "Öppna Inställningar",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

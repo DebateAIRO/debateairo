@@ -4,7 +4,7 @@ import {
   BillingPlansQuerySchema, BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema,
   type BillingCurrency
 } from "@debateai/contract";
-import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
+import { allowanceVsPlus, microsToDecimal, type PaymentEnvironment } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
 import { planNetPrice, priceCurrencyFor, type BillingPlans, type PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
@@ -95,6 +95,11 @@ export type BillingRouteDeps = Readonly<{
   geo?: GeoLookup;
   /** Terms §12: the connection country's tax on the plans list; absent, the list carries no total and the page shows no price. */
   displayedTax?: DisplayedTaxPort;
+  /**
+   * Which NETOPIA system the card payments go to (it follows NETOPIA_API_BASE_URL). The plans list names it, so the
+   * pages show their test-mode note only while payments run on the sandbox; absent, the list names none.
+   */
+  paymentEnvironment?: PaymentEnvironment;
   legal?: BillingLegalGate;
   /** P8b. */
   quotes?: QuoteServicePort;
@@ -259,6 +264,9 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       tax: tax === null ? null : {
         country: tax.country, tax_name: tax.taxName, tax_rate_bp: tax.taxRateBasisPoints, tax_status: tax.status
       },
+      // Read at every request from the running server, so switching the server to live payments removes the pages'
+      // test-mode note with no new release of the website.
+      ...(deps.paymentEnvironment === undefined ? {} : { environment: deps.paymentEnvironment }),
       plans: plans.plans.map((plan) => {
         const total = tax?.totalMicros.get(plan.planId);
         return {

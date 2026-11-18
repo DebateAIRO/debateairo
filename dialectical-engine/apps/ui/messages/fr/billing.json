@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Connectez-vous et ouvrez Paramètres, puis Abonnement, puis « Renoncer au contrat ici ».",
   "billing.withdrawPage.byEmail": "Vous pouvez aussi envoyer le modèle de formulaire de rétractation joint à votre e-mail de confirmation, ou toute déclaration claire de rétractation, à {email}. Nous l’exécutons et vous le confirmons par e-mail.",
   "billing.withdrawPage.signIn": "Se connecter",
-  "billing.withdrawPage.settings": "Ouvrir les Paramètres"
+  "billing.withdrawPage.settings": "Ouvrir les Paramètres",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

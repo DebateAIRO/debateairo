@@ -728,11 +728,15 @@ export type BillingPlansPlace = z.infer<typeof BillingPlansPlaceSchema>;
  * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance". Terms §12: `tax` is
  * the place's tax and each plan's `total_price` its price in `currency` with that tax; both are present exactly when
  * `place.status` is PRICED, so a net price is never offered as the price.
+ * `environment` is the payment system this server's card payments go to, the same value the checkout answers: the
+ * pages show their test-mode note while it is "sandbox", and drop it by themselves once the server is switched to
+ * live. Optional, so an answer without it (an older server, a test's hand-made answer) shows no note.
  */
 export const BillingPlansResponseSchema = z.object({
   currency: BillingCurrencySchema,
   place: BillingPlansPlaceSchema,
   tax: BillingPlansTaxSchema.nullable(),
+  environment: z.enum(["sandbox", "live"]).optional(),
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
     net_prices: BillingPricesSchema,

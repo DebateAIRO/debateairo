@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 type HomePageModule = {
   default: (props: { searchParams: Promise<{ tab?: string }> }) => Promise<ReactNode>;
@@ -146,8 +147,9 @@ describe("T9-C1 route split & chrome", () => {
     // library work can slip in front of the landing.
     // P21: that one read now answers the price line AND the footer's billing facts.
     // Terms §12: the same read says whether that price already holds the visitor's tax.
+    // The same read also says whether card payments are test-only (the price line's test-mode note).
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+tax=\{plans\.tax\}\s+footerBilling=\{plans\.footer\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+tax=\{plans\.tax\}\s+footerBilling=\{plans\.footer\}\s+testModeNote=\{plans\.testModeNote\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;
@@ -179,6 +181,27 @@ describe("T9-C1 route split & chrome", () => {
     });
     const footer = (await renderRoute(null)).querySelector("footer.siteFooterFull");
     for (const href of ["/pricing", "/cancel", "/withdraw"]) expect(footer?.querySelector(`a[href="${href}"]`), href).not.toBeNull();
+  });
+
+  it("says under the price line that payments are test-only exactly while the plans list names NETOPIA's sandbox", async () => {
+    const note = (billingEnglish as Readonly<Record<string, string>>)["billing.testMode.notice"]!;
+    const answer = (environment?: "sandbox" | "live") => ({
+      currency: "USD",
+      plans: [{ plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }],
+      ...(environment === undefined ? {} : { environment })
+    });
+    const notes = async (): Promise<string[]> => [
+      ...(await renderRoute(null)).querySelectorAll('[data-landing-section="pricing"] [role="note"]')
+    ].map((element) => element.textContent ?? "");
+    routeMocks.getBillingPlans.mockResolvedValueOnce(answer("sandbox"));
+    expect(await notes()).toEqual([note]);
+    // Switched to live payments on the server: the next visit shows no note, with no new upload of the website.
+    routeMocks.getBillingPlans.mockResolvedValueOnce(answer("live"));
+    expect(await notes()).toEqual([]);
+    routeMocks.getBillingPlans.mockResolvedValueOnce(answer());
+    expect(await notes()).toEqual([]);
+    // Billing off (the route's 404): no price line to carry it.
+    expect(await notes()).toEqual([]);
   });
 });
 

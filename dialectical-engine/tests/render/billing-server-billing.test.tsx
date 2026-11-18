@@ -21,7 +21,7 @@ vi.mock("../../apps/ui/lib/serverApi.js", async (importOriginal) => ({
   }
 }));
 
-import { ageConfirmationOwed, billingIsOn, sessionConfirmed } from "../../apps/ui/lib/billing/serverBilling.js";
+import { ageConfirmationOwed, billingIsOn, billingState, sessionConfirmed } from "../../apps/ui/lib/billing/serverBilling.js";
 
 describe("P19 the billing pages exist only while billing is on", () => {
   beforeEach(() => {
@@ -41,6 +41,22 @@ describe("P19 the billing pages exist only while billing is on", () => {
     expect(await billingIsOn()).toBe(true);
     // The public plans are read without the person's session.
     expect(mocks.sessions.every((session) => session === undefined)).toBe(true);
+  });
+
+  it("says payments are test-only exactly while the plans name NETOPIA's sandbox, read again at every request", async () => {
+    mocks.getBillingPlans.mockResolvedValue({ currency: "USD", plans: [], environment: "sandbox" });
+    expect(await billingState()).toEqual({ on: true, testMode: true });
+    // The server switched to live payments: the same page, with no new upload, shows no note.
+    mocks.getBillingPlans.mockResolvedValue({ currency: "USD", plans: [], environment: "live" });
+    expect(await billingState()).toEqual({ on: true, testMode: false });
+    // An answer that names no environment (an older server) shows no note either.
+    mocks.getBillingPlans.mockResolvedValue({ currency: "USD", plans: [] });
+    expect(await billingState()).toEqual({ on: true, testMode: false });
+    mocks.getBillingPlans.mockRejectedValue(new ContractHttpError("NOT_FOUND", 404, "Not found"));
+    expect(await billingState()).toEqual({ on: false, testMode: false });
+    mocks.getBillingPlans.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "Unavailable"));
+    expect(await billingState()).toEqual({ on: true, testMode: false });
+    expect(mocks.getBillingPlans).toHaveBeenCalledTimes(5);
   });
 
   it("asks the age gate with the person's own session, and a failed read owes nothing, as on the home page (R3-2)", async () => {
