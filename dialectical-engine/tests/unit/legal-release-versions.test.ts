@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { LOCALES, OFFERED_LOCALE_CODES } from "../../apps/ui/lib/i18n/locales.js";
+import { RELEASE_LEGAL_LOCALES } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import {
   PRIVACY_313_ENTRY,
@@ -95,5 +96,12 @@ describe("Terms 2.19 and Privacy Policy 3.13", () => {
       current: false,
       href: `/terms/versions/${archivedEnglish("TERMS", "2.18").sha256}`
     });
+  });
+
+  it("checks and archives the legal texts of every interface language the site offers, and French for Canada", () => {
+    // A person can only be shown and accept a legal text in an offered interface language, or in French when they pick
+    // Canada at sign-up. Each of those must be in the release check, or a text nobody checked or archived could be accepted.
+    for (const code of OFFERED_LOCALE_CODES) expect(RELEASE_LEGAL_LOCALES).toContain(code);
+    expect(RELEASE_LEGAL_LOCALES).toContain("fr");
   });
 });
