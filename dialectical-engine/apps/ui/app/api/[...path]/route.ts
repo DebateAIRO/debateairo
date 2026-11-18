@@ -83,6 +83,7 @@ const SOCIAL_FLOW_COOKIE_NAME = "__Host-debateai-social-flow";
 const SOCIAL_APPLE_FLOW_COOKIE_NAME = "__Host-debateai-social-apple";
 const SOCIAL_BROWSER_COOKIE_NAME = "__Host-debateai-social-browser";
 const SOCIAL_COOKIE_MAX_AGE_SECONDS = 300;
+const SOCIAL_COOKIE_NAMES = [SOCIAL_FLOW_COOKIE_NAME, SOCIAL_APPLE_FLOW_COOKIE_NAME, SOCIAL_BROWSER_COOKIE_NAME] as const;
 const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
@@ -165,6 +166,7 @@ function createUpstreamHeaders(request: Request): Headers {
 function filteredSessionCookies(raw: string | null): string | null {
   if (raw === null || /[\r\n\0]/.test(raw)) return null;
   const selected = new Map<string, string>();
+  const social = new Map<string, string | null>();
   let localeSeen = false;
   for (const member of raw.split(";")) {
     const index = member.indexOf("=");
@@ -187,12 +189,18 @@ function filteredSessionCookies(raw: string | null): string | null {
       selected.set(name, value);
       continue;
     }
+    // Social sign-in: forwarded as the API's exactCookie reads it (one occurrence, 43 characters);
+    // a malformed or repeated one is left out on its own and never refuses the request.
+    if (SOCIAL_COOKIE_NAMES.some((allowed) => allowed === name)) {
+      social.set(name, social.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value) ? null : value);
+      continue;
+    }
     if (!AUTH_COOKIE_NAMES.some((allowed) => allowed === name)) continue;
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME].flatMap((name) => {
-    const value = selected.get(name);
+  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME, ...SOCIAL_COOKIE_NAMES].flatMap((name) => {
+    const value = selected.get(name) ?? social.get(name) ?? undefined;
     return value === undefined ? [] : [`${name}=${value}`];
   });
   return pairs.length === 0 ? null : pairs.join("; ");

@@ -78,3 +78,55 @@ describe("social sign-in cookies through the /api proxy", () => {
     expect((await proxy([cleared(FLOW), cleared(FLOW), issued(BROWSER, 300)])).headers.getSetCookie()).toEqual([issued(BROWSER, 300)]);
   });
 });
+
+/**
+ * The other direction: the browser's social cookies reach the API as the API reads them
+ * (apps/api/src/index.ts exactCookie: one occurrence with a 43-character base64url value, else none).
+ * A malformed or repeated social cookie is left out on its own; it never costs the session cookie.
+ */
+async function forwardedCookie(cookie: string) {
+  let forwarded = new Headers();
+  globalThis.fetch = (async (_url, init) => {
+    forwarded = new Headers(init?.headers);
+    return new Response("{}", { headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  await route.POST(new Request("https://ui.example.test/api/v1/auth/social/signup/status", {
+    method: "POST", headers: { origin: "https://ui.example.test", "content-type": "application/json", cookie }, body: "{}"
+  }), { params: Promise.resolve({ path: ["v1", "auth", "social", "signup", "status"] }) });
+  return forwarded.get("cookie");
+}
+
+const SESSION = `__Host-debateai-session=${"S".repeat(43)}`;
+const OTHER = "Q".repeat(43);
+
+describe("social sign-in cookies from the browser to the API", () => {
+  it.each([FLOW, APPLE, BROWSER])("forwards %s", async name => {
+    expect(await forwardedCookie(`${name}=${TOKEN}`)).toBe(`${name}=${TOKEN}`);
+  });
+
+  it("forwards all three next to the session cookie, in a fixed order", async () => {
+    expect(await forwardedCookie(`${BROWSER}=${OTHER}; unrelated=drop; ${APPLE}=${TOKEN}; ${SESSION}; ${FLOW}=${TOKEN}`))
+      .toBe(`${SESSION}; ${FLOW}=${TOKEN}; ${APPLE}=${TOKEN}; ${BROWSER}=${OTHER}`);
+  });
+
+  it.each([
+    ["a 42-character value", `${FLOW}=${TOKEN.slice(1)}`],
+    ["a 44-character value", `${FLOW}=${TOKEN}A`],
+    ["a value outside base64url", `${BROWSER}=${TOKEN.slice(1)}=`],
+    ["an empty value", `${APPLE}=`],
+    ["a repeated cookie, even with equal values", `${FLOW}=${TOKEN}; ${FLOW}=${TOKEN}`],
+    ["a repeated cookie whose second value is malformed", `${BROWSER}=${TOKEN}; ${BROWSER}=bad`],
+    ["a foreign social name", `__Host-debateai-social-other=${TOKEN}`],
+    ["a name without the __Host- prefix", `debateai-social-flow=${TOKEN}`]
+  ])("leaves out %s and keeps the session cookie", async (_label, social) => {
+    expect(await forwardedCookie(`${SESSION}; ${social}`)).toBe(SESSION);
+  });
+
+  it("a bad social cookie leaves the other social cookies alone", async () => {
+    expect(await forwardedCookie(`${FLOW}=${TOKEN}; ${FLOW}=${OTHER}; ${BROWSER}=${OTHER}`)).toBe(`${BROWSER}=${OTHER}`);
+  });
+
+  it("sends no cookie header when only a bad social cookie came", async () => {
+    expect(await forwardedCookie(`${APPLE}=short`)).toBeNull();
+  });
+});
