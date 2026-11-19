@@ -1,4 +1,5 @@
 import type { PoolClient } from "pg";
+import type { PriceCurrency } from "@debateai/billing-core";
 import type { EntitlementRepository } from "@debateai/db";
 import { planById, planNetPrice } from "@debateai/register";
 import { enqueueEmail } from "./email-job.js";
@@ -195,9 +196,16 @@ export async function revokeCancelForOwner(deps: SubscriptionRouteDeps, ownerRef
  * NETOPIA outage, R2 Q-1), it is priced at the current plan and settles RENEWED at it, so a downgrade then would only
  * move to the month after while the person was told "from today": it is refused DOWNGRADE_NOT_AVAILABLE_NOW (as
  * P12c refuses an upgrade), read under the lock on its own connection, as `requestCancelLocked` reads it.
+ * `shown` is the lower plan's price before tax as the confirmation showed it. The plan prices can change while that
+ * confirmation is open, and the price recorded here is the one every later renewal charges, so the downgrade is
+ * written only when the plan's price in this process is exactly the shown one, in the subscription's currency;
+ * otherwise it is refused DOWNGRADE_PRICE_CHANGED before any tax quote, and nothing is written. Asking again for the
+ * plan already scheduled stays a quiet success whatever price is shown: nothing is written, the price recorded when it
+ * was scheduled stands, and the page then names that recorded amount.
  */
 export async function scheduleDowngrade(
-  deps: SubscriptionRouteDeps, ownerRef: string, planId: "PLUS" | "PRO"
+  deps: SubscriptionRouteDeps, ownerRef: string, planId: "PLUS" | "PRO",
+  shown: Readonly<{ netMicros: number; currency: PriceCurrency }>
 ): Promise<void> {
   const now = deps.clock();
   if (await deps.legal.requiresReacceptance(ownerRef)) refuse(403, "LEGAL_REACCEPTANCE_REQUIRED");
@@ -208,6 +216,7 @@ export async function scheduleDowngrade(
   const targetNetMicros = planNetPrice(target, before.currency);
   if (targetNetMicros >= planNetPrice(planById(deps.plans, before.planId), before.currency)) refuse(422, "DOWNGRADE_NOT_LOWER");
   if (before.scheduledDowngradePlanId === planId) return;
+  if (shown.currency !== before.currency || shown.netMicros !== targetNetMicros) refuse(409, "DOWNGRADE_PRICE_CHANGED");
   const context = await storedTaxContext({ billing: deps.billing, recordsKey: deps.recordsKey }, before);
   const recurring = await quoteTax(deps.tax, deps.policy, context, targetNetMicros, now);
   const written = await deps.billing.withTransaction(async (client) => {
@@ -221,6 +230,10 @@ export async function scheduleDowngrade(
     }
     // Asking again for the plan already scheduled stays a quiet success: its renewal charge, if written, is priced at it.
     if (locked.state.scheduledDowngradePlanId === planId) return false;
+    // The net about to be recorded is the one the tax quote priced: it must still be the shown one.
+    if (shown.currency !== locked.state.currency || shown.netMicros !== recurring.netMicros) {
+      refuse(409, "DOWNGRADE_PRICE_CHANGED");
+    }
     // The renewal is under way once its charge for the next period exists: that charge is priced at the plan in force
     // (or the one already scheduled), and its settlement writes the renewal at it, so a new choice could only start a
     // month later. Read on the lock's own connection (P12b's one-connection rule).

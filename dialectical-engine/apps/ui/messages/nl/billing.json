@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Dat abonnement is niet hoger dan uw huidige abonnement. Wilt u naar een lager abonnement, kies het dan voor uw volgende verlenging.",
   "billing.subscription.downgradeNotLower": "Dat abonnement is niet lager dan uw huidige abonnement.",
   "billing.subscription.downgradeNotAvailableNow": "Uw abonnement wordt nu verlengd, dus een wijziging kan nog niet worden ingepland. U kunt het wijzigen zodra de verlenging is verwerkt.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Overstappen naar {plan} bij uw volgende verlenging? Het kost {price} per maand + belasting, vanaf {date}.",
   "billing.subscription.downgradeYes": "Ja, overstappen naar {plan}",
   "billing.subscription.downgraded": "Klaar. U stapt op {date} over naar {plan}, voor {total} per maand, inclusief belasting.",

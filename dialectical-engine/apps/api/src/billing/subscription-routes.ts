@@ -16,7 +16,7 @@ import {
   BillingWithdrawRequestSchema,
   BillingWithdrawResponseSchema
 } from "@debateai/contract";
-import { microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { clientIpNetworkScope } from "../client-ip.js";
 import { mailLocaleOfCookieHeader } from "../mail-locale.js";
 import { readCardDetails, startCardChange } from "./card-change.js";
@@ -101,7 +101,9 @@ export function installSubscriptionRoutes(
     // Every downgrade prices the lower plan at the tax service: the same sealed per-owner budget as a quote.
     if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/downgrade", ownerRef)) return reply;
     return answer(reply, async () => {
-      await scheduleDowngrade(deps, ownerRef, parsed.data.plan_id);
+      await scheduleDowngrade(deps, ownerRef, parsed.data.plan_id, {
+        netMicros: decimalToMicros(parsed.data.net_price), currency: parsed.data.currency
+      });
       return reply.status(204).send();
     });
   });

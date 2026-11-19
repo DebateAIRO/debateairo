@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Dak il-pjan mhuwiex ogħla mill-pjan attwali tiegħek. Biex taqleb għal pjan aktar baxx, agħżlu għat-tiġdid li jmiss.",
   "billing.subscription.downgradeNotLower": "Dak il-pjan mhuwiex aktar baxx mill-pjan attwali tiegħek.",
   "billing.subscription.downgradeNotAvailableNow": "Il-pjan tiegħek qed jiġġedded bħalissa, għalhekk bidla għadha ma tistax tiġi skedata. Tista’ tibdlu hekk kif it-tiġdid ikun għadda.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Taqleb għal {plan} fit-tiġdid li jmiss? Jiswa {price} fix-xahar + taxxa, mill-{date}.",
   "billing.subscription.downgradeYes": "Iva, aqleb għal {plan}",
   "billing.subscription.downgraded": "Lest. Se taqleb għal {plan} fil-{date}, għal {total} fix-xahar, inkluża t-taxxa.",

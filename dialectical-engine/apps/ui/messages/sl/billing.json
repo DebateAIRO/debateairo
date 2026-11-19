@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Ta paket ni višji od vašega trenutnega paketa. Za prehod na nižji paket ga izberite za naslednjo obnovitev.",
   "billing.subscription.downgradeNotLower": "Ta paket ni nižji od vašega trenutnega paketa.",
   "billing.subscription.downgradeNotAvailableNow": "Vaš paket se prav zdaj obnavlja, zato spremembe še ni mogoče načrtovati. Spremenite ga lahko, takoj ko bo obnovitev opravljena.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Ali želite ob naslednji obnovitvi preiti na {plan}? Stane {price} na mesec + davek, od {date}.",
   "billing.subscription.downgradeYes": "Da, preidi na {plan}",
   "billing.subscription.downgraded": "Končano. {date} boste prešli na {plan} za {total} na mesec z davkom.",

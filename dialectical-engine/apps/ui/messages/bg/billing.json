@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Този план не е по-висок от текущия Ви план. За да преминете към по-нисък план, изберете го за следващото подновяване.",
   "billing.subscription.downgradeNotLower": "Този план не е по-нисък от текущия Ви план.",
   "billing.subscription.downgradeNotAvailableNow": "Планът Ви се подновява в момента, затова все още не може да бъде насрочена промяна. Можете да го промените веднага щом подновяването премине.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Да преминете към {plan} при следващото подновяване? Струва {price} на месец + данък, от {date}.",
   "billing.subscription.downgradeYes": "Да, премини към {plan}",
   "billing.subscription.downgraded": "Готово. Ще преминете към {plan} на {date}, за {total} на месец с включен данък.",

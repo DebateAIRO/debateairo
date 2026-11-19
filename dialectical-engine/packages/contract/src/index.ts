@@ -882,8 +882,14 @@ export const BillingSubscriptionResponseSchema = z.object({
 }).strict();
 export type BillingSubscriptionResponse = z.infer<typeof BillingSubscriptionResponseSchema>;
 
-/** A downgrade target is a paid plan below Max; Free is reached by cancelling. */
-export const BillingDowngradeRequestSchema = z.object({ plan_id: z.enum(["PLUS", "PRO"]) }).strict();
+/**
+ * A downgrade target is a paid plan below Max; Free is reached by cancelling. `net_price` and `currency` are the lower
+ * plan's monthly price before tax exactly as the confirmation showed it: the server schedules the downgrade only at
+ * that price, so the price recorded for the next renewals is the one the person agreed to.
+ */
+export const BillingDowngradeRequestSchema = z.object({
+  plan_id: z.enum(["PLUS", "PRO"]), net_price: BillingDecimalMoneySchema, currency: BillingCurrencySchema
+}).strict();
 
 export const BillingInvoicesResponseSchema = z.object({
   invoices: z.array(z.object({

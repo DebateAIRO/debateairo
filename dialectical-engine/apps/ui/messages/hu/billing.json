@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Ez a csomag nem magasabb a jelenlegi csomagjánál. Alacsonyabb csomagra váltáshoz válassza azt a következő megújításra.",
   "billing.subscription.downgradeNotLower": "Ez a csomag nem alacsonyabb a jelenlegi csomagjánál.",
   "billing.subscription.downgradeNotAvailableNow": "A csomagja éppen megújul, ezért még nem ütemezhető változtatás. Amint a megújítás lezajlott, módosíthatja.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Átvált erre a következő megújításkor: {plan}? Havi {price} + adó, {date} naptól.",
   "billing.subscription.downgradeYes": "Igen, váltás erre: {plan}",
   "billing.subscription.downgraded": "Kész. {date} napon átvált erre: {plan}, havi {total} összegért, adóval együtt.",

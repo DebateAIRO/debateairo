@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "해당 요금제는 현재 요금제보다 상위가 아닙니다. 하위 요금제로 변경하려면 다음 갱신에 적용되도록 선택해 주세요.",
   "billing.subscription.downgradeNotLower": "해당 요금제는 현재 요금제보다 하위가 아닙니다.",
   "billing.subscription.downgradeNotAvailableNow": "요금제가 지금 갱신 중이므로 아직 변경을 예약할 수 없습니다. 갱신이 완료되면 바로 변경할 수 있습니다.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "다음 갱신 때 {plan}(으)로 변경할까요? {date}부터 월 {price} + 세금입니다.",
   "billing.subscription.downgradeYes": "네, {plan}(으)로 변경",
   "billing.subscription.downgraded": "완료되었습니다. {date}에 세금 포함 월 {total}의 {plan}(으)로 변경됩니다.",

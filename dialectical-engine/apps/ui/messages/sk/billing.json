@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Tento program nie je vyšší ako váš súčasný program. Ak chcete prejsť na nižší program, zvoľte ho pre ďalšie obnovenie.",
   "billing.subscription.downgradeNotLower": "Tento program nie je nižší ako váš súčasný program.",
   "billing.subscription.downgradeNotAvailableNow": "Váš program sa práve obnovuje, preto zmenu zatiaľ nemožno naplánovať. Zmeniť ho môžete hneď, ako obnovenie prebehne.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Prejsť na {plan} pri ďalšom obnovení? Stojí {price} mesačne + daň, od {date}.",
   "billing.subscription.downgradeYes": "Áno, prejsť na {plan}",
   "billing.subscription.downgraded": "Hotovo. {date} prejdete na {plan} za {total} mesačne vrátane dane.",

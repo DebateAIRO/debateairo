@@ -213,6 +213,8 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
     "billing.subscription.downgradeNotLower": "That plan isn't lower than your current plan.",
     // DOWNGRADE_NOT_AVAILABLE_NOW (409): the renewal charge for the next period is already written at the current plan.
     "billing.subscription.downgradeNotAvailableNow": "Your plan is renewing right now, so a change can't be scheduled yet. You can change it as soon as the renewal has gone through.",
+    // DOWNGRADE_PRICE_CHANGED (409): the lower plan no longer costs what the confirmation showed.
+    "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
     // WITHDRAWAL_WINDOW_CLOSED (409): the 14 days are over. Everyone served has the right (owner's decision of
     // 16 November 2026), so the sentence no longer says it may not apply where the person lives.
     "billing.subscription.withdrawWindowClosed": "The 14-day withdrawal period has ended. You can still cancel at any time.",

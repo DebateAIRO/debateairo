@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "そのプランは現在のプランより上位ではありません。下位のプランに移るには、次回の更新に向けて選んでください。",
   "billing.subscription.downgradeNotLower": "そのプランは現在のプランより下位ではありません。",
   "billing.subscription.downgradeNotAvailableNow": "プランは現在更新中のため、まだ変更を予約できません。更新が完了すればすぐに変更できます。",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "次回の更新で {plan} に切り替えますか？ {date} から月額 {price} + 税です。",
   "billing.subscription.downgradeYes": "はい、{plan} に切り替える",
   "billing.subscription.downgraded": "完了しました。{date} に税込み月額 {total} の {plan} に切り替わります。",

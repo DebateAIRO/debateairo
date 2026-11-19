@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Det abonnemanget är inte högre än ditt nuvarande. Vill du byta till ett lägre abonnemang väljer du det för nästa förnyelse.",
   "billing.subscription.downgradeNotLower": "Det abonnemanget är inte lägre än ditt nuvarande.",
   "billing.subscription.downgradeNotAvailableNow": "Ditt abonnemang förnyas just nu, så en ändring kan inte schemaläggas än. Du kan ändra det så snart förnyelsen har gått igenom.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Byta till {plan} vid nästa förnyelse? Det kostar {price} per månad + skatt från den {date}.",
   "billing.subscription.downgradeYes": "Ja, byt till {plan}",
   "billing.subscription.downgraded": "Klart. Du byter till {plan} den {date}, för {total} per månad inklusive skatt.",

@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Šis plāns nav augstāks par jūsu pašreizējo plānu. Lai pārietu uz zemāku plānu, izvēlieties to nākamajai atjaunošanai.",
   "billing.subscription.downgradeNotLower": "Šis plāns nav zemāks par jūsu pašreizējo plānu.",
   "billing.subscription.downgradeNotAvailableNow": "Jūsu plāns pašlaik atjaunojas, tāpēc izmaiņas vēl nevar ieplānot. Varat to mainīt, tiklīdz atjaunošana būs notikusi.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Pāriet uz {plan} nākamajā atjaunošanā? Tas maksā {price} mēnesī + nodoklis, no {date}.",
   "billing.subscription.downgradeYes": "Jā, pāriet uz {plan}",
   "billing.subscription.downgraded": "Gatavs. {date} pāriesiet uz {plan} par {total} mēnesī, ieskaitot nodokli.",

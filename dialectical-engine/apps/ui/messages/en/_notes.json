@@ -27,6 +27,7 @@
   "billing.subscription.upgradeInProgress": "An earlier upgrade payment is still waiting for the bank or the payment provider; nothing new was charged.",
   "billing.checkout.erasurePending": "The person asked to delete their account (a 7-day wait). They can cancel that deletion in Settings.",
   "billing.subscription.downgradeNotAvailableNow": "The renewal payment for the next month has already started at the current plan, so no lower plan can be chosen until it has gone through (minutes, or up to 3 days during an outage). Nothing failed and nothing was charged extra: do not say it failed, and name no date.",
+  "billing.subscription.downgradePriceChanged": "The lower plan's price was changed by us between the moment the person saw it and the moment they confirmed. Nothing was scheduled and nothing was charged. Do not say whether the price went up or down. 'Choose it again' means pressing the same 'Move to … at renewal' button once more.",
   "billing.subscription.downgradeConfirm": "{price} is the lower plan's price BEFORE tax, so keep '+ tax' (or the local short form); {date} is the day the lower plan starts.",
   "billing.subscription.withdrawOwnerReview": "A refund made outside the site touched one of the payments; a person checks what is still due. Keep 'within 14 days' (the legal refund deadline).",
   "billing.card.countryRefused": "Nothing was taken from the new card, and the plan keeps its old card. Name no country and no plan, and do not mention a hold.",

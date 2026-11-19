@@ -24,6 +24,19 @@ import { StubCardPayments } from "./stub-card-payments.js";
 /** A generated records key: tests never hold a real one. */
 export const TEST_RECORDS_KEY = Buffer.alloc(32, 7);
 /** Stands for PUBLIC_APP_URL (R-7) in every billing link a test reads. */
+/**
+ * The lower plan's price as a downgrade confirmation shows it under `plans` (default: the test plans), in the two
+ * shapes a test sends it: the route's body fields and `scheduleDowngrade`'s argument.
+ */
+export function shownDowngradePrice(
+  planId: "PLUS" | "PRO", currency: PriceCurrency = "USD", plans: SubscriptionRouteDeps["plans"] = testBillingPlans
+): Readonly<{ body: Readonly<{ net_price: string; currency: PriceCurrency }>; shown: Readonly<{ netMicros: number; currency: PriceCurrency }> }> {
+  const netMicros = planNetPrice(planById(plans, planId), currency);
+  return Object.freeze({
+    body: Object.freeze({ net_price: microsToDecimal(netMicros), currency }), shown: Object.freeze({ netMicros, currency })
+  });
+}
+
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
 
 const TEST_AGREEMENT_SHA256 = createHash("sha256").update("renewal agreement (test)", "utf8").digest("hex");

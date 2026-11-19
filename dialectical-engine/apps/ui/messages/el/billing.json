@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Αυτό το πρόγραμμα δεν είναι ανώτερο από το τρέχον πρόγραμμά σας. Για να μεταβείτε σε κατώτερο πρόγραμμα, επιλέξτε το για την επόμενη ανανέωση.",
   "billing.subscription.downgradeNotLower": "Αυτό το πρόγραμμα δεν είναι κατώτερο από το τρέχον πρόγραμμά σας.",
   "billing.subscription.downgradeNotAvailableNow": "Το πρόγραμμά σας ανανεώνεται αυτή τη στιγμή, οπότε δεν μπορεί ακόμη να προγραμματιστεί αλλαγή. Μπορείτε να το αλλάξετε μόλις ολοκληρωθεί η ανανέωση.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Μετάβαση στο {plan} στην επόμενη ανανέωση; Κοστίζει {price} τον μήνα + φόρος, από τις {date}.",
   "billing.subscription.downgradeYes": "Ναι, μετάβαση στο {plan}",
   "billing.subscription.downgraded": "Έγινε. Θα μεταβείτε στο {plan} στις {date}, για {total} τον μήνα, με τον φόρο.",

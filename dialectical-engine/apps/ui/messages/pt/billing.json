@@ -141,6 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Esse plano não é superior ao seu plano atual. Para passar para um plano inferior, escolha-o para a próxima renovação.",
   "billing.subscription.downgradeNotLower": "Esse plano não é inferior ao seu plano atual.",
   "billing.subscription.downgradeNotAvailableNow": "O seu plano está a renovar-se neste momento, por isso ainda não é possível agendar uma mudança. Pode alterá-lo assim que a renovação estiver concluída.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Passar para o {plan} na próxima renovação? Custa {price} por mês + impostos, a partir de {date}.",
   "billing.subscription.downgradeYes": "Sim, passar para o {plan}",
   "billing.subscription.downgraded": "Concluído. Passará para o {plan} a {date}, por {total} por mês, impostos incluídos.",
