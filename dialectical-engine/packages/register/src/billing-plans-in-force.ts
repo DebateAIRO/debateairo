@@ -8,7 +8,7 @@ import { readBillingPlans, type BillingPlans } from "./billing-plans.js";
  *
  * A plans row goes live with an upload: the release that takes the traffic serves the `billingPlans` row of its own
  * settings version, the number in its release key. The database keeps every such switch with the instant the new
- * release took the traffic from (`core.release_event`, read through migration 0183's `core.read_release_history()`),
+ * release took the traffic from (`core.release_event`, read through migration 0185's `core.read_release_history()`),
  * a way back to an older release included. So "the plans served at an instant" is the row of the release that last
  * took the traffic at or before it.
  */
@@ -70,8 +70,8 @@ export function createBillingPlansInForce(options: Readonly<{
         "SELECT release_key, take_traffic_from FROM core.read_release_history() ORDER BY event_seq"
       )).rows;
     } catch (error) {
-      // A database that does not have migration 0183 yet (a practice run before the step is applied) has no reader:
-      // nothing is known of the switches, so this process's own plans answer, as before 0183.
+      // A database that does not have migration 0185 yet (a practice run before the step is applied) has no reader:
+      // nothing is known of the switches, so this process's own plans answer, as before 0185.
       if ((error as { code?: unknown } | null)?.code !== UNDEFINED_FUNCTION) throw error;
       recorded = [];
     }

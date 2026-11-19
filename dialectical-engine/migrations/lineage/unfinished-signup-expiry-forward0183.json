@@ -1,5 +1,5 @@
 {
-  "version": "release-history-forward0183-v1",
+  "version": "unfinished-signup-expiry-forward0183-v1",
   "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
   "previous": {
     "name": "0182_mfa_recovery_control_user_started.sql",
@@ -7,12 +7,11 @@
     "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
   },
   "migration": {
-    "name": "0183_release_history.sql",
-    "sha256": "ec99745bc54346ed05ff4cc0cb635b27b0f9c697f8573f5777107e7200575cf1"
+    "name": "0183_unfinished_signup_expiry.sql",
+    "sha256": "73e2b883b88af1dbd2a8494b5a3d8d474dadac03420cba91d4fbd05f94ec8d37"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",
     "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
-  },
-  "amendsPostconditionsOf": []
+  }
 }

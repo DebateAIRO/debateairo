@@ -20,7 +20,7 @@ import { importHistoricalRegisterFixture, publishRegisterFixture, registerFixtur
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * A month keeps the plan numbers it started with, on real PostgreSQL: the switches 0123 records, read through 0183's
+ * A month keeps the plan numbers it started with, on real PostgreSQL: the switches 0123 records, read through 0185's
  * `core.read_release_history()`, the sealed plans rows of two settings versions, the real entitlement reads and the
  * real spend ledger. Every amount is made up (multiples of eleven).
  *
@@ -125,7 +125,7 @@ const apiAllowance = (kept: boolean) => new BillingPersonAllowanceSource({
 const limitOf = (windows: ReadonlyArray<PersonWindow>, scope: PersonWindow["scope"]): number =>
   windows.find((window) => window.scope === scope)!.limitMicros;
 
-describe("0183: the switches the site made, read by the runtime", () => {
+describe("0185: the switches the site made, read by the runtime", () => {
   it("lists each switch with its release and the instant it took the traffic from, oldest first", async () => {
     const rows = (await database.pool.query<{ release_key: string; take_traffic_from: Date }>(
       "SELECT release_key, take_traffic_from FROM core.read_release_history()")).rows;

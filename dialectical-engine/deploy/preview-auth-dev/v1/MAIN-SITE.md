@@ -599,7 +599,7 @@ What this release adds to that recipe:
   `bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -n 80 -o cat --no-pager | grep -E "STARTUP_REFUSED|PREVIEW_MAIL_MODE|api.boot.failed"'`.
   A `PREVIEW_MAIL_…` code means `mail-plan.json` (part 1.5). Stop and ask before you choose the way back.
 - **MONTHNUMBERS, after DR6.** To keep each person's month on the numbers it started with, the new API and runner read
-  the database's record of release switches through a function this release adds (migration `0183_release_history.sql`).
+  the database's record of release switches through a function this release adds (migration `0185_release_history.sql`).
   SB13b's team debate may be paid from a team grant, which never reads that record, so check it once by hand. The
   check is read-only: it asks the record as the API's login and as the runner's login, and wants the new release as
   its last line.

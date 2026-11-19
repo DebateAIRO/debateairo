@@ -1749,11 +1749,23 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
   ]
 },
-// 0183: the switches the site made (which release took the traffic, and from when), so a person's month keeps the plan
+// 0183 (owner's goal of 2026-11-11): a sign-up not finished within 24 hours is deleted. The four functions are the cross-account
+// marker's alone, as 0171's sweep; the API runs them outside any request, on its system login, from a gated ten-minute timer.
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0183_unfinished_signup_expiry.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_unfinished_signups_due(integer)",
+    "EXECUTE ON FUNCTION identity.expire_unfinished_signup(uuid)",
+    "EXECUTE ON FUNCTION identity.read_unfinished_signup_key_cleanup(integer)",
+    "EXECUTE ON FUNCTION identity.complete_unfinished_signup_key_cleanup(uuid)"
+  ]
+},
+// 0185: the switches the site made (which release took the traffic, and from when), so a person's month keeps the plan
 // numbers it started with; release keys and instants only (the shared runtime role: the API and the runner).
 {
   "roleName": "debateai_runtime",
-  "source": "migrations/0183_release_history.sql",
+  "source": "migrations/0185_release_history.sql",
   "grants": ["EXECUTE ON FUNCTION core.read_release_history()"]
 }
 ]);
