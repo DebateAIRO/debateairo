@@ -8,6 +8,7 @@ import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t } from "@/lib/i18n/translate";
 import { ADR_URL, COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
 import { useSupportOffered } from "@/components/support/availability";
+import { ReportProblemLink } from "@/components/BetaNotice";
 
 const PRODUCT_NAME = "Dialectical Engine";
 
@@ -126,6 +127,10 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
  * - `line` — every other screen: copyright, the made-in sentence, the seven legal links, cookie preferences and the
  *   small SAL badge on one line, so the canvas keeps its room (15b).
  *
+ * While the site is in Beta both shapes end their links with "Report a problem" (it starts a mail to our support address),
+ * so a person can report from the page the problem showed on: the `line` shape after cookie preferences, the `full` shape
+ * at the end of the PRODUCT column.
+ *
  * The root layout renders the `line` footer after every page; a page that renders the `full`
  * footer hides it through `.appShell:has(.siteFooterFull) > .siteFooterLine` in `app/legal.css`,
  * so no page has to know which footer the layout drew.
@@ -159,6 +164,9 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
             {legalLinks}
             <li>
               <CookiePreferencesButton className="siteFooterLink" label={cookiePreferences} />
+            </li>
+            <li>
+              <ReportProblemLink className="siteFooterLink" />
             </li>
           </ul>
         </nav>
@@ -217,6 +225,9 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
                 </a>
               </li>
             ))}
+            <li>
+              <ReportProblemLink className="siteFooterLink" />
+            </li>
           </ul>
         </nav>
         <nav className="siteFooterColumn" aria-label={t(catalog, "chrome.legalPages")}>

@@ -179,10 +179,11 @@ describe("question 15 (5 Nov): the phone header is one row", () => {
     expect(phone).not.toMatch(/\.v4HdrQuota/u);
   });
 
-  it("the brand link keeps its whole name for screen readers ('Dialectical Engine') and goes to /v4", async () => {
+  it("the brand link keeps its whole name for screen readers ('Dialectical Engine', then the Beta mark) and goes to /v4", async () => {
     const page = await mount(<V4Header catalog={CATALOG} session="OUT" />);
     const brand = page.querySelector<HTMLAnchorElement>("a.v4HdrBrand")!;
-    expect(brand.textContent).toBe("Dialectical Engine");
+    expect(brand.textContent).toBe("Dialectical Engine Beta");
+    expect(brand.querySelector(".v4HdrBeta")!.textContent).toBe("Beta");
     expect(brand.querySelector(".v4HdrNameAccent")!.textContent).toBe("Engine");
     expect(brand.querySelector(".v4HdrMark")!.getAttribute("aria-hidden")).toBe("true");
     expect(brand.getAttribute("href")).toBe("/v4");

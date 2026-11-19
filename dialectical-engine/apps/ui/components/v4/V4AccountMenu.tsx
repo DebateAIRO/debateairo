@@ -10,6 +10,7 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { currentReturnPath, signInHrefFor } from "@/lib/signInWayBack";
 import type { ReadingLevel } from "@/lib/v4/types";
 import { allMapsHref } from "./V4MapShelf";
+import { ReportProblemLink } from "@/components/BetaNotice";
 
 /*
  * V4 screen review (owner's picks, 3 Nov 2026):
@@ -120,6 +121,8 @@ export function V4AccountMenu({ catalog, classicHref, session }: Readonly<{
                   {t(catalog, "v4.header.menu.theme")}
                 </button>
                 <a role="menuitem" href="/settings" onClick={() => close(false)}>{t(catalog, "v4.header.menu.settings")}</a>
+                {/* While the site is in Beta: a report starts here, from whichever page the problem showed on. */}
+                <ReportProblemLink role="menuitem" onPress={() => close(false)} />
                 {classicHref === null ? null : (
                   <a role="menuitem" href={classicHref} data-v4-menu="classic" onClick={() => close(false)}>{t(catalog, "v4.common.classicView")}</a>
                 )}

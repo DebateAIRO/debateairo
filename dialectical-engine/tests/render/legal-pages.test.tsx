@@ -734,15 +734,18 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the seven legal links, cookie preferences and ANPC's SAL badge", () => {
+  it("the one-line footer carries the seven legal links, cookie preferences, the report link and ANPC's SAL badge", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
       const view = render(<SiteFooter variant="line" />);
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
-      expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
+      const links = [...(footer?.querySelectorAll("a") ?? [])];
+      expect(links.filter((link) => !link.hasAttribute("data-report-problem")).map((link) => link.getAttribute("href")))
         .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
+      // While the site is in Beta: one "Report a problem" link, after cookie preferences.
+      expect(links.filter((link) => link.hasAttribute("data-report-problem")).map((link) => link.textContent)).toEqual(["Report a problem"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());
