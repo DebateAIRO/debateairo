@@ -13,7 +13,7 @@ The test server is locked on purpose. There are six locks:
 3. **Mail.** Mail goes only to the four allow-listed addresses.
 4. **Payments.** Only NETOPIA's sandbox is admitted: test cards, no real money.
 5. **The site password.** Caddy (the web server in front of the website) asks every visitor for a password.
-   The NETOPIA review window (5.7) is the one exception: strangers may read the public pages.
+   The NETOPIA review window (5.8) is the one exception: strangers may read the public pages.
 6. **The old release's files.** The release before this one knows none of the new settings. You can go back to it only
    with every lock closed, and only while LIVEAFTER (7.12) says no real-payment record would be lost (part 9).
 
@@ -40,7 +40,7 @@ setting stops that service, and the journal names the setting with a short code.
   billing job that failed for good (for example an invoice SmartBill refused).
 - *A bcrypt hash* is the scrambled form of the site password that Caddy keeps. The password itself is never stored.
 - *A stranger* is a browser that sends no site password and holds no sign-in cookie of this site.
-- *The NETOPIA review window* (5.7) lets strangers read the public pages of dezbatere.ro; everything else keeps the
+- *The NETOPIA review window* (5.8) lets strangers read the public pages of dezbatere.ro; everything else keeps the
   site password.
 - *The point of sale (POS)* is your shop's entry in NETOPIA's admin; NETOPIA approves card payments for it.
 - *The shop id* is the short number NETOPIA gives for its logo; it is not a secret.
@@ -80,7 +80,7 @@ if the server shows something else.
 | 3 | your sandbox payment test, on the test name, behind the password | unchanged | close the sandbox records |
 | 4 | mail: allow-list on the new path, then open | password on | MAIL_CLOSE |
 | 5 | the main name | password on | NAME5 |
-| 5.7 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.7b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
+| 5.8 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.8b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
 | 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
 | 7 | real payments (only after NETOPIA's approval and the signed contract; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
 | 8 | opening to everyone: asks, then the password off (only after a later upload brings the staff screens back) | open | PWON, ASKS_CLOSE |
@@ -88,9 +88,9 @@ if the server shows something else.
 | 10 | every named refusal code | – | – |
 
 **The upload day, and the days after.** Part 1 is the day before. Parts 2 to 5, up to and including the review window
-(5.7), fit in one day: the upload, your sandbox test, mail, the name and the window. Real payments do not: NETOPIA's
+(5.8), fit in one day: the upload, your sandbox test, mail, the name and the window. Real payments do not: NETOPIA's
 point of sale is not enrolled yet, and four of NETOPIA's steps remain:
-1. you enrol the point of sale in NETOPIA's admin and tick its conditions, once the window is open (5.7b);
+1. you enrol the point of sale in NETOPIA's admin and tick its conditions, once the window is open (5.8b);
 2. NETOPIA checks your identity;
 3. NETOPIA checks your shop's profile, and looks at https://dezbatere.ro without a password;
 4. the contract.
@@ -111,7 +111,7 @@ These can also hold you up:
   waits for it and for its credit note.
 
 It is fine to end the upload day with the review window open and payments still on NETOPIA's sandbox: that is the
-state 5.7 leaves. Part 7, on its own day, leaves real payments on, behind the site password, with asks for the team
+state 5.8 leaves. Part 7, on its own day, leaves real payments on, behind the site password, with asks for the team
 only. Do all staff work (Hide now) on the test name before the upload (1.6): from STAFFOFF, right
 before the rename, the staff screens are off (5.1b). Part 8 (opening to everyone) waits for a later upload that brings them back, with a
 staff key that works on dezbatere.ro.
@@ -121,7 +121,7 @@ test (part 6) fits there, behind the site password, with the review window open.
 then PAY0 (7.1) until it prints all zeros, then a new site password (PWNEW, 7.0), as the order rules say.
 
 **If NETOPIA approves before you have had a friends' test,** part 7 comes first. Skip 7.0 only if nobody outside the
-team has had the site password. If NETOPIA's tester had it (5.7b), run PWNEW (7.0) first. Friends can then come in
+team has had the site password. If NETOPIA's tester had it (5.8b), run PWNEW (7.0) first. Friends can then come in
 while payments are real: run ASKS_OPEN
 (6.1) with the line `V=everyone`, and stop there, so the site password stays on. They use the Free plan. Tell them
 not to press **Abonați-vă și plătiți** (Subscribe and pay): payments are real, a plan one of them buys renews every
@@ -138,7 +138,7 @@ go on a second time, that friends' test closes and the site password changes (7.
   at the moment of each payment. Take real payments only on the name they will stay on.
 - **The friends' test closes before real payments.** The API refuses `everyone-with-test-payments` with live payments
   (`PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX`). The friends knew the site password (and NETOPIA's tester may
-  have, 5.7b), so it changes before real payments (PWNEW, 7.0).
+  have, 5.8b), so it changes before real payments (PWNEW, 7.0).
 - **`everyone` needs real payments.** The API refuses `everyone` while billing runs on NETOPIA's sandbox
   (`PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING`): anyone could pay with the public test card and get real AI credit. With
   billing off it is refused too (`PREVIEW_ASKS_OPEN_TO_BILLING_OFF`): without plans, an account's only limit is its
@@ -155,7 +155,7 @@ go on a second time, that friends' test closes and the site password changes (7.
 - **NETOPIA's logo comes only with an upload.** Its line (`NETOPIA_LOGO_ID`) goes into the new release's own website
   file in the release guide's SB5d, right after DR1; no step of this document adds it, and it never goes into an
   older release's file. It changes nothing in Caddy, so it does not depend on the site password or the name.
-- **The NETOPIA review window: only on the main name, only with the password on.** REVIEW_OPEN (5.7) runs after
+- **The NETOPIA review window: only on the main name, only with the password on.** REVIEW_OPEN (5.8) runs after
   NAME4, on the Caddyfile NAME3 put in place, and never during an upload. While it is open, NAME5, PWOFF1 and SIGNUPS
   refuse; REVIEW_CLOSE and PWON close it. Every script that checks whether the site password is on does it on the Log
   in page (`/login`). The window never opens that page, so those scripts work with the window open or closed.
@@ -171,7 +171,7 @@ go on a second time, that friends' test closes and the site password changes (7.
 ### 1.1 The payment companies (in their websites)
 
 **NETOPIA, live admin.** Skip these checks for now: NETOPIA's point of sale is not enrolled yet. You enrol it once the
-public pages are open (5.7b). NETOPIA then checks your identity and the site, and sends the contract. Do the checks
+public pages are open (5.8b). NETOPIA then checks your identity and the site, and sends the contract. Do the checks
 below after NETOPIA's approval, before part 7.
 - Check: the live point of sale (POS) is approved, the contract is signed, live card payments and saved-card
   (recurring) payments are switched on, and the RON settlement form is signed.
@@ -201,7 +201,7 @@ checkout's card step show NETOPIA's own picture (its logo with the Visa and Mast
 server, while billing is on. It needs no file of yours and no Caddy change, so skip the release guide's PM1, SB5b,
 MT1, PM2 and MT2, and add no `PAYMENT_MARKS_AVAILABLE` line. If NETOPIA's admin shows you no shop id before the
 upload, ask NETOPIA for it. If you still have none, stop before SB1 and ask: without it this upload adds no logo, part
-5 waits for the logo check (LOGOCHECK, part 2), and NETOPIA's review looks for the logo (5.7b).
+5 waits for the logo check (LOGOCHECK, part 2), and NETOPIA's review looks for the logo (5.8b).
 
 ### 1.2 The SmartBill proof, on your Mac (it reads only; it writes nothing)
 
@@ -655,7 +655,7 @@ said -xF 'PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbat
 [ "$(jq -r .schema "$MP")" = preview-auth-dev-mail-v1 ] || flag 'mail: mail-plan.json is not the v1 file'
 [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ] && grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" && [ ! -e "$EDROP" ] || flag 'payments: not the sandbox'
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || flag 'the site password: /login does not answer 401'
-! grep -qE 'review_locked|review_quiet|review window begin' "$C" || flag 'the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.7)'
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || flag 'the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.8)'
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" > "$M/same-closed.txt" || flag 'a SAME check is BAD (look at the file named below)'
 grep -qx "OK SAME_UI_API_PUBLIC_APP_URL:$LABEL" "$M/same-closed.txt" && grep -qx "OK VALID_PREVIEW_ASKS_OPEN_TO:$LABEL" "$M/same-closed.txt" || flag 'the tools folder does not carry the new SAME checks (DR5 folder swap)'
 [ -z "$OPEN" ] || { echo "CLOSED_NOT_DONE: a lock is not closed (above; SAME output: $M/same-closed.txt): ask"; exit 1; }
@@ -1252,7 +1252,7 @@ set -euo pipefail
 # NAME5: the site answers as the test name again; dezbatere.ro stays prepared (redirect and notice pass-through).
 [ -s "$M/name/Caddyfile.phase1" ] && [ -s "$M/name/notify-code.before-dezbatere" ] || { echo "NAME5_NOT_DONE: a kept file is missing; nothing was stopped: ask"; exit 1; }
 ! cmp -s "$C" "$M/password/Caddyfile.open" || { echo "NAME5_NOT_DONE: the site is open to everyone: PWON first (part 9 order); nothing was stopped"; exit 1; }
-! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "NAME5_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.7) or PWON first (part 9 order); nothing was stopped"; exit 1; }
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "NAME5_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) or PWON first (part 9 order); nothing was stopped"; exit 1; }
 ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "NAME5_NOT_DONE: payments are real on this name: PAY_BACK first (part 9 order); nothing was stopped"; exit 1; }
 MMODE=$(jq -r 'if .schema == "preview-auth-dev-mail-v1" then "legacy" else .recipients end' "$MP" 2>/dev/null || true)
 case "$MMODE" in legacy|allow-list|open) ;; *) echo "NAME5_NOT_DONE: mail-plan.json does not read as a mail plan; nothing was stopped: ask"; exit 1;; esac
@@ -1343,7 +1343,7 @@ Never put the policy line back by hand while the site answers as dezbatere.ro: t
 - From NAME1 on, change nothing in the Caddyfile by hand: NAME2 and NAME1_BACK refuse a changed file, and NAME5 puts
   back the copy NAME1 made. Only the steps of this document change it (NAME3, REVIEW_OPEN, REVIEW_CLOSE, PWOFF2, PWON,
   SIGNUPS). Ask first. NETOPIA's logo needs no Caddy change: a later upload carries its line by itself.
-- The NETOPIA review window (5.7) stays open through a later upload: no upload step reads or changes the Caddyfile
+- The NETOPIA review window (5.8) stays open through a later upload: no upload step reads or changes the Caddyfile
   after NAME1, and nobody can buy through the window. During the drained upload's downtime the open pages show an
   error, to NETOPIA's reviewer too, so do not upload while NETOPIA is reviewing. After SB13b, change the first line
   of names.sh to the new upload (end of 3.0), then run REVIEW_OPEN again: with the window open it only checks, now
@@ -1353,13 +1353,13 @@ Never put the policy line back by hand while the site answers as dezbatere.ro: t
 - While payments are real, 7.12 adds two rules to every later upload. Once real payments were ever on, its LIVEAFTER
   rule holds before any rbD-B.
 
-### 5.7 The NETOPIA review window (the public pages without the password)
+### 5.8 The NETOPIA review window (the public pages without the password)
 
 NETOPIA approves card payments only after it has looked at https://dezbatere.ro in public, with no password, and made
 a test payment. This step lets anyone read the public pages of dezbatere.ro. Everything else keeps asking for the site
-password: sign-in, sign-up, debates and buying. 5.7b says what to check on the open site, and when to ask NETOPIA.
+password: sign-in, sign-up, debates and buying. 5.8b says what to check on the open site, and when to ask NETOPIA.
 
-**Before you start:** do 5.7a first, on your Mac (below REVIEW_CLOSE): REVIEW_MACTEST must end with
+**Before you start:** do 5.8a first, on your Mac (below REVIEW_CLOSE): REVIEW_MACTEST must end with
 `REVIEW_MACTEST_DONE`. Then check: NAME4 passed and you did the checks by hand of 5.4; billing is on (`/pricing`
 exists); the site password is on; no upload is running.
 
@@ -1374,7 +1374,7 @@ you type the password, see the site exactly as before.
 
 **What stays behind the password:** sign-in, sign-up, password reset, the checkout, Settings, every debate (published
 ones too), help, the staff screens and the rest of the API. A visitor who presses Log in, Start, a plan's button or
-Settings gets the browser's password box; its Cancel shows an empty page. Tell NETOPIA this (5.7b).
+Settings gets the browser's password box; its Cancel shows an empty page. Tell NETOPIA this (5.8b).
 
 **What does not change:** NETOPIA's payment notices, the HTTPS rule, the API, the website and their settings. While
 payments run on NETOPIA's sandbox, the home page and the plans page keep their test-mode note ("Test mode: payments on
@@ -1448,7 +1448,7 @@ probes() {
   [ "$(code -H 'RSC: 1' -H 'Next-Router-Prefetch: 1' "$U/new")" = 401 ] && [ "$(box -H 'RSC: 1' -H 'Next-Router-Prefetch: 1' "$U/new")" = 0 ] || bad "a Next.js prefetch of /new is not a plain 401"
   # The two /cancel requests reach the API, which refuses an empty form (400); another site is refused (403).
   for P in /api/v1/billing/cancel-link /api/v1/billing/cancel-by-token; do CC=$(code -X POST -H 'Content-Type: application/json' -H "Origin: $U" --data '{}' "$U$P")
-    case "$CC" in 400) ;; 2??|401|000|5??) bad "an empty /cancel request to $P answers $CC, not the API's 400";; *) echo "LOOK: an empty /cancel request to $P answers $CC, not 400: send the /cancel form by hand (5.7)";; esac; done
+    case "$CC" in 400) ;; 2??|401|000|5??) bad "an empty /cancel request to $P answers $CC, not the API's 400";; *) echo "LOOK: an empty /cancel request to $P answers $CC, not 400: send the /cancel form by hand (5.8)";; esac; done
   [ "$(code -X POST -H 'Content-Type: application/json' -H 'Origin: https://example.invalid' --data '{}' "$U/api/v1/billing/cancel-link")" = 403 ] || bad "a /cancel request from another site is not refused"
   # No open answer sets a site cookie; the robots and HTTPS headers.
   for P in / /pricing /terms /cancel; do [ "$(heads "$U$P" | grep -c '^set-cookie: __host-debateai-' || true)" = 0 ] || bad "$P sets a site cookie"; done
@@ -1510,7 +1510,7 @@ systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; 
 probes
 [ -z "$BAD" ] || back "a check failed (above)"
 rm -f "$RW.lines"
-echo "NETOPIA's logo on the open home page: $(body "$U/" | grep -oE 'src="https://mny[.]ro/np-black-0[.]svg[?]id=[0-9]+"' | grep -c . || true) time(s) (1: shown; 0: this release has no logo id: ask before you enrol the point of sale, 5.7b)"
+echo "NETOPIA's logo on the open home page: $(body "$U/" | grep -oE 'src="https://mny[.]ro/np-black-0[.]svg[?]id=[0-9]+"' | grep -c . || true) time(s) (1: shown; 0: this release has no logo id: ask before you enrol the point of sale, 5.8b)"
 echo "the plans page shows the test-mode note: $(body "$U/pricing" | grep -c 'Test mode:' || true) time(s)"
 echo "open now to strangers: the home page, /pricing, Terms and Privacy with their versions, /legal, /cookies, /providers, /ai-transparency, /privacy/us-health-data, /cancel and /withdraw, their files, and the /cancel form"
 echo REVIEW_OPEN_DONE
@@ -1521,7 +1521,7 @@ Expect the diff (one `< basic_auth {` line and the window's lines), the two hand
 nothing is linked from `/terms/versions` (the Terms have no earlier version yet). Then three information lines:
 NETOPIA's logo `1 time(s)`; the test-mode note `1` or more `time(s)` while payments are on NETOPIA's sandbox (0 once
 real payments are on, 7.6); what is open now. Then `REVIEW_OPEN_DONE`. A 0 for the logo, or for the note while
-payments are on the sandbox: ask before 5.7b. A `LOOK:` line changes nothing: read it, and ask before you write to
+payments are on the sandbox: ask before 5.8b. A `LOOK:` line changes nothing: read it, and ask before you write to
 NETOPIA. On a later run, with the window open, expect `the review window is open already: checks only, nothing
 changes`, the `/terms/versions` line and `REVIEW_OPEN_DONE`.
 
@@ -1608,10 +1608,10 @@ change is kept. Ask. The file with the window stays in `/root/preview-archive/ma
 - NAME5, PWOFF1 and SIGNUPS refuse: close the window first.
 - PWNEW, ASKS_OPEN, ASKS_CLOSE, MAIL_CLOSE, PAY_SWITCH and PAY_BACK work as written: they check the password on the
   Log in page, which the window never opens.
-- CLOSED says `NOT CLOSED: the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.7)`.
+- CLOSED says `NOT CLOSED: the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.8)`.
 - A later upload leaves the window as it is (5.6). Do not upload while NETOPIA is reviewing.
 
-### 5.7a Trying the window on the Mac first (REVIEW_MACTEST)
+### 5.8a Trying the window on the Mac first (REVIEW_MACTEST)
 
 On the Mac, in Terminal: run `brew install caddy` once, then `caddy version`, and write down what it prints. On the
 server, run `/usr/bin/caddy version`. If the two differ, go on: REVIEW_OPEN repeats the Caddy checks on the server and
@@ -1814,9 +1814,9 @@ done
 echo REVIEW_MACTEST_DONE
 ```
 
-### 5.7b NETOPIA's review: the list, the point of sale, and the days after
+### 5.8b NETOPIA's review: the list, the point of sale, and the days after
 
-Do this once REVIEW_OPEN ended with `REVIEW_OPEN_DONE` and the checks by hand of 5.7 passed.
+Do this once REVIEW_OPEN ended with `REVIEW_OPEN_DONE` and the checks by hand of 5.8 passed.
 
 **1. Check NETOPIA's list on the open site.** NETOPIA looks for each of these before it approves. Open every address
 in a private window that never had the site password, from a Romanian connection (on the phone: mobile data).
@@ -1874,7 +1874,7 @@ your identity, checks your shop's profile (it looks at the open site), and sends
 
 **6. After NETOPIA's approval and the signed contract:** NETOPIA switches live and saved-card (recurring) payments on.
 Then come the NETOPIA checks of 1.1 and part 7, on a later day. Every part-7 script works with the window open, and at
-PAY_SWITCH the test-mode note leaves the open pages by itself. Close the window as 5.7 says ("Closing the window").
+PAY_SWITCH the test-mode note leaves the open pages by itself. Close the window as 5.8 says ("Closing the window").
 
 ---
 
@@ -2037,10 +2037,10 @@ Open them again with each gate's `activate`:
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1 --go /etc/debateai-v3-preview/provider-perplexity-go-v1.json
 ```
 
-(b) **Close the site to strangers:** PWON (part 8.4), when the password is off or the NETOPIA review window (5.7) is
+(b) **Close the site to strangers:** PWON (part 8.4), when the password is off or the NETOPIA review window (5.8) is
 open. PWON closes both.
 
-(b2) **Close only the review window:** REVIEW_CLOSE (5.7). It reads no names file, so it works at any time.
+(b2) **Close only the review window:** REVIEW_CLOSE (5.8). It reads no names file, so it works at any time.
 
 (c) **Stop sign-ups only** (for when the password is off): a Caddy rule that answers 503 to the three sign-up
 requests. People see a plain error; it is an emergency brake. While the password is on, only people who know it can
@@ -2117,11 +2117,11 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
 ## 7. Real payments
 
 **Before you start:**
-- NETOPIA approved and the contract is signed (1.1, 5.7b), and the SmartBill proof passed (1.2).
+- NETOPIA approved and the contract is signed (1.1, 5.8b), and the SmartBill proof passed (1.2).
 - The main name is open (part 5), and the billing check passes on it.
 - Asks are closed (ASKS_CLOSE). The live start refuses `everyone-with-test-payments`. After the switch you open asks
   with `everyone` (part 8), never with the friends' value.
-- If a friends' test ran (part 6), or NETOPIA's tester had the site password (5.7b): every plan they bought is closed
+- If a friends' test ran (part 6), or NETOPIA's tester had the site password (5.8b): every plan they bought is closed
   (PAY0, 7.1, prints all zeros), and the site password is a new one that they never had (PWNEW, 7.0).
 - The staff screens are off (5.1b) until a later upload brings them back. While payments are real this means: nobody
   can hide a published debate or settle a report by hand, and the test name is no way round either, because from
@@ -2129,7 +2129,7 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
   take real payments this way, with the site password on and asks for the team only; you do not need to ask again.
 - The site password is on. While payments are real and asks are closed, the API refuses a checkout or a plan upgrade
   from any account not on the team (403 `PREVIEW_TEAM_ONLY`; the page shows its general error). Keep the password on
-  anyway while mail is on the allow-list: a buyer outside it would get no M1 or M2. The NETOPIA review window (5.7)
+  anyway while mail is on the allow-list: a buyer outside it would get no M1 or M2. The NETOPIA review window (5.8)
   may be open: it opens only the public pages and the `/cancel` form, no sign-in and no checkout, and PAY_SWITCH and
   PAY_BACK check the password on the Log in page, which the window never opens.
 - Never during an upload, and never while a second release runs or drains: two APIs on different payment systems on one
@@ -2137,7 +2137,7 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
 
 ### 7.0 A new site password (after a friends' test, or after NETOPIA's tester had it)
 
-The friends (or NETOPIA's tester, 5.7b) had the site password. During part 7 it keeps everyone but the team away from
+The friends (or NETOPIA's tester, 5.8b) had the site password. During part 7 it keeps everyone but the team away from
 sign-in, debates and buying, so change it first.
 This step writes a new user name and its bcrypt hash into `/etc/debateai-v3-preview/public/caddy.env` and
 restarts Caddy. The script asks for the old password only to check that it stops working; nothing you type is printed
@@ -2543,7 +2543,7 @@ the line. Two more rules, for the release guide's drained upload (DR1 to DR6):
   After SB13b, edit only the first line of `/root/preview-archive/main-site/names.sh` so it names the new upload's
   names file (as the end of 3.0 says; do not run LOCKS0 again). Then take the password off again with PWOFF1 and
   PWOFF2.
-  If only the NETOPIA review window (5.7) was open, not the whole site: leave it open during the upload, since nobody
+  If only the NETOPIA review window (5.8) was open, not the whole site: leave it open during the upload, since nobody
   can pay through it, and do not run PWOFF1 or PWOFF2. After SB13b, make the names.sh edit above, then run
   REVIEW_OPEN again (if you ran PWON, it closed the window, and REVIEW_OPEN opens it again).
 - **Before you choose rbD-B, for this upload or a later one, run LIVEAFTER below, even if payments are back on the
@@ -2584,7 +2584,7 @@ Without it nothing published can be hidden by hand while the site is open, and t
 closed while payments are real. PWOFF1 (8.2) refuses while the API file has no line `STAFF_ACCESS_POLICY_VERSION=2`.
 
 **Before you start:** the site answers as dezbatere.ro (part 5); the NETOPIA review window is closed (REVIEW_CLOSE,
-5.7; PWOFF1 refuses while it is open); mail is open there (4.3: PWOFF1 checks both the
+5.8; PWOFF1 refuses while it is open); mail is open there (4.3: PWOFF1 checks both the
 plan file and the API's mode line); real payments work (part 7); the staff screens are back and your staff key works
 on dezbatere.ro (above); with the staff screens back, you have read the **Public** tab again and used Hide now on
 anything that went public while they were off and must not stay public (Free debates go public by themselves, 5.1b);
@@ -2611,7 +2611,7 @@ grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "PWOFF1_NOT_DONE: the st
 jq -e --arg o "https://$HOST" '.schema=="preview-auth-dev-mail-v2" and .recipients=="open" and .publicAppUrl==$o' "$MP" >/dev/null 2>&1 || { echo "PWOFF1_NOT_DONE: mail-plan.json is not the open plan for $HOST (4.3 first)"; exit 1; }
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" || { echo "PWOFF1_NOT_DONE: the running API does not say mail mode open on $HOST (4.3 first)"; exit 1; }
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "PWOFF1_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
-! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "PWOFF1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.7) first"; exit 1; }
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "PWOFF1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first"; exit 1; }
 [ ! -e "$M/password/Caddyfile.before-open" ] || { echo "PWOFF1_NOT_DONE: $M/password/Caddyfile.before-open exists (look first)"; exit 1; }
 cp -p "$C" "$M/password/Caddyfile.before-open"; cp -p "$C" "$M/password/Caddyfile.open"
 echo "now edit $M/password/Caddyfile.open, then run PWOFF2"
@@ -2667,7 +2667,7 @@ everyone.
 
 ```sh
 set -euo pipefail
-# PWON: the site password back (the Caddyfile kept by PWOFF1), and the NETOPIA review window (5.7) closed if it is open; Caddy restarts. It reads no names file, so it works at any time.
+# PWON: the site password back (the Caddyfile kept by PWOFF1), and the NETOPIA review window (5.8) closed if it is open; Caddy restarts. It reads no names file, so it works at any time.
 C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site
 K=$M/password/Caddyfile.before-open; O=$M/password/Caddyfile.open; TS=$(date -u +%Y%m%dT%H%M%SZ)
 # The review window's marks, and how its lines come out again (the same lines in REVIEW_OPEN, REVIEW_CLOSE, PWON and REVIEW_MACTEST).
@@ -2707,7 +2707,7 @@ echo PWON_DONE
 exit 0
 ```
 
-If the NETOPIA review window (5.7) is open, PWON closes it first, with the same lines as REVIEW_CLOSE, and prints
+If the NETOPIA review window (5.8) is open, PWON closes it first, with the same lines as REVIEW_CLOSE, and prints
 `the review window is closed: every page asks for the site password again`.
 
 ### 8.5 The rules once the site is open
@@ -2723,17 +2723,17 @@ If the NETOPIA review window (5.7) is open, PWON closes it first, with the same 
 
 Close in this order. Each step is safe to stop after. The scripts hold you to it. While the site is open, PAY_BACK and
 NAME5 refuse, and so do ASKS_CLOSE and MAIL_CLOSE if payments are real. While payments are real, NAME5 refuses too.
-While the NETOPIA review window (5.7) is open, NAME5 refuses too; step 1 closes it.
+While the NETOPIA review window (5.8) is open, NAME5 refuses too; step 1 closes it.
 
 **If the password was ever off with real payments on (part 8), stop and ask before step 1.** Someone outside the
 team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
 both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
 password is back, such a plan does not end until its owner cancels it on `/cancel`, and only the NETOPIA review
-window (5.7, REVIEW_OPEN) can let them reach that page again. Until then PAY_BACK never passes, and that person is
+window (5.8, REVIEW_OPEN) can let them reach that page again. Until then PAY_BACK never passes, and that person is
 still charged every month while they cannot open the rest of the site. Never end their plan yourself. PWON as a
 brake (6.5 (b)) still works at any time.
 
-1. **The site password back:** PWON (8.4). It also closes the NETOPIA review window (5.7) if it is open.
+1. **The site password back:** PWON (8.4). It also closes the NETOPIA review window (5.8) if it is open.
 2. **Asks back to the team:** ASKS_CLOSE (6.3).
 3. **Payments back to the sandbox:** PAY_BACK (7.11). It waits until every live plan is over and every refund and
    credit note is recorded. After your test payment alone, that takes days. Meanwhile the password stays on, and
@@ -2839,4 +2839,4 @@ that service.
 | `BAD SAME_API_PAYMENT_SYSTEM` | SAME, two releases | two API files name different payment systems | ask before any switch |
 | `PREVIEW_TEAM_ONLY` (HTTP 403 from `/api/v1/billing/checkout` or `/api/v1/billing/subscription/upgrade`; the page shows its general error) | per request, the API | while payments are real and asks are closed, an account not on the team tried to buy or upgrade a plan; nothing was charged or written | expected; pay with a team account, or open asks (part 8) |
 | `PREVIEW_MAIL_REFUSED` (and the API's `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`) | per mail, the mail program | one mail was refused by the plan's rules (in allow-list mode: an address not on the list) | expected in allow-list mode for other addresses; otherwise MAIL_CLOSE and ask |
-| a plain `401` with no password box (only while the NETOPIA review window, 5.7, is open) | per request, Caddy | a stranger's background request for a closed address: a Next.js page request, the account check (`/api/v1/session`), the help check (`/api/v1/geo/availability`) or the browser's own icon request (`/favicon.ico`, `/apple-touch-icon.png`); the page shows Log in and no Help, and no password box opens | expected; if a password box opens by itself over a public page, REVIEW_CLOSE, then ask |
+| a plain `401` with no password box (only while the NETOPIA review window, 5.8, is open) | per request, Caddy | a stranger's background request for a closed address: a Next.js page request, the account check (`/api/v1/session`), the help check (`/api/v1/geo/availability`) or the browser's own icon request (`/favicon.ico`, `/apple-touch-icon.png`); the page shows Log in and no Help, and no password box opens | expected; if a password box opens by itself over a public page, REVIEW_CLOSE, then ask |

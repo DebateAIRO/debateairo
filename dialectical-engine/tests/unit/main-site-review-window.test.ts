@@ -1,4 +1,4 @@
-// The NETOPIA review window of the owner's runbook (deploy/preview-auth-dev/v1/MAIN-SITE.md, 5.7). REVIEW_OPEN lets a
+// The NETOPIA review window of the owner's runbook (deploy/preview-auth-dev/v1/MAIN-SITE.md, 5.8). REVIEW_OPEN lets a
 // stranger read the public pages of dezbatere.ro without the site password, REVIEW_CLOSE and PWON close them again,
 // and REVIEW_MACTEST tries the window on the Mac. The scripts live only in the runbook, so they are checked here as
 // text and run in bash: the lines they share are the same in every copy; the address pattern opens every public page
