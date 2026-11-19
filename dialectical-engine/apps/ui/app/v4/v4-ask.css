@@ -23,6 +23,8 @@
   white-space: nowrap;
 }
 .v4HdrNameAccent { color: var(--brand); }
+/* The "Beta" mark follows the wordmark (globals.css draws the mark itself); on a phone it follows the diamond mark. */
+.v4HdrBeta { align-self: center; }
 .v4HdrNav { display: flex; flex-wrap: wrap; gap: 0 24px; font-size: 15px; font-weight: 700; }
 .v4HdrNavLink {
   display: inline-flex; align-items: center; min-height: 44px; padding: 0; color: var(--text-2); text-decoration: none;
@@ -53,6 +55,16 @@
 }
 
 /* ---- /v4 page ---- */
+/* The Beta sentence opens the ask page, right under the header: the column's width and gutters. The header above it
+   already shows the "Beta" mark, so the sentence draws none of its own here. */
+.v4BetaNote {
+  width: 100%; max-width: 820px; margin: 0 auto;
+  padding: 14px var(--v4-gutter) 0;
+}
+.v4BetaNote .betaBadge { display: none; }
+@media (min-width: 768px) {
+  .v4BetaNote { padding: 20px 32px 0; }
+}
 /* Design Document v2 (16a, 18b): one 820px column, 48px above and 56px below, 28px between its blocks. */
 .v4AskMain {
   width: 100%; max-width: 820px; margin: 0 auto;

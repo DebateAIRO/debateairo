@@ -51,6 +51,14 @@
 //       (side-by-side spec §5: the database steps the newer release adds, each with both n1 header lines, and the newer
 //        release's own chain; root installs it as /etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older label>.json and
 //        pins it with prestart.mjs accept-ahead, so the older release can restart beside the newer database)
+//   release-artifacts.mjs site-inputs --operation report|compose --from <the live settings version's verify plan> --site '<JSON object>'
+//       [--change '<input names>'] [--limits '<plan ids>'] [--out <artifacts folder>/site-inputs.json]
+//       (the site's numbers for an upload, site-inputs.mjs: --site is the owner's server file as one JSON object, compared
+//        input by input with the hosted inputs of --from. report prints the lines only (which input, plan and member
+//        differs, and whether a number went up or down; never an amount). compose also needs --out, and writes the new
+//        version's hosted inputs there: the live version's, with exactly the inputs --change names taken from the file. It
+//        refuses unless --change names every input that differs and no other, and --limits names every plan whose limits
+//        get lower or change for the people already on it, and no other)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -71,6 +79,7 @@ import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-a
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 import { addedMigrations, n1Headers } from '../../preview-lifecycle/v1/migration-steps.mjs';
 import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_MAX_STEPS, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
+import { SiteInputsRefusal, compareSiteInputs, composeSiteInputs } from './site-inputs.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
 export const LAYOUT = Object.freeze({
@@ -159,7 +168,8 @@ const COMMANDS = Object.freeze({
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
   'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--engine-version', '--line-up', '--answer-seats', '--hosted-billing'] },
-  'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] }
+  'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] },
+  'site-inputs': { required: ['--operation', '--from', '--site'], optional: ['--change', '--limits', '--out'] }
 });
 
 export class Refusal extends Error {
@@ -780,6 +790,48 @@ async function databaseAheadCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], file, { layout, maxBytes: DATABASE_AHEAD_MAX_BYTES, name: `database-ahead-${olderLabel}.json` });
 }
 
+/** The record `site-inputs --operation compose` writes: what was compared, what the owner named, and the hosted inputs chosen. */
+export const SITE_INPUTS_SCHEMA = 'preview-site-inputs-v1';
+
+/**
+ * The site's numbers for an upload (site-inputs.mjs; release guide SB3). `--from` is the verify plan of the live settings
+ * version, so its hosted inputs are the ones that version sealed; `--site` is the owner's server file, as one JSON
+ * object. `report` reads and prints lines, never an amount. `compose` writes the new version's hosted inputs to `--out`
+ * (the plan that follows carries the same values in the same folder) and prints only names and the file's hash.
+ */
+async function siteInputsCommand(options, { layout, deps }) {
+  const operation = options['--operation'];
+  if (!['report', 'compose'].includes(operation)) refuse('ARGUMENTS_REFUSED', ['--operation']);
+  const composing = operation === 'compose';
+  if (composing !== (options['--out'] !== undefined)) refuse('ARGUMENTS_REFUSED', ['--out']);
+  // The two lists are the owner's decision for a compose; a report decides nothing.
+  for (const flag of ['--change', '--limits']) if (!composing && options[flag] !== undefined) refuse('ARGUMENTS_REFUSED', [flag]);
+  let site;
+  try { site = strictJson(Buffer.from(options['--site'], 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--site']); }
+  if (composing) await assertOutputFree(options['--out'], { layout, name: 'site-inputs.json' });
+  const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
+  if (!plainObject(from.value) || from.value.operation !== 'verify' || !Object.hasOwn(from.value, 'hostedBilling')) refuse('FROM_PLAN_INVALID');
+  try { validatePublication(from.value.approval?.publication); } catch { refuse('NATIVE_APPROVAL_REQUIRED'); }
+  const guarded = work => { try { return work(); } catch (error) { return error instanceof SiteInputsRefusal ? refuse(error.code, error.fields) : refuse('SITE_INPUTS_REFUSED'); } };
+  if (!composing) {
+    const { lines, differing, limitPlans } = guarded(() => compareSiteInputs(from.value.hostedBilling, site));
+    return { event: 'PREVIEW_SITE_INPUTS', operation, lines, differing, limitPlans };
+  }
+  // Lazy, as in native-plan: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
+  const nativeOperator = () => import('../../preview-auth-dev/v1/native-operator.mjs');
+  try { (deps.validateNativePlan ?? (await nativeOperator()).validateNativePlan)(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
+  const composed = guarded(() => composeSiteInputs(from.value.hostedBilling, site, { change: options['--change'], limits: options['--limits'] }));
+  // The mix of the two sides must itself be lawful hosted inputs (a per-debate ceiling from the file above the live day's refuses here).
+  let hostedBilling;
+  try { hostedBilling = (deps.validateHostedBillingChoice ?? (await nativeOperator()).validateHostedBillingChoice)(composed.hostedBilling); } catch { refuse('SITE_INPUTS_REFUSED', ['--site']); }
+  const { change, limits, lines } = composed;
+  const written = await writeArtifact(options['--out'], {
+    schema: SITE_INPUTS_SCHEMA, from: { path: from.path, sha256: from.sha256 }, baseRegisterVersion: from.value.approval.publication.registerVersion,
+    change, limits, lines, hostedBilling
+  }, { layout, maxBytes: MAX_PLAN_BYTES, name: 'site-inputs.json' });
+  return { ...written, change, limits };
+}
+
 /** Parse, then run one subcommand. `layout`/`deps` exist for the unit tests' throwaway roots. */
 export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const { command, options } = parseArguments(argv);
@@ -792,6 +844,7 @@ export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
     case 'operator-digest': return operatorDigestCommand(options, context);
     case 'launch-plan': return launchPlanCommand(options, context);
     case 'database-ahead': return databaseAheadCommand(options, context);
+    case 'site-inputs': return siteInputsCommand(options, context);
     default: return nativePlanCommand(options, context);
   }
 }

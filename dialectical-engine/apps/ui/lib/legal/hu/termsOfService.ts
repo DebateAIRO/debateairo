@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Hatósági kapcsolattartó pont — office@dezbatere.ro — román és angol nyelven",
         "Terrorista tartalom eltávolítására irányuló végzések (az (EU) 2021/784 rendelet) — office@dezbatere.ro — kapcsolattartó pontunk ezekhez a végzésekhez; román és angol nyelven; lásd a 10. szakaszt",
         "Más országokban működő képviselők — Az A. melléklet sorolja fel azon régiók tekintetében, ahol képviselőt jelöltünk ki"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Bejegyzett székhely","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Románia"],
+            ["Cégjegyzékszám","J2022000426271"],
+            ["Egyedi nyilvántartási kód (CUI)","45935221 · héa: RO45935221"],
+            ["Jegyzett tőke","5000 RON"],
+            ["Általános kapcsolattartás","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Jogi értesítések","support@dezbatere.ro"],
+            ["Adatvédelem","privacy@dezbatere.ro"],
+            ["Jogellenes tartalom bejelentése","support@dezbatere.ro — lásd a 10. szakaszt"],
+            ["Hatósági kapcsolattartó pont","office@dezbatere.ro — román és angol nyelven"],
+            ["Terrorista tartalom eltávolítására irányuló végzések (az (EU) 2021/784 rendelet)","office@dezbatere.ro — kapcsolattartó pontunk ezekhez a végzésekhez; román és angol nyelven; lásd a 10. szakaszt"],
+            ["Más országokban működő képviselők","Az A. melléklet sorolja fel azon régiók tekintetében, ahol képviselőt jelöltünk ki"]
+          ]
+        }
       },
       { kind: "p", text: "Ezek az adatok folyamatosan elérhetők a webhelyen is: dezbatere.ro/legal. Mindig kapcsolatba léphet egy személlyel, nem csupán az asszisztensünkkel; ennek módját a 10. szakasz ismerteti." }
     ]

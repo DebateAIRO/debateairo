@@ -8,6 +8,7 @@ import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { ADR_URL, COMPANY, isUnverified, LEGAL_PAGES } from "@/lib/legal/pages";
 import { useSupportOffered } from "@/components/support/availability";
+import { ReportProblemLink } from "@/components/BetaNotice";
 
 const PRODUCT_NAME = "Dialectical Engine";
 
@@ -176,6 +177,10 @@ export function PaymentMarksGroup({ marks, netopiaLogo = null }: { marks: Paymen
  * - `line` — every other screen: copyright, the made-in sentence, the seven legal links, cookie preferences and the
  *   small SAL badge on one line, so the canvas keeps its room (15b).
  *
+ * While the site is in Beta both shapes hold a "Report a problem" link (it starts a mail to our support address), so a
+ * person can report from the page the problem showed on: the `line` shape after its page links and before cookie
+ * preferences, which still closes the list; the `full` shape at the end of the PRODUCT column.
+ *
  * The root layout renders the `line` footer after every page; a page that renders the `full`
  * footer hides it through `.appShell:has(.siteFooterFull) > .siteFooterLine` in `app/legal.css`,
  * so no page has to know which footer the layout drew.
@@ -206,6 +211,9 @@ export function SiteFooter(
           <ul className="siteFooterLineLinks">
             {legalLinks}
             {props.billing?.billingOn === true ? linkItems(LINE_BILLING_LINKS, catalog) : null}
+            <li>
+              <ReportProblemLink className="siteFooterLink" />
+            </li>
             <li>
               <CookiePreferencesButton className="siteFooterLink" label={cookiePreferences} />
             </li>
@@ -267,7 +275,12 @@ export function SiteFooter(
           <span className="siteFooterHead" aria-hidden>
             {t(catalog, "chrome.footer.product")}
           </span>
-          <ul>{linkItems(productLinks, catalog)}</ul>
+          <ul>
+            {linkItems(productLinks, catalog)}
+            <li>
+              <ReportProblemLink className="siteFooterLink" />
+            </li>
+          </ul>
         </nav>
         <nav className="siteFooterColumn" aria-label={t(catalog, "chrome.legalPages")}>
           <span className="siteFooterHead" aria-hidden>

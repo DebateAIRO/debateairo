@@ -1,0 +1,17 @@
+{
+  "version": "staff-rekey-permit-forward0184-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0183_unfinished_signup_expiry.sql",
+    "manifestSha256": "e312bae59b20a7bf9a578c3fb908e99a08de987b86ddb0eef2e58fd55507b4e0",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0184_staff_rekey_permit.sql",
+    "sha256": "34275a32fb72c91291903a615f533178e155e31981abf01b64c5bbf839fa31e1"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  }
+}

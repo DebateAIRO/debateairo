@@ -1748,6 +1748,18 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
   ]
+},
+// 0183 (owner's goal of 2026-11-11): a sign-up not finished within 24 hours is deleted. The four functions are the cross-account
+// marker's alone, as 0171's sweep; the API runs them outside any request, on its system login, from a gated ten-minute timer.
+{
+  "roleName": "debateai_rls_all_accounts",
+  "source": "migrations/0183_unfinished_signup_expiry.sql",
+  "grants": [
+    "EXECUTE ON FUNCTION identity.read_unfinished_signups_due(integer)",
+    "EXECUTE ON FUNCTION identity.expire_unfinished_signup(uuid)",
+    "EXECUTE ON FUNCTION identity.read_unfinished_signup_key_cleanup(integer)",
+    "EXECUTE ON FUNCTION identity.complete_unfinished_signup_key_cleanup(uuid)"
+  ]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([
@@ -2186,7 +2198,7 @@ describe("P3-01 production database-principal manifest", () => {
   });
   it('pins the independent Owner ceremony lifecycle to only enumerated JIT definers',async()=>{
     const manifest=JSON.parse(await readFile(manifestPath,'utf8'));
-    expect(manifest.independentOwnerRecovery).toEqual({version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.read_committed_owner_operation','staff.commit_owner_command','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness']});
+    expect(manifest.independentOwnerRecovery).toEqual({version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.read_committed_owner_operation','staff.commit_owner_command','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.arm_rekey']});
   });
 
   it('rejects mixed Owner recovery grants before accepting credential material or touching SQL',async()=>{

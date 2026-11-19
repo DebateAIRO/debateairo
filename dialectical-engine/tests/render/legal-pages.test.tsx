@@ -322,8 +322,11 @@ describe("the text pages render the same documents as the sign-up modals", () =>
       for (const { name } of LEGAL_INVENTORY.filter(({ name }) => name !== "debateai.support.offered.v1")) {
         // A bearer name is a prefix of its CSRF companion; count complete stored-name tokens.
         const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const written = (page.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`, "g"))?.length ?? 0;
-        const isolated = [...page.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
+        // Counted on what is drawn: a table row's sr-only spoken copy (`.srOnly`) repeats its names for screen readers.
+        const drawn = page.cloneNode(true) as Element;
+        drawn.querySelectorAll(".srOnly").forEach((copy) => copy.remove());
+        const written = (drawn.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`, "g"))?.length ?? 0;
+        const isolated = [...drawn.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
         expect(written, `${edition}: ${name} is in the policy`).toBeGreaterThan(0);
         expect(isolated, `${edition}: every ${name} is its own left-to-right run`).toBe(written);
       }
@@ -478,7 +481,16 @@ describe("the cookie policy describes the cookies the product really sets", () =
           && r.style.display === "block"
           && r.style.getPropertyValue("width") === "auto"
           && r.style.getPropertyPriority("width") === "important";
-        return inner.some((r) => selectors(r).includes(".legalCookieTable thead") && r.style.display === "none")
+        // The header row hides from sight only (a11y 2026-11-19): clipped, never display:none, so a screen reader still
+        // names each stacked cell by its column.
+        const hiddenFromSightOnly = (r: CSSStyleRule): boolean =>
+          selectors(r).includes(".legalCookieTable thead")
+          && r.style.position === "absolute"
+          && r.style.width === "1px"
+          && r.style.height === "1px"
+          && r.style.overflow === "hidden"
+          && r.style.display !== "none";
+        return inner.some(hiddenFromSightOnly)
           && inner.some((r) => blockCell(r, "th"))
           && inner.some((r) => blockCell(r, "td"));
       })
@@ -731,15 +743,18 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the seven legal links, cookie preferences and ANPC's SAL badge", () => {
+  it("the one-line footer carries the seven legal links, cookie preferences, the report link and ANPC's SAL badge", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
       const view = render(<SiteFooter variant="line" />);
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
-      expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
+      const links = [...(footer?.querySelectorAll("a") ?? [])];
+      expect(links.filter((link) => !link.hasAttribute("data-report-problem")).map((link) => link.getAttribute("href")))
         .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
+      // While the site is in Beta: one "Report a problem" link, before cookie preferences.
+      expect(links.filter((link) => link.hasAttribute("data-report-problem")).map((link) => link.textContent)).toEqual(["Report a problem"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());

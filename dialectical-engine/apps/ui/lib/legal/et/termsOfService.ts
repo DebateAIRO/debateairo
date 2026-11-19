@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Ametiasutuste kontaktpunkt — office@dezbatere.ro — rumeenia ja inglise keeles",
         "Terroristliku sisu eemaldamiskorraldused (määrus (EL) 2021/784) — office@dezbatere.ro — meie kontaktpunkt selliste korralduste jaoks; rumeenia ja inglise keeles; vt jaotis 10",
         "Esindajad teistes riikides — Loetletud lisas A nende piirkondade kohta, kus oleme esindaja määranud"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Registrijärgne asukoht","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumeenia"],
+            ["Äriregistri number","J2022000426271"],
+            ["Registrikood (CUI)","45935221 · Käibemaks: RO45935221"],
+            ["Osakapital","5000 RON"],
+            ["Üldine kontakt","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Õiguslikud teated","support@dezbatere.ro"],
+            ["Privaatsus ja andmekaitse","privacy@dezbatere.ro"],
+            ["Ebaseaduslikust sisust teatamine","support@dezbatere.ro — vt jaotis 10"],
+            ["Ametiasutuste kontaktpunkt","office@dezbatere.ro — rumeenia ja inglise keeles"],
+            ["Terroristliku sisu eemaldamiskorraldused (määrus (EL) 2021/784)","office@dezbatere.ro — meie kontaktpunkt selliste korralduste jaoks; rumeenia ja inglise keeles; vt jaotis 10"],
+            ["Esindajad teistes riikides","Loetletud lisas A nende piirkondade kohta, kus oleme esindaja määranud"]
+          ]
+        }
       },
       { kind: "p", text: "Need andmed on püsivalt esitatud ka veebisaidil dezbatere.ro/legal. Teil on alati võimalik võtta ühendust inimesega, mitte ainult meie assistendiga; jaotises 10 selgitatakse, kuidas seda teha." }
     ]
