@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { BillingRepository, createPool, EntitlementRepository, migrate } from "@debateai/db";
-import { foldSubscription, withdrawalDeadline, type TaxEngine } from "@debateai/billing-core";
+import { consumerCalendarDay, foldSubscription, withdrawalDeadline, type TaxEngine } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { AdjustableTaxEngine, testBillingPolicy } from "../support/billingFixtures.js";
@@ -68,7 +68,8 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     expect(read.json().subscription).toMatchObject({
       plan_id: "PLUS", status: "ACTIVE", cancel_requested: false,
       renews_on: seeded.periodEnd.toISOString(), renewal_total: "24.20",
-      withdrawal_open_until: deadline.closesAt.toISOString(), withdrawal_last_day: deadline.lastDay
+      withdrawal_open_until: deadline.closesAt.toISOString(), withdrawal_last_day: deadline.lastDay,
+      started_on: consumerCalendarDay(seeded.periodStart, "RO")
     });
     await api.close();
   });

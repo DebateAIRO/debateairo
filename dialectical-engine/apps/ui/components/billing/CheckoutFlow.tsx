@@ -471,6 +471,15 @@ export function CheckoutFlow({
             <input type="checkbox" id="checkout-immediate" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />
             <span>{t(catalog, "billing.consent.immediateStart")}</span>
           </label>
+          {/* OUG 34/2014 art. 6(1)(h): before the contract, where the withdrawal function is. A paragraph of its own,
+              so the sealed consent sentences above stay as they are; the page opens in a new tab, so this one keeps
+              the boxes the person ticked. */}
+          {quote.withdrawal_days !== null ? (
+            <p className="billingNote" data-withdrawal-where>
+              {t(catalog, "billing.checkout.withdrawalWhere", { days: quote.withdrawal_days })}{" "}
+              <a href="/withdraw" target="_blank" rel="noopener">{t(catalog, "billing.checkout.withdrawalLink")}</a>
+            </p>
+          ) : null}
           <h2 className="setSubtitle">{t(catalog, "billing.checkout.cardTitle")}</h2>
           <p className="billingNote">{t(catalog, "billing.checkout.cardNote")}</p>
           {/* Right above the button that leaves for NETOPIA's page, where a real card would otherwise be typed. */}
