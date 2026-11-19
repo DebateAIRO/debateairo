@@ -17,7 +17,9 @@ import {
  * that is not an AI provider. The AI rows are unchanged (`providerRegister`); `/providers` shows them and then
  * NETOPIA's row on every answer (`legalRegister`). Its row says what NETOPIA receives (the same list as Privacy §5),
  * "not applicable" for the AI-only facts, and "[to confirm]" for what the repo does not know. The intro still says AI
- * providers never receive email, account, IP or payment details, and says the last entry does.
+ * providers never receive email, account, IP or payment details, and says the last entry does. The plans are on sale,
+ * so the row and the intro no longer say "once paid plans start", and both name the check of a new card, which sends
+ * NETOPIA the same details as a payment.
  */
 const catalogs: Readonly<Record<string, Record<string, string>>> = Object.fromEntries(
   readdirSync(resolve(process.cwd(), "apps/ui/messages"), { withFileTypes: true })
@@ -55,11 +57,11 @@ describe("the Register lists the payment provider after the AI providers", () =>
     expect(html).toContain(escaped(en["legal.providers.purpose.payments"]));
     expect(html.split(escaped(en["legal.providers.notApplicable"])).length - 1, "zero retention and training").toBe(2);
     expect(html).toContain(escaped(en["legal.providers.euBasis"]));
-    expect(en["legal.providers.purpose.payments"]).toBe("Your name, email address, phone number and billing address, a customer code that stays the same, our reference for the order, the amount, the currency and a short description, with each card payment, and at a renewal the IP address you last paid from yourself — to take card payments, once paid plans start");
+    expect(en["legal.providers.purpose.payments"]).toBe("Your name, email address, phone number and billing address, a customer code that stays the same, our reference for the order, the amount, the currency and a short description, with each card payment and when you check a new card, and at a renewal the IP address you last paid from yourself — to take card payments and check new cards");
     expect(en["legal.providers.notApplicable"]).toBe("Not applicable — not an AI provider");
     expect(en["legal.providers.euBasis"]).toBe("None needed — a company in the European Union (Romania)");
     expect(en["legal.providers.intro"]).toContain("They never receive your email address, your account, your IP address or your payment details.");
-    expect(en["legal.providers.intro"]).toContain("The last entry is not an AI provider: it is our payment provider, NETOPIA Payments, which takes card payments once paid plans start. It does receive your name, your email address, your phone number, your billing address and, at a renewal, an IP address, and its entry says what it receives and why.");
+    expect(en["legal.providers.intro"]).toContain("The last entry is not an AI provider: it is our payment provider, NETOPIA Payments, which takes card payments and checks new cards. It does receive your name, your email address, your phone number, your billing address and, at a renewal, an IP address, and its entry says what it receives and why.");
   });
 
   it.each(Object.keys(catalogs).map((code) => [code]))("%s: the three new keys are there and translated, and the intro names NETOPIA Payments", (code) => {
