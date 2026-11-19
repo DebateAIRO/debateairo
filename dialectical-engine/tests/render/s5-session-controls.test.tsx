@@ -93,7 +93,7 @@ describe.each(surfaces)("S5 rendered session controls — %s", (_name, Controls)
     // This browser's own sign-in shows its short code (the id's first eight characters), and only that row does:
     // an operator reads it here to say which sign-in an approval on the server is for.
     const codes = [...document.querySelectorAll("[data-sign-in-code]")].map((node) => node.textContent);
-    expect(codes).toEqual(["Sign-in code: 11111111"]);
+    expect(codes).toEqual(["Sign-in code: 11111111. It tells this sign-in apart from your others; it is not a password."]);
     expect(document.body.textContent).not.toContain("22222222");
     expect(document.body.textContent).toContain("Other session");
     expect(document.body.textContent).toContain("Signed in");

@@ -92,7 +92,7 @@ can all be done in one day, unless one of these holds you up:
 
 It is fine to end the day with real payments on, behind the new site password, with asks for the team only: that is
 the state part 7 leaves. Do all staff work (Hide now) on the test name before the rename (1.6): a staff key belongs
-to one name, so after the rename nobody can use the staff screens until their staff key is enrolled again under
+to one name, so from the rename on nobody can use the staff screens until their staff key is enrolled again under
 dezbatere.ro (5.7). Part 8 (opening to everyone) waits for that.
 
 **If your real payment comes before a friends' test.** Parts 6 and 7 can swap. Do parts 1 to 5, then part 7, and
@@ -374,8 +374,8 @@ exit 0
 Read the lines just before `STAFFCHECK_DONE`:
 - `staff tools are on`: the file holds `STAFF_ACCESS_POLICY_VERSION=2`, and the two staff name lines
   (`STAFF_WEBAUTHN_ORIGIN`, `STAFF_WEBAUTHN_RP_ID`) name the name the site answers as. Do the steps below. If the next
-  line says `the file has team allowance lines`, never run STAFFOFF on this server (the rename does not need it). The
-  count line above it (`team allowance lines: 0; …`) is not a warning.
+  line says `the file has team allowance lines`, never run STAFFOFF on this server: the staff screens then stay on
+  through the rename (5.1b). The count line above it (`team allowance lines: 0; …`) is not a warning.
 - `staff tools are off`: Hide now does not exist on this server now. Skip step 2 below. If a published debate must
   not stay public, put the staff screens on first: STAFFON (5.5b) on the test name, or 5.7 on dezbatere.ro.
 
@@ -383,8 +383,8 @@ Read the lines just before `STAFFCHECK_DONE`:
 not (5.1b says why it matters).
 
 **Why now.** A staff key belongs to one site name. The one you enrolled works only on the test name. After the rename
-the staff screens are there on dezbatere.ro, but nobody's staff key works until it is enrolled again under the new
-name (5.7: about half an hour, and it needs you at the server and at the browser). **This is your last chance for
+nobody's staff key works until the staff screens are on under dezbatere.ro and the key is enrolled again there (5.7:
+about half an hour, and it needs you at the server and at the browser). **This is your last chance for
 staff work (Hide now, reports, publication reviews) until then.**
 
 Do this **before DR2** of the upload, while the old release still runs on the test name:
@@ -816,9 +816,11 @@ MAIL_CLOSE runs only with the site password on (PWON first): a buyer outside the
 Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), PM2 has run if this
 upload added the payment marks, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
 (NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If STAFFCHECK (1.6)
-said `staff tools are on`, they stay on: NAME2 and NAME3 move the two staff name lines together with the name, and
-after NAME3 you enrol your staff key again under dezbatere.ro (5.7). Pick a quiet minute for NAME3 (it restarts the
-API): nothing being admitted, no checkout open. If you did not do 1.3 (b) to (e), do them now.
+said `staff tools are on`: the first time this server is renamed, run STAFFOFF (5.1b) after NAME1C and right before
+NAME2, and put the staff screens on again with STAFFMAIN (5.7) after the rename. NAME2 and NAME3 also work with the
+staff screens on (they move the two staff name lines with the name); 5.1b says when that is the better way. Either
+way you enrol your staff key again under dezbatere.ro (5.7). Pick a quiet minute for STAFFOFF and for NAME3 (each
+restarts the API): nothing being admitted, no checkout open. If you did not do 1.3 (b) to (e), do them now.
 
 **What closing keeps.** The prepared state (NAME1) stays after you close the name again: dezbatere.ro then redirects
 to the test name, and NETOPIA's payment notices on dezbatere.ro still reach the site. NETOPIA does not follow
@@ -939,13 +941,22 @@ echo NAME1_BACK_DONE
 exit 0
 ```
 
-### 5.1b The staff screens off (STAFFOFF; no longer needed for the rename)
+### 5.1b The staff screens off for the rename (STAFFOFF; the careful way the first time)
 
-**With this release, skip this step.** NAME2 and NAME3 move the two staff name lines with the name, and 5.7 enrols
-your staff key again under dezbatere.ro. STAFFOFF is kept for two cases: NAME2 said `run STAFFOFF (5.1b) first` (the
-release or the tools folder on the server is older than this document), or you want the staff screens off on the test
-name for another reason. If the rename was already done with the staff screens off, go to 5.7: STAFFMAIN puts them on
-under dezbatere.ro.
+**The first time this server is renamed, run this step,** after NAME1C and right before NAME2. If STAFFCHECK (1.6)
+said `staff tools are off`, skip it.
+
+**Why.** The rename itself no longer needs it: NAME2 and NAME3 move the two staff name lines with the name. But the
+API has never started on this server with the staff screens on under dezbatere.ro, and only the server can show
+whether it does.
+- With the staff screens **off** for the rename, that first start is STAFFMAIN (5.7). If the API refuses there,
+  STAFFMAIN puts the file back by itself, the site keeps answering as dezbatere.ro, and only the staff screens wait.
+- With the staff screens **on** through the rename, that first start is NAME3. If the API refuses there, the way out
+  is NAME5: the whole rename undone, a few minutes down. Then run STAFFOFF, and NAME2 and NAME3 again.
+
+Keep the staff screens on through the rename only when STAFFMAIN has already ended with `STAFFMAIN_DONE` on this
+server once (a later rename), or when STAFFCHECK said `the file has team allowance lines` (STAFFOFF refuses then). If
+the rename was already done with the staff screens off, go to 5.7: STAFFMAIN puts them on under dezbatere.ro.
 
 **What it does.** STAFFOFF takes the one line `STAFF_ACCESS_POLICY_VERSION=2` out of the API file. Nothing else in
 the API file, the runner's file or the website's file depends on it, and the SAME checks do not read it. Then it
@@ -1025,9 +1036,9 @@ SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
 [ "$SN" = 0 ] || { [ "$SN" = 2 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A" || true)" = 1 ]; } || { echo "NAME2_NOT_DONE: the API file's two staff name lines do not name the test name exactly once each: ask"; exit 1; }
 if grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A"; then
   [ "$SN" = 2 ] && [ -f "$CAPI/dialectical-engine/migrations/0183_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "NAME2_NOT_DONE: the staff screens are on, but this release or the tools folder cannot enrol a staff key under a new name: run STAFFOFF (5.1b) first"; exit 1; }
-  [ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text)')" || true)" = 1 ] || { echo "NAME2_NOT_DONE: the staff screens are on, but the database does not hold the staff re-key step, so no staff key could be enrolled under dezbatere.ro: ask, or run STAFFOFF (5.1b) first"; exit 1; }
-  [ "$(psqlq "SELECT count(*) FROM pg_hba_file_rules WHERE type = 'local' AND ('debateai_prod_staff_recovery' = ANY (user_name) OR 'all' = ANY (user_name)) AND auth_method = 'scram-sha-256' AND error IS NULL" || true)" -ge 1 ] 2>/dev/null || { echo "NAME2_NOT_DONE: the staff screens are on, but the database's pg_hba.conf has no local scram-sha-256 line for debateai_prod_staff_recovery, so REKEY (5.7) could not arm a permit under dezbatere.ro: ask, or run STAFFOFF (5.1b) first"; exit 1; }
-  echo "the staff screens are on: they move to dezbatere.ro with the name, and every staff key must be enrolled again there (5.7) after NAME3"
+  [ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')" || true)" = 1 ] || { echo "NAME2_NOT_DONE: the staff screens are on, but the database does not hold the staff re-key step, so no staff key could be enrolled under dezbatere.ro: ask, or run STAFFOFF (5.1b) first"; exit 1; }
+  [ "$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)" = scram-sha-256 ] || { echo "NAME2_NOT_DONE: the staff screens are on, but the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256, so REKEY (5.7) could not arm a permit under dezbatere.ro: ask, or run STAFFOFF (5.1b) first"; exit 1; }
+  echo "the staff screens are on: they move to dezbatere.ro with the name, and every staff key must be enrolled again there (5.7) after NAME3; if the API refuses at NAME3, run NAME5, then STAFFOFF (5.1b), then NAME2 and NAME3 again"
 fi
 [ "$(grep -c '^SOCIAL_SOCKET_PATH=' "$A" || true)" = 0 ] || { echo "NAME2_NOT_DONE: social sign-in is set up and its relay's callbacks name the test name, so every provider button would vanish on dezbatere.ro: ask"; exit 1; }
 TK=$(grep '^TURNSTILE_SITE_KEY=' "$UF" || true); [ -z "$TK" ] || [ "$TK" = 'TURNSTILE_SITE_KEY=0x4AAAAAAFNg9KPm2tECytqZ' ] || { echo "NAME2_NOT_DONE: the website file's site key is not the listed one (it would refuse PREVIEW_ORIGIN_SITE_KEY_MISMATCH)"; exit 1; }
@@ -1332,6 +1343,32 @@ REKEY need the upload's operator folder swap and its database step to have run; 
 - With the permit you add the key on the Team page. The site writes the key change in the staff audit history and
   sends its key-change alert to the security alert address set on this server.
 
+**Before the day: is the server ready?** REKEYCHECK only reads. Run it any time after the upload:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# REKEYCHECK: whether this server can do 5.7 (read-only): the release, the tools folder, the database step, and the database's own rule for the login REKEY uses.
+BAD=''; chk() { echo "NOT READY: $1"; BAD=yes; }
+[ -f "$CAPI/dialectical-engine/migrations/0183_staff_rekey_permit.sql" ] || chk 'this release does not carry the staff re-key (the upload first)'
+[ -f "$L/rekey-staff-key.mjs" ] || chk "the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first)"
+[ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')" || true)" = 1 ] || chk "the database does not hold the staff re-key step (the upload's database step first)"
+HB=$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)
+[ "$HB" = scram-sha-256 ] || chk "the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256 (the first rule that matches it says: ${HB:-unreadable}): ask"
+echo "the API answers as $HOST; policy line: $(grep -x 'STAFF_ACCESS_POLICY_VERSION=.*' "$A" || echo none); staff name lines: $(grep -E '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" | tr '\n' ' ' || true)"
+[ -z "$BAD" ] || { echo "REKEYCHECK_NOT_DONE: a line above says NOT READY"; exit 1; }
+echo REKEYCHECK_DONE
+exit 0
+```
+
+Expect the line about the API file, then `REKEYCHECK_DONE`. If it says the database's `pg_hba.conf` does not admit
+the login: ask, before the day. REKEY connects to the database as the staff recovery login, on the database's local
+socket, with a password that exists for three minutes; the database lets that login in only if its `pg_hba.conf`
+holds the line `local debateai debateai_prod_staff_recovery scram-sha-256` (it is in
+`deploy/postgres/pg_hba.conf.template`) above any broader `local` line. Adding it means a copy of the file, the one
+line, a check of `pg_hba_file_rules` for errors and a reload; step 7 of `deploy/preview-lifecycle/v1/README.md` shows
+that kind of change. Do not edit that file alone.
+
 **1. The staff screens on (skip if they are on already).** If the rename was done with the staff screens on, they are
 on already and STAFFMAIN says so. If it was done after STAFFOFF, STAFFMAIN moves the two staff name lines to
 dezbatere.ro and puts the line `STAFF_ACCESS_POLICY_VERSION=2` back.
@@ -1343,7 +1380,7 @@ set -euo pipefail
 K=$M/name/api-$LABEL.env.before-staffmain-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = dezbatere.ro ] || { echo "STAFFMAIN_NOT_DONE: the API answers as $HOST; on the test name the step is STAFFON (5.5b); nothing changed"; exit 1; }
 [ -f "$CAPI/dialectical-engine/migrations/0183_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "STAFFMAIN_NOT_DONE: this release, or the tools folder, does not carry the staff re-key (the upload first, with its tools-folder swap); nothing changed"; exit 1; }
-[ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text)')" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the database does not hold the staff re-key step (the upload's database step first); nothing changed: ask"; exit 1; }
+[ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the database does not hold the staff re-key step (the upload's database step first); nothing changed: ask"; exit 1; }
 [ "$(grep -c '^STAFF_WEBAUTHN_ORIGIN=' "$A" || true)" = 1 ] && [ "$(grep -c '^STAFF_WEBAUTHN_RP_ID=' "$A" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the API file does not hold each of the two staff name lines exactly once; nothing changed: ask"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true)
 if [ "$P" = 1 ] && grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A"; then
@@ -1372,8 +1409,9 @@ staff name lines back together); to have the staff screens off again on dezbater
 
 **2. Sign in, and read your sign-in code.** Sign in at https://dezbatere.ro/login with your password and
 authenticator code (if you are signed in already, that sign-in is fine). Open Settings → **Active sessions** (Sesiuni
-active). The row **Current session** (Sesiunea actuală) shows a line `Sign-in code: ` followed by eight characters,
-digits and the letters a to f, for example `3f9a1c2e`. Write them down: REKEY asks for them. The code is not a
+active). The row **Current session** (Sesiunea actuală) shows a line that begins `Sign-in code: ` (`Codul acestei
+sesiuni: ` in Romanian), followed by eight characters, digits and the letters a to f, for example `3f9a1c2e`. Write
+those eight down: REKEY asks for them. The code is not a
 secret, but it must be the one this browser shows; never take it from a message or from anyone else. Keep this
 browser signed in until the key is enrolled: if you sign out or sign in again, the code changes and the permit ends.
 If the list shows an **Other session** (Altă sesiune) you do not recognise, press its **Revoke** (Revocați) and
@@ -1390,7 +1428,7 @@ set -euo pipefail
 # REKEY: the operator's yes for ONE new staff key of the Owner account, under the name the site answers as: one permit in the database (15 minutes, one use, for the sign-in whose code you type). Nothing restarts; no file changes.
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "REKEY_NOT_DONE: the staff screens are off (STAFFMAIN first); nothing changed"; exit 1; }
 [ -f "$L/rekey-staff-key.mjs" ] || { echo "REKEY_NOT_DONE: the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first); nothing changed"; exit 1; }
-[ "$(psqlq "SELECT count(*) FROM pg_hba_file_rules WHERE type = 'local' AND ('debateai_prod_staff_recovery' = ANY (user_name) OR 'all' = ANY (user_name)) AND auth_method = 'scram-sha-256' AND error IS NULL" || true)" -ge 1 ] 2>/dev/null || { echo "REKEY_NOT_DONE: the database's pg_hba.conf has no local scram-sha-256 line for debateai_prod_staff_recovery, so the tool cannot connect; adding it is a reviewed change: ask; nothing changed"; exit 1; }
+[ "$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)" = scram-sha-256 ] || { echo "REKEY_NOT_DONE: the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256 (REKEYCHECK says the same), so the tool cannot connect; adding the line is a reviewed change: ask; nothing changed"; exit 1; }
 UA=$(systemctl is-active debateai-preview-team-unlock || true)
 if [ "$(systemctl show -p ExecStart debateai-preview-team-unlock 2>/dev/null | grep -c 'PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login' || true)" != 0 ]; then
   [ "$UA" != active ] || { echo "REKEY_NOT_DONE: the team unlock runs on its fallback writer, which holds the login this step needs: run  systemctl stop debateai-preview-team-unlock , run REKEY again, then start the unlock again; nothing changed"; exit 1; }
@@ -1475,8 +1513,9 @@ themselves after one hour anyway).
   holds the lost key as working. Ask.
 - **To confirm on the server:** STAFFMAIN and REKEY were tested on throwaway files, against a test database and with
   stand-ins for the server's parts, not on this server. Three things only the server can show: that the API starts
-  with the staff screens on under dezbatere.ro (STAFFMAIN puts the file back if it does not), that the database's
-  `pg_hba.conf` lets the staff recovery login in on the local socket (REKEY checks it first), and where the
+  with the staff screens on under dezbatere.ro (STAFFMAIN puts the file back if it does not; with the staff screens
+  left on through the rename that first start is NAME3, and the way out is NAME5, 5.1b), that the database's
+  `pg_hba.conf` lets the staff recovery login in on the local socket (REKEYCHECK and REKEY check it), and where the
   key-change alert mail arrives. The first time, do each step slowly, and ask if a line differs from the ones above.
 
 ---

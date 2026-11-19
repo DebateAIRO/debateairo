@@ -83,7 +83,7 @@
   "settings.sessions.current": "当前会话",
   "settings.sessions.other": "其他会话",
   "settings.sessions.lastSeen": "上次活动时间：{date}",
-  "settings.sessions.signInCode": "Sign-in code: {code}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "撤销会话 {sessionId}",
   "settings.sessions.revoke": "撤销",
   "settings.sessions.revokeAll": "撤销所有会话",

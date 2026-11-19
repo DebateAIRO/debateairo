@@ -83,7 +83,7 @@
   "settings.sessions.current": "Trenutačna sesija",
   "settings.sessions.other": "Druga sesija",
   "settings.sessions.lastSeen": "Posljednja aktivnost: {date}",
-  "settings.sessions.signInCode": "Sign-in code: {code}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Opozovite sesiju {sessionId}",
   "settings.sessions.revoke": "Opozovite",
   "settings.sessions.revokeAll": "Opozovite sve sesije",

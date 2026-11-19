@@ -83,7 +83,7 @@
   "settings.sessions.current": "Текуща сесия",
   "settings.sessions.other": "Друга сесия",
   "settings.sessions.lastSeen": "Последна активност: {date}",
-  "settings.sessions.signInCode": "Sign-in code: {code}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Прекратяване на сесия {sessionId}",
   "settings.sessions.revoke": "Прекратяване",
   "settings.sessions.revokeAll": "Прекратяване на всички сесии",

@@ -83,7 +83,7 @@
   "settings.sessions.current": "Sesión actual",
   "settings.sessions.other": "Otra sesión",
   "settings.sessions.lastSeen": "Última actividad: {date}",
-  "settings.sessions.signInCode": "Sign-in code: {code}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Revocar la sesión {sessionId}",
   "settings.sessions.revoke": "Revocar",
   "settings.sessions.revokeAll": "Revocar todas las sesiones",

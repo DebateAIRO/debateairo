@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPool, migrate, PostgresStaffRepository, type Pool, type StaffEnrollmentIntentBinding } from '@debateai/db';
 import { withMailLocale } from '../../packages/db/src/mail-locale.js';
@@ -428,6 +429,25 @@ describe('who may arm a permit, and for whom', () => {
     for (const [name, nameOrigin] of [[rpId, 'http://' + rpId], [rpId, origin + '/'], [rpId, OLD_ORIGIN], ['', 'https://'], ['Admin.Example.Test', 'https://Admin.Example.Test'], [rpId + ':8443', origin + ':8443']] as const)
       await expect(arm(b, name, nameOrigin)).rejects.toThrow('STAFF_REKEY_INVALID');
     expect(await permitOf(b)).toBeUndefined();
+  });
+
+  it('the runbook\'s own database checks hold on a migrated database', async () => {
+    // MAIN-SITE.md's scripts ask the database whether the re-key step is there and whether the tool's login is admitted.
+    // A check that names a function the step does not create would refuse on every server, so each one is run here.
+    const runbook = readFileSync(new URL('../../deploy/preview-auth-dev/v1/MAIN-SITE.md', import.meta.url), 'utf8');
+    const queries = [...runbook.matchAll(/psqlq "(SELECT [^"]+)"/g)].map((match) => match[1]!);
+    const present = [...new Set(queries.filter((sql) => sql.includes('to_regprocedure(')))];
+    expect(present).toEqual(["SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')"]);
+    expect(queries.filter((sql) => sql === present[0])).toHaveLength(3);
+    expect((await database.pool.query(present[0]!)).rows[0].count).toBe('1');
+    const admitted = [...new Set(queries.filter((sql) => sql.includes('pg_hba_file_rules')))];
+    expect(admitted).toHaveLength(1);
+    expect(queries.filter((sql) => sql === admitted[0])).toHaveLength(3);
+    const rule = (await database.pool.query(admitted[0]!)).rows[0].coalesce as string;
+    expect(typeof rule).toBe('string');
+    expect(rule.length).toBeGreaterThan(0);
+    // The tool is called with the sign-in code the script asked for.
+    expect(runbook).toContain('lc rekey-staff-key.mjs arm-owner "$SC"');
   });
 
   it('gives no login the permit table, and each new function only its own caller', async () => {

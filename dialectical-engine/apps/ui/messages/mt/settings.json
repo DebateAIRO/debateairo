@@ -83,7 +83,7 @@
   "settings.sessions.current": "Sessjoni attwali",
   "settings.sessions.other": "Sessjoni oħra",
   "settings.sessions.lastSeen": "Deher l-aħħar {date}",
-  "settings.sessions.signInCode": "Sign-in code: {code}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Irrevoka s-sessjoni {sessionId}",
   "settings.sessions.revoke": "Irrevoka",
   "settings.sessions.revokeAll": "Irrevoka s-sessjonijiet kollha",

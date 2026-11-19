@@ -83,7 +83,7 @@
   "settings.sessions.current": "An seisiún reatha",
   "settings.sessions.other": "Seisiún eile",
   "settings.sessions.lastSeen": "Feicthe go deireanach {date}",
-  "settings.sessions.signInCode": "Sign-in code: {code}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Cúlghair seisiún {sessionId}",
   "settings.sessions.revoke": "Cúlghair",
   "settings.sessions.revokeAll": "Cúlghair gach seisiún",
