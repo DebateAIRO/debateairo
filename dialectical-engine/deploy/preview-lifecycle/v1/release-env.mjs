@@ -4,9 +4,10 @@
 // ui-<label>.env. Each one is a copy of a live file in which only the values that must differ per release change:
 // the site version and release key, the ports of the release's slot, the runner's worker identity and the API's mail
 // helper inside the release's own folder. Every other line is copied byte for byte, so both releases keep using the
-// same spending gates, scope, team and secrets. The SAME check reads the files back and says, check by check, that
-// two releases share what they must share and never share what they must not, and that each release's website's
-// payment marks list, when it has one, is a list of netopia, visa and mastercard.
+// same spending gates, scope, team, who may start debates (PREVIEW_ASKS_OPEN_TO) and secrets. The SAME check reads
+// the files back and says, check by check, that two releases share what they must share and never share what they
+// must not, and that each release's website's payment marks list, when it has one, is a list of netopia, visa and
+// mastercard.
 //
 //   release-env.mjs derive --service api|ui|runner --from <file> --label <label> --slot A|B --release-key <key>
 //       <file>: /etc/debateai-v3-preview/auth-dev-v1/<service>.env or <service>-<older label>.env (root-owned, 0640).
@@ -102,6 +103,26 @@ function configField(environment, field) {
 const WITHIN_API_RUNNER = Object.freeze([['PREVIEW_PROVIDER_TEST_CONFIG_JSON', false], ['PREVIEW_TEAM_USER_IDS_JSON', false], ['DEBATEAI_DEPLOYMENT_MODE', false], ['REGISTER_VERSION', true], ['RELEASE_KEY', true]]);
 const ACROSS_CONFIG = Object.freeze(['budget_socket', 'anthropic_budget_socket', 'scope_id']);
 const ACROSS_SAME = Object.freeze(['DEBATEAI_DEPLOYMENT_MODE', 'HATCHET_WORKFLOW_NAME', 'PREVIEW_TEAM_USER_IDS_JSON']);
+/**
+ * Who may start debates (PREVIEW_ASKS_OPEN_TO, read by the API's and the runner's parsePreviewAsksOpenTo): both must read it
+ * alike within a release, and two releases side by side must too, so an ask one release admits the other never fails.
+ * Each file is also held to the parser's own rules, so `same` names a file the launcher would refuse before any restart:
+ * absent, or exactly one of the two values, with the preview configuration, no team list and hosted mode.
+ */
+const ASKS_OPEN_KEY = 'PREVIEW_ASKS_OPEN_TO';
+const ASKS_OPEN_VALUES = Object.freeze(['everyone', 'everyone-with-test-payments']);
+export function asksOpenValid(environment) {
+  const value = environment[ASKS_OPEN_KEY];
+  return value === undefined || (ASKS_OPEN_VALUES.includes(value) && environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON !== undefined
+    && environment.PREVIEW_TEAM_USER_IDS_JSON === undefined && environment.DEBATEAI_DEPLOYMENT_MODE === 'hosted');
+}
+function asksOpenChecks(releases) {
+  const out = [];
+  for (const { label, api, runner } of releases) out.push(result(`SAME_API_RUNNER_${ASKS_OPEN_KEY}:${label}`, allSame([api[ASKS_OPEN_KEY], runner[ASKS_OPEN_KEY]], false)),
+    result(`VALID_${ASKS_OPEN_KEY}:${label}`, asksOpenValid(api) && asksOpenValid(runner)));
+  if (releases.length === 2) out.push(result(`SAME_${ASKS_OPEN_KEY}`, allSame(releases.flatMap(release => [release.api[ASKS_OPEN_KEY], release.runner[ASKS_OPEN_KEY]]), false)));
+  return out;
+}
 const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_ID', 'runner'], ['HATCHET_WORKER_NAME', 'runner'], ['API_PORT', 'api'], ['PORT', 'ui']]);
 
 /**
@@ -111,8 +132,8 @@ const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_
  * of netopia, visa and mastercard (environment.mjs isPaymentMarksList; never compared across releases, since a release
  * may change it on purpose). Across releases (two only): every API and runner file names the same spending gates and
  * scope, deployment mode, workflow and team, and every API file that names a restore fence names the same one
- * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Returns every
- * check, OK or not, in a fixed order.
+ * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Last, who may
+ * start debates (asksOpenChecks). Returns every check, OK or not, in a fixed order.
  * The public name (PUBLIC_APP_URL) is held to one value too: a release's website and API name the same one
  * (SAME_UI_API_PUBLIC_APP_URL:<label>), and two releases name the same one (SAME_PUBLIC_APP_URL).
  */
@@ -144,6 +165,7 @@ export function sameChecks(releases) {
     out.push(result('SAME_API_RESTORE_FENCE_PATH', allSame(releases.map(release => release.api.RESTORE_FENCE_PATH).filter(value => value !== undefined), false)));
     for (const [key, service] of ACROSS_DIFFERENT) out.push(result(`DIFFERENT_${key}`, allDifferent(releases.map(release => release[service][key]))));
   }
+  out.push(...asksOpenChecks(releases));
   return Object.freeze(out);
 }
 
