@@ -190,6 +190,9 @@ describe("NETOPIA's hosted logo in the full footer", () => {
     };
     expect(rule(".siteFooterMarks > img")).toContain("background: #fff;");
     expect(rule(".siteFooterMarks > img")).toContain("height: 24px;");
+    // The page sets border-box on every element; the mark's chip padding and border must not eat into its 24px artwork.
+    expect(readFileSync(resolve("apps/ui/app/globals.css"), "utf8")).toMatch(/\n\* \{\s*box-sizing: border-box;/);
+    expect(rule(".siteFooterMarks > img")).toContain("box-sizing: content-box;");
     const chip = rule(".siteFooterNetopia");
     for (const part of ["background: #fff;", "border: 1px solid var(--line);", "forced-color-adjust: none;", "max-width: 100%;"]) expect(chip).toContain(part);
     // 245 x 44 (418 x 75 scaled), 223 x 40 on a phone: both inside 250 x 50.

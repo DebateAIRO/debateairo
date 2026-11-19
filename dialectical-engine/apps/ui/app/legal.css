@@ -564,8 +564,9 @@
 
 /* ---------- Paid plans (P21, R3-4): the card marks, the DB-IP credit, one archived text ---------- */
 .siteFooterMarks { display: flex; gap: 10px; align-items: center; max-width: 1180px; margin: 22px auto 0; }
-/* Each mark file on a white chip in both themes, as ANPC's badge: a dark wordmark would vanish on the dark footer. */
-.siteFooterMarks > img { width: auto; height: 24px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+/* Each mark file on a white chip in both themes, as ANPC's badge: a dark wordmark would vanish on the dark footer.
+   content-box keeps the artwork itself 24px tall, as it was before the chip; the padding and border sit outside it. */
+.siteFooterMarks > img { box-sizing: content-box; width: auto; height: 24px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
 /* NETOPIA's hosted logo: one picture of NETOPIA's mark and the Visa and Mastercard marks, dark artwork on a clear
    background, so it sits on a white chip in both themes too. NETOPIA's box is at most 250 x 50: 245 x 44 here, 223 x 40
    on a phone. */
