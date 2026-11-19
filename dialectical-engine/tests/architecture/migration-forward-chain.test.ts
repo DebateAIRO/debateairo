@@ -691,10 +691,10 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the MFA recovery control user index 0182 after 0181 as an outside-transaction step (NV-15, NV-16)", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: the one index NV-15's account-level failure count and NV-16's per-destination start count both
-    // read by user_id, built concurrently after the three notice due indexes on the same shared loader.
-    expect(names.slice(-2)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // The one index NV-15's and NV-16's counts read, right after the three notice due indexes; found by name, since later steps follow it.
+    const at = names.indexOf("0182_mfa_recovery_control_user_started.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     const securityFixes = plan.forwardChain[names.indexOf("0178_security_fixes_run3.sql")]!;
     expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true,
       concurrentIndex: { schema: "identity", table: "mfa_recovery_control", name: "mfa_recovery_control_user_started" } });
@@ -722,6 +722,46 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, and the MFA recovery control user index (0182, below) the seventy-second");
+  });
+
+  it("chains the reader of the release switches 0183 after 0182 as an expand step that keeps the verifier (the month keeps its numbers)", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one definer, so the API and the runner can tell which plan numbers a person's month started with.
+    expect(names.slice(-2)).toEqual(["0182_mfa_recovery_control_user_started.sql", "0183_release_history.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(step.n1).toMatchObject({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false });
+    // One function and its owner and grants; no table, no earlier function, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION core.read_release_history()",
+      "ALTER FUNCTION core.read_release_history() OWNER TO debateai_release_owner;",
+      "REVOKE ALL ON FUNCTION core.read_release_history() FROM PUBLIC;",
+      "GRANT EXECUTE ON FUNCTION core.read_release_history() TO debateai_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    expect(JSON.parse((await bytesOf("lineage/release-history-forward0183.json")).toString("utf8"))).toEqual({
+      version: "release-history-forward0183-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: previous.name, manifestSha256: sha256(await bytesOf("lineage/mfa-recovery-control-user-started-forward0182.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: step.name, sha256: sha256(await bytesOf(step.name)) },
+      verifier: { path: previous.verifierPath, sha256: previous.verifierSha256 },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/release-history-forward0183.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.replayVerifierSql).toBeUndefined();
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The reader of the release switches (0183)"));
+    expect(section.startsWith("## The reader of the release switches (0183)")).toBe(true);
+    for (const needle of ["0183_release_history.sql", "release-history-forward0183.json", "packages/db/src/migration-forward0183.ts",
+      "MIGRATION_FORWARD0183_", "core.read_release_history()", "debateai_release_owner", "packages/register/src/billing-plans-in-force.ts",
+      "-- n1: expand", "-- n1: keeps-verifier", "replayVerifierSql", "previous.manifestSha256", "renumber"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the MFA recovery control user index (0182, below) the seventy-second, and the reader of the release switches (0183, below) the seventy-third");
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {

@@ -1748,6 +1748,13 @@ describe("P3-01 production database-principal manifest", () => {
   "grants": [
     "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
   ]
+},
+// 0183: the switches the site made (which release took the traffic, and from when), so a person's month keeps the plan
+// numbers it started with; release keys and instants only (the shared runtime role: the API and the runner).
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0183_release_history.sql",
+  "grants": ["EXECUTE ON FUNCTION core.read_release_history()"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([

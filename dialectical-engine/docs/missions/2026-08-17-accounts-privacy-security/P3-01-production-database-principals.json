@@ -3623,6 +3623,13 @@
       "grants": [
         "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0183_release_history.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.read_release_history()"
+      ]
     }
   ],
   "privilegeRevocations": [

@@ -6034,8 +6034,13 @@ export function buildApi(options: ApiOptions): FastifyInstance {
         const plans = options.askBilling?.plans;
         const plan = plans === undefined || decided.planId === null || !plans.plans.some((each) => each.planId === decided.planId) ? null
           : planById(plans, decided.planId);
-        return Object.freeze({ free: decided.settings.plan_tier === "free",
-          reserveInsideMicros: plan !== null && plan.reserveHeld === "INSIDE_LIMITS" ? plan.reserveMicros ?? 0 : 0 });
+        const planReserveMicros = plan !== null && plan.reserveHeld === "INSIDE_LIMITS" ? plan.reserveMicros ?? 0 : 0;
+        // A month already started keeps the reserve it started with when an upload raised it since (billing-core
+        // plans-in-force.ts). The person's own month window carries that reserve, so a dig stops where a new question does.
+        const billing = options.askBilling;
+        const month = planReserveMicros === 0 || billing === undefined ? undefined
+          : (await billing.coarseFit.personAllowance.read(asker.ownerRef, billing.clock())).find((window) => window.scope === "PERSON_MONTH");
+        return Object.freeze({ free: decided.settings.plan_tier === "free", reserveInsideMicros: month?.keepsReserveMicros ?? planReserveMicros });
       },
       roomForDig: async (asker, ask) => {
         const room = options.carryOnRoom;

@@ -1226,6 +1226,13 @@ export {
   type PlanId,
   type ReserveHeld
 } from "./billing-plans.js";
+// A month keeps the plan numbers it started with: which plans the site served, and when (migration 0183).
+export {
+  createBillingPlansInForce,
+  settingsVersionsServedBetween,
+  type BillingPlansInForce,
+  type ReleaseSwitch
+} from "./billing-plans-in-force.js";
 export {
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW,
   BILLING_POLICY_ROW_KEY,

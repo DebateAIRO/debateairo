@@ -231,8 +231,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       // Side-by-side spec §9: the funding repository holds no register version (a grant lives under its own).
       "const allowances = new PostgresInternalAllowanceRepository(pool);",
       // Side-by-side spec §9: no funding read and no funding refusal at boot; the funding source is built whenever plans are.
-      "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({ allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)}, plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000 });",
-      "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints }), owners: modelSpendStore",
+      "const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({ allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)}, plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000, ...(plansInForce === undefined ? {} : { plansInForce }) });",
+      // A person's month keeps the plan numbers it started with: the wall reads the plans the site served since then.
+      "const plansInForce = billingPlans === null ? undefined : createBillingPlansInForce({ pool, ownVersion: environment.REGISTER_VERSION, ownPlans: billingPlans });",
+      "finishBasisPoints: envelopeBand === null ? null : envelopeBand.finishBasisPoints, persons: billingPlans === null ? plansUnresolvedPersonAllowance() : fundingAllowance ?? new BillingPersonAllowanceSource({ entitlements: new EntitlementRepository(pool).readOnlyPort(), plans: billingPlans, closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints, ...(plansInForce === undefined ? {} : { plansInForce }) }), owners: modelSpendStore",
       // Side-by-side spec §13 (S6): the money every version's guard shares (RunnerSiteContext.money): local mode none.
       "money: costEnvelopePolicy === null ? null : Object.freeze({ store: modelSpendStore, inFlight: moneyInFlight, ...(sharedWallTerms === null ? {} : { sharedWall: sharedWallTerms }), ...(fundingAllowance === undefined ? {} : { fundingAdmission: fundingAllowance }) })"
     ]) {
@@ -362,7 +364,10 @@ describe("the practice runs the shipped composition (drift guard)", () => {
       expect(shipped, gone).not.toContain(gone);
       expect(practice, gone).not.toContain(gone);
     }
-    expect(shipped).toContain("const fundedAllowance = entitlements === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});");
+    expect(shipped).toContain("const fundedAllowance = entitlements === null || billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints,...(plansInForce === undefined ? {} : { plansInForce })});");
+    // A person's month keeps the plan numbers it started with; the practice keeps billing off, so it reads no plans at all.
+    expect(shipped).toContain("const plansInForce = billingPlans === null ? undefined : createBillingPlansInForce({ pool, ownVersion: environment.REGISTER_VERSION, ownPlans: billingPlans });");
+    expect(practice).not.toContain("createBillingPlansInForce");
     expect(practice).not.toContain("PostgresInternalAllowanceRepository");
     expect(practice).not.toContain("FundingAwarePersonAllowanceSource");
     const shippedRoom = objectAfter(API_MAIN, "const room = new AskRoom({");

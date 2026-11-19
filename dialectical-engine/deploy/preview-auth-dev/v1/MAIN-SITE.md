@@ -433,6 +433,32 @@ Rules of thumb: Free's `monthly_credit_micros` well below the day ceiling (Free 
 otherwise use the whole day). The day ceiling at or below what the gate pots leave for debates, so people meet the
 gentle "wait in line" message before the hard "try tomorrow".
 
+**What a changed plan limit does to people who already have a plan.** A plan's limits here are its
+`monthly_credit_micros`, `day_bp` and `week_bp` (the day and week caps are shares of the credit, so a changed credit
+changes them too), its `reserve_micros` and its `finish_overflow_micros`. Each person's month keeps the numbers it
+started with; a paid month starts at the first payment and at each renewal date, a Free month at the account's own day
+of the month. With made-up numbers:
+- **A lower limit** reaches each person when their own next month starts, never before. A day cap of 11 that an upload
+  makes 5: someone whose month began before the upload keeps 11 until that month ends, and no day already used is
+  counted again. Someone who buys the plan after the upload has 5 from their first day. The same holds for the month
+  credit (nobody is stopped in a month they already started, and no running debate pauses), for the week cap, and for
+  Free. The Terms still ask you to tell people before a limit gets tighter (section 12); the product sends no such
+  notice by itself.
+- **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
+- **A higher limit cannot be taken back inside a month.** If an upload raises a limit and you then go back to the
+  release before (or publish the lower number again), everyone whose month saw the higher number keeps it until their
+  next month starts. Read SB3's lines before you publish a raise.
+- **A refund** on cancelling or withdrawing is measured against the credit the person's month had on the day they
+  cancelled or withdrew: the one it started with, or a higher one published since. A credit you lower later never makes
+  a refund smaller.
+- **The reserve.** A raised `reserve_micros` does not make new questions stop earlier in a month already started. Final
+  answers are paid from the site's reserve of the day, so in such a month a final answer may take the month past its
+  credit by the difference. A lower reserve reaches everyone at once.
+- **Someone who changed plan this month** has a month credit stored at that moment. It stays as it is until their next
+  month, after a raise too.
+- **During a side-by-side switch**, a debate still running on the release before is measured by the same rule. A
+  release from before this rule existed measures the debates it still finishes against its own numbers.
+
 **The gate pots** (the spending gates in front of each AI company) are set in each gate's GO file: `daily_budget_usd`,
 `max_paid_posts_per_day`, `max_concurrent_calls`, `open_days`; and in `/etc/debateai-v3-preview/provider-budget-caps-v1.json`:
 `max_go_budget_usd` and `team_total_budget_usd` (the hard fuse). They can change any day with a new GO, then the
