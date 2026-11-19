@@ -74,7 +74,7 @@ if the server shows something else.
 | 5 | the main name | password on | NAME5 |
 | 6 | friends' test with test payments | password on | ASKS_CLOSE |
 | 7 | real payments (after a friends' test, a new site password first) | password on | PAY_BACK |
-| 8 | opening to everyone: asks, then the password off | open | PWON, ASKS_CLOSE |
+| 8 | opening to everyone: asks, then the password off (only after a later upload brings the staff screens back) | open | PWON, ASKS_CLOSE |
 | 9 | closing everything again | closed | – |
 | 10 | every named refusal code | – | – |
 
@@ -91,14 +91,17 @@ can all be done in one day, unless one of these holds you up:
   waits for it and for its credit note.
 
 It is fine to end the day with real payments on, behind the new site password, with asks for the team only: that is
-the state part 7 leaves. Part 8 (opening to everyone) does not have to be the same day. It needs the staff key on
-dezbatere.ro, and you settle that before part 7 (5.4, step 5).
+the state part 7 leaves. Do all staff work (Hide now) on the test name before the upload (1.6): from STAFFOFF, right
+before the rename, the staff screens are off (5.1b). Part 8 (opening to everyone) waits for a later upload that brings them back, with a
+staff key that works on dezbatere.ro.
 
 **If your real payment comes before a friends' test.** Parts 6 and 7 can swap. Do parts 1 to 5, then part 7, and
 skip 7.0: nobody else has had the site password yet. Friends can then come in while payments are real: run ASKS_OPEN
 (6.1) with the line `V=everyone`, and stop there, so the site password stays on. They use the Free plan. Tell them
 not to press **Abonați-vă și plătiți** (Subscribe and pay): payments are real, a plan one of them buys renews every
-month until they cancel it in Settings, and PAY_BACK waits for it. When your own refund and its credit note are
+month until they cancel it in Settings, and PAY_BACK waits for it. Tell them too that a finished Free debate can go
+public by itself, to everyone inside the site password, and that nobody can take it down by hand while the staff
+screens are off (5.1b). When your own refund and its credit note are
 recorded, run ASKS_CLOSE (6.3), then PAY_BACK (7.11), then part 6 as written, with test payments. Before real payments
 go on a second time, that friends' test closes and the site password changes (7.0), as the order rules say.
 
@@ -332,17 +335,89 @@ put it in place:
 `install -o root -g root -m 0644 <fixed file> /etc/debateai-v3-preview/auth-dev-v1/mail-plan.json.new && mv -f /etc/debateai-v3-preview/auth-dev-v1/mail-plan.json.new /etc/debateai-v3-preview/auth-dev-v1/mail-plan.json`.
 Never change `transportTimeoutMs`: it must stay 5000.
 
-### 1.6 The old test debates
+### 1.6 The old test debates, and the staff screens
 
 Debates cannot be deleted: the database refuses to delete a debate's rows, by design. What strangers and friends can
-see is only the list of **published** test debates. Hiding is the supported way to take one down.
+see is only the list of **published** test debates. Hiding is the supported way to take one down. Only the staff
+screens (Admin → Team) can hide a debate by hand; the public Report button can also hide one by itself (5.1b).
+
+**First, see whether the staff screens are on.** STAFFCHECK only reads. Run it before the upload:
+
+```sh
+set -euo pipefail
+# STAFFCHECK: whether the staff screens are on in the running API's file (read-only; prints names and counts, never a key).
+L=/opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1
+lc() { /usr/bin/env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node "$L/$1" "${@:2}"; }
+E=/etc/debateai-v3-preview/auth-dev-v1
+ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "STAFFCHECK_NOT_DONE: release-check.mjs status refused (above): ask"; exit 1; }
+CL=$(jq -r '[.releases[] | select(.state == "CURRENT") | .label] | if length == 1 then .[0] else "" end' <<<"$ST" || true)
+[ -n "$CL" ] || { echo "STAFFCHECK_NOT_DONE: the release table does not name exactly one current release, or did not read (above): ask"; exit 1; }
+F=$E/api-$CL.env
+[ -f "$F" ] || { echo "STAFFCHECK_NOT_DONE: $F is missing: ask"; exit 1; }
+echo "the running API's file: $F (the API is $(systemctl is-active "debateai-preview-api@$CL" || true))"
+grep -E '^(PUBLIC_APP_URL|STAFF_ACCESS_POLICY_VERSION|STAFF_WEBAUTHN_ORIGIN|STAFF_WEBAUTHN_RP_ID)=' "$F" || true
+P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$F" || true); P1=$(grep -cx 'STAFF_ACCESS_POLICY_VERSION=1' "$F" || true); P2=$(grep -cx 'STAFF_ACCESS_POLICY_VERSION=2' "$F" || true)
+AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$F" || true); RC=$(grep -c '^SUPPORT_MODEL_TARGET_JSON=' "$F" || true)
+echo "team allowance lines: $AL; the Report button's AI check line: $RC"
+if [ "$P/$P2" = 1/1 ]; then
+  echo "staff tools are on: do your staff work now (1.6), and run STAFFOFF (5.1b) right before NAME2"
+  [ "$AL" = 0 ] || echo "but the file has team allowance lines, so STAFFOFF will refuse: ask before the upload"
+elif [ "$P" = 0 ] || [ "$P/$P1" = 1/1 ]; then
+  echo "staff tools are off: Hide now does not exist on this server; skip step 2 below and skip STAFFOFF"
+else
+  echo "STAFFCHECK_NOT_DONE: the policy line is not one line STAFF_ACCESS_POLICY_VERSION=1 or =2: ask"; exit 1
+fi
+echo STAFFCHECK_DONE
+exit 0
+```
+
+Read the lines just before `STAFFCHECK_DONE`:
+- `staff tools are on`: the file holds `STAFF_ACCESS_POLICY_VERSION=2`, and the two staff name lines
+  (`STAFF_WEBAUTHN_ORIGIN`, `STAFF_WEBAUTHN_RP_ID`) name the test name. Do the steps below. Later, run STAFFOFF (5.1b)
+  right before NAME2. If the next line says `but the file has team allowance lines`, ask before the upload. The count
+  line above it (`team allowance lines: 0; …`) is not a warning.
+- `staff tools are off`: Hide now does not exist on this server. Skip step 2 below. If a published debate must not stay
+  public, ask before the upload.
+
+`the Report button's AI check line` is 1 when the AI check behind the public Report button is set up, and 0 when it is
+not (5.1b says why it matters).
+
+**Why now.** A staff key belongs to one site name. The one you enrolled works only on the test name, and this release
+cannot enrol a new staff key for an account that is already staff. So the staff screens go off for the rename (5.1b)
+and stay off on dezbatere.ro until a later upload brings them back with a code fix. **This is your last chance for
+staff work (Hide now, reports, publication reviews) until that upload.**
 
 Do this **before DR2** of the upload, while the old release still runs on the test name:
 1. Sign in. Open the home page's **Public** tab. Read every published debate.
 2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then Admin → Team →
    public review → **Hide now**. Each hide needs the staff hardware key, and the staff key works only on the test name.
-3. Optional: you, and anyone on the team who wants to, can delete your own private test debates with "Delete private
+3. If the Team page shows open reports, settle them now too. Publication reviews (**Publication reviews**, Cereri de
+   publicare) and threat reports (**Threat reports**, Rapoarte despre amenințări) open from the links on the Team page
+   once your key is verified. Settling usually needs the team tools unlocked: if the page says
+   `Team tools are locked…` (in step 2 or 3), run `systemctl start debateai-preview-team-unlock` as root. It unlocks
+   them for one hour.
+4. Optional: you, and anyone on the team who wants to, can delete your own private test debates with "Delete private
    debate…" on the classic page `/debate/<id>`. A delete is permanent.
+
+**Optional: the staff records, counted.** STAFFDB only reads, and prints no names and no addresses:
+
+```sh
+set -euo pipefail
+# STAFFDB: the staff records, counted (read-only; prints no names and no addresses).
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+SA=$(psqlq "SELECT count(*) FROM staff.subject WHERE state = 'ACTIVE'") || { echo "STAFFDB_NOT_DONE: the database is unreadable: ask"; exit 1; }
+OW=$(psqlq "SELECT count(*) FROM staff.owner_designation WHERE active") || { echo "STAFFDB_NOT_DONE: the database is unreadable: ask"; exit 1; }
+KS=$(psqlq "SELECT concat_ws(' ', f.relying_party_id, f.credential_origin, count(*)) FROM identity.mfa_factor f JOIN identity.staff_webauthn_metadata m ON m.mfa_factor_id = f.mfa_factor_id WHERE f.state = 'active' GROUP BY f.relying_party_id, f.credential_origin") || { echo "STAFFDB_NOT_DONE: the database is unreadable: ask"; exit 1; }
+echo "active staff members: $SA; Owner: $OW"
+echo "staff keys (name, origin, how many):"; printf '%s\n' "$KS"
+echo STAFFDB_DONE
+exit 0
+```
+
+You should see `Owner: 1` and one key line for the test name, like
+`v3-preview.dezbatere.ro https://v3-preview.dezbatere.ro 1`. The last number counts the staff keys: 1 or more is
+fine. If STAFFCHECK said `staff tools are off`, `Owner: 0` and no key line are normal too. A warning about `/root` is
+harmless. Anything else: ask.
 
 ### 1.7 Your numbers (decide them; write no amounts here)
 
@@ -740,8 +815,10 @@ MAIL_CLOSE runs only with the site password on (PWON first): a buyer outside the
 
 Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), PM2 has run if this
 upload added the payment marks, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
-(NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). Pick a quiet
-minute for NAME3: nothing being admitted, no checkout open. If you did not do 1.3 (b) to (e), do them now.
+(NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If STAFFCHECK (1.6)
+said `staff tools are on`, run STAFFOFF (5.1b) after NAME1C and right before NAME2: NAME2 refuses until then. Pick a
+quiet minute for STAFFOFF and for NAME3 (each restarts the API): nothing being admitted, no checkout open. If you did
+not do 1.3 (b) to (e), do them now.
 
 **What closing keeps.** The prepared state (NAME1) stays after you close the name again: dezbatere.ro then redirects
 to the test name, and NETOPIA's payment notices on dezbatere.ro still reach the site. NETOPIA does not follow
@@ -862,6 +939,74 @@ echo NAME1_BACK_DONE
 exit 0
 ```
 
+### 5.1b The staff screens off (only if STAFFCHECK said they are on)
+
+Run this after NAME1C and right before NAME2. If STAFFCHECK (1.6) said `staff tools are off`, skip it.
+
+**Why.** The staff key belongs to the test name, and no staff key can work on dezbatere.ro in this release (1.6). With
+the line `STAFF_ACCESS_POLICY_VERSION=2` in the API file, the API would refuse to start on dezbatere.ro
+(`PREVIEW_STAFF_ORIGIN_MISMATCH`), so NAME2 refuses. STAFFOFF takes out that one line. Nothing else in the API file,
+the runner's file or the website's file depends on it, and the SAME checks do not read it. Then it restarts the API,
+still on the test name, so you see that the API starts without the line before anything is renamed.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# STAFFOFF: the staff screens off, on the test name: the one line STAFF_ACCESS_POLICY_VERSION=2 taken out of the API file (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
+K=$M/name/api-$LABEL.env.before-staffoff-$(date -u +%Y%m%dT%H%M%SZ)
+[ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFOFF_NOT_DONE: the API already answers as $HOST; nothing changed: ask"; exit 1; }
+P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true); AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$A" || true)
+if [ "$P" = 0 ] || { [ "$P" = 1 ] && grep -qx 'STAFF_ACCESS_POLICY_VERSION=1' "$A"; }; then
+  [ "$AL" = 0 ] || { echo "STAFFOFF_NOT_DONE: the API file has no line STAFF_ACCESS_POLICY_VERSION=2 but has team allowance lines; nothing changed: ask"; exit 1; }
+  echo "the API file has no line STAFF_ACCESS_POLICY_VERSION=2: the staff screens are off already; nothing changed"
+  echo STAFFOFF_DONE
+  exit 0
+fi
+[ "$P" = 1 ] && grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "STAFFOFF_NOT_DONE: the API file's policy line is not one line STAFF_ACCESS_POLICY_VERSION=1 or =2; nothing changed: ask"; exit 1; }
+[ "$AL" = 0 ] || { echo "STAFFOFF_NOT_DONE: the API file has team allowance lines, which the API refuses without the policy line; nothing changed: ask"; exit 1; }
+cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFOFF_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
+{ ( umask 077; sed '/^STAFF_ACCESS_POLICY_VERSION=2$/d' "$A" > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
+[ "$(diff "$A" "$A.new" | grep -c '^[<>]' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep -cx '< STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: not a one-line removal; nothing changed: ask"; exit 1; }
+mv "$A.new" "$A" || { rm -f "$A.new" "$K"; echo "STAFFOFF_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
+echo "taken out: STAFF_ACCESS_POLICY_VERSION=2 (the file before is $K); the API restarts without it"
+if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFOFF_NOT_DONE: the API did not start without the line, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFOFF_NOT_DONE: the API did not start without the line; the file before is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "STAFFOFF_NOT_DONE: the API did not start without the line (code above); the file before is back and the API restarted on it, with the staff screens on: ask"; exit 1; fi
+echo STAFFOFF_DONE
+exit 0
+```
+
+Expect the `taken out` line, the API's start lines (`PREVIEW_API_STARTED …`), then `STAFFOFF_DONE`.
+- It restarts the API on the test name, behind the password (a minute or more down). From then on the staff screens
+  are off. NAME3 later changes only the name.
+- It changes nothing in the database: the staff records, the staff keys, the Owner role and the audit history stay.
+- If it says `the staff screens are off already`, nothing changed: go on with NAME2.
+- If it stops on `team allowance lines`, run nothing more and ask.
+- If it stops with `the file before is back and the API restarted on it`, the staff screens are still on and nothing
+  else changed. Run nothing more and ask.
+- If NAME2 then stops for another reason and you will not rename today, run STAFFON (5.5b). It puts the staff screens
+  back on the test name.
+- The way back is STAFFON (5.5b), on the test name only.
+
+**While the staff screens are off**, nobody can:
+- hide a published debate by hand (Hide now);
+- settle a report the AI check did not accept, or decide a publication review or a threat report;
+- invite, grant or disable a staff member, or change the team limit (Admin → Team);
+- read the staff audit page.
+
+These wait in the database; nothing is lost. This holds on both names, during the friends' test (part 6) and while
+payments are real (part 7). The site password keeps it small: only people who know it can see a published debate.
+
+**What still happens by itself:**
+- **Free debates go public.** On the Free plan, a finished debate goes public by itself when an AI check allows it.
+  The page tells the person this before they ask. With STAFFCHECK's `the Report button's AI check line: 0`, that check is not
+  set up, so nothing goes public: each finished Free debate waits.
+- **The Report button.** It needs no staff. If the same AI check agrees with a report, the debate hides at once (once
+  per debate). With the line at 0, or when the check does not agree, the report waits for a person, and nobody can act
+  on it until the staff screens come back.
+- **Staff mails.** You still get the mails that say a report or a threat report waits, or that a debate was hidden
+  by itself. You cannot open them in the app until the staff screens come back. That is expected.
+
+**Never open the site to everyone (part 8) while the staff screens are off.** PWOFF1 (8.2) refuses while they are.
+
 ### 5.2 Prepare the switch (nothing live changes)
 
 This makes four things in `/root/preview-archive/main-site/name`: the two env files for the main name, the Turnstile
@@ -873,7 +1018,7 @@ set -euo pipefail
 # NAME2: the switch prepared: env copies, the relay drop-in, the main Caddyfile, the main mail plan. Nothing live changes.
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "NAME2_NOT_DONE: the API already answers as $HOST"; exit 1; }
 [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$A" || true)" = 1 ] || { echo "NAME2_NOT_DONE: the API is not in hosted mode (it would refuse PREVIEW_MAIN_ORIGIN_NOT_HOSTED)"; exit 1; }
-[ "$(grep -c '^STAFF_ACCESS_POLICY_VERSION=2$' "$A" || true)" = 0 ] || { echo "NAME2_NOT_DONE: staff passkeys (policy 2) are bound to the test name (it would refuse PREVIEW_STAFF_ORIGIN_MISMATCH): ask"; exit 1; }
+[ "$(grep -c '^STAFF_ACCESS_POLICY_VERSION=2$' "$A" || true)" = 0 ] || { echo "NAME2_NOT_DONE: the staff screens are on, and their keys belong to the test name (the API would refuse PREVIEW_STAFF_ORIGIN_MISMATCH): run STAFFOFF (5.1b) first"; exit 1; }
 [ "$(grep -c '^SOCIAL_SOCKET_PATH=' "$A" || true)" = 0 ] || { echo "NAME2_NOT_DONE: social sign-in is set up and its relay's callbacks name the test name, so every provider button would vanish on dezbatere.ro: ask"; exit 1; }
 TK=$(grep '^TURNSTILE_SITE_KEY=' "$UF" || true); [ -z "$TK" ] || [ "$TK" = 'TURNSTILE_SITE_KEY=0x4AAAAAAFNg9KPm2tECytqZ' ] || { echo "NAME2_NOT_DONE: the website file's site key is not the listed one (it would refuse PREVIEW_ORIGIN_SITE_KEY_MISMATCH)"; exit 1; }
 [ "$(jq -r .schema "$MP")" = preview-auth-dev-mail-v2 ] || { echo "NAME2_NOT_DONE: mail-plan.json is still v1 (part 4.2 first; the API would refuse PREVIEW_MAIL_LEGACY_NEEDS_PREVIEW_ORIGIN)"; exit 1; }
@@ -1018,15 +1163,21 @@ Then, by hand:
    notify line must pass.
 3. In the browser, with the site password: sign in at https://dezbatere.ro/login with password and authenticator code.
    Everyone signs in again after the rename (sign-in cookies belong to a name).
-4. **Your passkey.** Passkeys belong to a name. In Settings → Security, remove the old passkey entry and add your
-   hardware key again.
-5. **The staff hardware key.** Staff screens stay on staff policy 1 (`STAFF_ACCESS_POLICY_VERSION` unset), which binds
-   the staff key to the name the API answers as. The key enrolled on the test name does not work on dezbatere.ro, so
-   staff tools (Admin → Team, Hide now) need the staff key enrolled again under dezbatere.ro. How to enrol it again for
-   an existing owner is **to confirm on the server**; it may need the owner-access ceremony. Until then, staff work
-   needs NAME5 (the test name), and NAME5 refuses once payments are real (part 7), until PAY_BACK, which takes days.
-   So settle this right after these checks, before part 7. Part 8 needs it: while the site is open to everyone, Hide
-   now is the only way to take a published debate down.
+4. **Your passkey.** Passkeys belong to a name, so the old one does not work on dezbatere.ro. Add your hardware key
+   again: Settings → Security → **Create a passkey** (Creați o cheie de acces). In the confirm card choose
+   **Password · 6-digit authentication code** (Parolă · Cod de autentificare din 6 cifre), not **Use a passkey**
+   (Folosiți o cheie de acces): the old passkey fails on the new name. Type your password and code. The page goes on by
+   itself after the sixth digit; if it does not, press **Confirm action** (Continuați). A new card shows **Create a
+   passkey** (Creați o cheie de acces) again: press it within five minutes, then touch the key. If the browser refuses
+   the key, ask. Keep the old entry until the name is final: after NAME5 only the old one works. Remove it later with
+   its Remove button, your password and your code.
+5. **The staff screens are off on dezbatere.ro in this release** (5.1b). A staff key belongs to one name, the key you
+   enrolled works only on the test name, and this release cannot enrol a new staff key for an account that is already
+   staff. So Admin → Team shows the line "The action could not be completed…" (Acțiunea nu a putut fi finalizată…)
+   and a greyed-out **Verify security key for team access** button. That is expected; press nothing there, and do
+   not open "Security key setup and recovery". Your ordinary passkey (step 4) is separate, and it works. The staff
+   screens come back with a later upload that carries a code fix. Until then part 8 waits: once the site is open to
+   everyone, Hide now is the only way you can take a published debate down yourself.
 6. Open `/sign-up` and see the Turnstile check pass.
 7. Start one team question and check it is not cut at 55 seconds.
 
@@ -1047,6 +1198,7 @@ set -euo pipefail
 ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "NAME5_NOT_DONE: payments are real on this name: PAY_BACK first (part 9 order); nothing was stopped"; exit 1; }
 MMODE=$(jq -r 'if .schema == "preview-auth-dev-mail-v1" then "legacy" else .recipients end' "$MP" 2>/dev/null || true)
 case "$MMODE" in legacy|allow-list|open) ;; *) echo "NAME5_NOT_DONE: mail-plan.json does not read as a mail plan; nothing was stopped: ask"; exit 1;; esac
+! grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { grep -qx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" && grep -qx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A"; } || { echo "NAME5_NOT_DONE: the staff screens are on with staff lines that do not name the test name, and this way back does not move them (the API would refuse PREVIEW_STAFF_ORIGIN_MISMATCH); nothing was stopped: ask"; exit 1; }
 systemctl stop "$WEB" "$API" || { echo "NAME5_NOT_DONE: systemctl stop of the website and API failed: the site may be DOWN: ask at once"; exit 1; }
 for SVC in api ui; do F=$E/$SVC-$LABEL.env
   { ( umask 077; sed 's|^PUBLIC_APP_URL=https://dezbatere\.ro$|PUBLIC_APP_URL=https://v3-preview.dezbatere.ro|' "$F" > "$F.new" ) && chown --reference="$F" "$F.new" && chmod --reference="$F" "$F.new" && mv "$F.new" "$F"; } || { echo "NAME5_NOT_DONE: $SVC-$LABEL.env was not rewritten: the site is DOWN: ask at once"; exit 1; }
@@ -1075,13 +1227,56 @@ The env edit reverses only the one line, so other edits made since are kept. The
 back to the test name; the script checks that the API's mail line says the same mode. The prepared Caddyfile has the
 site password. NAME5 puts back the Caddyfile NAME1 made, so any Caddyfile change made after NAME1 is gone; the live
 file it replaced is kept as `/root/preview-archive/main-site/name/Caddyfile.before-name5-<time>`.
-Passkeys added on dezbatere.ro do not work on the test name: sign in with password and authenticator, and add the key
-there. To un-prepare the name later, run NAME1_BACK, then remove the DNS records and the Turnstile hostname.
+Passkeys added on dezbatere.ro do not work on the test name: sign in with password and authenticator. The old
+passkey entry works there again if you kept it; otherwise add the key as in 5.4, step 4. The staff screens stay off
+after NAME5; STAFFON (5.5b) puts them back on the test name. This holds until the upload that brings the staff screens
+back on dezbatere.ro. After that upload, close the name with that upload's own steps, not with NAME5 and STAFFON:
+NAME5 refuses then, with nothing stopped. To un-prepare the name later, run NAME1_BACK, then remove the DNS records
+and the Turnstile hostname.
+
+### 5.5b The staff screens back on the test name (STAFFON)
+
+Run it only while the site answers as the test name: before NAME3, or after NAME5 (which waits for PAY_BACK while
+payments are real). It puts the line `STAFF_ACCESS_POLICY_VERSION=2` back and restarts the API (a minute or more
+down). If the API refuses, the file before comes back and the API restarts on it. It works on this release and on any
+later one, as long as STAFFOFF once took the line out on this server.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# STAFFON: the staff screens back on the test name: the line STAFF_ACCESS_POLICY_VERSION=2 back into the API file, then the API restarts.
+K=$M/name/api-$LABEL.env.before-staffon-$(date -u +%Y%m%dT%H%M%SZ)
+[ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFON_NOT_DONE: the API answers as $HOST, and the staff keys work only on the test name (NAME5 first); nothing changed"; exit 1; }
+P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true)
+if [ "$P" = 1 ] && grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A"; then echo "the API file holds STAFF_ACCESS_POLICY_VERSION=2 already: the staff screens are on; nothing changed"; echo STAFFON_DONE; exit 0; fi
+[ "$P" = 0 ] || { echo "STAFFON_NOT_DONE: the API file has a policy line that is not STAFF_ACCESS_POLICY_VERSION=2; nothing changed: ask"; exit 1; }
+ls "$M"/name/api-*.env.before-staffoff* >/dev/null 2>&1 || { echo "STAFFON_NOT_DONE: $M/name holds no copy kept by STAFFOFF, so STAFFOFF never took the staff screens off on this server; nothing changed: ask"; exit 1; }
+[ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A" || true)" = 1 ] || { echo "STAFFON_NOT_DONE: the staff name lines do not name the test name exactly once; nothing changed: ask"; exit 1; }
+for SK in STAFF_INDEPENDENT_ALERT_CONFIG_PATH STAFF_ALERT_OPERATOR_MODULE_PATH STAFF_ALERT_OPERATOR_MODULE_SHA256; do [ "$(grep -c "^$SK=" "$A" || true)" = 1 ] || { echo "STAFFON_NOT_DONE: the API file does not hold $SK exactly once; nothing changed: ask"; exit 1; }; done
+[ -z "$(tail -c1 "$A")" ] || { echo "STAFFON_NOT_DONE: $A does not end in a newline; nothing changed: ask"; exit 1; }
+cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFON_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
+{ ( umask 077; { cat "$A"; printf 'STAFF_ACCESS_POLICY_VERSION=2\n'; } > "$A.new" ) && chown --reference="$A" "$A.new" && chmod --reference="$A" "$A.new"; } || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: the new file was not written; nothing changed: ask"; exit 1; }
+[ "$(diff "$A" "$A.new" | grep -c '^[<>]' || true)" = 1 ] && [ "$(diff "$A" "$A.new" | grep -cx '> STAFF_ACCESS_POLICY_VERSION=2' || true)" = 1 ] || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: not a one-line addition; nothing changed: ask"; exit 1; }
+mv "$A.new" "$A" || { rm -f "$A.new"; echo "STAFFON_NOT_DONE: the new file was not put in place; nothing changed: ask"; exit 1; }
+if ! apiup; then { cp -p "$K" "$A.new" && mv "$A.new" "$A"; } || { echo "STAFFON_NOT_DONE: the API refused the staff screens, and the file before could not be put back (it is $K): the site is DOWN: ask at once"; exit 1; }; apiup || { echo "STAFFON_NOT_DONE: the API refused the staff screens; the file before is back, but the API did not start on it either: the site is DOWN: ask at once"; exit 1; }; echo "STAFFON_NOT_DONE: the API refused the staff screens (code above); the file before is back and the API restarted on it: ask"; exit 1; fi
+echo STAFFON_DONE
+exit 0
+```
+
+Expect the API's start lines, then `STAFFON_DONE`. Your old staff key works again on the test name, and STAFFOFF can
+run again later. If it says `the staff screens are on`, nothing changed and nothing is wrong. If you ran STAFFON
+between NAME2 and NAME3, run STAFFOFF and NAME2 again before NAME3: NAME3 refuses an API file changed since NAME2.
+Never put the policy line back by hand while the site answers as dezbatere.ro: the API would refuse to start
+(`PREVIEW_STAFF_ORIGIN_MISMATCH`).
 
 ### 5.6 Later uploads, while the main name is open
 
 - The release guide's `derive` copies `PUBLIC_APP_URL` byte for byte, so a new release's files name the same name, and
   `SAME_PUBLIC_APP_URL` refuses two live releases on different names.
+- `derive` copies the staff lines the same way, so after STAFFOFF a new release starts with the staff screens off too,
+  and STAFFON (after NAME5) works on it. The upload that brings them back on dezbatere.ro brings its own steps, and
+  also its own way to close the name (5.5). Never put the policy line back by hand on dezbatere.ro
+  (`PREVIEW_STAFF_ORIGIN_MISMATCH`).
 - For SB1b and A5, compare the website's build values with
   `rel build-env --origin https://dezbatere.ro --models <stage> --release-key "$KEY"`. Without `--origin` the report
   holds the test name's values. The website build itself does not change: one build serves both names.
@@ -1105,7 +1300,9 @@ one-to-one message (never in a group, an e-mail thread, or a chat with Claude). 
 password on.
 
 **Before you open:** mail is open (part 4.3; friends need the verification mail to sign up), payments are the sandbox
-with billing on, and you have read 6.4 (what bounds spending) and 6.5 (the brakes).
+with billing on, and you have read 6.4 (what bounds spending) and 6.5 (the brakes). The staff screens are off (5.1b),
+so nobody can hide a debate by hand during the test. Tell friends that on the Free plan a finished debate goes public
+by itself when the AI check allows it (5.1b), and that nobody can take it down by hand for now.
 
 **If friends buy test plans.** Every open sandbox plan blocks the live start (part 7), so decide this first:
 - Friends may buy test plans only if you withdraw each friend's sandbox plan with WITHDRAWOTHER (3.3) within 14 days
@@ -1336,8 +1533,10 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
   with `everyone` (part 8), never with the friends' value.
 - If a friends' test ran (part 6): it is closed (PAY0, 7.1, prints all zeros), and the site password is a new one
   that the friends never had (PWNEW, 7.0).
-- Your staff key works on dezbatere.ro (5.4, step 5). If it does not, ask before you go on: from PAY_SWITCH on, NAME5
-  refuses until PAY_BACK, so the test name is no way round.
+- The staff screens are off (5.1b) until a later upload brings them back. While payments are real this means: nobody
+  can hide a published debate or settle a report by hand, and the test name is no way round either, because from
+  PAY_SWITCH until PAY_BACK NAME5 refuses. The payment, refund and invoice steps need no staff screen. You decided to
+  take real payments this way, with the site password on and asks for the team only; you do not need to ask again.
 - The site password is on. While payments are real and asks are closed, the API refuses a checkout or a plan upgrade
   from any account not on the team (403 `PREVIEW_TEAM_ONLY`; the page shows its general error). Keep the password on
   anyway while mail is on the allow-list: a buyer outside it would get no M1 or M2.
@@ -1783,10 +1982,16 @@ exit 0
 
 ## 8. Opening to everyone
 
+**Not in this release.** Do not start part 8 until a later upload has brought the staff screens back and your staff key
+works on dezbatere.ro: sign in there, open Admin → Team → public review, and check that your staff key is accepted.
+Without it nothing published can be hidden by hand while the site is open, and the way back to the test name is
+closed while payments are real. PWOFF1 (8.2) refuses while the API file has no line `STAFF_ACCESS_POLICY_VERSION=2`.
+
 **Before you start:** the site answers as dezbatere.ro (part 5); mail is open there (4.3: PWOFF1 checks both the
-plan file and the API's mode line); real payments work (part 7); the staff key works on dezbatere.ro (sign in there,
-open Admin → Team → public review, and check that your staff key is accepted: without it nothing published can be
-hidden while the site is open, and the way back to the test name is closed while payments are real); the payment marks
+plan file and the API's mode line); real payments work (part 7); the staff screens are back and your staff key works
+on dezbatere.ro (above); with the staff screens back, you have read the **Public** tab again and used Hide now on
+anything that went public while they were off and must not stay public (Free debates go public by themselves, 5.1b);
+the payment marks
 are on the site if you want them (only an upload made before part 5 adds them, 1.1; if they are missing, ask before
 you take the password off); you have decided your numbers and gate pots (1.7, 6.4); and you have read the
 warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
@@ -1806,6 +2011,7 @@ said -xF '{"event":"api.preview.asks_open","to":"everyone"}' || { echo "PWOFF1_N
 ! grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" || { echo "PWOFF1_NOT_DONE: the API file names NETOPIA's sandbox"; exit 1; }
 grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "PWOFF1_NOT_DONE: payments are not live (part 7 first)"; exit 1; }
 [ "$HOST" = dezbatere.ro ] || { echo "PWOFF1_NOT_DONE: the API answers as $HOST: the password comes off only on the main name (part 5)"; exit 1; }
+grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "PWOFF1_NOT_DONE: the staff screens are off (5.1b): part 8 waits for the upload that brings them back"; exit 1; }
 jq -e --arg o "https://$HOST" '.schema=="preview-auth-dev-mail-v2" and .recipients=="open" and .publicAppUrl==$o' "$MP" >/dev/null 2>&1 || { echo "PWOFF1_NOT_DONE: mail-plan.json is not the open plan for $HOST (4.3 first)"; exit 1; }
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" || { echo "PWOFF1_NOT_DONE: the running API does not say mail mode open on $HOST (4.3 first)"; exit 1; }
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "PWOFF1_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
@@ -1904,7 +2110,10 @@ they cannot even open the site. Never end their plan yourself. PWON as a brake (
 3. **Payments back to the sandbox:** PAY_BACK (7.11). It waits until every live plan is over and every refund and
    credit note is recorded. After your test payment alone, that takes days. Meanwhile the password stays on, and
    steps 4 to 6 wait too.
-4. **The name back to the test name:** NAME5 (5.5). It also moves the mail plan back to the test name.
+4. **The name back to the test name:** NAME5 (5.5). It also moves the mail plan back to the test name. The staff
+   screens stay off; if you want them back on the test name, run STAFFON (5.5b) after NAME5. This holds until the
+   upload that brings the staff screens back on dezbatere.ro. After that upload, close the name with that upload's own
+   steps, not with NAME5 and STAFFON (NAME5 then refuses, with nothing stopped).
 5. **Mail back to the allow-list:** MAIL_CLOSE (4.4), then check the v1 file is the kept one:
    `sha256sum /etc/debateai-v3-preview/auth-dev-v1/mail-plan.json` must print the digest of 4.1.
 6. Run CLOSED (3.1). Expect `CLOSED_DONE`.
@@ -1923,6 +2132,9 @@ know none of these settings, and they answer only as the test name.
   in its journal.
 - Asks: an older release starts from its own files, which have no asks line. Close asks in the current files anyway
   (ASKS_CLOSE), so the two releases agree.
+- Staff screens: an older release starts from its own files, made before STAFFOFF, so its staff screens are as they
+  were before the upload, on the test name. The current files need nothing for the switch: the SAME checks do not
+  compare the staff lines. Run STAFFON (after NAME5) only if you stay on this release and want the staff screens back.
 - Only then do the release switch.
 
 ---
@@ -1946,7 +2158,7 @@ that service.
 |---|---|---|---|
 | `PREVIEW_ORIGIN_NOT_LISTED` | launcher, API or website | `PUBLIC_APP_URL` is missing, or not exactly `https://v3-preview.dezbatere.ro` or `https://dezbatere.ro` (no slash, no www, no capitals) | NAME5; check the env file |
 | `PREVIEW_MAIN_ORIGIN_NOT_HOSTED` | launcher, API | the main name without `DEBATEAI_DEPLOYMENT_MODE=hosted` | NAME5; ask |
-| `PREVIEW_STAFF_ORIGIN_MISMATCH` | launcher, API | staff policy 2 is bound to the other name | NAME5; staff keys stay on policy 1 here |
+| `PREVIEW_STAFF_ORIGIN_MISMATCH` | launcher, API | the API file holds `STAFF_ACCESS_POLICY_VERSION=2` (the staff screens on), but its staff name lines name the other name: a staff key belongs to one name | NAME5. On dezbatere.ro the staff screens stay off in this release (STAFFOFF, 5.1b); never put the policy line back by hand there |
 | `PREVIEW_ORIGIN_SITE_KEY_MISMATCH` | launcher, website | the website file's Turnstile site key is not the listed one | NAME5; put the site key line back |
 | `PREVIEW_PROVIDER_ORIGIN_INVALID` | the API's own guard | the API was started without the launcher on a name it does not admit (through the launcher, `PREVIEW_ORIGIN_NOT_LISTED` or `PREVIEW_MAIN_ORIGIN_NOT_HOSTED` comes first, so you will not see this code there) | ask |
 | `PREVIEW_ASKS_OPEN_TO_INVALID` | launcher, API or runner | `PREVIEW_ASKS_OPEN_TO` is not exactly `everyone` or `everyone-with-test-payments` | ASKS_CLOSE |
