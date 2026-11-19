@@ -1,6 +1,7 @@
 // PREVIEW_ASKS_OPEN_TO at the API's boot, once the room and billing are built: open asks need the room (it alone bounds
-// each person's spending), "everyone" is refused while billing runs on the sandbox (a public test card would buy real AI
-// credit), and "everyone-with-test-payments" is refused on any other payment system, so the boot line is always true.
+// each person's spending), "everyone" needs real payments (on the sandbox a public test card would buy real AI credit,
+// and with billing off no account has a plan window of its own), and "everyone-with-test-payments" is refused on any
+// other payment system, so the boot line is always true.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine } from "../../apps/api/src/preview-asks-open.js";
@@ -14,7 +15,9 @@ const PAYMENTS = ["sandbox", "live", null] as const;
 function expected(asksOpen: typeof VALUES[number], roomComposed: boolean, payment: typeof PAYMENTS[number]): string | null {
   if (asksOpen === undefined) return null;
   if (!roomComposed) return "PREVIEW_ASKS_OPEN_TO_WITHOUT_ROOM";
-  if (asksOpen === "everyone") return payment === "sandbox" ? "PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING" : null;
+  if (asksOpen === "everyone") {
+    return payment === "sandbox" ? "PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING" : payment === null ? "PREVIEW_ASKS_OPEN_TO_BILLING_OFF" : null;
+  }
   return payment === "sandbox" ? null : "PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX";
 }
 
@@ -34,9 +37,9 @@ describe("assertPreviewAsksOpenBoot", () => {
     }
   });
 
-  it("names the four cases the owner meets", () => {
+  it("names the cases the owner meets", () => {
     expect(expected("everyone", true, "live")).toBeNull();
-    expect(expected("everyone", true, null)).toBeNull();
+    expect(expected("everyone", true, null)).toBe("PREVIEW_ASKS_OPEN_TO_BILLING_OFF");
     expect(expected("everyone-with-test-payments", true, "sandbox")).toBeNull();
     expect(expected("everyone", true, "sandbox")).toBe("PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING");
   });

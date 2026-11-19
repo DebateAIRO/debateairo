@@ -5995,6 +5995,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
   const billingSessions = options.sessions;
   const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
+  // On the preview while payments are real, only an account the asks rule admits may buy or upgrade a plan: anyone else
+  // would be charged and then refused every question. On the sandbox, and off the preview, nothing changes.
+  const previewBuyerAdmits = previewConfig === undefined || options.billing?.paymentEnvironment !== "live" ? undefined
+    : (session: AuthenticatedSession) => previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, session.userId);
   installBillingRoutes(api, {
     ...(options.billing ?? {}),
     policy: (route: BillingRoutePath) => routePolicy(route),
@@ -6005,7 +6009,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const { ip, userAgent } = sourceFor(request);
       return Object.freeze({ ip, userAgent });
     },
-    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation })
+    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation }),
+    ...(previewBuyerAdmits === undefined ? {} : { buyerAdmits: previewBuyerAdmits })
   });
   if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
     route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});
