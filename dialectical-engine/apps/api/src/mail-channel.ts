@@ -43,6 +43,15 @@ function renderMail(input: AccountMailRequest, from: string): string {
   catch { throw new MailDeliveryError("MAIL_INPUT_INVALID"); }
 }
 
+/**
+ * An account mail exactly as the senders below write it, for the test server's mail program
+ * (deploy/preview-auth-dev/v1/mail-handoff.mjs). The program renders a mail again from the fields the mail carries and
+ * lets it through only when the bytes are equal, so its check follows this composition and never a frozen copy.
+ */
+export function renderAccountMailMessage(input: AccountMailRequest, from: string): string {
+  return renderMail(input, from);
+}
+
 export interface VerificationMail {
   readonly attemptId: string;
   readonly recipient: string;
