@@ -87,7 +87,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
 | `database-ahead --older-source-manifest <old candidate api manifest> --newer-source-manifest <new candidate api manifest> --out <artifacts folder>/database-ahead-<older label>.json` | the database steps the newer release adds (each with both `n1` header lines) and its whole forward chain, for the older release's native verify (side-by-side spec §5); root installs it as `/etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older label>.json` and pins it with `prestart.mjs accept-ahead`; no new step: `DATABASE_AHEAD_NOT_NEEDED`, nothing written |
-| `site-inputs --operation report\|compose --from <the live settings version's verify plan> --site '<JSON object>' [--change '<input names>'] [--limits '<plan ids>'] [--out <artifacts folder>/site-inputs.json]` | the site's numbers for an upload (SB3): compares the owner's server file (`--site`, as one JSON object) with the hosted inputs of `--from`, input by input, plan by plan. `report` prints `{event,operation,lines,differing,limitPlans}` and takes neither list: each line says `SAME`, or `DIFFERENT` with the member and `higher`, `lower` or `changed` (or `NOTE` with advice); never an amount. `compose` needs `--out`; it writes the new version's hosted inputs there (the live ones, with exactly the inputs `--change` names taken from the file) and prints `{path,sha256,bytes,change,limits}`. It refuses, naming the inputs or plans in `fields`, unless `--change` is exactly the inputs that differ (`SITE_CHANGE_NOT_NAMED`, `SITE_CHANGE_NAMED_BUT_SAME`) and `--limits` exactly the plans whose limits get lower or change for the people already on them (`SITE_LIMITS_NOT_NAMED`, `SITE_LIMITS_NAMED_BUT_SAME`). `billing` must be the same on both sides (`SITE_BILLING_SWITCH_DIFFERS`); both must list the same plans (`SITE_PLAN_LIST_DIFFERS`); a side that is not the six hosted inputs, or a mix the native operator's check refuses, is `SITE_INPUTS_REFUSED` |
+| `site-inputs --operation report\|compose --from <the live settings version's verify plan> --site '<JSON object>' [--change '<input names>'] [--limits '<plan ids>'] [--out <artifacts folder>/site-inputs.json]` | the site's numbers for an upload (SB3): compares the owner's server file (`--site`, as one JSON object) with the hosted inputs of `--from`, input by input, plan by plan. `report` prints `{event,operation,lines,differing,limitPlans}` and takes neither list: each line says `SAME`, or `DIFFERENT` with the member and `higher`, `lower` or `changed` (or `NOTE` with advice); never an amount. `compose` needs `--out`; it writes the new version's hosted inputs there (the live ones, with exactly the inputs `--change` names taken from the file) and prints `{path,sha256,bytes,change,limits}`. It refuses, naming the inputs or plans in `fields`, unless `--change` is exactly the inputs that differ (`SITE_CHANGE_NOT_NAMED`, `SITE_CHANGE_NAMED_BUT_SAME`) and `--limits` exactly the plans whose limits change, up or down, for the people already on them (`SITE_LIMITS_NOT_NAMED`, `SITE_LIMITS_NAMED_BUT_SAME`). `billing` must be the same on both sides (`SITE_BILLING_SWITCH_DIFFERS`); both must list the same plans (`SITE_PLAN_LIST_DIFFERS`); a side that is not the six hosted inputs, or a mix the native operator's check refuses, is `SITE_INPUTS_REFUSED` |
 
 ## Operator sequence for one release
 
@@ -4468,7 +4468,7 @@ set -euo pipefail
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
 LINEUP=''                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty
 NEWNUM=''                                                 # the numbers this upload takes from hosted-billing-v1.json, on purpose: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between; empty = the live numbers stay
-LIMITS=''                                                 # only with billingPlans in NEWNUM: the plans whose people get less or something else (read "What a change does to the people who already have a plan" below first), e.g. 'PLUS PRO'; else empty
+LIMITS=''                                                 # only with billingPlans in NEWNUM: the plans whose limits change, up or down (read "What a change does to the people who already have a plan" below first), e.g. 'PLUS PRO'; else empty
 REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
 [ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON (hosted-billing-v1.json does not read as JSON: put its last good copy back)"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
@@ -4490,7 +4490,7 @@ TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs
 if grep -qF "'site-inputs':" "$TOOL"; then
   SI=$(rel site-inputs --operation report --from "$FROM" --site "$HB_ON") || { echo "SB3_NOT_DONE: the numbers could not be compared (the reason line above; nothing was written). SITE_INPUTS_REFUSED with --site: hosted-billing-v1.json does not have the six inputs. SITE_PLAN_LIST_DIFFERS: it lists other plans than the live version. INPUT_REFUSED, FROM_PLAN_INVALID or NATIVE_APPROVAL_REQUIRED: the live version's plan $FROM is not readable as a published hosted verify plan. Ask"; exit 1; }
   jq -r '.lines[]' <<<"$SI"
-  rel site-inputs --operation compose --from "$FROM" --site "$HB_ON" ${NEWNUM:+--change "$NEWNUM"} ${LIMITS:+--limits "$LIMITS"} --out "$ART/site-inputs.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers are not as NEWNUM and LIMITS name them (the reason line above names the inputs or plans; nothing was written). ARGUMENTS_REFUSED with --change or --limits: that list is misspelled (exact names, one space between, none twice). SITE_CHANGE_NOT_NAMED: the file differs from the live numbers there: name the input in NEWNUM to publish the file's value, or keep the live value with SB3c. SITE_CHANGE_NAMED_BUT_SAME: take it out of NEWNUM. SITE_LIMITS_NOT_NAMED: the people already on that plan get less or something else: read what that does to them under this step first, then name the plan in LIMITS. SITE_LIMITS_NAMED_BUT_SAME: take it out of LIMITS. SITE_INPUTS_REFUSED: the mix is not allowed (a per-debate ceiling above the day's). SITE_BILLING_SWITCH_DIFFERS, FROM_PLAN_INVALID or anything else: ask"; exit 1; }
+  rel site-inputs --operation compose --from "$FROM" --site "$HB_ON" ${NEWNUM:+--change "$NEWNUM"} ${LIMITS:+--limits "$LIMITS"} --out "$ART/site-inputs.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers are not as NEWNUM and LIMITS name them (the reason line above names the inputs or plans; nothing was written). ARGUMENTS_REFUSED with --change or --limits: that list is misspelled (exact names, one space between, none twice). SITE_CHANGE_NOT_NAMED: the file differs from the live numbers there: name the input in NEWNUM to publish the file's value, or keep the live value with SB3c. SITE_CHANGE_NAMED_BUT_SAME: take it out of NEWNUM. SITE_LIMITS_NOT_NAMED: that plan's limits change, up or down, for the people already on it: read what that does to them under this step first, then name the plan in LIMITS. SITE_LIMITS_NAMED_BUT_SAME: take it out of LIMITS. SITE_INPUTS_REFUSED: the mix is not allowed (a per-debate ceiling above the day's). SITE_BILLING_SWITCH_DIFFERS, FROM_PLAN_INVALID or anything else: ask"; exit 1; }
   HB=$(jq -c .hostedBilling "$ART/site-inputs.json") && NAMED=$(jq -c .change "$ART/site-inputs.json") && jq -r --argjson seen "$(jq -c .lines <<<"$SI")" '(.lines - $seen)[]' "$ART/site-inputs.json" || { echo "SB3_NOT_DONE: $ART/site-inputs.json is unreadable (SB3b sets it aside): ask"; exit 1; }
 else
   # A release older than the site-inputs command cannot publish changed numbers: the file must be the live numbers, whole.
@@ -4571,22 +4571,40 @@ plan's prices or limits; the tool cannot know who holds which plan.
 - A subscription keeps the currency it was bought in.
 
 *Limits* (`limits` lines: the month's credit, the day and week caps, the finish room, the closing reserve, Free's fixed
-gauges). The product reads them from the live version for everyone, and has no way yet to apply a new limit only from
-a person's next month. So a limit that goes **lower**, or changes with no up or down, does all of this to the people
-already on that plan, in the middle of a month they paid for:
-- Someone who already used more than the new credit can ask nothing new until their month ends; a running debate
-  pauses.
-- The day and week caps are counted again over the days already used this month, with the new, lower cap. Someone who
-  never went over a cap can find today's allowance already used, for several days.
-- A refund on cancelling or withdrawing is measured against the new credit: the same use is a larger share of a
-  smaller credit, so less comes back.
-- The Terms ask for more than a notice here: section 12 promises notice before limits get tighter, and section 14
-  lists lower limits among the changes people accept at their next sign-in and that apply only going forward. The
-  product has no acceptance step for limits.
+gauges). Each person's month keeps the numbers it started with. A paid month starts at the first payment and at each
+renewal date; a Free month starts on the account's own day of the month. The numbers below are made up.
+- **A lower limit** reaches each person when their own next month starts, never before. A day cap of 11 that this
+  upload makes 5: someone whose month began before the switch keeps 11 until that month ends. No day already used is
+  counted again, nobody is stopped in a month they already started, and no running debate pauses. Someone who buys the
+  plan after the switch has 5 from their first day.
+- **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
+- **A higher limit cannot be taken back inside a month.** After a way back (WB2), or a later upload that publishes the
+  lower number again, everyone whose month saw the higher number keeps it until their own next month starts. A wrongly
+  high number therefore stays for those people for up to about a month.
+- **A refund** on cancelling or withdrawing is measured against the credit the person's month had on that day: the one
+  it started with, or a higher one published since. A credit lowered later never makes a refund smaller; a raised one
+  makes it larger for everyone already on the plan (the same use is a smaller share of a larger credit).
+- **The closing reserve.** A raised reserve does not make new questions stop earlier in a month already started. Final
+  answers are paid from the site's reserve of the day, so in such a month a final answer may take the month past its
+  credit by the difference. A lower reserve reaches everyone at once.
+- **Free's fixed gauges, and any member the tool does not read,** are read from the live version for everyone: they
+  reach everybody at the switch.
+- **Someone who changed plan this month** has a month credit stored at that moment. It stays as it is until their next
+  month, after a raise too.
+- **Accounts that exist at the switch**, the owner's and test accounts included, keep their numbers like everyone
+  else: after an upload that lowers a limit they still have the larger one until their own next month, at most about
+  31 days.
+- **During a side-by-side switch**, a debate still running on the old release is measured by the same rule when that
+  release carries it. A release from before the rule measures the debates it still finishes against its own numbers.
+- **The Terms ask two things the product does not do by itself.** Section 12 promises notice before limits get
+  tighter, and section 14 lists lower limits among the changes people accept at their next sign-in. The product sends
+  no notice and has no acceptance step for limits.
 
-So: **do not lower a plan's limits while anyone holds that plan**, unless that is decided with eyes open. The step
-stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named in `LIMITS`, for example `LIMITS='PLUS'`; naming it is the
-owner's statement that nobody holds the plan, or that the people on it were told and what follows is accepted. For
+So: **a plan whose limits change, up or down, is named in `LIMITS`.** The step
+stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named there, for example `LIMITS='PLUS'`. Naming a plan whose limit
+goes **lower** is the owner's statement that the people on that plan were told first (Terms section 12), or that
+nobody holds it. Naming a plan whose limit goes **higher** is the owner's statement that the number was checked
+twice, because it cannot be taken back for a month. For
 each plan named there SB3 prints `HELD` or `nobody holds it now`, read from the subscriptions that are open (test
 purchases count; Free is held by everyone without a paid plan). The reading errs to one side only: `HELD` is printed
 when an open subscription names the plan anywhere in its history, so also for a plan someone was on earlier and
@@ -4598,11 +4616,8 @@ owner's.
 plans: every paid plan's closing is admitted against the smallest paid reserve, so when that smallest one moves, every
 paid plan must be named.
 
-A limit that only goes **higher** needs no second naming. The people on the plan get more from the switch on, with
-three exceptions worth knowing: someone who changed plan this month keeps this month's stored credit until their next
-month; a debate still running on the old release finishes under the old limits; and a refund becomes larger (the
-same use is a smaller share of a larger credit). Raising the Plus credit alone lowers the size the pricing page shows
-for the other plans ("N times Plus"); the tool prints a line for each.
+Raising the Plus credit alone lowers the size the pricing page shows for the other plans ("N times Plus"); the tool
+prints a line for each.
 
 *The site-wide numbers.* The day's ceiling, the room-read budget and the abuse limits reach everyone at the switch. A
 lower day's ceiling makes everyone wait until the next day (UTC) once it is reached, people with credit left included.
@@ -4960,8 +4975,9 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - the online backup;
 - the migrations by number (or "no migrations");
 - the publish of register V with its delta hash;
-- only when SB3's `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and either
-  that nobody holds them or the date the people on them were told;
+- only when SB3's `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and for each
+  one whose limit goes lower either that nobody holds it or the date the people on it were told, and for each one
+  whose limit goes higher that the number was checked twice;
 - the new commit and its release key;
 - the switch;
 - only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the
@@ -5499,12 +5515,18 @@ site version it activates nothing. WB1 and WB4 activate nothing (WB4 never write
 numbers before back, and nothing is typed: the plans, the day's ceiling, the room-read budget and the abuse limits are sealed
 in the old release's own site version, and the per-debate ceiling comes with the settings version WB2 activates.
 Purchases made while the new numbers were live keep the price they were bought at. **When the upload had raised a
-plan's limits, WB2 lowers them again**, for everyone on that plan, with everything "What a change does to the people
-who already have a plan" (under SB3) says about a lower limit; the owner's yes for WB2 names that. Once the old release
+plan's limits, WB2 does not take the raise back from the people whose month saw it**: they keep the higher number
+until their own next month starts, as "What a change does to the people who already have a plan" (under SB3) says; a
+month that starts after WB2 has the old number. When the upload had lowered a limit, WB2 brings the higher number back
+for everyone at once. Both hold only when the old release carries that rule. An old release from before it measures
+everyone against its own numbers at once, a lowering included; the owner's yes for WB2 names which of the two it is.
+The old release carries the rule when this line, run with the upload's names file, prints 1 or more; a 0, or an
+error, means an older one: `grep -c createBillingPlansInForce "$OCAPI/dialectical-engine/apps/api/src/main.ts"`.
+Once the old release
 is retired there is no switch back: put the numbers before into the owner's file with SB3c (`KEEP` = the inputs that
 upload named; `SRC` = the plan that upload compared with, which its record names:
 `jq -r .from.path <its artifacts folder>/site-inputs.json`), then publish them with the next upload, named in its
-`NEWNUM` like any other change, and with the plans in `LIMITS` where a limit goes down. The owner's file itself is
+`NEWNUM` like any other change, and with the plans in `LIMITS` whose limits change. The owner's file itself is
 never changed by an upload or by a way back; only the owner and SB3c write it.
 
 If SB10 swapped the operator folder, moving it back (`mv /opt/debateai-v3-preview/operator/lifecycle-v1
@@ -5628,7 +5650,8 @@ When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
 Register row (§5), as in SB6.
 When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
-plans, and either that nobody holds them or the date the people on them were told, as in SB6. On this path SB3b (SB3
+plans, and for each one whose limit goes lower either that nobody holds it or the date the people on it were told,
+and for each one whose limit goes higher that the number was checked twice, as in SB6. On this path SB3b (SB3
 once more) is for before that yes, and never after DR4 or DR5.
 
 | Step | What | The site | The way back from here |
@@ -5889,7 +5912,10 @@ payments); or SB3c (`KEEP` = the inputs the upload named; `SRC` = the plan it co
 `jq -r .from.path <that upload's artifacts folder>/site-inputs.json`) and then the next upload, with those inputs
 named in its `NEWNUM`. The second way loses nothing and takes one more upload. The folder is the one of the upload
 that published the numbers, not `$ART` of a later upload's names file: SB3c's last line names the settings version it
-wrote from, which must be the one before the change.
+wrote from, which must be the one before the change. For a plan's limits the two ways differ. rbD-B brings the old
+numbers back for everyone at once: the record of the switch goes with the copy. The second way is an upload like any
+other, so a limit it lowers again reaches each person from their own next month, and the people whose month saw the
+higher number keep it until then.
 
 **rbD-B: from DR4 on.** The new release stops (its runner only with nothing open), the cold copy's data and config
 folders come back (the current ones moved aside, never deleted), the lock goes back to its copy from SB1 (the new

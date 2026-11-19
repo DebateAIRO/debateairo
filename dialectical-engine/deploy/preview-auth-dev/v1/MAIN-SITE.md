@@ -476,8 +476,7 @@ gate's `stop` and `activate`, as each gate's README says (`deploy/preview-gate/v
 numbers of the live settings version. An upload publishes a new version. Its numbers are the live ones, except the
 inputs you name at the top of SB3:
 - `NEWNUM`: the inputs to take from the file, for example `NEWNUM='billingPlans'`. Empty means no number changes.
-- `LIMITS`: only when a plan's limits get lower (or change in a way that is neither up nor down): the plans, for example
-  `LIMITS='PLUS'`.
+- `LIMITS`: whenever a plan's limits change, up or down: the plans, for example `LIMITS='PLUS'`.
 
 SB3 compares the file with the live numbers and prints one line per input, and per plan: `SAME`, or `DIFFERENT` with
 `higher`, `lower` or `changed`. It never prints an amount. Then it stops, with nothing written, unless your two lists
@@ -485,8 +484,8 @@ are exactly what differs:
 - an input that differs and is not in `NEWNUM` stops it: no number is published by accident, and none is skipped
   without a word;
 - an input in `NEWNUM` that does not differ stops it too;
-- a plan whose people would get less stops it until you name the plan in `LIMITS`; a plan named there without need
-  stops it too.
+- a plan whose limits change, up or down, stops it until you name the plan in `LIMITS`; a plan named there without
+  need stops it too.
 
 **Never edit the file in place.** A file that no longer reads as JSON makes every step print an error instead of its
 numbers. Copy it, edit the copy, check the copy, then put it in place: the four lines are in the release guide under
@@ -499,17 +498,19 @@ SB3, "Editing the owner's file". Do it before SB2 (the practice runs with the fi
   price by a release that does not yet save that price, and paid after the switch, is renewed at the new price. **So
   do not change plan prices in this upload** (the release running today does not save it); change them in a later
   one.
-- **Lower limits** (a plan's credit, its day and week caps, the finish room, the reserve, Free's gauges) hit everyone
-  on that plan at once, in the month they already paid for: people over the new credit can ask nothing until their
-  month ends, the day and week caps are counted again over the days already used, and a refund pays back less. The
-  Terms ask for more than a notice (sections 12 and 14), and the product cannot yet apply a lower limit only from a
-  person's next month. So do not lower a plan's limits while anyone holds that plan. Naming the plan in `LIMITS` is
-  your statement that nobody holds it, or that you decided this knowing the above. For each plan you name, SB3 prints
-  `HELD` or `nobody holds it now` (test purchases count; it prints no count). `HELD` is also printed for a plan
-  someone was on earlier and has since left, so it can be wrong only towards caution; `nobody holds it now` is firm
-  at that moment, and people can still buy until DR2.
-- **Higher limits** need no second naming. People get more from the switch on; someone who changed plan this month,
-  from their next month.
+- **A plan's limits**: what a lower or a higher limit does to the people already on the plan is said once, above
+  ("What a changed plan limit does to people who already have a plan"). SB3 stops until you name the plan in
+  `LIMITS`, for a limit that goes lower and for one that goes higher:
+  - naming a plan whose limit goes **lower** is your statement that you told the people on that plan first (Terms
+    section 12), or that nobody holds it. The product sends no notice, and it has no step where people accept the
+    change at their next sign-in (Terms section 14);
+  - naming a plan whose limit goes **higher** is your statement that you checked the number twice: it cannot be taken
+    back for a month.
+
+  For each plan you name, SB3 prints `HELD` or `nobody holds it now` (test purchases count; it prints no count).
+  `HELD` is also printed for a plan someone was on earlier and has since left, so it can be wrong only towards
+  caution; `nobody holds it now` is firm at that moment, and people can still buy until DR2.
+- Free's gauges are read from the live version for everyone: a change reaches everybody at the switch.
 - The day's ceiling, `askRoomReads` and `abuseLimits` are site-wide; they reach everyone at the switch. A new
   per-debate ceiling applies to debates asked after the switch.
 
@@ -524,12 +525,13 @@ of the new code on those numbers before DR6, and at DR6 the site is down.
 **Going back after new numbers were published.** This runbook's upload is a drained one: at DR6 the release before is
 retired, so there is no switch back to it. The numbers come back in one of two ways only:
 - rbD-B, the drained upload's own way back: it puts back the database as it was at DR3, with the old numbers, and
-  loses everything written since (sign-ups, debates, payments);
+  loses everything written since (sign-ups, debates, payments). The old numbers are back for everyone at once;
 - SB3c with `SRC`, then the next upload with those inputs named in `NEWNUM`. It loses nothing and takes one more
-  upload.
+  upload. It is an upload like any other: a limit it lowers again reaches each person from their own next month.
 
 The release guide says both under "The numbers on the drained path". After a side-by-side upload there is a third
-way while the release before is still there (WB2); if that upload had raised limits, WB2 lowers them again.
+way while the release before is still there (WB2). If that upload had raised limits, WB2 does not take the raise back
+from the people whose month saw it: they keep the higher number until their own next month.
 
 **A release older than this step** cannot publish changed numbers: its SB3 needs `NEWNUM` and `LIMITS` empty and the
 file equal to the live numbers.
@@ -571,7 +573,7 @@ What this release adds to that recipe:
   unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
   inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
 - **Your numbers (1.7), at SB3.** SB3 publishes a number from `hosted-billing-v1.json` only where you name it in
-  `NEWNUM` (and a plan whose people get less in `LIMITS`), and stops when the file differs anywhere you did not name.
+  `NEWNUM` (and a plan whose limits change, up or down, in `LIMITS`), and stops when the file differs anywhere you did not name.
   SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
   lists empty. Two rules for this upload: change no plan price in it (1.7, the trap with upgrades), and when `NEWNUM`
   is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS` either that nobody holds it

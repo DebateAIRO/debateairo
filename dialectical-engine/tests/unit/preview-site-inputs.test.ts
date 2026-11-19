@@ -31,6 +31,8 @@ const withPlan = (id: string, patch: Plan): any => {
 const lineOf = (report: { lines: string[] }, start: string) => report.lines.find(line => line.startsWith(start));
 const refusal = (work: () => unknown) => { try { work(); } catch (error) { const { code, fields } = error as { code: string; fields?: string[] }; return { code, fields }; } return null; };
 const amount = /\d{3,}/;
+/** What every `limits` line says about the people already on the plan. */
+const REACH = 'the people already on this plan: a lower limit from each person\'s own next month, a higher one at the switch and not taken back before their next month';
 
 describe('site-inputs: comparing the owner\'s file with the live numbers', () => {
   it('says SAME for every input when the file holds the live numbers, whatever order its keys were typed in', () => {
@@ -60,12 +62,13 @@ describe('site-inputs: comparing the owner\'s file with the live numbers', () =>
     expect(report).toMatchObject({ differing: ['billingPlans'], limitPlans: [] });
   });
 
-  it('a limit that only goes up gives the people on the plan more; one that goes down, or has no up or down, names the plan', () => {
+  it('a limit that goes up, goes down, or has no up or down names the plan, and the line says when each reaches its people', () => {
+    // A raise is named too: it reaches everyone at the switch and is not taken back before each person's next month.
     const more = site.compareSiteInputs(LIVE, withPlan('PRO', { monthly_credit_micros: 55_000_000 }));
-    expect(lineOf(more, 'DIFFERENT billingPlans PRO limits')).toBe('DIFFERENT billingPlans PRO limits: month credit higher, day cap higher, week cap higher [the people already on this plan get more from the switch on; someone who changed plan this month, from their next month]');
-    expect(more.limitPlans).toEqual([]);
+    expect(lineOf(more, 'DIFFERENT billingPlans PRO limits')).toBe(`DIFFERENT billingPlans PRO limits: month credit higher, day cap higher, week cap higher [${REACH}]`);
+    expect(more.limitPlans).toEqual(['PRO']);
     const less = site.compareSiteInputs(LIVE, withPlan('PRO', { monthly_credit_micros: 33_000_000 }));
-    expect(lineOf(less, 'DIFFERENT billingPlans PRO limits')).toBe('DIFFERENT billingPlans PRO limits: month credit lower, day cap lower, week cap lower [the people already on this plan get less or something else, at the switch and counted over the month they are in]');
+    expect(lineOf(less, 'DIFFERENT billingPlans PRO limits')).toBe(`DIFFERENT billingPlans PRO limits: month credit lower, day cap lower, week cap lower [${REACH}]`);
     expect(less.limitPlans).toEqual(['PRO']);
     for (const patch of [{ reserve_micros: 330_000 }, { reserve_held: 'ON_TOP_OF_CREDIT' }, { fixed_gauges: { risk_tier: 'high', composition_budget_tier: 'low', depth: 1 } },
       { finish_overflow_micros: undefined }, { finish_bp: 9900 }, { tier: 'free' }, { a_new_member: 11 }]) {
@@ -76,7 +79,7 @@ describe('site-inputs: comparing the owner\'s file with the live numbers', () =>
   it('judges a day or week cap by what it comes to in money, not by its share alone', () => {
     // More credit with a smaller day share: the month goes up, the day's cap goes down (7.7 x 22% above 8.8 x 11%).
     const mixed = site.compareSiteInputs(LIVE, withPlan('PLUS', { monthly_credit_micros: 8_800_000, day_bp: 1100 }));
-expect(lineOf(mixed, 'DIFFERENT billingPlans PLUS limits')).toContain('PLUS limits: month credit higher, day cap lower, week cap higher [the people already on this plan get less or something else');
+    expect(lineOf(mixed, 'DIFFERENT billingPlans PLUS limits')).toContain('PLUS limits: month credit higher, day cap lower, week cap higher [the people already on this plan: a lower limit from');
     expect(mixed.limitPlans).toEqual(['PLUS']);
     // A share that differs while its cap comes out the same still shows, and still names the plan.
     const tiny = (bp: number) => withPlan('PLUS', { monthly_credit_micros: 11, day_bp: bp });
@@ -100,7 +103,7 @@ expect(lineOf(mixed, 'DIFFERENT billingPlans PLUS limits')).toContain('PLUS limi
       'DIFFERENT billingPlans MAX size shown on the pricing page (times the Plus credit): higher',
       'DIFFERENT billingPlans currency_by_country'
     ]);
-    expect(report.limitPlans).toEqual(['PLUS']);
+    expect(report.limitPlans).toEqual(['PLUS', 'MAX']);
     for (const line of report.lines) expect(line).not.toMatch(amount);
   });
 
@@ -116,14 +119,14 @@ expect(lineOf(mixed, 'DIFFERENT billingPlans PLUS limits')).toContain('PLUS limi
     expect(site.compareSiteInputs(LIVE, withPlan('FREE', { reserve_micros: 110_000 })).limitPlans).toEqual(['FREE']);
   });
 
-  it('raising the Plus credit alone changes what the pricing page shows for the other plans, and names no plan', () => {
+  it('raising the Plus credit alone changes what the pricing page shows for the other plans, and names Plus alone', () => {
     const report = site.compareSiteInputs(LIVE, withPlan('PLUS', { monthly_credit_micros: 8_800_000 }));
     expect(report.lines.slice(5)).toEqual([
-      'DIFFERENT billingPlans PLUS limits: month credit higher, day cap higher, week cap higher [the people already on this plan get more from the switch on; someone who changed plan this month, from their next month]',
+      `DIFFERENT billingPlans PLUS limits: month credit higher, day cap higher, week cap higher [${REACH}]`,
       'DIFFERENT billingPlans PRO size shown on the pricing page (times the Plus credit): lower',
       'DIFFERENT billingPlans MAX size shown on the pricing page (times the Plus credit): lower'
     ]);
-    expect(report.limitPlans).toEqual([]);
+    expect(report.limitPlans).toEqual(['PLUS']);
   });
 
   it('notes a plan whose credit is no longer above the plan before it', () => {
@@ -185,16 +188,18 @@ describe('site-inputs: the new version\'s numbers', () => {
     expect(refusal(() => site.composeSiteInputs(LIVE, copy(), { change: 'askRoomReads' }))).toEqual({ code: 'SITE_CHANGE_NAMED_BUT_SAME', fields: ['askRoomReads'] });
   });
 
-  it('a plan whose people get less is named a second time, and only such a plan', () => {
+  it('a plan whose limits change, down or up, is named a second time, and only such a plan', () => {
+    // Plus gets less and Pro gets more: both are named. Max does not change, and naming it refuses.
     const file = withPlan('PLUS', { monthly_credit_micros: 6_600_000 });
     file.billingPlans.plans[2] = { ...file.billingPlans.plans[2]!, monthly_credit_micros: 55_000_000 };
-    expect(refusal(() => site.composeSiteInputs(LIVE, file, { change: 'billingPlans' }))).toEqual({ code: 'SITE_LIMITS_NOT_NAMED', fields: ['PLUS'] });
-    expect(refusal(() => site.composeSiteInputs(LIVE, file, { change: 'billingPlans', limits: 'PLUS PRO' }))).toEqual({ code: 'SITE_LIMITS_NAMED_BUT_SAME', fields: ['PRO'] });
-    const composed = site.composeSiteInputs(LIVE, file, { change: 'billingPlans', limits: 'PLUS' });
-    expect(composed).toMatchObject({ change: ['billingPlans'], limits: ['PLUS'] });
+    expect(refusal(() => site.composeSiteInputs(LIVE, file, { change: 'billingPlans' }))).toEqual({ code: 'SITE_LIMITS_NOT_NAMED', fields: ['PLUS', 'PRO'] });
+    expect(refusal(() => site.composeSiteInputs(LIVE, file, { change: 'billingPlans', limits: 'PLUS' }))).toEqual({ code: 'SITE_LIMITS_NOT_NAMED', fields: ['PRO'] });
+    expect(refusal(() => site.composeSiteInputs(LIVE, file, { change: 'billingPlans', limits: 'PLUS PRO MAX' }))).toEqual({ code: 'SITE_LIMITS_NAMED_BUT_SAME', fields: ['MAX'] });
+    const composed = site.composeSiteInputs(LIVE, file, { change: 'billingPlans', limits: 'PLUS PRO' });
+    expect(composed).toMatchObject({ change: ['billingPlans'], limits: ['PLUS', 'PRO'] });
     expect(composed.hostedBilling.billingPlans).toEqual(file.billingPlans);
     // Naming the plan does not stand in for naming the input.
-    expect(refusal(() => site.composeSiteInputs(LIVE, file, { limits: 'PLUS' }))).toEqual({ code: 'SITE_CHANGE_NOT_NAMED', fields: ['billingPlans'] });
+    expect(refusal(() => site.composeSiteInputs(LIVE, file, { limits: 'PLUS PRO' }))).toEqual({ code: 'SITE_CHANGE_NOT_NAMED', fields: ['billingPlans'] });
     // Prices alone need no second naming, and refuse one.
     const priced = withPlan('MAX', { net_prices: { USD: 121_000_000, EUR: 121_000_000, RON: 605_000_000 } });
     expect(site.composeSiteInputs(LIVE, priced, { change: 'billingPlans' }).limits).toEqual([]);
