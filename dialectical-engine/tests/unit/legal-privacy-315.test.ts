@@ -112,8 +112,8 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinis
     expect(text, `${code}: no line names 3.14 as the current version`).not.toMatch(/ v3\.14( ·|$)|\*\*Version 3\.14 · /mu);
     expect(sha256Of(withoutPrivacy315(code, text)), `${code}: undoing 3.15 gives back the 3.14 draft byte for byte`).toBe(privacy314Sha256(code));
     expect(manifest().documents.PRIVACY![code], `${code}: the manifest`).toEqual({ version: "3.15", sha256: sha256Of(text) });
-    // The languages the release offers carry every change and the history entry; the others carry pull request 306's
-    // sentences as first translated, and the day.
+    // The languages the release offers carry every change and the history entry; the others carry only the NETOPIA,
+    // consent-record, backup and unfinished sign-up sentences as first translated for them, and the day.
     expect(PRIVACY_315_SWAPS[code]!.swaps.length > 30, `${code}: every change`).toBe(RELEASED.includes(code));
     // The 3.15 entry stands on the history's one line, so every language keeps English's line count.
     expect(lines, `${code}: the line count`).toHaveLength(draft("en").split("\n").length);

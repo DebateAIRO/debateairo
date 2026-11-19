@@ -13,7 +13,7 @@ import {
 } from "../../apps/ui/lib/legal/pages.js";
 
 /**
- * Privacy 3.15 (owner, 19 November 2026): the Register also lists the payment provider, NETOPIA Payments, the one row
+ * Privacy 3.15: the Register also lists the payment provider, NETOPIA Payments, the one row
  * that is not an AI provider. The AI rows are unchanged (`providerRegister`); `/providers` shows them and then
  * NETOPIA's row on every answer (`legalRegister`). Its row says what NETOPIA receives (the same list as Privacy §5),
  * "not applicable" for the AI-only facts, and "[to confirm]" for what the repo does not know. The intro still says AI

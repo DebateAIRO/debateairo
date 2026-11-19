@@ -478,11 +478,11 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * Privacy 3.15 (owner, 19 November 2026): the Register also lists the payment provider, NETOPIA Payments, the one row
+ * Privacy 3.15: the Register also lists the payment provider, NETOPIA Payments, the one row
  * that is not an AI provider. Only what the repo supports is filled in. What it receives with each payment is
  * `buildHostedStartBody` / `buildSavedCardChargeBody` (packages/payments-netopia/src/requests.ts), the same list as
- * Privacy Policy §5. The legal entity is not recorded in the repo: "NETOPIA Financial Services S.A." in Romania is
- * the owner's working name, for counsel to confirm (spec 2026-10-05 §2.22 leaves the entity and its role to counsel).
+ * Privacy Policy §5. The legal entity is not recorded in the code: "NETOPIA Financial Services S.A." in Romania is
+ * the name Privacy Policy §5 gives, still to be confirmed against the contract, as is NETOPIA's role.
  * Romania is in the EU, so no transfer basis is needed. Where it processes, how long it keeps data and the privacy
  * contact are unknown, so they stay "[to confirm]", and the row has no checked date. Zero data retention and training
  * are facts about AI providers: "not applicable". Listed on every answer, after the AI rows (`legalRegister`).
