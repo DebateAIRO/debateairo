@@ -412,7 +412,12 @@ function nextCursor(position: unknown): string | null {
     cursorPosition(encoded);
     return encoded;
 }
-/** Runtime pool only; the authorization repository remains separate. Source hashes precede BEGIN. */
+/**
+ * Runtime pool only; the authorization repository remains separate. Source hashes precede BEGIN.
+ * It calls 0183's `step_up_prerequisite_v2`, which is 0085's check for everyone but a staff member whose sign-in holds an
+ * operator's current re-key permit (migrations/0183_staff_rekey_permit.sql): that person passes it once, to enrol a key
+ * under the site's current name.
+ */
 export class PostgresStaffPrerequisiteProducer implements StaffPrerequisiteProducer {
     constructor(private readonly pool: Pool, private readonly auditContext: import('@debateai/crypto').AuditContextHasher) { }
     async complete(input: StaffPrerequisiteInput, signal?: AbortSignal): Promise<Readonly<{
@@ -426,7 +431,7 @@ export class PostgresStaffPrerequisiteProducer implements StaffPrerequisiteProdu
         if (!Object.values(source).every(value => /^argon2id-audit:v1:[0-9a-f]{64}$/.test(value)))
             throw new Error('STAFF_PREREQUISITE_INVALID');
         const result = await guardedAuthorityQuery<{value:{expiresAt:unknown}}>(this.pool,
-          'SELECT staff.step_up_prerequisite($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15) AS value',
+          'SELECT staff.step_up_prerequisite_v2($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15) AS value',
           [input.identity.userId, input.identity.ownerRef, input.identity.passwordHash, input.identity.factorId,
            input.acceptedStep, input.currentSessionId, input.currentTokenHash, input.replacementTokenHash,
            input.replacementCsrfHash, input.bindingContext, source, input.handleHash, input.purpose,
@@ -448,6 +453,8 @@ function invitation(value: InvitationContext): InvitationContext { return Object
 /**
  * This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. Since 0171 its grant, acceptance, capability check and
  * owned key ceremony are the cross-account marker's, so main.ts builds every staff route's repository on the request pool's system login (X14).
+ * A key registration's start, read and completion call 0183's `_v2` entry points: each is the older function for every case but a
+ * registration started under an operator's re-key permit, which only the `_v2` functions accept.
  */
 export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRepository, StaffManagementRepository, StaffTargetInvitationChannels {
     constructor(private readonly pool: Pool) { }
@@ -588,11 +595,11 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
         return value === null ? null : Object.freeze({ ...value, command: Object.freeze({ ...value.command, credentialIds: Object.freeze([...value.command.credentialIds]) as OwnerPossessionContext["command"]["credentialIds"], expiresAt: date(value.command.expiresAt) }) });
     }
     async beginWebAuthn(input: StaffCeremonyBegin): ReturnType<StaffWebAuthnRepository['beginWebAuthn']> {
-        const value = await this.call<Awaited<ReturnType<StaffWebAuthnRepository['beginWebAuthn']>>>('SELECT staff.begin_owned_webauthn($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb) AS value', [input.userId, input.ordinarySessionId, input.purpose, input.challengeHash, input.handleHash, input.rpId, input.origin, input.userHandleHash, input.operationId, input.context, input.binding, input.scope]);
+        const value = await this.call<Awaited<ReturnType<StaffWebAuthnRepository['beginWebAuthn']>>>('SELECT staff.begin_owned_webauthn_v2($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12::jsonb) AS value', [input.userId, input.ordinarySessionId, input.purpose, input.challengeHash, input.handleHash, input.rpId, input.origin, input.userHandleHash, input.operationId, input.context, input.binding, input.scope]);
         return Object.freeze({ ...value, expiresAt: date(value.expiresAt) });
     }
     async readWebAuthnChallenge(input: StaffCeremonyRead): Promise<StaffCeremonyChallenge | null> {
-        const value = await this.call<StaffCeremonyChallenge | null>('SELECT staff.read_owned_webauthn_challenge($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb) AS value', [input.userId, input.ordinarySessionId, input.handleHash, input.purpose, input.context, input.binding, input.scope]);
+        const value = await this.call<StaffCeremonyChallenge | null>('SELECT staff.read_owned_webauthn_challenge_v2($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb) AS value', [input.userId, input.ordinarySessionId, input.handleHash, input.purpose, input.context, input.binding, input.scope]);
         return value === null ? null : Object.freeze({ ...value, expiresAt: date(value.expiresAt) });
     }
     readWebAuthnCredential(input: StaffOrdinarySession & Readonly<{
@@ -603,7 +610,7 @@ export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRe
         challengeId: string;
     }>): Promise<void> { await this.call('SELECT staff.fail_owned_webauthn($1,$2,$3) AS value', [input.userId, input.ordinarySessionId, input.challengeId]); }
     async completeWebAuthnRegistration(input: Parameters<StaffWebAuthnRepository['completeWebAuthnRegistration']>[0]): ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']> {
-        const value = await withMailLocale(this.pool, input.source?.mailLocale ?? 'en', (client) => this.callOn<Awaited<ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']>>>(client, 'SELECT staff.complete_owned_webauthn_registration($1,$2,$3,$4,$5,$6,$7,$8::bigint,$9::jsonb,$10::text[],$11::jsonb) AS value', [input.userId, input.ordinarySessionId, input.challengeId, input.operationId, input.factorId, input.credentialId, input.publicKey, input.newCounter, input.deviceLabelEnvelope, input.transports, input.alertIntent]));
+        const value = await withMailLocale(this.pool, input.source?.mailLocale ?? 'en', (client) => this.callOn<Awaited<ReturnType<StaffWebAuthnRepository['completeWebAuthnRegistration']>>>(client, 'SELECT staff.complete_owned_webauthn_registration_v2($1,$2,$3,$4,$5,$6,$7,$8::bigint,$9::jsonb,$10::text[],$11::jsonb) AS value', [input.userId, input.ordinarySessionId, input.challengeId, input.operationId, input.factorId, input.credentialId, input.publicKey, input.newCounter, input.deviceLabelEnvelope, input.transports, input.alertIntent]));
         return Object.freeze({ ...value, receipt: receipt(value.receipt) });
     }
     async completeWebAuthnAssertion(input: StaffAssertionCompletion): ReturnType<StaffWebAuthnRepository['completeWebAuthnAssertion']> {

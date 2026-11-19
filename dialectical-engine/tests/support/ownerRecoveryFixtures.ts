@@ -25,6 +25,18 @@ export type OwnerCandidate=Awaited<ReturnType<typeof ownerCandidate>>;
  * The owner's possession receipts, through the step-up on `runtime` and the owned ceremony on `staff`: since 0171 the ceremony is the cross-account
  * marker's, so `staff` is a login shaped as the API's system login, on which main.ts builds its staff repository (X14).
  */
+/**
+ * For a database that stops before 0183: the staff repository's key ceremony calls 0183's `_v2` entry points, which such a
+ * database does not have. This hands the repository the same pool with those four calls under the names the release of
+ * that schema called (the functions the `_v2` ones stand beside).
+ */
+export function poolBeforeRekeyStep(pool:Pool):Pool {
+ const older=(text:string)=>text.replace(/\bstaff\.(step_up_prerequisite|begin_owned_webauthn|read_owned_webauthn_challenge|complete_owned_webauthn_registration)_v2\(/g,'staff.$1(');
+ return new Proxy(pool,{get(target,property,receiver){
+  if(property==='query')return (text:unknown,...rest:unknown[])=>(target.query as (...args:unknown[])=>unknown)(typeof text==='string'?older(text):text,...rest);
+  const value=Reflect.get(target,property,receiver);return typeof value==='function'?value.bind(target):value;
+ }});
+}
 export async function ownerNativeReceipts(runtime:Pool,a:OwnerCandidate,commandId:string,nonce:string,staff:Pool) {
  const handle=b64(randomBytes(32)),replacement=digest(randomBytes(32));
  await runtime.query('SELECT staff.step_up_prerequisite($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12,$13,$14,$15)',[a.userId,a.ownerRef,'task6-synthetic-password',a.factorId,2,a.ordinarySessionId,digest(a.ordinarySessionId),replacement,digest(randomBytes(32)),{}, {ipArgon2id:'argon2id-audit:v1:'+'0'.repeat(64),userAgentArgon2id:'argon2id-audit:v1:'+'1'.repeat(64)},digest(handle),'OWNER_POSSESSION',commandId,digest(nonce)]);

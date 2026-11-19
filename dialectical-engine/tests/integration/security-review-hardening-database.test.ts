@@ -2274,6 +2274,8 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)", "staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.step_up_prerequisite(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)",
+    // 0183's entry point beside it, gated as it is: the account's password and authenticator step, and for a staff member an operator's permit too.
+    "staff.step_up_prerequisite_v2(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)",
     // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
     "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
     "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",

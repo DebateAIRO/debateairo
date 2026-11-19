@@ -86,7 +86,8 @@ const STEPS: ReadonlyArray<readonly [name: string, n1: ForwardStepN1]> = [
   ["0179_password_reset_notice_due.sql", "expand, outside transaction"],
   ["0180_backup_email_notice_due.sql", "expand, outside transaction"],
   ["0181_mfa_recovery_notice_due.sql", "expand, outside transaction"],
-  ["0182_mfa_recovery_control_user_started.sql", "expand, outside transaction"]
+  ["0182_mfa_recovery_control_user_started.sql", "expand, outside transaction"],
+  ["0183_staff_rekey_permit.sql", "expand"]
 ];
 
 /** Every step's file name, in chain order. */
