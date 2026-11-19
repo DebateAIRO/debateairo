@@ -650,8 +650,9 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
   signed-in page.
 - Sign-up refuses the special-use email endings (`.test`, `.example`, `.invalid`, `.localhost`).
 - Billing emails, and the owner's reports, go only to the addresses allowed in
-  `/etc/debateai-v3-preview/auth-dev-v1/mail-recipient.json`. Buy only from accounts on those
-  addresses, and give the owner-report file one of them.
+  `/etc/debateai-v3-preview/auth-dev-v1/mail-recipient.json` while the mail plan is v1 or v2 `allow-list`
+  (with v2 `open`, each goes to its own address: `deploy/preview-auth-dev/v1/MAIN-SITE.md` part 4). Buy only
+  from accounts on those addresses, and give the owner-report file one of them.
 - Moving the billing clock (`BILLING_STAGE_CLOCK_OFFSET_DAYS`) stays refused (the owner is still
   deciding), so a renewal cannot be tested on this host yet.
 
@@ -1078,7 +1079,9 @@ switched.
 Then run the two SAME checks of `deploy/preview-auth-dev/v1/README.md` "Operator checks before the
 first start" (the preview configuration and team; the mode and register version): both must print
 `SAME`. The launchers refuse anything outside the rules, with `PREVIEW_API_STARTUP_REFUSED` and nothing
-more: a live NETOPIA base, a key file elsewhere, three of NETOPIA's four settings, or the moved clock.
+more: a live NETOPIA base (unless the API file also carries the payments line `PREVIEW_LIVE_PAYMENTS=real-money`,
+whose own rules refuse by name: `deploy/preview-auth-dev/v1/MAIN-SITE.md` part 7), a key file elsewhere, three of
+NETOPIA's four settings, or the moved clock.
 
 **Do not run the runner's prepare-only launcher here** (`launch-runner.mjs --plan`, no `--start`). It
 refuses a database proof (native attestation) older than 180 seconds (`native-attestation.mjs`). The
@@ -1196,7 +1199,9 @@ sandbox. Then, on a second allow-listed account (the first already has Plus), th
 dummy SmartBill and fails harmlessly: do not pay as one here. Renewals need the moved billing clock,
 which stays refused. `mail-recipient.json` allows four addresses (stored as SHA-256 hashes). Two of
 them are verification-forward aliases, and mail to those arrives in the forward target's inbox
-(`verificationForwardTarget`, the one address the file holds in plain text).
+(`verificationForwardTarget`, the one address the file holds in plain text). The allow-list holds while the
+mail plan is v1 or v2 `allow-list`; with v2 `open` each mail goes to its own address
+(`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 4).
 
 ### H9. The billing notice spool (optional, from the release that carries PR #192)
 
@@ -5311,6 +5316,14 @@ Register row (§5), as in SB6.
 | DR5 | publish, verify plan, first proof, launch plans, pins, drop-ins, stage | down | rbD-B |
 | DR6 | the new runner, API and website; the switch with the old pair stopped; the old release marked retired (the downtime ends) | up | rbD-B |
 
+**Once real payments are on** (`PREVIEW_LIVE_PAYMENTS` in the API file: `deploy/preview-auth-dev/v1/MAIN-SITE.md` part
+7), two more rules hold. While they are on, keep the site password on from DR2 until SB13b has passed, so nobody can
+pay while the upload may still be undone: if the site is open, put the password back before the upload starts
+(MAIN-SITE.md PWON, 8.4). And if real payments were on at any time since DR3, even if they are closed again now, run
+MAIN-SITE.md's LIVEAFTER (7.12) before you choose rbD-B: rbD-B puts back DR3's cold copy, so it would lose every real
+payment, NETOPIA notice, invoice and credit note written since then, while the cards stay charged and the documents
+stay issued. If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B: fix forward, and ask.
+
 #### DR1. The three env files
 
 ```sh
@@ -5554,6 +5567,9 @@ sessions and marks the restore fence (H11) before any API starts. Everything wri
 with it. Sign-outs, password changes and other revocations since then would come back with it, so the script revokes
 every restored session first. When the release it starts carries NV-07, the public library stays empty until the owner
 releases the hold: H11 step 4.
+
+**If real payments were on at any time since DR3** (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 7), run its
+LIVEAFTER (7.12) first, and never run rbD-B unless it ends with `LIVEAFTER_DONE`.
 
 ```sh
 set -euo pipefail
