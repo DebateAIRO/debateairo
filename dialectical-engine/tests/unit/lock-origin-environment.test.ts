@@ -80,8 +80,8 @@ describe('the main origin', () => {
   it('leaves the default settings exactly as before', () => {
     const before = local();
     const result = api(before);
-    expect(result).toEqual({ environment: { ...before, PATH: '/usr/local/bin:/usr/bin:/bin' }, selectedRegisterVersion: '12', deploymentMode: 'local' });
-    expect(api(hosted())).toEqual({ environment: { ...hosted(), PATH: '/usr/local/bin:/usr/bin:/bin' }, selectedRegisterVersion: '12', deploymentMode: 'hosted' });
+    expect(result).toEqual({ environment: { ...before, PATH: '/usr/local/bin:/usr/bin:/bin' }, selectedRegisterVersion: '12', deploymentMode: 'local', livePayments: false });
+    expect(api(hosted())).toEqual({ environment: { ...hosted(), PATH: '/usr/local/bin:/usr/bin:/bin' }, selectedRegisterVersion: '12', deploymentMode: 'hosted', livePayments: false });
     const page = website({ TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY });
     expect(ui(page)).toEqual({ environment: { ...page, PATH: '/usr/local/bin:/usr/bin:/bin' }, selectedRegisterVersion: null, deploymentMode: 'local' });
     // A default-name refusal that has nothing to do with the name stays unnamed.
