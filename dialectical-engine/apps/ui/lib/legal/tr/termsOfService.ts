@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Yetkili makamlar için irtibat noktası — office@dezbatere.ro — Romence ve İngilizce",
         "Terör içeriğine yönelik kaldırma emirleri (2021/784 sayılı AB Tüzüğü) — office@dezbatere.ro — bu emirler için irtibat noktamız; Romence ve İngilizce; 10. bölüme bakınız",
         "Diğer ülkelerdeki temsilciler — Temsilci atadığımız bölgeler için Ek A'da listelenmiştir"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Tescilli merkez","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romanya"],
+            ["Ticaret Sicili numarası","J2022000426271"],
+            ["Tekil tescil kodu (CUI)","45935221 · KDV: RO45935221"],
+            ["Sermaye","RON 5.000"],
+            ["Genel iletişim","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Hukuki bildirimler","support@dezbatere.ro"],
+            ["Gizlilik ve veri koruma","privacy@dezbatere.ro"],
+            ["Hukuka aykırı içerik bildirimi","support@dezbatere.ro — 10. bölüme bakınız"],
+            ["Yetkili makamlar için irtibat noktası","office@dezbatere.ro — Romence ve İngilizce"],
+            ["Terör içeriğine yönelik kaldırma emirleri (2021/784 sayılı AB Tüzüğü)","office@dezbatere.ro — bu emirler için irtibat noktamız; Romence ve İngilizce; 10. bölüme bakınız"],
+            ["Diğer ülkelerdeki temsilciler","Temsilci atadığımız bölgeler için Ek A'da listelenmiştir"]
+          ]
+        }
       },
       { kind: "p", text: "Bu bilgiler ayrıca dezbatere.ro/legal adresindeki sitede kalıcı olarak gösterilir. Yalnızca asistanımıza değil, her zaman bir kişiye ulaşabilirsiniz; bunun nasıl yapılacağı 10. bölümde açıklanmıştır." }
     ]

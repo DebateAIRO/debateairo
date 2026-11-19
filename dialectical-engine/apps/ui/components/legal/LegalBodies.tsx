@@ -2,7 +2,7 @@ import { Fragment, type ReactNode } from "react";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
-import type { LegalBlock, LegalDocument } from "@/lib/legalDocument";
+import type { LegalBlock, LegalDocument, LegalTable } from "@/lib/legalDocument";
 import {
   ADR_URL,
   COMPANY,
@@ -59,6 +59,36 @@ export function withNames(text: string): ReactNode {
   return parts.map((part, index) => (index % 2 === 1 ? <bdi dir="ltr" key={index}>{part}</bdi> : part));
 }
 
+/**
+ * What a screen reader hears for one row of a legal table rendered as a list: each value after its
+ * column name, "Category: Account. What, exactly: Email …". Null for a plain list item (no table, or
+ * no cells for this row), which renders exactly as before.
+ *
+ * The visible line stays ONE untouched run of text, `cell — cell — cell`, hidden from screen readers
+ * (aria-hidden) while this sr-only copy is read instead. Splitting the visible text around per-column
+ * labels would change how the browser shapes it, and the page must look the same to the pixel.
+ */
+export function legalRowSpoken(table: LegalTable | undefined, cells: readonly string[] | undefined): ReactNode {
+  if (table === undefined || cells === undefined) return null;
+  const parts: ReactNode[] = [];
+  cells.forEach((cell, column) => {
+    if (cell.length === 0) return;
+    const name = table.head[column] ?? "";
+    const end = /[.!?;:…。！？]$/u.test(cell) ? " " : ". ";
+    parts.push(<Fragment key={column}>{name.length > 0 ? `${name}: ` : ""}{withNames(cell)}{end}</Fragment>);
+  });
+  if (parts.length === 0) return null;
+  // `.srOnly` is absolutely positioned, so the copy is placed against its nearest positioned ancestor. In the sign-up
+  // modal that ancestor sits outside the scrolling policy text, and the copies overflowed it and made it scrollable
+  // too. This empty wrapper is that ancestor instead: it holds no visible text (a positioned box around the visible
+  // line would be painted on a layer of its own and its text antialiased differently), and it has no width.
+  return (
+    <span style={{ position: "relative" }}>
+      <span className="srOnly">{parts}</span>
+    </span>
+  );
+}
+
 function NumberedSections({ sections }: { sections: readonly NumberedSection[] }) {
   return (
     <div className="legalSections">
@@ -71,9 +101,19 @@ function NumberedSections({ sections }: { sections: readonly NumberedSection[] }
               <ul key={index}>
                 {block.items.map((item, itemIndex) => {
                   // `.legalSection li` is a flex row: a line with an isolated name goes in ONE span, or the name's <bdi>
-                  // becomes its own flex item, gets a column of its own and breaks mid-word (REV-S01 p3 PT3-B1).
+                  // becomes its own flex item, gets a column of its own and breaks mid-word (REV-S01 p3 PT3-B1). A table
+                  // row's visible run and its sr-only spoken copy share that one wrapper too.
                   const line = withNames(item);
-                  return <li key={itemIndex}>{typeof line === "string" ? line : <span>{line}</span>}</li>;
+                  const spoken = legalRowSpoken(block.table, block.table?.rows[itemIndex]);
+                  if (spoken === null) return <li key={itemIndex}>{typeof line === "string" ? line : <span>{line}</span>}</li>;
+                  return (
+                    <li key={itemIndex}>
+                      <span>
+                        <span aria-hidden="true">{line}</span>
+                        {spoken}
+                      </span>
+                    </li>
+                  );
                 })}
               </ul>
             )
@@ -334,14 +374,14 @@ function InventoryName({ name }: { name: string }) {
 /** One /cookies row: the name as the code writes it, then kind, purpose, who receives it, and lifetime. */
 function InventoryRow({ item, legalCatalog }: { item: LegalInventoryItem; legalCatalog: MessageCatalog }) {
   return (
-    <tr>
-      <th scope="row">
+    <tr role="row">
+      <th scope="row" role="rowheader">
         <InventoryName name={item.name} />
       </th>
-      <td className="legalKindCell">{t(legalCatalog, item.kindKey)}</td>
-      <td>{t(legalCatalog, item.purposeKey)}</td>
-      <td>{t(legalCatalog, item.recipientKey)}</td>
-      <td>{t(legalCatalog, item.lifeKey)}</td>
+      <td role="cell" className="legalKindCell">{t(legalCatalog, item.kindKey)}</td>
+      <td role="cell">{t(legalCatalog, item.purposeKey)}</td>
+      <td role="cell">{t(legalCatalog, item.recipientKey)}</td>
+      <td role="cell">{t(legalCatalog, item.lifeKey)}</td>
     </tr>
   );
 }
@@ -351,23 +391,25 @@ function InventoryRow({ item, legalCatalog }: { item: LegalInventoryItem; legalC
  * the browser-storage keys (`LEGAL_BROWSER_STORAGE`) in another, then how to refuse them and what then stops working.
  */
 export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalog }) {
+  // Explicit table roles: below 1000px the cookie tables stack (display:block), and Safari then drops native table
+  // semantics; the roles keep each cell named by its column header for screen readers (WCAG 1.3.1).
   const head = (
-    <thead>
-      <tr>
-        <th scope="col">{t(legalCatalog, "legal.cookies.colName")}</th>
-        <th scope="col">{t(legalCatalog, "legal.cookies.colType")}</th>
-        <th scope="col">{t(legalCatalog, "legal.cookies.colPurpose")}</th>
-        <th scope="col">{t(legalCatalog, "legal.cookies.colRecipient")}</th>
-        <th scope="col">{t(legalCatalog, "legal.cookies.colLasts")}</th>
+    <thead role="rowgroup">
+      <tr role="row">
+        <th scope="col" role="columnheader">{t(legalCatalog, "legal.cookies.colName")}</th>
+        <th scope="col" role="columnheader">{t(legalCatalog, "legal.cookies.colType")}</th>
+        <th scope="col" role="columnheader">{t(legalCatalog, "legal.cookies.colPurpose")}</th>
+        <th scope="col" role="columnheader">{t(legalCatalog, "legal.cookies.colRecipient")}</th>
+        <th scope="col" role="columnheader">{t(legalCatalog, "legal.cookies.colLasts")}</th>
       </tr>
     </thead>
   );
   return (
     <>
       <p className="legalIntro">{t(legalCatalog, "legal.cookies.intro")}</p>
-      <table className="legalTable legalCookieTable">
+      <table role="table" className="legalTable legalCookieTable">
         {head}
-        <tbody>
+        <tbody role="rowgroup">
           {LEGAL_COOKIES.map((item) => (
             <InventoryRow item={item} legalCatalog={legalCatalog} key={item.name} />
           ))}
@@ -375,9 +417,9 @@ export function LegalCookiesBody({ legalCatalog }: { legalCatalog: MessageCatalo
       </table>
       <h2 className="legalSubhead">{t(legalCatalog, "legal.cookies.storageTitle")}</h2>
       <p className="legalIntro">{t(legalCatalog, "legal.cookies.storageIntro")}</p>
-      <table className="legalTable legalCookieTable">
+      <table role="table" className="legalTable legalCookieTable">
         {head}
-        <tbody>
+        <tbody role="rowgroup">
           {LEGAL_BROWSER_STORAGE.map((item) => (
             <InventoryRow item={item} legalCatalog={legalCatalog} key={item.name} />
           ))}

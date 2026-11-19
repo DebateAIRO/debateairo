@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Kontaktna točka za nadležna tijela — office@dezbatere.ro — rumunjski i engleski",
         "Nalozi za uklanjanje terorističkog sadržaja (Uredba (EU) 2021/784) — office@dezbatere.ro — naša kontaktna točka za te naloge; rumunjski i engleski; vidjeti odjeljak 10.",
         "Predstavnici u drugim državama — Navedeni su u Prilogu A za regije u kojima smo imenovali predstavnika"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Registrirano sjedište","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunjska"],
+            ["Broj u Trgovačkom registru","J2022000426271"],
+            ["Jedinstveni registracijski broj (CUI)","45935221 · PDV: RO45935221"],
+            ["Temeljni kapital","5.000 RON"],
+            ["Opći kontakt","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Pravne obavijesti","support@dezbatere.ro"],
+            ["Privatnost i zaštita podataka","privacy@dezbatere.ro"],
+            ["Prijava nezakonitog sadržaja","support@dezbatere.ro — vidjeti odjeljak 10."],
+            ["Kontaktna točka za nadležna tijela","office@dezbatere.ro — rumunjski i engleski"],
+            ["Nalozi za uklanjanje terorističkog sadržaja (Uredba (EU) 2021/784)","office@dezbatere.ro — naša kontaktna točka za te naloge; rumunjski i engleski; vidjeti odjeljak 10."],
+            ["Predstavnici u drugim državama","Navedeni su u Prilogu A za regije u kojima smo imenovali predstavnika"]
+          ]
+        }
       },
       { kind: "p", text: "Ti su podaci također trajno prikazani na mrežnom mjestu dezbatere.ro/legal. Uvijek možete stupiti u kontakt s osobom, a ne samo s našim pomoćnikom; u odjeljku 10. objašnjeno je kako." }
     ]
