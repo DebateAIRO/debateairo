@@ -165,6 +165,9 @@
 .subLink { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--link); font-family: var(--font-sans); font-size: 14px; font-weight: 600; text-align: start; text-decoration: underline; cursor: pointer; }
 .subLink:disabled { opacity: .55; cursor: not-allowed; }
 .subHint { margin: 0; font-size: 13px; color: var(--muted); }
+/* The withdrawal statement the buyer confirms: its title, the statement, then its facts, one per line. */
+.subStatement { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.subStatement .setStatus { overflow-wrap: anywhere; }
 .subCard .setInvoiceList { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .subCard .setInvoiceList li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; font-size: 13px; }
 .subCard .setInvoiceList li > span { min-width: 0; overflow-wrap: anywhere; }

@@ -14,7 +14,7 @@ import { ChargeStatusPoller } from "./ChargeStatusPoller";
 export type SubscriptionClient = Pick<ContractClient,
   | "getBillingSubscription" | "getBillingInvoices" | "quoteSubscriptionUpgrade" | "upgradeSubscription"
   | "downgradeSubscription" | "cancelSubscription" | "revokeSubscriptionCancel" | "withdrawSubscription"
-  | "getBillingCharge" | "getBillingPlans"
+  | "getBillingCharge" | "getBillingPlans" | "getBillingCardDetails" | "readAccountEmail"
 >;
 type Subscription = NonNullable<Awaited<ReturnType<ContractClient["getBillingSubscription"]>>["subscription"]>;
 type Invoice = Awaited<ReturnType<ContractClient["getBillingInvoices"]>>["invoices"][number];
@@ -119,6 +119,28 @@ function revokeFailureWords(failure: unknown): FailureWords {
 /** Ruling Q-7: the confirm needs the lower plan's price; without the plans list it offers no confirm at all. */
 const PLANS_UNAVAILABLE: FailureWords = Object.freeze({ key: "billing.pricing.unavailable", reload: false });
 
+/**
+ * What the withdrawal statement shows the buyer to confirm (OUG 34/2014 art. 11^1(4)): the payer's name on the billing
+ * details, and the account's address, where the acknowledgement goes. Each is null until read, and stays null when its
+ * read fails: the statement then reads without the name, and says the confirmation goes to the account's address.
+ */
+type StatementFacts = Readonly<{ name: string | null; email: string | null }>;
+const NO_FACTS: StatementFacts = Object.freeze({ name: null, email: null });
+
+async function readStatementFacts(client: SubscriptionClient): Promise<StatementFacts> {
+  // Each read is started inside its own promise, so a client that throws at once fails only its own fact.
+  const [card, account] = await Promise.allSettled([
+    Promise.resolve().then(() => client.getBillingCardDetails()),
+    Promise.resolve().then(() => client.readAccountEmail())
+  ]);
+  const parts = card.status === "fulfilled" ? [card.value.first_name, card.value.last_name] : [];
+  const name = parts.filter((part): part is string => part !== null && part.trim() !== "").join(" ").trim();
+  return Object.freeze({
+    name: name === "" ? null : name,
+    email: account.status === "fulfilled" ? account.value.email : null
+  });
+}
+
 class PlanPriceUnavailable extends Error {
   constructor() {
     super("DOWNGRADE_PRICE_UNAVAILABLE");
@@ -177,6 +199,7 @@ export function SubscriptionControls({
     planId: DowngradeTarget; netPrice: string; currency: BillingCurrency;
   }> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statementFacts, setStatementFacts] = useState<StatementFacts>(NO_FACTS);
   // `linksHome`: W10 (P2-M20) the updated-Terms sentence is a plain link to the signed-in home page, whose accept
   // screen L4 shows (a full page load, never a client-side move). Every other sentence is plain text.
   const [message, setMessageState] = useState<Readonly<{ text: string; linksHome: boolean }> | null>(null);
@@ -268,6 +291,15 @@ export function SubscriptionControls({
    * retragerea" sends it. A signed-in person, social sign-in included, is not asked to identify again: no password and
    * no authenticator code.
    */
+  function openWithdrawal(): void {
+    setPanel("WITHDRAW");
+    // A paused plan's panel gives the e-mail route and sends no statement, so it reads nothing.
+    if (paused) return;
+    // The statement's facts are read when it opens; the Confirm button never waits for them.
+    setStatementFacts(NO_FACTS);
+    void readStatementFacts(client).then(setStatementFacts);
+  }
+
   function withdraw(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     void run(async () => {
@@ -490,7 +522,7 @@ export function SubscriptionControls({
           {withdrawOpen || panel === "WITHDRAW" ? (
             <div className="subBlock" data-subscription-withdraw>
               {withdrawOpen ? (
-                <button type="button" className="subLink" disabled={busy} onClick={() => setPanel("WITHDRAW")}>
+                <button type="button" className="subLink" disabled={busy} onClick={openWithdrawal}>
                   {t(catalog, "billing.subscription.withdraw")}
                 </button>
               ) : null}
@@ -499,6 +531,24 @@ export function SubscriptionControls({
                 <p className="setCardNote" data-withdraw-while-paused>
                   {t(catalog, "billing.subscription.withdrawWhilePaused", { email: COMPANY.emails.general })}
                 </p>
+              ) : null}
+              {panel === "WITHDRAW" && !paused ? (
+                <div className="subStatement" data-withdraw-statement>
+                  <h3 className="setCardTitle">{t(catalog, "billing.subscription.withdrawStatementTitle")}</h3>
+                  <p className="setStatus">{t(catalog, "billing.subscription.withdrawStatementText")}</p>
+                  {statementFacts.name !== null
+                    ? <p className="setStatus">{t(catalog, "billing.subscription.withdrawStatementName", { name: statementFacts.name })}</p>
+                    : null}
+                  <p className="setStatus">{live.started_on === null
+                    ? t(catalog, "billing.subscription.plan", { plan: planName(catalog, live.plan_id) })
+                    : t(catalog, "billing.subscription.withdrawStatementContract", {
+                      plan: planName(catalog, live.plan_id), date: date(live.started_on)
+                    })}</p>
+                  <p className="setStatus">{statementFacts.email !== null
+                    ? t(catalog, "billing.subscription.withdrawStatementEmail", { email: statementFacts.email })
+                    : t(catalog, "billing.subscription.withdrawStatementEmailAccount")}</p>
+                  <p className="subHint">{t(catalog, "billing.subscription.withdrawStatementChangeEmail")}</p>
+                </div>
               ) : null}
               {panel === "WITHDRAW" && !paused ? (
                 <form onSubmit={withdraw}>

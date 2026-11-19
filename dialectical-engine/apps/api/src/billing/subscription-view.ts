@@ -1,5 +1,7 @@
 import { TypedDomainError } from "@debateai/kernel";
-import { microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline } from "@debateai/billing-core";
+import {
+  consumerCalendarDay, microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline
+} from "@debateai/billing-core";
 import type { BillingInvoicesResponse, BillingSubscriptionResponse } from "@debateai/contract";
 import type { BillingRepository } from "@debateai/db";
 import type { BillingPolicy, PlanId } from "@debateai/register";
@@ -132,6 +134,9 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     scheduled_downgrade_plan_id: state.scheduledDowngradePlanId === null ? null : paidPlanOf(state.scheduledDowngradePlanId),
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),
     withdrawal_last_day: withdrawal?.lastDay ?? null,
+    // The withdrawal statement names the contract by its plan and the day it started, in the buyer's calendar.
+    started_on: state.activatedAt === null || input.taxCountry === null
+      ? null : consumerCalendarDay(state.activatedAt, input.taxCountry),
     can_upgrade: upgradeOffered(input),
     can_change_card: cardChangeOffered(input),
     can_revoke_cancel: revokeCancelOffered(input)

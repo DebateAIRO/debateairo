@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { withdrawalDeadline, type SubscriptionState } from "@debateai/billing-core";
+import { consumerCalendarDay, consumerTimeZone, withdrawalDeadline, type SubscriptionState } from "@debateai/billing-core";
 import { PlanIdSchema, SubscribedPlanIdSchema } from "@debateai/contract";
 import { renewalLeadMs } from "../../apps/api/src/billing/renewal-rules.js";
 import { subscriptionView, withdrawalOpenUntil } from "../../apps/api/src/billing/subscription-view.js";
@@ -37,9 +37,26 @@ describe("P12b the subscription as the person sees it", () => {
       current_period_end: "2026-11-01T09:00:00.000Z", renews_on: "2026-11-01T09:00:00.000Z",
       renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
       // Romania: the 14 days run 2–15 October, Bucharest time; the window closes at the next local midnight.
-      withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15",
+      withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15", started_on: "2026-10-01",
       can_upgrade: true, can_change_card: true, can_revoke_cancel: false
     });
+  });
+
+  it("names the day the plan started in the buyer's calendar, the one the 14 days are counted in", () => {
+    // 22:30 UTC on 1 October is already 2 October in Bucharest, and still 1 October in Lisbon.
+    const late = new Date("2026-10-01T22:30:00.000Z");
+    expect(view({ activatedAt: late }, "RO").started_on).toBe("2026-10-02");
+    expect(view({ activatedAt: late }, "PT").started_on).toBe("2026-10-01");
+    expect(consumerCalendarDay(late, "RO")).toBe("2026-10-02");
+    // A country with no zone of its own is read where the day is latest, as its window is.
+    expect(consumerCalendarDay(late, "US")).toBe("2026-10-02");
+    // No activation or no tax country: unknown, so the statement names the plan alone.
+    expect(view({ activatedAt: null }).started_on).toBeNull();
+    expect(view({}, null).started_on).toBeNull();
+    // The zone the acknowledgement prints the time in: the country's own, or UTC where it has several or none listed.
+    expect(consumerTimeZone("RO")).toBe("Europe/Bucharest");
+    expect(consumerTimeZone("DE")).toBe("Europe/Berlin");
+    for (const country of ["ES", "PT", "US", null]) expect(consumerTimeZone(country), String(country)).toBe("UTC");
   });
 
   it("shows no renewal once a cancel is requested, and the postponed date while a notice runs", () => {

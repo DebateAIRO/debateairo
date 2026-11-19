@@ -17,8 +17,9 @@ function subscription(overrides: Record<string, unknown> = {}) {
   return {
     plan_id: "PLUS", status: "ACTIVE", cancel_requested: false, current_period_end: "2026-10-29T10:00:00.000Z",
     renews_on: "2026-10-29T10:00:00.000Z", renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
-    // A Romanian window: it closes at midnight in Bucharest (UTC+3 in October), the end of October 13 there.
-    withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13",
+    // A Romanian window: it closes at midnight in Bucharest (UTC+3 in October), the end of October 13 there, 14 days
+    // after the plan started on 29 September.
+    withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13", started_on: "2026-09-29",
     can_upgrade: true, can_change_card: true, can_revoke_cancel: false, ...overrides
   };
 }
@@ -54,7 +55,13 @@ beforeEach(() => {
     quoteSubscriptionUpgrade: vi.fn(), upgradeSubscription: vi.fn(), downgradeSubscription: vi.fn(async () => undefined),
     cancelSubscription: vi.fn(async () => undefined), revokeSubscriptionCancel: vi.fn(async () => undefined),
     withdrawSubscription: vi.fn(), getBillingCharge: vi.fn(),
-    getBillingPlans: vi.fn(async () => PLANS)
+    getBillingPlans: vi.fn(async () => PLANS),
+    // The withdrawal statement's facts: the payer's name and the address the confirmation goes to.
+    getBillingCardDetails: vi.fn(async () => ({
+      country: "RO", region: "Cluj", first_name: "Ana", last_name: "Popescu", phone: "+40712345678", street: "Strada 1",
+      city: "Cluj-Napoca", postal_code: "400114"
+    })),
+    readAccountEmail: vi.fn(async () => ({ email: "ana@example.test", recovery_email: null, pending: null }))
   };
 });
 afterEach(() => {
@@ -153,6 +160,59 @@ describe("P20 SubscriptionControls (S1)", () => {
     // W9 (P2-I11): only what has happened; the refund is on its way, and M8 says when it is done.
     expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
     expect(text()).not.toContain("We refunded");
+  });
+
+  it("shows the withdrawal statement before the confirmation: the name, the plan and its start, and the confirmation's address", async () => {
+    // OUG 34/2014 art. 11^1(4): the buyer gives or confirms the name, the contract and where the confirmation goes.
+    client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
+    await render();
+    expect(client.getBillingCardDetails).not.toHaveBeenCalled();
+    expect(client.readAccountEmail).not.toHaveBeenCalled();
+    await click("Withdraw from contract here");
+    expect(client.getBillingCardDetails).toHaveBeenCalledTimes(1);
+    expect(client.readAccountEmail).toHaveBeenCalledTimes(1);
+    const panel = container.querySelector("[data-withdraw-statement]")!;
+    expect([...panel.querySelectorAll("h3, p")].map((line) => line.textContent)).toEqual([
+      "Your withdrawal statement",
+      "I withdraw from my contract for this plan.",
+      "Name: Ana Popescu",
+      "Contract: the Plus plan, started on 29 September 2026",
+      "We will send the confirmation to: ana@example.test",
+      "To use another address, change it under Email on this page first."
+    ]);
+    // The statement sits above the button that sends it.
+    const confirm = button("Confirm withdrawal")!;
+    expect(panel.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click("Confirm withdrawal");
+    expect(client.withdrawSubscription).toHaveBeenCalledTimes(1);
+  });
+
+  it("still confirms the withdrawal when the name and the address cannot be read, and never waits for them", async () => {
+    client.getBillingCardDetails.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "x"));
+    client.readAccountEmail.mockRejectedValue(new ContractHttpError("NETWORK_FAILURE", 0, "x"));
+    client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
+    await render();
+    await click("Withdraw from contract here");
+    const panel = container.querySelector("[data-withdraw-statement]")!;
+    expect(panel.textContent).not.toContain("Name:");
+    expect(panel.textContent).toContain("Contract: the Plus plan, started on 29 September 2026");
+    expect(panel.textContent).toContain("We will send the confirmation to the email address of your account.");
+    expect(button("Confirm withdrawal")!.disabled).toBe(false);
+    // A failed read is not a failed withdrawal: no "try again" before anything was sent.
+    expect(text()).not.toContain("That didn't work.");
+    await click("Confirm withdrawal");
+    expect(client.withdrawSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
+    // Reads that never answer do not hold the button either.
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingCardDetails.mockReturnValue(new Promise(() => undefined));
+    client.readAccountEmail.mockReturnValue(new Promise(() => undefined));
+    await render();
+    await click("Withdraw from contract here");
+    expect(container.querySelector("[data-withdraw-statement]")?.textContent)
+      .toContain("We will send the confirmation to the email address of your account.");
+    expect(button("Confirm withdrawal")!.disabled).toBe(false);
   });
 
   it("sends nothing until the confirmation is pressed", async () => {
@@ -424,6 +484,7 @@ describe("P20 SubscriptionControls (S1)", () => {
       + "You can withdraw now by email: send the model form, or any clear statement that you withdraw, to support@dezbatere.ro. "
       + "It counts from the moment it reaches us, and we confirm it by email.");
     expect(button("Confirm withdrawal")).toBeUndefined();
+    expect(container.querySelector("[data-withdraw-statement]")).toBeNull();
     expect(client.withdrawSubscription).not.toHaveBeenCalled();
   });
 
