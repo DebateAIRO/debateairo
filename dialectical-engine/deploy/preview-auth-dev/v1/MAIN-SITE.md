@@ -627,7 +627,8 @@ What this release adds to that recipe:
 **The unfinished sign-ups (UNFINISHED).** From this release on, a sign-up not finished within 24 hours is deleted.
 Not finished means the account still waits for its e-mail link to be opened (`pending_verification`) or for its second
 factor (`pending_mfa`). Today nothing deletes such an account, so it keeps its e-mail address and its public name
-(pseudonym) for good: signing up again with that address only says the address is taken. While today's v1 mail plan
+(pseudonym) for good. Signing up again with that address shows the usual answer ("If this address can be registered,
+verification instructions will arrive. Check your spam folder."), and no mail ever comes. While today's v1 mail plan
 refuses every account mail (1.4), every sign-up on this server waits like that.
 
 **What happens at DR6.** As soon as the new release becomes current, its API deletes every sign-up already due: still
@@ -654,7 +655,9 @@ exit 0
 Expect the count line, then `UNFINISHED_DONE`. Name the count in your yes before DR2, for example "UNFINISHED: 37".
 The number can grow a little before DR6: a sign-up that turns 24 hours old in between goes too. If the count surprises
 you (it is larger than the sign-ups you know of), ask before DR2. Someone among them who still wants an account signs
-up again with the same address. If you ever go back with rbD-B, part 9 says what happens to these sign-ups.
+up again with the same address once mail reaches them: after MAIL_ALLOW (4.2) for the four allow-listed addresses,
+after MAIL_OPEN (4.3) for everyone else. Before that, a new sign-up gets no mail either: it waits again, and goes 24
+hours later. If you ever go back with rbD-B, part 9 says what happens to these sign-ups.
 
 **After DR6**, look for the pass's lines in the new API's journal. Paste this one line, with rNN filled in:
 `bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -o cat --no-pager | grep -E "signup[.]unfinished_expired|UNFINISHED_SIGNUP_EXPIRY_PENDING"'`.
