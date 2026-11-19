@@ -546,10 +546,12 @@ What this release adds to that recipe:
   and DR2, as the release guide says.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
   `deploy/preview-auth-dev/v1/public-origins.mjs`, `startup-refusals.mjs`, `start-check-mail.mjs`,
-  `start-check-payments.mjs`, this `MAIN-SITE.md` and `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
-  your numbers, 1.7); and changed ones: `environment.mjs`, `egress-proxy.mjs`,
+  `start-check-payments.mjs`, this `MAIN-SITE.md`, `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
+  your numbers, 1.7) and `deploy/preview-lifecycle/v1/rekey-staff-key.mjs` (the staff key under a new name, 5.7); and
+  changed ones: `environment.mjs`, `egress-proxy.mjs`,
   `mail-handoff.mjs`, `launch-api.mjs`, `launch-runner.mjs`, `launch-ui.mjs`, `README.md`,
-  `deploy/preview-lifecycle/v1/release-env.mjs`, `deploy/preview-release/v1/release-artifacts.mjs` and its `README.md`.
+  `deploy/preview-lifecycle/v1/release-env.mjs`, `unlock-team-tools.mjs`, `jit-creator-actor.mjs` and that folder's
+  `README.md`, `deploy/preview-release/v1/release-artifacts.mjs` and its `README.md`.
   Review them, then run SB4 again with `LIFE=yes`. On the drained path, DR5 runs SB10's operator folder swap by hand
   first, as the release guide says.
 - **The new SAME lines.** DR1's `same` still runs the old tools, so it prints no new line. After DR5's folder swap,
@@ -1400,9 +1402,10 @@ this document. It takes about half an hour. You need the server (as root), a bro
 authenticator and your hardware key. It works while payments are real; STAFFMAIN restarts the API, so pick a quiet
 minute with no checkout open.
 
-In that upload, SB4's operator review lists one new file, `deploy/preview-lifecycle/v1/rekey-staff-key.mjs`, and
-changed ones beside it: `unlock-team-tools.mjs`, `jit-creator-actor.mjs` and the kit's `README.md`. STAFFMAIN and
-REKEY need the upload's operator folder swap and its database step to have run; each checks that first.
+In that upload, SB4's operator review (part 2) lists this step's files among the others: the new
+`deploy/preview-lifecycle/v1/rekey-staff-key.mjs`, and the changed `unlock-team-tools.mjs`, `jit-creator-actor.mjs`
+and that folder's `README.md`. STAFFMAIN and REKEY need the upload's operator folder swap and its database step to
+have run; each checks that first, and REKEYCHECK (below) says so before the day.
 
 **What happens, in plain words.**
 - A staff key belongs to one site name. The one you enrolled belongs to the test name, so on dezbatere.ro the Team
