@@ -56,8 +56,8 @@ DROPIN_BYTES = 512 * 1024
 RANGES_BYTES = 16 * 1024 * 1024
 MAX_RANGES = 4096
 MAX_ADDRESSES = 256
-# A published range is never wider than this (a /8 would be a sixteen-million-address hole in the fence).
-WIDEST_PREFIX = 9
+# No range wider than this is taken or written: Amazon publishes per-Region ranges well inside single /8 blocks.
+WIDEST_PREFIX = 8
 CREATE_DATE = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}-[0-9]{2}')
 HEADER = (
     '# Install as /etc/systemd/system/debateai-preview-bedrock-budget.service.d/50-bedrock-addresses.conf\n'

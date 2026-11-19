@@ -308,7 +308,7 @@ class AddressCheckTests(unittest.TestCase):
                json.dumps(ranges_document(('13.48.0.0/15', 'eu-north-1', 'AMAZON'))),  # Nothing for the Region.
                json.dumps(ranges_document(('10.0.0.0/16', 'us-east-1', 'AMAZON'))),
                json.dumps(ranges_document(('127.0.0.0/24', 'us-east-1', 'AMAZON'))),
-               json.dumps(ranges_document(('3.0.0.0/8', 'us-east-1', 'AMAZON'))),
+               json.dumps(ranges_document(('2.0.0.0/7', 'us-east-1', 'AMAZON'))),
                json.dumps(ranges_document(('0.0.0.0/0', 'us-east-1', 'AMAZON'))),
                json.dumps(ranges_document(('3.208.0.5/24', 'us-east-1', 'AMAZON'))),
                json.dumps({**SAMPLE, 'prefixes': ['3.208.0.0/24']})]
@@ -320,8 +320,15 @@ class AddressCheckTests(unittest.TestCase):
         self.assertEqual(self.run_main(['render', '--ranges', str(self.folder() / 'absent.json')], FakeResolver([]))[1],
                          {'status': 'refused', 'error': 'RANGES_FILE_UNREADABLE'})
 
+    def test_ranges_that_merge_wider_than_a_slash_8_are_written_as_slash_8s(self):
+        document = ranges_document(('2.0.0.0/8', 'us-east-1', 'AMAZON'), ('3.0.0.0/9', 'us-east-1', 'AMAZON'),
+                                   ('3.128.0.0/9', 'us-east-1', 'AMAZON'))
+        _created, networks = addresses.read_ranges(self.ranges_file(document))
+        self.assertEqual([str(network) for network in networks], ['2.0.0.0/8', '3.0.0.0/8'])
+        addresses.parse_dropin(addresses.render('2026-11-19-20-13-07', networks))
+
     def test_a_dropin_can_only_hold_public_ranges(self):
-        for line in ('IPAddressAllow=10.0.0.0/8', 'IPAddressAllow=0.0.0.0/0', 'IPAddressAllow=3.0.0.0/8',
+        for line in ('IPAddressAllow=10.0.0.0/8', 'IPAddressAllow=0.0.0.0/0', 'IPAddressAllow=2.0.0.0/7',
                      'IPAddressAllow=3.208.0.1/24', 'IPAddressAllow=any', 'IPAddressDeny=3.208.0.0/24',
                      'ExecStartPre=/bin/true', 'IPAddressAllow=2600:1f18::/33'):
             with self.subTest(line=line):
