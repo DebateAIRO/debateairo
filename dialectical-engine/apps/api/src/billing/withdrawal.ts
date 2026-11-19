@@ -1,11 +1,10 @@
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  consumerCalendarDay, consumerTimeZone, microsToDecimal, withdrawalRefundDeadline, withdrawalRefundMicros,
-  type PriceCurrency
+  consumerCalendarDay, consumerTimeZone, microsToDecimal, monthCreditInForce, withdrawalRefundDeadline,
+  withdrawalRefundMicros, type PriceCurrency
 } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
-import { planById } from "@debateai/register";
 import type { AuthenticatedSession } from "../sessions.js";
 import { enqueueEmail } from "./email-job.js";
 import { isThisPaymentSystem } from "./outbox.js";
@@ -16,8 +15,8 @@ import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
 
 /** What a withdrawal needs: the route's composition, or the owner's command (P14c) over its operator pool. */
 export type WithdrawalDeps = Pick<SubscriptionRouteDeps,
-  | "billing" | "jobs" | "entitlements" | "plans" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock" | "kick"
-  | "paymentEnvironment">;
+  | "billing" | "jobs" | "entitlements" | "plans" | "plansInForce" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock"
+  | "kick" | "paymentEnvironment">;
 
 export type WithdrawalRequest = Readonly<{
   ownerRef: string;
@@ -65,7 +64,9 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * The refund, one rule for every country the site serves: what the payments made up to `withdrewAt` still hold, added
  * up, times the share of the plan credit not used, floored to cents once (`withdrawalRefundMicros`). The days gone by
  * do not count: nothing used gives the whole price back, and the whole credit used gives nothing back. The credit is
- * the one in force at `withdrewAt` (the upgrade's override, after an upgrade) and the credit used is what was spent
+ * the one in force at `withdrewAt`: the upgrade's override after an upgrade; else the plan's credit as the month
+ * started with it, or a higher one an upload brought before `withdrewAt`, never the credit of a settings version that
+ * went live after it (`monthCreditInForce`). The credit used is what was spent
  * from the period start to it, so after an upgrade the paid total is every successful charge since the first
  * activation; both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is
  * written. The credit used counts calls by when they were sent, and only those charged by the time it is read. A
@@ -109,6 +110,11 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
   const creditPlanId = entitlement.planId === "FREE" ? before.planId : entitlement.planId;
   const periodStart = before.currentPeriodStart;
   const activatedAt = before.activatedAt;
+  // The plan's credit for this month: the one the month started with, or a higher one an upload brought since, up to
+  // the day the person withdrew. A credit lowered or raised after that day changes nothing here.
+  const planCreditMicros = monthCreditInForce(
+    deps.plansInForce === undefined ? [deps.plans] : await deps.plansInForce.between(periodStart, withdrewAt), creditPlanId
+  );
   const decided = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
     if (locked === null || locked.state.subscriptionId !== before.subscriptionId || locked.state.status !== "ACTIVE"
@@ -136,7 +142,7 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     const madeAfter = paid.filter((row) => row.succeededAt.getTime() > withdrewAt.getTime());
     const refundMicros = withdrawalRefundMicros({
       paidMicros: stillHeld(statedOver), creditSpentMicros: spentMicros,
-      monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planById(deps.plans, creditPlanId).monthlyCreditMicros
+      monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planCreditMicros
     }) + stillHeld(madeAfter);
     let byOwner = paid.some((row) => row.providerRefunded);
     let allocations: RefundAllocation[] = [];

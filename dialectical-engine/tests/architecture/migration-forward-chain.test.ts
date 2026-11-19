@@ -729,8 +729,10 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // The chain head: one table and nine functions, applied inside the step's own transaction like every step but the index builds.
-    expect(names.slice(-2)).toEqual(["0183_unfinished_signup_expiry.sql", "0184_staff_rekey_permit.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // Found by name: the reader of the release switches (0185) follows it.
+    const at = names.indexOf("0184_staff_rekey_permit.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0183_unfinished_signup_expiry.sql", "0184_staff_rekey_permit.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     expect(previous.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
     expect(JSON.parse((await bytesOf("lineage/staff-rekey-permit-forward0184.json")).toString("utf8"))).toEqual({
       version: "staff-rekey-permit-forward0184-v1",
@@ -770,7 +772,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "staff.rekey_key_present", "staff.rekey_permit_current", "staff.rekey_challenge_current", "identity.staff_insert_rekey_webauthn_key"
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth. A step is added");
+      "a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth");
   });
 
   it("chains a sign-up not finished within 24 hours being deleted (0183) after 0182 with 0182's manifest and effective verifier, expand, amending no step", async () => {
@@ -802,6 +804,46 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("the MFA recovery control user index (0182, below) the seventy-second",
       "a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third"));
+  });
+
+  it("chains the reader of the release switches 0185 after 0184 as an expand step that keeps the verifier (the month keeps its numbers)", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one definer, so the API and the runner can tell which plan numbers a person's month started with.
+    expect(names.slice(-2)).toEqual(["0184_staff_rekey_permit.sql", "0185_release_history.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(step.n1).toMatchObject({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false });
+    // One function and its owner and grants; no table, no earlier function, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION core.read_release_history()",
+      "ALTER FUNCTION core.read_release_history() OWNER TO debateai_release_owner;",
+      "REVOKE ALL ON FUNCTION core.read_release_history() FROM PUBLIC;",
+      "GRANT EXECUTE ON FUNCTION core.read_release_history() TO debateai_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    expect(JSON.parse((await bytesOf("lineage/release-history-forward0185.json")).toString("utf8"))).toEqual({
+      version: "release-history-forward0185-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: previous.name, manifestSha256: sha256(await bytesOf("lineage/staff-rekey-permit-forward0184.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: step.name, sha256: sha256(await bytesOf(step.name)) },
+      verifier: { path: previous.verifierPath, sha256: previous.verifierSha256 },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/release-history-forward0185.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.replayVerifierSql).toBeUndefined();
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The reader of the release switches (0185)"));
+    expect(section.startsWith("## The reader of the release switches (0185)")).toBe(true);
+    for (const needle of ["0185_release_history.sql", "release-history-forward0185.json", "packages/db/src/migration-forward0185.ts",
+      "MIGRATION_FORWARD0185_", "core.read_release_history()", "debateai_release_owner", "packages/register/src/billing-plans-in-force.ts",
+      "-- n1: expand", "-- n1: keeps-verifier", "replayVerifierSql", "previous.manifestSha256", "renumber"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth");
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {

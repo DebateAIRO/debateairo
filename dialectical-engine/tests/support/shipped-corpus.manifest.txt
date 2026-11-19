@@ -1142,6 +1142,7 @@ packages/billing-core/src/internal-allowance-source.ts
 packages/billing-core/src/money.ts
 packages/billing-core/src/payments.ts
 packages/billing-core/src/plan-lookup.ts
+packages/billing-core/src/plans-in-force.ts
 packages/billing-core/src/ports.ts
 packages/billing-core/src/romanian-public-holidays.ts
 packages/billing-core/src/subscription.ts
@@ -1335,6 +1336,7 @@ packages/db/src/migration-forward0181.ts
 packages/db/src/migration-forward0182.ts
 packages/db/src/migration-forward0183.ts
 packages/db/src/migration-forward0184.ts
+packages/db/src/migration-forward0185.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
 packages/db/src/migration-forward111.ts
@@ -1534,6 +1536,7 @@ packages/register/src/abuse-limits.ts
 packages/register/src/algorithm-policy.ts
 packages/register/src/answer-role-rotation-policy.ts
 packages/register/src/auth-policy.ts
+packages/register/src/billing-plans-in-force.ts
 packages/register/src/billing-plans.ts
 packages/register/src/billing-policy.ts
 packages/register/src/call-concurrency-policy.ts

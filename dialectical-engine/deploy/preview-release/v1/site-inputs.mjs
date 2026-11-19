@@ -8,11 +8,13 @@
 // that differ. Example: the file has a new price for one plan and the owner names `billingPlans`: the new version gets
 // the file's plans and the live version's everything else. The same file with nothing named refuses.
 //
-// A second list protects the people who already have a plan. A plan's prices reach only what is bought or changed from
-// then on (a subscriber's renewals charge the price recorded for that subscriber). A plan's limits are read from the
-// version in force for everyone, so a lower or otherwise changed limit reaches the people already on that plan the
-// moment the site switches, and is counted over the month they are already in. Such a plan must be named a second
-// time, on its own.
+// A second list is for the people who already have a plan. A plan's prices reach only what is bought or changed from
+// then on (a subscriber's renewals charge the price recorded for that subscriber). A plan's limits reach the people
+// already on it: each person's month keeps the numbers it started with, so a lower limit reaches them when their own
+// next month starts, and the Terms ask that they are told first; a higher limit reaches them at the switch and is not
+// taken back before their next month by a later upload or by a switch back to the release before, so a wrong one
+// stays that long. What changes with no up or down (the reserve, Free's fixed gauges, a member this file does not
+// read) is said to reach them at the switch. In every case the plan must be named a second time, on its own.
 //
 // Nothing here prints or returns an amount except `composeSiteInputs`'s `hostedBilling`, which the caller writes to a
 // file. Every line says only which input, plan and member differs, and whether a number went up or down.
@@ -25,6 +27,21 @@ const PLUS = 'PLUS', FREE = 'FREE';
 /** The plan members the lines below account for one by one; any other member that differs is reported as "other members". */
 const PLAN_MEMBERS_READ = Object.freeze(['plan_id', 'net_prices', 'monthly_credit_micros', 'day_bp', 'week_bp', 'finish_bp', 'finish_overflow_micros',
   'reserve_micros', 'reserve_held', 'fixed_gauges']);
+/**
+ * When a changed limit reaches the people already on the plan (packages/billing-core/src/plans-in-force.ts), said on a
+ * `limits` line for each kind of change the line names: a figure that went `lower`, one that went `higher`, and what
+ * `changed` with no up or down.
+ */
+const REACH = Object.freeze({
+  lower: 'a lower limit from each person\'s own next month',
+  higher: 'a higher limit at the switch, not taken back before their next month',
+  changed: 'what changed with no up or down at the switch'
+});
+/** The words after the plan's figures: one part per kind of change among `limits`, in the order lower, higher, changed. */
+function reachOf(limits) {
+  const kinds = Object.keys(REACH).filter(kind => limits.some(part => part.endsWith(` ${kind}`)));
+  return `the people already on this plan: ${kinds.map(kind => REACH[kind]).join('; ')}`;
+}
 /** The register's own denominator for `day_bp` and `week_bp` (packages/register/src/billing-plans.ts planCapMicros). */
 const BASIS_POINTS = 10_000n;
 
@@ -43,6 +60,15 @@ function moved(before, after) {
   if (same(before, after)) return null;
   if (!whole(before) || !whole(after)) return 'changed';
   return after > before ? 'higher' : 'lower';
+}
+/**
+ * A day or week cap, before and after. No cap at all is the most a person can have: a cap that appears where the plan
+ * had none is `lower`, and one that goes away is `higher`.
+ */
+function capMoved(before, after) {
+  if (before === null && whole(after)) return 'lower';
+  if (whole(before) && after === null) return 'higher';
+  return moved(before, after);
 }
 /** A member's name as the file spells it, when it is a plain name; a key that could carry a number or a control character is never printed. */
 const nameOf = key => (/^[A-Za-z_]{1,64}$/.test(key) ? key : 'another member');
@@ -83,18 +109,18 @@ function shownSizeOf(plans, plan) {
 
 /**
  * One plan, before and after. `prices`: its net prices that differ. `limits`: what a person on the plan may use, each
- * figure that differs. `tighter`: some limit went down, or changed in a way that has no up or down (the reserve, where
- * it is held, Free's fixed gauges, a member this file does not read): the people already on the plan must be told first.
+ * figure that differs, with the way it moved; the reserve, where it is held, Free's fixed gauges and a member this file
+ * does not read have no up or down here and are said to have changed.
  */
 function planMoved(before, after) {
   const prices = membersMoved(before.net_prices, after.net_prices);
   const figures = [
-    ['month credit', before.monthly_credit_micros, after.monthly_credit_micros],
-    ['day cap', capOf(before, 'day_bp'), capOf(after, 'day_bp')],
-    ['week cap', capOf(before, 'week_bp'), capOf(after, 'week_bp')],
-    ['finish share', before.finish_bp, after.finish_bp],
-    ['finish overflow', before.finish_overflow_micros, after.finish_overflow_micros]
-  ].map(([name, a, b]) => [name, moved(a, b)]).filter(([, how]) => how !== null);
+    ['month credit', moved(before.monthly_credit_micros, after.monthly_credit_micros)],
+    ['day cap', capMoved(capOf(before, 'day_bp'), capOf(after, 'day_bp'))],
+    ['week cap', capMoved(capOf(before, 'week_bp'), capOf(after, 'week_bp'))],
+    ['finish share', moved(before.finish_bp, after.finish_bp)],
+    ['finish overflow', moved(before.finish_overflow_micros, after.finish_overflow_micros)]
+  ].filter(([, how]) => how !== null);
   const limits = figures.map(([name, how]) => `${name} ${how}`);
   const named = new Set(figures.map(([name]) => name));
   // A share that differs while its cap comes out the same (rounding) is still a changed row: say so.
@@ -104,13 +130,13 @@ function planMoved(before, after) {
   if (!same(before.fixed_gauges, after.fixed_gauges)) limits.push('fixed gauges changed');
   const rest = plan => Object.fromEntries(Object.entries(plan).filter(([key]) => !PLAN_MEMBERS_READ.includes(key)));
   if (!same(rest(before), rest(after))) limits.push('other members changed');
-  return { prices, limits, tighter: limits.some(part => !part.endsWith(' higher')) };
+  return { prices, limits };
 }
 
 /**
  * The live version's hosted inputs (`active`) against the server file's (`site`), input by input. Returns the lines
- * for the owner (no amount in any of them), the inputs that differ, and the plans whose limits get lower or change
- * for the people already on them. Refuses `SITE_INPUTS_REFUSED` when either side is not the hosted inputs' shape, and
+ * for the owner (no amount in any of them), the inputs that differ, and the plans whose limits change, up or down, for
+ * the people already on them. Refuses `SITE_INPUTS_REFUSED` when either side is not the hosted inputs' shape, and
  * `SITE_PLAN_LIST_DIFFERS` when the two do not list the same plans in the same order.
  */
 export function compareSiteInputs(active, site) {
@@ -136,15 +162,18 @@ export function compareSiteInputs(active, site) {
     differing.push('billingPlans');
     const planLines = [];
     for (const [index, plan] of before.plans.entries()) {
-      const id = plan.plan_id, { prices, limits, tighter } = planMoved(plan, after.plans[index]);
+      const id = plan.plan_id, { prices, limits } = planMoved(plan, after.plans[index]);
       if (prices.length > 0) planLines.push(`DIFFERENT billingPlans ${id} prices: ${prices.join(', ')} [purchases and plan changes from the switch on; a subscriber's renewals keep their own price]`);
-      if (limits.length > 0) planLines.push(`DIFFERENT billingPlans ${id} limits: ${limits.join(', ')} [${tighter ? 'the people already on this plan get less or something else, at the switch and counted over the month they are in' : 'the people already on this plan get more from the switch on; someone who changed plan this month, from their next month'}]`);
-      if (tighter) limitPlans.push(id);
+      if (limits.length > 0) {
+        planLines.push(`DIFFERENT billingPlans ${id} limits: ${limits.join(', ')} [${reachOf(limits)}]`);
+        limitPlans.push(id);
+      }
     }
-    // One reserve serves every paid plan's closing: when the smallest one moves, each paid plan's people are reached.
+    // One reserve pays every paid plan's closing, read from the version in force: when the smallest one moves, each
+    // paid plan's people are reached at the switch.
     const reserve = moved(paidReserveOf(before.plans), paidReserveOf(after.plans));
     if (reserve !== null) {
-      planLines.push(`DIFFERENT billingPlans paid plans' closing reserve (the smallest of them): ${reserve} [every paid plan's closings]`);
+      planLines.push(`DIFFERENT billingPlans paid plans' closing reserve (the smallest of them): ${reserve} [every paid plan's closings, at the switch]`);
       for (const plan of before.plans) if (plan.plan_id !== FREE && !limitPlans.includes(plan.plan_id)) limitPlans.push(plan.plan_id);
     }
     // What the pricing page says about a plan can move while the plan's own limits stay (Plus's credit is the measure).
@@ -181,7 +210,7 @@ const missingFrom = (list, other) => list.filter(item => !other.includes(item));
  * the file. Refuses, naming the inputs or plans, unless:
  *  - `billing` is the same on both sides (`SITE_BILLING_SWITCH_DIFFERS`: the switch is never changed here);
  *  - every input that differs is named (`SITE_CHANGE_NOT_NAMED`) and every named input differs (`SITE_CHANGE_NAMED_BUT_SAME`);
- *  - every plan whose limits get lower or change is named in `limits` (`SITE_LIMITS_NOT_NAMED`), and no other plan is
+ *  - every plan whose limits change, up or down, is named in `limits` (`SITE_LIMITS_NOT_NAMED`), and no other plan is
  *    (`SITE_LIMITS_NAMED_BUT_SAME`).
  * A `NOTE` line is added for each plan whose smallest window (its day cap, or Free's month) newly falls below the
  * per-debate ceiling: one debate may then use more than that window.

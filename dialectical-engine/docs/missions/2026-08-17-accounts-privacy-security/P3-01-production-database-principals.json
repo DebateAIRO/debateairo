@@ -3633,6 +3633,13 @@
         "EXECUTE ON FUNCTION identity.read_unfinished_signup_key_cleanup(integer)",
         "EXECUTE ON FUNCTION identity.complete_unfinished_signup_key_cleanup(uuid)"
       ]
+    },
+    {
+      "roleName": "debateai_runtime",
+      "source": "migrations/0185_release_history.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION core.read_release_history()"
+      ]
     }
   ],
   "privilegeRevocations": [

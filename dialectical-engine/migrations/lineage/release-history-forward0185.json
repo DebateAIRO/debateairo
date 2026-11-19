@@ -1,0 +1,18 @@
+{
+  "version": "release-history-forward0185-v1",
+  "baseRecipeSha256": "3ad4ca844799fa0e498124250dba11683d0e305a2e3571468809ec5a6cec45c2",
+  "previous": {
+    "name": "0184_staff_rekey_permit.sql",
+    "manifestSha256": "bdbe25655a04449c24017af21eb888dd2207060dd79df0559a1004e477ab29e8",
+    "verifierSha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "migration": {
+    "name": "0185_release_history.sql",
+    "sha256": "c34bf7f3b2729af85ae0d671a9b065540750cacebb3187fbfcf3e485a6dfa081"
+  },
+  "verifier": {
+    "path": "lineage/verify-effective-capabilities-130.sql",
+    "sha256": "12eda800397d7da482e9b88b14b08d762ced9889214033ef8605163a8211fe57"
+  },
+  "amendsPostconditionsOf": []
+}

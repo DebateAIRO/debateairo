@@ -1,5 +1,5 @@
 import type { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
-import type { CardPayments, TaxEngine } from "@debateai/billing-core";
+import type { CardPayments, PlansInForcePort, TaxEngine } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
 import type { BillingPlans, BillingPolicy, CountryPolicy } from "@debateai/register";
 import type { AccountEmailReader } from "./account-email.js";
@@ -23,6 +23,8 @@ export type SubscriptionRouteDeps = Readonly<{
   jobs: Pick<BillingJobQueries, "lockOwner" | "withSubscriptionLease" | "bringForward" | "outboxJobExists">;
   entitlements: EntitlementRepository;
   plans: BillingPlans;
+  /** The plans the site served over a span: a refund is measured against the credit the month started with. Absent: `plans` alone. */
+  plansInForce?: PlansInForcePort;
   policy: BillingPolicy;
   tax: Pick<TaxEngine, "quote">;
   recordsKey: Buffer;

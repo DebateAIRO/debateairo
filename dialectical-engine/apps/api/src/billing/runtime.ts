@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Pool } from "pg";
+import type { PlansInForcePort } from "@debateai/billing-core";
 import type { ReadableUserDekStore } from "@debateai/crypto";
 import { AcceptanceRepository, BillingJobQueries, BillingRepository, EntitlementRepository } from "@debateai/db";
 import type { GeoLookup } from "@debateai/geo";
@@ -53,6 +54,11 @@ export type BillingRuntimeDeps = Readonly<{
   connectors: BillingConnectors;
   policy: BillingPolicy;
   plans: BillingPlans;
+  /**
+   * The plans the site served over a span (register `createBillingPlansInForce`): the refund and the upgrade credit
+   * measure a person's month against the numbers it started with. Absent: `plans` alone.
+   */
+  plansInForce?: PlansInForcePort;
   countryPolicy: CountryPolicy;
   geo: GeoLookup;
   /** L4's re-acceptance answer (main.ts's `legal`): billing routes refuse LEGAL_REACCEPTANCE_REQUIRED. */
@@ -164,7 +170,9 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
   });
   verify.registerSettlement("RENEWAL", renewalSettlement);
   // P12c: a paid upgrade changes the plan only here, inside VERIFY_PAYMENT's one transaction (A3f).
-  verify.registerSettlement("UPGRADE", createUpgradeSettlement({ repository, entitlements, plans: deps.plans }));
+  verify.registerSettlement("UPGRADE", createUpgradeSettlement({
+    repository, entitlements, plans: deps.plans, ...(deps.plansInForce === undefined ? {} : { plansInForce: deps.plansInForce })
+  }));
   // P12e (A12): a card change's paid hold moves the order and the card only here, then RefundDesk releases it.
   verify.registerSettlement("CARD_CHECK", createCardCheckSettlement({
     repository, recordsKey: deps.connectors.recordsKey, countryPolicy: deps.countryPolicy, audit: deps.audit
@@ -268,6 +276,7 @@ export function createBillingRuntime(deps: BillingRuntimeDeps): BillingRuntime {
     jobs,
     entitlements,
     plans: deps.plans,
+    ...(deps.plansInForce === undefined ? {} : { plansInForce: deps.plansInForce }),
     policy: deps.policy,
     tax: deps.connectors.tax,
     recordsKey: deps.connectors.recordsKey,

@@ -472,6 +472,44 @@ Rules of thumb: Free's `monthly_credit_micros` well below the day ceiling (Free 
 otherwise use the whole day). The day ceiling at or below what the gate pots leave for debates, so people meet the
 gentle "wait in line" message before the hard "try tomorrow".
 
+**What a changed plan limit does to people who already have a plan.** A plan's limits here are its
+`monthly_credit_micros`, `day_bp` and `week_bp` (the day and week caps are shares of the credit, so a changed credit
+changes them too), its `reserve_micros` and its `finish_overflow_micros`. Each person's month keeps the numbers it
+started with; a paid month starts at the first payment and at each renewal date, a Free month at the account's own day
+of the month. With made-up numbers:
+- **A lower limit** reaches each person when their own next month starts, never before. A day cap of 11 that an upload
+  makes 5: someone whose month began before the upload keeps 11 until that month ends, and no day already used is
+  counted again. Someone who buys the plan after the upload has 5 from their first day. The same holds for the month
+  credit (nobody is stopped in a month they already started, and no running debate pauses), for the week cap, and for
+  Free. The Terms still ask two things of you that the product does not do by itself: tell people before a limit
+  gets tighter (section 12), and ask them to accept the new Terms at their next sign-in before a lower limit applies to
+  them (section 14).
+- **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
+- **A day or week cap added where the plan had none** is a lower limit: it starts with each person's own next month.
+  One taken away is a higher limit.
+- **A higher limit cannot be taken back inside a month.** If an upload raises a limit and a later upload publishes
+  the lower number again, everyone whose month saw the higher number keeps it until their next month starts. The same
+  holds for a switch back to the release before after a side-by-side upload. It does not hold for rbD-B, this
+  runbook's own way back: rbD-B puts the database back as it was, and the old numbers are back for everyone. Check a
+  raise twice before you publish it.
+- **A refund** on cancelling or withdrawing is measured against the credit the person's month had on the day they
+  cancelled or withdrew: the one it started with, or a higher one published since. A credit you lower later never makes
+  a refund smaller.
+- **The reserve.** A raised `reserve_micros` does not make new questions stop earlier in a month already started. Final
+  answers are paid from the site's reserve of the day, so in such a month a final answer may take the month past its
+  credit by the difference. A lower reserve reaches everyone at once.
+- **Someone who changed plan this month** has a month credit stored at that moment. It stays as it is until their next
+  month, after a raise too.
+- **During a side-by-side switch**, a debate still running on the release before is measured by the same rule. A
+  release from before this rule existed measures the debates it still finishes against its own numbers.
+- **Accounts that exist when numbers change** keep the numbers their month started with, like everyone else. This
+  includes your own account and every test account: after an upload that publishes lower numbers, each of them still
+  has the larger ones until its own next month starts, at most about 31 days. An account created after the switch has
+  the new numbers from its first day.
+- **The first upload that carries this rule.** The release before it does not know the rule. If you go back to that
+  release (the release guide's way back), it measures everyone against its own numbers at once, as before; "cannot be
+  taken back inside a month" holds only between releases that both carry the rule.
+
 **The gate pots** (the spending gates in front of each AI company) are set in each gate's GO file: `daily_budget_usd`,
 `max_paid_posts_per_day`, `max_concurrent_calls`, `open_days`; and in `/etc/debateai-v3-preview/provider-budget-caps-v1.json`:
 `max_go_budget_usd` and `team_total_budget_usd` (the hard fuse). They can change any day with a new GO, then the
@@ -481,8 +519,7 @@ gate's `stop` and `activate`, as each gate's README says (`deploy/preview-gate/v
 numbers of the live settings version. An upload publishes a new version. Its numbers are the live ones, except the
 inputs you name at the top of SB3:
 - `NEWNUM`: the inputs to take from the file, for example `NEWNUM='billingPlans'`. Empty means no number changes.
-- `LIMITS`: only when a plan's limits get lower (or change in a way that is neither up nor down): the plans, for example
-  `LIMITS='PLUS'`.
+- `LIMITS`: whenever a plan's limits change, up or down: the plans, for example `LIMITS='PLUS'`.
 
 SB3 compares the file with the live numbers and prints one line per input, and per plan: `SAME`, or `DIFFERENT` with
 `higher`, `lower` or `changed`. It never prints an amount. Then it stops, with nothing written, unless your two lists
@@ -490,8 +527,8 @@ are exactly what differs:
 - an input that differs and is not in `NEWNUM` stops it: no number is published by accident, and none is skipped
   without a word;
 - an input in `NEWNUM` that does not differ stops it too;
-- a plan whose people would get less stops it until you name the plan in `LIMITS`; a plan named there without need
-  stops it too.
+- a plan whose limits change, up or down, stops it until you name the plan in `LIMITS`; a plan named there without
+  need stops it too.
 
 **Never edit the file in place.** A file that no longer reads as JSON makes every step print an error instead of its
 numbers. Copy it, edit the copy, check the copy, then put it in place: the four lines are in the release guide under
@@ -504,17 +541,20 @@ SB3, "Editing the owner's file". Do it before SB2 (the practice runs with the fi
   price by a release that does not yet save that price, and paid after the switch, is renewed at the new price. **So
   do not change plan prices in this upload** (the release running today does not save it); change them in a later
   one.
-- **Lower limits** (a plan's credit, its day and week caps, the finish room, the reserve, Free's gauges) hit everyone
-  on that plan at once, in the month they already paid for: people over the new credit can ask nothing until their
-  month ends, the day and week caps are counted again over the days already used, and a refund pays back less. The
-  Terms ask for more than a notice (sections 12 and 14), and the product cannot yet apply a lower limit only from a
-  person's next month. So do not lower a plan's limits while anyone holds that plan. Naming the plan in `LIMITS` is
-  your statement that nobody holds it, or that you decided this knowing the above. For each plan you name, SB3 prints
-  `HELD` or `nobody holds it now` (test purchases count; it prints no count). `HELD` is also printed for a plan
-  someone was on earlier and has since left, so it can be wrong only towards caution; `nobody holds it now` is firm
-  at that moment, and people can still buy until DR2.
-- **Higher limits** need no second naming. People get more from the switch on; someone who changed plan this month,
-  from their next month.
+- **A plan's limits**: what a lower or a higher limit does to the people already on the plan is said once, above
+  ("What a changed plan limit does to people who already have a plan"). SB3 stops until you name the plan in
+  `LIMITS`, for a limit that goes lower and for one that goes higher:
+  - naming a plan whose limit goes **lower**, or whose line says `changed` (the reserve, Free's gauges, a member
+    the tool does not read), is your statement that you told the people on that plan first (Terms
+    section 12), or that nobody holds it. The product sends no notice, and it has no step where people accept the
+    change at their next sign-in (Terms section 14);
+  - naming a plan whose limit goes **higher** is your statement that you checked the number twice: it cannot be taken
+    back for a month.
+
+  For each plan you name, SB3 prints `HELD` or `nobody holds it now` (test purchases count; it prints no count).
+  `HELD` is also printed for a plan someone was on earlier and has since left, so it can be wrong only towards
+  caution; `nobody holds it now` is firm at that moment, and people can still buy until DR2.
+- Free's gauges are read from the live version for everyone: a change reaches everybody at the switch.
 - The day's ceiling, `askRoomReads` and `abuseLimits` are site-wide; they reach everyone at the switch. A new
   per-debate ceiling applies to debates asked after the switch.
 
@@ -529,12 +569,13 @@ of the new code on those numbers before DR6, and at DR6 the site is down.
 **Going back after new numbers were published.** This runbook's upload is a drained one: at DR6 the release before is
 retired, so there is no switch back to it. The numbers come back in one of two ways only:
 - rbD-B, the drained upload's own way back: it puts back the database as it was at DR3, with the old numbers, and
-  loses everything written since (sign-ups, debates, payments);
+  loses everything written since (sign-ups, debates, payments). The old numbers are back for everyone at once;
 - SB3c with `SRC`, then the next upload with those inputs named in `NEWNUM`. It loses nothing and takes one more
-  upload.
+  upload. It is an upload like any other: a limit it lowers again reaches each person from their own next month.
 
 The release guide says both under "The numbers on the drained path". After a side-by-side upload there is a third
-way while the release before is still there (WB2); if that upload had raised limits, WB2 lowers them again.
+way while the release before is still there (WB2). If that upload had raised limits, WB2 does not take the raise back
+from the people whose month saw it: they keep the higher number until their own next month.
 
 **A release older than this step** cannot publish changed numbers: its SB3 needs `NEWNUM` and `LIMITS` empty and the
 file equal to the live numbers.
@@ -590,11 +631,12 @@ What this release adds to that recipe:
   unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
   inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
 - **Your numbers (1.7), at SB3.** SB3 publishes a number from `hosted-billing-v1.json` only where you name it in
-  `NEWNUM` (and a plan whose people get less in `LIMITS`), and stops when the file differs anywhere you did not name.
+  `NEWNUM` (and a plan whose limits change, up or down, in `LIMITS`), and stops when the file differs anywhere you did not name.
   SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
   lists empty. Two rules for this upload: change no plan price in it (1.7, the trap with upgrades), and when `NEWNUM`
-  is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS` either that nobody holds it
-  or the date its people were told.
+  is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or
+  is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher,
+  that you checked the number twice.
 - **NETOPIA's logo** (1.1): SB5d right after DR1, before your yes (the release guide's "owner's yes") and DR2, with
   the shop id. Skip PM1, SB5b, MT1, PM2 and MT2. After SB13b, run the release guide's LOGOCHECK. It only reads, and
   must end with `LOGOCHECK_DONE`: part 5 waits for it.
@@ -621,6 +663,29 @@ What this release adds to that recipe:
   one line, with rNN filled in (it reads the upload's names file, so `$LABEL` is the new release):
   `bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -n 80 -o cat --no-pager | grep -E "STARTUP_REFUSED|PREVIEW_MAIL_MODE|api.boot.failed"'`.
   A `PREVIEW_MAIL_…` code means `mail-plan.json` (part 1.5). Stop and ask before you choose the way back.
+- **MONTHNUMBERS, after DR6.** To keep each person's month on the numbers it started with, the new API and runner read
+  the database's record of release switches through a function this release adds (migration `0185_release_history.sql`).
+  SB13b's team debate may be paid from a team grant, which never reads that record, so check it once by hand. The
+  check is read-only: it asks the record as the API's login and as the runner's login, and wants the new release as
+  its last line.
+
+  ```sh
+  set -euo pipefail
+  . /root/preview-archive/rNN-names.sh
+  # MONTHNUMBERS: both logins can read the record of release switches, and its last line is the new release. Read-only.
+  for LOGIN in debateai_prod_api_runtime debateai_prod_runner_runtime; do
+    LAST=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAtq -c "SET ROLE $LOGIN; SELECT release_key FROM core.read_release_history() ORDER BY event_seq DESC LIMIT 1" | tail -n 1) || { echo "MONTHNUMBERS_NOT_DONE: $LOGIN cannot read the record of switches: ask"; exit 1; }
+    [ "$LAST" = "$KEY" ] || { echo "MONTHNUMBERS_NOT_DONE: $LOGIN reads '$LAST' as the last switch, not $KEY: ask"; exit 1; }
+    echo "OK $LOGIN"
+  done
+  echo MONTHNUMBERS_DONE
+  exit 0
+  ```
+
+  You should see `OK` for both logins, then `MONTHNUMBERS_DONE`. Then, signed in as a Free or paid account that is not
+  paid from a team grant, open the page that shows your usage, or ask one question: it must answer as usual. A
+  `MONTHNUMBERS_NOT_DONE` line, or a refused question there while team debates work: stop and ask. This block was
+  written on the Mac and has not been run on the server yet.
 - **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
   database never took a live payment, so the count is 0 and the API starts as before.
 

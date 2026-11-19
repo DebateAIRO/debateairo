@@ -51,6 +51,25 @@ describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () =
     });
   });
 
+  it("counts the stored credit in the numbers this month has, when an upload lowered a plan's credit since it started", () => {
+    // Made-up numbers. The month started with PLUS at 6,600,000 and PRO at 33,000,000; an upload since then halved
+    // both. The upgrade is paid at mid-month: the month keeps PLUS's 6,600,000 and adds half of the difference between
+    // the two credits it started with, (33,000,000 - 6,600,000) / 2, as before the upload.
+    const halved = Object.freeze({
+      ...testBillingPlans,
+      plans: Object.freeze(testBillingPlans.plans.map((plan) => Object.freeze({ ...plan, monthlyCreditMicros: plan.monthlyCreditMicros / 2 })))
+    });
+    const now = new Date(MIDDLE.getTime() + 5_000);
+    const input = {
+      state: state(), charge: charge(), quote, plans: halved, currentMonthCreditOverrideMicros: null, now, recurringNetMicros: 50_000_000
+    };
+    expect(upgradeSucceededWrites(input).entitlement.monthCreditOverrideMicros).toBe(9_900_000);
+    expect(upgradeSucceededWrites({ ...input, creditPlans: [testBillingPlans, halved] }).entitlement.monthCreditOverrideMicros).toBe(19_800_000);
+    // The price the next renewals charge is the monthly quote's, whatever the month's credits are counted in.
+    expect(upgradeSucceededWrites({ ...input, creditPlans: [testBillingPlans, halved] }).subscriptionEvent.data)
+      .toMatchObject({ recurring_net_micros: 50_000_000 });
+  });
+
   it("CF1 (tests-1): a RON subscription upgrading PLUS to PRO records PRO's RON price as the next renewals' net", () => {
     // Terms §12: every renewal after the upgrade charges this net. PRO is 250.00 RON but 50.00 USD and 50.00 EUR, so only
     // RON tells the subscription's currency from a price read in another one (spec 2026-10-05 §2.16.3).

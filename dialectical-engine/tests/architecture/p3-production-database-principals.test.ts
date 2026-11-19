@@ -1760,6 +1760,13 @@ describe("P3-01 production database-principal manifest", () => {
     "EXECUTE ON FUNCTION identity.read_unfinished_signup_key_cleanup(integer)",
     "EXECUTE ON FUNCTION identity.complete_unfinished_signup_key_cleanup(uuid)"
   ]
+},
+// 0185: the switches the site made (which release took the traffic, and from when), so a person's month keeps the plan
+// numbers it started with; release keys and instants only (the shared runtime role: the API and the runner).
+{
+  "roleName": "debateai_runtime",
+  "source": "migrations/0185_release_history.sql",
+  "grants": ["EXECUTE ON FUNCTION core.read_release_history()"]
 }
 ]);
     expect(manifest.privilegeRevocations).toEqual([

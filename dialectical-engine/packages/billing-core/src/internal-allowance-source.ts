@@ -2,6 +2,7 @@ import { TypedDomainError, type FundingBasis, type InternalAllowancePolicy, type
 import type { PersonAllowanceSource, PersonWindow } from "@debateai/budget";
 import type { BillingPlans } from "@debateai/register";
 import { BillingPersonAllowanceSource, type EntitlementWindowBasis } from "./allowance-source.js";
+import type { PlansInForcePort } from "./plans-in-force.js";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const unavailable = () => new TypedDomainError("INTERNAL_FUNDING_UNAVAILABLE", "The finite funding basis is unavailable");
 const positive = (n: number) => Number.isSafeInteger(n) && n > 0;
@@ -44,11 +45,14 @@ export class FundingAwarePersonAllowanceSource implements PersonAllowanceSource 
   constructor(private readonly options: Readonly<{
     allowances: FundingAllowancePort; entitlements: FundingEntitlementPort; plans: BillingPlans;
     closeBasisPoints: number;
+    /** The subscription path's month keeps its numbers (plans-in-force.ts); absent: `plans` alone. */
+    plansInForce?: PlansInForcePort;
   }>) {
     // The subscription path reads exactly as the plain source does: an owner with no windows row has no personal limit
     // (`[]`). Only a NEW ask refuses a missing row (resolveAskFunding), since its run needs a basis to pin.
     this.customer = new BillingPersonAllowanceSource({
-      entitlements: options.entitlements, plans: options.plans, closeBasisPoints: options.closeBasisPoints
+      entitlements: options.entitlements, plans: options.plans, closeBasisPoints: options.closeBasisPoints,
+      ...(options.plansInForce === undefined ? {} : { plansInForce: options.plansInForce })
     });
   }
   private checkBasis(basis: FundingBasis | null): FundingBasis {
