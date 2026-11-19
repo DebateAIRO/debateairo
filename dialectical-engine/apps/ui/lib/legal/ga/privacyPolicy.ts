@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.15",
-  sha256: "ca5c74fd17e662c03e2ce910c2d7f063727f6e9ccd20fc692d797f6d942bd561",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.15 · I bhFEIDHM 19 SAMHAIN 2026",
+  sha256: "4bfd16cac435029fb8e73102f325d7a97b93f11398ee84bc8638b11e924aebb7",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.15 · I bhFEIDHM 21 SAMHAIN 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
   endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.15",

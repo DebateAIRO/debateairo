@@ -378,8 +378,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.0",
-  sha256: "8f8e1e70bd4dbae2d9e2aa7bb951359a2e03f7b2ce8c514dc9498828a0beaa79",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v1.0 · I bhFEIDHM 19 SAMHAIN 2026",
+  sha256: "8043c6043b2d5a62c5f19269ef463bce9e7eb2c60aa37bedad7f1736d12939ff",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v1.0 · I bhFEIDHM 21 SAMHAIN 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
   endMarker: "DEIREADH NA dTÉARMAÍ · v1.0",

@@ -378,8 +378,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.0",
-  sha256: "331c7fda5d7abaa0c531a92181090ff9c2fa754a2c55718b05e0cea873337298",
-  eyebrow: "UVJETI KORIŠTENJA · v1.0 · NA SNAZI OD 19. STUDENOGA 2026.",
+  sha256: "ed7e4e226f31cf30d90669354ba847e726dfd211c385d1b5452560a08e8cba7d",
+  eyebrow: "UVJETI KORIŠTENJA · v1.0 · NA SNAZI OD 21. STUDENOGA 2026.",
   title: "Na što pristajete",
   lede: "Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.",
   endMarker: "KRAJ UVJETA · v1.0",

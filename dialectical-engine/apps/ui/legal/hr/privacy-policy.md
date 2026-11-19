@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: PRAVILA O PRIVATNOSTI · v3.15 · NA SNAZI OD 19. STUDENOGA 2026.
+eyebrow: PRAVILA O PRIVATNOSTI · v3.15 · NA SNAZI OD 21. STUDENOGA 2026.
 title: Što pohranjujemo i zašto
 lede: Vaša prava i naše obveze prema Uredbi GDPR (EU) 2016/679, jednostavnim jezikom. Četrnaest odjeljaka i Prilog B — pomaknite se do kraja.
 endMarker: KRAJ PRAVILA · GDPR (EU) 2016/679 · v3.15
@@ -19,7 +19,7 @@ jumps:
 13 KOLAČIĆI
 -->
 
-**Version 3.15 · Effective 19. studenoga 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.15 · Effective 21. studenoga 2026. · Prethodne verzije na dezbatere.ro/privacy/versions · Voditelj obrade: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Prikupljamo ono što je potrebno za račun i ono što upišete u svoje rasprave. Ono što napišete pomoćniku za podršku šalje se njegovu modelu umjetne inteligencije kako bi vam mogao odgovoriti, a mi ništa od toga ne čuvamo. Vaša se pitanja šalju pružateljima usluga umjetne inteligencije navedenima u našem Registru, uglavnom pružatelju DeepInfra, u Sjedinjenim Američkim Državama. Uvjeti društava DeepInfra, Anthropic i Perplexity ne dopuštaju im treniranje modela na onome što napišete; odjeljak 5 navodi za koje društvo to još nismo potvrdili. Naš pružatelj usluga smještaja pohranjuje vaš račun i vaše rasprave u Londonu, u Ujedinjenoj Kraljevini; odjeljak 5 navodi kamo još idu vaši podaci. Na besplatnom planu rasprave su javne nakon završetka, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Brisanjem računa uništavaju se ključevi vaših privatnih podataka na našem poslužitelju, ali šifrirane kopije u našem zasebnom spremištu sigurnosnih kopija ne brišu se automatski (odjeljak 7.); javne rasprave ostaju javne, a vaš se pseudonim iz njih uklanja. Možete nam se obratiti na privacy@dezbatere.ro, a osobe imenovane u raspravi mogu nam pisati i bez računa.
 

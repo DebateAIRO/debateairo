@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.15",
-  sha256: "81438ab717905f649ad7c807d9e039739c0746bf8ce4c72409b9e8806bef75bd",
-  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.15 · HATÁLYOS 2026. NOVEMBER 19.",
+  sha256: "ea59b72dbd1924d42ca8100bd72559cb254ecbae873a34323bb9d124fddc8d9b",
+  eyebrow: "ADATVÉDELMI SZABÁLYZAT · v3.15 · HATÁLYOS 2026. NOVEMBER 21.",
   title: "Mit tárolunk és miért",
   lede: "Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.",
   endMarker: "A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v3.15",

@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.15",
-  sha256: "fdb1e53cbcffe33812c9c522dbdfe994298b7b2b5c47e144e60774b909655616",
-  eyebrow: "隐私政策 · v3.15 · 生效日期 2026 年 11 月 19 日",
+  sha256: "e768e595798b23f5bf878b2fddcbb189b3ab5669ada270e226bdf44e6f0bec30",
+  eyebrow: "隐私政策 · v3.15 · 生效日期 2026 年 11 月 21 日",
   title: "我们存储哪些内容及其原因",
   lede: "以通俗语言说明您依据 GDPR (EU) 2016/679 享有的权利及我们承担的义务。共十四节及附件 B — 请滚动至末尾。",
   endMarker: "政策结束 · GDPR (EU) 2016/679 · v3.15",

@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.15",
-  sha256: "f52953122b20955391c24b2a04f8fea8b0bd4fc8c5bc7b65f6a8a9fb33e2eb5f",
-  eyebrow: "ПОЛИТИКА ЗА ПОВЕРИТЕЛНОСТ · v3.15 · В СИЛА ОТ 19 НОЕМВРИ 2026 Г.",
+  sha256: "d0e93e8d181bbf3f084b10bbb1b4101ec9ece0c4b9975dc272c3a9d4b91afc80",
+  eyebrow: "ПОЛИТИКА ЗА ПОВЕРИТЕЛНОСТ · v3.15 · В СИЛА ОТ 21 НОЕМВРИ 2026 Г.",
   title: "Какво съхраняваме и защо",
   lede: "Вашите права и нашите задължения съгласно GDPR (EU) 2016/679, на разбираем език. Четиринадесет раздела и Приложение Б — превъртете до края.",
   endMarker: "КРАЙ НА ПОЛИТИКАТА · GDPR (EU) 2016/679 · v3.15",
