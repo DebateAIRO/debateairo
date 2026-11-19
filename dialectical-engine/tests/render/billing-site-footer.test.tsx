@@ -20,6 +20,10 @@ const full = (billing: SiteFooterBilling | null): Element =>
   markup(<SiteFooter variant="full" billing={billing} />).querySelector("footer.siteFooterFull")!;
 const fullWithoutProp = (): Element => markup(<SiteFooter variant="full" />).querySelector("footer.siteFooterFull")!;
 const hrefs = (root: Element): string[] => [...root.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
+/** While the site is in Beta the footer also holds "Report a problem", a mail to the support address and not a page. */
+const isReport = (href: string): boolean => href.startsWith("mailto:support@dezbatere.ro?subject=");
+const reportHrefs = (root: Element): string[] => hrefs(root).filter(isReport);
+const pageHrefs = (root: Element): string[] => hrefs(root).filter((href) => !isReport(href));
 const on = (visa: boolean, mastercard: boolean, netopia = false): SiteFooterBilling =>
   ({ billingOn: true, marks: { netopia, visa, mastercard }, netopiaLogo: null });
 const OFF_WITH_MARKS: SiteFooterBilling = { billingOn: false, marks: { netopia: true, visa: true, mastercard: true }, netopiaLogo: null };
@@ -106,15 +110,19 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
     }
   });
 
-  it("leaves the one-line footer to the seven legal links and ANPC's SAL badge (15b) while billing is off or unknown", () => {
+  it("leaves the one-line footer to the seven legal links, the report link and ANPC's SAL badge (15b) while billing is off or unknown", () => {
     for (const root of [line(), line(null), line({ billingOn: false })]) {
-      expect(hrefs(root)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
+      expect(pageHrefs(root)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
+      expect(reportHrefs(root)).toHaveLength(1);
     }
   });
 
   it("adds cancel and withdraw to the one-line footer while billing is on, after the legal links; never delivery, a mark or the logo", () => {
     const root = line({ billingOn: true });
-    expect(hrefs(root)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "/cancel", "/withdraw", "https://reclamatiisal.anpc.ro/"]);
+    expect(pageHrefs(root)).toEqual([...LEGAL_PAGES.map(({ href }) => href), "/cancel", "/withdraw", "https://reclamatiisal.anpc.ro/"]);
+    // The report link (a mail to the support address) follows the page links.
+    expect(reportHrefs(root)).toHaveLength(1);
+    expect(hrefs(root).indexOf(reportHrefs(root)[0]!)).toBe(hrefs(root).indexOf("/withdraw") + 1);
     expect(root.querySelector('a[href="/cancel"]')?.textContent).toBe("Cancel a plan");
     expect(root.querySelector('a[href="/withdraw"]')?.textContent).toBe("Withdraw from contract");
     // The cookie preferences button still closes the list.

@@ -82,5 +82,13 @@
   "chrome.release.madeByNewer": "このディベートは、より新しいバージョンのサイトで作成されたものです。ページを再読み込みするか、数分後にもう一度お試しください。",
   "chrome.error.title": "Something went wrong",
   "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
-  "chrome.error.retry": "Try again"
+  "chrome.error.retry": "Try again",
+  "chrome.beta.badge": "Beta",
+  "chrome.beta.note": "Dialectical Engine is in Beta. You may run into bugs. Thank you for your patience.",
+  "chrome.beta.tellUsLead": "Found a problem or have an idea?",
+  "chrome.beta.tellUs": "Tell us",
+  "chrome.beta.report": "Report a problem",
+  "chrome.beta.mailSubject": "Dialectical Engine Beta: a problem or an idea",
+  "chrome.beta.mailPage": "Page: {address}",
+  "chrome.beta.mailPrompt": "What happened, or what could be better:"
 }

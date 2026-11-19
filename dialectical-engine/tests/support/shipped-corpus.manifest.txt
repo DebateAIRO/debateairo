@@ -581,6 +581,7 @@ apps/ui/components/ArgumentFocusView.tsx
 apps/ui/components/AuthGate.tsx
 apps/ui/components/AuthShell.tsx
 apps/ui/components/BackupEmailVerification.tsx
+apps/ui/components/BetaNotice.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
 apps/ui/components/CheckRemovalNotice.tsx

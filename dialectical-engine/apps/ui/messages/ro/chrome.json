@@ -82,5 +82,13 @@
   "chrome.release.madeByNewer": "Această dezbatere a fost creată de o versiune mai nouă a site-ului. Reîncărcați pagina sau încercați din nou peste câteva minute.",
   "chrome.error.title": "Ceva nu a funcționat",
   "chrome.error.body": "Această pagină nu a putut fi afișată din cauza unei erori din partea noastră. Vă rugăm să încercați din nou.",
-  "chrome.error.retry": "Încercați din nou"
+  "chrome.error.retry": "Încercați din nou",
+  "chrome.beta.badge": "Beta",
+  "chrome.beta.note": "Dialectical Engine este în versiune Beta. Este posibil să întâlniți erori. Vă mulțumim pentru răbdare.",
+  "chrome.beta.tellUsLead": "Ați găsit o problemă sau aveți o idee?",
+  "chrome.beta.tellUs": "Scrieți-ne",
+  "chrome.beta.report": "Raportați o problemă",
+  "chrome.beta.mailSubject": "Dialectical Engine Beta: o problemă sau o idee",
+  "chrome.beta.mailPage": "Pagina: {address}",
+  "chrome.beta.mailPrompt": "Ce s-a întâmplat sau ce ar putea fi mai bine:"
 }

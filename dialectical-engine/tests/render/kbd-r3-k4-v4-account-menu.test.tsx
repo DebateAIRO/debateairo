@@ -97,8 +97,8 @@ describe("the V4 account menu by keyboard", () => {
     await mount();
     await pressTrigger();
     const all = items();
-    // My questions, Language, Light or dark, Settings, the classic view, Sign out.
-    expect(all).toHaveLength(6);
+    // My questions, Language, Light or dark, Settings, Report a problem, the classic view, Sign out.
+    expect(all).toHaveLength(7);
     for (let index = 1; index < all.length; index += 1) {
       await key(document.activeElement!, { key: "ArrowDown" });
       expect(document.activeElement).toBe(all[index]);
