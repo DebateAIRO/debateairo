@@ -42,21 +42,64 @@ describe("P12b the subscription as the person sees it", () => {
     });
   });
 
-  it("names the day the plan started in the buyer's calendar, the one the 14 days are counted in", () => {
+  it("names the day the plan started in the buyer's calendar, and prints the time in the buyer's zone", () => {
     // 22:30 UTC on 1 October is already 2 October in Bucharest, and still 1 October in Lisbon.
     const late = new Date("2026-10-01T22:30:00.000Z");
     expect(view({ activatedAt: late }, "RO").started_on).toBe("2026-10-02");
     expect(view({ activatedAt: late }, "PT").started_on).toBe("2026-10-01");
     expect(consumerCalendarDay(late, "RO")).toBe("2026-10-02");
-    // A country with no zone of its own is read where the day is latest, as its window is.
-    expect(consumerCalendarDay(late, "US")).toBe("2026-10-02");
+    // A country with several zones is read in UTC, the zone its acknowledgement prints the time in, as its invoice is
+    // dated: 18:30 in New York on 1 October, and 15:00 there on 10 December, stay on their own day.
+    expect(consumerCalendarDay(late, "US")).toBe("2026-10-01");
+    expect(view({ activatedAt: new Date("2026-12-10T20:00:00.000Z") }, "US").started_on).toBe("2026-12-10");
+    // A served country with one zone outside Europe is read in it: 21:00 in Tokyo on 10 December, 16:00 in Chisinau
+    // on 11 December, and 01:00 in Seoul on 11 December (still 10 December in UTC).
+    expect(consumerCalendarDay(new Date("2026-12-10T12:00:00.000Z"), "JP")).toBe("2026-12-10");
+    expect(consumerCalendarDay(new Date("2026-12-11T14:00:00.000Z"), "MD")).toBe("2026-12-11");
+    expect(consumerCalendarDay(new Date("2026-12-10T16:00:00.000Z"), "KR")).toBe("2026-12-11");
     // No activation or no tax country: unknown, so the statement names the plan alone.
     expect(view({ activatedAt: null }).started_on).toBeNull();
     expect(view({}, null).started_on).toBeNull();
-    // The zone the acknowledgement prints the time in: the country's own, or UTC where it has several or none listed.
+    // The zone the acknowledgement prints the time in: the country's own, or UTC where it has several.
     expect(consumerTimeZone("RO")).toBe("Europe/Bucharest");
     expect(consumerTimeZone("DE")).toBe("Europe/Berlin");
-    for (const country of ["ES", "PT", "US", null]) expect(consumerTimeZone(country), String(country)).toBe("UTC");
+    expect(consumerTimeZone("JP")).toBe("Asia/Tokyo");
+    expect(consumerTimeZone("SG")).toBe("Asia/Singapore");
+    expect(consumerTimeZone("MD")).toBe("Europe/Chisinau");
+    expect(consumerTimeZone("KR")).toBe("Asia/Seoul");
+    for (const country of ["ES", "PT", "US", "CA", "AU", "NZ", null]) {
+      expect(consumerTimeZone(country), String(country)).toBe("UTC");
+    }
+  });
+
+  it("prints a served country's own zone exactly when the Unicode zone data gives that country one clock", () => {
+    // The zones CLDR lists for a country (Intl Locale Info, in the Node version the project pins).
+    const regionZones = (country: string): readonly string[] =>
+      (new Intl.Locale(`und-${country}`) as Intl.Locale & { getTimeZones(): string[] | undefined }).getTimeZones() ?? [];
+    // A zone's UTC offset at noon UTC on every day of 2026: two zones share a clock when these agree.
+    const clock = (zone: string): string => Array.from({ length: 365 }, (_, day) => new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, timeZoneName: "longOffset"
+    }).formatToParts(new Date(Date.UTC(2026, 0, 1 + day, 12))).find((part) => part.type === "timeZoneName")?.value)
+      .join(",");
+    const dayIn = (at: Date, zone: string): string => new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(at);
+    // Spain and Portugal name the start day on the mainland, where their 14 days are counted.
+    const mainland: Readonly<Record<string, string>> = { ES: "Europe/Madrid", PT: "Europe/Lisbon" };
+    const hours = Array.from({ length: 24 }, (_, hour) => new Date(Date.UTC(2026, 11, 10, hour, 30)));
+    // Every country the site serves, so a country that joins it is checked here too.
+    for (const country of testBillingPolicy.withdrawalCountries) {
+      const clocks = new Set(regionZones(country).map(clock));
+      expect(clocks.size, country).toBeGreaterThan(0);
+      const printed = consumerTimeZone(country);
+      if (clocks.size === 1) {
+        expect(printed, country).not.toBe("UTC");
+        expect(clock(printed), country).toBe([...clocks][0]);
+      } else {
+        expect(printed, country).toBe("UTC");
+      }
+      // The start day is read in the zone the time is printed in, at every hour of a day.
+      const dayZone = mainland[country] ?? printed;
+      for (const at of hours) expect(consumerCalendarDay(at, country), `${country} ${at.toISOString()}`).toBe(dayIn(at, dayZone));
+    }
   });
 
   it("shows no renewal once a cancel is requested, and the postponed date while a notice runs", () => {

@@ -171,8 +171,8 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     if (customer !== null) {
       // S01-C13 (R-17): the withdraw request's language, when the request carries one.
       const language = request.mailLocale === undefined ? {} : { locale: request.mailLocale };
-      // The statement as the buyer made it: its instant in their own zone, and the day the plan started in their own
-      // calendar, the one the 14 days are counted in.
+      // The statement as the buyer made it: its instant in their own zone (UTC where their country has several), and
+      // the day the plan started in their own calendar.
       const statement = {
         plan: state.planId, withdrawalDate, timeZone: consumerTimeZone(taxCountry),
         ...(taxCountry === null ? {} : { startDate: consumerCalendarDay(activatedAt, taxCountry) })

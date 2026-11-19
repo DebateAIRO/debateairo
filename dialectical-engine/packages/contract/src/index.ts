@@ -875,8 +875,9 @@ export const BillingSubscriptionResponseSchema = z.object({
     /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
     withdrawal_last_day: z.iso.date().nullable(),
     /**
-     * The day the plan started (its first activation) in the consumer's own calendar, the one the 14 days are counted
-     * in: the withdrawal statement names the contract by its plan and this day. Null when it is not known.
+     * The day the plan started (its first activation) in the consumer's own calendar (UTC for a country with several
+     * zones, the mainland's for Portugal and Spain): the withdrawal statement names the contract by its plan and this
+     * day. Null when it is not known.
      */
     started_on: z.iso.date().nullable(),
     can_upgrade: z.boolean(),
