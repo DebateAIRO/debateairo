@@ -1,9 +1,21 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isNamedRefusal, namedRefusal, refuseNamed, startupRefusedLine } from "../../deploy/preview-auth-dev/v1/startup-refusals.mjs";
-import { MAIN_ORIGIN, PUBLIC_ORIGINS, PUBLIC_SITES, publicSiteOf } from "../../deploy/preview-auth-dev/v1/public-origins.mjs";
-import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from "../../deploy/preview-auth-dev/v1/turnstile-custody.mjs";
+
+type PublicSite = Readonly<{ origin: string; hostname: string; turnstileSiteKey: string; hostedOnly: boolean }>;
+// The operator files are plain .mjs without type declarations; they are loaded as the other launcher tests load them.
+const operator = "../../deploy/" + "preview-auth-dev/v1/";
+const { isNamedRefusal, namedRefusal, refuseNamed, startupRefusedLine } = await import(operator + "startup-refusals.mjs") as {
+  isNamedRefusal: (code: unknown) => boolean;
+  namedRefusal: (error: unknown) => string | undefined;
+  refuseNamed: (code: string) => never;
+  startupRefusedLine: (line: string, error: unknown) => string;
+};
+const { MAIN_ORIGIN, PUBLIC_ORIGINS, PUBLIC_SITES, publicSiteOf } = await import(operator + "public-origins.mjs") as {
+  MAIN_ORIGIN: string; PUBLIC_ORIGINS: readonly string[]; PUBLIC_SITES: readonly PublicSite[];
+  publicSiteOf: (value: string | undefined) => PublicSite | undefined;
+};
+const { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } = await import(operator + "turnstile-custody.mjs") as { PREVIEW_ORIGIN: string; PREVIEW_SITE_KEY: string };
 
 /**
  * The launchers name a refusal only when it has one of a few closed forms, so the journal can say which owner setting
@@ -71,6 +83,6 @@ describe("the public names this setup may answer as", () => {
   it("matches an origin only by its exact text", () => {
     expect(publicSiteOf("https://dezbatere.ro")?.hostname).toBe("dezbatere.ro");
     for (const other of ["https://dezbatere.ro/", "https://www.dezbatere.ro", "http://dezbatere.ro", "https://Dezbatere.ro", "https://dezbatere.ro.evil.test", undefined])
-      expect(publicSiteOf(other as string)).toBeUndefined();
+      expect(publicSiteOf(other)).toBeUndefined();
   });
 });
