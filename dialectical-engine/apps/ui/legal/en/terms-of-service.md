@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v2.19 · EFFECTIVE 19 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v1.0 · EFFECTIVE 19 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v2.19
+endMarker: END OF TERMS · v1.0
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 2.19 · Effective 19 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 1.0 · Effective 19 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to the AI providers listed in our Provider Register, mainly DeepInfra, in the United States. The terms of DeepInfra and Anthropic do not allow them to train models on it; section 8 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 8). Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
@@ -251,32 +251,6 @@ We tell you in advance, on a durable medium, what is changing and when. If the c
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
 
-Version 2.19 replaced version 2.18: section 6 says how you can sign in: with a passkey, or with your password or, where the sign-in page offers it, your Google, Apple or X account, each followed by a second step; and that a recovery email address and a phone number are optional, and a phone number is not a way to sign in. Version 2.19 also says that a public debate stays public after its author leaves, that this is a term of our contract with you, that nobody owns the page, and that a flagged debate you publish after our approval stays public like any other (section 9); that the licence you give when something of yours becomes public also lets us adapt it and lets others build on it, lasts after you close your account and cannot be withdrawn, except where the law says otherwise (section 9); what you agree to about your rights as the author of what you publish (section 9 and, for Canada, Annex A.3); that starting, steering or digging into a debate does not by itself make you the author of the text the AIs write (section 8); and that we hold the rights the law gives to the maker of the collection of public debates (section 16). Version 2.19 also names DeepInfra, the company that receives most of a debate's text, says that it passes one model's requests to a partner company, says for which providers we have confirmed that their terms do not allow training on your content, and says that the web search provider receives only the short search phrases the models write and that its terms let it keep and use them (section 8). Version 2.19 also says that prices include tax (section 12); that you may withdraw within 14 days wherever you live, and that a refund, when you cancel or withdraw, is measured by the share of the plan's credit you have used (sections 12 and 13, and Annex A); and that we offer Dialectical Engine in fewer places (section 2 and Annex A). Version 2.19 no longer says that the licence for published content does not let us sell your content or license it for someone else's product (section 9), or that we use AI providers only under terms that do not allow them to use your content to train or improve their models (section 8).
-
-Version 2.18 replaced version 2.17: Annex A.3 says that, in Quebec too, debates on a paid plan are private by default and debates on the Free plan are public, as section 9 says; what we are liable for, and every right in these Terms, is unchanged.
-
-Version 2.17 replaced version 2.16: section 10 says when an AI reads a report made with the Report button and when a person does, that the button asks for your good-faith statement, that we confirm a report and tell you our decision by email, and that statements of reasons are emailed and kept in your account; what we are liable for, and every right in these Terms, is unchanged.
-
-Version 2.16 replaced version 2.15: section 12 names the paid plans, Plus, Pro and Max, and sections 12 and 15 no longer carry drafting notes; what we are liable for, and every right in these Terms, is unchanged.
-
-Version 2.15 replaced version 2.14: section 12 says that our prices are shown before tax, as price + VAT, and that the tax is added at checkout.
-
-Version 2.14 replaced version 2.13: section 18 and Annex A name ANPC (SAL) as the route for alternative dispute resolution.
-
-Version 2.13 replaced version 2.12: section 12 gives the payment button's Romanian wording.
-
-Version 2.12 replaced version 2.11: section 10 says that a signed-in person can also use the Report button on any public debate, that an AI reads a report made with it beside the public text, and what happens then.
-
-Version 2.11 replaced version 2.10: section 9 says that we can hide a public debate while we review it, and remove or correct part of it.
-
-Version 2.10 replaced version 2.9: section 9 says that debates on the Free plan are public, that a public debate cannot be unpublished and stays public after you close your account, that anyone with credit can contribute to a public debate or write a report on it, and that a public debate stays open after its first author has left; section 11 says what closure does to your public debates.
-
-Version 2.9 replaced version 2.8: section 8 gains the paragraph "Charts and statistics we generate", which says who owns the charts in a debate report and gives you a licence to use them.
-
-Version 2.8 replaced version 2.7: the question check also refuses a question that asks how to commit a crime or get away with one, or whether someone should commit one, such as buying or selling drugs or weapons illegally, stealing or evading tax, and does not keep it; a question about whether a law should change still starts a debate (section 7). It also sets one line for drugs and lets a question about whether the law on suicide, euthanasia or assisted dying should change start a debate (section 7), and the question check no longer keeps any question for our team (sections 7 and 10); the screen that refuses a question is our statement of reasons for every question section 7 does not start (section 10).
-
-Version 2.7 replaced version 2.6: it adds the question check, which reads each question before a debate starts, refuses some, and keeps for our team to read each refused question that threatens, plans or asks whether or how to harm another person or other people, named or not, including an attack on unnamed people, or that asks how to make weapons, explosives, poisons or drugs or how to support a terrorist act, or praises one (sections 7, 8, 10 and 11); the check that reads the synthesis of each finished debate, the approval a flagged debate needs before it can be published, and the debates that check deletes (sections 5, 8, 9, 10 and 11); what the support chat sends to Anthropic's model Claude, that it keeps nothing of what you write and opens no case, and that its "Talk to a human" button shows our support address (sections 8 and 10); and rules in section 7 that forbid hate speech of any kind, instructions for crafting weapons or drugs, content encouraging suicide or harming other people, and religious insult, and say which questions do not start a debate.
-
 ## 15. Liability
 
 **What we do not limit.** Nothing in these Terms excludes or limits our liability for death or personal injury caused by our negligence, for fraud or fraudulent misrepresentation, for gross negligence or wilful misconduct, or for anything else that cannot lawfully be limited. If you are a consumer, nothing here removes your statutory rights, including the right to have a non-conforming service brought into conformity, or to a price reduction or refund, or any guarantee that applies under the law of the country where you live.
@@ -307,7 +281,7 @@ How we handle personal data is set out in the **Privacy Policy** at dezbatere.ro
 
 **Courts, if you live in the EU or the EEA.** You may bring proceedings against us either in the courts of Romania or in the courts of the country where you live. We may bring proceedings against you only in the courts of the country where you live.
 
-**Consumers elsewhere.** If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; if you live in Brazil, the Código de Defesa do Consumidor; and if you live in the United States, the consumer-protection laws of your state.
+**Consumers elsewhere.** If you live outside the EU and the EEA, nothing in these Terms limits any right you have under the law of your country to bring a claim in its courts, or any right under that law that cannot be waived — including, if you live in Australia or New Zealand, your consumer-guarantee rights; and if you live in the United States, the consumer-protection laws of your state.
 
 **Before going to court.** Contact us at support@dezbatere.ro; most things are fixable, and we aim to reply within 5 working days. If you are a consumer in Romania or the EU, you may use alternative dispute resolution through ANPC (SAL), reclamatiisal.anpc.ro; we do not commit to participate in that procedure. Complaints about moderation decisions follow section 10, which is a separate route.
 

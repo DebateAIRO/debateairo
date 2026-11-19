@@ -101,11 +101,11 @@ const DOCUMENTS = {
   terms: {
     key: "terms",
     manifestKind: "TERMS",
-    reacceptanceFrom: "2.1",
+    reacceptanceFrom: "1.0",
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
-    versionAnchor: "Version 2.19",
+    versionAnchor: "Version 1.0",
     numberedSections: 19,
     annexLetter: "A",
     annexParts: 6,

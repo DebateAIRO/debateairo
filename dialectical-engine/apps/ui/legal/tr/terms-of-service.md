@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kısaca
-eyebrow: HİZMET KOŞULLARI · v2.19 · YÜRÜRLÜK TARİHİ 19 KASIM 2026
+eyebrow: HİZMET KOŞULLARI · v1.0 · YÜRÜRLÜK TARİHİ 19 KASIM 2026
 title: Kabul ettiğiniz hükümler
 lede: Sizinle DMS Merchandise Shop S.R.L. arasındaki sözleşme, sade bir dille. On dokuz bölüm ve Ek A — sonuna kadar kaydırın.
-endMarker: KOŞULLARIN SONU · v2.19
+endMarker: KOŞULLARIN SONU · v1.0
 bodyLabel: Hizmet Koşulları metni
 annexTitle: Ek A — Bölgesel koşullar
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 UYGULANACAK HUKUK
 -->
 
-**Version 2.19 · Effective 19 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
+**Version 1.0 · Effective 19 Kasım 2026 · Önceki sürümler: dezbatere.ro/terms/versions · Dil: Türkçe.**
 
 **In short.** En az 18 yaşında olmalısınız. Dialectical Engine, yapay zekâ modelleriyle argümanlar oluşturur ve ürettiği her şey yanlış olabilir — bunlar tavsiye değildir. Ücretsiz plandaki tartışmalarınız, tamamlandığında ve bir yapay zekâ kontrolünden geçtikten sonra herkese açık olur; ücretli planda ise siz yayımlamadıkça özeldir. Herkese açık olduktan sonra herkes bir tartışmayı okuyabilir ve tartışma herkese açık kalır. Gönderdiğiniz metin, Sağlayıcı Sicilimizde belirtilen yapay zekâ sağlayıcılarına, ağırlıklı olarak Amerika Birleşik Devletleri'ndeki DeepInfra'ya iletilir. DeepInfra, Anthropic ve Perplexity'nin koşulları, bu metinle model eğitmelerine izin vermez; hangi şirket için bunu henüz teyit etmediğimizi bölüm 8 anlatır. Hesabınız olsun veya olmasın, hukuka aykırı içerikleri support@dezbatere.ro adresine bildirin. Romanya hukuku uygulanır; ancak yerel tüketici korumalarınız saklıdır.
 
@@ -251,30 +251,6 @@ Neyin ne zaman değişeceğini kalıcı veri saklayıcısıyla önceden bildirir
 
 **Bu Koşullarda.** Bu Koşulları aynı tür nedenlerle değiştirebiliriz. Haklarınızı azaltmayan değişiklikler için yeni sürümü, değişikliklerin özetiyle yayımlar ve yürürlüğe girmesinden en az **30 gün önce** size e-posta göndeririz; o tarihten sonra Dialectical Engine'i kullanmaya devam etmeniz değişikliği kabul ettiğiniz anlamına gelir ve hesabınızı o tarihten önce kapatabilirsiniz. Mevcut bir plandaki fiyat artışları, daha düşük sınırlar, kaldırılan özellikler, içeriğinizin yeni kullanım biçimleri veya sorumluluk, uygulanacak hukuk ya da uyuşmazlık çözümüne ilişkin değişiklikler dahil, haklarınızı azaltan değişiklikler için bir sonraki oturum açışınızda yeni sürümü açıkça kabul etmenizi isteriz ve değişiklik yalnızca ileriye dönük uygulanır. Hiçbir değişikliği geriye yürütmeyiz ve size bir çıkış yolu sunmadan, sürenin ortasında ücretini ödediğiniz hususun özünü değiştirmek için bu bölümü kullanmayız. Önceki sürümler dezbatere.ro/terms/versions adresinde erişilebilir kalır.
 
-Sürüm 2.18, sürüm 2.17'nin yerine geçmiştir: Ek A.3, Quebec'te de ücretli plandaki tartışmaların varsayılan olarak özel, ücretsiz plandaki tartışmaların ise 9. bölümde belirtildiği gibi herkese açık olduğunu belirtir; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir. Sürüm 2.18 ayrıca bir tartışmanın metninin çoğunu alan şirket olan DeepInfra'yı adıyla anar; DeepInfra'nın bir modelin isteklerini ortak bir şirkete ilettiğini söyler; ve hangi sağlayıcılar için koşullarının içeriğinizle eğitime izin vermediğini teyit ettiğimizi belirtir (8. bölüm).
-
-Sürüm 2.17, sürüm 2.16'nın yerine geçmiştir: 10. bölüm, Bildir düğmesiyle yapılan bir bildirimi ne zaman bir yapay zekânın, ne zaman bir kişinin okuduğunu, düğmenin sizden iyi niyet beyanı istediğini, bir bildirimi aldığımızı teyit ettiğimizi ve kararımızı size e-postayla bildirdiğimizi ve gerekçe bildirimlerinin e-postayla gönderildiğini ve hesabınızda saklandığını belirtir; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir.
-
-Sürüm 2.16, sürüm 2.15'in yerine geçmiştir: 12. bölüm ücretli planları, yani Plus, Pro ve Max'i adlarıyla belirtir ve 12. ile 15. bölümler artık taslak notları içermez; sorumlu olduğumuz konular ve bu Koşullardaki her hak değişmemiştir.
-
-Sürüm 2.15, sürüm 2.14'ün yerine geçmiştir: 12. bölüm, fiyatlarımızın vergi hariç olarak, fiyat + KDV şeklinde gösterildiğini ve verginin ödeme sayfasında eklendiğini söyler.
-
-Sürüm 2.14, sürüm 2.13'ün yerine geçmiştir: 18. bölüm ve Ek A, alternatif uyuşmazlık çözümü yolu olarak ANPC (SAL)'ı belirtir.
-
-Sürüm 2.13, sürüm 2.12'nin yerine geçmiştir: 12. bölüm, ödeme düğmesinin Romence metnini belirtir.
-
-Sürüm 2.12, sürüm 2.11'in yerine geçmiştir: 10. bölüm, oturum açmış bir kişinin herkese açık herhangi bir tartışmada Bildir düğmesini de kullanabileceğini, bir yapay zekânın düğmeyle yapılan bildirimi herkese açık metnin yanında okuduğunu ve sonrasında ne olacağını söyler.
-
-Sürüm 2.11, sürüm 2.10'un yerine geçmiştir: 9. bölüm, incelerken herkese açık bir tartışmayı geçici olarak görünmez hâle getirebileceğimizi ve bunun bir kısmını kaldırabileceğimizi veya düzeltebileceğimizi söyler.
-
-Sürüm 2.10, sürüm 2.9'un yerine geçmiştir: 9. bölüm, ücretsiz plandaki tartışmaların herkese açık olduğunu; herkese açık bir tartışmanın yayından kaldırılamayacağını ve hesabınızı kapattıktan sonra da herkese açık kalacağını; kredisi olan herkesin herkese açık bir tartışmaya katkıda bulunabileceğini veya hakkında rapor yazabileceğini; ve herkese açık bir tartışmanın ilk yazarı ayrıldıktan sonra da açık kalacağını söyler; 11. bölüm ise kapatmanın herkese açık tartışmalarınız üzerindeki etkisini açıklar.
-
-Sürüm 2.9, sürüm 2.8'in yerine geçmiştir: 8. bölüme “Ürettiğimiz grafikler ve istatistikler” paragrafı eklenmiştir; bu paragraf bir tartışma raporundaki grafiklerin kime ait olduğunu belirtir ve size bunları kullanmanız için bir lisans verir.
-
-Sürüm 2.8, sürüm 2.7'in yerine geçmiştir: soru kontrolümüz artık bir suçun nasıl işleneceğini ya da cezasından nasıl kaçılacağını veya birinin suç işleyip işlememesi gerektiğini soran bir soruyu da (örneğin yasa dışı olarak uyuşturucu ya da silah alıp satmak, hırsızlık yapmak veya vergi kaçırmak) reddeder ve bu soruyu saklamaz; bir yasanın değişip değişmemesi gerektiğine dair bir soru ise tartışma başlatmaya devam eder (7. bölüm). Ayrıca uyuşturucuya ilişkin sorular için tek bir kural belirler ve intihar, ötanazi veya yardımlı ölüme ilişkin yasanın değişip değişmemesi gerektiğine dair bir sorunun tartışma başlatmasına izin verir (7. bölüm) ve soru kontrolü artık hiçbir soruyu ekibimizin okuması için saklamaz (7. ve 10. bölümler); bir soruyu reddeden ekran, 7. bölüm uyarınca tartışma başlatmayan her soru için gerekçe bildirimimizdir (10. bölüm).
-
-Sürüm 2.7, sürüm 2.6'ün yerine geçmiştir: her soruyu bir tartışma başlamadan önce okuyan, bazılarını reddeden ve ekibimizin okuması için, adı belirtilmiş olsun olmasın başka bir kişiye veya başka kişilere zarar vermekle tehdit eden (adı belirtilmeyen kişilere yönelik bir saldırı dâhil), bunu planlayan veya buna zarar verilip verilemeyeceğini ya da nasıl verileceğini soran, silah, patlayıcı, zehir veya uyuşturucunun nasıl yapılacağını ya da bir terör eylemine nasıl destek olunacağını soran veya terörü öven her reddedilmiş soruyu saklayan soru kontrolünü (7., 8., 10. ve 11. bölümler); her biten tartışmanın sentezini okuyan kontrolü, işaretlenmiş bir tartışmanın yayımlanabilmesi için gereken onayı ve o kontrolün sildiği tartışmaları (5., 8., 9., 10. ve 11. bölümler); destek sohbetinin Anthropic'in modeli Claude'a neler gönderdiğini, yazdıklarınızdan hiçbir şey saklamadığını ve hiçbir destek talebi açmadığını, ayrıca “Bir yetkiliyle görüş” düğmesinin destek adresimizi gösterdiğini (8. ve 10. bölümler); ve 7. bölümde her türlü nefret söylemini, silah veya uyuşturucu yapımına ilişkin talimatları, intihara veya başkalarına zarar vermeye teşvik eden içeriği ve dine hakareti yasaklayan ve hangi soruların tartışma başlatmadığını belirten kuralları ekler.
-
 ## 15. Sorumluluk
 
 **Sınırlandırmadığımız hususlar.** Bu Koşullardaki hiçbir hüküm; ihmalimizin neden olduğu ölüm veya bedensel zarar, hile veya hileli yanlış beyan, ağır ihmal veya kasten kötü davranış ya da hukuken sınırlandırılamayacak başka herhangi bir hususa ilişkin sorumluluğumuzu ortadan kaldırmaz veya sınırlandırmaz. Tüketiciyseniz buradaki hiçbir hüküm; uygun olmayan hizmetin uygun hâle getirilmesi, fiyat indirimi veya geri ödeme hakkı ya da yaşadığınız ülkenin hukuku uyarınca geçerli olan herhangi bir güvence dahil kanuni haklarınızı ortadan kaldırmaz.
@@ -305,7 +281,7 @@ Kişisel verileri nasıl işlediğimiz dezbatere.ro/privacy adresindeki **Gizlil
 
 **AB veya AEA'da yaşıyorsanız mahkemeler.** Bize karşı Romanya mahkemelerinde veya yaşadığınız ülkenin mahkemelerinde dava açabilirsiniz. Biz size karşı yalnızca yaşadığınız ülkenin mahkemelerinde dava açabiliriz.
 
-**Başka yerlerdeki tüketiciler.** AB ve AEA dışında yaşıyorsanız bu Koşullardaki hiçbir hüküm, ülkenizin hukuku uyarınca o ülkenin mahkemelerinde talepte bulunma hakkınızı veya o hukuk uyarınca vazgeçilemeyecek herhangi bir hakkınızı sınırlandırmaz — Avustralya veya Yeni Zelanda'da yaşıyorsanız tüketici güvencesi haklarınız; Brezilya'da yaşıyorsanız Código de Defesa do Consumidor ve Amerika Birleşik Devletleri'nde yaşıyorsanız eyaletinizin tüketiciyi koruma kanunları buna dahildir.
+**Başka yerlerdeki tüketiciler.** AB ve AEA dışında yaşıyorsanız bu Koşullardaki hiçbir hüküm, ülkenizin hukuku uyarınca o ülkenin mahkemelerinde talepte bulunma hakkınızı veya o hukuk uyarınca vazgeçilemeyecek herhangi bir hakkınızı sınırlandırmaz — Avustralya veya Yeni Zelanda'da yaşıyorsanız tüketici güvencesi haklarınız ve Amerika Birleşik Devletleri'nde yaşıyorsanız eyaletinizin tüketiciyi koruma kanunları buna dahildir.
 
 **Mahkemeye gitmeden önce.** support@dezbatere.ro adresinden bizimle iletişime geçin; çoğu sorun çözülebilir ve 5 iş günü içinde yanıt vermeyi hedefleriz. Romanya'da veya AB'de bir tüketiciyseniz ANPC (SAL), reclamatiisal.anpc.ro üzerinden alternatif uyuşmazlık çözümünden yararlanabilirsiniz; bu usule katılmayı taahhüt etmiyoruz. Moderasyon kararlarına ilişkin şikâyetler ayrı bir yol olan 10. bölüme tabidir.
 

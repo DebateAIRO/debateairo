@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: SERVICEVOORWAARDEN · v2.19 · VAN KRACHT OP 19 NOVEMBER 2026
+eyebrow: SERVICEVOORWAARDEN · v1.0 · VAN KRACHT OP 19 NOVEMBER 2026
 title: Waarmee u instemt
 lede: De overeenkomst tussen u en DMS Merchandise Shop S.R.L., in begrijpelijke taal. Negentien hoofdstukken en Bijlage A — scrol tot het einde.
-endMarker: EINDE VAN DE VOORWAARDEN · v2.19
+endMarker: EINDE VAN DE VOORWAARDEN · v1.0
 bodyLabel: Tekst van de Servicevoorwaarden
 annexTitle: Bijlage A — Regionale voorwaarden
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TOEPASSELIJK RECHT
 -->
 
-**Version 2.19 · Effective 19 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
+**Version 1.0 · Effective 19 november 2026 · Eerdere versies op dezbatere.ro/terms/versions · Taal: Nederlands.**
 
 **In short.** U moet 18 jaar of ouder zijn. Dialectical Engine stelt met AI-modellen argumenten op en alles wat het genereert kan onjuist zijn — het is geen advies. Op het gratis abonnement worden uw debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Eenmaal openbaar kan iedereen een debat lezen, en het blijft openbaar. Tekst die u indient, wordt verzonden naar de AI-aanbieders in ons Register van aanbieders, voornamelijk DeepInfra, in de Verenigde Staten. De voorwaarden van DeepInfra, Anthropic en Perplexity staan hen niet toe daarop modellen te trainen; hoofdstuk 8 zegt voor welk bedrijf wij dit nog niet hebben bevestigd. Meld illegale inhoud via support@dezbatere.ro, ongeacht of u een account hebt. Het Roemeense recht is van toepassing, maar uw lokale consumentenbescherming blijft voor u gelden.
 
@@ -251,30 +251,6 @@ Wij vertellen u vooraf, op een duurzame gegevensdrager, wat er verandert en wann
 
 **In deze Voorwaarden.** Wij kunnen deze Voorwaarden om dezelfde soorten redenen wijzigen. Voor wijzigingen die uw rechten niet verminderen, publiceren wij de nieuwe versie met een samenvatting van wat is gewijzigd en sturen wij u ten minste **30 dagen** vóór de ingangsdatum een e-mail; als u Dialectical Engine na die datum blijft gebruiken, betekent dit dat u de wijziging aanvaardt, en u kunt uw account voordien sluiten. Voor wijzigingen die uw rechten verminderen — waaronder prijsverhogingen voor een bestaand abonnement, lagere limieten, verwijderde functies, nieuw gebruik van uw inhoud of wijzigingen in aansprakelijkheid, toepasselijk recht of geschillenbeslechting — vragen wij u bij uw volgende aanmelding uitdrukkelijk de nieuwe versie te aanvaarden en geldt de wijziging uitsluitend voor de toekomst. Wij maken een wijziging nooit met terugwerkende kracht en gebruiken dit hoofdstuk nooit om de kern van hetgeen waarvoor u hebt betaald tijdens de looptijd te wijzigen zonder u een uitweg te bieden. Eerdere versies blijven beschikbaar op dezbatere.ro/terms/versions.
 
-Versie 2.18 verving versie 2.17: bijlage A.3 zegt dat ook in Quebec debatten op een betaald abonnement standaard privé zijn en debatten op het gratis abonnement openbaar, zoals hoofdstuk 9 aangeeft; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd. Versie 2.18 noemt ook DeepInfra, het bedrijf dat het grootste deel van de tekst van een debat ontvangt, vermeldt dat het de verzoeken van één model doorgeeft aan een partnerbedrijf, en noemt voor welke aanbieders wij hebben bevestigd dat hun voorwaarden niet toestaan op uw inhoud te trainen (hoofdstuk 8).
-
-Versie 2.17 verving versie 2.16: hoofdstuk 10 zegt wanneer een AI een melding leest die met de knop Melden is gedaan en wanneer een persoon dat doet, dat de knop om uw verklaring te goeder trouw vraagt, dat wij een melding bevestigen en u onze beslissing per e-mail meedelen, en dat motiveringen per e-mail worden verstuurd en in uw account worden bewaard; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd.
-
-Versie 2.16 verving versie 2.15: hoofdstuk 12 noemt de betaalde abonnementen, Plus, Pro en Max, en de hoofdstukken 12 en 15 bevatten geen redactionele notities meer; waarvoor wij aansprakelijk zijn, en elk recht uit deze Voorwaarden, blijft ongewijzigd.
-
-Versie 2.15 verving versie 2.14: hoofdstuk 12 zegt dat onze prijzen worden getoond zonder belasting, als prijs + btw, en dat de belasting bij het afrekenen wordt toegevoegd.
-
-Versie 2.14 verving versie 2.13: hoofdstuk 18 en bijlage A noemen ANPC (SAL) als de weg voor alternatieve geschillenbeslechting.
-
-Versie 2.13 verving versie 2.12: hoofdstuk 12 noemt de Roemeense tekst van de betaalknop.
-
-Versie 2.12 verving versie 2.11: hoofdstuk 10 zegt dat een ingelogde persoon ook de knop Melden kan gebruiken bij elk openbaar debat, dat een AI een melding die ermee is gedaan naast de openbare tekst leest, en wat er dan gebeurt.
-
-Versie 2.11 verving versie 2.10: hoofdstuk 9 zegt dat wij een openbaar debat tijdelijk kunnen verbergen terwijl wij het beoordelen, en een deel ervan kunnen verwijderen of corrigeren.
-
-Versie 2.10 verving versie 2.9: hoofdstuk 9 zegt dat debatten op het gratis abonnement openbaar zijn, dat een openbaar debat niet kan worden teruggenomen en na sluiting van uw account openbaar blijft, dat iedereen met tegoed kan bijdragen aan een openbaar debat of er een rapport over kan schrijven, en dat een openbaar debat open blijft nadat de eerste auteur is vertrokken; hoofdstuk 11 zegt wat sluiting met uw openbare debatten doet.
-
-Versie 2.9 verving versie 2.8: hoofdstuk 8 krijgt de alinea „Grafieken en statistieken die wij genereren”, die bepaalt van wie de grafieken in een debatrapport zijn en u een licentie geeft om ze te gebruiken.
-
-Versie 2.8 verving versie 2.7: onze vraagcontrole weigert ook een vraag hoe je een misdrijf pleegt of ermee wegkomt, of een vraag of iemand er een zou moeten plegen, zoals illegaal drugs of wapens kopen of verkopen, stelen of belasting ontduiken, en bewaart die niet; een vraag of een wet zou moeten veranderen, laat nog steeds een debat beginnen (hoofdstuk 7). Zij stelt ook één lijn voor drugs vast en laat een debat beginnen uit een vraag of de wetgeving over zelfdoding, euthanasie of hulp bij sterven zou moeten veranderen (hoofdstuk 7), en de vraagcontrole bewaart geen enkele vraag meer voor ons team (hoofdstukken 7 en 10); het scherm dat een vraag weigert, is onze motivering voor elke vraag waaruit volgens hoofdstuk 7 geen debat begint (hoofdstuk 10).
-
-Versie 2.7 verving versie 2.6: zij voegt het volgende toe, namelijk de vraagcontrole, die elke vraag leest voordat een debat begint, sommige weigert en elke geweigerde vraag die dreigt met schade aan een ander persoon of andere mensen, die zulke schade plant of die vraagt of en hoe men een ander persoon of andere mensen schade kan toebrengen, al dan niet bij naam genoemd, met inbegrip van een aanval op niet bij naam genoemde mensen, of die vraagt hoe men wapens, explosieven, gif of drugs maakt of hoe men een terroristische daad kan steunen, of er een verheerlijkt bewaart zodat ons team haar kan lezen (hoofdstukken 7, 8, 10 en 11); de controle die de synthese van elk afgerond debat leest, de goedkeuring die een gemarkeerd debat nodig heeft voordat het kan worden gepubliceerd, en de debatten die die controle verwijdert (hoofdstukken 5, 8, 9, 10 en 11); wat de ondersteuningschat naar het model Claude van Anthropic stuurt, dat zij niets bewaart van wat u schrijft en geen zaak opent, en dat haar knop „Met een medewerker praten” ons ondersteuningsadres toont (hoofdstukken 8 en 10); en regels in hoofdstuk 7 die haatzaaiende uitlatingen van welke aard dan ook, instructies voor het maken van wapens of drugs, inhoud die zelfdoding of het schaden van andere mensen aanmoedigt en religieuze belediging verbieden, en zeggen welke vragen geen debat laten beginnen.
-
 ## 15. Aansprakelijkheid
 
 **Wat wij niet beperken.** Niets in deze Voorwaarden sluit onze aansprakelijkheid uit of beperkt deze voor overlijden of persoonlijk letsel als gevolg van onze nalatigheid, fraude of frauduleuze voorstelling van zaken, grove nalatigheid of opzettelijk wangedrag, of voor iets anders dat wettelijk niet mag worden beperkt. Als u consument bent, doet niets hierin afbreuk aan uw wettelijke rechten, waaronder het recht een niet-conforme dienst in overeenstemming te laten brengen, op prijsvermindering of terugbetaling, of aan enige garantie die krachtens het recht van het land waar u woont van toepassing is.
@@ -305,7 +281,7 @@ Hoe wij persoonsgegevens verwerken, staat in het **Privacybeleid** op dezbatere.
 
 **Bevoegde rechter, als u in de EU of de EER woont.** U kunt een procedure tegen ons aanhangig maken bij de Roemeense rechter of bij de rechter van het land waar u woont. Wij kunnen alleen bij de rechter van het land waar u woont een procedure tegen u aanhangig maken.
 
-**Consumenten elders.** Als u buiten de EU en de EER woont, beperkt niets in deze Voorwaarden enig recht dat u krachtens het recht van uw land hebt om bij de rechter van dat land een vordering in te stellen, of enig recht krachtens dat recht waarvan geen afstand kan worden gedaan — waaronder, als u in Australië of Nieuw-Zeeland woont, uw rechten inzake consumentengaranties; als u in Brazilië woont, de Código de Defesa do Consumidor; en als u in de Verenigde Staten woont, de consumentenbeschermingswetgeving van uw staat.
+**Consumenten elders.** Als u buiten de EU en de EER woont, beperkt niets in deze Voorwaarden enig recht dat u krachtens het recht van uw land hebt om bij de rechter van dat land een vordering in te stellen, of enig recht krachtens dat recht waarvan geen afstand kan worden gedaan — waaronder, als u in Australië of Nieuw-Zeeland woont, uw rechten inzake consumentengaranties; en als u in de Verenigde Staten woont, de consumentenbeschermingswetgeving van uw staat.
 
 **Voordat u naar de rechter gaat.** Neem contact met ons op via support@dezbatere.ro; de meeste zaken kunnen worden opgelost en wij streven ernaar binnen 5 werkdagen te antwoorden. Als u consument in Roemenië of de EU bent, kunt u alternatieve geschillenbeslechting gebruiken via ANPC (SAL), reclamatiisal.anpc.ro; wij verbinden ons er niet toe aan die procedure deel te nemen. Klachten over moderatiebeslissingen volgen hoofdstuk 10, dat een afzonderlijke procedure is.
 

@@ -65,8 +65,8 @@ describe("the Report button and the six months in the legal texts", () => {
     const log = policy.find((line) => line.includes("3.11") && line.includes("3.10") && line.includes("3.9"));
     expect(log, `${code}: the change log`).toBeDefined();
     expect(log!.indexOf("3.11"), `${code}: newest first`).toBeLessThan(log!.indexOf("3.9"));
-    const terms212 = contract.findIndex((line) => line.includes("2.12") && line.includes("2.11"));
-    expect(contract[terms212 + 2]!, `${code}: the old log follows`).toMatch(/2\.11[^]*2\.10/u);
+    // Terms 1.0 is the first published text and carries no change log (owner's decision of 19 November 2026).
+    expect(contract.join("\n"), `${code}: no Terms change log`).not.toMatch(/replaced (version )?2\.\d+|2\.12/u);
     expect(contract.filter((line) => line.includes("support@dezbatere.ro")).length).toBeGreaterThan(0);
     expect(read(code, "privacy-policy.md")).toContain("**privacy@dezbatere.ro**");
     expect(contract.slice(0, 25).join("\n")).not.toMatch(/2\.11/u);
