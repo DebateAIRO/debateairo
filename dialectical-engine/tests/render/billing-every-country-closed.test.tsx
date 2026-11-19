@@ -88,6 +88,9 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
     expect(document.querySelector('[data-plan="PRO"]')?.textContent).toContain("$59.50 a month");
     expect(document.querySelector('[data-plan="MAX"]')?.textContent).toContain("$238.00 a month");
     expect(document.body.textContent).not.toContain("The plans can't be shown right now.");
+    // Where the withdrawal function is, and the page that explains it, also while no country can pay.
+    expect(document.querySelector(".pricingFaq")?.textContent).toContain("Can I withdraw after I subscribe?");
+    expect(document.querySelector('.pricingFaq a[href="/withdraw"]')?.textContent).toBe("Withdraw from contract");
   });
 
   it("billing on with every country closed: /withdraw and /cancel keep their own content", async () => {

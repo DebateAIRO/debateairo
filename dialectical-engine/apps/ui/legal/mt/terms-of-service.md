@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: TERMINI TAS-SERVIZZ · v2.19 · EFFETTIVI 19 TA’ NOVEMBRU 2026
+eyebrow: TERMINI TAS-SERVIZZ · v1.0 · EFFETTIVI 19 TA’ NOVEMBRU 2026
 title: Dak li taqbel miegħu
 lede: Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.
-endMarker: TMIEM IT-TERMINI · v2.19
+endMarker: TMIEM IT-TERMINI · v1.0
 bodyLabel: Test tat-Termini tas-Servizz
 annexTitle: Anness A — Termini reġjonali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LIĠI APPLIKABBLI
 -->
 
-**Version 2.19 · Effective 19 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
+**Version 1.0 · Effective 19 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/terms/versions · Lingwa: il-Malti.**
 
 **In short.** Irid ikollok 18-il sena jew aktar. Dialectical Engine tibni argumenti b’mudelli tal-IA u dak kollu li tiġġenera jista’ jkun żbaljat — mhuwiex parir. Fuq il-pjan bla ħlas, id-dibattiti tiegħek huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. Ladarba jkunu pubbliċi, kulħadd jista’ jaqra dibattitu, u jibqa’ pubbliku. It-test li tissottometti jintbagħat lill-fornituri tal-IA elenkati fir-Reġistru tal-Fornituri tagħna, prinċipalment lil DeepInfra, fl-Istati Uniti. It-termini ta’ DeepInfra, Anthropic u Perplexity ma jippermettulhomx iħarrġu mudelli fuqu; it-taqsima 8 tgħid għal liema kumpanija għadna ma kkonfermajniex dan. Irrapporta kontenut illegali fuq support@dezbatere.ro kemm jekk għandek kont kif ukoll jekk le. Tapplika l-liġi Rumena, iżda l-protezzjonijiet lokali tiegħek bħala konsumatur jibqgħu japplikaw għalik.
 
@@ -251,30 +251,6 @@ Ngħidulek minn qabel, fuq mezz durabbli, x’inhu jinbidel u meta. Jekk il-bidl
 
 **F’dawn it-Termini.** Nistgħu nibdlu dawn it-Termini għall-istess tipi ta’ raġunijiet. Għal bidliet li ma jnaqqsux id-drittijiet tiegħek, nippubblikaw il-verżjoni l-ġdida b’sommarju ta’ dak li nbidel u nibagħtulek messaġġ elettroniku mill-inqas **30 jum** qabel ma tidħol fis-seħħ; jekk tkompli tuża Dialectical Engine wara dik id-data, dan ifisser li taċċettaha, u tista’ tagħlaq il-kont tiegħek qabel dak iż-żmien. Għal bidliet li jnaqqsu d-drittijiet tiegħek — inkluż żidiet fil-prezz fuq pjan eżistenti, limiti aktar baxxi, funzjonalitajiet imneħħija, użi ġodda tal-kontenut tiegħek, jew bidliet fir-responsabbiltà, fil-liġi applikabbli jew fis-soluzzjoni tat-tilwim — nitolbuk taċċetta l-verżjoni l-ġdida b’mod espliċitu meta terġa’ tidħol fil-kont, u l-bidla tapplika biss għall-futur. Qatt ma nagħmlu bidla retroattiva, u qatt ma nużaw din it-taqsima biex nibdlu l-qalba ta’ dak li ħallast għalih f’nofs it-terminu mingħajr ma noffrulek mod kif toħroġ. Il-verżjonijiet preċedenti jibqgħu disponibbli fuq dezbatere.ro/terms/versions.
 
-Il-Verżjoni 2.18 issostitwiet il-Verżjoni 2.17: l-Anness A.3 jgħid li anke fil-Quebec id-dibattiti fuq pjan bi ħlas huma privati b’mod awtomatiku u d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, kif tgħid it-taqsima 9; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx. Il-Verżjoni 2.18 issemmi wkoll lil DeepInfra, il-kumpanija li tirċievi l-biċċa l-kbira tat-test ta’ dibattitu, tgħid li jgħaddi t-talbiet ta’ mudell wieħed lil kumpanija sieħba, u tgħid għal liema fornituri kkonfermajna li t-termini tagħhom ma jippermettux it-taħriġ fuq il-kontenut tiegħek (it-taqsima 8).
-
-Il-Verżjoni 2.17 issostitwiet il-Verżjoni 2.16: it-taqsima 10 tgħid meta IA taqra rapport magħmul bil-buttuna Irrapporta u meta taqrah persuna, li l-buttuna titlob id-dikjarazzjoni tiegħek b’rieda tajba, li nikkonfermaw rapport u ngħidulek id-deċiżjoni tagħna bl-email, u li d-dikjarazzjonijiet tar-raġunijiet jintbagħtu bl-email u jinżammu fil-kont tiegħek; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
-
-Il-Verżjoni 2.16 issostitwiet il-Verżjoni 2.15: it-taqsima 12 issemmi l-pjanijiet bi ħlas, Plus, Pro u Max, u t-taqsimiet 12 u 15 m’għadx fihom noti tal-abbozzar; dak li aħna responsabbli għalih, u kull dritt f’dawn it-Termini, ma nbidilx.
-
-Il-Verżjoni 2.15 issostitwiet il-Verżjoni 2.14: it-taqsima 12 tgħid li l-prezzijiet tagħna jintwerew mingħajr taxxa, bħala prezz + VAT, u li t-taxxa tiżdied fil-checkout.
-
-Il-Verżjoni 2.14 issostitwiet il-Verżjoni 2.13: it-taqsima 18 u l-Anness A jsemmu lill-ANPC (SAL) bħala r-rotta għas-soluzzjoni alternattiva tat-tilwim.
-
-Il-Verżjoni 2.13 issostitwiet il-Verżjoni 2.12: it-taqsima 12 tagħti l-kliem bir-Rumen tal-buttuna tal-ħlas.
-
-Il-Verżjoni 2.12 issostitwiet il-Verżjoni 2.11: it-taqsima 10 tgħid li persuna mdaħħla fil-kont tagħha tista’ wkoll tuża l-buttuna Irrapporta fuq kwalunkwe dibattitu pubbliku, li IA taqra rapport magħmul biha ħdejn it-test pubbliku, u x’jiġri wara.
-
-Il-Verżjoni 2.11 issostitwiet il-Verżjoni 2.10: it-taqsima 9 tgħid li nistgħu naħbu dibattitu pubbliku temporanjament waqt li nirrieżaminawh, u nneħħu jew nikkoreġu parti minnu.
-
-Il-Verżjoni 2.10 issostitwiet il-Verżjoni 2.9: it-taqsima 9 tgħid li d-dibattiti fuq il-pjan bla ħlas huma pubbliċi, li dibattitu pubbliku ma jistax jitneħħa mill-pubbliku u jibqa’ pubbliku wara li tagħlaq il-kont tiegħek, li kull min għandu kreditu jista’ jikkontribwixxi għal dibattitu pubbliku jew jikteb rapport dwaru, u li dibattitu pubbliku jibqa’ miftuħ wara li l-ewwel awtur tiegħu jitlaq; it-taqsima 11 tgħid x’jagħmel l-għeluq għad-dibattiti pubbliċi tiegħek.
-
-Il-Verżjoni 2.9 issostitwiet il-verżjoni 2.8: it-taqsima 8 tikseb il-paragrafu “Graffs u statistika li niġġeneraw”, li jgħid lil min jappartjenu l-graffs f’rapport ta’ dibattitu u jagħtik liċenzja biex tużahom.
-
-Il-Verżjoni 2.8 issostitwiet il-verżjoni 2.7: il-verifika tal-mistoqsijiet tirrifjuta wkoll mistoqsija li tistaqsi kif jitwettaq reat jew kif wieħed jaħrab mill-piena tiegħu, jew jekk xi ħadd għandux iwettaq reat, bħax-xiri jew il-bejgħ illegali ta’ drogi jew armi, is-serq jew l-evażjoni tat-taxxa, u ma żżommhiex; mistoqsija dwar jekk liġi għandhiex tinbidel xorta tibda dibattitu (taqsima 7). Tistabbilixxi wkoll linja waħda għad-drogi u tħalli mistoqsija dwar jekk il-liġi dwar is-suwiċidju, l-ewtanasja jew il-mewt assistita għandhiex tinbidel tibda dibattitu (taqsima 7), u l-verifika tal-mistoqsijiet ma għadhiex iżżomm l-ebda mistoqsija għat-tim tagħna (it-taqsimiet 7 u 10); l-iskrin li jirrifjuta mistoqsija huwa d-dikjarazzjoni tar-raġunijiet tagħna għal kull mistoqsija li, skont it-taqsima 7, ma tibdiex dibattitu (taqsima 10).
-
-Il-Verżjoni 2.7 issostitwiet il-verżjoni 2.6: iżżid il-verifika tal-mistoqsijiet, li taqra kull mistoqsija qabel ma jibda dibattitu, tirrifjuta xi wħud, u żżomm biex jaqraha t-tim tagħna kull mistoqsija rifjutata li thedded, tippjana jew tistaqsi jekk jew kif tista’ ssir ħsara lil persuna oħra jew lil persuni oħra, imsemmija jew le, inkluż attakk fuq persuni mhux imsemmija, jew li tistaqsi kif jiġu fabbrikati armi, splussivi, velenijiet jew drogi jew kif jiġi appoġġat att terroristiku, jew li tfaħħar wieħed (it-taqsimiet 7, 8, 10 u 11); il-verifika li taqra s-sinteżi ta’ kull dibattitu li jintemm, l-approvazzjoni li dibattitu mmarkat jeħtieġ qabel ma jkun jista’ jiġi ppubblikat, u d-dibattiti li dik il-verifika tħassar (it-taqsimiet 5, 8, 9, 10 u 11); x’jibgħat iċ-chat tal-appoġġ lill-mudell Claude ta’ Anthropic, li ma jżomm xejn minn dak li tikteb u ma jiftaħ ebda każ, u li l-buttuna tiegħu “Tkellem ma’ persuna” turi l-indirizz ta’ appoġġ tagħna (it-taqsimiet 8 u 10); u regoli fit-taqsima 7 li jipprojbixxu diskors ta’ mibegħda ta’ kull tip, struzzjonijiet għall-fabbrikazzjoni ta’ armi jew drogi, kontenut li jinkoraġġixxi s-suwiċidju jew li jagħmel ħsara lil persuni oħra, u insult reliġjuż, u jgħidu liema mistoqsijiet ma jibdewx dibattitu.
-
 ## 15. Responsabbiltà
 
 **Dak li ma nillimitawx.** Xejn f’dawn it-Termini ma jeskludi jew jillimita r-responsabbiltà tagħna għal mewt jew korriment personali kkawżat min-negliġenza tagħna, għal frodi jew rappreżentazzjoni falza frawdolenti, għal negliġenza gravi jew imġiba ħażina intenzjonata, jew għal kull ħaġa oħra li legalment ma tistax tiġi limitata. Jekk int konsumatur, xejn hawn ma jneħħi d-drittijiet statutorji tiegħek, inkluż id-dritt li servizz mhux konformi jinġieb f’konformità, jew għal tnaqqis fil-prezz jew ħlas lura, jew kwalunkwe garanzija li tapplika skont il-liġi tal-pajjiż fejn tgħix.
@@ -305,7 +281,7 @@ Il-mod kif nittrattaw id-data personali huwa stabbilit fil-**Politika dwar il-Pr
 
 **Qrati, jekk tgħix fl-UE jew fiż-ŻEE.** Tista’ tibda proċedimenti kontra tagħna jew fil-qrati tar-Rumanija jew fil-qrati tal-pajjiż fejn tgħix. Aħna nistgħu nibdew proċedimenti kontrik biss fil-qrati tal-pajjiż fejn tgħix.
 
-**Konsumaturi band’oħra.** Jekk tgħix barra l-UE u ż-ŻEE, xejn f’dawn it-Termini ma jillimita xi dritt li għandek skont il-liġi ta’ pajjiżek li tressaq pretensjoni fil-qrati tiegħu, jew xi dritt skont dik il-liġi li ma jistax jiġi rrinunzjat — inkluż, jekk tgħix fl-Awstralja jew fiż-Żelanda l-Ġdida, id-drittijiet tiegħek għall-garanziji tal-konsumatur; jekk tgħix fil-Brażil, il-Código de Defesa do Consumidor; u jekk tgħix fl-Istati Uniti, il-liġijiet tal-istat tiegħek dwar il-protezzjoni tal-konsumatur.
+**Konsumaturi band’oħra.** Jekk tgħix barra l-UE u ż-ŻEE, xejn f’dawn it-Termini ma jillimita xi dritt li għandek skont il-liġi ta’ pajjiżek li tressaq pretensjoni fil-qrati tiegħu, jew xi dritt skont dik il-liġi li ma jistax jiġi rrinunzjat — inkluż, jekk tgħix fl-Awstralja jew fiż-Żelanda l-Ġdida, id-drittijiet tiegħek għall-garanziji tal-konsumatur; u jekk tgħix fl-Istati Uniti, il-liġijiet tal-istat tiegħek dwar il-protezzjoni tal-konsumatur.
 
 **Qabel tmur il-qorti.** Ikkuntattjana fuq support@dezbatere.ro; il-biċċa l-kbira tal-affarijiet jistgħu jiġu solvuti, u nimmiraw li nwieġbu fi żmien 5 ijiem tax-xogħol. Jekk int konsumatur fir-Rumanija jew fl-UE, tista’ tuża s-soluzzjoni alternattiva għat-tilwim permezz ta’ ANPC (SAL), reclamatiisal.anpc.ro; aħna ma nintrabtux li nipparteċipaw f’dik il-proċedura. Ilmenti dwar deċiżjonijiet ta’ moderazzjoni jsegwu t-taqsima 10, li hija rotta separata.
 

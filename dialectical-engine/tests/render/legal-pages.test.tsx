@@ -345,37 +345,29 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
-  it("names the current and previous versions, linking each to its text", () => {
+  // Version 1.0 is the first published text (owner's decision of 19 November 2026: the pre-launch 2.x drafts were never
+  // offered to the public and are not kept), so the page lists it alone and says no earlier version exists.
+  it("names the current version, linked to its text, and says no earlier version has been published", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
-    expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
-    expect(view.querySelector(".legalVersionsNone")).toBeNull();
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.0"]);
+    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
   });
 
-  it("has a row for every version from 2.0 to the current one, newest first, so a skipped number shows up here", () => {
-    const current = minor(TERMS_VERSIONS[0]?.version ?? "2.0");
+  it("has a row for every version from 1.0 to the current one, newest first, so a skipped number shows up here", () => {
+    const current = minor(TERMS_VERSIONS[0]?.version ?? "1.0");
     expect(TERMS_VERSIONS.map(({ version }) => version))
-      .toEqual(Array.from({ length: current + 1 }, (_, index) => `2.${current - index}`));
+      .toEqual(Array.from({ length: current + 1 }, (_, index) => `1.${current - index}`));
   });
 
   it("has a row for every version the Terms' own change history names", () => {
     const history = source("apps/ui/legal/en/terms-of-service.md");
     const named = new Set([...history.matchAll(/Version (\d+\.\d+) replaced version (\d+\.\d+)/g)].flatMap(([, newer, older]) => [newer, older]));
-    expect(named.size).toBeGreaterThan(0);
     const listed = TERMS_VERSIONS.map(({ version }) => version);
     for (const version of named) expect(listed, `Terms ${version}`).toContain(version);
-  });
-
-  it("shows 2.7, which was never published on its own, without a link to a text", () => {
-    const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
-    const row = [...view.querySelectorAll(".legalVersionRow")]
-      .find((item) => item.querySelector(".legalVersionNo")?.textContent === "2.7");
-    expect(row).toBeDefined();
-    expect(row?.querySelector("a")).toBeNull();
-    expect(row?.textContent).toContain(legalEnglish["legal.versions.unpublished.note"]);
   });
 
   it("shows no effective date, and no unfilled [placeholder], on any row in any language (no dates until go-live)", () => {

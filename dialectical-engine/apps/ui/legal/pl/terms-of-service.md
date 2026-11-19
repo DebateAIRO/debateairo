@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: W skrócie
-eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v2.19 · OBOWIĄZUJĄ OD 19 LISTOPADA 2026
+eyebrow: WARUNKI ŚWIADCZENIA USŁUG · v1.0 · OBOWIĄZUJĄ OD 19 LISTOPADA 2026
 title: Na co wyrażasz zgodę
 lede: Umowa między Tobą a DMS Merchandise Shop S.R.L., napisana prostym językiem. Dziewiętnaście sekcji i załącznik A — przewiń do końca.
-endMarker: KONIEC WARUNKÓW · v2.19
+endMarker: KONIEC WARUNKÓW · v1.0
 bodyLabel: Treść Warunków świadczenia usług
 annexTitle: Załącznik A — Warunki regionalne
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PRAWO WŁAŚCIWE
 -->
 
-**Version 2.19 · Effective 19 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
+**Version 1.0 · Effective 19 listopada 2026 · Poprzednie wersje są dostępne pod adresem dezbatere.ro/terms/versions · Język: polski.**
 
 **In short.** Musisz mieć ukończone 18 lat. Dialectical Engine tworzy argumenty przy użyciu modeli sztucznej inteligencji, a wszystko, co generuje, może być błędne — nie jest to porada. W planie bezpłatnym Twoje debaty stają się publiczne po zakończeniu, po sprawdzeniu przez AI; w płatnym planie są prywatne, chyba że je opublikujesz. Po upublicznieniu każdy może przeczytać debatę, a ona pozostaje publiczna. Przesyłany przez Ciebie tekst jest przekazywany dostawcom AI wymienionym w naszym Rejestrze Dostawców, głównie do DeepInfra, w Stanach Zjednoczonych. Warunki DeepInfra, Anthropic i Perplexity nie pozwalają im trenować na nim modeli; sekcja 8 wskazuje, w odniesieniu do której spółki jeszcze tego nie potwierdziliśmy. Nielegalne treści zgłaszaj pod adresem support@dezbatere.ro, niezależnie od tego, czy masz konto. Zastosowanie ma prawo rumuńskie, jednak zachowujesz ochronę konsumencką wynikającą z prawa miejscowego.
 
@@ -251,30 +251,6 @@ Z wyprzedzeniem informujemy Cię na trwałym nośniku, co i kiedy ulegnie zmiani
 
 **Zmiany niniejszych Warunków.** Możemy zmieniać niniejsze Warunki z tych samych rodzajów powodów. W przypadku zmian, które nie ograniczają Twoich praw, publikujemy nową wersję wraz z podsumowaniem zmian i wysyłamy Ci wiadomość e-mail co najmniej **30 dni** przed jej wejściem w życie; dalsze korzystanie z Dialectical Engine po tej dacie oznacza akceptację zmiany, a przed tą datą możesz zamknąć konto. W przypadku zmian ograniczających Twoje prawa — w tym podwyżek cen w istniejącym planie, obniżenia limitów, usunięcia funkcji, nowych sposobów wykorzystywania Twoich treści albo zmian odpowiedzialności, prawa właściwego lub rozstrzygania sporów — prosimy Cię o wyraźne zaakceptowanie nowej wersji przy kolejnym logowaniu, a zmiana obowiązuje wyłącznie na przyszłość. Nigdy nie wprowadzamy zmian z mocą wsteczną ani nie wykorzystujemy niniejszej sekcji do zmiany w trakcie okresu podstawowego zakresu opłaconej przez Ciebie usługi bez zapewnienia możliwości rezygnacji. Poprzednie wersje pozostają dostępne pod adresem dezbatere.ro/terms/versions.
 
-Wersja 2.18 zastąpiła wersję 2.17: załącznik A.3 wskazuje, że również w Quebecu debaty w płatnym planie są domyślnie prywatne, a debaty w planie bezpłatnym są publiczne, jak wskazano w sekcji 9; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian. Wersja 2.18 wymienia też DeepInfra, spółkę, która otrzymuje większość tekstu debaty, mówi, że przekazuje ona żądania dotyczące jednego modelu spółce-partnerowi, oraz wskazuje, w odniesieniu do których dostawców potwierdziliśmy, że ich warunki nie pozwalają na trenowanie na Twoich treściach (sekcja 8).
-
-Wersja 2.17 zastąpiła wersję 2.16: sekcja 10 określa, kiedy zgłoszenie złożone przyciskiem Zgłoś czyta AI, a kiedy człowiek, że przycisk prosi o Twoje oświadczenie złożone w dobrej wierze, że potwierdzamy zgłoszenie i przekazujemy Ci decyzję e-mailem oraz że uzasadnienia są wysyłane e-mailem i przechowywane na Twoim koncie; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
-
-Wersja 2.16 zastąpiła wersję 2.15: sekcja 12 wymienia płatne plany, Plus, Pro i Max, a sekcje 12 i 15 nie zawierają już uwag redakcyjnych; zakres naszej odpowiedzialności i każde prawo wynikające z niniejszych Warunków pozostają bez zmian.
-
-Wersja 2.15 zastąpiła wersję 2.14: sekcja 12 mówi, że nasze ceny są podawane bez podatku, jako cena + VAT, oraz że podatek jest doliczany na stronie płatności.
-
-Wersja 2.14 zastąpiła wersję 2.13: sekcja 18 i załącznik A wskazują ANPC (SAL) jako drogę alternatywnego rozstrzygania sporów.
-
-Wersja 2.13 zastąpiła wersję 2.12: sekcja 12 podaje rumuński napis na przycisku płatności.
-
-Wersja 2.12 zastąpiła wersję 2.11: sekcja 10 mówi, że zalogowana osoba może także użyć przycisku Zgłoś przy dowolnej publicznej debacie, że AI czyta zgłoszenie złożone tym przyciskiem obok publicznego tekstu oraz co wtedy się dzieje.
-
-Wersja 2.11 zastąpiła wersję 2.10: sekcja 9 mówi, że możemy tymczasowo ukryć publiczną debatę podczas jej przeglądu oraz usunąć lub poprawić jej część.
-
-Wersja 2.10 zastąpiła wersję 2.9: sekcja 9 mówi, że debaty w planie bezpłatnym są publiczne, że publicznej debaty nie można wycofać z publikacji i że pozostaje ona publiczna po zamknięciu konta, że każdy, kto ma kredyt, może wnosić wkład do publicznej debaty lub napisać jej raport, oraz że publiczna debata pozostaje otwarta po odejściu jej pierwszego autora; sekcja 11 mówi, co zamknięcie konta oznacza dla Twoich publicznych debat.
-
-Wersja 2.9 zastąpiła wersję 2.8: w sekcji 8 dodano akapit „Wykresy i statystyki, które generujemy”, który określa, do kogo należą wykresy w raporcie z debaty, i udziela Ci licencji na ich wykorzystywanie.
-
-Wersja 2.8 zastąpiła wersję 2.7: kontrola pytań odrzuca również pytanie o to, jak popełnić przestępstwo lub uniknąć za nie kary, albo czy ktoś powinien je popełnić, na przykład nielegalnie kupić lub sprzedać narkotyki lub broń, ukraść coś lub uchylać się od podatków, i go nie przechowuje; pytanie o to, czy należy zmienić jakieś prawo, nadal rozpoczyna debatę (sekcja 7). Wprowadza też jedną zasadę dotyczącą narkotyków i pozwala, by pytanie o to, czy należy zmienić prawo dotyczące samobójstwa, eutanazji lub wspomaganego umierania, rozpoczynało debatę (sekcja 7), a kontrola pytań nie przechowuje już żadnego pytania dla naszego zespołu (sekcje 7 i 10); ekran, który odrzuca pytanie, jest naszym uzasadnieniem w przypadku każdego pytania, które zgodnie z sekcją 7 nie rozpoczyna debaty (sekcja 10).
-
-Wersja 2.7 zastąpiła wersję 2.6: dodaje kontrolę pytań, która odczytuje każde pytanie, zanim debata się rozpocznie, niektóre odrzuca, a każde odrzucone pytanie, które grozi skrzywdzeniem innej osoby lub innych osób, wskazanych z imienia lub nie, w tym atakiem na osoby niewskazane, planuje to lub pyta, czy i jak skrzywdzić inną osobę lub inne osoby, albo które pyta, jak wytwarzać broń, materiały wybuchowe, trucizny lub narkotyki albo jak wesprzeć akt terrorystyczny, albo go gloryfikuje, przechowuje do przeczytania przez nasz zespół (sekcje 7, 8, 10 i 11); kontrolę, która odczytuje syntezę każdej zakończonej debaty, zatwierdzenie, którego oznaczona debata wymaga przed opublikowaniem, oraz debaty, które ta kontrola usuwa (sekcje 5, 8, 9, 10 i 11); dane, które czat wsparcia wysyła do modelu Claude firmy Anthropic, fakt, że nie przechowuje on niczego z tego, co piszesz, i nie otwiera sprawy, oraz fakt, że jego przycisk „Porozmawiaj z człowiekiem” pokazuje nasz adres wsparcia (sekcje 8 i 10); a także zasady w sekcji 7, które zakazują mowy nienawiści w jakiejkolwiek formie, instrukcji wytwarzania broni lub narkotyków, treści zachęcających do samobójstwa lub krzywdzenia innych osób oraz znieważania religii i wskazują, które pytania nie rozpoczynają debaty.
-
 ## 15. Odpowiedzialność
 
 **Czego nie ograniczamy.** Żadne postanowienie niniejszych Warunków nie wyłącza ani nie ogranicza naszej odpowiedzialności za śmierć lub uszkodzenie ciała spowodowane naszym zaniedbaniem, oszustwo lub oszukańcze wprowadzenie w błąd, rażące niedbalstwo lub umyślne działanie ani za żadne inne okoliczności, w których odpowiedzialności nie można zgodnie z prawem ograniczyć. Jeżeli jesteś konsumentem, żadne postanowienie nie pozbawia Cię praw ustawowych, w tym prawa do doprowadzenia usługi niezgodnej z umową do zgodności, do obniżenia ceny lub zwrotu ani jakiejkolwiek gwarancji mającej zastosowanie na mocy prawa państwa, w którym mieszkasz.
@@ -305,7 +281,7 @@ Sposób przetwarzania przez nas danych osobowych określa **Polityka prywatnośc
 
 **Sądy w przypadku zamieszkania w UE lub EOG.** Możesz wszcząć przeciwko nam postępowanie przed sądami Rumunii albo przed sądami państwa, w którym mieszkasz. My możemy wszcząć przeciwko Tobie postępowanie wyłącznie przed sądami państwa, w którym mieszkasz.
 
-**Konsumenci w innych miejscach.** Jeżeli mieszkasz poza UE i EOG, żadne postanowienie niniejszych Warunków nie ogranicza przysługującego Ci na mocy prawa Twojego państwa prawa do dochodzenia roszczeń przed jego sądami ani żadnego prawa, którego na mocy tych przepisów nie można się zrzec — w tym, jeżeli mieszkasz w Australii lub Nowej Zelandii, praw z tytułu gwarancji konsumenckich; jeżeli mieszkasz w Brazylii, praw wynikających z Código de Defesa do Consumidor; a jeżeli mieszkasz w Stanach Zjednoczonych, praw wynikających z przepisów ochrony konsumentów Twojego stanu.
+**Konsumenci w innych miejscach.** Jeżeli mieszkasz poza UE i EOG, żadne postanowienie niniejszych Warunków nie ogranicza przysługującego Ci na mocy prawa Twojego państwa prawa do dochodzenia roszczeń przed jego sądami ani żadnego prawa, którego na mocy tych przepisów nie można się zrzec — w tym, jeżeli mieszkasz w Australii lub Nowej Zelandii, praw z tytułu gwarancji konsumenckich; a jeżeli mieszkasz w Stanach Zjednoczonych, praw wynikających z przepisów ochrony konsumentów Twojego stanu.
 
 **Przed skierowaniem sprawy do sądu.** Skontaktuj się z nami pod adresem support@dezbatere.ro; większość problemów można rozwiązać, a naszym celem jest udzielenie odpowiedzi w ciągu 5 dni roboczych. Jeżeli jesteś konsumentem w Rumunii lub UE, możesz skorzystać z alternatywnego rozstrzygania sporów za pośrednictwem ANPC (SAL), reclamatiisal.anpc.ro; nie zobowiązujemy się uczestniczyć w tej procedurze. Skargi dotyczące decyzji moderacyjnych podlegają odrębnej ścieżce opisanej w sekcji 10.
 

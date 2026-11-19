@@ -154,7 +154,7 @@ export function installSubscriptionRoutes(
       agreement: parsed.data.renewal_terms
     }))));
   });
-  // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up.
+  // OUG 34/2014 art. 11^1: the signed-in session withdraws; the body is empty and no step-up is asked.
   api.post("/v1/billing/subscription/withdraw", policy("POST /v1/billing/subscription/withdraw"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;

@@ -208,6 +208,11 @@ describe("P23 paid plans, end to end on the fake stack", () => {
     expect(await stack.subscriptionStatus(person.ownerRef)).toBe("WITHDRAWN");
     expect(await stack.entitlementPlan(person.ownerRef)).toBe("FREE");
     expect(ids(stack.mailsTo(person.email))).toContain("M8_RECEIVED");
+    // The acknowledgement repeats the statement: its instant in the buyer's zone (Germany: Berlin), the day the plan
+    // started, and the payer's name, read from the billing details when the email is sent.
+    const acknowledgement = stack.mailsTo(person.email).find((mail) => mail.templateId === "M8_RECEIVED")!;
+    expect(acknowledgement.params).toMatchObject({ plan: "PRO", timeZone: "Europe/Berlin", buyerName: "Anna Schmidt" });
+    expect(acknowledgement.params.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/u);
     // Spec §2.12.2, the owner mode: the refund is handed to the owner, with the exact amount and the one command to run.
     const [due] = refundsDue(chargeRef);
     expect(due?.params).toMatchObject({

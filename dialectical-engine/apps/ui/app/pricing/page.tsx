@@ -108,6 +108,11 @@ export default async function PricingPage({
           <p>{t(billingCatalog, "billing.pricing.faqLimitsAnswer")}</p>
           <h3>{t(billingCatalog, "billing.pricing.faqCancelQuestion")}</h3>
           <p>{t(billingCatalog, "billing.pricing.faqCancelAnswer")}</p>
+          {/* OUG 34/2014 art. 6(1)(h): where the withdrawal function is, before anyone subscribes, also while no country
+              can pay; the link carries the page's one name. */}
+          <h3>{t(billingCatalog, "billing.pricing.faqWithdrawQuestion")}</h3>
+          <p>{t(billingCatalog, "billing.pricing.faqWithdrawAnswer")}</p>
+          <p><a href="/withdraw">{t(billingCatalog, "billing.withdrawPage.title")}</a></p>
           <h3>{t(billingCatalog, "billing.pricing.faqTaxQuestionIncluded")}</h3>
           <p>{t(billingCatalog, FAQ_TAX_ANSWER[priced])}</p>
           <p className="billingActions">

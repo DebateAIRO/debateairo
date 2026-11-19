@@ -216,6 +216,22 @@ describe("P18 /pricing", () => {
     expect((empty.querySelector('[data-pricing-place] button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
   });
 
+  it("says in its questions where the withdrawal function is, with a link to the Withdraw from contract page", async () => {
+    // OUG 34/2014 art. 6(1)(h): where the withdrawal function is, before anyone subscribes.
+    mocks.getBillingPlans.mockResolvedValue(GERMANY);
+    const document = await renderPricing();
+    const faq = document.querySelector(".pricingFaq")!;
+    const questions = [...faq.querySelectorAll("h3")].map((question) => question.textContent);
+    expect(questions.indexOf(billingEnglish["billing.pricing.faqWithdrawQuestion"]))
+      .toBe(questions.indexOf(billingEnglish["billing.pricing.faqCancelQuestion"]) + 1);
+    expect(billingEnglish["billing.pricing.faqWithdrawQuestion"]).toBe("Can I withdraw after I subscribe?");
+    const answer = [...faq.querySelectorAll("p")].find((line) => line.textContent?.startsWith("Yes. Wherever you live"))!;
+    expect(answer.textContent).toBe("Yes. Wherever you live, you can withdraw within 14 days of subscribing, without giving a reason:"
+      + " in Settings, under Subscription, press “Withdraw from contract here”. You get back the price minus the share of the"
+      + " plan's credit you have used.");
+    expect(faq.querySelector('a[href="/withdraw"]')?.textContent).toBe("Withdraw from contract");
+  });
+
   it("never shows a dollar amount of AI credit", async () => {
     mocks.getBillingPlans.mockResolvedValue(TEXAS);
     const text = (await renderPricing()).body.textContent ?? "";

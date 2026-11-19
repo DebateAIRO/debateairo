@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v2.19 · ĮSIGALIOJA 2026 M. LAPKRIČIO 19 D.
+eyebrow: PASLAUGŲ TEIKIMO SĄLYGOS · v1.0 · ĮSIGALIOJA 2026 M. LAPKRIČIO 19 D.
 title: Su kuo sutinkate
 lede: Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.
-endMarker: SĄLYGŲ PABAIGA · v2.19
+endMarker: SĄLYGŲ PABAIGA · v1.0
 bodyLabel: Paslaugų teikimo sąlygų tekstas
 annexTitle: A priedas — Regioninės sąlygos
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 TAIKYTINA TEISĖ
 -->
 
-**Version 2.19 · Effective 2026 m. lapkričio 19 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
+**Version 1.0 · Effective 2026 m. lapkričio 19 d. · Ankstesnės versijos adresu dezbatere.ro/terms/versions · Kalba: lietuvių.**
 
 **In short.** Turite būti ne jaunesni kaip 18 metų. Dialectical Engine kuria argumentus naudodama DI modelius, todėl viskas, ką ji sugeneruoja, gali būti klaidinga — tai nėra konsultacija. Nemokamame plane jūsų debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane jie yra privatūs, nebent juos paskelbiate. Viešus tapusius debatus gali skaityti bet kas, ir jie lieka vieši. Jūsų pateiktas tekstas siunčiamas mūsų Paslaugų teikėjų registre nurodytiems DI paslaugų teikėjams, daugiausia DeepInfra, Jungtinėse Amerikos Valstijose. DeepInfra, Anthropic ir Perplexity sąlygos neleidžia jiems pagal jį mokyti modelių; 8 skyriuje nurodyta, dėl kurios bendrovės to dar nepatvirtinome. Apie neteisėtą turinį praneškite adresu support@dezbatere.ro, nesvarbu, ar turite paskyrą. Taikoma Rumunijos teisė, tačiau jums ir toliau taikoma vietos vartotojų apsauga.
 
@@ -251,30 +251,6 @@ Patvariojoje laikmenoje iš anksto pranešame, kas ir kada keisis. Jei pakeitima
 
 **Šių Sąlygų pakeitimai.** Šias Sąlygas galime keisti dėl tokių pačių priežasčių. Jei pakeitimai nesumažina jūsų teisių, paskelbiame naują versiją su pakeitimų santrauka ir išsiunčiame jums el. laišką bent prieš **30 dienų** iki jos įsigaliojimo; jei po tos dienos toliau naudositės Dialectical Engine, tai reikš, kad su pakeitimais sutinkate, o iki tol galite uždaryti paskyrą. Jei pakeitimais sumažinamos jūsų teisės — įskaitant esamo plano kainos padidinimą, mažesnes ribas, pašalintas funkcijas, naujus jūsų turinio naudojimo būdus arba atsakomybės, taikytinos teisės ar ginčų sprendimo pakeitimus — kitą kartą prisijungus prašome aiškiai sutikti su nauja versija, o pakeitimas taikomas tik ateityje. Niekada netaikome pakeitimo atgaline data ir niekada nesinaudojame šiuo skyriumi tam, kad sutarties laikotarpio viduryje pakeistume esminius dalykus, už kuriuos sumokėjote, nepasiūlydami galimybės atsisakyti sutarties. Ankstesnes versijas galima rasti adresu dezbatere.ro/terms/versions.
 
-2.18 versija pakeitė 2.17 versiją: A.3 priede nurodyta, kad ir Kvebeke mokamame plane debatai yra privatūs pagal numatytuosius nustatymus, o nemokamame plane – vieši, kaip nurodyta 9 skyriuje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė. 2.18 versijoje taip pat įvardijama DeepInfra — bendrovė, gaunanti didžiąją dalį debatų teksto; nurodoma, kad ji vieno modelio užklausas perduoda bendrovei partnerei; ir nurodoma, dėl kurių teikėjų patvirtinome, kad jų sąlygos neleidžia mokyti modelių pagal jūsų turinį (8 skyrius).
-
-2.17 versija pakeitė 2.16 versiją: 10 skyriuje nurodyta, kada mygtuku Pranešti pateiktą pranešimą skaito DI, o kada asmuo, kad mygtukas prašo jūsų sąžiningumo patvirtinimo, kad pranešimo gavimą patvirtiname ir savo sprendimą pranešame el. paštu ir kad motyvų pareiškimai siunčiami el. paštu ir saugomi jūsų paskyroje; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
-
-2.16 versija pakeitė 2.15 versiją: 12 skyriuje nurodyti mokami planai, Plus, Pro ir Max, o 12 ir 15 skyriuose nebėra rengimo pastabų; tai, už ką atsakome, ir visos šiose Sąlygose numatytos teisės nepasikeitė.
-
-2.15 versija pakeitė 2.14 versiją: 12 skyriuje nurodyta, kad mūsų kainos rodomos be mokesčių, kaip kaina + PVM, ir kad mokestis pridedamas apmokėjimo metu.
-
-2.14 versija pakeitė 2.13 versiją: 18 skyriuje ir A priede alternatyvaus ginčų sprendimo keliu nurodyta ANPC (SAL).
-
-2.13 versija pakeitė 2.12 versiją: 12 skyriuje nurodytas mokėjimo mygtuko užrašas rumunų kalba.
-
-2.12 versija pakeitė 2.11 versiją: 10 skyriuje nurodyta, kad prisijungęs asmuo taip pat gali naudoti mygtuką Pranešti bet kuriame viešame debate, kad DI perskaito pranešimą, pateiktą jį naudojant, šalia viešo teksto, ir kas tada įvyksta.
-
-2.11 versija pakeitė 2.10 versiją: 9 skyriuje nurodyta, kad mes galime laikinai paslėpti viešą debatą, kol jį peržiūrime, ir pašalinti arba ištaisyti jo dalį.
-
-2.10 versija pakeitė 2.9 versiją: 9 skyriuje nurodyta, kad nemokamame plane debatai yra vieši, kad viešo debato paskelbimo negalima atšaukti ir jis lieka viešas jums uždarius paskyrą, kad kiekvienas, turintis kredito, gali prisidėti prie viešo debato arba parašyti jo ataskaitą, ir kad viešas debatas lieka atviras po to, kai jo pirmasis autorius pasitraukė; 11 skyriuje nurodyta, ką uždarymas reiškia jūsų viešiems debatams.
-
-2.9 versija pakeitė 2.8 versiją: 8 skyrius papildomas pastraipa „Mūsų generuojamos diagramos ir statistika“, kurioje nurodoma, kam priklauso debatų ataskaitos diagramos, ir suteikiama jums licencija jas naudoti.
-
-2.8 versija pakeitė 2.7 versiją: mūsų klausimų patikra taip pat atmeta klausimą, kaip padaryti nusikaltimą ar išvengti už jį bausmės, arba ar kas nors turėtų jį padaryti, pavyzdžiui, neteisėtai pirkti ar parduoti narkotikus ar ginklus, vogti ar vengti mokėti mokesčius, ir jo nesaugo; klausimas, ar reikėtų pakeisti kokį nors įstatymą, ir toliau pradeda debatus (7 skyrius). Ji taip pat nustato vieną taisyklę narkotikams ir leidžia klausimui, ar reikėtų pakeisti su savižudybe, eutanazija ar padėjimu mirti susijusį įstatymą, pradėti debatus (7 skyrius), o klausimų patikra nebesaugo jokio klausimo mūsų komandai (7 ir 10 skyriai); klausimą atmetantis ekranas yra mūsų motyvų pareiškimas dėl kiekvieno klausimo, dėl kurio pagal 7 skyrių debatai neprasideda (10 skyrius).
-
-2.7 versija pakeitė 2.6 versiją: ji prideda klausimų patikrą, kuri perskaito kiekvieną klausimą prieš debatų pradžią, kai kuriuos atmeta ir mūsų komandos perskaitymui saugo kiekvieną atmestą klausimą, kuriame grasinama pakenkti vienam ar keliems kitiems žmonėms, įvardytiems ar ne, įskaitant išpuolį prieš neįvardytus žmones, planuojama tai padaryti arba klausiama, ar ir kaip jiems pakenkti, arba kuriame klausiama, kaip pagaminti ginklų, sprogmenų, nuodų ar narkotikų arba kaip paremti teroro aktą, arba kuris jį šlovina (7, 8, 10 ir 11 skyriai); patikrą, kuri perskaito kiekvienų pasibaigusių debatų apibendrinimą, pritarimą, kurio reikia pažymėtiems debatams prieš juos paskelbiant, ir debatus, kuriuos ta patikra ištrina (5, 8, 9, 10 ir 11 skyriai); tai, ką pagalbos pokalbis siunčia Anthropic modeliui Claude, kad jis nesaugo nieko, ką rašote, ir neatidaro atvejo, ir kad jo mygtukas „Kalbėtis su žmogumi“ parodo mūsų pagalbos adresą (8 ir 10 skyriai); ir 7 skyriaus taisykles, kurios draudžia bet kokios rūšies neapykantos kalbą, ginklų ar narkotikų gaminimo instrukcijas, turinį, skatinantį savižudybę arba kenkimą kitiems žmonėms, ir religijos įžeidimą bei nurodo, dėl kokių klausimų debatai neprasideda.
-
 ## 15. Atsakomybė
 
 **Ko neribojame.** Jokia šių Sąlygų nuostata neatmeta ir neriboja mūsų atsakomybės už mirtį ar kūno sužalojimą dėl mūsų aplaidumo, sukčiavimą ar apgaulingą klaidingos informacijos pateikimą, didelį neatsargumą ar tyčinį netinkamą elgesį arba už bet ką kita, ko pagal teisės aktus negalima riboti. Jei esate vartotojas, jokia šių Sąlygų nuostata neatima jūsų įstatymų nustatytų teisių, įskaitant teisę reikalauti, kad sutarties neatitinkanti paslauga būtų suderinta su sutartimi, proporcingai sumažinti kainą ar susigrąžinti pinigus, arba bet kokią pagal jūsų gyvenamosios šalies teisę taikomą garantiją.
@@ -305,7 +281,7 @@ Kaip tvarkome asmens duomenis, nustatyta **Privatumo politikoje** adresu dezbate
 
 **Teismai, jei gyvenate ES arba EEE.** Bylą prieš mus galite iškelti Rumunijos arba šalies, kurioje gyvenate, teismuose. Bylą prieš jus galime iškelti tik šalies, kurioje gyvenate, teismuose.
 
-**Kitur gyvenantys vartotojai.** Jei gyvenate ne ES ar EEE, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas, Brazilijoje gyvenančių asmenų teises pagal *Código de Defesa do Consumidor* ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus.
+**Kitur gyvenantys vartotojai.** Jei gyvenate ne ES ar EEE, jokia šių Sąlygų nuostata neriboja pagal jūsų šalies teisę turimos teisės pareikšti ieškinį jos teismuose ar teisės, kurios pagal tos šalies teisę negalima atsisakyti — įskaitant Australijoje ar Naujojoje Zelandijoje gyvenančių asmenų teises pagal vartotojų garantijas ir Jungtinėse Amerikos Valstijose gyvenančių asmenų teises pagal jų valstijos vartotojų apsaugos įstatymus.
 
 **Prieš kreipiantis į teismą.** Susisiekite su mumis adresu support@dezbatere.ro; daugumą dalykų galima išspręsti ir siekiame atsakyti per 5 darbo dienas. Jei esate vartotojas Rumunijoje arba ES, galite naudotis alternatyviu ginčų sprendimu per ANPC (SAL), reclamatiisal.anpc.ro; mes neįsipareigojame dalyvauti šioje procedūroje. Skundams dėl moderavimo sprendimų taikoma 10 skyriuje nustatyta atskira tvarka.
 
