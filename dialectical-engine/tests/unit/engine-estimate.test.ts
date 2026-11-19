@@ -137,8 +137,8 @@ describe("the v4 storyteller's price (pre-flight Ruling PF-D4.2)", () => {
     // The estimate's storyteller output (previewCallOutputTokens) is the largest row ceiling: never below the v4 storyteller's
     // guided cap off the preview (STORY_GUIDED_BOUND_LIMITS.tokenCeiling, Task 11, = 131,072).
     expect(Math.max(...ceilings)).toBe(128 * 1024);
-    // The slow rows (GLM, MiMo, Qwen) keep LG-B's 16,384 on the preview, whatever Task 11's bound asks.
-    expect(ceilings.filter((ceiling) => ceiling === 16_384)).toHaveLength(3);
+    // The slow rows (GLM, MiMo, Qwen, and GPT-6 Luna until its speed is measured) keep LG-B's 16,384 on the preview, whatever Task 11's bound asks.
+    expect(ceilings.filter((ceiling) => ceiling === 16_384)).toHaveLength(4);
     // Task 7 review 2 (final wave B5): the estimate's storyteller output IS that value, the v4 storyteller's guided cap off
     // the preview (STORY_GUIDED_BOUND_LIMITS.tokenCeiling), whatever the story row's own bound says.
     const config = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",

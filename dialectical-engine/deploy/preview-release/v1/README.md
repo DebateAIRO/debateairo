@@ -3154,9 +3154,9 @@ it once; a second run changes nothing. The way back for this piece is the copy i
 (`$S/<service>-$LABEL.env.before-bedrock`), before anything of the new release has started.
 
 The website's own file (`ui-$LABEL.env`) does not change: its build list is only the page's fallback, and the page
-reads the live line-up from the API. The AI providers page lists Amazon from this upload on, because the API reaches
-its address; until the legal texts carry the reviewed Amazon entry it shows as not checked yet. So this upload goes out
-together with, or after, the release that carries that entry.
+reads the live line-up from the API. The AI providers page lists Amazon Web Services from this upload on, with its
+checked entry, because the API reaches its address. The paragraphs of the Privacy Policy and the Terms that name
+Amazon are a separate change; Luna is not switched on for anyone before they are live (piece 4).
 
 **Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload. In this order:
 1. The key, if it is not in yet, and the probe, twice (`README-bedrock.md`, install steps 4 and 8). Every field must

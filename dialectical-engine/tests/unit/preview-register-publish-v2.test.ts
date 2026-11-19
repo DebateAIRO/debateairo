@@ -41,7 +41,9 @@ const REVIEWED_PROVIDER_SET = { kind: 'CONFIGURED_PROVIDER_SET', requiredDistinc
   { providerRef: 'preview:mimo-v2-6-pro', adapterKind: 'openai-compatible-http', maker: 'Xiaomi' },
   { providerRef: 'preview:qwen-3-8-flash', adapterKind: 'openai-compatible-http', maker: 'Alibaba' },
   // PR B: Anthropic's reviewed ref, on the native Anthropic Messages adapter.
-  { providerRef: 'preview:claude-haiku-5-5', adapterKind: 'anthropic-messages-http', maker: 'Anthropic' }
+  { providerRef: 'preview:claude-haiku-5-5', adapterKind: 'anthropic-messages-http', maker: 'Anthropic' },
+  // OpenAI's GPT-6 Luna, served by Amazon Bedrock on the OpenAI-compatible wire.
+  { providerRef: 'preview:gpt-6-luna', adapterKind: 'openai-compatible-http', maker: 'OpenAI' }
 ] };
 /** The set A's kit published before PR B (DeepInfra's five refs): still a lawful base. */
 const DEEPINFRA_PROVIDER_SET = { ...REVIEWED_PROVIDER_SET, providers: REVIEWED_PROVIDER_SET.providers.slice(0, 5) };
@@ -80,7 +82,8 @@ describe('publish kit v2: source closure', () => {
       { familyRef: 'DeepSeek', providerRefs: ['preview:deepseek-v4-1-flash'] },
       { familyRef: 'Xiaomi', providerRefs: ['preview:mimo-v2-6-pro'] },
       { familyRef: 'Alibaba', providerRefs: ['preview:qwen-3-8-flash'] },
-      { familyRef: 'Anthropic', providerRefs: ['preview:claude-haiku-5-5'] }
+      { familyRef: 'Anthropic', providerRefs: ['preview:claude-haiku-5-5'] },
+      { familyRef: 'OpenAI', providerRefs: ['preview:gpt-6-luna'] }
     ]);
     for (const key of PREVIEW_BASE_OWNED_KEYS) expect(PREVIEW_SOURCE_ROW_KEYS_V2).not.toContain(key);
   });
@@ -119,7 +122,7 @@ describe('publish kit v2: composing from the current version', () => {
     const providerSet = plan.delta.find(row => row.rowKey === PROVIDER_SET_ROW)!;
     const refsOf = (text: string) => JSON.parse(text).providers.map((p: any) => p.providerRef);
     expect(refsOf(providerSet.newValueJsonText))
-      .toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash', 'preview:mimo-v2-6-pro', 'preview:qwen-3-8-flash', 'preview:claude-haiku-5-5']);
+      .toEqual(['preview:fixture-a', 'preview:fixture-b', 'preview:deepseek-v4-1-flash', 'preview:mimo-v2-6-pro', 'preview:qwen-3-8-flash', 'preview:claude-haiku-5-5', 'preview:gpt-6-luna']);
     expect(refsOf(providerSet.oldValueJsonText!)).toEqual(['preview:fixture-a', 'preview:fixture-b']);
     for (const key of MULTI_MODEL_KEYS) {
       const entry = plan.delta.find(row => row.rowKey === key)!;

@@ -323,8 +323,8 @@ is switched on for users.
 ## Switch it on
 
 **Only after** the step-8 probe has passed twice (each field shows its "Good" value), **and** the Privacy Policy and
-the AI providers page name Amazon Web Services (the legal row is live on the site). Until then Luna stays out of the
-line-up.
+the Terms on the site name Amazon Web Services (the AI providers page lists it by itself, as soon as the server's
+settings name its address). Until then Luna stays out of the line-up.
 
 **1. Start at boot, and the two watchers.** Each watcher run by hand should print `"status": "ok"`.
 

@@ -77,7 +77,9 @@ describe("(2) time: the gate, not the app, decides when a call has taken too lon
 });
 
 describe("(3) the storyteller's allowance is a reviewed per-row field, smaller on the slower rows", () => {
-  const expected: Readonly<Record<string, number>> = { [GLM]: 16_384, [DEEPSEEK]: 131_072, [MIMO]: 16_384, [QWEN]: 16_384, [HAIKU]: 128_000 };
+  const expected: Readonly<Record<string, number>> = { [GLM]: 16_384, [DEEPSEEK]: 131_072, [MIMO]: 16_384, [QWEN]: 16_384, [HAIKU]: 128_000,
+    // GPT-6 Luna keeps the slow rows' allowance until its speed on this connection is measured.
+    "us.openai.gpt-6-luna": 16_384 };
 
   it("MiMo, Qwen and GLM: 16,384; DeepSeek and Claude Haiku: their own maximum (L26)", () => {
     expect(Object.fromEntries(PREVIEW_MODEL_ROWS.map((row) => [row.model, row.storytellerTokenCeiling]))).toEqual(expected);

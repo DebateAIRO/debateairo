@@ -412,6 +412,36 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
+ * Amazon Bedrock, for OpenAI's GPT-6 Luna (`docs/legal/2026-11-17-provider-contract-facts.md`, read 17 November 2026;
+ * the model card and the data pages read again on 20 November 2026). A customer in Romania contracts with Amazon Web
+ * Services EMEA SARL, Luxembourg. The gate calls the model through Amazon's United States route only, so it is processed
+ * in the United States. OpenAI does not receive the text, and neither company may train on it (Bedrock's terms).
+ * Amazon keeps nothing but the requests its abuse filter flags, for up to 30 days; zero data retention exists only on
+ * request, which we have not made. Amazon Web Services, Inc. is certified under the EU–US Data Privacy Framework, and
+ * the data processing addendum carries the standard contractual clauses. The wording of the row is the owner's
+ * (approved 20 November 2026). Listed when the API's declared targets reach Bedrock's address (company `amazon`).
+ */
+export const AMAZON_BEDROCK_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  ...UNCHECKED_CLOUD,
+  key: "amazon",
+  provider: "Amazon Web Services (Amazon Bedrock)",
+  models: "GPT-6 Luna (OpenAI)",
+  entity: "Amazon Web Services EMEA SARL",
+  homeCountryKey: "legal.providers.luxembourg",
+  // A line-up model like DeepInfra's: role rotation gives it every debate job, and it is among the AIs that write the
+  // lists of what to look into before a debate starts.
+  purposes: Object.freeze<ProviderPurpose[]>([...UNCHECKED_CLOUD.purposes, "suggestPaths"]),
+  purposesConfirmed: true,
+  locationKey: "legal.providers.unitedStates",
+  retentionKey: "legal.providers.retentionAmazon",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.basisAmazon",
+  contact: "aws-EU-privacy@amazon.com",
+  checkedOn: "2026-11-20"
+});
+
+/**
  * Google's Gemini API, paid tier only, as the private preview uses it (Gemini 3.8 Flash), checked
  * 10 October 2026: for a billing address in Romania the contracting entity is Google Cloud EMEA
  * Limited (Google Contracting Entity page, "Gemini API Paid Services"); paid prompts and responses
@@ -481,7 +511,8 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
  */
 const REVIEWED_PROVIDER_COMPANIES = Object.freeze([
   ["anthropic", ANTHROPIC_PREVIEW_PROVIDER],
-  ["deepinfra", DEEPINFRA_PROVIDER]
+  ["deepinfra", DEEPINFRA_PROVIDER],
+  ["amazon", AMAZON_BEDROCK_PROVIDER]
 ] as const);
 const REVIEWED_COMPANY_KEYS: ReadonlySet<string> = new Set(REVIEWED_PROVIDER_COMPANIES.map(([company]) => company));
 /** The prefix the API gives a public host no catalogue row knows yet (ruling R20). */
@@ -511,7 +542,7 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
  * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
  * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
  * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
- * then DeepInfra, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
+ * then DeepInfra then Amazon, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
  * to (`DEEPINFRA_PARTNER_PROVIDER`); each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
  * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and

@@ -19,6 +19,7 @@ import {
 } from "@debateai/providers";
 import { previewGateKeyOf } from "../../apps/api/src/preview-budget-estimate.js";
 import { PREVIEW_MODEL_MAKERS, parsePreviewRosterFlag, previewRostersOfRoomRead } from "../../apps/ui/lib/previewPlanRoster.js";
+import { AMAZON_BEDROCK_PROVIDER, providerRegister } from "../../apps/ui/lib/legal/pages.js";
 import { framedFixturePacket } from "../support/framed-packet.js";
 
 const GLM = "zai-org/GLM-5.3-Flash";
@@ -197,6 +198,18 @@ describe("the Luna target is checked against its row, and older reviewed sets ke
   it("the providers page counts the host as Amazon, the company that receives the text", () => {
     expect(providerCompaniesOfTargets(targets(PREVIEW_REVIEWED_PROVIDER_REFS))).toEqual(["amazon", "anthropic", "deepinfra"]);
     expect(providerCompaniesOfTargets(targets(PREVIEW_REVIEWED_PROVIDER_REFS.filter(ref => ref !== LUNA_REF)))).toEqual(["anthropic", "deepinfra"]);
+  });
+  it("the Register's Amazon entry holds the facts and the wording the owner approved", () => {
+    expect(providerRegister(["amazon"])[0]).toBe(AMAZON_BEDROCK_PROVIDER);
+    expect(AMAZON_BEDROCK_PROVIDER).toMatchObject({ key: "amazon", provider: "Amazon Web Services (Amazon Bedrock)",
+      entity: "Amazon Web Services EMEA SARL", homeCountryKey: "legal.providers.luxembourg", locationKey: "legal.providers.unitedStates",
+      retentionKey: "legal.providers.retentionAmazon", zeroRetention: "no", training: "no", basisKey: "legal.providers.basisAmazon",
+      contact: "aws-EU-privacy@amazon.com", checkedOn: "2026-11-20", purposesConfirmed: true });
+    const english = JSON.parse(readFileSync(new URL("../../apps/ui/messages/en/legal.json", import.meta.url), "utf8")) as Record<string, string>;
+    expect(english["legal.providers.luxembourg"]).toBe("Luxembourg");
+    expect(english["legal.providers.unitedStates"]).toBe("United States");
+    expect(english["legal.providers.retentionAmazon"]).toBe("Not stored, with one exception: requests that Amazon's automatic abuse filter flags are kept for up to 30 days, and Amazon may review them. OpenAI, the model's maker, does not receive the text");
+    expect(english["legal.providers.basisAmazon"]).toBe("EU–US Data Privacy Framework: Amazon Web Services, Inc., which runs the United States data centres, is certified under it. Amazon's data processing addendum also carries the EU standard contractual clauses");
   });
 });
 
