@@ -300,6 +300,30 @@ test("the plans page and the checkout name the withdrawal function by the Settin
   assert.equal(english["billing.pricing.faqWithdrawQuestion"], "Can I withdraw after I subscribe?");
 });
 
+test("/pricing and /cancel say the plans renew monthly until cancelled, and the refund of the unused part as Terms §12 does", () => {
+  const english = catalogue("en");
+  assert.equal(english["billing.pricing.lede"],
+    "Paid plans are monthly subscriptions, paid in advance, that renew every month until you cancel. Every paid plan has the same features and differs only in AI credit each month, with a daily and a weekly share so it lasts all month.");
+  const refund = "If you cancel during a month you have paid for, you can also ask at support@dezbatere.ro for a refund of the share of that month's price you have not used, measured by the plan's credit, however many days have passed; once we refund, the plan ends.";
+  assert.equal(english["billing.pricing.faqCancelAnswer"],
+    `Yes, at any time, in Settings or on the cancel page without signing in. You keep your plan until the month you paid for ends. ${refund}`);
+  assert.equal(english["billing.cancelPage.lede"],
+    `Cancelling stops the renewal: you keep your plan until the end of the month you paid for. ${refund} Enter the email address of your account. We'll send you a link that cancels your plan. You don't need to sign in.`);
+  // The same refund rule, in the same words, as the English Terms (section 12, "Statutory rights first.").
+  const terms = readFileSync(join(root, "legal/en/terms-of-service.md"), "utf8");
+  for (const words of ["measured by the plan's credit, however many days have passed", "Ask at support@dezbatere.ro; once we refund, the plan ends."]) {
+    assert.ok(terms.includes(words), `Terms §12 says: ${words}`);
+  }
+  for (const key of ["billing.pricing.faqCancelAnswer", "billing.cancelPage.lede"]) {
+    assert.ok(english[key].includes("once we refund, the plan ends"), key);
+  }
+  const romanian = catalogue("ro");
+  for (const key of ["billing.pricing.faqCancelAnswer", "billing.cancelPage.lede"]) {
+    assert.ok(romanian[key].includes("odată ce am rambursat, abonamentul încetează"), `ro ${key}`);
+  }
+  assert.ok(romanian["billing.pricing.lede"].startsWith("Abonamentele plătite sunt lunare, se plătesc în avans și se reînnoiesc în fiecare lună până când le anulați."));
+});
+
 test("a plan paused by a payment dispute is cancelled with true words, in English exactly (P2-W10)", () => {
   const english = catalogue("en");
   // Its paid features stay paused: no sentence may promise them until a date, or offer an undo the server refuses.
