@@ -98,7 +98,7 @@ describe("English first: an English-only edit moves nothing else", () => {
   it("builds the manifest from an English-only edit, changes only the English pair, and archives nothing", () => {
     const history = committedArchive();
     const manifest = buildLegalManifest(withEnglishEdit, {}, history);
-    expect(manifest.documents.PRIVACY.en).toEqual({ version: "3.14", sha256: sha(editedEnglish()) });
+    expect(manifest.documents.PRIVACY.en).toEqual({ version: "3.15", sha256: sha(editedEnglish()) });
     for (const code of TRANSLATED) expect(manifest.documents.PRIVACY[code], code).toEqual(currentDocument("PRIVACY", code));
     for (const code of CODES) expect(manifest.documents.TERMS[code], code).toEqual(currentDocument("TERMS", code));
     // No archive copy is listed for the edited text: the archive is written at release.
@@ -109,7 +109,7 @@ describe("English first: an English-only edit moves nothing else", () => {
   it("is read by the package although the archive does not hold the English text yet", () => {
     const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(withEnglishEdit, {}, committedArchive()))) as LegalManifest;
     const parsed = parseLegalManifest(manifest);
-    expect(parsed.documents.PRIVACY.get("en")).toEqual({ version: "3.14", sha256: sha(editedEnglish()) });
+    expect(parsed.documents.PRIVACY.get("en")).toEqual({ version: "3.15", sha256: sha(editedEnglish()) });
     expect(parsed.archive.PRIVACY.get("en")?.get(sha(editedEnglish()))).toBeUndefined();
   });
 
@@ -126,7 +126,7 @@ describe("English first: an English-only edit moves nothing else", () => {
   it("lists the current texts in the archive only when the release step asks for it", () => {
     const manifest = buildLegalManifest(withEnglishEdit, {}, {}, undefined, { archiveCurrent: true });
     expect(manifest.archive.PRIVACY.en?.[sha(editedEnglish())]).toEqual({
-      version: "3.14", path: legalArchivePath("en", sha(editedEnglish()))
+      version: "3.15", path: legalArchivePath("en", sha(editedEnglish()))
     });
   });
 
@@ -229,9 +229,9 @@ describe("the release check", () => {
     const manifest = buildLegalManifest(releaseWithEnglishEdit, {}, archive);
     const problems = legalReleaseProblems(root, { readDraft: releaseWithEnglishEdit, manifest, translations: followingEnglish(releaseDraft) });
     expect(problems).toEqual([
-      `Privacy Policy: these 34 languages lag the English text (version 3.14, sha256 ${sha(editedEnglish()).slice(0, 12)}): ${TRANSLATED.join(", ")}. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document privacy`,
+      `Privacy Policy: these 34 languages lag the English text (version 3.15, sha256 ${sha(editedEnglish()).slice(0, 12)}): ${TRANSLATED.join(", ")}. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document privacy`,
       "Privacy Policy: the archive does not hold the current text of en. Run pnpm run generate:legal:archive and commit what it writes.",
-      "Privacy Policy: in en the archive already holds a different text as version 3.14. A changed text needs a new version number."
+      "Privacy Policy: in en the archive already holds a different text as version 3.15. A changed text needs a new version number."
     ]);
   });
 

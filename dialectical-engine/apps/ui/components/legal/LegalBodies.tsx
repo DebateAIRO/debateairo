@@ -442,14 +442,16 @@ const PURPOSE_KEYS: Readonly<Record<ProviderPurpose, string>> = {
   reportCheck: "legal.providers.purpose.reportCheck",
   clarifyQuestions: "legal.providers.purpose.clarifyQuestions",
   suggestPaths: "legal.providers.purpose.suggestPaths",
-  support: "legal.providers.purpose.support"
+  support: "legal.providers.purpose.support",
+  payments: "legal.providers.purpose.payments"
 };
 
 const FLAG_KEYS: Readonly<Record<ProviderRegisterEntry["zeroRetention"] | ProviderRegisterEntry["training"], string>> = {
   yes: "legal.providers.yes",
   no: "legal.providers.no",
   unconfirmed: "legal.providers.unconfirmed",
-  notNeeded: "legal.providers.zeroNotNeeded"
+  notNeeded: "legal.providers.zeroNotNeeded",
+  notApplicable: "legal.providers.notApplicable"
 };
 
 /**
@@ -458,7 +460,7 @@ const FLAG_KEYS: Readonly<Record<ProviderRegisterEntry["zeroRetention"] | Provid
  * It renders exactly the `entries` it is given (the page passes `providerRegister` of the API's
  * companies); the catalogues carry only labels and the words around them. Addition D24 (owner
  * 2026-10-22: providers only, not the models): no row names a model, so a model change never
- * changes the page.
+ * changes the page. Privacy 3.15: the page also lists the payment provider, whose AI-only facts read "not applicable".
  */
 export function LegalProvidersBody({ legalCatalog, entries }: {
   legalCatalog: MessageCatalog;

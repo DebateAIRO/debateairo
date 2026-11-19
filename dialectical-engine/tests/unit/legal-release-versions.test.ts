@@ -13,6 +13,7 @@ import {
   withoutPrivacy314,
   withoutPrivacy314Number
 } from "../support/legalPrivacy314.js";
+import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
 
 /**
  * Terms of Service 1.0 and Privacy Policy 3.13, effective 19 November 2026. The Terms start again at 1.0 (owner's
@@ -24,7 +25,13 @@ import {
  */
 
 const root = process.cwd();
-const draft = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+/**
+ * A draft as these checks were written for it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts),
+ * so as 3.14 left it, and the Terms as they are, since 1.0 is still their only version.
+ */
+const draft = (code: string, name: string): string =>
+  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : file(code, name);
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;

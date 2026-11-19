@@ -90,7 +90,7 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v3.14 · EFFECTIVE 19 NOVEMBER 2026"
+      "PRIVACY POLICY · v3.15 · EFFECTIVE 19 NOVEMBER 2026"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
@@ -217,7 +217,8 @@ describe("privacy policy modal — rendered", () => {
     // Privacy 3.12 (plan Task 83c): section 2's and section 7's "Questions not started yet" rows add two.
     // 0157 (Privacy 3.11, amended in place): three table rows more.
     // Privacy 3.14: section 4's product-news row left (we send no marketing email).
-    expect(expectedBullets).toBe(90);
+    // Privacy 3.15: section 7 gains the unfinished sign-up row, and its acceptance row becomes two.
+    expect(expectedBullets).toBe(92);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 
@@ -241,7 +242,7 @@ describe("privacy policy modal — rendered", () => {
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.14");
+    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.15");
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(
