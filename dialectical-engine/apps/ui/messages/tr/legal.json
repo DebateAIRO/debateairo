@@ -55,7 +55,6 @@
   "legal.versions.meta": "Yayımladığımız tüm sürümler, en yeniden en eskiye",
   "legal.versions.current": "Güncel",
   "legal.versions.read": "Oku",
-  "legal.versions.unpublished.note": "Ayrı bir metin olarak yayımlanmadı. Değişiklikleri 2.8 sürümünün parçasıdır.",
   "legal.versions.v2.note": "Kaydolurken size gösterilen sürüm.",
   "legal.versions.none": "Henüz önceki bir sürüm yayımlanmadı. Bu Koşullar değiştiğinde, yerini yenisine bırakan sürüm burada okunabilir olarak kalır.",
   "legal.privacyVersions.eyebrow": "Gizlilik Politikası",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: En resumen
-eyebrow: TÉRMINOS DE SERVICIO · v2.19 · EN VIGOR DESDE 19 DE NOVIEMBRE DE 2026
+eyebrow: TÉRMINOS DE SERVICIO · v1.0 · EN VIGOR DESDE 19 DE NOVIEMBRE DE 2026
 title: Lo que usted acepta
 lede: El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.
-endMarker: FIN DE LOS TÉRMINOS · v2.19
+endMarker: FIN DE LOS TÉRMINOS · v1.0
 bodyLabel: Texto de los Términos de servicio
 annexTitle: Anexo A — Términos regionales
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEY APLICABLE
 -->
 
-**Version 2.19 · Effective 19 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
+**Version 1.0 · Effective 19 de noviembre de 2026 · Versiones anteriores en dezbatere.ro/terms/versions · Idioma: español.**
 
 **In short.** Debe tener al menos 18 años. Dialectical Engine elabora argumentos mediante modelos de IA y todo lo que genera puede ser erróneo; no constituye asesoramiento. En el plan gratuito, sus debates son públicos cuando terminan, tras una comprobación de IA; en un plan de pago son privados salvo que los publique. Una vez públicos, cualquiera puede leer un debate, y sigue siendo público. El texto que envía se remite a los proveedores de IA incluidos en nuestro Registro de proveedores, principalmente DeepInfra, en Estados Unidos. Las condiciones de DeepInfra, Anthropic y Perplexity no les permiten entrenar modelos con él; la sección 8 indica de qué empresa aún no lo hemos confirmado. Denuncie contenido ilícito en support@dezbatere.ro, tenga o no una cuenta. Se aplica la legislación rumana, pero usted conserva la protección local que le corresponda como consumidor.
 
@@ -251,30 +251,6 @@ Le informaremos de antemano, en un soporte duradero, de qué va a cambiar y cuá
 
 **En estos Términos.** Podemos modificar estos Términos por los mismos tipos de motivos. Para los cambios que no reduzcan sus derechos, publicaremos la nueva versión con un resumen de las modificaciones y le enviaremos un correo electrónico al menos **30 días** antes de que entre en vigor; si continúa utilizando Dialectical Engine después de esa fecha, se entenderá que la acepta, y puede cerrar su cuenta antes de entonces. Para los cambios que reduzcan sus derechos —incluidos aumentos de precio de un plan existente, límites inferiores, funciones retiradas, nuevos usos de su contenido o cambios en la responsabilidad, la ley aplicable o la resolución de controversias—, le pediremos que acepte expresamente la nueva versión la próxima vez que inicie sesión, y el cambio solo se aplicará en lo sucesivo. Nunca aplicamos cambios con carácter retroactivo ni utilizamos esta sección para modificar, durante la vigencia del contrato, la esencia de aquello por lo que ha pagado sin ofrecerle una vía de salida. Las versiones anteriores seguirán disponibles en dezbatere.ro/terms/versions.
 
-La versión 2.18 sustituyó a la versión 2.17: el anexo A.3 indica que también en Quebec los debates de un plan de pago son privados por defecto y los del plan gratuito son públicos, como indica la sección 9; aquello de lo que respondemos, y cada uno de los derechos de estos Términos, no cambia. La versión 2.18 nombra además a DeepInfra, la empresa que recibe la mayor parte del texto de un debate, indica que DeepInfra remite las solicitudes de un modelo a una empresa socia, e indica de qué proveedores hemos confirmado que sus condiciones no permiten entrenar con su contenido (sección 8).
-
-La versión 2.17 sustituyó a la versión 2.16: la sección 10 indica cuándo lee una IA una denuncia hecha con el botón Denunciar y cuándo la lee una persona, que el botón le pide su declaración de buena fe, que le confirmamos la recepción de una denuncia y le comunicamos nuestra decisión por correo electrónico, y que las exposiciones de motivos se envían por correo electrónico y se conservan en su cuenta; aquello de lo que respondemos, y cada uno de los derechos de estos Términos, no cambia.
-
-La versión 2.16 sustituyó a la versión 2.15: la sección 12 nombra los planes de pago, Plus, Pro y Max, y las secciones 12 y 15 ya no contienen notas de redacción; aquello de lo que respondemos, y cada uno de los derechos de estos Términos, no cambia.
-
-La versión 2.15 sustituyó a la versión 2.14: la sección 12 indica que nuestros precios se muestran sin impuestos, como precio + IVA, y que el impuesto se añade al finalizar la compra.
-
-La versión 2.14 sustituyó a la versión 2.13: la sección 18 y el anexo A indican ANPC (SAL) como vía para la resolución alternativa de litigios.
-
-La versión 2.13 sustituyó a la versión 2.12: la sección 12 indica el texto en rumano del botón de pago.
-
-La versión 2.12 sustituyó a la versión 2.11: la sección 10 indica que una persona que ha iniciado sesión también puede usar el botón Denunciar de cualquier debate público, que una IA lee una denuncia hecha con él junto al texto público, y qué ocurre entonces.
-
-La versión 2.11 sustituyó a la versión 2.10: la sección 9 indica que podemos ocultar un debate público mientras lo revisamos, y eliminar o corregir parte de él.
-
-La versión 2.10 sustituyó a la versión 2.9: la sección 9 indica que los debates del plan gratuito son públicos, que un debate público no puede retirarse de la publicación y sigue siendo público tras cerrar su cuenta, que cualquiera con crédito puede aportar a un debate público o redactar un informe sobre él, y que un debate público sigue abierto tras la marcha de su primer autor; la sección 11 indica qué efecto tiene el cierre sobre sus debates públicos.
-
-La versión 2.9 sustituyó a la versión 2.8: la sección 8 incorpora el párrafo «Gráficos y estadísticas que generamos», que establece a quién pertenecen los gráficos de un informe de debate y le concede una licencia para usarlos.
-
-La versión 2.8 sustituyó a la versión 2.7: la comprobación de preguntas también rechaza una pregunta sobre cómo cometer un delito o quedar impune, o sobre si alguien debería cometer uno, como comprar o vender drogas o armas ilegalmente, robar o evadir impuestos, y no la conserva; una pregunta sobre si debería cambiar una ley sigue iniciando un debate (sección 7). También fija un único criterio para las drogas y permite que una pregunta sobre si debería cambiar la ley relativa al suicidio, a la eutanasia o a la muerte asistida inicie un debate (sección 7), y la comprobación de preguntas ya no conserva ninguna pregunta para nuestro equipo (secciones 7 y 10); la pantalla que rechaza una pregunta es nuestra exposición de motivos para toda pregunta con la que, según la sección 7, no empieza un debate (sección 10).
-
-La versión 2.7 sustituyó a la versión 2.6: añade la comprobación de preguntas, que lee cada pregunta antes de que empiece un debate, rechaza algunas y conserva, para que las lea nuestro equipo, cada pregunta rechazada que amenaza, planea o pregunta si o cómo causar daño a otra persona o a otras personas, con nombre o sin él, incluido un ataque contra personas sin nombre, o que pregunta cómo fabricar armas, explosivos, venenos o drogas o cómo apoyar un acto terrorista, o que hace apología de él (secciones 7, 8, 10 y 11); la comprobación que lee la síntesis de cada debate terminado, la aprobación que necesita un debate marcado antes de poder publicarse y los debates que esa comprobación elimina (secciones 5, 8, 9, 10 y 11); qué envía el chat de soporte al modelo Claude de Anthropic, que no conserva nada de lo que usted escribe y no abre ningún caso, y que su botón «Hablar con una persona» muestra nuestra dirección de soporte (secciones 8 y 10); y normas de la sección 7 que prohíben el discurso de odio de cualquier tipo, las instrucciones de fabricación de armas o drogas, el contenido que incite al suicidio o a dañar a otras personas y el insulto religioso, e indican qué preguntas no inician un debate.
-
 ## 15. Responsabilidad
 
 **Lo que no limitamos.** Nada de lo dispuesto en estos Términos excluye ni limita nuestra responsabilidad por muerte o lesiones personales causadas por nuestra negligencia, por fraude o declaración fraudulenta, por negligencia grave o conducta dolosa, ni por ninguna otra cuestión que no pueda limitarse legalmente. Si usted es consumidor, nada de lo aquí dispuesto suprime sus derechos legales, incluido el derecho a que se restablezca la conformidad de un servicio no conforme, a una reducción del precio o un reembolso, o cualquier garantía aplicable conforme a la legislación del país donde vive.
@@ -305,7 +281,7 @@ La forma en que tratamos los datos personales se expone en la **Política de pri
 
 **Tribunales, si vive en la UE o el EEE.** Puede iniciar un procedimiento contra nosotros ante los tribunales de Rumanía o ante los tribunales del país donde vive. Nosotros solo podemos iniciar un procedimiento contra usted ante los tribunales del país donde vive.
 
-**Consumidores de otros lugares.** Si vive fuera de la UE y el EEE, nada de lo dispuesto en estos Términos limita ningún derecho que tenga, conforme a la legislación de su país, a presentar una reclamación ante sus tribunales, ni ningún derecho que no pueda ser objeto de renuncia conforme a dicha legislación; incluidos, si vive en Australia o Nueva Zelanda, sus derechos de garantía como consumidor; si vive en Brasil, los derechos derivados del Código de Defesa do Consumidor; y, si vive en Estados Unidos, las normas de protección de los consumidores de su estado.
+**Consumidores de otros lugares.** Si vive fuera de la UE y el EEE, nada de lo dispuesto en estos Términos limita ningún derecho que tenga, conforme a la legislación de su país, a presentar una reclamación ante sus tribunales, ni ningún derecho que no pueda ser objeto de renuncia conforme a dicha legislación; incluidos, si vive en Australia o Nueva Zelanda, sus derechos de garantía como consumidor; y, si vive en Estados Unidos, las normas de protección de los consumidores de su estado.
 
 **Antes de acudir a los tribunales.** Póngase en contacto con nosotros en support@dezbatere.ro; la mayoría de las cuestiones pueden resolverse y nuestro objetivo es responder en un plazo de 5 días laborables. Si es un consumidor de Rumanía o de la UE, puede utilizar la resolución alternativa de litigios a través de ANPC (SAL), reclamatiisal.anpc.ro; no nos comprometemos a participar en dicho procedimiento. Las reclamaciones relativas a decisiones de moderación siguen la sección 10, que constituye una vía separada.
 
