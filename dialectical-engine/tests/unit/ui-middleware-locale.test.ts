@@ -80,7 +80,8 @@ describe("the first-visit language in the middleware", () => {
     expect(run({ "accept-language": "en", cookie: "debateai.locale=de" }).cookie).toBe("debateai.locale=de");
   });
 
-  it("marks every page as varying with Accept-Language, whatever it decided", () => {
+  // Next replaces this Vary on a rendered page with its own; server.mjs adds the name there (the built-server smoke).
+  it("says its answer varies with Accept-Language, whatever it decided", () => {
     for (const headers of [{}, { "accept-language": "ro" }, { "accept-language": "en" }, { "accept-language": "ro", cookie: "debateai.locale=en-GB" }]) {
       expect(run(headers).vary, JSON.stringify(headers)).toBe("Accept-Language");
     }

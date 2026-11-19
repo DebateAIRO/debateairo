@@ -26,6 +26,27 @@ function refuse(code) {
   return error;
 }
 
+/**
+ * A page answers in the language the visitor picked or, with no choice, in the one the browser prefers
+ * (middleware.ts), so it says it varies with Accept-Language. Next replaces any Vary set before a page renders with its
+ * own list, so the name is added as the headers go out. Only rendered pages and their navigation data (HTML and React
+ * Server Component answers) get it: static files and /api answers do not depend on the browser's language.
+ */
+function varyPagesByLanguage(response) {
+  const writeHead = response.writeHead;
+  response.writeHead = function writeHeadVaryingByLanguage(...args) {
+    if (/^text\/(?:html|x-component)\b/iu.test(String(this.getHeader("content-type") ?? ""))) {
+      const vary = this.getHeader("vary");
+      const names = (Array.isArray(vary) ? vary.join(",") : String(vary ?? "")).split(",")
+        .map((name) => name.trim()).filter((name) => name !== "");
+      if (!names.some((name) => name === "*" || name.toLowerCase() === "accept-language")) {
+        this.setHeader("vary", [...names, "Accept-Language"].join(", "));
+      }
+    }
+    return writeHead.apply(this, args);
+  };
+}
+
 const development = process.argv.includes("--dev");
 // This Node process is the ruled network edge. A reverse proxy in front of it
 // is trusted only when named exactly (R2 / C2): DIALECTICAL_UI_TRUSTED_PROXIES
@@ -92,6 +113,7 @@ const server = createServer((request, response) => {
   // when the pair is healthy, which /readyz checks), so a headerless API shows as missing (C12 review).
   const ownRelease = releaseHeaderFor(releaseKey, request.url);
   if (ownRelease !== null) response.setHeader("x-debateai-release", ownRelease);
+  varyPagesByLanguage(response);
   // Spec §6: the health check Caddy polls (with or without the edge secret) is answered here, never by Next, and
   // the website's /readyz proves the UI-to-API proof with its API (NV-03).
   if (readiness(request, response)) return;

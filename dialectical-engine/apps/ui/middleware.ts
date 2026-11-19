@@ -28,7 +28,9 @@ export function middleware(request: NextRequest) {
   }
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("content-security-policy", policy);
-  // The same address answers in either language, so a cache must never hand one browser's page to another.
+  // The same address answers in either language, so the answer says it varies with Accept-Language. Next keeps this on
+  // the answers it does not render as pages, such as the report downloads; a rendered page gets Next's own Vary, and
+  // the edge (server.mjs) adds the name to it.
   response.headers.append("vary", "Accept-Language");
   return response;
 }
