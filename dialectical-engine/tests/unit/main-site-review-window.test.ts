@@ -195,7 +195,8 @@ describe('the addresses the window opens', () => {
     'apps/ui/components/consent/CookiePreferencesCard.tsx', 'apps/ui/components/landing/LandingChrome.tsx',
     'apps/ui/components/landing/LandingHero.tsx', 'apps/ui/components/landing/LandingMethod.tsx',
     'apps/ui/components/landing/LandingPricing.tsx', 'apps/ui/components/billing/PricingCards.tsx',
-    'apps/ui/components/billing/PricingPlaceForm.tsx', 'apps/ui/components/billing/CancelFlow.tsx'
+    'apps/ui/components/billing/PricingPlaceForm.tsx', 'apps/ui/components/billing/CancelFlow.tsx',
+    'apps/ui/components/BetaNotice.tsx'
   ];
 
   it('every site address the public pages write is open, or closed on purpose', () => {

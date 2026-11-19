@@ -43,7 +43,8 @@ setting stops that service, and the journal names the setting with a short code.
 - *The NETOPIA review window* (5.8) lets strangers read the public pages of dezbatere.ro; everything else keeps the
   site password.
 - *The point of sale (POS)* is your shop's entry in NETOPIA's admin; NETOPIA approves card payments for it.
-- *The shop id* is the short number NETOPIA gives for its logo; it is not a secret.
+- *The shop id* is the short number in the logo code on NETOPIA's admin page **Identitate vizuală** (the digits of
+  `secret="…"`, 1.1). Despite that word, it is not a secret.
 - *A Next.js page request* is the website's own background request when it moves to another page (Next.js is the
   website's framework).
 
@@ -195,14 +196,15 @@ a live private API key.
 If NETOPIA has not approved yet, stop part 7 here. The same release can open payments on a later day, with no new
 upload.
 
-**NETOPIA's logo.** NETOPIA asks for its logo on the site. Write down the shop id NETOPIA shows you on its visual
-identity page (a short number; it is not a secret: every visitor's browser sees it). The upload puts it in the new
-release's website file (SB5d, part 2). Once the new release runs (from DR6 of the upload), the full footer and the
-checkout's card step show NETOPIA's own picture (its logo with the Visa and Mastercard marks), loaded from NETOPIA's
-server, while billing is on. It needs no file of yours and no Caddy change, so skip the release guide's PM1, SB5b,
-MT1, PM2 and MT2, and add no `PAYMENT_MARKS_AVAILABLE` line. If NETOPIA's admin shows you no shop id before the
-upload, ask NETOPIA for it. If you still have none, stop before SB1 and ask: without it this upload adds no logo, part
-5 waits for the logo check (LOGOCHECK, part 2), and NETOPIA's review looks for the logo (5.8b).
+**NETOPIA's logo.** NETOPIA asks for its logo on the site. Its admin shows the shop id already, before the point of
+sale is enrolled: open the page **Identitate vizuală** (visual identity). It shows a few lines of code for the logo;
+the shop id is the digits between the quotes of `secret="…"` in them. For example, `secret="12345"` means the shop id
+`12345`. Write down only the digits. Despite that word, it is not a secret: every visitor's browser sees it. The upload
+puts it in the new release's website file (SB5d, part 2). Once the new release runs (from DR6 of the upload), the full
+footer and the checkout's card step show NETOPIA's own picture (its logo with the Visa and Mastercard marks), loaded
+from NETOPIA's server, while billing is on. It needs no file of yours and no Caddy change, so skip the release guide's
+PM1, SB5b, MT1, PM2 and MT2, and add no `PAYMENT_MARKS_AVAILABLE` line. Part 5 waits for the logo check (LOGOCHECK,
+part 2), and NETOPIA's review looks for the logo (5.8b).
 
 ### 1.2 The SmartBill proof, on your Mac (it reads only; it writes nothing)
 
@@ -1900,7 +1902,9 @@ on mobile data.
    in the next minute.
 2. Open every page link in the footer, and one earlier version of the Privacy Policy (from `/privacy/versions`). Each
    opens with no password box, except Settings (Setări), which shows the password box as Log in does. The phone and
-   e-mail links open your phone and mail apps; the NETOPIA, ANPC and DB-IP links open those sites.
+   e-mail links open your phone and mail apps; the NETOPIA, ANPC and DB-IP links open those sites. **Report a problem**
+   (Raportați o problemă) is no page: it opens your mail program with a draft to the company's address, as does the
+   **Tell us** (Scrieți-ne) link in the home page's Beta sentence.
 3. Look at the page's language: Romanian if your browser's first language is Romanian, English otherwise. Then choose
    another language with the language button at the bottom of the page: the page comes back in that language, and the
    next page you open stays in it.
@@ -2228,6 +2232,8 @@ your identity, checks your shop's profile (it looks at the open site), and sends
   mode: payments on this site are not real and no money is taken").
 - A browser that prefers Romanian gets the site in Romanian; the language button at the bottom of every page
   switches.
+- The site is in Beta, and the home page says so; **Raportați o problemă** (Report a problem), in every page's footer,
+  opens the visitor's own mail program with a draft to the company's e-mail address.
 - Your question of step 2, if NETOPIA has not answered it yet.
 
 **5. While NETOPIA reviews** (days):
