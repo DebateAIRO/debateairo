@@ -19,7 +19,7 @@ import {
   isAnthropicThinkingControl,
   readAnthropicMessagesReply
 } from "./anthropic-messages.js";
-import { previewModelRowForEndpoint, previewSamplingMembers } from "./preview-models.js";
+import { previewModelRowForEndpoint, previewOutputTokensMember, previewSamplingMembers } from "./preview-models.js";
 import { ProviderSentBilledFailure, ProviderUnbilledRefusal } from "./unbilled-refusal.js";
 import { PROVIDER_SENT_INPUT_OVER_LIMIT, assertSentForm, packetWithPageTexts } from "./sent-form.js";
 import { ANTHROPIC_TOKEN_COUNT, type TokenCounter } from "./anthropic-token-count.js";
@@ -2433,7 +2433,8 @@ export class OpenAICompatibleProviderGateway implements ProviderGateway {
         ? anthropicBody
         : JSON.stringify({
         model: this.#options.model,
-        max_tokens: attemptTokenCeiling,
+        // The answer limit's member name follows the reviewed row (Amazon Bedrock: max_completion_tokens).
+        [previewOutputTokensMember(this.#options.endpoint, this.#options.model)]: attemptTokenCeiling,
         ...attemptThinking.wire,
         ...previewSamplingMembers(this.#options.endpoint, this.#options.model),
         messages: sentPacket.messages,

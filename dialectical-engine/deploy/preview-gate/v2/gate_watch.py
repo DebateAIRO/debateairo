@@ -70,12 +70,15 @@ NOTICE_KINDS = NOTICE_KINDS + ('anthropic-halted',)
 # Plan 2026-10-30, task W1-1: the Perplexity (web search) gate's halt watcher passes --notice perplexity-halted
 # (README-perplexity.md), with its own unbilled and booked notices.
 NOTICE_KINDS = NOTICE_KINDS + ('perplexity-halted',)
+# The Amazon Bedrock gate's halt watcher passes --notice bedrock-halted (README-bedrock.md), with its own unbilled and
+# booked notices.
+NOTICE_KINDS = NOTICE_KINDS + ('bedrock-halted',)
 # Each gate's own daily unbilled notice, by its halt kind. Google is parked: none.
 UNBILLED_KINDS = {'gate-halted': 'gate-unbilled', 'anthropic-halted': 'anthropic-unbilled',
-                  'perplexity-halted': 'perplexity-unbilled'}
+                  'perplexity-halted': 'perplexity-unbilled', 'bedrock-halted': 'bedrock-unbilled'}
 # Each gate's own booked-at-maximum notice (owner ruling 2026-10-12), by its halt kind. Google: none.
 BOOKED_KINDS = {'gate-halted': 'gate-booked', 'anthropic-halted': 'anthropic-booked',
-                'perplexity-halted': 'perplexity-booked'}
+                'perplexity-halted': 'perplexity-booked', 'bedrock-halted': 'bedrock-booked'}
 BOOKED_STATE_NAME = 'announced-booked.json'
 
 

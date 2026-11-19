@@ -3,8 +3,8 @@
  * automatically"): which serving COMPANIES the API's declared provider targets reach, so the "AI providers" legal page
  * lists exactly the companies that receive text, and a company added with an upload appears there by itself.
  *
- * Plain words: every declared target names a base URL; its host says which company serves it. The two reviewed
- * connections' hosts (`PREVIEW_DEEPINFRA_BASE_URL`, `PREVIEW_ANTHROPIC_BASE_URL`) map to the company keys the website's
+ * Plain words: every declared target names a base URL; its host says which company serves it. The reviewed
+ * connections' hosts (`PREVIEW_DEEPINFRA_BASE_URL`, `PREVIEW_ANTHROPIC_BASE_URL`, `PREVIEW_BEDROCK_BASE_URL`) map to the company keys the website's
  * reviewed catalogue knows (`apps/ui/lib/legal/pages.ts`). A loopback or private host (local mode only; hosted refuses
  * them, `assertHostedProviderTargets`) sends nothing to an outside company and is left out. Any other public host is
  * `host:<hostname>` (ruling R20): the page still shows it, as an unchecked row headed by its host name, so a company
@@ -13,9 +13,11 @@
 import { isRefusedHostedProviderHost, type ProviderDiscoveryTarget } from "./index.js";
 
 /** Addition D24: the reviewed connections' hosts and the company each one is (lower case, no trailing dot). */
-export const PROVIDER_COMPANY_HOSTS: Readonly<Record<string, "anthropic" | "deepinfra">> = Object.freeze({
+export const PROVIDER_COMPANY_HOSTS: Readonly<Record<string, "amazon" | "anthropic" | "deepinfra">> = Object.freeze({
   "api.anthropic.com": "anthropic",
-  "api.deepinfra.com": "deepinfra"
+  "api.deepinfra.com": "deepinfra",
+  // Amazon Bedrock serves OpenAI's model itself; OpenAI does not receive the text, so the company is Amazon.
+  "bedrock-runtime.us-east-1.amazonaws.com": "amazon"
 });
 
 /** The prefix of a company the table does not know, followed by its host name (ruling R20). */
@@ -29,7 +31,7 @@ function companyHostOf(baseUrl: string): string {
 }
 
 /**
- * Addition D24 item 2: the sorted, unique company keys the targets reach — `anthropic`, `deepinfra`, or
+ * Addition D24 item 2: the sorted, unique company keys the targets reach — `amazon`, `anthropic`, `deepinfra`, or
  * `host:<hostname>` for a public host the table does not know; a loopback or private host is omitted (it names no
  * outside company). The API computes it once at boot from its declared targets (`apps/api/src/main.ts`) and answers it
  * on `GET /v1/public/ai-providers`. Never throws for a parsed target (`parseProviderDiscoveryTargets` admits only an

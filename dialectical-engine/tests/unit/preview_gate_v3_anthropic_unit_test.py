@@ -179,7 +179,8 @@ class GateUnitTests(unittest.TestCase):
             'perplexity': ('/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
                            '/etc/debateai-v3-preview/provider-perplexity-go-v1.json'),
             'google': (GOOGLE_PRIVATE, '/etc/debateai-v3-preview/provider-google-go-v1.json'),
-            'team-v2': ('/var/lib/debateai-v3-preview/provider-team-authority-v2', '/etc/debateai-v3-preview/provider-team-go-v2.json'),
+            'bedrock': ('/var/lib/debateai-v3-preview/provider-bedrock-authority-v1', '/etc/debateai-v3-preview/provider-bedrock-go-v1.json'),
+        'team-v2': ('/var/lib/debateai-v3-preview/provider-team-authority-v2', '/etc/debateai-v3-preview/provider-team-go-v2.json'),
         }
         units = sorted(SYSTEMD.glob('*.service'))
         self.assertGreaterEqual(len(units), 6)

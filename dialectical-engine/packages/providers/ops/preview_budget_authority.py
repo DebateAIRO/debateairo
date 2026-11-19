@@ -322,6 +322,9 @@ GATE_PATHS = {
                    '/etc/debateai-v3-preview/provider-perplexity-go-v1.json'),
     'google': ('/var/lib/debateai-v3-preview/provider-google-authority-v1',
                '/etc/debateai-v3-preview/provider-google-go-v1.json'),
+    # Amazon Bedrock, for OpenAI's GPT-6 Luna (deploy/preview-gate/v3/README-bedrock.md).
+    'bedrock': ('/var/lib/debateai-v3-preview/provider-bedrock-authority-v1',
+                '/etc/debateai-v3-preview/provider-bedrock-go-v1.json'),
 }
 # The retired gates' state (v1, v2) and v2's GO: hidden from every probe too.
 RETIRED_GATE_PATHS = ('/var/lib/debateai-v3-preview/provider-test-authority',
@@ -1884,7 +1887,9 @@ def probe_summary(observed, profile):
             'reply_model': observed['changes'].get('reply_model'),
             'usage': {name: accounting.get(name) for name in ('prompt_tokens', 'completion_tokens', 'total_tokens',
                                                              'reasoning_tokens', 'billed_output_tokens', 'cached_tokens',
-                                                             'usage_valid')},
+                                                             'usage_valid')}
+                     # A profile whose accounting counts cache writes on their own (Amazon Bedrock) shows them too.
+                     | ({'cache_write_tokens': accounting['cache_write_tokens']} if 'cache_write_tokens' in accounting else {}),
             'guard_charge_usd': accounting.get('guard_charge_usd'),
             'provider_estimated_cost_usd': accounting.get('provider_estimated_cost_usd'),
             'entry_state': observed['changes'].get('state'), 'halt_reason': observed['halt_reason'],

@@ -16,7 +16,9 @@
 // (DeepInfra's addresses no longer match the gate's allow-list), and the Google gate's twins
 // "google-halted-<reason>" and "google-addresses-mismatch", and the Anthropic gate's
 // "anthropic-halted-<reason>" and "anthropic-addresses-mismatch", and (plan 2026-10-30, task W1-1) the Perplexity
-// web search gate's "perplexity-halted-<reason>" and "perplexity-addresses-mismatch". Each carries the one command
+// web search gate's "perplexity-halted-<reason>" and "perplexity-addresses-mismatch", and the Amazon Bedrock gate's
+// "bedrock-halted-<reason>" and "bedrock-addresses-mismatch" (with "bedrock-unbilled-..." and "bedrock-booked-..." as
+// the other gates'). Each carries the one command
 // that fixes it. Fixed wording, no amounts; at most one per notice name per 30 minutes.
 // Daily unbilled alert (2026-10-12 ruling: alert, never halt): "gate-unbilled-<count>_<YYYY>_<MM>_<DD>"
 // (DeepInfra), "anthropic-unbilled-<count>_<YYYY>_<MM>_<DD>" and "perplexity-unbilled-<count>_<YYYY>_<MM>_<DD>", queued by the halt watcher at most
@@ -124,7 +126,7 @@ const NOTICES = Object.freeze({
 /** `<kind>-<code>` -> { kind, code, unit } for the notice kinds; anything else null (an unbilled or booked kind needs a valid count and day). */
 export function parseNotice(text) {
   const match = typeof text === 'string'
-    ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text) ?? PERPLEXITY_NOTICE.exec(text) ?? RELEASE_NOTICE.exec(text)) : null;
+    ? (NOTICE.exec(text) ?? ANTHROPIC_NOTICE.exec(text) ?? PERPLEXITY_NOTICE.exec(text) ?? BEDROCK_NOTICE.exec(text) ?? RELEASE_NOTICE.exec(text)) : null;
   if (match && (match[1].endsWith('-unbilled') || match[1].endsWith('-booked')) && unbilledCode(match[2]) === null) return null;
   // A release notice's code must read back as a release label, so the runner unit it names is a real instance name.
   if (match && match[1].startsWith('release-') && !RELEASE_LABEL.test(releaseOf(match[2]))) return null;
@@ -177,6 +179,31 @@ const PERPLEXITY_NOTICES = Object.freeze({
     lead: 'The hourly address check of the Perplexity spending gate failed. Usually the addresses of api.perplexity.ai no longer match the gate\'s allow-list, and web searches fail as not sent until it is updated (debates go on without web search); the journal lines below say which case it is (PERPLEXITY_ADDRESSES_CHANGED, or another error such as an unreadable list). This email blanks addresses; to see the new ones, run the journalctl line under "What to look at" and check that they are Perplexity\'s. Then run the one command below. It adds today\'s DNS answer to the list and restarts the gate.',
     command: `/usr/bin/python3 -I ${PERPLEXITY_FOLDER}/perplexity_addresses.py update --dropin /etc/systemd/system/debateai-preview-perplexity-budget.service.d/50-perplexity-addresses.conf && systemctl restart debateai-preview-perplexity-budget`,
     lookAt: PERPLEXITY_ADDRESS_UNIT, journal: PERPLEXITY_ADDRESS_UNIT
+  })
+});
+
+// The Amazon Bedrock gate, for OpenAI's GPT-6 Luna (deploy/preview-gate/v3/README-bedrock.md): its own notices, kept
+// apart like the other gates'. Its allow-list holds Amazon's published ranges, so its address notice asks root to fetch
+// Amazon's ranges file first; the command then writes the list from that file.
+const BEDROCK_NOTICE = /^(bedrock-halted|bedrock-addresses|bedrock-unbilled|bedrock-booked)-([a-z0-9_]{1,64})$/;
+const BEDROCK_FOLDER = '/opt/debateai-v3-preview/operator/bedrock-budget-v1';
+const BEDROCK_PRIVATE = '/var/lib/debateai-v3-preview/provider-bedrock-authority-v1';
+const BEDROCK_UNIT = 'debateai-preview-bedrock-budget.service';
+const BEDROCK_ADDRESS_UNIT = 'debateai-preview-bedrock-addresses.service';
+const BEDROCK_NOTICES = Object.freeze({
+  'bedrock-halted': code => ({
+    subject: `Preview: Amazon Bedrock spending gate stopped: ${code}`,
+    lead: `The preview's Amazon Bedrock spending gate stopped taking paid GPT-6 Luna calls. Reason code: ${code}. Debates that use Luna do not start until it is re-opened; other models are not affected. Check the reason first (deploy/preview-gate/v3/README-bedrock.md, "Re-open after a halt"; status shows today's spend and every halt; a key that has passed its end date halts the gate too). Then re-open it with the one command below.`,
+    command: `/usr/bin/python3 -I ${BEDROCK_FOLDER}/preview_budget_authority.py activate --private ${BEDROCK_PRIVATE} --go /etc/debateai-v3-preview/provider-bedrock-go-v1.json`,
+    lookAt: BEDROCK_UNIT, journal: null
+  }),
+  'bedrock-unbilled': unbilledNotice('Amazon Bedrock', BEDROCK_FOLDER, BEDROCK_PRIVATE, BEDROCK_UNIT),
+  'bedrock-booked': bookedNotice('Amazon Bedrock', BEDROCK_FOLDER, BEDROCK_PRIVATE, BEDROCK_UNIT),
+  'bedrock-addresses': code => ({
+    subject: `Preview: Amazon Bedrock gate address list needs an update (${code})`,
+    lead: 'The hourly address check of the Amazon Bedrock spending gate failed. Usually bedrock-runtime.us-east-1.amazonaws.com now answers with an address outside the published Amazon ranges the gate may reach, and Luna calls fail as not sent until the list is updated; the journal lines below say which case it is (BEDROCK_ADDRESSES_OUTSIDE_RANGES, or another error such as an unreadable list). This email blanks addresses; to see them, run the journalctl line under "What to look at". First fetch Amazon\'s current ranges file as README-bedrock.md says ("Addresses": it is saved as /root/preview-archive/aws-ip-ranges.json). Then run the one command below. It writes the list from that file, refuses a file that does not cover today\'s addresses, and restarts the gate.',
+    command: `/usr/bin/python3 -I ${BEDROCK_FOLDER}/bedrock_addresses.py update --dropin /etc/systemd/system/debateai-preview-bedrock-budget.service.d/50-bedrock-addresses.conf --ranges /root/preview-archive/aws-ip-ranges.json && systemctl restart debateai-preview-bedrock-budget`,
+    lookAt: BEDROCK_ADDRESS_UNIT, journal: BEDROCK_ADDRESS_UNIT
   })
 });
 
@@ -472,7 +499,7 @@ export async function runAlert({ unit, layout = LAYOUT, deps = {}, test = false,
   try {
     if (typeof unit !== 'string' || !UNIT.test(unit)) refuse('UNIT_REFUSED');
     if (notice !== null && (parseNotice(`${notice.kind}-${notice.code}`)?.unit !== unit)) refuse('NOTICE_REFUSED');
-    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind] ?? PERPLEXITY_NOTICES[notice.kind] ?? RELEASE_NOTICES[notice.kind])(notice.code) }
+    const failure = notice !== null ? { kind: 'notice', send: true, restarts: null, notice: (NOTICES[notice.kind] ?? ANTHROPIC_NOTICES[notice.kind] ?? PERPLEXITY_NOTICES[notice.kind] ?? BEDROCK_NOTICES[notice.kind] ?? RELEASE_NOTICES[notice.kind])(notice.code) }
       : test ? { kind: 'test', send: true, restarts: null }
       : classifyFailure(await Promise.resolve().then(() => (deps.readUnitState ?? (name => readUnitState(name, { layout })))(unit)).catch(() => null));
     if (!failure.send) return done({ event: 'PREVIEW_LIFECYCLE_ALERT_SKIPPED', unit, state: failure.kind, restarts: failure.restarts });

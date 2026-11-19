@@ -27,7 +27,8 @@ export type PreviewLineUp = Readonly<{
 }>;
 /** Addition D13-D14: the part of the preview configuration that stays in the env (no rosters, no table). */
 export type PreviewGateSettings = Pick<PreviewProviderTestConfig,
-  "deployment" | "requested_thinking_level" | "budget_socket" | "scope_id" | "anthropic_budget_socket" | "perplexity_budget_socket">;
+  "deployment" | "requested_thinking_level" | "budget_socket" | "scope_id" | "anthropic_budget_socket" | "bedrock_budget_socket"
+  | "perplexity_budget_socket">;
 /**
  * Addition D14: the env, parsed. `envLineUp` is the line-up the two old forms carry (the fallback for a settings version
  * without the row); null for the sockets-only form.
@@ -75,7 +76,8 @@ export function parsePreviewLineUp(value: unknown): PreviewLineUp {
  *   sockets): their rosters and optional table become `envLineUp`, the fallback for settings versions without the
  *   line-up row;
  * - the sockets-only form (`budget_socket`, `deployment`, `requested_thinking_level`, `scope_id`, optional
- *   `anthropic_budget_socket` and `perplexity_budget_socket`; no rosters, no table): `envLineUp: null`.
+ *   `anthropic_budget_socket`, `bedrock_budget_socket` and `perplexity_budget_socket`; no rosters, no table):
+ *   `envLineUp: null`.
  * Undefined when the variable is unset; PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID otherwise (a table without rosters
  * included), or the thinking parser's own error for a bad table. Whether an env line-up may stand beside a site version
  * carrying the row (D15) is the boot's decision, not this parser's.

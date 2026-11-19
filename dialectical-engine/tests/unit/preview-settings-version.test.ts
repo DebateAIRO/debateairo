@@ -443,14 +443,14 @@ describe('the gate-code fingerprint and the live check for a switch (addition D2
     // An old gate file with its old GO agree with each other, but not with this release.
     const old = gateFilesOf('print("old")\n');
     expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...old, [`${engineOld}/${RELEASE_GATE_HELPER}`]: HELPER }) }))
-      .toEqual([differs('deepinfra'), differs('anthropic')]);
+      .toEqual([differs('deepinfra'), differs('anthropic'), differs('bedrock')]);
     // The GO names another digest; the GO is unreadable; the release's own copy is missing (every gate differs).
     expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [deepinfra.go]: JSON.stringify({ helper_sha256: 'a'.repeat(64) }) }) }))
       .toEqual([differs('deepinfra')]);
     expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [deepinfra.go]: '{' }) })).toEqual([differs('deepinfra')]);
     const noRelease = gateFilesOf();
     delete noRelease[`${engineOld}/${RELEASE_GATE_HELPER}`];
-    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io(noRelease) })).toEqual([differs('deepinfra'), differs('anthropic')]);
+    expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io(noRelease) })).toEqual([differs('deepinfra'), differs('anthropic'), differs('bedrock')]);
     // R65b: the authority (bridge) file the same way: its installed copy, the release's copy and the GO's bridge_sha256.
     const anthropic = LAYOUT.gates.find((gate: { name: string }) => gate.name === 'anthropic')!;
     expect(await gateHelperDifferences({ engine: engineOld, gates: LAYOUT.gates, io: io({ ...gateFilesOf(), [`${anthropic.folder}/${AUTHORITY_FILE}`]: 'older' }) }))

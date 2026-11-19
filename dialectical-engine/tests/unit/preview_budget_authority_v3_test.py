@@ -1350,7 +1350,7 @@ class ProfileTests(GateTest):
     def test_reserved_provider_names_have_no_profile_yet(self):
         # Anthropic's profile arrived with PR B (its own tests: preview_budget_authority_anthropic_test.py).
         # Perplexity's arrived with plan task W1-1 (2026-10-30; preview_budget_authority_perplexity_test.py).
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'perplexity'})
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'perplexity', 'bedrock'})
         self.assertNotIn('google', bridge.helper.PROFILES)
 
 
@@ -2427,7 +2427,8 @@ class TeamTotalTests(GateTest):
             'deepinfra': '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json',
             'anthropic': '/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
             'perplexity': '/etc/debateai-v3-preview/provider-perplexity-go-v1.json',
-            'google': '/etc/debateai-v3-preview/provider-google-go-v1.json'})
+            'google': '/etc/debateai-v3-preview/provider-google-go-v1.json',
+            'bedrock': '/etc/debateai-v3-preview/provider-bedrock-go-v1.json'})
         text = SOURCE.read_text()
         self.assertIn('result = activate(args.private, args.go)\n', text)  # main() passes no seam.
         self.assertNotIn('os.environ', text)

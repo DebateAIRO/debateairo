@@ -546,8 +546,8 @@ class DeepInfraProfile:
     final_writer_per_call_cap_usd = Decimal('0.75')
     redaction_patterns = ()  # DeepInfra keys have no fixed shape; the key itself and Bearer are always blanked.
     # No fixed shape either, but never another provider's key (Anthropic sk-ant-, Google AIza, Perplexity pplx-: plan
-    # 2026-10-30 task W1-1).
-    key_pattern = r'(?!sk-ant-|AIza|pplx-)[!-~]{16,512}'
+    # 2026-10-30 task W1-1; Amazon Bedrock ABSK and bedrock-api-key-).
+    key_pattern = r'(?!sk-ant-|AIza|pplx-|ABSK|bedrock-api-key-)[!-~]{16,512}'
     # Reviewed sampling (2026-10-12): the members a row may set, in the order the app's body carries them.
     sampling_keys = ('temperature', 'top_p', 'top_k')
     # Spec 2026-10-12 section 4.1: the words a row's menu may hold. None is no reasoning_effort member at all (the
@@ -1493,9 +1493,219 @@ class PerplexityProfile:
             return error.get('message') if isinstance(error.get('message'), str) else None
         return error if isinstance(error, str) else None
 
+# Amazon Bedrock's OpenAI-compatible Chat Completions reply (OpenAI's Chat Completions reference and Bedrock's prompt
+# caching page, read 2026-11-20). The usage members it may carry, and the splits inside the two details objects. A
+# member outside these sets halts: a new member may be a new way to bill.
+BEDROCK_USAGE_KEYS = frozenset({'prompt_tokens', 'completion_tokens', 'total_tokens', 'prompt_tokens_details',
+                                'completion_tokens_details'})
+BEDROCK_PROMPT_DETAIL_KEYS = frozenset({'cached_tokens', 'cache_write_tokens', 'audio_tokens', 'image_tokens', 'text_tokens'})
+BEDROCK_COMPLETION_DETAIL_KEYS = frozenset({'reasoning_tokens', 'audio_tokens', 'accepted_prediction_tokens',
+                                            'rejected_prediction_tokens', 'text_tokens'})
+# Splits that would mean something a text-only request never asks for, each billed its own way: they must be 0 or absent.
+BEDROCK_UNPRICED_PROMPT_DETAILS = ('audio_tokens', 'image_tokens')
+BEDROCK_UNPRICED_COMPLETION_DETAILS = ('audio_tokens', 'accepted_prediction_tokens', 'rejected_prediction_tokens')
+# One price step of a Bedrock row: prompts of at most prompt_tokens_up_to tokens (None: any size), each kind of token at
+# its own list price in USD per million.
+BedrockPriceStep = namedtuple('BedrockPriceStep', 'name prompt_tokens_up_to input_usd_per_m cache_write_usd_per_m '
+                                                  'cache_read_usd_per_m output_usd_per_m')
+
+
+def bedrock_split(details, known, unpriced):
+    """A usage details object as {name: whole count}, a missing or null member as 0; None when it is not an object (or
+    absent), names a member outside `known`, holds anything but a whole count or null, or reports an `unpriced` kind."""
+    if details is None:
+        return {}
+    if not isinstance(details, dict) or not set(details) <= known:
+        return None
+    if not all(value is None or integer(value) for value in details.values()):
+        return None
+    counts = {name: value or 0 for name, value in details.items()}
+    return None if any(counts.get(name, 0) != 0 for name in unpriced) else counts
+
+
+class BedrockProfile(DeepInfraProfile):
+    """Amazon Bedrock, OpenAI-compatible Chat Completions on the bedrock-runtime endpoint of us-east-1, Bearer key (a
+    long-term Bedrock API key). One reviewed row, OpenAI's GPT-6 Luna through the United States inference profile, so the
+    row's own id keeps every request inside the United States. The profile API is DeepInfraProfile's; what differs:
+
+    Request: exactly model, max_completion_tokens (OpenAI's name for the answer limit on reasoning models; it bounds
+    visible and reasoning tokens together), a reasoning_effort word on the row's menu, and messages. No sampling member,
+    no JSON mode, no caching member, no service tier. Chat Completions keeps no stored answers (the Responses API's
+    `store` does not exist here), so there is nothing to switch off.
+
+    Prices: Amazon bills this model in two steps by prompt size (settlement_steps), and its prompt cache is on by
+    default: it may write any part of a prompt to the cache, at a price above the plain input price, without the request
+    asking. So a call RESERVES every input token at the cache-write price of the step its size can reach (rounded up to
+    a whole nano-USD per token at the lower step, where the app's integer arithmetic needs it): the row's own input
+    price is that hold price, and the upper step applies once request bytes + 2048 pass the lower step's token limit.
+    A reply is SETTLED at Amazon's real prices: the step its prompt_tokens fall in, plain input, cache writes and cache
+    reads each at their own price, the output (reasoning included, billed_output_tokens) at the step's output price.
+    prompt_tokens counts the cached and written tokens too (as Bedrock documents for input_tokens on its Responses API);
+    a reply whose two cache counts add up to more than prompt_tokens does not add up and is uncertain.
+
+    A reply the profile cannot price is uncertain and the gate halts: a usage member or details split it does not know,
+    an audio, image or prediction count above 0, a service tier other than "default", counts that are not whole numbers.
+    Its ledger entry names the check and keeps the reply's outline (reply_outline). Only a reply with no usage at all, or
+    with unreadable prompt or completion counts, may be booked at its reservation (bookable_unreported).
+
+    Refusals that bill nothing: 429 (throttling), 503 (service unavailable) and 529 (overloaded), each a JSON object that
+    carries an error or a message and no billing key anywhere. All three say Amazon is busy: the model cools off, the gate
+    never halts for them. Any other 4xx (400 validation, 403 for a wrong, expired or unauthorised key, 404) halts: root
+    must look. Any other 5xx is booked at the reservation, as DeepInfra's are.
+
+    The reply must name the model by the row's own id (the inference profile's), as the app's gateway demands too; any
+    other name halts. The probe shows which name Amazon really sends before anyone relies on it.
+    """
+    name = 'bedrock'
+    host = 'bedrock-runtime.us-east-1.amazonaws.com'
+    path = '/openai/v1/chat/completions'
+    # A long-term Bedrock API key: ABSK, then base64 text. A short-term key (bedrock-api-key-..., 12 hours at most) is
+    # refused: the gate cannot renew one.
+    redaction_patterns = (r'ABSK[A-Za-z0-9+/=]{16,}', r'bedrock-api-key-[A-Za-z0-9+/=_-]+')
+    key_pattern = r'ABSK[A-Za-z0-9+/=]{16,508}'
+    sampling_keys = ()
+    # OpenAI documents none, low, medium, high, xhigh and max for GPT-6 Luna; the reviewed words are the four the app knows.
+    effort_words = ('none', 'low', 'medium', 'high')
+    settlement_steps = (
+        BedrockPriceStep('up_to_272k', 272000, Decimal('0.11'), Decimal('0.1375'), Decimal('0.011'), Decimal('0.55')),
+        BedrockPriceStep('over_272k', None, Decimal('0.22'), Decimal('0.275'), Decimal('0.022'), Decimal('0.825')))
+    # The upper step's hold: its cache-write price for every input token, and its output price.
+    UPPER_HOLD_PRICES = (Decimal('0.275'), Decimal('0.825'))
+    rows = {row.model: row for row in (
+        # The row's input price is the lower step's hold price (see the class docstring), not the plain input price.
+        ModelRow('us.openai.gpt-6-luna', 'OpenAI', Decimal('0.138'), Decimal('0.55'), 32768,
+                 ('high', 'medium', 'low', 'none'), False, final_writer_output_bound=128000),)}
+    RESERVATION_OVERHEAD_BYTES = 2048  # The core's own figure (preview_budget_authority); the app adds the same.
+    UNBILLED_STATUSES = frozenset({429, 503, 529})
+
+    def reservation_prices(self, row, moment, request_bytes=None):
+        """The row's hold prices while request bytes + 2048 cannot pass the lower step's token limit; the upper step's
+        hold prices above it, or for an unknown size."""
+        lower = self.settlement_steps[0]
+        small = (type(request_bytes) is int and request_bytes >= 0
+                 and request_bytes + self.RESERVATION_OVERHEAD_BYTES <= lower.prompt_tokens_up_to)
+        return (row.input_usd_per_m, row.output_usd_per_m) if small else self.UPPER_HOLD_PRICES
+
+    def ceiling_prices(self, row):
+        return self.UPPER_HOLD_PRICES
+
+    def body_valid(self, body, row):
+        """Exactly model, max_completion_tokens and messages, and a reasoning_effort word on the row's menu (no member
+        only where the menu holds None, which this row's does not). Nothing else."""
+        if not isinstance(body, dict) or body.get('model') != row.model:
+            return False
+        effort_member = 'reasoning_effort' in body
+        if set(body) != {'model', 'max_completion_tokens', 'messages'} | ({'reasoning_effort'} if effort_member else set()):
+            return False
+        if effort_member:
+            if not (isinstance(body['reasoning_effort'], str) and body['reasoning_effort'] in row.efforts):
+                return False
+        elif None not in row.efforts:
+            return False
+        return (type(body['max_completion_tokens']) is int and 1 <= body['max_completion_tokens'] <= row.output_bound
+                and isinstance(body['messages'], list) and bool(body['messages'])
+                and all(isinstance(m, dict) and set(m) == {'role', 'content'} and m['role'] in ('system', 'user', 'assistant')
+                        and isinstance(m['content'], str) for m in body['messages']))
+
+    def step_for(self, prompt_tokens):
+        lower, upper = self.settlement_steps
+        return lower if prompt_tokens <= lower.prompt_tokens_up_to else upper
+
+    def usage_check(self, response):
+        """(None, (prompt, cache write, cache read, completion, reasoning, billed output)) for a reply whose usage this
+        profile fully understands, else (the name of the check it failed, None)."""
+        if not isinstance(response, dict):
+            return 'not_an_object', None
+        if response.get('service_tier') not in (None, 'default'):
+            return 'service_tier', None
+        usage = response.get('usage')
+        if not isinstance(usage, dict):
+            return 'usage_missing', None
+        if not set(usage) <= BEDROCK_USAGE_KEYS:
+            return 'usage_unknown_field', None
+        prompt, completion, total = usage.get('prompt_tokens'), usage.get('completion_tokens'), usage.get('total_tokens')
+        if not (integer(prompt) and integer(completion)) or not (total is None or integer(total)):
+            return 'token_counts', None
+        prompt_split = bedrock_split(usage.get('prompt_tokens_details'), BEDROCK_PROMPT_DETAIL_KEYS,
+                                     BEDROCK_UNPRICED_PROMPT_DETAILS)
+        if prompt_split is None:
+            return 'prompt_tokens_details', None
+        completion_split = bedrock_split(usage.get('completion_tokens_details'), BEDROCK_COMPLETION_DETAIL_KEYS,
+                                         BEDROCK_UNPRICED_COMPLETION_DETAILS)
+        if completion_split is None:
+            return 'completion_tokens_details', None
+        write, read = prompt_split.get('cache_write_tokens', 0), prompt_split.get('cached_tokens', 0)
+        if write + read > prompt:
+            return 'cache_counts', None
+        reasoning = completion_split.get('reasoning_tokens')
+        output = billed_output_tokens(prompt, completion, total, reasoning)
+        if output is None:
+            return 'token_total', None
+        return None, (prompt, write, read, completion, reasoning, output)
+
+    def account(self, response, row, moment):
+        reason, counts = self.usage_check(response)
+        if counts is None:
+            # The dearest prices stay in the entry, so a reply booked unread is weighed at them (bookable_unreported).
+            return {'input_usd_per_m': str(self.UPPER_HOLD_PRICES[0]), 'output_usd_per_m': str(self.UPPER_HOLD_PRICES[1]),
+                    'prompt_tokens': None, 'completion_tokens': None, 'total_tokens': None, 'cached_tokens': None,
+                    'reasoning_tokens': None, 'usage_valid': False, 'configured_price_cost_usd': None,
+                    'provider_estimated_cost_usd': None, 'guard_charge_usd': None,
+                    'cost_basis': 'unknown; full reservation retained', 'invalid_reason': reason,
+                    'reply_shape': reply_outline(response)}
+        prompt, write, read, completion, reasoning, output = counts
+        step = self.step_for(prompt)
+        charge = (Decimal(prompt - write - read) * step.input_usd_per_m + Decimal(write) * step.cache_write_usd_per_m
+                  + Decimal(read) * step.cache_read_usd_per_m + Decimal(output) * step.output_usd_per_m) / Decimal(1000000)
+        text = format(charge, 'f')
+        return {'input_usd_per_m': str(step.input_usd_per_m), 'output_usd_per_m': str(step.output_usd_per_m),
+                'prompt_tokens': prompt, 'completion_tokens': completion, 'total_tokens': prompt + completion,
+                'cached_tokens': read, 'reasoning_tokens': reasoning, 'billed_output_tokens': output, 'usage_valid': True,
+                'configured_price_cost_usd': text, 'provider_estimated_cost_usd': None, 'guard_charge_usd': text,
+                'cost_basis': 'Amazon Bedrock list prices at the prompt-size step; no provider-reported cost',
+                'price_step': step.name, 'cache_write_tokens': write, 'cache_read_tokens': read,
+                'cache_write_usd_per_m': str(step.cache_write_usd_per_m),
+                'cache_read_usd_per_m': str(step.cache_read_usd_per_m)}
+
+    def unbilled_refusal(self, status, response):
+        """True only for 429, 503 or 529 with a JSON object that carries an error or a message and no usage, choices,
+        cost or token count at any depth: Amazon refused before any token was processed."""
+        return (status in self.UNBILLED_STATUSES and isinstance(response, dict)
+                and bool(response.get('error') or response.get('message') or response.get('Message'))
+                and not names_any_key(response, BILLED_KEYS)
+                and not names_any_key_prefixed(response, 'tokens_')
+                and not names_any_key_suffixed(response, '_tokens'))
+
+    def busy_refusal(self, status, response):
+        """Each unbilled refusal above (throttled, unavailable, overloaded) says Amazon is busy."""
+        return status in self.UNBILLED_STATUSES
+
+    def bookable_unreported(self, status, response, accounting, reserved):
+        """DeepInfraProfile's rule, but only for a reply with no usage or with unreadable prompt or completion counts. A
+        usage this profile read and did not understand (an unknown member, another service tier, an unpriced kind of
+        token) halts instead: root must see it before anything more is spent."""
+        if not isinstance(accounting, dict) or accounting.get('invalid_reason') not in ('usage_missing', 'token_counts'):
+            return False
+        return super().bookable_unreported(status, response, accounting, reserved)
+
+    # The probe's question is padded past the smallest prompt Amazon's cache keeps, so the probe shows how a cache write
+    # (first run) and a cache read (a second run within the cache's lifetime) are reported before any debate depends on it.
+    PROBE_PADDING_LINES = 150
+
+    def probe_body(self, row):
+        padding = ''.join('Padding line %03d of the probe; it carries no question.\n' % number
+                          for number in range(1, self.PROBE_PADDING_LINES + 1))
+        body = {'model': row.model, 'max_completion_tokens': min(1024, row.output_bound),
+                'messages': [{'role': 'user', 'content': padding + 'Reply exactly: OK'}]}
+        if row.efforts[0] is not None:
+            body['reasoning_effort'] = row.efforts[0]
+        return body
+
+
 # The providers this gate can serve. Google is a reserved name: a GO naming it is refused until
 # its reviewed profile is added here.
-PROFILES = {profile.name: profile for profile in (DeepInfraProfile(), AnthropicProfile(), PerplexityProfile())}
+PROFILES = {profile.name: profile for profile in (DeepInfraProfile(), AnthropicProfile(), PerplexityProfile(),
+                                                  BedrockProfile())}
 
 
 class HttpsTransport:

@@ -158,7 +158,7 @@ class ParityAndPriceTests(PerplexityTest):
         self.assertEqual((row.request_usd, row.maker, PERPLEXITY.SEARCH_TYPE), (PRICE, 'Perplexity', 'fast'))
 
     def test_the_profile_is_served_at_the_exact_search_url_only(self):
-        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'perplexity'})
+        self.assertEqual(set(bridge.helper.PROFILES), {'deepinfra', 'anthropic', 'perplexity', 'bedrock'})
         self.assertEqual((PERPLEXITY.name, PERPLEXITY.host, PERPLEXITY.path_for(PERPLEXITY.rows[SEARCH])),
                          ('perplexity', 'api.perplexity.ai', '/search'))
         self.assertIs(bridge.profile_of('perplexity'), PERPLEXITY)

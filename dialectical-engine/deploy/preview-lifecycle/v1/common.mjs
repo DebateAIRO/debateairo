@@ -61,7 +61,10 @@ export const LAYOUT = Object.freeze({
   bootMode: 'target',
   gates: Object.freeze([
     Object.freeze({ name: 'deepinfra', folder: '/opt/debateai-v3-preview/operator/deepinfra-budget-v3', privateDir: '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', go: '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json' }),
-    Object.freeze({ name: 'anthropic', folder: '/opt/debateai-v3-preview/operator/anthropic-budget-v1', privateDir: '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', go: '/etc/debateai-v3-preview/provider-anthropic-go-v1.json' })
+    Object.freeze({ name: 'anthropic', folder: '/opt/debateai-v3-preview/operator/anthropic-budget-v1', privateDir: '/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', go: '/etc/debateai-v3-preview/provider-anthropic-go-v1.json' }),
+    // Amazon Bedrock, for OpenAI's GPT-6 Luna (deploy/preview-gate/v3/README-bedrock.md). Listed here so a settings
+    // activation asks it which models it serves, and a release's runner is never stopped while one of its calls is out.
+    Object.freeze({ name: 'bedrock', folder: '/opt/debateai-v3-preview/operator/bedrock-budget-v1', privateDir: '/var/lib/debateai-v3-preview/provider-bedrock-authority-v1', go: '/etc/debateai-v3-preview/provider-bedrock-go-v1.json' })
   ]),
   noticeTemplate: 'debateai-preview-notice@',
   retiredLines: Object.freeze(['DEBATEAI_RUNNER_RETIRED', 'PREVIEW_RUNNER_RETIRED']),
