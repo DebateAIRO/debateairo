@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Pointe teagmhála d'údaráis — office@dezbatere.ro — Rómáinis agus Béarla",
         "Orduithe baint anuas maidir le hábhar sceimhlitheoireachta (Rialachán (AE) 2021/784) — office@dezbatere.ro — ár bpointe teagmhála le haghaidh na n-orduithe sin; Rómáinis agus Béarla; féach rannán 10",
         "Ionadaithe i dtíortha eile — Liostaítear in Iarscríbhinn A iad do na réigiúin ina bhfuil ceann ceaptha againn"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Oifig chláraithe","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, an Rómáin"],
+            ["Uimhir sa Chlár Trádála","J2022000426271"],
+            ["Cód uathúil clárúcháin (CUI)","45935221 · CBL: RO45935221"],
+            ["Scairchaipiteal","RON 5,000"],
+            ["Teagmháil ghinearálta","support@dezbatere.ro"],
+            ["Teileafón","+40 748 793 490"],
+            ["Fógraí dlíthiúla","support@dezbatere.ro"],
+            ["Príobháideachas agus cosaint sonraí","privacy@dezbatere.ro"],
+            ["Ábhar neamhdhleathach a thuairisciú","support@dezbatere.ro — féach rannán 10"],
+            ["Pointe teagmhála d'údaráis","office@dezbatere.ro — Rómáinis agus Béarla"],
+            ["Orduithe baint anuas maidir le hábhar sceimhlitheoireachta (Rialachán (AE) 2021/784)","office@dezbatere.ro — ár bpointe teagmhála le haghaidh na n-orduithe sin; Rómáinis agus Béarla; féach rannán 10"],
+            ["Ionadaithe i dtíortha eile","Liostaítear in Iarscríbhinn A iad do na réigiúin ina bhfuil ceann ceaptha againn"]
+          ]
+        }
       },
       { kind: "p", text: "Taispeántar na sonraí seo go buan ar an suíomh ag dezbatere.ro/legal freisin. Is féidir leat teagmháil a dhéanamh le duine i gcónaí, ní hamháin lenár gcúntóir; mínítear i rannán 10 conas é sin a dhéanamh." }
     ]

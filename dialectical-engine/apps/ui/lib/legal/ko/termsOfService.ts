@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "관계 당국 연락 창구 — office@dezbatere.ro — 루마니아어 및 영어",
         "테러리스트 콘텐츠 삭제 명령(EU 규정 제2021/784호) — office@dezbatere.ro — 이러한 명령에 관한 당사의 연락 창구; 루마니아어 및 영어; 제10조 참조",
         "다른 국가의 대리인 — 당사가 대리인을 지정한 지역은 부속서 A에 열거됨"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["등록 사무소","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, 루마니아"],
+            ["상업등기번호","J2022000426271"],
+            ["고유등록코드(CUI)","45935221 · VAT: RO45935221"],
+            ["자본금","RON 5,000"],
+            ["일반 문의","support@dezbatere.ro"],
+            ["전화","+40 748 793 490"],
+            ["법적 통지","support@dezbatere.ro"],
+            ["개인정보 보호 및 데이터 보호","privacy@dezbatere.ro"],
+            ["불법 콘텐츠 신고","support@dezbatere.ro — 제10조 참조"],
+            ["관계 당국 연락 창구","office@dezbatere.ro — 루마니아어 및 영어"],
+            ["테러리스트 콘텐츠 삭제 명령(EU 규정 제2021/784호)","office@dezbatere.ro — 이러한 명령에 관한 당사의 연락 창구; 루마니아어 및 영어; 제10조 참조"],
+            ["다른 국가의 대리인","당사가 대리인을 지정한 지역은 부속서 A에 열거됨"]
+          ]
+        }
       },
       { kind: "p", text: "이러한 정보는 dezbatere.ro/legal의 사이트에도 항상 표시됩니다. 귀하는 당사의 지원 도우미뿐만 아니라 언제든 담당자에게 연락할 수 있으며, 그 방법은 제10조에서 설명합니다." }
     ]

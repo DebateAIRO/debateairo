@@ -721,7 +721,7 @@ function OpenCard(props: Readonly<{
           <span className="v4MapOpenKind">
             {question.star ? <span className="v4MapStar" aria-hidden="true">★ </span> : null}
             <OpenWord catalog={pieces.catalog} />
-            <span>{openNote(question, picked, pieces.catalog)}</span>
+            <span data-pick-note="">{openNote(question, picked, pieces.catalog)}</span>
           </span>
           <span className="v4MapOpenTitle" data-ai-generated="true">{shortText(question.text)}</span>
           {question.star ? <span className="v4MapStarWords">{t(pieces.catalog, "v4.map.starHint")}</span> : null}

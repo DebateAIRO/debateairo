@@ -9,12 +9,19 @@
 export type LegalJump = Readonly<{ label: string; target: string }>;
 
 /**
+ * A markdown table's column names and its rows cell by cell (empty cells kept, so each cell lines
+ * up with its column name). `rows[i]` is the row `items[i]` shows. It is for screen readers only:
+ * each value is read with its column name, while the visible row stays `items[i]`.
+ */
+export type LegalTable = Readonly<{ head: readonly string[]; rows: readonly (readonly string[])[] }>;
+
+/**
  * One block of a section, in document order: a paragraph, or a bulleted list. A markdown table
- * arrives as a list whose items are the row cells joined with an em dash.
+ * arrives as a list whose items are the row cells joined with an em dash, plus `table`.
  */
 export type LegalBlock =
   | Readonly<{ kind: "p"; text: string }>
-  | Readonly<{ kind: "list"; items: readonly string[] }>;
+  | Readonly<{ kind: "list"; items: readonly string[]; table?: LegalTable }>;
 
 /**
  * One numbered section. `no` is what the reader sees in the margin (`01`, `A.3`); `accent` is a
