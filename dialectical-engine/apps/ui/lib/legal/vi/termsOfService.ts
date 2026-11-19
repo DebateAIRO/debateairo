@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Đầu mối liên hệ cho cơ quan có thẩm quyền — office@dezbatere.ro — tiếng Romania và tiếng Anh",
         "Lệnh gỡ bỏ nội dung khủng bố (Quy định (EU) số 2021/784) — office@dezbatere.ro — đầu mối liên hệ của chúng tôi cho các lệnh này; tiếng Romania và tiếng Anh; xem mục 10",
         "Đại diện tại các quốc gia khác — Được liệt kê trong Phụ lục A đối với các khu vực nơi chúng tôi đã chỉ định đại diện"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Trụ sở đăng ký","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania"],
+            ["Số đăng ký thương mại","J2022000426271"],
+            ["Mã đăng ký duy nhất (CUI)","45935221 · VAT: RO45935221"],
+            ["Vốn điều lệ","5.000 RON"],
+            ["Liên hệ chung","support@dezbatere.ro"],
+            ["Điện thoại","+40 748 793 490"],
+            ["Thông báo pháp lý","support@dezbatere.ro"],
+            ["Quyền riêng tư và bảo vệ dữ liệu","privacy@dezbatere.ro"],
+            ["Báo cáo nội dung bất hợp pháp","support@dezbatere.ro — xem mục 10"],
+            ["Đầu mối liên hệ cho cơ quan có thẩm quyền","office@dezbatere.ro — tiếng Romania và tiếng Anh"],
+            ["Lệnh gỡ bỏ nội dung khủng bố (Quy định (EU) số 2021/784)","office@dezbatere.ro — đầu mối liên hệ của chúng tôi cho các lệnh này; tiếng Romania và tiếng Anh; xem mục 10"],
+            ["Đại diện tại các quốc gia khác","Được liệt kê trong Phụ lục A đối với các khu vực nơi chúng tôi đã chỉ định đại diện"]
+          ]
+        }
       },
       { kind: "p", text: "Những thông tin này cũng được hiển thị thường xuyên trên trang web tại dezbatere.ro/legal. Bạn luôn có thể liên hệ với một người, không chỉ với trợ lý của chúng tôi; mục 10 giải thích cách thức." }
     ]

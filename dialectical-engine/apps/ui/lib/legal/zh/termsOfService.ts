@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "主管机关联系点 — office@dezbatere.ro — 罗马尼亚语和英语",
         "恐怖主义内容删除令（《（欧盟）第 2021/784 号条例》） — office@dezbatere.ro — 我们处理此类命令的联系点；罗马尼亚语和英语；见第 10 节",
         "其他国家的代表 — 对于我们已任命代表的区域，列于附件 A"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["注册办公地址","Str. 1 Decembrie 1918 nr. 80A，Piatra Neamț，罗马尼亚"],
+            ["商业登记号","J2022000426271"],
+            ["唯一注册代码（CUI）","45935221 · 增值税：RO45935221"],
+            ["注册资本","RON 5,000"],
+            ["一般联系","support@dezbatere.ro"],
+            ["电话","+40 748 793 490"],
+            ["法律通知","support@dezbatere.ro"],
+            ["隐私与数据保护","privacy@dezbatere.ro"],
+            ["举报违法内容","support@dezbatere.ro — 见第 10 节"],
+            ["主管机关联系点","office@dezbatere.ro — 罗马尼亚语和英语"],
+            ["恐怖主义内容删除令（《（欧盟）第 2021/784 号条例》）","office@dezbatere.ro — 我们处理此类命令的联系点；罗马尼亚语和英语；见第 10 节"],
+            ["其他国家的代表","对于我们已任命代表的区域，列于附件 A"]
+          ]
+        }
       },
       { kind: "p", text: "上述信息亦长期显示于网站 dezbatere.ro/legal。您始终可以联系到真人，而不仅是我们的助理；第 10 节说明了联系方式。" }
     ]

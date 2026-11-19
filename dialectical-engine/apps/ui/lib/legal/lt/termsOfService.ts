@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Institucijų kontaktinis punktas — office@dezbatere.ro — rumunų ir anglų kalbomis",
         "Nurodymai pašalinti teroristinį turinį (Reglamentas (ES) 2021/784) — office@dezbatere.ro — mūsų kontaktinis punktas šiems nurodymams; rumunų ir anglų kalbomis; žr. 10 skyrių",
         "Atstovai kitose šalyse — Regionuose, kuriuose juos paskyrėme, jie nurodyti A priede"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Registruota buveinė","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunija"],
+            ["Prekybos registro numeris","J2022000426271"],
+            ["Bendrasis registracijos kodas (CUI)","45935221 · PVM: RO45935221"],
+            ["Įstatinis kapitalas","5 000 RON"],
+            ["Bendrieji kontaktai","support@dezbatere.ro"],
+            ["Telefonas","+40 748 793 490"],
+            ["Teisiniai pranešimai","support@dezbatere.ro"],
+            ["Privatumas ir duomenų apsauga","privacy@dezbatere.ro"],
+            ["Pranešimai apie neteisėtą turinį","support@dezbatere.ro — žr. 10 skyrių"],
+            ["Institucijų kontaktinis punktas","office@dezbatere.ro — rumunų ir anglų kalbomis"],
+            ["Nurodymai pašalinti teroristinį turinį (Reglamentas (ES) 2021/784)","office@dezbatere.ro — mūsų kontaktinis punktas šiems nurodymams; rumunų ir anglų kalbomis; žr. 10 skyrių"],
+            ["Atstovai kitose šalyse","Regionuose, kuriuose juos paskyrėme, jie nurodyti A priede"]
+          ]
+        }
       },
       { kind: "p", text: "Šie duomenys taip pat nuolat skelbiami svetainėje adresu dezbatere.ro/legal. Visada galite susisiekti su žmogumi, ne tik su mūsų asistentu; kaip tai padaryti, paaiškinta 10 skyriuje." }
     ]

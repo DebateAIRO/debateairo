@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Kontaktstelle für Behörden — office@dezbatere.ro – Rumänisch und Englisch",
         "Entfernungsanordnungen für terroristische Inhalte (Verordnung (EU) 2021/784) — office@dezbatere.ro – unsere Kontaktstelle für diese Anordnungen; Rumänisch und Englisch; siehe Abschnitt 10",
         "Vertreter in anderen Ländern — In Anhang A für die Regionen aufgeführt, in denen wir einen Vertreter bestellt haben"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Eingetragener Sitz","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumänien"],
+            ["Handelsregisternummer","J2022000426271"],
+            ["Einheitlicher Registrierungscode (CUI)","45935221 · USt.: RO45935221"],
+            ["Stammkapital","5.000 RON"],
+            ["Allgemeiner Kontakt","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Rechtliche Mitteilungen","support@dezbatere.ro"],
+            ["Datenschutz","privacy@dezbatere.ro"],
+            ["Meldung rechtswidriger Inhalte","support@dezbatere.ro – siehe Abschnitt 10"],
+            ["Kontaktstelle für Behörden","office@dezbatere.ro – Rumänisch und Englisch"],
+            ["Entfernungsanordnungen für terroristische Inhalte (Verordnung (EU) 2021/784)","office@dezbatere.ro – unsere Kontaktstelle für diese Anordnungen; Rumänisch und Englisch; siehe Abschnitt 10"],
+            ["Vertreter in anderen Ländern","In Anhang A für die Regionen aufgeführt, in denen wir einen Vertreter bestellt haben"]
+          ]
+        }
       },
       { kind: "p", text: "Diese Angaben werden auch dauerhaft auf der Website unter dezbatere.ro/legal angezeigt. Sie können stets einen Menschen erreichen und nicht nur unseren Assistenten; Abschnitt 10 erläutert, wie dies möglich ist." }
     ]

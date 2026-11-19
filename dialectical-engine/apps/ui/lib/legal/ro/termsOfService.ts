@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Punct de contact pentru autorități — office@dezbatere.ro — română și engleză",
         "Ordine de eliminare a conținutului cu caracter terorist (Regulamentul (UE) 2021/784) — office@dezbatere.ro — punctul nostru de contact pentru aceste ordine; română și engleză; consultați secțiunea 10",
         "Reprezentanți în alte țări — Enumerați în Anexa A pentru regiunile în care am desemnat un reprezentant"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Sediul social","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, România"],
+            ["Numărul din Registrul Comerțului","J2022000426271"],
+            ["Cod unic de înregistrare (CUI)","45935221 · TVA: RO45935221"],
+            ["Capital social","5.000 RON"],
+            ["Contact general","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Notificări juridice","support@dezbatere.ro"],
+            ["Confidențialitate și protecția datelor","privacy@dezbatere.ro"],
+            ["Raportarea conținutului ilegal","support@dezbatere.ro — consultați secțiunea 10"],
+            ["Punct de contact pentru autorități","office@dezbatere.ro — română și engleză"],
+            ["Ordine de eliminare a conținutului cu caracter terorist (Regulamentul (UE) 2021/784)","office@dezbatere.ro — punctul nostru de contact pentru aceste ordine; română și engleză; consultați secțiunea 10"],
+            ["Reprezentanți în alte țări","Enumerați în Anexa A pentru regiunile în care am desemnat un reprezentant"]
+          ]
+        }
       },
       { kind: "p", text: "Aceste date sunt afișate permanent și pe site, la dezbatere.ro/legal. Puteți contacta întotdeauna o persoană, nu doar asistentul nostru; secțiunea 10 explică modalitatea." }
     ]

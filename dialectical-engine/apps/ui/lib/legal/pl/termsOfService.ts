@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Punkt kontaktowy dla organów — office@dezbatere.ro — w języku rumuńskim i angielskim",
         "Nakazy usunięcia treści o charakterze terrorystycznym (rozporządzenie (UE) 2021/784) — office@dezbatere.ro — nasz punkt kontaktowy dla takich nakazów; w języku rumuńskim i angielskim; zob. sekcja 10",
         "Przedstawiciele w innych państwach — Wymienieni w załączniku A w odniesieniu do regionów, w których ich wyznaczyliśmy"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Siedziba","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunia"],
+            ["Numer w rejestrze handlowym","J2022000426271"],
+            ["Unikalny kod rejestracyjny (CUI)","45935221 · VAT: RO45935221"],
+            ["Kapitał zakładowy","5000 RON"],
+            ["Kontakt ogólny","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Zawiadomienia prawne","support@dezbatere.ro"],
+            ["Prywatność i ochrona danych","privacy@dezbatere.ro"],
+            ["Zgłaszanie nielegalnych treści","support@dezbatere.ro — zob. sekcja 10"],
+            ["Punkt kontaktowy dla organów","office@dezbatere.ro — w języku rumuńskim i angielskim"],
+            ["Nakazy usunięcia treści o charakterze terrorystycznym (rozporządzenie (UE) 2021/784)","office@dezbatere.ro — nasz punkt kontaktowy dla takich nakazów; w języku rumuńskim i angielskim; zob. sekcja 10"],
+            ["Przedstawiciele w innych państwach","Wymienieni w załączniku A w odniesieniu do regionów, w których ich wyznaczyliśmy"]
+          ]
+        }
       },
       { kind: "p", text: "Dane te są również stale dostępne w serwisie pod adresem dezbatere.ro/legal. Zawsze możesz skontaktować się z człowiekiem, a nie wyłącznie z naszym asystentem; sposób kontaktu opisano w sekcji 10." }
     ]

@@ -271,8 +271,9 @@ function tableCells(line) {
 
 /**
  * Splits the lines of one section (or the preamble) into blocks in document order. A table
- * becomes ONE list block: its header row and separator are dropped and every other row is its
- * non-empty cells joined with an em dash.
+ * becomes ONE list block: every row after the header is its non-empty cells joined with an em
+ * dash, and `table` keeps the header and each row's cells so a screen reader can name each value
+ * by its column (the visible row is unchanged).
  */
 export function parseBlocks(lines) {
   const blocks = [];
@@ -285,19 +286,24 @@ export function parseBlocks(lines) {
     }
     if (isTableLine(line)) {
       const rows = [];
-      let header = true;
+      const cellRows = [];
+      let head = null;
       while (index < lines.length && isTableLine(lines[index])) {
         const cells = tableCells(lines[index]);
         index += 1;
         if (isSeparatorRow(cells)) continue;
-        if (header) {
-          header = false;
+        if (head === null) {
+          head = cells.map(inlineText);
           continue;
         }
-        const item = cells.map(inlineText).filter((cell) => cell.length > 0).join(" — ");
-        if (item.length > 0) rows.push(item);
+        const texts = cells.map(inlineText);
+        const item = texts.filter((cell) => cell.length > 0).join(" — ");
+        if (item.length > 0) {
+          rows.push(item);
+          cellRows.push(texts);
+        }
       }
-      blocks.push({ kind: "list", items: rows });
+      blocks.push({ kind: "list", items: rows, table: { head: head ?? [], rows: cellRows } });
       continue;
     }
     if (isListLine(line)) {
@@ -509,7 +515,12 @@ const str = (value) => JSON.stringify(value);
 function renderBlock(block) {
   if (block.kind === "p") return `      { kind: "p", text: ${str(block.text)} }`;
   const items = block.items.map((item) => `        ${str(item)}`).join(",\n");
-  return `      {\n        kind: "list",\n        items: [\n${items}\n        ]\n      }`;
+  if (block.table === undefined) return `      {\n        kind: "list",\n        items: [\n${items}\n        ]\n      }`;
+  const rows = block.table.rows.map((row) => `            ${str(row)}`).join(",\n");
+  return (
+    `      {\n        kind: "list",\n        items: [\n${items}\n        ],\n` +
+    `        table: {\n          head: ${str(block.table.head)},\n          rows: [\n${rows}\n          ]\n        }\n      }`
+  );
 }
 
 function renderSection(section) {

@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Kontaktné miesto pre orgány verejnej moci — office@dezbatere.ro — rumunčina a angličtina",
         "Príkazy na odstránenie teroristického obsahu (nariadenie (EÚ) 2021/784) — office@dezbatere.ro — naše kontaktné miesto pre tieto príkazy; rumunčina a angličtina; pozri časť 10",
         "Zástupcovia v iných krajinách — Uvedení v prílohe A pre regióny, v ktorých sme zástupcu vymenovali"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Sídlo","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumunsko"],
+            ["Číslo v obchodnom registri","J2022000426271"],
+            ["Jednotné registračné číslo (CUI)","45935221 · DPH: RO45935221"],
+            ["Základné imanie","5 000 RON"],
+            ["Všeobecný kontakt","support@dezbatere.ro"],
+            ["Telefón","+40 748 793 490"],
+            ["Právne oznámenia","support@dezbatere.ro"],
+            ["Súkromie a ochrana osobných údajov","privacy@dezbatere.ro"],
+            ["Hlásenie nezákonného obsahu","support@dezbatere.ro — pozri časť 10"],
+            ["Kontaktné miesto pre orgány verejnej moci","office@dezbatere.ro — rumunčina a angličtina"],
+            ["Príkazy na odstránenie teroristického obsahu (nariadenie (EÚ) 2021/784)","office@dezbatere.ro — naše kontaktné miesto pre tieto príkazy; rumunčina a angličtina; pozri časť 10"],
+            ["Zástupcovia v iných krajinách","Uvedení v prílohe A pre regióny, v ktorých sme zástupcu vymenovali"]
+          ]
+        }
       },
       { kind: "p", text: "Tieto údaje sú tiež trvalo uvedené na webovej lokalite dezbatere.ro/legal. Vždy môžete kontaktovať človeka, nielen nášho asistenta; postup vysvetľuje časť 10." }
     ]

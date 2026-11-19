@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Iestāžu kontaktpunkts — office@dezbatere.ro — rumāņu un angļu valodā",
         "Teroristiska satura izņemšanas rīkojumi (Regula (ES) 2021/784) — office@dezbatere.ro — mūsu kontaktpunkts šiem rīkojumiem; rumāņu un angļu valodā; skatiet 10. sadaļu",
         "Pārstāvji citās valstīs — Norādīti A pielikumā attiecībā uz reģioniem, kuros esam tādus iecēluši"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Juridiskā adrese","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumānija"],
+            ["Komercreģistra numurs","J2022000426271"],
+            ["Vienotais reģistrācijas kods (CUI)","45935221 · PVN: RO45935221"],
+            ["Pamatkapitāls","5000 RON"],
+            ["Vispārīga saziņa","support@dezbatere.ro"],
+            ["Tālrunis","+40 748 793 490"],
+            ["Juridiski paziņojumi","support@dezbatere.ro"],
+            ["Privātums un datu aizsardzība","privacy@dezbatere.ro"],
+            ["Ziņošana par nelikumīgu saturu","support@dezbatere.ro — skatiet 10. sadaļu"],
+            ["Iestāžu kontaktpunkts","office@dezbatere.ro — rumāņu un angļu valodā"],
+            ["Teroristiska satura izņemšanas rīkojumi (Regula (ES) 2021/784)","office@dezbatere.ro — mūsu kontaktpunkts šiem rīkojumiem; rumāņu un angļu valodā; skatiet 10. sadaļu"],
+            ["Pārstāvji citās valstīs","Norādīti A pielikumā attiecībā uz reģioniem, kuros esam tādus iecēluši"]
+          ]
+        }
       },
       { kind: "p", text: "Šī informācija ir arī pastāvīgi redzama vietnē dezbatere.ro/legal. Jūs vienmēr varat sazināties ar cilvēku, ne tikai ar mūsu asistentu; 10. sadaļā paskaidrots, kā to izdarīt." }
     ]

@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Punto di contatto per le autorità — office@dezbatere.ro — rumeno e inglese",
         "Ordini di rimozione di contenuti terroristici (regolamento (UE) 2021/784) — office@dezbatere.ro — il nostro punto di contatto per questi ordini; rumeno e inglese; consulta la sezione 10",
         "Rappresentanti in altri Paesi — Elencati nell'Allegato A per le regioni in cui ne abbiamo nominato uno"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Sede legale","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania"],
+            ["Numero del Registro delle imprese","J2022000426271"],
+            ["Codice unico di registrazione (CUI)","45935221 · IVA: RO45935221"],
+            ["Capitale sociale","5000 RON"],
+            ["Contatto generale","support@dezbatere.ro"],
+            ["Telefono","+40 748 793 490"],
+            ["Comunicazioni legali","support@dezbatere.ro"],
+            ["Privacy e protezione dei dati","privacy@dezbatere.ro"],
+            ["Segnalazione di contenuti illegali","support@dezbatere.ro — consulta la sezione 10"],
+            ["Punto di contatto per le autorità","office@dezbatere.ro — rumeno e inglese"],
+            ["Ordini di rimozione di contenuti terroristici (regolamento (UE) 2021/784)","office@dezbatere.ro — il nostro punto di contatto per questi ordini; rumeno e inglese; consulta la sezione 10"],
+            ["Rappresentanti in altri Paesi","Elencati nell'Allegato A per le regioni in cui ne abbiamo nominato uno"]
+          ]
+        }
       },
       { kind: "p", text: "Questi dati sono inoltre sempre disponibili sul sito all'indirizzo dezbatere.ro/legal. Puoi sempre contattare una persona, non soltanto il nostro assistente; la sezione 10 spiega come fare." }
     ]

@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Punt ta’ kuntatt għall-awtoritajiet — office@dezbatere.ro — bir-Rumen u bl-Ingliż",
         "Ordnijiet ta’ tneħħija għal kontenut terroristiku (Regolament (UE) 2021/784) — office@dezbatere.ro — il-punt ta’ kuntatt tagħna għal dawn l-ordnijiet; bir-Rumen u bl-Ingliż; ara t-taqsima 10",
         "Rappreżentanti f’pajjiżi oħra — Elenkati fl-Anness A għar-reġjuni fejn ħtarna wieħed"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Uffiċċju rreġistrat","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, ir-Rumanija"],
+            ["Numru fir-Reġistru tal-Kummerċ","J2022000426271"],
+            ["Kodiċi uniku tar-reġistrazzjoni (CUI)","45935221 · VAT: RO45935221"],
+            ["Kapital azzjonarju","RON 5,000"],
+            ["Kuntatt ġenerali","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Avviżi legali","support@dezbatere.ro"],
+            ["Privatezza u protezzjoni tad-data","privacy@dezbatere.ro"],
+            ["Rapportar ta’ kontenut illegali","support@dezbatere.ro — ara t-taqsima 10"],
+            ["Punt ta’ kuntatt għall-awtoritajiet","office@dezbatere.ro — bir-Rumen u bl-Ingliż"],
+            ["Ordnijiet ta’ tneħħija għal kontenut terroristiku (Regolament (UE) 2021/784)","office@dezbatere.ro — il-punt ta’ kuntatt tagħna għal dawn l-ordnijiet; bir-Rumen u bl-Ingliż; ara t-taqsima 10"],
+            ["Rappreżentanti f’pajjiżi oħra","Elenkati fl-Anness A għar-reġjuni fejn ħtarna wieħed"]
+          ]
+        }
       },
       { kind: "p", text: "Dawn id-dettalji jintwerew ukoll b’mod permanenti fuq is-sit fuq dezbatere.ro/legal. Dejjem tista’ tikkuntattja persuna, mhux biss lill-assistent tagħna; it-taqsima 10 tispjega kif." }
     ]

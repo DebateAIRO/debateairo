@@ -13,6 +13,7 @@ export default async function PrivacyPage({searchParams}:{searchParams?:Promise<
   return (
     <LegalPageLayout
       current="privacy"
+      locale={locale}
       chromeCatalog={chromeCatalog}
       legalCatalog={legalCatalog}
       eyebrow={document.eyebrow}

@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Point of contact for authorities — office@dezbatere.ro — Romanian and English",
         "Removal orders for terrorist content (EU Regulation 2021/784) — office@dezbatere.ro — our contact point for these orders; Romanian and English; see section 10",
         "Representatives in other countries — Listed in Annex A for the regions where we have appointed one"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Registered office","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania"],
+            ["Trade Register number","J2022000426271"],
+            ["Sole registration code (CUI)","45935221 · VAT: RO45935221"],
+            ["Share capital","RON 5,000"],
+            ["General contact","support@dezbatere.ro"],
+            ["Telephone","+40 748 793 490"],
+            ["Legal notices","support@dezbatere.ro"],
+            ["Privacy and data protection","privacy@dezbatere.ro"],
+            ["Reporting illegal content","support@dezbatere.ro — see section 10"],
+            ["Point of contact for authorities","office@dezbatere.ro — Romanian and English"],
+            ["Removal orders for terrorist content (EU Regulation 2021/784)","office@dezbatere.ro — our contact point for these orders; Romanian and English; see section 10"],
+            ["Representatives in other countries","Listed in Annex A for the regions where we have appointed one"]
+          ]
+        }
       },
       { kind: "p", text: "These details are also shown permanently on the site at dezbatere.ro/legal. You can always reach a person, not only our assistant; section 10 explains how." }
     ]

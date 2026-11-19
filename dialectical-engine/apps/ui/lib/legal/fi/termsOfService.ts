@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Viranomaisten yhteyspiste — office@dezbatere.ro — romaniaksi ja englanniksi",
         "Terroristisen sisällön poistamismääräykset (asetus (EU) 2021/784) — office@dezbatere.ro — yhteyspisteemme näitä määräyksiä varten; romaniaksi ja englanniksi; katso kohta 10",
         "Edustajat muissa maissa — Lueteltu liitteessä A niiden alueiden osalta, joille olemme nimittäneet edustajan"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Rekisteröity toimipaikka","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Romania"],
+            ["Kaupparekisterinumero","J2022000426271"],
+            ["Yksilöllinen rekisteröintitunnus (CUI)","45935221 · ALV: RO45935221"],
+            ["Osakepääoma","5 000 RON"],
+            ["Yleinen yhteydenotto","support@dezbatere.ro"],
+            ["Puhelin","+40 748 793 490"],
+            ["Oikeudelliset tiedoksiannot","support@dezbatere.ro"],
+            ["Yksityisyys ja tietosuoja","privacy@dezbatere.ro"],
+            ["Lainvastaisesta sisällöstä ilmoittaminen","support@dezbatere.ro — katso kohta 10"],
+            ["Viranomaisten yhteyspiste","office@dezbatere.ro — romaniaksi ja englanniksi"],
+            ["Terroristisen sisällön poistamismääräykset (asetus (EU) 2021/784)","office@dezbatere.ro — yhteyspisteemme näitä määräyksiä varten; romaniaksi ja englanniksi; katso kohta 10"],
+            ["Edustajat muissa maissa","Lueteltu liitteessä A niiden alueiden osalta, joille olemme nimittäneet edustajan"]
+          ]
+        }
       },
       { kind: "p", text: "Nämä tiedot ovat myös pysyvästi nähtävillä sivustolla osoitteessa dezbatere.ro/legal. Saat aina yhteyden henkilöön etkä ainoastaan avustajaamme; kohdassa 10 kerrotaan, miten." }
     ]

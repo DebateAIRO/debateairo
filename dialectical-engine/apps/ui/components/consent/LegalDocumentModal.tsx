@@ -4,7 +4,7 @@ import * as React from "react";
 
 import type { LegalDocument } from "../../lib/legalDocument";
 import type { CatalogLocaleCode } from "@/lib/i18n/locales";
-import { withNames } from "../legal/LegalBodies";
+import { legalRowSpoken, withNames } from "../legal/LegalBodies";
 import type { LegalLanguageSwitch } from "./canadaLegalLanguage";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
 import { useHideOutside } from "@/components/dialogSurface";
@@ -246,7 +246,9 @@ export function LegalDocumentModal({
                     </p>
                   ) : (
                     <div key={blockIndex} className="policyItems">
-                      {block.items.map((item, itemIndex) => (
+                      {block.items.map((item, itemIndex) => {
+                        const spoken = legalRowSpoken(block.table, block.table?.rows[itemIndex]);
+                        return (
                         <div key={itemIndex} className="policyItem">
                           <span
                             className="policyDot"
@@ -256,9 +258,20 @@ export function LegalDocumentModal({
                             }
                           />
                           {/* Each stored-item name is its own left-to-right run, as on /privacy (REV-S01 p2 PT2-N2). */}
-                          <span className="policyItemText">{withNames(item)}</span>
+                          {/* A table row keeps its visible text untouched; screen readers hear the column-named copy. */}
+                          <span className="policyItemText">
+                            {spoken === null ? (
+                              withNames(item)
+                            ) : (
+                              <>
+                                <span aria-hidden="true">{withNames(item)}</span>
+                                {spoken}
+                              </>
+                            )}
+                          </span>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )
                 )}
