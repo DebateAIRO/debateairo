@@ -109,7 +109,7 @@
   "home.sensitiveConsent.failed": "Your answer could not be saved. Try again.",
   "home.flag.flagged": "FLAGGED",
   "home.removal.title": "We deleted this debate",
-  "home.removal.what": "We do not keep it, and it cannot be restored.",
+  "home.removal.what": "It is gone from the service, and it cannot be restored, unless we restore the whole service from a backup that still holds it.",
   "home.removal.reach": "Only this debate was deleted. Your account and your other debates are untouched.",
   "home.removal.facts": "Our automatic check of its conclusion found “tendencies to suicide or harming other people”. No one reported it to us, and no person read it.",
   "home.removal.automatic": "This decision was made by an automated tool, with no person involved.",

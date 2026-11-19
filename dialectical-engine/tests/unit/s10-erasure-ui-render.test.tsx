@@ -37,6 +37,13 @@ function button(label:string):HTMLButtonElement {
   return match;
 }
 
+// The toggle "Delete private debate…" and the form's "Delete private debate" share their words, so each is found by its whole label.
+function buttonLabelled(label:string):HTMLButtonElement {
+  const match=[...document.querySelectorAll("button")].find((candidate)=>candidate.textContent?.trim()===label);
+  if (!(match instanceof dom.window.HTMLButtonElement)) throw new Error(`BUTTON_NOT_FOUND:${label}`);
+  return match;
+}
+
 async function flush():Promise<void> {
   await act(async ()=>{ await Promise.resolve(); });
 }
@@ -75,10 +82,10 @@ describe("S10 rendered erasure boundaries",()=>{
         root=createRoot(document.getElementById("root")!);
         await act(async ()=>{ root!.render(<Page />); });
         await flush();
-        await act(async ()=>{ button("Delete private debate").click(); });
+        await act(async ()=>{ buttonLabelled("Delete private debate…").click(); });
         const checkbox=document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
         await act(async ()=>{ checkbox.click(); });
-        const form=button("Permanently delete private debate").closest("form")!;
+        const form=buttonLabelled("Delete private debate").closest("form")!;
         await act(async ()=>{ form.dispatchEvent(new dom.window.Event(
           "submit",{ bubbles:true,cancelable:true }
         )); });
@@ -112,9 +119,9 @@ describe("S10 rendered erasure boundaries",()=>{
       root=createRoot(document.getElementById("root")!);
       await act(async ()=>{ root!.render(<Page />); });
       await flush();
-      await act(async ()=>{ button("Delete private debate").click(); });
+      await act(async ()=>{ buttonLabelled("Delete private debate…").click(); });
       await act(async ()=>{ document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
-      const form=button("Permanently delete private debate").closest("form")!;
+      const form=buttonLabelled("Delete private debate").closest("form")!;
       await act(async ()=>{ form.dispatchEvent(new dom.window.Event(
         "submit",{ bubbles:true,cancelable:true }
       )); });

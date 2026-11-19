@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /*
- * Keyboard audit round 3 (2026-11-12), seen in a real browser: on a debate's Visibility card, "Publish publicly" and
- * "Permanently delete" open the security check at the END of the card, and focus stayed on the pressed button. Nothing
+ * Seen in a real browser: on a debate's Visibility card, "Publish publicly" and the delete form's "Delete private
+ * debate" open the security check at the END of the card, and focus stayed on the pressed button. Nothing
  * said the check had opened; the card is height-capped and scrolls, so the check could be out of view; and the next Tab
  * stops were the form's Cancel and then "Delete private debate…", before the step the person has to do next.
  * Focus now goes to the security check itself (a named region), so it is read out, scrolled into view, and the next Tab
@@ -61,7 +61,7 @@ describe("the security check on the Visibility card takes focus when it opens", 
     expect(region!.contains(after!)).toBe(true);
   });
 
-  it("Permanently delete: focus is on the check", async () => {
+  it("Delete private debate: focus is on the check", async () => {
     await mount();
     await press(button(pub["public.publication.deletePrivateEllipsis"]));
     await press(checkbox(pub["public.publication.deleteAcknowledgement"]));
