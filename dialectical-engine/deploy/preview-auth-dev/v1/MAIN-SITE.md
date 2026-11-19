@@ -13,6 +13,7 @@ The test server is locked on purpose. There are six locks:
 3. **Mail.** Mail goes only to the four allow-listed addresses.
 4. **Payments.** Only NETOPIA's sandbox is admitted: test cards, no real money.
 5. **The site password.** Caddy (the web server in front of the website) asks every visitor for a password.
+   The NETOPIA review window (5.8) is the one exception: strangers may read the public pages.
 6. **The old release's files.** The release before this one knows none of the new settings. You can go back to it only
    with every lock closed, and only while LIVEAFTER (7.12) says no real-payment record would be lost (part 9).
 
@@ -38,6 +39,14 @@ setting stops that service, and the journal names the setting with a short code.
   refund you must make in NETOPIA's admin; O2_WITHDRAWAL is a withdrawal whose refund you must settle by hand; O3 is a
   billing job that failed for good (for example an invoice SmartBill refused).
 - *A bcrypt hash* is the scrambled form of the site password that Caddy keeps. The password itself is never stored.
+- *A stranger* is a browser that sends no site password and holds no sign-in cookie of this site.
+- *The NETOPIA review window* (5.8) lets strangers read the public pages of dezbatere.ro; everything else keeps the
+  site password.
+- *The point of sale (POS)* is your shop's entry in NETOPIA's admin; NETOPIA approves card payments for it.
+- *The shop id* is the short number in the logo code on NETOPIA's admin page **Identitate vizuală** (the digits of
+  `secret="…"`, 1.1). Despite that word, it is not a secret.
+- *A Next.js page request* is the website's own background request when it moves to another page (Next.js is the
+  website's framework).
 
 **How to run a server step.** Each block that starts with `set -euo pipefail` is one script.
 1. On the server, as root, remove the last step's file and open an empty one:
@@ -71,15 +80,27 @@ if the server shows something else.
 | 2 | the upload, every lock closed | the release guide's downtime | the release guide's way back |
 | 3 | your sandbox payment test, on the test name, behind the password | unchanged | close the sandbox records |
 | 4 | mail: allow-list on the new path, then open | password on | MAIL_CLOSE |
-| 5 | the main name | password on | NAME5 |
-| 6 | friends' test with test payments | password on | ASKS_CLOSE |
-| 7 | real payments (after a friends' test, a new site password first) | password on | PAY_BACK |
+| 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
+| 5.8 | the NETOPIA review window: the public pages without the password (after NAME4), then NETOPIA's review (5.8b) | public pages open; sign-in, sign-up, debates and buying behind the password | REVIEW_CLOSE (or PWON) |
+| 6 | friends' test with test payments (it may run while NETOPIA reviews) | password on | ASKS_CLOSE |
+| 7 | real payments (only after NETOPIA's approval and the signed contract; if anyone outside the team had the site password, a new one first) | password on | PAY_BACK |
 | 8 | opening to everyone: asks, then the password off (only once your staff key works on dezbatere.ro, 5.7) | open | PWON, ASKS_CLOSE |
 | 9 | closing everything again | closed | – |
 | 10 | every named refusal code | – | – |
 
-**What fits in one day.** The upload, your sandbox test, mail, the name, a friends' test, and the first real payment
-can all be done in one day, unless one of these holds you up:
+**The upload day, and the days after.** Part 1 is the day before. Parts 2 to 5, up to and including the review window
+(5.8), fit in one day: the upload, your sandbox test, mail, the name, your staff key there (5.7) and the window. Real
+payments do not: NETOPIA's point of sale is not enrolled yet, and four of NETOPIA's steps remain:
+1. you enrol the point of sale in NETOPIA's admin and tick its conditions, once the window is open (5.8b);
+2. NETOPIA checks your identity;
+3. NETOPIA checks your shop's profile, and looks at https://dezbatere.ro without a password;
+4. the contract.
+
+They take as long as NETOPIA takes. Part 7 begins only after NETOPIA's approval and the signed contract, days after the
+upload, with no new upload. Meanwhile the window stays open, and a friends' test with test payments (part 6) may run
+behind the password.
+
+These can also hold you up:
 - Mail opens only when SES shows Production access. Amazon's review can take up to a day, so ask for it the day
   before (1.4).
 - Cancel your own sandbox plans: a cancelled plan does not block real payments. The account that holds it cannot buy a
@@ -90,13 +111,19 @@ can all be done in one day, unless one of these holds you up:
 - The refund of the first real payment may be recorded only the next day (7.10). Going back to the sandbox (7.11)
   waits for it and for its credit note.
 
-It is fine to end the day with real payments on, behind the new site password, with asks for the team only: that is
-the state part 7 leaves. Do all staff work (Hide now) on the test name before the rename (1.6): a staff key belongs
-to one name, so from the rename on nobody can use the staff screens until their staff key is enrolled again under
-dezbatere.ro (5.7). Part 8 (opening to everyone) waits for that.
+It is fine to end the upload day with the review window open and payments still on NETOPIA's sandbox: that is the
+state 5.8 leaves. Part 7, on its own day, leaves real payments on, behind the site password, with asks for the team
+only. Do all staff work (Hide now) on the test name before the rename (1.6): a staff key belongs to one name, so from
+the rename on nobody can use the staff screens until their staff key is enrolled again under dezbatere.ro (5.7). Part
+8 (opening to everyone) waits for that.
 
-**If your real payment comes before a friends' test.** Parts 6 and 7 can swap. Do parts 1 to 5, then part 7, and
-skip 7.0: nobody else has had the site password yet. Friends can then come in while payments are real: run ASKS_OPEN
+**A friends' test while NETOPIA reviews.** NETOPIA's steps leave days between the upload and part 7, so a friends'
+test (part 6) fits there, behind the site password, with the review window open. Close it before part 7: ASKS_CLOSE,
+then PAY0 (7.1) until it prints all zeros, then a new site password (PWNEW, 7.0), as the order rules say.
+
+**If NETOPIA approves before you have had a friends' test,** part 7 comes first. Skip 7.0 only if nobody outside the
+team has had the site password. If NETOPIA's tester had it (5.8b), run PWNEW (7.0) first. Friends can then come in
+while payments are real: run ASKS_OPEN
 (6.1) with the line `V=everyone`, and stop there, so the site password stays on. They use the Free plan. Tell them
 not to press **Abonați-vă și plătiți** (Subscribe and pay): payments are real, a plan one of them buys renews every
 month until they cancel it in Settings, and PAY_BACK waits for it. Tell them too that a finished Free debate can go
@@ -111,8 +138,8 @@ go on a second time, that friends' test closes and the site password changes (7.
 - **The name before real payments.** NETOPIA's return and notice addresses are made from the name the API answers as,
   at the moment of each payment. Take real payments only on the name they will stay on.
 - **The friends' test closes before real payments.** The API refuses `everyone-with-test-payments` with live payments
-  (`PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX`). The friends knew the site password, so it changes before real
-  payments (PWNEW, 7.0).
+  (`PREVIEW_ASKS_OPEN_TO_TEST_PAYMENTS_NOT_SANDBOX`). The friends knew the site password (and NETOPIA's tester may
+  have, 5.8b), so it changes before real payments (PWNEW, 7.0).
 - **`everyone` needs real payments.** The API refuses `everyone` while billing runs on NETOPIA's sandbox
   (`PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING`): anyone could pay with the public test card and get real AI credit. With
   billing off it is refused too (`PREVIEW_ASKS_OPEN_TO_BILLING_OFF`): without plans, an account's only limit is its
@@ -124,14 +151,19 @@ go on a second time, that friends' test closes and the site password changes (7.
   payments are real and the site is open: closing asks would lock paying customers out of their questions, and
   closing mail would send buyers outside the allow-list no confirmation (M1, with the Terms) and no receipt (M2). PWON
   first.
-- **The site password comes off last:** after mail is open, after real payments work, and after asks are open to
-  everyone.
-- **The payment marks need the password on, and the test name.** If an upload adds the payment marks (the release
-  guide's PM2), it must run while the site password is on: the tool refuses a Caddy file without the password. It
-  also runs only before NAME1, the first step of the main name (5.6).
+- **The site password comes off last:** after mail is open, after real payments work, after your staff key works on
+  dezbatere.ro (5.7), and after asks are open to everyone.
+- **NETOPIA's logo comes only with an upload.** Its line (`NETOPIA_LOGO_ID`) goes into the new release's own website
+  file in the release guide's SB5d, right after DR1; no step of this document adds it, and it never goes into an
+  older release's file. It changes nothing in Caddy, so it does not depend on the site password or the name.
+- **The NETOPIA review window: only on the main name, only with the password on.** REVIEW_OPEN (5.8) runs after
+  NAME4, on the Caddyfile NAME3 put in place, and never during an upload. While it is open, NAME5, PWOFF1 and SIGNUPS
+  refuse; REVIEW_CLOSE and PWON close it. Every script that checks whether the site password is on does it on the Log
+  in page (`/login`). The window never opens that page, so those scripts work with the window open or closed.
 - **Never open or close a lock during an upload**, from SB3 to the end of DR6 (or SB13), and never while a second
   release is staged or draining. The locks' names file below stops you when a release is staged or draining. Only
-  the brakes (a) and (b) of 6.5 may run during an upload: the gates' `stop`, and PWON (the site password back).
+  the brakes (a), (b) and (b2) of 6.5 may run during an upload: the gates' `stop`, PWON (the site password back) and
+  REVIEW_CLOSE (the review window closed).
 
 ---
 
@@ -139,7 +171,9 @@ go on a second time, that friends' test closes and the site password changes (7.
 
 ### 1.1 The payment companies (in their websites)
 
-**NETOPIA, live admin.**
+**NETOPIA, live admin.** Skip these checks for now: NETOPIA's point of sale is not enrolled yet. You enrol it once the
+public pages are open (5.8b). NETOPIA then checks your identity and the site, and sends the contract. Do the checks
+below after NETOPIA's approval, before part 7.
 - Check: the live point of sale (POS) is approved, the contract is signed, live card payments and saved-card
   (recurring) payments are switched on, and the RON settlement form is signed.
 - Write down the live POS signature (five groups of four characters).
@@ -161,10 +195,15 @@ a live private API key.
 If NETOPIA has not approved yet, stop part 7 here. The same release can open payments on a later day, with no new
 upload.
 
-**The payment marks.** If the site does not show the NETOPIA, Visa and Mastercard marks yet, and you want them before
-real payments, they must come with this upload. In the release guide ("Payment marks: the files and Caddy's rule"):
-PM1 any time after SB1; then, after DR1 and before DR2, SB5b, MT1, PM2 and MT2. From NAME1 (part 5) on, no step adds
-them.
+**NETOPIA's logo.** NETOPIA asks for its logo on the site. Its admin shows the shop id already, before the point of
+sale is enrolled: open the page **Identitate vizuală** (visual identity). It shows a few lines of code for the logo;
+the shop id is the digits between the quotes of `secret="…"` in them. For example, `secret="12345"` means the shop id
+`12345`. Write down only the digits. Despite that word, it is not a secret: every visitor's browser sees it. The upload
+puts it in the new release's website file (SB5d, part 2). Once the new release runs (from DR6 of the upload), the full
+footer and the checkout's card step show NETOPIA's own picture (its logo with the Visa and Mastercard marks), loaded
+from NETOPIA's server, while billing is on. It needs no file of yours and no Caddy change, so skip the release guide's
+PM1, SB5b, MT1, PM2 and MT2, and add no `PAYMENT_MARKS_AVAILABLE` line. Part 5 waits for the logo check (LOGOCHECK,
+part 2), and NETOPIA's review looks for the logo (5.8b).
 
 ### 1.2 The SmartBill proof, on your Mac (it reads only; it writes nothing)
 
@@ -573,6 +612,20 @@ not restate or change the recipe. Every lock stays closed during it: add no `PRE
 no new drop-in, and keep the site password on. Never add a new setting to the old release's own files: a release older
 than this code refuses a key it does not know, and a way back starts it from its own files.
 
+**First, on the Mac: the legal texts of the commit you upload.** This server's upload path never runs the legal check,
+so run it yourself before SB1. Open Terminal and go to the `dialectical-engine` folder of your copy of the code (with
+the packages installed, as in 1.2). Run:
+
+```sh
+git rev-parse HEAD
+zsh -lic 'pnpm legal:release-check'
+```
+
+The first line must be the same 40 characters as SB1's `REV`; if it is not, stop and ask. The last line must start
+`Legal texts: ready for release.` If it says `NOT ready for release`, stop before SB1 and ask: the lines above it say
+what is missing (for example a translation of the Terms or the Privacy Policy that is older than the English text),
+and only a new commit fixes that.
+
 What this release adds to that recipe:
 - **MAILPLAN once more, right before DR1.** Run MAILPLAN (1.5) again immediately before DR1, and stop the upload
   unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
@@ -584,8 +637,11 @@ What this release adds to that recipe:
   is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or
   is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher,
   that you checked the number twice.
-- **The payment marks, if you want them before real payments** (1.1): PM1, then SB5b, MT1, PM2 and MT2 between DR1
-  and DR2, as the release guide says.
+- **NETOPIA's logo** (1.1): SB5d right after DR1, before your yes (the release guide's "owner's yes") and DR2, with
+  the shop id. Skip PM1, SB5b, MT1, PM2 and MT2. After SB13b, run the release guide's LOGOCHECK. It only reads, and
+  must end with `LOGOCHECK_DONE`: part 5 waits for it.
+- **UNFINISHED, right before your yes and DR2** (below). The new release deletes sign-ups that were never finished.
+  UNFINISHED counts the ones it deletes at DR6, and your yes before DR2 names that count.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
   `deploy/preview-auth-dev/v1/public-origins.mjs`, `startup-refusals.mjs`, `start-check-mail.mjs`,
   `start-check-payments.mjs`, this `MAIN-SITE.md`, `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
@@ -598,8 +654,9 @@ What this release adds to that recipe:
   first, as the release guide says.
 - **The new SAME lines.** DR1's `same` still runs the old tools, so it prints no new line. After DR5's folder swap,
   `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` also prints `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`,
-  `OK SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<LABEL>` and `OK VALID_PREVIEW_ASKS_OPEN_TO:<LABEL>`. With two labels it
-  also prints `OK SAME_PUBLIC_APP_URL`, `OK SAME_API_PAYMENT_SYSTEM` and `OK SAME_PREVIEW_ASKS_OPEN_TO`.
+  `OK SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<LABEL>`, `OK VALID_PREVIEW_ASKS_OPEN_TO:<LABEL>` and
+  `OK UI_NETOPIA_LOGO_ID:<LABEL>`. With two labels it also prints `OK SAME_PUBLIC_APP_URL`, `OK SAME_API_PAYMENT_SYSTEM`
+  and `OK SAME_PREVIEW_ASKS_OPEN_TO`.
 - **The mail plan check at start.** At DR6 the new API reads `mail-plan.json` before anything else of the API runs. Its
   journal shows `PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}` before
   `PREVIEW_API_STARTED`. If DR6 stops with "the new API did not start", read why before anything else. Paste this
@@ -631,6 +688,50 @@ What this release adds to that recipe:
   written on the Mac and has not been run on the server yet.
 - **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
   database never took a live payment, so the count is 0 and the API starts as before.
+
+**The unfinished sign-ups (UNFINISHED).** From this release on, a sign-up not finished within 24 hours is deleted.
+Not finished means the account still waits for its e-mail link to be opened (`pending_verification`) or for its second
+factor (`pending_mfa`). Today nothing deletes such an account, so it keeps its e-mail address and its public name
+(pseudonym) for good. Signing up again with that address shows the usual answer ("If this address can be registered,
+verification instructions will arrive. Check your spam folder."), and no mail ever comes. While today's v1 mail plan
+refuses every account mail (1.4), every sign-up on this server waits like that.
+
+**What happens at DR6.** As soon as the new release becomes current, its API deletes every sign-up already due: still
+unfinished, begun at least 24 hours ago, and every e-mail link it was sent has run out (a link lasts at most 24 hours,
+so a link sent again late keeps its sign-up a little longer). The oldest go first, at most 1,000 at once; any more go
+1,000 at a time every ten minutes. Each one goes with its pseudonym and its key folder on the server; what stays is one
+audit line and the record of the Terms it accepted, as for a deleted account. Its address can sign up again at once.
+An account that was ever active is never touched. From then on the API does the same every ten minutes, for each
+sign-up that turns 24 hours old.
+
+Run this right before your yes, while the old release still runs. It only reads, and prints a count only:
+
+```sh
+set -euo pipefail
+# UNFINISHED: how many unfinished sign-ups the new release deletes at its first start (read-only; prints a count, no names and no addresses).
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+N=$(psqlq "SELECT count(*) FROM identity.\"user\" AS account WHERE account.state IN ('pending_verification','pending_mfa') AND account.created_at <= clock_timestamp() - interval '24 hours' AND NOT EXISTS (SELECT 1 FROM identity.channel_binding AS channel JOIN identity.verification_token_credential AS link ON link.channel_binding_id = channel.channel_binding_id WHERE channel.user_id = account.user_id AND link.expires_at > clock_timestamp())") || { echo "UNFINISHED_NOT_DONE: the database is unreadable: ask"; exit 1; }
+[ -n "$N" ] || { echo "UNFINISHED_NOT_DONE: the database gave no count: ask"; exit 1; }
+echo "unfinished sign-ups the new release deletes at its first start (DR6): $N"
+echo UNFINISHED_DONE
+exit 0
+```
+
+Expect the count line, then `UNFINISHED_DONE`. Name the count in your yes before DR2, for example "UNFINISHED: 37".
+The number can grow a little before DR6: a sign-up that turns 24 hours old in between goes too. If the count surprises
+you (it is larger than the sign-ups you know of), ask before DR2. Someone among them who still wants an account signs
+up again with the same address once mail reaches them: after MAIL_ALLOW (4.2) for the four allow-listed addresses,
+after MAIL_OPEN (4.3) for everyone else. Before that, a new sign-up gets no mail either: it waits again, and goes 24
+hours later. If you ever go back with rbD-B, part 9 says what happens to these sign-ups.
+
+**After DR6**, look for the pass's lines in the new API's journal. Paste this one line, with rNN filled in:
+`bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -o cat --no-pager | grep -E "signup[.]unfinished_expired|UNFINISHED_SIGNUP_EXPIRY_PENDING"'`.
+- `{"event":"signup.unfinished_expired","expired":<n>,"keys":<n>,"failed":0}`: a pass that deleted something.
+  `expired` counts the sign-ups that went, `keys` their key folders. The first line's `expired` should be your count
+  (at most 1,000, and a little more if more turned 24 hours old before DR6). With a count of 0, expect no line.
+- `[UNFINISHED_SIGNUP_EXPIRY_PENDING]`: a pass did not finish (then the line above it says `"failed"` more than 0, or
+  there is none). What it left stays due, and the next pass, ten minutes later, tries again. The site keeps running.
+  If the line shows on two passes in a row, ask.
 
 ---
 
@@ -732,7 +833,8 @@ OPEN=''; flag() { echo "NOT CLOSED: $1"; OPEN=yes; }
 said -xF 'PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}' || flag 'mail: the running API does not say mode legacy'
 [ "$(jq -r .schema "$MP")" = preview-auth-dev-mail-v1 ] || flag 'mail: mail-plan.json is not the v1 file'
 [ "$(grep -c '^PREVIEW_LIVE_PAYMENTS=' "$A" || true)" = 0 ] && grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A" && [ ! -e "$EDROP" ] || flag 'payments: not the sandbox'
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || flag 'the site password: the site does not answer 401'
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || flag 'the site password: /login does not answer 401'
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || flag 'the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.8)'
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" > "$M/same-closed.txt" || flag 'a SAME check is BAD (look at the file named below)'
 grep -qx "OK SAME_UI_API_PUBLIC_APP_URL:$LABEL" "$M/same-closed.txt" && grep -qx "OK VALID_PREVIEW_ASKS_OPEN_TO:$LABEL" "$M/same-closed.txt" || flag 'the tools folder does not carry the new SAME checks (DR5 folder swap)'
 [ -z "$OPEN" ] || { echo "CLOSED_NOT_DONE: a lock is not closed (above; SAME output: $M/same-closed.txt): ask"; exit 1; }
@@ -821,12 +923,15 @@ set -euo pipefail
 read -r -p 'Their account address: ' ADDR < /dev/tty
 OR=$(printf '%s\n' "$ADDR" | RUNAPI apps/api/src/billing/withdraw-cli.ts --owner-of-email | sed -n 's/^owner_ref: //p' || true); unset ADDR
 printf '%s\n' "$OR" | grep -qxE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' || { echo "WITHDRAWOTHER_NOT_DONE: no account with that address"; exit 1; }
-RUNAPI apps/api/src/billing/withdraw-cli.ts --owner "$OR" || { echo "WITHDRAWOTHER_NOT_DONE: the tool refused (its code is the line above). WITHDRAWAL_DEBATE_RUNNING: their debate is still running, run this again when it ends. Any other code: ask"; exit 1; }
+RUNAPI apps/api/src/billing/withdraw-cli.ts --owner "$OR" || { echo "WITHDRAWOTHER_NOT_DONE: the tool refused (its code is the line above). WITHDRAWAL_WINDOW_CLOSED: their 14 days are over, so only they can cancel. NOT_SUBSCRIBED: that account has no running sandbox plan, so there is nothing to withdraw (check the address you typed). Any other code: ask"; exit 1; }
 echo WITHDRAWOTHER_DONE
 exit 0
 ```
 
-Then settle its refund as above. After 14 days only they can cancel.
+Expect one line that says the withdrawal is recorded and the plan has ended, then `WITHDRAWOTHER_DONE`. A debate of
+theirs that is still running does not hold it up: the withdrawal is recorded at once. If the line says a refund made
+in NETOPIA's admin touched a payment, ask before you refund anything. Then settle its refund as above. After 14 days
+only they can cancel.
 
 Never write billing rows by hand: the tables only take new rows. Do all of this before any account is deleted.
 
@@ -925,7 +1030,7 @@ plan for the main name.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # MAIL_CLOSE: mail back to the allow-listed addresses.
-! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "MAIL_CLOSE_NOT_DONE: payments are live and the site is open: PWON first"; exit 1; }
+! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "MAIL_CLOSE_NOT_DONE: payments are live and the site is open: PWON first"; exit 1; }
 [ -s "$M/mail/mail-plan.v1.json" ] || { echo "MAIL_CLOSE_NOT_DONE: no kept v1 file: ask"; exit 1; }
 cp -p "$MP" "$M/mail/mail-plan.before-close.json"
 if [ "$HOST" = v3-preview.dezbatere.ro ]; then W=$M/mail/mail-plan.v1.json; WANT='PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}'
@@ -944,8 +1049,8 @@ MAIL_CLOSE runs only with the site password on (PWON first): a buyer outside the
 
 ## 5. The main name (dezbatere.ro)
 
-Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), PM2 has run if this
-upload added the payment marks, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
+Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), the release guide's
+LOGOCHECK ended with `LOGOCHECK_DONE`, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
 (NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If you did not do
 1.3 (b) to (e), do them now.
 
@@ -1106,6 +1211,7 @@ restarts the API, still on the test name, so you see that the API starts without
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFOFF: the staff screens off, on the test name: the one line STAFF_ACCESS_POLICY_VERSION=2 taken out of the API file (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
+# The NETOPIA review window (5.8) opens only on dezbatere.ro, and this step runs only on the test name, so with the window open it refuses.
 K=$M/name/api-$LABEL.env.before-staffoff-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFOFF_NOT_DONE: the API already answers as $HOST; nothing changed: ask"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true); AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$A" || true)
@@ -1170,6 +1276,7 @@ relay's drop-in, the main Caddyfile and the main mail plan.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # NAME2: the switch prepared: env copies, the relay drop-in, the main Caddyfile, the main mail plan. Nothing live changes.
+# The NETOPIA review window (5.8) opens only on dezbatere.ro, after the rename, so with the window open this step refuses (the API answers as dezbatere.ro).
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "NAME2_NOT_DONE: the API already answers as $HOST"; exit 1; }
 [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$A" || true)" = 1 ] || { echo "NAME2_NOT_DONE: the API is not in hosted mode (it would refuse PREVIEW_MAIN_ORIGIN_NOT_HOSTED)"; exit 1; }
 SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
@@ -1268,6 +1375,7 @@ would loop after closing.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # NAME3: the site answers as dezbatere.ro: env files, the relay drop-in, Caddy and the mail plan, in one stop window.
+# The NETOPIA review window (5.8) opens only after the rename, so with the window open this step refuses before it stops anything (the live Caddyfile is not NAME1's).
 cmp -s "$C" "$M/name/Caddyfile.phase1" || { echo "NAME3_NOT_DONE: the live Caddyfile is not the prepared one (nothing was stopped): look"; exit 1; }
 [ ! -e "$TDROP" ] || { echo "NAME3_NOT_DONE: $TDROP exists (nothing was stopped): look"; exit 1; }
 SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
@@ -1307,7 +1415,7 @@ set -euo pipefail
 BAD=''; chk() { echo "CHECK_FAILED: $1"; BAD=yes; }
 [ "$HOST" = dezbatere.ro ] || chk 'the API file does not name dezbatere.ro'
 [ "$(relay)" = 'PUBLIC_APP_URL=https://dezbatere.ro' ] || chk 'the running relay'
-[ "$(curl -s -o /dev/null -w '%{http_code}' https://dezbatere.ro/)" = 401 ] || chk 'dezbatere.ro does not ask for the site password'
+[ "$(curl -s -o /dev/null -w '%{http_code}' https://dezbatere.ro/login)" = 401 ] || chk 'dezbatere.ro does not ask for the site password'
 [ "$(loc 'https://www.dezbatere.ro/x?y=1')" = 'location: https://dezbatere.ro/x?y=1' ] || chk 'www'
 [ "$(loc https://v3-preview.dezbatere.ro/settings)" = 'location: https://dezbatere.ro/settings' ] || chk 'the old name does not redirect'
 [ "$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://dezbatere.ro/)" = '308 https://dezbatere.ro/' ] || chk 'http://dezbatere.ro'
@@ -1349,9 +1457,9 @@ Then, by hand:
 
 A few minutes down, like the switch (the API's start alone takes a minute or more). It works from any state NAME3
 left. It starts nothing until both env files name the test name and every SAME check is OK. It refuses, with nothing
-stopped, while the site is open to everyone (PWON first) or while payments are real (PAY_BACK first): part 9's order.
-Once it has stopped the website and the API, every `NAME5_NOT_DONE` up to the API's start means the site is down: ask
-at once.
+stopped, while the site is open to everyone (PWON first), while the NETOPIA review window is open (REVIEW_CLOSE or
+PWON first, 5.8) or while payments are real (PAY_BACK first): part 9's order. Once it has stopped the website and
+the API, every `NAME5_NOT_DONE` up to the API's start means the site is down: ask at once.
 
 ```sh
 set -euo pipefail
@@ -1359,6 +1467,7 @@ set -euo pipefail
 # NAME5: the site answers as the test name again; dezbatere.ro stays prepared (redirect and notice pass-through).
 [ -s "$M/name/Caddyfile.phase1" ] && [ -s "$M/name/notify-code.before-dezbatere" ] || { echo "NAME5_NOT_DONE: a kept file is missing; nothing was stopped: ask"; exit 1; }
 ! cmp -s "$C" "$M/password/Caddyfile.open" || { echo "NAME5_NOT_DONE: the site is open to everyone: PWON first (part 9 order); nothing was stopped"; exit 1; }
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "NAME5_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) or PWON first (part 9 order); nothing was stopped"; exit 1; }
 ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "NAME5_NOT_DONE: payments are real on this name: PAY_BACK first (part 9 order); nothing was stopped"; exit 1; }
 MMODE=$(jq -r 'if .schema == "preview-auth-dev-mail-v1" then "legacy" else .recipients end' "$MP" 2>/dev/null || true)
 case "$MMODE" in legacy|allow-list|open) ;; *) echo "NAME5_NOT_DONE: mail-plan.json does not read as a mail plan; nothing was stopped: ask"; exit 1;; esac
@@ -1413,6 +1522,7 @@ later one, as long as STAFFOFF once took the line out on this server.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFON: the staff screens back on the test name: the line STAFF_ACCESS_POLICY_VERSION=2 back into the API file, then the API restarts.
+# The NETOPIA review window (5.8) opens only on dezbatere.ro, and this step runs only on the test name, so with the window open it refuses.
 K=$M/name/api-$LABEL.env.before-staffon-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFON_NOT_DONE: the API answers as $HOST; on dezbatere.ro the step is STAFFMAIN (5.7); nothing changed"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true)
@@ -1452,9 +1562,14 @@ the two staff name lines. With the lines naming the other name the API refuses t
   holds the test name's values. The website build itself does not change: one build serves both names.
 - In the release guide's commands that name the host (curl, jq, `NO_PROXY`), write dezbatere.ro by hand instead of
   v3-preview.dezbatere.ro.
-- Run PM2 (the payment marks) before NAME1 (1.1). From NAME1 on, change nothing in the Caddyfile by hand: NAME2 and
-  NAME1_BACK refuse a changed file, and NAME5 puts back the copy NAME1 made. Only the steps of this document change it
-  (NAME3, PWOFF2, PWON, SIGNUPS). Ask first.
+- From NAME1 on, change nothing in the Caddyfile by hand: NAME2 and NAME1_BACK refuse a changed file, and NAME5 puts
+  back the copy NAME1 made. Only the steps of this document change it (NAME3, REVIEW_OPEN, REVIEW_CLOSE, PWOFF2, PWON,
+  SIGNUPS). Ask first. NETOPIA's logo needs no Caddy change: a later upload carries its line by itself.
+- The NETOPIA review window (5.8) stays open through a later upload: no upload step reads or changes the Caddyfile
+  after NAME1, and nobody can buy through the window. During the drained upload's downtime the open pages show an
+  error, to NETOPIA's reviewer too, so do not upload while NETOPIA is reviewing. After SB13b, change the first line
+  of names.sh to the new upload (end of 3.0), then run REVIEW_OPEN again: with the window open it only checks, now
+  against the new release's pages.
 - If you watch a later upload's switch from the Mac (the release guide's SB13 watcher), write `machine dezbatere.ro`
   in `~/.config/debateai-preview.netrc` and `https://dezbatere.ro/login` in the watch line.
 - While payments are real, 7.12 adds two rules to every later upload. Once real payments were ever on, its LIVEAFTER
@@ -1466,6 +1581,10 @@ Do this once the site answers as dezbatere.ro (NAME4 done), behind the site pass
 this document. It takes about half an hour. You need the server (as root), a browser, your password, your
 authenticator and your hardware key. It works while payments are real; STAFFMAIN restarts the API, so pick a quiet
 minute with no checkout open.
+
+Do it before you open the NETOPIA review window (5.8) if you can. It works with the window open too: STAFFMAIN and
+REKEY never touch Caddy, and the Team page stays behind the site password. But while STAFFMAIN restarts the API, the
+open pages show an error, to NETOPIA's reviewer too.
 
 In that upload, SB4's operator review (part 2) lists this step's files among the others: the new
 `deploy/preview-lifecycle/v1/rekey-staff-key.mjs`, and the changed `unlock-team-tools.mjs`, `jit-creator-actor.mjs`
@@ -1491,6 +1610,7 @@ have run; each checks that first, and REKEYCHECK (below) says so before the day.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # REKEYCHECK: whether this server can do 5.7 (read-only): the release, the tools folder, the database step, and the database's own rule for the login REKEY uses.
+# The NETOPIA review window (5.8) may be open: this step only reads.
 BAD=''; chk() { echo "NOT READY: $1"; BAD=yes; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] || chk 'this release does not carry the staff re-key (the upload first)'
 [ -f "$L/rekey-staff-key.mjs" ] || chk "the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first)"
@@ -1521,6 +1641,7 @@ them first.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFMAIN: the staff screens on, on dezbatere.ro: the API file's two staff name lines name dezbatere.ro and the line STAFF_ACCESS_POLICY_VERSION=2 is in it (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
+# The NETOPIA review window (5.8) may be open: this step changes the API file and restarts the API, never Caddy. While the API restarts, the open pages show an error.
 K=$M/name/api-$LABEL.env.before-staffmain-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = dezbatere.ro ] || { echo "STAFFMAIN_NOT_DONE: the API answers as $HOST; on the test name the step is STAFFON (5.5b); nothing changed"; exit 1; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "STAFFMAIN_NOT_DONE: this release, or the tools folder, does not carry the staff re-key (the upload first, with its tools-folder swap); nothing changed"; exit 1; }
@@ -1570,6 +1691,7 @@ change your password after this step; it cannot use the permit either way.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # REKEY: the operator's yes for ONE new staff key of the Owner account, under the name the site answers as: one permit in the database (15 minutes, one use, for the sign-in whose code you type). Nothing restarts; no file changes.
+# The NETOPIA review window (5.8) may be open: this step changes neither Caddy nor the API.
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "REKEY_NOT_DONE: the staff screens are off (STAFFMAIN first); nothing changed"; exit 1; }
 [ -f "$L/rekey-staff-key.mjs" ] || { echo "REKEY_NOT_DONE: the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first); nothing changed"; exit 1; }
 [ "$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)" = scram-sha-256 ] || { echo "REKEY_NOT_DONE: the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256 (REKEYCHECK says the same), so the tool cannot connect; adding the line is a reviewed change: ask; nothing changed"; exit 1; }
@@ -1662,6 +1784,536 @@ themselves after one hour anyway).
   `pg_hba.conf` lets the staff recovery login in on the local socket (REKEYCHECK and REKEY check it), and where the
   key-change alert mail arrives. The first time, do each step slowly, and ask if a line differs from the ones above.
 
+### 5.8 The NETOPIA review window (the public pages without the password)
+
+NETOPIA approves card payments only after it has looked at https://dezbatere.ro in public, with no password, and made
+a test payment. This step lets anyone read the public pages of dezbatere.ro. Everything else keeps asking for the site
+password: sign-in, sign-up, debates and buying. 5.8b says what to check on the open site, and when to ask NETOPIA.
+
+**Before you start:** do 5.8a first, on your Mac (below REVIEW_CLOSE): REVIEW_MACTEST must end with
+`REVIEW_MACTEST_DONE`. Then check: NAME4 passed and you did the checks by hand of 5.4; billing is on (`/pricing`
+exists); the site password is on; no upload is running. Do 5.7 (your staff key) first if you can: STAFFMAIN restarts
+the API, and with the window open the open pages would show an error meanwhile.
+
+**What opens, for reading only:** the home page, `/pricing`, `/terms` and `/privacy` (with their earlier versions),
+`/legal`, `/cookies`, `/providers`, `/ai-transparency`, `/privacy/us-health-data`, `/cancel` and `/withdraw`, and the
+files these pages load (scripts, fonts, the icon, the ANPC badge). NETOPIA's logo needs nothing from the window: the
+visitor's browser loads it from NETOPIA's own server. The form on `/cancel` works too: it mails a link only to an
+account that has a plan. While the window is open, every answer tells search engines not to list the page.
+
+**For whom:** a browser that sends no site password and holds no sign-in cookie of this site. You and the team, once
+you type the password, see the site exactly as before.
+
+**What stays behind the password:** sign-in, sign-up, password reset, the checkout, Settings, every debate (published
+ones too), help, the staff screens and the rest of the API. A visitor who presses Log in, Start, a plan's button or
+Settings gets the browser's password box; its Cancel shows an empty page. Tell NETOPIA this (5.8b).
+
+**What does not change:** NETOPIA's payment notices, the HTTPS rule, the API, the website and their settings. While
+payments run on NETOPIA's sandbox, the home page and the plans page keep their test-mode note ("Test mode: payments on
+this site are not real…").
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# REVIEW_OPEN: the NETOPIA review window. On dezbatere.ro a stranger may read the public pages and send the two /cancel requests without the site password; everything else still asks for it. Every check runs before the change; Caddy restarts (about a second); then about a hundred checks from outside, and on any failed check the file before comes back. Run again while the window is open, it only checks and changes nothing.
+TS=$(date -u +%Y%m%dT%H%M%SZ); U=https://dezbatere.ro
+# The review window's marks, and how its lines come out again (the same lines in REVIEW_OPEN, REVIEW_CLOSE, PWON and REVIEW_MACTEST).
+RV=/root/preview-archive/main-site/review; RK=$RV/Caddyfile.before-window; RW=$RV/Caddyfile.window
+WB='# review window begin: the public pages answer strangers without the site password; REVIEW_CLOSE takes these lines out'; WE='# review window end'
+wopen() { grep -qE 'review_locked|review_quiet|review window begin' "$1"; }
+wstrip() { awk -v b="$WB" -v e="$WE" '{ t = $0; sub(/^[ \t]+/, "", t) } t == b { s = 1; n++; next } s && t == e { s = 0; next } s { next } t == "basic_auth @review_locked {" { print substr($0, 1, length($0) - length(t)) "basic_auth {"; c++; next } { print } END { if (n != 1 || s || c != 1) exit 1 }' "$1"; }
+# What the window opens. A stranger is a request that sends no password and no site cookie. A stranger may read the public pages and the files they load (GET or HEAD, the raw request line exactly one of these addresses, with at most a plain query) and send the two /cancel requests (POST, exactly these two addresses). Raw means as sent: no dot segment, no double slash, no capital letter and no escaped slash can turn a closed address into an open one.
+PAT='^(/|/pricing|/terms|/terms/versions|/terms/versions/[0-9a-f]+|/privacy|/privacy/versions|/privacy/versions/[0-9a-f]+|/privacy/us-health-data|/legal|/cookies|/providers|/ai-transparency|/cancel|/withdraw|/icon[.]svg|/consumer-protection/anpc-sal[.]png|/payment-marks/(netopia|visa|mastercard)[.]svg|/_next/static(/([A-Za-z0-9_~-]|%5[BbDd])([A-Za-z0-9._~-]|%5[BbDd])*)+)([?][A-Za-z0-9._~%+=&-]*)?$'
+STRANGER='{http.request.header.Authorization} == "" && !({http.request.header.Cookie}.matches("(?i)__host-debateai-"))'
+PAGE='({http.request.method} == "GET" || {http.request.method} == "HEAD") && {http.request.orig_uri}.matches("'"$PAT"'")'
+CANCEL='{http.request.method} == "POST" && ({http.request.orig_uri} == "/api/v1/billing/cancel-link" || {http.request.orig_uri} == "/api/v1/billing/cancel-by-token")'
+QUIETURI='{http.request.header.RSC} == "1" || {http.request.orig_uri} == "/api/v1/session" || {http.request.orig_uri} == "/api/v1/geo/availability" || {http.request.orig_uri} == "/favicon.ico" || {http.request.orig_uri} == "/apple-touch-icon.png" || {http.request.orig_uri} == "/apple-touch-icon-precomposed.png"'
+PUB="$STRANGER && (($PAGE) || ($CANCEL))"
+QUIET="$STRANGER && ($QUIETURI) && !($PAGE)"
+wlines() {
+  printf '%s%s\n' "$1" "$WB" \
+    "$1" 'header X-Robots-Tag "noindex, nofollow"' \
+    "$1" '# A stranger'"'"'s background request for a closed address (a Next.js page request, the account and help checks, the browser'"'"'s own icon requests) gets a plain 401 without the password box, so no box opens over a public page.' \
+    "$1" '@review_quiet expression `'"$QUIET"'`' \
+    "$1" 'respond @review_quiet 401' \
+    "$1" '# The password below is skipped only for a stranger reading a public page or its files, or sending one of the two /cancel requests.' \
+    "$1" '@review_locked not expression `'"$PUB"'`' \
+    "$1" "$WE" \
+    "$1" 'basic_auth @review_locked {'
+}
+code() { curl -s -o /dev/null -m 15 -w '%{http_code}' "$@" || true; }
+heads() { { curl -s -o /dev/null -m 15 -D - "$@" || true; } | tr -d '\r' | tr 'A-Z' 'a-z'; }
+box() { heads "$@" | grep -c '^www-authenticate: basic' || true; }
+body() { curl -s -m 15 "$@" || true; }
+BAD=''; bad() { echo "CHECK_FAILED: $1"; BAD=yes; }
+# The probes, from this server to its own public name, without the password unless a line says otherwise.
+probes() {
+  local P X CC ST V SC D
+  # Open to a stranger.
+  for P in / '/?tab=public' /pricing '/pricing?country=RO' /terms '/terms?lang=ro' /terms/versions /privacy '/privacy?lang=ro' /privacy/versions /privacy/us-health-data /legal /cookies /providers /ai-transparency /cancel /withdraw /icon.svg /consumer-protection/anpc-sal.png; do [ "$(code "$U$P")" = 200 ] || bad "$P does not answer 200 without the password"; done
+  [ "$(code -I "$U/terms")" = 200 ] || bad "HEAD /terms does not answer 200"
+  [ "$(code -H 'Cookie: debateai.locale=ro' "$U/terms")" = 200 ] || bad "the language cookie closes /terms"
+  [ "$(body -H 'Accept-Language: ro-RO,ro;q=0.9' "$U/" | grep -c '<html lang="ro"' || true)" -gt 0 ] || echo "LOOK: a browser that prefers Romanian does not get the home page in Romanian (the window does not decide this): ask before you write to NETOPIA"
+  for P in / '/?tab=public'; do [ "$(body "$U$P" | grep -c 'data-landing-section' || true)" -gt 0 ] || bad "$P is not the signed-out home page"; done
+  [ "$(body -H 'x-matched-path: /settings' -H 'x-invoke-path: /settings' "$U/" | grep -c 'data-landing-section' || true)" -gt 0 ] || bad "a routing header changes what / shows"
+  ST=$(body "$U/terms" | grep -oE '/_next/static/[A-Za-z0-9._~/%-]+[.]js' | head -n 1 || true); [ -n "$ST" ] && [ "$(code "$U$ST")" = 200 ] || bad "the first script of /terms does not load"
+  for D in terms privacy; do V=$(body "$U/$D/versions" | grep -oE "/$D/versions/[0-9a-f]{64}" | head -n 1 || true)
+    if [ -n "$V" ]; then [ "$(code "$U$V")" = 200 ] || bad "$V does not answer 200"; else echo "no earlier $D text is linked from /$D/versions (nothing to check there)"; fi; done
+  [ "$(code -H 'RSC: 1' "$U/terms")" != 401 ] || bad "a Next.js page request for /terms is stopped by the window"
+  # Closed: the password box.
+  for P in /login /sign-up /settings /settings/security /checkout '/checkout?plan=PLUS' /checkout/return /new /v4 /help /export /admin/team /recover /reset-password /enroll-mfa /verify-email /social/complete /public/debate/x /debate/x /robots.txt /TERMS /Pricing /terms/ /terms. '/terms%2e' '/pricing?next=/settings' /api/v1/billing/plans /api/v1/auth/sessions /api/v1/session/ /payment-marks/amex.svg /_next/data/x/settings.json '/_next/image?url=%2Ficon.svg&w=64&q=75'; do [ "$(code "$U$P")" = 401 ] && [ "$(box "$U$P")" = 1 ] || bad "$P does not ask for the password"; done
+  # Written to look like an open address, sent exactly as written: never answered by the website.
+  for P in //terms /terms/../login /settings/.. '/settings/%2e%2e' '/settings%2F..' /_next/static/../../login '/_next/static/%2e%2e/%2e%2e/login' '/_next/static/..%2f..%2flogin' '/pricing/..%2Fsettings' '/terms/versions/..%2F..%2Fsettings'; do CC=$(code --http1.1 --path-as-is "$U$P"); case "$CC" in 401|400) ;; *) bad "$P, sent as written, answers $CC";; esac; done
+  CC=$(code --http1.1 --request-target "$U/terms" "$U/"); case "$CC" in 401|400) ;; *) bad "the absolute form of /terms answers $CC";; esac
+  # Every other method, and every other POST.
+  for X in POST PUT DELETE PATCH OPTIONS; do [ "$(code -X "$X" --data '' "$U/terms")" = 401 ] || bad "$X /terms does not ask for the password"; done
+  [ "$(code -X POST -H 'Next-Action: 0' -H 'Content-Type: text/plain' --data '[]' "$U/pricing")" = 401 ] || bad "a server-action POST to /pricing does not ask for the password"
+  for P in /api/v1/auth/login /api/v1/auth/register /api/v1/support/messages /api/v1/billing/checkout '/api/v1/billing/cancel-link?x=1'; do [ "$(code -X POST -H 'Content-Type: application/json' -H "Origin: $U" --data '{}' "$U$P")" = 401 ] || bad "POST $P does not ask for the password"; done
+  # A request that is not a stranger's goes to the password.
+  SC="__Host-debateai-session=$(printf 'A%.0s' $(seq 1 43))"
+  [ "$(code -H "Cookie: $SC" "$U/?tab=public")" = 401 ] && [ "$(box -H "Cookie: $SC" "$U/?tab=public")" = 1 ] || bad "a made-up session cookie on /?tab=public does not ask for the password"
+  [ "$(code -H 'Cookie: debateai.locale=ro; __host-DebateAI-x=1' "$U/terms")" = 401 ] || bad "a site cookie written in other letters does not ask for the password"
+  [ "$(code -H 'Authorization: Basic Og==' "$U/")" = 401 ] || bad "a wrong password on / is not refused"
+  # A stranger's background requests: a plain 401 without the password box.
+  for P in /api/v1/session /api/v1/geo/availability /favicon.ico; do [ "$(code "$U$P")" = 401 ] && [ "$(box "$U$P")" = 0 ] || bad "$P is not a plain 401"; done
+  [ "$(code -H 'RSC: 1' "$U/settings")" = 401 ] && [ "$(box -H 'RSC: 1' "$U/settings")" = 0 ] || bad "a Next.js page request for /settings is not a plain 401"
+  [ "$(code -H 'RSC: 1' -H 'Next-Router-Prefetch: 1' "$U/new")" = 401 ] && [ "$(box -H 'RSC: 1' -H 'Next-Router-Prefetch: 1' "$U/new")" = 0 ] || bad "a Next.js prefetch of /new is not a plain 401"
+  # The two /cancel requests reach the API, which refuses an empty form (400); another site is refused (403).
+  for P in /api/v1/billing/cancel-link /api/v1/billing/cancel-by-token; do CC=$(code -X POST -H 'Content-Type: application/json' -H "Origin: $U" --data '{}' "$U$P")
+    case "$CC" in 400) ;; 2??|401|000|5??) bad "an empty /cancel request to $P answers $CC, not the API's 400";; *) echo "LOOK: an empty /cancel request to $P answers $CC, not 400: send the /cancel form by hand (5.8)";; esac; done
+  [ "$(code -X POST -H 'Content-Type: application/json' -H 'Origin: https://example.invalid' --data '{}' "$U/api/v1/billing/cancel-link")" = 403 ] || bad "a /cancel request from another site is not refused"
+  # No open answer sets a site cookie; the robots and HTTPS headers.
+  for P in / /pricing /terms /cancel; do [ "$(heads "$U$P" | grep -c '^set-cookie: __host-debateai-' || true)" = 0 ] || bad "$P sets a site cookie"; done
+  [ "$(heads -X POST -H 'Content-Type: application/json' -H "Origin: $U" --data '{}' "$U/api/v1/billing/cancel-link" | grep -c '^set-cookie: __host-debateai-' || true)" = 0 ] || bad "the /cancel request sets a site cookie"
+  [ "$(heads "$U/" | grep -cx 'x-robots-tag: noindex, nofollow' || true)" = 1 ] || bad "/ does not send the robots header exactly once"
+  [ "$(heads "$U/" | grep '^strict-transport-security:' || true)" = 'strict-transport-security: max-age=31536000' ] || bad "/ sends another HTTPS-only header (or two)"
+  # What the window must leave as it was.
+  [ "$(notify "$HOST")" = "$(cat "$M/name/notify-code.before-dezbatere")" ] || bad "a NETOPIA notice is not passed through as before"
+  [ "$(code "$U/readyz")" = 404 ] || bad "/readyz is not refused"
+  [ "$(code http://127.0.0.1:3090/readyz)" = 200 ] || bad "the edge's readiness"
+}
+[ "$HOST" = dezbatere.ro ] || { echo "REVIEW_OPEN_NOT_DONE: the API answers as $HOST; the window opens only on dezbatere.ro, after NAME4; nothing changed"; exit 1; }
+if wopen "$C"; then
+  [ -s "$RW" ] && cmp -s "$C" "$RW" || { echo "REVIEW_OPEN_NOT_DONE: the window's lines are in the live Caddyfile, but it is not the file REVIEW_OPEN put in place: run REVIEW_CLOSE, then ask"; exit 1; }
+  echo "the review window is open already: checks only, nothing changes"
+  probes
+  [ -z "$BAD" ] || { echo "REVIEW_OPEN_NOT_DONE: a check failed with the window open (above): run REVIEW_CLOSE now, then ask"; exit 1; }
+  echo REVIEW_OPEN_DONE; exit 0
+fi
+cmp -s "$C" "$M/name/Caddyfile.main" || { echo "REVIEW_OPEN_NOT_DONE: the live Caddyfile is not the one NAME3 put in place (the password off, a sign-up rule, or another change since); nothing changed: ask"; exit 1; }
+[ ! -e "$M/password/Caddyfile.before-open" ] && [ ! -e "$M/password/Caddyfile.open" ] || { echo "REVIEW_OPEN_NOT_DONE: PWOFF1's copies exist (the password is off, or PWOFF1 ran without PWOFF2): PWON first; nothing changed"; exit 1; }
+[ -s "$M/name/notify-code.before-dezbatere" ] || { echo "REVIEW_OPEN_NOT_DONE: NAME1's notice code is missing; nothing changed: ask"; exit 1; }
+for P in / /terms /login; do [ "$(code "$U$P")" = 401 ] || { echo "REVIEW_OPEN_NOT_DONE: $P does not ask for the site password now; nothing changed: ask at once"; exit 1; }; done
+for P in /pricing /cancel /withdraw /terms /privacy /legal; do [ "$(code "http://127.0.0.1:$UIP$P")" = 200 ] || { echo "REVIEW_OPEN_NOT_DONE: the website does not serve $P (billing off, or the website is down); nothing changed: ask"; exit 1; }; done
+! grep -qi 'x-robots-tag' "$C" || { echo "REVIEW_OPEN_NOT_DONE: the live Caddyfile sends a robots header already; nothing changed: ask"; exit 1; }
+[ "$(grep -cx 'dezbatere\.ro {' "$C" || true)" = 1 ] && [ "$(grep -cE '^[[:space:]]*basic_auth([[:space:]]|$)' "$C" || true)" = 1 ] && [ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$C" || true)" = 1 ] || { echo "REVIEW_OPEN_NOT_DONE: the live Caddyfile has not one dezbatere.ro block with one basic_auth line, written basic_auth {; nothing changed: ask"; exit 1; }
+DL=$(grep -nx 'dezbatere\.ro {' "$C" | cut -d: -f1); DE=$(awk -v s="$DL" 'NR > s && $0 == "}" { print NR; exit }' "$C"); BL=$(grep -nE '^[[:space:]]*basic_auth \{$' "$C" | cut -d: -f1)
+[ -n "$DE" ] && [ "$BL" -gt "$DL" ] && [ "$BL" -lt "$DE" ] || { echo "REVIEW_OPEN_NOT_DONE: the basic_auth line is not inside the dezbatere.ro block; nothing changed: ask"; exit 1; }
+[ "$(sed -n "$((BL - 1))p" "$C" | sed 's/^[[:space:]]*//')" = 'respond @wrongOrigin "ORIGIN_REFUSED" 403' ] && [ "$(sed -n "$((BL + 1))p" "$C" | sed 's/^[[:space:]]*//')" = '{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}' ] || { echo "REVIEW_OPEN_NOT_DONE: the lines around basic_auth are not the recorded ones (the origin check before it, the caddy.env pair inside it); nothing changed: ask"; exit 1; }
+I=$(sed -n "${BL}p" "$C" | sed -E 's/^([[:space:]]*).*$/\1/'); [ -n "$I" ] || { echo "REVIEW_OPEN_NOT_DONE: the basic_auth line has no indentation; nothing changed: ask"; exit 1; }
+install -d -o root -g root -m 0700 "$RV"
+[ ! -e "$RK" ] && [ ! -e "$RW" ] || { echo "REVIEW_OPEN_NOT_DONE: copies of an earlier window are in $RV; nothing changed: run REVIEW_CLOSE (it moves them aside), then REVIEW_OPEN again"; exit 1; }
+cp -p "$C" "$RK"
+stop() { rm -f "$RK" "$RW" "$RW.lines" "$RW.undo"; echo "REVIEW_OPEN_NOT_DONE: $1; nothing changed"; exit 1; }
+wlines "$I" > "$RW.lines"
+awk -v n="$BL" -v f="$RW.lines" 'NR == n { while ((getline l < f) > 0) print l; next } { print }' "$RK" > "$RW"
+chmod 0644 "$RW"
+diff "$RK" "$RW" || true
+[ "$(diff "$RK" "$RW" | grep -c '^[0-9]' || true)" = 1 ] && [ "$(diff "$RK" "$RW" | sed -n 's/^<[[:space:]]*//p')" = 'basic_auth {' ] && [ "$(diff "$RK" "$RW" | sed -n 's/^>[[:space:]]*//p')" = "$(sed 's/^[[:space:]]*//' "$RW.lines")" ] || stop "the window's file does not change exactly the basic_auth line and add the window's lines before it"
+{ wstrip "$RW" > "$RW.undo" && cmp -s "$RW.undo" "$RK"; } || stop "taking the window's lines out again does not give back today's Caddyfile byte for byte"
+cad validate --config "$RW" --adapter caddyfile >/dev/null 2>&1 || stop "caddy validate refused the window's file"
+O1=$(order "$RK" "$HOST" || true); O2=$(order "$RW" "$HOST" || true)
+echo "handlers, before: $O1"; echo "handlers, window: $O2"
+[ "$(grep -o authentication <<<"$O1" | grep -c . || true)" = 1 ] && [ "$O2" = "${O1/authentication/headers > static_response > authentication}" ] || stop "the window's file changes the handler order beyond its two new handlers"
+AX=$(cad adapt --config "$RW" --adapter caddyfile 2>/dev/null | jq -r --arg h "$HOST" 'def ex: if type == "object" then .expr else . end; [.apps.http.servers[].routes[] | select(.match[0].host[0] == $h) | .. | objects | select(has("handle"))] as $r | [$r[] | select(any(.handle[]?; .handler? == "authentication"))] as $a | [$r[] | select(any(.handle[]?; .handler? == "static_response" and ((.status_code // "") | tostring) == "401"))] as $q | if ($a | length) == 1 and ($a[0].match | length) == 1 and ($a[0].match[0] | keys) == ["not"] and ($a[0].match[0].not | length) == 1 and ($a[0].match[0].not[0] | keys) == ["expression"] and ($q | length) == 1 and ($q[0].match | length) == 1 and ($q[0].match[0] | keys) == ["expression"] then ($a[0].match[0].not[0].expression | ex), ($q[0].match[0].expression | ex) else "SHAPE" end' || true)
+[ "$AX" = "$PUB"$'\n'"$QUIET" ] || stop "Caddy does not read the window's two rules exactly as written"
+cmp -s "$C" "$RK" || stop "the live Caddyfile changed while this ran"
+rm -f "$RW.undo"
+back() {
+  { install -o root -g root -m 0644 "$RK" "$C.new" && mv "$C.new" "$C" && cmp -s "$RK" "$C"; } || { echo "REVIEW_OPEN_NOT_DONE: $1, and the Caddyfile before could not be put back (it is $RK): run REVIEW_CLOSE now, then ask at once"; exit 1; }
+  systemctl restart caddy || true; sleep 3
+  [ "$(systemctl is-active caddy || true)" = active ] && [ "$(code "$U/")" = 401 ] && [ "$(code "$U/terms")" = 401 ] || { echo "REVIEW_OPEN_NOT_DONE: $1; the Caddyfile before is back, but Caddy is not active on it or / and /terms do not ask for the password: the site may be DOWN: ask at once"; exit 1; }
+  mv "$RK" "$RK.failed-$TS"; mv "$RW" "$RW.failed-$TS"; rm -f "$RW.lines"
+  echo "REVIEW_OPEN_NOT_DONE: $1; the Caddyfile before is back, and every page asks for the password again"; exit 1
+}
+{ install -o root -g root -m 0644 "$RW" "$C.new" && mv "$C.new" "$C" && cmp -s "$RW" "$C"; } || back "the window's file was not put in place"
+systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
+[ "$(systemctl is-active caddy || true)" = active ] || back "Caddy did not start on the window's file"
+probes
+[ -z "$BAD" ] || back "a check failed (above)"
+rm -f "$RW.lines"
+echo "NETOPIA's logo on the open home page: $(body "$U/" | grep -oE 'src="https://mny[.]ro/np-black-0[.]svg[?]id=[0-9]+"' | grep -c . || true) time(s) (1: shown; 0: this release has no logo id: ask before you enrol the point of sale, 5.8b)"
+echo "the plans page shows the test-mode note: $(body "$U/pricing" | grep -c 'Test mode:' || true) time(s)"
+echo "open now to strangers: the home page, /pricing, Terms and Privacy with their versions, /legal, /cookies, /providers, /ai-transparency, /privacy/us-health-data, /cancel and /withdraw, their files, and the /cancel form"
+echo REVIEW_OPEN_DONE
+exit 0
+```
+
+Expect the diff (one `< basic_auth {` line and the window's lines), the two handler lines, and a line that says
+nothing is linked from `/terms/versions` (the Terms have no earlier version yet). Then three information lines:
+NETOPIA's logo `1 time(s)`; the test-mode note `1` or more `time(s)` while payments are on NETOPIA's sandbox (0 once
+real payments are on, 7.6); what is open now. Then `REVIEW_OPEN_DONE`. A 0 for the logo, or for the note while
+payments are on the sandbox: ask before 5.8b. A `LOOK:` line changes nothing: read it, and ask before you write to
+NETOPIA. On a later run, with the window open, expect `the review window is open already: checks only, nothing
+changes`, the `/terms/versions` line and `REVIEW_OPEN_DONE`.
+
+If it says `REVIEW_OPEN_NOT_DONE`, read the reason:
+- On the first run (the window was closed), a failed check puts the file before back, and every page asks for the
+  password again. Ask.
+- On a later run (it printed `the review window is open already`), nothing changes and the window stays open, with a
+  check failing. Run REVIEW_CLOSE at once, then ask.
+
+**Then by hand**, in a private window that never had the site password: Chrome and Safari on the Mac, and the phone
+on mobile data.
+1. Open https://dezbatere.ro. You must see no password box: not while the page loads, not while you scroll, and not
+   in the next minute.
+2. Open every page link in the footer, and one earlier version of the Privacy Policy (from `/privacy/versions`). Each
+   opens with no password box, except Settings (Setări), which shows the password box as Log in does. The phone and
+   e-mail links open your phone and mail apps; the NETOPIA, ANPC and DB-IP links open those sites. **Report a problem**
+   (Raportați o problemă) is no page: it opens your mail program with a draft to the company's address, as does the
+   **Tell us** (Scrieți-ne) link in the home page's Beta sentence.
+3. Look at the page's language: Romanian if your browser's first language is Romanian, English otherwise. Then choose
+   another language with the language button at the bottom of the page: the page comes back in that language, and the
+   next page you open stays in it.
+4. Accept or decline the cookie bar: it goes away, and no password box appears.
+5. Press Log in: exactly one password box; its Cancel shows an empty page.
+6. On `/pricing`, press a plan's button: the password box.
+7. On `/cancel`, send your own address (one the mail plan reaches). The page says "If a plan exists for this address,
+   we've sent a link." (in Romanian: "Dacă există un abonament pentru această adresă, am trimis un link."). The mail
+   comes only if that account has a plan.
+8. In a normal window, with the password: sign in and open Settings. Everything is as before.
+
+If a password box appears by itself: write down the page you were on and what you had just done, press Cancel, run
+REVIEW_CLOSE, then ask, with those two facts.
+
+**Then try both ways back once:** REVIEW_CLOSE, then REVIEW_OPEN; PWON, then REVIEW_OPEN. Each ends with its `…_DONE`
+line.
+
+**Running REVIEW_OPEN again** while the window is open changes nothing: it only runs the checks (a minute or two). Run
+it after a later upload, once SB13b has passed and you have changed the first line of
+`/root/preview-archive/main-site/names.sh` to the new upload (end of 3.0); after PWNEW; and every morning while
+NETOPIA reviews.
+
+**Closing the window:** REVIEW_CLOSE, below, or PWON (8.4), which closes it too. Both work at any time, even during an
+upload. When the contract is signed, ask NETOPIA whether it still needs to see the site without the password. Close
+the window when it says no, and at the latest before part 8 or part 9.
+
+```sh
+set -euo pipefail
+# REVIEW_CLOSE: the NETOPIA review window closed: its lines come out of the live Caddyfile and Caddy restarts (about a second); every page asks for the site password again. It reads no names file, so it works at any time, even during an upload.
+C=/etc/debateai-v3-preview/public/Caddyfile; TS=$(date -u +%Y%m%dT%H%M%SZ)
+# The review window's marks, and how its lines come out again (the same lines in REVIEW_OPEN, REVIEW_CLOSE, PWON and REVIEW_MACTEST).
+RV=/root/preview-archive/main-site/review; RK=$RV/Caddyfile.before-window; RW=$RV/Caddyfile.window
+WB='# review window begin: the public pages answer strangers without the site password; REVIEW_CLOSE takes these lines out'; WE='# review window end'
+wopen() { grep -qE 'review_locked|review_quiet|review window begin' "$1"; }
+wstrip() { awk -v b="$WB" -v e="$WE" '{ t = $0; sub(/^[ \t]+/, "", t) } t == b { s = 1; n++; next } s && t == e { s = 0; next } s { next } t == "basic_auth @review_locked {" { print substr($0, 1, length($0) - length(t)) "basic_auth {"; c++; next } { print } END { if (n != 1 || s || c != 1) exit 1 }' "$1"; }
+# Closing the window (the same lines in REVIEW_CLOSE and PWON): its lines come out of the live Caddyfile, the result is compared with the copy REVIEW_OPEN kept, put in place, and Caddy restarts. If Caddy does not start, the file with the window comes back.
+wclose() {
+  local S=$RV/Caddyfile.without-window-$TS L=$RV/Caddyfile.with-window-$TS P
+  install -d -o root -g root -m 0700 "$RV"
+  { wstrip "$C" > "$S" && ! wopen "$S" && [ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$S" || true)" = 1 ]; } || { echo "$1_NOT_DONE: the window's lines do not come out of the live Caddyfile cleanly (edited by hand?); nothing changed, the window is still open: ask at once"; exit 1; }
+  if [ -s "$RK" ] && cmp -s "$S" "$RK"; then echo "without the window, the Caddyfile is the one before REVIEW_OPEN, byte for byte"
+  elif [ -s "$RK" ]; then echo "without the window, the Caddyfile differs from the copy REVIEW_OPEN kept; only the window's lines come out. The differences:"; diff "$RK" "$S" || true
+  else echo "the copy REVIEW_OPEN kept is missing; only the window's lines come out"; fi
+  cp -p "$C" "$L"
+  { install -o root -g root -m 0644 "$S" "$C.new" && mv "$C.new" "$C" && cmp -s "$S" "$C"; } || { echo "$1_NOT_DONE: the Caddyfile without the window was not put in place (it is $S; Caddy was not restarted, the window is still open): ask at once"; exit 1; }
+  systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
+  if [ "$(systemctl is-active caddy || true)" != active ]; then
+    { install -o root -g root -m 0644 "$L" "$C.new" && mv "$C.new" "$C"; } || true; systemctl restart caddy || true; sleep 3
+    echo "$1_NOT_DONE: Caddy did not start without the window; the file with the window is back and Caddy is $(systemctl is-active caddy || true) (active: the window is still open; anything else: the site is DOWN): ask at once"; exit 1
+  fi
+  for P in / /terms /login; do [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://dezbatere.ro$P" || true)" = 401 ] || { echo "$1_NOT_DONE: Caddy runs without the window, but https://dezbatere.ro$P does not ask for the password: ask at once"; exit 1; }; done
+  for P in "$RK" "$RW"; do if [ -e "$P" ]; then mv "$P" "$P.closed-$TS"; fi; done
+  echo "the review window is closed: every page asks for the site password again"
+}
+if ! wopen "$C"; then for F in "$RK" "$RW"; do if [ -e "$F" ]; then mv "$F" "$F.closed-$TS"; fi; done; echo "the review window is not open; nothing changed"; echo REVIEW_CLOSE_DONE; exit 0; fi
+wclose REVIEW_CLOSE
+echo REVIEW_CLOSE_DONE
+exit 0
+```
+
+Expect `without the window, the Caddyfile is the one before REVIEW_OPEN, byte for byte`, then
+`the review window is closed: every page asks for the site password again`, then `REVIEW_CLOSE_DONE`. If it shows
+differences instead, something changed the Caddyfile while the window was open: the window is closed anyway, and the
+change is kept. Ask. The file with the window stays in `/root/preview-archive/main-site/review/` as
+`Caddyfile.with-window-<time>`.
+
+**While the window is open:**
+- NAME5, PWOFF1 and SIGNUPS refuse: close the window first.
+- PWNEW, ASKS_OPEN, ASKS_CLOSE, MAIL_CLOSE, PAY_SWITCH and PAY_BACK work as written: they check the password on the
+  Log in page, which the window never opens.
+- REKEYCHECK, STAFFMAIN and REKEY (5.7) work as written: they never touch Caddy. NAME2, NAME3, STAFFOFF and STAFFON
+  refuse, as they do whenever the site answers as dezbatere.ro.
+- CLOSED says `NOT CLOSED: the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.8)`.
+- A later upload leaves the window as it is (5.6). Do not upload while NETOPIA is reviewing.
+
+### 5.8a Trying the window on the Mac first (REVIEW_MACTEST)
+
+On the Mac, in Terminal: run `brew install caddy` once, then `caddy version`, and write down what it prints. On the
+server, run `/usr/bin/caddy version`. If the two differ, go on: REVIEW_OPEN repeats the Caddy checks on the server and
+stops before any change if they fail there. In your copy of the code, `git rev-parse HEAD` must print the commit you
+uploaded (SB1's `REV`); if it does not, ask. If the website runs on your Mac, stop it first: it uses ports 3100 and
+3200, which the test needs. Save the block below the way you save a server step, but on the Mac, outside the project
+folder: `rm -f ~/review-mactest.sh; nano ~/review-mactest.sh`, paste, Ctrl-O, Enter, Ctrl-X. Then run
+`bash ~/review-mactest.sh <the full path of the dialectical-engine folder>`. Expect `file checks passed: …`, the
+handler lines, `ok` lines, and `REVIEW_MACTEST_DONE`. Any `FAIL` or `REVIEW_MACTEST_NOT_DONE`: do not open the window
+on the server; ask.
+
+```bash
+#!/usr/bin/env bash
+# REVIEW_MACTEST: the review window tried on the Mac, before the server. The recorded dezbatere.ro Caddyfile is rebuilt with the kit's own caddy-slots.mjs and NAME2's rename, REVIEW_OPEN's lines are added by the same lines of code, and REVIEW_OPEN's file checks run. Then Caddy validates and adapts both files, and a local Caddy in front of two echo servers is probed with curl: with the window, without it, and after its lines come out again. Everything is written in a new temporary folder, removed at the end; nothing is installed or trusted.
+set -euo pipefail
+REPO=$(cd "${1:?usage: bash review-mactest.sh <the dialectical-engine folder>}" && pwd)
+nd() { echo "REVIEW_MACTEST_NOT_DONE: $1"; exit 1; }
+T=$(mktemp -d); CP=''; UPS=''; FAILS=0
+cleanup() { if [ -n "$CP" ]; then kill "$CP" 2>/dev/null || true; fi; for P in $UPS; do kill "$P" 2>/dev/null || true; done; rm -rf "$T"; }
+trap cleanup EXIT
+# The review window's marks, and how its lines come out again (the same lines in REVIEW_OPEN, REVIEW_CLOSE, PWON and REVIEW_MACTEST).
+RV=/root/preview-archive/main-site/review; RK=$RV/Caddyfile.before-window; RW=$RV/Caddyfile.window
+WB='# review window begin: the public pages answer strangers without the site password; REVIEW_CLOSE takes these lines out'; WE='# review window end'
+wopen() { grep -qE 'review_locked|review_quiet|review window begin' "$1"; }
+wstrip() { awk -v b="$WB" -v e="$WE" '{ t = $0; sub(/^[ \t]+/, "", t) } t == b { s = 1; n++; next } s && t == e { s = 0; next } s { next } t == "basic_auth @review_locked {" { print substr($0, 1, length($0) - length(t)) "basic_auth {"; c++; next } { print } END { if (n != 1 || s || c != 1) exit 1 }' "$1"; }
+# What the window opens. A stranger is a request that sends no password and no site cookie. A stranger may read the public pages and the files they load (GET or HEAD, the raw request line exactly one of these addresses, with at most a plain query) and send the two /cancel requests (POST, exactly these two addresses). Raw means as sent: no dot segment, no double slash, no capital letter and no escaped slash can turn a closed address into an open one.
+PAT='^(/|/pricing|/terms|/terms/versions|/terms/versions/[0-9a-f]+|/privacy|/privacy/versions|/privacy/versions/[0-9a-f]+|/privacy/us-health-data|/legal|/cookies|/providers|/ai-transparency|/cancel|/withdraw|/icon[.]svg|/consumer-protection/anpc-sal[.]png|/payment-marks/(netopia|visa|mastercard)[.]svg|/_next/static(/([A-Za-z0-9_~-]|%5[BbDd])([A-Za-z0-9._~-]|%5[BbDd])*)+)([?][A-Za-z0-9._~%+=&-]*)?$'
+STRANGER='{http.request.header.Authorization} == "" && !({http.request.header.Cookie}.matches("(?i)__host-debateai-"))'
+PAGE='({http.request.method} == "GET" || {http.request.method} == "HEAD") && {http.request.orig_uri}.matches("'"$PAT"'")'
+CANCEL='{http.request.method} == "POST" && ({http.request.orig_uri} == "/api/v1/billing/cancel-link" || {http.request.orig_uri} == "/api/v1/billing/cancel-by-token")'
+QUIETURI='{http.request.header.RSC} == "1" || {http.request.orig_uri} == "/api/v1/session" || {http.request.orig_uri} == "/api/v1/geo/availability" || {http.request.orig_uri} == "/favicon.ico" || {http.request.orig_uri} == "/apple-touch-icon.png" || {http.request.orig_uri} == "/apple-touch-icon-precomposed.png"'
+PUB="$STRANGER && (($PAGE) || ($CANCEL))"
+QUIET="$STRANGER && ($QUIETURI) && !($PAGE)"
+wlines() {
+  printf '%s%s\n' "$1" "$WB" \
+    "$1" 'header X-Robots-Tag "noindex, nofollow"' \
+    "$1" '# A stranger'"'"'s background request for a closed address (a Next.js page request, the account and help checks, the browser'"'"'s own icon requests) gets a plain 401 without the password box, so no box opens over a public page.' \
+    "$1" '@review_quiet expression `'"$QUIET"'`' \
+    "$1" 'respond @review_quiet 401' \
+    "$1" '# The password below is skipped only for a stranger reading a public page or its files, or sending one of the two /cancel requests.' \
+    "$1" '@review_locked not expression `'"$PUB"'`' \
+    "$1" "$WE" \
+    "$1" 'basic_auth @review_locked {'
+}
+# 1. The recorded live file of the test name (LIVE_PREVIEW in tests/unit/preview-release-caddy-slots.test.ts).
+EDGE='header_up X-Debateai-Edge-Secret {file./etc/debateai-v3-preview/ui-edge.caddy.secret}'
+printf '%b\n' '# Protected preview only.' '{' '\temail {$PREVIEW_ACME_EMAIL}' '\tadmin off' '\tauto_https disable_redirects' '\tlog {' '\t\toutput discard' '\t}' '}' '' \
+  'v3-preview.dezbatere.ro {' '\ttls {' '\t\tprotocols tls1.2 tls1.3' '\t}' '\troute {' \
+  '\t\t@wrongHost not host v3-preview.dezbatere.ro' '\t\trespond @wrongHost "NOT_FOUND" 404' \
+  '\t\t@netopia_notify {' '\t\t\tmethod POST' '\t\t\tpath /api/v1/billing/netopia/notify' '\t\t}' \
+  '\t\thandle @netopia_notify {' '\t\t\trequest_body {' '\t\t\t\tmax_size 1MB' '\t\t\t}' '\t\t\treverse_proxy 127.0.0.1:3100 {' \
+  '\t\t\t\theader_up Host v3-preview.dezbatere.ro' '\t\t\t\theader_up X-Forwarded-For {remote_host}' '\t\t\t\theader_up X-Forwarded-Proto https' "\t\t\t\t$EDGE" '\t\t\t\theader_up -Authorization' '\t\t\t}' '\t\t}' \
+  '\t\t@wrongOrigin expression `{http.request.header.Origin} != "" && {http.request.header.Origin} != "https://v3-preview.dezbatere.ro"`' \
+  '\t\trespond @wrongOrigin "ORIGIN_REFUSED" 403' '\t\tbasic_auth {' '\t\t\t{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}' '\t\t}' \
+  '\t\theader {' '\t\t\tCache-Control "no-store"' '\t\t\t-Server' '\t\t}' '\t\trequest_body {' '\t\t\tmax_size 1MB' '\t\t}' \
+  '\t\treverse_proxy 127.0.0.1:3100 {' '\t\t\theader_up Host v3-preview.dezbatere.ro' '\t\t\theader_up X-Forwarded-For {remote_host}' '\t\t\theader_up X-Forwarded-Proto https' "\t\t\t$EDGE" '\t\t\theader_up -Authorization' '\t\t}' \
+  '\t}' '}' '' 'http://v3-preview.dezbatere.ro {' '\tredir https://v3-preview.dezbatere.ro{uri} 308' '}' > "$T/Caddyfile.recorded"
+# 2. The two slots, by the kit's own code (the release guide's T). PM2's payment-marks rule is not added: this server shows NETOPIA's hosted logo and has no mark files.
+cat > "$T/build.mjs" <<'JS'
+import { readFileSync, writeFileSync } from 'node:fs';
+const [repo, dir] = process.argv.slice(2);
+const slots = await import(`${repo}/deploy/preview-release/v1/caddy-slots.mjs`);
+writeFileSync(`${dir}/Caddyfile.two-slot`, slots.transformCaddyfile(readFileSync(`${dir}/Caddyfile.recorded`, 'utf8')));
+JS
+zsh -lic "node '$T/build.mjs' '$REPO' '$T'" || nd "the kit's caddy-slots.mjs did not build the two-slot file"
+# 3. NAME2: the rename and the HTTPS header group (MAIN-SITE.md 5.2); the result stands for NAME3's Caddyfile.main.
+sed 's/v3-preview\.dezbatere\.ro/dezbatere.ro/g' "$T/Caddyfile.two-slot" > "$T/Caddyfile.renamed"
+awk '{print} $0=="dezbatere.ro {"{n++; print "\theader {"; print "\t\tStrict-Transport-Security \"max-age=31536000\""; print "\t\t-Server"; print "\t}"} END{if(n!=1)exit 1}' "$T/Caddyfile.renamed" > "$T/Caddyfile.main" || nd "the renamed file has not exactly one dezbatere.ro block"
+# 4. REVIEW_OPEN's lines, by the same code, and REVIEW_OPEN's file checks.
+C=$T/Caddyfile.main; RK=$T/Caddyfile.before-window; RW=$T/Caddyfile.window; HOST=dezbatere.ro
+cp -p "$C" "$RK"
+[ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$RK" || true)" = 1 ] || nd "not exactly one basic_auth line"
+BL=$(grep -nE '^[[:space:]]*basic_auth \{$' "$RK" | cut -d: -f1)
+[ "$(sed -n "$((BL - 1))p" "$RK" | sed 's/^[[:space:]]*//')" = 'respond @wrongOrigin "ORIGIN_REFUSED" 403' ] && [ "$(sed -n "$((BL + 1))p" "$RK" | sed 's/^[[:space:]]*//')" = '{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}' ] || nd "the lines around basic_auth are not the recorded ones"
+I=$(sed -n "${BL}p" "$RK" | sed -E 's/^([[:space:]]*).*$/\1/')
+wlines "$I" > "$RW.lines"
+awk -v n="$BL" -v f="$RW.lines" 'NR == n { while ((getline l < f) > 0) print l; next } { print }' "$RK" > "$RW"
+[ "$(diff "$RK" "$RW" | grep -c '^[0-9]' || true)" = 1 ] && [ "$(diff "$RK" "$RW" | sed -n 's/^<[[:space:]]*//p')" = 'basic_auth {' ] && [ "$(diff "$RK" "$RW" | sed -n 's/^>[[:space:]]*//p')" = "$(sed 's/^[[:space:]]*//' "$RW.lines")" ] || nd "the window's file is not exactly the window's lines"
+wstrip "$RW" > "$T/Caddyfile.undone" && cmp -s "$T/Caddyfile.undone" "$RK" || nd "taking the window's lines out again does not give back the file before, byte for byte"
+wopen "$RW" && ! wopen "$RK" || nd "wopen does not tell the two files apart"
+echo "file checks passed: one diff hunk ($(diff "$RK" "$RW" | grep '^[0-9]')), and the undo gives back the file before, byte for byte"
+# 5. Caddy itself.
+for P in caddy jq python3 curl lsof openssl; do command -v "$P" >/dev/null || nd "$P is missing (the file checks above passed): for caddy or jq, run brew install $P, then run this again; for anything else, ask"; done
+for PORT in 3090 3100 3200 18080 18443; do if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then nd "port $PORT is in use (stop the local website first)"; fi; done
+echo "caddy on this Mac: $(caddy version) (compare with /usr/bin/caddy version on the server)"
+TP=$(openssl rand -hex 16)
+export PREVIEW_BASIC_AUTH_USER=mactest PREVIEW_ACME_EMAIL=test@example.invalid XDG_CONFIG_HOME="$T/config" XDG_DATA_HOME="$T/data"
+PREVIEW_BASIC_AUTH_HASH=$(caddy hash-password --plaintext "$TP"); export PREVIEW_BASIC_AUTH_HASH
+cad() { caddy "$@"; }
+order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r --arg h "$2" '[.apps.http.servers[].routes[] | select(.match[0].host[0]==$h) | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
+for F in "$RK" "$RW"; do cad validate --config "$F" --adapter caddyfile >/dev/null 2>&1 || { cad validate --config "$F" --adapter caddyfile 2>&1 | tail -n 5; nd "caddy validate refused $(basename "$F")"; }; done
+O1=$(order "$RK" "$HOST" || true); O2=$(order "$RW" "$HOST" || true); echo "handlers, before: $O1"; echo "handlers, window: $O2"
+[ "$(grep -o authentication <<<"$O1" | grep -c . || true)" = 1 ] && [ "$O2" = "${O1/authentication/headers > static_response > authentication}" ] || nd "the handler order differs beyond the window's two handlers (REVIEW_OPEN's check must change with it)"
+AX=$(cad adapt --config "$RW" --adapter caddyfile 2>/dev/null | jq -r --arg h "$HOST" 'def ex: if type == "object" then .expr else . end; [.apps.http.servers[].routes[] | select(.match[0].host[0] == $h) | .. | objects | select(has("handle"))] as $r | [$r[] | select(any(.handle[]?; .handler? == "authentication"))] as $a | [$r[] | select(any(.handle[]?; .handler? == "static_response" and ((.status_code // "") | tostring) == "401"))] as $q | if ($a | length) == 1 and ($a[0].match | length) == 1 and ($a[0].match[0] | keys) == ["not"] and ($a[0].match[0].not | length) == 1 and ($a[0].match[0].not[0] | keys) == ["expression"] and ($q | length) == 1 and ($q[0].match | length) == 1 and ($q[0].match[0] | keys) == ["expression"] then ($a[0].match[0].not[0].expression | ex), ($q[0].match[0].expression | ex) else "SHAPE" end' || true)
+[ "$AX" = "$PUB"$'\n'"$QUIET" ] || { cad adapt --config "$RW" --adapter caddyfile 2>/dev/null | jq -c '.. | objects | select(has("handle")) | select(any(.handle[]?; .handler? == "authentication" or .handler? == "static_response")) | .match' || true; nd "Caddy does not read the window's two rules as written (what it reads is above; REVIEW_OPEN's check must change with it)"; }
+echo "caddy validate, the handler order and the two rules: as REVIEW_OPEN expects"
+# 6. Local copies: local ports, a local certificate authority that nothing trusts, the edge secret here.
+printf 'mactest\n' > "$T/edge.secret"
+wstrip "$RW" > "$T/Caddyfile.after-close"
+for F in before-window window after-close; do
+  awk -v t="$T" '{ gsub("/etc/debateai-v3-preview/ui-edge.caddy.secret", t "/edge.secret"); print }
+    $0 == "\tadmin off" { print "\tlocal_certs"; print "\tskip_install_trust"; print "\thttp_port 18080"; print "\thttps_port 18443" }' "$T/Caddyfile.$F" > "$T/local.$F"
+done
+# 7. Two echo servers for the two slots: 200 with the request line they received, exactly as received.
+cat > "$T/echo.py" <<'PY'
+import http.server, sys
+class Echo(http.server.BaseHTTPRequestHandler):
+    def answer(self):
+        n = int(self.headers.get("Content-Length") or 0)
+        if n:
+            self.rfile.read(n)
+        body = ("UPSTREAM %s %s\n" % (self.command, self.path)).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+    do_GET = do_HEAD = do_POST = do_PUT = do_DELETE = do_OPTIONS = do_PATCH = answer
+    def log_message(self, *args):
+        pass
+http.server.ThreadingHTTPServer(("127.0.0.1", int(sys.argv[1])), Echo).serve_forever()
+PY
+python3 -I "$T/echo.py" 3100 & UPS="$UPS $!"
+python3 -I "$T/echo.py" 3200 & UPS="$UPS $!"
+H=dezbatere.ro; B=https://dezbatere.ro:18443
+start() {
+  if [ -n "$CP" ]; then kill "$CP" 2>/dev/null || true; wait "$CP" 2>/dev/null || true; CP=''; fi
+  caddy run --config "$T/local.$1" --adapter caddyfile > "$T/caddy-$1.log" 2>&1 & CP=$!
+  for i in $(seq 1 60); do [ "$(curl -sk --resolve "$H:18443:127.0.0.1" -m 2 -o /dev/null -w '%{http_code}' "$B/readyz" || true)" = 404 ] && return 0; sleep 0.5; done
+  tail -n 20 "$T/caddy-$1.log"; nd "the local Caddy did not answer on the $1 file"
+}
+probe() { # probe <want> <method> <path> [curl options]; want: open, box, quiet, trick, refused, caddy404
+  local want=$1 m=$2 p=$3 c ch up; shift 3
+  if [ "$m" = HEAD ]; then set -- -I "$@"; else set -- -X "$m" "$@"; fi
+  : > "$T/body"; : > "$T/head"
+  c=$(curl -sk --resolve "$H:18443:127.0.0.1" -m 15 -o "$T/body" -D "$T/head" -w '%{http_code}' "$@" "$B$p" || true)
+  ch=$(tr -d '\r' < "$T/head" | grep -ci '^www-authenticate: basic' || true)
+  up=$(head -c 9 "$T/body" || true)
+  case "$want" in
+    open) [ "$c" = 200 ] && { [ "$m" = HEAD ] || [ "$up" = 'UPSTREAM ' ]; } ;;
+    box) [ "$c" = 401 ] && [ "$ch" = 1 ] && [ "$up" != 'UPSTREAM ' ] ;;
+    quiet) [ "$c" = 401 ] && [ "$ch" = 0 ] && [ "$up" != 'UPSTREAM ' ] ;;
+    trick) { [ "$c" = 401 ] || [ "$c" = 400 ]; } && [ "$up" != 'UPSTREAM ' ] ;;
+    refused) [ "$c" = 403 ] ;;
+    caddy404) [ "$c" = 404 ] && [ "$up" != 'UPSTREAM ' ] ;;
+    *) false ;;
+  esac && { echo "ok    $want $m $p"; return 0; }
+  echo "FAIL  $want $m $p: answered $c, password box $ch, $( [ "$up" = 'UPSTREAM ' ] && head -n 1 "$T/body" || echo 'not passed on')"; FAILS=$((FAILS + 1))
+}
+same() { # same <method> <path as sent> <request line the echo server must see>
+  local got; got=$(curl -sk --resolve "$H:18443:127.0.0.1" -m 15 -X "$1" "$B$2" | head -n 1 || true)
+  if [ "$got" = "UPSTREAM $1 $3" ]; then echo "ok    the website gets $3 as sent"; else echo "FAIL  the website gets '$got' for $2"; FAILS=$((FAILS + 1)); fi
+}
+J='Content-Type: application/json'; OR='Origin: https://dezbatere.ro'; SC="Cookie: __Host-debateai-session=$(printf 'A%.0s' $(seq 1 43))"
+# 8. The window open.
+start window
+for P in / '/?tab=public' /pricing '/pricing?country=RO&postal_code=10001' /terms '/terms?lang=ro' /terms/versions /terms/versions/0123abcd /privacy /privacy/versions /privacy/versions/0123abcd /privacy/us-health-data /legal /cookies /providers /ai-transparency /cancel /withdraw '/icon.svg?a1b2c3' /_next/static/chunks/main-1a2b.js /_next/static/media/a34f-s.p.woff2 /_next/static/chunks/app/terms/versions/%5Bsha256%5D/page-1a2b.js /consumer-protection/anpc-sal.png '/terms?_rsc=1ld0r'; do probe open GET "$P"; done
+probe open HEAD /
+probe open GET /terms -H 'RSC: 1' -H 'Next-Router-State-Tree: %5B%22%22%5D'
+probe open GET /terms -H 'Cookie: debateai.locale=ro'
+probe open GET /payment-marks/netopia.svg
+for P in /api/v1/billing/cancel-link /api/v1/billing/cancel-by-token; do probe open POST "$P" -H "$J" -H "$OR" --data '{}'; done
+probe refused POST /api/v1/billing/cancel-link -H "$J" -H 'Origin: https://example.invalid' --data '{}'
+same GET '/terms?lang=ro' '/terms?lang=ro'
+same GET /_next/static/chunks/app/terms/versions/%5Bsha256%5D/page-1a2b.js /_next/static/chunks/app/terms/versions/%5Bsha256%5D/page-1a2b.js
+for P in /login /sign-up /settings /settings/security /checkout '/checkout?plan=PLUS' /checkout/return /new /v4 /help /export /admin/team /recover /reset-password /enroll-mfa /verify-email /social/complete /public/debate/x /debate/x /robots.txt /TERMS /Pricing /terms/ /terms. '/terms%2e' '/pricing?next=/settings' '/pricing?x=a:b' /api/v1/billing/plans /api/v1/auth/sessions /api/v1/session/ '/api/v1/session?x=1' /payment-marks/amex.svg /_next/data/x/settings.json '/_next/image?url=%2Ficon.svg&w=64&q=75' /_next/static /_next/static/; do probe box GET "$P"; done
+for P in //terms /terms/../login /settings/.. '/settings/%2e%2e' '/settings%2F..' /_next/static/../../login '/_next/static/%2e%2e/%2e%2e/login' '/_next/static/..%2f..%2flogin' '/_next/static/.hidden' '/pricing/..%2Fsettings' '/terms/versions/..%2F..%2Fsettings' '/terms/versions/%2e%2e'; do probe trick GET "$P" --http1.1 --path-as-is; done
+probe trick GET / --http1.1 --request-target 'https://dezbatere.ro/terms'
+for X in POST PUT DELETE PATCH OPTIONS; do probe box "$X" /terms --data ''; done
+probe box POST /pricing -H 'Next-Action: 0' -H 'Content-Type: text/plain' --data '[]'
+for P in /api/v1/auth/login /api/v1/auth/register /api/v1/support/messages /api/v1/billing/checkout '/api/v1/billing/cancel-link?x=1'; do probe box POST "$P" -H "$J" -H "$OR" --data '{}'; done
+probe box GET '/?tab=public' -H "$SC"
+probe box GET /terms -H 'Cookie: debateai.locale=ro; __host-DebateAI-x=1'
+probe box GET / -H 'Authorization: Basic Og=='
+probe box GET /login -u 'mactest:wrong'
+for P in /api/v1/session /api/v1/geo/availability /favicon.ico /apple-touch-icon.png; do probe quiet GET "$P"; done
+probe quiet GET /settings -H 'RSC: 1'
+probe quiet GET /new -H 'RSC: 1' -H 'Next-Router-Prefetch: 1'
+probe box GET /settings -H 'RSC: 1' -H "$SC"
+probe open GET /login -u "mactest:$TP"
+probe open GET /settings -H 'RSC: 1' -u "mactest:$TP"
+probe open GET /api/v1/session -u "mactest:$TP"
+probe open POST /api/v1/billing/netopia/notify -H "$J" --data '{}'
+probe caddy404 GET /readyz
+RB=$(curl -skI --resolve "$H:18443:127.0.0.1" -m 15 "$B/" | tr -d '\r' | grep -ci '^x-robots-tag: noindex, nofollow$' || true)
+if [ "$RB" = 1 ]; then echo "ok    the robots header, once, on /"; else echo "FAIL  the robots header on / ($RB)"; FAILS=$((FAILS + 1)); fi
+# 9. The window closed: the file before it, then the file after its lines came out (byte for byte the same).
+cmp -s "$T/Caddyfile.after-close" "$RK" || { echo "FAIL  the file after closing is not the file before"; FAILS=$((FAILS + 1)); }
+for F in before-window after-close; do
+  start "$F"
+  for P in / /pricing /terms /cancel /consumer-protection/anpc-sal.png /api/v1/session /api/v1/geo/availability; do probe box GET "$P"; done
+  probe box GET /settings -H 'RSC: 1'
+  probe box POST /api/v1/billing/cancel-link -H "$J" -H "$OR" --data '{}'
+  probe open GET /login -u "mactest:$TP"
+  probe open POST /api/v1/billing/netopia/notify -H "$J" --data '{}'
+  probe caddy404 GET /readyz
+done
+[ "$FAILS" = 0 ] || nd "$FAILS probe(s) failed (above)"
+echo REVIEW_MACTEST_DONE
+```
+
+### 5.8b NETOPIA's review: the list, the point of sale, and the days after
+
+Do this once REVIEW_OPEN ended with `REVIEW_OPEN_DONE` and the checks by hand of 5.8 passed.
+
+**1. Check NETOPIA's list on the open site.** NETOPIA looks for each of these before it approves. Open every address
+in a private window that never had the site password, from a Romanian connection (on the phone: mobile data).
+
+| NETOPIA asks for | Where | What must be there |
+|---|---|---|
+| a description of the service | https://dezbatere.ro/ | what the site does and how, and the line "Abonamentele plătite pornesc de la … pe lună, cu taxe incluse" (English: "Paid plans start at … a month, tax included") |
+| the plans, with prices in RON and "Taxe incluse" | https://dezbatere.ro/pricing | in Romanian, each paid plan's price in RON, followed by "Taxe incluse (…%, …)" |
+| company details and contact | the footer of every page above, and https://dezbatere.ro/legal (footer: "Datele firmei și contact", Company details and contact) | the company's name, registered office, CUI, trade register number, telephone and e-mail |
+| the Terms | https://dezbatere.ro/terms (footer: "Termenii serviciului") | the whole text, version 1.0 |
+| who sells | https://dezbatere.ro/terms, section 1 | its first sentence names the company that runs the site |
+| the Privacy Policy (GDPR) | https://dezbatere.ro/privacy (footer: "Politica de confidențialitate (GDPR)") | the whole text |
+| delivery, cancellation and refunds | https://dezbatere.ro/terms#legal-section-12 (footer: "Livrarea serviciului", Delivery) and https://dezbatere.ro/cancel (footer: "Anularea unui abonament", Cancel a plan) | Terms section 12 names delivery, cancelling and refunds; `/cancel` shows its form |
+| withdrawal | https://dezbatere.ro/withdraw (footer: "Retragere din contract", Withdraw from contract) | the two steps in Settings, the e-mail route and the model form |
+| HTTPS | every address above | the browser's padlock; http://dezbatere.ro goes on to https://dezbatere.ro |
+| NETOPIA's logo | the footer of the home page and of `/pricing` | NETOPIA's picture with the Visa and Mastercard marks; a click opens netopia-payments.com |
+| the ANPC badge | the footer of every page above ("Protecția consumatorilor", Consumer protection) | ANPC's badge; a click opens ANPC's page |
+
+If anything is missing or wrong: stop here and ask. Do not tick NETOPIA's boxes yet.
+
+**2. The question for NETOPIA.** Buying is closed to strangers: the checkout, sign-up and sign-in ask for the site
+password. Ask NETOPIA how it wants to make its test payment while that is so: for example, you pay while NETOPIA
+watches, or NETOPIA's tester gets the site password from you in a one-to-one message (never in a group, an e-mail
+thread or a chat with Claude). If NETOPIA's tester gets the password, change it before part 7 (PWNEW, 7.0), as after a
+friends' test; the tester's sign-up also needs open mail (4.3). A plan NETOPIA's tester buys here is a sandbox plan
+like a friend's. Withdraw it with WITHDRAWOTHER (3.3) within 14 days of its purchase, once NETOPIA says its test is
+over and you have told its tester, and close its records before part 7 (7.1). After 14 days only NETOPIA's tester can
+cancel it (Settings or `/cancel`), and part 7 waits until they do. You may ask this early, even before the upload, so
+the answer comes in time.
+
+**3. Enrol the point of sale.** Only now, with the window open: NETOPIA may look at once, and must not find a password
+box. In NETOPIA's admin, enrol the point of sale for https://dezbatere.ro and tick its conditions. NETOPIA then checks
+your identity, checks your shop's profile (it looks at the open site), and sends the contract.
+
+**4. What to tell NETOPIA** (in your own words, with the enrolment):
+- The site is https://dezbatere.ro.
+- The home page, the plans with prices, the Terms and the Privacy Policy (with earlier versions), the company details
+  and contact page, the cookie policy, the AI model providers, the AI transparency notice, Cancel and Withdraw can be
+  read without a password.
+- Sign-in, account creation, debates and the order page ask for an access password for now. They open to everyone
+  later, after the contract.
+- Card payments run on NETOPIA's test system (sandbox) until NETOPIA switches live payments on, and the home page and
+  the plans page say so: "Mod de test: plățile de pe acest site nu sunt reale și nu se iau bani" (in English: "Test
+  mode: payments on this site are not real and no money is taken").
+- A browser that prefers Romanian gets the site in Romanian; the language button at the bottom of every page
+  switches.
+- The site is in Beta, and the home page says so; **Raportați o problemă** (Report a problem), in every page's footer,
+  opens the visitor's own mail program with a draft to the company's e-mail address.
+- Your question of step 2, if NETOPIA has not answered it yet.
+
+**5. While NETOPIA reviews** (days):
+- The window stays open, across days and Caddy restarts.
+- Upload nothing (5.6).
+- Run REVIEW_OPEN again every morning while NETOPIA reviews. With the window open it only checks.
+- A friends' test (part 6) may run: friends use the site password.
+- NETOPIA's test payment goes as NETOPIA answered step 2. If its answer needs a step this document does not have, ask.
+
+**6. After NETOPIA's approval and the signed contract:** NETOPIA switches live and saved-card (recurring) payments on.
+Then come the NETOPIA checks of 1.1 and part 7, on a later day. Every part-7 script works with the window open, and at
+PAY_SWITCH the test-mode note leaves the open pages by itself. Close the window as 5.8 says ("Closing the window").
+
 ---
 
 ## 6. Friends' test, with test payments
@@ -1705,7 +2357,7 @@ gatesok || { gates; echo "ASKS_OPEN_NOT_DONE: a spending gate is not active with
 PAY=none; if grep -qxE 'NETOPIA_API_BASE_URL=https://secure(-sandbox|\.sandbox)\.netopia-payments\.com' "$A"; then PAY=sandbox; elif grep -qx 'NETOPIA_API_BASE_URL=https://secure.netopia-payments.com/api' "$A"; then PAY=live; fi
 echo "payments: $PAY"
 case "$V/$PAY" in everyone-with-test-payments/sandbox|everyone/live) ;; *) echo "ASKS_OPEN_NOT_DONE: $V does not go with payments $PAY (part 10: PREVIEW_ASKS_OPEN_TO_SANDBOX_BILLING, ..._BILLING_OFF, ..._TEST_PAYMENTS_NOT_SANDBOX)"; exit 1;; esac
-[ "$V" = everyone ] || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "ASKS_OPEN_NOT_DONE: the site password is off; the friends' test runs only behind it"; exit 1; }
+[ "$V" = everyone ] || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "ASKS_OPEN_NOT_DONE: the site password is off; the friends' test runs only behind it"; exit 1; }
 AS=$M/asks/open-$(date -u +%Y%m%dT%H%M%SZ); install -d -o root -g root -m 0700 "$AS"
 for F in "$A" "$RF"; do cp -p "$F" "$AS/$(basename "$F").before-open"; done
 ( umask 077; printf 'ASKS_ARCHIVE=%s\nASKS_LABEL=%s\n' "$AS" "$LABEL" > "$M/asks/names.sh" )
@@ -1746,7 +2398,7 @@ exit 0
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # ASKS_CLOSE: only the team may start debates again. Edits the current release's two files, so it works after any later upload.
-! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "ASKS_CLOSE_NOT_DONE: payments are live and the site is open: PWON first"; exit 1; }
+! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "ASKS_CLOSE_NOT_DONE: payments are live and the site is open: PWON first"; exit 1; }
 [ -s "$M/asks/names.sh" ] || { echo "ASKS_CLOSE_NOT_DONE: $M/asks/names.sh is missing (asks were never opened by ASKS_OPEN): ask"; exit 1; }
 . "$M/asks/names.sh"                                      # ASKS_ARCHIVE, ASKS_LABEL
 grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "ASKS_CLOSE_NOT_DONE: asks are not open in this release's files"; exit 1; }
@@ -1824,7 +2476,10 @@ Open them again with each gate's `activate`:
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1 --go /etc/debateai-v3-preview/provider-perplexity-go-v1.json
 ```
 
-(b) **Close the site to strangers:** PWON (part 8.4), when the password is off.
+(b) **Close the site to strangers:** PWON (part 8.4), when the password is off or the NETOPIA review window (5.8) is
+open. PWON closes both.
+
+(b2) **Close only the review window:** REVIEW_CLOSE (5.8). It reads no names file, so it works at any time.
 
 (c) **Stop sign-ups only** (for when the password is off): a Caddy rule that answers 503 to the three sign-up
 requests. People see a plain error; it is an emergency brake. While the password is on, only people who know it can
@@ -1853,6 +2508,7 @@ set -euo pipefail
 # While the password is off, the copy PWON and NAME5 compare with moves with it. If Caddy does not start, the file before comes back.
 W=$M/password/Caddyfile.signups; O=$M/password/Caddyfile.open; TS=$(date -u +%Y%m%dT%H%M%SZ); PREV=$M/password/Caddyfile.before-signups-$TS
 [ -s "$W" ] || { echo "SIGNUPS_NOT_DONE: $W is missing (make the edited copy first; nothing changed)"; exit 1; }
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "SIGNUPS_NOT_DONE: the NETOPIA review window is open, so sign-ups already ask for the site password and this brake is not needed; nothing changed"; exit 1; }
 OFF=no; if [ -e "$O" ]; then cmp -s "$C" "$O" || { echo "SIGNUPS_NOT_DONE: the live Caddyfile is not the copy PWOFF2 put in place (between PWOFF1 and PWOFF2?); nothing changed: ask"; exit 1; }; OFF=yes; fi
 [ ! -e "$M/password/Caddyfile.before-open" ] || ! cmp -s "$C" "$M/password/Caddyfile.before-open" || { echo "SIGNUPS_NOT_DONE: PWOFF1 ran but the password is still on: finish PWOFF2, or run PWON to drop its copies, then run this again; nothing changed"; exit 1; }
 RULE=$(printf '%s\n' '@signup {' 'method POST' 'path /api/v1/auth/register /api/v1/auth/social/signup/complete /api/v1/auth/resend-verification' '}' 'respond @signup 503')
@@ -1890,7 +2546,7 @@ out with SIGNUPS.
 (d) **Asks back to the team only:** ASKS_CLOSE (6.3). While payments are real it runs only with the password on, so
 PWON (b) comes first.
 
-(a) and (b) work at any time, even during an upload. (c) and (d) do not: wait until the upload is over. Their names
+(a), (b) and (b2) work at any time, even during an upload. (c) and (d) do not: wait until the upload is over. Their names
 file stops them only once the new release is staged, not from the start of the upload, so do not count on it.
 
 To see spend: GATES (6.2), and the gates' halt e-mails.
@@ -1900,12 +2556,12 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
 ## 7. Real payments
 
 **Before you start:**
-- NETOPIA approved (1.1), and the SmartBill proof passed (1.2).
+- NETOPIA approved and the contract is signed (1.1, 5.8b), and the SmartBill proof passed (1.2).
 - The main name is open (part 5), and the billing check passes on it.
 - Asks are closed (ASKS_CLOSE). The live start refuses `everyone-with-test-payments`. After the switch you open asks
   with `everyone` (part 8), never with the friends' value.
-- If a friends' test ran (part 6): it is closed (PAY0, 7.1, prints all zeros), and the site password is a new one
-  that the friends never had (PWNEW, 7.0).
+- If a friends' test ran (part 6), or NETOPIA's tester had the site password (5.8b): every plan they bought is closed
+  (PAY0, 7.1, prints all zeros), and the site password is a new one that they never had (PWNEW, 7.0).
 - Until your staff key works on dezbatere.ro (5.7), nobody can hide a published debate or settle a report by hand,
   and the test name is no way round either, because from PAY_SWITCH until PAY_BACK NAME5 refuses. The payment, refund
   and invoice steps need no staff screen, and 5.7 can be done while payments are real (STAFFMAIN restarts the API:
@@ -1913,13 +2569,16 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
   team only, was your decision; you do not need to ask again.
 - The site password is on. While payments are real and asks are closed, the API refuses a checkout or a plan upgrade
   from any account not on the team (403 `PREVIEW_TEAM_ONLY`; the page shows its general error). Keep the password on
-  anyway while mail is on the allow-list: a buyer outside it would get no M1 or M2.
+  anyway while mail is on the allow-list: a buyer outside it would get no M1 or M2. The NETOPIA review window (5.8)
+  may be open: it opens only the public pages and the `/cancel` form, no sign-in and no checkout, and PAY_SWITCH and
+  PAY_BACK check the password on the Log in page, which the window never opens.
 - Never during an upload, and never while a second release runs or drains: two APIs on different payment systems on one
   database would end each other's billing jobs.
 
-### 7.0 A new site password (after a friends' test)
+### 7.0 A new site password (after a friends' test, or after NETOPIA's tester had it)
 
-The friends had the site password. During part 7 it keeps everyone but the team off the site, so change it first.
+The friends (or NETOPIA's tester, 5.8b) had the site password. During part 7 it keeps everyone but the team away from
+sign-in, debates and buying, so change it first.
 This step writes a new user name and its bcrypt hash into `/etc/debateai-v3-preview/public/caddy.env` and
 restarts Caddy. The script asks for the old password only to check that it stops working; nothing you type is printed
 or put on a command line. Use letters and digits only, at least 20 for the password.
@@ -1935,13 +2594,13 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # PWNEW: a new site user and password (its bcrypt hash in caddy.env); Caddy restarts; the new pair is admitted and the old one refused. Nothing secret is printed.
 CE=/etc/debateai-v3-preview/public/caddy.env
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/" || true)" = 401 ] || { echo "PWNEW_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login" || true)" = 401 ] || { echo "PWNEW_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
 [ "$(grep -c '^PREVIEW_BASIC_AUTH_USER=' "$CE" || true)" = 1 ] && [ "$(grep -c '^PREVIEW_BASIC_AUTH_HASH=' "$CE" || true)" = 1 ] || { echo "PWNEW_NOT_DONE: caddy.env does not hold exactly one user line and one hash line (nothing changed): ask"; exit 1; }
 [ "$(grep -cF '{$PREVIEW_BASIC_AUTH_USER} {$PREVIEW_BASIC_AUTH_HASH}' "$C" || true)" = 1 ] || { echo "PWNEW_NOT_DONE: the live Caddyfile does not read the two caddy.env values in one basic_auth line (nothing changed): ask"; exit 1; }
 cad validate --config "$C" --adapter caddyfile >/dev/null 2>&1 || { echo "PWNEW_NOT_DONE: caddy validate refuses the live Caddyfile today (nothing changed): ask"; exit 1; }
 esc() { printf '%s' "$1" | sed 's/[\\"]/\\&/g'; }
 pair() { printf 'user = "%s:%s"\n' "$(esc "$1")" "$(esc "$2")"; }
-answer() { pair "$1" "$2" | curl -s -o /dev/null -w '%{http_code}' -K - "https://$HOST/" || true; }
+answer() { pair "$1" "$2" | curl -s -o /dev/null -w '%{http_code}' -K - "https://$HOST/login" || true; }
 OLDUSER=$(sed -n 's/^PREVIEW_BASIC_AUTH_USER=//p' "$CE")
 read -rs -p 'The OLD site password (hidden): ' OLDPASS < /dev/tty; echo
 case "$(answer "$OLDUSER" "$OLDPASS")" in 401|000) echo "PWNEW_NOT_DONE: the old password you typed is not admitted now (a typo?); nothing changed"; exit 1;; esac
@@ -1962,7 +2621,7 @@ cad validate --config "$C" --adapter caddyfile >/dev/null 2>&1 || { undo; echo "
 systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
 BAD=''
 [ "$(systemctl is-active caddy || true)" = active ] || BAD="$BAD caddy"
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/" || true)" = 401 ] || BAD="$BAD no-password"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login" || true)" = 401 ] || BAD="$BAD no-password"
 case "$(answer "$NEWUSER" "$NEWPASS")" in 401|000) BAD="$BAD new";; esac
 [ "$(answer "$OLDUSER" "$OLDPASS")" = 401 ] || BAD="$BAD old"
 if [ -n "$BAD" ]; then undo; echo "PWNEW_NOT_DONE: a check failed ($BAD); the old caddy.env is back and Caddy restarted on it"; exit 1; fi
@@ -2121,7 +2780,7 @@ set -euo pipefail
 QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | cut -d/ -f3 || true)
 [ "$HOST" = dezbatere.ro ] || { echo "PAY_SWITCH_NOT_DONE: the API answers as $HOST: open the main name first (part 5)"; exit 1; }
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "PAY_SWITCH_NOT_DONE: asks are open: ASKS_CLOSE first (the live start refuses everyone-with-test-payments)"; exit 1; }
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "PAY_SWITCH_NOT_DONE: the site password is off"; exit 1; }
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "PAY_SWITCH_NOT_DONE: the site password is off"; exit 1; }
 [ "$(modecheck "$QL")" = 'egress: live' ] || { echo "PAY_SWITCH_NOT_DONE: the egress proxy is not live for $QL (PAY_EGRESS first)"; exit 1; }
 cmp -s "$M/pay/sandbox.lines" <(grep -E "$KEYS" "$A") || { echo "PAY_SWITCH_NOT_DONE: the API file's payment lines changed since PAY_LINES: ask"; exit 1; }
 [ "$(swap "$M/pay/live.lines")" = swapped ] || { echo "PAY_SWITCH_NOT_DONE: the swap did not finish (compare the API file with $M/pay/api-$LABEL.env.before-live); nothing restarted: ask"; exit 1; }
@@ -2282,7 +2941,7 @@ set -euo pipefail
 QL=$(grep -oE '^QUADERNO_API_BASE_URL=https://[a-z0-9-]+' "$M/pay/live.lines" | cut -d/ -f3 || true)
 grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "PAY_BACK_NOT_DONE: the API file is not live"; exit 1; }
 ! grep -q '^PREVIEW_ASKS_OPEN_TO=' "$A" "$RF" || { echo "PAY_BACK_NOT_DONE: asks are open: ASKS_CLOSE first (the sandbox start refuses everyone)"; exit 1; }
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "PAY_BACK_NOT_DONE: the site password is off: PWON first"; exit 1; }
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "PAY_BACK_NOT_DONE: the site password is off: PWON first"; exit 1; }
 W1=$(psqlq "SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'payment_provider') = 'netopia' AND jsonb_extract_path_text(c.data, 'payment_environment') = 'live' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED')")
 W2=$(psqlq "SELECT count(*) FROM billing.charge c WHERE c.payment_provider = 'netopia' AND c.payment_environment = 'live' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED'))")
 W3=$(psqlq "SELECT count(*) FROM billing.charge_event r WHERE r.kind = 'REFUND_REQUESTED' AND r.payment_provider = 'netopia' AND r.payment_environment = 'live' AND r.amount_micros > 0 AND COALESCE((SELECT sum(d.amount_micros) FROM billing.charge_event d WHERE d.charge_id = r.charge_id AND d.kind = 'REFUNDED' AND COALESCE(d.refunds_transaction_id, d.provider_payment_id) = r.provider_payment_id), 0) < r.amount_micros")
@@ -2324,6 +2983,9 @@ the line. Two more rules, for the release guide's drained upload (DR1 to DR6):
   After SB13b, edit only the first line of `/root/preview-archive/main-site/names.sh` so it names the new upload's
   names file (as the end of 3.0 says; do not run LOCKS0 again). Then take the password off again with PWOFF1 and
   PWOFF2.
+  If only the NETOPIA review window (5.8) was open, not the whole site: leave it open during the upload, since nobody
+  can pay through it, and do not run PWOFF1 or PWOFF2. After SB13b, make the names.sh edit above, then run
+  REVIEW_OPEN again (if you ran PWON, it closed the window, and REVIEW_OPEN opens it again).
 - **Before you choose rbD-B, for this upload or a later one, run LIVEAFTER below, even if payments are back on the
   sandbox.** rbD-B puts back DR3's cold copy of the database, so it would lose every real payment, NETOPIA notice,
   invoice and credit note written since then, while the cards stay charged and the invoices stay issued in SmartBill,
@@ -2362,13 +3024,13 @@ published can be hidden by hand while the site is open, and the way back to the 
 are real. PWOFF1 (8.2) refuses while the API file has no line `STAFF_ACCESS_POLICY_VERSION=2`, and while the database
 holds no working staff key of the Owner account under the name the site answers as.
 
-**Before you start:** the site answers as dezbatere.ro (part 5); mail is open there (4.3: PWOFF1 checks both the
+**Before you start:** the site answers as dezbatere.ro (part 5); the NETOPIA review window is closed (REVIEW_CLOSE,
+5.8; PWOFF1 refuses while it is open); mail is open there (4.3: PWOFF1 checks both the
 plan file and the API's mode line); real payments work (part 7); the staff screens are on and your staff key works
 on dezbatere.ro (5.7); with your staff key working, you have read the **Public** tab again and used Hide now on
 anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves, 5.1b);
-the payment marks
-are on the site if you want them (only an upload made before part 5 adds them, 1.1; if they are missing, ask before
-you take the password off); you have decided your numbers and gate pots (1.7, 6.4); and you have read the
+NETOPIA's logo shows in the home page's footer (LOGOCHECK, part 2; if it is missing, ask before you take the password
+off); you have decided your numbers and gate pots (1.7, 6.4); and you have read the
 warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
 
 ### 8.1 Asks open to everyone
@@ -2391,7 +3053,8 @@ OK=$(psqlq "SELECT count(*) FROM staff.owner_designation d JOIN staff.subject s 
 [ "${OK:-0}" -ge 1 ] 2>/dev/null || { echo "PWOFF1_NOT_DONE: the Owner account has no working staff key under $HOST, so nobody could hide a debate by hand: 5.7 first"; exit 1; }
 jq -e --arg o "https://$HOST" '.schema=="preview-auth-dev-mail-v2" and .recipients=="open" and .publicAppUrl==$o' "$MP" >/dev/null 2>&1 || { echo "PWOFF1_NOT_DONE: mail-plan.json is not the open plan for $HOST (4.3 first)"; exit 1; }
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" || { echo "PWOFF1_NOT_DONE: the running API does not say mail mode open on $HOST (4.3 first)"; exit 1; }
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" = 401 ] || { echo "PWOFF1_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || { echo "PWOFF1_NOT_DONE: the site does not ask for the password now: look"; exit 1; }
+! grep -qE 'review_locked|review_quiet|review window begin' "$C" || { echo "PWOFF1_NOT_DONE: the NETOPIA review window is open: REVIEW_CLOSE (5.8) first"; exit 1; }
 [ ! -e "$M/password/Caddyfile.before-open" ] || { echo "PWOFF1_NOT_DONE: $M/password/Caddyfile.before-open exists (look first)"; exit 1; }
 cp -p "$C" "$M/password/Caddyfile.before-open"; cp -p "$C" "$M/password/Caddyfile.open"
 echo "now edit $M/password/Caddyfile.open, then run PWOFF2"
@@ -2430,7 +3093,7 @@ cad validate --config "$O" --adapter caddyfile >/dev/null 2>&1 || { echo "PWOFF2
 systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
 BAD=''
 [ "$(systemctl is-active caddy || true)" = active ] || BAD="$BAD caddy"
-[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/")" != 401 ] || BAD="$BAD password"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" != 401 ] || BAD="$BAD password"
 [ "$(curl -sI "https://$HOST/" | tr -d '\r' | grep -ci '^x-robots-tag: noindex, nofollow$' || true)" = 1 ] || BAD="$BAD noindex"
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/readyz")" = 404 ] || BAD="$BAD readyz"
 [ "$(notify "$HOST")" != 401 ] || BAD="$BAD notify"
@@ -2447,20 +3110,48 @@ everyone.
 
 ```sh
 set -euo pipefail
-# PWON: the site password back (the Caddyfile kept by PWOFF1); Caddy restarts. It reads no names file, so it works at any time.
+# PWON: the site password back (the Caddyfile kept by PWOFF1), and the NETOPIA review window (5.8) closed if it is open; Caddy restarts. It reads no names file, so it works at any time.
 C=/etc/debateai-v3-preview/public/Caddyfile; M=/root/preview-archive/main-site
 K=$M/password/Caddyfile.before-open; O=$M/password/Caddyfile.open; TS=$(date -u +%Y%m%dT%H%M%SZ)
-ON=no; for H in dezbatere.ro v3-preview.dezbatere.ro; do if [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$H/" || true)" = 401 ]; then ON=yes; fi; done
+# The review window's marks, and how its lines come out again (the same lines in REVIEW_OPEN, REVIEW_CLOSE, PWON and REVIEW_MACTEST).
+RV=/root/preview-archive/main-site/review; RK=$RV/Caddyfile.before-window; RW=$RV/Caddyfile.window
+WB='# review window begin: the public pages answer strangers without the site password; REVIEW_CLOSE takes these lines out'; WE='# review window end'
+wopen() { grep -qE 'review_locked|review_quiet|review window begin' "$1"; }
+wstrip() { awk -v b="$WB" -v e="$WE" '{ t = $0; sub(/^[ \t]+/, "", t) } t == b { s = 1; n++; next } s && t == e { s = 0; next } s { next } t == "basic_auth @review_locked {" { print substr($0, 1, length($0) - length(t)) "basic_auth {"; c++; next } { print } END { if (n != 1 || s || c != 1) exit 1 }' "$1"; }
+# Closing the window (the same lines in REVIEW_CLOSE and PWON): its lines come out of the live Caddyfile, the result is compared with the copy REVIEW_OPEN kept, put in place, and Caddy restarts. If Caddy does not start, the file with the window comes back.
+wclose() {
+  local S=$RV/Caddyfile.without-window-$TS L=$RV/Caddyfile.with-window-$TS P
+  install -d -o root -g root -m 0700 "$RV"
+  { wstrip "$C" > "$S" && ! wopen "$S" && [ "$(grep -cE '^[[:space:]]*basic_auth \{$' "$S" || true)" = 1 ]; } || { echo "$1_NOT_DONE: the window's lines do not come out of the live Caddyfile cleanly (edited by hand?); nothing changed, the window is still open: ask at once"; exit 1; }
+  if [ -s "$RK" ] && cmp -s "$S" "$RK"; then echo "without the window, the Caddyfile is the one before REVIEW_OPEN, byte for byte"
+  elif [ -s "$RK" ]; then echo "without the window, the Caddyfile differs from the copy REVIEW_OPEN kept; only the window's lines come out. The differences:"; diff "$RK" "$S" || true
+  else echo "the copy REVIEW_OPEN kept is missing; only the window's lines come out"; fi
+  cp -p "$C" "$L"
+  { install -o root -g root -m 0644 "$S" "$C.new" && mv "$C.new" "$C" && cmp -s "$S" "$C"; } || { echo "$1_NOT_DONE: the Caddyfile without the window was not put in place (it is $S; Caddy was not restarted, the window is still open): ask at once"; exit 1; }
+  systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
+  if [ "$(systemctl is-active caddy || true)" != active ]; then
+    { install -o root -g root -m 0644 "$L" "$C.new" && mv "$C.new" "$C"; } || true; systemctl restart caddy || true; sleep 3
+    echo "$1_NOT_DONE: Caddy did not start without the window; the file with the window is back and Caddy is $(systemctl is-active caddy || true) (active: the window is still open; anything else: the site is DOWN): ask at once"; exit 1
+  fi
+  for P in / /terms /login; do [ "$(curl -s -o /dev/null -m 15 -w '%{http_code}' "https://dezbatere.ro$P" || true)" = 401 ] || { echo "$1_NOT_DONE: Caddy runs without the window, but https://dezbatere.ro$P does not ask for the password: ask at once"; exit 1; }; done
+  for P in "$RK" "$RW"; do if [ -e "$P" ]; then mv "$P" "$P.closed-$TS"; fi; done
+  echo "the review window is closed: every page asks for the site password again"
+}
+if wopen "$C"; then wclose PWON; fi
+ON=no; for H in dezbatere.ro v3-preview.dezbatere.ro; do if [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$H/login" || true)" = 401 ]; then ON=yes; fi; done
 if [ "$ON" = yes ]; then for F in "$K" "$O"; do if [ -e "$F" ]; then mv "$F" "$F.$TS"; fi; done; echo "the site already asks for the password"; echo PWON_DONE; exit 0; fi
 [ -s "$K" ] && cmp -s "$C" "$O" || { echo "PWON_NOT_DONE: the live Caddyfile is not the one PWOFF2 put in place: ask at once (the kept copy is $K)"; exit 1; }
 { install -o root -g root -m 0644 "$K" "$C.new" && mv "$C.new" "$C" && cmp -s "$K" "$C"; } || { echo "PWON_NOT_DONE: the kept Caddyfile was not put in place (the kept copy is $K): ask at once"; exit 1; }
 systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; sleep 3
-ON=no; for H in dezbatere.ro v3-preview.dezbatere.ro; do if [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$H/" || true)" = 401 ]; then ON=yes; fi; done
+ON=no; for H in dezbatere.ro v3-preview.dezbatere.ro; do if [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$H/login" || true)" = 401 ]; then ON=yes; fi; done
 [ "$ON" = yes ] || { echo "PWON_NOT_DONE: the site does not ask for the password: ask at once"; exit 1; }
 mv "$K" "$K.$TS"; mv "$O" "$O.$TS"
 echo PWON_DONE
 exit 0
 ```
+
+If the NETOPIA review window (5.8) is open, PWON closes it first, with the same lines as REVIEW_CLOSE, and prints
+`the review window is closed: every page asks for the site password again`.
 
 ### 8.5 The rules once the site is open
 
@@ -2475,14 +3166,17 @@ exit 0
 
 Close in this order. Each step is safe to stop after. The scripts hold you to it. While the site is open, PAY_BACK and
 NAME5 refuse, and so do ASKS_CLOSE and MAIL_CLOSE if payments are real. While payments are real, NAME5 refuses too.
+While the NETOPIA review window (5.8) is open, NAME5 refuses too; step 1 closes it.
 
 **If the password was ever off with real payments on (part 8), stop and ask before step 1.** Someone outside the
 team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
 both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
-password is back, such a plan never ends, PAY_BACK never passes, and that person is still charged every month while
-they cannot even open the site. Never end their plan yourself. PWON as a brake (6.5 (b)) still works at any time.
+password is back, such a plan does not end until its owner cancels it on `/cancel`, and only the NETOPIA review
+window (5.8, REVIEW_OPEN) can let them reach that page again. Until then PAY_BACK never passes, and that person is
+still charged every month while they cannot open the rest of the site. Never end their plan yourself. PWON as a
+brake (6.5 (b)) still works at any time.
 
-1. **The site password back:** PWON (8.4).
+1. **The site password back:** PWON (8.4). It also closes the NETOPIA review window (5.8) if it is open.
 2. **Asks back to the team:** ASKS_CLOSE (6.3).
 3. **Payments back to the sandbox:** PAY_BACK (7.11). It waits until every live plan is over and every refund and
    credit note is recorded. After your test payment alone, that takes days. Meanwhile the password stays on, and
@@ -2501,6 +3195,10 @@ know none of these settings, and they answer only as the test name.
   Before you choose it, run LIVEAFTER (7.12) with this upload's rNN. If it does not end with `LIVEAFTER_DONE`, never
   go back, even after PAY_BACK: the invoice, the credit note and the refund stay in SmartBill, ANAF and NETOPIA,
   while our records of them would be gone. Fix forward, and ask.
+- **The unfinished sign-ups the new release deleted** (UNFINISHED, part 2: at DR6 and every ten minutes after) come
+  back with DR3's cold copy, but without their key folders, which the new release destroyed. Those sign-ups cannot be
+  finished, and their addresses and pseudonyms stay taken, until a release with this code runs again and deletes them
+  once more; then those people can sign up again.
 - Close payments first (PAY_BACK): an older API refuses the payments line, and does not see open live work.
 - Then close the name (NAME5): an older launcher refuses the main name.
 - Put the **v1 mail plan** back (MAIL_CLOSE on the test name), and check its digest. With a v2 plan an older release
@@ -2524,7 +3222,7 @@ Where it shows:
   own code runs.
 - **API start**: first `{"event":"api.boot.failed","stage":"<stage>"}`, then `PREVIEW_API_STARTUP_REFUSED <code>`.
 - **SAME**: `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` prints `BAD <check>`.
-- **Per request or per mail** (the last two rows): the service keeps running and refuses that one request or mail.
+- **Per request or per mail** (the last three rows): the service keeps running and refuses that one request or mail.
 
 In every other case the service is not running, except for the SAME rows and `MODE_OTHER_ACCOUNT`, which stop
 nothing by themselves (NAME3 and NAME5 run SAME after they stopped the site, and their last line says so). The scripts
@@ -2588,3 +3286,4 @@ that service.
 | `BAD SAME_API_PAYMENT_SYSTEM` | SAME, two releases | two API files name different payment systems | ask before any switch |
 | `PREVIEW_TEAM_ONLY` (HTTP 403 from `/api/v1/billing/checkout` or `/api/v1/billing/subscription/upgrade`; the page shows its general error) | per request, the API | while payments are real and asks are closed, an account not on the team tried to buy or upgrade a plan; nothing was charged or written | expected; pay with a team account, or open asks (part 8) |
 | `PREVIEW_MAIL_REFUSED` (and the API's `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`) | per mail, the mail program | one mail was refused by the plan's rules (in allow-list mode: an address not on the list) | expected in allow-list mode for other addresses; otherwise MAIL_CLOSE and ask |
+| a plain `401` with no password box (only while the NETOPIA review window, 5.8, is open) | per request, Caddy | a stranger's background request for a closed address: a Next.js page request, the account check (`/api/v1/session`), the help check (`/api/v1/geo/availability`) or the browser's own icon request (`/favicon.ico`, `/apple-touch-icon.png`); the page shows Log in and no Help, and no password box opens | expected; if a password box opens by itself over a public page, REVIEW_CLOSE, then ask |

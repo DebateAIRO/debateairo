@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { migrate, PostgresIdentityRepository, type PendingAccountInput, type SignUpAcceptanceRow } from "@debateai/db";
@@ -277,6 +278,31 @@ describe("0183 a sign-up not finished within 24 hours is deleted", () => {
     }
     expect(await sqlError(() => system.query("SELECT identity.expire_unfinished_signup(NULL)"))).toMatchObject({ code: "22023" });
     expect(await sqlError(() => system.query("SELECT identity.complete_unfinished_signup_key_cleanup(NULL)"))).toMatchObject({ code: "22023" });
+  }, timeout);
+
+  it("the owner's runbook counts exactly the sign-ups the first pass deletes (MAIN-SITE.md's UNFINISHED)", async () => {
+    // The owner names this count before the upload's downtime, so it must ask what the pass asks: still pending, begun 24 hours ago or more, and
+    // no link still live. It runs as the database's administrator, outside any login of the API.
+    const runbook = readFileSync(new URL("../../deploy/preview-auth-dev/v1/MAIN-SITE.md", import.meta.url), "utf8");
+    const lines = runbook.split("\n").filter((text) => text.startsWith('N=$(psqlq "SELECT count(*) FROM identity.\\"user\\" '));
+    expect(lines).toHaveLength(1);
+    const sql = /^N=\$\(psqlq "((?:[^"\\]|\\.)*)"\)/u.exec(lines[0]!)![1]!.replace(/\\"/gu, '"');
+    const runbookCount = async () => Number((await db.pool.query<{ count: string }>(sql)).rows[0]!.count);
+    await drain();
+    expect(await runbookCount()).toBe(0);
+    const due = [await signUp(72 * HOUR), await signUp(25 * HOUR)];
+    const young = await signUp(23 * HOUR);
+    const withLiveLink = await signUp(30 * HOUR);
+    await db.pool.query(`UPDATE identity.verification_token_credential AS link SET expires_at = clock_timestamp() + interval '1 hour'
+      FROM identity.channel_binding AS channel WHERE channel.channel_binding_id = link.channel_binding_id AND channel.user_id = $1`, [withLiveLink.userId]);
+    const finished = await signUp(0);
+    await db.pool.query(`UPDATE identity."user" SET state = 'active', created_at = clock_timestamp() - interval '90 days' WHERE user_id = $1`, [finished.userId]);
+    expect(await runbookCount()).toBe(2);
+    expect([...await expiry.due(1000)].sort()).toEqual(due.map(({ userId }) => userId).sort());
+    await drain();
+    expect(await runbookCount()).toBe(0);
+    for (const kept of [young, withLiveLink]) expect(await stateOf(kept.userId)).toBe("pending_verification");
+    expect(await stateOf(finished.userId)).toBe("active");
   }, timeout);
 
   it("keeps each deleted sign-up's key file owed until the API says it is gone", async () => {
