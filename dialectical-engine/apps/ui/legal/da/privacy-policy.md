@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: PRIVATLIVSPOLITIK · v3.15 · GÆLDENDE FRA 21. NOVEMBER 2026
+eyebrow: PRIVATLIVSPOLITIK · v3.15 · GÆLDENDE FRA 20. NOVEMBER 2026
 title: Hvad vi opbevarer, og hvorfor
 lede: Dine rettigheder og vores forpligtelser i henhold til GDPR (EU) 2016/679 forklaret i et klart sprog. Fjorten afsnit og bilag B — rul helt ned.
 endMarker: SLUT PÅ POLITIKKEN · GDPR (EU) 2016/679 · v3.15
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.15 · Effective 21. november 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.15 · Effective 20. november 2026 · Tidligere versioner på dezbatere.ro/privacy/versions · Dataansvarlig: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Vi indsamler det, en konto har brug for, og det, du skriver i dine debatter. Det, du skriver til supportassistenten, går til dens AI-model, så den kan svare dig, og vi gemmer intet af det. Dine spørgsmål sendes til AI-udbydere, der er anført i vores Register, hovedsageligt DeepInfra, i USA. Vilkårene hos DeepInfra, Anthropic og Perplexity tillader dem ikke at træne modeller på det, du skriver; afsnit 5 angiver, for hvilken virksomhed vi endnu ikke har bekræftet dette. Vores hostingudbyder opbevarer din konto og dine debatter i London i Storbritannien; afsnit 5 beskriver, hvor dine data ellers sendes hen. På det gratis abonnement er debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når du sletter din konto, destrueres nøglerne til dine private data på vores server, men de krypterede kopier på vores separate lager til sikkerhedskopier slettes ikke automatisk (afsnit 7); offentlige debatter forbliver offentlige, og dit pseudonym fjernes fra dem. Du kan kontakte os på privacy@dezbatere.ro, og personer, som nævnes i en debat, kan skrive til os uden at have en konto.
 

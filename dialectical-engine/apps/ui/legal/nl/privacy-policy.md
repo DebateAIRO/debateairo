@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: In het kort
-eyebrow: PRIVACYBELEID · v3.15 · VAN KRACHT OP 21 NOVEMBER 2026
+eyebrow: PRIVACYBELEID · v3.15 · VAN KRACHT OP 20 NOVEMBER 2026
 title: Wat wij opslaan en waarom
 lede: Uw rechten en onze verplichtingen krachtens de GDPR (EU) 2016/679, in begrijpelijke taal. Veertien hoofdstukken en Bijlage B — scrol tot het einde.
 endMarker: EINDE VAN HET BELEID · GDPR (EU) 2016/679 · v3.15
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.15 · Effective 21 november 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.15 · Effective 20 november 2026 · Eerdere versies op dezbatere.ro/privacy/versions · Verwerkingsverantwoordelijke: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Wij verzamelen wat nodig is voor een account en wat u in uw debatten invoert. Wat u aan de ondersteuningsassistent schrijft, gaat naar het AI-model ervan zodat het u kan antwoorden, en wij bewaren er niets van. Uw vragen gaan naar de AI-aanbieders die in ons Register staan, voornamelijk DeepInfra, in de Verenigde Staten. De voorwaarden van DeepInfra, Anthropic en Perplexity staan hen niet toe modellen te trainen op wat u schrijft; hoofdstuk 5 zegt voor welk bedrijf wij dit nog niet hebben bevestigd. Onze hostingprovider bewaart uw account en uw debatten in Londen, in het Verenigd Koninkrijk; hoofdstuk 5 zegt waar uw gegevens verder naartoe gaan. Op het gratis abonnement zijn debatten openbaar wanneer ze zijn afgerond, na een AI-controle; op een betaald abonnement zijn ze privé, tenzij u ze publiceert. Wanneer u uw account verwijdert, worden de sleutels tot uw privégegevens op onze server vernietigd, maar de versleutelde kopieën op onze afzonderlijke back-upopslag worden niet automatisch verwijderd (hoofdstuk 7); openbare debatten blijven openbaar, en uw pseudoniem wordt eruit verwijderd. U kunt ons bereiken via privacy@dezbatere.ro, en personen die in een debat worden genoemd, kunnen zonder account contact met ons opnemen.
 

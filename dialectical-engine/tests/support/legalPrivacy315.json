@@ -4,7 +4,7 @@
   "swaps": [
    [
     "4 · سارية من 19",
-    "5 · سارية من 21"
+    "5 · سارية من 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -12,7 +12,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -89,7 +89,7 @@
   "swaps": [
    [
     "4 · В СИЛА ОТ 19",
-    "5 · В СИЛА ОТ 21"
+    "5 · В СИЛА ОТ 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -97,7 +97,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -178,7 +178,7 @@
   "swaps": [
    [
     "4 · ÚČINNÉ OD 19",
-    "5 · ÚČINNÉ OD 21"
+    "5 · ÚČINNÉ OD 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -186,7 +186,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -267,7 +267,7 @@
   "swaps": [
    [
     "4 · GÆLDENDE FRA 19",
-    "5 · GÆLDENDE FRA 21"
+    "5 · GÆLDENDE FRA 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -275,7 +275,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -356,7 +356,7 @@
   "swaps": [
    [
     "4 · GÜLTIG AB 19",
-    "5 · GÜLTIG AB 21"
+    "5 · GÜLTIG AB 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -364,7 +364,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "vernichtet",
@@ -445,7 +445,7 @@
   "swaps": [
    [
     "4 · ΙΣΧΥΕΙ ΑΠΟ 19",
-    "5 · ΙΣΧΥΕΙ ΑΠΟ 21"
+    "5 · ΙΣΧΥΕΙ ΑΠΟ 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -453,7 +453,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -534,7 +534,7 @@
   "swaps": [
    [
     "4 · EFFECTIVE 19",
-    "5 · EFFECTIVE 21"
+    "5 · EFFECTIVE 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -542,7 +542,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -710,7 +710,7 @@
    ],
    [
     "19 November 2026",
-    "21 November 2026. Version 3.15 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, what we send it with each payment, and that the Register lists it too (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); which copies our backups keep, on our server and at OVHcloud, that we do not encrypt them ourselves and keep no log of access to them, and that some of them hold the keys together with the data, so that closing your account or deleting a debate makes the data unreadable only in the live service, and a closed account or a deleted debate can come back if we restore the whole service from a copy that still holds it, where it said that our backups are encrypted before they leave our server, that OVHcloud cannot read them and that they are kept for up to 8 weeks and then overwritten (sections 3, 5, 6, 7, 8 and 9); and that an account whose sign-up is not finished is deleted 24 hours after the sign-up began, or once the last link we sent expires if that is later (section 7). Section 4 also gives the legal basis for taking payment for your plan. Section 5 also says that we issue your invoices and credit notes ourselves, as the seller, through our invoicing services; that your full card number and security code never reach us; that NETOPIA Payments also sees your IP address and browser details on its payment page, receives from us the same details when you check a new card as with a payment, and tells us whether a payment or a card check went through; that NETOPIA's own notice for payers, not this policy, says how and in what role NETOPIA uses your data, so section 5 no longer counts NETOPIA among the companies that act only on our instructions; and that when a page shows NETOPIA's logo, your browser loads it from NETOPIA's server. Section 5 also says that Cloudflare runs the bot check and is responsible in its own right for what that check collects, which it uses to improve its bot detection, and no longer says that it delivers our pages or carries traffic between you and the service, or that we do not send your data to a company that would use it for its own purposes. Section 9 says that every page of the site is served over HTTPS. Section 13 says that we use no advertising or analytics trackers, and which other companies receive requests from your browser through our pages. The policy no longer speaks of paid plans as something still to start (sections 2, 4, 5 and 7), and section 5 and Annex B.4 call the other recipients companies, not processors"
+    "20 November 2026. Version 3.15 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, what we send it with each payment, and that the Register lists it too (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); which copies our backups keep, on our server and at OVHcloud, that we do not encrypt them ourselves and keep no log of access to them, and that some of them hold the keys together with the data, so that closing your account or deleting a debate makes the data unreadable only in the live service, and a closed account or a deleted debate can come back if we restore the whole service from a copy that still holds it, where it said that our backups are encrypted before they leave our server, that OVHcloud cannot read them and that they are kept for up to 8 weeks and then overwritten (sections 3, 5, 6, 7, 8 and 9); and that an account whose sign-up is not finished is deleted 24 hours after the sign-up began, or once the last link we sent expires if that is later (section 7). Section 4 also gives the legal basis for taking payment for your plan. Section 5 also says that we issue your invoices and credit notes ourselves, as the seller, through our invoicing services; that your full card number and security code never reach us; that NETOPIA Payments also sees your IP address and browser details on its payment page, receives from us the same details when you check a new card as with a payment, and tells us whether a payment or a card check went through; that NETOPIA's own notice for payers, not this policy, says how and in what role NETOPIA uses your data, so section 5 no longer counts NETOPIA among the companies that act only on our instructions; and that when a page shows NETOPIA's logo, your browser loads it from NETOPIA's server. Section 5 also says that Cloudflare runs the bot check and is responsible in its own right for what that check collects, which it uses to improve its bot detection, and no longer says that it delivers our pages or carries traffic between you and the service, or that we do not send your data to a company that would use it for its own purposes. Section 9 says that every page of the site is served over HTTPS. Section 13 says that we use no advertising or analytics trackers, and which other companies receive requests from your browser through our pages. The policy no longer speaks of paid plans as something still to start (sections 2, 4, 5 and 7), and section 5 and Annex B.4 call the other recipients companies, not processors"
    ],
    [
     "are the processors named ",
@@ -723,7 +723,7 @@
   "swaps": [
    [
     "4 · EN VIGOR DESDE 19",
-    "5 · EN VIGOR DESDE 21"
+    "5 · EN VIGOR DESDE 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -731,7 +731,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -816,7 +816,7 @@
   "swaps": [
    [
     "4 · KEHTIB ALATES 19",
-    "5 · KEHTIB ALATES 21"
+    "5 · KEHTIB ALATES 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -824,7 +824,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -905,7 +905,7 @@
   "swaps": [
    [
     "4 · VOIMASSA 19",
-    "5 · VOIMASSA 21"
+    "5 · VOIMASSA 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -913,7 +913,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -998,7 +998,7 @@
   "swaps": [
    [
     "4 · EN VIGUEUR LE 19",
-    "5 · EN VIGUEUR LE 21"
+    "5 · EN VIGUEUR LE 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1006,7 +1006,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -1182,7 +1182,7 @@
    ],
    [
     "19 novembre 2026",
-    "21 novembre 2026. La version 3.15 a remplacé la version 3.14 : elle indique quelle société exploite notre prestataire de paiement, NETOPIA Payments, ce que nous lui envoyons à chaque paiement et que le Registre le mentionne aussi (section 5) ; que la preuve de votre consentement au traitement des données sensibles est supprimée avec votre compte, tandis que les autres preuves d'acceptation et de consentement sont conservées 6 ans après la fin du compte (sections 2, 3 et 7) ; quelles copies de sauvegarde sont conservées, sur notre serveur et chez OVHcloud, que nous ne les chiffrons pas nous-mêmes et ne tenons aucun journal des accès à ces copies, et que certaines d'entre elles contiennent les clés en même temps que les données, de sorte que la clôture de votre compte ou la suppression d'un débat ne rend les données illisibles que dans le service en exploitation, et qu'un compte clôturé ou un débat supprimé peut revenir si nous restaurons l'ensemble du service à partir d'une copie qui le contient encore, alors qu'elle indiquait que nos sauvegardes étaient chiffrées avant de quitter notre serveur, qu'OVHcloud ne pouvait pas les lire et qu'elles étaient conservées jusqu'à 8 semaines puis écrasées (sections 3, 5, 6, 7, 8 et 9) ; et qu'un compte dont l'inscription n'est pas menée à terme est supprimé 24 heures après le début de l'inscription ou, si le dernier lien que nous vous avons envoyé expire plus tard, à l'expiration de celui-ci (section 7). La section 4 indique aussi la base juridique de l'encaissement du paiement de votre formule. La section 5 indique aussi que nous émettons nous-mêmes vos factures et vos avoirs, en tant que vendeur, au moyen de nos services de facturation ; que le numéro complet de votre carte et son code de sécurité ne nous parviennent jamais ; que NETOPIA Payments voit aussi votre adresse IP et les informations relatives à votre navigateur sur sa page de paiement, reçoit de notre part, lorsque vous vérifiez une nouvelle carte, les mêmes données que pour un paiement, et nous indique si un paiement ou une vérification de carte a abouti ; que la notice d'information propre à NETOPIA destinée aux payeurs, et non la présente politique, indique comment et en quelle qualité NETOPIA utilise vos données, de sorte que la section 5 ne compte plus NETOPIA parmi les sociétés qui n'agissent que sur nos instructions ; et que, lorsqu'une page affiche le logo de NETOPIA, votre navigateur le charge depuis le serveur de NETOPIA. La section 5 indique aussi que Cloudflare effectue la vérification anti-robot et est responsable à part entière de ce que collecte cette vérification, données qu'il utilise pour améliorer sa détection des robots, et n'indique plus qu'il diffuse nos pages ni qu'il achemine le trafic entre vous et le service, ni que nous n'envoyons pas vos données à une société qui les utiliserait à ses propres fins. La section 9 indique que chaque page du site est servie en HTTPS. La section 13 indique que nous n'utilisons aucun traceur de publicité ou d'analyse, et quelles autres sociétés reçoivent des requêtes de votre navigateur par l'intermédiaire de nos pages. La politique ne présente plus les formules payantes comme quelque chose qui reste à lancer (sections 2, 4, 5 et 7), et la section 5 et l'annexe B.4 qualifient les autres destinataires de sociétés, et non de sous-traitants"
+    "20 novembre 2026. La version 3.15 a remplacé la version 3.14 : elle indique quelle société exploite notre prestataire de paiement, NETOPIA Payments, ce que nous lui envoyons à chaque paiement et que le Registre le mentionne aussi (section 5) ; que la preuve de votre consentement au traitement des données sensibles est supprimée avec votre compte, tandis que les autres preuves d'acceptation et de consentement sont conservées 6 ans après la fin du compte (sections 2, 3 et 7) ; quelles copies de sauvegarde sont conservées, sur notre serveur et chez OVHcloud, que nous ne les chiffrons pas nous-mêmes et ne tenons aucun journal des accès à ces copies, et que certaines d'entre elles contiennent les clés en même temps que les données, de sorte que la clôture de votre compte ou la suppression d'un débat ne rend les données illisibles que dans le service en exploitation, et qu'un compte clôturé ou un débat supprimé peut revenir si nous restaurons l'ensemble du service à partir d'une copie qui le contient encore, alors qu'elle indiquait que nos sauvegardes étaient chiffrées avant de quitter notre serveur, qu'OVHcloud ne pouvait pas les lire et qu'elles étaient conservées jusqu'à 8 semaines puis écrasées (sections 3, 5, 6, 7, 8 et 9) ; et qu'un compte dont l'inscription n'est pas menée à terme est supprimé 24 heures après le début de l'inscription ou, si le dernier lien que nous vous avons envoyé expire plus tard, à l'expiration de celui-ci (section 7). La section 4 indique aussi la base juridique de l'encaissement du paiement de votre formule. La section 5 indique aussi que nous émettons nous-mêmes vos factures et vos avoirs, en tant que vendeur, au moyen de nos services de facturation ; que le numéro complet de votre carte et son code de sécurité ne nous parviennent jamais ; que NETOPIA Payments voit aussi votre adresse IP et les informations relatives à votre navigateur sur sa page de paiement, reçoit de notre part, lorsque vous vérifiez une nouvelle carte, les mêmes données que pour un paiement, et nous indique si un paiement ou une vérification de carte a abouti ; que la notice d'information propre à NETOPIA destinée aux payeurs, et non la présente politique, indique comment et en quelle qualité NETOPIA utilise vos données, de sorte que la section 5 ne compte plus NETOPIA parmi les sociétés qui n'agissent que sur nos instructions ; et que, lorsqu'une page affiche le logo de NETOPIA, votre navigateur le charge depuis le serveur de NETOPIA. La section 5 indique aussi que Cloudflare effectue la vérification anti-robot et est responsable à part entière de ce que collecte cette vérification, données qu'il utilise pour améliorer sa détection des robots, et n'indique plus qu'il diffuse nos pages ni qu'il achemine le trafic entre vous et le service, ni que nous n'envoyons pas vos données à une société qui les utiliserait à ses propres fins. La section 9 indique que chaque page du site est servie en HTTPS. La section 13 indique que nous n'utilisons aucun traceur de publicité ou d'analyse, et quelles autres sociétés reçoivent des requêtes de votre navigateur par l'intermédiaire de nos pages. La politique ne présente plus les formules payantes comme quelque chose qui reste à lancer (sections 2, 4, 5 et 7), et la section 5 et l'annexe B.4 qualifient les autres destinataires de sociétés, et non de sous-traitants"
    ],
    [
     "us-traitants mentionné",
@@ -1195,7 +1195,7 @@
   "swaps": [
    [
     "4 · I bhFEIDHM 19",
-    "5 · I bhFEIDHM 21"
+    "5 · I bhFEIDHM 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1203,7 +1203,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -1284,7 +1284,7 @@
   "swaps": [
    [
     "4 · בתוקף מ-19",
-    "5 · בתוקף מ-21"
+    "5 · בתוקף מ-20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1292,7 +1292,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -1373,7 +1373,7 @@
   "swaps": [
    [
     "4 · प्रभावी 19",
-    "5 · प्रभावी 21"
+    "5 · प्रभावी 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1381,7 +1381,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "टाने से आपके निज",
@@ -1462,7 +1462,7 @@
   "swaps": [
    [
     "4 · NA SNAZI OD 19",
-    "5 · NA SNAZI OD 21"
+    "5 · NA SNAZI OD 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1470,7 +1470,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -1555,7 +1555,7 @@
    ],
    [
     "OVEMBER 19.\ntitle:",
-    "OVEMBER 21.\ntitle:"
+    "OVEMBER 20.\ntitle:"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1567,7 +1567,7 @@
    ],
    [
     "ovember 19. · Korá",
-    "ovember 21. · Korá"
+    "ovember 20. · Korá"
    ],
    [
     "",
@@ -1648,7 +1648,7 @@
   "swaps": [
    [
     "4 · BERLAKU 19",
-    "5 · BERLAKU 21"
+    "5 · BERLAKU 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1656,7 +1656,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -1737,7 +1737,7 @@
   "swaps": [
    [
     "4 · IN VIGORE DAL 19",
-    "5 · IN VIGORE DAL 21"
+    "5 · IN VIGORE DAL 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1745,7 +1745,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -1826,7 +1826,7 @@
   "swaps": [
    [
     "4 · 発効日 2026年11月19",
-    "5 · 発効日 2026年11月21"
+    "5 · 発効日 2026年11月20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1834,7 +1834,7 @@
    ],
    [
     "4 · Effective 2026年11月19",
-    "5 · Effective 2026年11月21"
+    "5 · Effective 2026年11月20"
    ],
    [
     "非公開データの鍵が破棄されます",
@@ -1907,7 +1907,7 @@
   "swaps": [
    [
     "4 · 시행일 2026년 11월 19",
-    "5 · 시행일 2026년 11월 21"
+    "5 · 시행일 2026년 11월 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -1915,7 +1915,7 @@
    ],
    [
     "4 · Effective 2026년 11월 19",
-    "5 · Effective 2026년 11월 21"
+    "5 · Effective 2026년 11월 20"
    ],
    [
     "비공개 데이터의 키가 파기됩니다",
@@ -1992,7 +1992,7 @@
    ],
    [
     "PKRIČIO 19 D.\ntitl",
-    "PKRIČIO 21 D.\ntitl"
+    "PKRIČIO 20 D.\ntitl"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2004,7 +2004,7 @@
    ],
    [
     "pkričio 19 d. · An",
-    "pkričio 21 d. · An"
+    "pkričio 20 d. · An"
    ],
    [
     "",
@@ -2089,7 +2089,7 @@
   "swaps": [
    [
     "4 · SPĒKĀ NO 2026. GADA 19",
-    "5 · SPĒKĀ NO 2026. GADA 21"
+    "5 · SPĒKĀ NO 2026. GADA 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2101,7 +2101,7 @@
    ],
    [
     "6. gada 19. novemb",
-    "6. gada 21. novemb"
+    "6. gada 20. novemb"
    ],
    [
     "",
@@ -2178,7 +2178,7 @@
   "swaps": [
    [
     "4 · EFFETTIVA 19",
-    "5 · EFFETTIVA 21"
+    "5 · EFFETTIVA 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2186,7 +2186,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -2267,7 +2267,7 @@
   "swaps": [
    [
     "4 · VAN KRACHT OP 19",
-    "5 · VAN KRACHT OP 21"
+    "5 · VAN KRACHT OP 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2275,7 +2275,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "vernietigd",
@@ -2356,7 +2356,7 @@
   "swaps": [
    [
     "4 · OBOWIĄZUJE OD 19",
-    "5 · OBOWIĄZUJE OD 21"
+    "5 · OBOWIĄZUJE OD 20"
    ],
    [
     ") · v3.14\nbodyLab",
@@ -2364,7 +2364,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -2445,7 +2445,7 @@
   "swaps": [
    [
     "4 · EM VIGOR DESDE 19",
-    "5 · EM VIGOR DESDE 21"
+    "5 · EM VIGOR DESDE 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2453,7 +2453,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -2538,7 +2538,7 @@
   "swaps": [
    [
     "4 · ÎN VIGOARE DE LA 19",
-    "5 · ÎN VIGOARE DE LA 21"
+    "5 · ÎN VIGOARE DE LA 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2546,7 +2546,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "istruge cheile d",
@@ -2722,7 +2722,7 @@
    ],
    [
     "19 noiembrie 2026",
-    "21 noiembrie 2026. Versiunea 3.15 a înlocuit versiunea 3.14: arată ce companie operează furnizorul nostru de plăți, NETOPIA Payments, ce îi trimitem la fiecare plată și că Registrul îl cuprinde și pe el (secțiunea 5); că evidența consimțământului dumneavoastră privind datele sensibile se șterge odată cu contul, în timp ce celelalte evidențe privind acceptarea și consimțământul se păstrează 6 ani după încetarea contului (secțiunile 2, 3 și 7); ce copii de rezervă se păstrează, pe serverul nostru și la OVHcloud, că nu le criptăm noi înșine și nu ținem un jurnal al accesului la ele și că unele dintre ele conțin cheile împreună cu datele, astfel încât închiderea contului sau ștergerea unei dezbateri face datele ilizibile numai în serviciul activ, iar un cont închis sau o dezbatere ștearsă pot reveni dacă restaurăm întregul serviciu dintr-o copie care încă le conține, pe când versiunea anterioară spunea că copiile noastre de rezervă sunt criptate înainte să plece de pe serverul nostru, că OVHcloud nu le poate citi și că se păstrează până la 8 săptămâni, după care sunt suprascrise (secțiunile 3, 5, 6, 7, 8 și 9); și că un cont a cărui înregistrare nu este finalizată se șterge la 24 de ore de la începerea înregistrării sau, dacă ultimul link pe care vi l-am trimis expiră mai târziu, la expirarea acestuia (secțiunea 7). Secțiunea 4 arată, de asemenea, temeiul juridic pentru încasarea plății pentru planul dumneavoastră. Secțiunea 5 arată, de asemenea, că facturile și facturile de stornare vi le emitem noi înșine, în calitate de vânzător, prin serviciile noastre de facturare; că numărul complet al cardului și codul de securitate nu ajung niciodată la noi; că NETOPIA Payments vede și adresa dumneavoastră IP și detaliile browserului pe pagina sa de plată, primește de la noi, atunci când verificați un card nou, aceleași date ca la o plată și ne comunică dacă o plată sau o verificare a cardului a reușit; că nota proprie de informare a NETOPIA pentru plătitori, nu această politică, arată cum și în ce calitate folosește NETOPIA datele dumneavoastră, astfel încât secțiunea 5 nu mai include NETOPIA printre companiile care acționează numai pe baza instrucțiunilor noastre; și că, atunci când o pagină afișează sigla NETOPIA, browserul dumneavoastră o încarcă de pe serverul NETOPIA. Secțiunea 5 arată, de asemenea, că Cloudflare efectuează verificarea anti-robot și răspunde în nume propriu de ceea ce colectează această verificare, date pe care le folosește pentru a-și îmbunătăți detectarea roboților, iar secțiunea nu mai spune că acesta distribuie paginile noastre sau că transportă traficul dintre dumneavoastră și serviciu, nici că nu trimitem datele dumneavoastră unei companii care le-ar folosi în scopuri proprii. Secțiunea 9 arată că fiecare pagină a site-ului este transmisă prin HTTPS. Secțiunea 13 arată că nu folosim instrumente de urmărire publicitare sau analitice și ce alte companii primesc solicitări de la browserul dumneavoastră prin paginile noastre. Politica nu mai vorbește despre planurile cu plată ca despre ceva ce urmează să înceapă (secțiunile 2, 4, 5 și 7), iar secțiunea 5 și Anexa B.4 îi numesc pe ceilalți destinatari companii, nu persoane împuternicite"
+    "20 noiembrie 2026. Versiunea 3.15 a înlocuit versiunea 3.14: arată ce companie operează furnizorul nostru de plăți, NETOPIA Payments, ce îi trimitem la fiecare plată și că Registrul îl cuprinde și pe el (secțiunea 5); că evidența consimțământului dumneavoastră privind datele sensibile se șterge odată cu contul, în timp ce celelalte evidențe privind acceptarea și consimțământul se păstrează 6 ani după încetarea contului (secțiunile 2, 3 și 7); ce copii de rezervă se păstrează, pe serverul nostru și la OVHcloud, că nu le criptăm noi înșine și nu ținem un jurnal al accesului la ele și că unele dintre ele conțin cheile împreună cu datele, astfel încât închiderea contului sau ștergerea unei dezbateri face datele ilizibile numai în serviciul activ, iar un cont închis sau o dezbatere ștearsă pot reveni dacă restaurăm întregul serviciu dintr-o copie care încă le conține, pe când versiunea anterioară spunea că copiile noastre de rezervă sunt criptate înainte să plece de pe serverul nostru, că OVHcloud nu le poate citi și că se păstrează până la 8 săptămâni, după care sunt suprascrise (secțiunile 3, 5, 6, 7, 8 și 9); și că un cont a cărui înregistrare nu este finalizată se șterge la 24 de ore de la începerea înregistrării sau, dacă ultimul link pe care vi l-am trimis expiră mai târziu, la expirarea acestuia (secțiunea 7). Secțiunea 4 arată, de asemenea, temeiul juridic pentru încasarea plății pentru planul dumneavoastră. Secțiunea 5 arată, de asemenea, că facturile și facturile de stornare vi le emitem noi înșine, în calitate de vânzător, prin serviciile noastre de facturare; că numărul complet al cardului și codul de securitate nu ajung niciodată la noi; că NETOPIA Payments vede și adresa dumneavoastră IP și detaliile browserului pe pagina sa de plată, primește de la noi, atunci când verificați un card nou, aceleași date ca la o plată și ne comunică dacă o plată sau o verificare a cardului a reușit; că nota proprie de informare a NETOPIA pentru plătitori, nu această politică, arată cum și în ce calitate folosește NETOPIA datele dumneavoastră, astfel încât secțiunea 5 nu mai include NETOPIA printre companiile care acționează numai pe baza instrucțiunilor noastre; și că, atunci când o pagină afișează sigla NETOPIA, browserul dumneavoastră o încarcă de pe serverul NETOPIA. Secțiunea 5 arată, de asemenea, că Cloudflare efectuează verificarea anti-robot și răspunde în nume propriu de ceea ce colectează această verificare, date pe care le folosește pentru a-și îmbunătăți detectarea roboților, iar secțiunea nu mai spune că acesta distribuie paginile noastre sau că transportă traficul dintre dumneavoastră și serviciu, nici că nu trimitem datele dumneavoastră unei companii care le-ar folosi în scopuri proprii. Secțiunea 9 arată că fiecare pagină a site-ului este transmisă prin HTTPS. Secțiunea 13 arată că nu folosim instrumente de urmărire publicitare sau analitice și ce alte companii primesc solicitări de la browserul dumneavoastră prin paginile noastre. Politica nu mai vorbește despre planurile cu plată ca despre ceva ce urmează să înceapă (secțiunile 2, 4, 5 și 7), iar secțiunea 5 și Anexa B.4 îi numesc pe ceilalți destinatari companii, nu persoane împuternicite"
    ],
    [
     "al sunt persoanele împuternicite mențio",
@@ -2735,7 +2735,7 @@
   "swaps": [
    [
     "4 · ДЕЙСТВУЕТ С 19",
-    "5 · ДЕЙСТВУЕТ С 21"
+    "5 · ДЕЙСТВУЕТ С 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2743,7 +2743,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -2828,7 +2828,7 @@
   "swaps": [
    [
     "4 · ÚČINNÉ OD 19",
-    "5 · ÚČINNÉ OD 21"
+    "5 · ÚČINNÉ OD 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2836,7 +2836,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -2921,7 +2921,7 @@
   "swaps": [
    [
     "4 · VELJA OD 19",
-    "5 · VELJA OD 21"
+    "5 · VELJA OD 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -2929,7 +2929,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -3014,7 +3014,7 @@
   "swaps": [
    [
     "4 · GÄLLER FRÅN 19",
-    "5 · GÄLLER FRÅN 21"
+    "5 · GÄLLER FRÅN 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -3022,7 +3022,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -3107,7 +3107,7 @@
   "swaps": [
    [
     "4 · YÜRÜRLÜK TARİHİ 19",
-    "5 · YÜRÜRLÜK TARİHİ 21"
+    "5 · YÜRÜRLÜK TARİHİ 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -3115,7 +3115,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     " silmek özel ver",
@@ -3204,7 +3204,7 @@
   "swaps": [
    [
     "4 · ЧИННА З 19",
-    "5 · ЧИННА З 21"
+    "5 · ЧИННА З 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -3212,7 +3212,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -3297,7 +3297,7 @@
   "swaps": [
    [
     "4 · CÓ HIỆU LỰC 19",
-    "5 · CÓ HIỆU LỰC 21"
+    "5 · CÓ HIỆU LỰC 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -3305,7 +3305,7 @@
    ],
    [
     "4 · Effective 19",
-    "5 · Effective 21"
+    "5 · Effective 20"
    ],
    [
     "",
@@ -3386,7 +3386,7 @@
   "swaps": [
    [
     "4 · 生效日期 2026 年 11 月 19",
-    "5 · 生效日期 2026 年 11 月 21"
+    "5 · 生效日期 2026 年 11 月 20"
    ],
    [
     "9 · v3.14\nbodyLab",
@@ -3398,7 +3398,7 @@
    ],
    [
     " 年 11 月 19 日 · 历史版",
-    " 年 11 月 21 日 · 历史版"
+    " 年 11 月 20 日 · 历史版"
    ],
    [
     "您私密数据的密钥",

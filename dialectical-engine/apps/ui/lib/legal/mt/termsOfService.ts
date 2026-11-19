@@ -378,8 +378,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.0",
-  sha256: "cf6da859acfd881cbd5e38233b1b0df9ea13f74062fd248a4019d3286234b1b3",
-  eyebrow: "TERMINI TAS-SERVIZZ · v1.0 · EFFETTIVI 21 TA’ NOVEMBRU 2026",
+  sha256: "f435e9da3b96fdd1ff460d0351fa5596ae81637433c3d5aa24deb5b4e7546937",
+  eyebrow: "TERMINI TAS-SERVIZZ · v1.0 · EFFETTIVI 20 TA’ NOVEMBRU 2026",
   title: "Dak li taqbel miegħu",
   lede: "Il-kuntratt bejnek u DMS Merchandise Shop S.R.L., b’lingwaġġ ċar. Dsatax-il taqsima u l-Anness A — niżżel sal-aħħar.",
   endMarker: "TMIEM IT-TERMINI · v1.0",

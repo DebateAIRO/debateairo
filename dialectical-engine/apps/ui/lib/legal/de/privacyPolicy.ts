@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.15",
-  sha256: "43247bd83b73e9bb3bb8a1315750b0f69c94f08d29a24acea5b29b5c67788f4d",
-  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.15 · GÜLTIG AB 21. NOVEMBER 2026",
+  sha256: "2099b8554a51a86c4c4b4078cdf6a667fdc8c1dd0393dac5c11996155be068a6",
+  eyebrow: "DATENSCHUTZERKLÄRUNG · v3.15 · GÜLTIG AB 20. NOVEMBER 2026",
   title: "Was wir speichern und warum",
   lede: "DSGVO – GDPR (EU) 2016/679: Ihre Rechte und unsere Pflichten, verständlich formuliert. Vierzehn Abschnitte und Anhang B – scrollen Sie bis zum Ende.",
   endMarker: "ENDE DER DATENSCHUTZERKLÄRUNG · DSGVO – GDPR (EU) 2016/679 · v3.15",

@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "3.15",
-  sha256: "cdcb257c0eec1fe20e626c04be824ce2abb37e7fbfa56b48e97e5b47cce65265",
-  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.15 · VOIMASSA 21. MARRASKUUTA 2026 ALKAEN",
+  sha256: "c8885e6efc0d1f24e8691928f1adbbe586b5c8a7f955727f780c005af3995eda",
+  eyebrow: "TIETOSUOJAKÄYTÄNTÖ · v3.15 · VOIMASSA 20. MARRASKUUTA 2026 ALKAEN",
   title: "Mitä säilytämme ja miksi",
   lede: "Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.",
   endMarker: "TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v3.15",

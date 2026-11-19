@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Terms of Service 1.0, the launch text, effective 21 November 2026. 1.0 is still the only version, so the corrections
+ * Terms of Service 1.0, the launch text, effective 20 November 2026. 1.0 is still the only version, so the corrections
  * made to it before launch change the 1.0 text itself and add no change history: the archived 1.0 copies are rebuilt
  * from the corrected text. The corrections, so that the Terms say what the code and the payment provider's conditions
  * require:
@@ -26,7 +26,7 @@ import { resolve } from "node:path";
  */
 
 /** The day of November 2026 on which the corrected 1.0 takes effect, as every language's eyebrow and version line write it. */
-export const TERMS_10_DAY = "21";
+export const TERMS_10_DAY = "20";
 
 type Swaps = Readonly<Record<string, Readonly<{ sha256: string; swaps: readonly (readonly [string, string])[] }>>>;
 

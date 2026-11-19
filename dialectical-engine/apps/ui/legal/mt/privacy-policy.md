@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Fil-qosor
-eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.15 · EFFETTIVA 21 TA’ NOVEMBRU 2026
+eyebrow: POLITIKA DWAR IL-PRIVATEZZA · v3.15 · EFFETTIVA 20 TA’ NOVEMBRU 2026
 title: X’naħżnu, u għaliex
 lede: Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.
 endMarker: TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v3.15
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 3.15 · Effective 21 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.15 · Effective 20 ta’ Novembru 2026 · Verżjonijiet preċedenti fuq dezbatere.ro/privacy/versions · Kontrollur: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Niġbru dak li jeħtieġ kont u dak li tittajpja fid-dibattiti tiegħek. Dak li tikteb lill-assistent tal-appoġġ jintbagħat lill-mudell tal-IA tiegħu biex ikun jista’ jwieġbek, u ma nżommu xejn minnu. Il-mistoqsijiet tiegħek jintbagħtu lill-fornituri tal-IA elenkati fir-Reġistru tagħna, prinċipalment lil DeepInfra, fl-Istati Uniti. It-termini ta’ DeepInfra, Anthropic u Perplexity ma jippermettulhomx iħarrġu mudelli fuq dak li tikteb; it-taqsima 5 tgħid għal liema kumpanija għadna ma kkonfermajniex dan. Il-fornitur tal-ospitar tagħna jaħżen il-kont tiegħek u d-dibattiti tiegħek f’Londra, fir-Renju Unit; it-taqsima 5 tispjega fejn oħra tmur id-data tiegħek. Fuq il-pjan bla ħlas, id-dibattiti huma pubbliċi meta jintemmu, wara verifika bl-IA; fuq pjan bi ħlas, huma privati sakemm ma tippubblikahomx. It-tħassir tal-kont tiegħek jeqred iċ-ċwievet tad-data privata tiegħek fuq is-server tagħna, iżda l-kopji kriptati fil-ħażna separata tagħna tal-kopji ta’ riżerva ma jitħassrux awtomatikament (taqsima 7); id-dibattiti pubbliċi jibqgħu pubbliċi, u l-psewdonimu tiegħek jitneħħa minnhom. Tista’ tikkuntattjana fuq privacy@dezbatere.ro, u persuni msemmija f’dibattitu jistgħu jikitbu lilna mingħajr kont.
 

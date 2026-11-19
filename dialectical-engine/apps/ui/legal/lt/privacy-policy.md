@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Trumpai
-eyebrow: PRIVATUMO POLITIKA · v3.15 · ĮSIGALIOJA 2026 M. LAPKRIČIO 21 D.
+eyebrow: PRIVATUMO POLITIKA · v3.15 · ĮSIGALIOJA 2026 M. LAPKRIČIO 20 D.
 title: Ką saugome ir kodėl
 lede: Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.
 endMarker: POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v3.15
@@ -19,7 +19,7 @@ jumps:
 13 SLAPUKAI
 -->
 
-**Version 3.15 · Effective 2026 m. lapkričio 21 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.15 · Effective 2026 m. lapkričio 20 d. · Ankstesnės versijos adresu dezbatere.ro/privacy/versions · Duomenų valdytojas: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Renkame tai, ko reikia paskyrai, ir tai, ką įvedate savo debatuose. Tai, ką rašote pagalbos asistentui, siunčiama jo DI modeliui, kad jis galėtų jums atsakyti, ir mes nieko iš to nesaugome. Jūsų klausimai perduodami mūsų Registre išvardytiems DI paslaugų teikėjams, daugiausia DeepInfra, Jungtinėse Amerikos Valstijose. DeepInfra, Anthropic ir Perplexity sąlygos neleidžia jiems mokyti modelių pagal tai, ką rašote; 5 skyriuje nurodyta, dėl kurios bendrovės to dar nepatvirtinome. Mūsų prieglobos paslaugų teikėjas jūsų paskyrą ir debatus saugo Londone, Jungtinėje Karalystėje; 5 skyriuje nurodyta, kur dar siunčiami jūsų duomenys. Nemokamame plane debatai tampa vieši, kai jie baigiami, po DI patikros; mokamame plane debatai yra privatūs, nebent juos paskelbiate. Ištrynus paskyrą sunaikinami jūsų privačių duomenų raktai mūsų serveryje, tačiau užšifruotos kopijos mūsų atskiroje atsarginių kopijų saugykloje automatiškai neištrinamos (7 skyrius); vieši debatai lieka vieši, o iš jų pašalinamas jūsų slapyvardis. Su mumis galite susisiekti adresu privacy@dezbatere.ro, o debatuose paminėti asmenys gali rašyti mums ir neturėdami paskyros.
 
