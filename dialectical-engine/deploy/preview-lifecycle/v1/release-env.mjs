@@ -26,7 +26,7 @@
 import { lstat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { RELEASE_KEY_PATTERN, isPaymentMarksList, parseEnvironmentText, readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
+import { PREVIEW_NETOPIA_LIVE_BASE, PREVIEW_NETOPIA_SANDBOX_BASES, RELEASE_KEY_PATTERN, isPaymentMarksList, parseEnvironmentText, readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
 import { PREVIEW_SLOTS } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { LAYOUT, RELEASE_LABEL, atomicWrite, canonicalJson, envPathFor, logLine } from './common.mjs';
 
@@ -126,6 +126,26 @@ function asksOpenChecks(releases) {
 const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_ID', 'runner'], ['HATCHET_WORKER_NAME', 'runner'], ['API_PORT', 'api'], ['PORT', 'ui']]);
 
 /**
+ * The payment system an API file names, as comparable text: NETOPIA's sandbox (either sandbox base), its live base, or
+ * none, together with the owner's live payments line (or none). Any other base is unreadable and equals nothing.
+ */
+function paymentSystemOf(api) {
+  const base = api.NETOPIA_API_BASE_URL;
+  const system = base === undefined ? 'none' : PREVIEW_NETOPIA_SANDBOX_BASES.includes(base) ? 'sandbox' : base === PREVIEW_NETOPIA_LIVE_BASE ? 'live' : null;
+  return system === null ? Symbol('unreadable') : `${system}|${api.PREVIEW_LIVE_PAYMENTS ?? 'none'}`;
+}
+/**
+ * Across two releases only, SAME_API_PAYMENT_SYSTEM: both API files name the same payment system and the same live
+ * payments line (or neither). Two APIs of different systems on one database would each end the other's billing jobs
+ * as another payment system's (DEAD OTHER_PAYMENT_SYSTEM), a refund's credit note among them. Runner and website files
+ * carry no payment setting and are never compared.
+ */
+function paymentSystemChecks(releases) {
+  if (releases.length !== 2) return [];
+  return [result('SAME_API_PAYMENT_SYSTEM', allSame(releases.map(release => paymentSystemOf(release.api)), true))];
+}
+
+/**
  * Side-by-side spec §10, the SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
  * preview configuration, the team, the deployment mode, the site version and the release key; its website names the
  * API's release key; its ports and API address are its slot's; and its payment marks list, when it has one, is a list
@@ -165,6 +185,7 @@ export function sameChecks(releases) {
     out.push(result('SAME_API_RESTORE_FENCE_PATH', allSame(releases.map(release => release.api.RESTORE_FENCE_PATH).filter(value => value !== undefined), false)));
     for (const [key, service] of ACROSS_DIFFERENT) out.push(result(`DIFFERENT_${key}`, allDifferent(releases.map(release => release[service][key]))));
   }
+  out.push(...paymentSystemChecks(releases));
   out.push(...asksOpenChecks(releases));
   return Object.freeze(out);
 }

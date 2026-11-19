@@ -89,6 +89,39 @@ const NETOPIA_KEYS=['NETOPIA_API_BASE_URL','NETOPIA_POS_SIGNATURE','NETOPIA_API_
 const INVOICING_KEYS=['QUADERNO_API_KEY_PATH','QUADERNO_API_BASE_URL','SMARTBILL_CREDENTIALS_PATH','SMARTBILL_API_BASE_URL','SMARTBILL_SERIES','OWNER_REPORT_EMAIL_PATH'];
 const SPOOL_KEY='BILLING_NOTICE_SPOOL_PATH';
 /**
+ * Real payments: the owner's one line PREVIEW_LIVE_PAYMENTS=real-money in the API's file, and nothing else, lets this kit
+ * take them. With it the billing group must be NETOPIA's live base, one live Quaderno account, SmartBill's real address
+ * and the key files at their own live paths in the same API-owned folder (the owner's address file stays shared). The
+ * paths differ from the sandbox ones, so a sandbox key never sits behind a live address and going back to the sandbox
+ * needs no key typed again. The egress proxy must run in its live form too (start-check-payments.mjs).
+ */
+export const PREVIEW_LIVE_PAYMENTS_VALUE='real-money';
+export const PREVIEW_NETOPIA_LIVE_BASE='https://secure.netopia-payments.com/api';
+/** A Quaderno LIVE account's API address: one DNS label before quadernoapp.com, so a sandbox address never matches. */
+export const PREVIEW_QUADERNO_LIVE_BASE=/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.quadernoapp\.com\/api$/;
+export const PREVIEW_SMARTBILL_LIVE_BASE='https://ws.smartbill.ro/SBORO/api';
+export const PREVIEW_HOSTED_LIVE_FIXED_VALUES=Object.freeze({
+ NETOPIA_API_KEY_PATH:'/etc/debateai-v3-preview/billing/live-netopia-api-key',
+ NETOPIA_IPN_KEYS_PATH:'/etc/debateai-v3-preview/billing/live-netopia-ipn-keys.pem',
+ QUADERNO_API_KEY_PATH:'/etc/debateai-v3-preview/billing/live-quaderno-api-key',
+ SMARTBILL_CREDENTIALS_PATH:'/etc/debateai-v3-preview/billing/live-smartbill-credentials',
+ OWNER_REPORT_EMAIL_PATH:PREVIEW_HOSTED_FIXED_VALUES.OWNER_REPORT_EMAIL_PATH
+});
+const LIVE_KEY='PREVIEW_LIVE_PAYMENTS';
+/**
+ * The live rules, each refusal named (startup-refusals.mjs) and never carrying a value: the exact value, all ten billing
+ * keys (live is never the provider-only mode), the three live addresses, then the live key paths.
+ */
+function assertLivePaymentValues(configured) {
+ const live=PREVIEW_HOSTED_LIVE_FIXED_VALUES;
+ if(configured[LIVE_KEY]!==PREVIEW_LIVE_PAYMENTS_VALUE)refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:value');
+ if([...NETOPIA_KEYS,...INVOICING_KEYS].some(key=>configured[key]===undefined))refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:incomplete');
+ if(configured.NETOPIA_API_BASE_URL!==PREVIEW_NETOPIA_LIVE_BASE)refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:netopia-base');
+ if(!PREVIEW_QUADERNO_LIVE_BASE.test(configured.QUADERNO_API_BASE_URL))refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:quaderno-base');
+ if(configured.SMARTBILL_API_BASE_URL!==PREVIEW_SMARTBILL_LIVE_BASE)refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:smartbill-base');
+ if(Object.keys(live).some(key=>configured[key]!==live[key]))refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:paths');
+}
+/**
  * Owner ruling 2026-10-13: moving the billing clock for renewal tests stays refused on the preview (the owner is still
  * deciding). A host that ever ran with it must never go live (deploy/vps/README.md §14.8).
  */
@@ -97,9 +130,10 @@ const REFUSED_ON_PREVIEW=['BILLING_STAGE_CLOCK_OFFSET_DAYS'];
  * The hosted API's extra rules: the country files and the Turnstile relay at their fixed values (the API refuses to
  * start without them in hosted mode); NETOPIA's four settings all or none, and Quaderno's, SmartBill's and the owner's
  * six all or none and only beside NETOPIA's (none: hosted, billing off; NETOPIA alone: the provider-only mode; all
- * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. The billing notice
- * spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed folder. The restore
- * fence path (NV-07), when set, only at its fixed path.
+ * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. With the owner's live
+ * line the live rules replace those billing rules (assertLivePaymentValues); every other rule holds either way. The
+ * billing notice spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed
+ * folder. The restore fence path (NV-07), when set, only at its fixed path.
  */
 function assertHostedApiValues(configured) {
  const fixed=PREVIEW_HOSTED_FIXED_VALUES;
@@ -107,23 +141,27 @@ function assertHostedApiValues(configured) {
   ||configured.TURNSTILE_SOCKET_PATH!==PREVIEW_SOCKET)refuse();
  const present=keys=>keys.filter(key=>configured[key]!==undefined).length;
  const netopia=present(NETOPIA_KEYS),invoicing=present(INVOICING_KEYS);
+ if(configured[LIVE_KEY]!==undefined)assertLivePaymentValues(configured);
+ else{
  if(![0,NETOPIA_KEYS.length].includes(netopia)||![0,INVOICING_KEYS.length].includes(invoicing)||(invoicing>0&&netopia===0))refuse();
  if(netopia>0&&(!PREVIEW_NETOPIA_SANDBOX_BASES.includes(configured.NETOPIA_API_BASE_URL)
   ||configured.NETOPIA_API_KEY_PATH!==fixed.NETOPIA_API_KEY_PATH||configured.NETOPIA_IPN_KEYS_PATH!==fixed.NETOPIA_IPN_KEYS_PATH))refuse();
  if(invoicing>0&&(!PREVIEW_QUADERNO_SANDBOX_BASE.test(configured.QUADERNO_API_BASE_URL)||configured.SMARTBILL_API_BASE_URL!==fixed.SMARTBILL_API_BASE_URL
   ||['QUADERNO_API_KEY_PATH','SMARTBILL_CREDENTIALS_PATH','OWNER_REPORT_EMAIL_PATH'].some(key=>configured[key]!==fixed[key])))refuse();
+ }
  if(configured[SPOOL_KEY]!==undefined&&(netopia===0||configured[SPOOL_KEY]!==fixed[SPOOL_KEY]))refuse();
  if(configured.RESTORE_FENCE_PATH!==undefined&&configured.RESTORE_FENCE_PATH!==fixed.RESTORE_FENCE_PATH)refuse();
 }
 /** No billing setting in local mode: billing exists only in hosted mode (apps/api/src/billing/connectors.ts billingModeOf). */
-const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY];
+const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY,LIVE_KEY];
 /** What the hosted API's fetch does: https through the loopback egress proxy, loopback itself direct. */
 export const PREVIEW_HOSTED_PROXY_ENVIRONMENT=Object.freeze({HTTPS_PROXY:PREVIEW_EGRESS_PROXY_URL,NO_PROXY:'localhost,127.0.0.1,[::1]'});
 /**
  * Hosted only, before the API's main is imported: every https request of the process's global fetch (NETOPIA's,
  * Quaderno's) and of the https module goes through the egress proxy (egress-proxy.mjs), which lets only NETOPIA's and
- * Quaderno's sandboxes through. Plain-http requests (the spending gates' Unix sockets) and loopback stay direct. The
- * values are given to Node directly, never put into the process environment the API reads. Returns Node's restore.
+ * Quaderno's sandboxes through (in its live form, only the live payment hosts). Plain-http requests (the spending
+ * gates' Unix sockets) and loopback stay direct. The values are given to Node directly, never put into the process
+ * environment the API reads. Returns Node's restore.
  */
 export function installHostedEgress(deploymentMode,setProxy=setGlobalProxyFromEnv) {
  if(deploymentMode==='local')return ()=>{};
@@ -227,7 +265,7 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
    if(mode==='hosted')assertHostedApiValues(configured);
    else if(BILLING_ONLY_KEYS.some(key=>configured[key]!==undefined))refuse();
   }
-  return {environment:Object.freeze(environment),selectedRegisterVersion:String(normalized.REGISTER_VERSION),deploymentMode:normalized.DEPLOYMENT_MODE};
+  return {environment:Object.freeze(environment),selectedRegisterVersion:String(normalized.REGISTER_VERSION),deploymentMode:normalized.DEPLOYMENT_MODE,...(service==='api'?{livePayments:configured[LIVE_KEY]!==undefined}:{})};
  }catch(error){
   // One message for every refusal, as before. A refusal of a closed, named form (startup-refusals.mjs) keeps its name in
   // the cause, so the launcher can say which owner setting is wrong; it never carries a value.
