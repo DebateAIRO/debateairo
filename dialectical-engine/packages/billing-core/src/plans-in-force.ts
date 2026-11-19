@@ -51,6 +51,8 @@ const smallest = (values: ReadonlyArray<number | undefined>): number | undefined
 /**
  * `personWindowsFor` over a month that was served `plans`. The windows are the ones the plans served last give (so the
  * money rule in force is today's); each number in them is the best any of the plans gives:
+ *  - a day or week cap that one of the plans did not have at all: no such window. No cap is the most a person can
+ *    have, so a cap added by an upload starts with the person's next month, like any lower limit;
  *  - a window's limit and its finish room: the largest;
  *  - the reserve kept inside the month: the smallest, so a reserve raised later does not make new questions stop
  *    earlier in a month already started (a final answer is paid from the site's reserve of the day, `closingReservesOf`).
@@ -67,7 +69,8 @@ export function personWindowsInForce(
   const each = served(plans).map((one) => personWindowsFor(planIn(one, planId), anchor, now, closeBasisPoints, monthCreditOverrideMicros));
   const latest = each[each.length - 1]!;
   if (each.length === 1) return latest;
-  return Object.freeze(latest.map((window): PersonWindow => {
+  const inEveryPlans = latest.filter((window) => each.every((windows) => windows.some((entry) => entry.scope === window.scope)));
+  return Object.freeze(inEveryPlans.map((window): PersonWindow => {
     const same = each.map((windows) => windows.find((entry) => entry.scope === window.scope))
       .filter((entry): entry is PersonWindow => entry !== undefined);
     const overflow = window.finishOverflowMicros === undefined ? undefined : largest(same.map((entry) => entry.finishOverflowMicros));

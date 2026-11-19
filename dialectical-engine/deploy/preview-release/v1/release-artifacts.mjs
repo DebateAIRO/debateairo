@@ -58,7 +58,7 @@
 //        differs, and whether a number went up or down; never an amount). compose also needs --out, and writes the new
 //        version's hosted inputs there: the live version's, with exactly the inputs --change names taken from the file. It
 //        refuses unless --change names every input that differs and no other, and --limits names every plan whose limits
-//        get lower or change for the people already on it, and no other)
+//        change, up or down, for the people already on it, and no other)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.

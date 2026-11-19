@@ -446,9 +446,13 @@ of the month. With made-up numbers:
   gets tighter (section 12), and ask them to accept the new Terms at their next sign-in before a lower limit applies to
   them (section 14).
 - **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
-- **A higher limit cannot be taken back inside a month.** If an upload raises a limit and you then go back to the
-  release before (or publish the lower number again), everyone whose month saw the higher number keeps it until their
-  next month starts. Check a raise twice before you publish it.
+- **A day or week cap added where the plan had none** is a lower limit: it starts with each person's own next month.
+  One taken away is a higher limit.
+- **A higher limit cannot be taken back inside a month.** If an upload raises a limit and a later upload publishes
+  the lower number again, everyone whose month saw the higher number keeps it until their next month starts. The same
+  holds for a switch back to the release before after a side-by-side upload. It does not hold for rbD-B, this
+  runbook's own way back: rbD-B puts the database back as it was, and the old numbers are back for everyone. Check a
+  raise twice before you publish it.
 - **A refund** on cancelling or withdrawing is measured against the credit the person's month had on the day they
   cancelled or withdrew: the one it started with, or a higher one published since. A credit you lower later never makes
   a refund smaller.
@@ -501,7 +505,8 @@ SB3, "Editing the owner's file". Do it before SB2 (the practice runs with the fi
 - **A plan's limits**: what a lower or a higher limit does to the people already on the plan is said once, above
   ("What a changed plan limit does to people who already have a plan"). SB3 stops until you name the plan in
   `LIMITS`, for a limit that goes lower and for one that goes higher:
-  - naming a plan whose limit goes **lower** is your statement that you told the people on that plan first (Terms
+  - naming a plan whose limit goes **lower**, or whose line says `changed` (the reserve, Free's gauges, a member
+    the tool does not read), is your statement that you told the people on that plan first (Terms
     section 12), or that nobody holds it. The product sends no notice, and it has no step where people accept the
     change at their next sign-in (Terms section 14);
   - naming a plan whose limit goes **higher** is your statement that you checked the number twice: it cannot be taken
@@ -576,8 +581,9 @@ What this release adds to that recipe:
   `NEWNUM` (and a plan whose limits change, up or down, in `LIMITS`), and stops when the file differs anywhere you did not name.
   SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
   lists empty. Two rules for this upload: change no plan price in it (1.7, the trap with upgrades), and when `NEWNUM`
-  is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS` either that nobody holds it
-  or the date its people were told.
+  is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or
+  is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher,
+  that you checked the number twice.
 - **The payment marks, if you want them before real payments** (1.1): PM1, then SB5b, MT1, PM2 and MT2 between DR1
   and DR2, as the release guide says.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:

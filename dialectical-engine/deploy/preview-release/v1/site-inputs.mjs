@@ -12,8 +12,9 @@
 // then on (a subscriber's renewals charge the price recorded for that subscriber). A plan's limits reach the people
 // already on it: each person's month keeps the numbers it started with, so a lower limit reaches them when their own
 // next month starts, and the Terms ask that they are told first; a higher limit reaches them at the switch and is not
-// taken back before their next month, a way back included, so a wrong one stays that long. Either way the plan must
-// be named a second time, on its own.
+// taken back before their next month by a later upload or by a switch back to the release before, so a wrong one
+// stays that long. What changes with no up or down (the reserve, Free's fixed gauges, a member this file does not
+// read) is said to reach them at the switch. In every case the plan must be named a second time, on its own.
 //
 // Nothing here prints or returns an amount except `composeSiteInputs`'s `hostedBilling`, which the caller writes to a
 // file. Every line says only which input, plan and member differs, and whether a number went up or down.
@@ -26,8 +27,21 @@ const PLUS = 'PLUS', FREE = 'FREE';
 /** The plan members the lines below account for one by one; any other member that differs is reported as "other members". */
 const PLAN_MEMBERS_READ = Object.freeze(['plan_id', 'net_prices', 'monthly_credit_micros', 'day_bp', 'week_bp', 'finish_bp', 'finish_overflow_micros',
   'reserve_micros', 'reserve_held', 'fixed_gauges']);
-/** What a changed limit does to the people already on the plan, said on every `limits` line (packages/billing-core/src/plans-in-force.ts). */
-const LIMITS_REACH = 'the people already on this plan: a lower limit from each person\'s own next month, a higher one at the switch and not taken back before their next month';
+/**
+ * When a changed limit reaches the people already on the plan (packages/billing-core/src/plans-in-force.ts), said on a
+ * `limits` line for each kind of change the line names: a figure that went `lower`, one that went `higher`, and what
+ * `changed` with no up or down.
+ */
+const REACH = Object.freeze({
+  lower: 'a lower limit from each person\'s own next month',
+  higher: 'a higher limit at the switch, not taken back before their next month',
+  changed: 'what changed with no up or down at the switch'
+});
+/** The words after the plan's figures: one part per kind of change among `limits`, in the order lower, higher, changed. */
+function reachOf(limits) {
+  const kinds = Object.keys(REACH).filter(kind => limits.some(part => part.endsWith(` ${kind}`)));
+  return `the people already on this plan: ${kinds.map(kind => REACH[kind]).join('; ')}`;
+}
 /** The register's own denominator for `day_bp` and `week_bp` (packages/register/src/billing-plans.ts planCapMicros). */
 const BASIS_POINTS = 10_000n;
 
@@ -46,6 +60,15 @@ function moved(before, after) {
   if (same(before, after)) return null;
   if (!whole(before) || !whole(after)) return 'changed';
   return after > before ? 'higher' : 'lower';
+}
+/**
+ * A day or week cap, before and after. No cap at all is the most a person can have: a cap that appears where the plan
+ * had none is `lower`, and one that goes away is `higher`.
+ */
+function capMoved(before, after) {
+  if (before === null && whole(after)) return 'lower';
+  if (whole(before) && after === null) return 'higher';
+  return moved(before, after);
 }
 /** A member's name as the file spells it, when it is a plain name; a key that could carry a number or a control character is never printed. */
 const nameOf = key => (/^[A-Za-z_]{1,64}$/.test(key) ? key : 'another member');
@@ -92,12 +115,12 @@ function shownSizeOf(plans, plan) {
 function planMoved(before, after) {
   const prices = membersMoved(before.net_prices, after.net_prices);
   const figures = [
-    ['month credit', before.monthly_credit_micros, after.monthly_credit_micros],
-    ['day cap', capOf(before, 'day_bp'), capOf(after, 'day_bp')],
-    ['week cap', capOf(before, 'week_bp'), capOf(after, 'week_bp')],
-    ['finish share', before.finish_bp, after.finish_bp],
-    ['finish overflow', before.finish_overflow_micros, after.finish_overflow_micros]
-  ].map(([name, a, b]) => [name, moved(a, b)]).filter(([, how]) => how !== null);
+    ['month credit', moved(before.monthly_credit_micros, after.monthly_credit_micros)],
+    ['day cap', capMoved(capOf(before, 'day_bp'), capOf(after, 'day_bp'))],
+    ['week cap', capMoved(capOf(before, 'week_bp'), capOf(after, 'week_bp'))],
+    ['finish share', moved(before.finish_bp, after.finish_bp)],
+    ['finish overflow', moved(before.finish_overflow_micros, after.finish_overflow_micros)]
+  ].filter(([, how]) => how !== null);
   const limits = figures.map(([name, how]) => `${name} ${how}`);
   const named = new Set(figures.map(([name]) => name));
   // A share that differs while its cap comes out the same (rounding) is still a changed row: say so.
@@ -142,7 +165,7 @@ export function compareSiteInputs(active, site) {
       const id = plan.plan_id, { prices, limits } = planMoved(plan, after.plans[index]);
       if (prices.length > 0) planLines.push(`DIFFERENT billingPlans ${id} prices: ${prices.join(', ')} [purchases and plan changes from the switch on; a subscriber's renewals keep their own price]`);
       if (limits.length > 0) {
-        planLines.push(`DIFFERENT billingPlans ${id} limits: ${limits.join(', ')} [${LIMITS_REACH}]`);
+        planLines.push(`DIFFERENT billingPlans ${id} limits: ${limits.join(', ')} [${reachOf(limits)}]`);
         limitPlans.push(id);
       }
     }
@@ -150,7 +173,7 @@ export function compareSiteInputs(active, site) {
     // paid plan's people are reached at the switch.
     const reserve = moved(paidReserveOf(before.plans), paidReserveOf(after.plans));
     if (reserve !== null) {
-      planLines.push(`DIFFERENT billingPlans paid plans' closing reserve (the smallest of them): ${reserve} [every paid plan's closings]`);
+      planLines.push(`DIFFERENT billingPlans paid plans' closing reserve (the smallest of them): ${reserve} [every paid plan's closings, at the switch]`);
       for (const plan of before.plans) if (plan.plan_id !== FREE && !limitPlans.includes(plan.plan_id)) limitPlans.push(plan.plan_id);
     }
     // What the pricing page says about a plan can move while the plan's own limits stay (Plus's credit is the measure).

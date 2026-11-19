@@ -267,6 +267,27 @@ describe("effect 2: a lower month credit does not stop a month already started",
   });
 });
 
+describe("a day or week cap added where the plan had none", () => {
+  // Free has a month credit only. The upload of 11 October gives Free a day cap of a tenth of its credit, 33,000.
+  const before = plansWith();
+  // The register refuses a Free row with a day cap today, so the plans are built as an upload could one day seal them.
+  const withDayCap: BillingPlans = Object.freeze({
+    ...before, plans: Object.freeze(before.plans.map((plan) => plan.planId === "FREE" ? Object.freeze({ ...plan, dayBasisPoints: 1_000 }) : plan))
+  });
+  const scopes = (plans: ReadonlyArray<BillingPlans>, when: Date) =>
+    personWindowsInForce(plans, "FREE", at("2026-10-03T08:00:00.000Z"), when, 9_500).map((window) => [window.scope, window.limitMicros]);
+  const now = at("2026-10-12T12:00:00.000Z");
+
+  it("does not reach a month already started: no cap is the most a person can have", () => {
+    expect(scopes([withDayCap], now)).toEqual([["PERSON_DAY", 33_000], ["PERSON_MONTH", 330_000]]);
+    expect(scopes([before, withDayCap], now)).toEqual([["PERSON_MONTH", 330_000]]);
+  });
+
+  it("a cap taken away reaches the month at once", () => {
+    expect(scopes([withDayCap, before], now)).toEqual([["PERSON_MONTH", 330_000]]);
+  });
+});
+
 describe("the reserve and the finish room of a month already started", () => {
   const now = at("2026-10-12T12:00:00.000Z");
   const monthOf = async (site: Readonly<{ own: BillingPlans; plansInForce: PlansInForcePort }>) =>

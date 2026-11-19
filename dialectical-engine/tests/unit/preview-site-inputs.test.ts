@@ -31,8 +31,10 @@ const withPlan = (id: string, patch: Plan): any => {
 const lineOf = (report: { lines: string[] }, start: string) => report.lines.find(line => line.startsWith(start));
 const refusal = (work: () => unknown) => { try { work(); } catch (error) { const { code, fields } = error as { code: string; fields?: string[] }; return { code, fields }; } return null; };
 const amount = /\d{3,}/;
-/** What every `limits` line says about the people already on the plan. */
-const REACH = 'the people already on this plan: a lower limit from each person\'s own next month, a higher one at the switch and not taken back before their next month';
+/** What a `limits` line says about the people already on the plan, for each kind of change on it. */
+const LOWER = 'a lower limit from each person\'s own next month', HIGHER = 'a higher limit at the switch, not taken back before their next month';
+const CHANGED = 'what changed with no up or down at the switch';
+const reach = (...parts: string[]) => `the people already on this plan: ${parts.join('; ')}`;
 
 describe('site-inputs: comparing the owner\'s file with the live numbers', () => {
   it('says SAME for every input when the file holds the live numbers, whatever order its keys were typed in', () => {
@@ -65,11 +67,18 @@ describe('site-inputs: comparing the owner\'s file with the live numbers', () =>
   it('a limit that goes up, goes down, or has no up or down names the plan, and the line says when each reaches its people', () => {
     // A raise is named too: it reaches everyone at the switch and is not taken back before each person's next month.
     const more = site.compareSiteInputs(LIVE, withPlan('PRO', { monthly_credit_micros: 55_000_000 }));
-    expect(lineOf(more, 'DIFFERENT billingPlans PRO limits')).toBe(`DIFFERENT billingPlans PRO limits: month credit higher, day cap higher, week cap higher [${REACH}]`);
+    expect(lineOf(more, 'DIFFERENT billingPlans PRO limits')).toBe(`DIFFERENT billingPlans PRO limits: month credit higher, day cap higher, week cap higher [${reach(HIGHER)}]`);
     expect(more.limitPlans).toEqual(['PRO']);
     const less = site.compareSiteInputs(LIVE, withPlan('PRO', { monthly_credit_micros: 33_000_000 }));
-    expect(lineOf(less, 'DIFFERENT billingPlans PRO limits')).toBe(`DIFFERENT billingPlans PRO limits: month credit lower, day cap lower, week cap lower [${REACH}]`);
+    expect(lineOf(less, 'DIFFERENT billingPlans PRO limits')).toBe(`DIFFERENT billingPlans PRO limits: month credit lower, day cap lower, week cap lower [${reach(LOWER)}]`);
     expect(less.limitPlans).toEqual(['PRO']);
+    // What has no up or down (the reserve, where it is held, Free's gauges, a member the tool does not read) is said to reach people at the switch.
+    expect(lineOf(site.compareSiteInputs(LIVE, withPlan('PLUS', { reserve_micros: 330_000 })), 'DIFFERENT billingPlans PLUS limits'))
+      .toBe(`DIFFERENT billingPlans PLUS limits: closing reserve changed [${reach(CHANGED)}]`);
+    expect(lineOf(site.compareSiteInputs(LIVE, withPlan('FREE', { fixed_gauges: { risk_tier: 'high', composition_budget_tier: 'low', depth: 1 } })), 'DIFFERENT billingPlans FREE limits'))
+      .toBe(`DIFFERENT billingPlans FREE limits: fixed gauges changed [${reach(CHANGED)}]`);
+    expect(lineOf(site.compareSiteInputs(LIVE, withPlan('PLUS', { monthly_credit_micros: 6_600_000, a_new_member: 11 })), 'DIFFERENT billingPlans PLUS limits'))
+      .toBe(`DIFFERENT billingPlans PLUS limits: month credit lower, day cap lower, week cap lower, other members changed [${reach(LOWER, CHANGED)}]`);
     for (const patch of [{ reserve_micros: 330_000 }, { reserve_held: 'ON_TOP_OF_CREDIT' }, { fixed_gauges: { risk_tier: 'high', composition_budget_tier: 'low', depth: 1 } },
       { finish_overflow_micros: undefined }, { finish_bp: 9900 }, { tier: 'free' }, { a_new_member: 11 }]) {
       expect(site.compareSiteInputs(LIVE, withPlan('PLUS', patch)).limitPlans, JSON.stringify(patch)).toEqual(['PLUS']);
@@ -79,8 +88,11 @@ describe('site-inputs: comparing the owner\'s file with the live numbers', () =>
   it('judges a day or week cap by what it comes to in money, not by its share alone', () => {
     // More credit with a smaller day share: the month goes up, the day's cap goes down (7.7 x 22% above 8.8 x 11%).
     const mixed = site.compareSiteInputs(LIVE, withPlan('PLUS', { monthly_credit_micros: 8_800_000, day_bp: 1100 }));
-    expect(lineOf(mixed, 'DIFFERENT billingPlans PLUS limits')).toContain('PLUS limits: month credit higher, day cap lower, week cap higher [the people already on this plan: a lower limit from');
+    expect(lineOf(mixed, 'DIFFERENT billingPlans PLUS limits')).toBe(`DIFFERENT billingPlans PLUS limits: month credit higher, day cap lower, week cap higher [${reach(LOWER, HIGHER)}]`);
     expect(mixed.limitPlans).toEqual(['PLUS']);
+    // A cap that appears where the plan had none is a lower limit (no cap is the most a person can have); one taken away, a higher one.
+    expect(lineOf(site.compareSiteInputs(LIVE, withPlan('FREE', { day_bp: 5500 })), 'DIFFERENT billingPlans FREE limits')).toBe(`DIFFERENT billingPlans FREE limits: day cap lower [${reach(LOWER)}]`);
+    expect(lineOf(site.compareSiteInputs(LIVE, withPlan('PLUS', { week_bp: null })), 'DIFFERENT billingPlans PLUS limits')).toBe(`DIFFERENT billingPlans PLUS limits: week cap higher [${reach(HIGHER)}]`);
     // A share that differs while its cap comes out the same still shows, and still names the plan.
     const tiny = (bp: number) => withPlan('PLUS', { monthly_credit_micros: 11, day_bp: bp });
     const rounded = site.compareSiteInputs(tiny(2200), tiny(2300));
@@ -113,7 +125,7 @@ describe('site-inputs: comparing the owner\'s file with the live numbers', () =>
     // Pro's reserve goes down: it is now the smallest, and Plus's and Max's closings are admitted against it too.
     const lower = site.compareSiteInputs(LIVE, withPlan('PRO', { reserve_micros: 110_000 }));
     expect(lower.limitPlans).toEqual(['PLUS', 'PRO', 'MAX']);
-    expect(lower.lines).toContain('DIFFERENT billingPlans paid plans\' closing reserve (the smallest of them): lower [every paid plan\'s closings]');
+    expect(lower.lines).toContain('DIFFERENT billingPlans paid plans\' closing reserve (the smallest of them): lower [every paid plan\'s closings, at the switch]');
     expect(refusal(() => site.composeSiteInputs(LIVE, withPlan('PRO', { reserve_micros: 110_000 }), { change: 'billingPlans', limits: 'PRO' }))).toEqual({ code: 'SITE_LIMITS_NOT_NAMED', fields: ['PLUS', 'MAX'] });
     // Free's reserve is its own.
     expect(site.compareSiteInputs(LIVE, withPlan('FREE', { reserve_micros: 110_000 })).limitPlans).toEqual(['FREE']);
@@ -122,7 +134,7 @@ describe('site-inputs: comparing the owner\'s file with the live numbers', () =>
   it('raising the Plus credit alone changes what the pricing page shows for the other plans, and names Plus alone', () => {
     const report = site.compareSiteInputs(LIVE, withPlan('PLUS', { monthly_credit_micros: 8_800_000 }));
     expect(report.lines.slice(5)).toEqual([
-      `DIFFERENT billingPlans PLUS limits: month credit higher, day cap higher, week cap higher [${REACH}]`,
+      `DIFFERENT billingPlans PLUS limits: month credit higher, day cap higher, week cap higher [${reach(HIGHER)}]`,
       'DIFFERENT billingPlans PRO size shown on the pricing page (times the Plus credit): lower',
       'DIFFERENT billingPlans MAX size shown on the pricing page (times the Plus credit): lower'
     ]);

@@ -4581,6 +4581,8 @@ renewal date; a Free month starts on the account's own day of the month. The num
 - **A higher limit cannot be taken back inside a month.** After a way back (WB2), or a later upload that publishes the
   lower number again, everyone whose month saw the higher number keeps it until their own next month starts. A wrongly
   high number therefore stays for those people for up to about a month.
+- **A cap added or taken away.** A day or week cap added where the plan had none is a lower limit: it starts with each
+  person's own next month, and its line says `lower`. One taken away is a higher limit, and its line says `higher`.
 - **A refund** on cancelling or withdrawing is measured against the credit the person's month had on that day: the one
   it started with, or a higher one published since. A credit lowered later never makes a refund smaller; a raised one
   makes it larger for everyone already on the plan (the same use is a smaller share of a larger credit).
@@ -4588,7 +4590,8 @@ renewal date; a Free month starts on the account's own day of the month. The num
   answers are paid from the site's reserve of the day, so in such a month a final answer may take the month past its
   credit by the difference. A lower reserve reaches everyone at once.
 - **Free's fixed gauges, and any member the tool does not read,** are read from the live version for everyone: they
-  reach everybody at the switch.
+  reach everybody at the switch. Their lines say `changed`, as the closing reserve's does: the tool gives these no up
+  or down, and every such line ends "at the switch".
 - **Someone who changed plan this month** has a month credit stored at that moment. It stays as it is until their next
   month, after a raise too.
 - **Accounts that exist at the switch**, the owner's and test accounts included, keep their numbers like everyone
@@ -4601,10 +4604,12 @@ renewal date; a Free month starts on the account's own day of the month. The num
   no notice and has no acceptance step for limits.
 
 So: **a plan whose limits change, up or down, is named in `LIMITS`.** The step
-stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named there, for example `LIMITS='PLUS'`. Naming a plan whose limit
-goes **lower** is the owner's statement that the people on that plan were told first (Terms section 12), or that
-nobody holds it. Naming a plan whose limit goes **higher** is the owner's statement that the number was checked
-twice, because it cannot be taken back for a month. For
+stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named there, for example `LIMITS='PLUS'`. Each `limits` line ends with
+when each kind of change on it reaches the people already on the plan. Naming a plan whose limit goes **lower**, or
+whose line says `changed`, is the owner's statement that the people on that plan were told first (Terms section 12),
+or that nobody holds it; a paid plan named only because the smallest paid reserve moved is one of these. Naming a plan
+whose limit goes **higher** is the owner's statement that the number was checked twice, because it cannot be taken
+back for a month. A plan with both needs both statements. For
 each plan named there SB3 prints `HELD` or `nobody holds it now`, read from the subscriptions that are open (test
 purchases count; Free is held by everyone without a paid plan). The reading errs to one side only: `HELD` is printed
 when an open subscription names the plan anywhere in its history, so also for a plan someone was on earlier and
@@ -4976,8 +4981,8 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - the migrations by number (or "no migrations");
 - the publish of register V with its delta hash;
 - only when SB3's `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and for each
-  one whose limit goes lower either that nobody holds it or the date the people on it were told, and for each one
-  whose limit goes higher that the number was checked twice;
+  one whose limit goes lower or is said to have changed either that nobody holds it or the date the people on it were
+  told, and for each one whose limit goes higher that the number was checked twice;
 - the new commit and its release key;
 - the switch;
 - only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the
@@ -5650,8 +5655,8 @@ When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
 Register row (§5), as in SB6.
 When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
-plans, and for each one whose limit goes lower either that nobody holds it or the date the people on it were told,
-and for each one whose limit goes higher that the number was checked twice, as in SB6. On this path SB3b (SB3
+plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the
+people on it were told, and for each one whose limit goes higher that the number was checked twice, as in SB6. On this path SB3b (SB3
 once more) is for before that yes, and never after DR4 or DR5.
 
 | Step | What | The site | The way back from here |

@@ -1548,7 +1548,7 @@ describe('site-inputs: the site\'s numbers for an upload (release guide SB3)', (
     const report = await run(t.argv('report', file), t.s.layout);
     expect(report).toEqual({ event: 'PREVIEW_SITE_INPUTS', operation: 'report', differing: ['dailyCeilingMicros', 'billingPlans'], limitPlans: ['PLUS'],
       lines: ['SAME billing', 'SAME perRunCeilingMicros', 'DIFFERENT dailyCeilingMicros: higher', 'SAME askRoomReads', 'SAME abuseLimits',
-        'DIFFERENT billingPlans PLUS limits: month credit lower, day cap lower, week cap lower [the people already on this plan: a lower limit from each person\'s own next month, a higher one at the switch and not taken back before their next month]',
+        'DIFFERENT billingPlans PLUS limits: month credit lower, day cap lower, week cap lower [the people already on this plan: a lower limit from each person\'s own next month]',
         'DIFFERENT billingPlans FREE size shown on the pricing page (times the Plus credit): higher', 'DIFFERENT billingPlans PRO size shown on the pricing page (times the Plus credit): higher',
         'DIFFERENT billingPlans MAX size shown on the pricing page (times the Plus credit): higher'] });
     expect(JSON.stringify(report)).not.toMatch(/\d{3,}/);
