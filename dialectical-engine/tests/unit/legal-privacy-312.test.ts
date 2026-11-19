@@ -13,6 +13,7 @@ import {
 } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_RELEASE_SWAPS, withoutRelease } from "../support/legalRelease.js";
 import { PRIVACY_SIGN_IN_SWAPS, withoutSignIn } from "../support/legalSignIn.js";
+import { PRIVACY_314_RELEASE_SWAPS, withoutPrivacy314, withoutPrivacy314Number } from "../support/legalPrivacy314.js";
 
 /**
  * Privacy Policy 3.12 (V4 start step, plan Task 83; the owner's Day-1 answers 13 and 14 of 3 Nov 2026,
@@ -68,10 +69,10 @@ const CHANGE_ENTRY_TAB =
 
 /** 16 November 2026: the summary, section 4's last paragraph, and section 5's new paragraph, Training and Transfers paragraphs (0-based line indexes, as below). */
 const SUMMARY = 23;
-const NO_PROFILING = 93;
-const DEEPINFRA_AT = 99;
-const TRAINING = 105;
-const TRANSFERS = 107;
+const NO_PROFILING = 92;
+const DEEPINFRA_AT = 98;
+const TRAINING = 104;
+const TRANSFERS = 106;
 
 /** 16 November 2026: the 3.12 entry's third sentence. */
 const CHANGE_ENTRY_DEEPINFRA =
@@ -349,27 +350,27 @@ const SENSITIVE_INFORMATION = 63;
 const CONTRACT = 75;
 const SENSITIVE_CONSENT = 84;
 const QUESTION_CHECK = 88;
-const FREE = 127;
-const SAVED_RETENTION_AT = 156;
-const SECURITY = 186;
-const ACCESS = 196;
-const ERASURE = 198;
-const WITHDRAW = 202;
-const CHANGE_LOG = 260;
+const FREE = 126;
+const SAVED_RETENTION_AT = 155;
+const SECURITY = 185;
+const ACCESS = 195;
+const ERASURE = 197;
+const WITHDRAW = 201;
+const CHANGE_LOG = 259;
 /**
  * Section 6's paragraph on flagged debates. A person cannot take their own public debate down, so English no longer
- * ends that paragraph's approval sentences with the leftover "you can take it down from Your debates"; the
- * translations still have it until they are brought up to date before release (English first).
+ * ends that paragraph's approval sentences with the leftover "you can take it down from Your debates". The
+ * translations followed on 18 November 2026: each lost that one sentence and nothing else.
  */
-const FLAGGED = 119;
+const FLAGGED = 118;
 /**
  * A public debate stays public after its author closes the account, and English says on what basis: section 4's
  * publishing row names the basis before and after closure, section 6's paragraph on the name says why the text stays
- * and that a person can object, and section 10's Objection row says the objection covers it. English only until the
- * translations are brought up to date before release; legal-public-debate-stays-public pins the wording.
+ * and that a person can object, and section 10's Objection row says the objection covers it. The translations followed
+ * on 18 November 2026; legal-public-debate-stays-public pins the English wording.
  * (The last two sit after section 5's DeepInfra paragraph, so they moved by two with it.)
  */
-const KEPT_AFTER_CLOSURE = [85, 129, 200];
+const KEPT_AFTER_CLOSURE = [85, 128, 199];
 /**
  * Web search is not under a no-training contract: the search provider's terms let it keep the search phrases the models
  * write. English says so in section 5's web search paragraph, and its no-training statements (the summary, section 4's
@@ -385,7 +386,7 @@ const TAKE_DOWN = "If you publish a flagged debate after our approval, you can t
  * paragraph no longer ends with Taiwan's part, in English and in the 34 translations alike: a closed country is
  * named in no language. Nothing else on the line changes.
  */
-const ASIA_PACIFIC = 290;
+const ASIA_PACIFIC = 289;
 const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
 /**
  * Annex B.3's paragraph (Canada and Quebec). Its Quebec part said that "the settings that keep your debates private
@@ -393,7 +394,7 @@ const TAIWAN = " *Taiwan:* Taiwan's Personal Data Protection Act applies.";
  * 16 November 2026). In every language that one clause now says what section 6 says, in the words Terms 2.18's
  * Annex A.3 already uses there; nothing else on the line changes.
  */
-const QUEBEC = 278;
+const QUEBEC = 277;
 const QUEBEC_BEFORE = "the settings that keep your debates private are on by default";
 const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates on the Free plan are public, as section 6 says";
 /**
@@ -401,7 +402,7 @@ const QUEBEC_AFTER = "debates on a paid plan are private by default, and debates
  * nothing could switch such a signal off, and the Dutch could be read that way. Those two translations now say what
  * English says (cookie-copy review, 18 November 2026); no other language and nothing else on the line changes.
  */
-const DO_NOT_TRACK = 252;
+const DO_NOT_TRACK = 251;
 /**
  * Section 13's table. The cookie-copy review (18 November 2026) corrected rows of /cookies in several languages (an
  * idle expiry that read as a second duration, "until the previous deletion", a recipient named "DebateAI", and the
@@ -467,7 +468,8 @@ const as312 = (code: string, text: string): string => {
 };
 
 /**
- * A draft's text for the checks against 3.11, with 3.13 undone (as312). English also says how you sign in (English
+ * A draft's text for the checks against 3.11, with 3.14's number (tests/support/legalPrivacy314.ts) and 3.13 undone (as312).
+ * 3.14's marketing lines are not put back: withoutMarketing takes them out of the 3.11 text instead. English also says how you sign in (English
  * first; see tests/support/legalSignIn.ts) and carries the 3.13 entry in section 14 (tests/support/legalRelease.ts):
  * both are undone here, so the lines below compare as they did before, and `legal-sign-in-methods` and
  * `legal-release-versions` pin the new English. The manifest checks hash the file as it is (draftBytes).
@@ -475,8 +477,8 @@ const as312 = (code: string, text: string): string => {
 const draftText = (code: string): string => {
   const text = draftBytes(code).toString("utf8");
   return code === "en"
-    ? withoutSignIn(withoutRelease(text, PRIVACY_RELEASE_SWAPS), PRIVACY_SIGN_IN_SWAPS)
-    : as312(code, text);
+    ? withoutSignIn(withoutRelease(withoutPrivacy314(text, PRIVACY_314_RELEASE_SWAPS), PRIVACY_RELEASE_SWAPS), PRIVACY_SIGN_IN_SWAPS)
+    : as312(code, withoutPrivacy314Number(text));
 };
 
 /**
@@ -505,7 +507,7 @@ const legalCatalog = (code: string): Record<string, string> =>
  * reference to Annex B.7 follows the new number. Every pin below compares the draft with the 3.11 text after exactly
  * that, so each still says that nothing else changed; this function pins what left.
  */
-const SWISS_PART = 280;
+const SWISS_PART = 279;
 /**
  * Section 7 ended with an English drafting note, published in every language: "[The support retention period and the
  * backup line describe policies to implement; …]". The support chat stores nothing and section 7's table says so in
@@ -518,8 +520,73 @@ const withoutNote = (code: string, prior: readonly string[]): string[] => {
   expect([prior[NOTE - 1], prior[NOTE + 1]], `${code}: the note is its own paragraph`).toEqual(["", ""]);
   return [...prior.slice(0, NOTE), ...prior.slice(NOTE + 2)];
 };
+/**
+ * Privacy 3.14 (tests/support/legalPrivacy314.ts): we send no marketing email, so every language dropped what promised
+ * it: section 4's "Sending you product news" row, the Objection row's last sentence (object to marketing), the Withdraw
+ * consent row's first clause (withdraw marketing consent from any email or from Settings) and Annex B.3's sentence on
+ * marketing email under CASL (LCAP in French). Every pin below compares the draft with the 3.11 text less those four;
+ * this function pins what left. Translations that need more than the clause's removal to read well (Arabic's leading
+ * "and", Russian's verb) are checked by shape.
+ */
+const MARKETING: Readonly<Record<string, string>> = {
+  ar: "التسويق", bg: "маркетинг", cs: "marketing", da: "markedsføring", de: "werb", el: "προώθησ", en: "marketing",
+  es: "mercadotecnia", et: "turundus", fi: "markkinoin", fr: "prospection", ga: "margaíocht", he: "שיווק", hi: "विपणन",
+  hr: "marketin", hu: "marketing", id: "pemasaran", it: "marketing", ja: "マーケティング", ko: "마케팅", lt: "rinkodar",
+  lv: "tirgvedīb", mt: "kummerċjalizzazzjoni", nl: "marketing", pl: "marketing", pt: "marketing", ro: "marketing",
+  ru: "маркетинг", sk: "marketing", sl: "trženj", sv: "marknadsföring", tr: "pazarlama", uk: "маркетинг", vi: "tiếp thị",
+  zh: "营销"
+};
+const SENTENCE_ENDS = [". ", "。", "। "] as const;
+const CLAUSE_ENDS = ["; ", "؛ ", "· ", " ; ", "；", "。", ". "] as const;
+const withoutMarketing = (code: string, prior: readonly string[]): string[] => {
+  const word = new RegExp(MARKETING[code]!, "iu");
+  const only = (test: (line: string) => boolean, label: string): number => {
+    const found = prior.flatMap((line, index) => (test(line) ? [index] : []));
+    expect(found, `${code}: ${label} in 3.11, once`).toHaveLength(1);
+    return found[0]!;
+  };
+  const row = only((line) => line.startsWith("| ") && line.includes("Art. 6(1)(a)"), "section 4's product-news row");
+  expect(cells(prior[row]!), `${code}: the product-news row's shape`).toHaveLength(3);
+  // The Objection row's last sentence objects to marketing; the cell then ends where the sentence before it ended.
+  const objection = only((line) => line.startsWith("| **") && cells(line)[0]!.includes("Art. 21"), "the Objection row");
+  const body = prior[objection]!.slice(0, -2);
+  const cut = Math.max(...SENTENCE_ENDS.map((end) => body.lastIndexOf(end)));
+  expect(body.slice(cut), `${code}: the Objection row's last sentence is on marketing`).toMatch(word);
+  // The Withdraw consent row's first clause withdraws marketing consent; the clause after it opens the cell.
+  const withdraw = only((line) => line.startsWith("| **") && cells(line)[0]!.includes("Art. 7(3)"), "the Withdraw consent row");
+  const opens = prior[withdraw]!.indexOf(" | ", 2) + 3;
+  const [label, cell] = [prior[withdraw]!.slice(0, opens), prior[withdraw]!.slice(opens)];
+  const [clauseEnd, end] = CLAUSE_ENDS.map((sep) => [cell.indexOf(sep), sep] as const)
+    .filter(([at]) => at > 0).sort(([a], [b]) => a - b)[0]!;
+  expect(cell.slice(0, clauseEnd), `${code}: the Withdraw consent row's first clause is on marketing`).toMatch(word);
+  const rest = cell.slice(clauseEnd + end.length);
+  // Annex B.3's sentence on marketing email: it starts after a sentence end that a capital (or an uncased script) follows.
+  const key = code === "fr" ? "LCAP" : "CASL";
+  const canada = only((line) => line.includes(key), "Annex B.3's paragraph");
+  const line = prior[canada]!;
+  const at = line.indexOf(key);
+  let start = at;
+  for (;;) {
+    const [found, stop] = SENTENCE_ENDS.map((sep) => [line.lastIndexOf(sep, start - 1), sep] as const).sort(([a], [b]) => b - a)[0]!;
+    expect(found, `${code}: Annex B.3's marketing sentence has a start`).toBeGreaterThan(0);
+    start = found + stop.length;
+    const first = line[start]!;
+    if (first === first.toUpperCase()) break;
+    start = found;
+  }
+  const [stop, stopEnd] = SENTENCE_ENDS.map((sep) => [line.indexOf(sep, at), sep] as const)
+    .filter(([found]) => found >= 0).sort(([a], [b]) => a - b)[0]!;
+  expect(line.slice(start, stop), `${code}: Annex B.3's sentence is on marketing email`).toMatch(word);
+  return prior.flatMap((text, index) => {
+    if (index === row) return [];
+    if (index === objection) return [`${body.slice(0, cut)} |`];
+    if (index === withdraw) return [`${label}${rest[0]!.toUpperCase()}${rest.slice(1)}`];
+    if (index === canada) return [line.slice(0, start) + line.slice(stop + stopEnd.length)];
+    return [text];
+  });
+};
 const withoutSwitzerland = (code: string, raw: readonly string[]): string[] => {
-  const prior = withoutNote(code, raw);
+  const prior = withoutMarketing(code, withoutNote(code, raw));
   expect(prior[SWISS_PART], `${code}: Annex B.5's heading in 3.11`).toMatch(/^### B\.5 \S/u);
   expect([prior[SWISS_PART + 1], prior[SWISS_PART + 3]], `${code}: Annex B.5 is one paragraph`).toEqual(["", ""]);
   expect(prior[SWISS_PART + 2], `${code}: Annex B.5's paragraph`).toMatch(/\S/u);
@@ -647,7 +714,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   it("leaves out of the 3.12 line checks only French and Romanian, the translations brought up to 3.13 for the release", () => {
     const left = LOCALES.map(({ code }) => code).filter((code) => !STILL_312.includes(code));
     expect([...left].sort()).toEqual(["fr", "ro"]);
-    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "3.13", sha256: englishNow });
+    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "3.14", sha256: englishNow });
   });
 
   it.each(STILL_312.map((code) => [code]))("%s: two rows and one paragraph more, and only the listed lines differ from the last 3.11 text", (code) => {
@@ -664,7 +731,14 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     const syncedRows = next.flatMap((line, index) => (!INSERTED.includes(index) && line !== prior[priorIndex(index)] && rows.has(line) ? [index] : []));
     expect(syncedRows.every((index) => prior[priorIndex(index)]!.startsWith("| `")), `${code}: only §13 cookie rows are synced`).toBe(true);
     const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && (line === prior[priorIndex(index)] || syncedRows.includes(index)) ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, ...(code === "en" ? [FLAGGED, ...KEPT_AFTER_CLOSURE, WEB_SEARCH_PARAGRAPH] : []), ...(code in DO_NOT_TRACK_FIXED ? [DO_NOT_TRACK] : [])].sort((a, b) => a - b));
+    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, FLAGGED, ...KEPT_AFTER_CLOSURE, ...(code === "en" ? [WEB_SEARCH_PARAGRAPH] : []), ...(code in DO_NOT_TRACK_FIXED ? [DO_NOT_TRACK] : [])].sort((a, b) => a - b));
+    // Section 6's flagged-debates paragraph only loses a stretch (the take-down sentence); section 6's paragraph on the
+    // name and section 10's Objection row only gain one; section 4's publishing row is rewritten and keeps its shape.
+    expect(insertionOf(prior[priorIndex(FLAGGED)]!, next[FLAGGED]!), `${code}: section 6's flagged-debates paragraph only loses a stretch`).not.toBeNull();
+    for (const at of KEPT_AFTER_CLOSURE.slice(1)) {
+      expect(insertionOf(next[at]!, prior[priorIndex(at)]!), `${code}: line ${at} only gains a stretch of text`).not.toBeNull();
+    }
+    expect(cells(next[KEPT_AFTER_CLOSURE[0]!]!), `${code}: section 4's publishing row keeps its shape`).toHaveLength(3);
     // Section 13's Do Not Track paragraph: only el and nl change, and only to say the signal has nothing to switch off.
     expect(next[DO_NOT_TRACK], `${code}: section 13's Do Not Track paragraph`).toContain("Do Not Track");
     if (code in DO_NOT_TRACK_FIXED) expect(next[DO_NOT_TRACK], `${code}: the signal has nothing to switch off`).toContain(DO_NOT_TRACK_FIXED[code]);
@@ -915,14 +989,14 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.13 for the draft's exact bytes", (code) => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.14 for the draft's exact bytes", (code) => {
     const current = manifest().documents.PRIVACY?.[code];
-    expect(current).toEqual({ version: "3.13", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
+    expect(current).toEqual({ version: "3.14", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
   });
 
   // The archive holds one 3.12 text per language, the one the versions page lists. The texts changed after it took them,
-  // so the drafts carry 3.13 now and none of them is that archived 3.12 text.
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, and the 3.13 draft is another", (code) => {
+  // so the drafts carry 3.14 now and none of them is that archived 3.12 text.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, and the 3.14 draft is another", (code) => {
     const draft = createHash("sha256").update(draftBytes(code)).digest("hex");
     const archived = Object.entries(manifest().archive.PRIVACY?.[code] ?? {}).filter(([, entry]) => entry.version === "3.12");
     expect(archived).toHaveLength(1);

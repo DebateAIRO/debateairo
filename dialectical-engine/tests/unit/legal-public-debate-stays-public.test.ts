@@ -66,7 +66,7 @@ describe("a public debate stays after its author leaves, in the English legal te
     expect(publishing).toContain("After you close your account, **legitimate interests** — point (f) of the same paragraph");
     expect(publishing).toContain("You may object; section 10");
     const objection = privacy.split("\n").find((line) => line.startsWith("| **Objection** (Art. 21)"))!;
-    expect(objection).toContain("This includes our keeping a public debate after you close your account; section 6 says how we decide.");
+    expect(objection).toContain("This includes our keeping a public debate after you close your account; section 6 says how we decide |");
     expect(privacy).toContain("If a public text contains personal details about you, write to us and we will remove them.");
   });
 });

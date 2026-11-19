@@ -12,12 +12,20 @@ import {
   TERMS_219_ENTRY,
   TERMS_RELEASE_SWAPS
 } from "../support/legalRelease.js";
+import {
+  PRIVACY_314_ENTRY,
+  PRIVACY_314_MARKETING_SWAPS,
+  PRIVACY_314_RELEASE_SWAPS,
+  withoutPrivacy314,
+  withoutPrivacy314Number
+} from "../support/legalPrivacy314.js";
 
 /**
  * Terms of Service 2.19 and Privacy Policy 3.13, effective 19 November 2026 (tests/support/legalRelease.ts). Every
  * language's drafts carry the new numbers and the new date in their own date words; English's change histories name
  * what changed since the archived 2.18 and 3.12, whose own entries read again as those texts wrote them; nobody has to
- * accept again; and the Terms versions page lists 2.18 as a past version.
+ * accept again; and the Terms versions page lists 2.18 as a past version. Privacy 3.14 followed on the same day
+ * (tests/support/legalPrivacy314.ts); the 3.13 checks below read the Privacy Policy with 3.14 undone.
  */
 
 const root = process.cwd();
@@ -45,7 +53,8 @@ const entry = (text: string, version: string, previous: string): string => {
 describe("Terms 2.19 and Privacy Policy 3.13", () => {
   it.each(LOCALES.map(({ code }) => [code]))("%s: both drafts name the new version and 19 November 2026 in their own words", (code) => {
     for (const [name, version] of [["privacy-policy.md", "3.13"], ["terms-of-service.md", "2.19"]] as const) {
-      const lines = draft(code, name).split("\n");
+      const text = draft(code, name);
+      const lines = (name === "privacy-policy.md" ? withoutPrivacy314Number(text) : text).split("\n");
       const eyebrow = lines.find((line) => line.startsWith("eyebrow: "))!;
       const end = lines.find((line) => line.startsWith("endMarker: "))!;
       const versionLine = lines.find((line) => line.startsWith("**Version "))!;
@@ -62,7 +71,7 @@ describe("Terms 2.19 and Privacy Policy 3.13", () => {
 
   it("English carries the new numbers and the date", () => {
     for (const [name, swaps] of [["privacy-policy.md", PRIVACY_RELEASE_SWAPS], ["terms-of-service.md", TERMS_RELEASE_SWAPS]] as const) {
-      const text = draft("en", name);
+      const text = name === "privacy-policy.md" ? withoutPrivacy314(draft("en", name)) : draft("en", name);
       for (const [before, after] of swaps) {
         expect(text.split(after), `${name}: ${after.slice(0, 50)}`).toHaveLength(2);
         expect(text, `${name}: ${before.slice(0, 50)}`).not.toContain(before);
@@ -79,7 +88,7 @@ describe("Terms 2.19 and Privacy Policy 3.13", () => {
   });
 
   it("the Privacy Policy's history opens with the 3.13 entry, and the 3.12 entry reads as the archived 3.12 wrote it", () => {
-    const privacy = draft("en", "privacy-policy.md");
+    const privacy = withoutPrivacy314(draft("en", "privacy-policy.md"));
     expect(privacy).toContain(`\nThis policy was last updated on 19 November 2026. ${PRIVACY_313_ENTRY} Version 3.12 replaced version 3.11:`);
     expect(entry(privacy, "3.12", "3.11")).toBe(entry(archivedEnglish("PRIVACY", "3.12").text, "3.12", "3.11"));
     expect(privacy).not.toMatch(/Version 3\.12 also (names DeepInfra|says how you can sign in)/u);
@@ -114,5 +123,38 @@ describe("Terms 2.19 and Privacy Policy 3.13", () => {
     for (const value of ["de", "pl", "es", "zh", "RO", "fr-CA", "xx", "", null, undefined]) {
       expect(isLegalTextLocale(value), String(value)).toBe(false);
     }
+  });
+});
+
+describe("Privacy Policy 3.14: the marketing promises leave", () => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the draft names 3.14 where it named 3.13, and nothing else in those lines changes", (code) => {
+    const text = draft(code, "privacy-policy.md");
+    const lines = text.split("\n");
+    expect(lines[4], `${code}: the eyebrow`).toContain(" v3.14 · ");
+    expect(lines[7], `${code}: the end marker`).toMatch(/ v3\.14$/u);
+    expect(lines[21]!.startsWith("**Version 3.14 · Effective "), `${code}: the version line`).toBe(true);
+    expect(text, `${code}: no line names 3.13 as the current version`).not.toMatch(/ v3\.13( ·|$)|\*\*Version 3\.13 · /mu);
+  });
+
+  it("English is the archived 3.13 text with the number, the 3.14 entry and the four marketing promises changed, and nothing else", () => {
+    const now = draft("en", "privacy-policy.md");
+    for (const [before, after] of [...PRIVACY_314_RELEASE_SWAPS, ...PRIVACY_314_MARKETING_SWAPS]) {
+      expect(now.split(after), after.slice(0, 50)).toHaveLength(2);
+      expect(now, before.slice(0, 50)).not.toContain(before);
+    }
+    expect(withoutPrivacy314(now)).toBe(archivedEnglish("PRIVACY", "3.13").text);
+    expect(now).toContain(`\nThis policy was last updated on 19 November 2026. ${PRIVACY_314_ENTRY} ${PRIVACY_313_ENTRY} Version 3.12 replaced`);
+    expect(now).not.toMatch(/product news \|/u);
+    expect(now).not.toMatch(/\bCASL\b/u);
+  });
+
+  it("the archive holds the English, Romanian and French 3.14 texts, and asks nobody to accept again", () => {
+    const archive = manifest().archive.PRIVACY!;
+    for (const code of ["en", "ro", "fr"]) {
+      const current = Object.entries(archive[code]!).filter(([, entry]) => entry.version === "3.14");
+      expect(current, code).toHaveLength(1);
+      expect(readFileSync(resolve(root, current[0]![1].path), "utf8"), code).toBe(draft(code, "privacy-policy.md"));
+    }
+    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "2.1" });
   });
 });

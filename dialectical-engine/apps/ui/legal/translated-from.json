@@ -37,8 +37,8 @@
       "sha256": "9d689242f6796e4779a0438b872f50a4f9ca93574e723fac9c19127c74a4d207"
     },
     "fr": {
-      "version": "3.13",
-      "sha256": "13bfcd53e0a27007d14c1d578fc9ec9f6515681902ab627fb63d94b03baa6174"
+      "version": "3.14",
+      "sha256": "fff5c25ac8689c4ce5e0cb6b58314b9223d8e8a9e421ec9bb17a98d26137e329"
     },
     "ga": {
       "version": "3.12",
@@ -101,8 +101,8 @@
       "sha256": "9d689242f6796e4779a0438b872f50a4f9ca93574e723fac9c19127c74a4d207"
     },
     "ro": {
-      "version": "3.13",
-      "sha256": "13bfcd53e0a27007d14c1d578fc9ec9f6515681902ab627fb63d94b03baa6174"
+      "version": "3.14",
+      "sha256": "fff5c25ac8689c4ce5e0cb6b58314b9223d8e8a9e421ec9bb17a98d26137e329"
     },
     "ru": {
       "version": "3.12",
