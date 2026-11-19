@@ -197,9 +197,11 @@ describe("P17 renderMail", () => {
     );
     expect(mail.text).toContain("https://dezbatere.ro/cancel");
     // Owner's decision of 16 November 2026: everyone may withdraw, and pays only for the plan's credit used. The
-    // sentence names no region and no days share.
-    const withdrawal = "Wherever you live, you may withdraw within 14 days. You then pay only for the share of the plan's credit"
-      + " you have used; if you have used none, you get the full price back. The model withdrawal form is attached to this email.";
+    // sentence names no region and no days share. It says where the withdrawal function is, by the label of the
+    // Settings button (OUG 34/2014 art. 6(1)(h)).
+    const withdrawal = "Wherever you live, you may withdraw within 14 days: in Settings, under Subscription, press “Withdraw"
+      + " from contract here”. You then pay only for the share of the plan's credit you have used; if you have used none, you"
+      + " get the full price back. The model withdrawal form is attached to this email.";
     expect(mail.text).toContain(withdrawal);
     expect(JSON.parse(readFileSync(resolve("packages/mail-templates/messages/en/mail.json"), "utf8"))["mail.M1.withdrawal"])
       .toBe(withdrawal.replace("14 days", "{withdrawalDays} days"));

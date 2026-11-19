@@ -93,6 +93,8 @@ const REQUIRED = [
   "billing.pricing.freeFeatures", "billing.pricing.paidFeatures", "billing.pricing.startFree", "billing.pricing.choose",
   "billing.pricing.unavailable", "billing.pricing.faqTitle", "billing.pricing.faqLimitsQuestion",
   "billing.pricing.faqLimitsAnswer", "billing.pricing.faqCancelQuestion", "billing.pricing.faqCancelAnswer",
+  "billing.pricing.faqWithdrawQuestion", "billing.pricing.faqWithdrawAnswer",
+  "billing.checkout.withdrawalWhere", "billing.checkout.withdrawalLink",
   "billing.pricing.faqTaxQuestionIncluded", "billing.pricing.faqTaxAnswerIncluded", "billing.pricing.faqTaxAnswerNoTax",
   "billing.pricing.faqTaxAnswerChoose", "billing.pricing.termsLink", "billing.pricing.privacyLink",
   "billing.checkout.eyebrow", "billing.checkout.title", "billing.checkout.country", "billing.checkout.region",
@@ -276,6 +278,26 @@ test("/withdraw carries the page's one name and names the Settings buttons by th
     assert.ok(billing["billing.withdrawPage.step2"].includes("{confirm}"), `${code}: step2 names the confirm button`);
     assert.equal(Object.hasOwn(billing, "billing.withdrawPage.how"), false, `${code}: the one-line route is gone`);
   }
+});
+
+test("the plans page and the checkout name the withdrawal function by the Settings buttons' own labels", () => {
+  // OUG 34/2014 art. 6(1)(h): before the contract, where the withdrawal function is. The sentences quote the buttons,
+  // so they must quote them as the buttons read, in English and in Romanian.
+  for (const code of ["en", "ro"]) {
+    const billing = catalogue(code);
+    const withdraw = billing["billing.subscription.withdraw"];
+    const confirm = billing["billing.subscription.withdrawConfirm"];
+    assert.ok(billing["billing.checkout.withdrawalWhere"].includes(withdraw), `${code}: the checkout names ${withdraw}`);
+    assert.ok(billing["billing.checkout.withdrawalWhere"].includes(confirm), `${code}: the checkout names ${confirm}`);
+    assert.ok(billing["billing.pricing.faqWithdrawAnswer"].includes(withdraw), `${code}: the plans page names ${withdraw}`);
+    // The confirmation email (M1) says where the button is, by the same label.
+    const mail = JSON.parse(readFileSync(join(root, "../../packages/mail-templates/messages", code, "mail.json"), "utf8"));
+    assert.ok(mail["mail.M1.withdrawal"].includes(withdraw), `${code}: M1 names ${withdraw}`);
+  }
+  const english = catalogue("en");
+  assert.equal(english["billing.checkout.withdrawalWhere"],
+    "You can withdraw within {days} days of subscribing, without giving a reason: in Settings, under Subscription, press “Withdraw from contract here”, then “Confirm withdrawal”.");
+  assert.equal(english["billing.pricing.faqWithdrawQuestion"], "Can I withdraw after I subscribe?");
 });
 
 test("a plan paused by a payment dispute is cancelled with true words, in English exactly (P2-W10)", () => {

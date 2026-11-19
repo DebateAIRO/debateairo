@@ -528,9 +528,13 @@ export function SubscriptionControls({
               ) : null}
               <p className="subHint">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
               {panel === "WITHDRAW" && paused ? (
-                <p className="setCardNote" data-withdraw-while-paused>
-                  {t(catalog, "billing.subscription.withdrawWhilePaused", { email: COMPANY.emails.general })}
-                </p>
+                <>
+                  <p className="setCardNote" data-withdraw-while-paused>
+                    {t(catalog, "billing.subscription.withdrawWhilePaused", { email: COMPANY.emails.general })}
+                  </p>
+                  {/* The model form the sentence names is printed on /withdraw. */}
+                  <a className="subHint" href="/withdraw">{t(catalog, "billing.checkout.withdrawalLink")}</a>
+                </>
               ) : null}
               {panel === "WITHDRAW" && !paused ? (
                 <div className="subStatement" data-withdraw-statement>

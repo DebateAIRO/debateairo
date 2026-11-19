@@ -483,6 +483,9 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain("A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. "
       + "You can withdraw now by email: send the model form, or any clear statement that you withdraw, to support@dezbatere.ro. "
       + "It counts from the moment it reaches us, and we confirm it by email.");
+    // The model form the sentence names is on /withdraw.
+    expect(container.querySelector('[data-subscription-withdraw] a[href="/withdraw"]')?.textContent)
+      .toBe("How to withdraw, and the model withdrawal form");
     expect(button("Confirm withdrawal")).toBeUndefined();
     expect(container.querySelector("[data-withdraw-statement]")).toBeNull();
     expect(client.withdrawSubscription).not.toHaveBeenCalled();

@@ -10,7 +10,7 @@
   "mail.M1.active": "Vă mulțumim. Abonamentul dumneavoastră {plan} este acum activ.",
   "mail.M1.price": "Plătiți {totalAmount} pe lună, cu taxele incluse. Abonamentul se reînnoiește pe {renewDate} și apoi în fiecare lună, până când îl anulați.",
   "mail.M1.cancel": "Îl puteți anula oricând din Setări sau, fără să vă conectați, pe această pagină: {cancelPageUrl}",
-  "mail.M1.withdrawal": "Oriunde locuiți, vă puteți retrage în termen de {withdrawalDays} zile. Plătiți atunci doar partea din creditul abonamentului pe care ați folosit-o; dacă nu ați folosit nimic, primiți înapoi întregul preț. Formularul-tip de retragere este atașat acestui e-mail.",
+  "mail.M1.withdrawal": "Oriunde locuiți, vă puteți retrage în termen de {withdrawalDays} zile: în Setări, la Abonament, apăsați „Retrageți-vă din contract aici”. Plătiți atunci doar partea din creditul abonamentului pe care ați folosit-o; dacă nu ați folosit nimic, primiți înapoi întregul preț. Formularul-tip de retragere este atașat acestui e-mail.",
   "mail.M1.termsAttached": "Termenii pe care i-ați acceptat sunt atașați. Cea mai recentă versiune se află întotdeauna la {termsUrl}",
   "mail.M1.termsCurrent": "Termenii noștri actuali sunt online la {termsUrl}",
   "mail.M2.subject": "Chitanța dumneavoastră Dialectical Engine pentru {totalAmount}",
