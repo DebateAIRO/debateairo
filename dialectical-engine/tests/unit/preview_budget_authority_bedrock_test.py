@@ -298,15 +298,32 @@ class RefusalTests(unittest.TestCase):
         for status in (400, 401, 403, 404, 500):
             self.assertFalse(BEDROCK.unbilled_refusal(status, self.ERROR))
 
-    def test_a_refused_key_or_request_halts_so_root_looks(self):
+    def test_a_refused_key_halts_under_its_own_name_and_a_refused_request_under_the_general_one(self):
         denied = {'error': {'message': 'Invalid API Key format', 'type': 'permission_denied_error', 'param': None, 'code': 'access_denied'}}
-        for status in (400, 401, 403, 404):
+        for status, reason in ((401, 'provider_key_refused'), (403, 'provider_key_refused'), (400, 'uncertain_charge'),
+                               (404, 'uncertain_charge')):
             with self.subTest(status=status):
                 g = gate()
                 self.addCleanup(g.close)
                 with self.assertRaises(SafetyError):
                     run(g, status=status, answer=denied)
-                self.assertEqual(g.status()['state'], 'halted')
+                status_now = g.status()
+                self.assertEqual((status_now['state'], status_now['reason']), ('halted', reason))
+                # Nothing is released: the call's whole hold stays counted until root has looked.
+                self.assertEqual((entry_of(g)['state'], entry_of(g)['http_status']), ('uncertain', status))
+        self.assertEqual(bridge.KEY_REFUSED_HALT, 'provider_key_refused')
+
+    def test_only_a_plain_401_or_403_is_a_refused_key(self):
+        denied = {'error': {'message': 'The security token included in the request is expired', 'type': 'permission_denied_error'}}
+        self.assertTrue(BEDROCK.key_refused(401, denied))
+        self.assertTrue(BEDROCK.key_refused(403, {'message': 'Forbidden'}))
+        for status in (400, 404, 429, 500, 200):
+            self.assertFalse(BEDROCK.key_refused(status, denied))
+        self.assertFalse(BEDROCK.key_refused(403, {**denied, 'usage': {'prompt_tokens': 1}}))
+        self.assertFalse(BEDROCK.key_refused(403, {}))
+        # The other gates' profiles have no such hook: their halts keep their names.
+        for other in ('deepinfra', 'anthropic', 'perplexity'):
+            self.assertFalse('key_refused' in type(bridge.helper.PROFILES[other]).__dict__)
 
 
 class ProbeTests(unittest.TestCase):

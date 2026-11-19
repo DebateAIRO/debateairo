@@ -182,6 +182,9 @@ class GateUnitTests(unittest.TestCase):
         self.assertIn('bedrock-halted|bedrock-addresses|bedrock-unbilled|bedrock-booked', text)
         self.assertIn("BEDROCK_PRIVATE = '%s'" % PRIVATE, text)
         self.assertIn("BEDROCK_FOLDER = '%s'" % OPERATOR.rstrip('/'), text)
+        # A refused or expired key has its own halt name, and the email says to put a new key in first.
+        self.assertIn("code === '%s'" % gate.KEY_REFUSED_HALT, text)
+        self.assertIn('"A new key"', text)
         self.assertIn('preview_budget_authority.py activate --private ${BEDROCK_PRIVATE} --go %s' % GO, text)
         self.assertIn('bedrock_addresses.py update --dropin %s --ranges %s && systemctl restart debateai-preview-bedrock-budget'
                       % (DROPIN, RANGES), text)
@@ -210,7 +213,7 @@ class ReadmeTests(unittest.TestCase):
                      'bedrock_budget_socket', 'preview:gpt-6-luna', 'getent ahostsv4 ' + HOST, 'bedrock_addresses.py render',
                      'bedrock_addresses.py update', 'BEDROCK_ADDRESSES_OUTSIDE_RANGES', 'RANGES_DO_NOT_COVER_DNS',
                      'https://ip-ranges.amazonaws.com/ip-ranges.json', 'MODEL_COOLING', 'PROVIDER_REFUSED_UNBILLED',
-                     'ABSK', 'AmazonBedrockLimitedAccess', 'end date', UNIT.name, HALT_TIMER.name, CHECK_TIMER.name,
+                     'ABSK', 'AmazonBedrockLimitedAccess', 'end date', 'provider_key_refused', UNIT.name, HALT_TIMER.name, CHECK_TIMER.name,
                      TARGET_DROPIN.name, 'Run it twice', 'What only the server can prove'):
             self.assertIn(name, self.readme)
 

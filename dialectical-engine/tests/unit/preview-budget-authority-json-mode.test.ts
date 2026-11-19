@@ -92,7 +92,7 @@ describe('production preview spending guard optional JSON mode', () => {
     const result = runPython('tests/unit/preview_budget_authority_bedrock_test.py', 30000);
     const last = result.stderr.split('\n').filter(line => line.trim()).slice(-12).join(' | ');
     expect(result.status, `status=${result.status} signal=${result.signal} ${String(result.error ?? '')} LAST: ${last}\n${result.stderr.slice(-6000)}`).toBe(0);
-    expect(result.stderr).toContain('Ran 19 tests');
+    expect(result.stderr).toContain('Ran 20 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
   it('checks the Amazon Bedrock gate systemd files, its address check against published ranges and its README offline', () => {

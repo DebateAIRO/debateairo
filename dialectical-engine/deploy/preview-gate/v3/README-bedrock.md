@@ -66,8 +66,10 @@ One reviewed model:
   (overloaded), each with Amazon's error text and no token count: the call is released, nothing is charged, the day's
   record keeps a $0 `released_unbilled` entry, and that call alone fails with `PROVIDER_REFUSED_UNBILLED`. After 2 of
   them in a row Luna sits out for a while (`MODEL_COOLING`), as the other gates' models do.
-- **A refused key halts.** 401 or 403 means the key is wrong, was deleted, or has passed its end date; 400 and 404
-  mean the request or the model id is not accepted. Root must look, so the gate halts and the halt watcher emails.
+- **A refused key halts, and says so.** When Amazon answers 401 or 403, the key is wrong, was deleted, or has passed its
+  end date. The gate halts with the reason `provider_key_refused`, and the halt email says in plain words to put a new
+  key in before re-opening ("A new key"). 400 and 404 mean the request or the model id is not accepted: the gate halts
+  with `uncertain_charge` and root must look. Either way the call's whole set-aside amount stays counted that day.
 - **A slow or cut-off answer is booked at its maximum, never a halt**, as on the other gates (README.md, "Slow or
   cut-off answers").
 - **The key is a long-term Bedrock API key with an end date** (the owner's choice). It works like the other
@@ -367,8 +369,9 @@ have finished) a GO without it.
 1. Read `reason` and `halts` in `status` first.
 2. If a call was uncertain (`uncertain_charge`, `interrupted_call_uncertain`), look at the AWS Billing page for Amazon
    Bedrock at that time before re-opening. Its full set-aside amount stays counted in that day's pot.
-3. If the reason is `provider_error_or_model_identity`, the entry's `http_status` and `reply_model` in that day's record
-   say which: a refused key (401, 403: see "A new key"), a refused request, or another model name. For an answer the
+3. If the reason is `provider_key_refused`, Amazon refused the key (401 or 403): do "A new key" below first, or the
+   gate halts again on the next call. If it is `provider_error_or_model_identity`, the entry's `http_status` and
+   `reply_model` in that day's record say which: an error answer, or another model name. For an answer the
    gate could not price, the entry's `accounting.invalid_reason` names the check and `accounting.reply_shape` outlines
    the answer (field names and kinds only).
 4. Then run this (owner's yes). No restart is needed.
@@ -400,7 +403,8 @@ would also reset every value changed since the install), same `scope_id`, then `
 `SERVE_RESTART_REQUIRED` until you do.
 
 **A new key (every time, before the old key's end date).** A key that has passed its end date is refused by Amazon, the
-gate halts on the first call, and Luna debates stop until a new key is in. So renew when the calendar reminder comes:
+gate halts on the first call (`provider_key_refused`, with an email that says so), and Luna debates stop until a new key
+is in. The other AIs are not affected. So renew when the calendar reminder comes:
 1. In the AWS console, create a new long-term Bedrock API key with a new end date (install step 0, item 2). The old
    key keeps working until it ends or you delete it, so nothing stops while you do this.
 2. On the server, the owner types it at the hidden prompt. The gate reads the key file on every call, so no restart is
@@ -412,7 +416,8 @@ gate halts on the first call, and Luna debates stop until a new key is in. So re
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py install bedrock --replace
 ```
 
-If the gate has already halted on an expired key: steps 1 to 3, then "Re-open after a halt".
+If the gate has already halted on an expired key (`provider_key_refused`): step 1, step 2, then "Re-open after a halt"
+(the probe refuses while the gate is halted), then the probe of step 3.
 
 ## Addresses
 

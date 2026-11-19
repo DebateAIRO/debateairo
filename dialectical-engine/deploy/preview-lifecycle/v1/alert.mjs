@@ -193,7 +193,7 @@ const BEDROCK_ADDRESS_UNIT = 'debateai-preview-bedrock-addresses.service';
 const BEDROCK_NOTICES = Object.freeze({
   'bedrock-halted': code => ({
     subject: `Preview: Amazon Bedrock spending gate stopped: ${code}`,
-    lead: `The preview's Amazon Bedrock spending gate stopped taking paid GPT-6 Luna calls. Reason code: ${code}. Debates that use Luna do not start until it is re-opened; other models are not affected. Check the reason first (deploy/preview-gate/v3/README-bedrock.md, "Re-open after a halt"; status shows today's spend and every halt; a key that has passed its end date halts the gate too). Then re-open it with the one command below.`,
+    lead: `The preview's Amazon Bedrock spending gate stopped taking paid GPT-6 Luna calls. Reason code: ${code}. Debates that use Luna do not start until it is re-opened; other models are not affected. ${code === 'provider_key_refused' ? 'Amazon refused the key: it is wrong, was deleted, or has passed its end date. Put a new key in first (deploy/preview-gate/v3/README-bedrock.md, "A new key"): re-opening with the old key only halts the gate again on the next call.' : 'Check the reason first (deploy/preview-gate/v3/README-bedrock.md, "Re-open after a halt"; status shows today\'s spend and every halt).'} Then re-open it with the one command below.`,
     command: `/usr/bin/python3 -I ${BEDROCK_FOLDER}/preview_budget_authority.py activate --private ${BEDROCK_PRIVATE} --go /etc/debateai-v3-preview/provider-bedrock-go-v1.json`,
     lookAt: BEDROCK_UNIT, journal: null
   }),

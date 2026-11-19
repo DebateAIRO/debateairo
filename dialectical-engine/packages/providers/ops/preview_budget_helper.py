@@ -1550,8 +1550,9 @@ class BedrockProfile(DeepInfraProfile):
 
     Refusals that bill nothing: 429 (throttling), 503 (service unavailable) and 529 (overloaded), each a JSON object that
     carries an error or a message and no billing key anywhere. All three say Amazon is busy: the model cools off, the gate
-    never halts for them. Any other 4xx (400 validation, 403 for a wrong, expired or unauthorised key, 404) halts: root
-    must look. Any other 5xx is booked at the reservation, as DeepInfra's are.
+    never halts for them. Any other 4xx halts: root must look. A 401 or 403 (a wrong, deleted, unauthorised or expired
+    key) halts under its own name, provider_key_refused (key_refused); 400 and 404 under the general one. Any other 5xx
+    is booked at the reservation, as DeepInfra's are.
 
     The reply must name the model by the row's own id (the inference profile's), as the app's gateway demands too; any
     other name halts. The probe shows which name Amazon really sends before anyone relies on it.
@@ -1679,6 +1680,16 @@ class BedrockProfile(DeepInfraProfile):
     def busy_refusal(self, status, response):
         """Each unbilled refusal above (throttled, unavailable, overloaded) says Amazon is busy."""
         return status in self.UNBILLED_STATUSES
+
+    def key_refused(self, status, response):
+        """True for 401 or 403 with a JSON error and no billing key anywhere: Amazon refused the key itself (wrong,
+        deleted, without the permission, or past its end date: a long-term key has one). The gate halts as for any
+        refused request, under a halt name that says so."""
+        return (status in (401, 403) and isinstance(response, dict)
+                and bool(response.get('error') or response.get('message') or response.get('Message'))
+                and not names_any_key(response, BILLED_KEYS)
+                and not names_any_key_prefixed(response, 'tokens_')
+                and not names_any_key_suffixed(response, '_tokens'))
 
     def bookable_unreported(self, status, response, accounting, reserved):
         """DeepInfraProfile's rule, but only for a reply with no usage or with unreadable prompt or completion counts. A

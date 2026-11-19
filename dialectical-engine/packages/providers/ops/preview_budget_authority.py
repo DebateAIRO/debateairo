@@ -330,6 +330,8 @@ GATE_PATHS = {
 RETIRED_GATE_PATHS = ('/var/lib/debateai-v3-preview/provider-test-authority',
                       '/var/lib/debateai-v3-preview/provider-team-authority-v2',
                       '/etc/debateai-v3-preview/provider-team-go-v2.json')
+# The halt a refused key leaves (a profile's key_refused): the key is wrong, deleted, lacks a permission or has expired.
+KEY_REFUSED_HALT = 'provider_key_refused'
 PROBE_UNIT_PREFIX = 'debateai-preview-probe-'  # + provider + '.service': the probe's transient unit.
 # TEST-NET-1 (RFC 5737): reserved for documentation, never routed. Inside the fence an empty
 # datagram to it is refused at once; outside it leaves the process, which proves there is no fence.
@@ -1695,6 +1697,15 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                 if on_settled is not None:  # The probe still prints what it measured.
                     on_settled({'changes': changes, 'halt_reason': None, 'response': response, 'row': row, **outcome})
                 raise ChargeBookedMax('PROVIDER_CHARGE_BOOKED_MAX')
+        # A profile may say that the vendor refused the key itself (its optional key_refused, judged on the RAW reply:
+        # Amazon Bedrock's 401 and 403). The call halts exactly as before; only the halt's name says what root must fix.
+        if halt_reason == 'uncertain_charge':
+            key_refused = getattr(profile, 'key_refused', None)
+            try:
+                if key_refused is not None and key_refused(status, raw_response) is True:
+                    halt_reason = KEY_REFUSED_HALT
+            except BaseException:
+                pass  # A hook that fails changes nothing: the halt keeps its name.
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
         log_event({**event, 'model': row.model, 'status': changes['state'], 'halt_reason': halt_reason,
                    'guard_charge_usd': charge, 'elapsed_seconds': elapsed, **outcome})
