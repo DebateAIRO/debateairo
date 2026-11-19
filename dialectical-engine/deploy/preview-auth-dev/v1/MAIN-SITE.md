@@ -597,6 +597,8 @@ What this release adds to that recipe:
 - **NETOPIA's logo** (1.1): SB5d right after DR1, before your yes (the release guide's "owner's yes") and DR2, with
   the shop id. Skip PM1, SB5b, MT1, PM2 and MT2. After SB13b, run the release guide's LOGOCHECK. It only reads, and
   must end with `LOGOCHECK_DONE`: part 5 waits for it.
+- **UNFINISHED, right before your yes and DR2** (below). The new release deletes sign-ups that were never finished.
+  UNFINISHED counts the ones it deletes at DR6, and your yes before DR2 names that count.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
   `deploy/preview-auth-dev/v1/public-origins.mjs`, `startup-refusals.mjs`, `start-check-mail.mjs`,
   `start-check-payments.mjs`, this `MAIN-SITE.md`, `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
@@ -620,6 +622,47 @@ What this release adds to that recipe:
   A `PREVIEW_MAIL_…` code means `mail-plan.json` (part 1.5). Stop and ask before you choose the way back.
 - **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
   database never took a live payment, so the count is 0 and the API starts as before.
+
+**The unfinished sign-ups (UNFINISHED).** From this release on, a sign-up not finished within 24 hours is deleted.
+Not finished means the account still waits for its e-mail link to be opened (`pending_verification`) or for its second
+factor (`pending_mfa`). Today nothing deletes such an account, so it keeps its e-mail address and its public name
+(pseudonym) for good: signing up again with that address only says the address is taken. While today's v1 mail plan
+refuses every account mail (1.4), every sign-up on this server waits like that.
+
+**What happens at DR6.** As soon as the new release becomes current, its API deletes every sign-up already due: still
+unfinished, begun at least 24 hours ago, and every e-mail link it was sent has run out (a link lasts at most 24 hours,
+so a link sent again late keeps its sign-up a little longer). The oldest go first, at most 1,000 at once; any more go
+1,000 at a time every ten minutes. Each one goes with its pseudonym and its key folder on the server; what stays is one
+audit line and the record of the Terms it accepted, as for a deleted account. Its address can sign up again at once.
+An account that was ever active is never touched. From then on the API does the same every ten minutes, for each
+sign-up that turns 24 hours old.
+
+Run this right before your yes, while the old release still runs. It only reads, and prints a count only:
+
+```sh
+set -euo pipefail
+# UNFINISHED: how many unfinished sign-ups the new release deletes at its first start (read-only; prints a count, no names and no addresses).
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+N=$(psqlq "SELECT count(*) FROM identity.\"user\" AS account WHERE account.state IN ('pending_verification','pending_mfa') AND account.created_at <= clock_timestamp() - interval '24 hours' AND NOT EXISTS (SELECT 1 FROM identity.channel_binding AS channel JOIN identity.verification_token_credential AS link ON link.channel_binding_id = channel.channel_binding_id WHERE channel.user_id = account.user_id AND link.expires_at > clock_timestamp())") || { echo "UNFINISHED_NOT_DONE: the database is unreadable: ask"; exit 1; }
+[ -n "$N" ] || { echo "UNFINISHED_NOT_DONE: the database gave no count: ask"; exit 1; }
+echo "unfinished sign-ups the new release deletes at its first start (DR6): $N"
+echo UNFINISHED_DONE
+exit 0
+```
+
+Expect the count line, then `UNFINISHED_DONE`. Name the count in your yes before DR2, for example "UNFINISHED: 37".
+The number can grow a little before DR6: a sign-up that turns 24 hours old in between goes too. If the count surprises
+you (it is larger than the sign-ups you know of), ask before DR2. Someone among them who still wants an account signs
+up again with the same address. If you ever go back with rbD-B, part 9 says what happens to these sign-ups.
+
+**After DR6**, look for the pass's lines in the new API's journal. Paste this one line, with rNN filled in:
+`bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -o cat --no-pager | grep -E "signup[.]unfinished_expired|UNFINISHED_SIGNUP_EXPIRY_PENDING"'`.
+- `{"event":"signup.unfinished_expired","expired":<n>,"keys":<n>,"failed":0}`: a pass that deleted something.
+  `expired` counts the sign-ups that went, `keys` their key folders. The first line's `expired` should be your count
+  (at most 1,000, and a little more if more turned 24 hours old before DR6). With a count of 0, expect no line.
+- `[UNFINISHED_SIGNUP_EXPIRY_PENDING]`: a pass did not finish (then the line above it says `"failed"` more than 0, or
+  there is none). What it left stays due, and the next pass, ten minutes later, tries again. The site keeps running.
+  If the line shows on two passes in a row, ask.
 
 ---
 
@@ -3079,6 +3122,10 @@ know none of these settings, and they answer only as the test name.
   Before you choose it, run LIVEAFTER (7.12) with this upload's rNN. If it does not end with `LIVEAFTER_DONE`, never
   go back, even after PAY_BACK: the invoice, the credit note and the refund stay in SmartBill, ANAF and NETOPIA,
   while our records of them would be gone. Fix forward, and ask.
+- **The unfinished sign-ups the new release deleted** (UNFINISHED, part 2: at DR6 and every ten minutes after) come
+  back with DR3's cold copy, but without their key folders, which the new release destroyed. Those sign-ups cannot be
+  finished, and their addresses and pseudonyms stay taken, until a release with this code runs again and deletes them
+  once more; then those people can sign up again.
 - Close payments first (PAY_BACK): an older API refuses the payments line, and does not see open live work.
 - Then close the name (NAME5): an older launcher refuses the main name.
 - Put the **v1 mail plan** back (MAIL_CLOSE on the test name), and check its digest. With a v2 plan an older release
