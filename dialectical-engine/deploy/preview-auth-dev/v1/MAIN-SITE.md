@@ -815,12 +815,21 @@ MAIL_CLOSE runs only with the site password on (PWON first): a buyer outside the
 
 Before you start: the upload is finished and proven (DR6 and SB13b done, the old release retired), PM2 has run if this
 upload added the payment marks, **mail is on the v2 plan** (part 4.2 or 4.3), and social sign-in is not set up
-(NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If STAFFCHECK (1.6)
-said `staff tools are on`: the first time this server is renamed, run STAFFOFF (5.1b) after NAME1C and right before
-NAME2, and put the staff screens on again with STAFFMAIN (5.7) after the rename. NAME2 and NAME3 also work with the
-staff screens on (they move the two staff name lines with the name); 5.1b says when that is the better way. Either
-way you enrol your staff key again under dezbatere.ro (5.7). Pick a quiet minute for STAFFOFF and for NAME3 (each
-restarts the API): nothing being admitted, no checkout open. If you did not do 1.3 (b) to (e), do them now.
+(NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If you did not do
+1.3 (b) to (e), do them now.
+
+**The staff screens and the rename.** If STAFFCHECK (1.6) said `staff tools are on`:
+- **Run REKEYCHECK (5.7) now, while the site still answers as the test name.** It only reads. It says whether this
+  server can enrol a staff key again after the rename. If it says `NOT READY`, ask before you rename: after a rename
+  with STAFFOFF, nothing else looks at this until REKEY, when your staff key already does not work.
+- The first time this server is renamed, run STAFFOFF (5.1b) after NAME1C and right before NAME2, and put the staff
+  screens on again with STAFFMAIN (5.7) after the rename.
+- The exception: if STAFFCHECK said `the file has team allowance lines`, never run STAFFOFF (it refuses). The staff
+  screens then stay on through the rename; NAME2 and NAME3 work that way too, and 5.1b says what it means.
+- Either way NAME2 and NAME3 move the API file's two staff name lines with the name, and you enrol your staff key
+  again under dezbatere.ro (5.7).
+
+Pick a quiet minute for STAFFOFF and for NAME3 (each restarts the API): nothing being admitted, no checkout open.
 
 **What closing keeps.** The prepared state (NAME1) stays after you close the name again: dezbatere.ro then redirects
 to the test name, and NETOPIA's payment notices on dezbatere.ro still reach the site. NETOPIA does not follow
@@ -1303,9 +1312,10 @@ the two staff name lines. With the lines naming the other name the API refuses t
 - The release guide's `derive` copies `PUBLIC_APP_URL` byte for byte, so a new release's files name the same name, and
   `SAME_PUBLIC_APP_URL` refuses two live releases on different names.
 - `derive` copies the staff lines the same way, so a new release starts with the staff screens as they were (on or
-  off) and with the same two staff name lines. If the rename was done with the staff screens off, the two staff name
-  lines still name the test name; STAFFMAIN (5.7) moves them and puts the screens on. Never put the policy line back
-  by hand on dezbatere.ro (`PREVIEW_STAFF_ORIGIN_MISMATCH`).
+  off) and with the same two staff name lines. This document's NAME2 moves those two lines with the name whether the
+  staff screens are on or off. A rename done with an earlier version of this document, after STAFFOFF, left them
+  naming the test name; STAFFMAIN (5.7) moves them then. Either way STAFFMAIN is what puts the screens on under
+  dezbatere.ro: never put the policy line back by hand there (`PREVIEW_STAFF_ORIGIN_MISMATCH`).
 - For SB1b and A5, compare the website's build values with
   `rel build-env --origin https://dezbatere.ro --models <stage> --release-key "$KEY"`. Without `--origin` the report
   holds the test name's values. The website build itself does not change: one build serves both names.
@@ -1370,8 +1380,10 @@ line, a check of `pg_hba_file_rules` for errors and a reload; step 7 of `deploy/
 that kind of change. Do not edit that file alone.
 
 **1. The staff screens on (skip if they are on already).** If the rename was done with the staff screens on, they are
-on already and STAFFMAIN says so. If it was done after STAFFOFF, STAFFMAIN moves the two staff name lines to
-dezbatere.ro and puts the line `STAFF_ACCESS_POLICY_VERSION=2` back.
+on already and STAFFMAIN says so. If it was done after STAFFOFF, STAFFMAIN puts the line
+`STAFF_ACCESS_POLICY_VERSION=2` back. The two staff name lines already name dezbatere.ro when this document's NAME2
+did the rename; when an earlier version of this document did it, they still name the test name, and STAFFMAIN moves
+them first.
 
 ```sh
 set -euo pipefail
