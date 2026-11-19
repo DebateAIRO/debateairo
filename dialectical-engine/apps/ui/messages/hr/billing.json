@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Prijavite se i otvorite Postavke, zatim Pretplata, zatim „Odustati od ugovora”.",
   "billing.withdrawPage.byEmail": "Možete poslati i obrazac za jednostrani raskid ugovora iz e-poruke s potvrdom, ili bilo koju jasnu izjavu da raskidate ugovor, na {email}. Mi ga provodimo i potvrđujemo e-poštom.",
   "billing.withdrawPage.signIn": "Prijavite se",
-  "billing.withdrawPage.settings": "Otvori Postavke"
+  "billing.withdrawPage.settings": "Otvori Postavke",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

@@ -14,7 +14,7 @@ import {
 import {
   filterLocales,
   getLocale,
-  LOCALE_PREFERENCES,
+  OFFERED_LOCALE_PREFERENCES,
   type LocaleCode
 } from "@/lib/i18n/locales";
 import { writeLocaleCookie } from "@/lib/i18n/localeChoice";
@@ -68,7 +68,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
   const [ownOpen, setOwnOpen] = useState(false);
   const open = opener === undefined ? ownOpen : opener.open;
   const [query, setQuery] = useState("");
-  const filtered = useMemo(() => filterLocales(query), [query]);
+  const filtered = useMemo(() => filterLocales(query, OFFERED_LOCALE_PREFERENCES), [query]);
   const filteredCodes = useMemo(() => filtered.map(({ code }) => code as LocaleCode), [filtered]);
   const [highlightedCode, setHighlightedCode] = useState<LocaleCode>(locale);
   // A pointer press is under way: the blur it causes is the person's own click, never a focus loss to repair.
@@ -226,7 +226,7 @@ export function LanguageSwitcher({ opener }: Readonly<{ opener?: LanguageSwitche
         >
           <div className="languageSwitcherHead">
             <span className="languageSwitcherTitle">{t(catalog, "chrome.interfaceLanguage")}</span>
-            <span className="languageSwitcherCount">{LOCALE_PREFERENCES.length}</span>
+            <span className="languageSwitcherCount">{OFFERED_LOCALE_PREFERENCES.length}</span>
             <span className="languageSwitcherCurrent">
               <span>{current.code.toUpperCase()}</span>
             </span>

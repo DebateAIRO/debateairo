@@ -33,7 +33,8 @@ export function SettingsPageClient({
   locale = "en",
   newDebateCatalog = newDebateEnglish,
   billingCatalog = billingEnglish,
-  renewalConsent = null
+  renewalConsent = null,
+  testMode = false
 }: SettingsI18nProps & {
 
   /** The locale's `newDebate` catalogue: the session gate's copy (review F2). */
@@ -42,6 +43,8 @@ export function SettingsPageClient({
   billingCatalog?: MessageCatalog;
   /** Spec §2.18: the card-saving sentence's manifest pair for Settings' upgrade. */
   renewalConsent?: Readonly<{ version: string; sha256: string }> | null;
+  /** Card payments run on the payment sandbox: the upgrade shows the test-mode note before the payment page. */
+  testMode?: boolean;
 }) {
   // Turn 14: a link mailed by the change-email flow opens Settings with its
   // bearer in the fragment. It is spent without a session (the bearer is the
@@ -60,15 +63,16 @@ export function SettingsPageClient({
     <AuthGate catalog={newDebateCatalog} legalGate={false}>
       {() => (
         <AccountSettingsScreen catalog={catalog} locale={locale} billingCatalog={billingCatalog} renewalConsent={renewalConsent}
-          focusTitle={linkDone} />
+          testMode={testMode} focusTitle={linkDone} />
       )}
     </AuthGate>
   );
 }
 
-function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent, focusTitle }: Required<SettingsI18nProps> & {
+function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent, testMode, focusTitle }: Required<SettingsI18nProps> & {
   billingCatalog: MessageCatalog;
   renewalConsent: Readonly<{ version: string; sha256: string }> | null;
+  testMode: boolean;
   /** Settings replaced a screen whose focused control is gone (the mailed link's Go to Settings). */
   focusTitle: boolean;
 }) {
@@ -109,7 +113,7 @@ function AccountSettingsScreen({ catalog, locale, billingCatalog, renewalConsent
           <a className="setBtn" href="/settings/security">{t(catalog, "settings.security.title")}</a>
           {/* 0157 (D1): the person's statements of reasons. */}
           <a className="setBtn" href="/settings/notices">{t(catalog, "settings.notices.title")}</a>
-          <SubscriptionControls catalog={billingCatalog} locale={locale} renewalConsent={renewalConsent} />
+          <SubscriptionControls catalog={billingCatalog} locale={locale} renewalConsent={renewalConsent} testMode={testMode} />
           <UsageBars catalog={billingCatalog} locale={locale} />
 
           <EmailSettingsCard

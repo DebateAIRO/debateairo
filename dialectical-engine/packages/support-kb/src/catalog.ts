@@ -143,7 +143,7 @@ export const SUPPORT_ACTION_CATALOG: readonly SupportActionDefinition[] = Object
 /** Closed visitor-visible labels copied from the reviewed public menu inventory. */
 export const SUPPORT_GUIDE_LABELS: readonly SupportGuideLabel[] = Object.freeze([
   guideLabel("app-navigation","home",["Home","Library"],["Acasă","Bibliotecă"]),
-  guideLabel("app-navigation","start-debate",["Start a debate","New debate","Start a round"],["Pornește o dezbatere","Dezbatere nouă","Pornește o rundă"]),
+  guideLabel("app-navigation","start-debate",["Start a debate","New debate","Ask a question","Start a round"],["Pornește o dezbatere","Dezbatere nouă","Puneți o întrebare","Pornește o rundă"]),
   guideLabel("settings-help-menus","settings",["Settings","Account","Account settings"],["Setări","Cont","Account","Setările contului"]),
   guideLabel("app-navigation","help",["Help","Help conversation"],["Ajutor","Conversație de ajutor"]),
   guideLabel("support-status-limits","support-status",["Support status","Service status"],["Starea serviciului de asistență","Starea serviciului","Starea publică a serviciului"]),

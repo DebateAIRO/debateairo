@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   session: null as string | null,
   locale: "en",
   billingOn: true,
+  testMode: false,
   ageOwed: false,
   sessionLive: true,
   sessionCheckedWith: [] as string[],
@@ -32,6 +33,7 @@ vi.mock("next/headers", async () => {
 });
 vi.mock("@/lib/billing/serverBilling", () => ({
   billingIsOn: async () => mocks.billingOn,
+  billingState: async () => ({ on: mocks.billingOn, testMode: mocks.testMode }),
   sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; },
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
@@ -57,6 +59,7 @@ beforeEach(() => {
   mocks.session = null;
   mocks.locale = "en";
   mocks.billingOn = true;
+  mocks.testMode = false;
   mocks.ageOwed = false;
   mocks.sessionLive = true;
   mocks.sessionCheckedWith = [];
@@ -87,15 +90,15 @@ describe("P19 /checkout and /checkout/return", () => {
 
   it("hands the flow the plan and the consent pairs of the reader's locale, and nothing of a card form", async () => {
     mocks.session = "t".repeat(43);
-    mocks.locale = "de";
+    mocks.locale = "ro";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
     expect(mocks.flowProps).toHaveLength(1);
     expect(mocks.flowProps[0]).toMatchObject({
       planId: "PLUS",
-      locale: "de",
+      locale: "ro",
       consents: {
-        renewal: { version: "CONSENT_RENEWAL@de", sha256: "c".repeat(64) },
-        immediateStart: { version: "CONSENT_IMMEDIATE_START@de", sha256: "c".repeat(64) }
+        renewal: { version: "CONSENT_RENEWAL@ro", sha256: "c".repeat(64) },
+        immediateStart: { version: "CONSENT_IMMEDIATE_START@ro", sha256: "c".repeat(64) }
       }
     });
     // The country comes from the connection through P8b's first quote, never from the browser's language.
@@ -112,6 +115,15 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(html).toContain('src="/payment-marks/netopia.svg"');
     expect(html).toContain('src="/payment-marks/mastercard.svg"');
     expect(html).not.toContain('src="/payment-marks/visa.svg"');
+  });
+
+  it("tells the flow payments are test-only exactly while the plans list names NETOPIA's sandbox", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.testMode = true;
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    mocks.testMode = false;
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps.map((props) => props.testMode)).toEqual([true, false]);
   });
 
   it("is not found while billing is off, for the checkout and its return page alike", async () => {
@@ -135,10 +147,23 @@ describe("P19 /checkout and /checkout/return", () => {
 
   it("never sends another locale's consent pair: without the reader's own pair the flow gets none (P8c would refuse it)", async () => {
     mocks.session = "t".repeat(43);
-    mocks.locale = "de";
-    mocks.consentMissingFor = "de";
+    mocks.locale = "ro";
+    mocks.consentMissingFor = "ro";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
-    expect(mocks.flowProps[0]).toMatchObject({ locale: "de", consents: null });
+    expect(mocks.flowProps[0]).toMatchObject({ locale: "ro", consents: null });
+  });
+
+  it("reads a cookie naming a language the site does not offer as English, consent pairs included", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.locale = "de";
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[0]).toMatchObject({
+      locale: "en",
+      consents: {
+        renewal: { version: "CONSENT_RENEWAL@en", sha256: "c".repeat(64) },
+        immediateStart: { version: "CONSENT_IMMEDIATE_START@en", sha256: "c".repeat(64) }
+      }
+    });
   });
 
   it("sends an expired or revoked session to sign in, from the checkout and its return page alike (spec §2.10)", async () => {

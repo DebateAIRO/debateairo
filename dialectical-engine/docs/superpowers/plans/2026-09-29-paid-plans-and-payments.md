@@ -29,7 +29,7 @@ These are copied from the spec. Every task includes them implicitly.
 **Plans and limits**
 
 - Plans are exactly FREE / PLUS / PRO / MAX. Net prices are the public ones. Monthly credit is the plan's limit.
-- Paid plans get a day cap of 2000 basis points and a week cap of 5000 basis points of the monthly credit. Free has only its monthly credit.
+- Paid plans get a day cap of <amount> basis points and a week cap of <amount> basis points of the monthly credit. Free has only its monthly credit.
 - Every person window has a finish edge of <amount> basis points (<amount>). The site day keeps <amount> (<amount>), and the close edge is <amount> (<amount>).
 - One waiting question per person.
 - Periods are anchored at the subscription instant (for Free, at account creation). A month runs from the anchor day-of-month, clamped to the month's end. A week is a 7-day block from the month start; a day is a 24-hour block from the month start. All in UTC.
@@ -10734,10 +10734,10 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
   });
 
   it.each([
-    ["FREE", "free", 0, 200_000, null, null],
-    ["PLUS", "premium", 20_000_000, 5_000_000, 2_000, 5_000],
-    ["PRO", "premium", 50_000_000, 20_000_000, 2_000, 5_000],
-    ["MAX", "premium", 200_000_000, 150_000_000, 2_000, 5_000]
+    ["FREE", "free", 0, <the plan's limit>, null, null],
+    ["PLUS", "premium", 20_000_000, <the plan's limit>, <a share>, <a share>],
+    ["PRO", "premium", 50_000_000, <the plan's limit>, <a share>, <a share>],
+    ["MAX", "premium", 200_000_000, <the plan's limit>, <a share>, <a share>]
   ] as const)("%s: tier %s, price %d, credit %d, day %s, week %s, finish 11000", (id, tier, price, credit, day, week) => {
     expect(planById(plans, id)).toMatchObject({
       planId: id, tier, netPriceMicros: price, monthlyCreditMicros: credit,
@@ -10757,9 +10757,9 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
   });
 
   it("computes each cap as credit x basis points / 10000, rounded down", () => {
-    expect(planCapMicros(planById(plans, "PLUS"), "DAY")).toBe(1_000_000);
-    expect(planCapMicros(planById(plans, "PLUS"), "WEEK")).toBe(2_500_000);
-    expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(30_000_000);
+    expect(planCapMicros(planById(plans, "PLUS"), "DAY")).toBe(<the plan's day cap>);
+    expect(planCapMicros(planById(plans, "PLUS"), "WEEK")).toBe(<the plan's week cap>);
+    expect(planCapMicros(planById(plans, "MAX"), "DAY")).toBe(<the plan's day cap>);
     expect(planCapMicros(planById(plans, "MAX"), "MONTH")).toBe(<the plan's limit>);
     expect(planCapMicros(planById(plans, "FREE"), "DAY")).toBeNull();
     expect(planCapMicros(planById(plans, "FREE"), "MONTH")).toBe(<the plan's limit>);
@@ -10775,9 +10775,9 @@ describe("billingPlans v1 carries exactly the owner's plans", () => {
 
   it.each([
     ["a price that is not whole cents", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.net_price_micros = 20_000_001; }],
-    ["Free with a day cap", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.day_bp = 2_000; }],
+    ["Free with a day cap", (row: ReturnType<typeof plansRow>) => { row.plans[0]!.day_bp = <a share>; }],
     ["a paid plan without a week cap", (row: ReturnType<typeof plansRow>) => { row.plans[2]!.week_bp = null; }],
-    ["a paid plan whose day cap exceeds its week cap", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.day_bp = 6_000; }],
+    ["a paid plan whose day cap exceeds its week cap", (row: ReturnType<typeof plansRow>) => { row.plans[1]!.day_bp = <a share above the week cap>; }],
     ["a paid plan with fixed gauges", (row: ReturnType<typeof plansRow>) => {
       row.plans[1]!.fixed_gauges = { risk_tier: "standard", composition_budget_tier: "low", depth: 2 };
     }],
@@ -11636,7 +11636,7 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
   it("gives a paid plan a day, a week and a month, each with the plan's finish edge and the site's close edge", () => {
     const windows = personWindowsFor(planById(plans, "PLUS"), anchor, now, 9_500);
     expect(windows.map((window) => [window.scope, window.limitMicros])).toEqual([
-      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", <the plan's limit>]
+      ["PERSON_DAY", <the plan's day cap>], ["PERSON_WEEK", <the plan's week cap>], ["PERSON_MONTH", <the plan's limit>]
     ]);
     const computed = computeWindows(anchor, now);
     expect(windows[0]).toMatchObject({ periodStart: computed.day.start, resetsAt: computed.day.end, finishBasisPoints: 11_000, closeBasisPoints: 9_500 });
@@ -11651,13 +11651,13 @@ describe("personWindowsFor: the plan's limits over those windows", () => {
 
   it("uses a prorated month credit after an upgrade, and never lets a day or week cap exceed it (A6)", () => {
     const pro = planById(plans, "PRO");
-    // PLUS -> PRO at half the period: 5 + (20 - 5) x 0.5 = 12.50 USD for the month.
-    expect(personWindowsFor(pro, anchor, now, 9_500, 12_500_000).map((window) => window.limitMicros))
-      .toEqual([4_000_000, 10_000_000, 12_500_000]);
+    // PLUS -> PRO at half the period: Plus's credit plus half of what Pro adds, for the month.
+    expect(personWindowsFor(pro, anchor, now, 9_500, <the prorated credit>).map((window) => window.limitMicros))
+      .toEqual([<the plan's day cap>, <the plan's week cap>, <the prorated credit>]);
     expect(personWindowsFor(pro, anchor, now, 9_500, <amount>).map((window) => window.limitMicros))
-      .toEqual([3_000_000, 3_000_000, <amount>]);
+      .toEqual([<amount>, <amount>, <amount>]);
     expect(personWindowsFor(pro, anchor, now, 9_500, null).map((window) => window.limitMicros))
-      .toEqual([4_000_000, 10_000_000, 20_000_000]);
+      .toEqual([<the plan's day cap>, <the plan's week cap>, <the plan's limit>]);
   });
 
   it("refuses a close edge outside 5000-10000 and an override below one micro-unit (0081's CHECK says > 0)", () => {
@@ -12249,11 +12249,11 @@ describe("the entitlement in force", () => {
       .toMatchObject({ planId: "PLUS", periodAnchorAt: T0, eventId: subscribed, paidThrough: plusMonthEnd, lapsed: false });
     await appendEvent({
       ownerRef, planId: "PRO", periodAnchorAt: T0, cause: "UPGRADED", effectiveAt: new Date("2026-03-20T00:00:00.000Z"),
-      subscriptionId: randomUUID(), monthCreditOverrideMicros: 12_500_000, paidThrough: plusMonthEnd
+      subscriptionId: randomUUID(), monthCreditOverrideMicros: <the prorated credit>, paidThrough: plusMonthEnd
     });
     expect((await entitlements.current(ownerRef, new Date("2026-03-15T00:00:00.000Z"))).planId).toBe("PLUS");
     expect(await entitlements.current(ownerRef, new Date("2026-03-21T00:00:00.000Z")))
-      .toMatchObject({ planId: "PRO", periodAnchorAt: T0, monthCreditOverrideMicros: 12_500_000 });
+      .toMatchObject({ planId: "PRO", periodAnchorAt: T0, monthCreditOverrideMicros: <the prorated credit> });
   });
 
   it("reads a paid plan past its paid-through instant as Free, anchored at that instant (A8)", async () => {
@@ -12513,17 +12513,17 @@ describe("BillingPersonAllowanceSource (spec §2.4.1)", () => {
     const windows = await allowance.read(OWNER, now);
     expect(current).toHaveBeenCalledWith(OWNER, now);
     expect(windows.map((window) => [window.scope, window.limitMicros, window.closeBasisPoints, window.finishBasisPoints])).toEqual([
-      ["PERSON_DAY", 1_000_000, 9_500, 11_000],
-      ["PERSON_WEEK", 2_500_000, 9_500, 11_000],
-      ["PERSON_MONTH", 5_000_000, 9_500, 11_000]
+      ["PERSON_DAY", <the plan's day cap>, 9_500, 11_000],
+      ["PERSON_WEEK", <the plan's week cap>, 9_500, 11_000],
+      ["PERSON_MONTH", <the plan's limit>, 9_500, 11_000]
     ]);
     expect(windows[2]!.resetsAt).toEqual(computeWindows(anchor, now).month.end);
   });
 
   it("gives Free its month only, passes the A6 override through, and has no windows without an entitlement", async () => {
     expect((await source("FREE").allowance.read(OWNER, now)).map((window) => window.scope)).toEqual(["PERSON_MONTH"]);
-    expect((await source("PRO", 12_500_000).allowance.read(OWNER, now)).map((window) => window.limitMicros))
-      .toEqual([4_000_000, 10_000_000, 12_500_000]);
+    expect((await source("PRO", <the prorated credit>).allowance.read(OWNER, now)).map((window) => window.limitMicros))
+      .toEqual([<the plan's day cap>, <the plan's week cap>, <the prorated credit>]);
     expect(await source(null).allowance.read(OWNER, now)).toEqual([]);
   });
 
@@ -12540,7 +12540,7 @@ describe("an entitlement anchored just after the caller's clock (the view's cloc
     const windows = await source("PLUS", null, justAfter).allowance.read(OWNER, now);
     const opened = computeWindows(justAfter, justAfter);
     expect(windows.map((window) => [window.scope, window.limitMicros])).toEqual([
-      ["PERSON_DAY", 1_000_000], ["PERSON_WEEK", 2_500_000], ["PERSON_MONTH", <the plan's limit>]
+      ["PERSON_DAY", <the plan's day cap>], ["PERSON_WEEK", <the plan's week cap>], ["PERSON_MONTH", <the plan's limit>]
     ]);
     expect(windows.map((window) => window.periodStart)).toEqual([justAfter, justAfter, justAfter]);
     expect(windows.map((window) => window.resetsAt)).toEqual([opened.day.end, opened.week.end, opened.month.end]);
@@ -13542,7 +13542,7 @@ describe("B6a the person's windows (paid-plans spec §2.4.1)", () => {
 
   it("A5: Free, whose cold-start estimate is above its whole month, still STARTS as CLOSE", async () => {
     const { room } = arrange({
-      windows: { [OWNER]: [window("PERSON_MONTH", 200_000, MONTH_RESET)] },
+      windows: { [OWNER]: [window("PERSON_MONTH", <the plan's limit>, MONTH_RESET)] },
       estimate: 360_000
     });
     await expect(decisionOf(room)).resolves.toMatchObject({
@@ -16363,9 +16363,9 @@ describe("B7a usage as a percentage (paid-plans spec §1.2, U1)", () => {
   it("reads each window's spend in [periodStart, resetsAt), and orders day, week, month", async () => {
     const reads: Array<[string, Date, Date]> = [];
     const windows = [
-      window("PERSON_MONTH", 5_000_000, "2026-10-29T09:00:00.000Z"),
-      window("PERSON_DAY", 1_000_000, "2026-10-01T09:00:00.000Z"),
-      window("PERSON_WEEK", 2_500_000, "2026-10-06T09:00:00.000Z")
+      window("PERSON_MONTH", <the plan's limit>, "2026-10-29T09:00:00.000Z"),
+      window("PERSON_DAY", <the plan's day cap>, "2026-10-01T09:00:00.000Z"),
+      window("PERSON_WEEK", <the plan's week cap>, "2026-10-06T09:00:00.000Z")
     ];
     const reader = new PersonUsageReader({
       entitlements: { current: async () => ({ planId: "PLUS" }) },
@@ -16375,9 +16375,9 @@ describe("B7a usage as a percentage (paid-plans spec §1.2, U1)", () => {
     await expect(reader.read("owner:a", NOW)).resolves.toEqual({
       planId: "PLUS",
       windows: [
-        { scope: "PERSON_DAY", percent: 40, resetsAt: new Date("2026-10-01T09:00:00.000Z") },
-        { scope: "PERSON_WEEK", percent: 16, resetsAt: new Date("2026-10-06T09:00:00.000Z") },
-        { scope: "PERSON_MONTH", percent: 8, resetsAt: new Date("2026-10-29T09:00:00.000Z") }
+        { scope: "PERSON_DAY", percent: <the day's share>, resetsAt: new Date("2026-10-01T09:00:00.000Z") },
+        { scope: "PERSON_WEEK", percent: <the week's share>, resetsAt: new Date("2026-10-06T09:00:00.000Z") },
+        { scope: "PERSON_MONTH", percent: <the month's share>, resetsAt: new Date("2026-10-29T09:00:00.000Z") }
       ]
     });
     expect(reads).toContainEqual(["owner:a", new Date("2026-09-29T09:00:00.000Z"), new Date("2026-10-01T09:00:00.000Z")]);
@@ -17892,8 +17892,8 @@ describe("B7b a waiting paid question whose owner is now on Free (PLAN_CHANGED)"
       entitlements,
       billingPlans: PLANS
     });
-    // PLUS's day cap is 20 % of <amount>: one dollar, spent.
-    await spendAs(owner, 1_000_000, new Date("2031-10-15T11:59:00.000Z"));
+    // PLUS's whole day cap, spent.
+    await spendAs(owner, <the plan's day cap>, new Date("2031-10-15T11:59:00.000Z"));
     const waitingRunId = await waitAs(room, owner, "premium");
     const { dispatched, dispatcher } = recording();
     const application = applicationWith(room, dispatcher);
@@ -41620,14 +41620,14 @@ export const testBillingPlans: BillingPlans = Object.freeze({
   sourceRef: "test:billing-plans",
   plans: Object.freeze([
     // R-11: Free's fixed risk tier is "standard", what apps/ui/app/new/defaults.tsx sends today.
-    { planId: "FREE", tier: "free", netPriceMicros: 0, monthlyCreditMicros: <the plan's limit> dayBasisPoints: null,
+    { planId: "FREE", tier: "free", netPriceMicros: 0, monthlyCreditMicros: <the plan's limit>, dayBasisPoints: null,
       weekBasisPoints: null, finishBasisPoints: 11_000, fixedGauges: { riskTier: "standard", compositionBudgetTier: "low", depth: 1 } },
-    { planId: "PLUS", tier: "premium", netPriceMicros: 20_000_000, monthlyCreditMicros: <the plan's limit> dayBasisPoints: 2_000,
-      weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
-    { planId: "PRO", tier: "premium", netPriceMicros: 50_000_000, monthlyCreditMicros: <the plan's limit> dayBasisPoints: 2_000,
-      weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null },
-    { planId: "MAX", tier: "premium", netPriceMicros: 200_000_000, monthlyCreditMicros: <the plan's limit> dayBasisPoints: 2_000,
-      weekBasisPoints: 5_000, finishBasisPoints: 11_000, fixedGauges: null }
+    { planId: "PLUS", tier: "premium", netPriceMicros: 20_000_000, monthlyCreditMicros: <the plan's limit>, dayBasisPoints: <a share>,
+      weekBasisPoints: <a share>, finishBasisPoints: 11_000, fixedGauges: null },
+    { planId: "PRO", tier: "premium", netPriceMicros: 50_000_000, monthlyCreditMicros: <the plan's limit>, dayBasisPoints: <a share>,
+      weekBasisPoints: <a share>, finishBasisPoints: 11_000, fixedGauges: null },
+    { planId: "MAX", tier: "premium", netPriceMicros: 200_000_000, monthlyCreditMicros: <the plan's limit>, dayBasisPoints: <a share>,
+      weekBasisPoints: <a share>, finishBasisPoints: 11_000, fixedGauges: null }
   ])
 }) as BillingPlans;
 
@@ -55906,24 +55906,24 @@ const START = new Date("2026-10-01T00:00:00.000Z");
 const END = new Date("2026-10-31T00:00:00.000Z");
 const at = (fraction: number) => new Date(START.getTime() + (END.getTime() - START.getTime()) * fraction);
 const plusToPro = {
-  currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 20_000_000,
+  currentMonthCreditMicros: <Plus's limit>, oldPlanCreditMicros: <Plus's limit>, newPlanCreditMicros: <Pro's limit>,
   periodStart: START, periodEnd: END
 };
 
 describe("P12c A6: the month credit after an upgrade", () => {
   it("adds the new plan's extra credit for the part of the period still to run", () => {
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: at(0.5) })).toBe(12_500_000);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: START })).toBe(20_000_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: at(0.5) })).toBe(<the prorated credit>);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: START })).toBe(<Pro's limit>);
     expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: END })).toBe(<the plan's limit>);
     expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(END.getTime() + 1) })).toBe(<the plan's limit>);
-    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(START.getTime() - 1) })).toBe(20_000_000);
+    expect(upgradeMonthCreditOverrideMicros({ ...plusToPro, at: new Date(START.getTime() - 1) })).toBe(<Pro's limit>);
   });
 
   it("builds on an earlier upgrade's credit in the same period", () => {
     expect(upgradeMonthCreditOverrideMicros({
-      currentMonthCreditMicros: 12_500_000, oldPlanCreditMicros: 20_000_000, newPlanCreditMicros: 150_000_000,
+      currentMonthCreditMicros: <the prorated credit>, oldPlanCreditMicros: <Pro's limit>, newPlanCreditMicros: <Max's limit>,
       periodStart: START, periodEnd: END, at: at(0.75)
-    })).toBe(45_000_000);
+    })).toBe(<the prorated credit plus a quarter of what Max adds>);
   });
 
   it("floors to whole micros and never lowers the credit", () => {
@@ -55991,7 +55991,7 @@ describe("P12c what the UPGRADE settlement writes when an upgrade is paid", () =
       data: { announced_total_micros: 60_500_000, quote_ref: "q-1", recurring_net_micros: 50_000_000 }
     });
     expect(writes.entitlement).toEqual({
-      planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: 12_500_000
+      planId: "PRO", periodAnchorAt: START, cause: "UPGRADED", paidThrough: END, monthCreditOverrideMicros: <the prorated credit>
     });
   });
 
@@ -56383,7 +56383,7 @@ describe("P12c upgrade on real PostgreSQL", () => {
     expect(await entitlements.current(run.identity.authenticated.ownerRef, at)).toMatchObject({
       planId: "PRO", cause: "UPGRADED", periodAnchorAt: run.seeded.periodStart, paidThrough: run.seeded.periodEnd,
       monthCreditOverrideMicros: upgradeMonthCreditOverrideMicros({
-        currentMonthCreditMicros: 5_000_000, oldPlanCreditMicros: 5_000_000, newPlanCreditMicros: 20_000_000,
+        currentMonthCreditMicros: <Plus's limit>, oldPlanCreditMicros: <Plus's limit>, newPlanCreditMicros: <Pro's limit>,
         periodStart: run.seeded.periodStart, periodEnd: run.seeded.periodEnd, at: quote.createdAt
       })
     });
@@ -57566,7 +57566,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const run = await start("p12d-happy", { activatedDaysAgo: 1, taxCountry: "RO" });
     const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
       at: new Date(run.now.getTime() - 12 * 3_600_000), netMicros: 15_000_000, taxMicros: 3_150_000,
-      transactionId: "7700123", monthCreditOverrideMicros: 12_500_000
+      transactionId: "7700123", monthCreditOverrideMicros: <the prorated credit>
     });
     const expected = withdrawalRefundMicros({
       paidTotalMicros: run.seeded.totalMicros + 18_150_000, periodStart: run.seeded.periodStart,
@@ -57666,7 +57666,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
         readOwnerSpentMicros: async () => {
           await seedPaidUpgrade(database.pool, run.seeded, {
             at: new Date(run.now.getTime() - 60_000), netMicros: 15_000_000, taxMicros: 3_150_000,
-            transactionId: "7700456", monthCreditOverrideMicros: 12_500_000
+            transactionId: "7700456", monthCreditOverrideMicros: <the prorated credit>
           });
           return 0;
         }
@@ -57711,7 +57711,7 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     const run = await start("p12d-held", { activatedDaysAgo: 1, taxCountry: "RO" });
     const upgrade = await seedPaidUpgrade(database.pool, run.seeded, {
       at: new Date(run.now.getTime() - 12 * 3_600_000), netMicros: 15_000_000, taxMicros: 3_150_000,
-      transactionId: "7700789", monthCreditOverrideMicros: 12_500_000
+      transactionId: "7700789", monthCreditOverrideMicros: <the prorated credit>
     });
     // An earlier refund of ours on the INITIAL payment, still in flight: that transaction cannot take a second request.
     await run.billing.withTransaction((client) => run.billing.appendChargeEvent(client, chargeEvent(
@@ -61154,11 +61154,11 @@ describe("P14b dispute outcomes on real PostgreSQL, through the command's own po
   it("gives back the period's own credit after a won dispute: an upgrade's prorated override (A6)", async () => {
     const seeded = await disputed("PLUS", (plus) => seedPaidUpgrade(database.pool, plus, {
       at: new Date(Date.now() - DAY), netMicros: 15_000_000, taxMicros: 2_850_000, transactionId: "7710001",
-      monthCreditOverrideMicros: 12_500_000
+      monthCreditOverrideMicros: <the prorated credit>
     }).then(() => undefined));
     expect(await recordDisputeOutcome(stores(), { chargeRef: seeded.initialChargeId, outcome: "won" })).toBe("RESUMED");
     expect(await new EntitlementRepository(database.pool).current(seeded.ownerRef, new Date())).toMatchObject({
-      planId: "PRO", cause: "RESUMED", monthCreditOverrideMicros: 12_500_000
+      planId: "PRO", cause: "RESUMED", monthCreditOverrideMicros: <the prorated credit>
     });
   }, 10_000);
 
@@ -61853,7 +61853,7 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     });
     const upgrade = await seedPaidUpgrade(database.pool, seeded, {
       at: new Date(now.getTime() - 2 * DAY), netMicros: 15_000_000, taxMicros: 3_150_000, transactionId: "7720001",
-      monthCreditOverrideMicros: 12_500_000
+      monthCreditOverrideMicros: <the prorated credit>
     });
     await dashboardRefund(seeded, new Date(now.getTime() - DAY));
     expect(await recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt: new Date(now.getTime() - 60_000) }))

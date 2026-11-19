@@ -4805,8 +4805,8 @@ echo "exit: $?"
 4. In S-6, after the debate command block, add:
 
 ````markdown
-The openings comparison: one run, all five AIs, after a fresh S-3 gate status (about 350 calls; expected about $0.5
-to $1 within the owners' test budget; several hours, because the slow models take 30 to 170
+The openings comparison: one run, all five AIs, after a fresh S-3 gate status (about 350 calls, within the owners'
+test budget; several hours, because the slow models take 30 to 170
 seconds a call):
 
 ```sh

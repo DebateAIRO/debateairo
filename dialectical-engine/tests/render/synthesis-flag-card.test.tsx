@@ -63,7 +63,7 @@ describe("S01 owner library card", () => {
       synthesis_check: "CHECKING", models: [] }], open_runs: [], limit: 10, offset: 0, total: 1 } as never);
     const html = ownerMarkup(summaries[0]);
     expect(html).toContain("Checking the debate…");
-    expect(html).toContain('href="/debate/run-1"');
+    expect(html).toContain('href="/v4/debate/run-1"');
     expect(html).toContain('data-state="generating"');
     expect(html).not.toContain('data-flagged="true"');
     expect(html).not.toContain('class="libFlagMark"');

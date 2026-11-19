@@ -44,7 +44,7 @@ import {
  * back (the request's own token caps), read in as many batches as the worst page sizes need.
  *
  * R22 prices (packages/providers/src/preview-models.ts): Haiku 0.10 / 0.50 (5-minute write 0.125); DeepSeek 0.20 / 0.60;
- * GLM 0.15 / 0.50; Qwen 0.113 / 0.382. The design's "5 paths about 50 cents, 3 about 33" were TYPICAL whole debates
+ * GLM 0.15 / 0.50; Qwen 0.113 / 0.382. The design's typical figures were for TYPICAL whole debates
  * with 2 searches a path; at the owner's caps (4 a path) the web part alone is 90.5 cents at 5 paths, 54.5 at 3.
  */
 
@@ -261,7 +261,7 @@ describe("the owner's ruling, 31 Oct: what follows a dig in its share", () => {
 
   it("the hosted estimator prices it from its web prices; none without them", () => {
     const estimator = (webPrices: WebRolePrices | null) => new RecentRunsCostEstimator({
-      source: { readRecentRunUsage: async () => [] }, prices: new Map(), maximumMicros: 3_660_000, webPrices });
+      source: { readRecentRunUsage: async () => [] }, prices: new Map(), maximumMicros: 4_400_000, webPrices });
     expect(estimator(ROLES).digUpdatesPartMicros({ level: 2, free: true })).toBe(estimateDigUpdatesMicros({ level: 2, free: true }, ROLES));
     expect(estimator(null).digUpdatesPartMicros({ level: 2, free: true })).toBeNull();
   });
@@ -295,7 +295,7 @@ describe("W2-2 · the hosted room's estimate of a web debate", () => {
   const BASE: RunSettingsClass = Object.freeze({ planTier: "premium", compositionBudgetTier: "high", makerCount: 4, depth: 1 });
   const WEB_CLASS: RunSettingsClass = Object.freeze({ ...BASE, web: { kind: "START" as const, depth: "QUICK" as const, paths: 5 } });
   const START = Object.freeze({ minSamples: 5, startMicrosByDepth: new Map([[1, 300_000]]) });
-  const estimator = (webPrices: WebRolePrices | null, maximumMicros = 3_660_000) => new RecentRunsCostEstimator({
+  const estimator = (webPrices: WebRolePrices | null, maximumMicros = 4_400_000) => new RecentRunsCostEstimator({
     source: { readRecentRunUsage: async () => [] }, prices: SITE_PRICES, maximumMicros, start: START, webPrices
   });
 
@@ -308,8 +308,8 @@ describe("W2-2 · the hosted room's estimate of a web debate", () => {
     expect(await estimator(ROLES).estimateMicros(BASE)).toBe(300_000);
     expect(await estimator(ROLES).estimateMicros(WEB_CLASS)).toBe(300_000 + 1_071_906);
     expect(await estimator(ROLES, 1_000_000).estimateMicros(WEB_CLASS)).toBe(1_000_000);
-    // No web prices: the careful side, the maximum.
-    expect(await estimator(null).estimateMicros(WEB_CLASS)).toBe(3_660_000);
+    // No web prices: the careful side, the maximum (a made-up one here).
+    expect(await estimator(null).estimateMicros(WEB_CLASS)).toBe(4_400_000);
   });
 
   it("Free asks carry no web part: their class and estimate are today's", async () => {

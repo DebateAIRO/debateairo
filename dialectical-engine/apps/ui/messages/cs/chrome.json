@@ -71,7 +71,12 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Ochrana spotřebitele",
+  "chrome.footer.madeIn": "Made with {heart} in Romania {flag}",
+  "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "Web byl aktualizován. Znovu načtěte stránku.",
   "chrome.release.reload": "Znovu načíst",
-  "chrome.release.madeByNewer": "Tuto debatu vytvořila novější verze webu. Znovu načtěte stránku nebo to zkuste znovu za několik minut."
+  "chrome.release.madeByNewer": "Tuto debatu vytvořila novější verze webu. Znovu načtěte stránku nebo to zkuste znovu za několik minut.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

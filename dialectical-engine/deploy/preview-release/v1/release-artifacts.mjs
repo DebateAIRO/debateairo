@@ -7,7 +7,9 @@
 // produced, runs the reviewed checks before writing, and never overwrites a file.
 //
 //   release-artifacts.mjs source-manifest --repository <clean git clone> --root <release root> --role api|ui|runner --out <file>
-//   release-artifacts.mjs build-env --release-key <key> [--models glm-only|multi-model|all-models]
+//   release-artifacts.mjs build-env --release-key <key> [--models glm-only|multi-model|all-models] [--origin <listed public origin>]
+//       (--origin names the public name ui.env answers as, one of public-origins.mjs; default the test name. The website
+//        reads neither PUBLIC_APP_URL nor TURNSTILE_SITE_KEY when it is built, so one build serves either name)
 //   release-artifacts.mjs ui-build --source <ui source manifest> --release-key <key> [--models glm-only|multi-model|all-models] --out <file>
 //       (--models picks the website's public model list; default glm-only, the legacy GLM-only list)
 //       (--release-key names the release the website is built for, r<site version>-<first 12 hex of the UI source's
@@ -64,6 +66,7 @@ import { PREVIEW_ENV_ROOT, PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifact
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
+import { publicSiteOf } from '../../preview-auth-dev/v1/public-origins.mjs';
 import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 import { addedMigrations, n1Headers } from '../../preview-lifecycle/v1/migration-steps.mjs';
@@ -89,9 +92,12 @@ const DEFAULT_MODEL_ROSTER = 'glm-only';
 export const RELEASE_KEY_NOT_GIVEN = 'RELEASE_KEY_NOT_GIVEN';
 const publicBuildValues = (flag, releaseKey) => Object.freeze({ NODE_ENV: 'production', PUBLIC_APP_URL: PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: flag, TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY, RELEASE_KEY: releaseKey });
 /**
- * Public values the website is BUILT with. Each one is the exact value the reviewed runtime gate
- * (environment.mjs narrowEnvironment, service ui) demands from ui.env, imported from the same
+ * Public values the website is BUILT with. Each one is a value the reviewed runtime gate
+ * (environment.mjs narrowEnvironment, service ui) admits from ui.env, imported from the same
  * constants, so the build and the running site cannot disagree. Nothing here is read from ui.env.
+ * PUBLIC_APP_URL and TURNSTILE_SITE_KEY are the test name's: the website reads neither when it is
+ * built (the site key is read per request, the public name only by the ask proxy at run time), so
+ * the same build serves the other listed name too; build-env --origin gives that name's values.
  * The model list is one of the reviewed lists, picked by stage name (`--models`); the build records
  * which one (ui-build.mjs), and the UI launcher demands that ui.env names the same list.
  * RELEASE_KEY is the release the build is for (side-by-side spec §1, §7): the website bakes its code part in and
@@ -147,7 +153,7 @@ const ROLES = ['api', 'ui', 'runner'];
 const ACTOR_ENV = ['PATH', 'LANG', 'LC_ALL', 'TZ'];
 const COMMANDS = Object.freeze({
   'source-manifest': { required: ['--repository', '--root', '--role', '--out'], optional: [] },
-  'build-env': { required: ['--release-key'], optional: ['--models'] },
+  'build-env': { required: ['--release-key'], optional: ['--models', '--origin'] },
   'ui-build': { required: ['--source', '--release-key', '--out'], optional: ['--models'] },
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
@@ -285,9 +291,16 @@ async function sourceManifestCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], manifest, { layout });
 }
 
-/** The public build values (for one reviewed model list and one release key) and their sha256, for comparing with ui.env without printing it. */
-export function buildEnvironmentReport(releaseKey, models = DEFAULT_MODEL_ROSTER) {
-  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(releaseKey, models)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
+/**
+ * The public build values (for one reviewed model list and one release key) and their sha256, for comparing with ui.env
+ * without printing it. <origin> is the listed public name ui.env answers as (public-origins.mjs; default the test name):
+ * its origin and site key replace the build's, and any other text refuses.
+ */
+export function buildEnvironmentReport(releaseKey, models = DEFAULT_MODEL_ROSTER, origin = PREVIEW_ORIGIN) {
+  const site = publicSiteOf(origin);
+  if (!site) refuse('ARGUMENTS_REFUSED', ['--origin']);
+  const values = { ...uiPublicBuildValues(releaseKey, models), PUBLIC_APP_URL: site.origin, TURNSTILE_SITE_KEY: site.turnstileSiteKey };
+  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
 }
 
 async function uiBuildCommand(options, { layout, deps }) {
@@ -773,7 +786,7 @@ export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const context = { layout, deps };
   switch (command) {
     case 'source-manifest': return sourceManifestCommand(options, context);
-    case 'build-env': return buildEnvironmentReport(options['--release-key'], options['--models']);
+    case 'build-env': return buildEnvironmentReport(options['--release-key'], options['--models'], options['--origin']);
     case 'ui-build': return uiBuildCommand(options, context);
     case 'verify': return verifyCommand(options, context);
     case 'operator-digest': return operatorDigestCommand(options, context);

@@ -5,14 +5,19 @@ import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 /**
  * public-f7 and public-f8 (owner screen review, 3 Nov): a public debate that cannot be shown is never a bare line on an empty page. The normal V4
- * header, the one plain sentence, what the person can do here (`children`, e.g. "Try again"), and, where asked, two ways on: other public debates
+ * header, the one plain sentence, what the person can do here (`children`, e.g. "Try again"), and, where asked, the ways on: other public debates
  * (today's list, until V4 has its own) and the ask page. Kept out of search engines, like the under-review answer.
  */
-export function PublicPageNote({ kind, v4Catalog, line, waysOn = true, children }: Readonly<{
+export function PublicPageNote({ kind, v4Catalog, line, signedIn, waysOn = true, children }: Readonly<{
   /** Which note this is, for tests and the click-test: "under-review", "newer-release" or "could-not-load". */
   kind: string;
   v4Catalog: MessageCatalog;
   line: string;
+  /**
+   * Whether the visitor holds a session, as the home page decides it. The public list is on the signed-in home page only: a signed-out
+   * visitor's "/" is the landing, which has no list, so they are not offered "See other public debates".
+   */
+  signedIn: boolean;
   waysOn?: boolean;
   children?: ReactNode;
 }>) {
@@ -27,7 +32,7 @@ export function PublicPageNote({ kind, v4Catalog, line, waysOn = true, children 
         {children}
         {waysOn ? (
           <div className="v4PubNoteWays">
-            <Link className="v4Link" href="/?tab=public">{t(v4Catalog, "v4.public.otherDebates")}</Link>
+            {signedIn ? <Link className="v4Link" href="/?tab=public">{t(v4Catalog, "v4.public.otherDebates")}</Link> : null}
             <Link className="v4Link" href="/v4">{t(v4Catalog, "v4.public.askYourOwn")}</Link>
           </div>
         ) : null}

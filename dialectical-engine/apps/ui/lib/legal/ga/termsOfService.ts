@@ -372,12 +372,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "2.18",
-  sha256: "b9479b0cc93aeed085607de6204ccac3e810c259b00e3636eb233b49a8ec03c2",
-  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.18 · I bhFEIDHM 1 SAMHAIN 2026",
+  version: "2.19",
+  sha256: "ec56104038ae0ee646de53f41c63d2ef07e4a1417fbfc8414a79300414757160",
+  eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.19 · I bhFEIDHM 19 SAMHAIN 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH NA dTÉARMAÍ · v2.18",
+  endMarker: "DEIREADH NA dTÉARMAÍ · v2.19",
   contact: "support@dezbatere.ro",
   bodyLabel: "Téacs na dTéarmaí Seirbhíse",
   sectionIdPrefix: "terms-section-",

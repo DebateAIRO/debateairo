@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Συνδεθείτε και ανοίξτε τις Ρυθμίσεις, μετά τη Συνδρομή και μετά «Πατήστε εδώ για υπαναχώρηση».",
   "billing.withdrawPage.byEmail": "Μπορείτε επίσης να στείλετε το υπόδειγμα εντύπου υπαναχώρησης από το email επιβεβαίωσης, ή οποιαδήποτε σαφή δήλωση ότι υπαναχωρείτε, στο {email}. Την εκτελούμε και την επιβεβαιώνουμε με email.",
   "billing.withdrawPage.signIn": "Σύνδεση",
-  "billing.withdrawPage.settings": "Άνοιγμα Ρυθμίσεων"
+  "billing.withdrawPage.settings": "Άνοιγμα Ρυθμίσεων",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

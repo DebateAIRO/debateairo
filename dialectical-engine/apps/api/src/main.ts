@@ -178,6 +178,7 @@ import { createProviderOnlyJobs } from "./billing/provider-only-jobs.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
   assertLiveInvoicersAreLive,
+  assertPreviewLivePayments,
   assertStageInvoicersAreSandboxes,
   billingClock
 } from "./billing/stage-clock.js";
@@ -234,6 +235,7 @@ import {
 } from "./account-erasure.js";
 import { runErasureReconcileChain } from "./erasure-reconcile-chain.js";
 import { installBootCustody } from "./boot-custody.js";
+import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine } from "./preview-asks-open.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, settingsVersionPassed, siteCapBootLine } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
@@ -246,6 +248,7 @@ import {
   type ProviderDiscoveryProbeStore
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { previewMainOriginAdmitted } from "./preview-origin.js";
 import { createUnattributedEntriesReporter } from "./run-key-store-report.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
@@ -273,7 +276,8 @@ for (const key of loadRetiredBillingSettings()) console.warn(JSON.stringify({ ev
 // composed over it by the admission loader (./admission-settings.ts).
 const previewGate = environment.PREVIEW_GATE_SETTINGS;
 if (previewGate !== undefined && environment.PUBLIC_APP_URL !== "https://v3-preview.dezbatere.ro") {
-  throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
+  // The preview setup may also answer as the main site, which is always hosted (./preview-origin.ts).
+  if (!previewMainOriginAdmitted(environment)) throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
 }
 // V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
 // vendor, which is itself a model call — until the per-run and daily cost
@@ -992,6 +996,14 @@ const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createPro
   // B3a: the spool's replay every 10 minutes, as the billing runtime's.
   ...(billingNoticeSpool === undefined || providerOnlyIntake === undefined ? {} : { notices: providerOnlyIntake })
 });
+// The hosted preview takes real payments only with the owner's switch, and the switch only with NETOPIA's live system
+// and the site version's billing on (the preview launcher checks the same, with the addresses and the egress proxy).
+boot.runSync("preview-live-payments", () => assertPreviewLivePayments({
+  preview: previewGate !== undefined,
+  paymentEnvironment: (billingConnectors ?? providerOnlyConnectors)?.paymentEnvironment ?? null,
+  billingOn: billingMode === "ON",
+  flag: environment.PREVIEW_LIVE_PAYMENTS ?? null
+}));
 // A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
 // open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
 // closes them first.
@@ -1010,11 +1022,23 @@ if (billingConnectors?.paymentEnvironment === "live") {
 // NETOPIA plans are open, so a sandbox API never runs over live customers' plans and cards.
 if (billingConnectors?.paymentEnvironment === "sandbox") {
   await boot.run("billing-live-records-on-sandbox", async () => {
+    const live = new BillingRepository(pool);
     assertOtherSystemRecordsClosed({
-      subscriptions: await new BillingRepository(pool).openNetopiaSubscriptionCount("live"), charges: 0, jobs: 0
+      subscriptions: await live.openNetopiaSubscriptionCount("live"),
+      // The hosted preview's way back from real payments also waits for the live charges' open work (a payment not yet
+      // final, a refund not yet recorded, their jobs: the credit note among them), which a sandbox API would leave undone.
+      ...(previewGate === undefined ? { charges: 0, jobs: 0 } : await live.openNetopiaChargeWork("live"))
     });
   });
 }
+// PREVIEW_ASKS_OPEN_TO: asks open to strangers only with the room built and on the payment system the value names
+// (./preview-asks-open.ts). A refusal names its code; once open, one content-free line says which opening runs.
+boot.runSync("preview-asks-open", () => assertPreviewAsksOpenBoot({
+  asksOpen: environment.PREVIEW_ASKS_OPEN, roomComposed: askRoom !== undefined,
+  paymentEnvironment: billingConnectors?.paymentEnvironment ?? null
+}));
+const previewAsksOpenLine = previewAsksOpenBootLine(environment.PREVIEW_ASKS_OPEN);
+if (previewAsksOpenLine !== null) console.warn(previewAsksOpenLine);
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
 // ledger (A-I2) because the construction refuses a store path that is not one
@@ -1271,6 +1295,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...admissionSettingsOfVersion(siteAdmission),
   // Step 1: the preview's team; keyed on the env's gate part (ruling R25).
   ...(previewGate === undefined ? {} : { previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  // PREVIEW_ASKS_OPEN_TO: any signed-in account may ask instead of the team; the waker then starts any account's runs.
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   // Side-by-side spec §1: every run this API admits carries its own checked release key.
   releaseKey: environment.RELEASE_KEY,
@@ -2049,6 +2075,7 @@ const api = buildApi({
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
   // line-up over the gate part). `admissionView` below carries the active version's: the room read's class counts it (SA6).
   ...(previewGate === undefined ? {} : { previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   application,
   stories: ownerStories,
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of

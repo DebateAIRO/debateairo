@@ -221,6 +221,32 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(goToPayment.mock.calls).toEqual([[page]]);
   });
 
+  it("shows the test-mode note in the upgrade step only while card payments run on the sandbox", async () => {
+    const quote = {
+      quote_ref: "77777777-7777-4777-8777-777777777777", plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
+      tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
+      renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
+    };
+    client.quoteSubscriptionUpgrade.mockResolvedValue(quote);
+    const note = (billingEnglish as Record<string, string>)["billing.testMode.notice"]!;
+    // The upgrade leaves for the payment page, as the checkout does, so the same note stands before its Pay button.
+    await act(async () => {
+      root.render(<SubscriptionControls catalog={billingEnglish} locale="en" client={client as unknown as SubscriptionClient} now={() => NOW}
+        renewalConsent={CONSENT} goToPayment={goToPayment} testMode />);
+    });
+    await settle();
+    expect(text()).not.toContain(note);
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(container.querySelector('p.billingNote[role="note"]')?.textContent).toBe(note);
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(text()).not.toContain(note);
+  });
+
   it("drops an upgrade quote whose start failed, so choosing the upgrade again pays a fresh price (N19b)", async () => {
     const used = "55555555-5555-4555-8555-555555555555";
     const fresh = "66666666-6666-4666-8666-666666666666";
@@ -265,10 +291,10 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Change plan");
     expect(button("Move to Pro at renewal")).toBeDefined();
     await click("Move to Plus at renewal");
-    // The price is P8a's public net price, "+ tax", from the renewal date; nothing has changed yet.
+    // The price is P8a's public net price, named as the price before tax, from the renewal date; nothing has changed yet.
     expect(client.getBillingPlans).toHaveBeenCalledTimes(1);
     expect(client.downgradeSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 29 October 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? From 29 October 2026, it costs $20.00 a month before tax. This page shows the exact amount, with tax, once the change is scheduled.");
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ plan_id: "MAX", scheduled_downgrade_plan_id: "PLUS" })
     });
@@ -293,8 +319,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain(`DBAI 0044 · 1 October 2026 · ${formatMoney("en", "1210.00", "RON")}`);
     await click("Change plan");
     await click("Move to Pro at renewal");
-    expect(text()).toContain(`Move to Pro at your next renewal? It costs ${formatMoney("en", "250.00", "RON")} a month + tax,`
-      + " from 29 October 2026.");
+    expect(text()).toContain(`Move to Pro at your next renewal? From 29 October 2026, it costs ${formatMoney("en", "250.00", "RON")} a month`
+      + " before tax.");
     expect(text()).not.toContain("€");
     expect(text()).not.toContain("$");
   });
@@ -398,7 +424,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain("We're processing your renewal. Your plan stays active meanwhile.");
     await click("Change plan");
     await click("Move to Plus at renewal");
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 3 October 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? From 3 October 2026, it costs $20.00 a month before tax.");
     await click("Keep my plan");
     await click("Cancel");
     expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");

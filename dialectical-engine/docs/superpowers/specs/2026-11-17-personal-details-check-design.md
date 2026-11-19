@@ -163,17 +163,16 @@ brought in from a web page that names a private person. This is open decision 2.
 Prices are the code's own for Haiku 5.5 (`packages/providers/src/preview-models.ts`: $0.10 per million tokens in,
 $0.50 out). A question check call is about 1,700 tokens in today.
 
-| Case | Extra tokens | Extra cost |
-|---|---|---|
-| Free debate, nothing found (the usual case) | 200–400 in, 10–20 out | about $0.00005 |
-| Details found, "Use this version" | the changed text out, usually under 150 | about $0.0001 |
-| Details found, person edits | one more question check call, about 1,900 in | about $0.0002 |
-| Paid private debate, while private | none | none |
-| Any publication (Door 2) | about 150 in on each of five to seven calls | about $0.0001 |
+| Case | Extra tokens |
+|---|---|
+| Free debate, nothing found (the usual case) | 200–400 in, 10–20 out |
+| Details found, "Use this version" | the changed text out, usually under 150 |
+| Details found, person edits | one more question check call, about 1,900 in |
+| Paid private debate, while private | none |
+| Any publication (Door 2) | about 150 in on each of five to seven calls |
 
-A Free debate costs about one two-hundredth of a cent more. One hidden cost when details are found: the planner that
-prepares the path lists reads the question at the same moment as the check, to save a second, so its one call is
-thrown away and made again on the changed text.
+One hidden cost when details are found: the planner that prepares the path lists reads the question at the same
+moment as the check, to save a second, so its one call is thrown away and made again on the changed text.
 
 ## When the model cannot be reached
 
@@ -234,7 +233,7 @@ API, the gap in row 4 included; (3) Door 1 on the screens; (4) Door 2; (5) the E
 ## Open decisions
 
 1. **If the measurement shows the shared call judges worse, may Door 1 use a small call of its own?**
-   - *Yes, if the numbers say so (recommended)*: about $0.00005 more per Free question; the harm check stays as it is.
+   - *Yes, if the numbers say so (recommended)*: one small extra call per Free question; the harm check stays as it is.
    - *No, shared call only*: fewest tokens; we accept what the measurement shows.
 2. **Should the check at publishing look for personal details in Free debates and contributions too?**
    - *Yes (recommended)*: no extra call; catches what Door 1 missed and what an AI brought in from the web. A Free

@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Prisijunkite ir atidarykite Nustatymai, tada Prenumerata, tada „Atsisakyti sutarties čia“.",
   "billing.withdrawPage.byEmail": "Taip pat galite atsiųsti sutarties atsisakymo formos pavyzdį iš patvirtinimo el. laiško arba bet kokį aiškų pareiškimą, kad atsisakote, adresu {email}. Jį įvykdome ir patvirtiname el. laišku.",
   "billing.withdrawPage.signIn": "Prisijungti",
-  "billing.withdrawPage.settings": "Atidaryti nustatymus"
+  "billing.withdrawPage.settings": "Atidaryti nustatymus",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

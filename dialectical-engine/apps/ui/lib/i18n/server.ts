@@ -1,11 +1,24 @@
 import "server-only";
 
-import { DEFAULT_LOCALE, catalogLocale, isLocale, type CatalogLocaleCode } from "./locales";
+import { DEFAULT_LOCALE, catalogLocale, isCatalogLocale, type CatalogLocaleCode } from "./locales";
 import type { I18nNamespace } from "./I18nProvider";
 import type { MessageCatalog } from "./translate";
 
 type CatalogModule = Readonly<{ default: MessageCatalog }>;
 type CatalogLoader = () => Promise<CatalogModule>;
+
+/**
+ * A translated catalogue laid over its English one. t() falls back to English only for a few namespaces (translate.ts),
+ * so a key the translation lacks would otherwise show as the raw key; with English underneath it shows the English text.
+ * The page hands this merged catalogue to its client components, so they get the same fallback.
+ */
+export async function overEnglish(
+  translated: Promise<CatalogModule>,
+  english: Promise<CatalogModule>
+): Promise<CatalogModule> {
+  const [own, base] = await Promise.all([translated, english]);
+  return { default: Object.freeze({ ...base.default, ...own.default }) };
+}
 
 const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace, CatalogLoader>>>> = Object.freeze({
     ar: {
@@ -573,7 +586,8 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
       billing: () => import("../../messages/ro/billing.json"),
       "password-reset": () => import("../../messages/ro/password-reset.json"),
       "mfa-recovery": () => import("../../messages/ro/mfa-recovery.json"),
-      v4: () => import("../../messages/en/v4.json")
+      // The V4 screens have their own Romanian catalogue; every other language reads the English one.
+      v4: () => overEnglish(import("../../messages/ro/v4.json"), import("../../messages/en/v4.json"))
     },
     ru: {
       chrome: () => import("../../messages/ru/chrome.json"),
@@ -745,11 +759,16 @@ const LOADERS: Readonly<Record<CatalogLocaleCode, Readonly<Record<I18nNamespace,
     }
   });
 
+/**
+ * A namespace's catalogue in any of the 35 catalogue languages, not only the offered ones: the short story and the
+ * report of a debate argued in another language read their fixed words in that language. Pages pass their interface
+ * locale, which is already limited to the offered languages.
+ */
 export async function loadNamespace(
   locale: string,
   namespace: I18nNamespace
 ): Promise<MessageCatalog> {
-  const selectedLocale = catalogLocale(isLocale(locale) ? locale : DEFAULT_LOCALE);
+  const selectedLocale = catalogLocale(isCatalogLocale(locale) ? locale : DEFAULT_LOCALE);
   try {
     return (await LOADERS[selectedLocale][namespace]()).default;
   } catch {

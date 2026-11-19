@@ -137,3 +137,8 @@ c1ea4d571f6feab2576eea18b0a1546573371a4c:dialectical-engine/tests/unit/preview_b
 # 2026-11-09 — the same made-up release name in the unit test of the same carrier (commit a273d069b). Owner's ruling of
 # 2026-11-09, as for U5.
 a273d069b8eadfecc62bab6caecbb2bca3e64654:dialectical-engine/tests/unit/public-report-carrier-maker.test.ts:generic-api-key:24
+# 2026-11-19 — release branch for the main site (PR #297): generic-api-key matched a made-up NETOPIA POS signature
+# (the letters A to T in five dash-joined groups of four) in the fixture lines of the release-env test of the payment
+# settings. It names no POS and unlocks nothing; the real signature lives only in the server's own files. Classified by
+# reading it, as .gitleaks.toml describes.
+1bf8c89d5eec8ee1c757641e402d0e10d0eea8eb:dialectical-engine/tests/unit/lock-pay-release-env.test.ts:generic-api-key:12

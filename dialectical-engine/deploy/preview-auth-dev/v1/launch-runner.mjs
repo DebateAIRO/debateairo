@@ -5,6 +5,7 @@ import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment } from '
 import { afterRunnerReady,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
 import { loadTsxApi } from './tsx-api.mjs';
+import { startupRefusedLine } from './startup-refusals.mjs';
 /** The in-process readiness event apps/runner/src/runner-ready.ts announces (RUNNER_READY_PROCESS_EVENT). */
 export const RUNNER_READY_PROCESS_EVENT='debateai:runner-ready';
 /** The in-process event apps/runner/src/runner-retirement.ts emits when the runner retired itself (RUNNER_RETIRED_PROCESS_EVENT). */
@@ -67,8 +68,11 @@ export async function launchRunner(argv) {
  // Starting is preview-only: the start-up team gate is off without the preview configuration, so
  // a start without it (or with no team) is refused here rather than run without the team rule.
  // Addition D14: the configuration's gate part (PREVIEW_GATE_SETTINGS) is present for all three forms, sockets-only included.
+ // With PREVIEW_ASKS_OPEN_TO set (the parser admits it only with the preview configuration and no team) there is no team
+ // to require: the API lets any signed-in account ask, and the runner agrees; the preview configuration is still required.
  const parsed=runtime.parseRunnerEnvironment(configured);
- if(parsed.PREVIEW_GATE_SETTINGS===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0)refuse('PREVIEW_RUNNER_TEAM_REQUIRED');
+ if(parsed.PREVIEW_ASKS_OPEN!==undefined){if(parsed.PREVIEW_GATE_SETTINGS===undefined)refuse('PREVIEW_RUNNER_TEAM_REQUIRED');}
+ else if(parsed.PREVIEW_GATE_SETTINGS===undefined||!Array.isArray(parsed.PREVIEW_TEAM_USER_IDS)||parsed.PREVIEW_TEAM_USER_IDS.length===0)refuse('PREVIEW_RUNNER_TEAM_REQUIRED');
  const verify=await tsImport('./verify-native.ts',import.meta.url);
  await verify.assertSelectedRunnerConnection(configured,plan.publication);
  const entry=join(engine,'apps/runner/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/runner/src/main.ts');
@@ -101,7 +105,7 @@ export async function startRunner(argv,launch=launchRunner,{retiredSettleMs=RETI
  // Any refusal or later end ends this process: the runner's worker must not stay up unreported.
  const stop=installRunnerFailureCodes();
  let started;
- try{started=await launch(argv);}catch{process.stderr.write('PREVIEW_RUNNER_STARTUP_REFUSED\n');process.exit(1);}
+ try{started=await launch(argv);}catch(error){process.stderr.write(`${startupRefusedLine('PREVIEW_RUNNER_STARTUP_REFUSED',error)}\n`);process.exit(1);}
  let asked=false;
  const stopped=()=>{process.stdout.write('PREVIEW_RUNNER_STOPPED\n');process.exit(0);};
  // Listening replaces Node's default end on the signal; with no worker listening too, end here.

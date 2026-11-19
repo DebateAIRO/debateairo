@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { LoginFlow } from "../../apps/ui/components/LoginFlow.js";
 import { SignUpFlow } from "../../apps/ui/components/SignUpFlow.js";
+import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 type HomePageModule = {
   default: (props: { searchParams: Promise<{ tab?: string }> }) => Promise<ReactNode>;
@@ -91,7 +92,7 @@ describe("T9-C1 route split & chrome", () => {
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
 
-    expect(hero?.textContent).toContain("Find the weakest joint in your own argument.");
+    expect(hero?.textContent).toContain("See what holds up, and what is still open.");
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]')).toBeNull();
   });
 
@@ -104,7 +105,7 @@ describe("T9-C1 route split & chrome", () => {
       document.querySelector('.sectionHead[aria-label="Debate library"]'),
       "signed-in library discriminator"
     ).not.toBeNull();
-    expect(document.body.textContent).not.toContain("Find the weakest joint in your own argument.");
+    expect(document.body.textContent).not.toContain("See what holds up, and what is still open.");
   });
 
   it("renders an accessibly named mode control on the anonymous document", async () => {
@@ -118,15 +119,16 @@ describe("T9-C1 route split & chrome", () => {
     expect(accessibleName).toMatch(/Switch to (dark|light) mode/);
   });
 
-  it("composes the five landing sections in contract order", async () => {
+  it("composes the four landing sections in contract order", async () => {
     // PROPERTY: the landing's structural sections stay in Chrome → Hero →
-    // Sample → Method → Pricing document order even while later clusters fill them.
+    // Method → Pricing document order. The sample exchange is not shown: it
+    // showed an older kind of debate, with scores and model codes.
     const document = await renderRoute(null);
     const order = [...document.querySelectorAll("[data-landing-section]")].map(
       (section) => section.getAttribute("data-landing-section")
     );
 
-    expect(order).toEqual(["chrome", "hero", "sample", "method", "pricing"]);
+    expect(order).toEqual(["chrome", "hero", "method", "pricing"]);
   });
 
   it("keeps the route branch immediate and the landing a server component", () => {
@@ -146,8 +148,9 @@ describe("T9-C1 route split & chrome", () => {
     // library work can slip in front of the landing.
     // P21: that one read now answers the price line AND the footer's billing facts.
     // Terms §12: the same read says whether that price already holds the visitor's tax.
+    // The same read also says whether card payments are test-only (the price line's test-mode note).
     const landingBranch =
-      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+tax=\{plans\.tax\}\s+footerBilling=\{plans\.footer\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
+      /if\s*\(\s*token\s*===\s*null\s*\)\s*\{\s*const\s+plans\s*=\s*await\s+landingPlans\(\s*locale\s*,\s*await\s+headers\(\)\s*\)\s*;\s*return\s*<>\s*<LandingPage\s+catalog=\{catalog\}\s+lowestPaidPrice=\{plans\.lowestPaidPrice\}\s+tax=\{plans\.tax\}\s+footerBilling=\{plans\.footer\}\s+testModeNote=\{plans\.testModeNote\}\s*\/>\s*<SupportWidget\s*\/>\s*<\/>\s*;\s*\}/.exec(
         pageSource
       );
     const landingReturnIndex = landingBranch?.index ?? -1;
@@ -180,6 +183,27 @@ describe("T9-C1 route split & chrome", () => {
     const footer = (await renderRoute(null)).querySelector("footer.siteFooterFull");
     for (const href of ["/pricing", "/cancel", "/withdraw"]) expect(footer?.querySelector(`a[href="${href}"]`), href).not.toBeNull();
   });
+
+  it("says under the price line that payments are test-only exactly while the plans list names NETOPIA's sandbox", async () => {
+    const note = (billingEnglish as Readonly<Record<string, string>>)["billing.testMode.notice"]!;
+    const answer = (environment?: "sandbox" | "live") => ({
+      currency: "USD",
+      plans: [{ plan_id: "PLUS", net_prices: { USD: "20.00", EUR: "20.00", RON: "100.00" }, allowance_vs_plus: "1" }],
+      ...(environment === undefined ? {} : { environment })
+    });
+    const notes = async (): Promise<string[]> => [
+      ...(await renderRoute(null)).querySelectorAll('[data-landing-section="pricing"] [role="note"]')
+    ].map((element) => element.textContent ?? "");
+    routeMocks.getBillingPlans.mockResolvedValueOnce(answer("sandbox"));
+    expect(await notes()).toEqual([note]);
+    // Switched to live payments on the server: the next visit shows no note, with no new upload of the website.
+    routeMocks.getBillingPlans.mockResolvedValueOnce(answer("live"));
+    expect(await notes()).toEqual([]);
+    routeMocks.getBillingPlans.mockResolvedValueOnce(answer());
+    expect(await notes()).toEqual([]);
+    // Billing off (the route's 404): no price line to carry it.
+    expect(await notes()).toEqual([]);
+  });
 });
 
 describe("T9-C2 chrome labels & CTAs", () => {
@@ -192,7 +216,6 @@ describe("T9-C2 chrome labels & CTAs", () => {
 
     const expectedLinks = [
       ["Method", "#method"],
-      ["Transcripts", "#transcripts"],
       ["Pricing", "#pricing"]
     ] as const;
 
@@ -202,6 +225,9 @@ describe("T9-C2 chrome labels & CTAs", () => {
       expect(link, `missing chrome link ${label}`).toBeDefined();
       expect(link?.getAttribute("href")).toBe(href);
     }
+    // The sample exchange is not shown, so nothing links to it.
+    expect(chrome!.querySelector('a[href="#transcripts"]')).toBeNull();
+    expect(chrome!.textContent).not.toContain("Transcripts");
 
     const wordmark = [...chrome!.querySelectorAll<HTMLAnchorElement>("a")]
       .find((candidate) => candidate.textContent?.trim() === "Dialectical Engine");
@@ -217,7 +243,7 @@ describe("T9-C2 chrome labels & CTAs", () => {
     const document = await renderRoute(null);
     const chrome = document.querySelector('[data-landing-section="chrome"]');
     const primary = [...chrome!.querySelectorAll("a")]
-      .find((candidate) => (candidate.textContent ?? "").replace("→", "").trim() === "Start a round");
+      .find((candidate) => (candidate.textContent ?? "").replace("→", "").trim() === "Ask a question");
 
     expect(primary).toBeDefined();
     expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
@@ -226,14 +252,14 @@ describe("T9-C2 chrome labels & CTAs", () => {
   });
 
   it("keeps every stub navigation link safe to click", async () => {
-    // PROPERTY: all three stub anchors can be activated on the real anonymous
+    // PROPERTY: both stub anchors can be activated on the real anonymous
     // document without replacing the page with an uncaught error surface.
     const document = await renderRoute(null);
     const chrome = document.querySelector('[data-landing-section="chrome"]');
     const errorEvents: ErrorEvent[] = [];
     document.defaultView?.addEventListener("error", (event) => errorEvents.push(event));
 
-    for (const href of ["#method", "#transcripts", "#pricing"]) {
+    for (const href of ["#method", "#pricing"]) {
       const link = chrome!.querySelector<HTMLAnchorElement>(`a[href="${href}"]`);
       expect(link, `missing stub ${href}`).not.toBeNull();
       expect(() => link!.click()).not.toThrow();
@@ -318,26 +344,27 @@ describe("T9-C4 landing content", () => {
     const document = await renderRoute(null);
     const method = document.querySelector('[data-landing-section="method"]');
     const steps = [...(method?.querySelectorAll("li") ?? [])];
+    // The four steps are the V4 ask page's own four steps, in its words.
     const expectedSteps = [
       [
         "01",
-        "Models argue",
-        "Five frontier models build the tree — pro, con, and the reasoning that binds them."
+        "Your question",
+        "Ask in your own words. We show how we read your question, and you can change our assumptions."
       ],
       [
         "02",
-        "They review each other",
-        "Every claim is cross-reviewed by a rival model: agree or dispute, on the record."
+        "What we'll look into",
+        "The AIs suggest paths: different ways to answer it. You pick the ones to look into, or let the AIs choose."
       ],
       [
         "03",
-        "You challenge",
-        "Flag any sentence; the bench spawns a focused rebuttal where you pointed."
+        "The map",
+        "Each point carries a word for how sure it is, such as Sure or Still argued. Dig into any point to look closer."
       ],
       [
         "04",
-        "Verdict with receipts",
-        "Scores, condition marks, and replay handles — every number traces to its source."
+        "Your report",
+        "A plain answer, what would change it, the objections still standing, and how each point was checked."
       ]
     ] as const;
 
@@ -350,28 +377,22 @@ describe("T9-C4 landing content", () => {
     });
   });
 
-  it("renders complete static sample-card anatomy inside the sample block", async () => {
-    // PROPERTY: a sample card is a double-bezel, stance-marked card carrying
-    // type, two scores, model attribution, and a recorded review disposition.
+  it("shows no sample exchange: no scores, turns or model codes anywhere on the landing", async () => {
+    // PROPERTY: the hand-made sample of an older debate (BASE/FINAL scores, Pro/Con turns,
+    // model codes) is not on the page, and no link points at where it was.
     const document = await renderRoute(null);
-    const sample = document.querySelector('[data-landing-section="sample"]');
+    const landing = document.querySelector(".lpRoot");
 
-    expect(sample).not.toBeNull();
-    expect(sample?.textContent).toContain("One round, four turns");
-    expect(sample?.textContent).toContain("The pressure lands on the joint, not the wording.");
-    for (const stance of ["pro", "con", "reasoning"] as const) {
-      expect(sample?.querySelector(`[data-bezel="shell"][data-stance="${stance}"]`)).not.toBeNull();
+    expect(landing).not.toBeNull();
+    expect(document.querySelector('[data-landing-section="sample"]')).toBeNull();
+    expect(document.querySelector("#transcripts")).toBeNull();
+    expect(document.querySelector('a[href="#transcripts"]')).toBeNull();
+    expect(landing?.querySelector("[data-bezel]")).toBeNull();
+    const text = landing?.textContent ?? "";
+    for (const retired of ["One round, four turns", "BASE ", "FINAL ", "REVIEW AGREED BY:", "Read a scored transcript"]) {
+      expect(text, retired).not.toContain(retired);
     }
-
-    const card = sample?.querySelector('[data-bezel="shell"][data-stance]');
-    const cardText = card?.textContent ?? "";
-    expect(card?.querySelector('[data-bezel="core"]')).not.toBeNull();
-    // The role chip now renders the catalogue word ("Reasoning"); `.lpChipStance` uppercases it in CSS.
-    expect(cardText).toMatch(/PRO|CON|REASONING/i);
-    expect(cardText).toContain("BASE");
-    expect(cardText).toContain("FINAL");
-    expect(cardText).toMatch(/\S+\s+·\s+\S+/);
-    expect(cardText).toMatch(/REVIEW (?:AGREED|DISPUTED) BY:/);
+    expect(text).not.toMatch(/claude-opus|gpt-5|gemini/iu);
   });
 
   it("shows no placeholder counter in the hero and states the pricing plainly when billing is off", async () => {
@@ -387,6 +408,8 @@ describe("T9-C4 landing content", () => {
     const facts = [...(hero?.querySelectorAll(".lpStatBar > li") ?? [])];
     expect(facts.map((item) => item.classList.contains("lpStatRule") ? "rule" : "fact")).toEqual(["fact", "rule", "fact"]);
     expect(pricing?.textContent).toContain("Start free. No card needed.");
+    // This line shows only while billing is off, where no question is published, so it says nothing about public questions.
+    expect(pricing?.textContent).not.toContain("questions are public");
     expect(pricing?.textContent).not.toContain("[PLACEHOLDER]");
     expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();
   });
@@ -456,57 +479,52 @@ describe("T9-C4 landing content", () => {
     // region that owns it rather than being paraphrased or copied across regions.
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
-    const sample = document.querySelector('[data-landing-section="sample"]');
     const method = document.querySelector('[data-landing-section="method"]');
     const pricing = document.querySelector('[data-landing-section="pricing"]');
 
+    // The hero lede is the V4 ask page's promise (v4.ask.promise) with "Ask a question." in front.
     expect(hero?.textContent).toContain(
-      "You argue. An opponent trained to locate the softest point in your reasoning presses on it until the joint holds or gives. Every turn is scored on evidence and on whether you actually answered the question — never on how well it was phrased."
+      "Ask a question. Several AIs from different companies argue it from all sides. You choose what they look into. You get a plain answer and see what holds up and what doesn't."
     );
-    expect(sample?.textContent).toContain(
-      "The round ends here. Nothing is declared won. You get the transcript, the two marks per turn, and the joint you conceded."
-    );
-    expect(method?.textContent).toContain("Four steps, then you do it again tomorrow.");
+    expect(hero?.textContent).toContain("Several AIs, one plain answer");
+    expect([...(hero?.querySelectorAll(".lpStatBar > li:not(.lpStatRule)") ?? [])].map((item) => item.textContent)).toEqual([
+      "Each point shows whether a second AI agreed",
+      "Free questions are public"
+    ]);
+    expect(method?.textContent).toContain("Four steps, from your question to your report.");
     expect(method?.textContent).toContain(
-      "The arena is built for repetition, not for a performance you prepare for once."
+      "You choose what the AIs look into, and you can dig into any point."
     );
-    expect(method?.textContent).toContain(
-      "Five frontier models build the tree — pro, con, and the reasoning that binds them."
-    );
-    expect(method?.textContent).toContain(
-      "Every claim is cross-reviewed by a rival model: agree or dispute, on the record."
-    );
-    expect(method?.textContent).toContain(
-      "Flag any sentence; the bench spawns a focused rebuttal where you pointed."
-    );
-    expect(method?.textContent).toContain(
-      "Scores, condition marks, and replay handles — every number traces to its source."
-    );
-    expect(pricing?.textContent).toContain("Your argument is only as strong as its weakest joint.");
-    // Owner's answer to question 9 (5 Nov 2026, A): the closing line names no time. The English words are the answer's own;
-    // as a new line (section 2c) it is still shown at the click-test, and the other 34 languages are drafts for a native
-    // speaker's check.
+    expect(pricing?.textContent).toContain("Good questions deserve more than one answer.");
+    // The closing line names no time.
     expect(pricing?.textContent).toContain(
-      "Take one round. Four turns, and a transcript that tells you exactly where you stopped answering."
+      "Ask one question. You get a plain answer, the points it rests on, and what is still open."
     );
     expect(pricing?.textContent).not.toMatch(/minute/iu);
+    // None of the older product's promises is left on the landing.
+    const landing = document.querySelector(".lpRoot")?.textContent ?? "";
+    for (const retired of ["You argue", "Four turns", "turn is scored", "Five frontier models", "Verdict with receipts",
+      "No audience", "weakest joint", "Take one round", "Start a round"]) {
+      expect(landing, retired).not.toContain(retired);
+    }
   });
 
-  it("renders both hero CTAs and sends the primary through the safe auth entry", async () => {
-    // PROPERTY: the hero owns both CTA labels and its primary enters auth with
-    // the exact encoded /v4 return path (V4 review ask-f1) rather than a dead or unsafe target.
+  it("renders the hero's one CTA and sends it through the safe auth entry", async () => {
+    // PROPERTY: the hero's CTA enters auth with the exact encoded /v4 return path
+    // rather than a dead or unsafe target. The second button, which opened the
+    // sample exchange, is gone with it.
     const document = await renderRoute(null);
     const hero = document.querySelector('[data-landing-section="hero"]');
     const links = [...(hero?.querySelectorAll("a") ?? [])];
     // The CTA carries a trailing arrow glyph, so compare the label itself.
     const label = (link: Element): string =>
       (link.textContent ?? "").replace("→", "").trim();
-    const primary = links.find((link) => label(link) === "Start a round");
-    const secondary = links.find((link) => label(link) === "Read a scored transcript");
+    const primary = links.find((link) => label(link) === "Ask a question");
 
     expect(primary).toBeDefined();
     expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");
-    expect(secondary).toBeDefined();
+    expect(hero?.querySelector(".lpCtaGhost")).toBeNull();
+    expect(links.find((link) => label(link) === "Read a scored transcript")).toBeUndefined();
   });
 
   it("renders the closing CTA with the safe auth entry", async () => {
@@ -516,7 +534,7 @@ describe("T9-C4 landing content", () => {
     const document = await renderRoute(null);
     const closing = document.querySelector('[data-landing-section="pricing"]');
     const primary = [...(closing?.querySelectorAll("a") ?? [])]
-      .find((link) => (link.textContent ?? "").replace("→", "").trim() === "Start a round");
+      .find((link) => (link.textContent ?? "").replace("→", "").trim() === "Ask a question");
 
     expect(primary).toBeDefined();
     expect(primary?.getAttribute("href")).toBe("/login?next=%2Fv4");

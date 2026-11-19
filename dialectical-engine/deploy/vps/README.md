@@ -1204,8 +1204,8 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf 
 downloads), then install the folder from the store with the network off, and build what the
 release needs (the contract and the website; the website build stamps `RELEASE_KEY`). The build
 line first runs the legal release check (`pnpm run legal:release-check`, §14.7): while the Terms
-of Service or the Privacy Policy is not up to date in every language, or the archive lacks a
-current text, it lists what is missing and the build does not run. That is fixed in the
+of Service or the Privacy Policy is not up to date in every language the release offers, or the
+archive lacks a current text of one of them, it lists what is missing and the build does not run. That is fixed in the
 repository and a new commit reviewed, never on this server:
 
 ```sh
@@ -2602,6 +2602,8 @@ The paid-vendor probe spends at most `max_tokens: 512` per target per staleness 
 
 `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
 
+The API has one more start-up refusal, for the test server's setup only and never on this host: `PREVIEW_PROVIDER_ORIGIN_INVALID`. It means `PREVIEW_PROVIDER_TEST_CONFIG_JSON` is set and `PUBLIC_APP_URL` is neither `https://v3-preview.dezbatere.ro` nor, in hosted mode, `https://dezbatere.ro`. The test server's launcher refuses the same case first, with its own named code (`PREVIEW_ORIGIN_NOT_LISTED` or `PREVIEW_MAIN_ORIGIN_NOT_HOSTED`), so this code shows only when the API is started without the launcher (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 10).
+
 ### The credential-file contract
 
 The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
@@ -3931,10 +3933,12 @@ true:
 
 **The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
 `apps/ui/legal/archive/` (one folder per language). A change to either text is made in English first; before a
-release, every language is translated from the current English text and recorded in
-`apps/ui/legal/translated-from.json`, and `pnpm run generate:legal:archive` adds the file for each current text.
-`pnpm run legal:release-check`, which step 2 of an upgrade runs before the build, refuses a release until both are
-done and names each language that lags.
+release, every language the release offers (`RELEASE_LEGAL_LOCALES` in `apps/ui/scripts/generate-legal-data.mjs`:
+English, French, which Canada reads at sign-up, and Romanian) is translated from the current English text and recorded
+in `apps/ui/legal/translated-from.json`, and `pnpm run generate:legal:archive` adds the file for each current text of
+those languages. `pnpm run legal:release-check`, which step 2 of an upgrade runs before the build, refuses a release
+until both are done and names each of those languages that lags. The other languages' texts stay in the repository
+and are neither checked nor archived.
 Never delete or edit a file there: each is a version someone accepted, and the confirmation email attaches the
 version the person accepted from there, even after the Terms change. The site lists them at `/terms/versions` and
 `/privacy/versions`, as both documents promise, and shows each one at its own address.

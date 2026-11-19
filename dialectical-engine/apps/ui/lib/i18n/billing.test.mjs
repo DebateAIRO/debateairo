@@ -192,8 +192,11 @@ test("each sentence shown before a paid click names the money it moves (A7: the 
   // The upgrade's new monthly price is what the next renewal charges without a notice; it must be seen first.
   assert.match(english["billing.subscription.upgradeQuote"], /\{recurringTotal\}/);
   assert.match(english["billing.subscription.downgraded"], /\{total\}/);
-  // Ruling Q-7: before a downgrade, the lower plan's net price from the plans list, "+ tax", and the date it starts.
-  assert.match(english["billing.subscription.downgradeConfirm"], /\{price\}.*\+ tax.*\{date\}/u);
+  // Ruling Q-7: before a downgrade, the date it starts and the lower plan's net price from the plans list. Terms §12
+  // says prices include tax, so the figure is named as the price before tax, never as "+ tax".
+  assert.match(english["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} a month before tax\..*with tax, once the change is scheduled/u);
+  assert.doesNotMatch(english["billing.subscription.downgradeConfirm"], /\+ tax/u);
+  assert.match(catalogue("ro")["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} pe lună fără taxe\..*cu taxe, după ce schimbarea este programată/u);
   // Spec §1.3: "$20.00 + $4.20 VAT (21%, Romania)" — the tax amount, not only its rate.
   assert.match(english["billing.checkout.taxLabel"], /\{tax\}/);
   assert.match(english["billing.consent.renewal"], /\{total\}/);
@@ -323,10 +326,23 @@ const RETIRED_PLAN_LINES = {
   zh: ["2 位辩手，最经济的模型，固定设置", "3 位辩手，全部设置，最好的模型"],
 };
 
-test("/pricing's plan lines say what is true: Free's low-cost models, and the paid choice of strengths (S4d)", () => {
+// V4 asks send no model strength, so English and Romanian no longer offer a pick of Best, Balanced or Economy: the paid
+// line names the choice V4 does give (Quick look or Thorough, the words of v4.digMode.*), and the Free line says Free
+// questions are public. The other languages keep their earlier lines until they are translated again.
+const V4_PLAN_LINES = {
+  en: ["2 debaters, carefully chosen low-cost models, fixed settings. Free questions and their debates are public.",
+    "3 debaters, all settings, and a choice of Quick look or Thorough for each question", ["Quick look", "Thorough"]],
+  ro: ["2 participanți la dezbatere, modele cu cost redus alese cu grijă, setări fixe. Întrebările din planul Gratuit și dezbaterile lor sunt publice.",
+    "3 participanți la dezbatere, toate setările și, pentru fiecare întrebare, alegerea între „Privire rapidă” și „Analiză amănunțită”",
+    ["Privire rapidă", "Analiză amănunțită"]],
+};
+
+test("/pricing's plan lines say what is true: Free's low-cost models, and the choice a paid plan gives", () => {
   const english = catalogue("en");
-  assert.equal(english["billing.pricing.freeFeatures"], "2 debaters, carefully chosen low-cost models, fixed settings");
-  assert.equal(english["billing.pricing.paidFeatures"], "3 debaters, all settings, and your pick of Best, Balanced or Economy models for each debate");
+  assert.equal(english["billing.pricing.freeFeatures"], V4_PLAN_LINES.en[0]);
+  assert.equal(english["billing.pricing.paidFeatures"], V4_PLAN_LINES.en[1]);
+  assert.equal(JSON.parse(source("messages/en/v4.json"))["v4.digMode.quick"], "Quick look");
+  assert.equal(JSON.parse(source("messages/en/v4.json"))["v4.digMode.thorough"], "Thorough");
   // Spec 2026-10-05 §2.16.5 (Part C): under the cards, which show the connection's currency; it names no currency.
   assert.equal(english["billing.pricing.currencyNote"],
     "You pay in the currency of your billing country. At checkout you see the exact amount, with tax, before you pay.");
@@ -337,6 +353,17 @@ test("/pricing's plan lines say what is true: Free's low-cost models, and the pa
     const [retiredFree, retiredPaid] = RETIRED_PLAN_LINES[code];
     assert.notEqual(billing["billing.pricing.freeFeatures"], retiredFree, `${code}: Free's line no longer promises the cheapest models`);
     assert.notEqual(billing["billing.pricing.paidFeatures"], retiredPaid, `${code}: the paid line no longer promises the best models`);
+    if (code in V4_PLAN_LINES) {
+      const [free, paid, depthNames] = V4_PLAN_LINES[code];
+      assert.equal(billing["billing.pricing.freeFeatures"], free, `${code}: Free's line`);
+      assert.equal(billing["billing.pricing.paidFeatures"], paid, `${code}: the paid line`);
+      for (const name of depthNames) assert.ok(paid.includes(name), `${code}: the paid line names ${name}`);
+      for (const strength of ["Best", "Balanced", "Economy"]) {
+        const label = newDebate[`newDebate.modelStrength${strength}`];
+        assert.ok(!paid.includes(label), `${code}: the paid line offers no model strength (${label})`);
+      }
+      continue;
+    }
     // The paid line names the strengths with the very labels of /new's Model strength chooser.
     for (const strength of ["Best", "Balanced", "Economy"]) {
       const label = newDebate[`newDebate.modelStrength${strength}`];

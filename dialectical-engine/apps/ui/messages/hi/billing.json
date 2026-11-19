@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "साइन इन करें और सेटिंग्स खोलें, फिर सदस्यता, फिर “यहाँ अनुबंध से वापस लें”।",
   "billing.withdrawPage.byEmail": "आप अपने पुष्टि ईमेल का वापसी का आदर्श फ़ॉर्म, या अनुबंध वापस लेने का कोई भी स्पष्ट कथन, {email} पर भी भेज सकते हैं। हम उसे लागू करते हैं और ईमेल से पुष्टि करते हैं।",
   "billing.withdrawPage.signIn": "लॉग इन करें",
-  "billing.withdrawPage.settings": "सेटिंग्स खोलें"
+  "billing.withdrawPage.settings": "सेटिंग्स खोलें",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

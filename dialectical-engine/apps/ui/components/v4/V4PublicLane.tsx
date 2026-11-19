@@ -42,7 +42,7 @@ import { useV4Ask, type V4AskOutcome } from "@/lib/v4/useV4Ask";
 /*
  * Decisions 13, 16 and 22 of 31 Oct on a public page. Under each path: who added to it and when, the digs on it with their own paths, and "Dig into this";
  * the Reports section, with "Write a report". A signed-in stranger digs and writes on their own quota. The dig goes through the one ask hook (consent, room,
- * refusals), so the page starts nothing another way. English for R22 (owner N10), like V4's other labels.
+ * refusals), so the page starts nothing another way. Its words come from the reader's V4 catalogue, like V4's other labels.
  * Owner screen review (3 Nov): the map's dig flow (public-f11, dig-f25): Quick look, with Thorough on paid plans; the share before the press when the room read
  * says one; the site's one Undo window, during which nothing is sent or used (lib/v4/digUndo.ts). After it the person stays on the page, with a card under
  * the path (public-d2 A, V4PublicDig.tsx); the box starts with the path's own suggestions as chips when the public read carries them; "This will be public."

@@ -13,10 +13,10 @@
   "chrome.method": "Method",
   "chrome.transcripts": "Transcripts",
   "chrome.pricing": "Pricing",
-  "chrome.startRound": "Start a round",
+  "chrome.startRound": "Ask a question",
   "chrome.library": "Library",
   "chrome.notFound": "This page could not be found.",
-  "chrome.metaDescription": "A reasoning instrument — several AI models argue a claim in a structured tree.",
+  "chrome.metaDescription": "Ask a question. Several AIs from different companies look into it, and you see what holds up and what is still open.",
   "chrome.debateLibrary": "Debate library",
   "chrome.newDebate": "New debate",
   "chrome.settings": "Settings",
@@ -71,7 +71,12 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Consumer protection",
+  "chrome.footer.madeIn": "Made with {heart} in Romania {flag}",
+  "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "The site was updated. Please reload the page.",
   "chrome.release.reload": "Reload",
-  "chrome.release.madeByNewer": "This was made by a newer version of the site. Reload the page, or try again in a few minutes."
+  "chrome.release.madeByNewer": "This was made by a newer version of the site. Reload the page, or try again in a few minutes.",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

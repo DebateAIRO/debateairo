@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Влезте и отворете Настройки, след това Абонамент, след това „Откажете се от договора тук“.",
   "billing.withdrawPage.byEmail": "Можете също да изпратите стандартния формуляр за отказ от имейла с потвърждение или всяко ясно изявление, че се отказвате, на {email}. Ние го изпълняваме и го потвърждаваме по имейл.",
   "billing.withdrawPage.signIn": "Влезте",
-  "billing.withdrawPage.settings": "Отворете Настройки"
+  "billing.withdrawPage.settings": "Отворете Настройки",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

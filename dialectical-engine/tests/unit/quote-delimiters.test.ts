@@ -290,10 +290,13 @@ describe("QUOTE_DELIMITERS_STRAIGHTENED fix rounds 2-3: the syntax pass reads th
     ["prose and 100 000 spans that never decode", `note ${"{\"a\": “x}".repeat(100000)}`],
     ["prose and 100 000 spans each missing one bracket", `note ${"{\"a\": [1, 2, 3, 4}".repeat(100000)}`]
   ])("answers %s in linear time", (_name, text) => {
+    // 4 s, not 2 s: on a busy CI runner one linear read of this reply took just over 2 s, so the tighter bound failed at random.
+    // The looser one still catches the fault it guards: the reply is over a million characters, so reading it again from each of
+    // its 100 000 spans is some 10^10 character reads, tens of seconds at the least, far past either bound.
     expect(fastestOfThreeMs(() => {
       decodeModelJson(text, STOP);
       classifyStructuredArtifact(text, judgeArtifactSchema, STOP, JUDGE_ARTIFACT_READING);
-    })).toBeLessThan(2000);
+    })).toBeLessThan(4000);
   });
 });
 

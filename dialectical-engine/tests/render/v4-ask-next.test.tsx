@@ -673,3 +673,33 @@ describe("one line, never both, while one question already waits (read-f17)", ()
     expect(page.querySelector(".v4AskRefusal")?.textContent).toBe(CATALOG["v4.askError.alreadyWaiting"]);
   });
 });
+
+describe("a Start refused because an AI it needs is not available: V4's own plain sentence", () => {
+  // These are 422 refusals: nothing was started, so V4 says so plainly instead of /new's "coordinator" sentence, which also
+  // offered a plan choice V4 does not have.
+  it.each([
+    ["a model the plan needs", "ASK_PLAN_TIER_MODEL_UNAVAILABLE"],
+    ["no model for one of the debate's jobs", "ASK_MODEL_CANDIDATE_UNAVAILABLE"]
+  ])("%s: 'The AIs we need are busy right now', never the coordinator or the other plan", async (_name, code) => {
+    server.consent = "given";
+    server.createDebate.mockImplementation(async () => { throw new ContractHttpError("UNPROCESSABLE", 422, `${code}: ${code}`, code); });
+    const page = await mount();
+    await click(justButton());
+    await sent();
+    expect(server.createDebate).toHaveBeenCalledTimes(1);
+    expect(page.querySelector(".v4AskRefusal")?.textContent).toBe(CATALOG["v4.askError.aisBusy"]);
+    expect(page.textContent).not.toMatch(/coordinator|other plan/iu);
+  });
+
+  it("a plan the server does not know: the plain 'nothing was started' line, with no plan to choose", async () => {
+    server.consent = "given";
+    server.createDebate.mockImplementation(async () => {
+      throw new ContractHttpError("UNPROCESSABLE", 422, "ASK_PLAN_TIER_INVALID: ASK_PLAN_TIER_INVALID", "ASK_PLAN_TIER_INVALID");
+    });
+    const page = await mount();
+    await click(justButton());
+    await sent();
+    expect(page.querySelector(".v4AskRefusal")?.textContent).toBe(CATALOG["v4.ask.failed"]);
+    expect(page.textContent).not.toMatch(/coordinator|Free or Premium/iu);
+  });
+});

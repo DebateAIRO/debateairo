@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "サインインして［設定］、［サブスクリプション］、［ここで契約を撤回する］の順に開いてください。",
   "billing.withdrawPage.byEmail": "確認メールに添付の撤回書式のひな形、または撤回する旨の明確な意思表示を {email} に送ることもできます。当社が手続きを行い、メールで確認をお送りします。",
   "billing.withdrawPage.signIn": "ログイン",
-  "billing.withdrawPage.settings": "設定を開く"
+  "billing.withdrawPage.settings": "設定を開く",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

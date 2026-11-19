@@ -221,13 +221,20 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
     mocks.getDebateServer.mockResolvedValue({ ok: false, kind: "loading", run: queuedRun });
   });
 
-  it("renders the Synthesis title, subtitle and pending note from the Hebrew catalogue", async () => {
-    const hebrew = synthesisStrings("he");
+  // The interface offers English and Romanian only, so the non-English page under test is the Romanian one.
+  it("renders the Synthesis title, subtitle and pending note from the Romanian catalogue", async () => {
+    const romanian = synthesisStrings("ro");
     const english = synthesisStrings("en");
-    const panel = synthesisPanel(await renderPage("he"));
-    for (const value of hebrew) expect(panel).toContain(escapeHtml(value));
+    const panel = synthesisPanel(await renderPage("ro"));
+    for (const value of romanian) expect(panel).toContain(escapeHtml(value));
     // MUT: drop catalog={debateDrawersCatalog} from <SynthesisPanel>, or stop loading debateDrawers in page.tsx -> RED.
     for (const value of english) expect(panel).not.toContain(escapeHtml(value));
+  });
+
+  it("renders the English page for a cookie naming a language the site does not offer", async () => {
+    const panel = synthesisPanel(await renderPage("he"));
+    for (const value of synthesisStrings("en")) expect(panel).toContain(escapeHtml(value));
+    for (const value of synthesisStrings("he")) expect(panel).not.toContain(escapeHtml(value));
   });
 
   it("leaves the English page byte-identical except for S02's pending publication action", async () => {
@@ -275,16 +282,16 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
 
   // Follow-up 4, review F1: the workspace's AI notice reads home.* keys, which the
   // debateChrome catalogue it used to receive does not carry, so its link and both
-  // aria-labels answered from t()'s English backstop on a Hebrew page.
-  it("labels the debate page's AI notice link and region from the Hebrew home catalogue", async () => {
-    const html = await renderPage("he");
+  // aria-labels answered from t()'s English backstop on a non-English page.
+  it("labels the debate page's AI notice link and region from the Romanian home catalogue", async () => {
+    const html = await renderPage("ro");
     const notice = html.slice(html.indexOf('<section class="aiNotice'));
     const close = notice.indexOf("</section>");
     const region = notice.slice(0, close);
-    expect(region).toContain(`aria-label="${escapeHtml(catalogValue("he", "home", "home.aiDisclosure"))}"`);
-    expect(region).toContain(`aria-label="${escapeHtml(catalogValue("he", "home", "home.aiLinkLabel"))}"`);
-    expect(region).toContain(`>${escapeHtml(catalogValue("he", "home", "home.aiLink"))}<`);
-    expect(region).toContain(escapeHtml(catalogValue("he", "debateChrome", "debateChrome.aiNotice")));
+    expect(region).toContain(`aria-label="${escapeHtml(catalogValue("ro", "home", "home.aiDisclosure"))}"`);
+    expect(region).toContain(`aria-label="${escapeHtml(catalogValue("ro", "home", "home.aiLinkLabel"))}"`);
+    expect(region).toContain(`>${escapeHtml(catalogValue("ro", "home", "home.aiLink"))}<`);
+    expect(region).toContain(escapeHtml(catalogValue("ro", "debateChrome", "debateChrome.aiNotice")));
     // MUT: pass catalog={debateChromeCatalog} to <AiNotice> again (the pre-fix wiring) -> RED.
     for (const key of ["home.aiDisclosure", "home.aiLinkLabel", "home.aiLink"]) {
       expect(region).not.toContain(escapeHtml(catalogValue("en", "home", key)));
@@ -293,14 +300,14 @@ describe("FIX-DEBATE-CATALOGS: the debate page renders its drawers in the interf
 
   // Follow-up 2 (V: "This needs to be done in all languages"): one level down,
   // the helpers the cards call (roleLabel, scrutinyStatus) take the locale's
-  // catalogue too; neither falls back to English on a Hebrew page.
-  it("labels a lens branch on the Hebrew page from the Hebrew debateChrome catalogue", async () => {
+  // catalogue too; neither falls back to English on a non-English page.
+  it("labels a lens branch on the Romanian page from the Romanian debateChrome catalogue", async () => {
     mocks.getDebateServer.mockResolvedValue({ ok: true, debate: debateWithLensBranch(), answer: null });
-    const hebrewLens = catalogValue("he", "debateChrome", "debateChrome.presentation.lens.scientific");
+    const romanianLens = catalogValue("ro", "debateChrome", "debateChrome.presentation.lens.scientific");
     const englishLens = catalogValue("en", "debateChrome", "debateChrome.presentation.lens.scientific");
-    const html = await renderPage("he");
+    const html = await renderPage("ro");
     const card = html.slice(html.indexOf('data-node-id="node:lens"'));
-    expect(card).toContain(`◆ ${escapeHtml(hebrewLens)}`);
+    expect(card).toContain(`◆ ${escapeHtml(romanianLens)}`);
     // MUT: drop debateChromeCatalog from the canvas, or call roleLabel(node) bare -> RED.
     expect(card).not.toContain(`◆ ${escapeHtml(englishLens)}`);
     const english = await renderPage("en");

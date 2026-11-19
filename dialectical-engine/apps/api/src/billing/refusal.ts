@@ -1,4 +1,5 @@
 import type { FastifyReply } from "fastify";
+import type { AuthenticatedSession } from "../sessions.js";
 
 /**
  * A refusal a billing route answers with `{error: code, message: code}` (plus `charge_ref` for CHECKOUT_PENDING);
@@ -77,7 +78,12 @@ export type BillingRefusalCode =
   /**
    * P15: an account erasure is pending (the person stays signed in for the 7-day grace): no new money is taken (409).
    */
-  | "ACCOUNT_ERASURE_PENDING";
+  | "ACCOUNT_ERASURE_PENDING"
+  /**
+   * On the hosted preview while payments are real: the account may not ask questions there, so it may not buy or upgrade
+   * a plan either; it would pay and then be refused every question. Nothing was written (403).
+   */
+  | "PREVIEW_TEAM_ONLY";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 
@@ -92,6 +98,18 @@ export class BillingRefusal extends Error {
 /** The house 404 every billing route answers while its dependency is absent. */
 export function billingNotFound(reply: FastifyReply): FastifyReply {
   return reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" });
+}
+
+/**
+ * Who may buy or upgrade a plan, when a rule applies: buildApi hands one over only on the hosted preview while payments
+ * are real, where it is the same rule as who may ask. Absent, everyone may, as before.
+ */
+export type BillingBuyerAdmits = (session: AuthenticatedSession) => boolean;
+
+/** The buyer rule's refusal, answered before any budget, check or payment page: nothing is spent or written. */
+export function refuseBuyer(reply: FastifyReply): FastifyReply {
+  const code: BillingRefusalCode = "PREVIEW_TEAM_ONLY";
+  return reply.status(403).send({ error: code, message: code });
 }
 
 /**

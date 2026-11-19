@@ -14,6 +14,7 @@ import { createLiveRunState } from "../../apps/ui/lib/v3/liveEvents.js";
 import type { DebateNode } from "../../apps/ui/lib/types.js";
 import { buildFairShapedAnswer } from "../support/v2uiFixtures.js";
 import chromeEnglish from "../../apps/ui/messages/en/chrome.json" with { type: "json" };
+import chromeRomanian from "../../apps/ui/messages/ro/chrome.json" with { type: "json" };
 import { installFocusFixup } from "./kbd-focus-fixup";
 import { guardSettled, pressByKeyboard, startFocusGuard } from "./kbd-guard-harness";
 
@@ -76,7 +77,8 @@ describe("DEB2-7: No, thanks on the language offer", () => {
   });
 
   it("with nothing focusable after it, it leaves the place to the guard", async () => {
-    await mount(<QuestionLanguageOffer questionLocale="de" interfaceLocale="en" catalog={chromeEnglish} />);
+    // An English debate on a Romanian page: Romanian was dismissed above, and the site offers only these two languages.
+    await mount(<QuestionLanguageOffer questionLocale="en" interfaceLocale="ro" catalog={chromeRomanian} />);
     pressByKeyboard(document.querySelector<HTMLButtonElement>(".languageOfferDismiss")!);
     await settle();
     await guardSettled();

@@ -19,8 +19,8 @@ import { CATALOG, click, harness, mountMap, page, resetHarness, seededAnswer, se
  * V4 start step, Task 76j: the map page's own wiring of the owner's 5 Nov answers, on the real page with the REAL header
  * (its account menu and quota circle; only the server's reads are stand-ins). The review session's wiring list
  * (docs/research/2026-11-03-v4-ux-review/FOR-START-STEP-2026-11-06-wiring.md):
- *  - question 12 B (items 4 and 5): "Open in the classic view" is in the account menu only, on every screen of the map's
- *    step: waiting, paused and failed too; no body screen draws one.
+ *  - "Open in the classic view" is not offered on any screen of the map's step (waiting, paused and failed too): no body
+ *    screen draws one, and the account menu is handed no classic address (every debate on the main site is a V4 one).
  *  - question 18 A (item 6): on a phone the top bar shows "Write my report" only while the bottom bar does not: at a good
  *    moment, and with the strip grown from the bar, one on screen; with a text box focused (the stack aside), the top bar's.
  *  - question 23 A (item 7): the map's report wait line names the one READ dig the report waits for; two, or a dig the
@@ -121,13 +121,15 @@ afterEach(async () => {
   vi.useRealTimers();
 });
 
-// ── Question 12 B: the classic view in the account menu only ─────────────────────────────────────────────────────
-describe("question 12 B: \"Open in the classic view\" is in the account menu only, on every screen of the map", () => {
+// ── No classic view on the map's pages ───────────────────────────────────────────────────────────────────────────
+describe("\"Open in the classic view\" is offered on no screen of the map, its account menu included", () => {
   /** Opens the real header's account menu; the classic items it holds (their addresses). */
   async function classicInMenu(): Promise<string[]> {
     const account = page().querySelector<HTMLButtonElement>(".v4Hdr .v4HdrAccountButton");
     expect(account).not.toBeNull();
     await click(account!);
+    // The menu really is open (its theme item draws only then), so an empty answer below means "no classic item".
+    expect(document.querySelector("[data-v4-menu=mode]")).not.toBeNull();
     return [...document.querySelectorAll<HTMLAnchorElement>("[data-v4-menu=classic]")].map((link) => link.getAttribute("href")!);
   }
   /** Classic links anywhere else on the page (a body screen's own link). */
@@ -140,20 +142,22 @@ describe("question 12 B: \"Open in the classic view\" is in the account menu onl
     ["failed", (runId) => running(runId, { state: "FAILED", terminal_reason: UNAVAILABLE })]
   ];
   for (const [name, run] of screens) {
-    it(`${name}: exactly one, in the menu, with this debate's classic address, and none in the body`, async () => {
+    it(`${name}: none in the menu and none in the body`, async () => {
       const runId = crypto.randomUUID();
       harness.run = run(runId);
       await mountMap(1600, runId);
       expect(classicInBody()).toEqual([]);
-      expect(await classicInMenu()).toEqual([`/debate/${runId}`]);
+      expect(await classicInMenu()).toEqual([]);
       expect(classicInBody()).toEqual([]);
+      expect(document.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
     });
   }
 
-  it("the served map keeps it in the menu, once", async () => {
+  it("the served map offers none either", async () => {
     const runId = await mountMap(1600);
-    expect(await classicInMenu()).toEqual([`/debate/${runId}`]);
+    expect(await classicInMenu()).toEqual([]);
     expect(classicInBody()).toEqual([]);
+    expect(document.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
   });
 });
 

@@ -32,6 +32,7 @@ vi.mock("@/components/support/SupportWidget", () => ({ SupportWidget: () => null
 import { QuestionLanguageChoiceNeededError } from "../../apps/ui/lib/api.js";
 import { ContractHttpError } from "@debateai/contract";
 import NewDebatePageClient from "../../apps/ui/app/new/NewDebatePageClient.js";
+import { useQuestionLanguageChoice } from "../../apps/ui/components/QuestionLanguageChoice.js";
 
 // There is no catalogsFor helper: build the three catalogues the page takes from apps/ui/messages/<locale>/<ns>.json.
 const MESSAGES = resolve(process.cwd(), "apps/ui/messages");
@@ -92,14 +93,14 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
     const { host } = await renderNew("ro");
     await askWith(host, MIXED);
     const dialog = document.querySelector('[data-dialog="question-language"]')!;
-    expect(dialog.textContent).toContain("Întrebarea ta amestecă limbile");
+    expect(dialog.textContent).toContain("Întrebarea dumneavoastră amestecă limbile");
     expect(dialog.querySelector("blockquote bdi")!.getAttribute("lang")).toBe("ro");   // M2: on the <bdi>
     // EU AI Act Art. 50(2): the proposed rewrite is the AI's (apps/api question-language fast-check); the pop-up's own words are not.
     expect(dialog.querySelector("blockquote bdi")!.getAttribute("data-ai-generated")).toBe("true");
     expect(dialog.querySelector("#question-language-body")!.closest("[data-ai-generated]")).toBeNull();
     expect(dialog.textContent).toContain(OFFER.proposed_question);
     expect(dialog.textContent).not.toMatch(/eld|score|model|check_ref/iu);
-    await act(async () => { button("Folosește varianta propusă").click(); });
+    await act(async () => { button("Folosiți varianta propusă").click(); });
     expect(createDebate).toHaveBeenLastCalledWith(OFFER.proposed_question, expect.anything(), "test-token", undefined,
       { siteLanguage: "ro", choice: { check_ref: "ref.sig", choice: "USE_REWRITE", original_question_line: MIXED } }, undefined, undefined, undefined);
   });
@@ -191,12 +192,23 @@ describe("/new: the question's language (question-language spec 2026-10-13)", ()
   });
 
   it("el: Greek running text writes the language names in lower case", async () => {
-    createDebate.mockRejectedValueOnce(new QuestionLanguageChoiceNeededError(OFFER));
-    const { host } = await renderNew("el");
-    await askWith(host, MIXED);
+    // Greek is a catalogue the site does not offer for the interface, so no page runs in Greek (the server reads such a
+    // cookie as English). The pop-up's own rule for Greek is held here directly, with the Greek catalogue.
+    let ensureChoice: ((offer: typeof OFFER) => Promise<unknown>) | null = null;
+    function GreekChoice() {
+      const choice = useQuestionLanguageChoice({ catalog: catalogue("el", "newDebate"), locale: "el" });
+      ensureChoice = choice.ensureChoice;
+      return <>{choice.dialog}</>;
+    }
+    const host = document.createElement("div");
+    document.body.append(host);
+    const root = createRoot(host);
+    await act(async () => { root.render(<GreekChoice />); });
+    await act(async () => { void ensureChoice!(OFFER); });
     const text = document.querySelector('[data-dialog="question-language"]')!.textContent!;
     expect(text).toContain("συνδυάζει ρουμανικά και αγγλικά.");
     expect(text).toContain("στα ρουμανικά:");
+    await act(async () => root.unmount());
   });
 
   it("a language the browser cannot name keeps the server's English name", async () => {

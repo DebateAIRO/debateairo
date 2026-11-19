@@ -13,10 +13,10 @@
   "chrome.method": "Metodă",
   "chrome.transcripts": "Transcrieri",
   "chrome.pricing": "Tarife",
-  "chrome.startRound": "Începeți o rundă",
+  "chrome.startRound": "Puneți o întrebare",
   "chrome.library": "Bibliotecă",
   "chrome.notFound": "Această pagină nu a putut fi găsită.",
-  "chrome.metaDescription": "Un instrument de raționament — mai multe modele IA dezbat o afirmație într-un arbore structurat.",
+  "chrome.metaDescription": "Puneți o întrebare. Mai multe modele IA de la companii diferite o cercetează, iar dumneavoastră vedeți ce rezistă și ce rămâne deschis.",
   "chrome.debateLibrary": "Biblioteca dezbaterilor",
   "chrome.newDebate": "Dezbatere nouă",
   "chrome.settings": "Setări",
@@ -71,7 +71,12 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "Protecția consumatorilor",
+  "chrome.footer.madeIn": "Făcut cu {heart} în România {flag}",
+  "chrome.footer.madeInSpoken": "Făcut cu dragoste în România",
   "chrome.release.newerVersion": "Site-ul a fost actualizat. Reîncărcați pagina.",
   "chrome.release.reload": "Reîncărcați",
-  "chrome.release.madeByNewer": "Această dezbatere a fost creată de o versiune mai nouă a site-ului. Reîncărcați pagina sau încercați din nou peste câteva minute."
+  "chrome.release.madeByNewer": "Această dezbatere a fost creată de o versiune mai nouă a site-ului. Reîncărcați pagina sau încercați din nou peste câteva minute.",
+  "chrome.error.title": "Ceva nu a funcționat",
+  "chrome.error.body": "Această pagină nu a putut fi afișată din cauza unei erori din partea noastră. Vă rugăm să încercați din nou.",
+  "chrome.error.retry": "Încercați din nou"
 }

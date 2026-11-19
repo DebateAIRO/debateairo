@@ -203,5 +203,6 @@
   "billing.withdrawPage.how": "Jelentkezzen be, és nyissa meg a Beállításokat, majd az Előfizetést, majd az „Elállás a szerződéstől” gombot.",
   "billing.withdrawPage.byEmail": "A visszaigazoló e-mailben található elállási nyilatkozatmintát vagy bármilyen egyértelmű nyilatkozatot az elállásról elküldheti a(z) {email} címre is. Végrehajtjuk, és e-mailben visszaigazoljuk.",
   "billing.withdrawPage.signIn": "Bejelentkezés",
-  "billing.withdrawPage.settings": "Beállítások megnyitása"
+  "billing.withdrawPage.settings": "Beállítások megnyitása",
+  "billing.testMode.notice": "Test mode: payments on this site are not real and no money is taken. On the payment page, use the test card 9900 0048 1022 5098 (any future expiry, CVV 111), never your own card."
 }

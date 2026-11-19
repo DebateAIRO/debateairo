@@ -335,6 +335,14 @@ describe("runCarryOnToReport: one dig into each path's top suggestion, through t
     expect(named("askAsOwner")).toBe(0);
   });
 
+  it("a dig whose question spells past the crisis check's cap is never sent either (REFUSED, nothing asked)", async () => {
+    // ﷺ spells as 18 letters: a 1,000-character suggestion is 18,000 for the check, past crisisCheckMaxChars().
+    const flood = suggestion("flood-1", "CONTRADICTING", null, "\u{FDFA}".repeat(1_000));
+    const { ports, named } = fakePorts({ answer: answerWith({ b1: [flood] }, branchesFixture(1)), set: setOf(1) });
+    expect(await runCarryOnToReport(DUE, ports)).toEqual({ kind: "STARTED", digs: 0, stop: "REFUSED" });
+    expect(named("askAsOwner")).toBe(0);
+  });
+
   it("the one principal with a carry-on is built inside the carry-on ports, in buildApi, never by a route", () => {
     const source = readFileSync(resolve(import.meta.dirname, "../../apps/api/src/index.ts"), "utf8");
     const at = [...source.matchAll(/carryOn:/gu)].map((match) => match.index ?? 0);

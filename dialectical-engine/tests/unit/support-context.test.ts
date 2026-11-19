@@ -115,7 +115,9 @@ describe("Support knowledge context", () => {
     // DONE S05 r2: the words check pins the reviewed article and catalogue bytes.
     // 2026-11-18 (cookie-copy): the owner signed the corrected privacy-consent pair (13 cookies, 8 storage items,
     // Dialectical Engine, the notice showing again); its bytes, recovery rows and OWNER records moved the version.
-    expect(corpus.kbVersion).toBe("dcdc4dfdec46392ebd1397f828f8d8e47d49abcd8a63d15d7638f7712fc38815");
+    // The landing lost its Transcripts link and its button became Ask a question: the app-navigation pair's bytes,
+    // chat texts and SOL records (the owner has not read them) moved the version again.
+    expect(corpus.kbVersion).toBe("b26e93161e1e095cd0b1d318bdc73c52c1175224b73ae607cd01a55954d7d4e1");
     expect(Object.isFrozen(corpus)).toBe(true);
     expect(Object.isFrozen(corpus.entries)).toBe(true);
 

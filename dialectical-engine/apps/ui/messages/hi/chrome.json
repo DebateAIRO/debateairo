@@ -71,7 +71,12 @@
   "chrome.footer.mastercard": "Mastercard",
   "chrome.footer.dbipCredit": "IP Geolocation by DB-IP",
   "chrome.footer.consumerProtection": "उपभोक्ता संरक्षण",
+  "chrome.footer.madeIn": "Made with {heart} in Romania {flag}",
+  "chrome.footer.madeInSpoken": "Made with love in Romania",
   "chrome.release.newerVersion": "वेबसाइट को अपडेट किया गया है। पेज फिर से लोड करें।",
   "chrome.release.reload": "फिर से लोड करें",
-  "chrome.release.madeByNewer": "यह वाद-विवाद वेबसाइट के नए संस्करण से बनाया गया है। पेज फिर से लोड करें, या कुछ मिनट बाद फिर से कोशिश करें।"
+  "chrome.release.madeByNewer": "यह वाद-विवाद वेबसाइट के नए संस्करण से बनाया गया है। पेज फिर से लोड करें, या कुछ मिनट बाद फिर से कोशिश करें।",
+  "chrome.error.title": "Something went wrong",
+  "chrome.error.body": "This page could not be shown because of an error on our side. Please try again.",
+  "chrome.error.retry": "Try again"
 }

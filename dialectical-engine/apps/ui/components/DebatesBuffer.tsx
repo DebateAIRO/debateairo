@@ -152,7 +152,9 @@ export function DebatesBuffer({
     return (
       <LibraryRow
         key={debate.id}
-        href={`/debate/${debate.id}`}
+        // Every debate on the main site is a V4 one, so a row opens its V4 page, which is addressed by the run (a served
+        // row's own id is its answer's id; an open run's id is already the run).
+        href={`/v4/debate/${encodeURIComponent(debate.run_ref ?? debate.id)}`}
         claim={debate.topic}
         meta={meta}
         models={debate.models}
