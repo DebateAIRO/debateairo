@@ -8,7 +8,8 @@ import { PRIVACY_315_ENTRY, PRIVACY_315_SWAPS, privacy314Sha256, sha256Of, witho
 /**
  * Privacy Policy 3.15 (tests/support/legalPrivacy315.ts): four corrections so that the policy says what the code does —
  * what NETOPIA receives, the sensitive-data consent record going with the account, off-host backups that do not expire,
- * and unfinished sign-ups deleted after 24 hours. Every language is its 3.14 draft plus the recorded swaps and nothing
+ * and unfinished sign-ups deleted after 24 hours or once their last link expires; section 5 also says the Register
+ * lists the payment provider, and section 6 that a deleted debate comes back only with a whole-service restore. Every language is its 3.14 draft plus the recorded swaps and nothing
  * else; English is pinned word for word; every language has English's rows and names NETOPIA's company in section 5.
  */
 
@@ -33,7 +34,7 @@ const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) 
 const NETOPIA =
   "Payments go through our payment provider, NETOPIA Payments, run by NETOPIA Financial Services S.A. in Romania, once paid plans start. You type your card details on its page, not ours, and it keeps your card so that it can charge it at each renewal. With each payment we send it your name, email address and phone number, your billing address (street, city, region, postcode and country), a customer code that stays the same for all your payments, our reference for the order, the amount and the currency, and a short description of the payment, such as the name of your plan; when it charges your saved card at a renewal, we also send the IP address you last paid from yourself. NETOPIA asks for these details with every card payment.";
 const UNFINISHED_SIGN_UP =
-  "| An account whose sign-up was not finished: the email address not verified, or the second sign-in step (a passkey or an authenticator app) not set up | 24 hours after the sign-up began | Deleted, with everything that belongs to the account; its email address and pseudonym can be used again. The acceptance records and the security audit trail keep their entries, as their rows say |";
+  "| An account whose sign-up was not finished: the email address not verified, or the second sign-in step (a passkey or an authenticator app) not set up | 24 hours after the sign-up began, or once the last link we sent expires if that is later (each link is valid for 24 hours) | Deleted, with everything that belongs to the account; its email address and pseudonym can be used again. The acceptance records and the security audit trail keep their entries, as their rows say |";
 const ACCEPTANCE =
   "| Acceptance and consent records, except the sensitive-data consent: which Terms you accepted, which policy you were shown and what else you agreed to at sign-up and at checkout | Life of the account plus 6 years — the longest limitation period that applies to us | Deleted |";
 const SENSITIVE_CONSENT =
@@ -50,6 +51,8 @@ const ENGLISH_SENTENCES = [
   "Deleting your account destroys those keys on our server, after which the encrypted records there cannot be read by us or anyone else, and we delete your account record.",
   "We describe this as deletion because that is its effect on our server, and we hold a documented assessment behind it",
   "Four things to know:",
+  "The Register applies to every user, wherever you live. It also lists our payment provider, which is not an AI provider: its entry says what it receives for card payments, as \"Other recipients\" below does. For each provider",
+  "No person reads the debate first, and it cannot be restored, unless we restore the whole service from a backup that still holds it (section 7). The first time",
   "not by our deletion; and our backups hold the keys together with the records, so what a backup copy holds can be restored until that copy is removed, and the copies on our separate backup storage are not deleted automatically (the row on backups above)."
 ];
 
@@ -92,6 +95,9 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups and unfi
     expect(text).not.toMatch(/Up to 8 weeks after the live copy is deleted \| Overwritten/u);
     expect(text).not.toContain("Backups keep them for up to 8 weeks");
     expect(text).not.toContain("Three things to know");
+    expect(text).not.toContain("and it cannot be restored. The first time");
+    // Section 5 names NETOPIA in one paragraph only: the sentence on the Register does not name it.
+    expect(section(text, 5).split("\n").filter((line) => line.includes("NETOPIA"))).toHaveLength(1);
     expect(text).toContain(`\nThis policy was last updated on 19 November 2026. ${PRIVACY_315_ENTRY} ${PRIVACY_314_ENTRY} Version 3.13 replaced`);
   });
 

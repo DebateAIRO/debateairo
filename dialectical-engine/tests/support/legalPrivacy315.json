@@ -27,12 +27,20 @@
     "، ونحذف هذا السجل مع حسابك"
    ],
    [
+    "",
+    "ُدرج السجل أيضًا مزود خدمات الدفع لدينا، وهو ليس مزودًا لخدمات الذكاء الاصطناعي: ويبين إدخاله ما يتلقاه عند الدفع بالبطاقة، كما تبين فقرة «المتلقون الآخرون» أدناه. وي"
+   ],
+   [
     "عند بدء الخطط المدفوع",
     "الذي تديره شركة NETOPIA Financial Services S.A. في رومانيا، عند بدء الخطط المدفوعة. وتُدخل بيانات بطاقتك في صفحته، لا في صفحتنا، وهو يحتفظ ببطاقتك ليتمكن من خصم المبالغ منها عند كل تجديد. ومع كل دفعة نرسل إليه اسمك وعنوان بريدك الإلكتروني ورقم هاتفك، وعنوان الفوترة الخاص بك (الشارع والمدينة والمنطقة والرمز البريدي والبلد)، ورمز عميل يبقى هو نفسه لجميع مدفوعاتك، ومرجعنا للطلب، والمبلغ والعملة، ووصفًا موجزًا للدفعة، مثل اسم خطتك؛ وعندما يخصم المبلغ من بطاقتك المحفوظة عند التجديد، نرسل إليه أيضًا عنوان IP الذي دفعت منه بنفسك آخر مرة. وتطلب NETOPIA هذه البيانات مع كل دفعة بالبطاق"
    ],
    [
     "",
-    "\n| حساب لم يكتمل تسجيله: لم يُتحقق من عنوان البريد الإلكتروني، أو لم تُعدّ خطوة تسجيل الدخول الثانية (مفتاح مرور أو تطبيق مصادقة) | 24 ساعة بعد بدء التسجيل | يُحذف مع كل ما يخص الحساب؛ ويمكن استخدام عنوان بريده الإلكتروني واسمه المستعار مرة أخرى. وتحتفظ سجلات القبول وسجل تدقيق الأمان بقيودها، كما تبين صفوفها |"
+    "، إلا إذا استعدنا الخدمة بأكملها من نسخة احتياطية لا تزال تحتفظ بها (القسم 7)"
+   ],
+   [
+    "",
+    "\n| حساب لم يكتمل تسجيله: لم يُتحقق من عنوان البريد الإلكتروني، أو لم تُعدّ خطوة تسجيل الدخول الثانية (مفتاح مرور أو تطبيق مصادقة) | 24 ساعة بعد بدء التسجيل، أو عند انتهاء صلاحية آخر رابط أرسلناه إذا كان ذلك لاحقًا (تبقى صلاحية كل رابط 24 ساعة) | يُحذف مع كل ما يخص الحساب؛ ويمكن استخدام عنوان بريده الإلكتروني واسمه المستعار مرة أخرى. وتحتفظ سجلات القبول وسجل تدقيق الأمان بقيودها، كما تبين صفوفها |"
    ],
    [
     "",
@@ -84,12 +92,20 @@
     " и изтриваме този запис заедно с профила Ви"
    ],
    [
+    "",
+    "В него е посочен и нашият доставчик на платежни услуги, който не е доставчик на ИИ: неговият запис посочва какво получава при плащания с карта, както прави и параграфът „Други получатели“ по-долу. "
+   ],
+   [
     "когато стартират платените планове",
     "управляван от NETOPIA Financial Services S.A. в Румъния, когато стартират платените планове. Данните на картата си въвеждате на неговата страница, а не на нашата, и той съхранява картата Ви, за да може да я таксува при всяко подновяване. С всяко плащане му изпращаме Вашето име, адрес на електронна поща и телефонен номер, адреса Ви за фактуриране (улица, град, област, пощенски код и държава), клиентски код, който е един и същ за всичките Ви плащания, нашия идентификатор на поръчката, сумата и валутата, както и кратко описание на плащането, например името на плана Ви; когато таксува запазената Ви карта при подновяване, му изпращаме и IP адреса, от който последно сте платили сами. NETOPIA изисква тези данни при всяко плащане с карта"
    ],
    [
     "",
-    "\n| Профил, чиято регистрация не е завършена: адресът на електронната поща не е потвърден или не е настроена втората стъпка за влизане (ключ за достъп или приложение за удостоверяване) | 24 часа от началото на регистрацията | Изтрива се заедно с всичко, което принадлежи на профила; адресът му на електронна поща и псевдонимът могат да бъдат използвани отново. Записите за приемане и одитната следа за сигурност запазват своите вписвания, както е посочено в техните редове |"
+    ", освен ако не възстановим цялата услуга от резервно копие, което все още го съдържа (раздел 7)"
+   ],
+   [
+    "",
+    "\n| Профил, чиято регистрация не е завършена: адресът на електронната поща не е потвърден или не е настроена втората стъпка за влизане (ключ за достъп или приложение за удостоверяване) | 24 часа от началото на регистрацията или когато изтече последната изпратена от нас връзка, ако това е по-късно (всяка връзка е валидна 24 часа) | Изтрива се заедно с всичко, което принадлежи на профила; адресът му на електронна поща и псевдонимът могат да бъдат използвани отново. Записите за приемане и одитната следа за сигурност запазват своите вписвания, както е посочено в техните редове |"
    ],
    [
     "",
@@ -141,12 +157,20 @@
     "; tento záznam vymažeme spolu s vaším účtem"
    ],
    [
+    "",
+    "vádí také našeho poskytovatele platebních služeb, který není poskytovatelem AI: jeho záznam říká, co přijímá u plateb kartou, stejně jako níže odstavec „Další příjemci“. U"
+   ],
+   [
     "od spuštění placených tarifů",
     "provozovaného společností NETOPIA Financial Services S.A. v Rumunsku, od spuštění placených tarifů. Údaje o kartě zadáváte na stránce poskytovatele, nikoli na naší, a poskytovatel vaši kartu uchovává, aby z ní mohl strhávat platby při každém obnovení. S každou platbou mu zasíláme vaše jméno, e-mailovou adresu a telefonní číslo, vaši fakturační adresu (ulici, město, region, PSČ a zemi), zákaznický kód, který zůstává stejný pro všechny vaše platby, naše referenční číslo objednávky, částku a měnu a krátký popis platby, například název vašeho tarifu; když při obnovení strhává platbu z vaší uložené karty, zasíláme mu také IP adresu, ze které jste naposledy platili sami. NETOPIA tyto údaje požaduje u každé platby kartou"
    ],
    [
     "",
-    "\n| Účet, jehož registrace nebyla dokončena: e-mailová adresa nebyla ověřena nebo nebyl nastaven druhý krok přihlášení (přístupový klíč nebo ověřovací aplikace) | 24 hodin od zahájení registrace | Vymazán se vším, co k účtu patří; jeho e-mailovou adresu a pseudonym lze použít znovu. Záznamy o přijetí a bezpečnostní auditní stopa si své položky ponechávají, jak uvádějí jejich řádky |"
+    ", ledaže bychom obnovili celou službu ze zálohy, která ji stále obsahuje (oddíl 7)"
+   ],
+   [
+    "",
+    "\n| Účet, jehož registrace nebyla dokončena: e-mailová adresa nebyla ověřena nebo nebyl nastaven druhý krok přihlášení (přístupový klíč nebo ověřovací aplikace) | 24 hodin od zahájení registrace, nebo jakmile vyprší platnost posledního odkazu, který jsme vám poslali, pokud to nastane později (každý odkaz platí 24 hodin) | Vymazán se vším, co k účtu patří; jeho e-mailovou adresu a pseudonym lze použít znovu. Záznamy o přijetí a bezpečnostní auditní stopa si své položky ponechávají, jak uvádějí jejich řádky |"
    ],
    [
     "stane nečitelným",
@@ -198,12 +222,20 @@
     ", og vi sletter denne registrering sammen med din konto"
    ],
    [
+    "",
+    "Det angiver også vores betalingsudbyder, som ikke er en AI-udbyder: Dens registrering angiver, hvad den modtager ved kortbetalinger, ligesom »Andre modtagere« nedenfor gør. "
+   ],
+   [
     "når betalte abonnementer starter",
     "drevet af NETOPIA Financial Services S.A. i Rumænien, når betalte abonnementer starter. Du indtaster dine kortoplysninger på udbyderens side, ikke vores, og udbyderen gemmer dit kort, så den kan debitere det ved hver fornyelse. Ved hver betaling sender vi udbyderen dit navn, din e-mailadresse og dit telefonnummer, din faktureringsadresse (gade, by, region, postnummer og land), en kundekode, der er den samme for alle dine betalinger, vores reference for ordren, beløbet og valutaen samt en kort beskrivelse af betalingen, f.eks. navnet på dit abonnement; når udbyderen debiterer dit gemte kort ved en fornyelse, sender vi også den IP-adresse, du sidst selv betalte fra. NETOPIA beder om disse oplysninger ved hver kortbetaling"
    ],
    [
     "",
-    "\n| En konto, hvis tilmelding ikke blev gennemført: e-mailadressen er ikke bekræftet, eller det andet trin ved login (en adgangsnøgle eller en godkendelsesapp) er ikke sat op | 24 timer efter at tilmeldingen begyndte | Slettes med alt, hvad der hører til kontoen; dens e-mailadresse og pseudonym kan bruges igen. Registreringerne af accept og samtykke og sikkerhedsrevisionssporet beholder deres poster, som deres rækker angiver |"
+    ", medmindre vi gendanner hele tjenesten fra en sikkerhedskopi, der stadig indeholder den (afsnit 7)"
+   ],
+   [
+    "",
+    "\n| En konto, hvis tilmelding ikke blev gennemført: e-mailadressen er ikke bekræftet, eller det andet trin ved login (en adgangsnøgle eller en godkendelsesapp) er ikke sat op | 24 timer efter at tilmeldingen begyndte, eller når det sidste link, vi sendte, udløber, hvis det er senere (hvert link er gyldigt i 24 timer) | Slettes med alt, hvad der hører til kontoen; dens e-mailadresse og pseudonym kan bruges igen. Registreringerne af accept og samtykke og sikkerhedsrevisionssporet beholder deres poster, som deres rækker angiver |"
    ],
    [
     "",
@@ -255,12 +287,20 @@
     " und löschen diesen Nachweis mit Ihrem Konto"
    ],
    [
+    "",
+    "führt auch unseren Zahlungsanbieter auf, der kein KI-Anbieter ist: Sein Eintrag gibt an, was er bei Kartenzahlungen erhält, wie es auch der Absatz „Andere Empfänger“ weiter unten tut. Es "
+   ],
+   [
     " abgewickelt, sobald kostenpflichtige Tarife starten",
     ", betrieben von NETOPIA Financial Services S.A. in Rumänien, abgewickelt, sobald kostenpflichtige Tarife starten. Sie geben Ihre Kartendaten auf seiner Seite ein, nicht auf unserer, und er speichert Ihre Karte, damit er sie bei jeder Verlängerung belasten kann. Mit jeder Zahlung übermitteln wir ihm Ihren Namen, Ihre E-Mail-Adresse und Ihre Telefonnummer, Ihre Rechnungsadresse (Straße, Ort, Region, Postleitzahl und Land), eine Kundenkennung, die für alle Ihre Zahlungen gleich bleibt, unsere Referenz für die Bestellung, den Betrag und die Währung sowie eine kurze Beschreibung der Zahlung, etwa den Namen Ihres Tarifs; wenn er Ihre gespeicherte Karte bei einer Verlängerung belastet, übermitteln wir außerdem die IP-Adresse, von der aus Sie zuletzt selbst bezahlt haben. NETOPIA verlangt diese Angaben bei jeder Kartenzahlung"
    ],
    [
     "",
-    "\n| Ein Konto, dessen Registrierung nicht abgeschlossen wurde: die E-Mail-Adresse nicht bestätigt oder der zweite Anmeldeschritt (ein Passkey oder eine Authenticator-App) nicht eingerichtet | 24 Stunden nach Beginn der Registrierung | Gelöscht, mit allem, was zu dem Konto gehört; seine E-Mail-Adresse und sein Pseudonym können wieder verwendet werden. Die Nachweise über Annahme und Einwilligung und das Sicherheitsprotokoll behalten ihre Einträge, wie in ihren Zeilen angegeben |"
+    ", es sei denn, wir stellen den gesamten Dienst aus einer Sicherung wieder her, die sie noch enthält (Abschnitt 7)"
+   ],
+   [
+    "",
+    "\n| Ein Konto, dessen Registrierung nicht abgeschlossen wurde: die E-Mail-Adresse nicht bestätigt oder der zweite Anmeldeschritt (ein Passkey oder eine Authenticator-App) nicht eingerichtet | 24 Stunden nach Beginn der Registrierung oder, falls dies später ist, sobald der letzte von uns gesendete Link abläuft (jeder Link ist 24 Stunden lang gültig) | Gelöscht, mit allem, was zu dem Konto gehört; seine E-Mail-Adresse und sein Pseudonym können wieder verwendet werden. Die Nachweise über Annahme und Einwilligung und das Sicherheitsprotokoll behalten ihre Einträge, wie in ihren Zeilen angegeben |"
    ],
    [
     "unlesbar werden",
@@ -312,12 +352,20 @@
     ", και διαγράφουμε αυτή την εγγραφή μαζί με τον λογαριασμό σας"
    ],
    [
+    "",
+    "Περιλαμβάνει επίσης τον πάροχο πληρωμών μας, ο οποίος δεν είναι πάροχος ΤΝ: η καταχώρισή του αναφέρει τι λαμβάνει για τις πληρωμές με κάρτα, όπως και η παράγραφος «Άλλοι αποδέκτες» παρακάτω. "
+   ],
+   [
     "όταν ξεκινήσουν τα επί πληρωμή προγράμμα",
     "τον οποίο λειτουργεί η NETOPIA Financial Services S.A. στη Ρουμανία, όταν ξεκινήσουν τα επί πληρωμή προγράμματα. Τα στοιχεία της κάρτας σας τα πληκτρολογείτε στη δική του σελίδα, όχι στη δική μας, και αυτός τηρεί την κάρτα σας ώστε να μπορεί να τη χρεώνει σε κάθε ανανέωση. Με κάθε πληρωμή του στέλνουμε το όνομά σας, τη διεύθυνση email και τον αριθμό τηλεφώνου σας, τη διεύθυνση χρέωσής σας (οδό, πόλη, περιφέρεια, ταχυδρομικό κώδικα και χώρα), έναν κωδικό πελάτη που παραμένει ίδιος για όλες τις πληρωμές σας, τον δικό μας κωδικό αναφοράς της παραγγελίας, το ποσό και το νόμισμα, καθώς και μια σύντομη περιγραφή της πληρωμής, όπως το όνομα του προγράμματός σας· όταν χρεώνει την αποθηκευμένη κάρτα σας σε μια ανανέωση, του στέλνουμε επίσης τη διεύθυνση IP από την οποία πληρώσατε την τελευταία φορά εσείς οι ίδιοι. Η NETOPIA ζητά αυτά τα στοιχεία σε κάθε πληρωμή με κάρ"
    ],
    [
     "",
-    "\n| Λογαριασμός του οποίου η εγγραφή δεν ολοκληρώθηκε: η διεύθυνση email δεν επαληθεύτηκε ή δεν ρυθμίστηκε το δεύτερο βήμα σύνδεσης (κλειδί πρόσβασης ή εφαρμογή ελέγχου ταυτότητας) | 24 ώρες από την έναρξη της εγγραφής | Διαγράφεται μαζί με ό,τι ανήκει στον λογαριασμό· η διεύθυνση email και το ψευδώνυμό του μπορούν να χρησιμοποιηθούν ξανά. Τα αρχεία αποδοχής και το αρχείο ελέγχου ασφαλείας διατηρούν τις καταχωρίσεις τους, όπως αναφέρουν οι αντίστοιχες γραμμές τους |"
+    ", εκτός αν αποκαταστήσουμε ολόκληρη την υπηρεσία από αντίγραφο ασφαλείας που την περιέχει ακόμη (ενότητα 7)"
+   ],
+   [
+    "",
+    "\n| Λογαριασμός του οποίου η εγγραφή δεν ολοκληρώθηκε: η διεύθυνση email δεν επαληθεύτηκε ή δεν ρυθμίστηκε το δεύτερο βήμα σύνδεσης (κλειδί πρόσβασης ή εφαρμογή ελέγχου ταυτότητας) | 24 ώρες από την έναρξη της εγγραφής ή όταν λήξει ο τελευταίος σύνδεσμος που στείλαμε, αν αυτό συμβεί αργότερα (κάθε σύνδεσμος ισχύει για 24 ώρες) | Διαγράφεται μαζί με ό,τι ανήκει στον λογαριασμό· η διεύθυνση email και το ψευδώνυμό του μπορούν να χρησιμοποιηθούν ξανά. Τα αρχεία αποδοχής και το αρχείο ελέγχου ασφαλείας διατηρούν τις καταχωρίσεις τους, όπως αναφέρουν οι αντίστοιχες γραμμές τους |"
    ],
    [
     "",
@@ -369,12 +417,20 @@
     ", and we delete this record with your account"
    ],
    [
+    "",
+    "It also lists our payment provider, which is not an AI provider: its entry says what it receives for card payments, as \"Other recipients\" below does. "
+   ],
+   [
     "once paid plans star",
     "run by NETOPIA Financial Services S.A. in Romania, once paid plans start. You type your card details on its page, not ours, and it keeps your card so that it can charge it at each renewal. With each payment we send it your name, email address and phone number, your billing address (street, city, region, postcode and country), a customer code that stays the same for all your payments, our reference for the order, the amount and the currency, and a short description of the payment, such as the name of your plan; when it charges your saved card at a renewal, we also send the IP address you last paid from yourself. NETOPIA asks for these details with every card paymen"
    ],
    [
     "",
-    "\n| An account whose sign-up was not finished: the email address not verified, or the second sign-in step (a passkey or an authenticator app) not set up | 24 hours after the sign-up began | Deleted, with everything that belongs to the account; its email address and pseudonym can be used again. The acceptance records and the security audit trail keep their entries, as their rows say |"
+    ", unless we restore the whole service from a backup that still holds it (section 7)"
+   ],
+   [
+    "",
+    "\n| An account whose sign-up was not finished: the email address not verified, or the second sign-in step (a passkey or an authenticator app) not set up | 24 hours after the sign-up began, or once the last link we sent expires if that is later (each link is valid for 24 hours) | Deleted, with everything that belongs to the account; its email address and pseudonym can be used again. The acceptance records and the security audit trail keep their entries, as their rows say |"
    ],
    [
     "",
@@ -398,7 +454,7 @@
    ],
    [
     "",
-    "5 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, and what we send it with each payment (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); that the encrypted copies on our separate backup storage are not deleted automatically, so a deleted debate or a closed account can be restored from them until they are removed, where it said that backups are kept for up to 8 weeks (section 7); and that an account whose sign-up is not finished within 24 hours is deleted (section 7). Version 3.1"
+    "5 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, what we send it with each payment, and that the Register lists it too (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); that the encrypted copies on our separate backup storage are not deleted automatically, so a deleted debate or a closed account can be restored from them until they are removed, where it said that backups are kept for up to 8 weeks (sections 6 and 7); and that an account whose sign-up is not finished is deleted 24 hours after the sign-up began, or once the last link we sent expires if that is later (section 7). Version 3.1"
    ]
   ]
  },
@@ -430,12 +486,20 @@
     ", y eliminamos este registro con su cuenta"
    ],
    [
+    "",
+    "También figura en él nuestro proveedor de pagos, que no es un proveedor de IA: su entrada indica qué recibe para los pagos con tarjeta, como hace más abajo el apartado «Otros destinatarios». "
+   ],
+   [
     "cuando comiencen los planes de pago",
     "gestionado por NETOPIA Financial Services S.A. en Rumanía, cuando comiencen los planes de pago. Usted introduce los datos de su tarjeta en la página del proveedor, no en la nuestra, y este conserva su tarjeta para poder efectuar el cargo en ella en cada renovación. Con cada pago le enviamos su nombre, su dirección de correo electrónico y su número de teléfono, su dirección de facturación (calle, ciudad, región, código postal y país), un código de cliente que es el mismo para todos sus pagos, nuestra referencia del pedido, el importe y la moneda, y una breve descripción del pago, como el nombre de su plan; cuando efectúa el cargo en su tarjeta guardada en una renovación, le enviamos también la dirección IP desde la que usted mismo pagó por última vez. NETOPIA solicita estos datos en cada pago con tarjeta"
    ],
    [
     "",
-    "\n| Una cuenta cuyo registro no se completó: la dirección de correo electrónico no se verificó, o no se configuró el segundo paso de inicio de sesión (una llave de acceso o una aplicación de autenticación) | 24 horas después de iniciarse el registro | Se elimina, con todo lo que pertenece a la cuenta; su dirección de correo electrónico y su seudónimo pueden volver a utilizarse. Los registros de aceptación y el registro de auditoría de seguridad conservan sus entradas, como indican sus filas |"
+    ", salvo que restauremos todo el servicio a partir de una copia de seguridad que aún lo contenga (sección 7)"
+   ],
+   [
+    "",
+    "\n| Una cuenta cuyo registro no se completó: la dirección de correo electrónico no se verificó, o no se configuró el segundo paso de inicio de sesión (una llave de acceso o una aplicación de autenticación) | 24 horas después de iniciarse el registro, o cuando caduque el último enlace que le enviamos, si esto ocurre más tarde (cada enlace es válido durante 24 horas) | Se elimina, con todo lo que pertenece a la cuenta; su dirección de correo electrónico y su seudónimo pueden volver a utilizarse. Los registros de aceptación y el registro de auditoría de seguridad conservan sus entradas, como indican sus filas |"
    ],
    [
     "",
@@ -487,12 +551,20 @@
     " ning kustutame selle kirje koos teie kontoga"
    ],
    [
+    "",
+    "Selles on loetletud ka meie makseteenuse pakkuja, kes ei ole tehisintellekti pakkuja: tema kirjes on öeldud, mida ta kaardimaksete puhul saab, nagu ka allpool lõigus „Muud vastuvõtjad“. "
+   ],
+   [
     "kui tasulised paketid algavad",
     "mida haldab NETOPIA Financial Services S.A. Rumeenias, kui tasulised paketid algavad. Kaardiandmed sisestate pakkuja lehel, mitte meie omal, ja pakkuja säilitab teie kaardi, et sellelt igal uuendamisel tasu võtta. Iga maksega saadame pakkujale teie nime, e-posti aadressi ja telefoninumbri, teie arveldusaadressi (tänav, linn, piirkond, postiindeks ja riik), kliendikoodi, mis jääb kõigi teie maksete puhul samaks, meie viite tellimusele, summa ja valuuta ning makse lühikirjelduse, näiteks teie paketi nime; kui pakkuja võtab uuendamisel tasu teie salvestatud kaardilt, saadame ka IP-aadressi, millelt te viimati ise maksite. NETOPIA nõuab neid andmeid iga kaardimakse puhul"
    ],
    [
     "",
-    "\n| Konto, mille registreerumine jäi lõpetamata: e-posti aadress on kinnitamata või sisselogimise teine samm (pääsuvõti või autentimisrakendus) on seadistamata | 24 tundi pärast registreerumise algust | Kustutatakse koos kõigega, mis kontole kuulub; selle e-posti aadressi ja pseudonüümi saab uuesti kasutada. Nõustumise ja nõusoleku kirjed ning turbeauditilogi säilitavad oma kanded, nagu nende ridades on öeldud |"
+    ", välja arvatud juhul, kui taastame kogu teenuse varukoopiast, milles see veel alles on (jaotis 7)"
+   ],
+   [
+    "",
+    "\n| Konto, mille registreerumine jäi lõpetamata: e-posti aadress on kinnitamata või sisselogimise teine samm (pääsuvõti või autentimisrakendus) on seadistamata | 24 tundi pärast registreerumise algust või, kui see on hiljem, siis kui meie saadetud viimane link aegub (iga link kehtib 24 tundi) | Kustutatakse koos kõigega, mis kontole kuulub; selle e-posti aadressi ja pseudonüümi saab uuesti kasutada. Nõustumise ja nõusoleku kirjed ning turbeauditilogi säilitavad oma kanded, nagu nende ridades on öeldud |"
    ],
    [
     "loetamatuks",
@@ -544,12 +616,20 @@
     ", ja poistamme tämän tietueen tilisi mukana"
    ],
    [
+    "",
+    "luetellaan myös maksupalveluntarjoajamme, joka ei ole tekoälypalveluntarjoaja: sitä koskevassa merkinnässä kerrotaan, mitä se saa korttimaksujen yhteydessä, kuten alla oleva kappale ”Muut vastaanottajat” kertoo. Siinä "
+   ],
+   [
     "kun maksulliset tilaukset alkavat",
     "jota ylläpitää NETOPIA Financial Services S.A. Romaniassa, kun maksulliset tilaukset alkavat. Syötät korttitietosi sen sivulla, et meidän sivullamme, ja se säilyttää korttisi voidakseen veloittaa sitä jokaisen uusimisen yhteydessä. Jokaisen maksun yhteydessä lähetämme sille nimesi, sähköpostiosoitteesi ja puhelinnumerosi, laskutusosoitteesi (katuosoite, kaupunki, alue, postinumero ja maa), asiakaskoodin, joka pysyy samana kaikissa maksuissasi, oman viitteemme ostokselle, summan ja valuutan sekä lyhyen kuvauksen maksusta, kuten tilauksesi nimen; kun se veloittaa tallennettua korttiasi uusimisen yhteydessä, lähetämme lisäksi IP-osoitteen, josta viimeksi maksoit itse. NETOPIA pyytää näitä tietoja jokaisen korttimaksun yhteydessä"
    ],
    [
     "",
-    "\n| Tili, jonka rekisteröityminen jäi kesken: sähköpostiosoitetta ei vahvistettu tai toista kirjautumisvaihetta (pääsyavainta tai todennussovellusta) ei otettu käyttöön | 24 tuntia rekisteröitymisen alkamisesta | Poistetaan kaikkine tiliin kuuluvine tietoineen; sen sähköpostiosoitetta ja nimimerkkiä voi käyttää uudelleen. Hyväksyntä- ja suostumustiedot sekä turvallisuuden kirjausketju säilyttävät merkintänsä niiden rivien mukaisesti |"
+    ", ellemme palauta koko palvelua varmuuskopiosta, jossa se on yhä tallessa (osio 7)"
+   ],
+   [
+    "",
+    "\n| Tili, jonka rekisteröityminen jäi kesken: sähköpostiosoitetta ei vahvistettu tai toista kirjautumisvaihetta (pääsyavainta tai todennussovellusta) ei otettu käyttöön | 24 tuntia rekisteröitymisen alkamisesta tai, jos se on myöhemmin, kun viimeisin lähettämämme linkki vanhenee (jokainen linkki on voimassa 24 tuntia) | Poistetaan kaikkine tiliin kuuluvine tietoineen; sen sähköpostiosoitetta ja nimimerkkiä voi käyttää uudelleen. Hyväksyntä- ja suostumustiedot sekä turvallisuuden kirjausketju säilyttävät merkintänsä niiden rivien mukaisesti |"
    ],
    [
     "",
@@ -601,12 +681,20 @@
     ", et nous supprimons cet enregistrement avec votre compte"
    ],
    [
+    "",
+    "Il mentionne aussi notre prestataire de paiement, qui n'est pas un fournisseur d'IA : sa fiche indique ce qu'il reçoit pour les paiements par carte, comme le fait le paragraphe « Autres destinataires » ci-dessous. "
+   ],
+   [
     "dès le lancement des formules payantes",
     "exploité par NETOPIA Financial Services S.A. en Roumanie, dès le lancement des formules payantes. Vous saisissez les données de votre carte sur sa page, et non sur la nôtre, et il conserve votre carte afin de pouvoir la débiter à chaque renouvellement. À chaque paiement, nous lui envoyons votre nom, votre adresse e-mail et votre numéro de téléphone, votre adresse de facturation (rue, ville, région, code postal et pays), un code client qui reste le même pour tous vos paiements, notre référence de la commande, le montant et la devise, ainsi qu'une courte description du paiement, par exemple le nom de votre formule ; lorsqu'il débite votre carte enregistrée lors d'un renouvellement, nous lui envoyons aussi l'adresse IP depuis laquelle vous avez payé vous-même la dernière fois. NETOPIA demande ces données pour chaque paiement par carte"
    ],
    [
     "",
-    "\n| Un compte dont l'inscription n'a pas été menée à terme : l'adresse e-mail n'a pas été vérifiée, ou la deuxième étape de connexion (une clé d’accès ou une application d’authentification) n'a pas été configurée | 24 heures après le début de l'inscription | Supprimé, avec tout ce qui appartient au compte ; son adresse e-mail et son pseudonyme peuvent être réutilisés. Les preuves d'acceptation et le journal d'audit de sécurité conservent leurs entrées, comme l'indiquent leurs lignes |"
+    ", sauf si nous restaurons l’ensemble du service à partir d’une sauvegarde qui le contient encore (section 7)"
+   ],
+   [
+    "",
+    "\n| Un compte dont l'inscription n'a pas été menée à terme : l'adresse e-mail n'a pas été vérifiée, ou la deuxième étape de connexion (une clé d’accès ou une application d’authentification) n'a pas été configurée | 24 heures après le début de l'inscription ou, si c'est plus tard, après l'expiration du dernier lien que nous vous avons envoyé (chaque lien est valable 24 heures) | Supprimé, avec tout ce qui appartient au compte ; son adresse e-mail et son pseudonyme peuvent être réutilisés. Les preuves d'acceptation et le journal d'audit de sécurité conservent leurs entrées, comme l'indiquent leurs lignes |"
    ],
    [
     "",
@@ -630,7 +718,7 @@
    ],
    [
     "",
-    "5 a remplacé la version 3.14 : elle indique quelle société exploite notre prestataire de paiement, NETOPIA Payments, et ce que nous lui envoyons à chaque paiement (section 5) ; que la preuve de votre consentement au traitement des données sensibles est supprimée avec votre compte, tandis que les autres preuves d'acceptation et de consentement sont conservées 6 ans après la fin du compte (sections 2, 3 et 7) ; que les copies chiffrées conservées sur notre stockage de sauvegarde distinct ne sont pas supprimées automatiquement, de sorte qu'un débat supprimé ou un compte clôturé peut en être restauré tant qu'elles n'ont pas été supprimées, alors qu'elle indiquait que les sauvegardes étaient conservées jusqu'à 8 semaines (section 7) ; et qu'un compte dont l'inscription n'est pas menée à terme dans les 24 heures est supprimé (section 7). La version 3.1"
+    "5 a remplacé la version 3.14 : elle indique quelle société exploite notre prestataire de paiement, NETOPIA Payments, ce que nous lui envoyons à chaque paiement et que le Registre le mentionne aussi (section 5) ; que la preuve de votre consentement au traitement des données sensibles est supprimée avec votre compte, tandis que les autres preuves d'acceptation et de consentement sont conservées 6 ans après la fin du compte (sections 2, 3 et 7) ; que les copies chiffrées conservées sur notre stockage de sauvegarde distinct ne sont pas supprimées automatiquement, de sorte qu'un débat supprimé ou un compte clôturé peut en être restauré tant qu'elles n'ont pas été supprimées, alors qu'elle indiquait que les sauvegardes étaient conservées jusqu'à 8 semaines (sections 6 et 7) ; et qu'un compte dont l'inscription n'est pas menée à terme est supprimé 24 heures après le début de l'inscription ou, si c'est plus tard, à l'expiration du dernier lien que nous vous avons envoyé (section 7). La version 3.1"
    ]
   ]
  },
@@ -662,12 +750,20 @@
     ", agus scriosaimid an taifead seo le do chuntas"
    ],
    [
+    "",
+    "Liostaítear ann freisin ár soláthraí íocaíochta, nach soláthraí IS é: deir a iontráil cad a fhaigheann sé le haghaidh íocaíochtaí cárta, mar a dhéanann «Faighteoirí eile» thíos. "
+   ],
+   [
     "nuair a thosóidh pleananna íocth",
     "arna reáchtáil ag NETOPIA Financial Services S.A. sa Rómáin, nuair a thosóidh pleananna íoctha. Cuireann tú sonraí do chárta isteach ar leathanach an tsoláthraí, ní ar ár leathanach féin, agus coinníonn sé do chárta ionas gur féidir leis muirear a ghearradh air ag gach athnuachan. Le gach íocaíocht seolaimid chuige d'ainm, do sheoladh ríomhphoist agus d'uimhir theileafóin, do sheoladh billeála (sráid, cathair, réigiún, cód poist agus tír), cód custaiméara a fhanann mar an gcéanna do d'íocaíochtaí go léir, ár dtagairt don ordú, an méid agus an t-airgeadra, agus cur síos gearr ar an íocaíocht, amhail ainm do phlean; nuair a ghearrann sé muirear ar do chárta sábháilte ag athnuachan, seolaimid chuige freisin an seoladh IP ónar íoc tú féin an uair dheireanach. Iarrann NETOPIA na sonraí seo le gach íocaíocht chárt"
    ],
    [
     "",
-    "\n| Cuntas nár críochnaíodh a shíniú suas: níor fíoraíodh an seoladh ríomhphoist, nó níor socraíodh an dara céim sínithe isteach (eochair rochtana nó aip fíordheimhnithe) | 24 uair an chloig tar éis don síniú suas tosú | Scriostar é, mar aon le gach a mbaineann leis an gcuntas; is féidir a sheoladh ríomhphoist agus a ainm cleite a úsáid arís. Coinníonn na taifid ghlactha agus an rian iniúchóireachta slándála a n-iontrálacha, mar a deir a sraitheanna |"
+    ", mura n-athchóirímid an tseirbhís ar fad ó chúltaca a choinníonn fós í (rannán 7)"
+   ],
+   [
+    "",
+    "\n| Cuntas nár críochnaíodh a shíniú suas: níor fíoraíodh an seoladh ríomhphoist, nó níor socraíodh an dara céim sínithe isteach (eochair rochtana nó aip fíordheimhnithe) | 24 uair an chloig tar éis don síniú suas tosú, nó nuair a théann an nasc deireanach a sheolamar chugat in éag, más déanaí é sin (bíonn gach nasc bailí ar feadh 24 uair an chloig) | Scriostar é, mar aon le gach a mbaineann leis an gcuntas; is féidir a sheoladh ríomhphoist agus a ainm cleite a úsáid arís. Coinníonn na taifid ghlactha agus an rian iniúchóireachta slándála a n-iontrálacha, mar a deir a sraitheanna |"
    ],
    [
     "",
@@ -719,12 +815,20 @@
     ", ומוחקים רישום זה יחד עם חשבונכם"
    ],
    [
+    "",
+    "הוא מפרט גם את ספק התשלומים שלנו, שאינו ספק בינה מלאכותית: הרשומה שלו מציינת מה הוא מקבל בתשלומים בכרטיס, כפי שעושה הפסקה „מקבלים אחרים“ להלן. "
+   ],
+   [
     "כאשר יתחילו תוכניות בתשלום",
     "המופעל בידי NETOPIA Financial Services S.A. ברומניה, כאשר יתחילו תוכניות בתשלום. את פרטי הכרטיס אתם מקלידים בדף שלו, לא בדף שלנו, והוא שומר את הכרטיס שלכם כדי שיוכל לחייב אותו בכל חידוש. עם כל תשלום אנו שולחים לו את שמכם, את כתובת הדוא״ל ואת מספר הטלפון שלכם, את כתובת החיוב שלכם (רחוב, עיר, אזור, מיקוד ומדינה), קוד לקוח שנשאר זהה בכל התשלומים שלכם, את האסמכתה שלנו להזמנה, את הסכום ואת המטבע, ותיאור קצר של התשלום, כגון שם התוכנית שלכם; כאשר הוא מחייב את הכרטיס השמור שלכם בעת חידוש, אנו שולחים לו גם את כתובת ה-IP שממנה שילמתם בעצמכם בפעם האחרונה. NETOPIA מבקשת פרטים אלה בכל תשלום בכרטיס"
    ],
    [
     "",
-    "\n| חשבון שההרשמה אליו לא הושלמה: כתובת הדוא״ל לא אומתה, או ששלב הכניסה השני (מפתח גישה או אפליקציית אימות) לא הוגדר | 24 שעות מתחילת ההרשמה | נמחק, יחד עם כל מה ששייך לחשבון; ניתן להשתמש שוב בכתובת הדוא״ל ובכינוי שלו. רישומי הקבלה ויומן ביקורת האבטחה שומרים את הרשומות שלהם, כמפורט בשורות שלהם |"
+    ", אלא אם נשחזר את השירות כולו מגיבוי שעדיין מכיל אותו (סעיף 7)"
+   ],
+   [
+    "",
+    "\n| חשבון שההרשמה אליו לא הושלמה: כתובת הדוא״ל לא אומתה, או ששלב הכניסה השני (מפתח גישה או אפליקציית אימות) לא הוגדר | 24 שעות מתחילת ההרשמה, או כשתוקף הקישור האחרון ששלחנו פג, אם מועד זה מאוחר יותר (כל קישור תקף 24 שעות) | נמחק, יחד עם כל מה ששייך לחשבון; ניתן להשתמש שוב בכתובת הדוא״ל ובכינוי שלו. רישומי הקבלה ויומן ביקורת האבטחה שומרים את הרשומות שלהם, כמפורט בשורות שלהם |"
    ],
    [
     "",
@@ -777,11 +881,19 @@
    ],
    [
     "",
+    "इसमें हमारा भुगतान प्रदाता भी सूचीबद्ध है, जो AI प्रदाता नहीं है: उसकी प्रविष्टि बताती है कि कार्ड भुगतानों के लिए उसे क्या मिलता है, जैसा नीचे “अन्य प्राप्तकर्ता” भी बताता है। "
+   ],
+   [
+    "",
     ", जो रोमानिया में NETOPIA Financial Services S.A. द्वारा संचालित है। आप अपने कार्ड का विवरण उसके पृष्ठ पर टाइप करते हैं, हमारे पृष्ठ पर नहीं, और वह आपका कार्ड रखता है ताकि हर नवीकरण पर उससे शुल्क ले सके। हर भुगतान के साथ हम उसे आपका नाम, ईमेल पता और फ़ोन नंबर, आपका बिलिंग पता (सड़क, शहर, क्षेत्र, डाक कोड और देश), एक ग्राहक कोड जो आपके सभी भुगतानों के लिए एक ही रहता है, ऑर्डर के लिए हमारा संदर्भ, राशि और मुद्रा, और भुगतान का एक संक्षिप्त विवरण, जैसे आपकी योजना का नाम, भेजते हैं; जब वह नवीकरण पर आपके सहेजे गए कार्ड से शुल्क लेता है, तो हम उसे वह IP पता भी भेजते हैं जिससे आपने पिछली बार स्वयं भुगतान किया था। NETOPIA हर कार्ड भुगतान के साथ ये विवरण माँगता है"
    ],
    [
     "",
-    "\n| ऐसा खाता जिसका साइन-अप पूरा नहीं हुआ: ईमेल पता सत्यापित नहीं हुआ, या साइन-इन का दूसरा चरण (पासकी या ऑथेंटिकेटर ऐप) सेट नहीं किया गया | साइन-अप शुरू होने के 24 घंटे बाद | खाते से जुड़ी हर चीज़ के साथ हटाया गया; उसका ईमेल पता और छद्मनाम फिर से उपयोग किए जा सकते हैं। स्वीकृति अभिलेख और सुरक्षा लेखापरीक्षा विवरण अपनी प्रविष्टियाँ रखते हैं, जैसा उनकी पंक्तियों में बताया गया है |"
+    ", जब तक कि हम पूरी सेवा को किसी ऐसे बैकअप से बहाल न करें जिसमें वह अब भी मौजूद हो (धारा 7)"
+   ],
+   [
+    "",
+    "\n| ऐसा खाता जिसका साइन-अप पूरा नहीं हुआ: ईमेल पता सत्यापित नहीं हुआ, या साइन-इन का दूसरा चरण (पासकी या ऑथेंटिकेटर ऐप) सेट नहीं किया गया | साइन-अप शुरू होने के 24 घंटे बाद, या जब हमारे भेजे गए अंतिम लिंक की अवधि समाप्त हो, यदि वह बाद में हो (प्रत्येक लिंक 24 घंटे तक मान्य रहता है) | खाते से जुड़ी हर चीज़ के साथ हटाया गया; उसका ईमेल पता और छद्मनाम फिर से उपयोग किए जा सकते हैं। स्वीकृति अभिलेख और सुरक्षा लेखापरीक्षा विवरण अपनी प्रविष्टियाँ रखते हैं, जैसा उनकी पंक्तियों में बताया गया है |"
    ],
    [
     "अपठनीय हो जाती है",
@@ -833,12 +945,20 @@
     ", a taj zapis brišemo zajedno s vašim računom"
    ],
    [
+    "",
+    "U njemu je naveden i naš pružatelj platnih usluga, koji nije pružatelj usluga umjetne inteligencije: njegov unos navodi što prima za plaćanja karticom, kao što to navodi i odlomak „Drugi primatelji” u nastavku. "
+   ],
+   [
     "ada plaćeni planovi započnu",
     "ojim upravlja društvo NETOPIA Financial Services S.A. u Rumunjskoj, kada plaćeni planovi započnu. Podatke o kartici unosite na njegovoj stranici, a ne na našoj, a on čuva vašu karticu kako bi je mogao teretiti pri svakom obnavljanju. Uz svako plaćanje šaljemo mu vaše ime, adresu e-pošte i broj telefona, vašu adresu za naplatu (ulicu, grad, regiju, poštanski broj i zemlju), kod kupca koji je isti za sva vaša plaćanja, našu oznaku narudžbe, iznos i valutu te kratak opis plaćanja, primjerice naziv vašeg plana; kada pri obnavljanju tereti vašu spremljenu karticu, šaljemo mu i IP adresu s koje ste posljednji put sami platili. NETOPIA traži te podatke pri svakom plaćanju karticom"
    ],
    [
     "",
-    "\n| Račun čija registracija nije dovršena: adresa e-pošte nije potvrđena ili drugi korak prijave (pristupni ključ ili aplikacija za autentifikaciju) nije postavljen | 24 sata od početka registracije | Briše se zajedno sa svime što pripada računu; njegova adresa e-pošte i pseudonim mogu se ponovno upotrijebiti. Evidencija prihvaćanja i sigurnosni revizijski trag zadržavaju svoje unose, kako je navedeno u njihovim retcima |"
+    ", osim ako cijelu uslugu vratimo iz sigurnosne kopije koja je još sadržava (odjeljak 7)"
+   ],
+   [
+    "",
+    "\n| Račun čija registracija nije dovršena: adresa e-pošte nije potvrđena ili drugi korak prijave (pristupni ključ ili aplikacija za autentifikaciju) nije postavljen | 24 sata od početka registracije ili kada istekne posljednja poveznica koju smo poslali, ako je to kasnije (svaka poveznica vrijedi 24 sata) | Briše se zajedno sa svime što pripada računu; njegova adresa e-pošte i pseudonim mogu se ponovno upotrijebiti. Evidencija prihvaćanja i sigurnosni revizijski trag zadržavaju svoje unose, kako je navedeno u njihovim retcima |"
    ],
    [
     "postaje nečitljiv",
@@ -890,12 +1010,20 @@
     ", és ezt a nyilvántartást a fiókjával együtt töröljük"
    ],
    [
+    "",
+    "Fizetési szolgáltatónkat is felsorolja, amely nem MI-szolgáltató: a bejegyzése megmondja, mit kap a kártyás fizetésekhez, ahogyan az alábbi „További címzettek” rész is. "
+   ],
+   [
     "Paymentsen keresztül történnek, amint elindulnak a fizetős csomagok",
     "Financial Services S.A. által Romániában működtetett NETOPIA Paymentsen keresztül történnek, amint elindulnak a fizetős csomagok. A kártyaadatait a szolgáltató oldalán adja meg, nem a miénken, és a szolgáltató megőrzi a kártyáját, hogy minden megújításkor megterhelhesse. Minden fizetéskor elküldjük neki az Ön nevét, e-mail-címét és telefonszámát, számlázási címét (utca, város, régió, irányítószám és ország), egy ügyfélkódot, amely minden fizetésénél ugyanaz, a megrendelésre vonatkozó saját hivatkozásunkat, az összeget és a pénznemet, valamint a fizetés rövid leírását, például csomagja nevét; amikor egy megújításkor megterheli az Ön elmentett kártyáját, azt az IP-címet is elküldjük neki, amelyről Ön legutóbb saját maga fizetett. A NETOPIA minden kártyás fizetésnél bekéri ezeket az adatokat"
    ],
    [
     "",
-    "\n| Fiók, amelynek regisztrációja nem fejeződött be: az e-mail-címet nem erősítették meg, vagy a második bejelentkezési lépést (jelkulcs vagy hitelesítő alkalmazás) nem állították be | A regisztráció megkezdése után 24 óráig | Töröljük, a fiókhoz tartozó minden adattal együtt; e-mail-címe és álneve újra felhasználható. Az elfogadási nyilvántartások és a biztonsági auditnapló megőrzik bejegyzéseiket, ahogy a saját soruk mondja |"
+    ", kivéve, ha a teljes szolgáltatást egy olyan biztonsági mentésből állítjuk vissza, amely még tartalmazza (7. szakasz)"
+   ],
+   [
+    "",
+    "\n| Fiók, amelynek regisztrációja nem fejeződött be: az e-mail-címet nem erősítették meg, vagy a második bejelentkezési lépést (jelkulcs vagy hitelesítő alkalmazás) nem állították be | A regisztráció megkezdése után 24 óráig, vagy az általunk küldött utolsó hivatkozás lejártáig, ha az későbbi (minden hivatkozás 24 órán át érvényes) | Töröljük, a fiókhoz tartozó minden adattal együtt; e-mail-címe és álneve újra felhasználható. Az elfogadási nyilvántartások és a biztonsági auditnapló megőrzik bejegyzéseiket, ahogy a saját soruk mondja |"
    ],
    [
     "olvashatatlanná válik",
@@ -947,12 +1075,20 @@
     ", dan kami menghapus catatan ini bersama akun Anda"
    ],
    [
+    "",
+    "Daftar juga mencantumkan penyedia pembayaran kami, yang bukan penyedia AI: entrinya menyebutkan apa yang diterimanya untuk pembayaran kartu, sebagaimana halnya bagian “Penerima lain” di bawah. "
+   ],
+   [
     "setelah paket berbayar dimulai",
     "yang dijalankan oleh NETOPIA Financial Services S.A. di Rumania, setelah paket berbayar dimulai. Anda mengetikkan detail kartu Anda di halamannya, bukan di halaman kami, dan penyedia tersebut menyimpan kartu Anda agar dapat menagihnya pada setiap perpanjangan. Pada setiap pembayaran, kami mengirimkan kepadanya nama, alamat email, dan nomor telepon Anda, alamat penagihan Anda (jalan, kota, wilayah, kode pos, dan negara), kode pelanggan yang tetap sama untuk semua pembayaran Anda, referensi kami untuk pesanan tersebut, jumlah dan mata uangnya, serta deskripsi singkat pembayaran, seperti nama paket Anda; saat penyedia tersebut menagih kartu tersimpan Anda pada perpanjangan, kami juga mengirimkan alamat IP yang terakhir Anda gunakan saat membayar sendiri. NETOPIA meminta detail ini pada setiap pembayaran dengan kartu"
    ],
    [
     "",
-    "\n| Akun yang pendaftarannya belum selesai: alamat email belum diverifikasi, atau langkah masuk kedua (kunci sandi atau aplikasi autentikator) belum disiapkan | 24 jam setelah pendaftaran dimulai | Dihapus, beserta semua hal yang menjadi milik akun tersebut; alamat email dan nama samarannya dapat digunakan lagi. Catatan penerimaan dan jejak audit keamanan tetap menyimpan entrinya, sebagaimana dijelaskan dalam barisnya masing-masing |"
+    ", kecuali jika kami memulihkan seluruh layanan dari cadangan yang masih menyimpannya (bagian 7)"
+   ],
+   [
+    "",
+    "\n| Akun yang pendaftarannya belum selesai: alamat email belum diverifikasi, atau langkah masuk kedua (kunci sandi atau aplikasi autentikator) belum disiapkan | 24 jam setelah pendaftaran dimulai, atau saat tautan terakhir yang kami kirim kedaluwarsa jika itu lebih lambat (setiap tautan berlaku selama 24 jam) | Dihapus, beserta semua hal yang menjadi milik akun tersebut; alamat email dan nama samarannya dapat digunakan lagi. Catatan penerimaan dan jejak audit keamanan tetap menyimpan entrinya, sebagaimana dijelaskan dalam barisnya masing-masing |"
    ],
    [
     "",
@@ -1004,12 +1140,20 @@
     ", e cancelliamo questa registrazione con il tuo account"
    ],
    [
+    "",
+    "Elenca anche il nostro fornitore di servizi di pagamento, che non è un fornitore di IA: la sua voce indica cosa riceve per i pagamenti con carta, come fa più sotto «Altri destinatari». "
+   ],
+   [
     "dall'avvio dei piani a pagamento",
     "gestito da NETOPIA Financial Services S.A. in Romania, dall'avvio dei piani a pagamento. Inserisci i dati della tua carta nella pagina del fornitore, non nella nostra, e il fornitore conserva la tua carta per poterla addebitare a ogni rinnovo. Con ogni pagamento gli inviamo il tuo nome, il tuo indirizzo email e il tuo numero di telefono, il tuo indirizzo di fatturazione (via, città, regione, codice postale e Paese), un codice cliente che resta lo stesso per tutti i tuoi pagamenti, il nostro riferimento dell'ordine, l'importo e la valuta, e una breve descrizione del pagamento, come il nome del tuo piano; quando addebita la tua carta salvata a un rinnovo, gli inviamo anche l'indirizzo IP da cui hai pagato tu stesso l'ultima volta. NETOPIA richiede questi dati per ogni pagamento con carta"
    ],
    [
     "",
-    "\n| Un account la cui iscrizione non è stata completata: l'indirizzo email non verificato, oppure il secondo passaggio di accesso (una passkey o un'app di autenticazione) non configurato | 24 ore dall'inizio dell'iscrizione | Cancellato, con tutto ciò che appartiene all'account; il suo indirizzo email e il suo pseudonimo possono essere utilizzati di nuovo. I registri di accettazione e il registro di controllo della sicurezza conservano le loro voci, come indicano le rispettive righe |"
+    ", a meno che non ripristiniamo l'intero servizio da un backup che lo contiene ancora (sezione 7)"
+   ],
+   [
+    "",
+    "\n| Un account la cui iscrizione non è stata completata: l'indirizzo email non verificato, oppure il secondo passaggio di accesso (una passkey o un'app di autenticazione) non configurato | 24 ore dall'inizio dell'iscrizione, oppure alla scadenza dell'ultimo link che ti abbiamo inviato, se è successiva (ogni link è valido per 24 ore) | Cancellato, con tutto ciò che appartiene all'account; il suo indirizzo email e il suo pseudonimo possono essere utilizzati di nuovo. I registri di accettazione e il registro di controllo della sicurezza conservano le loro voci, come indicano le rispettive righe |"
    ],
    [
     "",
@@ -1061,12 +1205,20 @@
     "、この記録をお客様のアカウントとともに削除し"
    ],
    [
+    "",
+    "AIプロバイダーではない当社の決済プロバイダーも記載されています。その項目には、下記の「その他の受領者」と同様に、カード支払いについて決済プロバイダーが受領する情報が記載されています。登録簿には、"
+   ],
+   [
     "当社の決済プロバイダーであるNETOPIA Paymentsを通じて行われ",
     "ルーマニアのNETOPIA Financial Services S.A.が運営する、当社の決済プロバイダーであるNETOPIA Paymentsを通じて行われます。カード情報は、お客様が当社のページではなく同社のページで入力し、同社は更新のたびに請求できるようお客様のカードを保持します。各支払いの際、当社は同社に、お客様の氏名、メールアドレスおよび電話番号、請求先住所（番地、市区町村、地域、郵便番号および国）、お客様のすべての支払いで同じままの顧客コード、当社の注文参照番号、金額と通貨、ならびにプラン名など支払いの簡単な説明を送信します。更新時に同社が保存済みのカードに請求する場合は、お客様が最後にご自身で支払いを行った際のIPアドレスも送信します。NETOPIAは、カード支払いのたびにこれらの情報を求め"
    ],
    [
     "",
-    "\n| 登録が完了していないアカウント：メールアドレスが確認されていないもの、またはサインインの第2段階（パスキーまたは認証アプリ）が設定されていないもの | 登録開始から24時間 | アカウントに属するすべてのものとともに削除。そのメールアドレスと仮名は再び使用できます。承諾の記録およびセキュリティ監査証跡は、それぞれの行に記載のとおり、その記録を保持します |"
+    "、そのディベートがまだ含まれているバックアップからサービス全体を復元する場合（第7節）を除き、"
+   ],
+   [
+    "",
+    "\n| 登録が完了していないアカウント：メールアドレスが確認されていないもの、またはサインインの第2段階（パスキーまたは認証アプリ）が設定されていないもの | 登録開始から24時間、または当社が最後に送信したリンクの有効期限が切れる時点のいずれか遅い方（各リンクの有効期間は24時間） | アカウントに属するすべてのものとともに削除。そのメールアドレスと仮名は再び使用できます。承諾の記録およびセキュリティ監査証跡は、それぞれの行に記載のとおり、その記録を保持します |"
    ],
    [
     "内容を読めない状態にします",
@@ -1118,12 +1270,20 @@
     "하며, 이 기록을 귀하의 계정과 함께 삭제"
    ],
    [
+    "",
+    "AI 제공업체가 아닌 당사의 결제 제공업체도 기재됩니다. 그 항목에는 아래 「기타 수령자」에서와 같이 결제 제공업체가 카드 결제와 관련하여 수령하는 정보가 기재됩니다. 등록부에는 "
+   ],
+   [
     "당사의 결제 제공업체인 NETOPIA Payments를 통해 이루어집",
     "루마니아의 NETOPIA Financial Services S.A.가 운영하는 당사의 결제 제공업체인 NETOPIA Payments를 통해 이루어집니다. 카드 정보는 귀하가 당사 페이지가 아닌 해당 업체의 페이지에서 입력하며, 해당 업체는 갱신 시마다 대금을 청구할 수 있도록 귀하의 카드를 보관합니다. 당사는 결제할 때마다 해당 업체에 귀하의 이름, 이메일 주소 및 전화번호, 청구지 주소(도로명, 도시, 지역, 우편번호 및 국가), 귀하의 모든 결제에 동일하게 유지되는 고객 코드, 주문에 대한 당사의 참조번호, 금액과 통화, 그리고 요금제 이름 등 결제에 대한 간단한 설명을 보냅니다. 해당 업체가 갱신 시 저장된 카드에 대금을 청구할 때에는 귀하가 마지막으로 직접 결제한 IP 주소도 보냅니다. NETOPIA는 카드 결제 때마다 이러한 정보를 요구합"
    ],
    [
     "",
-    "\n| 가입이 완료되지 않은 계정: 이메일 주소가 인증되지 않았거나 로그인 2단계(패스키 또는 인증 앱)가 설정되지 않은 계정 | 가입을 시작한 후 24시간 | 계정에 속한 모든 것과 함께 삭제. 해당 이메일 주소와 가명은 다시 사용할 수 있습니다. 수락 기록과 보안 감사 추적 기록은 각 행에 적힌 대로 해당 항목을 보존합니다 |"
+    "그 토론이 아직 남아 있는 백업에서 서비스 전체를 복원하는 경우(제7조)를 제외하고는 "
+   ],
+   [
+    "",
+    "\n| 가입이 완료되지 않은 계정: 이메일 주소가 인증되지 않았거나 로그인 2단계(패스키 또는 인증 앱)가 설정되지 않은 계정 | 가입을 시작한 후 24시간 또는 당사가 마지막으로 보낸 링크가 만료되는 시점 중 더 늦은 때(각 링크의 유효 기간은 24시간) | 계정에 속한 모든 것과 함께 삭제. 해당 이메일 주소와 가명은 다시 사용할 수 있습니다. 수락 기록과 보안 감사 추적 기록은 각 행에 적힌 대로 해당 항목을 보존합니다 |"
    ],
    [
     "콘텐츠를 읽을 수 없게 함",
@@ -1175,12 +1335,20 @@
     ", o šį įrašą ištriname kartu su jūsų paskyra"
    ],
    [
+    "",
+    "Jame taip pat nurodytas mūsų mokėjimo paslaugų teikėjas, kuris nėra DI paslaugų teikėjas: jo įraše nurodyta, ką jis gauna atliekant mokėjimus kortele, kaip ir toliau pateiktoje pastraipoje „Kiti gavėjai“. "
+   ],
+   [
     "pradėjus taikyti mokamus planus",
     "kurią valdo NETOPIA Financial Services S.A. Rumunijoje, pradėjus taikyti mokamus planus. Kortelės duomenis įvedate teikėjo puslapyje, o ne mūsų, ir teikėjas išsaugo jūsų kortelę, kad galėtų iš jos nuskaičiuoti lėšas kiekvieno atnaujinimo metu. Su kiekvienu mokėjimu teikėjui siunčiame jūsų vardą, pavardę, el. pašto adresą ir telefono numerį, jūsų atsiskaitymo adresą (gatvę, miestą, regioną, pašto kodą ir šalį), kliento kodą, kuris visiems jūsų mokėjimams išlieka tas pats, mūsų užsakymo nuorodą, sumą ir valiutą bei trumpą mokėjimo aprašymą, pavyzdžiui, jūsų plano pavadinimą; kai atnaujinimo metu teikėjas nuskaičiuoja lėšas iš jūsų išsaugotos kortelės, siunčiame ir IP adresą, iš kurio paskutinį kartą mokėjote patys. NETOPIA šių duomenų prašo atliekant kiekvieną mokėjimą kortele"
    ],
    [
     "",
-    "\n| Paskyra, kurios registracija nebuvo užbaigta: el. pašto adresas nepatvirtintas arba nenustatytas antrasis prisijungimo veiksmas (slaptaraktis arba autentifikavimo programėlė) | Praėjus 24 valandoms nuo registracijos pradžios | Ištrinama kartu su viskuo, kas priklauso paskyrai; jos el. pašto adresą ir slapyvardį galima naudoti iš naujo. Sutikimo su sąlygomis ir kitų sutikimų įrašai bei saugumo audito žurnalo įrašai išsaugomi, kaip nurodyta atitinkamose eilutėse |"
+    ", nebent atkurtume visą paslaugą iš atsarginės kopijos, kurioje jie dar yra (7 skyrius)"
+   ],
+   [
+    "",
+    "\n| Paskyra, kurios registracija nebuvo užbaigta: el. pašto adresas nepatvirtintas arba nenustatytas antrasis prisijungimo veiksmas (slaptaraktis arba autentifikavimo programėlė) | Praėjus 24 valandoms nuo registracijos pradžios arba, jei tai vėliau, kai baigiasi paskutinės mūsų išsiųstos nuorodos galiojimas (kiekviena nuoroda galioja 24 valandas) | Ištrinama kartu su viskuo, kas priklauso paskyrai; jos el. pašto adresą ir slapyvardį galima naudoti iš naujo. Sutikimo su sąlygomis ir kitų sutikimų įrašai bei saugumo audito žurnalo įrašai išsaugomi, kaip nurodyta atitinkamose eilutėse |"
    ],
    [
     "perskaityti nebegalima",
@@ -1232,12 +1400,20 @@
     ", un dzēšam šo ierakstu kopā ar jūsu kontu"
    ],
    [
+    "",
+    "Tajā ir norādīts arī mūsu maksājumu pakalpojumu sniedzējs, kas nav MI pakalpojumu sniedzējs: tā ierakstā norādīts, ko tas saņem saistībā ar kartes maksājumiem, tāpat kā tālāk rindkopā „Citi saņēmēji”. "
+   ],
+   [
     "pēc maksas plānu ieviešanas",
     "ko Rumānijā darbina NETOPIA Financial Services S.A., pēc maksas plānu ieviešanas. Kartes datus jūs ievadāt tā lapā, nevis mūsējā, un tas saglabā jūsu karti, lai katrā atjaunošanas reizē varētu no tās iekasēt maksu. Ar katru maksājumu mēs tam nosūtām jūsu vārdu un uzvārdu, e-pasta adresi un tālruņa numuru, jūsu norēķinu adresi (iela, pilsēta, reģions, pasta indekss un valsts), klienta kodu, kas visiem jūsu maksājumiem ir vienāds, mūsu atsauci uz pasūtījumu, summu un valūtu, kā arī īsu maksājuma aprakstu, piemēram, jūsu plāna nosaukumu; kad tas atjaunošanas reizē iekasē maksu no jūsu saglabātās kartes, mēs nosūtām arī IP adresi, no kuras jūs pēdējo reizi pats veicāt maksājumu. NETOPIA šos datus pieprasa katram kartes maksājumam"
    ],
    [
     "",
-    "\n| Konts, kura reģistrācija netika pabeigta: e-pasta adrese nav verificēta vai nav iestatīts otrais pierakstīšanās solis (piekļuves atslēga vai autentifikatora lietotne) | 24 stundas pēc reģistrācijas sākuma | Tiek dzēsts kopā ar visu, kas pieder kontam; tā e-pasta adresi un pseidonīmu var izmantot atkārtoti. Piekrišanas un akceptēšanas ierakstos un drošības audita pierakstā attiecīgie ieraksti saglabājas, kā norādīts to rindās |"
+    ", ja vien mēs neatjaunojam visu pakalpojumu no dublējumkopijas, kurā tās joprojām ir saglabātas (7. sadaļa)"
+   ],
+   [
+    "",
+    "\n| Konts, kura reģistrācija netika pabeigta: e-pasta adrese nav verificēta vai nav iestatīts otrais pierakstīšanās solis (piekļuves atslēga vai autentifikatora lietotne) | 24 stundas pēc reģistrācijas sākuma vai, ja tas ir vēlāk, kad beidzas pēdējās mūsu nosūtītās saites derīgums (katra saite ir derīga 24 stundas) | Tiek dzēsts kopā ar visu, kas pieder kontam; tā e-pasta adresi un pseidonīmu var izmantot atkārtoti. Piekrišanas un akceptēšanas ierakstos un drošības audita pierakstā attiecīgie ieraksti saglabājas, kā norādīts to rindās |"
    ],
    [
     "",
@@ -1289,12 +1465,20 @@
     ", u nħassru dan ir-rekord mal-kont tiegħek"
    ],
    [
+    "",
+    "Jelenka wkoll il-fornitur tal-pagamenti tagħna, li mhuwiex fornitur tal-IA: l-entrata tiegħu tgħid x’jirċievi għall-ħlasijiet bil-karta, kif tagħmel “Riċevituri oħra” hawn taħt. "
+   ],
+   [
     "ladarba jibdew il-pjanijiet bi ħlas",
     "immexxi minn NETOPIA Financial Services S.A. fir-Rumanija, ladarba jibdew il-pjanijiet bi ħlas. Id-dettalji tal-karta tiegħek iddaħħalhom fuq il-paġna tal-fornitur, mhux fuq tagħna, u l-fornitur iżomm il-karta tiegħek biex ikun jista’ jiddebitaha f’kull tiġdid. Ma’ kull ħlas nibagħtulu ismek, l-indirizz elettroniku u n-numru tat-telefon tiegħek, l-indirizz tal-kontijiet tiegħek (it-triq, il-belt, ir-reġjun, il-kodiċi postali u l-pajjiż), kodiċi tal-klijent li jibqa’ l-istess għall-ħlasijiet kollha tiegħek, ir-referenza tagħna għall-ordni, l-ammont u l-munita, u deskrizzjoni qasira tal-ħlas, bħall-isem tal-pjan tiegħek; meta jiddebita l-karta salvata tiegħek f’tiġdid, nibagħtulu wkoll l-indirizz IP minn fejn ħallast int stess l-aħħar darba. NETOPIA titlob dawn id-dettalji ma’ kull ħlas bil-karta"
    ],
    [
     "",
-    "\n| Kont li r-reġistrazzjoni tiegħu ma tlestietx: l-indirizz elettroniku ma ġiex ivverifikat, jew it-tieni pass tad-dħul (passkey jew app tal-awtentikazzjoni) ma ġiex issettjat | 24 siegħa wara li tkun bdiet ir-reġistrazzjoni | Jitħassar, flimkien ma’ kull ma jappartjeni lill-kont; l-indirizz elettroniku u l-psewdonimu tiegħu jistgħu jerġgħu jintużaw. Ir-rekords tal-aċċettazzjoni u r-reġistru tal-awditjar tas-sigurtà jżommu l-entrati tagħhom, kif jgħidu r-ringieli tagħhom |"
+    ", ħlief jekk nirrestawraw is-servizz kollu minn kopja ta’ riżerva li għad fiha d-dibattitu (taqsima 7)"
+   ],
+   [
+    "",
+    "\n| Kont li r-reġistrazzjoni tiegħu ma tlestietx: l-indirizz elettroniku ma ġiex ivverifikat, jew it-tieni pass tad-dħul (passkey jew app tal-awtentikazzjoni) ma ġiex issettjat | 24 siegħa wara li tkun bdiet ir-reġistrazzjoni, jew meta jiskadi l-aħħar link li bgħatnielek, jekk dan ikun aktar tard (kull link jibqa’ validu għal 24 siegħa) | Jitħassar, flimkien ma’ kull ma jappartjeni lill-kont; l-indirizz elettroniku u l-psewdonimu tiegħu jistgħu jerġgħu jintużaw. Ir-rekords tal-aċċettazzjoni u r-reġistru tal-awditjar tas-sigurtà jżommu l-entrati tagħhom, kif jgħidu r-ringieli tagħhom |"
    ],
    [
     "",
@@ -1346,12 +1530,20 @@
     ", en wij verwijderen deze vastlegging met uw account"
    ],
    [
+    "",
+    "Het vermeldt ook onze betalingsaanbieder, die geen AI-aanbieder is: de vermelding daarvan zegt wat die bij kaartbetalingen ontvangt, zoals ook „Andere ontvangers” hieronder doet. "
+   ],
+   [
     "zodra betaalde abonnementen van start gaan",
     "beheerd door NETOPIA Financial Services S.A. in Roemenië, zodra betaalde abonnementen van start gaan. U voert uw kaartgegevens in op de pagina van de aanbieder, niet op de onze, en de aanbieder bewaart uw kaart, zodat die bij elke verlenging kan worden belast. Bij elke betaling sturen wij de aanbieder uw naam, e-mailadres en telefoonnummer, uw factuuradres (straat, plaats, regio, postcode en land), een klantcode die voor al uw betalingen dezelfde blijft, onze referentie voor de bestelling, het bedrag en de valuta, en een korte omschrijving van de betaling, zoals de naam van uw abonnement; wanneer de aanbieder uw opgeslagen kaart bij een verlenging belast, sturen wij ook het IP-adres van waaruit u de laatste keer zelf hebt betaald. NETOPIA vraagt bij elke kaartbetaling om deze gegevens"
    ],
    [
     "",
-    "\n| Een account waarvan de registratie niet is voltooid: het e-mailadres niet geverifieerd, of de tweede aanmeldstap (een passkey of een authenticator-app) niet ingesteld | 24 uur nadat de registratie begon | Verwijderd, met alles wat bij het account hoort; het e-mailadres en het pseudoniem ervan kunnen opnieuw worden gebruikt. De vastleggingen van aanvaarding en toestemming en het beveiligingsauditlogboek behouden hun vermeldingen, zoals in hun rijen staat |"
+    ", tenzij wij de hele dienst herstellen vanaf een back-up die het nog bevat (hoofdstuk 7)"
+   ],
+   [
+    "",
+    "\n| Een account waarvan de registratie niet is voltooid: het e-mailadres niet geverifieerd, of de tweede aanmeldstap (een passkey of een authenticator-app) niet ingesteld | 24 uur nadat de registratie begon, of zodra de laatste link die wij stuurden verloopt, als dat later is (elke link is 24 uur geldig) | Verwijderd, met alles wat bij het account hoort; het e-mailadres en het pseudoniem ervan kunnen opnieuw worden gebruikt. De vastleggingen van aanvaarding en toestemming en het beveiligingsauditlogboek behouden hun vermeldingen, zoals in hun rijen staat |"
    ],
    [
     "nleesbaar wordt",
@@ -1403,12 +1595,20 @@
     ", a ten zapis usuwamy wraz z Twoim kontem"
    ],
    [
+    "",
+    "Wymienia także naszego dostawcę usług płatniczych, który nie jest dostawcą AI: jego wpis podaje, co otrzymuje on przy płatnościach kartą, podobnie jak poniższy akapit „Inni odbiorcy”. "
+   ],
+   [
     "o uruchomieniu planów płatnych",
     "rowadzonego przez NETOPIA Financial Services S.A. w Rumunii, po uruchomieniu planów płatnych. Dane karty wpisujesz na stronie dostawcy, a nie na naszej, a dostawca przechowuje Twoją kartę, aby móc ją obciążać przy każdym odnowieniu. Przy każdej płatności przesyłamy mu Twoje imię i nazwisko, adres e-mail i numer telefonu, Twój adres rozliczeniowy (ulicę, miasto, region, kod pocztowy i kraj), kod klienta, który pozostaje taki sam dla wszystkich Twoich płatności, nasz numer referencyjny zamówienia, kwotę i walutę oraz krótki opis płatności, na przykład nazwę Twojego planu; gdy obciąża Twoją zapisaną kartę przy odnowieniu, przesyłamy mu też adres IP, z którego ostatnio płaciłeś samodzielnie. NETOPIA wymaga tych danych przy każdej płatności kartą"
    ],
    [
     "",
-    "\n| Konto, którego rejestracja nie została dokończona: adres e-mail nie został zweryfikowany albo drugi krok logowania (klucz dostępu lub aplikacja uwierzytelniająca) nie został skonfigurowany | 24 godziny od rozpoczęcia rejestracji | Zostaje usunięte wraz ze wszystkim, co należy do konta; jego adres e-mail i pseudonim mogą zostać ponownie użyte. Rejestry akceptacji i dziennik audytu bezpieczeństwa zachowują swoje wpisy, jak podają ich wiersze |"
+    ", chyba że przywrócimy całą usługę z kopii zapasowej, która nadal ją zawiera (sekcja 7)"
+   ],
+   [
+    "",
+    "\n| Konto, którego rejestracja nie została dokończona: adres e-mail nie został zweryfikowany albo drugi krok logowania (klucz dostępu lub aplikacja uwierzytelniająca) nie został skonfigurowany | 24 godziny od rozpoczęcia rejestracji albo z chwilą wygaśnięcia ostatniego wysłanego przez nas linku, jeśli nastąpi to później (każdy link jest ważny przez 24 godziny) | Zostaje usunięte wraz ze wszystkim, co należy do konta; jego adres e-mail i pseudonim mogą zostać ponownie użyte. Rejestry akceptacji i dziennik audytu bezpieczeństwa zachowują swoje wpisy, jak podają ich wiersze |"
    ],
    [
     "",
@@ -1460,12 +1660,20 @@
     ", e eliminamos este registo com a sua conta"
    ],
    [
+    "",
+    "Inclui também o nosso prestador de serviços de pagamento, que não é um fornecedor de IA: a respetiva entrada indica o que recebe para os pagamentos com cartão, tal como «Outros destinatários», mais abaixo. "
+   ],
+   [
     "quando os planos pagos tiverem iníci",
     "gerido pela NETOPIA Financial Services S.A. na Roménia, quando os planos pagos tiverem início. Introduz os dados do seu cartão na página do prestador, e não na nossa, e o prestador guarda o seu cartão para o poder debitar em cada renovação. Com cada pagamento, enviamos-lhe o seu nome, o seu endereço de correio eletrónico e o seu número de telefone, o seu endereço de faturação (rua, cidade, região, código postal e país), um código de cliente que se mantém igual para todos os seus pagamentos, a nossa referência da encomenda, o montante e a moeda, e uma breve descrição do pagamento, como o nome do seu plano; quando debita o seu cartão guardado numa renovação, enviamos-lhe também o endereço IP a partir do qual pagou pessoalmente pela última vez. A NETOPIA solicita estes dados em cada pagamento com cartã"
    ],
    [
     "",
-    "\n| Uma conta cujo registo não foi concluído: o endereço de correio eletrónico não foi verificado, ou o segundo passo de início de sessão (uma chave de acesso ou uma aplicação de autenticação) não foi configurado | 24 horas após o início do registo | É eliminada, com tudo o que pertence à conta; o seu endereço de correio eletrónico e o seu pseudónimo podem voltar a ser utilizados. Os registos de aceitação e o registo de auditoria de segurança mantêm as suas entradas, como indicam as respetivas linhas |"
+    ", a menos que restauremos todo o serviço a partir de uma cópia de segurança que ainda o contenha (secção 7)"
+   ],
+   [
+    "",
+    "\n| Uma conta cujo registo não foi concluído: o endereço de correio eletrónico não foi verificado, ou o segundo passo de início de sessão (uma chave de acesso ou uma aplicação de autenticação) não foi configurado | 24 horas após o início do registo, ou quando expirar a última ligação que lhe enviámos, se isso acontecer mais tarde (cada ligação é válida durante 24 horas) | É eliminada, com tudo o que pertence à conta; o seu endereço de correio eletrónico e o seu pseudónimo podem voltar a ser utilizados. Os registos de aceitação e o registo de auditoria de segurança mantêm as suas entradas, como indicam as respetivas linhas |"
    ],
    [
     "",
@@ -1517,12 +1725,20 @@
     " și ștergem această evidență odată cu contul dumneavoastră"
    ],
    [
+    "",
+    "Acesta cuprinde și furnizorul nostru de plăți, care nu este un furnizor de IA: rubrica sa arată ce primește pentru plățile cu cardul, la fel ca paragraful „Alți destinatari” de mai jos. "
+   ],
+   [
     "dată ce încep planurile cu plată",
     "perat de NETOPIA Financial Services S.A. din România, odată ce încep planurile cu plată. Datele cardului le introduceți pe pagina acestuia, nu pe a noastră, iar el vă păstrează cardul pentru a-l putea debita la fiecare reînnoire. La fiecare plată îi trimitem numele, adresa de e-mail și numărul de telefon, adresa de facturare (strada, localitatea, regiunea, codul poștal și țara), un cod de client care rămâne același pentru toate plățile dumneavoastră, referința noastră pentru comandă, suma și moneda, precum și o scurtă descriere a plății, de exemplu numele planului; când vă debitează cardul salvat la o reînnoire, îi trimitem și adresa IP de la care ați plătit ultima dată personal. NETOPIA cere aceste date la fiecare plată cu cardul"
    ],
    [
     "",
-    "\n| Un cont a cărui înregistrare nu a fost finalizată: adresa de e-mail nu a fost verificată sau al doilea pas de autentificare (o cheie de acces sau o aplicație de autentificare) nu a fost configurat | 24 de ore de la începerea înregistrării | Șters, cu tot ce ține de cont; adresa de e-mail și pseudonimul pot fi folosite din nou. Evidențele privind acceptarea și jurnalul de audit al securității își păstrează înregistrările, așa cum arată rândurile lor |"
+    ", decât dacă restaurăm întregul serviciu dintr-o copie de rezervă care încă o conține (secțiunea 7)"
+   ],
+   [
+    "",
+    "\n| Un cont a cărui înregistrare nu a fost finalizată: adresa de e-mail nu a fost verificată sau al doilea pas de autentificare (o cheie de acces sau o aplicație de autentificare) nu a fost configurat | 24 de ore de la începerea înregistrării sau, dacă momentul acesta este mai târziu, de la expirarea ultimului link pe care vi l-am trimis (fiecare link este valabil 24 de ore) | Șters, cu tot ce ține de cont; adresa de e-mail și pseudonimul pot fi folosite din nou. Evidențele privind acceptarea și jurnalul de audit al securității își păstrează înregistrările, așa cum arată rândurile lor |"
    ],
    [
     "",
@@ -1546,7 +1762,7 @@
    ],
    [
     "",
-    "5 a înlocuit versiunea 3.14: arată ce companie operează furnizorul nostru de plăți, NETOPIA Payments, și ce îi trimitem la fiecare plată (secțiunea 5); că evidența consimțământului dumneavoastră privind datele sensibile se șterge odată cu contul, în timp ce celelalte evidențe privind acceptarea și consimțământul se păstrează 6 ani după încetarea contului (secțiunile 2, 3 și 7); că copiile criptate din spațiul nostru separat de stocare a copiilor de rezervă nu se șterg automat, așa că o dezbatere ștearsă sau un cont închis pot fi restaurate din ele până când sunt eliminate, acolo unde spunea că copiile de rezervă se păstrează până la 8 săptămâni (secțiunea 7); și că un cont a cărui înregistrare nu este finalizată în 24 de ore se șterge (secțiunea 7). Versiunea 3.1"
+    "5 a înlocuit versiunea 3.14: arată ce companie operează furnizorul nostru de plăți, NETOPIA Payments, ce îi trimitem la fiecare plată și că Registrul îl cuprinde și pe el (secțiunea 5); că evidența consimțământului dumneavoastră privind datele sensibile se șterge odată cu contul, în timp ce celelalte evidențe privind acceptarea și consimțământul se păstrează 6 ani după încetarea contului (secțiunile 2, 3 și 7); că copiile criptate din spațiul nostru separat de stocare a copiilor de rezervă nu se șterg automat, așa că o dezbatere ștearsă sau un cont închis pot fi restaurate din ele până când sunt eliminate, acolo unde spunea că copiile de rezervă se păstrează până la 8 săptămâni (secțiunile 6 și 7); și că un cont a cărui înregistrare nu este finalizată se șterge la 24 de ore de la începerea înregistrării sau, dacă momentul acesta este mai târziu, la expirarea ultimului link pe care vi l-am trimis (secțiunea 7). Versiunea 3.1"
    ]
   ]
  },
@@ -1578,12 +1794,20 @@
     ", а при удалении вашей учётной записи удаляем и эту запись"
    ],
    [
+    "",
+    "В нём также указан наш поставщик платёжных услуг, который не является поставщиком ИИ: его запись сообщает, что он получает при оплате картой, как и абзац «Другие получатели» ниже. "
+   ],
+   [
     "после запуска платных тарифов",
     "которым управляет компания NETOPIA Financial Services S.A. в Румынии, после запуска платных тарифов. Данные карты вы вводите на его странице, а не на нашей, и он хранит вашу карту, чтобы списывать с неё оплату при каждом продлении. С каждым платежом мы передаём ему ваши имя, адрес электронной почты и номер телефона, ваш платёжный адрес (улицу, город, регион, почтовый индекс и страну), код клиента, одинаковый для всех ваших платежей, наш идентификатор заказа, сумму и валюту, а также краткое описание платежа, например название вашего тарифа; когда он списывает оплату с вашей сохранённой карты при продлении, мы также передаём ему IP-адрес, с которого вы в последний раз платили сами. NETOPIA запрашивает эти данные при каждой оплате картой"
    ],
    [
     "",
-    "\n| Учётная запись, регистрация которой не была завершена: адрес электронной почты не подтверждён или не настроен второй шаг входа (ключ доступа или приложение-аутентификатор) | 24 часа с начала регистрации | Удаляется вместе со всем, что относится к учётной записи; её адрес электронной почты и псевдоним можно использовать снова. Записи о принятии и журнал аудита безопасности сохраняют свои данные, как указано в их строках |"
+    ", если только мы не восстановим весь сервис из резервной копии, в которой они ещё сохранились (раздел 7)"
+   ],
+   [
+    "",
+    "\n| Учётная запись, регистрация которой не была завершена: адрес электронной почты не подтверждён или не настроен второй шаг входа (ключ доступа или приложение-аутентификатор) | 24 часа с начала регистрации или после истечения срока действия последней отправленной нами ссылки, если это позже (каждая ссылка действительна 24 часа) | Удаляется вместе со всем, что относится к учётной записи; её адрес электронной почты и псевдоним можно использовать снова. Записи о принятии и журнал аудита безопасности сохраняют свои данные, как указано в их строках |"
    ],
    [
     "становится нечитаемым",
@@ -1635,12 +1859,20 @@
     ", a tento záznam vymažeme spolu s vaším účtom"
    ],
    [
+    "",
+    "Uvádza aj nášho poskytovateľa platobných služieb, ktorý nie je poskytovateľom umelej inteligencie: jeho položka uvádza, čo dostáva pri platbách kartou, rovnako ako odsek „Iní príjemcovia“ nižšie. "
+   ],
+   [
     "po spustení platených programov",
     "ktorého prevádzkuje spoločnosť NETOPIA Financial Services S.A. v Rumunsku, po spustení platených programov. Údaje o karte zadávate na jeho stránke, nie na našej, a on vašu kartu uchováva, aby z nej mohol strhávať platby pri každom obnovení. Pri každej platbe mu posielame vaše meno, e-mailovú adresu a telefónne číslo, vašu fakturačnú adresu (ulicu, mesto, región, PSČ a krajinu), kód zákazníka, ktorý je rovnaký pre všetky vaše platby, naše označenie objednávky, sumu a menu a krátky popis platby, napríklad názov vášho programu; keď pri obnovení strhne platbu z vašej uloženej karty, posielame mu aj IP adresu, z ktorej ste naposledy platili sami. NETOPIA tieto údaje vyžaduje pri každej platbe kartou"
    ],
    [
     "",
-    "\n| Účet, ktorého registrácia nebola dokončená: e-mailová adresa nebola overená alebo nebol nastavený druhý krok prihlásenia (prístupový kľúč alebo overovacia aplikácia) | 24 hodín od začatia registrácie | Vymaže sa spolu so všetkým, čo k účtu patrí; jeho e-mailovú adresu a pseudonym možno znovu použiť. Záznamy o prijatí a bezpečnostný auditný záznam si svoje položky ponechávajú, ako uvádzajú ich riadky |"
+    ", okrem prípadu, keď obnovíme celú službu zo zálohy, ktorá ju ešte obsahuje (časť 7)"
+   ],
+   [
+    "",
+    "\n| Účet, ktorého registrácia nebola dokončená: e-mailová adresa nebola overená alebo nebol nastavený druhý krok prihlásenia (prístupový kľúč alebo overovacia aplikácia) | 24 hodín od začatia registrácie alebo po uplynutí platnosti posledného odkazu, ktorý sme poslali, ak je to neskôr (každý odkaz platí 24 hodín) | Vymaže sa spolu so všetkým, čo k účtu patrí; jeho e-mailovú adresu a pseudonym možno znovu použiť. Záznamy o prijatí a bezpečnostný auditný záznam si svoje položky ponechávajú, ako uvádzajú ich riadky |"
    ],
    [
     "stane nečitateľným",
@@ -1692,12 +1924,20 @@
     ", to evidenco pa izbrišemo skupaj z vašim računom"
    ],
    [
+    "",
+    "Navaja tudi našega ponudnika plačilnih storitev, ki ni ponudnik umetne inteligence: njegov vnos navaja, kaj prejme pri plačilih s kartico, kot to navaja tudi odstavek »Drugi prejemniki« spodaj. "
+   ],
+   [
     "o se plačljivi paketi začnej",
     "i ga upravlja družba NETOPIA Financial Services S.A. v Romuniji, ko se plačljivi paketi začnejo. Podatke o kartici vnesete na njegovi strani, ne na naši, on pa vašo kartico hrani, da jo lahko bremeni ob vsakem podaljšanju. Ob vsakem plačilu mu pošljemo vaše ime, e-poštni naslov in telefonsko številko, vaš naslov za obračun (ulico, kraj, regijo, poštno številko in državo), kodo stranke, ki je enaka za vsa vaša plačila, našo oznako naročila, znesek in valuto ter kratek opis plačila, na primer ime vašega paketa; ko ob podaljšanju bremeni vašo shranjeno kartico, mu pošljemo tudi naslov IP, s katerega ste nazadnje plačali sami. NETOPIA te podatke zahteva pri vsakem plačilu s kartic"
    ],
    [
     "",
-    "\n| Račun, katerega registracija ni bila dokončana: e-poštni naslov ni bil preverjen ali drugi korak prijave (ključ za dostop ali aplikacija za preverjanje pristnosti) ni bil nastavljen | 24 ur od začetka registracije | Izbriše se skupaj z vsem, kar pripada računu; njegov e-poštni naslov in psevdonim je mogoče znova uporabiti. Evidence sprejetja in varnostna revizijska sled ohranijo svoje vnose, kot navajajo njihove vrstice |"
+    ", razen če celotno storitev obnovimo iz varnostne kopije, ki jo še vsebuje (razdelek 7)"
+   ],
+   [
+    "",
+    "\n| Račun, katerega registracija ni bila dokončana: e-poštni naslov ni bil preverjen ali drugi korak prijave (ključ za dostop ali aplikacija za preverjanje pristnosti) ni bil nastavljen | 24 ur od začetka registracije ali ko poteče zadnja povezava, ki smo jo poslali, če je to pozneje (vsaka povezava velja 24 ur) | Izbriše se skupaj z vsem, kar pripada računu; njegov e-poštni naslov in psevdonim je mogoče znova uporabiti. Evidence sprejetja in varnostna revizijska sled ohranijo svoje vnose, kot navajajo njihove vrstice |"
    ],
    [
     "i mogoče prebrati",
@@ -1749,12 +1989,20 @@
     ", och vi raderar denna post tillsammans med ditt konto"
    ],
    [
+    "",
+    "Det anger också vår betalningsleverantör, som inte är en AI-leverantör: dess post anger vad den tar emot vid kortbetalningar, precis som ”Andra mottagare” nedan gör. "
+   ],
+   [
     "när betalabonnemang börjar erbjudas",
     "som drivs av NETOPIA Financial Services S.A. i Rumänien, när betalabonnemang börjar erbjudas. Du anger dina kortuppgifter på leverantörens sida, inte på vår, och leverantören sparar ditt kort för att kunna debitera det vid varje förnyelse. Vid varje betalning skickar vi leverantören ditt namn, din e-postadress och ditt telefonnummer, din faktureringsadress (gata, ort, region, postnummer och land), en kundkod som är densamma för alla dina betalningar, vår referens för beställningen, beloppet och valutan samt en kort beskrivning av betalningen, till exempel namnet på ditt abonnemang; när leverantören debiterar ditt sparade kort vid en förnyelse skickar vi också den IP-adress som du senast själv betalade från. NETOPIA begär dessa uppgifter vid varje kortbetalning"
    ],
    [
     "",
-    "\n| Ett konto vars registrering inte slutfördes: e-postadressen har inte verifierats, eller det andra inloggningssteget (en lösennyckel eller en autentiseringsapp) har inte konfigurerats | 24 timmar efter att registreringen påbörjades | Raderas, med allt som hör till kontot; dess e-postadress och pseudonym kan användas igen. Uppgifterna om godkännanden och samtycken och säkerhetsloggen behåller sina poster, som deras rader anger |"
+    ", såvida vi inte återställer hela tjänsten från en säkerhetskopia som fortfarande innehåller den (avsnitt 7)"
+   ],
+   [
+    "",
+    "\n| Ett konto vars registrering inte slutfördes: e-postadressen har inte verifierats, eller det andra inloggningssteget (en lösennyckel eller en autentiseringsapp) har inte konfigurerats | 24 timmar efter att registreringen påbörjades, eller när den senaste länken vi skickade upphör att gälla, om det är senare (varje länk gäller i 24 timmar) | Raderas, med allt som hör till kontot; dess e-postadress och pseudonym kan användas igen. Uppgifterna om godkännanden och samtycken och säkerhetsloggen behåller sina poster, som deras rader anger |"
    ],
    [
     "",
@@ -1806,12 +2054,20 @@
     " ve bu kaydı hesabınızla birlikte sileriz"
    ],
    [
+    "",
+    "Sicilde, yapay zekâ sağlayıcısı olmayan ödeme sağlayıcımız da yer alır: aşağıdaki “Diğer alıcılar” paragrafında olduğu gibi, onun kaydı da kartlı ödemeler için neyi aldığını belirtir. "
+   ],
+   [
     " ödeme sağlayıcımız NETOPIA Payments üzerinden yapılı",
     ", Romanya'daki NETOPIA Financial Services S.A. tarafından işletilen ödeme sağlayıcımız NETOPIA Payments üzerinden yapılır. Kart bilgilerinizi bizim sayfamıza değil, onun sayfasına girersiniz; o da her yenilemede kartınızdan tahsilat yapabilmek için kartınızı saklar. Her ödemede ona adınızı, e-posta adresinizi ve telefon numaranızı, fatura adresinizi (sokak, şehir, bölge, posta kodu ve ülke), tüm ödemeleriniz için aynı kalan bir müşteri kodunu, siparişe ilişkin referansımızı, tutarı ve para birimini ve planınızın adı gibi kısa bir ödeme açıklamasını göndeririz; bir yenilemede kayıtlı kartınızdan tahsilat yaptığında, en son kendiniz ödeme yaptığınız IP adresini de göndeririz. NETOPIA bu bilgileri her kartlı ödemede iste"
    ],
    [
+    "artışma geri getirilemez",
+    "üm hizmeti tartışmayı hâlâ içeren bir yedekten geri yüklemedikçe tartışma geri getirilemez (7. bölüm)"
+   ],
+   [
     "",
-    "\n| Kaydı tamamlanmamış bir hesap: e-posta adresi doğrulanmamış veya ikinci oturum açma adımı (bir geçiş anahtarı veya bir kimlik doğrulayıcı uygulama) ayarlanmamış | Kaydın başlamasından 24 saat sonra | Hesaba ait her şeyle birlikte silinir; e-posta adresi ve takma adı yeniden kullanılabilir. Kabul kayıtları ve güvenlik denetim izi, kendi satırlarında belirtildiği gibi, girdilerini korur |"
+    "\n| Kaydı tamamlanmamış bir hesap: e-posta adresi doğrulanmamış veya ikinci oturum açma adımı (bir geçiş anahtarı veya bir kimlik doğrulayıcı uygulama) ayarlanmamış | Kaydın başlamasından 24 saat sonra veya, daha geç olursa, gönderdiğimiz son bağlantının süresi dolduğunda (her bağlantı 24 saat geçerlidir) | Hesaba ait her şeyle birlikte silinir; e-posta adresi ve takma adı yeniden kullanılabilir. Kabul kayıtları ve güvenlik denetim izi, kendi satırlarında belirtildiği gibi, girdilerini korur |"
    ],
    [
     "okunamaz hâle gelir",
@@ -1863,12 +2119,20 @@
     " і видаляємо цей запис разом із вашим обліковим записом"
    ],
    [
+    "",
+    "У ньому також наведено нашого постачальника платіжних послуг, який не є постачальником ШІ: його запис зазначає, що він отримує під час оплати карткою, як і абзац «Інші одержувачі» нижче. "
+   ],
+   [
     "щойно почнуть діяти платні плани",
     "яким керує компанія NETOPIA Financial Services S.A. у Румунії, щойно почнуть діяти платні плани. Дані картки ви вводите на його сторінці, а не на нашій, і він зберігає вашу картку, щоб списувати з неї кошти під час кожного поновлення. З кожним платежем ми надсилаємо йому ваше ім’я, адресу електронної пошти та номер телефону, вашу платіжну адресу (вулицю, місто, регіон, поштовий індекс і країну), код клієнта, однаковий для всіх ваших платежів, наш ідентифікатор замовлення, суму та валюту, а також короткий опис платежу, наприклад назву вашого плану; коли він списує кошти з вашої збереженої картки під час поновлення, ми також надсилаємо йому IP-адресу, з якої ви востаннє платили самі. NETOPIA запитує ці дані під час кожної оплати карткою"
    ],
    [
     "",
-    "\n| Обліковий запис, реєстрацію якого не завершено: адресу електронної пошти не підтверджено або не налаштовано другий крок входу (ключ доступу чи застосунок-автентифікатор) | 24 години від початку реєстрації | Видаляється разом з усім, що належить до облікового запису; його адресу електронної пошти та псевдонім можна використати знову. Записи про прийняття та журнал аудиту безпеки зберігають свої дані, як зазначено в їхніх рядках |"
+    ", хіба що ми відновимо весь сервіс із резервної копії, у якій вони ще зберігаються (розділ 7)"
+   ],
+   [
+    "",
+    "\n| Обліковий запис, реєстрацію якого не завершено: адресу електронної пошти не підтверджено або не налаштовано другий крок входу (ключ доступу чи застосунок-автентифікатор) | 24 години від початку реєстрації або після закінчення строку дії останнього надісланого нами посилання, якщо це пізніше (кожне посилання дійсне 24 години) | Видаляється разом з усім, що належить до облікового запису; його адресу електронної пошти та псевдонім можна використати знову. Записи про прийняття та журнал аудиту безпеки зберігають свої дані, як зазначено в їхніх рядках |"
    ],
    [
     "стає нечитабельним",
@@ -1920,12 +2184,20 @@
     ", và chúng tôi xóa hồ sơ này cùng với tài khoản của bạn"
    ],
    [
+    "",
+    "Sổ đăng ký cũng liệt kê nhà cung cấp dịch vụ thanh toán của chúng tôi, vốn không phải là nhà cung cấp AI: mục của nhà cung cấp này nêu những gì họ nhận được đối với các khoản thanh toán bằng thẻ, giống như phần “Các bên nhận khác” bên dưới. "
+   ],
+   [
     "khi các gói trả phí bắt đầu",
     "do NETOPIA Financial Services S.A. tại Romania vận hành, khi các gói trả phí bắt đầu. Bạn nhập thông tin thẻ trên trang của nhà cung cấp này, không phải trên trang của chúng tôi, và nhà cung cấp này lưu giữ thẻ của bạn để có thể trừ tiền vào thẻ ở mỗi lần gia hạn. Với mỗi khoản thanh toán, chúng tôi gửi cho nhà cung cấp này tên, địa chỉ email và số điện thoại của bạn, địa chỉ lập hóa đơn của bạn (đường phố, thành phố, vùng, mã bưu chính và quốc gia), một mã khách hàng giữ nguyên cho mọi khoản thanh toán của bạn, mã tham chiếu đơn hàng của chúng tôi, số tiền và loại tiền tệ, và một mô tả ngắn về khoản thanh toán, chẳng hạn như tên gói của bạn; khi nhà cung cấp này trừ tiền vào thẻ đã lưu của bạn lúc gia hạn, chúng tôi cũng gửi địa chỉ IP mà bạn đã tự mình dùng để thanh toán lần gần nhất. NETOPIA yêu cầu các thông tin này với mỗi khoản thanh toán bằng thẻ"
    ],
    [
     "",
-    "\n| Tài khoản chưa hoàn tất đăng ký: địa chỉ email chưa được xác minh, hoặc bước đăng nhập thứ hai (khóa truy cập hoặc ứng dụng xác thực) chưa được thiết lập | 24 giờ sau khi bắt đầu đăng ký | Bị xóa, cùng với mọi thứ thuộc về tài khoản; địa chỉ email và bút danh của tài khoản đó có thể được sử dụng lại. Hồ sơ chấp nhận và dấu vết kiểm toán bảo mật vẫn giữ các mục của chúng, như các hàng tương ứng nêu rõ |"
+    ", trừ khi chúng tôi khôi phục toàn bộ dịch vụ từ một bản sao lưu vẫn còn chứa nó (mục 7)"
+   ],
+   [
+    "",
+    "\n| Tài khoản chưa hoàn tất đăng ký: địa chỉ email chưa được xác minh, hoặc bước đăng nhập thứ hai (khóa truy cập hoặc ứng dụng xác thực) chưa được thiết lập | 24 giờ sau khi bắt đầu đăng ký, hoặc khi liên kết cuối cùng chúng tôi gửi hết hạn nếu thời điểm đó muộn hơn (mỗi liên kết có hiệu lực trong 24 giờ) | Bị xóa, cùng với mọi thứ thuộc về tài khoản; địa chỉ email và bút danh của tài khoản đó có thể được sử dụng lại. Hồ sơ chấp nhận và dấu vết kiểm toán bảo mật vẫn giữ các mục của chúng, như các hàng tương ứng nêu rõ |"
    ],
    [
     "",
@@ -1978,11 +2250,19 @@
    ],
    [
     "",
+    "《名录》还列出了我们的支付提供商，它并非 AI 提供商：其条目说明它就银行卡付款接收哪些信息，下文“其他接收方”也有相应说明。"
+   ],
+   [
+    "",
     "，该服务由位于罗马尼亚的 NETOPIA Financial Services S.A. 运营。您在其页面而非我们的页面上输入银行卡详情，它会保存您的银行卡，以便在每次续订时扣款。每次付款时，我们会向其发送您的姓名、电子邮件地址和电话号码，您的账单地址（街道、城市、地区、邮政编码和国家），一个在您所有付款中保持不变的客户代码，我们的订单参考编号，金额和币种，以及对该笔付款的简短说明，例如您的套餐名称；当它在续订时从您保存的银行卡扣款时，我们还会发送您上一次亲自付款时使用的 IP 地址。NETOPIA 在每次银行卡付款时都会要求提供这些信息"
    ],
    [
     "",
-    "\n| 未完成注册的账户：电子邮件地址未经验证，或未设置登录的第二步（通行密钥或身份验证器应用） | 注册开始后 24 小时 | 连同属于该账户的所有内容一并删除；其电子邮件地址和化名可再次使用。接受记录和安全审计记录会保留其中的条目，如各自所在行所述 |"
+    "，除非我们从仍保存该辩论的备份中恢复整个服务（第 7 节）"
+   ],
+   [
+    "",
+    "\n| 未完成注册的账户：电子邮件地址未经验证，或未设置登录的第二步（通行密钥或身份验证器应用） | 注册开始后 24 小时，或我们发送的最后一个链接失效时，以较晚者为准（每个链接的有效期为 24 小时） | 连同属于该账户的所有内容一并删除；其电子邮件地址和化名可再次使用。接受记录和安全审计记录会保留其中的条目，如各自所在行所述 |"
    ],
    [
     "无法读取",

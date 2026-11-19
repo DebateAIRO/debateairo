@@ -20,6 +20,7 @@ import {
   withoutPrivacy314Number
 } from "../support/legalPrivacy314.js";
 import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
+import { withoutTerms220 } from "../support/legalTerms220.js";
 
 /**
  * Terms of Service 2.19 and Privacy Policy 3.13, effective 19 November 2026 (tests/support/legalRelease.ts). Every
@@ -33,9 +34,12 @@ import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
 
 const root = process.cwd();
 const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
-/** A draft as 3.14 left it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts), the Terms as they are. */
+/**
+ * A draft as 3.14 and 2.19 left it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts), the Terms
+ * with 2.20 undone (tests/support/legalTerms220.ts).
+ */
 const draft = (code: string, name: string): string =>
-  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : file(code, name);
+  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : withoutTerms220(code, file(code, name));
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
@@ -104,9 +108,10 @@ describe("Terms 2.19 and Privacy Policy 3.13", () => {
     expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "2.1" });
   });
 
-  it("lists 2.19 as the Terms in force and 2.18 as the archived English text", () => {
-    expect(TERMS_VERSIONS[0]).toEqual({ version: "2.19", noteKey: "legal.versions.v2.note", current: true, href: "/terms" });
-    expect(TERMS_VERSIONS[1]).toEqual({
+  // Terms 2.20 followed on the same day (tests/unit/legal-terms-220.test.ts): 2.19 is now the past version after it.
+  it("lists 2.18 as the archived English text after 2.19", () => {
+    expect(TERMS_VERSIONS[1]).toMatchObject({ version: "2.19", current: false });
+    expect(TERMS_VERSIONS[2]).toEqual({
       version: "2.18",
       noteKey: "legal.archive.meta",
       current: false,

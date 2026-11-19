@@ -14,7 +14,12 @@ import { resolve } from "node:path";
  *   - the off-host backup copies are never deleted by deploy/vps/backup.sh (`rclone copy` / `scp` only add files), and
  *     each holds the database with the key stores, so the summary and section 7 no longer say "up to 8 weeks" for every
  *     backup, nor that destroyed keys make content unreadable without saying "on our server";
- *   - section 7 gains a row: an account whose sign-up is not finished within 24 hours is deleted (0183).
+ *   - section 7 gains a row: an account whose sign-up is not finished is deleted 24 hours after it began, or once the
+ *     last link sent to it expires if that is later (0183, PR #303: a resend keeps the account while its new link lives);
+ *   - section 5 says the Register also lists the payment provider (pages.ts NETOPIA_PROVIDER), and section 6 that a
+ *     debate our check deletes comes back only if the whole service is restored from a backup that holds it
+ *     (deploy/vps/README.md: a restore brings erased accounts and unpublished debates back).
+ * 3.15 was amended in place before it was published (same branch); the archive holds only the amended text.
  * English, Romanian and French, the languages the release offers, gain the 3.15 history entry. Nobody has to accept
  * again: the floors stay 3.2 / 2.1.
  *
@@ -24,7 +29,7 @@ import { resolve } from "node:path";
  */
 
 export const PRIVACY_315_ENTRY =
-  "Version 3.15 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, and what we send it with each payment (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); that the encrypted copies on our separate backup storage are not deleted automatically, so a deleted debate or a closed account can be restored from them until they are removed, where it said that backups are kept for up to 8 weeks (section 7); and that an account whose sign-up is not finished within 24 hours is deleted (section 7).";
+  "Version 3.15 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, what we send it with each payment, and that the Register lists it too (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); that the encrypted copies on our separate backup storage are not deleted automatically, so a deleted debate or a closed account can be restored from them until they are removed, where it said that backups are kept for up to 8 weeks (sections 6 and 7); and that an account whose sign-up is not finished is deleted 24 hours after the sign-up began, or once the last link we sent expires if that is later (section 7).";
 
 type Swaps = Readonly<Record<string, Readonly<{ sha256: string; swaps: readonly (readonly [string, string])[] }>>>;
 

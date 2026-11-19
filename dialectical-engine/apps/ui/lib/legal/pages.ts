@@ -173,12 +173,16 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
  * Privacy 3.12 (V4 start step, owner 3 Nov 2026): `clarifyQuestions` and `suggestPaths` are the two calls made when
  * the person presses Next, before a debate starts.
  */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "reportCheck" | "clarifyQuestions" | "suggestPaths" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "reportCheck" | "clarifyQuestions" | "suggestPaths" | "support" | "payments";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"]);
+/** Privacy 3.15: `payments` is the payment provider's one job (NETOPIA_PROVIDER), the only row that is not an AI provider. */
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support", "payments"]);
 
-/** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
-export type ContractFlag = "yes" | "no" | "unconfirmed";
+/**
+ * A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. "notApplicable"
+ * (Privacy 3.15) is for a fact about AI that does not apply to a row that is not an AI provider (NETOPIA_PROVIDER).
+ */
+export type ContractFlag = "yes" | "no" | "unconfirmed" | "notApplicable";
 
 /**
  * One row of the AI Provider Register, which the Privacy Policy (§5) makes part of the policy and
@@ -474,6 +478,35 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
+ * Privacy 3.15 (owner, 19 November 2026): the Register also lists the payment provider, NETOPIA Payments, the one row
+ * that is not an AI provider. Only what the repo supports is filled in. What it receives with each payment is
+ * `buildHostedStartBody` / `buildSavedCardChargeBody` (packages/payments-netopia/src/requests.ts), the same list as
+ * Privacy Policy §5. The legal entity is not recorded in the repo: "NETOPIA Financial Services S.A." in Romania is
+ * the owner's working name, for counsel to confirm (spec 2026-10-05 §2.22 leaves the entity and its role to counsel).
+ * Romania is in the EU, so no transfer basis is needed. Where it processes, how long it keeps data and the privacy
+ * contact are unknown, so they stay "[to confirm]", and the row has no checked date. Zero data retention and training
+ * are facts about AI providers: "not applicable". Listed on every answer, after the AI rows (`legalRegister`).
+ */
+export const NETOPIA_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  key: "netopia",
+  provider: "NETOPIA Payments",
+  nameKey: null,
+  models: "",
+  modelsKey: null,
+  entity: "NETOPIA Financial Services S.A.",
+  homeCountryKey: "legal.providers.romania",
+  purposes: Object.freeze<ProviderPurpose[]>(["payments"]),
+  purposesConfirmed: true,
+  locationKey: "legal.providers.unconfirmed",
+  retentionKey: "legal.providers.unconfirmed",
+  zeroRetention: "notApplicable",
+  training: "notApplicable",
+  basisKey: "legal.providers.euBasis",
+  contact: "[…]",
+  checkedOn: null
+});
+
+/**
  * Addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed automatically): the
  * reviewed catalogue, keyed by the company keys the API answers on `GET /v1/public/ai-providers`
  * (`providerCompaniesOfTargets`, `PROVIDER_COMPANY_HOSTS` in `@debateai/providers`), in the order the page shows
@@ -541,6 +574,14 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, support]);
 }
 
+/**
+ * What `/providers` shows (Privacy 3.15): the AI Provider Register (`providerRegister`), then the payment provider,
+ * which is not an AI provider and is listed on every answer. Never throws.
+ */
+export function legalRegister(companies: readonly string[] | null): readonly ProviderRegisterEntry[] {
+  return Object.freeze([...providerRegister(companies), NETOPIA_PROVIDER]);
+}
+
 export type TermsVersion = Readonly<{
   version: string;
   noteKey: string;
@@ -557,7 +598,9 @@ export type TermsVersion = Readonly<{
  * numbered 2.7 became 2.9, but the change history in the Terms names a 2.7, so its row says why there is nothing to read.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.19", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.20", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "2.19", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/8904aa701cf3816f5e31a52cc03f3607bec8758af0332dc220db8f90b5b2ecee" },
   { version: "2.18", noteKey: "legal.archive.meta", current: false,
     href: "/terms/versions/b598df6acbe610001b8740b17231d36f03912abbabebbe06dcf0eb5d960f3cac" },
   { version: "2.17", noteKey: "legal.archive.meta", current: false,
