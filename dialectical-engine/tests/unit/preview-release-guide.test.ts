@@ -1547,6 +1547,7 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       'A subscriber\'s renewals keep charging the price recorded for that subscriber when they bought (Terms section 12), after a rise and after a cut alike.',
       '**An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan is renewed at depends on the release that showed it.',
       '**an upload whose old release is such an older one must not change a plan\'s prices**: no `prices` line may print.',
+      'The reading errs to one side only: `HELD` is printed when an open subscription names the plan anywhere in its history',
       '**If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**',
       'For each plan named there SB3 prints `HELD` or `nobody holds it now`',
       'has no way yet to apply a new limit only from a person\'s next month',
@@ -1564,11 +1565,16 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
     expect(back).toContain('put the numbers before into the owner\'s file with SB3c');
     // The yes names a number change and, for a named plan, that nobody holds it or when its people were told.
     expect(sectionOf(guide, '### SB6. The owner\'s fresh yes').replace(/\s+/g, ' ')).toContain('only when SB3\'s `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told');
+    // The line that tells whether the old release saves an upgrade's shown price looks for a name the upgrade code really has.
+    expect(flat).toContain('`grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`');
+    expect(read('apps/api/src/billing/upgrade.ts')).toContain('export function monthlyQuoteIdOf(');
     // The drained path never runs SB6: its own yes names the same, and its numbers have their own way back (no WB2 after DR6).
     const drainedFlat = drained.replace(/\s+/g, ' ');
     expect(drainedFlat).toContain('When SB3\'s `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told, as in SB6.');
-    expect(drainedFlat).toContain('**The numbers (SB3\'s `NEWNUM`) on the drained path.** DR6 marks the old release retired, so there is no switch back to it (no WB2) once the upload is done.');
-    expect(back).toContain('After a drained upload there is no WB2');
+    expect(drainedFlat).toContain('**The numbers on the drained path (SB3\'s `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to it (no WB2) once the upload is done.');
+    // Both places that send the reader there quote the paragraph's own first words.
+    expect(back).toContain('After a drained upload there is no WB2: see "The numbers on the drained path"');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md')).toContain('The release guide says both under "The numbers on the drained path".');
     // The order table names the two new steps between SB3 and SB4.
     expect(sideBySide).toMatch(/\n\| SB3 \|[^\n]*\n\| SB3b \|[^\n]*\n\| SB3c \|[^\n]*\n\| SB4 \|/);
   });

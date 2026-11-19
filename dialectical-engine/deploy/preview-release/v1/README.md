@@ -4559,7 +4559,9 @@ plan's prices or limits; the tool cannot know who holds which plan.
   renews at that price. An older release does not: the plan is then renewed at the new price, after the short renewal
   notice instead of the Terms' 30 days. So **an upload whose old release is such an older one must not change a
   plan's prices**: no `prices` line may print. That includes the first upload that carries the fix, because the
-  quotes still open at the switch were made by the old release. When unsure, treat the old release as an older one.
+  quotes still open at the switch were made by the old release. The old release saves that price when this line,
+  run with the upload's names file, prints 1 or more; a 0, or an error, means an older one:
+  `grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`.
 - A plan change by an existing subscriber uses the new list. After a rise, a move to a lower plan is recorded at that
   plan's new price, which can be more than they pay today. The page shows the amount, but a downgrade panel left open
   across the switch still shows the old one. After a cut, an upgrade is
@@ -4584,8 +4586,12 @@ So: **do not lower a plan's limits while anyone holds that plan**, unless that i
 stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named in `LIMITS`, for example `LIMITS='PLUS'`; naming it is the
 owner's statement that nobody holds the plan, or that the people on it were told and what follows is accepted. For
 each plan named there SB3 prints `HELD` or `nobody holds it now`, read from the subscriptions that are open (test
-purchases count; Free is held by everyone without a paid plan). It prints no count, and it does not stop the step:
-the decision stays the owner's.
+purchases count; Free is held by everyone without a paid plan). The reading errs to one side only: `HELD` is printed
+when an open subscription names the plan anywhere in its history, so also for a plan someone was on earlier and
+has since left, or is only scheduled to move to; `nobody holds it now` means no open subscription ever named it. It is
+a reading at SB3: people can still buy until the switch (on the drained path, until DR2), so a `nobody` that matters
+is read again right before the yes. It prints no count, and it does not stop the step: the decision stays the
+owner's.
 `LIMITS` must name exactly those plans (`SITE_LIMITS_NAMED_BUT_SAME` otherwise). The closing reserve works across
 plans: every paid plan's closing is admitted against the smallest paid reserve, so when that smallest one moves, every
 paid plan must be named.
@@ -5787,12 +5793,14 @@ for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --
 echo RBD_A_DONE
 ```
 
-**The numbers (SB3's `NEWNUM`) on the drained path.** DR6 marks the old release retired, so there is no switch back to
+**The numbers on the drained path (SB3's `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to
 it (no WB2) once the upload is done. Numbers published by a drained upload come back in one of two ways only: rbD-B,
 which puts back DR3's cold copy and with it the old numbers, and loses everything written since DR3 (sign-ups, debates,
-payments); or SB3c (`KEEP` = the inputs the upload named; `SRC` = the plan it compared with,
-`jq -r .from.path "$ART/site-inputs.json"`) and then the next upload, with those inputs named in its `NEWNUM`. The
-second way loses nothing and takes one more upload.
+payments); or SB3c (`KEEP` = the inputs the upload named; `SRC` = the plan it compared with, which its record names:
+`jq -r .from.path <that upload's artifacts folder>/site-inputs.json`) and then the next upload, with those inputs
+named in its `NEWNUM`. The second way loses nothing and takes one more upload. The folder is the one of the upload
+that published the numbers, not `$ART` of a later upload's names file: SB3c's last line names the settings version it
+wrote from, which must be the one before the change.
 
 **rbD-B: from DR4 on.** The new release stops (its runner only with nothing open), the cold copy's data and config
 folders come back (the current ones moved aside, never deleted), the lock goes back to its copy from SB1 (the new

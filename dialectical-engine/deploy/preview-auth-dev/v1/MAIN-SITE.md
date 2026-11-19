@@ -471,7 +471,9 @@ SB3, "Editing the owner's file". Do it before SB2 (the practice runs with the fi
   Terms ask for more than a notice (sections 12 and 14), and the product cannot yet apply a lower limit only from a
   person's next month. So do not lower a plan's limits while anyone holds that plan. Naming the plan in `LIMITS` is
   your statement that nobody holds it, or that you decided this knowing the above. For each plan you name, SB3 prints
-  `HELD` or `nobody holds it now` (test purchases count; it prints no count).
+  `HELD` or `nobody holds it now` (test purchases count; it prints no count). `HELD` is also printed for a plan
+  someone was on earlier and has since left, so it can be wrong only towards caution; `nobody holds it now` is firm
+  at that moment, and people can still buy until DR2.
 - **Higher limits** need no second naming. People get more from the switch on; someone who changed plan this month,
   from their next month.
 - The day's ceiling, `askRoomReads` and `abuseLimits` are site-wide; they reach everyone at the switch. A new
