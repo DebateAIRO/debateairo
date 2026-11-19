@@ -90,7 +90,7 @@ export const WEB_PLANNER_PATHS_MAX = 8 as const;
 /**
  * Which AI plans (owner, 30 Oct, "Search planner AI": "Haiku first", Qwen as the backup): Claude Haiku 5.5
  * ($0.10 / $0.50 per million), then Qwen3.8-Flash ($0.113 / $0.382), GLM-5.3-Flash ($0.15 / $0.50),
- * DeepSeek-V4.1-Flash ($0.20 / $0.60). About 0.1¢ a debate. A backup is the next one of another company.
+ * DeepSeek-V4.1-Flash ($0.20 / $0.60). A backup is the next one of another company.
  */
 export const WEB_PLANNER_MODEL_ORDER = Object.freeze([
   "claude-haiku-5-5", "Qwen/Qwen3.8-Flash", "zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"

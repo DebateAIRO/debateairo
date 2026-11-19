@@ -58,7 +58,7 @@ export type BeforeFastDecision = LanguageDecision | Readonly<{ kind: "ASK_FAST" 
  * Ruling CR-2: the sites where eld may be confidently wrong about a near neighbour, so the fast AI always checks even
  * when eld names the site language: the three eld lacks (ga, id, mt), Croatian (Serbian and Bosnian in Latin script
  * read as Croatian), and every site Task 3 measured with a confident cross-locale confusion (ELD_CONFUSED_SITES).
- * Each extra check costs about $0.00013 (the framed system message is about 5.2 KB, ~1,300 input tokens). The fallback
+ * Each extra check is one small fast call (the framed system message is about 5.2 KB, ~1,300 input tokens). The fallback
  * (fast AI down) still uses eld: never block.
  */
 export const FAST_CHECK_ALWAYS_SITES: readonly string[] = Object.freeze(

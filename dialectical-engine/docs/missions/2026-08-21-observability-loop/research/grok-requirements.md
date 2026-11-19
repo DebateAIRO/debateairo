@@ -337,9 +337,9 @@ Options: (A) direct commit to `main`; (B) auto-merged PR on `obs/quick/*` after 
 
 ### E3. Listener runtime + model + monthly budget
 
-Options: (A) non-LLM loop + spawn Grok CLI per event, SuperGrok $30 already paid, cap 8 spawns/day (R27/R32); (B) standing Claude/Grok CLI session; (C) wait for DR-179 lift and use `grok-4.6` HTTP with a $50/month API cap.
+Options: (A) non-LLM loop + spawn Grok CLI per event on the subscription already paid, cap 8 spawns/day (R27/R32); (B) standing Claude/Grok CLI session; (C) wait for DR-179 lift and use `grok-4.6` HTTP with a monthly API spend cap.
 
-**Pick: A.** Confidence: HIGH on architecture; MEDIUM on $30 being enough quota (CLI rate limits UNVERIFIED). Strongest counter: SuperGrok quotas may be too small for a storm; shedding to report-only is required. If V lifts DR-179, `grok-4.6` is $2/$6 per 1M ([xAI models](https://docs.x.ai/developers/models)) plus $5/1k tool calls UNVERIFIED-for-this-agent; do not budget from API prices until the hold lifts. Idle cost of A is ~$0 extra.
+**Pick: A.** Confidence: HIGH on architecture; MEDIUM on the subscription's quota being enough (CLI rate limits UNVERIFIED). Strongest counter: SuperGrok quotas may be too small for a storm; shedding to report-only is required. If V lifts DR-179, `grok-4.6` is $2/$6 per 1M ([xAI models](https://docs.x.ai/developers/models)) plus $5/1k tool calls UNVERIFIED-for-this-agent; do not budget from API prices until the hold lifts. Idle cost of A is ~$0 extra.
 
 ### E4. Error-data retention under DR-188
 
@@ -382,7 +382,7 @@ Options: (A) capture-at-boundary, strip inner frames, never auto-fix (R18); (B) 
 |---|---|---|---|
 | E1 | A 1-file/≤20 + floor; B no QUICK-FIX; C 3-files/50 | **A** | Honours "very quick, no approval" without Cursor's 5-file band. Floor dominates lines. |
 | E2 | A direct main; B auto-merged PR; C daily batch | **B** | PR body is the audit; auto-merge is the grant; main-direct is un-revertable without SHA discipline. |
-| E3 | A spawn Grok CLI + $30 sub; B standing session; C wait + HTTP API | **A** | Only lawful spend under DR-179; idle ≈ 0; lift later. |
+| E3 | A spawn Grok CLI on the existing subscription; B standing session; C wait + HTTP API | **A** | Only lawful spend under DR-179; idle ≈ 0; lift later. |
 | E4 | A append-only + V-gated compaction; B timed delete; C treat as user data | **A** | DR-188 forbids deletion of product data; ops payloads compact, they do not delete debates. |
 | E5 | A boundary capture; B fully exclude; C instrument inside | **A** | Observes auth outages without touching W.I.P. security or `6e58adc`. |
 | E6.1 | Lift DR-179 for this agent? | **No for now** | CLI-relay works; API prices are a different grant. |

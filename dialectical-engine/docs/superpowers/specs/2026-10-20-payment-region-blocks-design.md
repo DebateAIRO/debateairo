@@ -1,6 +1,6 @@
 # Payment region blocks: design
 
-Date: 20 October 2026. Owner: V (stefan.nour@dezbatere.ro). Status: draft for the owner's approval.
+Date: 20 October 2026. Owner: V (the owner). Status: draft for the owner's approval.
 
 ## 1. Intent
 

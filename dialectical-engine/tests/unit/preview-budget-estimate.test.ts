@@ -1067,7 +1067,7 @@ describe("what one debate is estimated at with today's register (realistic worst
     budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture", free_model_ids: [GLM, DEEPSEEK],
     premium_model_ids: [GLM, DEEPSEEK, MIMO, QWEN] }))!;
   const sent = previewCallOutputTokens(config, { debate: [2048, 2048, 2048, 2048, 2048], story: { storyteller: 12_000, checker: 2048 } });
-  /** The DeepInfra gate's /remaining figures under the owner's GO: 10 at once x MiMo's worst case (the largest of the four). */
+  /** The DeepInfra gate's /remaining figures in these tests: 10 at once x MiMo's worst case (the largest of the four). */
   const HOLD = 10n * MIMO_LARGEST;
   /**
    * The Anthropic gate's (PR #126): 2 at once x Claude Haiku's worst case at its upper price step. Prompt caching

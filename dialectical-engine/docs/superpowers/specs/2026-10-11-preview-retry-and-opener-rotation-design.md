@@ -194,13 +194,13 @@ Size for the owner's five-AI debate at depth 2 (sealed shape: branching 2, one r
 using the realistic call of 22,528 tokens in and 8,192 out at list prices, × 1.15. UNCONFIRMED until the test table
 (`tests/unit/preview-budget-estimate.test.ts:1050-1054`) is recomputed:
 
-| Five AIs | DeepInfra today → with final retries | Anthropic today → with final retries |
+| Five AIs | DeepInfra calls today → with final retries | Anthropic calls today → with final retries |
 |---|---|---|
-| depth 1 | $4.05 / 470 calls → ~$5.04 / ~590 | $0.92 / 154 → ~$1.18 / ~234 |
-| **depth 2** | **$5.35 / 700 → ~$6.91 / ~930** | **$1.18 / 237 → ~$1.58 / ~364** |
-| depth 3 | $7.93 / 1160 → **~$10.6** / ~1550 (over the $10 pot) | $1.71 / 403 → **~$2.40 / ~620** (over $2.00 and the 600 calls) |
+| depth 1 | 470 → ~590 | 154 → ~234 |
+| **depth 2** | **700 → ~930** | **237 → ~364** |
+| depth 3 | 1160 → **~1550** (over that gate's pot) | 403 → **~620** (over that gate's pot) |
 
-The free and premium (four-model) rows stay under the pots at every depth. Premium depth 3 comes to about $8.7.
+The free and premium (four-model) rows stay under the pots at every depth.
 
 Not covered: re-claims. If a resumed pass sends again at sites that already answered (the A16a comments at
 `index.ts:5097-5163` suggest each pass re-authors every site; UNCONFIRMED), then under option B a re-claim can resend
@@ -365,9 +365,8 @@ Tests:
 ### 2.4 Questions for the owner (short, with my recommended answer)
 
 1. **Should the start-of-debate check count the second paid try (the retry after the 10-minute wait) at every
-   argument and review step?** Recommended: **yes**. For five AIs at depth 2 this adds about +$1.56 on DeepInfra and
-   +<amount> on Anthropic. Five AIs at depth 3 then no longer fits today's <amount>0 / <amount> day (about <amount> and <amount>), so the
-   app will refuse that size at the start unless the pots are raised.
+   argument and review step?** Recommended: **yes**. For five AIs at depth 2 this adds the calls in the table above on both
+   gates. Five AIs at depth 3 then no longer fits today's pots, so the app will refuse that size at the start unless the pots are raised.
 2. **Should the gate's own "too many calls at once" refusal be treated as free, like the other two** (not counted,
    and given the one 60-second retry)? Recommended: **yes**. Nothing was sent for it
    (`preview-test.ts:391-395`, `:413-416`). Owner ruling 5 named only the other two codes.

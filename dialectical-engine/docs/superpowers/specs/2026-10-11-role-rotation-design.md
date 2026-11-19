@@ -143,15 +143,15 @@ At boot, the preview configuration already refuses a free or premium model list 
 
 Pricing the dearest member rather than the actual pick also means the decision "fits / does not fit" never depends on whose turn it is: the same ask on the same day gets the same answer.
 
-**The re-pinned room table** (preview, depth 1-3, largest story size, realistic worst case, × 1.15, plus each gate's in-flight hold; pots DeepInfra <amount>0 / 2,000 calls, Anthropic <amount>0 / 600 calls). Computed on 2026-10-11 by running the shipped estimate functions with the roles placed at each gate's dearest member, as above (a scratch run; the same scratch, with today's roles, reproduced the currently pinned table exactly):
+**The re-pinned room table** (preview, depth 1-3, largest story size, realistic worst case, × 1.15, plus each gate's in-flight hold; each gate's pot is the owner's figure, kept on the server). The table gives the calls each combination needs. Computed on 2026-10-11 by running the shipped estimate functions with the roles placed at each gate's dearest member, as above (a scratch run; the same scratch, with today's roles, reproduced the currently pinned table exactly):
 
-| Depth | Free (GLM + DeepSeek) | Premium (4 on DeepInfra) | All five: DeepInfra share | All five: Anthropic share |
+| Depth | Free (GLM + DeepSeek), calls | Premium (4 on DeepInfra), calls | All five: DeepInfra share, calls | All five: Anthropic share, calls |
 |---|---|---|---|---|
-| 1 | $1.98, 106 calls (today $1.97, 112) | $3.56, 338 (today $3.34, 344) | $4.27, 465 (today $4.05, 470) | $1.07, 177 (today $0.92, 154) |
-| 2 | $2.22, 161 (today $2.21, 167) | $4.59, 522 (today $4.38, 528) | $5.56, 695 (today $5.35, 700) | $1.33, 260 (today $1.18, 237) |
-| 3 | $2.71, 272 (today $2.69, 277) | $6.66, 890 (today $6.45, 896) | $8.15, 1,155 (today $7.93, 1,160) | $1.85, 426 (today $1.71, 403) |
+| 1 | 106 (today 112) | 338 (today 344) | 465 (today 470) | 177 (today 154) |
+| 2 | 161 (today 167) | 522 (today 528) | 695 (today 700) | 260 (today 237) |
+| 3 | 272 (today 277) | 890 (today 896) | 1,155 (today 1,160) | 426 (today 403) |
 
-Every combination still fits. The tightest is the five-AI debate at depth 3 on the Anthropic gate: $1.85 of $2.00. Call counts drop slightly because the off-panel `preview:fixture-b` health checks disappear. As today, while one five-AI depth-3 debate is unfinished, a second one the same day does not fit on DeepInfra; it fits again when the first is done. The roles were placed on MiMo (DeepInfra), DeepSeek (free) and Haiku (Anthropic).
+Every combination still fits. The tightest is the five-AI debate at depth 3 on the Anthropic gate. Call counts drop slightly because the off-panel `preview:fixture-b` health checks disappear. As today, while one five-AI depth-3 debate is unfinished, a second one the same day does not fit on DeepInfra; it fits again when the first is done. The roles were placed on MiMo (DeepInfra), DeepSeek (free) and Haiku (Anthropic).
 
 ## Part 6: the runner
 
@@ -229,5 +229,5 @@ Each has a default that this spec builds; none blocks the build.
 1. **A newly added model catches up in a burst.** "Least often so far" counts all time. A model added later (for example a sixth AI) starts at zero and takes the role in every debate it is on until it reaches the others' totals. Built: the approved rule. Alternative: count each model's share of the debates it was eligible for, so a newcomer joins the rotation at once. That would be a new rule version, not an edit.
 2. **Fallback may still land the checker on the writer's company.** When the planned checker is refused for money or fails mid-debate, today's cheaper-model fallback tries the other companies first and the writer's company last, and discloses it. Built: unchanged (a debate is never cut off for this). Alternative: never let the checker fall back to the writer's company, and fail the check instead.
 3. **The "same model" honesty flag compares provider refs, not companies.** The disclosure's `checker_same_as_writer` is set only when the served checker's ref is the served writer's ref. A stand-in checker (Part 6, "Absent at claim") can share the writer's maker as a last resort, as on today's two-GLM preview; with two different refs the flag stays unset, and the stand-in is disclosed as that role's fallback. For rotated debates without a stand-in, refs and companies are the same thing (one model per company on a panel). For non-rotated debates it can miss a same-company pair (two names for GLM). Built: unchanged, so that without the setting nothing changes. Alternative: compare companies everywhere, which may newly mark some of today's debates.
-4. **The five-AI depth-3 room on Anthropic is thinner.** It sets aside $1.85 of the $2.00 pot (was $1.71). It fits; nothing to decide unless the Anthropic pot changes.
+4. **The five-AI depth-3 room on Anthropic is thinner.** It sets aside more of the Anthropic pot than before. It fits; nothing to decide unless the Anthropic pot changes.
 5. **Claude Haiku as storyteller has no JSON mode.** It may need the format-repair try more often than GLM. Built: it is eligible like every panel member; the new repair count measures it.

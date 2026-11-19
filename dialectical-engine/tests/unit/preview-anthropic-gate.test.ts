@@ -101,7 +101,7 @@ describe("the Anthropic row equals its parity file and keeps the per-call cap", 
     // A row that cannot cache is never reserved as a cached call.
     expect(() => previewReservationNanoUsd(previewModelRow(GLM)!, 100, { cacheWrite: true })).toThrow("PREVIEW_MODEL_ROW_CANNOT_CACHE");
   });
-  it("a full-size cached request reserves $0.24704 at the upper step, under the $0.25 cap; 2 at once fit the $2.00 pot", () => {
+  it("a full-size cached request reserves $0.24704 at the upper step, under the $0.25 cap; 2 at once fit the sample pot", () => {
     const worst = previewReservationNanoUsd(previewModelRow(HAIKU)!, 256 * 1024, { cacheWrite: true });
     expect(worst).toBe(264_192n * 625n + 32_768n * 2_500n);
     expect(worst).toBe(247_040_000n);
@@ -357,8 +357,8 @@ describe("each gate's IPC goes to its own socket", () => {
   it("/complete for Haiku reaches only the Anthropic socket; /remaining asks each configured gate", async () => {
     folder = await mkdtemp(join(tmpdir(), "pb-"));
     const deepinfraSocket = join(folder, "d.sock"), anthropicSocket = join(folder, "a.sock");
-    const remaining = (models: string[]) => JSON.stringify({ state: "active", window_open: true, remaining_usd: "2.00",
-      remaining_calls: 600, max_concurrent_calls: 2, largest_reservation_usd: "0.214016", enabled_models: models });
+    const remaining = (models: string[]) => JSON.stringify({ state: "active", window_open: true, remaining_usd: "3.30",
+      remaining_calls: 330, max_concurrent_calls: 2, largest_reservation_usd: "0.214016", enabled_models: models });
     const deepinfraSeen = await listen(deepinfraSocket, () => remaining([GLM]));
     const anthropicSeen = await listen(anthropicSocket, body => body.includes("requestBody")
       ? JSON.stringify({ status: 200, body: haikuReply() }) : remaining([HAIKU]));
@@ -393,11 +393,11 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
   const callOutputTokens = Object.freeze({ debate: 8192, storyteller: 12_000, storytellerRetry: 24_000, storyChecker: 8192 });
   const estimateSettings = Object.freeze({ roleModels, roleProviderRefs: ["preview:fixture-a", "preview:deepseek-v4-1-flash", "preview:fixture-b"],
     storyRounds: 2, callOutputTokens, maxCooldownHoldsPerRun: 2 });
-  /** The Anthropic gate's /remaining under the owner's GO: $2.00, 600 calls, 2 at once x $0.24704 (a cached full-size call). */
+  /** The Anthropic gate's /remaining in these tests: a sample pot and call count, 2 at once x $0.24704 (a cached full-size call). */
   const answer = (models: string[], change: Partial<PreviewGateRemaining> = {}): PreviewGateRemaining => Object.freeze({
     state: "active", windowOpen: true, remainingNanoUsd: 2_000_000_000n, remainingCalls: 600, maxConcurrentCalls: 2,
     largestReservationNanoUsd: 247_040_000n, enabledModels: models, ...change });
-  /** The DeepInfra gate's: $10.00, 2,000 calls, 10 at once x MiMo's worst case. */
+  /** The DeepInfra gate's: a sample pot and call count, 10 at once x MiMo's worst case. */
   const deepinfra = async () => answer([GLM, DEEPSEEK, MIMO, QWEN], { remainingNanoUsd: 10_000_000_000n, remainingCalls: 2000,
     maxConcurrentCalls: 10, largestReservationNanoUsd: 142_110_720n });
   const settings = (remaining: PreviewBudgetGateSettings["remaining"], change: Partial<PreviewBudgetGateSettings> = {}): PreviewBudgetGateSettings =>
@@ -416,11 +416,11 @@ describe("the estimate asks every gate the debate uses, unfinished debates inclu
     expect(needs[1]!.callsWithMargin).toBeLessThan(needs[0]!.callsWithMargin);
     expect(needs[1]!.callsNanoUsd > 0n).toBe(true);
   });
-  it("the owner's all-five debate fits both pots at depths 1 to 3 (the preview's most)", async () => {
+  it("the owner's all-five debate fits both sample pots at depths 1 to 3 (the preview's most)", async () => {
     for (const depth of [1, 2, 3]) {
       const [deepinfraNeed, anthropicNeed] = needsOf(ALL_FIVE, depth);
       expect([deepinfraNeed!.gate, anthropicNeed!.gate]).toEqual(["deepinfra", "anthropic"]);
-      // Calls x 1.15 + 2 in flight within 600; money x 1.15 + 2 x $0.24704 within $2.00.
+      // Calls x 1.15 + 2 in flight within the sample calls; money x 1.15 + 2 x $0.24704 within the sample pot.
       expect(anthropicNeed!.callsWithMargin + 2).toBeLessThanOrEqual(600);
       expect(anthropicNeed!.callsNanoUsd + 494_080_000n <= 2_000_000_000n).toBe(true);
       await expect(assertPreviewBudgetAdmits(settings({ deepinfra, anthropic: async () => answer([HAIKU]) },
