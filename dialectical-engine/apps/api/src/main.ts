@@ -51,6 +51,7 @@ import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 // V4 start step, Task 57f: Continue on a failed debate, and the room for the rest.
 import { continueRoomOf } from "./run-continue.js";
 import { PostgresOutboundMailStore } from "../../../packages/db/src/outbound-mail.js";
+import { PostgresUnfinishedSignupExpiryRepository } from "../../../packages/db/src/unfinished-signup-expiry.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { routeLeaseBodyQueries } from "@debateai/db";
@@ -184,6 +185,7 @@ import {
 } from "./billing/stage-clock.js";
 import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
+import { createUnfinishedSignupExpiry, UNFINISHED_SIGNUP_EXPIRY_EVERY_MS } from "./unfinished-signup-expiry.js";
 import {
   assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
   billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
@@ -1589,6 +1591,16 @@ const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
   ()=>console.error("[ASK_CLARIFY_RESERVATION_SWEEP_PENDING]")
 );
 const askClarifyReservationSweepTimer=gatedInterval(releaseWatcher,triggerAskClarifyReservationSweep,ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS);
+// 0183: a sign-up not finished within 24 hours is deleted, so it no longer holds its address and its name for good. Every ten minutes, and once each
+// time this release becomes current (below). Outside any request, so `pool` sends it to the API's system login, which holds the cross-account marker
+// 0183's four functions are granted to; the pass then destroys each deleted account's key file. Never the erasure login: every release counts that
+// role's functions exactly at boot, so a function added there would stop the release before from restarting beside the step.
+const unfinishedSignupExpiry = createUnfinishedSignupExpiry({ repository: new PostgresUnfinishedSignupExpiryRepository(pool), users: dekStore, log: (line) => console.error(line) });
+const triggerUnfinishedSignupExpiry=createSingleFlightErasureReconciler(
+  async ()=>{ await unfinishedSignupExpiry.run(); },
+  ()=>console.error("[UNFINISHED_SIGNUP_EXPIRY_PENDING]")
+);
+const unfinishedSignupExpiryTimer=gatedInterval(releaseWatcher,triggerUnfinishedSignupExpiry,UNFINISHED_SIGNUP_EXPIRY_EVERY_MS);
 /**
  * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
  * here; once right after listen (a raised site limit arrives as a restart, and
@@ -2327,6 +2339,7 @@ api.addHook("onClose",async () => providerOnlyJobs?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => clearInterval(askClarifyReservationSweepTimer));
+api.addHook("onClose",async () => clearInterval(unfinishedSignupExpiryTimer));
 api.addHook("onClose",async () => askWaker?.stop());
 api.addHook("onClose",async () => carryOnLoop?.stop());
 api.addHook("onClose",async () => staffAlerts?.close());
@@ -2478,6 +2491,7 @@ endBecameCurrent = releaseWatcher.onBecameCurrent(() => {
   triggerAuthenticationRiskCleanup();
   triggerRetentionPurge();
   triggerAskClarifyReservationSweep();
+  triggerUnfinishedSignupExpiry();
   billingRuntime?.start({ when: () => releaseWatcher.ownIsCurrent() });
   providerOnlyJobs?.start({ when: () => releaseWatcher.ownIsCurrent() });
   // N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message

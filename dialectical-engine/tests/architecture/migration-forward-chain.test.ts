@@ -691,10 +691,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the MFA recovery control user index 0182 after 0181 as an outside-transaction step (NV-15, NV-16)", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: the one index NV-15's account-level failure count and NV-16's per-destination start count both
-    // read by user_id, built concurrently after the three notice due indexes on the same shared loader.
-    expect(names.slice(-2)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // The one index NV-15's account-level failure count and NV-16's per-destination start count both read by user_id,
+    // built concurrently after the three notice due indexes on the same shared loader (0183 follows it), so found by name.
+    const at = names.indexOf("0182_mfa_recovery_control_user_started.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     const securityFixes = plan.forwardChain[names.indexOf("0178_security_fixes_run3.sql")]!;
     expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true,
       concurrentIndex: { schema: "identity", table: "mfa_recovery_control", name: "mfa_recovery_control_user_started" } });
@@ -722,6 +723,37 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
       "the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, and the MFA recovery control user index (0182, below) the seventy-second");
+  });
+
+  it("chains a sign-up not finished within 24 hours being deleted (0183) after 0182 with 0182's manifest and effective verifier, expand, amending no step", async () => {
+    const plan = await loadMigrationPlan();
+    const step = atStep(plan.forwardChain, "0183");
+    const previous = atStep(plan.forwardChain, "0182");
+    const manifest = JSON.parse((await bytesOf("lineage/unfinished-signup-expiry-forward0183.json")).toString("utf8"));
+    expect(step?.name).toBe("0183_unfinished_signup_expiry.sql");
+    expect(previous?.name).toBe("0182_mfa_recovery_control_user_started.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/mfa-recovery-control-user-started-forward0182.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0183_unfinished_signup_expiry.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf ?? []).toEqual([]);
+  });
+
+  it("documents a sign-up not finished within 24 hours being deleted (0183) as the seventy-third chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## A sign-up not finished within 24 hours is deleted (0183)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0182", "0183_unfinished_signup_expiry.sql", "unfinished-signup-expiry-forward0183.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0183.ts", "`STEPS`", "`-- n1: expand`", "`-- n1: keeps-verifier`", "`identity.expire_unfinished_signup(uuid)`",
+      "`debateai_rls_all_accounts`", "tests/integration/unfinished-signup-expiry-database.test.ts", "renumber"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("the MFA recovery control user index (0182, below) the seventy-second",
+      "a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third"));
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {
