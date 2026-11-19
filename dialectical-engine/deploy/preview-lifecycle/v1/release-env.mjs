@@ -113,6 +113,8 @@ const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_
  * scope, deployment mode, workflow and team, and every API file that names a restore fence names the same one
  * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Returns every
  * check, OK or not, in a fixed order.
+ * The public name (PUBLIC_APP_URL) is held to one value too: a release's website and API name the same one
+ * (SAME_UI_API_PUBLIC_APP_URL:<label>), and two releases name the same one (SAME_PUBLIC_APP_URL).
  */
 export function sameChecks(releases) {
   if (!Array.isArray(releases) || releases.length < 1 || releases.length > 2
@@ -127,6 +129,12 @@ export function sameChecks(releases) {
       result(`SLOT_DIALECTICAL_API_BASE:${label}`, ui.DIALECTICAL_API_BASE === `http://127.0.0.1:${apiPort}`),
       result(`UI_PAYMENT_MARKS_AVAILABLE:${label}`, ui.PAYMENT_MARKS_AVAILABLE === undefined || isPaymentMarksList(ui.PAYMENT_MARKS_AVAILABLE)));
   }
+
+  // The public name (PUBLIC_APP_URL): a release's website and API answer as the same one, and two live releases too,
+  // since the server answers as one name at a time. The launchers check that each is a listed name (public-origins.mjs).
+  for (const { label, api, ui } of releases) out.push(result(`SAME_UI_API_PUBLIC_APP_URL:${label}`, allSame([ui.PUBLIC_APP_URL, api.PUBLIC_APP_URL], false)));
+  if (releases.length === 2) out.push(result('SAME_PUBLIC_APP_URL', allSame(releases.flatMap(release => [release.api.PUBLIC_APP_URL, release.ui.PUBLIC_APP_URL]), false)));
+
   if (releases.length === 2) {
     const backends = releases.flatMap(release => [release.api, release.runner]);
     for (const field of ACROSS_CONFIG) out.push(result(`SAME_${field.toUpperCase()}`, allSame(backends.map(environment => configField(environment, field)), false)));

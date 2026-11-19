@@ -246,6 +246,7 @@ import {
   type ProviderDiscoveryProbeStore
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { previewMainOriginAdmitted } from "./preview-origin.js";
 import { createUnattributedEntriesReporter } from "./run-key-store-report.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
@@ -273,7 +274,8 @@ for (const key of loadRetiredBillingSettings()) console.warn(JSON.stringify({ ev
 // composed over it by the admission loader (./admission-settings.ts).
 const previewGate = environment.PREVIEW_GATE_SETTINGS;
 if (previewGate !== undefined && environment.PUBLIC_APP_URL !== "https://v3-preview.dezbatere.ro") {
-  throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
+  // The preview setup may also answer as the main site, which is always hosted (./preview-origin.ts).
+  if (!previewMainOriginAdmitted(environment)) throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
 }
 // V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
 // vendor, which is itself a model call — until the per-run and daily cost

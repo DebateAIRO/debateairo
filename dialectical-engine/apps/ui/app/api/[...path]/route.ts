@@ -353,7 +353,7 @@ function upstreamSignal(request: Request, path: readonly string[]): AbortSignal 
   const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
     || path[path.length - 1] === "events";
   const ceiling = request.method === "POST" && RUN_PUBLISH_PATH.test(path.join("/"))
-    ? PUBLISH_UPSTREAM_TIMEOUT_MS : previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")},process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)
+    ? PUBLISH_UPSTREAM_TIMEOUT_MS : previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")},process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,process.env.PUBLIC_APP_URL)
       ?? (request.method === "POST" && ASK_PATH.test(path.join("/")) ? ASK_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS);
   return streaming
     ? request.signal
