@@ -3,8 +3,8 @@ import { parseReleaseKey, TypedDomainError } from "@debateai/kernel";
 import { readBillingPlans, type BillingPlans } from "./billing-plans.js";
 
 /**
- * WHICH PLANS THE SITE SERVED, AND WHEN (owner, 19 November 2026; `@debateai/billing-core` plans-in-force.ts reads this
- * to keep a person's month on the numbers it started with).
+ * WHICH PLANS THE SITE SERVED, AND WHEN (`@debateai/billing-core` plans-in-force.ts reads this to keep a person's month
+ * on the numbers it started with).
  *
  * A plans row goes live with an upload: the release that takes the traffic serves the `billingPlans` row of its own
  * settings version, the number in its release key. The database keeps every such switch with the instant the new

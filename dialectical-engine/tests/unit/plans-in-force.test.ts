@@ -11,7 +11,7 @@ import {
 import { readWindowBorrow, type AskRoomSpend } from "../../apps/api/src/ask-room.js";
 
 /**
- * A month keeps the plan numbers it started with (owner, 19 November 2026): a limit lowered by an upload reaches a
+ * A month keeps the plan numbers it started with: a limit lowered by an upload reaches a
  * person from their next month, a higher one at once. Every amount here is made up (multiples of eleven).
  */
 const OWNER = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";

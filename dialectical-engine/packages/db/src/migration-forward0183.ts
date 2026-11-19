@@ -4,7 +4,7 @@ import type { PoolClient } from "pg";
 import type { ForwardStepAnchor, ForwardStepPlan } from "./migration-forward-chain.js";
 
 /**
- * 0183, which release took the traffic and from when (owner, 19 November 2026; expand): one definer,
+ * 0183, which release took the traffic and from when (expand): one definer,
  * core.read_release_history, the switches 0123 records (release keys and instants only, oldest first), granted to debateai_runtime only,
  * so a person's month can be measured against the plan numbers the site served when it started. No table, column or table right is
  * added. It keeps 0130's verifier and amends no earlier step.

@@ -146,6 +146,9 @@ describe("0183: the switches the site made, read by the runtime", () => {
       await client.query("BEGIN");
       await client.query("SET LOCAL ROLE debateai_runtime");
       expect((await client.query("SELECT release_key FROM core.read_release_history()")).rows).toHaveLength(2);
+      // The owner's check after an upload (MAIN-SITE.md, MONTHNUMBERS): the record's last line is the new release.
+      expect((await client.query("SELECT release_key FROM core.read_release_history() ORDER BY event_seq DESC LIMIT 1")).rows)
+        .toEqual([{ release_key: NEW_KEY }]);
       await client.query("ROLLBACK");
     } finally {
       client.release();

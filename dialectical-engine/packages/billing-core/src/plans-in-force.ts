@@ -4,7 +4,7 @@ import { planIn } from "./plan-lookup.js";
 import { personWindowsFor } from "./windows.js";
 
 /**
- * THE NUMBERS A MONTH KEEPS (owner, 19 November 2026; Terms sections 12 to 14).
+ * THE NUMBERS A MONTH KEEPS (Terms sections 12 to 14).
  *
  * A plan's limits are settings, and a new settings version goes live with an upload. A person's month must not get
  * tighter because of one: a lower limit reaches them when their own next month starts, never in the month they are
@@ -15,6 +15,9 @@ import { personWindowsFor } from "./windows.js";
  * person. Made-up example: the day cap is 11 when a month starts, and an upload on its tenth day makes it 5: the month
  * keeps 11. Had the upload made it 22, the month has 22 from the tenth day on, and its first nine days still count at
  * 11. A month that starts after the upload has the new number alone.
+ *
+ * A way back to an older release is one more set of plans served. So a higher number is not taken from a month that
+ * already had it; a month that starts after the way back never sees it.
  *
  * Free follows the same rule: its month starts at the account's own day of the month.
  */

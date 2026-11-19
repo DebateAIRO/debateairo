@@ -442,12 +442,13 @@ of the month. With made-up numbers:
   makes 5: someone whose month began before the upload keeps 11 until that month ends, and no day already used is
   counted again. Someone who buys the plan after the upload has 5 from their first day. The same holds for the month
   credit (nobody is stopped in a month they already started, and no running debate pauses), for the week cap, and for
-  Free. The Terms still ask you to tell people before a limit gets tighter (section 12); the product sends no such
-  notice by itself.
+  Free. The Terms still ask two things of you that the product does not do by itself: tell people before a limit
+  gets tighter (section 12), and ask them to accept the new Terms at their next sign-in before a lower limit applies to
+  them (section 14).
 - **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
 - **A higher limit cannot be taken back inside a month.** If an upload raises a limit and you then go back to the
   release before (or publish the lower number again), everyone whose month saw the higher number keeps it until their
-  next month starts. Read SB3's lines before you publish a raise.
+  next month starts. Check a raise twice before you publish it.
 - **A refund** on cancelling or withdrawing is measured against the credit the person's month had on the day they
   cancelled or withdrew: the one it started with, or a higher one published since. A credit you lower later never makes
   a refund smaller.
@@ -458,6 +459,13 @@ of the month. With made-up numbers:
   month, after a raise too.
 - **During a side-by-side switch**, a debate still running on the release before is measured by the same rule. A
   release from before this rule existed measures the debates it still finishes against its own numbers.
+- **Accounts that exist when numbers change** keep the numbers their month started with, like everyone else. This
+  includes your own account and every test account: after an upload that publishes lower numbers, each of them still
+  has the larger ones until its own next month starts, at most about 31 days. An account created after the switch has
+  the new numbers from its first day.
+- **The first upload that carries this rule.** The release before it does not know the rule. If you go back to that
+  release (the release guide's way back), it measures everyone against its own numbers at once, as before; "cannot be
+  taken back inside a month" holds only between releases that both carry the rule.
 
 **The gate pots** (the spending gates in front of each AI company) are set in each gate's GO file: `daily_budget_usd`,
 `max_paid_posts_per_day`, `max_concurrent_calls`, `open_days`; and in `/etc/debateai-v3-preview/provider-budget-caps-v1.json`:
@@ -524,6 +532,29 @@ What this release adds to that recipe:
   one line, with rNN filled in (it reads the upload's names file, so `$LABEL` is the new release):
   `bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -n 80 -o cat --no-pager | grep -E "STARTUP_REFUSED|PREVIEW_MAIL_MODE|api.boot.failed"'`.
   A `PREVIEW_MAIL_…` code means `mail-plan.json` (part 1.5). Stop and ask before you choose the way back.
+- **MONTHNUMBERS, after DR6.** To keep each person's month on the numbers it started with, the new API and runner read
+  the database's record of release switches through a function this release adds (migration `0183_release_history.sql`).
+  SB13b's team debate may be paid from a team grant, which never reads that record, so check it once by hand. The
+  check is read-only: it asks the record as the API's login and as the runner's login, and wants the new release as
+  its last line.
+
+  ```sh
+  set -euo pipefail
+  . /root/preview-archive/rNN-names.sh
+  # MONTHNUMBERS: both logins can read the record of release switches, and its last line is the new release. Read-only.
+  for LOGIN in debateai_prod_api_runtime debateai_prod_runner_runtime; do
+    LAST=$(runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAtq -c "SET ROLE $LOGIN; SELECT release_key FROM core.read_release_history() ORDER BY event_seq DESC LIMIT 1" | tail -n 1) || { echo "MONTHNUMBERS_NOT_DONE: $LOGIN cannot read the record of switches: ask"; exit 1; }
+    [ "$LAST" = "$KEY" ] || { echo "MONTHNUMBERS_NOT_DONE: $LOGIN reads '$LAST' as the last switch, not $KEY: ask"; exit 1; }
+    echo "OK $LOGIN"
+  done
+  echo MONTHNUMBERS_DONE
+  exit 0
+  ```
+
+  You should see `OK` for both logins, then `MONTHNUMBERS_DONE`. Then, signed in as a Free or paid account that is not
+  paid from a team grant, open the page that shows your usage, or ask one question: it must answer as usual. A
+  `MONTHNUMBERS_NOT_DONE` line, or a refused question there while team debates work: stop and ask. This block was
+  written on the Mac and has not been run on the server yet.
 - **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
   database never took a live payment, so the count is 0 and the API starts as before.
 

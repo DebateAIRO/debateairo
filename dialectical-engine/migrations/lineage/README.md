@@ -1214,7 +1214,7 @@ file and constant that carries the number, recompute the manifest, re-pin the ch
 
 ## The reader of the release switches (0183)
 
-The seventy-third chain step, after the MFA recovery control user index (0182; owner, 19 November 2026). A plan's limits
+The seventy-third chain step, after the MFA recovery control user index (0182). A plan's limits
 are settings, and a release serves the limits of its own settings version, the number in its release key. So that a
 person's month keeps the numbers it started with (a lower limit reaches them from their next month, a higher one at
 once; `packages/billing-core/src/plans-in-force.ts`), the API and the runner read which release took the traffic and
