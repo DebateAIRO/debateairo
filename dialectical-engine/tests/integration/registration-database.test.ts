@@ -8796,9 +8796,13 @@ describe("NV-14 verification sets the token holder's password", () => {
     'SELECT state FROM identity."user" WHERE user_id=$1', [userId])).rows[0]!.state;
   /** Enrols TOTP with the step before now, so a login may use the current step (drift 1) without waiting. */
   async function enrolTotp(flow: ReturnType<typeof buildService>, token: string, hash: string) {
-    const { mfa, sessions } = await currentMfa(flow, hash, () => new Date());
+    // One instant for the code and for the services that check it. The enrolment sends the code of the step before,
+    // the oldest one the check accepts, so that the sign-in afterwards can send this step's. With the wall clock on
+    // both sides, a 30-second boundary passing between the two readings made that code two steps old and refused it.
+    const at = Date.now(), step = Math.floor(at / 30_000);
+    const { mfa, sessions } = await currentMfa(flow, hash, () => new Date(at));
     const setup = await mfa.beginTotp({ enrollmentToken: token }, nv14Source);
-    const secret = decodeBase32(setup.secret), step = Math.floor(Date.now() / 30_000);
+    const secret = decodeBase32(setup.secret);
     const enrolled = await mfa.verifyTotp({ enrollmentToken: token, code: totpCodeAtStep(secret, step - 1) }, nv14Source);
     return { sessions, secret, step, enrolled };
   }
