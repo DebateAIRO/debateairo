@@ -621,6 +621,12 @@ const apiEnvironmentShape = {
     NETOPIA_API_KEY_PATH: z.string().min(1).optional(),
     NETOPIA_IPN_KEYS_PATH: z.string().min(1).optional(),
     /**
+     * The hosted preview's switch to real payments: exactly "real-money", set by the owner beside NETOPIA's live base.
+     * Absent, the preview takes sandbox payments only. Any other value is refused by name in parseApiEnvironment; the
+     * preview launcher and main.ts's "preview-live-payments" stage check what it goes with.
+     */
+    PREVIEW_LIVE_PAYMENTS: z.literal("real-money").optional(),
+    /**
      * B3a (NETOPIA answers 2026-10-21): the folder where a verified NETOPIA message the database could not take is kept,
      * sealed, until it is stored (NETOPIA sends the saved card only in its first message). Optional: absent, nothing is
      * kept (one boot line says so); set, it must be an existing folder the API can write, or the API refuses to start.
@@ -859,6 +865,10 @@ function validateApiEnvironment(
 export function parseApiEnvironment(
   source: Readonly<Record<string, string | undefined>>
 ) {
+  // The live payments switch takes one value; any other is refused by name, never echoed (the shape would refuse it unnamed).
+  if (source.PREVIEW_LIVE_PAYMENTS !== undefined && source.PREVIEW_LIVE_PAYMENTS !== "real-money") {
+    throw new TypeError("PREVIEW_LIVE_PAYMENTS_REFUSED:value");
+  }
   const staffAccess = parseStaffAccessEnvironment(source);
   const environment = validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
   const preview = parsePreviewEnvironment(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);

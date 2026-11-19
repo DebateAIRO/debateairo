@@ -91,3 +91,33 @@ export function assertLiveInvoicersAreLive(input: BillingInvoicerEnvironment): v
     );
   }
 }
+
+/**
+ * The hosted preview's switch to real payments (PREVIEW_LIVE_PAYMENTS=real-money), checked by the API itself beside
+ * the preview launcher's own rules: the preview configuration takes live payments only with the switch, and the switch
+ * means exactly that. It refuses the switch outside the preview configuration (PREVIEW_LIVE_PAYMENTS_OFF_PREVIEW: the
+ * hosted kit decides live by its own setup), NETOPIA's live system on the preview without the switch
+ * (PREVIEW_LIVE_PAYMENTS_UNSET), the switch without NETOPIA's live system (PREVIEW_LIVE_PAYMENTS_MISMATCH), and the
+ * switch while the site version's billing is off (PREVIEW_LIVE_PAYMENTS_BILLING_OFF: the provider-only mode would take
+ * live payments with no plan and skip the live start's checks of the sandbox's open records). Without the switch and
+ * off live, nothing changes.
+ */
+export function assertPreviewLivePayments(input: Readonly<{
+  preview: boolean;
+  paymentEnvironment: PaymentEnvironment | null;
+  billingOn: boolean;
+  flag: "real-money" | null;
+}>): void {
+  if (input.flag !== null && !input.preview) {
+    throw new TypedDomainError("PREVIEW_LIVE_PAYMENTS_OFF_PREVIEW", "the live payments switch belongs to the preview configuration only");
+  }
+  if (input.preview && input.paymentEnvironment === "live" && input.flag === null) {
+    throw new TypedDomainError("PREVIEW_LIVE_PAYMENTS_UNSET", "the preview takes live payments only with its live payments switch");
+  }
+  if (input.flag !== null && input.paymentEnvironment !== "live") {
+    throw new TypedDomainError("PREVIEW_LIVE_PAYMENTS_MISMATCH", "the live payments switch needs NETOPIA's live system");
+  }
+  if (input.flag !== null && !input.billingOn) {
+    throw new TypedDomainError("PREVIEW_LIVE_PAYMENTS_BILLING_OFF", "the live payments switch needs the site version's billing on");
+  }
+}

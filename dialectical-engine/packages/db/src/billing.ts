@@ -759,6 +759,69 @@ export class BillingRepository {
   }
 
   /**
+   * The work NETOPIA charges of `paymentEnvironment` still have open once their plans may all be over, for the hosted
+   * preview's sandbox boot to refuse while any is left after real payments: a withdrawn plan is over at once, while its
+   * refund and credit note are still to come, and a sandbox API would end those jobs unrun and could not record the
+   * refund. `charges`: a payment with no SUCCEEDED or FAILED yet whose plan is not ENDED or WITHDRAWN (the rule of
+   * `openOtherSystemRecordCounts`), or a refund request of more than 0.00 whose REFUNDED parts on that payment sum to
+   * less and that no open charge-back holds (the rule of `openOwnerRefunds`, every reason). `jobs`: outbox jobs neither
+   * done nor dead that name such a charge (by payload `charge_id`, an old notice job's `external_order_id`, or the two
+   * invoice jobs' ref).
+   */
+  async openNetopiaChargeWork(paymentEnvironment: "sandbox" | "live"): Promise<{ charges: number; jobs: number }> {
+    const events = (await this.pool.query<SubscriptionEventRaw>(`
+      SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event
+      WHERE event.subscription_id IN (
+        SELECT created.subscription_id FROM billing.subscription_event AS created
+        WHERE created.kind = 'CREATED'
+          AND created.data ->> 'payment_provider' = 'netopia'
+          AND created.data ->> 'payment_environment' = $1
+      )
+      ORDER BY event.subscription_id, event.seq
+    `, [paymentEnvironment])).rows;
+    const settled = new Set<string>();
+    for (const state of foldEach(events, () => undefined)) {
+      if (state.status === "ENDED" || state.status === "WITHDRAWN") settled.add(state.subscriptionId);
+    }
+    const charges = (await this.pool.query<{ subscription_id: string; unpaid: boolean; refund_open: boolean }>(`
+      SELECT charge.subscription_id,
+        NOT EXISTS (
+          SELECT 1 FROM billing.charge_event AS final
+          WHERE final.charge_id = charge.charge_id AND final.kind IN ('SUCCEEDED','FAILED')
+        ) AS unpaid,
+        EXISTS (
+          SELECT 1 FROM billing.charge_event AS requested
+          WHERE requested.charge_id = charge.charge_id AND requested.kind = 'REFUND_REQUESTED' AND requested.amount_micros > 0
+            AND COALESCE((SELECT sum(refunded.amount_micros) FROM billing.charge_event AS refunded
+              WHERE refunded.charge_id = requested.charge_id AND refunded.kind = 'REFUNDED'
+                AND COALESCE(refunded.refunds_transaction_id, refunded.provider_payment_id) = requested.provider_payment_id), 0)
+              < requested.amount_micros
+            AND NOT EXISTS (SELECT 1 FROM billing.charge_event AS chargeback
+              WHERE chargeback.charge_id = requested.charge_id AND chargeback.kind = 'CHARGEBACK'
+                AND chargeback.provider_payment_id = requested.provider_payment_id
+                AND NOT EXISTS (SELECT 1 FROM billing.charge_event AS resolved
+                  WHERE resolved.charge_id = requested.charge_id AND resolved.kind = 'CHARGEBACK_RESOLVED'
+                    AND resolved.provider_payment_id = requested.provider_payment_id))
+        ) AS refund_open
+      FROM billing.charge AS charge
+      WHERE charge.payment_provider = 'netopia' AND charge.payment_environment = $1
+    `, [paymentEnvironment])).rows
+      .filter((row) => row.refund_open || (row.unpaid && !settled.has(row.subscription_id))).length;
+    const jobs = (await this.pool.query<{ open_jobs: string }>(`
+      SELECT count(*) AS open_jobs FROM billing.outbox AS job
+      WHERE job.done_at IS NULL AND job.dead_at IS NULL
+        AND EXISTS (
+          SELECT 1 FROM billing.charge AS charge
+          WHERE charge.payment_provider = 'netopia' AND charge.payment_environment = $1
+            AND (charge.charge_id = job.payload ->> 'charge_id'
+              OR charge.charge_id = job.payload ->> 'external_order_id'
+              OR (job.kind IN ('QUADERNO_RECORD_SALE','SMARTBILL_INVOICE') AND charge.charge_id = job.ref))
+        )
+    `, [paymentEnvironment])).rows[0]?.open_jobs ?? "0";
+    return { charges, jobs: Number(jobs) };
+  }
+
+  /**
    * W14 (P2-I19): what lies more than a day ahead of `now`, the API's real clock at a live boot. `rows`: the billing
    * changes, whichever payment system, by the time they record (every writer stamps them with the billing clock's
    * `now`, so only a moved stage clock dates one ahead): subscription events (`at`), entitlement events

@@ -178,6 +178,7 @@ import { createProviderOnlyJobs } from "./billing/provider-only-jobs.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
   assertLiveInvoicersAreLive,
+  assertPreviewLivePayments,
   assertStageInvoicersAreSandboxes,
   billingClock
 } from "./billing/stage-clock.js";
@@ -992,6 +993,14 @@ const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createPro
   // B3a: the spool's replay every 10 minutes, as the billing runtime's.
   ...(billingNoticeSpool === undefined || providerOnlyIntake === undefined ? {} : { notices: providerOnlyIntake })
 });
+// The hosted preview takes real payments only with the owner's switch, and the switch only with NETOPIA's live system
+// and the site version's billing on (the preview launcher checks the same, with the addresses and the egress proxy).
+boot.runSync("preview-live-payments", () => assertPreviewLivePayments({
+  preview: previewGate !== undefined,
+  paymentEnvironment: (billingConnectors ?? providerOnlyConnectors)?.paymentEnvironment ?? null,
+  billingOn: billingMode === "ON",
+  flag: environment.PREVIEW_LIVE_PAYMENTS ?? null
+}));
 // A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
 // open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
 // closes them first.
@@ -1010,8 +1019,12 @@ if (billingConnectors?.paymentEnvironment === "live") {
 // NETOPIA plans are open, so a sandbox API never runs over live customers' plans and cards.
 if (billingConnectors?.paymentEnvironment === "sandbox") {
   await boot.run("billing-live-records-on-sandbox", async () => {
+    const live = new BillingRepository(pool);
     assertOtherSystemRecordsClosed({
-      subscriptions: await new BillingRepository(pool).openNetopiaSubscriptionCount("live"), charges: 0, jobs: 0
+      subscriptions: await live.openNetopiaSubscriptionCount("live"),
+      // The hosted preview's way back from real payments also waits for the live charges' open work (a payment not yet
+      // final, a refund not yet recorded, their jobs: the credit note among them), which a sandbox API would leave undone.
+      ...(previewGate === undefined ? { charges: 0, jobs: 0 } : await live.openNetopiaChargeWork("live"))
     });
   });
 }
