@@ -5,8 +5,8 @@
 // parser (with the platform refused, so nothing runs): a flag or a subcommand the tool does not know fails here, not on
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -72,7 +72,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
@@ -802,7 +802,9 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   CC: '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}',
   LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off',
   // S18 fix round 1: the choices a plan does not take from its base, read from the active version's publish plan.
-  DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off'
+  DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off',
+  // SB3's two lists: the inputs the upload takes from the owner's file, and the plans whose people get less.
+  NEWNUM: 'billingPlans dailyCeilingMicros', LIMITS: 'PLUS PRO'
 });
 
 type Invocation = Readonly<{ tool: string; script: string; argv: readonly string[]; line: string }>;
@@ -1133,7 +1135,9 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(from).toBeGreaterThan(-1);
     expect(plan).toBeGreaterThan(from);
     expect(sb3[plan]).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB"');
-    expect(sb3).toContain('HB=$(jq -c .hostedBilling "$FROM")');
+    // The hosted inputs are the active version's, except where the owner's file is named (the site-inputs tests below).
+    expect(sb3.some(line => line.startsWith('  HB=$(jq -c .hostedBilling "$ART/site-inputs.json") && NAMED=$(jq -c .change "$ART/site-inputs.json") && '))).toBe(true);
+    expect(sb3).toContain('  HB=$(jq -c .hostedBilling "$FROM"); NAMED=\'[]\'');
     expect(sb3.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP"');
     expect(scriptOf('SB9').lines.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ]');
     expect(scriptOf('SB9').lines.join('\n')).toContain('PREVIEW_REGISTER_BASE_NOT_ACTIVE');
@@ -1303,5 +1307,373 @@ describe('NV-07: the restore fence in the guides', () => {
     for (const line of block!.lines.filter(line => line.includes('RESTORE_NOT_DONE'))) expect(line, line).toMatch(/exit 1/);
     // psqlq is the names file's definition byte for byte.
     expect(guide).toContain(text.split('\n').find(line => line.trimStart().startsWith('psqlq() {'))!.trimStart());
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// SB3's numbers: the owner's server file against the live settings version (site-inputs.mjs). The tool's own rules are
+// tested in preview-site-inputs.test.ts and preview-release-artifacts.test.ts; here the guide's lines around them. Every
+// number is made up (a multiple of eleven).
+
+describe('SB3 publishes a changed number only where the owner names it, and prints no amount', async () => {
+  const sb1 = scriptOf('SB1').lines, sb3 = scriptOf('SB3').lines, sb3b = scriptOf('SB3B').lines, sb3c = scriptOf('SB3C').lines;
+  const section = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB3. '))!);
+  const flat = section.replace(/\s+/g, ' ');
+  const jq = spawnSync('jq', ['--version']).status === 0;
+  const bash = (script: string[]) => { try { return execFileSync('bash', ['-c', script.join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); } };
+  const INPUTS = ['perRunCeilingMicros', 'dailyCeilingMicros', 'askRoomReads', 'billingPlans', 'abuseLimits'];
+  const numbers = (patch: Record<string, unknown> = {}) => ({ billing: 'on', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 66, windowMs: 66_000, capacity: 65_536 },
+    billingPlans: { kind: 'BILLING_PLANS', plans: [{ plan_id: 'FREE', monthly_credit_micros: 440_000 }, { plan_id: 'PLUS', monthly_credit_micros: 7_700_000 }] }, abuseLimits: { kind: 'ABUSE_LIMITS', clarify_per_hour: 11 }, ...patch });
+  const check = sb3.findIndex(line => line.startsWith('jq -e --argjson n "$NAMED" '));
+  const NORM = 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; ';
+
+  it('CI has jq (the lines below are run, not only read)', () => {
+    if (process.env.CI) expect(jq).toBe(true);
+  });
+
+  it('the two lists are empty unless the owner fills them in, and both reach the tool', () => {
+    expect(sb3.find(line => line.startsWith('NEWNUM='))).toMatch(/^NEWNUM=''\s+# the numbers this upload takes from hosted-billing-v1\.json, on purpose: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between; empty = the live numbers stay$/);
+    expect(sb3.find(line => line.startsWith('LIMITS='))).toMatch(/^LIMITS=''\s+# only with billingPlans in NEWNUM: /);
+    const tool = sb3.indexOf('TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs');
+    const detect = sb3.indexOf('if grep -qF "\'site-inputs\':" "$TOOL"; then');
+    const report = sb3.findIndex(line => line.startsWith('  SI=$(rel site-inputs --operation report --from "$FROM" --site "$HB_ON") || { echo "SB3_NOT_DONE: '));
+    const compose = sb3.findIndex(line => line.startsWith('  rel site-inputs --operation compose --from "$FROM" --site "$HB_ON" ${NEWNUM:+--change "$NEWNUM"} ${LIMITS:+--limits "$LIMITS"} --out "$ART/site-inputs.json" > /dev/null || { echo "SB3_NOT_DONE: '));
+    const plan = sb3.findIndex(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '));
+    expect(tool).toBeGreaterThan(sb3.findIndex(line => line.startsWith('if [ "$AV" = "$OSITE" ]; then FROM=')));
+    // A release that is not staged yet stops; it is never taken for an older tool.
+    expect(sb3[tool + 1]).toMatch(/^\[ -f "\$TOOL" \] \|\| \{ echo "SB3_NOT_DONE: /);
+    expect(detect).toBe(tool + 2);
+    expect(report).toBe(detect + 1);
+    // The lines are printed before anything is decided, so a stop still shows what differs.
+    expect(sb3[report + 1]).toBe('  jq -r \'.lines[]\' <<<"$SI"');
+    expect(compose).toBe(report + 2);
+    expect(plan).toBeGreaterThan(compose);
+    // Each refusal the tool can give is explained on a stop line, with what to do.
+    for (const code of ['SITE_INPUTS_REFUSED', 'SITE_PLAN_LIST_DIFFERS', 'INPUT_REFUSED', 'FROM_PLAN_INVALID', 'NATIVE_APPROVAL_REQUIRED']) expect(sb3[report], code).toContain(code);
+    for (const code of ['ARGUMENTS_REFUSED', 'SITE_CHANGE_NOT_NAMED', 'SITE_CHANGE_NAMED_BUT_SAME', 'SITE_LIMITS_NOT_NAMED', 'SITE_LIMITS_NAMED_BUT_SAME', 'SITE_INPUTS_REFUSED', 'SITE_BILLING_SWITCH_DIFFERS']) expect(sb3[compose], code).toContain(code);
+    expect(sb3[compose]).toContain('nothing was written');
+    // Nothing of the step exists yet when the numbers are compared: a stop leaves no file behind.
+    expect(compose).toBeLessThan(sb3.findIndex(line => line.startsWith('put "$ART/native-plan-plan.json"')));
+    expect(sb3.findIndex(line => line.includes('[ ! -e "$ART/site-inputs.json" ]') && line.includes('SB3_NOT_DONE'))).toBeLessThan(detect);
+    // The words SB3 looks for are the tool's own: a change of spelling there would send every upload down the old path.
+    expect(read('deploy/preview-release/v1/release-artifacts.mjs')).toContain("\n  'site-inputs': { required: ");
+    // A file that does not read as JSON must not stop the way back: the names line gives an empty value, and SB3 stops on it.
+    expect(sb1).toContain('HB_ON="$(jq -c \'.billing="on"\' /etc/debateai-v3-preview/hosted-billing-v1.json 2>/dev/null || true)"');
+    expect(sb3.some(line => line.startsWith('[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: '))).toBe(true);
+  });
+
+  it('for a plan named in LIMITS, SB3 says whether an open subscription holds it, and prints no count', () => {
+    const read = sb3.findIndex(line => line.startsWith('  HOLD=$(psqlq "SELECT DISTINCT e.plan_id FROM billing.subscription_event e JOIN billing.subscription_latest_v s ON s.subscription_id = e.subscription_id WHERE s.kind NOT IN (\'ENDED\',\'WITHDRAWN\',\'ERASURE_STOPPED\')") || { echo "SB3_NOT_DONE: '));
+    expect(sb3[read - 1]).toBe('if [ -n "$LIMITS" ]; then');
+    expect(sb3[read + 2]).toBe('fi');
+    // Before the tool is asked, so the lines are there when the step then stops, and nothing is written yet.
+    expect(read).toBeLessThan(sb3.indexOf('TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs'));
+    const lines = (limits: string, held: string[], fail = false) => bash(['set -euo pipefail', `LIMITS='${limits}'`,
+      `psqlq() { ${fail ? 'return 1' : `printf '%s\\n' ${held.map(plan => `'${plan}'`).join(' ') || "''"}`}; }`, ...sb3.slice(read - 1, read + 3), 'echo READ']).split('\n');
+    expect(lines('PLUS PRO FREE', ['PLUS', 'MAX'])).toEqual(['PLUS: HELD by at least one open subscription', 'PRO: nobody holds it now', 'FREE: HELD by everyone without a paid plan', 'READ']);
+    expect(lines('MAX', [])).toEqual(['MAX: nobody holds it now', 'READ']);
+    // Nothing named: the database is not read at all.
+    expect(lines('', [], true)).toEqual(['READ']);
+    // A read that fails stops the step by name.
+    expect(lines('PLUS', [], true)[0]).toMatch(/^SB3_NOT_DONE: the open subscriptions could not be read/);
+  });
+
+  it('no line of SB3, SB3b or SB3c prints a number of the file or of the plan', () => {
+    for (const [step, lines] of [['SB3', sb3], ['SB3B', sb3b], ['SB3C', sb3c]] as const) {
+      for (const line of lines.filter(code)) {
+        // The hosted inputs are only ever handed to a tool or compared; they never reach echo, printf or a bare jq print.
+        for (const echoed of line.matchAll(/echo "((?:[^"\\]|\\.)*)"/g)) expect(echoed[1], `${step}: ${line}`).not.toMatch(/\$\{?(HB|HB_ON|NUM|SI)\b|hostedBilling/);
+        if (/^\s*jq /.test(line) && !/>\s*("\$N"|\/dev\/null)/.test(line)) expect(line, `${step}: ${line}`).toMatch(/^\s*jq -r '\.lines\[\]' <<<"\$SI"$|^jq -c '\{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256\}' /);
+      }
+    }
+    // The one other print reads the record's lines, which hold names only (preview-site-inputs.test.ts).
+    expect(sb3.filter(line => /jq -r /.test(line) && line.includes('site-inputs.json')).map(line => /jq -r [^|]*'([^']*)' "\$ART\/site-inputs\.json"/.exec(line)?.[1])).toEqual(['(.lines - $seen)[]']);
+    expect(sb3.join('\n')).not.toContain("jq -c '{perRunCeilingMicros}'");
+  });
+
+  it('a release older than the site-inputs command publishes no changed number: the file must be the live numbers, whole', () => {
+    const start = sb3.indexOf('else'), end = sb3.indexOf('fi', start);
+    expect(start).toBeGreaterThan(-1);
+    const branch = sb3.slice(start + 1, end).filter(code);
+    expect(branch).toHaveLength(2);
+    expect(branch[1]!.startsWith(`  [ -z "$NEWNUM$LIMITS" ] && [ "$(jq -cS '${NORM}norm' <<<"$HB")" = "$(jq -cS '${NORM}norm' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: this release's tool has no site-inputs command`)).toBe(true);
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-'));
+    try {
+      const run = (file: string, lists: string[] = ['', '']) => {
+        writeFileSync(join(dir, 'from.json'), JSON.stringify({ operation: 'verify', hostedBilling: numbers() }));
+        return bash(['set -euo pipefail', `FROM='${dir}/from.json'; HB_ON='${file}'; NEWNUM='${lists[0]}'; LIMITS='${lists[1]}'`, ...branch, 'echo "OLD_TOOL_OK $NAMED"']);
+      };
+      const text = (value: unknown) => JSON.stringify(value);
+      // The same numbers, typed in another key order, and with a number spelled another way (jq 1.7 keeps a spelling).
+      expect(run(text(Object.fromEntries(Object.entries(numbers()).reverse())))).toBe('OLD_TOOL_OK []');
+      expect(run(text(numbers()).replace('11000000', '1.1e7').replace('3300000', '3300000.0'))).toBe('OLD_TOOL_OK []');
+      for (const input of INPUTS) expect(run(text(numbers({ [input]: input.endsWith('Micros') ? 2_200_000 : { changed: 11 } }))), input).toMatch(/^SB3_NOT_DONE: /);
+      expect(run(text(numbers()), ['billingPlans', ''])).toMatch(/^SB3_NOT_DONE: /);
+      expect(run(text(numbers()), ['', 'PLUS'])).toMatch(/^SB3_NOT_DONE: /);
+      // An unreadable file (the names line gave nothing) stops too.
+      expect(run('')).toMatch(/^SB3_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the proposal must change exactly the numbers named, member by member', () => {
+    expect(check).toBeGreaterThan(sb3.findIndex(line => line.startsWith('OUT=$(nat "$ART/register-proposal.json")')));
+    expect(check).toBeLessThan(sb3.findIndex(line => line.startsWith('sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"')));
+    expect(sb3[check]).toContain('SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names');
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-rows-'));
+    try {
+      const cost = { per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000, band: { close_basis_points: 9900 } };
+      const admission = { ask_room_reads: { key: 'owner', limit: 66, window_ms: 66_000, capacity: 65_536 }, sign_in: { limit: 11 } };
+      const entry = (rowKey: string, before: unknown, after: unknown, sourceRef = false) => ({ rowKey, change: before === null ? 'added' : 'changed',
+        oldValueJsonText: before === null ? null : JSON.stringify(before), newValueJsonText: JSON.stringify(after), oldSourceRef: before === null ? null : 'x', newSourceRef: sourceRef ? 'y' : 'x' });
+      const verdict = (named: string[], delta: unknown[]) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta }));
+        return bash(['set -euo pipefail', `ART='${dir}'; NAMED='${JSON.stringify(named)}'`, sb3[check]!, 'echo NUMBERS_OK']);
+      };
+      const code = [entry('nodeRuntimeVersion', { v: 'v26' }, { v: 'v26' }, true), entry('judgeContractHash', { sha256: 'a' }, { sha256: 'b' })];
+      expect(verdict([], code)).toBe('NUMBERS_OK');
+      // Each input alone, named: passes; the same delta with nothing named, or with another input named, stops.
+      const one: Record<string, unknown> = {
+        perRunCeilingMicros: entry('costEnvelopePolicy', cost, { ...cost, per_run_ceiling_micros: 2_200_000 }),
+        dailyCeilingMicros: entry('costEnvelopePolicy', cost, { ...cost, daily_ceiling_micros: 22_000_000 }),
+        askRoomReads: entry('admissionPolicy', admission, { ...admission, ask_room_reads: { ...admission.ask_room_reads, limit: 77 } }),
+        billingPlans: entry('billingPlans', numbers().billingPlans, { kind: 'BILLING_PLANS', plans: [] }),
+        abuseLimits: entry('abuseLimits', numbers().abuseLimits, { kind: 'ABUSE_LIMITS', clarify_per_hour: 22 })
+      };
+      for (const input of INPUTS) {
+        expect(verdict([input], [...code, one[input]]), input).toBe('NUMBERS_OK');
+        expect(verdict([], [...code, one[input]]), input).toMatch(/^SB3_NOT_DONE: /);
+        expect(verdict([INPUTS[(INPUTS.indexOf(input) + 1) % INPUTS.length]!], [...code, one[input]]), input).toMatch(/^SB3_NOT_DONE: /);
+        // Named, and the proposal does not change it: the change did not take.
+        expect(verdict([input], code), input).toMatch(/^SB3_NOT_DONE: /);
+      }
+      // A code-owned member of the ceilings row or of the admission row may move with nothing named, and beside a named number.
+      const band = entry('costEnvelopePolicy', cost, { ...cost, band: { close_basis_points: 9800 } }), scope = entry('admissionPolicy', admission, { ...admission, sign_in: { limit: 22 } });
+      expect(verdict([], [...code, band, scope])).toBe('NUMBERS_OK');
+      expect(verdict(['costEnvelopePolicy'], [...code, band])).toMatch(/^SB3_NOT_DONE: /);
+      // Both ceilings moved and only one is named: stops. Both named: passes.
+      const both = entry('costEnvelopePolicy', cost, { ...cost, per_run_ceiling_micros: 2_200_000, daily_ceiling_micros: 22_000_000 });
+      expect(verdict(['perRunCeilingMicros'], [...code, both])).toMatch(/^SB3_NOT_DONE: /);
+      expect(verdict(['dailyCeilingMicros', 'perRunCeilingMicros'], [...code, both])).toBe('NUMBERS_OK');
+      // Only a source reference moved: no number changed. A row added whole counts as its numbers changing.
+      expect(verdict([], [...code, entry('billingPlans', numbers().billingPlans, numbers().billingPlans, true)])).toBe('NUMBERS_OK');
+      expect(verdict(['abuseLimits'], [...code, entry('abuseLimits', null, numbers().abuseLimits)])).toBe('NUMBERS_OK');
+      expect(verdict([], [...code, entry('abuseLimits', null, numbers().abuseLimits)])).toMatch(/^SB3_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  // The whole path once, with the real pieces: the tool's choice, the register kit's own delta over a base sealed from
+  // the live numbers, and the guide's check line on that delta.
+  const kit = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v3.ts');
+  const kitV2 = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v2.ts');
+  const registerModule = await import('@debateai/register');
+  const owned = await import('../../packages/register/src/staff-access-policy.js');
+  const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+  const siteInputs = await import('../../deploy/' + 'preview-release/v1/site-inputs.mjs');
+  const { TEST_OWNER_LIMIT_ROWS } = await import('../support/hostedRegisterRows.js');
+
+  it('end to end: what the tool chooses is what the register kit changes, and the check line agrees', async () => {
+    if (!jq) return;
+    const live = { billing: 'on', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS };
+    const runtime = (observedAt: string) => ({ nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'c'.repeat(40), sourceTree: 'd'.repeat(40), operatorSha256: 'e'.repeat(64), observedAt });
+    const bootstrap = await registerModule.loadBootstrapRegister();
+    const sorted = (rows: any[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
+    const local = sorted([...await kitV2.buildPreviewSourceRowsV2(bootstrap, runtime('2026-10-12T09:00:00.000Z')),
+      ...[owned.STAFF_ACCESS_POLICY_REGISTER_ROW, owned.INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map((row: any) => ({ rowKey: row.rowKey, valueJsonText: registerModule.canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }))]);
+    /** A version sealed with `hosted` over `base`: its rows are what the database then holds. */
+    const seal = async (hosted: unknown, base: any[], observedAt: string) => kit.composePreviewSnapshotV3({ sourceRows: await kit.buildPreviewSourceRowsV3(bootstrap, runtime(observedAt), hosted),
+      baseRows: base, baseRegisterVersion: '12', baseSnapshotSha256: registerModule.computeRegisterSnapshotSha256(base) });
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-e2e-'));
+    try {
+      const verdict = (named: readonly string[], delta: unknown) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta }));
+        return bash(['set -euo pipefail', `ART='${dir}'; NAMED='${JSON.stringify(named)}'`, sb3[check]!, 'echo NUMBERS_OK']);
+      };
+      const database = sorted([...(await seal(live, local, '2026-10-13T12:00:00.000Z')).rows]);
+      /** SB3 for one owner's file: the tool's choice, then the kit's proposal over the database's rows. */
+      const upload = async (file: any, lists: { change?: string; limits?: string } = {}, rows = database) => {
+        const chosen = siteInputs.composeSiteInputs(live, file, lists);
+        const proposal = await seal(operator.validateHostedBillingChoice(chosen.hostedBilling), rows, '2026-10-20T12:00:00.000Z');
+        return { chosen, proposal, verdict: verdict(chosen.change, proposal.delta) };
+      };
+      // Nothing named, nothing different: only code rows move (the runtime row's time), and the check passes.
+      const same = await upload(JSON.parse(JSON.stringify(live)));
+      expect(same.proposal.changedKeys).toEqual(['nodeRuntimeVersion']);
+      expect(same.verdict).toBe('NUMBERS_OK');
+      // A higher day's ceiling, more Plus credit and a higher abuse limit, all three named.
+      const file = JSON.parse(JSON.stringify(live));
+      file.dailyCeilingMicros += 11_000_000;
+      file.billingPlans.plans[1].monthly_credit_micros += 1_100_000;
+      file.abuseLimits.flag_per_site_day += 11;
+      const changed = await upload(file, { change: 'abuseLimits billingPlans dailyCeilingMicros' });
+      expect([...changed.proposal.changedKeys].sort()).toEqual(['abuseLimits', 'billingPlans', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
+      expect(changed.verdict).toBe('NUMBERS_OK');
+      // The very same proposal against another list of names stops.
+      expect(verdict([], changed.proposal.delta)).toMatch(/^SB3_NOT_DONE: /);
+      expect(verdict(['billingPlans', 'dailyCeilingMicros'], changed.proposal.delta)).toMatch(/^SB3_NOT_DONE: /);
+      expect(verdict(['abuseLimits', 'billingPlans', 'dailyCeilingMicros', 'perRunCeilingMicros'], changed.proposal.delta)).toMatch(/^SB3_NOT_DONE: /);
+      // The kept plan says the live numbers, but the database's version was sealed with another per-debate ceiling:
+      // the tool sees nothing to name, the kit's delta moves that ceiling, and the check stops the step.
+      const drifted = sorted([...(await seal({ ...live, perRunCeilingMicros: 2_200_000 }, local, '2026-10-13T12:00:00.000Z')).rows]);
+      const stale = await upload(JSON.parse(JSON.stringify(live)), {}, drifted);
+      expect(stale.chosen.change).toEqual([]);
+      expect(stale.proposal.changedKeys).toContain('costEnvelopePolicy');
+      expect(stale.verdict).toMatch(/^SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names \(\[\]\)/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the delta line for a number change names the members that differ and prints none of their values', () => {
+    const block = blocksOf(section).find(candidate => candidate.lines.some(line => line.includes('members that differ (values not printed)')))!;
+    expect(block.lines).toHaveLength(1);
+    expect(flat).toContain('With `NEWNUM` not empty, use this line instead of A9\'s first one');
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-delta-'));
+    try {
+      const row = (rowKey: string, before: unknown, after: unknown, reason = 'owner-hosted-billing-input') => ({ rowKey, change: before === null ? 'added' : 'changed', reason,
+        oldValueJsonText: before === null ? null : JSON.stringify(before), newValueJsonText: JSON.stringify(after) });
+      writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta: [
+        row('billingPlans', numbers().billingPlans, { kind: 'BILLING_PLANS', plans: [{ plan_id: 'FREE', monthly_credit_micros: 550_000 }] }),
+        row('costEnvelopePolicy', { per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000, currency: 'USD' }, { per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 22_000_000, currency: 'USD' }),
+        row('abuseLimits', null, { kind: 'ABUSE_LIMITS', clarify_per_hour: 11 }),
+        row('judgeContractHash', { sha256: '77777' }, { sha256: '88888' }, 'reviewed-current-source-facet')
+      ] }));
+      const printed = bash(['set -euo pipefail', `ART='${dir}'`, ...block.lines]).split('\n');
+      expect(printed).toEqual([
+        'changed billingPlans (owner-hosted-billing-input)', '  members that differ (values not printed): plans',
+        'changed costEnvelopePolicy (owner-hosted-billing-input)', '  members that differ (values not printed): daily_ceiling_micros',
+        'added abuseLimits (owner-hosted-billing-input)', '  members that differ (values not printed): clarify_per_hour kind',
+        'changed judgeContractHash (reviewed-current-source-facet)', '  old: {"sha256":"77777"}', '  new: {"sha256":"88888"}'
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB3b sets SB3\'s files aside only while nothing was applied or published from them', () => {
+    const guard = sb3b.findIndex(line => line.startsWith('for F in native-plan-apply-and-plan.json native-apply-and-plan.json native-plan-publish.json register-published.json; do [ ! -e "$ART/$F" ] || { echo "SB3B_NOT_DONE: '));
+    const move = sb3b.findIndex(line => line.startsWith('for F in "$NP" "$ART/native-plan-plan.json" "$ART/register-proposal.json" "$ART/site-inputs.json" "$S/plan-proposal.sha256"; do [ ! -e "$F" ] || mv "$F" "$D/" || { echo "SB3B_NOT_DONE: '));
+    expect(guard).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(guard);
+    // Moved into a new folder of the upload's own archive; nothing is deleted, and a second run in the same second stops.
+    const folder = sb3b.indexOf('D=$S/sb3-$(date -u +%Y%m%dT%H%M%SZ)');
+    expect(sb3b[folder + 1]).toMatch(/^\[ ! -e "\$D" \] \|\| \{ echo "SB3B_NOT_DONE: /);
+    expect(sb3b.join('\n')).not.toMatch(/\brm\b/);
+    // Every file SB3 refuses to find again is among the ones SB3b moves.
+    for (const file of ['"$NP"', '"$ART/native-plan-plan.json"', '"$ART/register-proposal.json"', '"$ART/site-inputs.json"']) expect(sb3.some(line => line.includes(`[ ! -e ${file} ]`) && line.includes('SB3_NOT_DONE')), file).toBe(true);
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3b-'));
+    try {
+      const art = join(dir, 'art'), archive = join(dir, 's');
+      const run = (extra: string[] = []) => {
+        for (const folderPath of [art, archive]) execFileSync('mkdir', ['-p', folderPath]);
+        for (const name of ['native-plan-plan.json', 'register-proposal.json', 'site-inputs.json', ...extra]) writeFileSync(join(art, name), '{"p":1}');
+        writeFileSync(join(dir, 'np.json'), '{"p":1}'); writeFileSync(join(archive, 'plan-proposal.sha256'), 'x');
+        return bash(['set -euo pipefail', `ART='${art}'; S='${archive}'; NP='${dir}/np.json'`, 'install() { mkdir -p "${@: -1}"; }', ...sb3b.slice(2)]).split('\n');
+      };
+      expect(run().at(-1)).toBe('SB3B_DONE');
+      for (const moved of [join(dir, 'np.json'), join(art, 'native-plan-plan.json'), join(art, 'site-inputs.json')]) expect(existsSync(moved), moved).toBe(false);
+      // After SB8 or SB9 wrote from the plan, nothing moves.
+      expect(run(['native-plan-publish.json'])[0]).toMatch(/^SB3B_NOT_DONE: .*native-plan-publish\.json exists/);
+      expect(readFileSync(join(art, 'native-plan-plan.json'), 'utf8')).toBe('{"p":1}');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB3c writes only the named inputs into the owner\'s file, keeps the file before, and prints names only', () => {
+    expect(sb3c.find(line => line.startsWith('KEEP='))).toMatch(/^KEEP=''\s+# the inputs to write: /);
+    const names = sb3c.findIndex(line => line.startsWith('printf \'%s\\n\' "$KEEP" | grep -qxE '));
+    const free = sb3c.findIndex(line => line.startsWith('[ ! -e "$B" ] && [ ! -e "$N" ] || { echo "SB3C_NOT_DONE: '));
+    const copyLine = sb3c.findIndex(line => line.startsWith('cp -p "$F" "$B" && cmp -s "$F" "$B" || { echo "SB3C_NOT_DONE: '));
+    const write = sb3c.findIndex(line => line.startsWith('jq -s --arg keep "$KEEP" '));
+    const keys = sb3c.findIndex(line => line.startsWith('[ "$(jq -r \'keys | join(",")\' "$N")" = '));
+    const place = sb3c.findIndex(line => line.startsWith('install -o root -g root -m 0600 "$N" "$F.new" && mv "$F.new" "$F" && cmp -s "$N" "$F" || { echo "SB3C_NOT_DONE: '));
+    const loop = sb3c.indexOf('for K in perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits; do');
+    expect(names).toBeGreaterThan(-1);
+    expect(free).toBeGreaterThan(sb3c.indexOf('umask 077'));
+    // The copy of the file before is never written over: a second run in the same second stops first.
+    expect([copyLine, write, keys, place, loop]).toEqual([free + 1, free + 2, free + 3, free + 4, free + 6]);
+    expect(sb3c).toContain('[ ! -L "$F" ] && [ "$(stat -c \'%a %U %h\' "$F")" = "600 root 1" ] || { echo "SB3C_NOT_DONE: $F is not root\'s own 0600 file: ask"; exit 1; }');
+    // The live version by default, read as SB3 reads it, and only while it is still the live one.
+    expect(sb3c.join('\n')).toContain('[ "$(jq -r .approval.publication.registerVersion "$SRC")" = "$AV" ] && [ "$(activev)" = "$AV" ] || { echo "SB3C_NOT_DONE: ');
+    // The last line says which settings version the numbers came from (a version, never an amount).
+    expect(sb3c.at(-2)).toMatch(/^echo "written from settings version \$\(jq -r \.approval\.publication\.registerVersion "\$SRC"\) /);
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3c-'));
+    try {
+      const file = numbers({ billing: 'anything', perRunCeilingMicros: 2_200_000, abuseLimits: { kind: 'ABUSE_LIMITS', clarify_per_hour: 22 }, dailyCeilingMicros: 22_000_000 });
+      const run = (keep: string, fileText = JSON.stringify(file)) => {
+        writeFileSync(join(dir, 'file.json'), fileText);
+        writeFileSync(join(dir, 'plan.json'), JSON.stringify({ operation: 'verify', hostedBilling: numbers() }));
+        const out = bash(['set -euo pipefail', `F='${dir}/file.json'; N='${dir}/new.json'; SRC='${dir}/plan.json'; KEEP='${keep}'`, sb3c[names]!, sb3c[write]!, sb3c[keys]!, 'mv "$N" "$F"', ...sb3c.slice(loop, loop + 3), 'echo WRITTEN']);
+        return { out: out.split('\n'), now: JSON.parse(readFileSync(join(dir, 'file.json'), 'utf8')) };
+      };
+      const kept = run('perRunCeilingMicros abuseLimits');
+      // The two named inputs are the live ones now; the day's ceiling stays the file's own, and so does its billing word.
+      expect(kept.now).toEqual({ ...file, perRunCeilingMicros: 3_300_000, abuseLimits: numbers().abuseLimits });
+      expect(kept.out).toEqual(['SAME perRunCeilingMicros', 'DIFFERENT dailyCeilingMicros', 'SAME askRoomReads', 'SAME billingPlans', 'SAME abuseLimits', 'WRITTEN']);
+      expect(run(INPUTS.join(' ')).now).toEqual({ ...numbers(), billing: 'anything' });
+      // A number the file spells another way is still the same number.
+      expect(run('abuseLimits', JSON.stringify({ ...numbers(), dailyCeilingMicros: 0 }).replace('"dailyCeilingMicros":0', '"dailyCeilingMicros":1.1e7')).out).toContain('SAME dailyCeilingMicros');
+      // A list with two spaces, a tab, a comma or an unknown name stops before anything is written.
+      for (const bad of ['perRunCeilingMicros  abuseLimits', ' abuseLimits', 'abuseLimits,askRoomReads', 'billing', '', 'abuseLimits\tbillingPlans']) {
+        const stopped = run(bad);
+        expect(stopped.out, bad).toEqual(['SB3C_NOT_DONE: KEEP is not input names with one space between']);
+        expect(stopped.now, bad).toEqual(file);
+      }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the text says what the owner does, what reaches the people who already have a plan, and how to go back', () => {
+    for (const text of [
+      '**Nothing changes (most uploads).** Leave `NEWNUM` and `LIMITS` empty.',
+      'It never prints an amount',
+      'A subscriber\'s renewals keep charging the price recorded for that subscriber when they bought (Terms section 12), after a rise and after a cut alike.',
+      '**An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan is renewed at depends on the release that showed it.',
+      '**an upload whose old release is such an older one must not change a plan\'s prices**: no `prices` line may print.',
+      'The reading errs to one side only: `HELD` is printed when an open subscription names the plan anywhere in its history',
+      '**If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**',
+      'For each plan named there SB3 prints `HELD` or `nobody holds it now`',
+      'has no way yet to apply a new limit only from a person\'s next month',
+      'The day and week caps are counted again over the days already used this month, with the new, lower cap.',
+      'A refund on cancelling or withdrawing is measured against the new credit',
+      '**do not lower a plan\'s limits while anyone holds that plan**',
+      'when that smallest one moves, every paid plan must be named',
+      'Do not name it (that would publish the old value again). Run SB3c with `KEEP=\'perRunCeilingMicros\'`',
+      '**Editing the owner\'s file.**',
+      '**A release older than this step.**'
+    ]) expect(flat, text).toContain(text);
+    const back = sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ');
+    expect(back).toContain('A way back that makes the old release current again (WB2) also brings the numbers before back');
+    expect(back).toContain('**When the upload had raised a plan\'s limits, WB2 lowers them again**');
+    expect(back).toContain('put the numbers before into the owner\'s file with SB3c');
+    // The yes names a number change and, for a named plan, that nobody holds it or when its people were told.
+    expect(sectionOf(guide, '### SB6. The owner\'s fresh yes').replace(/\s+/g, ' ')).toContain('only when SB3\'s `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told');
+    // The line that tells whether the old release saves an upgrade's shown price looks for a name the upgrade code really has.
+    expect(flat).toContain('`grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`');
+    expect(read('apps/api/src/billing/upgrade.ts')).toContain('export function monthlyQuoteIdOf(');
+    // The drained path never runs SB6: its own yes names the same, and its numbers have their own way back (no WB2 after DR6).
+    const drainedFlat = drained.replace(/\s+/g, ' ');
+    expect(drainedFlat).toContain('When SB3\'s `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told, as in SB6.');
+    expect(drainedFlat).toContain('**The numbers on the drained path (SB3\'s `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to it (no WB2) once the upload is done.');
+    // Both places that send the reader there quote the paragraph's own first words.
+    expect(back).toContain('After a drained upload there is no WB2: see "The numbers on the drained path"');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md')).toContain('The release guide says both under "The numbers on the drained path".');
+    // The order table names the two new steps between SB3 and SB4.
+    expect(sideBySide).toMatch(/\n\| SB3 \|[^\n]*\n\| SB3b \|[^\n]*\n\| SB3c \|[^\n]*\n\| SB4 \|/);
+  });
+
+  it('the file is edited as a checked copy, never in place', () => {
+    const block = blocksOf(section).find(candidate => candidate.lines.some(line => line.includes('COPY_READS')))!;
+    expect(block.lines).toHaveLength(4);
+    expect(block.lines[3]).toBe('install -o root -g root -m 0600 /root/hosted-billing-v1.edit.json /etc/debateai-v3-preview/hosted-billing-v1.json.new && mv /etc/debateai-v3-preview/hosted-billing-v1.json.new /etc/debateai-v3-preview/hosted-billing-v1.json');
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-edit-'));
+    try {
+      const reads = (text: string) => { writeFileSync(join(dir, 'edit.json'), text); return bash(['set -uo pipefail', block.lines[1]!.replaceAll('/root/hosted-billing-v1.edit.json', join(dir, 'edit.json'))]); };
+      expect(reads(JSON.stringify(numbers()))).toBe('COPY_READS');
+      // A trailing comma, a missing input and an extra one all fail the check.
+      expect(reads(JSON.stringify(numbers()).replace(/\}$/, ',}'))).toBe('');
+      const { abuseLimits: _dropped, ...five } = numbers();
+      expect(reads(JSON.stringify(five))).toBe('');
+      expect(reads(JSON.stringify({ ...numbers(), extra: 11 }))).toBe('');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
