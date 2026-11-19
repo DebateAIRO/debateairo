@@ -6,7 +6,7 @@ import type { BillingPlans } from "@debateai/register";
 import { scheduleDowngrade } from "../../apps/api/src/billing/subscription-actions.js";
 import { quoteUpgrade } from "../../apps/api/src/billing/upgrade.js";
 import { AdjustableTaxEngine, StubGeo, testRegionalPlans } from "../support/billingFixtures.js";
-import { seedNetopiaSubscription, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
+import { seedNetopiaSubscription, shownDowngradePrice, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
@@ -64,7 +64,7 @@ describe("every later quote of a subscription is in its own currency (Part C)", 
   it("a RON MAX subscription schedules a downgrade to PRO at PRO's RON price, asked in RON", async () => {
     const run = await seeded({ planId: "MAX", taxCountry: "RO", currency: "RON" });
     expect((await billing.quote(run.subscription.initialQuoteId, run.ownerRef))?.netMicros).toBe(1_000_000_000);
-    await scheduleDowngrade(run.deps, run.ownerRef, "PRO");
+    await scheduleDowngrade(run.deps, run.ownerRef, "PRO", shownDowngradePrice("PRO", "RON", testRegionalPlans).shown);
     const events = await billing.subscriptionEvents(run.subscription.subscriptionId);
     const scheduled = events.find((event) => event.kind === "DOWNGRADE_SCHEDULED");
     expect(scheduled).toMatchObject({ planId: "PRO", data: { recurring_net_micros: 250_000_000 } });
@@ -87,7 +87,7 @@ describe("every later quote of a subscription is in its own currency (Part C)", 
 
   it("a USD MAX subscription schedules a downgrade to PRO at PRO's USD price, asked in USD", async () => {
     const run = await seeded({ planId: "MAX", taxCountry: "RO" });
-    await scheduleDowngrade(run.deps, run.ownerRef, "PRO");
+    await scheduleDowngrade(run.deps, run.ownerRef, "PRO", shownDowngradePrice("PRO", "USD", testRegionalPlans).shown);
     const scheduled = (await billing.subscriptionEvents(run.subscription.subscriptionId))
       .find((event) => event.kind === "DOWNGRADE_SCHEDULED");
     expect(scheduled).toMatchObject({ planId: "PRO", data: { recurring_net_micros: 50_000_000 } });

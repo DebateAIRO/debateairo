@@ -4,12 +4,14 @@ import { BillingRepository, createPool, EntitlementRepository, migrate } from "@
 import { consumerCalendarDay, foldSubscription, withdrawalDeadline, type TaxEngine } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { AdjustableTaxEngine, testBillingPolicy } from "../support/billingFixtures.js";
+import type { BillingPlans } from "@debateai/register";
+import { AdjustableTaxEngine, testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
   holdOwnerLock,
   mountSubscriptionRoutes,
   recordingAudit,
   seedNetopiaSubscription,
+  shownDowngradePrice,
   subscriptionDeps,
   suspendForChargeback,
   TEST_PUBLIC_APP_URL
@@ -266,7 +268,9 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
       activatedAt: new Date(Date.now() - 4 * DAY), taxCountry: "RO"
     });
     const downgrade = (plan: string) => api.inject({
-      method: "POST", url: "/v1/billing/subscription/downgrade", headers, payload: { plan_id: plan }
+      method: "POST", url: "/v1/billing/subscription/downgrade", headers,
+      // "FREE" is no downgrade target: it is refused as malformed whatever price rides along.
+      payload: { plan_id: plan, ...shownDowngradePrice(plan === "PRO" ? "PRO" : "PLUS").body }
     });
     const notLower = await downgrade("PRO");
     expect(notLower.statusCode).toBe(422);
@@ -290,6 +294,57 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     await api.close();
   });
 
+  it("schedules a downgrade only at the price the confirmation showed, and refuses one whose plan price changed since", async () => {
+    // Made-up prices. The confirmation showed Pro at 66.00 a month before tax; by the time the person confirms, the
+    // server's plans say 88.00.
+    const later: BillingPlans = Object.freeze({
+      ...testBillingPlans, sourceRef: "test:plans-later",
+      plans: Object.freeze(testBillingPlans.plans.map((plan) => plan.planId !== "PRO" ? plan
+        : Object.freeze({ ...plan, netPrices: Object.freeze({ USD: 88_000_000, EUR: 88_000_000, RON: 88_000_000 }) })))
+    }) as BillingPlans;
+    const identity = testHttpIdentity("downgrade-price-changed");
+    const tax = new AdjustableTaxEngine();
+    const api = await mountSubscriptionRoutes(subscriptionDeps(database.pool, { tax, plans: later }), identity);
+    const headers = { "x-test-session": identity.rawSessionToken };
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef: identity.authenticated.ownerRef, planId: "MAX", activatedAt: new Date(Date.now() - 4 * DAY), taxCountry: "RO"
+    });
+    const downgrade = (payload: Readonly<Record<string, string>>) =>
+      api.inject({ method: "POST", url: "/v1/billing/subscription/downgrade", headers, payload });
+    const changed = { error: "DOWNGRADE_PRICE_CHANGED", message: "DOWNGRADE_PRICE_CHANGED" };
+    const before = await events(seeded.subscriptionId);
+
+    const stale = await downgrade({ plan_id: "PRO", net_price: "66.00", currency: "USD" });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toEqual(changed);
+    // The right amount in another currency is not the price shown either.
+    expect((await downgrade({ plan_id: "PRO", net_price: "88.00", currency: "EUR" })).json()).toEqual(changed);
+    // A request that names no price is malformed: the server never guesses what the person saw.
+    expect((await downgrade({ plan_id: "PRO" })).statusCode).toBe(400);
+    expect((await downgrade({ plan_id: "PRO", net_price: "88", currency: "USD" })).statusCode).toBe(400);
+    // Nothing was written, and no refusal paid for a tax quote.
+    expect(await events(seeded.subscriptionId)).toHaveLength(before.length);
+    expect(tax.quotedCurrencies).toEqual([]);
+
+    // The person chooses again and confirms the price now shown: that price is the one recorded for the renewals.
+    expect((await downgrade({ plan_id: "PRO", net_price: "88.00", currency: "USD" })).statusCode).toBe(204);
+    const written = await events(seeded.subscriptionId);
+    expect(written.at(-1)).toMatchObject({
+      kind: "DOWNGRADE_SCHEDULED", planId: "PRO", data: { recurring_net_micros: 88_000_000 }
+    });
+    expect(recurringNetOf(written).nextRenewalMicros).toBe(88_000_000);
+    expect(tax.quotedCurrencies).toEqual(["USD"]);
+
+    // Asked again for the plan already scheduled: a quiet success that writes nothing, so the recorded price stands
+    // whatever price that later request names.
+    expect((await downgrade({ plan_id: "PRO", net_price: "88.00", currency: "USD" })).statusCode).toBe(204);
+    expect((await downgrade({ plan_id: "PRO", net_price: "77.00", currency: "USD" })).statusCode).toBe(204);
+    expect(await events(seeded.subscriptionId)).toHaveLength(written.length);
+    expect(recurringNetOf(await events(seeded.subscriptionId)).nextRenewalMicros).toBe(88_000_000);
+    expect(tax.quotedCurrencies).toEqual(["USD"]);
+    await api.close();
+  });
+
   it("charges the per-owner quote budget for a downgrade and a revoke, and never refuses a cancel", async () => {
     const identity = testHttpIdentity("p12b-budget");
     const quote = vi.fn<TaxEngine["quote"]>(async () => { throw new Error("the tax engine must not be called"); });
@@ -300,7 +355,8 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
       activatedAt: new Date(Date.now() - 2 * DAY), taxCountry: "RO"
     });
     const downgrade = await api.inject({
-      method: "POST", url: "/v1/billing/subscription/downgrade", headers, payload: { plan_id: "PLUS" }
+      method: "POST", url: "/v1/billing/subscription/downgrade", headers,
+      payload: { plan_id: "PLUS", ...shownDowngradePrice("PLUS").body }
     });
     expect(downgrade.statusCode).toBe(429);
     expect(quote).not.toHaveBeenCalled();
@@ -326,7 +382,8 @@ describe("P12b subscription reads and plain actions on real PostgreSQL", () => {
     });
     const refusal = { error: "LEGAL_REACCEPTANCE_REQUIRED", message: "LEGAL_REACCEPTANCE_REQUIRED" };
     const downgrade = await api.inject({
-      method: "POST", url: "/v1/billing/subscription/downgrade", headers, payload: { plan_id: "PLUS" }
+      method: "POST", url: "/v1/billing/subscription/downgrade", headers,
+      payload: { plan_id: "PLUS", ...shownDowngradePrice("PLUS").body }
     });
     expect(downgrade.statusCode).toBe(403);
     expect(downgrade.json()).toEqual(refusal);

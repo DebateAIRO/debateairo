@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Ten plan nie jest wyższy niż Twój obecny plan. Aby przejść na niższy plan, wybierz go na następne odnowienie.",
   "billing.subscription.downgradeNotLower": "Ten plan nie jest niższy niż Twój obecny plan.",
   "billing.subscription.downgradeNotAvailableNow": "Twój plan właśnie się odnawia, więc nie można jeszcze zaplanować zmiany. Możesz go zmienić, gdy tylko odnowienie się zakończy.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Przejść na {plan} przy następnym odnowieniu? Kosztuje {price} miesięcznie + podatek, od {date}.",
   "billing.subscription.downgradeYes": "Tak, przejdź na {plan}",
   "billing.subscription.downgraded": "Gotowe. {date} przejdziesz na {plan}, za {total} miesięcznie z podatkiem.",

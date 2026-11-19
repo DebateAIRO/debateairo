@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Níl an plean sin níos airde ná do phlean reatha. Chun aistriú go plean níos ísle, roghnaigh é do d’athnuachan eile.",
   "billing.subscription.downgradeNotLower": "Níl an plean sin níos ísle ná do phlean reatha.",
   "billing.subscription.downgradeNotAvailableNow": "Tá do phlean á athnuachan anois, mar sin ní féidir athrú a sceidealú fós. Is féidir leat é a athrú a luaithe a bheidh an athnuachan curtha i gcrích.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Aistriú go {plan} ag d’athnuachan eile? Cosnaíonn sé {price} sa mhí + cáin, ó {date}.",
   "billing.subscription.downgradeYes": "Aistrigh, aistrigh go {plan}",
   "billing.subscription.downgraded": "Déanta. Aistreoidh tú go {plan} ar {date}, ar {total} sa mhí, cáin san áireamh.",

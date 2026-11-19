@@ -124,7 +124,7 @@ describe("SET-6 the subscription card (guard)", () => {
     expectFocusOn(button("Move to Plus at renewal"));
     expect(nextTabStop()).toBe(button("Yes, move to Plus"));
     await press(button("Yes, move to Plus"));
-    expect(plan.downgradeSubscription).toHaveBeenCalledWith("PLUS");
+    expect(plan.downgradeSubscription).toHaveBeenCalledWith("PLUS", { netPrice: PLANS.plans[1]!.net_prices.USD, currency: "USD" });
     expectParkedOn(card());
   });
 

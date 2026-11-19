@@ -906,7 +906,7 @@ describe("S04-C3 the help panel and the layout guard follow a session change", (
   it("A11 the root layout mounts the guard exactly once, right after the footer", () => {
     const layout = readFileSync(LAYOUT_SOURCE, "utf8");
     expect(layout.match(/<SupportConversationGuard \/>/gu) ?? []).toHaveLength(1);
-    expect(layout).toMatch(/<SiteFooter variant="line" \/>\s*<SupportConversationGuard \/>/u);
+    expect(layout).toMatch(/<SiteFooter variant="line" billing=\{await lineBilling\} \/>\s*<SupportConversationGuard \/>/u);
   });
 
   it("A12 a gate result that belongs to an older generation is never shown", async () => {

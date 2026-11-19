@@ -839,6 +839,7 @@ apps/ui/lib/endSession.ts
 apps/ui/lib/focusGuard.ts
 apps/ui/lib/format.ts
 apps/ui/lib/i18n/I18nProvider.tsx
+apps/ui/lib/i18n/acceptLanguage.ts
 apps/ui/lib/i18n/auth.test.mjs
 apps/ui/lib/i18n/billing.test.mjs
 apps/ui/lib/i18n/catalog.test.mjs

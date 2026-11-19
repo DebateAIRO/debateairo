@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Den plan er ikke højere end din nuværende plan. Vil du skifte til en lavere plan, så vælg den til din næste fornyelse.",
   "billing.subscription.downgradeNotLower": "Den plan er ikke lavere end din nuværende plan.",
   "billing.subscription.downgradeNotAvailableNow": "Din plan fornyes lige nu, så en ændring kan ikke planlægges endnu. Du kan ændre den, så snart fornyelsen er gået igennem.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Skift til {plan} ved din næste fornyelse? Den koster {price} om måneden + skat fra den {date}.",
   "billing.subscription.downgradeYes": "Ja, skift til {plan}",
   "billing.subscription.downgraded": "Færdig. Du skifter til {plan} den {date} for {total} om måneden inkl. skat.",

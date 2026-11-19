@@ -147,6 +147,7 @@ import {
   type BillingCheckoutResponse,
   type BillingChargeStatusResponse,
   type BillingUpgradePendingResponse,
+  type BillingCurrency,
   type BillingInvoicesResponse,
   type BillingSubscriptionResponse,
   type BillingUpgradeQuoteResponse,
@@ -556,7 +557,8 @@ export interface ContractClient {
   getBillingCharge(chargeRef: string): Promise<BillingChargeStatusResponse>;
   getBillingSubscription(): Promise<BillingSubscriptionResponse>;
   getBillingInvoices(): Promise<BillingInvoicesResponse>;
-  downgradeSubscription(planId: "PLUS" | "PRO"): Promise<void>;
+  /** `shown`: the lower plan's monthly price before tax, as the confirmation showed it to the person. */
+  downgradeSubscription(planId: "PLUS" | "PRO", shown: Readonly<{ netPrice: string; currency: BillingCurrency }>): Promise<void>;
   cancelSubscription(): Promise<void>;
   revokeSubscriptionCancel(): Promise<void>;
   /** P12c: the prorated upgrade price with tax and the new plan's recurring total; spend it with `upgradeSubscription`. */
@@ -1062,9 +1064,12 @@ export function createContractClient(
     ),
     getBillingSubscription: () => request("/v1/billing/subscription", BillingSubscriptionResponseSchema),
     getBillingInvoices: () => request("/v1/billing/invoices", BillingInvoicesResponseSchema),
-    downgradeSubscription: (planId: "PLUS" | "PRO") => requestNoContent(
+    downgradeSubscription: (planId: "PLUS" | "PRO", shown: Readonly<{ netPrice: string; currency: BillingCurrency }>) => requestNoContent(
       root.href, fetchImplementation, "/v1/billing/subscription/downgrade",
-      { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ plan_id: planId }) },
+      {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ plan_id: planId, net_price: shown.netPrice, currency: shown.currency })
+      },
       auth
     ),
     cancelSubscription: () => requestNoContent(

@@ -92,6 +92,8 @@ function quoteFailureWords(failure: unknown): FailureWords {
  * P12's DOWNGRADE_NOT_LOWER: the plan changed elsewhere, so say so and show the plan the server has now.
  * DOWNGRADE_NOT_AVAILABLE_NOW: the renewal charge is already written at the current plan, so nothing was scheduled;
  * the plan is unchanged, so the card is not read again.
+ * DOWNGRADE_PRICE_CHANGED: the lower plan no longer costs what the confirmation showed, so nothing was scheduled; the
+ * card is read again, and choosing the plan again shows its price now.
  */
 function downgradeFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
@@ -99,6 +101,9 @@ function downgradeFailureWords(failure: unknown): FailureWords {
   if (code === "ADMISSION_RATE_LIMITED") return RATE_LIMITED;
   if (code === "DOWNGRADE_NOT_AVAILABLE_NOW") {
     return Object.freeze({ key: "billing.subscription.downgradeNotAvailableNow", reload: false });
+  }
+  if (code === "DOWNGRADE_PRICE_CHANGED") {
+    return Object.freeze({ key: "billing.subscription.downgradePriceChanged", reload: true });
   }
   return code === "DOWNGRADE_NOT_LOWER"
     ? Object.freeze({ key: "billing.subscription.downgradeNotLower", reload: true })
@@ -329,10 +334,12 @@ export function SubscriptionControls({
     }, (failure) => (failure instanceof PlanPriceUnavailable ? PLANS_UNAVAILABLE : ACTION_FAILED));
   }
 
-  function confirmDowngrade(planId: DowngradeTarget): void {
+  /** Sends the price the confirmation showed with the choice: the server schedules the downgrade only at that price. */
+  function confirmDowngrade(shown: Readonly<{ planId: DowngradeTarget; netPrice: string; currency: BillingCurrency }>): void {
+    const { planId } = shown;
     setDowngrade(null);
     void run(async () => {
-      await client.downgradeSubscription(planId);
+      await client.downgradeSubscription(planId, { netPrice: shown.netPrice, currency: shown.currency });
       setPanel("NONE");
       // A7: the lower plan's total is now the announced one (renewal_total), so the sentence names it.
       const fresh = await reload();
@@ -432,7 +439,7 @@ export function SubscriptionControls({
                 plan: planName(catalog, downgrade.planId), price: formatMoney(locale, downgrade.netPrice, downgrade.currency), date: nextRenewalText
               })}</p>
               <div className="setCardRow">
-                <button type="button" className="setBtn" disabled={busy} onClick={() => confirmDowngrade(downgrade.planId)}>
+                <button type="button" className="setBtn" disabled={busy} onClick={() => confirmDowngrade(downgrade)}>
                   {t(catalog, "billing.subscription.downgradeYes", { plan: planName(catalog, downgrade.planId) })}
                 </button>
                 <button type="button" className="setBtn" onClick={() => { setDowngrade(null); setPanel("NONE"); }}>

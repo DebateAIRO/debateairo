@@ -8798,8 +8798,13 @@ describe("NV-14 verification sets the token holder's password", () => {
   async function enrolTotp(flow: ReturnType<typeof buildService>, token: string, hash: string) {
     const { mfa, sessions } = await currentMfa(flow, hash, () => new Date());
     const setup = await mfa.beginTotp({ enrollmentToken: token }, nv14Source);
+    // The code of the step the clock is in now. Two readers check it after this line, each one step either way: the
+    // service's clock, and the database's own clock_timestamp() when it completes the enrolment
+    // (identity.complete_secure_totp_enrollment). The code of the step before would already be at that edge: one
+    // 30-second boundary passing before the database's reading would refuse the enrolment. A sign-in that follows sends
+    // the code of `step + 1`, the next step, which is newer than the one accepted here.
     const secret = decodeBase32(setup.secret), step = Math.floor(Date.now() / 30_000);
-    const enrolled = await mfa.verifyTotp({ enrollmentToken: token, code: totpCodeAtStep(secret, step - 1) }, nv14Source);
+    const enrolled = await mfa.verifyTotp({ enrollmentToken: token, code: totpCodeAtStep(secret, step) }, nv14Source);
     return { sessions, secret, step, enrolled };
   }
 
@@ -8895,7 +8900,7 @@ describe("NV-14 verification sets the token holder's password", () => {
     expect(await verifyPassword(sharedArgon2Pool(), hash!, password)).toBe(true);
     const { sessions, secret, step } = await enrolTotp(flow, token, hash!);
     const challenge = await sessions.beginLogin({ email: registered.email, password }, nv14Source);
-    const logged = await sessions.completeLogin({ challengeToken: challenge.challengeToken, code: totpCodeAtStep(secret, step) }, nv14Source);
+    const logged = await sessions.completeLogin({ challengeToken: challenge.challengeToken, code: totpCodeAtStep(secret, step + 1) }, nv14Source);
     secret.fill(0);
     expect(logged.status).toBe("authenticated");
   }, 120_000);

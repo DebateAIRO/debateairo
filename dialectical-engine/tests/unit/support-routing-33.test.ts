@@ -28,6 +28,10 @@ const INTEGRATION = resolve(process.cwd(), "tests/support/fixtures/support-routi
 const V131 = resolve(process.cwd(), "tests/support/fixtures/support-routing-v131-overlay.json");
 // R22 decision 13: the help articles no longer describe an Unpublish control. The same three articles answer; only their order moved on 18 rows.
 const R22_PUBLIC = resolve(process.cwd(), "tests/support/fixtures/support-routing-r22-public-overlay.json");
+// The footer's English link to /legal is now "Company details and contact", so the English query read from it (`…|en7`)
+// changed words. That query now finds only the legal notice's own help article; the two articles that matched the old
+// words "Legal notice" drop out. Actions, recovery sources and source policy stay as they were, on all 66 rows.
+const COMPANY_DETAILS = resolve(process.cwd(), "tests/support/fixtures/support-routing-company-details-overlay.json");
 const QUERY_KEYS = [
   "chrome:chrome.aiTransparency", "chrome:chrome.legal.notice", "chrome:chrome.legal.terms", "chrome:chrome.legal.versions",
   "chrome:chrome.legal.privacy", "chrome:chrome.legal.health", "chrome:chrome.legal.cookies", "chrome:chrome.legal.providers",
@@ -114,6 +118,19 @@ describe("S05 33-locale routing pin (SPEC-v5 R10, R13)", () => {
       expect(current.slice(1), key).toEqual(prior.slice(1));
       expect(current[0]!.split(",").sort(), key).toEqual(prior[0]!.split(",").sort());
     }
-    expect(now).toEqual({...beforeR22,...r22Public});
+    const companyDetails = JSON.parse(readFileSync(COMPANY_DETAILS, "utf8")) as Record<string,string>;
+    const beforeCompanyDetails = {...beforeR22,...r22Public};
+    expect(queriesIn("en")[7]).toBe(`${msg("en", "chrome:chrome.legal.notice")}?`);
+    expect(Object.keys(companyDetails).sort()).toEqual(SUPPORT_LOCALES.filter((l) => l !== "en" && l !== "ro")
+      .flatMap((language) => [`${language}|in|en7`, `${language}|out|en7`]).sort());
+    const legalNoticeArticles = SUPPORT_CAPABILITIES.find(({ id }) => id === "legal-notice")!.articleIds;
+    for (const [key,value] of Object.entries(companyDetails)) {
+      const prior = beforeCompanyDetails[key]!.split("|");
+      const current = value.split("|");
+      expect(current.slice(1), key).toEqual(prior.slice(1));
+      expect(current[0]!.split(","), key).toEqual([...legalNoticeArticles]);
+      for (const source of current[0]!.split(",")) expect(prior[0]!.split(","), key).toContain(source);
+    }
+    expect(now).toEqual({...beforeCompanyDetails,...companyDetails});
   });
 });

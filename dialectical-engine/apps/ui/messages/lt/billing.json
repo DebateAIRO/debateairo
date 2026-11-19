@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Šis planas nėra aukštesnis už dabartinį jūsų planą. Norėdami pereiti prie žemesnio plano, pasirinkite jį kitam atnaujinimui.",
   "billing.subscription.downgradeNotLower": "Šis planas nėra žemesnis už dabartinį jūsų planą.",
   "billing.subscription.downgradeNotAvailableNow": "Jūsų planas šiuo metu atnaujinamas, todėl pakeitimo dar negalima suplanuoti. Pakeisti galėsite, kai tik atnaujinimas bus atliktas.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Pereiti prie {plan} kito atnaujinimo metu? Jis kainuoja {price} per mėnesį + mokestis, nuo {date}.",
   "billing.subscription.downgradeYes": "Taip, pereiti prie {plan}",
   "billing.subscription.downgraded": "Atlikta. {date} pereisite prie {plan} už {total} per mėnesį su mokesčiais.",
