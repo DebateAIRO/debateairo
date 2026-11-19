@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Paket itu tidak lebih tinggi dari paket Anda saat ini. Untuk pindah ke paket yang lebih rendah, pilih paket itu untuk perpanjangan berikutnya.",
   "billing.subscription.downgradeNotLower": "Paket itu tidak lebih rendah dari paket Anda saat ini.",
   "billing.subscription.downgradeNotAvailableNow": "Paket Anda sedang diperpanjang saat ini, jadi perubahan belum dapat dijadwalkan. Anda dapat mengubahnya begitu perpanjangan selesai.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Pindah ke {plan} pada perpanjangan berikutnya? Harganya {price} per bulan + pajak, mulai {date}.",
   "billing.subscription.downgradeYes": "Ya, pindah ke {plan}",
   "billing.subscription.downgraded": "Selesai. Anda akan pindah ke {plan} pada {date}, seharga {total} per bulan, termasuk pajak.",

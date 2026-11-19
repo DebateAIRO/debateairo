@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "התוכנית הזו אינה גבוהה מהתוכנית הנוכחית שלכם. כדי לעבור לתוכנית נמוכה יותר, בחרו בה לחידוש הבא.",
   "billing.subscription.downgradeNotLower": "התוכנית הזו אינה נמוכה מהתוכנית הנוכחית שלכם.",
   "billing.subscription.downgradeNotAvailableNow": "התוכנית שלכם מתחדשת ממש עכשיו, ולכן עדיין אי אפשר לתזמן שינוי. אפשר לשנות אותה מיד כשהחידוש יושלם.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "לעבור ל-{plan} בחידוש הבא? העלות היא {price} לחודש + מס, החל מ-{date}.",
   "billing.subscription.downgradeYes": "כן, מעבר ל-{plan}",
   "billing.subscription.downgraded": "בוצע. תעברו ל-{plan} ב-{date}, תמורת {total} לחודש כולל מס.",

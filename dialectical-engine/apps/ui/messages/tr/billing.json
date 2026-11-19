@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Bu plan mevcut planınızdan daha üst değil. Daha alt bir plana geçmek için onu bir sonraki yenilemeniz için seçin.",
   "billing.subscription.downgradeNotLower": "Bu plan mevcut planınızdan daha alt değil.",
   "billing.subscription.downgradeNotAvailableNow": "Planınız şu anda yenileniyor, bu yüzden henüz bir değişiklik planlanamıyor. Yenileme tamamlanır tamamlanmaz değiştirebilirsiniz.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Bir sonraki yenilemede {plan} planına geçilsin mi? {date} tarihinden itibaren ayda {price} + vergi tutar.",
   "billing.subscription.downgradeYes": "Evet, {plan} planına geç",
   "billing.subscription.downgraded": "Tamam. {date} tarihinde vergi dahil ayda {total} karşılığında {plan} planına geçeceksiniz.",

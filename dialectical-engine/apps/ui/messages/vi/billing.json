@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Gói đó không cao hơn gói hiện tại của bạn. Để chuyển sang gói thấp hơn, hãy chọn gói đó cho lần gia hạn tiếp theo.",
   "billing.subscription.downgradeNotLower": "Gói đó không thấp hơn gói hiện tại của bạn.",
   "billing.subscription.downgradeNotAvailableNow": "Gói của bạn đang được gia hạn ngay lúc này, nên chưa thể lên lịch thay đổi. Bạn có thể đổi gói ngay khi việc gia hạn hoàn tất.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Chuyển sang {plan} ở lần gia hạn tiếp theo? Gói này có giá {price} mỗi tháng + thuế, từ {date}.",
   "billing.subscription.downgradeYes": "Có, chuyển sang {plan}",
   "billing.subscription.downgraded": "Xong. Bạn sẽ chuyển sang {plan} vào {date}, với giá {total} mỗi tháng, đã gồm thuế.",

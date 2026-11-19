@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Dieser Tarif ist nicht höher als Ihr aktueller Tarif. Um zu einem niedrigeren Tarif zu wechseln, wählen Sie ihn für Ihre nächste Verlängerung.",
   "billing.subscription.downgradeNotLower": "Dieser Tarif ist nicht niedriger als Ihr aktueller Tarif.",
   "billing.subscription.downgradeNotAvailableNow": "Ihr Tarif wird gerade verlängert, daher kann noch kein Wechsel geplant werden. Sie können ihn ändern, sobald die Verlängerung durch ist.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Bei Ihrer nächsten Verlängerung zu {plan} wechseln? Er kostet {price} pro Monat zzgl. Steuer, ab dem {date}.",
   "billing.subscription.downgradeYes": "Ja, zu {plan} wechseln",
   "billing.subscription.downgraded": "Erledigt. Sie wechseln am {date} zu {plan}, für {total} pro Monat inkl. Steuer.",

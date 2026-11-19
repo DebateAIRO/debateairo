@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Cette formule n’est pas supérieure à votre formule actuelle. Pour passer à une formule inférieure, choisissez-la pour votre prochain renouvellement.",
   "billing.subscription.downgradeNotLower": "Cette formule n’est pas inférieure à votre formule actuelle.",
   "billing.subscription.downgradeNotAvailableNow": "Votre formule est en cours de renouvellement, un changement ne peut donc pas encore être programmé. Vous pourrez la modifier dès que le renouvellement aura abouti.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Passer à {plan} à votre prochain renouvellement ? Elle coûte {price} par mois + taxes, à partir du {date}.",
   "billing.subscription.downgradeYes": "Oui, passer à {plan}",
   "billing.subscription.downgraded": "C’est fait. Vous passerez à {plan} le {date}, pour {total} par mois, taxes comprises.",

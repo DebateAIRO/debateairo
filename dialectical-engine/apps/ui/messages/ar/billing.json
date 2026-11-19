@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "هذه الخطة ليست أعلى من خطتك الحالية. للانتقال إلى خطة أدنى، اخترها لتجديدك القادم.",
   "billing.subscription.downgradeNotLower": "هذه الخطة ليست أدنى من خطتك الحالية.",
   "billing.subscription.downgradeNotAvailableNow": "خطتك قيد التجديد الآن، لذا لا يمكن جدولة أي تغيير بعد. يمكنك تغييرها فور اكتمال التجديد.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "هل تنتقل إلى {plan} عند تجديدك القادم؟ تكلف {price} شهريًا + الضريبة، اعتبارًا من {date}.",
   "billing.subscription.downgradeYes": "نعم، انتقل إلى {plan}",
   "billing.subscription.downgraded": "تم. ستنتقل إلى {plan} في {date}، مقابل {total} شهريًا شاملًا الضريبة.",
