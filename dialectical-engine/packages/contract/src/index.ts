@@ -5,13 +5,8 @@ export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
 export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
-import { ThreatReportSchema as StaffThreatReportSchema } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
-/** A kept question from an unsigned ask has no account to identify (S04-R18). */
-export const ThreatReportSchema = StaffThreatReportSchema.extend({
-  account: StaffThreatReportSchema.shape.account.nullable()
-}).strict();
 import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguageSchema, type QuestionLanguageOffer } from "./question-language.js";
 export * from "./question-language.js";
 // V4 start step, Task 9: the step before Start's ids, limits and wire shapes.

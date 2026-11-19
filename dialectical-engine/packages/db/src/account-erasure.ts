@@ -778,8 +778,8 @@ export class AccountErasureCoordinator {
     private readonly publications?: Pick<PublicationCipher,
       "destroy" | "exists" | "keyReadable">,
     private readonly support?: SupportErasurePort,
-    // synthesis-flag S04 (threat reports): the email hold before any key is destroyed. After C-1's support port, which
-    // every composition passes; a composition with no hold passes `undefined` or nothing.
+    // synthesis-flag S04: an optional hook before any key is destroyed (it held the threat reports' email until they were
+    // removed; the API passes none now). After C-1's support port, which every composition passes; no hook: `undefined` or nothing.
     private readonly options: Readonly<{
       readEmailCiphertext?: (userId: string) => Promise<CryptoEnvelope | null>;
       beforeKeyDestruction?: (input: Readonly<{ erasureId: string; userId: string; email: string }>) => Promise<void>;

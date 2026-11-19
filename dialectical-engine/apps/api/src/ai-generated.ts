@@ -36,7 +36,7 @@ const sourceIsAi: CarriesAi = (body) => field(body, "source") === "AI";
  * never marked. Deliberately absent: the disclosure record (GET /v1/answers/{id}/disclosure, provenance codes about the
  * AIs, not their content), the inspection and the ledger digest (codes and ids), the dig links and the last visit (ids),
  * the ask's acceptance (POST /v1/asks: a run reference) and the room read (GET /v1/asks/room: shares and limits); on the
- * team's side the threat reports (the person's own question and the team's decision), the public-review list, the audit,
+ * team's side the public-review list, the audit,
  * the team and its limits, and every team action's answer (an operation id and an outcome).
  * Marked elsewhere, because they bypass this table: the run-event stream and the lists and merge streams (their own
  * writeHead), and the question-language offer (a 409 whose `proposed_question` is the AI's rewrite, in the error handler).

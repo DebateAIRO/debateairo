@@ -15,7 +15,7 @@ export const RAW_SECTIONS = [
   "email_change_requests", "recovery_email_requests", "recovery_requests", "runs",
   "erasure_tombstones", "visibility_events", "legal_acceptances", "sensitive_data_consents",
   "billing", "support_sessions", "support_messages", "support_cases", "support_case_events",
-  "support_case_messages", "support_ratings", "support_key_states", "audit_events", "threat_reports",
+  "support_case_messages", "support_ratings", "support_key_states", "audit_events",
   // V4 account memory (migration 0131, identity.read_data_export_page_memory).
   "page_reading_level", "debate_visits", "dig_links",
   // The Perplexity plan's stores: each debate's web evidence (0132, identity.read_data_export_web_evidence) and the
@@ -132,7 +132,6 @@ export const KEEP_COLUMNS = {
   support_ratings: ["rating", "at"],
   support_key_states: ["kind", "ref", "destroyed_at"],
   audit_events: ["event_type", "occurred_at"],
-  threat_reports: ["question", "kept_at"],
   page_reading_level: ["reading_level", "updated_at"],
   debate_visits: ["run_id", "seen_at", "items"],
   dig_links: ["parent_run_id", "child_run_id", "places", "mode", "created_at"],
@@ -602,7 +601,6 @@ export async function collectSnapshot(input: {
         account, channels,
         registration_region: raw.registration_region == null ? null : project(row(raw.registration_region), KEEP_COLUMNS.registration_region),
         age_checks: simple("age_checks"), erasure_requests: simple("erasure_requests"),
-        kept_questions: simple("threat_reports"),
         // V4 account memory (0131). A debate is named by its reference, as debates.json names it; a visit's items are
         // the [{item, word}] pairs 0131's reader writes.
         reading_level: raw.page_reading_level == null ? null : project(row(raw.page_reading_level), KEEP_COLUMNS.page_reading_level),
@@ -619,7 +617,7 @@ export async function collectSnapshot(input: {
         reports_you_made: reportsYouMade,
         moderation_notices: moderationNotices,
         earlier_moderation_notices: earlierNotices,
-        // V4 start step, Task 39e: the questions not started yet (never `kept_questions`, which the threat reports use).
+        // V4 start step, Task 39e: the questions not started yet.
         questions_not_started: await collectQuestionsNotStarted(raw, claim, decrypt),
       },
       security: {

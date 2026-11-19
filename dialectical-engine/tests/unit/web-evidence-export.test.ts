@@ -212,11 +212,11 @@ describe("web sources, investigations and the reserve in the data export", () =>
     await expect(harness(raw).collect()).rejects.toMatchObject({ code: "DATA_EXPORT_SOURCE_FAILED" });
   });
 
-  it("reads the three sections through 0132's and 0133's readers, beside the snapshot, the kept questions and the page memory", async () => {
+  it("reads the three sections through 0132's and 0133's readers, beside the snapshot and the page memory", async () => {
     const seen: string[] = [];
     const pool = { query: async (sql: string) => {
       seen.push(sql);
-      return { rows: [{ snapshot: { user: {} }, threat_reports: [], page_memory: { page_reading_level: null, debate_visits: [], dig_links: [] },
+      return { rows: [{ snapshot: { user: {} }, page_memory: { page_reading_level: null, debate_visits: [], dig_links: [] },
         web_evidence: [{ run_id: RUN, web: {} }], investigations: { investigations: [{ investigation_id: INVESTIGATION }], reserve_events: [] } }] };
     } };
     const raw = await new PostgresDataExportSource(pool as never).readRaw("export", "worker");
@@ -224,7 +224,7 @@ describe("web sources, investigations and the reserve in the data export", () =>
     expect(seen[0]).toContain("identity.read_data_export_investigations($1,$2) investigations");
     expect(raw).toMatchObject({ web_evidence: [{ run_id: RUN, web: {} }], investigations: [{ investigation_id: INVESTIGATION }], reserve_events: [] });
     // A reader answering without a member leaves the section missing, so the snapshot refuses the export.
-    const bare = { query: async () => ({ rows: [{ snapshot: {}, threat_reports: [], page_memory: {}, web_evidence: [], investigations: {} }] }) };
+    const bare = { query: async () => ({ rows: [{ snapshot: {}, page_memory: {}, web_evidence: [], investigations: {} }] }) };
     const partial = await new PostgresDataExportSource(bare as never).readRaw("export", "worker");
     expect(Object.hasOwn(partial, "investigations")).toBe(false);
     expect(Object.hasOwn(partial, "reserve_events")).toBe(false);
@@ -232,7 +232,7 @@ describe("web sources, investigations and the reserve in the data export", () =>
 
   it("names the new records and the page-text choice in the README", () => {
     const readme = renderReadme();
-    expect(readme).toContain("account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, "
+    expect(readme).toContain("account.json — account, channels, region, age checks, erasure requests, reading level, "
       + "debate visits, dig links, investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, the reports you made with the Report button with how each was closed and which emails we sent you about it, and your moderation notices: each statement of reasons in full, and the earlier notices we emailed.");
     expect(readme).toContain("debates.json — owned debates, their content status, answer versions, each debate's model rotation record "
       + "and its web sources: searches, pages found, readers' lines, short quotes and pages added to researched.");

@@ -93,7 +93,7 @@ export type ExportSnapshot = Readonly<{
   locale: string;
   requestedAt: Date;
   generatedAt: Date;
-  account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[]; kept_questions: Row[];
+  account: Readonly<{ account: Row; channels: Row[]; registration_region: Row | null; age_checks: Row[]; erasure_requests: Row[];
     reading_level: Row | null; debate_visits: Row[]; dig_links: Row[]; investigations: Row[]; reserve_events: Row[]; question_readings: Row[]; before_start_readings: Row[]; reports_you_made: Row[];
     /** 0157: the statements of reasons, and 0156's earlier notices. */
     moderation_notices: Row[]; earlier_moderation_notices: Row[];

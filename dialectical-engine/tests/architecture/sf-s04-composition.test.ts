@@ -11,17 +11,11 @@ describe("S04 production composition", () => {
     expect(source).toContain("questionCheck,");
   });
 
-  it("starts both threat-report workers and holds email before destroying the user key", () => {
+  // 2026-11-19: the dormant threat reports were removed; nothing alerts, erases or holds an email for them.
+  it("starts no threat-report worker and holds no email before destroying the user key", () => {
     const source = main();
-    expect(source).toContain("startThreatReportAlerts({");
-    expect(source).toContain("startThreatReportErasure({");
-    expect(source).toContain("beforeKeyDestruction: threatReportEmailHold(");
-  });
-
-  it("resolves queued alert staff ids through an active capability holder", () => {
-    const source = main();
-    expect(source).toContain('const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");');
-    expect(source).toMatch(/startThreatReportAlerts\(\{[\s\S]*?readRecipientEmail: readThreatReportStaffEmail/u);
+    expect(source).not.toMatch(/startThreatReport|threatReportEmail|ThreatReportRepository/u);
+    expect(source).not.toContain("beforeKeyDestruction:");
   });
 
   // Property (V, 2026-10-28): the subjects file is read at boot, so a bad file stops the API; nothing keeps a question.

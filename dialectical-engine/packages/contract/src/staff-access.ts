@@ -153,7 +153,6 @@ export const StaffActionIntentSchema = z.discriminatedUnion("action", [
     z.object({ action: z.literal("CREDENTIAL_REGISTER"), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_APPROVE"), review_ref: z.uuid(), operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("PUBLICATION_REVIEW_REFUSE"), review_ref: z.uuid(), reason: z.string().trim().min(1).max(500), operation_id: z.uuid() }).strict(),
-    z.object({ action: z.literal("THREAT_REPORT_DECIDE"), target_report_ref: z.uuid(), decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema, operation_id: z.uuid() }).strict(),
     z.object({ action: z.literal("TEAM_LIMIT_SET"), ...TeamLimitSetShape }).strict(),
     z.object({ action: z.literal("TEAM_LIMIT_PARTNER_GRANT"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
     z.object({ action: z.literal("TEAM_LIMIT_PARTNER_REVOKE"), target_staff_id: z.uuid(), ...ActionMutationShape }).strict(),
@@ -296,19 +295,6 @@ export const ThreatReportAuditEventSchema = z.object({
 export const StaffAuditPageSchema = z.object({
     events: z.array(z.union([StaffAuditEventSchema, PublicationReviewAuditEventSchema, ThreatReportAuditEventSchema])).max(100), next_cursor: CursorSchema.nullable(), order: z.literal("RECORDED_AT_ID_ASC")
 }).strict();
-const ThreatReportBaseSchema = z.object({
-    report_ref: z.uuid(), kept_at: z.iso.datetime(), decision: z.enum(["UNREAD", "REPORTED", "NOT_REPORTED"]),
-    decided_at: z.iso.datetime().nullable()
-}).strict();
-export const ThreatReportListSchema = z.object({ reports: z.array(ThreatReportBaseSchema) }).strict();
-export const ThreatReportSchema = ThreatReportBaseSchema.extend({
-    question: z.string(), account: z.object({ email: z.email(), user_id: z.uuid().nullable() }).strict()
-}).strict();
-export const ThreatReportSummarySchema = z.object({ unread: z.number().int().nonnegative() }).strict();
-export const ThreatReportDecisionRequestSchema = z.object({
-    decision: z.enum(["REPORTED", "NOT_REPORTED"]), expected_revision: RevisionSchema,
-    operation_id: z.uuid(), proof: OpaqueHandleSchema
-}).strict();
 export type StaffActionIntent = z.infer<typeof StaffActionIntentSchema>;
 export type StaffPrerequisiteStepUpRequest = z.infer<typeof StaffPrerequisiteStepUpRequestSchema>;
 export type StaffPrerequisiteResponse = z.infer<typeof StaffPrerequisiteResponseSchema>;
@@ -331,8 +317,6 @@ export const staffContractInventory = Object.freeze({
         "PATCH /v1/admin/team/{staffId}/grants", "POST /v1/admin/team/{staffId}/disable", "GET /v1/admin/audit",
         "GET /v1/admin/publication-reviews", "GET /v1/admin/publication-reviews/{reviewRef}",
         "POST /v1/admin/publication-reviews/{reviewRef}/approve", "POST /v1/admin/publication-reviews/{reviewRef}/refuse",
-        "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
-        "GET /v1/admin/threat-reports/{reportRef}", "POST /v1/admin/threat-reports/{reportRef}/decision",
         "GET /v1/admin/team-limit", "POST /v1/admin/team-limit", "POST /v1/admin/team-limit/partner/{staffId}",
         "DELETE /v1/admin/team-limit/partner/{staffId}", "POST /v1/admin/team-limit/practice",
         "GET /v1/admin/public-review", "GET /v1/admin/public-review/{id}", "POST /v1/admin/public-review/{id}/hide", "POST /v1/admin/public-review/{id}/step",
@@ -349,7 +333,6 @@ export const staffContractInventory = Object.freeze({
         StaffInviteRequestSchema, StaffInviteResponseSchema, StaffInvitationOptionsRequestSchema, StaffInvitationOptionsResponseSchema, StaffInvitationVerifyRequestSchema,
         StaffInvitationAcceptRequestSchema, StaffTargetParamsSchema, StaffGrantRequestSchema, StaffDisableModeSchema, StaffDisableRequestSchema,
         StaffPageQuerySchema, StaffTeamQuerySchema, StaffAuditQuerySchema, StaffTeamMemberSchema, StaffTeamPageSchema, StaffAuditEventSchema, ThreatReportAuditEventSchema, StaffAuditPageSchema,
-        ThreatReportListSchema, ThreatReportSchema, ThreatReportSummarySchema, ThreatReportDecisionRequestSchema,
         TeamLimitSetRequestSchema, TeamLimitPartnerRequestSchema, TeamPracticeRequestSchema, TeamLimitPageSchema,
         PublicReviewHideRequestSchema, PublicReviewStepRequestSchema, PublicReviewPageSchema, PublicReviewListSchema,
         PublicFlagQueueSchema, PublicFlagDismissRequestSchema

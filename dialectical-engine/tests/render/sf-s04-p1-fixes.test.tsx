@@ -4,19 +4,16 @@ import { describe, expect, it, vi } from "vitest";
 import owner from "../../packages/mail-templates/messages/en/owner.json";
 
 describe("S04 review pass 1 contracts", () => {
-  it("renders V's selected subject and waiting sentence in the staff alert mail", () => {
-    // Property: the owner alert uses the two words V selected at DONE Q1.
-    expect(owner["owner.threatReport.subject"]).toBe("A threat report is waiting");
-    expect(owner["owner.threatReport.waiting"]).toBe("A question our automatic check refused has been kept as a threat report and is waiting to be read.");
+  // 2026-11-19: the threat reports were removed, with their staff alert mail and their console's styles.
+  it("has no staff alert mail for threat reports", () => {
+    expect(Object.keys(owner).filter(key => key.startsWith("owner.threatReport."))).toEqual([]);
   });
 
-  it("keeps S04 console CSS before the S02 closing marker", () => {
-    // Property: S02's closed block remains the stylesheet's end marker.
+  it("has no S04 console CSS, and S02's closed block remains the stylesheet's end marker", () => {
     const css = readFileSync(join(process.cwd(), "apps/ui/app/globals.css"), "utf8");
-    const s04 = css.indexOf("/* S04 threat reports staff console;");
+    expect(css).not.toMatch(/threatReports|S04 threat reports staff console/u);
     const s02End = css.indexOf("/* === end consent-ui S02 === */");
-    expect(s04).toBeGreaterThanOrEqual(0);
-    expect(s04).toBeLessThan(s02End);
+    expect(s02End).toBeGreaterThan(0);
     expect(css.slice(s02End + "/* === end consent-ui S02 === */".length).trim()).toBe("");
   });
 

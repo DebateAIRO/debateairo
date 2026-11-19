@@ -2,10 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import * as budget from "../../packages/budget/src/index.js";
 import * as db from "../../packages/db/src/index.js";
-import { encrypt } from "@debateai/crypto";
+import { decrypt, encrypt } from "@debateai/crypto";
 import { SUPPORT_RELAY_PROVIDER_REF } from "../../apps/api/src/support/model.js";
 import { createQuestionCheckTransport } from "../../apps/api/src/question-check/transport.js";
-import { threatReportEmailReader } from "../../apps/api/src/staff/threat-reports.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 let database: TestDatabase;
@@ -107,9 +106,8 @@ describe("0128 threat report database boundary", () => {
     expect(budget).toHaveProperty("recordQuestionCheckSpend", expect.any(Function));
   });
 
-  it("exports the threat report repository from the database package", () => {
-    // Property: the API and worker use the database's named function adapter.
-    expect(db).toHaveProperty("PostgresThreatReportRepository", expect.any(Function));
+  it("no longer exports the threat report repository from the database package (2026-11-19: the feature was removed)", () => {
+    expect(db).not.toHaveProperty("PostgresThreatReportRepository");
   });
 });
 
@@ -219,8 +217,12 @@ describe("0128 applied database", () => {
     // Property: the keep writer accepts the absent signed-in account and the audited holder read preserves that absence.
     // Mutant: require an account in keep_threat_report; changing alert order is a neighbour.
     const ref = await keep("Signed-out threat question", null);
-    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
-    const repository = new db.PostgresThreatReportRepository(runtime as never);
+    const repository = {
+      peekAccount: async (context: unknown, token: string, ref: string) => (await asRole("debateai_runtime",
+        "SELECT * FROM staff.peek_threat_report_account($1::jsonb,$2::text,$3::uuid)", [context, token, ref]))[0],
+      read: async (context: unknown, token: string, ref: string) => (await asRole("debateai_runtime",
+        "SELECT * FROM staff.read_threat_report($1::jsonb,$2::text,$3::uuid)", [context, token, ref]))[0]
+    };
     await expect(repository.peekAccount(holder.context, holder.tokenHash, ref)).resolves.toEqual({
       account_user_id: null, has_held_email: false
     });
@@ -236,8 +238,12 @@ describe("0128 applied database", () => {
     // Property: the API can resolve the email before the audited question read.
     // Mutant: call the audited read during preflight; changing the decision action is a neighbour.
     const ref = await keep("Private preflight question", noHolder.userId);
-    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
-    const repository = new db.PostgresThreatReportRepository(runtime as never);
+    const repository = {
+      peekAccount: async (context: unknown, token: string, ref: string) => (await asRole("debateai_runtime",
+        "SELECT * FROM staff.peek_threat_report_account($1::jsonb,$2::text,$3::uuid)", [context, token, ref]))[0],
+      read: async (context: unknown, token: string, ref: string) => (await asRole("debateai_runtime",
+        "SELECT * FROM staff.read_threat_report($1::jsonb,$2::text,$3::uuid)", [context, token, ref]))[0]
+    };
     await expect(repository.peekAccount(owner.context, owner.tokenHash, ref)).resolves.toEqual({
       account_user_id: noHolder.userId, has_held_email: false
     });
@@ -246,7 +252,7 @@ describe("0128 applied database", () => {
     expect((await database.pool.query("SELECT count(*)::int n FROM staff.threat_report_event WHERE report_ref=$1 AND action='READ'", [ref])).rows[0].n).toBe(1);
     const own = await keep("Private own preflight", holder.userId);
     await expect(repository.peekAccount(holder.context, holder.tokenHash, own))
-      .rejects.toMatchObject({ code: "THREAT_REPORT_OWN" });
+      .rejects.toMatchObject({ message: "THREAT_REPORT_OWN" });
   });
 
   it("marks REPORTED once and refuses a second decision", async () => {
@@ -373,8 +379,12 @@ describe("0128 applied database", () => {
       [question, asker.userId, email])).rows[0]!.ref;
     expect((await database.pool.query("SELECT account_user_id,held_email FROM staff.threat_report WHERE report_ref=$1", [ref])).rows[0])
       .toEqual({ account_user_id: null, held_email: email });
-    const runtime = { query: async (sql: string, values?: unknown[]) => ({ rows: await asRole("debateai_runtime", sql, values) }) };
-    const repository = new db.PostgresThreatReportRepository(runtime as never);
+    const repository = {
+      peekAccount: async (context: unknown, token: string, ref: string) => (await asRole("debateai_runtime",
+        "SELECT * FROM staff.peek_threat_report_account($1::jsonb,$2::text,$3::uuid)", [context, token, ref]))[0],
+      read: async (context: unknown, token: string, ref: string) => (await asRole("debateai_runtime",
+        "SELECT * FROM staff.read_threat_report($1::jsonb,$2::text,$3::uuid)", [context, token, ref]))[0]
+    };
     await expect(repository.peekAccount(owner.context, owner.tokenHash, ref)).resolves.toEqual({
       account_user_id: null, has_held_email: true
     });
@@ -472,7 +482,14 @@ describe("0128 applied database", () => {
       await system.query("BEGIN");
       await system.query("CREATE ROLE threat_report_x27_api_system NOLOGIN IN ROLE debateai_billing_runtime, debateai_rls_all_accounts");
       await system.query("SET LOCAL ROLE threat_report_x27_api_system");
-      const reader = threatReportEmailReader(system as never, { load: async () => Buffer.from(key) } as never, "staff");
+      // The API's reader was removed with the alert loop (2026-11-19); 0128's resolver itself stays until the schema goes.
+      const reader = async (staffId: string) => {
+        const userId = (await system.query<{ user_id: string | null }>(
+          "SELECT staff.threat_report_recipient_user($1::uuid) user_id", [staffId])).rows[0]?.user_id ?? null;
+        if (userId === null) return null;
+        const row = (await system.query('SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId])).rows[0];
+        return row === undefined ? null : decrypt(Buffer.from(key), row.email_ciphertext, [...aad]).toString("utf8");
+      };
       expect(recipient.staffId).not.toBe(recipient.userId);
       await expect(reader(recipient.staffId)).resolves.toBe(email);
       await database.pool.query("UPDATE staff.subject SET capabilities=ARRAY['TEAM_READ']::text[] WHERE staff_id=$1", [recipient.staffId]);

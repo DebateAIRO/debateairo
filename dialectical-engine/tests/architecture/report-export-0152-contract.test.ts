@@ -164,8 +164,9 @@ describe("0152: a reporter's own reports in their export, and what the AI checks
       `EXECUTE ON FUNCTION ${EXPORT_READER} TO ${WORKER}`
     ]);
     expect(read("packages/db/src/data-export.ts")).toContain(`"${EXPORT_READER}"`);
-    // V4 start step, Task 39e: 0162's export reader is the twenty-fifth worker function (after 0157's moderation reader).
-    expect(read("packages/db/src/data-export.ts")).toContain("worker.worker_count !== 25");
+    // V4 start step, Task 39e: 0162's export reader was the twenty-fifth worker function (after 0157's moderation reader);
+    // twenty-four since 0128's threat-report reader left the list with the threat reports (2026-11-19).
+    expect(read("packages/db/src/data-export.ts")).toContain("worker.worker_count !== 24");
   });
 
   it("discloses its grants, lists its loader, and is documented truthfully as expand", () => {

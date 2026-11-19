@@ -1683,7 +1683,7 @@ export const authorizationPolicyInventory = Object.freeze([
   staffCapability?: StaffCapability;
   resource: "identity" | "session-self" | "session-owner" | "run-owner" | "public-debate" |
     "deployment" | "evaluator" | "support-session" | "support-message" | "support-case" |
-    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit" | "staff-publication-review" | "staff-threat-report";
+    "support-status" | "geo" | "billing" | "staff-self" | "staff-team" | "staff-invitation" | "owner-possession" | "staff-audit" | "staff-publication-review";
   action: string;
 }>[]);
 
@@ -3046,8 +3046,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
           await options.staffAccess.assertCurrent(staffAuth);
           if (request.routeOptions.config.staffCapability !== undefined) await options.staffAccess.requireCapability(staffAuth, request.routeOptions.config.staffCapability);
         }
-        catch { return reply.status(403).send({ error: request.routeOptions.url?.startsWith("/v1/admin/threat-reports")
-          ? "STAFF_REQUEST_REFUSED" : "STAFF_AUTHORITY_INVALID" }); }
+        catch { return reply.status(403).send({ error: "STAFF_AUTHORITY_INVALID" }); }
         if (MUTATING_METHODS.has(request.method)) {
           const csrf = exactStaffCsrfPair(request.headers[STAFF_CSRF_HEADER], exactStaffCookie(rawCookie, STAFF_CSRF_COOKIE_NAME));
           if (csrf === null || !await options.staffAccess.verifyCsrf(staffAuth, csrf)) return reply.status(403).send({ error: "CSRF_VALIDATION_FAILED" });

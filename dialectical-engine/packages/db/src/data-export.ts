@@ -119,7 +119,6 @@ const WORKER_FUNCTIONS = [
   "identity.claim_data_export(uuid,integer)",
   "identity.renew_data_export_lease(uuid,uuid,integer)",
   "identity.read_data_export_snapshot_v2(uuid,uuid)",
-  "identity.read_data_export_threat_reports(uuid,uuid)",
   // V4 account memory (migration 0131): the reading level, debate visits and dig links.
   "identity.read_data_export_page_memory(uuid,uuid)",
   // The Perplexity plan's stores (0132, 0133): a debate's web evidence, the investigations and the reserve events
@@ -181,7 +180,7 @@ export async function assertDataExportDatabaseRoles(requestPool: Pool, workerPoo
     const [request, worker] = await Promise.all([roleWitness(requestPool), roleWitness(workerPool)]);
     if (request === undefined || worker === undefined || request.principal === worker.principal
       || !request.authorization_member || request.worker_member || request.request_count !== 4 || request.worker_count !== 0
-      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 25
+      || !worker.worker_member || worker.authorization_member || worker.request_count !== 0 || worker.worker_count !== 24
       || request.privileged || worker.privileged) {
       throw new TypeError("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
     }
@@ -209,9 +208,9 @@ export class PostgresDataExportSource implements DataExportSourcePort {
   constructor(private readonly pool: Pool) {}
 
   async readRaw(exportId: string, workerId: string): Promise<RawExportRows> {
-    const row = (await this.pool.query<{ snapshot: RawExportRows; threat_reports: unknown; page_memory: Record<string, unknown> | null;
+    const row = (await this.pool.query<{ snapshot: RawExportRows; page_memory: Record<string, unknown> | null;
       web_evidence: unknown; investigations: Record<string, unknown> | null; passage_retention: Readonly<{ web_shown_quotes?: unknown }> | null; ask_clarify_calls: unknown; pre_start_calls: unknown; public_flags: unknown; moderation: unknown; saved_questions: unknown }>(
-      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, identity.read_data_export_threat_reports($1,$2) threat_reports, "
+      "SELECT identity.read_data_export_snapshot_v2($1,$2) snapshot, "
         + "identity.read_data_export_page_memory($1,$2) page_memory, identity.read_data_export_web_evidence($1,$2) web_evidence, "
         + "identity.read_data_export_investigations($1,$2) investigations, identity.read_data_export_passage_retention($1,$2) passage_retention, identity.read_data_export_ask_clarify($1,$2) ask_clarify_calls, "
         + "identity.read_data_export_pre_start($1,$2) pre_start_calls, identity.read_data_export_public_flags($1,$2) public_flags, identity.read_data_export_moderation($1,$2) moderation, "
@@ -223,7 +222,7 @@ export class PostgresDataExportSource implements DataExportSourcePort {
     const memory = row.page_memory ?? {};
     const investigations = row.investigations ?? {};
     return {
-      ...row.snapshot, threat_reports: row.threat_reports, ask_clarify_calls: row.ask_clarify_calls, pre_start_calls: row.pre_start_calls, public_flags: row.public_flags, moderation: row.moderation,
+      ...row.snapshot, ask_clarify_calls: row.ask_clarify_calls, pre_start_calls: row.pre_start_calls, public_flags: row.public_flags, moderation: row.moderation,
       saved_questions: row.saved_questions,
       ...("page_reading_level" in memory ? { page_reading_level: memory.page_reading_level } : {}),
       ...("debate_visits" in memory ? { debate_visits: memory.debate_visits } : {}),
