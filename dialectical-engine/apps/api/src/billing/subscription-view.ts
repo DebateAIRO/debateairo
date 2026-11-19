@@ -46,8 +46,8 @@ function served(input: WindowInput): boolean {
 
 /**
  * The withdrawal deadline while the right is still open (ACTIVE, or SUSPENDED by a payment dispute, a withdrawal
- * country, before it closes, and the plan paid in a payment system this API serves (spec §2.5.4): its refund could
- * not be sent to another one); else null. The right lasts the whole period, so a plan paused by a dispute keeps its
+ * country, before it closes, and the plan paid in a payment system this API serves: its refund could not be sent to
+ * another one); else null. The right lasts the whole period, so a plan paused by a dispute keeps its
  * window and Settings shows the e-mail route; `recordWithdrawal` itself still takes only an ACTIVE plan.
  */
 function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {

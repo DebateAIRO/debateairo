@@ -55,7 +55,7 @@ export type BillingRefusalCode =
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
-   * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
+   * The withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
    * Saturday, a Sunday or a Romanian public holiday moves to the next working day), or a tax country outside
    * `withdrawalCountries` (409).
    */
