@@ -1281,6 +1281,22 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
     expect(sb3.some(line => line.startsWith('[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: '))).toBe(true);
   });
 
+  it('for a plan named in LIMITS, SB3 says whether an open subscription holds it, and prints no count', () => {
+    const read = sb3.findIndex(line => line.startsWith('  HOLD=$(psqlq "SELECT DISTINCT e.plan_id FROM billing.subscription_event e JOIN billing.subscription_latest_v s ON s.subscription_id = e.subscription_id WHERE s.kind NOT IN (\'ENDED\',\'WITHDRAWN\',\'ERASURE_STOPPED\')") || { echo "SB3_NOT_DONE: '));
+    expect(sb3[read - 1]).toBe('if [ -n "$LIMITS" ]; then');
+    expect(sb3[read + 2]).toBe('fi');
+    // Before the tool is asked, so the lines are there when the step then stops, and nothing is written yet.
+    expect(read).toBeLessThan(sb3.indexOf('TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs'));
+    const lines = (limits: string, held: string[], fail = false) => bash(['set -euo pipefail', `LIMITS='${limits}'`,
+      `psqlq() { ${fail ? 'return 1' : `printf '%s\\n' ${held.map(plan => `'${plan}'`).join(' ') || "''"}`}; }`, ...sb3.slice(read - 1, read + 3), 'echo READ']).split('\n');
+    expect(lines('PLUS PRO FREE', ['PLUS', 'MAX'])).toEqual(['PLUS: HELD by at least one open subscription', 'PRO: nobody holds it now', 'FREE: HELD by everyone without a paid plan', 'READ']);
+    expect(lines('MAX', [])).toEqual(['MAX: nobody holds it now', 'READ']);
+    // Nothing named: the database is not read at all.
+    expect(lines('', [], true)).toEqual(['READ']);
+    // A read that fails stops the step by name.
+    expect(lines('PLUS', [], true)[0]).toMatch(/^SB3_NOT_DONE: the open subscriptions could not be read/);
+  });
+
   it('no line of SB3, SB3b or SB3c prints a number of the file or of the plan', () => {
     for (const [step, lines] of [['SB3', sb3], ['SB3B', sb3b], ['SB3C', sb3c]] as const) {
       for (const line of lines.filter(code)) {
@@ -1529,7 +1545,10 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       '**Nothing changes (most uploads).** Leave `NEWNUM` and `LIMITS` empty.',
       'It never prints an amount',
       'A subscriber\'s renewals keep charging the price recorded for that subscriber when they bought (Terms section 12), after a rise and after a cut alike.',
-      '**A known gap: an upgrade shown before the switch and paid after it.**',
+      '**An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan is renewed at depends on the release that showed it.',
+      '**an upload whose old release is such an older one must not change a plan\'s prices**: no `prices` line may print.',
+      '**If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**',
+      'For each plan named there SB3 prints `HELD` or `nobody holds it now`',
       'has no way yet to apply a new limit only from a person\'s next month',
       'The day and week caps are counted again over the days already used this month, with the new, lower cap.',
       'A refund on cancelling or withdrawing is measured against the new credit',
@@ -1540,11 +1559,16 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       '**A release older than this step.**'
     ]) expect(flat, text).toContain(text);
     const back = sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ');
-    expect(back).toContain('**The numbers (SB3\'s `NEWNUM`).** A way back that makes the old release current again (WB2) also brings the numbers before back');
+    expect(back).toContain('A way back that makes the old release current again (WB2) also brings the numbers before back');
     expect(back).toContain('**When the upload had raised a plan\'s limits, WB2 lowers them again**');
     expect(back).toContain('put the numbers before into the owner\'s file with SB3c');
     // The yes names a number change and, for a named plan, that nobody holds it or when its people were told.
     expect(sectionOf(guide, '### SB6. The owner\'s fresh yes').replace(/\s+/g, ' ')).toContain('only when SB3\'s `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told');
+    // The drained path never runs SB6: its own yes names the same, and its numbers have their own way back (no WB2 after DR6).
+    const drainedFlat = drained.replace(/\s+/g, ' ');
+    expect(drainedFlat).toContain('When SB3\'s `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told, as in SB6.');
+    expect(drainedFlat).toContain('**The numbers (SB3\'s `NEWNUM`) on the drained path.** DR6 marks the old release retired, so there is no switch back to it (no WB2) once the upload is done.');
+    expect(back).toContain('After a drained upload there is no WB2');
     // The order table names the two new steps between SB3 and SB4.
     expect(sideBySide).toMatch(/\n\| SB3 \|[^\n]*\n\| SB3b \|[^\n]*\n\| SB3c \|[^\n]*\n\| SB4 \|/);
   });

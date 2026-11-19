@@ -4478,6 +4478,11 @@ if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-p
 [ "$(jq -r .approval.publication.registerVersion "$FROM")" = "$AV" ] && [ "$(jq -r .approval.snapshotSha256 "$CP")" = "$(jq -r .approval.publication.snapshotSha256 "$FROM")" ] || { echo "SB3_NOT_DONE: no kept verify and publish plan names the active settings version $AV ($FROM): ask"; exit 1; }
 # The numbers: the live version's, with exactly the inputs NEWNUM names taken from the file. Each line names an input, a
 # plan and a member and says SAME, or DIFFERENT with higher or lower; no amount is printed. Nothing is written on a stop.
+# Who holds a plan named in LIMITS: any open subscription whose history names it (a scheduled change counts for both plans).
+if [ -n "$LIMITS" ]; then
+  HOLD=$(psqlq "SELECT DISTINCT e.plan_id FROM billing.subscription_event e JOIN billing.subscription_latest_v s ON s.subscription_id = e.subscription_id WHERE s.kind NOT IN ('ENDED','WITHDRAWN','ERASURE_STOPPED')") || { echo "SB3_NOT_DONE: the open subscriptions could not be read (nothing was written): ask"; exit 1; }
+  for P in $LIMITS; do if [ "$P" = FREE ]; then echo "FREE: HELD by everyone without a paid plan"; elif grep -qxF "$P" <<<"$HOLD"; then echo "$P: HELD by at least one open subscription"; else echo "$P: nobody holds it now"; fi; done
+fi
 TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs
 [ -f "$TOOL" ] || { echo "SB3_NOT_DONE: $TOOL is missing: the new release is not staged (A2 to A7 first)"; exit 1; }
 if grep -qF "'site-inputs':" "$TOOL"; then
@@ -4527,7 +4532,9 @@ compares the two, input by input, and prints one line each: `SAME`, or `DIFFEREN
   below), then name each changed input in `NEWNUM`, for example `NEWNUM='billingPlans'` or
   `NEWNUM='dailyCeilingMicros abuseLimits'`. The new version gets the file's value for the named inputs and the live
   value for every other one. Do this before SB2: the practice runs with the file's numbers, so the file must already
-  hold what SB3 will publish.
+  hold what SB3 will publish. **If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**: the
+  practice is the only start of the new code on those numbers before the real one, and on the drained path the real
+  one is DR6, with the site down.
 - **The list must match what differs.** An input that differs and is not named stops the step
   (`SITE_CHANGE_NOT_NAMED`): a number is never published by accident, and never left out without a word. An input that
   is named and does not differ stops it too (`SITE_CHANGE_NAMED_BUT_SAME`). Nothing was written; fix the list or the
@@ -4547,11 +4554,15 @@ plan's prices or limits; the tool cannot know who holds which plan.
   tool, with the 30 days' notice the Terms promise.
 - A first purchase is charged, and then renewed, at the price the person was shown. Shown before the switch and paid
   after it: still the old price.
-- **A known gap: an upgrade shown before the switch and paid after it.** The person pays the amount they were shown, but
-  the plan is then renewed at the new price, after the short renewal notice instead of the Terms' 30 days. Until the
-  product records the shown price for an upgrade, publish a price change at a quiet hour.
+- **An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan
+  is renewed at depends on the release that showed it. A release that saves an upgrade's monthly price with its quote
+  renews at that price. An older release does not: the plan is then renewed at the new price, after the short renewal
+  notice instead of the Terms' 30 days. So **an upload whose old release is such an older one must not change a
+  plan's prices**: no `prices` line may print. That includes the first upload that carries the fix, because the
+  quotes still open at the switch were made by the old release. When unsure, treat the old release as an older one.
 - A plan change by an existing subscriber uses the new list. After a rise, a move to a lower plan is recorded at that
-  plan's new price, which can be more than they pay today (the page shows the amount). After a cut, an upgrade is
+  plan's new price, which can be more than they pay today. The page shows the amount, but a downgrade panel left open
+  across the switch still shows the old one. After a cut, an upgrade is
   refused while the higher plan's new price is not above what the person pays today.
 - A subscription keeps the currency it was bought in.
 
@@ -4571,7 +4582,10 @@ already on that plan, in the middle of a month they paid for:
 
 So: **do not lower a plan's limits while anyone holds that plan**, unless that is decided with eyes open. The step
 stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named in `LIMITS`, for example `LIMITS='PLUS'`; naming it is the
-owner's statement that nobody holds the plan, or that the people on it were told and what follows is accepted.
+owner's statement that nobody holds the plan, or that the people on it were told and what follows is accepted. For
+each plan named there SB3 prints `HELD` or `nobody holds it now`, read from the subscriptions that are open (test
+purchases count; Free is held by everyone without a paid plan). It prints no count, and it does not stop the step:
+the decision stays the owner's.
 `LIMITS` must name exactly those plans (`SITE_LIMITS_NAMED_BUT_SAME` otherwise). The closing reserve works across
 plans: every paid plan's closing is admitted against the smallest paid reserve, so when that smallest one moves, every
 paid plan must be named.
@@ -4628,7 +4642,8 @@ before SB4, as the gate README says; one that narrows waits until the old releas
 
 ### SB3b. SB3 once more (its plan, proposal and numbers record set aside)
 
-Only before SB6's yes, and never after SB8 or SB9: nothing may have been applied or published from this plan. Use it
+Only before SB6's yes, and never after SB8 or SB9 (on the drained path: before the yes before DR2, and never after
+DR4 or DR5): nothing may have been applied or published from this plan. Use it
 when SB3 stopped after it wrote a file, or when the numbers to publish changed after SB3. The files move into `$S`;
 nothing is deleted. Then run SB3 again; its new proposal has a new `deltaSha256`. After SB8 or SB9 it stops and says
 ask, also when SB9 itself refused and asked for a new plan: what was applied or published is read first, by hand.
@@ -5385,8 +5400,9 @@ that reverts by itself (`SWITCH_REVERTED`) puts back the version that was active
 site version it activates nothing. WB1 and WB4 activate nothing (WB4 never writes the switch). Afterwards
 `lc settings-version.mjs status` prints the pointer.
 
-**The numbers (SB3's `NEWNUM`).** A way back that makes the old release current again (WB2) also brings the numbers
-before back, and nothing is typed: the plans, the day's ceiling, the room-read budget and the abuse limits are sealed
+**The numbers (SB3's `NEWNUM`).** After a drained upload there is no WB2: see "The numbers on the drained path" in
+"Drained upload on the template layout". A way back that makes the old release current again (WB2) also brings the
+numbers before back, and nothing is typed: the plans, the day's ceiling, the room-read budget and the abuse limits are sealed
 in the old release's own site version, and the per-debate ceiling comes with the settings version WB2 activates.
 Purchases made while the new numbers were live keep the price they were bought at. **When the upload had raised a
 plan's limits, WB2 lowers them again**, for everyone on that plan, with everything "What a change does to the people
@@ -5516,6 +5532,9 @@ number (and which one is not expand-only), the publish with its delta hash, and 
 When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
 Register row (§5), as in SB6.
+When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
+plans, and either that nobody holds them or the date the people on them were told, as in SB6. On this path SB3b (SB3
+once more) is for before that yes, and never after DR4 or DR5.
 
 | Step | What | The site | The way back from here |
 |---|---|---|---|
@@ -5767,6 +5786,13 @@ for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --
 [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --since "@$T1" -o cat --no-pager | grep '^PREVIEW_RUNNER_STARTED ' | grep -c "\"releaseKey\":\"$OKEY\"" || true)" -ge 1 ] || { echo "RBD_A_NOT_DONE: the old runner did not start cleanly"; exit 1; }
 echo RBD_A_DONE
 ```
+
+**The numbers (SB3's `NEWNUM`) on the drained path.** DR6 marks the old release retired, so there is no switch back to
+it (no WB2) once the upload is done. Numbers published by a drained upload come back in one of two ways only: rbD-B,
+which puts back DR3's cold copy and with it the old numbers, and loses everything written since DR3 (sign-ups, debates,
+payments); or SB3c (`KEEP` = the inputs the upload named; `SRC` = the plan it compared with,
+`jq -r .from.path "$ART/site-inputs.json"`) and then the next upload, with those inputs named in its `NEWNUM`. The
+second way loses nothing and takes one more upload.
 
 **rbD-B: from DR4 on.** The new release stops (its runner only with nothing open), the cold copy's data and config
 folders come back (the current ones moved aside, never deleted), the lock goes back to its copy from SB1 (the new

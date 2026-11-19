@@ -461,14 +461,17 @@ SB3, "Editing the owner's file". Do it before SB2 (the practice runs with the fi
 **What a change does to people who already have a plan.** The release guide has the full list under SB3; in short:
 - A new **price** never touches a renewal: someone who already pays keeps the price they bought at (Terms section
   12), after a rise and after a cut. There is no tool yet that moves existing subscribers to a new price; when you want
-  that, it must be built, with the 30 days' notice the Terms promise. One known gap: an upgrade that was shown at the
-  old price and paid after the switch is renewed at the new price. Publish a price change at a quiet hour.
+  that, it must be built, with the 30 days' notice the Terms promise. One trap: an upgrade that was shown at the old
+  price by a release that does not yet save that price, and paid after the switch, is renewed at the new price. **So
+  do not change plan prices in this upload** (the release running today does not save it); change them in a later
+  one.
 - **Lower limits** (a plan's credit, its day and week caps, the finish room, the reserve, Free's gauges) hit everyone
   on that plan at once, in the month they already paid for: people over the new credit can ask nothing until their
   month ends, the day and week caps are counted again over the days already used, and a refund pays back less. The
   Terms ask for more than a notice (sections 12 and 14), and the product cannot yet apply a lower limit only from a
   person's next month. So do not lower a plan's limits while anyone holds that plan. Naming the plan in `LIMITS` is
-  your statement that nobody holds it, or that you decided this knowing the above.
+  your statement that nobody holds it, or that you decided this knowing the above. For each plan you name, SB3 prints
+  `HELD` or `nobody holds it now` (test purchases count; it prints no count).
 - **Higher limits** need no second naming. People get more from the switch on; someone who changed plan this month,
   from their next month.
 - The day's ceiling, `askRoomReads` and `abuseLimits` are site-wide; they reach everyone at the switch. A new
@@ -479,10 +482,18 @@ old value and SB3 says `DIFFERENT perRunCeilingMicros`. Do not name it. Run the 
 `KEEP='perRunCeilingMicros'`: it writes the live value into the file and keeps the file as it was in the upload's
 archive folder. SB3c is also how you undo an edit of a file that still reads as JSON.
 
-**Going back after new numbers were published.** While the release before is still there, the release guide's way
-back (WB2) brings its numbers back with it; if the upload had raised limits, that way back lowers them again. Later:
-SB3c with `SRC`, then the next upload with the inputs named in `NEWNUM`. The release guide says both under "The way
-back, side by side".
+**If the file changes after SB2** (by your edit or by SB3c), run SB2 again before SB3. The practice is the only start
+of the new code on those numbers before DR6, and at DR6 the site is down.
+
+**Going back after new numbers were published.** This runbook's upload is a drained one: at DR6 the release before is
+retired, so there is no switch back to it. The numbers come back in one of two ways only:
+- rbD-B, the drained upload's own way back: it puts back the database as it was at DR3, with the old numbers, and
+  loses everything written since (sign-ups, debates, payments);
+- SB3c with `SRC`, then the next upload with those inputs named in `NEWNUM`. It loses nothing and takes one more
+  upload.
+
+The release guide says both under "The numbers on the drained path". After a side-by-side upload there is a third
+way while the release before is still there (WB2); if that upload had raised limits, WB2 lowers them again.
 
 **A release older than this step** cannot publish changed numbers: its SB3 needs `NEWNUM` and `LIMITS` empty and the
 file equal to the live numbers.
@@ -526,12 +537,15 @@ What this release adds to that recipe:
 - **Your numbers (1.7), at SB3.** SB3 publishes a number from `hosted-billing-v1.json` only where you name it in
   `NEWNUM` (and a plan whose people get less in `LIMITS`), and stops when the file differs anywhere you did not name.
   SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
-  lists empty.
+  lists empty. Two rules for this upload: change no plan price in it (1.7, the trap with upgrades), and when `NEWNUM`
+  is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS` either that nobody holds it
+  or the date its people were told.
 - **The payment marks, if you want them before real payments** (1.1): PM1, then SB5b, MT1, PM2 and MT2 between DR1
   and DR2, as the release guide says.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
   `deploy/preview-auth-dev/v1/public-origins.mjs`, `startup-refusals.mjs`, `start-check-mail.mjs`,
-  `start-check-payments.mjs` and this `MAIN-SITE.md`; and changed ones: `environment.mjs`, `egress-proxy.mjs`,
+  `start-check-payments.mjs`, this `MAIN-SITE.md` and `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
+  your numbers, 1.7); and changed ones: `environment.mjs`, `egress-proxy.mjs`,
   `mail-handoff.mjs`, `launch-api.mjs`, `launch-runner.mjs`, `launch-ui.mjs`, `README.md`,
   `deploy/preview-lifecycle/v1/release-env.mjs`, `deploy/preview-release/v1/release-artifacts.mjs` and its `README.md`.
   Review them, then run SB4 again with `LIFE=yes`. On the drained path, DR5 runs SB10's operator folder swap by hand
