@@ -122,6 +122,6 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups and unfi
       expect(archive[code]![privacy314Sha256(code)]?.version, `${code}: the 3.14 text the swaps undo to`).toBe("3.14");
     }
     expect(Object.keys(PRIVACY_315_SWAPS).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
-    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "2.1" });
+    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
   });
 });
