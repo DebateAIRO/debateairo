@@ -245,6 +245,8 @@ export async function composePracticeAsk(input: Readonly<{
   budgetPorts: PreviewBudgetPorts;
   dispatcher: Dispatcher;
   teamUserIds: readonly string[];
+  /** What main.ts hands when PREVIEW_ASKS_OPEN_TO is set: any signed-in account may ask. Absent: the team rule. */
+  asksOpen?: true;
   /** Hosted only: the room's own decision pool (distinct from the others). Absent in local mode, where no room exists. */
   roomDecisionPool?: Pool;
   log?: (line: string) => void;
@@ -348,6 +350,7 @@ export async function composePracticeAsk(input: Readonly<{
     // Side-by-side spec §13, as main.ts: the site version's members by the one mapping (the defaults).
     ...practiceMembersOf(admissionSettingsOfVersion(siteAdmission)),
     previewTeamUserIds: [...input.teamUserIds],
+    ...(input.asksOpen === true ? { previewAsksOpen: true as const } : {}),
     strangerSampleRate: settings.strangerSampleRate,
     // Side-by-side spec §1, §3, as main.ts: every practice run is stamped, with the one key its runner claims under
     // (practice-runner-composition.ts reads the same settings.runner.RELEASE_KEY); a run stamped with another key would

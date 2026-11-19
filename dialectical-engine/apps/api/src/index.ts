@@ -1,4 +1,4 @@
-import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewTeamAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
+import { previewGateSocket, validatePreviewProviderTestConfig, previewLineUpOfConfig, previewPlanTierRosters, previewAskAdmits, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL, PREVIEW_ACCOUNT_RUNS_SQL, type PreviewProviderTestConfig } from "@debateai/providers";
 import { registerPasswordResetRoutes, passwordResetPolicyInventory } from "./password-reset-routes.js";
 import { registerEmailMfaRoutes, emailMfaPolicyInventory } from "./email-mfa-routes.js";
 import { AccountMemoryInputError, type AccountMemoryStore } from "./account-memory.js";
@@ -2004,6 +2004,8 @@ export interface ApiOptions {
    * preview. Read only with `previewProviderTestConfig`; absent there, nobody may.
    */
   readonly previewTeamUserIds?: readonly string[];
+  /** PREVIEW_ASKS_OPEN_TO set: on the preview any signed-in account may start debates; the team list is not read. */
+  readonly previewAsksOpen?: true;
   readonly application: AskApplication;
   readonly registration?: RegistrationApplication;
   /** Mandatory for signup and resend; absent configuration fails closed. */
@@ -3903,7 +3905,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     service: options.savedQuestions,
     callerOf: (request) => request.authenticatedSession === undefined ? null
       : Object.freeze({ ownerRef: request.authenticatedSession.ownerRef, userId: request.authenticatedSession.userId }),
-    teamAdmits: (request) => previewTeamAdmits(previewConfig, options.previewTeamUserIds, request.authenticatedSession?.userId),
+    teamAdmits: (request) => previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, request.authenticatedSession?.userId),
     consentGiven: async (request) => request.authenticatedSession !== undefined && options.sessions?.readSensitiveDataConsent !== undefined
       && await options.sessions.readSensitiveDataConsent(request.authenticatedSession) === "given",
     bindingOf: async (caller) => {
@@ -4554,7 +4556,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // model call, so only its team starts debates there. Third, after the crisis and consent
     // checks; before the quota, the country rule, admission and its paid discovery probe, so a
     // refusal here spends nothing. Off the preview there is no team rule.
-    if (!previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.owner?.userId)) {
+    if (!previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, asker.owner?.userId)) {
       return { status: 403, body: { error: PREVIEW_TEAM_ONLY } };
     }
     // B10: the sealed asks budget, as admitOrRefuse answers it.
@@ -4829,7 +4831,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // request past its cap is answered as a crisis would be, with no questions.
     const mayAsk = options.askClarify !== undefined
       && !crisisCheckTexts([question, ...(earlier?.answers ?? []).map((given) => given.answer)])
-      && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
+      && previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, asker.userId)
       && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
       && options.sessions?.readSensitiveDataConsent !== undefined
       && await options.sessions.readSensitiveDataConsent(asker) === "given";
@@ -4866,7 +4868,7 @@ export function buildApi(options: ApiOptions): FastifyInstance {
     // The person's words are screened together under the same caps as the ask's (crisisCheckTexts): a text or a request past
     // its cap is answered as a crisis would be, none NOT_ASKED.
     const mayAsk = !crisisCheckTexts(ownWords)
-      && previewTeamAdmits(previewConfig, options.previewTeamUserIds, asker.userId)
+      && previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, asker.userId)
       && (options.countryGate?.ask(sourceFor(request)) ?? null) === null
       && options.sessions?.readSensitiveDataConsent !== undefined
       && await options.sessions.readSensitiveDataConsent(asker) === "given";
@@ -5993,6 +5995,10 @@ export function buildApi(options: ApiOptions): FastifyInstance {
   // SessionService reads its repository through `this` (apps/api/src/sessions.ts:561-564).
   const billingSessions = options.sessions;
   const billingAgeConfirmation = billingSessions?.readAgeConfirmation?.bind(billingSessions);
+  // On the preview while payments are real, only an account the asks rule admits may buy or upgrade a plan: anyone else
+  // would be charged and then refused every question. On the sandbox, and off the preview, nothing changes.
+  const previewBuyerAdmits = previewConfig === undefined || options.billing?.paymentEnvironment !== "live" ? undefined
+    : (session: AuthenticatedSession) => previewAskAdmits(previewConfig, options.previewTeamUserIds, options.previewAsksOpen, session.userId);
   installBillingRoutes(api, {
     ...(options.billing ?? {}),
     policy: (route: BillingRoutePath) => routePolicy(route),
@@ -6003,7 +6009,8 @@ export function buildApi(options: ApiOptions): FastifyInstance {
       const { ip, userAgent } = sourceFor(request);
       return Object.freeze({ ip, userAgent });
     },
-    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation })
+    ...(billingAgeConfirmation === undefined ? {} : { ageConfirmation: billingAgeConfirmation }),
+    ...(previewBuyerAdmits === undefined ? {} : { buyerAdmits: previewBuyerAdmits })
   });
   if (options.staffPolicyVersion === 2) registerStaffRoutes(api, options.staff,
     route => routePolicy(route as AuthorizationRoute), {sourceFor, refreshedCookies});
@@ -6256,6 +6263,8 @@ export interface RunCreationSettings {
   readonly previewBudgetGate?: PreviewBudgetGateSettings;
   /** Step 1: the preview's team; `submit` refuses everyone else (the route refuses them first). */
   readonly previewTeamUserIds?: readonly string[];
+  /** PREVIEW_ASKS_OPEN_TO set: any signed-in account may ask, and the waker and the re-send start any account's runs. */
+  readonly previewAsksOpen?: true;
   readonly strangerSampleRate: number;
   readonly registerVersion: number;
   /**
@@ -7252,8 +7261,8 @@ export class PostgresAskApplication implements AskApplication {
     }
     // Step 1, defense in depth: the route refuses a person outside the preview's team first;
     // any other caller of submit is refused here, before billing, admission or any probe.
-    if (!previewTeamAdmits(validatePreviewProviderTestConfig(settings.previewProviderTestConfig),
-      settings.previewTeamUserIds, principal.kind === "server" ? principal.userId : undefined)) {
+    if (!previewAskAdmits(validatePreviewProviderTestConfig(settings.previewProviderTestConfig),
+      settings.previewTeamUserIds, settings.previewAsksOpen, principal.kind === "server" ? principal.userId : undefined)) {
       markAskRefusal(new TypedDomainError(PREVIEW_TEAM_ONLY, PREVIEW_TEAM_ONLY));
     }
     // Side-by-side spec §13 (Task S12): "please choose again" — before the question-language decider (which may make a
@@ -7872,8 +7881,8 @@ export class PostgresAskApplication implements AskApplication {
    * start that throws wrote nothing and stays in line for the next tick. Then
    * (final review Part 1b, Important 4) the started runs whose first job was
    * never handed to a runner are handed over again (`#redispatchStalledStarts`).
-   * On the private preview (Step 1) both start or hand over only the team's runs
-   * (`#previewTeamRuns`): an outsider's is recorded FAILED
+   * On the private preview (Step 1) both start or hand over only the team's runs, or with
+   * asks open any account's (`#previewTeamRuns`): an outsider's is recorded FAILED
    * (`RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY`) and counted failed; with no team listed
    * nothing is started, handed over or failed. Ids and counts only.
    * Side-by-side spec §4, O3 (plan C task C11): a run another release admitted is never started on its own row. The
@@ -8301,9 +8310,17 @@ export class PostgresAskApplication implements AskApplication {
    * team member owns: the owner is the run's latest ownership event, else its `owner:`
    * asker id (core.run_waiting_v's rule); a legacy asker's run has none and is never the
    * team's. One read per call, on the runtime pool, which already resolves owner refs.
+   * With asks open (PREVIEW_ASKS_OPEN_TO) the ids of the runs any account owns, by the same owner rule.
    */
   async #previewTeamRuns(runIds: readonly string[]): Promise<ReadonlySet<string> | typeof PREVIEW_TEAM_UNSET | null> {
     if (validatePreviewProviderTestConfig(this.settings.previewProviderTestConfig) === undefined) return null;
+    // Asks open to every signed-in account: the runs any account owns start, and a legacy asker's run, which no
+    // account owns, is still recorded FAILED, as the routes still refuse a session without a user id.
+    if (this.settings.previewAsksOpen === true) {
+      if (runIds.length === 0) return new Set();
+      const accountRuns = await this.pool.query<{ run_id: string }>(PREVIEW_ACCOUNT_RUNS_SQL, [[...runIds]]);
+      return new Set(accountRuns.rows.map((row) => row.run_id));
+    }
     const teamUserIds = this.settings.previewTeamUserIds ?? [];
     if (teamUserIds.length === 0) return PREVIEW_TEAM_UNSET;
     if (runIds.length === 0) return new Set();

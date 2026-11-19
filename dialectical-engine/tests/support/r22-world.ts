@@ -352,7 +352,8 @@ export async function startR22World(options: R22WorldOptions = {}) {
   const dispatcher: Dispatcher = { dispatch: async (job) => { queue.push({ ...job }); } };
   // Task 86, as main.ts (Task 36): THE ONE chosen paths store on the API's runtime pool, which the AskApplication and buildApi share.
   const startPaths = new PostgresStartPathsStore(apiPool);
-  const runSettings = { ...admissionSettingsOfVersion(siteAdmission), previewTeamUserIds, strangerSampleRate: settings.strangerSampleRate, releaseKey: environment.RELEASE_KEY,
+  // As main.ts with PREVIEW_ASKS_OPEN_TO absent: the team rule (previewAsksOpen undefined).
+  const runSettings = { ...admissionSettingsOfVersion(siteAdmission), previewTeamUserIds, previewAsksOpen: undefined, strangerSampleRate: settings.strangerSampleRate, releaseKey: environment.RELEASE_KEY,
     batteryVersion: settings.batteryVersion, settlementWatchHandle: settings.settlementWatchHandle, room: askRoom, waitingLine: askRoom, billing: askBilling, resolveDiscoveredPanel: resolveProviderPanel,
     admissionSettings: { activeSettingsVersion: () => activeSettings.current(), admissionSettingsFor: async (version: number) => admissionSettingsOfVersion(await admissionCache.admissionSettingsFor(version)) },
     // Task 86: the chosen paths (sealed at the START_PATHS setup step) and the purpose lines it records with them; without them every

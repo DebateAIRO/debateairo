@@ -612,9 +612,15 @@ const task = declareHatchetWalkingSkeletonTask({ client: hatchet, runner,
   workflowName: taskName, engineRetries: environment.HATCHET_ENGINE_RETRIES });
 // Step 1 (GAP-RUNNER): on the private preview, every open job no team member owns is recorded
 // FAILED (RUN_SETUP_FAILED:PREVIEW_TEAM_ONLY) BEFORE this worker exists, so neither the start-up
-// re-dispatch below nor an older job-system dispatch can run it. Off the preview: no read.
+// re-dispatch below nor an older job-system dispatch can run it. Off the preview: no read. With
+// PREVIEW_ASKS_OPEN_TO set the rule is the API's open one: only a job no account owns (a legacy
+// asker's) is recorded FAILED, and no team is needed.
+if (environment.PREVIEW_ASKS_OPEN !== undefined) {
+  console.warn(JSON.stringify({ kind: "DEBATEAI_RUNNER_STARTUP", event: "PREVIEW_ASKS_OPEN", to: environment.PREVIEW_ASKS_OPEN }));
+}
 await refusePreviewOutsiderWork({
   previewConfigured: previewGate !== undefined,
+  ...(environment.PREVIEW_ASKS_OPEN === undefined ? {} : { asksOpen: true as const }),
   teamUserIds: environment.PREVIEW_TEAM_USER_IDS,
   // Side-by-side spec §3: this release's jobs only (its live-outsider refusal and its 100 cap included).
   ...postgresRunnerPreviewTeamGateStore(pool, environment.RELEASE_KEY),

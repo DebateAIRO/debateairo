@@ -213,6 +213,43 @@ export function previewTeamAdmits(
   return userId !== undefined && teamUserIds !== undefined && teamUserIds.includes(userId);
 }
 /**
+ * Who may start debates on the preview when the team rule is lifted, read from PREVIEW_ASKS_OPEN_TO. Absent: the team
+ * rule as above. "everyone": any signed-in account. "everyone-with-test-payments": the same, while payments are the
+ * sandbox's; the two names keep the boot line truthful about which payment system strangers meet. Each name is accepted
+ * only exactly.
+ */
+export const PREVIEW_ASKS_OPEN_TO_VALUES = Object.freeze(["everyone", "everyone-with-test-payments"] as const);
+export type PreviewAsksOpenTo = typeof PREVIEW_ASKS_OPEN_TO_VALUES[number];
+/**
+ * The API and the runner both parse the setting here, so they decide alike. Refused at boot: any other value; no preview
+ * configuration (the spending gates would not be in the path); a team list in the same file (one file, one meaning);
+ * local mode (no room, so no per-person ceiling). Each refusal is a TypeError whose message is its code.
+ */
+export function parsePreviewAsksOpenTo(
+  source: string | undefined, context: Readonly<{ previewConfigured: boolean; teamKeyPresent: boolean; hosted: boolean }>
+): PreviewAsksOpenTo | undefined {
+  if (source === undefined) return undefined;
+  const value = PREVIEW_ASKS_OPEN_TO_VALUES.find((candidate) => candidate === source);
+  if (value === undefined) throw new TypeError("PREVIEW_ASKS_OPEN_TO_INVALID");
+  if (!context.previewConfigured) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW");
+  if (context.teamKeyPresent) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITH_TEAM");
+  if (!context.hosted) throw new TypeError("PREVIEW_ASKS_OPEN_TO_NOT_HOSTED");
+  return value;
+}
+/**
+ * The team rule, or, with asks open, any signed-in account. A session without a user id is refused either way on the
+ * preview; off the preview there is no rule. Runs already in the system follow the same choice through
+ * PREVIEW_TEAM_RUNS_SQL or PREVIEW_ACCOUNT_RUNS_SQL.
+ */
+export function previewAskAdmits(
+  config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined,
+  asksOpen: true | undefined, userId: string | undefined
+): boolean {
+  if (config === undefined) return true;
+  if (asksOpen === true) return userId !== undefined;
+  return previewTeamAdmits(config, teamUserIds, userId);
+}
+/**
  * Step 1 — THE ONE READ BEHIND THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM, shared by the
  * API's waker (`#previewTeamRuns`) and the runner's start-up gate so both apply the same rule.
  * $1 = run ids (uuid[]), $2 = team identity user ids (uuid[]). Returns the ids of the runs a
@@ -233,6 +270,29 @@ export const PREVIEW_TEAM_RUNS_SQL = `SELECT run.run_id::text AS run_id
         AND (account.owner_ref = latest.owner_ref
           OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || account.owner_ref::text))
        WHERE run.run_id = ANY($1::uuid[])` as const;
+/**
+ * The same read with asks open (PREVIEW_ASKS_OPEN_TO), for the same three callers. $1 = run ids (uuid[]). Returns the
+ * ids of the runs ANY account owns, by the owner rule above without the team list: a legacy asker's run has no account,
+ * so it is still recorded FAILED, as a session without a user id is still refused at the routes. An `owner:` asker id
+ * is read as a uuid only in the exact lower-case form `'owner:' || owner_ref::text` writes, so the answer equals the
+ * rule above's and the account is found through its unique owner_ref index.
+ */
+export const PREVIEW_ACCOUNT_RUNS_SQL = `SELECT run.run_id::text AS run_id
+       FROM core.run AS run
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref
+         FROM core.run_ownership_event AS event
+         WHERE event.run_id = run.run_id
+         ORDER BY event.at_seq DESC
+         LIMIT 1
+       ) AS latest ON true
+       WHERE run.run_id = ANY($1::uuid[])
+         AND EXISTS (
+           SELECT 1
+           FROM identity."user" AS account
+           WHERE account.owner_ref = COALESCE(latest.owner_ref, CASE
+             WHEN run.asker_id ~ '^owner:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             THEN substr(run.asker_id, 7)::uuid END))` as const;
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {

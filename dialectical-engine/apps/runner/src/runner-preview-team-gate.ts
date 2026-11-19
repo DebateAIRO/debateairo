@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import { withWriteTransaction } from "@debateai/db";
-import { PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL } from "@debateai/providers";
+import { PREVIEW_ACCOUNT_RUNS_SQL, PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL } from "@debateai/providers";
 
 /**
  * Step 1 (GAP-RUNNER, 2026-10-09) — THE TEAM RULE AT THE RUNNER'S START.
@@ -23,7 +23,9 @@ import { PREVIEW_TEAM_ONLY, PREVIEW_TEAM_RUNS_SQL } from "@debateai/providers";
  * Off the preview nothing is read and nothing changes. On the preview with no team listed the
  * runner refuses to start: the API then starts nothing for anyone, so the runner has no work it
  * may do, and refusing fails nothing (the API's own rule for an empty team). A refusal it
- * cannot record also refuses the start. Ids and codes only in every line.
+ * cannot record also refuses the start. Ids and codes only in every line. With asks open
+ * (PREVIEW_ASKS_OPEN_TO) the API admits any signed-in account, so here an outsider's job is one no
+ * account owns (a legacy asker's) and no team is needed; everything else is the same.
  *
  * Side-by-side spec §3: the gate is per release. Its store is built with this runner's RELEASE_KEY and reads, fails,
  * refuses on and counts only jobs of runs stamped with that key. Another release's jobs are that release's runner's
@@ -45,6 +47,11 @@ export type OpenRunWork = Readonly<{ runId: string; workItemId: string; claimLiv
 
 export type RunnerPreviewTeamGateInput = Readonly<{
   previewConfigured: boolean;
+  /**
+   * PREVIEW_ASKS_OPEN_TO set: the API's open rule instead of the team's. Only a job no account owns (a legacy asker's)
+   * is an outsider's, and no team is needed; every other step below is the same.
+   */
+  asksOpen?: true;
   teamUserIds: readonly string[] | undefined;
   work: Readonly<{
     listOpenRunWork(limit: number): Promise<readonly OpenRunWork[]>;
@@ -52,6 +59,8 @@ export type RunnerPreviewTeamGateInput = Readonly<{
     failClaimable(input: Readonly<{ runId: string; workItemId: string; reason: string }>): Promise<boolean>;
   }>;
   teamRuns(runIds: readonly string[], teamUserIds: readonly string[]): Promise<ReadonlySet<string>>;
+  /** The ids of the runs any account owns (PREVIEW_ACCOUNT_RUNS_SQL); read only with `asksOpen`. */
+  accountRuns?(runIds: readonly string[]): Promise<ReadonlySet<string>>;
   log(line: Readonly<Record<string, string | number>>): void;
 }>;
 
@@ -64,11 +73,16 @@ export async function refusePreviewOutsiderWork(
     throw new RunnerPreviewTeamGateError(code);
   };
   const team = input.teamUserIds ?? [];
-  if (team.length === 0) return refuse("RUNNER_PREVIEW_TEAM_UNSET");
+  // The open rule needs its own read: without it the start is refused, never run with no rule at all.
+  if (input.asksOpen === true) {
+    if (input.accountRuns === undefined) return refuse("RUNNER_PREVIEW_ACCOUNT_RULE_UNSET");
+  } else if (team.length === 0) return refuse("RUNNER_PREVIEW_TEAM_UNSET");
   const open = await input.work.listOpenRunWork(OPEN_RUN_WORK_LIMIT + 1);
   if (open.length > OPEN_RUN_WORK_LIMIT) return refuse("RUNNER_STARTUP_BACKLOG_SATURATED");
   if (open.length === 0) return Object.freeze({ checked: 0, refused: 0 });
-  const owned = await input.teamRuns([...new Set(open.map((item) => item.runId))], team);
+  const runIds = [...new Set(open.map((item) => item.runId))];
+  const owned = input.asksOpen === true && input.accountRuns !== undefined
+    ? await input.accountRuns(runIds) : await input.teamRuns(runIds, team);
   const outsiders = open.filter((item) => !owned.has(item.runId));
   // Checked before any write, so a refused start changes nothing.
   if (outsiders.some((item) => item.claimLive)) return refuse("RUNNER_PREVIEW_OUTSIDER_CLAIM_LIVE");
@@ -84,10 +98,13 @@ export async function refusePreviewOutsiderWork(
   return Object.freeze({ checked: open.length, refused });
 }
 
-/** The gate's two reads and one write on the runner's own pool, over `releaseKey`'s runs only (spec §3). */
+/**
+ * The gate's reads and one write on the runner's own pool, over `releaseKey`'s runs only (spec §3). The owner read is
+ * the team's, or with asks open any account's.
+ */
 export function postgresRunnerPreviewTeamGateStore(
   pool: Pool, releaseKey: string
-): Pick<RunnerPreviewTeamGateInput, "work" | "teamRuns"> {
+): Pick<RunnerPreviewTeamGateInput, "work" | "teamRuns"> & Required<Pick<RunnerPreviewTeamGateInput, "accountRuns">> {
   return Object.freeze({
     work: Object.freeze({
       async listOpenRunWork(limit: number): Promise<readonly OpenRunWork[]> {
@@ -120,6 +137,10 @@ export function postgresRunnerPreviewTeamGateStore(
     }),
     async teamRuns(runIds: readonly string[], teamUserIds: readonly string[]): Promise<ReadonlySet<string>> {
       const result = await pool.query<{ run_id: string }>(PREVIEW_TEAM_RUNS_SQL, [[...runIds], [...teamUserIds]]);
+      return new Set(result.rows.map((row) => row.run_id));
+    },
+    async accountRuns(runIds: readonly string[]): Promise<ReadonlySet<string>> {
+      const result = await pool.query<{ run_id: string }>(PREVIEW_ACCOUNT_RUNS_SQL, [[...runIds]]);
       return new Set(result.rows.map((row) => row.run_id));
     }
   });

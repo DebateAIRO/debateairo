@@ -5,6 +5,9 @@ import { readEnvironmentFile,narrowEnvironment,installNarrowEnvironment,installH
 import { afterApiListen,linuxProcessIdentity } from './runtime-receipt.mjs';
 import { refuse } from './custody.mjs';
 import { loadTsxApi } from './tsx-api.mjs';
+import { startupRefusedLine } from './startup-refusals.mjs';
+import { checkMailAtStart } from './start-check-mail.mjs';
+import { checkPaymentsAtStart } from './start-check-payments.mjs';
 export async function launchApi(argv) {
  const {plan,source}=await prepareLaunch(argv,'api',import.meta.url);
  const {tsImport}=await loadTsxApi();
@@ -12,6 +15,10 @@ export async function launchApi(argv) {
  const runtime=await tsImport(join(engine,'packages/register/src/runtime-environment.ts'),import.meta.url);
  const configured=await readEnvironmentFile(plan.environment.path,plan.environment);
  const selected=narrowEnvironment('api',configured,runtime,plan.publication,plan);
+ // The owner-set modes this setup may run in are checked here, before any of the API's code is imported: each check refuses
+ // a half-set combination by name (startup-refusals.mjs).
+ await checkMailAtStart({plan,configured,selected});
+ await checkPaymentsAtStart({plan,configured,selected});
  const verify=await tsImport('./verify-native.ts',import.meta.url);
  await verify.assertSelectedApiConnection(configured,plan.publication);
  const entry=join(engine,'apps/api/src/main.ts'),main=source.files.find(file=>file.path==='dialectical-engine/apps/api/src/main.ts');
@@ -23,4 +30,4 @@ export async function launchApi(argv) {
   readSelection:()=>({REGISTER_VERSION:process.env.REGISTER_VERSION,DEBATEAI_DEPLOYMENT_MODE:process.env.DEBATEAI_DEPLOYMENT_MODE,RELEASE_KEY:process.env.RELEASE_KEY}),
   importMain:()=>tsImport(entry,import.meta.url),emit:event=>process.stdout.write(`PREVIEW_API_STARTED ${JSON.stringify(event)}\n`)});
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{await launchApi(process.argv.slice(2));}catch{process.stderr.write('PREVIEW_API_STARTUP_REFUSED\n');process.exitCode=1;}}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){try{await launchApi(process.argv.slice(2));}catch(error){process.stderr.write(`${startupRefusedLine('PREVIEW_API_STARTUP_REFUSED',error)}\n`);process.exitCode=1;}}
