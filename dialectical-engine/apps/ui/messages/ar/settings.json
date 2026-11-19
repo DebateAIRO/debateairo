@@ -83,6 +83,7 @@
   "settings.sessions.current": "الجلسة الحالية",
   "settings.sessions.other": "جلسة أخرى",
   "settings.sessions.lastSeen": "آخر نشاط في {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "إلغاء الجلسة {sessionId}",
   "settings.sessions.revoke": "إلغاء الجلسة",
   "settings.sessions.revokeAll": "إلغاء جميع الجلسات",

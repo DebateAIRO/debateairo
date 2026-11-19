@@ -83,6 +83,7 @@
   "settings.sessions.current": "Bieżąca sesja",
   "settings.sessions.other": "Inna sesja",
   "settings.sessions.lastSeen": "Ostatnia aktywność: {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Unieważnij sesję {sessionId}",
   "settings.sessions.revoke": "Unieważnij",
   "settings.sessions.revokeAll": "Unieważnij wszystkie sesje",

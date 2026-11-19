@@ -83,6 +83,7 @@
   "settings.sessions.current": "Sesi saat ini",
   "settings.sessions.other": "Sesi lain",
   "settings.sessions.lastSeen": "Terakhir terlihat {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Cabut sesi {sessionId}",
   "settings.sessions.revoke": "Cabut",
   "settings.sessions.revokeAll": "Cabut semua sesi",

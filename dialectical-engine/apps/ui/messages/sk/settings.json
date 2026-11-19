@@ -83,6 +83,7 @@
   "settings.sessions.current": "Aktuálna relácia",
   "settings.sessions.other": "Iná relácia",
   "settings.sessions.lastSeen": "Naposledy aktívna {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Zrušiť reláciu {sessionId}",
   "settings.sessions.revoke": "Zrušiť",
   "settings.sessions.revokeAll": "Zrušiť všetky relácie",

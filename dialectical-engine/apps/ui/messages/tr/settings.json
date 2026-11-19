@@ -83,6 +83,7 @@
   "settings.sessions.current": "Geçerli oturum",
   "settings.sessions.other": "Diğer oturum",
   "settings.sessions.lastSeen": "Son görülme: {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "{sessionId} oturumunu iptal et",
   "settings.sessions.revoke": "İptal et",
   "settings.sessions.revokeAll": "Tüm oturumları iptal et",

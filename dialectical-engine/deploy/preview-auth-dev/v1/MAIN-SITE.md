@@ -390,7 +390,7 @@ staff work (Hide now, reports, publication reviews) until then.**
 Do this **before DR2** of the upload, while the old release still runs on the test name:
 1. Sign in. Open the home page's **Public** tab. Read every published debate.
 2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then Admin → Team →
-   public review → **Hide now**. Each hide needs the staff hardware key, and the staff key works only on the test name.
+   public review → **Hide now**. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
 3. If the Team page shows open reports, settle them now too. Publication reviews (**Publication reviews**, Cereri de
    publicare) and threat reports (**Threat reports**, Rapoarte despre amenințări) open from the links on the Team page
    once your key is verified. Settling usually needs the team tools unlocked: if the page says
@@ -978,7 +978,7 @@ exit 0
 
 Expect the `taken out` line, the API's start lines (`PREVIEW_API_STARTED …`), then `STAFFOFF_DONE`.
 - It restarts the API on the test name, behind the password (a minute or more down). From then on the staff screens
-  are off. NAME3 later changes only the name.
+  are off. NAME3 later moves the name and the API file's two staff name lines; the policy line stays out.
 - It changes nothing in the database: the staff records, the staff keys, the Owner role and the audit history stay.
 - If it says `the staff screens are off already`, nothing changed: go on with NAME2.
 - If it stops on `team allowance lines`, run nothing more and ask.
@@ -1025,6 +1025,8 @@ SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
 [ "$SN" = 0 ] || { [ "$SN" = 2 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A" || true)" = 1 ]; } || { echo "NAME2_NOT_DONE: the API file's two staff name lines do not name the test name exactly once each: ask"; exit 1; }
 if grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A"; then
   [ "$SN" = 2 ] && [ -f "$CAPI/dialectical-engine/migrations/0183_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "NAME2_NOT_DONE: the staff screens are on, but this release or the tools folder cannot enrol a staff key under a new name: run STAFFOFF (5.1b) first"; exit 1; }
+  [ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text)')" || true)" = 1 ] || { echo "NAME2_NOT_DONE: the staff screens are on, but the database does not hold the staff re-key step, so no staff key could be enrolled under dezbatere.ro: ask, or run STAFFOFF (5.1b) first"; exit 1; }
+  [ "$(psqlq "SELECT count(*) FROM pg_hba_file_rules WHERE type = 'local' AND ('debateai_prod_staff_recovery' = ANY (user_name) OR 'all' = ANY (user_name)) AND auth_method = 'scram-sha-256' AND error IS NULL" || true)" -ge 1 ] 2>/dev/null || { echo "NAME2_NOT_DONE: the staff screens are on, but the database's pg_hba.conf has no local scram-sha-256 line for debateai_prod_staff_recovery, so REKEY (5.7) could not arm a permit under dezbatere.ro: ask, or run STAFFOFF (5.1b) first"; exit 1; }
   echo "the staff screens are on: they move to dezbatere.ro with the name, and every staff key must be enrolled again there (5.7) after NAME3"
 fi
 [ "$(grep -c '^SOCIAL_SOCKET_PATH=' "$A" || true)" = 0 ] || { echo "NAME2_NOT_DONE: social sign-in is set up and its relay's callbacks name the test name, so every provider button would vanish on dezbatere.ro: ask"; exit 1; }
@@ -1209,15 +1211,14 @@ set -euo pipefail
 ! grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "NAME5_NOT_DONE: payments are real on this name: PAY_BACK first (part 9 order); nothing was stopped"; exit 1; }
 MMODE=$(jq -r 'if .schema == "preview-auth-dev-mail-v1" then "legacy" else .recipients end' "$MP" 2>/dev/null || true)
 case "$MMODE" in legacy|allow-list|open) ;; *) echo "NAME5_NOT_DONE: mail-plan.json does not read as a mail plan; nothing was stopped: ask"; exit 1;; esac
-SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
-[ "$SN" = 0 ] || { [ "$SN" = 2 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_ORIGIN=https://(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_RP_ID=(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ]; } || { echo "NAME5_NOT_DONE: the API file's two staff name lines do not each name one of the two names exactly once; nothing was stopped: ask"; exit 1; }
-[ "$SN" = 2 ] || ! grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "NAME5_NOT_DONE: the staff screens are on but the API file has no staff name lines; nothing was stopped: ask"; exit 1; }
+SOK=no; [ "$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)" = 2 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_ORIGIN=https://(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_RP_ID=(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] && SOK=yes
+[ "$SOK" = yes ] || ! grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "NAME5_NOT_DONE: the staff screens are on, but the API file's two staff name lines do not each name one of the two names exactly once; nothing was stopped: ask"; exit 1; }
 systemctl stop "$WEB" "$API" || { echo "NAME5_NOT_DONE: systemctl stop of the website and API failed: the site may be DOWN: ask at once"; exit 1; }
 for SVC in api ui; do F=$E/$SVC-$LABEL.env
   { ( umask 077; sed -e 's|^PUBLIC_APP_URL=https://dezbatere\.ro$|PUBLIC_APP_URL=https://v3-preview.dezbatere.ro|' -e 's|^STAFF_WEBAUTHN_ORIGIN=https://dezbatere\.ro$|STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro|' -e 's|^STAFF_WEBAUTHN_RP_ID=dezbatere\.ro$|STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro|' "$F" > "$F.new" ) && chown --reference="$F" "$F.new" && chmod --reference="$F" "$F.new" && mv "$F.new" "$F"; } || { echo "NAME5_NOT_DONE: $SVC-$LABEL.env was not rewritten: the site is DOWN: ask at once"; exit 1; }
   [ "$(grep -c '^PUBLIC_APP_URL=' "$F" || true)" = 1 ] && [ "$(grep -cx 'PUBLIC_APP_URL=https://v3-preview.dezbatere.ro' "$F" || true)" = 1 ] || { echo "NAME5_NOT_DONE: $F does not name the test name exactly once (compare it with $M/name/$SVC-$LABEL.env.before-main): the site is DOWN: ask at once"; exit 1; }
 done
-[ "$SN" = 0 ] || { [ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A" || true)" = 1 ]; } || { echo "NAME5_NOT_DONE: the API file's staff name lines do not name the test name exactly once each: the site is DOWN: ask at once"; exit 1; }
+[ "$SOK" = no ] || { [ "$(grep -cx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" || true)" = 1 ] && [ "$(grep -cx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A" || true)" = 1 ]; } || { echo "NAME5_NOT_DONE: the API file's staff name lines do not name the test name exactly once each: the site is DOWN: ask at once"; exit 1; }
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { echo "NAME5_NOT_DONE: a SAME check is BAD (above): the site is DOWN: ask at once"; exit 1; }
 rm -f "$TDROP"; systemctl daemon-reload || true; systemctl restart debateai-preview-turnstile || echo 'systemctl restart of the relay returned non-zero'; sleep 2
 [ "$(relay)" = 'PUBLIC_APP_URL=https://v3-preview.dezbatere.ro' ] || { echo "NAME5_NOT_DONE: the running relay does not answer as the test name: the site is DOWN: ask at once"; exit 1; }
@@ -1237,7 +1238,8 @@ echo NAME5_DONE
 exit 0
 ```
 
-The env edit reverses only the one line, so other edits made since are kept. The mail plan keeps its mode and goes
+The env edit reverses only the name line and, in the API file, the two staff name lines, so other edits made since
+are kept. The mail plan keeps its mode and goes
 back to the test name; the script checks that the API's mail line says the same mode. The prepared Caddyfile has the
 site password. NAME5 puts back the Caddyfile NAME1 made, so any Caddyfile change made after NAME1 is gone; the live
 file it replaced is kept as `/root/preview-archive/main-site/name/Caddyfile.before-name5-<time>`.
@@ -1261,7 +1263,7 @@ set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFON: the staff screens back on the test name: the line STAFF_ACCESS_POLICY_VERSION=2 back into the API file, then the API restarts.
 K=$M/name/api-$LABEL.env.before-staffon-$(date -u +%Y%m%dT%H%M%SZ)
-[ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFON_NOT_DONE: the API answers as $HOST, and the staff keys work only on the test name (NAME5 first); nothing changed"; exit 1; }
+[ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFON_NOT_DONE: the API answers as $HOST; on dezbatere.ro the step is STAFFMAIN (5.7); nothing changed"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true)
 if [ "$P" = 1 ] && grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A"; then echo "the API file holds STAFF_ACCESS_POLICY_VERSION=2 already: the staff screens are on; nothing changed"; echo STAFFON_DONE; exit 0; fi
 [ "$P" = 0 ] || { echo "STAFFON_NOT_DONE: the API file has a policy line that is not STAFF_ACCESS_POLICY_VERSION=2; nothing changed: ask"; exit 1; }
@@ -1313,17 +1315,22 @@ this document. It takes about half an hour. You need the server (as root), a bro
 authenticator and your hardware key. It works while payments are real; STAFFMAIN restarts the API, so pick a quiet
 minute with no checkout open.
 
+In that upload, SB4's operator review lists one new file, `deploy/preview-lifecycle/v1/rekey-staff-key.mjs`, and
+changed ones beside it: `unlock-team-tools.mjs`, `jit-creator-actor.mjs` and the kit's `README.md`. STAFFMAIN and
+REKEY need the upload's operator folder swap and its database step to have run; each checks that first.
+
 **What happens, in plain words.**
 - A staff key belongs to one site name. The one you enrolled belongs to the test name, so on dezbatere.ro the Team
   page cannot verify you.
 - The site never lets an account that is already staff add a staff key with password and code alone. Otherwise a
   thief with your password and your phone could add a key of their own and act as the Owner.
 - So the server's operator (you, as root) first says yes for one person and one key. That yes is a **permit**. It
-  lasts 15 minutes and works once. It is tied to the one sign-in open in your browser when you give it. Example: you
-  sign in at 10:02 and run REKEY at 10:05; REKEY says the permit is for the sign-in that began at 10:02 and ends at
-  10:20. A second sign-in made at 10:06, even with the right password and code, cannot use it.
-- With the permit you add the key on the Team page. The site sends its usual security mail for a key change and
-  writes it in the staff audit history.
+  lasts 15 minutes and works once. It is tied to one sign-in: the one whose **sign-in code** you read in your own
+  browser and type on the server. Example: your browser shows `Sign-in code: 3f9a1c2e`; you type `3f9a1c2e` when
+  REKEY asks; REKEY says the permit is for the sign-in that began at 10:02 and ends at 10:20. Any other sign-in to
+  your account, even one made with the right password and code, has another code and cannot use the permit.
+- With the permit you add the key on the Team page. The site writes the key change in the staff audit history and
+  sends its key-change alert to the security alert address set on this server.
 
 **1. The staff screens on (skip if they are on already).** If the rename was done with the staff screens on, they are
 on already and STAFFMAIN says so. If it was done after STAFFOFF, STAFFMAIN moves the two staff name lines to
@@ -1344,7 +1351,7 @@ if [ "$P" = 1 ] && grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A"; then
   echo "the staff screens are on under dezbatere.ro already; nothing changed"; echo STAFFMAIN_DONE; exit 0
 fi
 [ "$P" = 0 ] || { echo "STAFFMAIN_NOT_DONE: the API file has a policy line that is not STAFF_ACCESS_POLICY_VERSION=2; nothing changed: ask"; exit 1; }
-[ "$(grep -cxE 'STAFF_WEBAUTHN_ORIGIN=https://(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] && [ "$(grep -cxE 'STAFF_WEBAUTHN_RP_ID=(v3-preview\.)?dezbatere\.ro' "$A" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the staff name lines name neither of the two names; nothing changed: ask"; exit 1; }
+{ grep -qx 'STAFF_WEBAUTHN_ORIGIN=https://v3-preview.dezbatere.ro' "$A" && grep -qx 'STAFF_WEBAUTHN_RP_ID=v3-preview.dezbatere.ro' "$A"; } || { grep -qx 'STAFF_WEBAUTHN_ORIGIN=https://dezbatere.ro' "$A" && grep -qx 'STAFF_WEBAUTHN_RP_ID=dezbatere.ro' "$A"; } || { echo "STAFFMAIN_NOT_DONE: the two staff name lines do not both name the test name, nor both dezbatere.ro; nothing changed: ask"; exit 1; }
 for SK in STAFF_INDEPENDENT_ALERT_CONFIG_PATH STAFF_ALERT_OPERATOR_MODULE_PATH STAFF_ALERT_OPERATOR_MODULE_SHA256; do [ "$(grep -c "^$SK=" "$A" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the API file does not hold $SK exactly once; nothing changed: ask"; exit 1; }; done
 [ -z "$(tail -c1 "$A")" ] || { echo "STAFFMAIN_NOT_DONE: $A does not end in a newline; nothing changed: ask"; exit 1; }
 cp -p "$A" "$K" || { rm -f "$K"; echo "STAFFMAIN_NOT_DONE: the copy $K was not kept; nothing changed: ask"; exit 1; }
@@ -1363,11 +1370,14 @@ Expect the `in the API file` line, the API's start lines (`PREVIEW_API_STARTED �
 are still off and nothing else changed: run nothing more and ask. The way back is NAME5 (it moves the name and the
 staff name lines back together); to have the staff screens off again on dezbatere.ro, ask.
 
-**2. Sign in, in one browser only.** Sign in at https://dezbatere.ro/login with your password and authenticator
-code. Then open Settings → **Active sessions** (Sesiuni active). If it lists an **Other session** (Altă sesiune),
-press its **Revoke** (Revocați): the permit is given only while your account has exactly one sign-in open. Do not
-press **Revoke all sessions** (it signs this browser out too). Keep this browser tab open, and do not sign in
-anywhere else until the key is enrolled. Note the time you signed in.
+**2. Sign in, and read your sign-in code.** Sign in at https://dezbatere.ro/login with your password and
+authenticator code (if you are signed in already, that sign-in is fine). Open Settings → **Active sessions** (Sesiuni
+active). The row **Current session** (Sesiunea actuală) shows a line `Sign-in code: ` followed by eight characters,
+digits and the letters a to f, for example `3f9a1c2e`. Write them down: REKEY asks for them. The code is not a
+secret, but it must be the one this browser shows; never take it from a message or from anyone else. Keep this
+browser signed in until the key is enrolled: if you sign out or sign in again, the code changes and the permit ends.
+If the list shows an **Other session** (Altă sesiune) you do not recognise, press its **Revoke** (Revocați) and
+change your password after this step; it cannot use the permit either way.
 
 **3. Unlock the team tools.** As root: `systemctl start debateai-preview-team-unlock`. It unlocks them for one hour
 (a new staff key is one of the things that need them unlocked). Wait about half a minute.
@@ -1377,48 +1387,55 @@ anywhere else until the key is enrolled. Note the time you signed in.
 ```sh
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
-# REKEY: the operator's yes for ONE new staff key of the Owner account, under the name the site answers as: one permit in the database (15 minutes, one use, for the one sign-in open now). Nothing restarts; no file changes.
+# REKEY: the operator's yes for ONE new staff key of the Owner account, under the name the site answers as: one permit in the database (15 minutes, one use, for the sign-in whose code you type). Nothing restarts; no file changes.
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "REKEY_NOT_DONE: the staff screens are off (STAFFMAIN first); nothing changed"; exit 1; }
 [ -f "$L/rekey-staff-key.mjs" ] || { echo "REKEY_NOT_DONE: the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first); nothing changed"; exit 1; }
-[ "$(psqlq "SELECT count(*) FROM pg_hba_file_rules WHERE type = 'local' AND 'debateai_prod_staff_recovery' = ANY (user_name) AND auth_method = 'scram-sha-256' AND error IS NULL" || true)" -ge 1 ] 2>/dev/null || { echo "REKEY_NOT_DONE: the database's pg_hba.conf has no local scram-sha-256 line for debateai_prod_staff_recovery, so the tool cannot connect; adding it is a reviewed change: ask; nothing changed"; exit 1; }
+[ "$(psqlq "SELECT count(*) FROM pg_hba_file_rules WHERE type = 'local' AND ('debateai_prod_staff_recovery' = ANY (user_name) OR 'all' = ANY (user_name)) AND auth_method = 'scram-sha-256' AND error IS NULL" || true)" -ge 1 ] 2>/dev/null || { echo "REKEY_NOT_DONE: the database's pg_hba.conf has no local scram-sha-256 line for debateai_prod_staff_recovery, so the tool cannot connect; adding it is a reviewed change: ask; nothing changed"; exit 1; }
 UA=$(systemctl is-active debateai-preview-team-unlock || true)
-if systemctl cat debateai-preview-team-unlock 2>/dev/null | grep -q 'PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login'; then
+if [ "$(systemctl show -p ExecStart debateai-preview-team-unlock 2>/dev/null | grep -c 'PREVIEW_LIFECYCLE_STAFF_WRITER=interim-recovery-login' || true)" != 0 ]; then
   [ "$UA" != active ] || { echo "REKEY_NOT_DONE: the team unlock runs on its fallback writer, which holds the login this step needs: run  systemctl stop debateai-preview-team-unlock , run REKEY again, then start the unlock again; nothing changed"; exit 1; }
   echo "the team unlock uses its fallback writer: start it right after REKEY_DONE (systemctl start debateai-preview-team-unlock)"
 else
   [ "$UA" = active ] || { echo "REKEY_NOT_DONE: the team tools are locked: run  systemctl start debateai-preview-team-unlock , wait half a minute, then run REKEY again; nothing changed"; exit 1; }
 fi
-RC=0; OUT=$( ( ulimit -c 0; lc rekey-staff-key.mjs arm-owner ) 2>/dev/null ) || RC=$?
+read -r -p 'The sign-in code your browser shows under Current session (8 characters): ' SC
+SC=$(printf '%s' "$SC" | tr -d '[:space:]' | tr 'A-F' 'a-f')
+[[ "$SC" =~ ^[0-9a-f]{8}$ ]] || { echo "REKEY_NOT_DONE: a sign-in code is eight characters, digits and the letters a to f (step 2); nothing changed"; exit 1; }
+echo "arming the permit (up to a minute; the tool checks the release before it opens the database login)"
+RC=0; OUT=$( ( ulimit -c 0; lc rekey-staff-key.mjs arm-owner "$SC" ) 2>/dev/null ) || RC=$?
 EV=$(jq -r '.event // empty' <<<"$OUT" 2>/dev/null || true); RR=$(jq -r '.roleReset' <<<"$OUT" 2>/dev/null || true)
-at() { TZ=Europe/Bucharest date -d "$1" '+%H:%M:%S' 2>/dev/null || echo "$1"; }
-if [ "$EV" = PREVIEW_STAFF_REKEY_ARMED ]; then
-  echo "the permit is armed for $(jq -r .name <<<"$OUT"): it is for the sign-in that began at $(at "$(jq -r .signInStartedAt <<<"$OUT")") and it ends at $(at "$(jq -r .expiresAt <<<"$OUT")") (Bucharest time)"
-  [ "$RC" = 0 ] && [ "$RR" = true ] || { echo "REKEY_NOT_DONE: the permit is armed, but the staff recovery login was not closed again: run  lc unlock-team-tools.mjs reset  now (it closes by itself within three minutes anyway), then ask"; exit 1; }
-  echo REKEY_DONE
-  exit 0
+at() { TZ=Europe/Bucharest date -d "$1" '+%H:%M:%S Bucharest time' 2>/dev/null || echo "$1"; }
+CL=''; if [ "$RR" = false ]; then if lc unlock-team-tools.mjs reset >/dev/null 2>&1; then CL='the staff recovery login had stayed open; it is closed now'; else CL='the staff recovery login stayed open and closing it failed too (it stops working by itself within three minutes)'; fi; fi
+if [ "$EV" != PREVIEW_STAFF_REKEY_ARMED ]; then
+  R=$(jq -r '.reason // empty' <<<"$OUT" 2>/dev/null || true)
+  case "${R:-none}" in
+    STAFF_REKEY_KEY_PRESENT) W='the Owner account already has a staff key that works under this name: there is nothing to arm; go to step 6';;
+    STAFF_REKEY_SESSION_REQUIRED) W='no open sign-in of the Owner account has this code: read it again in your browser (step 2; signing in again changes it), then run REKEY again';;
+    STAFF_REKEY_PERMIT_ACTIVE) W='a permit is armed already and not used: do step 5 now, or wait until it ends (15 minutes after it was armed) and run REKEY again';;
+    STAFF_REKEY_TARGET_INVALID) W='the database has no single active Owner account in good standing (active, e-mail verified, authenticator on, not held, not being deleted): ask';;
+    STAFF_JIT_OPEN_REFUSED) W='the staff recovery login could not be opened (another tool may hold it): wait three minutes and run REKEY again; if it says this twice, ask';;
+    STAFF_SCREENS_OFF|STAFF_NAME_MISMATCH|PUBLIC_NAME_REFUSED) W='the API file does not have the staff screens on under the name the API answers as: STAFFMAIN first';;
+    *) W='ask, and give this line';;
+  esac
+  echo "REKEY_NOT_DONE: ${R:-the tool gave no answer}: $W; no permit was armed${CL:+; $CL}"
+  exit 1
 fi
-R=$(jq -r '.reason // empty' <<<"$OUT" 2>/dev/null || true)
-case "${R:-none}" in
-  STAFF_REKEY_KEY_PRESENT) W='the Owner account already has a staff key that works under this name: there is nothing to arm; go to step 6';;
-  STAFF_REKEY_SESSION_REQUIRED) W='the Owner account does not have exactly one sign-in open: do step 2 again (one browser, no Other session), then run REKEY again';;
-  STAFF_REKEY_PERMIT_ACTIVE) W='a permit is armed already and not used: do step 5 now, or wait until it ends (15 minutes) and run REKEY again';;
-  STAFF_REKEY_TARGET_INVALID) W='the database has no single active Owner account in good standing (active, e-mail verified, authenticator on, not held, not being deleted): ask';;
-  STAFF_JIT_OPEN_REFUSED) W='the staff recovery login could not be opened (another tool may hold it): wait three minutes and run REKEY again; if it says this twice, ask';;
-  STAFF_SCREENS_OFF|STAFF_NAME_MISMATCH|PUBLIC_NAME_REFUSED) W='the API file does not have the staff screens on under the name the API answers as: STAFFMAIN first';;
-  *) W='ask, and give this line';;
-esac
-[ "$RR" != false ] || W="$W; and the staff recovery login was not closed again: run  lc unlock-team-tools.mjs reset  now"
-echo "REKEY_NOT_DONE: ${R:-the tool gave no answer}: $W"
-exit 1
+echo "the permit is armed for $(jq -r .name <<<"$OUT"): it is for the sign-in with code $SC, which began at $(at "$(jq -r .signInStartedAt <<<"$OUT")"), and it ends at $(at "$(jq -r .expiresAt <<<"$OUT")")"
+OS=$(jq -r '.otherSignIns // 0' <<<"$OUT" 2>/dev/null || echo 0); [ "$OS" = 0 ] || echo "note: the account has $OS other sign-in(s) open now; they cannot use the permit; if you do not recognise them in Settings, revoke them and change your password"
+[ -z "$CL" ] || echo "$CL"
+[ "$RR" = true ] || [ "$CL" = 'the staff recovery login had stayed open; it is closed now' ] || { echo "REKEY_NOT_DONE: the permit is armed, but the staff recovery login is not closed: ask before step 5"; exit 1; }
+echo REKEY_DONE
+exit 0
 ```
 
-Expect the `the permit is armed` line, then `REKEY_DONE`. **Read the two times.** The first must be the minute you
-signed in at step 2. If it is another time, somebody else is signed in to your account: do not go on; change your
-password, and ask. The second is when the permit ends: do step 5 before then.
+Expect the question for the code, the `the permit is armed` line, then `REKEY_DONE`. The line names the code you
+typed, when that sign-in began and when the permit ends: do step 5 before then. A `note:` line about other sign-ins
+is not an error; step 2 says what to do about one you do not recognise.
 
-After `REKEY_NOT_DONE`, the line says what to do. No permit was armed, unless the line says `the permit is armed`.
+After `REKEY_NOT_DONE`, the line says what to do, and whether a permit was armed. The script closes the staff
+recovery login itself if the tool left it open, and says so.
 
-**5. Enrol the key (within 15 minutes, in the browser of step 2).**
+**5. Enrol the key (within 15 minutes, in the browser of step 2, without signing out in between).**
 1. Open Admin → Team. Open **Security key setup and recovery** (Configurarea cheilor și recuperarea accesului).
 2. Under **Register security key** (Înregistrează cheia de securitate), type your **Account password** (Parola
    contului) and the **Authenticator code** (Codul autentificatorului) your phone shows now. Press **Register
@@ -1426,13 +1443,15 @@ After `REKEY_NOT_DONE`, the line says what to do. No permit was armed, unless th
 3. The browser asks for the key: plug it in and touch it. If the browser asks which key or passkey to use, choose
    the hardware key (USB security key), not the phone or the computer.
 4. The page shows **Verified public credential ID: …** (ID-ul public al cheii verificate: …). The key is enrolled.
-   You get the security mail for a key change.
+   The key-change alert goes to the security alert address set on this server.
 
-If the page says "The action could not be completed…" (Acțiunea nu a putut fi finalizată…): the permit ended, was
-used already, or belongs to another sign-in; or the password or the code was wrong. Wait until the 15 minutes are
-over, then run REKEY again (step 4) and try once more. If the page says "Team tools are locked…" (Instrumentele
-echipei sunt blocate…), do step 3 and try again within the 15 minutes. Each try needs a new authenticator code: wait
-for the next one. If the browser refuses the key twice, ask.
+If the page says "The action could not be completed…" (Acțiunea nu a putut fi finalizată…): the password or the code
+was wrong, or the permit ended, was used already, or is for another sign-in than this browser's. Try once more with the next
+authenticator code (each try needs a new one). If it says the same, run REKEY again (step 4): it arms a new permit,
+or says one is still armed (then wait until its end time). If the page says "Security key verification unavailable
+or cancelled…", the browser's key prompt was closed or timed out; the permit is used by then, so run REKEY again. If
+the page says "Team tools are locked…" (Instrumentele echipei sunt blocate…), do step 3 and try again within the 15
+minutes. If the browser refuses the key twice, ask.
 
 **6. Verify, and check.** On the Team page press **Verify security key for team access** (Verifică cheia de
 securitate pentru accesul echipei) and touch the key. The page now shows your access. Open public review and check
@@ -1448,11 +1467,17 @@ themselves after one hour anyway).
   (it asks you to touch the key you already have). REKEY refuses while a key works under the name.
 - The key you enrolled on the test name stays in the database. It works again if the site ever goes back to the test
   name (NAME5), and it is no use to anyone on dezbatere.ro.
-- Another staff member needs the same permit, named by their account id (`rekey-staff-key.mjs arm-user <id>`): ask.
+- Another staff member needs the same permit, named by their account id and their own sign-in code
+  (`rekey-staff-key.mjs arm-user <id> <code>`): ask.
+- While a permit is armed and unused (15 minutes at most), the rule "a new staff key needs the server's operator"
+  rests on the permit and on the website's own server process, as it does for a person's very first staff key.
 - If you lose the key and no key works under the name, this is not the step: REKEY refuses while the database still
   holds the lost key as working. Ask.
-- **To confirm on the server:** REKEY was tested against a test database and with stand-ins for the server's parts,
-  not on this server. The first time, do it slowly, and ask if a line differs from the ones above.
+- **To confirm on the server:** STAFFMAIN and REKEY were tested on throwaway files, against a test database and with
+  stand-ins for the server's parts, not on this server. Three things only the server can show: that the API starts
+  with the staff screens on under dezbatere.ro (STAFFMAIN puts the file back if it does not), that the database's
+  `pg_hba.conf` lets the staff recovery login in on the local socket (REKEY checks it first), and where the
+  key-change alert mail arrives. The first time, do each step slowly, and ask if a line differs from the ones above.
 
 ---
 
@@ -2157,7 +2182,7 @@ holds no working staff key of the Owner account under the name the site answers 
 **Before you start:** the site answers as dezbatere.ro (part 5); mail is open there (4.3: PWOFF1 checks both the
 plan file and the API's mode line); real payments work (part 7); the staff screens are on and your staff key works
 on dezbatere.ro (5.7); with your staff key working, you have read the **Public** tab again and used Hide now on
-anything that went public while they were off and must not stay public (Free debates go public by themselves, 5.1b);
+anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves, 5.1b);
 the payment marks
 are on the site if you want them (only an upload made before part 5 adds them, 1.1; if they are missing, ask before
 you take the password off); you have decided your numbers and gate pots (1.7, 6.4); and you have read the
@@ -2179,7 +2204,7 @@ said -xF '{"event":"api.preview.asks_open","to":"everyone"}' || { echo "PWOFF1_N
 grep -qx 'PREVIEW_LIVE_PAYMENTS=real-money' "$A" || { echo "PWOFF1_NOT_DONE: payments are not live (part 7 first)"; exit 1; }
 [ "$HOST" = dezbatere.ro ] || { echo "PWOFF1_NOT_DONE: the API answers as $HOST: the password comes off only on the main name (part 5)"; exit 1; }
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "PWOFF1_NOT_DONE: the staff screens are off: STAFFMAIN and the rest of 5.7 first"; exit 1; }
-OK=$(psqlq "SELECT count(*) FROM staff.owner_designation d JOIN staff.subject s USING (staff_id) JOIN identity.mfa_factor f ON f.user_id = s.user_id JOIN identity.staff_webauthn_metadata m ON m.mfa_factor_id = f.mfa_factor_id WHERE d.active AND s.state = 'ACTIVE' AND f.factor_type = 'passkey' AND f.state = 'active' AND f.verified_at IS NOT NULL AND f.relying_party_id = '$HOST' AND f.credential_origin = 'https://$HOST'" || true)
+OK=$(psqlq "SELECT count(*) FROM staff.owner_designation d JOIN staff.subject s USING (staff_id) JOIN identity.mfa_factor f ON f.user_id = s.user_id JOIN identity.staff_webauthn_metadata m ON m.mfa_factor_id = f.mfa_factor_id WHERE d.active AND s.state = 'ACTIVE' AND m.user_id = f.user_id AND f.factor_type = 'passkey' AND f.state = 'active' AND f.verified_at IS NOT NULL AND f.backup_eligible = false AND f.backup_state = false AND f.user_verification_required AND f.relying_party_id = '$HOST' AND f.credential_origin = 'https://$HOST'" || true)
 [ "${OK:-0}" -ge 1 ] 2>/dev/null || { echo "PWOFF1_NOT_DONE: the Owner account has no working staff key under $HOST, so nobody could hide a debate by hand: 5.7 first"; exit 1; }
 jq -e --arg o "https://$HOST" '.schema=="preview-auth-dev-mail-v2" and .recipients=="open" and .publicAppUrl==$o' "$MP" >/dev/null 2>&1 || { echo "PWOFF1_NOT_DONE: mail-plan.json is not the open plan for $HOST (4.3 first)"; exit 1; }
 said -xF "PREVIEW_MAIL_MODE {\"mode\":\"open\",\"origin\":\"https://$HOST\"}" || { echo "PWOFF1_NOT_DONE: the running API does not say mail mode open on $HOST (4.3 first)"; exit 1; }

@@ -83,6 +83,7 @@
   "settings.sessions.current": "Phiên hiện tại",
   "settings.sessions.other": "Phiên khác",
   "settings.sessions.lastSeen": "Hoạt động lần cuối {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Thu hồi phiên {sessionId}",
   "settings.sessions.revoke": "Thu hồi",
   "settings.sessions.revokeAll": "Thu hồi tất cả phiên",

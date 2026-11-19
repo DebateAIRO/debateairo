@@ -83,6 +83,7 @@
   "settings.sessions.current": "Поточний сеанс",
   "settings.sessions.other": "Інший сеанс",
   "settings.sessions.lastSeen": "Остання активність: {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Відкликати сеанс {sessionId}",
   "settings.sessions.revoke": "Відкликати",
   "settings.sessions.revokeAll": "Відкликати всі сеанси",

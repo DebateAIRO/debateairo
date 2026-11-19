@@ -83,6 +83,7 @@
   "settings.sessions.current": "Nykyinen istunto",
   "settings.sessions.other": "Muu istunto",
   "settings.sessions.lastSeen": "Nähty viimeksi {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Kumoa istunto {sessionId}",
   "settings.sessions.revoke": "Kumoa",
   "settings.sessions.revokeAll": "Kumoa kaikki istunnot",

@@ -89,6 +89,12 @@ describe.each(surfaces)("S5 rendered session controls — %s", (_name, Controls)
     // Raw session ids are deliberately not shown: a uuid tells a person nothing
     // about which device they are revoking.
     expect(document.body.textContent).not.toContain(remoteId);
+    expect(document.body.textContent).not.toContain(currentId);
+    // This browser's own sign-in shows its short code (the id's first eight characters), and only that row does:
+    // an operator reads it here to say which sign-in an approval on the server is for.
+    const codes = [...document.querySelectorAll("[data-sign-in-code]")].map((node) => node.textContent);
+    expect(codes).toEqual(["Sign-in code: 11111111"]);
+    expect(document.body.textContent).not.toContain("22222222");
     expect(document.body.textContent).toContain("Other session");
     expect(document.body.textContent).toContain("Signed in");
 

@@ -1,13 +1,16 @@
 // rekey-staff-key.mjs: run by root, by hand, when a staff member has no staff key that works under
 // the name the site answers as (after the site was renamed):
-//   rekey-staff-key.mjs arm-owner            for the one active Owner
-//   rekey-staff-key.mjs arm-user <user id>   for another active staff member
+//   rekey-staff-key.mjs arm-owner <sign-in code>            for the one active Owner
+//   rekey-staff-key.mjs arm-user <user id> <sign-in code>   for another active staff member
+// The sign-in code is the eight characters Settings shows under "Current session" in that
+// person's own browser. The operator reads it there and types it here, so the permit is for
+// exactly that sign-in and never for one somebody else made with a stolen password and code.
 //
 // Plain words: a staff key belongs to one site name, and an account that is already staff may not
 // add a key with password and authenticator code alone (a stolen password must never add one). This
 // tool is the operator's yes for ONE person and ONE key: it writes a permit in the database
 // (migrations/0183_staff_rekey_permit.sql, staff.arm_rekey) that lasts at most 15 minutes, is bound
-// to the one sign-in that person has open right now, and is used up when their key ceremony starts.
+// to the sign-in the operator named, and is used up when that person's key ceremony starts.
 // The person then enrols the key on the Team page with password and code, while the team tools are
 // unlocked. The key change writes the usual audit row and sends the usual independent alert.
 //
@@ -16,7 +19,8 @@
 // same postgres-peer creator actor the team unlock's fallback uses (jit-creator-actor.mjs), with a
 // random password that lives only in this process's memory, makes the one call, and resets the
 // login to PASSWORD NULL VALID UNTIL '-infinity' before it ends. If the login is already open
-// (the team unlock runs on its fallback writer), the creator refuses and nothing changes.
+// (the team unlock runs on its fallback writer), the creator refuses and nothing changes. The run
+// is short, so SIGINT, SIGTERM and SIGHUP are held until it has reset the login.
 //
 // The name and origin come from the current release's API file and nowhere else: the staff screens
 // must be on (STAFF_ACCESS_POLICY_VERSION=2) and the staff name lines must name the site the API
@@ -28,11 +32,13 @@ import { readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
 import { publicSiteOf } from '../../preview-auth-dev/v1/public-origins.mjs';
 import { LAYOUT, logLine } from './common.mjs';
 import { verifyReleaseForImport } from './release-guard.mjs';
-import { INTERIM_IDENTITY_SQL, creatorRunner, interimIdentityAccepted, loadCurrentApiRelease, openCheckedPool, readCa, resolveStaffDbHost, staffPoolOptions } from './unlock-team-tools.mjs';
+import { INTERIM_IDENTITY_SQL, creatorRunner, interimIdentityAccepted, loadCurrentApiRelease, openCheckedPool, resolveStaffDbHost, staffPoolOptions } from './unlock-team-tools.mjs';
 
 /** The login is opened for this long: room for the creator's own release check (about 12 s) and one call, far under the database's 5 minutes. */
 export const REKEY_LEASE_MS = 3 * 60 * 1000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+/** A sign-in's code: the first eight characters of its id, as Settings shows it. */
+const SIGN_IN_CODE = /^[0-9a-f]{8}$/;
 const SOURCE_ROOT = /^\/opt\/debateai-v3-preview\/releases\/auth-dev-(candidate|fallback)-[a-z0-9-]{1,80}$/;
 /** The refusals of staff.arm_rekey and of its just-in-time guard, passed on by name; anything else is ARM_REFUSED. */
 const ARM_CODE = /^STAFF_(REKEY_[A-Z_]{2,40}|RECOVERY_JIT_REQUIRED)$/;
@@ -41,10 +47,10 @@ class RekeyRefusal extends Error { constructor(code) { super(code); this.code = 
 const refuse = code => { throw new RekeyRefusal(code); };
 const reasonOf = error => (typeof error?.code === 'string' && /^[A-Z][A-Z0-9_]{2,63}$/.test(error.code) ? error.code : 'UNEXPECTED');
 
-/** `arm-owner`, or `arm-user <uuid>`; nothing else. The Owner is named by null: the database finds the one active Owner itself. */
+/** `arm-owner <code>`, or `arm-user <uuid> <code>`; nothing else. The Owner is named by null: the database finds the one active Owner itself. */
 export function parseRekeyArguments(argv) {
-  if (argv.length === 1 && argv[0] === 'arm-owner') return { userId: null };
-  if (argv.length === 2 && argv[0] === 'arm-user' && UUID.test(argv[1])) return { userId: argv[1] };
+  if (argv.length === 2 && argv[0] === 'arm-owner' && SIGN_IN_CODE.test(argv[1])) return { userId: null, signIn: argv[1] };
+  if (argv.length === 3 && argv[0] === 'arm-user' && UUID.test(argv[1]) && SIGN_IN_CODE.test(argv[2])) return { userId: argv[1], signIn: argv[2] };
   return refuse('ARGUMENTS_REFUSED');
 }
 
@@ -64,8 +70,9 @@ export function staffSiteOf(configured) {
 
 function armed(value) {
   const expiresAt = new Date(value?.expiresAt), startedAt = new Date(value?.sessionStartedAt);
-  if (typeof value?.permitId !== 'string' || !UUID.test(value.permitId) || !Number.isFinite(expiresAt.getTime()) || !Number.isFinite(startedAt.getTime())) refuse('ARM_ANSWER_REFUSED');
-  return { expiresAt: expiresAt.toISOString(), signInStartedAt: startedAt.toISOString() };
+  if (typeof value?.permitId !== 'string' || !UUID.test(value.permitId) || !Number.isFinite(expiresAt.getTime()) || !Number.isFinite(startedAt.getTime())
+    || !Number.isSafeInteger(value.otherSignIns) || value.otherSignIns < 0) refuse('ARM_ANSWER_REFUSED');
+  return { expiresAt: expiresAt.toISOString(), signInStartedAt: startedAt.toISOString(), otherSignIns: value.otherSignIns };
 }
 
 /**
@@ -86,7 +93,7 @@ export async function armRekey({ target, site, runCreator, createPool, randomByt
     // The pool driver keeps its own copy for the one connection; ours is zeroed in the finally below.
     pool = await createPool(password.toString());
     let rows;
-    try { rows = (await pool.query('SELECT staff.arm_rekey($1::uuid,$2,$3) AS value', [target.userId, site.rpId, site.origin])).rows; }
+    try { rows = (await pool.query('SELECT staff.arm_rekey($1::uuid,$2,$3,$4) AS value', [target.userId, site.rpId, site.origin, target.signIn])).rows; }
     catch (error) { refuse(typeof error?.message === 'string' && ARM_CODE.test(error.message) ? error.message : 'ARM_REFUSED'); }
     if (rows.length !== 1) refuse('ARM_ANSWER_REFUSED');
     result = armed(rows[0].value);
@@ -118,26 +125,31 @@ async function runServer(target) {
   const pgPath = createRequire(`${engine}/package.json`).resolve('pg');
   await verifyReleaseForImport({ plan, importPaths: [pgPath] });
   const pg = createRequire(`${engine}/package.json`)(pgPath);
-  const host = resolveStaffDbHost(process.env.PREVIEW_LIFECYCLE_STAFF_DB_HOST);
-  const ca = host.tls ? await readCa() : null;
+  // Always the preview's own local socket: a tool run by hand reads no host from its environment.
+  const host = resolveStaffDbHost(undefined);
   return armRekey({
     target, site, runCreator: creatorRunner({ engine, nodePath: process.execPath }),
-    createPool: password => openCheckedPool({ Pool: pg.Pool, options: { ...staffPoolOptions({ target: host, password, ca }), application_name: 'preview-staff-rekey' },
+    createPool: password => openCheckedPool({ Pool: pg.Pool, options: { ...staffPoolOptions({ target: host, password, ca: null }), application_name: 'preview-staff-rekey' },
       sql: INTERIM_IDENTITY_SQL, accepted: row => interimIdentityAccepted(row, LAYOUT), code: 'STAFF_JIT_IDENTITY_REFUSED' })
   });
 }
+
+export const HELD_SIGNALS = Object.freeze(['SIGINT', 'SIGTERM', 'SIGHUP']);
 
 /**
  * One line, then the exit code: 0 only when a permit was armed AND the login was reset. A permit
  * armed with the login not reset still exits non-zero, so the operator resets it
  * (`unlock-team-tools.mjs reset`); the login's own expiry is at most three minutes away.
  */
-export async function runCommand(argv, { platform = process.platform, uid = process.getuid?.(), run = runServer, log = event => logLine(process.stdout, event) } = {}) {
+export async function runCommand(argv, { platform = process.platform, uid = process.getuid?.(), run = runServer, log = event => logLine(process.stdout, event), signals = process } = {}) {
+  // A signal must not end the process between opening the login and resetting it.
+  const hold = () => {};
+  for (const name of HELD_SIGNALS) signals.on(name, hold);
   try {
     if (platform !== 'linux' || uid !== 0) refuse('ACTOR_REFUSED');
     const result = await run(parseRekeyArguments(argv));
     if (result?.armed === true) {
-      log({ event: 'PREVIEW_STAFF_REKEY_ARMED', name: result.name, expiresAt: result.expiresAt, signInStartedAt: result.signInStartedAt, roleReset: result.roleReset === true });
+      log({ event: 'PREVIEW_STAFF_REKEY_ARMED', name: result.name, expiresAt: result.expiresAt, signInStartedAt: result.signInStartedAt, otherSignIns: result.otherSignIns, roleReset: result.roleReset === true });
       return result.roleReset === true ? 0 : 1;
     }
     log({ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: reasonOf({ code: result?.reason }), roleReset: result?.roleReset ?? null });
@@ -145,7 +157,7 @@ export async function runCommand(argv, { platform = process.platform, uid = proc
   } catch (error) {
     log({ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: reasonOf(error), roleReset: null });
     return 1;
-  }
+  } finally { for (const name of HELD_SIGNALS) signals.off(name, hold); }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

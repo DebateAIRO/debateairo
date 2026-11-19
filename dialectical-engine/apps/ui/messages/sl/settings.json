@@ -83,6 +83,7 @@
   "settings.sessions.current": "Trenutna seja",
   "settings.sessions.other": "Druga seja",
   "settings.sessions.lastSeen": "Nazadnje dejavna: {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Prekliči sejo {sessionId}",
   "settings.sessions.revoke": "Prekliči",
   "settings.sessions.revokeAll": "Prekliči vse seje",

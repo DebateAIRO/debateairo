@@ -83,6 +83,7 @@
   "settings.sessions.current": "मौजूदा सत्र",
   "settings.sessions.other": "अन्य सत्र",
   "settings.sessions.lastSeen": "अंतिम बार {date} को देखा गया",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "सत्र {sessionId} रद्द करें",
   "settings.sessions.revoke": "रद्द करें",
   "settings.sessions.revokeAll": "सभी सत्र रद्द करें",

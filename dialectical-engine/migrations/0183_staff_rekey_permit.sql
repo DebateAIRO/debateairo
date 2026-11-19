@@ -6,19 +6,23 @@
 -- staff (a stolen password and code must never add a staff key). Nothing was left that could give that person a key again.
 --
 -- This step adds one way, which an operator on the server opens for one person at a time:
---   staff.rekey_permit   one row per opening: the staff member, their one live sign-in, the name and origin the new key
---                        is for, and an expiry at most 15 minutes ahead. Used once.
+--   staff.rekey_permit   one row per opening: the staff member, the one sign-in it is for, the name and origin the new
+--                        key is for, and an expiry at most 15 minutes ahead. Used once.
 --   staff.arm_rekey      writes that row. Only the just-in-time staff recovery login may call it (the login that guards
 --                        the owner commands, staff.require_owner_recovery_jit). It refuses unless the person is an ACTIVE
---                        staff member with exactly one live sign-in and no working staff key under the named site.
--- While a permit is current, the same three steps a new staff key always takes accept that person once: the password and
--- code check, the start of the key ceremony (which uses the permit up), and its completion (which writes the same
--- KEY_CHANGE audit row and independent alert as every key change). A permit is bound to the sign-in that existed when
--- it was armed, so a second sign-in made with a stolen password and code cannot use it.
+--                        staff member with no working staff key under the named site, and the operator names one live
+--                        sign-in of theirs by its code (the first eight characters of its id, which Settings shows to
+--                        that sign-in's own browser).
+-- While a permit is current, the same three steps a new staff key always takes accept that person: the password and
+-- code check, the start of the key ceremony (which uses the permit up, so one ceremony starts), and its completion (which
+-- writes the same KEY_CHANGE audit row and independent alert as every key change). A permit is bound to the sign-in the operator named,
+-- so another sign-in made with a stolen password and code cannot use it, whenever it was made: the database never picks
+-- the sign-in itself.
 --
--- The four functions the API calls are new names beside the old ones (`_v2`). Each hands every other case to the
--- function it stands beside, unchanged, and takes only the permit's case itself. The older functions keep their bodies
--- and grants, so the release before runs beside this step as it did.
+-- The four functions the API calls are new names beside the old ones (`_v2`). Each takes the permit's case itself and
+-- hands every other case to the function it stands beside, unchanged. One of them, the start of a ceremony, also takes
+-- a staff member who comes with a password-and-code receipt and no permit, and refuses it as the older function does.
+-- The older functions keep their bodies and grants, so the release before runs beside this step as it did.
 --
 -- n1 (side-by-side spec §5, the database rule):
 -- n1: expand
@@ -44,7 +48,7 @@ CREATE TABLE IF NOT EXISTS staff.rekey_permit (
  CHECK((consumed_at IS NULL)=(registration_challenge_id IS NULL))
 );
 CREATE INDEX IF NOT EXISTS rekey_permit_user ON staff.rekey_permit(user_id,armed_at);
--- The rows are the record of every opening: no role, and no owner or definer path, may empty the table.
+-- The rows are the record of every opening: TRUNCATE is refused, and a person's rows go only with their account.
 SELECT core.install_truncate_guard('staff.rekey_permit');
 
 -- A working staff key of this person under this name: the same test the ceremonies apply before they offer a key.
@@ -67,14 +71,16 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
  ORDER BY p.armed_at DESC LIMIT 1
 $$;
 
--- The operator's opening. p_user NULL names the one active Owner. Answers the permit's expiry and when the sign-in it
--- is bound to began, so the operator can tell the person which sign-in it is for; it answers no account id.
-CREATE OR REPLACE FUNCTION staff.arm_rekey(p_user uuid,p_rp text,p_origin text) RETURNS jsonb
+-- The operator's opening. p_user NULL names the one active Owner. p_sign_in is the code of the sign-in the permit is
+-- for: the operator reads it in the person's own browser, so the permit never goes to a sign-in somebody else made.
+-- Answers the permit's expiry, when that sign-in began and how many other sign-ins the account has open; no account id.
+CREATE OR REPLACE FUNCTION staff.arm_rekey(p_user uuid,p_rp text,p_origin text,p_sign_in text) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE v_user uuid;v_staff staff.subject%ROWTYPE;v_sessions integer;v_session uuid;v_started timestamptz;v_now timestamptz;v_permit staff.rekey_permit%ROWTYPE;
+DECLARE v_user uuid;v_staff staff.subject%ROWTYPE;v_live integer;v_named integer;v_session uuid;v_started timestamptz;v_now timestamptz;v_permit staff.rekey_permit%ROWTYPE;
 BEGIN
  PERFORM staff.require_owner_recovery_jit();
- IF p_rp IS NULL OR p_origin IS NULL OR length(p_rp) NOT BETWEEN 1 AND 253 OR p_rp !~ '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$' OR p_origin<>'https://'||p_rp THEN
+ IF p_rp IS NULL OR p_origin IS NULL OR length(p_rp) NOT BETWEEN 1 AND 253 OR p_rp !~ '^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$' OR p_origin<>'https://'||p_rp
+  OR p_sign_in IS NULL OR p_sign_in !~ '^[0-9a-f]{8}$' THEN
   RAISE EXCEPTION 'STAFF_REKEY_INVALID';
  END IF;
  v_user:=p_user;
@@ -89,16 +95,18 @@ BEGIN
  IF staff.rekey_key_present(v_user,p_rp,p_origin) THEN RAISE EXCEPTION 'STAFF_REKEY_KEY_PRESENT';END IF;
  v_now:=clock_timestamp();
  IF EXISTS(SELECT 1 FROM staff.rekey_permit WHERE user_id=v_user AND consumed_at IS NULL AND expires_at>v_now) THEN RAISE EXCEPTION 'STAFF_REKEY_PERMIT_ACTIVE';END IF;
- -- Exactly one live sign-in: with two, nobody could say which of them the permit is for.
- SELECT count(*),min(session_id::text)::uuid,min(created_at) INTO v_sessions,v_session,v_started FROM identity.session
+ -- Exactly one live sign-in of this person carries the code; two would leave it open which one was meant.
+ SELECT count(*),count(*) FILTER(WHERE left(session_id::text,8)=p_sign_in),
+  (min(session_id::text) FILTER(WHERE left(session_id::text,8)=p_sign_in))::uuid,min(created_at) FILTER(WHERE left(session_id::text,8)=p_sign_in)
+  INTO v_live,v_named,v_session,v_started FROM identity.session
   WHERE user_id=v_user AND revoked_at IS NULL AND idle_expires_at>v_now AND absolute_expires_at>v_now;
- IF v_sessions<>1 THEN RAISE EXCEPTION 'STAFF_REKEY_SESSION_REQUIRED';END IF;
+ IF v_named<>1 THEN RAISE EXCEPTION 'STAFF_REKEY_SESSION_REQUIRED';END IF;
  -- The account itself must be one a ceremony would accept: not held, e-mail verified, authenticator active, not being erased.
  IF NOT staff.live_account(v_user,v_session) THEN RAISE EXCEPTION 'STAFF_REKEY_TARGET_INVALID';END IF;
  INSERT INTO staff.rekey_permit(user_id,staff_id,ordinary_session_id,account_security_epoch,staff_security_epoch,relying_party_id,credential_origin,armed_at,expires_at)
  VALUES(v_user,v_staff.staff_id,v_session,staff.account_epoch(v_user),v_staff.security_epoch,p_rp,p_origin,v_now,v_now+interval '15 minutes') RETURNING * INTO v_permit;
  PERFORM staff.require_owner_recovery_jit();
- RETURN jsonb_build_object('permitId',v_permit.permit_id,'expiresAt',v_permit.expires_at,'sessionStartedAt',v_started);
+ RETURN jsonb_build_object('permitId',v_permit.permit_id,'expiresAt',v_permit.expires_at,'sessionStartedAt',v_started,'otherSignIns',v_live-1);
 END $$;
 
 -- The password and code check. A staff member with a current permit passes it as a person who is not staff yet does;
@@ -111,6 +119,8 @@ BEGIN
  IF p_purpose IS DISTINCT FROM 'KEY_PREREGISTRATION' OR staff.rekey_permit_current(p_user,p_base) IS NULL THEN
   RETURN staff.step_up_prerequisite(p_user,p_owner,p_password,p_factor,p_step,p_base,p_current,p_replacement,p_csrf,p_binding,p_source,p_handle,p_purpose,p_command,p_nonce);
  END IF;
+ -- Every test below reads what is committed now; a caller's older snapshot would hide a sign-out, a hold or a disabled staff record.
+ IF current_setting('transaction_isolation')<>'read committed' THEN RAISE EXCEPTION 'STAFF_PREREQUISITE_INVALID';END IF;
  IF p_handle IS NULL OR p_handle !~ '^sha256:[0-9a-f]{64}$' OR p_command IS NOT NULL OR p_nonce IS NOT NULL OR NOT staff.live_account(p_user,p_base) THEN RAISE EXCEPTION 'STAFF_PREREQUISITE_INVALID';END IF;
  PERFORM identity.begin_runtime_audit_attempt();
  SELECT identity.rotate_session_after_step_up_with_audit(p_user,p_owner,p_password,p_factor,p_step,p_base,p_current,p_replacement,p_csrf,p_binding,clock_timestamp()+interval '1 hour',NULL,NULL,NULL,NULL,NULL,p_source) INTO v_valid;
@@ -157,11 +167,14 @@ CREATE OR REPLACE FUNCTION staff.begin_owned_webauthn_v2(p_user uuid,p_base uuid
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE v_permit staff.rekey_permit%ROWTYPE;v_staff staff.subject%ROWTYPE;v_prerequisite staff.prerequisite_receipt%ROWTYPE;v_id uuid;v_issued timestamptz;v_expiry timestamptz;
 BEGIN
- PERFORM identity.lock_security_subjects(ARRAY[p_user]);
+ -- No lock before the hand-over: 0151 locks the accounts it needs itself, two of them in order for an invitation.
  IF p_purpose IS DISTINCT FROM 'REGISTRATION' OR p_scope->>'kind' IS DISTINCT FROM 'PREREQUISITE'
   OR NOT EXISTS(SELECT 1 FROM staff.subject WHERE user_id=p_user) THEN
   RETURN staff.begin_owned_webauthn(p_user,p_base,p_purpose,p_hash,p_handle,p_rp,p_origin,p_user_handle,p_operation,p_context,p_binding,p_scope);
  END IF;
+ PERFORM identity.lock_security_subjects(ARRAY[p_user]);
+ -- Every test below reads what is committed now; a caller's older snapshot would hide a sign-out, a hold or a disabled staff record.
+ IF current_setting('transaction_isolation')<>'read committed' THEN RAISE EXCEPTION 'STAFF_CEREMONY_INVALID';END IF;
  IF p_hash IS NULL OR p_hash !~ '^sha256:[0-9a-f]{64}$' OR p_handle IS NULL OR p_handle !~ '^sha256:[0-9a-f]{64}$'
   OR p_rp IS NULL OR length(p_rp) NOT BETWEEN 1 AND 253 OR p_origin IS NULL OR length(p_origin)>512
   OR p_operation IS NULL OR p_user_handle IS NULL OR p_user_handle !~ '^sha256:[0-9a-f]{64}$'
@@ -197,10 +210,15 @@ CREATE OR REPLACE FUNCTION staff.read_owned_webauthn_challenge_v2(p_user uuid,p_
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE c staff.webauthn_challenge%ROWTYPE;
 BEGIN
+ -- No lock before the hand-over, as above; a ceremony the permit started is read again once the account is locked.
+ IF NOT EXISTS(SELECT 1 FROM staff.webauthn_challenge w WHERE w.handle_sha256=p_handle AND w.user_id=p_user AND w.ordinary_session_id=p_base AND w.purpose=p_purpose
+  AND w.purpose='REGISTRATION' AND EXISTS(SELECT 1 FROM staff.rekey_permit p WHERE p.registration_challenge_id=w.challenge_id)) THEN
+  RETURN staff.read_owned_webauthn_challenge(p_user,p_base,p_handle,p_purpose,p_context,p_binding,p_scope);
+ END IF;
  PERFORM identity.lock_security_subjects(ARRAY[p_user]);
- SELECT w.* INTO c FROM staff.webauthn_challenge w WHERE w.handle_sha256=p_handle AND w.user_id=p_user AND w.ordinary_session_id=p_base AND w.purpose=p_purpose
-  AND w.purpose='REGISTRATION' AND EXISTS(SELECT 1 FROM staff.rekey_permit p WHERE p.registration_challenge_id=w.challenge_id);
- IF NOT FOUND THEN RETURN staff.read_owned_webauthn_challenge(p_user,p_base,p_handle,p_purpose,p_context,p_binding,p_scope);END IF;
+ SELECT w.* INTO c FROM staff.webauthn_challenge w WHERE w.handle_sha256=p_handle AND w.user_id=p_user AND w.ordinary_session_id=p_base AND w.purpose='REGISTRATION'
+  AND EXISTS(SELECT 1 FROM staff.rekey_permit p WHERE p.registration_challenge_id=w.challenge_id);
+ IF NOT FOUND THEN RETURN NULL;END IF;
  IF p_context IS NOT NULL OR p_binding IS NOT NULL OR (p_scope IS NOT NULL AND p_scope IS DISTINCT FROM c.scope)
   OR staff.rekey_challenge_current(c.challenge_id) IS DISTINCT FROM true THEN RETURN NULL;
  END IF;
@@ -247,6 +265,8 @@ BEGIN
  IF NOT EXISTS(SELECT 1 FROM staff.rekey_permit WHERE registration_challenge_id=p_id) THEN
   RETURN staff.complete_owned_webauthn_registration(p_user,p_base,p_id,p_operation,p_factor,p_credential,p_key,p_counter,p_label,p_transports,p_alert);
  END IF;
+ -- Every test below reads what is committed now; a caller's older snapshot would hide a sign-out, a hold or a disabled staff record.
+ IF current_setting('transaction_isolation')<>'read committed' THEN RAISE EXCEPTION 'STAFF_CEREMONY_INVALID';END IF;
  SELECT * INTO c FROM staff.webauthn_challenge WHERE challenge_id=p_id FOR UPDATE;
  IF NOT FOUND OR c.user_id IS DISTINCT FROM p_user OR c.ordinary_session_id IS DISTINCT FROM p_base OR c.purpose<>'REGISTRATION'
   OR c.operation_id IS DISTINCT FROM p_operation OR staff.rekey_challenge_current(p_id) IS DISTINCT FROM true THEN RAISE EXCEPTION 'STAFF_CEREMONY_INVALID';
@@ -273,13 +293,13 @@ ALTER TABLE staff.rekey_permit OWNER TO debateai_staff_security_owner;
 REVOKE ALL ON staff.rekey_permit FROM PUBLIC,debateai_runtime,debateai_staff_recovery;
 ALTER FUNCTION staff.rekey_key_present(uuid,text,text) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.rekey_permit_current(uuid,uuid) OWNER TO debateai_staff_security_owner;
-ALTER FUNCTION staff.arm_rekey(uuid,text,text) OWNER TO debateai_staff_security_owner;
+ALTER FUNCTION staff.arm_rekey(uuid,text,text,text) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.step_up_prerequisite_v2(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.rekey_challenge_current(uuid) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.begin_owned_webauthn_v2(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.read_owned_webauthn_challenge_v2(uuid,uuid,text,text,jsonb,jsonb,jsonb) OWNER TO debateai_staff_security_owner;
 ALTER FUNCTION staff.complete_owned_webauthn_registration_v2(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb) OWNER TO debateai_staff_security_owner;
-REVOKE ALL ON FUNCTION staff.rekey_key_present(uuid,text,text),staff.rekey_permit_current(uuid,uuid),staff.arm_rekey(uuid,text,text),
+REVOKE ALL ON FUNCTION staff.rekey_key_present(uuid,text,text),staff.rekey_permit_current(uuid,uuid),staff.arm_rekey(uuid,text,text,text),
  staff.step_up_prerequisite_v2(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text),staff.rekey_challenge_current(uuid),
  staff.begin_owned_webauthn_v2(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb),staff.read_owned_webauthn_challenge_v2(uuid,uuid,text,text,jsonb,jsonb,jsonb),
  staff.complete_owned_webauthn_registration_v2(uuid,uuid,uuid,uuid,uuid,text,text,bigint,jsonb,text[],jsonb),
@@ -292,7 +312,7 @@ DO $rekey_owner$ DECLARE v_owner name; BEGIN
 END $rekey_owner$;
 GRANT EXECUTE ON FUNCTION identity.staff_insert_rekey_webauthn_key(uuid,uuid,text,text,bigint,jsonb,text[],timestamptz) TO debateai_staff_security_owner;
 -- The operator's opening: the staff recovery capability only, and the function itself asks for its just-in-time login.
-GRANT EXECUTE ON FUNCTION staff.arm_rekey(uuid,text,text) TO debateai_staff_recovery;
+GRANT EXECUTE ON FUNCTION staff.arm_rekey(uuid,text,text,text) TO debateai_staff_recovery;
 -- The password and code check is the request login's, as 0085's is; the ceremony is the system login's, as 0171 made 0086's.
 GRANT EXECUTE ON FUNCTION staff.step_up_prerequisite_v2(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text) TO debateai_runtime;
 GRANT EXECUTE ON FUNCTION staff.begin_owned_webauthn_v2(uuid,uuid,text,text,text,text,text,text,uuid,jsonb,jsonb,jsonb),

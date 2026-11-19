@@ -83,6 +83,7 @@
   "settings.sessions.current": "Huidige sessie",
   "settings.sessions.other": "Andere sessie",
   "settings.sessions.lastSeen": "Laatst gezien op {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Sessie {sessionId} intrekken",
   "settings.sessions.revoke": "Intrekken",
   "settings.sessions.revokeAll": "Alle sessies intrekken",

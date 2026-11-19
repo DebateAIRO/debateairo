@@ -83,6 +83,7 @@
   "settings.sessions.current": "Текущий сеанс",
   "settings.sessions.other": "Другой сеанс",
   "settings.sessions.lastSeen": "Последняя активность: {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Отозвать сеанс {sessionId}",
   "settings.sessions.revoke": "Отозвать",
   "settings.sessions.revokeAll": "Отозвать все сеансы",

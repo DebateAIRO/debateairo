@@ -9,9 +9,10 @@ const folder = join(dirname(fileURLToPath(import.meta.url)), '../../deploy/previ
 const start = Date.parse('2026-11-19T10:00:00Z');
 const USER = '11111111-1111-4111-8111-111111111111';
 const PERMIT = '22222222-2222-4222-8222-222222222222';
+const CODE = '3f9a1c2e';
 const site = { rpId: 'dezbatere.ro', origin: 'https://dezbatere.ro' };
 const closedRole = { passwordNull: true, expiredMinusInfinity: true, noSessions: true, capabilitiesPreserved: true };
-const answer = { permitId: PERMIT, expiresAt: '2026-11-19T10:15:00.000Z', sessionStartedAt: '2026-11-19T09:58:00.000Z' };
+const answer = { permitId: PERMIT, expiresAt: '2026-11-19T10:15:00.000Z', sessionStartedAt: '2026-11-19T09:58:00.000Z', otherSignIns: 0 };
 
 /** Recording fakes for the two things the tool reaches: the postgres-peer creator and the recovery-login pool. */
 function harness(options: { open?: unknown; close?: unknown | Error; query?: () => Promise<{ rows: unknown[] }>; pool?: Error; end?: Error } = {}) {
@@ -31,16 +32,17 @@ function harness(options: { open?: unknown; close?: unknown | Error; query?: () 
       end: async () => { calls.push('end'); if (options.end) throw options.end; }
     };
   };
-  const run = (target = { userId: null as string | null }) => rekey.armRekey({ target, site, runCreator, createPool, randomBytes: () => bytes, now: () => start });
+  const run = (target = { userId: null as string | null, signIn: CODE }) => rekey.armRekey({ target, site, runCreator, createPool, randomBytes: () => bytes, now: () => start });
   return { calls, controls, secrets, queries, passwords, bytes, run };
 }
 const sqlError = (message: string) => Object.assign(new Error(message), { code: 'P0001' });
 
 describe('rekey-staff-key.mjs: what the operator may type', () => {
-  it('accepts the Owner, or one account id, and nothing else', () => {
-    expect(rekey.parseRekeyArguments(['arm-owner'])).toEqual({ userId: null });
-    expect(rekey.parseRekeyArguments(['arm-user', USER])).toEqual({ userId: USER });
-    for (const argv of [[], ['arm-owner', USER], ['arm-user'], ['arm-user', 'not-an-id'], ['arm-user', USER, USER], ['arm'], ['reset'], ['arm-owner', '--database-url=postgres://x']])
+  it('accepts the Owner or one account id, each with the code of the sign-in the permit is for, and nothing else', () => {
+    expect(rekey.parseRekeyArguments(['arm-owner', CODE])).toEqual({ userId: null, signIn: CODE });
+    expect(rekey.parseRekeyArguments(['arm-user', USER, CODE])).toEqual({ userId: USER, signIn: CODE });
+    for (const argv of [[], ['arm-owner'], ['arm-owner', USER], ['arm-owner', '3F9A1C2E'], ['arm-owner', '3f9a1c2'], ['arm-owner', '3f9a1c2e0'], ['arm-owner', CODE, CODE], ['arm-user'], ['arm-user', USER],
+      ['arm-user', 'not-an-id', CODE], ['arm-user', USER, USER], ['arm', CODE], ['reset'], ['arm-owner', '--database-url=postgres://x']])
       expect(() => rekey.parseRekeyArguments(argv)).toThrow('ARGUMENTS_REFUSED');
   });
 });
@@ -69,15 +71,15 @@ describe('rekey-staff-key.mjs: the site a new staff key is for comes from the AP
 describe('rekey-staff-key.mjs: open the recovery login, one call, close it', () => {
   it('arms a permit for the Owner and resets the login', async () => {
     const h = harness();
-    expect(await h.run()).toEqual({ armed: true, name: 'dezbatere.ro', expiresAt: answer.expiresAt, signInStartedAt: answer.sessionStartedAt, roleReset: true });
+    expect(await h.run()).toEqual({ armed: true, name: 'dezbatere.ro', expiresAt: answer.expiresAt, signInStartedAt: answer.sessionStartedAt, otherSignIns: 0, roleReset: true });
     expect(h.calls).toEqual(['open', 'pool', 'query', 'end', 'close']);
-    expect(h.queries).toEqual([{ text: 'SELECT staff.arm_rekey($1::uuid,$2,$3) AS value', values: [null, 'dezbatere.ro', 'https://dezbatere.ro'] }]);
+    expect(h.queries).toEqual([{ text: 'SELECT staff.arm_rekey($1::uuid,$2,$3,$4) AS value', values: [null, 'dezbatere.ro', 'https://dezbatere.ro', CODE] }]);
   });
 
   it('names another staff member by account id', async () => {
     const h = harness();
-    await h.run({ userId: USER });
-    expect(h.queries[0]!.values).toEqual([USER, 'dezbatere.ro', 'https://dezbatere.ro']);
+    await h.run({ userId: USER, signIn: 'abcdef01' });
+    expect(h.queries[0]!.values).toEqual([USER, 'dezbatere.ro', 'https://dezbatere.ro', 'abcdef01']);
   });
 
   it('opens the login for three minutes, far under the database\'s five', async () => {
@@ -134,56 +136,66 @@ describe('rekey-staff-key.mjs: open the recovery login, one call, close it', () 
   });
 
   it('refuses an answer that is not a permit', async () => {
-    for (const rows of [[], [{ value: null }], [{ value: { ...answer, permitId: 'x' } }], [{ value: { ...answer, expiresAt: 'soon' } }], [{ value: answer }, { value: answer }]])
+    for (const rows of [[], [{ value: null }], [{ value: { ...answer, permitId: 'x' } }], [{ value: { ...answer, expiresAt: 'soon' } }], [{ value: { ...answer, otherSignIns: -1 } }], [{ value: answer }, { value: answer }]])
       expect(await harness({ query: async () => ({ rows }) }).run()).toEqual({ armed: false, reason: 'ARM_ANSWER_REFUSED', roleReset: true });
   });
 });
 
 describe('rekey-staff-key.mjs: the one line and the exit code', () => {
-  const ok = { armed: true, name: 'dezbatere.ro', expiresAt: answer.expiresAt, signInStartedAt: answer.sessionStartedAt, roleReset: true };
+  const ok = { armed: true, name: 'dezbatere.ro', expiresAt: answer.expiresAt, signInStartedAt: answer.sessionStartedAt, otherSignIns: 1, roleReset: true };
   const command = async (argv: string[], result: unknown, who = { platform: 'linux', uid: 0 }) => {
     const logs: any[] = [], targets: unknown[] = [];
-    const code = await rekey.runCommand(argv, { ...who, run: async (target: unknown) => { targets.push(target); if (result instanceof Error) throw result; return result; }, log: (event: unknown) => logs.push(event) });
-    return { code, logs, targets };
+    const held: string[] = [], released: string[] = [];
+    const signals = { on: (name: string) => { held.push(name); }, off: (name: string) => { released.push(name); } };
+    const code = await rekey.runCommand(argv, { ...who, signals, run: async (target: unknown) => { targets.push(target); expect(held).toEqual(['SIGINT', 'SIGTERM', 'SIGHUP']); expect(released).toEqual([]); if (result instanceof Error) throw result; return result; }, log: (event: unknown) => logs.push(event) });
+    return { code, logs, targets, held, released };
   };
 
+  it('holds SIGINT, SIGTERM and SIGHUP while it runs, so a signal cannot leave the login open, and lets go of them after', async () => {
+    for (const result of [ok, new Error('boom')]) {
+      const { held, released } = await command(['arm-owner', CODE], result);
+      expect(held).toEqual(['SIGINT', 'SIGTERM', 'SIGHUP']);
+      expect(released).toEqual(['SIGINT', 'SIGTERM', 'SIGHUP']);
+    }
+  });
+
   it('prints the permit\'s end and the sign-in it is for, never an account id, and exits 0', async () => {
-    const { code, logs, targets } = await command(['arm-user', USER], ok);
+    const { code, logs, targets } = await command(['arm-user', USER, CODE], ok);
     expect(code).toBe(0);
-    expect(targets).toEqual([{ userId: USER }]);
-    expect(logs).toEqual([{ event: 'PREVIEW_STAFF_REKEY_ARMED', name: 'dezbatere.ro', expiresAt: answer.expiresAt, signInStartedAt: answer.sessionStartedAt, roleReset: true }]);
+    expect(targets).toEqual([{ userId: USER, signIn: CODE }]);
+    expect(logs).toEqual([{ event: 'PREVIEW_STAFF_REKEY_ARMED', name: 'dezbatere.ro', expiresAt: answer.expiresAt, signInStartedAt: answer.sessionStartedAt, otherSignIns: 1, roleReset: true }]);
     expect(JSON.stringify(logs)).not.toContain(USER);
     expect(JSON.stringify(logs)).not.toContain(PERMIT);
   });
 
   it('exits non-zero when a permit was armed but the login was not reset', async () => {
-    const { code, logs } = await command(['arm-owner'], { ...ok, roleReset: false });
+    const { code, logs } = await command(['arm-owner', CODE], { ...ok, roleReset: false });
     expect(code).toBe(1);
     expect(logs[0]).toMatchObject({ event: 'PREVIEW_STAFF_REKEY_ARMED', roleReset: false });
   });
 
   it('prints the refusal by name and exits non-zero', async () => {
-    expect(await command(['arm-owner'], { armed: false, reason: 'STAFF_REKEY_KEY_PRESENT', roleReset: true }))
+    expect(await command(['arm-owner', CODE], { armed: false, reason: 'STAFF_REKEY_KEY_PRESENT', roleReset: true }))
       .toMatchObject({ code: 1, logs: [{ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: 'STAFF_REKEY_KEY_PRESENT', roleReset: true }] });
-    expect(await command(['arm-owner'], Object.assign(new Error('RELEASE_UNVERIFIED'), { code: 'RELEASE_UNVERIFIED' })))
+    expect(await command(['arm-owner', CODE], Object.assign(new Error('RELEASE_UNVERIFIED'), { code: 'RELEASE_UNVERIFIED' })))
       .toMatchObject({ code: 1, logs: [{ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: 'RELEASE_UNVERIFIED', roleReset: null }] });
-    expect(await command(['arm-owner'], new Error('something with a path /etc/secret')))
+    expect(await command(['arm-owner', CODE], new Error('something with a path /etc/secret')))
       .toMatchObject({ code: 1, logs: [{ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: 'UNEXPECTED', roleReset: null }] });
   });
 
   it('only root on Linux may run it, and wrong words reach nothing', async () => {
     for (const who of [{ platform: 'darwin', uid: 0 }, { platform: 'linux', uid: 1000 }]) {
-      const { code, logs, targets } = await command(['arm-owner'], ok, who);
+      const { code, logs, targets } = await command(['arm-owner', CODE], ok, who);
       expect(code).toBe(1); expect(targets).toEqual([]);
       expect(logs).toEqual([{ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: 'ACTOR_REFUSED', roleReset: null }]);
     }
-    const { code, logs, targets } = await command(['arm-everyone'], ok);
+    const { code, logs, targets } = await command(['arm-everyone', CODE], ok);
     expect(code).toBe(1); expect(targets).toEqual([]);
     expect(logs[0]).toMatchObject({ reason: 'ARGUMENTS_REFUSED' });
   });
 
   it('loads and refuses cleanly off the server with no environment but PATH', () => {
-    const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, join(folder, 'rekey-staff-key.mjs'), 'arm-owner'], { encoding: 'utf8' });
+    const result = spawnSync('/usr/bin/env', ['-i', 'PATH=/usr/sbin:/usr/bin:/sbin:/bin', process.execPath, join(folder, 'rekey-staff-key.mjs'), 'arm-owner', CODE], { encoding: 'utf8' });
     expect(result.status).toBe(1);
     expect(JSON.parse(result.stdout.trim())).toEqual({ event: 'PREVIEW_STAFF_REKEY_REFUSED', reason: 'ACTOR_REFUSED', roleReset: null });
     expect(result.stderr).toBe('');
@@ -194,10 +206,13 @@ describe('rekey-staff-key.mjs: what it may reach', () => {
   const source = readFileSync(join(folder, 'rekey-staff-key.mjs'), 'utf8');
   it('makes one database call, the permit, as the recovery login the creator actor opens', () => {
     expect(source.match(/\.query\(/g)).toHaveLength(1);
-    expect(source).toContain("'SELECT staff.arm_rekey($1::uuid,$2,$3) AS value'");
+    expect(source).toContain("'SELECT staff.arm_rekey($1::uuid,$2,$3,$4) AS value'");
     expect(source).toContain('creatorRunner({ engine, nodePath: process.execPath })');
     expect(source).toContain('INTERIM_IDENTITY_SQL');
     expect(source).not.toMatch(/ALTER ROLE|PASSWORD '|postgres(ql)?:\/\//);
+    // Run by hand, it takes the database's place from nowhere but the kit's own layout.
+    expect(source).toContain('resolveStaffDbHost(undefined)');
+    expect(source).not.toMatch(/process\.env/);
   });
   it('checks the release before it loads the database driver from it', () => {
     expect(source.indexOf('await verifyReleaseForImport({ plan, importPaths: [pgPath] })')).toBeGreaterThan(0);

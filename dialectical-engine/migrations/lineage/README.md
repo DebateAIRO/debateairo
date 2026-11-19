@@ -1221,26 +1221,32 @@ rename a staff member therefore has no key that works, and 0085's, 0086's and 01
 one from password and authenticator code alone once the account is staff, so that a stolen password and code can never
 add a staff key. This step adds one opening, which an operator on the server arms for one person at a time:
 
-- `staff.rekey_permit`: one row per opening. It names the staff member, the one live sign-in the permit is for, the site
+- `staff.rekey_permit`: one row per opening. It names the staff member, the one sign-in the permit is for, the site
   name and origin the new key is for, and an expiry at most 15 minutes ahead. It is used once. No login may read or
   write the table.
-- `staff.arm_rekey(uuid,text,text)` writes that row. Only the just-in-time staff recovery login may call it
-  (`staff.require_owner_recovery_jit`), and it refuses unless the person is an ACTIVE staff member with exactly one live
-  sign-in, no working staff key under the named site and no permit still open.
-- While a permit is current, the steps a new staff key always takes accept that person once: the password and
+- `staff.arm_rekey(uuid,text,text,text)` writes that row. Only the just-in-time staff recovery login may call it
+  (`staff.require_owner_recovery_jit`), and it refuses unless the person is an ACTIVE staff member with no working
+  staff key under the named site and no permit still open, and the operator names exactly one live sign-in of theirs by
+  its code (the first eight characters of its id, which Settings shows to that sign-in's own browser).
+- While a permit is current, the steps a new staff key always takes accept that person: the password and
   code check (`staff.step_up_prerequisite_v2`), the start of the key ceremony (`staff.begin_owned_webauthn_v2`, which
-  uses the permit up), the read between start and completion (`staff.read_owned_webauthn_challenge_v2`) and the
+  uses the permit up, so one ceremony starts), the read between start and completion (`staff.read_owned_webauthn_challenge_v2`) and the
   completion (`staff.complete_owned_webauthn_registration_v2`, which writes the same `KEY_CHANGE` audit row and
   independent alert as every key change). Each of these four stands beside the older function of the same name without
-  `_v2`, takes only the permit's case itself and hands every other case to the older function unchanged.
+  `_v2`, takes the permit's case itself and hands every other case to the older function unchanged. The start also
+  takes a staff member who comes with a password-and-code receipt and no permit, and refuses it as the older one does.
 - Four helpers the others share: `staff.rekey_key_present` (a working staff key of this person under this name),
   `staff.rekey_permit_current` (the permit a sign-in may use now), `staff.rekey_challenge_current` (whether a ceremony
   the permit started may still finish) and `identity.staff_insert_rekey_webauthn_key` (the key row, refused when the
   person already has a key under that name).
 
-A permit is bound to the sign-in that existed when it was armed and to the account's and the staff record's security
-state at that moment, so a second sign-in made with a stolen password and code cannot use it, and any change to either
-ends it.
+A permit is bound to the sign-in the operator named and to the account's and the staff record's security state at
+that moment, so another sign-in made with a stolen password and code cannot use it, whenever it was made, and any
+change to either ends it.
+
+While the step applies, the new table's two references take SHARE ROW EXCLUSIVE on `identity."user"` and on
+`staff.subject` until the step commits: writes to those two tables wait for it and reads do not. The step waits for
+that lock 2 s at a time, five times, and then ends `MIGRATION_LOCK_TIMEOUT`; run it again.
 
 Its files: `0183_staff_rekey_permit.sql`, `staff-rekey-permit-forward0183.json` and
 `packages/db/src/migration-forward0183.ts` (`loadForward0183`, appended last to `STEPS`, `MIGRATION_FORWARD0183_*`

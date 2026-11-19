@@ -11,7 +11,7 @@ import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js
 
 /**
  * 0183: a staff member whose staff key belongs to another site name enrols one key under the current name, once, with
- * password and authenticator code, only while an operator's permit is current. The site's current name here is the
+ * password and authenticator code, only while an operator's permit is current, and only from the sign-in the operator named. The site's current name here is the
  * fixtures' (admin.example.test); OLD_NAME stands for the name the site answered as before it was renamed.
  */
 const OLD_NAME = 'old.example.test', OLD_ORIGIN = 'https://old.example.test';
@@ -73,8 +73,13 @@ async function asRecovery<T>(call: (jit: Pool) => Promise<T>, validFor = '4 minu
   try { return await call(jit); }
   finally { await jit.end(); await database.pool.query("ALTER ROLE debateai_prod_staff_recovery PASSWORD NULL VALID UNTIL '-infinity'"); }
 }
-const arm = (userId: string | null, name = rpId, nameOrigin = origin) =>
-  asRecovery(async (jit) => (await jit.query('SELECT staff.arm_rekey($1::uuid,$2,$3) AS value', [userId, name, nameOrigin])).rows[0].value as { permitId: string; expiresAt: string; sessionStartedAt: string });
+type Armed = { permitId: string; expiresAt: string; sessionStartedAt: string; otherSignIns: number };
+/** A sign-in's code, as Settings shows it to that sign-in's own browser: the first eight characters of its id. */
+const codeOf = (a: Pick<Account, 'ordinarySessionId'>) => a.ordinarySessionId.slice(0, 8);
+const armRaw = (userId: string | null, signIn: string, name = rpId, nameOrigin = origin) =>
+  asRecovery(async (jit) => (await jit.query('SELECT staff.arm_rekey($1::uuid,$2,$3,$4) AS value', [userId, name, nameOrigin, signIn])).rows[0].value as Armed);
+/** The operator arms a permit for this person's sign-in, naming it by the code read in their browser. */
+const arm = (a: Account, name = rpId, nameOrigin = origin) => armRaw(a.userId, codeOf(a), name, nameOrigin);
 
 /** The password and code check, as the API's request login makes it. Each call uses the next authenticator step and rotates the sign-in's token. */
 async function prerequisite(a: Account, fn = 'staff.step_up_prerequisite_v2'): Promise<string> {
@@ -141,7 +146,7 @@ describe('without a permit nothing changed', () => {
 describe('with a permit', () => {
   it('accepts exactly one key under the current name, uses the permit up, and writes the audit row and the alert', async () => {
     const a = await staffAfterRename(), f = newKey(), operationId = randomUUID();
-    const armed = await arm(a.userId);
+    const armed = await arm(a);
     expect(new Date(armed.expiresAt).getTime() - Date.now()).toBeLessThanOrEqual(15 * 60 * 1000);
     expect(new Date(armed.expiresAt).getTime() - Date.now()).toBeGreaterThan(14 * 60 * 1000);
     expect(armed).not.toHaveProperty('userId');
@@ -176,13 +181,13 @@ describe('with a permit', () => {
 
     // The permit is gone: password and code alone are refused again, and a second permit is refused while that key works.
     await expect(prerequisite(a)).rejects.toThrow('STAFF_EXISTING_SUBJECT_REQUIRES_KEY_PROOF');
-    await expect(arm(a.userId)).rejects.toThrow('STAFF_REKEY_KEY_PRESENT');
+    await expect(arm(a)).rejects.toThrow('STAFF_REKEY_KEY_PRESENT');
     expect(await keysUnder(a, rpId)).toBe(1);
   });
 
   it('is used up when the key ceremony starts: no second ceremony starts, whatever receipt it comes with', async () => {
     const a = await staffAfterRename();
-    await arm(a.userId);
+    await arm(a);
     // Before the ceremony starts the permit is still current, so the check may be passed again; only the newest receipt counts.
     const superseded = await prerequisite(a), handle = await prerequisite(a);
     await expect(begin(a, superseded)).rejects.toThrow('STAFF_PREREQUISITE_INVALID');
@@ -204,7 +209,7 @@ describe('with a permit', () => {
 
   it('never leaves a second key: a ceremony whose name already has a working key is refused at the key insert', async () => {
     const a = await staffAfterRename();
-    await arm(a.userId);
+    await arm(a);
     const options = await begin(a, await prerequisite(a)), f = newKey();
     await keyUnder(a, rpId, origin);
     await expect(finish(a, options, f)).rejects.toThrow('STAFF_KEY_PROOF_REQUIRED');
@@ -213,17 +218,17 @@ describe('with a permit', () => {
 
   it('arms the one active Owner when no account is named', async () => {
     const a = await staffAfterRename(true);
-    await arm(null);
+    await armRaw(null, codeOf(a));
     expect((await permitOf(a)).staff_id).toBe(a.staffId);
     await finish(a, await begin(a, await prerequisite(a)), newKey());
     expect(await keysUnder(a, rpId)).toBe(1);
     await database.pool.query('UPDATE staff.owner_designation SET active=false WHERE active');
-    await expect(arm(null)).rejects.toThrow('STAFF_REKEY_TARGET_INVALID');
+    await expect(armRaw(null, codeOf(a))).rejects.toThrow('STAFF_REKEY_TARGET_INVALID');
   });
 
   it('rolls the key, the audit row and the alert back together when the independent alert is not ready', async () => {
     const a = await staffAfterRename(), f = newKey(), operationId = randomUUID();
-    await arm(a.userId);
+    await arm(a);
     const options = await begin(a, await prerequisite(a), operationId);
     await database.pool.query('DELETE FROM staff.independent_alert_readiness');
     await expect(service.finishRegistration(a, request(options, registration(f, options.options.challenge)), async (input) => ({ operationId: input.operationId, factorId: input.factorId,
@@ -241,21 +246,21 @@ describe('a permit that may not be used', () => {
 
   it('refuses an expired permit at the password and code check and at the start of the ceremony', async () => {
     const a = await staffAfterRename();
-    await arm(a.userId);
+    await arm(a);
     const handle = await prerequisite(a);
     await expire(a);
     await expect(prerequisite(a)).rejects.toThrow('STAFF_EXISTING_SUBJECT_REQUIRES_KEY_PROOF');
     await expect(begin(a, handle)).rejects.toThrow('STAFF_KEY_PROOF_REQUIRED');
     expect((await permitOf(a)).consumed_at).toBeNull();
     // An expired permit does not block a new one.
-    await arm(a.userId);
+    await arm(a);
     await finish(a, await begin(a, await prerequisite(a)), newKey());
     expect(await keysUnder(a, rpId)).toBe(1);
   });
 
   it('is for one person: another staff member, and an account that is not staff, gain nothing from it', async () => {
     const a = await staffAfterRename(), other = await staffAfterRename(), outsider = await account();
-    await arm(a.userId);
+    await arm(a);
     await expect(prerequisite(other)).rejects.toThrow('STAFF_EXISTING_SUBJECT_REQUIRES_KEY_PROOF');
     const handle = await prerequisite(a);
     await expect(begin(other, handle)).rejects.toThrow();
@@ -264,9 +269,9 @@ describe('a permit that may not be used', () => {
     expect((await permitOf(a)).consumed_at).toBeNull();
   });
 
-  it('is for the one sign-in that was open when it was armed: a later sign-in with the same password and code is refused', async () => {
+  it('is for the sign-in the operator named: a later sign-in with the same password and code is refused', async () => {
     const a = await staffAfterRename();
-    await arm(a.userId);
+    await arm(a);
     const stolen: Account = { ...a, ...(await session(a.userId)) };
     await expect(prerequisite(stolen)).rejects.toThrow('STAFF_EXISTING_SUBJECT_REQUIRES_KEY_PROOF');
     const handle = await prerequisite(a);
@@ -277,14 +282,14 @@ describe('a permit that may not be used', () => {
 
   it('is for one site name: a permit armed for another name starts no ceremony under this one', async () => {
     const a = await staffAfterRename();
-    await arm(a.userId, 'other.example.test', 'https://other.example.test');
+    await arm(a, 'other.example.test', 'https://other.example.test');
     await expect(begin(a, await prerequisite(a))).rejects.toThrow('STAFF_KEY_PROOF_REQUIRED');
     expect((await permitOf(a)).consumed_at).toBeNull();
   });
 
   it.each(['hold', 'disabled', 'sign-out', 'ceremony-expired'])('stops a started ceremony when the account changed since (%s)', async (change) => {
     const a = await staffAfterRename(), f = newKey();
-    await arm(a.userId);
+    await arm(a);
     const options = await begin(a, await prerequisite(a));
     if (change === 'hold') await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch) VALUES($1,false,1)', [a.userId]);
     if (change === 'disabled') await database.pool.query("UPDATE staff.subject SET state='DISABLED',security_epoch=security_epoch+1 WHERE staff_id=$1", [a.staffId]);
@@ -294,9 +299,41 @@ describe('a permit that may not be used', () => {
     expect(await keysUnder(a, rpId)).toBe(0);
   });
 
+  it('starts one ceremony when two starts race on two connections', async () => {
+    const a = await staffAfterRename();
+    await arm(a);
+    const handle = await prerequisite(a);
+    const results = await Promise.allSettled([begin(a, handle), begin(a, handle), begin(a, handle)]);
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    expect((await database.pool.query("SELECT count(*)::int AS n FROM staff.webauthn_challenge WHERE user_id=$1 AND purpose='REGISTRATION'", [a.userId])).rows[0].n).toBe(1);
+  });
+
+  it('refuses the permit\'s steps inside a transaction that reads an older snapshot', async () => {
+    const a = await staffAfterRename(), operationId = randomUUID(), factorId = randomUUID();
+    await arm(a);
+    const handle = await prerequisite(a), client = await system.connect();
+    try {
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      await expect(client.query('SELECT staff.begin_owned_webauthn_v2($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,NULL,$10::jsonb)',
+        [a.userId, a.ordinarySessionId, 'REGISTRATION', digest(randomBytes(32)), digest(randomBytes(32)), rpId, origin, digest(randomBytes(32)), operationId, { kind: 'PREREQUISITE', prerequisiteHandleHash: digest(handle) }])).rejects.toThrow('STAFF_CEREMONY_INVALID');
+      await client.query('ROLLBACK');
+      const options = await begin(a, handle, operationId);
+      const challenge = (await database.pool.query('SELECT challenge_id FROM staff.webauthn_challenge WHERE handle_sha256=$1', [digest(options.challenge_handle)])).rows[0].challenge_id as string;
+      await authorizeStaffAlertFixture(database.pool, operationId);
+      await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ');
+      await client.query('SELECT 1');
+      // The sign-in is revoked after the snapshot was taken; the completion must not finish on what it still sees.
+      await database.pool.query('UPDATE identity.session SET revoked_at=clock_timestamp() WHERE session_id=$1', [a.ordinarySessionId]);
+      await expect(client.query('SELECT staff.complete_owned_webauthn_registration_v2($1,$2,$3,$4,$5,$6,$7,$8::bigint,$9::jsonb,$10::text[],$11::jsonb)',
+        [a.userId, a.ordinarySessionId, challenge, operationId, factorId, b64(randomBytes(32)), b64(randomBytes(64)), 0, { ...env, keyId: 'passkey-label:' + factorId + ':v1' }, ['usb'],
+          { schema: 'staff-alert-v1', event: 'KEY_CHANGE', operationId, envelope: env }])).rejects.toThrow('STAFF_CEREMONY_INVALID');
+    } finally { await client.query('ROLLBACK').catch(() => undefined); client.release(); }
+    expect(await keysUnder(a, rpId)).toBe(0);
+  });
+
   it('is not accepted by the older functions, which the release before still calls', async () => {
     const a = await staffAfterRename(), operationId = randomUUID(), factorId = randomUUID();
-    await arm(a.userId);
+    await arm(a);
     const options = await begin(a, await prerequisite(a), operationId);
     const challenge = (await database.pool.query('SELECT challenge_id FROM staff.webauthn_challenge WHERE handle_sha256=$1', [digest(options.challenge_handle)])).rows[0].challenge_id as string;
     expect((await system.query('SELECT staff.read_owned_webauthn_challenge($1,$2,$3,$4,NULL,NULL,NULL) AS value', [a.userId, a.ordinarySessionId, digest(options.challenge_handle), 'REGISTRATION'])).rows[0].value).toBeNull();
@@ -311,7 +348,7 @@ describe('a permit that may not be used', () => {
 describe('who may arm a permit, and for whom', () => {
   it('refuses everyone but the staff recovery login while it expires within five minutes', async () => {
     const a = await staffAfterRename();
-    const call = (pool: Pool) => pool.query('SELECT staff.arm_rekey($1::uuid,$2,$3)', [a.userId, rpId, origin]);
+    const call = (pool: Pool) => pool.query('SELECT staff.arm_rekey($1::uuid,$2,$3,$4)', [a.userId, rpId, origin, codeOf(a)]);
     await expect(call(runtime)).rejects.toThrow(/permission denied/);
     await expect(call(system)).rejects.toThrow(/permission denied/);
     await expect(call(database.pool)).rejects.toThrow('STAFF_RECOVERY_JIT_REQUIRED');
@@ -323,37 +360,73 @@ describe('who may arm a permit, and for whom', () => {
     const outsider = await account(), disabled = await staffAfterRename(), held = await staffAfterRename();
     await database.pool.query("UPDATE staff.subject SET state='DISABLED',security_epoch=security_epoch+1 WHERE staff_id=$1", [disabled.staffId]);
     await database.pool.query('INSERT INTO identity.account_security_hold(user_id,held,security_epoch) VALUES($1,true,1)', [held.userId]);
-    for (const target of [outsider.userId, disabled.userId, held.userId, randomUUID()]) await expect(arm(target)).rejects.toThrow('STAFF_REKEY_TARGET_INVALID');
+    for (const target of [outsider, disabled, held]) await expect(arm(target)).rejects.toThrow('STAFF_REKEY_TARGET_INVALID');
+    await expect(armRaw(randomUUID(), codeOf(outsider))).rejects.toThrow('STAFF_REKEY_TARGET_INVALID');
   });
 
   it('refuses a staff member who already has a working staff key under the name', async () => {
     const a = await staffAfterRename();
     await keyUnder(a, rpId, origin);
-    await expect(arm(a.userId)).rejects.toThrow('STAFF_REKEY_KEY_PRESENT');
+    await expect(arm(a)).rejects.toThrow('STAFF_REKEY_KEY_PRESENT');
     // A key that was revoked under this name is not a working key.
     const b = await staffAfterRename(), revoked = await keyUnder(b, rpId, origin);
     await withMailLocale(database.pool, 'en', (c) => c.query("UPDATE identity.mfa_factor SET state='revoked',revoked_at=clock_timestamp() WHERE mfa_factor_id=$1", [revoked]));
-    await expect(arm(b.userId)).resolves.toHaveProperty('permitId');
+    await expect(arm(b)).resolves.toHaveProperty('permitId');
   });
 
-  it('needs exactly one live sign-in, and says when that sign-in began', async () => {
-    const none = await staffAfterRename(), two = await staffAfterRename(), one = await staffAfterRename();
-    await database.pool.query('UPDATE identity.session SET revoked_at=clock_timestamp() WHERE user_id=$1', [none.userId]);
-    await session(two.userId);
-    await expect(arm(none.userId)).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
-    await expect(arm(two.userId)).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
-    const started = (await database.pool.query('SELECT created_at FROM identity.session WHERE session_id=$1', [one.ordinarySessionId])).rows[0].created_at as Date;
-    expect(new Date((await arm(one.userId)).sessionStartedAt).getTime()).toBe(started.getTime());
-    expect((await permitOf(one)).ordinary_session_id).toBe(one.ordinarySessionId);
+  it('is for the sign-in the operator names by its code, whatever other sign-ins the account has', async () => {
+    const a = await staffAfterRename(), other: Account = { ...a, ...(await session(a.userId)) };
+    const started = (await database.pool.query('SELECT created_at FROM identity.session WHERE session_id=$1', [a.ordinarySessionId])).rows[0].created_at as Date;
+    const armed = await arm(a);
+    expect(new Date(armed.sessionStartedAt).getTime()).toBe(started.getTime());
+    expect(armed.otherSignIns).toBe(1);
+    expect((await permitOf(a)).ordinary_session_id).toBe(a.ordinarySessionId);
+    // The other sign-in, made with the same password and code before the permit was armed, gains nothing.
+    await expect(prerequisite(other)).rejects.toThrow('STAFF_EXISTING_SUBJECT_REQUIRES_KEY_PROOF');
+    await finish(a, await begin(a, await prerequisite(a)), newKey());
+    expect(await keysUnder(a, rpId)).toBe(1);
+  });
+
+  it('refuses a code that names no live sign-in of that person, or more than one', async () => {
+    const a = await staffAfterRename(), stranger = await staffAfterRename();
+    await expect(armRaw(a.userId, '00000000')).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
+    await expect(armRaw(a.userId, codeOf(stranger))).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
+    for (const code of ['', '3f9a1c2', '3F9A1C2E', '3f9a1c2e0', a.ordinarySessionId, "' OR '1'='1"]) await expect(armRaw(a.userId, code)).rejects.toThrow('STAFF_REKEY_INVALID');
+    // Two live sign-ins that share the code: nobody could say which one was meant.
+    const twin = a.ordinarySessionId.slice(0, 8) + randomUUID().slice(8);
+    await database.pool.query(`INSERT INTO identity.session(session_id,user_id,token_hash,csrf_token_hash,binding_context,idle_expires_at,absolute_expires_at,last_mfa_at)
+      VALUES($1,$2,$3,$4,'{}',now()+interval '1 hour',now()+interval '2 hours',now())`, [twin, a.userId, digest(twin), digest('csrf' + twin)]);
+    await expect(arm(a)).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
+    await database.pool.query('UPDATE identity.session SET revoked_at=clock_timestamp() WHERE session_id=$1', [twin]);
+    await expect(arm(a)).resolves.toHaveProperty('permitId');
+    // A signed-out or idle sign-in cannot be named.
+    const gone = await staffAfterRename(), idle = await staffAfterRename();
+    await database.pool.query('UPDATE identity.session SET revoked_at=clock_timestamp() WHERE session_id=$1', [gone.ordinarySessionId]);
+    await database.pool.query("UPDATE identity.session SET created_at=created_at-interval '2 hours',last_seen_at=last_seen_at-interval '2 hours',idle_expires_at=clock_timestamp()-interval '1 minute' WHERE session_id=$1", [idle.ordinarySessionId]);
+    await expect(arm(gone)).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
+    await expect(arm(idle)).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
+    expect(await permitOf(gone)).toBeUndefined();
+  });
+
+  it('gives a thief nothing who signs in with the stolen password and code and signs the Owner out before the operator arms', async () => {
+    const owner = await staffAfterRename(true);
+    // The thief's own sign-in, then the Owner's sign-in revoked from it: the thief's is now the account's only live sign-in.
+    const thief: Account = { ...owner, ...(await session(owner.userId)) };
+    await database.pool.query('UPDATE identity.session SET revoked_at=clock_timestamp() WHERE session_id=$1', [owner.ordinarySessionId]);
+    // The operator types the code read in the Owner's own browser, which the thief's sign-in does not carry.
+    await expect(armRaw(null, codeOf(owner))).rejects.toThrow('STAFF_REKEY_SESSION_REQUIRED');
+    expect(await permitOf(owner)).toBeUndefined();
+    await expect(prerequisite(thief)).rejects.toThrow('STAFF_EXISTING_SUBJECT_REQUIRES_KEY_PROOF');
+    expect(await keysUnder(owner, rpId)).toBe(0);
   });
 
   it('refuses a second permit while one is current, and a name that is not a plain https site name', async () => {
     const a = await staffAfterRename();
-    await arm(a.userId);
-    await expect(arm(a.userId)).rejects.toThrow('STAFF_REKEY_PERMIT_ACTIVE');
+    await arm(a);
+    await expect(arm(a)).rejects.toThrow('STAFF_REKEY_PERMIT_ACTIVE');
     const b = await staffAfterRename();
     for (const [name, nameOrigin] of [[rpId, 'http://' + rpId], [rpId, origin + '/'], [rpId, OLD_ORIGIN], ['', 'https://'], ['Admin.Example.Test', 'https://Admin.Example.Test'], [rpId + ':8443', origin + ':8443']] as const)
-      await expect(arm(b.userId, name, nameOrigin)).rejects.toThrow('STAFF_REKEY_INVALID');
+      await expect(arm(b, name, nameOrigin)).rejects.toThrow('STAFF_REKEY_INVALID');
     expect(await permitOf(b)).toBeUndefined();
   });
 

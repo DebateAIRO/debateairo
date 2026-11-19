@@ -83,6 +83,7 @@
   "settings.sessions.current": "ההפעלה הנוכחית",
   "settings.sessions.other": "הפעלה אחרת",
   "settings.sessions.lastSeen": "נראתה לאחרונה ב-{date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "ביטול ההפעלה {sessionId}",
   "settings.sessions.revoke": "ביטול",
   "settings.sessions.revokeAll": "ביטול כל ההפעלות",

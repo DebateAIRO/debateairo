@@ -200,6 +200,15 @@ export function SessionControls({
                     })
                   })}
                 </p>
+                {/* The one place a piece of the id is shown: this browser's own sign-in gets a short
+                    code (the id's first eight characters). An operator who is asked to approve
+                    something for "this sign-in" (a staff key under a new site name) reads it here and
+                    types it on the server, so the approval cannot go to a sign-in somebody else made. */}
+                {session.current ? (
+                  <p className="setSessionSeen" data-sign-in-code>
+                    {t(catalog, "settings.sessions.signInCode", { code: session.session_id.slice(0, 8) })}
+                  </p>
+                ) : null}
               </div>
               <button
                 type="button"

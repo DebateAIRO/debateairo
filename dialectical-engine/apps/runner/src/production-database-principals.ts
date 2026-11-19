@@ -75,6 +75,8 @@ const OWNER_RECOVERY_EXECUTE_FUNCTIONS = [
   'staff.commit_owner_command',
   'staff.publish_independent_alert_readiness',
   'staff.revoke_independent_alert_readiness',
+  // 0183: the operator's permit for one staff key under the site's current name.
+  'staff.arm_rekey',
 ] as const;
 type ProductionPrincipalManifest = Readonly<{
   format: string;

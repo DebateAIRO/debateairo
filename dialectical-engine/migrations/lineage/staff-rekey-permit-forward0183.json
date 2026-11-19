@@ -8,7 +8,7 @@
   },
   "migration": {
     "name": "0183_staff_rekey_permit.sql",
-    "sha256": "4aeb58ad873495f614b197eb2abad1f21ac250cd5f4a374d02b892eff56945ba"
+    "sha256": "69f0af2d334fd1545d40de580c146c95ac5a3e5432bf965c7f503ab95f13ba04"
   },
   "verifier": {
     "path": "lineage/verify-effective-capabilities-130.sql",

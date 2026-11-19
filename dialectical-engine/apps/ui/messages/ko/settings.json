@@ -83,6 +83,7 @@
   "settings.sessions.current": "현재 세션",
   "settings.sessions.other": "다른 세션",
   "settings.sessions.lastSeen": "마지막 활동 {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "세션 {sessionId} 해지",
   "settings.sessions.revoke": "해지",
   "settings.sessions.revokeAll": "모든 세션 해지",

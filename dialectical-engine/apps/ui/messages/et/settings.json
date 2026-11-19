@@ -83,6 +83,7 @@
   "settings.sessions.current": "Praegune seanss",
   "settings.sessions.other": "Muu seanss",
   "settings.sessions.lastSeen": "Viimati nähtud {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}",
   "settings.sessions.revokeLabel": "Tühistage seanss {sessionId}",
   "settings.sessions.revoke": "Tühistage",
   "settings.sessions.revokeAll": "Tühistage kõik seansid",

@@ -2186,7 +2186,7 @@ describe("P3-01 production database-principal manifest", () => {
   });
   it('pins the independent Owner ceremony lifecycle to only enumerated JIT definers',async()=>{
     const manifest=JSON.parse(await readFile(manifestPath,'utf8'));
-    expect(manifest.independentOwnerRecovery).toEqual({version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.read_committed_owner_operation','staff.commit_owner_command','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness']});
+    expect(manifest.independentOwnerRecovery).toEqual({version:1,loginRole:'debateai_prod_staff_recovery',capabilityRole:'debateai_staff_recovery',maximumLifetimeSeconds:300,defaultPassword:'NULL',defaultValidUntil:'-infinity',exportReusableUrl:false,executeFunctions:['staff.prepare_owner_command','staff.install_owner_recovery_generation','staff.prepare_owner_command_v2','staff.read_owner_command','staff.read_owner_receipts','staff.read_owner_alert_metadata','staff.authorize_owner_alert_operation','staff.read_committed_owner_operation','staff.commit_owner_command','staff.publish_independent_alert_readiness','staff.revoke_independent_alert_readiness','staff.arm_rekey']});
   });
 
   it('rejects mixed Owner recovery grants before accepting credential material or touching SQL',async()=>{

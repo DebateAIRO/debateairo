@@ -7,10 +7,11 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * The staff re-key permit as one chain step after 0182, the MFA recovery control user index (migrations/lineage/README.md
  * "The staff re-key permit (0183)"). A staff key belongs to one site name, so after the site is renamed a staff member has
  * no key that works, and the older functions refuse to enrol a new one from password and authenticator code alone. This
- * step adds a permit an operator on the server arms for one person: it is used once, lasts at most 15 minutes, and lets
- * an ACTIVE staff member with no working staff key under the site's current name enrol one key with password and
- * authenticator code. The API calls four `_v2` entry points beside 0085's, 0086's and 0151's; each takes only the
- * permit's case itself and hands every other case to the older function unchanged.
+ * step adds a permit an operator on the server arms for one person and one sign-in of theirs: it is used once, lasts at
+ * most 15 minutes, and lets an ACTIVE staff member with no working staff key under the site's current name enrol one key
+ * with password and authenticator code. The API calls four `_v2` entry points beside 0085's, 0086's and 0151's; each
+ * takes the permit's case itself and hands every other case to the older function unchanged (the start of a ceremony
+ * also refuses, as the older one does, a staff member who comes with a password-and-code receipt and no permit).
  *
  * An `expand` step: one new table and nine new functions, nothing older altered, replaced or revoked, so it amends no
  * earlier step's postcondition. It adds no billing relation or function, so it names the verifier in force (0130's) as
@@ -28,7 +29,7 @@ const FUNCTIONS:readonly string[]=[
  'staff.rekey_key_present(uuid,text,text)',
  'staff.rekey_permit_current(uuid,uuid)',
  // The operator's opening.
- 'staff.arm_rekey(uuid,text,text)',
+ 'staff.arm_rekey(uuid,text,text,text)',
  // The password and code check beside 0085's.
  'staff.step_up_prerequisite_v2(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)',
  // Whether a ceremony the permit started may still finish.
