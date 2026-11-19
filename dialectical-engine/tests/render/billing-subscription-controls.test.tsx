@@ -265,10 +265,10 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Change plan");
     expect(button("Move to Pro at renewal")).toBeDefined();
     await click("Move to Plus at renewal");
-    // The price is P8a's public net price, "+ tax", from the renewal date; nothing has changed yet.
+    // The price is P8a's public net price, named as the price before tax, from the renewal date; nothing has changed yet.
     expect(client.getBillingPlans).toHaveBeenCalledTimes(1);
     expect(client.downgradeSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 29 October 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? From 29 October 2026, it costs $20.00 a month before tax. This page shows the exact amount, with tax, once the change is scheduled.");
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ plan_id: "MAX", scheduled_downgrade_plan_id: "PLUS" })
     });
@@ -293,8 +293,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain(`DBAI 0044 · 1 October 2026 · ${formatMoney("en", "1210.00", "RON")}`);
     await click("Change plan");
     await click("Move to Pro at renewal");
-    expect(text()).toContain(`Move to Pro at your next renewal? It costs ${formatMoney("en", "250.00", "RON")} a month + tax,`
-      + " from 29 October 2026.");
+    expect(text()).toContain(`Move to Pro at your next renewal? From 29 October 2026, it costs ${formatMoney("en", "250.00", "RON")} a month`
+      + " before tax.");
     expect(text()).not.toContain("€");
     expect(text()).not.toContain("$");
   });
@@ -398,7 +398,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain("We're processing your renewal. Your plan stays active meanwhile.");
     await click("Change plan");
     await click("Move to Plus at renewal");
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 3 October 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? From 3 October 2026, it costs $20.00 a month before tax.");
     await click("Keep my plan");
     await click("Cancel");
     expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");

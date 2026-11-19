@@ -38,7 +38,7 @@
     },
     "fr": {
       "version": "3.13",
-      "sha256": "7e55ec20073d60088a829664fadbe3f8ca0369eed260a6c738285bb42de09db2"
+      "sha256": "13bfcd53e0a27007d14c1d578fc9ec9f6515681902ab627fb63d94b03baa6174"
     },
     "ga": {
       "version": "3.12",
@@ -102,7 +102,7 @@
     },
     "ro": {
       "version": "3.13",
-      "sha256": "7e55ec20073d60088a829664fadbe3f8ca0369eed260a6c738285bb42de09db2"
+      "sha256": "13bfcd53e0a27007d14c1d578fc9ec9f6515681902ab627fb63d94b03baa6174"
     },
     "ru": {
       "version": "3.12",
@@ -176,7 +176,7 @@
     },
     "fr": {
       "version": "2.19",
-      "sha256": "9cad7451e550477b8c839d392fdd2443639d533e2b6348d6e9d9975c37bb2773"
+      "sha256": "8904aa701cf3816f5e31a52cc03f3607bec8758af0332dc220db8f90b5b2ecee"
     },
     "ga": {
       "version": "2.18",
@@ -240,7 +240,7 @@
     },
     "ro": {
       "version": "2.19",
-      "sha256": "9cad7451e550477b8c839d392fdd2443639d533e2b6348d6e9d9975c37bb2773"
+      "sha256": "8904aa701cf3816f5e31a52cc03f3607bec8758af0332dc220db8f90b5b2ecee"
     },
     "ru": {
       "version": "2.18",

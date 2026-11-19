@@ -2,9 +2,10 @@ import "server-only";
 
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { isCatalogLocale, isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
+import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { isLegalTextLocale } from "./legalTextLocales";
 import { LEGAL_PAGES, type LegalPageKey } from "./pages";
 
 const PRODUCT_NAME = "Dialectical Engine";
@@ -17,12 +18,14 @@ export type LegalPageCatalogs = Readonly<{
 
 /**
  * The reader's locale (the layout's rule: the locale cookie when it names an offered language, else English) and both
- * catalogues. An explicit `?lang=` may name any catalogue language: the API links a person to the exact text they are
- * asked to accept (French for Canada, for example), and that link must show that text, not the cookie's.
+ * catalogues. An explicit `?lang=` counts when it names a language whose legal texts a person can be shown
+ * (isLegalTextLocale: the offered languages and French for Canada): the API links a person to the exact text they are
+ * asked to accept, and that link must show that text, not the cookie's. Any other value counts as no `?lang=` at all,
+ * because the other languages' drafts carry the current version number over older text that nobody checked.
  */
 export async function loadLegalPageCatalogs(explicitLocale?: string): Promise<LegalPageCatalogs> {
   const requested = (await cookies()).get(LOCALE_COOKIE)?.value;
-  const locale: LocaleCode = isCatalogLocale(explicitLocale) ? explicitLocale : isLocale(requested) ? requested : "en";
+  const locale: LocaleCode = isLegalTextLocale(explicitLocale) ? explicitLocale : isLocale(requested) ? requested : "en";
   const [chromeCatalog, legalCatalog] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "legal")
