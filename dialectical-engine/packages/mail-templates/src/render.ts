@@ -211,7 +211,7 @@ function formatParam(
       // A named zone is printed with its offset, so the instant can be read back from the email alone.
       const label = timeZone === null ? "" : ` (${offsetName(at, timeZone)})`;
       if (locale !== "en" && locale !== "ro") {
-        // CLDR supplies the join and any words around the time (for example Arabic "في" and Hindi "बجे").
+        // CLDR supplies the join and any words around the time (for example Arabic "في" and Hindi "बजे").
         return { kind: "text", value: new Intl.DateTimeFormat(locale, {
           dateStyle: "long", timeStyle: "short", hourCycle: "h23", timeZone: zone
         }).format(at) + label };
