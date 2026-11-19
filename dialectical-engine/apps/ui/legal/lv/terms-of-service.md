@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Īsumā
-eyebrow: PAKALPOJUMA NOTEIKUMI · v2.19 · SPĒKĀ NO 2026. GADA 19. NOVEMBRA
+eyebrow: PAKALPOJUMA NOTEIKUMI · v1.0 · SPĒKĀ NO 2026. GADA 19. NOVEMBRA
 title: Kam jūs piekrītat
 lede: Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.
-endMarker: NOTEIKUMU BEIGAS · v2.19
+endMarker: NOTEIKUMU BEIGAS · v1.0
 bodyLabel: Pakalpojuma noteikumu teksts
 annexTitle: A pielikums — Reģionālie noteikumi
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 PIEMĒROJAMIE TIESĪBU AKTI
 -->
 
-**Version 2.19 · Effective 2026. gada 19. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
+**Version 1.0 · Effective 2026. gada 19. novembris · Iepriekšējās versijas vietnē dezbatere.ro/terms/versions · Valoda: latviešu.**
 
 **In short.** Jums jābūt vismaz 18 gadus vecam. Dialectical Engine veido argumentus ar MI modeļiem, un viss, ko tas ģenerē, var būt nepareizs — tā nav konsultācija. Bezmaksas plānā jūsu debates kļūst publiskas, kad tās ir pabeigtas, pēc MI pārbaudes; maksas plānā tās ir privātas, ja vien tās nepublicējat. Kad debates ir publiskas, ikviens tās var lasīt, un tās paliek publiskas. Jūsu iesniegtais teksts tiek nosūtīts mūsu Pakalpojumu sniedzēju reģistrā norādītajiem MI pakalpojumu sniedzējiem, galvenokārt DeepInfra, Amerikas Savienotajās Valstīs. DeepInfra, Anthropic un Perplexity noteikumi neļauj tiem ar to apmācīt modeļus; 8. sadaļā norādīts, attiecībā uz kuru uzņēmumu mēs to vēl neesam apstiprinājuši. Par nelikumīgu saturu ziņojiet uz support@dezbatere.ro neatkarīgi no tā, vai jums ir konts. Piemēro Rumānijas tiesību aktus, taču jums joprojām ir vietējā patērētāju aizsardzība.
 
@@ -251,30 +251,6 @@ Mēs pastāvīgā informācijas nesējā iepriekš paziņojam, kas un kad mainī
 
 **Šo Noteikumu izmaiņas.** Mēs varam mainīt šos Noteikumus tādu pašu iemeslu dēļ. Attiecībā uz izmaiņām, kas nesamazina jūsu tiesības, mēs publicējam jauno versiju kopā ar izmaiņu kopsavilkumu un vismaz **30 dienu iepriekš** nosūtām jums e-pasta ziņojumu par tās stāšanos spēkā; turpinot lietot Dialectical Engine pēc šī datuma, jūs izmaiņām piekrītat, un pirms tam varat slēgt kontu. Attiecībā uz izmaiņām, kas samazina jūsu tiesības, — tostarp esoša plāna cenas paaugstinājumu, zemākiem ierobežojumiem, noņemtām funkcijām, jauniem jūsu satura lietošanas veidiem vai izmaiņām atbildībā, piemērojamajos tiesību aktos vai strīdu izšķiršanā — mēs lūdzam nākamajā pierakstīšanās reizē skaidri piekrist jaunajai versijai, un izmaiņas attiecas tikai uz turpmāko laiku. Mēs nekad neveicam izmaiņas ar atpakaļejošu spēku un nekad neizmantojam šo sadaļu, lai termiņa vidū mainītu jums apmaksātā pakalpojuma būtību, nepiedāvājot iespēju izstāties. Iepriekšējās versijas ir pieejamas vietnē dezbatere.ro/terms/versions.
 
-Versija 2.18 aizstāja versiju 2.17: A.3 pielikumā norādīts, ka arī Kvebekā debates maksas plānā pēc noklusējuma ir privātas, bet debates bezmaksas plānā ir publiskas, kā norādīts 9. sadaļā; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās. Versijā 2.18 arī nosaukts DeepInfra — uzņēmums, kas saņem lielāko daļu debašu teksta, norādīts, ka tas viena modeļa pieprasījumus nodod partneruzņēmumam, un norādīts, attiecībā uz kuriem pakalpojumu sniedzējiem esam apstiprinājuši, ka to noteikumi neļauj apmācību ar jūsu saturu (8. sadaļa).
-
-Versija 2.17 aizstāja versiju 2.16: 10. sadaļā norādīts, kad ar pogu „Ziņot” iesniegtu ziņojumu lasa MI un kad cilvēks, ka poga lūdz jūsu labticības apliecinājumu, ka mēs apstiprinām ziņojuma saņemšanu un paziņojam jums savu lēmumu pa e-pastu un ka pamatojumi tiek nosūtīti pa e-pastu un glabāti jūsu kontā; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās.
-
-Versija 2.16 aizstāja versiju 2.15: 12. sadaļā nosaukti maksas plāni, Plus, Pro un Max, un 12. un 15. sadaļā vairs nav sagatavošanas piezīmju; tas, par ko mēs atbildam, un visas šajos Noteikumos paredzētās tiesības nav mainījušās.
-
-Versija 2.15 aizstāja versiju 2.14: 12. sadaļā teikts, ka mūsu cenas tiek parādītas bez nodokļiem, kā cena + PVN, un ka nodoklis tiek pievienots norēķinu laikā.
-
-Versija 2.14 aizstāja versiju 2.13: 18. sadaļā un A pielikumā kā alternatīvas strīdu izšķiršanas ceļš norādīta ANPC (SAL).
-
-Versija 2.13 aizstāja versiju 2.12: 12. sadaļā norādīts maksājuma pogas uzraksts rumāņu valodā.
-
-Versija 2.12 aizstāja versiju 2.11: 10. sadaļā teikts, ka pieteikusies persona var arī izmantot pogu „Ziņot” jebkurā publiskā debatē, ka MI lasa ar to iesniegtu ziņojumu līdzās publiskajam tekstam un kas pēc tam notiek.
-
-Versija 2.11 aizstāja versiju 2.10: 9. sadaļā teikts, ka mēs varam uz laiku paslēpt publisku debati, kamēr to pārskatām, un noņemt vai labot tās daļu.
-
-Versija 2.10 aizstāja versiju 2.9: 9. sadaļā teikts, ka bezmaksas plānā debates ir publiskas, ka publiskas debates publikāciju nevar atsaukt un tā paliek publiska pēc konta slēgšanas, ka ikviens, kam ir kredīts, var sniegt ieguldījumu publiskā debatē vai uzrakstīt tai pārskatu, un ka publiska debate paliek atvērta pēc tam, kad tās pirmais autors ir aizgājis; 11. sadaļā teikts, ko slēgšana nozīmē jūsu publiskajām debatēm.
-
-Versija 2.9 aizstāja versiju 2.8: 8. sadaļa tiek papildināta ar rindkopu „Mūsu ģenerētās diagrammas un statistika”, kas nosaka, kam pieder debašu pārskata diagrammas, un piešķir jums licenci tās izmantot.
-
-Versija 2.8 aizstāja versiju 2.7: jautājumu pārbaude noraida arī jautājumu par to, kā izdarīt noziegumu vai izvairīties no soda par to, vai par to, vai kādam vajadzētu izdarīt noziegumu, piemēram, nelikumīgi pirkt vai pārdot narkotikas vai ieročus, zagt vai izvairīties no nodokļu nomaksas, un to nesaglabā; jautājums par to, vai kāds likums būtu jāmaina, joprojām ļauj debatēm sākties (7. sadaļa). Tā arī nosaka vienotu noteikumu attiecībā uz narkotikām un ļauj debatēm sākties no jautājuma par to, vai būtu jāmaina likums, kas attiecas uz pašnāvību, eitanāziju vai asistēto miršanu (7. sadaļa), un jautājumu pārbaude vairs neglabā nevienu jautājumu mūsu komandai (7. un 10. sadaļa); ekrāns, kas noraida jautājumu, ir mūsu pamatojums attiecībā uz katru jautājumu, kas saskaņā ar 7. sadaļu neļauj debatēm sākties (10. sadaļa).
-
-Versija 2.7 aizstāja versiju 2.6: tā pievieno jautājumu pārbaudi, kas izlasa katru jautājumu pirms debašu sākuma, dažus noraida un mūsu komandas izlasīšanai glabā katru noraidītu jautājumu, kas draud nodarīt kaitējumu citam cilvēkam vai citiem cilvēkiem, nosaucot viņus vai nenosaucot, tostarp uzbrukumu nenosauktiem cilvēkiem, plāno šādu kaitējumu vai jautā, vai un kā to nodarīt, vai kas jautā, kā izgatavot ieročus, sprāgstvielas, indes vai narkotikas vai kā atbalstīt teroristisku aktu, vai kas to slavina (7., 8., 10. un 11. sadaļa); pārbaudi, kas izlasa katru noslēgto debašu sintēzi, apstiprinājumu, kas atzīmētām debatēm nepieciešams pirms to publicēšanas, un debates, ko šī pārbaude izdzēš (5., 8., 9., 10. un 11. sadaļa); to, ko atbalsta tērzēšana nosūta Anthropic modelim Claude, ka tā neglabā neko no tā, ko rakstāt, un neatver lietu, un to, ka tās poga „Runāt ar cilvēku” parāda mūsu atbalsta adresi (8. un 10. sadaļa); un 7. sadaļas noteikumus, kas aizliedz jebkāda veida naida runu, norādījumus par ieroču vai narkotiku izgatavošanu, saturu, kas mudina uz pašnāvību vai kaitējuma nodarīšanu citiem cilvēkiem, un reliģisku apvainošanu, kā arī norāda, kuri jautājumi neļauj debatēm sākties.
-
 ## 15. Atbildība
 
 **Ko mēs neierobežojam.** Nekas šajos Noteikumos neizslēdz un neierobežo mūsu atbildību par nāvi vai miesas bojājumiem, ko izraisījusi mūsu nolaidība, par krāpšanu vai krāpniecisku sagrozīšanu, par rupju neuzmanību vai tīšu pārkāpumu vai par jebko citu, ko likumīgi nevar ierobežot. Ja esat patērētājs, nekas šeit neatceļ jūsu likumā noteiktās tiesības, tostarp tiesības panākt neatbilstoša pakalpojuma atbilstību vai saņemt cenas samazinājumu vai atmaksu, vai jebkādu garantiju, kas piemērojama saskaņā ar jūsu dzīvesvietas valsts tiesību aktiem.
@@ -305,7 +281,7 @@ Tas, kā mēs rīkojamies ar personas datiem, ir noteikts **Privātuma politikā
 
 **Tiesas, ja dzīvojat ES vai EEZ.** Jūs varat celt prasību pret mums Rumānijas tiesās vai savas dzīvesvietas valsts tiesās. Mēs varam celt prasību pret jums tikai jūsu dzīvesvietas valsts tiesās.
 
-**Patērētāji citviet.** Ja dzīvojat ārpus ES un EEZ, nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar savas valsts tiesību aktiem celt prasību tās tiesās vai tādas tiesības saskaņā ar šiem tiesību aktiem, no kurām nevar atteikties, — tostarp, ja dzīvojat Austrālijā vai Jaunzēlandē, jūsu patērētāja garantiju tiesības; ja dzīvojat Brazīlijā, *Código de Defesa do Consumidor*; un, ja dzīvojat Amerikas Savienotajās Valstīs, jūsu štata patērētāju aizsardzības tiesību aktus.
+**Patērētāji citviet.** Ja dzīvojat ārpus ES un EEZ, nekas šajos Noteikumos neierobežo jūsu tiesības saskaņā ar savas valsts tiesību aktiem celt prasību tās tiesās vai tādas tiesības saskaņā ar šiem tiesību aktiem, no kurām nevar atteikties, — tostarp, ja dzīvojat Austrālijā vai Jaunzēlandē, jūsu patērētāja garantiju tiesības; un, ja dzīvojat Amerikas Savienotajās Valstīs, jūsu štata patērētāju aizsardzības tiesību aktus.
 
 **Pirms vēršanās tiesā.** Sazinieties ar mums pa support@dezbatere.ro; lielāko daļu jautājumu var atrisināt, un mūsu mērķis ir atbildēt 5 darbdienu laikā. Ja esat patērētājs Rumānijā vai ES, varat izmantot alternatīvu strīdu izšķiršanu ar ANPC (SAL), reclamatiisal.anpc.ro starpniecību; mēs neapņemamies piedalīties šajā procedūrā. Sūdzības par moderēšanas lēmumiem izskata saskaņā ar 10. sadaļu, kas ir atsevišķa kārtība.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v2.19 · VOIMASSA 19. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v1.0 · VOIMASSA 19. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
-endMarker: KÄYTTÖEHTOJEN LOPPU · v2.19
+endMarker: KÄYTTÖEHTOJEN LOPPU · v1.0
 bodyLabel: Käyttöehtojen teksti
 annexTitle: Liite A — Alueelliset ehdot
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 2.19 · Effective 19. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 1.0 · Effective 19. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, pääasiassa DeepInfralle Yhdysvalloissa. DeepInfran, Anthropicin ja Perplexityn ehdot eivät salli niiden kouluttaa malleja sillä; kohdassa 8 kerrotaan, minkä yrityksen osalta emme ole vielä vahvistaneet tätä. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 
@@ -251,30 +251,6 @@ Ilmoitamme sinulle etukäteen pysyvällä välineellä, mikä muuttuu ja milloin
 
 **Näiden käyttöehtojen muutokset.** Voimme muuttaa näitä käyttöehtoja samanlaisista syistä. Jos muutos ei vähennä oikeuksiasi, julkaisemme uuden version ja yhteenvedon muutoksista sekä lähetämme sinulle sähköpostia vähintään **30 päivää ennen** sen voimaantuloa; Dialectical Engine -palvelun käytön jatkaminen kyseisen ajankohdan jälkeen merkitsee hyväksyntääsi, ja voit sulkea tilisi ennen sitä. Jos muutos vähentää oikeuksiasi — mukaan lukien olemassa olevan tilauksen hinnankorotukset, alhaisemmat rajat, poistetut ominaisuudet, sisältösi uudet käyttötavat tai vastuuta, sovellettavaa lakia tai riidanratkaisua koskevat muutokset — pyydämme sinua hyväksymään uuden version nimenomaisesti seuraavan kirjautumisesi yhteydessä, ja muutosta sovelletaan vain jatkossa. Emme koskaan muuta ehtoja taannehtivasti emmekä käytä tätä kohtaa muuttaaksemme kesken sopimuskauden maksamasi palvelun ydintä tarjoamatta sinulle mahdollisuutta irtautua. Aiemmat versiot säilyvät saatavilla osoitteessa dezbatere.ro/terms/versions.
 
-Versio 2.18 korvasi version 2.17: liitteessä A.3 kerrotaan, että myös Quebecissä maksullisen tilauksen väittelyt ovat oletusarvoisesti yksityisiä ja maksuttoman tilauksen väittelyt julkisia, kuten kohdassa 9 kerrotaan; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan. Versio 2.18 nimeää myös DeepInfran, yrityksen, joka saa suurimman osan väittelyn tekstistä, kertoo, että se välittää yhden mallin pyynnöt kumppaniyritykselle, ja kertoo, minkä palveluntarjoajien osalta olemme vahvistaneet, etteivät niiden ehdot salli koulutusta sisällölläsi (kohta 8).
-
-Versio 2.17 korvasi version 2.16: kohdassa 10 kerrotaan, milloin Ilmoita-painikkeella tehdyn ilmoituksen lukee tekoäly ja milloin henkilö, että painike pyytää vilpittömässä mielessä annetun vakuutuksesi, että vahvistamme ilmoituksen ja ilmoitamme päätöksestämme sähköpostitse ja että perustelut lähetetään sähköpostitse ja säilytetään tililläsi; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan.
-
-Versio 2.16 korvasi version 2.15: kohdassa 12 nimetään maksulliset tilaukset, Plus, Pro ja Max, eikä kohdissa 12 ja 15 ole enää luonnosteluhuomautuksia; se, mistä vastaamme, ja jokainen näiden käyttöehtojen mukainen oikeus pysyvät ennallaan.
-
-Versio 2.15 korvasi version 2.14: kohdassa 12 kerrotaan, että hintamme näytetään ilman veroa, muodossa hinta + ALV, ja että vero lisätään kassalla.
-
-Versio 2.14 korvasi version 2.13: kohdassa 18 ja liitteessä A vaihtoehtoisen riidanratkaisun reitiksi nimetään ANPC (SAL).
-
-Versio 2.13 korvasi version 2.12: kohdassa 12 kerrotaan maksupainikkeen romaniankielinen teksti.
-
-Versio 2.12 korvasi version 2.11: kohdassa 10 kerrotaan, että kirjautunut henkilö voi myös käyttää Ilmoita-painiketta minkä tahansa julkisen väittelyn kohdalla, että tekoäly lukee sillä tehdyn ilmoituksen julkisen tekstin rinnalla ja mitä sen jälkeen tapahtuu.
-
-Versio 2.11 korvasi version 2.10: kohdan 9 mukaan voimme piilottaa julkisen väittelyn sen tarkistamisen ajaksi sekä poistaa tai korjata osan siitä.
-
-Versio 2.10 korvasi version 2.9: kohdan 9 mukaan maksuttomassa tilauksessa väittelyt ovat julkisia, julkista väittelyä ei voi perua ja se pysyy julkisena tilin sulkemisen jälkeen, kuka tahansa, jolla on krediittiä, voi osallistua julkiseen väittelyyn tai kirjoittaa siitä raportin, ja julkinen väittely pysyy avoimena ensimmäisen kirjoittajan poistuttua; kohta 11 kertoo, mitä sulkeminen tekee julkisille väittelyillesi.
-
-Versio 2.9 korvasi version 2.8: kohtaan 8 lisätään kappale ”Tuottamamme kaaviot ja tilastot”, jossa kerrotaan, kenelle väittelyraportin kaaviot kuuluvat, ja myönnetään sinulle käyttölupa niiden käyttämiseen.
-
-Versio 2.8 korvasi version 2.7: kysymystarkistus hylkää myös kysymyksen siitä, miten rikos tehdään tai miten siitä selvitään rangaistuksetta, tai pitäisikö jonkun tehdä rikos, esimerkiksi ostaa tai myydä huumeita tai aseita laittomasti, varastaa tai kiertää veroja, eikä säilytä sitä; kysymys siitä, pitäisikö jotakin lakia muuttaa, käynnistää edelleen väittelyn (kohta 7). Se määrittää myös huumeille yhden linjan ja sallii kysymyksen siitä, pitäisikö itsemurhaa, eutanasiaa tai avustettua kuolemaa koskevaa lainsäädäntöä muuttaa, käynnistää väittelyn (kohta 7), eikä kysymystarkistus enää säilytä yhtään kysymystä tiimimme luettavaksi (kohdat 7 ja 10); kysymyksen hylkäävä näkymä on perustelumme jokaiselle kysymykselle, joka ei kohdan 7 mukaan käynnistä väittelyä (kohta 10).
-
-Versio 2.7 korvasi version 2.6: se lisää kysymystarkistuksen, joka lukee jokaisen kysymyksen ennen väittelyn alkua, hylkää osan niistä ja säilyttää tiimimme luettavaksi jokaisen hylätyn kysymyksen, joka uhkaa vahingoittaa toista ihmistä tai muita ihmisiä, nimeltä mainittuja tai ei, mukaan lukien hyökkäys nimeämättömiä ihmisiä vastaan, suunnittelee sitä tai kysyy, saako tai miten toista ihmistä tai muita ihmisiä vahingoitetaan, tai joka kysyy, miten valmistetaan aseita, räjähteitä, myrkkyjä tai huumeita tai miten tuetaan terroritekoa, tai joka ylistää sellaista (kohdat 7, 8, 10 ja 11); tarkistuksen, joka lukee jokaisen päättyneen väittelyn synteesin, hyväksynnän, jota merkitty väittely tarvitsee ennen julkaisemista, ja väittelyt, jotka tuo tarkistus poistaa (kohdat 5, 8, 9, 10 ja 11); sen, mitä tukipalvelun chat lähettää Anthropicin mallille Claude, ettei se säilytä mitään siitä, mitä kirjoitat, eikä avaa tapausta, ja että sen ”Keskustele henkilön kanssa” -painike näyttää tukiosoitteemme (kohdat 8 ja 10); sekä kohdan 7 säännöt, jotka kieltävät vihapuheen missä tahansa muodossa, ohjeet aseiden tai huumeiden valmistukseen, itsemurhaan tai muiden ihmisten vahingoittamiseen kannustavan sisällön ja uskonnon loukkaamisen ja kertovat, mitkä kysymykset eivät käynnistä väittelyä.
-
 ## 15. Vastuu
 
 **Mitä emme rajoita.** Mikään näissä käyttöehdoissa ei sulje pois tai rajoita vastuutamme kuolemasta tai henkilövahingosta, joka on aiheutunut huolimattomuudestamme, petoksesta tai vilpillisestä harhaanjohtamisesta, törkeästä huolimattomuudesta tai tahallisesta väärinkäytöksestä taikka muusta, jonka vastuuta ei voida lain mukaan rajoittaa. Jos olet kuluttaja, mikään tässä ei poista lakisääteisiä oikeuksiasi, mukaan lukien oikeuttasi saada vaatimustenvastainen palvelu saatetuksi vaatimusten mukaiseksi, oikeuttasi hinnanalennukseen tai palautukseen taikka asuinmaasi lain nojalla sovellettavaa takuuta.
@@ -305,7 +281,7 @@ Henkilötietojen käsittelymme kuvataan osoitteessa dezbatere.ro/privacy olevass
 
 **Tuomioistuimet, jos asut EU:ssa tai ETA:ssa.** Voit nostaa meitä vastaan kanteen joko Romanian tuomioistuimissa tai asuinmaasi tuomioistuimissa. Me voimme nostaa sinua vastaan kanteen vain asuinmaasi tuomioistuimissa.
 
-**Muualla asuvat kuluttajat.** Jos asut EU:n ja ETA:n ulkopuolella, mikään näissä käyttöehdoissa ei rajoita maasi lainsäädäntöön perustuvaa oikeuttasi nostaa kanne sen tuomioistuimissa tai mitään kyseiseen lainsäädäntöön perustuvaa oikeutta, josta ei voida luopua — mukaan lukien Australiassa tai Uudessa-Seelannissa asuvien kuluttajantakuuoikeudet, Brasiliassa asuvien Código de Defesa do Consumidor -lain mukaiset oikeudet ja Yhdysvalloissa asuvien oman osavaltion kuluttajansuojalainsäädäntöön perustuvat oikeudet.
+**Muualla asuvat kuluttajat.** Jos asut EU:n ja ETA:n ulkopuolella, mikään näissä käyttöehdoissa ei rajoita maasi lainsäädäntöön perustuvaa oikeuttasi nostaa kanne sen tuomioistuimissa tai mitään kyseiseen lainsäädäntöön perustuvaa oikeutta, josta ei voida luopua — mukaan lukien Australiassa tai Uudessa-Seelannissa asuvien kuluttajantakuuoikeudet ja Yhdysvalloissa asuvien oman osavaltion kuluttajansuojalainsäädäntöön perustuvat oikeudet.
 
 **Ennen asian viemistä tuomioistuimeen.** Ota meihin yhteyttä osoitteessa support@dezbatere.ro; useimmat asiat voidaan korjata, ja pyrimme vastaamaan 5 työpäivän kuluessa. Jos olet kuluttaja Romaniassa tai EU:ssa, voit käyttää vaihtoehtoista riidanratkaisua sivuston ANPC (SAL), reclamatiisal.anpc.ro kautta; emme sitoudu osallistumaan kyseiseen menettelyyn. Moderointipäätöksiä koskeviin valituksiin sovelletaan kohdan 10 erillistä reittiä.
 

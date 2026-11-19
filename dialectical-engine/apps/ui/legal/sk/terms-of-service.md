@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Stručne
-eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v2.19 · ÚČINNÉ OD 19. NOVEMBRA 2026
+eyebrow: PODMIENKY POSKYTOVANIA SLUŽBY · v1.0 · ÚČINNÉ OD 19. NOVEMBRA 2026
 title: S čím súhlasíte
 lede: Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.
-endMarker: KONIEC PODMIENOK · v2.19
+endMarker: KONIEC PODMIENOK · v1.0
 bodyLabel: Text Podmienok poskytovania služby
 annexTitle: Príloha A — Regionálne podmienky
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 ROZHODNÉ PRÁVO
 -->
 
-**Version 2.19 · Effective 19. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
+**Version 1.0 · Effective 19. novembra 2026 · Predchádzajúce verzie na dezbatere.ro/terms/versions · Jazyk: slovenčina.**
 
 **In short.** Musíte mať aspoň 18 rokov. Dialectical Engine vytvára argumenty pomocou modelov umelej inteligencie a všetko, čo vygeneruje, môže byť nesprávne — nejde o poradenstvo. V bezplatnom programe sú vaše debaty po dokončení verejné, po kontrole umelou inteligenciou; v platenom programe sú súkromné, pokiaľ ich nezverejníte. Keď je debata verejná, môže ju čítať ktokoľvek a zostáva verejná. Text, ktorý zadáte, sa odosiela poskytovateľom umelej inteligencie uvedeným v našom Registri poskytovateľov, najmä poskytovateľovi DeepInfra, v Spojených štátoch. Podmienky DeepInfra, Anthropic a Perplexity im nedovoľujú trénovať na ňom modely; časť 8 uvádza, pri ktorej spoločnosti sme to zatiaľ nepotvrdili. Nezákonný obsah nahláste na support@dezbatere.ro bez ohľadu na to, či máte účet. Rozhodným právom je rumunské právo, vaše miestne práva na ochranu spotrebiteľa vám však zostávajú zachované.
 
@@ -251,30 +251,6 @@ O tom, čo a kedy sa mení, vás vopred informujeme na trvanlivom médiu. Ak má
 
 **Zmeny týchto Podmienok.** Tieto Podmienky môžeme meniť z rovnakých druhov dôvodov. Pri zmenách, ktoré neobmedzujú vaše práva, zverejníme novú verziu so zhrnutím zmien a najmenej **30 dní** pred nadobudnutím účinnosti vám zašleme e-mail; pokračovaním v používaní Dialectical Engine po tomto dátume zmenu prijímate a pred týmto dátumom môžete svoj účet odstrániť. Pri zmenách, ktoré obmedzujú vaše práva — vrátane zvýšenia ceny existujúceho programu, zníženia limitov, odstránenia funkcií, nového spôsobu použitia vášho obsahu alebo zmien zodpovednosti, rozhodného práva či riešenia sporov — vás pri nasledujúcom prihlásení požiadame, aby ste novú verziu výslovne prijali, a zmena platí iba do budúcnosti. Žiadnu zmenu nikdy neuplatníme spätne a túto časť nikdy nepoužijeme na zmenu podstaty toho, za čo ste počas obdobia zaplatili, bez toho, aby sme vám ponúkli možnosť zmluvu ukončiť. Predchádzajúce verzie zostávajú dostupné na adrese dezbatere.ro/terms/versions.
 
-Verzia 2.18 nahradila verziu 2.17: príloha A.3 uvádza, že aj v Quebecu sú debaty v platenom programe v predvolenom nastavení súkromné a debaty v bezplatnom programe verejné, ako uvádza časť 9; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení. Verzia 2.18 tiež pomenúva DeepInfra, spoločnosť, ktorá dostáva väčšinu textu debaty, uvádza, že odovzdáva požiadavky pre jeden model partnerskej spoločnosti, a uvádza, pri ktorých poskytovateľoch sme potvrdili, že ich podmienky nedovoľujú trénovanie na vašom obsahu (časť 8).
-
-Verzia 2.17 nahradila verziu 2.16: časť 10 uvádza, kedy hlásenie podané tlačidlom Nahlásiť číta umelá inteligencia a kedy človek, že tlačidlo od vás žiada vyhlásenie o dobrej viere, že hlásenie potvrdzujeme a rozhodnutie vám oznamujeme e-mailom a že odôvodnenia sa posielajú e-mailom a uchovávajú vo vašom účte; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
-
-Verzia 2.16 nahradila verziu 2.15: časť 12 uvádza platené programy, Plus, Pro a Max, a časti 12 a 15 už neobsahujú poznámky k návrhu; to, za čo zodpovedáme, ani žiadne právo podľa týchto Podmienok sa nemení.
-
-Verzia 2.15 nahradila verziu 2.14: časť 12 uvádza, že naše ceny zobrazujeme bez dane, v tvare cena + DPH, a že sa daň pripočíta v pokladni.
-
-Verzia 2.14 nahradila verziu 2.13: časť 18 a príloha A uvádzajú ANPC (SAL) ako cestu k alternatívnemu riešeniu sporov.
-
-Verzia 2.13 nahradila verziu 2.12: časť 12 uvádza rumunský text platobného tlačidla.
-
-Verzia 2.12 nahradila verziu 2.11: časť 10 uvádza, že prihlásená osoba môže tiež použiť tlačidlo Nahlásiť pri ktorejkoľvek verejnej debate, že umelá inteligencia číta hlásenie podané týmto tlačidlom vedľa verejného textu a čo sa potom stane.
-
-Verzia 2.11 nahradila verziu 2.10: časť 9 uvádza, že môžeme dočasne skryť verejnú debatu, kým ju posudzujeme, a odstrániť alebo opraviť jej časť.
-
-Verzia 2.10 nahradila verziu 2.9: časť 9 uvádza, že debaty v bezplatnom programe sú verejné, že verejnú debatu nemožno zrušiť zverejnenie a zostáva verejná aj po zrušení vášho účtu, že ktokoľvek s kreditom môže prispievať do verejnej debaty alebo o nej napísať správu a že verejná debata zostáva otvorená aj po odchode jej prvého autora; časť 11 uvádza, čo zrušenie účtu znamená pre vaše verejné debaty.
-
-Verzia 2.9 nahradila verziu 2.8: do časti 8 pribudol odsek „Grafy a štatistiky, ktoré generujeme“, ktorý určuje, komu patria grafy v správe o debate, a udeľuje vám licenciu na ich používanie.
-
-Verzia 2.8 nahradila verziu 2.7: kontrola otázky zamieta aj otázku, ako spáchať trestný čin alebo ako za neho uniknúť trestu, alebo či by ho niekto mal spáchať, napríklad nelegálne kúpiť či predať drogy alebo zbrane, kradnúť alebo krátiť dane, a takú otázku neuchováva; otázka, či by sa mal zmeniť zákon, debatu naďalej začne (časť 7). Okrem toho stanovuje jednotné pravidlo pre drogy a umožňuje, aby otázka, či by sa mal zmeniť zákon o samovražde, eutanázii alebo asistovanom umieraní, začala debatu (časť 7), a kontrola otázky už neuchováva žiadnu otázku na prečítanie naším tímom (časti 7 a 10); obrazovka, ktorá zamietne otázku, je naším odôvodnením pre každú otázku, z ktorej podľa časti 7 debata nezačne (časť 10).
-
-Verzia 2.7 nahradila verziu 2.6: pridáva kontrolu otázky, ktorá číta každú otázku skôr, ako debata začne, niektoré zamieta a každú zamietnutú otázku, ktorá sa vyhráža ublížením inej osobe alebo iným osobám, menovaným alebo nie, vrátane útoku na nemenované osoby, plánuje takéto ublíženie alebo sa pýta, či a ako inej osobe alebo iným osobám ublížiť, alebo ktorá sa pýta, ako vyrobiť zbrane, výbušniny, jedy alebo drogy alebo ako podporiť teroristický čin, alebo ho oslavuje, uchováva na prečítanie naším tímom (časti 7, 8, 10 a 11); kontrolu, ktorá číta syntézu každej dokončenej debaty, schválenie, ktoré označená debata potrebuje, kým sa môže zverejniť, a debaty, ktoré táto kontrola odstraňuje (časti 5, 8, 9, 10 a 11); čo chat podpory posiela modelu Claude od Anthropic, že nič z toho, čo napíšete, neuchováva a neotvára žiadny prípad, a že jeho tlačidlo „Porozprávať sa s človekom“ zobrazuje našu adresu podpory (časti 8 a 10); a pravidlá v časti 7, ktoré zakazujú nenávistné prejavy akéhokoľvek druhu, návody na výrobu zbraní alebo drog, obsah podnecujúci k samovražde alebo k ubližovaniu iným ľuďom a urážku náboženstva a uvádzajú, ktoré otázky nezačnú debatu.
-
 ## 15. Zodpovednosť
 
 **Čo neobmedzujeme.** Nič v týchto Podmienkach nevylučuje ani neobmedzuje našu zodpovednosť za smrť alebo ujmu na zdraví spôsobenú našou nedbanlivosťou, za podvod alebo podvodné uvedenie do omylu, za hrubú nedbanlivosť alebo úmyselné protiprávne konanie ani za čokoľvek iné, čo zo zákona nemožno obmedziť. Ak ste spotrebiteľom, nič tu neodstraňuje vaše zákonné práva vrátane práva na uvedenie nevyhovujúcej služby do súladu, na zníženie ceny alebo vrátenie peňazí ani akúkoľvek záruku platnú podľa práva krajiny, v ktorej žijete.
@@ -305,7 +281,7 @@ Spôsob, akým nakladáme s osobnými údajmi, stanovujú **Zásady ochrany osob
 
 **Súdy, ak žijete v EÚ alebo EHP.** Konanie proti nám môžete začať buď na súdoch v Rumunsku, alebo na súdoch krajiny, v ktorej žijete. My môžeme začať konanie proti vám iba na súdoch krajiny, v ktorej žijete.
 
-**Spotrebitelia inde.** Ak žijete mimo EÚ a EHP, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; práv podľa Código de Defesa do Consumidor, ak žijete v Brazílii; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch.
+**Spotrebitelia inde.** Ak žijete mimo EÚ a EHP, nič v týchto Podmienkach neobmedzuje vaše právo podľa práva vašej krajiny podať žalobu na jej súdoch ani žiadne právo podľa tohto práva, ktorého sa nemožno vzdať — vrátane práv zo spotrebiteľských záruk, ak žijete v Austrálii alebo na Novom Zélande; a práv podľa zákonov vášho štátu na ochranu spotrebiteľa, ak žijete v Spojených štátoch.
 
 **Pred podaním žaloby.** Kontaktujte nás na support@dezbatere.ro; väčšinu vecí možno napraviť a snažíme sa odpovedať do 5 pracovných dní. Ak ste spotrebiteľom v Rumunsku alebo EÚ, môžete využiť alternatívne riešenie sporov prostredníctvom ANPC (SAL), reclamatiisal.anpc.ro; k účasti na tomto postupe sa nezaväzujeme. Sťažnosti na moderátorské rozhodnutia sa riadia časťou 10, čo je samostatný postup.
 

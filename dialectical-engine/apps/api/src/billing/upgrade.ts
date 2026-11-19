@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
@@ -77,6 +77,36 @@ export async function gateCardAction(
 }
 
 /**
+ * The id of the monthly quote kept beside an UPGRADE quote: always the same id for the same upgrade quote, so the
+ * start and the settlement find the row with no column pointing at it. A version 8 UUID (the kind reserved for ids an
+ * application computes itself) from a hash of the upgrade quote's id.
+ */
+export function monthlyQuoteIdOf(upgradeQuoteId: string): string {
+  const bytes = createHash("sha256").update(`upgrade-monthly-quote:${upgradeQuoteId}`).digest().subarray(0, 16);
+  bytes[6] = (bytes[6]! & 0x0f) | 0x80;
+  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/**
+ * The monthly quote kept beside an UPGRADE quote: the higher plan's full month as it was priced and shown with the
+ * upgrade (net, tax, total). Null when the upgrade quote has none (it was written before these rows existed). A row
+ * that is there but is not this upgrade's monthly quote (another plan, currency or total) is a writer's bug.
+ */
+export async function monthlyQuoteOf(
+  billing: Pick<BillingRepository, "quote">, upgradeQuote: QuoteRow, client: PoolClient
+): Promise<QuoteRow | null> {
+  const monthly = await billing.quote(monthlyQuoteIdOf(upgradeQuote.quoteId), upgradeQuote.ownerRef, client);
+  if (monthly === null) return null;
+  if (monthly.kind !== "RENEWAL" || monthly.planId !== upgradeQuote.planId || monthly.currency !== upgradeQuote.currency
+    || monthly.totalMicros !== upgradeQuote.recurringTotalMicros) {
+    throw new TypedDomainError("BILLING_UPGRADE_MONTHLY_QUOTE_INVALID", "The monthly quote beside an upgrade quote does not match it");
+  }
+  return monthly;
+}
+
+/**
  * Terms §12: the net this subscription pays now (the latest ACTIVATED / UPGRADED, or the downgrade a renewal
  * applied), P11a's `recurringNetOf`. Never the register's current price, which only reaches new checkouts.
  */
@@ -92,7 +122,10 @@ function ownNetMicros(events: Parameters<typeof recurringNetOf>[0]): number {
  * The UPGRADE quote: (new net − old net) × remaining seconds ÷ period seconds in whole cents (P2), taxed at P11's
  * stored location — the old net being the subscriber's own (`ownNetMicros`, Terms §12), the new one the higher plan's
  * price today; and A7's announced recurring total — the new plan's full monthly price with tax — kept on the same
- * quote row (`recurring_total_micros`, R-31) for the UPGRADED event.
+ * quote row (`recurring_total_micros`, R-31) for the UPGRADED event. The monthly quote itself (that price's net, tax
+ * and total) is written beside it as a row of its own (`monthlyQuoteIdOf`), in the same transaction: the settlement
+ * records its net as the price the plan renews at, so a person who was shown one monthly price is never renewed at
+ * another, even when the plan prices change between this quote and the payment.
  */
 export async function quoteUpgrade(deps: SubscriptionRouteDeps, input: Readonly<{
   ownerRef: string; planId: "PRO" | "MAX"; ip: string; now: Date;
@@ -135,7 +168,20 @@ export async function quoteUpgrade(deps: SubscriptionRouteDeps, input: Readonly<
     createdAt: input.now, expiresAt, locationCiphertext: sealed.ciphertext, keyId: sealed.keyId,
     recurringTotalMicros: recurring.totalMicros, currency: state.currency
   });
-  await deps.billing.withTransaction((client) => deps.billing.insertQuote(client, row));
+  const monthlyId = monthlyQuoteIdOf(quoteId);
+  const monthlySealed = sealQuoteLocation(deps.recordsKey, monthlyId, { ...context.quoteLocation, ip: input.ip, ipCountry });
+  const monthly: QuoteRow = Object.freeze({
+    quoteId: monthlyId, ownerRef: input.ownerRef, planId: input.planId, kind: "RENEWAL",
+    netMicros: recurring.netMicros, taxMicros: recurring.taxMicros, totalMicros: recurring.totalMicros,
+    taxCountry: recurring.taxCountry, taxRegion: recurring.taxRegion, taxRateBasisPoints: recurring.taxRateBasisPoints,
+    taxStatus: recurring.status, taxName: recurring.taxName, quadernoRef: recurring.reference,
+    createdAt: input.now, expiresAt, locationCiphertext: monthlySealed.ciphertext, keyId: monthlySealed.keyId,
+    recurringTotalMicros: null, currency: state.currency
+  });
+  await deps.billing.withTransaction(async (client) => {
+    await deps.billing.insertQuote(client, row);
+    await deps.billing.insertQuote(client, monthly);
+  });
   return Object.freeze({
     quote_ref: quoteId, plan_id: input.planId,
     net: microsToDecimal(prorated.netMicros), tax: microsToDecimal(prorated.taxMicros),
@@ -313,6 +359,9 @@ async function prepareUpgrade(
   if (quote.currency !== state.currency) {
     throw new TypedDomainError("BILLING_CURRENCY_MISMATCH", "The upgrade quote and the subscription name different currencies");
   }
+  // A quote with no monthly quote beside it does not say which monthly price the person was shown, so the price to
+  // renew at could only be guessed from today's plans: a new quote is needed (it costs the person nothing).
+  if (await monthlyQuoteOf(deps.billing, quote, client) === null) refuse(409, "QUOTE_EXPIRED");
   // A renewal since the quote moved the period: the prorated price no longer holds.
   if (quote.createdAt.getTime() < state.currentPeriodStart.getTime()) refuse(409, "QUOTE_EXPIRED");
   // Another upgrade applied since the quote changed the plan it was priced from: its price no longer holds.
@@ -380,10 +429,10 @@ const laterOf = (left: Date | null, right: Date | null): Date | null =>
  * period is paid: UPGRADED with the new plan and A7's announced total, and an entitlement with the SAME anchor,
  * `paid_through` = the period end, a later postponed renewal, or — paid after the period end, while the renewal waits
  * for it — R2 Q-1's pending window (`upgradedPaidThrough`, A8a), and A6's prorated month credit, measured at
- * the instant the price was prorated (the quote's creation). Terms §12: UPGRADED also records the new plan's net as
- * `recurring_net_micros`, the price P11a renews at from then on — the plan's price in this process's register, the
- * one the quote used (the quote is valid for minutes; were a new price published in between, the announced total
- * from the quote would no longer match P11a's fresh quote, and A7 sends M3 before any different charge). A payment
+ * the instant the price was prorated (the quote's creation). Terms §12: UPGRADED also records `recurringNetMicros`
+ * as `recurring_net_micros`, the price P11a renews at from then on. The caller passes the net of the monthly quote
+ * the person was shown with the upgrade, never the plan's price in this process: the plan prices can change between
+ * the quote and the payment, and the person is renewed at the price they saw, as after a first purchase. A payment
  * verified after a renewal moved the period is refunded in full by the settlement and writes nothing; reaching this
  * function with one is an error. N12: on NETOPIA, UPGRADED also carries the upgrade's saved card (`cardTokenId`, spec
  * §2.15.2). `creditPlans`: the plans the site served from the period's start to the quote; both plans' credits are the
@@ -393,6 +442,8 @@ const laterOf = (left: Date | null, right: Date | null): Date | null =>
 export function upgradeSucceededWrites(input: Readonly<{
   state: SubscriptionState; charge: ChargeRow; quote: QuoteRow; plans: BillingPlans;
   currentMonthCreditOverrideMicros: number | null; now: Date;
+  /** The net the plan renews at from now on: the monthly quote's, shown to the person with the upgrade. */
+  recurringNetMicros: number;
   creditPlans?: ReadonlyArray<BillingPlans>;
   /** N12: the token N10 chose at the decision (null: the payment saved no usable card). */
   cardTokenId?: string | null;
@@ -404,7 +455,6 @@ export function upgradeSucceededWrites(input: Readonly<{
       "BILLING_SUBSCRIPTION_EVENTS_INVALID", "An upgrade applies only in the period it was quoted in, with an announced total"
     );
   }
-  const newPlan = planById(plans, quote.planId);
   const creditPlans = input.creditPlans ?? [plans];
   const oldPlanCreditMicros = monthCreditInForce(creditPlans, state.planId);
   const monthCreditOverrideMicros = upgradeMonthCreditOverrideMicros({
@@ -419,7 +469,7 @@ export function upgradeSucceededWrites(input: Readonly<{
       ...(input.cardTokenId === undefined ? {} : { cardTokenId: input.cardTokenId }),
       data: Object.freeze({
         announced_total_micros: quote.recurringTotalMicros, quote_ref: quote.quoteId,
-        recurring_net_micros: planNetPrice(newPlan, state.currency)
+        recurring_net_micros: input.recurringNetMicros
       })
     }),
     entitlement: Object.freeze({
@@ -457,10 +507,14 @@ const CLOSED_GOES_BACK: SettlementResult = Object.freeze({ kind: "REFUND" as con
  * carries N10's adopted card. Any upgrade quoted before another one was applied (an UPGRADED at or after its quote's
  * creation) goes back in full, closed or not (`UPGRADE_CLOSED` when we closed it, `SUBSCRIPTION_ENDED` otherwise): it
  * was priced from a plan the subscription no longer has, so two upgrades never both apply.
+ * The price the plan renews at is the net of the monthly quote kept beside the upgrade quote (`monthlyQuoteOf`),
+ * whatever the plans of this process say. Only an upgrade quote written before those rows existed has none; its
+ * payment is already made, so it keeps the earlier rule, the plan's price in this process.
  */
 export function createUpgradeSettlement(deps: Readonly<{
   repository: Pick<BillingRepository,
-    "appendSubscriptionEvent" | "chargesForSubscription" | "charge" | "periodCreditOverride" | "ownerErasurePending">;
+    "appendSubscriptionEvent" | "chargesForSubscription" | "charge" | "periodCreditOverride" | "ownerErasurePending"
+    | "quote">;
   entitlements: Pick<EntitlementRepository, "append">;
   plans: BillingPlans;
   plansInForce?: PlansInForcePort;
@@ -495,10 +549,12 @@ export function createUpgradeSettlement(deps: Readonly<{
         subscriptionId: subscription.subscriptionId, planId: subscription.planId,
         since: subscription.currentPeriodStart, until: now
       }, client);
+      const monthly = await monthlyQuoteOf(deps.repository, quote, client);
       const creditPlans = deps.plansInForce === undefined ? undefined
         : await deps.plansInForce.between(subscription.currentPeriodStart, quote.createdAt);
       const writes = upgradeSucceededWrites({
         state: subscription, charge, quote, plans: deps.plans, currentMonthCreditOverrideMicros: currentOverride, now,
+        recurringNetMicros: monthly?.netMicros ?? planNetPrice(planById(deps.plans, quote.planId), subscription.currency),
         ...(creditPlans === undefined ? {} : { creditPlans }),
         ...(context.payment === null ? {} : { cardTokenId: context.payment.cardTokenId })
       });

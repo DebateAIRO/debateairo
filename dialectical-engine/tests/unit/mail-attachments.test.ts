@@ -104,10 +104,10 @@ describe("P17 mail attachments", () => {
     // The accepted pair is in the archive: attached, whatever the email's own locale is.
     const attached = await terms({ sha256: sha(english), locale: "en", version: "3.0" }, "de");
     expect(attached !== null && Buffer.from(attached.content).equals(english)).toBe(true);
-    // The person accepted in German: the German version is the one attached, not the email locale's.
-    const german = readFileSync(resolve(legalArchive("TERMS", "de")[0]!.path));
-    const acceptedInGerman = await terms({ sha256: sha(german), locale: "de" }, "en");
-    expect(acceptedInGerman !== null && Buffer.from(acceptedInGerman.content).equals(german)).toBe(true);
+    // The person accepted in French: the French version is the one attached, not the email locale's.
+    const french = readFileSync(resolve(legalArchive("TERMS", "fr")[0]!.path));
+    const acceptedInFrench = await terms({ sha256: sha(french), locale: "fr" }, "en");
+    expect(acceptedInFrench !== null && Buffer.from(acceptedInFrench.content).equals(french)).toBe(true);
     expect(lines).toEqual([]);
     // A hash no published version ever had: nothing attached, and the content-free reason is logged.
     expect(await terms({ sha256: "0".repeat(64), locale: "en" }, "en")).toBeNull();

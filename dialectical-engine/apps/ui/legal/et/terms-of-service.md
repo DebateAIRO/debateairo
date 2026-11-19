@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Lühidalt
-eyebrow: TEENUSETINGIMUSED · v2.19 · KEHTIB ALATES 19. NOVEMBRIST 2026
+eyebrow: TEENUSETINGIMUSED · v1.0 · KEHTIB ALATES 19. NOVEMBRIST 2026
 title: Millega te nõustute
 lede: Teie ja DMS Merchandise Shop S.R.L.-i vaheline leping lihtsas keeles. Üheksateist jaotist ja lisa A — kerige lõpuni.
-endMarker: TINGIMUSTE LÕPP · v2.19
+endMarker: TINGIMUSTE LÕPP · v1.0
 bodyLabel: Teenusetingimuste tekst
 annexTitle: Lisa A — Piirkondlikud tingimused
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 KOHALDATAV ÕIGUS
 -->
 
-**Version 2.19 · Effective 19. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
+**Version 1.0 · Effective 19. november 2026 · Varasemad versioonid aadressil dezbatere.ro/terms/versions · Keel: eesti.**
 
 **In short.** Peate olema vähemalt 18-aastane. Dialectical Engine koostab tehisintellektimudelite abil argumente ja kõik selle loodud tulemused võivad olla valed — need ei ole nõuanded. Tasuta paketi korral on teie väitlused pärast lõppu avalikud, pärast tehisintellekti kontrolli; tasulise paketi korral on need privaatsed, kui te neid ei avalda. Kui väitlus on avalik, saab seda lugeda igaüks, ja see jääb avalikuks. Teie sisestatud tekst saadetakse meie tehisintellekti pakkujate registris loetletud pakkujatele, peamiselt pakkujale DeepInfra Ameerika Ühendriikides. Pakkujate DeepInfra, Anthropic ja Perplexity tingimused ei luba neil selle põhjal mudeleid treenida; jaotises 8 on öeldud, millise ettevõtte kohta me seda veel kinnitanud ei ole. Teatage ebaseaduslikust sisust aadressil support@dezbatere.ro, olenemata sellest, kas teil on konto. Kohaldatakse Rumeenia õigust, kuid teile jääb teie kohaliku tarbijakaitse tagatud kaitse.
 
@@ -251,30 +251,6 @@ Teatame teile püsival andmekandjal ette, mis ja millal muutub. Kui muudatusel o
 
 **Nende Tingimuste muudatused.** Võime neid Tingimusi samalaadsetel põhjustel muuta. Muudatuste puhul, mis ei vähenda teie õigusi, avaldame uue versiooni koos muudatuste kokkuvõttega ja saadame teile e-kirja vähemalt **30 päeva** enne selle jõustumist; Dialectical Engine kasutamise jätkamine pärast seda kuupäeva tähendab, et nõustute muudatusega, ning võite oma konto enne seda sulgeda. Muudatuste puhul, mis vähendavad teie õigusi — sealhulgas olemasoleva paketi hinnatõus, madalamad kasutuslimiidid, eemaldatud funktsioonid, teie sisu uued kasutusviisid või vastutuse, kohaldatava õiguse või vaidluste lahendamise muudatused — palume teil järgmisel sisselogimisel uue versiooniga sõnaselgelt nõustuda ning muudatust kohaldatakse ainult edaspidi. Me ei kohalda muudatust kunagi tagasiulatuvalt ega kasuta seda jaotist selleks, et muuta tähtaja kestel tasulise teenuse põhiolemust ilma teile väljumisvõimalust pakkumata. Varasemad versioonid jäävad kättesaadavaks aadressil dezbatere.ro/terms/versions.
 
-Versioon 2.18 asendas versiooni 2.17: lisa A.3 ütleb, et ka Quebecis on tasulise paketi väitlused vaikimisi privaatsed ja tasuta paketi väitlused avalikud, nagu jaotises 9 öeldud; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata. Versioon 2.18 nimetab ka DeepInfra, ettevõtte, mis saab suurema osa väitluse tekstist, ütleb, et ta edastab ühe mudeli päringud partnerettevõttele, ning ütleb, milliste pakkujate puhul oleme kinnitanud, et nende tingimused ei luba treenimist teie sisul (jaotis 8).
-
-Versioon 2.17 asendas versiooni 2.16: jaotis 10 ütleb, millal loeb nupuga Teatage tehtud teadet tehisintellekt ja millal isik, et nupp küsib teie heauskset kinnitust, et kinnitame teate kättesaamist ja teatame teile oma otsuse e-postiga ning et põhjendused saadetakse e-postiga ja säilitatakse teie kontol; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
-
-Versioon 2.16 asendas versiooni 2.15: jaotis 12 nimetab tasulised paketid, Plus, Pro ja Max, ning jaotistes 12 ja 15 ei ole enam koostamismärkusi; see, mille eest me vastutame, ja kõik neist Tingimustest tulenevad õigused jäävad muutmata.
-
-Versioon 2.15 asendas versiooni 2.14: jaotis 12 ütleb, et meie hinnad on näidatud ilma maksudeta, kujul hind + käibemaks, ja et maks lisatakse kassas.
-
-Versioon 2.14 asendas versiooni 2.13: jaotis 18 ja lisa A nimetavad vaidluste kohtuvälise lahendamise teeks ANPC (SAL).
-
-Versioon 2.13 asendas versiooni 2.12: jaotis 12 esitab maksenupu rumeeniakeelse teksti.
-
-Versioon 2.12 asendas versiooni 2.11: jaotis 10 ütleb, et sisselogitud isik saab kasutada ka mis tahes avaliku väitluse juures nuppu Teatage, et tehisintellekt loeb nupuga tehtud teadet avaliku teksti kõrval ning mis siis juhtub.
-
-Versioon 2.11 asendas versiooni 2.10: jaotis 9 ütleb, et võime avaliku väitluse läbivaatamise ajaks peita ning eemaldada või parandada selle osa.
-
-Versioon 2.10 asendas versiooni 2.9: jaotis 9 ütleb, et tasuta paketi väitlused on avalikud, et avaliku väitluse avaldamist ei saa tühistada ja see jääb pärast konto sulgemist avalikuks, et igaüks, kellel on krediiti, võib avalikule väitlusele panustada või selle kohta aruande kirjutada, ning et avalik väitlus jääb avatuks pärast selle esimese autori lahkumist; jaotis 11 ütleb, mida sulgemine teie avalikele väitlustele teeb.
-
-Versioon 2.9 asendas versiooni 2.8: jaotisesse 8 lisandub lõik „Meie loodud diagrammid ja statistika“, mis sätestab, kellele kuuluvad väitluse aruande diagrammid, ja annab teile litsentsi neid kasutada.
-
-Versioon 2.8 asendas versiooni 2.7: küsimuse kontroll lükkab tagasi ka küsimuse, kuidas kuritegu toime panna või karistusest pääseda või kas keegi peaks kuriteo toime panema, näiteks uimasteid või relvi ebaseaduslikult osta või müüa, varastada või makse varjata, ega säilita seda; küsimus, kas mõnda seadust tuleks muuta, laseb väitlusel endiselt alata (jaotis 7). Samuti seab see uimastitele ühe joone ja laseb väitlusel alata küsimusest, kas enesetappu, eutanaasiat või abistatud suremist käsitlevat seadusandlust tuleks muuta (jaotis 7), ning küsimuse kontroll ei säilita enam ühtegi küsimust meie meeskonna lugemiseks (jaotised 7 ja 10); ekraan, mis lükkab küsimuse tagasi, on meie põhjendus iga küsimuse kohta, mis jaotise 7 kohaselt ei lase väitlusel alata (jaotis 10).
-
-Versioon 2.7 asendas versiooni 2.6: see lisab küsimuse kontrolli, mis loeb iga küsimuse enne väitluse algust, lükkab mõned tagasi ja säilitab meie meeskonna lugemiseks iga tagasilükatud küsimuse, mis ähvardab kahjustada teist inimest või teisi inimesi, nimeliselt või nimetult, sealhulgas rünnak nimetute inimeste vastu, kavandab seda või küsib, kas või kuidas neid kahjustada, või mis küsib, kuidas valmistada relvi, lõhkeaineid, mürke või uimasteid või kuidas toetada terroriakti, või mis seda ülistab (jaotised 7, 8, 10 ja 11); kontrolli, mis loeb iga lõppenud väitluse sünteesi, heakskiitu, mida märgistatud väitlus vajab enne avaldamist, ja väitlusi, mille see kontroll kustutab (jaotised 5, 8, 9, 10 ja 11); seda, mida kasutajatoe vestlus saadab ettevõtte Anthropic mudelile Claude, et see ei säilita midagi sellest, mida kirjutate, ega ava juhtumit, ning et selle nupp „Rääkige inimesega“ näitab meie kasutajatoe aadressi (jaotised 8 ja 10); ning jaotise 7 reegleid, mis keelavad vihakõne mis tahes kujul, relvade või uimastite valmistamise juhised, enesetapule või teiste inimeste kahjustamisele õhutava sisu ja religioosse solvangu ning ütlevad, millised küsimused ei lase väitlusel alata.
-
 ## 15. Vastutus
 
 **Mida me ei piira.** Miski neis Tingimustes ei välista ega piira meie vastutust meie hooletusest põhjustatud surma või kehavigastuse eest, pettuse või petturliku valeandmete esitamise eest, raske hooletuse või tahtliku rikkumise eest ega muu eest, mida ei saa seaduslikult piirata. Kui olete tarbija, ei kõrvalda miski siin teie seadusest tulenevaid õigusi, sealhulgas õigust nõuda mittevastava teenuse vastavusse viimist või hinnaalandust või tagasimakset ega ühtki teie elukohariigi õiguse alusel kohaldatavat garantiid.
@@ -305,7 +281,7 @@ Isikuandmete töötlemist kirjeldatakse **Privaatsuspoliitikas** aadressil dezba
 
 **Kohtud, kui elate ELis või EMPs.** Võite esitada meie vastu hagi kas Rumeenia või oma elukohariigi kohtule. Me võime esitada teie vastu hagi ainult teie elukohariigi kohtule.
 
-**Mujal elavad tarbijad.** Kui elate väljaspool ELi ja EMPd, ei piira miski neis Tingimustes teie riigi õigusest tulenevat õigust esitada nõue selle riigi kohtule ega õigust, millest selle õiguse alusel ei saa loobuda — sealhulgas Austraalias või Uus-Meremaal elades teie tarbijagarantii õigusi; Brasiilias elades *Código de Defesa do Consumidori* kohaseid õigusi; ja Ameerika Ühendriikides elades teie osariigi tarbijakaitseõiguse kohaseid õigusi.
+**Mujal elavad tarbijad.** Kui elate väljaspool ELi ja EMPd, ei piira miski neis Tingimustes teie riigi õigusest tulenevat õigust esitada nõue selle riigi kohtule ega õigust, millest selle õiguse alusel ei saa loobuda — sealhulgas Austraalias või Uus-Meremaal elades teie tarbijagarantii õigusi; ja Ameerika Ühendriikides elades teie osariigi tarbijakaitseõiguse kohaseid õigusi.
 
 **Enne kohtusse pöördumist.** Võtke meiega ühendust aadressil support@dezbatere.ro; enamik probleeme on lahendatavad ja meie eesmärk on vastata 5 tööpäeva jooksul. Kui olete tarbija Rumeenias või ELis, võite kasutada alternatiivset vaidluste lahendamist veebisaidi ANPC (SAL), reclamatiisal.anpc.ro kaudu; me ei kohustu selles menetluses osalema. Modereerimisotsuste kohta esitatavaid kaebusi käsitletakse eraldi kanalis jaotise 10 kohaselt.
 

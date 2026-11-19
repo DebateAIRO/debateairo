@@ -21,7 +21,6 @@ import {
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { legalReleaseProblems } from "../../apps/ui/scripts/legal-release-check.mjs";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { TERMS_219_ENTRY } from "../support/legalRelease.js";
 
 /**
  * English first: a change to the legal wording is made in English only while work goes on. The languages a release
@@ -43,26 +42,11 @@ const committedArchive = (): LegalArchiveIndex =>
 const sha = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
 
 /**
- * The repository's drafts, but the Terms without the 2.19 entry of their change history. That entry is a paragraph of
- * its own that a translation gains only when it is brought up to date, so a translation that lags lacks it; the release
- * check's cases below need every translation to have the English structure. So the entry goes from English and from
- * each translation that apps/ui/legal/translated-from.json records as translated from the current English text, whose
- * own 2.19 entry stands on the same line as English's.
+ * The repository's drafts, as the release check's cases below read them. They need every translation to have the
+ * English structure, and since Terms 1.0 carries no change history (the 2.x entries, one of which a lagging translation
+ * lacked, left with the renumbering), every language's Terms already has it.
  */
-const TERMS_RECORD = parseLegalTranslations(JSON.parse(readFileSync(resolve(process.cwd(), LEGAL_TRANSLATIONS_PATH), "utf8")));
-const releaseDraft = (locale: string, kind: Kind): string => {
-  const text = repoDraft(locale, kind);
-  if (kind !== "TERMS") return text;
-  const english = repoDraft("en", "TERMS");
-  if (locale !== "en" && !legalTranslationFollows(TERMS_RECORD, "TERMS", locale, sha(english))) return text;
-  const at = english.split("\n").indexOf(TERMS_219_ENTRY);
-  expect(at, "the English 2.19 entry").toBeGreaterThan(-1);
-  const lines = text.split("\n");
-  expect(lines, `${locale}: the line layout of the English Terms`).toHaveLength(english.split("\n").length);
-  expect(lines[at], `${locale}: the 2.19 entry`).toMatch(/\b2\.19\b/u);
-  expect(lines[at + 1], `${locale}: the blank line after the 2.19 entry`).toBe("");
-  return [...lines.slice(0, at), ...lines.slice(at + 2)].join("\n");
-};
+const releaseDraft = repoDraft;
 
 /** An English-only edit that also changes the structure: one new paragraph at the end of section 6. */
 const NEW_PARAGRAPH = "A paragraph that exists only in English so far.";
@@ -255,9 +239,9 @@ describe("the release check", () => {
     const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
     const manifest = buildLegalManifest(releaseDraft, {}, archive);
     const ledger = followingEnglish(releaseDraft);
-    const lagging = parseLegalTranslations({ ...ledger, TERMS: { ...ledger.TERMS, de: { version: "2.18", sha256: "1".repeat(64) } } });
+    const lagging = parseLegalTranslations({ ...ledger, TERMS: { ...ledger.TERMS, de: { version: "0.9", sha256: "1".repeat(64) } } });
     expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging })).toEqual([
-      `Terms of Service: this language lags the English text (version 2.19, sha256 ${sha(releaseDraft("en", "TERMS")).slice(0, 12)}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+      `Terms of Service: this language lags the English text (version 1.0, sha256 ${sha(releaseDraft("en", "TERMS")).slice(0, 12)}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
     ]);
   });
 
@@ -265,18 +249,18 @@ describe("the release check", () => {
     const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
     const manifest = buildLegalManifest(releaseDraft, {}, archive);
     const ledger = followingEnglish(releaseDraft);
-    const old = { version: "2.18", sha256: "1".repeat(64) };
+    const old = { version: "0.9", sha256: "1".repeat(64) };
     const lagging = parseLegalTranslations({ ...ledger, TERMS: { ...ledger.TERMS, de: old, ro: old } });
     const terms = sha(releaseDraft("en", "TERMS")).slice(0, 12);
     expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging, locales: RELEASE_LEGAL_LOCALES })).toEqual([
-      `Terms of Service: this language lags the English text (version 2.19, sha256 ${terms}): ro. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+      `Terms of Service: this language lags the English text (version 1.0, sha256 ${terms}): ro. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
     ]);
     expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging, locales: ["de", "en"] })).toEqual([
-      `Terms of Service: this language lags the English text (version 2.19, sha256 ${terms}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+      `Terms of Service: this language lags the English text (version 1.0, sha256 ${terms}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
     ]);
     // Every language when none is named: both lag.
     expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging })).toEqual([
-      `Terms of Service: these 2 languages lag the English text (version 2.19, sha256 ${terms}): de, ro. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+      `Terms of Service: these 2 languages lag the English text (version 1.0, sha256 ${terms}): de, ro. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
     ]);
   });
 

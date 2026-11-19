@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v2.19 · GÆLDENDE FRA 19. NOVEMBER 2026
+eyebrow: TJENESTEVILKÅR · v1.0 · GÆLDENDE FRA 19. NOVEMBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
-endMarker: SLUT PÅ VILKÅRENE · v2.19
+endMarker: SLUT PÅ VILKÅRENE · v1.0
 bodyLabel: Tjenestevilkårenes tekst
 annexTitle: Bilag A — Regionale vilkår
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 2.19 · Effective 19. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 1.0 · Effective 19. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. På det gratis abonnement er dine debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når en debat er offentlig, kan alle læse den, og den forbliver offentlig. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, hovedsageligt DeepInfra, i USA. Vilkårene hos DeepInfra, Anthropic og Perplexity tillader dem ikke at træne modeller på den; afsnit 8 angiver, for hvilken virksomhed vi endnu ikke har bekræftet dette. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
@@ -251,30 +251,6 @@ Vi oplyser dig på forhånd på et varigt medium om, hvad der ændres og hvornå
 
 **Disse vilkår.** Vi kan ændre disse vilkår af samme type grunde. Ved ændringer, der ikke begrænser dine rettigheder, offentliggør vi den nye version med et resumé af ændringerne og sender dig en e-mail mindst **30 dage**, før den får virkning; hvis du fortsætter med at bruge Dialectical Engine efter denne dato, betyder det, at du accepterer den, og du kan lukke din konto inden da. Ved ændringer, der begrænser dine rettigheder — herunder prisstigninger på et eksisterende abonnement, lavere grænser, fjernede funktioner, nye anvendelser af dit indhold eller ændringer af ansvar, lovvalg eller tvistbilæggelse — beder vi dig udtrykkeligt acceptere den nye version ved dit næste login, og ændringen gælder kun fremadrettet. Vi foretager aldrig ændringer med tilbagevirkende kraft, og vi bruger aldrig dette afsnit til at ændre kernen i det, du har betalt for, midt i en periode uden at tilbyde dig en udvej. Tidligere versioner forbliver tilgængelige på dezbatere.ro/terms/versions.
 
-Version 2.18 erstattede version 2.17: bilag A.3 angiver, at debatter også i Quebec er private som standard på et betalt abonnement og offentlige på det gratis abonnement, som afsnit 9 angiver; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede. Version 2.18 angiver også DeepInfra, den virksomhed, der modtager størstedelen af en debats tekst, at det videresender én models forespørgsler til en partnervirksomhed, og for hvilke udbydere vi har bekræftet, at deres vilkår ikke tillader træning på dit indhold (afsnit 8).
-
-Version 2.17 erstattede version 2.16: afsnit 10 angiver, hvornår en AI læser en anmeldelse indsendt med knappen Anmeld, og hvornår en person gør, at knappen beder om din erklæring i god tro, at vi bekræfter en anmeldelse og meddeler dig vores afgørelse via e-mail, og at begrundelser sendes via e-mail og opbevares på din konto; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede.
-
-Version 2.16 erstattede version 2.15: afsnit 12 nævner de betalte abonnementer, Plus, Pro og Max, og afsnit 12 og 15 indeholder ikke længere redaktionelle noter; det, vi hæfter for, og alle rettigheder i disse vilkår er uændrede.
-
-Version 2.15 erstattede version 2.14: afsnit 12 oplyser, at vores priser vises uden afgifter, som pris + moms, og at afgiften lægges til ved betalingen.
-
-Version 2.14 erstattede version 2.13: afsnit 18 og bilag A angiver ANPC (SAL) som vejen til alternativ tvistbilæggelse.
-
-Version 2.13 erstattede version 2.12: afsnit 12 oplyser betalingsknappens rumænske ordlyd.
-
-Version 2.12 erstattede version 2.11: afsnit 10 oplyser, at en person, der er logget ind, også kan bruge knappen Anmeld på enhver offentlig debat, at en AI læser en anmeldelse, der er indsendt med den, ved siden af den offentlige tekst, og hvad der så sker.
-
-Version 2.11 erstattede version 2.10: afsnit 9 oplyser, at vi kan midlertidigt skjule en offentlig debat, mens vi gennemgår den, og fjerne eller rette en del af den.
-
-Version 2.10 erstattede version 2.9: afsnit 9 oplyser, at debatter på det gratis abonnement er offentlige, at en offentlig debat ikke kan få ophævet offentliggørelsen og forbliver offentlig, efter at du har lukket din konto, at alle med kredit kan bidrage til en offentlig debat eller skrive en rapport om den, og at en offentlig debat forbliver åben, efter at dens første forfatter er gået; afsnit 11 oplyser, hvad lukning gør ved dine offentlige debatter.
-
-Version 2.9 erstattede version 2.8: afsnit 8 får stykket »Diagrammer og statistik, som vi genererer«, som angiver, hvem der ejer diagrammerne i en debatrapport, og giver dig en licens til at bruge dem.
-
-Version 2.8 erstattede version 2.7: spørgsmålskontrollen afviser også et spørgsmål, der spørger, hvordan man begår en forbrydelse eller slipper af sted med den, eller om nogen bør begå en, for eksempel at købe eller sælge narkotika eller våben ulovligt, stjæle eller unddrage skat, og gemmer det ikke; et spørgsmål om, hvorvidt en lov bør ændres, starter stadig en debat (afsnit 7). Den fastsætter også én linje for narkotika og lader et spørgsmål om, hvorvidt lovgivningen om selvmord, aktiv dødshjælp eller assisteret død bør ændres, starte en debat (afsnit 7), og spørgsmålskontrollen gemmer ikke længere noget spørgsmål for vores team (afsnit 7 og 10); den skærm, der afviser et spørgsmål, er vores begrundelse for hvert spørgsmål, som ifølge afsnit 7 ikke starter en debat (afsnit 10).
-
-Version 2.7 erstattede version 2.6: den tilføjer spørgsmålskontrollen, som læser hvert spørgsmål, før en debat starter, afviser nogle og gemmer hvert afvist spørgsmål, der truer med at skade, planlægger at skade eller spørger, om eller hvordan man kan skade en anden person eller andre personer, navngivne eller ej, herunder et angreb på unavngivne personer, eller som spørger, hvordan man fremstiller våben, sprængstoffer, giftstoffer eller narkotika, eller hvordan man støtter en terrorhandling, eller som hylder en sådan, så vores team kan læse det (afsnit 7, 8, 10 og 11); den kontrol, der læser syntesen af hver afsluttet debat, den godkendelse, en markeret debat har brug for, før den kan offentliggøres, og de debatter, som den kontrol sletter (afsnit 5, 8, 9, 10 og 11); hvad supportchatten sender til Anthropics model Claude, at den ikke gemmer noget af det, du skriver, og ikke åbner nogen sag, og at dens knap »Tal med et menneske« viser vores supportadresse (afsnit 8 og 10); og regler i afsnit 7, der forbyder hadtale af enhver art, vejledning i fremstilling af våben eller narkotika, indhold, der tilskynder til selvmord eller til at skade andre mennesker, og religiøs fornærmelse, og som angiver, hvilke spørgsmål der ikke starter en debat.
-
 ## 15. Ansvar
 
 **Det, vi ikke begrænser.** Intet i disse vilkår udelukker eller begrænser vores ansvar for dødsfald eller personskade forårsaget af vores uagtsomhed, for svig eller svigagtig urigtig fremstilling, for grov uagtsomhed eller forsætlig forsømmelse eller for andet, som ikke lovligt kan begrænses. Hvis du er forbruger, fjerner intet heri dine lovbestemte rettigheder, herunder retten til at få en mangelfuld tjeneste bragt i overensstemmelse, til et afslag eller en tilbagebetaling eller enhver garanti, der gælder efter lovgivningen i det land, hvor du bor.
@@ -305,7 +281,7 @@ Det fremgår af **privatlivspolitikken** på dezbatere.ro/privacy, hvordan vi be
 
 **Domstole, hvis du bor i EU eller EØS.** Du kan anlægge sag mod os enten ved domstolene i Rumænien eller ved domstolene i det land, hvor du bor. Vi kan kun anlægge sag mod dig ved domstolene i det land, hvor du bor.
 
-**Forbrugere andre steder.** Hvis du bor uden for EU og EØS, begrænser intet i disse vilkår din ret efter lovgivningen i dit land til at anlægge sag ved landets domstole eller nogen rettighed efter denne lovgivning, der ikke kan fraviges — herunder, hvis du bor i Australien eller New Zealand, dine rettigheder i henhold til forbrugergarantier; hvis du bor i Brasilien, Código de Defesa do Consumidor; og hvis du bor i USA, forbrugerbeskyttelseslovgivningen i din delstat.
+**Forbrugere andre steder.** Hvis du bor uden for EU og EØS, begrænser intet i disse vilkår din ret efter lovgivningen i dit land til at anlægge sag ved landets domstole eller nogen rettighed efter denne lovgivning, der ikke kan fraviges — herunder, hvis du bor i Australien eller New Zealand, dine rettigheder i henhold til forbrugergarantier; og hvis du bor i USA, forbrugerbeskyttelseslovgivningen i din delstat.
 
 **Før du går rettens vej.** Kontakt os på support@dezbatere.ro; de fleste forhold kan løses, og vi bestræber os på at svare inden for 5 arbejdsdage. Hvis du er forbruger i Rumænien eller EU, kan du benytte alternativ tvistbilæggelse gennem ANPC (SAL), reclamatiisal.anpc.ro; vi forpligter os ikke til at deltage i denne procedure. Klager over moderationsafgørelser følger afsnit 10, som er en særskilt fremgangsmåde.
 
