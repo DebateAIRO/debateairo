@@ -363,29 +363,76 @@ gentle "wait in line" message before the hard "try tomorrow".
 `max_go_budget_usd` and `team_total_budget_usd` (the hard fuse). They can change any day with a new GO, then the
 gate's `stop` and `activate`, as each gate's README says (`deploy/preview-gate/v3/`).
 
-**Important: the release guide's SB3 does not read most of the site's numbers from that file.** SB3 takes the whole
-`hostedBilling` value from the active settings version's own plan. It only checks that `billing`, `dailyCeilingMicros`
-and `askRoomReads` in the file equal the active ones, and stops otherwise. So a changed `billingPlans`, `abuseLimits`
-or `perRunCeilingMicros` in the file is not published by SB3, and a changed `dailyCeilingMicros` or `askRoomReads`
-makes SB3 stop. After SB1, before SB3, run this read-only comparison:
+**How an upload treats these numbers (the release guide's SB3).** The file is your own record; the site runs on the
+numbers of the live settings version. An upload publishes a new version. Its numbers are the live ones, except the
+inputs you name at the top of SB3:
+- `NEWNUM`: the inputs to take from the file, for example `NEWNUM='billingPlans'`. Empty means no number changes.
+- `LIMITS`: only when a plan's limits get lower (or change in a way that is neither up nor down): the plans, for example
+  `LIMITS='PLUS'`.
+
+SB3 compares the file with the live numbers and prints one line per input, and per plan: `SAME`, or `DIFFERENT` with
+`higher`, `lower` or `changed`. It never prints an amount. Then it stops, with nothing written, unless your two lists
+are exactly what differs:
+- an input that differs and is not in `NEWNUM` stops it: no number is published by accident, and none is skipped
+  without a word;
+- an input in `NEWNUM` that does not differ stops it too;
+- a plan whose people would get less stops it until you name the plan in `LIMITS`; a plan named there without need
+  stops it too.
+
+**Never edit the file in place.** A file that no longer reads as JSON makes every step print an error instead of its
+numbers. Copy it, edit the copy, check the copy, then put it in place: the four lines are in the release guide under
+SB3, "Editing the owner's file". Do it before SB2 (the practice runs with the file's numbers).
+
+**What a change does to people who already have a plan.** The release guide has the full list under SB3; in short:
+- A new **price** never touches a renewal: someone who already pays keeps the price they bought at (Terms section
+  12), after a rise and after a cut. There is no tool yet that moves existing subscribers to a new price; when you want
+  that, it must be built, with the 30 days' notice the Terms promise. One known gap: an upgrade that was shown at the
+  old price and paid after the switch is renewed at the new price. Publish a price change at a quiet hour.
+- **Lower limits** (a plan's credit, its day and week caps, the finish room, the reserve, Free's gauges) hit everyone
+  on that plan at once, in the month they already paid for: people over the new credit can ask nothing until their
+  month ends, the day and week caps are counted again over the days already used, and a refund pays back less. The
+  Terms ask for more than a notice (sections 12 and 14), and the product cannot yet apply a lower limit only from a
+  person's next month. So do not lower a plan's limits while anyone holds that plan. Naming the plan in `LIMITS` is
+  your statement that nobody holds it, or that you decided this knowing the above.
+- **Higher limits** need no second naming. People get more from the switch on; someone who changed plan this month,
+  from their next month.
+- The day's ceiling, `askRoomReads` and `abuseLimits` are site-wide; they reach everyone at the switch. A new
+  per-debate ceiling applies to debates asked after the switch.
+
+**When the file is behind.** If a per-debate ceiling was changed by a settings activation, the file still holds the
+old value and SB3 says `DIFFERENT perRunCeilingMicros`. Do not name it. Run the release guide's SB3c with
+`KEEP='perRunCeilingMicros'`: it writes the live value into the file and keeps the file as it was in the upload's
+archive folder. SB3c is also how you undo an edit of a file that still reads as JSON.
+
+**Going back after new numbers were published.** While the release before is still there, the release guide's way
+back (WB2) brings its numbers back with it; if the upload had raised limits, that way back lowers them again. Later:
+SB3c with `SRC`, then the next upload with the inputs named in `NEWNUM`. The release guide says both under "The way
+back, side by side".
+
+**A release older than this step** cannot publish changed numbers: its SB3 needs `NEWNUM` and `LIMITS` empty and the
+file equal to the live numbers.
+
+To look before SB3, run this read-only comparison after SB1 and before SB2. It prints one line per input; SB3 itself
+prints the same per plan and member:
 
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
-# SITEINPUTS: whether SB3 would publish the numbers in hosted-billing-v1.json. Prints SAME or DIFFERENT per input, never a value.
+# SITEINPUTS: hosted-billing-v1.json against the live settings version's numbers. Prints SAME or DIFFERENT per input, never a value.
 AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
 if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; fi
 [ -f "$FROM" ] || { echo "SITEINPUTS_NOT_DONE: $FROM is missing: ask"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SITEINPUTS_NOT_DONE: hosted-billing-v1.json does not read as JSON (put its last good copy back): ask"; exit 1; }
 for K in billing dailyCeilingMicros perRunCeilingMicros askRoomReads billingPlans abuseLimits; do
-  if [ "$(jq -cS --arg k "$K" '.hostedBilling[$k]' "$FROM")" = "$(jq -cS --arg k "$K" '.[$k]' <<<"$HB_ON")" ]; then echo "SAME $K"; else echo "DIFFERENT $K"; fi
+  if [ "$(jq -cS --arg k "$K" 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; .hostedBilling[$k] | norm' "$FROM")" = "$(jq -cS --arg k "$K" 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; .[$k] | norm' <<<"$HB_ON")" ]; then echo "SAME $K"; else echo "DIFFERENT $K"; fi
 done
 echo SITEINPUTS_DONE
 exit 0
 ```
 
-Every line `SAME`: SB3 publishes exactly your numbers. Any `DIFFERENT`: **stop and ask before SB3.** Publishing new
-site numbers with an upload needs a different SB3 than the one the release guide has today (to confirm on the
-server).
+Every line `SAME`: leave `NEWNUM` and `LIMITS` empty; SB3 publishes the live numbers, which are your file's. A line
+`DIFFERENT`: decide before SB3 whether that input is a change you mean (name it in `NEWNUM`) or the file being behind
+(SB3c). `DIFFERENT billing` is never a number change: stop and ask.
 
 ---
 
@@ -401,9 +448,10 @@ What this release adds to that recipe:
 - **MAILPLAN once more, right before DR1.** Run MAILPLAN (1.5) again immediately before DR1, and stop the upload
   unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
   inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
-- **SITEINPUTS (1.7), after SB1 and before SB3.** SB3 does not publish a changed `billingPlans`, `abuseLimits` or
-  `perRunCeilingMicros` from `hosted-billing-v1.json`, so the live checkout would use the active version's plans.
-  Stop and ask on any `DIFFERENT`.
+- **Your numbers (1.7), at SB3.** SB3 publishes a number from `hosted-billing-v1.json` only where you name it in
+  `NEWNUM` (and a plan whose people get less in `LIMITS`), and stops when the file differs anywhere you did not name.
+  SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
+  lists empty.
 - **The payment marks, if you want them before real payments** (1.1): PM1, then SB5b, MT1, PM2 and MT2 between DR1
   and DR2, as the release guide says.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
