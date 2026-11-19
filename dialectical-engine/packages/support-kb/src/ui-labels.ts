@@ -11125,7 +11125,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Tarifs",
     "billing-card-change": "Mettre à jour la carte",
     "billing-cancel": "Résilier une formule",
-    "billing-withdraw": "Se rétracter d’une formule",
+    "billing-withdraw": "Se rétracter du contrat",
     "legal-privacy-versions": "Toutes les versions de cette politique"
   },
   "ga": {

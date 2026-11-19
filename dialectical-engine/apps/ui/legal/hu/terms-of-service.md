@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v2.19 · HATÁLYOS 2026. NOVEMBER 19.
+eyebrow: SZOLGÁLTATÁSI FELTÉTELEK · v1.0 · HATÁLYOS 2026. NOVEMBER 19.
 title: Amit Ön elfogad
 lede: Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.
-endMarker: A FELTÉTELEK VÉGE · v2.19
+endMarker: A FELTÉTELEK VÉGE · v1.0
 bodyLabel: A Szolgáltatási feltételek szövege
 annexTitle: A. melléklet — Regionális feltételek
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 IRÁNYADÓ JOG
 -->
 
-**Version 2.19 · Effective 2026. november 19. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
+**Version 1.0 · Effective 2026. november 19. · Korábbi változatok: dezbatere.ro/terms/versions · Nyelv: magyar.**
 
 **In short.** Önnek legalább 18 évesnek kell lennie. A Dialectical Engine mesterségesintelligencia-modellekkel épít fel érveket, és minden általa létrehozott tartalom téves lehet — nem minősül tanácsadásnak. Az ingyenes csomagon az Ön vitái befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon bizalmasak, amíg közzé nem teszi őket. Nyilvánossá válva bárki elolvashatja a vitát, és az nyilvános marad. Az Ön által beküldött szöveget továbbítjuk a Szolgáltatói nyilvántartásunkban felsorolt MI-szolgáltatóknak, főként az Egyesült Államokban működő DeepInfra szolgáltatónak. A DeepInfra, az Anthropic és a Perplexity feltételei nem engedik meg nekik, hogy modelleket tanítsanak be rajta; hogy melyik vállalat esetében még nem erősítettük ezt meg, azt a 8. szakasz mondja el. Jogellenes tartalmat a support@dezbatere.ro címen jelenthet be, függetlenül attól, hogy rendelkezik-e fiókkal. A román jog az irányadó, de az Ön helyi fogyasztóvédelmi jogai változatlanul megilletik.
 
@@ -251,30 +251,6 @@ Tartós adathordozón előzetesen közöljük Önnel, mi és mikor változik. Ha
 
 **E Feltételek módosítása.** E Feltételeket ugyanezen típusú okokból módosíthatjuk. Az Ön jogait nem csökkentő módosítások esetén legalább **30 nappal** a hatálybalépés előtt közzétesszük az új változatot a módosítások összefoglalásával, és e-mailben értesítjük Önt; ha ezt az időpontot követően tovább használja a Dialectical Engine szolgáltatást, azzal elfogadja a módosítást, fiókját pedig ezt megelőzően megszüntetheti. Az Ön jogait csökkentő módosítások — ideértve egy meglévő csomag árának emelését, az alacsonyabb korlátokat, funkciók eltávolítását, tartalmának új felhasználási módjait, illetve a felelősség, az irányadó jog vagy a vitarendezés módosítását — esetén következő bejelentkezésekor kifejezett elfogadását kérjük, és a módosítás csak a jövőre nézve alkalmazandó. Módosítást soha nem alkalmazunk visszamenőleg, és e szakaszt soha nem használjuk arra, hogy a már kifizetett szolgáltatás lényegét a futamidő alatt megváltoztassuk anélkül, hogy kilépési lehetőséget biztosítanánk. A korábbi változatok továbbra is elérhetők itt: dezbatere.ro/terms/versions.
 
-A 2.18-as verzió a 2.17-es verzió helyébe lépett: az A.3. melléklet leírja, hogy Québecben is a fizetős csomagon a viták alapértelmezés szerint bizalmasak, az ingyenes csomagon pedig nyilvánosak, ahogy a 9. szakasz mondja; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan. A 2.18-as verzió azt is megnevezi, hogy a viták szövegének nagy részét megkapó vállalat a DeepInfra, kimondja, hogy egy modell kéréseit egy partnercégnek adja át, és megmondja, mely szolgáltatók esetében erősítettük meg, hogy feltételeik nem engedik meg az Ön tartalmán való betanítást (8. szakasz).
-
-A 2.17-es verzió a 2.16-os verzió helyébe lépett: a 10. szakasz leírja, mikor olvassa egy MI a Bejelentés gombbal tett bejelentést, és mikor egy személy, hogy a gomb az Ön jóhiszeműségi nyilatkozatát kéri, hogy visszaigazoljuk a bejelentést, és döntésünket e-mailben közöljük, valamint hogy az indokolásokat e-mailben elküldjük és a fiókjában megőrizzük; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
-
-A 2.16-os verzió a 2.15-ös verzió helyébe lépett: a 12. szakasz megnevezi a fizetős csomagokat, a Plus, a Pro és a Max csomagot, a 12. és a 15. szakasz pedig már nem tartalmaz szerkesztési megjegyzéseket; az, amiért felelünk, és az E Feltételek szerinti valamennyi jog változatlan.
-
-A 2.15-ös verzió a 2.14-es verzió helyébe lépett: a 12. szakasz kimondja, hogy árainkat adó nélkül, ár + héa formában tüntetjük fel, és hogy az adót a fizetési oldalon adjuk hozzá.
-
-A 2.14-es verzió a 2.13-as verzió helyébe lépett: a 18. szakasz és az A. melléklet az ANPC (SAL) szervet nevezi meg az alternatív vitarendezés útjaként.
-
-A 2.13-as verzió a 2.12-es verzió helyébe lépett: a 12. szakasz megadja a fizetési gomb román nyelvű feliratát.
-
-A 2.12-es verzió a 2.11-es verzió helyébe lépett: a 10. szakasz kimondja, hogy egy bejelentkezett személy a nyilvános vitáknál a Bejelentés gombot is használhatja, hogy egy MI a gombbal tett bejelentést a nyilvános szöveg mellett olvassa, és hogy ezután mi történik.
-
-A 2.11-es verzió a 2.10-es verzió helyébe lépett: a 9. szakasz kimondja, hogy a nyilvános vitát a felülvizsgálat idejére ideiglenesen elrejthetjük, és annak egy részét eltávolíthatjuk vagy kijavíthatjuk.
-
-A 2.10-es verzió a 2.9-es verzió helyébe lépett: a 9. szakasz kimondja, hogy az ingyenes csomagon a viták nyilvánosak, hogy a nyilvános vita nem vonható vissza, és a fiók megszüntetése után is nyilvános marad, hogy bárki, akinek kreditje van, közreműködhet egy nyilvános vitában vagy jelentést írhat róla, és hogy a nyilvános vita az első szerző távozása után is nyitva marad; a 11. szakasz kimondja, mit jelent a megszüntetés a nyilvános vitáira nézve.
-
-A 2.9-es verzió a 2.8-as verzió helyébe lépett: a 8. szakasz kiegészül „Az általunk létrehozott diagramok és statisztikák” című bekezdéssel, amely meghatározza, kinek a tulajdonát képezik a vitajelentésben szereplő diagramok, és engedélyt ad Önnek azok felhasználására.
-
-A 2.8-os verzió a 2.7-ös verzió helyébe lépett: a kérdésellenőrzés azt a kérdést is elutasítja, amely arra kérdez rá, hogyan lehet bűncselekményt elkövetni vagy megúszni a büntetést, vagy hogy valakinek el kellene-e követnie egyet, például kábítószert vagy fegyvert illegálisan venni vagy eladni, lopni vagy adót csalni, és nem őrzi meg; abból a kérdésből, hogy meg kellene-e változtatni egy törvényt, továbbra is elindul a vita (7. szakasz). Emellett egységes szabályt állapít meg a drogokra, és lehetővé teszi, hogy abból a kérdésből, hogy meg kellene-e változtatni az öngyilkosságra, az eutanáziára vagy a segített halálra vonatkozó törvényt, elinduljon a vita (7. szakasz), a kérdésellenőrzés pedig már egyetlen kérdést sem őriz meg csapatunk számára (7. és 10. szakasz); a kérdést elutasító képernyő a mi indokolásunk minden olyan kérdés esetében, amelyből a 7. szakasz szerint nem indul el vita (10. szakasz).
-
-A 2.7-es verzió a 2.6-as verzió helyébe lépett: hozzáadja a kérdésellenőrzést, amely minden kérdést elolvas, mielőtt egy vita elindul, némelyiket elutasítja, és csapatunk számára olvasásra megőrzi minden elutasított kérdést, amely másik személy vagy más emberek – megnevezett vagy megnevezetlen – bántásával fenyeget, azt tervezi, vagy azt kérdezi, hogy lehet-e, illetve hogyan lehet bántani őket, ideértve a megnevezetlen emberek elleni támadást is, vagy amely azt kérdezi, hogyan lehet fegyvereket, robbanószereket, mérgeket vagy drogokat készíteni, vagy hogyan lehet támogatni egy terrorcselekményt, vagy azt dicsőíti (7., 8., 10. és 11. szakasz); azt az ellenőrzést, amely minden befejezett vita szintézisét elolvassa, azt a jóváhagyást, amelyre egy megjelölt vitának szüksége van a közzétételhez, és az ellenőrzés által törölt vitákat (5., 8., 9., 10. és 11. szakasz); azt, hogy mit küld a támogatási csevegés az Anthropic cég Claude modelljének, hogy semmit nem őriz meg abból, amit Ön ír, és nem nyit ügyet, valamint hogy „Beszélgetés munkatárssal” gombja a támogatási címünket mutatja (8. és 10. szakasz); valamint a 7. szakasz szabályait, amelyek tiltják a bármilyen jellegű gyűlöletbeszédet, a fegyverek vagy drogok készítésére vonatkozó útmutatást, az öngyilkosságra vagy mások bántására buzdító tartalmat és a vallási sértést, és megmondják, mely kérdésekből nem indul el vita.
-
 ## 15. Felelősség
 
 **Amit nem korlátozunk.** E Feltételek egyetlen rendelkezése sem zárja ki vagy korlátozza felelősségünket a gondatlanságunk által okozott halálért vagy személyi sérülésért, csalásért vagy csalárd megtévesztésért, súlyos gondatlanságért vagy szándékos kötelezettségszegésért, illetve bármi másért, amely jogszerűen nem korlátozható. Ha Ön fogyasztó, az itt foglaltak nem vonják el törvényes jogait, ideértve a nem szerződésszerű szolgáltatás szerződésszerűvé tételéhez, árleszállításhoz vagy visszatérítéshez való jogot, valamint a lakóhelye szerinti ország joga alapján alkalmazandó bármely garanciát.
@@ -305,7 +281,7 @@ A személyes adatok kezelésének módját a dezbatere.ro/privacy címen elérhe
 
 **Bíróságok, ha Ön az EU-ban vagy az EGT-ben él.** Ön velünk szemben Románia bíróságai vagy a lakóhelye szerinti ország bíróságai előtt indíthat eljárást. Mi kizárólag az Ön lakóhelye szerinti ország bíróságai előtt indíthatunk eljárást Önnel szemben.
 
-**Máshol élő fogyasztók.** Ha Ön az EU-n és az EGT-n kívül él, e Feltételek egyetlen rendelkezése sem korlátozza az Ön országának joga alapján fennálló jogát arra, hogy annak bíróságai előtt igényt érvényesítsen, sem bármely, e jog alapján le nem mondható jogát — ideértve, ha Ön Ausztráliában vagy Új-Zélandon él, a fogyasztói garanciákhoz fűződő jogait; ha Brazíliában él, a Código de Defesa do Consumidor rendelkezéseit; ha pedig az Egyesült Államokban él, az állama fogyasztóvédelmi jogszabályait.
+**Máshol élő fogyasztók.** Ha Ön az EU-n és az EGT-n kívül él, e Feltételek egyetlen rendelkezése sem korlátozza az Ön országának joga alapján fennálló jogát arra, hogy annak bíróságai előtt igényt érvényesítsen, sem bármely, e jog alapján le nem mondható jogát — ideértve, ha Ön Ausztráliában vagy Új-Zélandon él, a fogyasztói garanciákhoz fűződő jogait; ha pedig az Egyesült Államokban él, az állama fogyasztóvédelmi jogszabályait.
 
 **Bírósághoz fordulás előtt.** Lépjen velünk kapcsolatba a support@dezbatere.ro címen; a legtöbb probléma orvosolható, és célunk, hogy 5 munkanapon belül válaszoljunk. Ha Ön romániai vagy uniós fogyasztó, igénybe veheti a ANPC (SAL), reclamatiisal.anpc.ro útján elérhető alternatív vitarendezést; nem vállaljuk az eljárásban való részvételt. A moderálási döntésekre vonatkozó panaszokra a 10. szakasz szerinti külön eljárás alkalmazandó.
 

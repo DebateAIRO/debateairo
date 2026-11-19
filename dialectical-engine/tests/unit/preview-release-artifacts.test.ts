@@ -1527,3 +1527,116 @@ describe('the shared server-tools folder', () => {
     expect(results.filter((result: { ok: boolean }) => !result.ok)).toEqual([]);
   }, 300_000);
 });
+
+describe('site-inputs: the site\'s numbers for an upload (release guide SB3)', () => {
+  /** Made-up numbers (tests/support/hostedRegisterRows.ts); the live version's hosted inputs, and the owner's file. */
+  const LIVE = { billing: 'on', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS };
+  const copy = (): any => JSON.parse(JSON.stringify(LIVE));
+  const checks = { validateNativePlan: operator.validateNativePlan, validateHostedBillingChoice: operator.validateHostedBillingChoice };
+  function staged(hostedBilling: unknown = LIVE) {
+    const s = server();
+    const from = s.write(join(s.art, 'native-plan-before.json'), oldNativePlan({ hostedBilling }));
+    const out = join(s.art, 'site-inputs.json');
+    const argv = (operation: string, file: unknown, extra: string[] = []) => ['site-inputs', '--operation', operation, '--from', from.path, '--site', JSON.stringify(file), ...extra];
+    return { s, from, out, argv };
+  }
+
+  it('report: prints the lines and the names, reads no other file and writes none', async () => {
+    const t = staged(), file = copy();
+    file.dailyCeilingMicros += 11_000_000;
+    file.billingPlans.plans[1].monthly_credit_micros -= 1_100_000;
+    const report = await run(t.argv('report', file), t.s.layout);
+    expect(report).toEqual({ event: 'PREVIEW_SITE_INPUTS', operation: 'report', differing: ['dailyCeilingMicros', 'billingPlans'], limitPlans: ['PLUS'],
+      lines: ['SAME billing', 'SAME perRunCeilingMicros', 'DIFFERENT dailyCeilingMicros: higher', 'SAME askRoomReads', 'SAME abuseLimits',
+        'DIFFERENT billingPlans PLUS limits: month credit lower, day cap lower, week cap lower [the people already on this plan get less or something else, at the switch and counted over the month they are in]',
+        'DIFFERENT billingPlans FREE size shown on the pricing page (times the Plus credit): higher', 'DIFFERENT billingPlans PRO size shown on the pricing page (times the Plus credit): higher',
+        'DIFFERENT billingPlans MAX size shown on the pricing page (times the Plus credit): higher'] });
+    expect(JSON.stringify(report)).not.toMatch(/\d{3,}/);
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('compose: writes the chosen numbers and the record of what was named, and prints no amount', async () => {
+    const t = staged(), file = copy();
+    file.dailyCeilingMicros += 11_000_000;
+    file.billingPlans.plans[1].monthly_credit_micros -= 1_100_000;
+    file.perRunCeilingMicros -= 1_100_000;
+    // Only two of the three are meant: the third stops it, and nothing is written.
+    await expect(run(t.argv('compose', file, ['--change', 'billingPlans dailyCeilingMicros', '--limits', 'PLUS', '--out', t.out]), t.s.layout, checks))
+      .rejects.toMatchObject({ code: 'SITE_CHANGE_NOT_NAMED', fields: ['perRunCeilingMicros'] });
+    expect(existsSync(t.out)).toBe(false);
+    file.perRunCeilingMicros = LIVE.perRunCeilingMicros;
+    const result = await run(t.argv('compose', file, ['--change', 'billingPlans dailyCeilingMicros', '--limits', 'PLUS', '--out', t.out]), t.s.layout, checks);
+    expect(result).toEqual({ path: t.out, sha256: sha(readFileSync(t.out)), bytes: statSync(t.out).size, change: ['billingPlans', 'dailyCeilingMicros'], limits: ['PLUS'] });
+    const record = JSON.parse(readFileSync(t.out, 'utf8'));
+    expect(record).toMatchObject({ schema: tool.SITE_INPUTS_SCHEMA, from: { path: t.from.path, sha256: t.from.sha256 }, baseRegisterVersion: '9',
+      change: ['billingPlans', 'dailyCeilingMicros'], limits: ['PLUS'] });
+    expect(record.lines[2]).toBe('DIFFERENT dailyCeilingMicros: higher');
+    // The file's value for the named inputs, the live value for every other one, in the plan's own key order.
+    expect(record.hostedBilling).toEqual({ ...LIVE, dailyCeilingMicros: file.dailyCeilingMicros, billingPlans: file.billingPlans });
+    expect(Object.keys(record.hostedBilling)).toEqual(['billing', 'perRunCeilingMicros', 'dailyCeilingMicros', 'askRoomReads', 'billingPlans', 'abuseLimits']);
+    expect(statSync(t.out).mode & 0o777).toBe(0o644);
+    // A native plan takes exactly this value (the next line of SB3).
+    expect(operator.validateHostedBillingChoice(record.hostedBilling)).toEqual(record.hostedBilling);
+    // A second run never replaces the record.
+    await expect(run(t.argv('compose', file, ['--change', 'billingPlans dailyCeilingMicros', '--limits', 'PLUS', '--out', t.out]), t.s.layout, checks)).rejects.toMatchObject({ code: 'OUTPUT_EXISTS' });
+  });
+
+  it('compose with nothing named: the live numbers, when the file holds them', async () => {
+    const t = staged();
+    const result = await run(t.argv('compose', copy(), ['--out', t.out]), t.s.layout, checks);
+    expect(result).toMatchObject({ change: [], limits: [] });
+    expect(JSON.parse(readFileSync(t.out, 'utf8')).hostedBilling).toEqual(LIVE);
+  });
+
+  it('compose refuses a mix the native operator\'s check refuses, and writes nothing', async () => {
+    const t = staged(), file = copy();
+    // The file's per-debate ceiling is above the live day's: lawful in the file (its own day is higher), not in the mix.
+    file.perRunCeilingMicros = LIVE.dailyCeilingMicros + 1_100_000;
+    file.dailyCeilingMicros = LIVE.dailyCeilingMicros * 2;
+    await expect(run(t.argv('compose', file, ['--change', 'perRunCeilingMicros', '--out', t.out]), t.s.layout, checks)).rejects.toMatchObject({ code: 'SITE_CHANGE_NOT_NAMED', fields: ['dailyCeilingMicros'] });
+    const half = copy(); half.perRunCeilingMicros = LIVE.dailyCeilingMicros + 1_100_000;
+    await expect(run(t.argv('compose', half, ['--change', 'perRunCeilingMicros', '--out', t.out]), t.s.layout, checks)).rejects.toMatchObject({ code: 'SITE_INPUTS_REFUSED', fields: ['--site'] });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it.each([
+    ['an unknown operation', 'publish', [], 'ARGUMENTS_REFUSED', ['--operation']],
+    ['report with --out', 'report', ['--out', 'OUT'], 'ARGUMENTS_REFUSED', ['--out']],
+    ['report with --change', 'report', ['--change', 'billingPlans'], 'ARGUMENTS_REFUSED', ['--change']],
+    ['report with --limits', 'report', ['--limits', 'PLUS'], 'ARGUMENTS_REFUSED', ['--limits']],
+    ['compose without --out', 'compose', [], 'ARGUMENTS_REFUSED', ['--out']],
+    ['compose with an unknown input', 'compose', ['--change', 'billing', '--out', 'OUT'], 'ARGUMENTS_REFUSED', ['--change']],
+    ['compose into another file name', 'compose', ['--out', 'OTHER'], 'OUTPUT_PATH_REFUSED', undefined]
+  ])('refuses %s', async (_name, operation, extra, code, fields) => {
+    const t = staged();
+    const words = extra.map(word => (word === 'OUT' ? t.out : word === 'OTHER' ? join(t.s.art, 'numbers.json') : word));
+    await expect(run(t.argv(operation, copy(), words), t.s.layout, checks)).rejects.toMatchObject(fields === undefined ? { code } : { code, fields });
+    expect(existsSync(t.out)).toBe(false);
+  });
+
+  it('refuses a --site that is not one JSON object of the six inputs, and a --from that is not a published hosted verify plan', async () => {
+    const t = staged();
+    await expect(run(['site-inputs', '--operation', 'report', '--from', t.from.path, '--site', 'billing=on'], t.s.layout)).rejects.toMatchObject({ code: 'ARGUMENTS_REFUSED', fields: ['--site'] });
+    const { abuseLimits: _dropped, ...five } = copy();
+    await expect(run(t.argv('report', five), t.s.layout)).rejects.toMatchObject({ code: 'SITE_INPUTS_REFUSED', fields: ['--site'] });
+    // A local-mode plan carries no hosted inputs at all.
+    const local = staged();
+    local.s.write(local.from.path, oldNativePlan());
+    await expect(run(local.argv('report', copy()), local.s.layout)).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    const planned = staged();
+    planned.s.write(planned.from.path, oldNativePlan({ operation: 'plan', approval: null, hostedBilling: LIVE }));
+    await expect(run(planned.argv('report', copy()), planned.s.layout)).rejects.toMatchObject({ code: 'FROM_PLAN_INVALID' });
+    const secret = staged();
+    chmodSync(secret.from.path, 0o600);
+    await expect(run(secret.argv('report', copy()), secret.s.layout)).rejects.toMatchObject({ code: 'INPUT_REFUSED', fields: ['--from'] });
+  });
+
+  it('refuses a billing switch that differs, and a file that lists other plans', async () => {
+    const off = staged({ ...LIVE, billing: 'off' });
+    expect((await run(off.argv('report', copy()), off.s.layout) as { lines: string[] }).lines[0]).toBe('DIFFERENT billing');
+    await expect(run(off.argv('compose', copy(), ['--out', off.out]), off.s.layout, checks)).rejects.toMatchObject({ code: 'SITE_BILLING_SWITCH_DIFFERS' });
+    const t = staged(), fewer = copy();
+    fewer.billingPlans.plans.pop();
+    await expect(run(t.argv('report', fewer), t.s.layout)).rejects.toMatchObject({ code: 'SITE_PLAN_LIST_DIFFERS' });
+  });
+});

@@ -108,6 +108,42 @@ describe("P7 the EMAIL job", () => {
     expect(sent).toEqual([]);
   });
 
+  it("adds the buyer's name at send time when the job asks for it, and never keeps the name in the queue", async () => {
+    // The withdrawal acknowledgement repeats the buyer's name (OUG 34/2014 art. 11^1(7)): the job holds only a flag,
+    // and the handler reads the name from the billing profile it opens anyway.
+    const params = { plan: "PLUS", withdrawalDate: NOW.toISOString(), timeZone: "Europe/Bucharest" };
+    const request = emailJob({
+      template: "M8_RECEIVED", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "sub-1",
+      params, notBefore: NOW, resolve: { buyerName: true }
+    });
+    expect(request.payload["resolve.buyer_name"]).toBe(true);
+    expect(Object.keys(request.payload).filter((key) => key.startsWith("param."))).toEqual([
+      "param.plan", "param.withdrawalDate", "param.timeZone"
+    ]);
+    const named = harness({ ...profile("buyer@example.test", "ro"), firstName: "Ana", lastName: "Popescu" });
+    expect(await named.handler(asJob(request), NOW)).toEqual({ kind: "DONE" });
+    expect(named.sent[0]?.params).toEqual({ ...params, buyerName: "Ana Popescu" });
+    // A profile sealed before the payer's two names keeps its single name.
+    const older = harness({ ...profile("buyer@example.test", "ro"), name: "Ion Ionescu" });
+    await older.handler(asJob(request), NOW);
+    expect(older.sent[0]?.params).toEqual({ ...params, buyerName: "Ion Ionescu" });
+    // No name at all, or one too long for the email's one-line name, leaves the line out rather than stop the email.
+    for (const nameless of [profile("buyer@example.test", "ro"),
+      { ...profile("buyer@example.test", "ro"), firstName: "A".repeat(128), lastName: "B".repeat(128) }]) {
+      const run = harness(nameless);
+      expect(await run.handler(asJob(request), NOW)).toEqual({ kind: "DONE" });
+      expect(run.sent[0]?.params).toEqual(params);
+    }
+    // A job that does not ask for the name never gets it.
+    const plain = emailJob({
+      template: "M8_RECEIVED", recipient: { kind: "CUSTOMER", customerId: CUSTOMER }, dedupeRef: "sub-2", params, notBefore: NOW
+    });
+    expect(plain.payload).not.toHaveProperty("resolve.buyer_name");
+    const unasked = harness({ ...profile("buyer@example.test", "ro"), firstName: "Ana", lastName: "Popescu" });
+    await unasked.handler(asJob(plain), NOW);
+    expect(unasked.sent[0]?.params).toEqual(params);
+  });
+
   it("sends the owner's mail to the owner's custody address in English", async () => {
     const request = emailJob({
       template: "O1", recipient: { kind: "OWNER" }, dedupeRef: "2026-Q4",

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ringkasnya
-eyebrow: KETENTUAN LAYANAN · v2.19 · BERLAKU 19 NOVEMBER 2026
+eyebrow: KETENTUAN LAYANAN · v1.0 · BERLAKU 19 NOVEMBER 2026
 title: Hal yang Anda setujui
 lede: Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.
-endMarker: AKHIR KETENTUAN · v2.19
+endMarker: AKHIR KETENTUAN · v1.0
 bodyLabel: Teks Ketentuan Layanan
 annexTitle: Lampiran A — Ketentuan regional
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 HUKUM YANG BERLAKU
 -->
 
-**Version 2.19 · Effective 19 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
+**Version 1.0 · Effective 19 November 2026 · Versi sebelumnya di dezbatere.ro/terms/versions · Bahasa: Indonesia.**
 
 **In short.** Anda harus berusia 18 tahun atau lebih. Dialectical Engine menyusun argumen dengan model AI dan segala sesuatu yang dihasilkannya mungkin salah — ini bukan nasihat. Di paket gratis, debat Anda bersifat publik setelah selesai, setelah pemeriksaan AI; di paket berbayar, debat bersifat privat kecuali Anda memublikasikannya. Setelah publik, siapa pun dapat membaca debat itu, dan debat itu tetap publik. Teks yang Anda kirim diteruskan kepada penyedia AI yang tercantum dalam Daftar Penyedia kami, terutama DeepInfra, di Amerika Serikat. Ketentuan DeepInfra, Anthropic, dan Perplexity tidak mengizinkan mereka melatih model dengan teks itu; bagian 8 menjelaskan untuk perusahaan mana hal ini belum kami konfirmasi. Laporkan konten ilegal ke support@dezbatere.ro, baik Anda memiliki akun maupun tidak. Hukum Rumania berlaku, tetapi perlindungan konsumen setempat Anda tetap berlaku bagi Anda.
 
@@ -251,30 +251,6 @@ Kami memberi tahu Anda terlebih dahulu, pada media tahan lama, mengenai hal yang
 
 **Pada Ketentuan ini.** Kami dapat mengubah Ketentuan ini untuk jenis alasan yang sama. Untuk perubahan yang tidak mengurangi hak Anda, kami memublikasikan versi baru beserta ringkasan perubahan dan mengirim email kepada Anda sekurang-kurangnya **30 hari** sebelum perubahan berlaku; jika Anda terus menggunakan Dialectical Engine setelah tanggal tersebut, berarti Anda menerimanya, dan Anda dapat menutup akun sebelumnya. Untuk perubahan yang mengurangi hak Anda — termasuk kenaikan harga pada paket yang sudah ada, batas yang lebih rendah, fitur yang dihapus, penggunaan baru atas konten Anda, atau perubahan pada tanggung jawab, hukum yang berlaku, maupun penyelesaian sengketa — kami meminta Anda menerima versi baru secara tegas saat masuk berikutnya, dan perubahan hanya berlaku untuk waktu mendatang. Kami tidak pernah memberlakukan perubahan secara surut, dan tidak pernah menggunakan bagian ini untuk mengubah inti dari hal yang telah Anda bayar di tengah masa berlaku tanpa menawarkan jalan keluar. Versi sebelumnya tetap tersedia di dezbatere.ro/terms/versions.
 
-Versi 2.18 menggantikan versi 2.17: Lampiran A.3 menyebutkan bahwa di Quebec pun debat di paket berbayar bersifat privat secara bawaan dan debat di paket gratis bersifat publik, sebagaimana dijelaskan dalam bagian 9; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah. Versi 2.18 juga menyebutkan DeepInfra, perusahaan yang menerima sebagian besar teks debat, menyebutkan bahwa DeepInfra meneruskan permintaan satu model kepada perusahaan mitra, dan menyebutkan untuk penyedia mana kami telah mengonfirmasi bahwa ketentuan mereka tidak mengizinkan pelatihan dengan konten Anda (bagian 8).
-
-Versi 2.17 menggantikan versi 2.16: bagian 10 menyebutkan kapan AI membaca laporan yang dibuat dengan tombol Laporkan dan kapan seseorang yang membacanya, bahwa tombol itu meminta pernyataan iktikad baik Anda, bahwa kami mengonfirmasi laporan dan memberi tahu Anda keputusan kami melalui email, dan bahwa pernyataan alasan dikirim melalui email dan disimpan di akun Anda; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah.
-
-Versi 2.16 menggantikan versi 2.15: bagian 12 menyebutkan paket berbayar, yaitu Plus, Pro, dan Max, dan bagian 12 dan 15 tidak lagi memuat catatan penyusunan; hal-hal yang menjadi tanggung jawab kami, dan setiap hak dalam Ketentuan ini, tidak berubah.
-
-Versi 2.15 menggantikan versi 2.14: bagian 12 menyatakan bahwa harga kami ditampilkan sebelum pajak, sebagai harga + PPN, dan bahwa pajak ditambahkan di halaman pembayaran.
-
-Versi 2.14 menggantikan versi 2.13: bagian 18 dan Lampiran A menyebut ANPC (SAL) sebagai jalur penyelesaian sengketa alternatif.
-
-Versi 2.13 menggantikan versi 2.12: bagian 12 menyebutkan tulisan tombol pembayaran dalam bahasa Rumania.
-
-Versi 2.12 menggantikan versi 2.11: bagian 10 menyatakan bahwa orang yang sudah masuk juga dapat menggunakan tombol Laporkan pada debat publik mana pun, bahwa AI membaca laporan yang dibuat dengan tombol itu di samping teks publik, dan apa yang terjadi setelah itu.
-
-Versi 2.11 menggantikan versi 2.10: bagian 9 menyatakan bahwa kami dapat menyembunyikan debat publik selama kami meninjaunya, dan menghapus atau memperbaiki sebagiannya.
-
-Versi 2.10 menggantikan versi 2.9: bagian 9 menyatakan bahwa debat di paket gratis bersifat publik, bahwa debat publik tidak dapat dibatalkan publikasinya dan tetap publik setelah Anda menutup akun, bahwa siapa pun yang memiliki kredit dapat berkontribusi pada debat publik atau menulis laporan tentangnya, dan bahwa debat publik tetap terbuka setelah penulis pertamanya pergi; bagian 11 menjelaskan apa yang dilakukan penutupan terhadap debat publik Anda.
-
-Versi 2.9 menggantikan versi 2.8: bagian 8 mendapat paragraf baru “Grafik dan statistik yang kami hasilkan”, yang menyatakan siapa pemilik grafik dalam laporan debat dan memberi Anda lisensi untuk menggunakannya.
-
-Versi 2.8 menggantikan versi 2.7: pemeriksaan pertanyaan juga menolak pertanyaan yang menanyakan cara melakukan kejahatan atau lolos dari hukumannya, atau apakah seseorang sebaiknya melakukan kejahatan, seperti membeli atau menjual narkoba atau senjata secara ilegal, mencuri, atau menghindari pajak, dan tidak menyimpannya; pertanyaan tentang apakah suatu undang-undang sebaiknya diubah tetap memulai debat (bagian 7). Versi ini juga menetapkan satu aturan untuk pertanyaan tentang narkoba dan memungkinkan pertanyaan tentang apakah undang-undang mengenai bunuh diri, eutanasia, atau kematian dengan bantuan sebaiknya diubah untuk memulai debat (bagian 7), dan pemeriksaan pertanyaan tidak lagi menyimpan pertanyaan apa pun untuk dibaca tim kami (bagian 7 dan 10); layar yang menolak suatu pertanyaan adalah pernyataan alasan kami untuk setiap pertanyaan yang menurut bagian 7 tidak memulai debat (bagian 10).
-
-Versi 2.7 menggantikan versi 2.6: versi ini menambahkan pemeriksaan pertanyaan, yang membaca setiap pertanyaan sebelum debat dimulai, menolak sebagian, dan menyimpan untuk dibaca tim kami setiap pertanyaan ditolak yang mengancam, merencanakan, atau menanyakan apakah atau bagaimana menyakiti orang lain, disebutkan namanya atau tidak, termasuk serangan terhadap orang yang tidak disebutkan namanya, atau yang menanyakan cara membuat senjata, bahan peledak, racun, atau narkoba atau cara mendukung tindakan terorisme, atau memujinya (bagian 7, 8, 10, dan 11); pemeriksaan yang membaca sintesis setiap debat yang telah selesai, persetujuan yang diperlukan debat yang ditandai sebelum dapat dipublikasikan, dan debat yang dihapus pemeriksaan itu (bagian 5, 8, 9, 10, dan 11); apa yang dikirim obrolan dukungan kepada model Claude milik Anthropic, bahwa obrolan itu tidak menyimpan apa pun dari yang Anda tulis dan tidak membuka kasus, dan bahwa tombol “Bicara dengan petugas” menampilkan alamat dukungan kami (bagian 8 dan 10); serta aturan pada bagian 7 yang melarang ujaran kebencian dalam bentuk apa pun, petunjuk pembuatan senjata atau narkoba, konten yang mendorong bunuh diri atau menyakiti orang lain, dan penghinaan agama, dan menyatakan pertanyaan mana yang tidak memulai debat.
-
 ## 15. Tanggung jawab
 
 **Hal yang tidak kami batasi.** Tidak ada hal dalam Ketentuan ini yang mengecualikan atau membatasi tanggung jawab kami atas kematian atau cedera pribadi yang disebabkan oleh kelalaian kami, penipuan atau pernyataan palsu yang menipu, kelalaian berat atau perbuatan salah yang disengaja, maupun hal lain yang secara hukum tidak dapat dibatasi. Jika Anda seorang konsumen, tidak ada hal di sini yang menghapus hak Anda berdasarkan undang-undang, termasuk hak agar layanan yang tidak sesuai dibuat menjadi sesuai, hak atas pengurangan harga atau pengembalian dana, maupun jaminan apa pun yang berlaku berdasarkan hukum negara tempat Anda tinggal.
@@ -305,7 +281,7 @@ Cara kami menangani data pribadi ditetapkan dalam **Kebijakan Privasi** di dezba
 
 **Pengadilan, jika Anda tinggal di Uni Eropa atau EEA.** Anda dapat mengajukan perkara terhadap kami di pengadilan Rumania atau di pengadilan negara tempat Anda tinggal. Kami hanya dapat mengajukan perkara terhadap Anda di pengadilan negara tempat Anda tinggal.
 
-**Konsumen di tempat lain.** Jika Anda tinggal di luar Uni Eropa dan EEA, tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum negara Anda untuk mengajukan klaim di pengadilannya, atau hak apa pun berdasarkan hukum tersebut yang tidak dapat dikesampingkan — termasuk hak jaminan konsumen jika Anda tinggal di Australia atau Selandia Baru; Código de Defesa do Consumidor jika Anda tinggal di Brasil; dan hukum perlindungan konsumen negara bagian Anda jika Anda tinggal di Amerika Serikat.
+**Konsumen di tempat lain.** Jika Anda tinggal di luar Uni Eropa dan EEA, tidak ada hal dalam Ketentuan ini yang membatasi hak Anda berdasarkan hukum negara Anda untuk mengajukan klaim di pengadilannya, atau hak apa pun berdasarkan hukum tersebut yang tidak dapat dikesampingkan — termasuk hak jaminan konsumen jika Anda tinggal di Australia atau Selandia Baru; dan hukum perlindungan konsumen negara bagian Anda jika Anda tinggal di Amerika Serikat.
 
 **Sebelum mengajukan perkara ke pengadilan.** Hubungi kami di support@dezbatere.ro; sebagian besar masalah dapat diperbaiki, dan kami berupaya menjawab dalam waktu 5 hari kerja. Jika Anda seorang konsumen di Rumania atau Uni Eropa, Anda dapat menggunakan penyelesaian sengketa alternatif melalui ANPC (SAL), reclamatiisal.anpc.ro; kami tidak berkomitmen untuk berpartisipasi dalam prosedur tersebut. Pengaduan mengenai keputusan moderasi mengikuti bagian 10, yang merupakan jalur terpisah.
 

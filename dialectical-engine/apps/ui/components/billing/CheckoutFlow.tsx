@@ -54,6 +54,7 @@ export function CheckoutFlow({
   navigate = leaveFor,
   goToPayment = leaveForPayment,
   paymentMarks = NO_MARKS,
+  netopiaLogo = null,
   testMode = false
 }: Readonly<{
   planId: PaidPlanId;
@@ -65,6 +66,8 @@ export function CheckoutFlow({
   goToPayment?: (url: string) => void;
   /** Spec §2.18 (N25b): the marks the PAYMENT_MARKS_AVAILABLE setting names, read on the server by the page; none by default. */
   paymentMarks?: PaymentMarks;
+  /** NETOPIA's hosted logo (the NETOPIA_LOGO_ID setting), read on the server by the page; when set it replaces the marks. */
+  netopiaLogo?: string | null;
   /** True while the server's card payments run on NETOPIA's sandbox (the page reads it from the plans list); none by default. */
   testMode?: boolean;
 }>) {
@@ -471,6 +474,15 @@ export function CheckoutFlow({
             <input type="checkbox" id="checkout-immediate" checked={immediateAccepted} onChange={(event) => setImmediateAccepted(event.target.checked)} />
             <span>{t(catalog, "billing.consent.immediateStart")}</span>
           </label>
+          {/* OUG 34/2014 art. 6(1)(h): before the contract, where the withdrawal function is. A paragraph of its own,
+              so the sealed consent sentences above stay as they are; the page opens in a new tab, so this one keeps
+              the boxes the person ticked. */}
+          {quote.withdrawal_days !== null ? (
+            <p className="billingNote" data-withdrawal-where>
+              {t(catalog, "billing.checkout.withdrawalWhere", { days: quote.withdrawal_days })}{" "}
+              <a href="/withdraw" target="_blank" rel="noopener">{t(catalog, "billing.checkout.withdrawalLink")}</a>
+            </p>
+          ) : null}
           <h2 className="setSubtitle">{t(catalog, "billing.checkout.cardTitle")}</h2>
           <p className="billingNote">{t(catalog, "billing.checkout.cardNote")}</p>
           {/* Right above the button that leaves for NETOPIA's page, where a real card would otherwise be typed. */}
@@ -488,8 +500,9 @@ export function CheckoutFlow({
             </button>
             {continueBlocker !== null ? <span id="checkout-continue-hint" className="srOnly">{t(catalog, continueBlocker.key)}</span> : null}
           </div>
-          {/* Spec §2.18: NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer. */}
-          <PaymentMarksGroup marks={paymentMarks} />
+          {/* NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer: its hosted
+              logo when the page hands one over, otherwise the marks. */}
+          <PaymentMarksGroup marks={paymentMarks} netopiaLogo={netopiaLogo} />
         </section>
       ) : null}
     </section>

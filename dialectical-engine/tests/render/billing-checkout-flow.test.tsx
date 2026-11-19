@@ -144,6 +144,37 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(container.querySelectorAll("iframe, script")).toHaveLength(0);
   });
 
+  it("says before the payment where the withdrawal function is, and links to /withdraw for the steps and the model form", async () => {
+    // OUG 34/2014 art. 6(1)(h): the pre-contract information names the withdrawal function and where it is.
+    client.createBillingQuote.mockResolvedValueOnce(quote({ address_required: true })).mockResolvedValueOnce(quote());
+    await render();
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    const note = container.querySelector<HTMLElement>("[data-withdrawal-where]")!;
+    expect(note.textContent).toBe("You can withdraw within 14 days of subscribing, without giving a reason: in Settings, under"
+      + " Subscription, press “Withdraw from contract here”, then “Confirm withdrawal”. How to withdraw, and the model withdrawal form");
+    const link = note.querySelector<HTMLAnchorElement>('a[href="/withdraw"]')!;
+    expect(link.textContent).toBe("How to withdraw, and the model withdrawal form");
+    // A new tab, so the checkout and its ticked boxes stay as they are.
+    expect([link.getAttribute("target"), link.getAttribute("rel")]).toEqual(["_blank", "noopener"]);
+    // After the immediate-start box, before the Payment heading.
+    const immediate = container.querySelector("#checkout-immediate")!.closest("label")!;
+    const payment = [...container.querySelectorAll("h2")].find((heading) => heading.textContent === EN["billing.checkout.cardTitle"])!;
+    expect(immediate.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(note.compareDocumentPosition(payment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The sealed consent sentences are untouched: the note is a paragraph of its own.
+    expect(immediate.textContent).toBe(EN["billing.consent.immediateStart"]);
+    // A quote with no withdrawal right says nothing about one.
+    client.createBillingQuote.mockReset();
+    client.createBillingQuote.mockResolvedValueOnce(quote({ address_required: true }))
+      .mockResolvedValueOnce(quote({ withdrawal_days: null }));
+    await remount();
+    await fillDetails();
+    await click(button("billing.checkout.showPrice")!);
+    expect(text()).toContain(EN["billing.checkout.cardNote"]);
+    expect(container.querySelector("[data-withdrawal-where]")).toBeNull();
+  });
+
   it("asks Romania for the county from SmartBill's list and, in Bucharest, a sector as the city (R-15, P2-M15)", async () => {
     client.createBillingQuote.mockResolvedValue(quote({ country: "RO", ip_country: "RO", tax_country: "RO", address_required: true }));
     await render();
@@ -474,10 +505,12 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
 describe("N25b the payment marks under Continue (spec §2.18)", () => {
   const marksImages = (): string[][] => [...container.querySelectorAll('[role="group"] img')]
     .map((image) => [image.getAttribute("src") ?? "", image.getAttribute("alt") ?? ""]);
-  async function renderWithMarks(paymentMarks?: Readonly<{ netopia: boolean; visa: boolean; mastercard: boolean }>): Promise<void> {
+  async function renderWithMarks(
+    paymentMarks?: Readonly<{ netopia: boolean; visa: boolean; mastercard: boolean }>, netopiaLogo?: string | null
+  ): Promise<void> {
     await act(async () => {
       root.render(<CheckoutFlow planId="PLUS" locale="en" catalog={billingEnglish} consents={CONSENTS}
-        client={client as unknown as CheckoutClient} goToPayment={goToPayment} paymentMarks={paymentMarks} />);
+        client={client as unknown as CheckoutClient} goToPayment={goToPayment} paymentMarks={paymentMarks} netopiaLogo={netopiaLogo} />);
     });
     await settle();
   }
@@ -505,5 +538,20 @@ describe("N25b the payment marks under Continue (spec §2.18)", () => {
     await renderWithMarks();
     expect(button("billing.checkout.continueToCard")).toBeDefined();
     expect(container.querySelectorAll("img")).toHaveLength(0);
+  });
+
+  it("shows NETOPIA's hosted logo under the button instead of the marks when the page hands one over", async () => {
+    client.createBillingQuote.mockResolvedValue(quote());
+    // A made-up shop id: the real one is never in the repository.
+    await renderWithMarks({ netopia: true, visa: true, mastercard: true }, "https://mny.ro/np-black-0.svg?id=123456");
+    expect(marksImages()).toEqual([["https://mny.ro/np-black-0.svg?id=123456", "NETOPIA Payments, Visa, Mastercard"]]);
+    const group = container.querySelector('[role="group"]')!;
+    expect(group.previousElementSibling?.contains(button("billing.checkout.continueToCard")!)).toBe(true);
+    const link = group.querySelector("a")!;
+    expect([link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("rel")])
+      .toEqual(["https://netopia-payments.com/", "_blank", "noopener noreferrer"]);
+    const image = group.querySelector("img")!;
+    expect([image.getAttribute("loading"), image.getAttribute("referrerpolicy"), image.hasAttribute("crossorigin")]).toEqual(["lazy", "no-referrer", false]);
+    expect(container.querySelector('img[src^="/payment-marks/"]')).toBeNull();
   });
 });

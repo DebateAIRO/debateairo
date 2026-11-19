@@ -186,10 +186,13 @@ export function isPaymentMarksList(value) {
  const names=value.split(',');
  return names.every(name=>PAYMENT_MARK_NAMES.includes(name))&&new Set(names).size===names.length;
 }
+/** The website's NETOPIA logo id form (apps/ui/lib/billing/paymentMarks.ts NETOPIA_LOGO_ID_FORM; a unit test pins the two equal), for the test site's tools: 1 to 12 digits. */
+export function isNetopiaLogoId(value) { return typeof value==='string'&&/^[0-9]{1,12}$/.test(value); }
 // RELEASE_KEY: the website refuses to start without its release key (side-by-side spec §1, §7; apps/ui/release-edge.mjs).
 // PAYMENT_MARKS_AVAILABLE: the website's payment marks list (deploy/vps/README.md §14.7); a release before T+1 refuses it, so it goes only into the ui file of a release that lists it here.
 // DIALECTICAL_UI_API_PROOF_PATH: the UI-to-API proof (NV-03); a release before NV-03 refuses it, so it goes only into the ui file of a release that lists it here (SB5c).
-const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE','DIALECTICAL_UI_API_PROOF_PATH'];
+// NETOPIA_LOGO_ID: the shop id of NETOPIA's hosted logo; the website refuses another form at start (NETOPIA_LOGO_ID_INVALID); a release before this code refuses the name, so it goes only into the ui file of a release that lists it here.
+const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE','DIALECTICAL_UI_API_PROOF_PATH','NETOPIA_LOGO_ID'];
 /**
  * Side-by-side spec §1 (O1): a preview process starts only as its plan's release. Its RELEASE_KEY must be exactly
  * r<plan register pin>-<first 12 hex of the plan's source revision>, so an env file of another release (another

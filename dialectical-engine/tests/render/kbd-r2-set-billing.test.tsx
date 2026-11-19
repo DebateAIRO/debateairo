@@ -24,7 +24,7 @@ function subscription(overrides: Record<string, unknown> = {}) {
   return {
     plan_id: "PLUS", status: "ACTIVE", cancel_requested: false, current_period_end: "2026-10-29T10:00:00.000Z",
     renews_on: "2026-10-29T10:00:00.000Z", renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
-    withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13",
+    withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13", started_on: "2026-09-29",
     can_upgrade: true, can_change_card: true, can_revoke_cancel: false, ...overrides
   };
 }
@@ -50,7 +50,11 @@ beforeEach(() => {
     quoteSubscriptionUpgrade: vi.fn(async () => UPGRADE_QUOTE), upgradeSubscription: vi.fn(),
     downgradeSubscription: vi.fn(async () => undefined), cancelSubscription: vi.fn(async () => undefined),
     revokeSubscriptionCancel: vi.fn(async () => undefined), withdrawSubscription: vi.fn(async () => ({ refund: "18.00", currency: "USD" })),
-    getBillingCharge: vi.fn(), getBillingPlans: vi.fn(async () => PLANS)
+    getBillingCharge: vi.fn(), getBillingPlans: vi.fn(async () => PLANS),
+    getBillingCardDetails: vi.fn(async () => ({
+      country: "RO", region: null, first_name: "Ana", last_name: "Popescu", phone: null, street: null, city: null, postal_code: null
+    })),
+    readAccountEmail: vi.fn(async () => ({ email: "ana@example.test", recovery_email: null, pending: null }))
   };
 });
 const card = () => document.querySelector<HTMLElement>("section[aria-labelledby=subscription-heading]")!;
@@ -120,7 +124,7 @@ describe("SET-6 the subscription card (guard)", () => {
     expectFocusOn(button("Move to Plus at renewal"));
     expect(nextTabStop()).toBe(button("Yes, move to Plus"));
     await press(button("Yes, move to Plus"));
-    expect(plan.downgradeSubscription).toHaveBeenCalledWith("PLUS");
+    expect(plan.downgradeSubscription).toHaveBeenCalledWith("PLUS", { netPrice: PLANS.plans[1]!.net_prices.USD, currency: "USD" });
     expectParkedOn(card());
   });
 
@@ -128,6 +132,8 @@ describe("SET-6 the subscription card (guard)", () => {
     await mountPlan();
     await press(button(EN["billing.subscription.withdraw"]!));
     expectFocusOn(button(EN["billing.subscription.withdraw"]!));
+    // The statement above the button is read, not operated: the next stop is the confirmation itself.
+    expect(nextTabStop()).toBe(button(EN["billing.subscription.withdrawConfirm"]!));
     // Once withdrawn there is nothing left to withdraw from: the withdrawal's block goes with its confirmation.
     plan.getBillingSubscription.mockResolvedValue({ subscription: subscription({ withdrawal_open_until: null, withdrawal_last_day: null }) });
     await press(button(EN["billing.subscription.withdrawConfirm"]!));

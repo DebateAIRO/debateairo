@@ -110,10 +110,10 @@ describe("the seven legal pages share one navigation", () => {
     const links = [...(nav?.querySelectorAll("a") ?? [])];
     expect(links.map((link) => link.getAttribute("href"))).toEqual(LEGAL_PAGES.map(({ href }) => href));
     expect(texts(links)).toEqual([
-      "Legal notice",
+      "Company details and contact",
       "Terms of service",
       "Terms versions",
-      "Privacy policy",
+      "Privacy policy (GDPR)",
       "Cookie policy",
       "Model providers",
       "US health data privacy"
@@ -340,42 +340,39 @@ describe("the text pages render the same documents as the sign-up modals", () =>
     const view = render(<LegalDocumentBody document={TERMS_OF_SERVICE} />);
     expect(texts(view.querySelectorAll(".legalSection h2"))).toEqual(TERMS_OF_SERVICE.sections.map(({ title }) => title));
   });
+
+  it("the footer's delivery link lands on the Terms section that holds the delivery rules", () => {
+    const view = render(<LegalDocumentBody document={TERMS_OF_SERVICE} />);
+    expect(view.querySelector("#legal-section-12")?.textContent).toContain("Delivery.");
+  });
 });
 
 describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
-  it("names the current and previous versions, linking each to its text", () => {
+  // Version 1.0 is the first published text (owner's decision of 19 November 2026: the pre-launch 2.x drafts were never
+  // offered to the public and are not kept), so the page lists it alone and says no earlier version exists.
+  it("names the current version, linked to its text, and says no earlier version has been published", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
-    expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
-    expect(view.querySelector(".legalVersionsNone")).toBeNull();
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.0"]);
+    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
   });
 
-  it("has a row for every version from 2.0 to the current one, newest first, so a skipped number shows up here", () => {
-    const current = minor(TERMS_VERSIONS[0]?.version ?? "2.0");
+  it("has a row for every version from 1.0 to the current one, newest first, so a skipped number shows up here", () => {
+    const current = minor(TERMS_VERSIONS[0]?.version ?? "1.0");
     expect(TERMS_VERSIONS.map(({ version }) => version))
-      .toEqual(Array.from({ length: current + 1 }, (_, index) => `2.${current - index}`));
+      .toEqual(Array.from({ length: current + 1 }, (_, index) => `1.${current - index}`));
   });
 
   it("has a row for every version the Terms' own change history names", () => {
     const history = source("apps/ui/legal/en/terms-of-service.md");
     const named = new Set([...history.matchAll(/Version (\d+\.\d+) replaced version (\d+\.\d+)/g)].flatMap(([, newer, older]) => [newer, older]));
-    expect(named.size).toBeGreaterThan(0);
     const listed = TERMS_VERSIONS.map(({ version }) => version);
     for (const version of named) expect(listed, `Terms ${version}`).toContain(version);
-  });
-
-  it("shows 2.7, which was never published on its own, without a link to a text", () => {
-    const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
-    const row = [...view.querySelectorAll(".legalVersionRow")]
-      .find((item) => item.querySelector(".legalVersionNo")?.textContent === "2.7");
-    expect(row).toBeDefined();
-    expect(row?.querySelector("a")).toBeNull();
-    expect(row?.textContent).toContain(legalEnglish["legal.versions.unpublished.note"]);
   });
 
   it("shows no effective date, and no unfilled [placeholder], on any row in any language (no dates until go-live)", () => {
@@ -734,21 +731,24 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the seven legal links, cookie preferences and ANPC's SAL badge", () => {
+  it("the one-line footer carries the seven legal links, cookie preferences, the report link and ANPC's SAL badge", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
       const view = render(<SiteFooter variant="line" />);
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
-      expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
+      const links = [...(footer?.querySelectorAll("a") ?? [])];
+      expect(links.filter((link) => !link.hasAttribute("data-report-problem")).map((link) => link.getAttribute("href")))
         .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
+      // While the site is in Beta: one "Report a problem" link, before cookie preferences.
+      expect(links.filter((link) => link.hasAttribute("data-report-problem")).map((link) => link.textContent)).toEqual(["Report a problem"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());
       expect(requests).toEqual([button]);
       expect(footer?.textContent).toContain(`© ${new Date().getFullYear()} ${COMPANY.legalName}`);
-      expect(footer?.querySelector("a[href='/legal']")?.textContent).toBe("Legal notice");
+      expect(footer?.querySelector("a[href='/legal']")?.textContent).toBe("Company details and contact");
     } finally {
       unsubscribe();
     }
@@ -765,9 +765,67 @@ describe("the footers (15a full, 15b one line)", () => {
     expect(footer?.querySelector(".languageSwitcher")).not.toBeNull();
   });
 
+  it("the full footer's company block states the seller's facts from COMPANY, as /legal does, and no other town", () => {
+    const view = render(<SiteFooter variant="full" />);
+    const company = view.querySelector("footer.siteFooterFull .siteFooterCompany");
+    const text = company?.textContent ?? "";
+    expect(text).toContain(COMPANY.legalName);
+    expect(text).toContain(`Registered office: ${COMPANY.registeredOffice}`);
+    expect(text).toContain(`CUI ${COMPANY.cui} · Trade Register no. ${COMPANY.tradeRegisterNo}`);
+    expect(COMPANY.cui).toBe("45935221");
+    expect(COMPANY.tradeRegisterNo).toBe("J2022000426271");
+    expect(company?.querySelector('a[href="tel:+40748793490"]')?.textContent).toBe(COMPANY.phone);
+    expect(company?.querySelector('a[href="mailto:support@dezbatere.ro"]')?.textContent).toBe(COMPANY.emails.general);
+    expect(company?.querySelector('a[href="mailto:privacy@dezbatere.ro"]')?.textContent).toBe(COMPANY.emails.privacy);
+    expect(text).not.toMatch(/Bucharest|București/u);
+    // The town line is gone from every catalogue: nothing draws it any more.
+    for (const locale of readdirSync(resolve("apps/ui/messages"))) {
+      const chrome = JSON.parse(source(`apps/ui/messages/${locale}/chrome.json`)) as Record<string, string>;
+      expect(chrome["chrome.footer.location"], locale).toBeUndefined();
+    }
+  });
+
+  it("on a phone the full footer shows everything: the company's facts, the PRODUCT column with Pricing, every legal link, as 44px targets", () => {
+    const css = source("apps/ui/app/legal.css");
+    // Every 760px block, each from its opening brace to the matching close.
+    const phoneBlocks: string[] = [];
+    for (let at = css.indexOf("@media (max-width: 760px) {"); at >= 0; at = css.indexOf("@media (max-width: 760px) {", at + 1)) {
+      let depth = 0;
+      for (let index = css.indexOf("{", at); index < css.length; index += 1) {
+        if (css[index] === "{") depth += 1;
+        if (css[index] === "}") depth -= 1;
+        if (depth === 0) { phoneBlocks.push(css.slice(at, index + 1)); break; }
+      }
+    }
+    expect(phoneBlocks.length).toBeGreaterThan(0);
+    for (const block of phoneBlocks) {
+      // Nothing of the footer's company block or columns is hidden there.
+      for (const rule of block.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (/display:\s*none/.test(rule[2]!)) expect(rule[1], rule[1]).not.toMatch(/siteFooterCompany|siteFooterColumn/);
+      }
+    }
+    const phone = phoneBlocks.join("\n");
+    expect(phone).toMatch(/\.siteFooterColumn \.siteFooterLink \{[^}]*display: flex;[^}]*min-height: 44px;/);
+    expect(phone).toMatch(/\.siteFooterCompany \.siteFooterLink \{[^}]*display: inline-flex;[^}]*min-height: 44px;/);
+    expect(phone).toMatch(/\.siteFooterColumn ul:not\(\.siteFooterLegalGrid\) \{ display: grid; grid-template-columns: 1fr 1fr;/);
+  });
+
+  it("names the /legal link for what the page holds, and labels the privacy policy as the GDPR text, in English and Romanian", () => {
+    const ro = JSON.parse(source("apps/ui/messages/ro/chrome.json")) as Record<string, string>;
+    expect(chromeEnglish["chrome.legal.notice"]).toBe("Company details and contact");
+    expect(ro["chrome.legal.notice"]).toBe("Datele firmei și contact");
+    expect(chromeEnglish["chrome.legal.notice"]).toContain("contact");
+    expect(ro["chrome.legal.notice"]).toContain("contact");
+    expect(chromeEnglish["chrome.legal.privacy"]).toBe("Privacy policy (GDPR)");
+    expect(ro["chrome.legal.privacy"]).toBe("Politica de confidențialitate (GDPR)");
+    expect(ro["chrome.footer.office"]).toBe("Sediul social: {office}");
+    expect(ro["chrome.footer.codes"]).toBe("CUI {cui} · Nr. Reg. Com. {register}");
+  });
+
   it("the layout renders the one-line footer on every page and CSS hides it under a full footer", () => {
     const layout = source("apps/ui/app/layout.tsx");
-    expect(layout).toMatch(/\{children\}<\/AuthCatalogProvider>\s*<\/main>\s*<CookieConsent \/>\s*<SiteFooter variant="line" \/>/);
+    expect(layout).toMatch(/\{children\}<\/AuthCatalogProvider>\s*<\/main>\s*<CookieConsent \/>\s*<SiteFooter variant="line" billing=\{await lineBilling\} \/>/);
+    expect(layout).toContain("const lineBilling = lineFooterBilling();");
     const css = source("apps/ui/app/legal.css");
     expect(css).toMatch(/\.appShell:has\(\.siteFooterFull\) > \.siteFooterLine\s*\{\s*display: none;/);
   });

@@ -21,7 +21,7 @@ import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
 import { formatMoney, pricedTax, type PricedTax } from "@/lib/billing/format";
-import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
+import { availablePaymentMarks, netopiaLogoAddress } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +38,8 @@ type LandingPlans = Readonly<{
  * the server is switched to live payments.
  */
 async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
-  const footer = (billingOn: boolean): SiteFooterBilling => Object.freeze({ billingOn, marks: availablePaymentMarks() });
+  const footer = (billingOn: boolean): SiteFooterBilling =>
+    Object.freeze({ billingOn, marks: availablePaymentMarks(), netopiaLogo: netopiaLogoAddress() });
   try {
     const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)

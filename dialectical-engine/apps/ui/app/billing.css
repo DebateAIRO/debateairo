@@ -76,6 +76,12 @@
    (the .billingCta recipe above, by the card's data-plan). */
 .pricingCard .btn { display: flex; margin-top: auto; min-height: 0; padding: 11px; background: transparent; }
 .pricingCard .btnDark { padding: 10px; border-color: transparent; background: var(--pro); }
+/* /withdraw: the two steps in Settings, each naming its button by the button's own label (a label, not a control), and
+   the model withdrawal form, set apart as the form it is. */
+.withdrawSteps { margin: 10px 0 0; padding-inline-start: 22px; line-height: 1.55; }
+.withdrawSteps li + li { margin-top: 6px; }
+.withdrawLabel { padding: 1px 6px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface-2); font-weight: 600; white-space: normal; }
+.withdrawForm { margin-top: 12px; padding: 4px 16px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--core); overflow-wrap: anywhere; }
 .pricingFaq { margin-top: 40px; max-width: 680px; }
 .pricingFaq h2 { margin: 0; font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; font-size: 22px; line-height: normal; }
 .pricingFaq h3 { margin: 18px 0 4px; font-family: var(--font-sans); font-size: 16px; font-weight: 700; line-height: normal; }
@@ -165,6 +171,9 @@
 .subLink { align-self: flex-start; padding: 0; border: 0; background: none; color: var(--link); font-family: var(--font-sans); font-size: 14px; font-weight: 600; text-align: start; text-decoration: underline; cursor: pointer; }
 .subLink:disabled { opacity: .55; cursor: not-allowed; }
 .subHint { margin: 0; font-size: 13px; color: var(--muted); }
+/* The withdrawal statement the buyer confirms: its title, the statement, then its facts, one per line. */
+.subStatement { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.subStatement .setStatus { overflow-wrap: anywhere; }
 .subCard .setInvoiceList { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .subCard .setInvoiceList li { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; font-size: 13px; }
 .subCard .setInvoiceList li > span { min-width: 0; overflow-wrap: anywhere; }

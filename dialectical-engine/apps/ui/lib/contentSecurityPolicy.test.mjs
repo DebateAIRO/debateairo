@@ -13,7 +13,7 @@ import {
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 
-const STATIC_TAIL = "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
+const STATIC_TAIL = "style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mny.ro; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
 
 test("createNonce draws 16 random bytes as 24 base64 characters, fresh every call", () => {
   const nonces = new Set();
@@ -53,10 +53,18 @@ test("a malformed nonce is refused, never interpolated into a policy", () => {
   }
 });
 
+test("the logo host in img-src is the host of the address the website builds for NETOPIA's logo, and only there", async () => {
+  const { netopiaLogoAddress } = await import("./billing/paymentMarks.ts");
+  const origin = new URL(netopiaLogoAddress({ NETOPIA_LOGO_ID: "123456" })).origin;
+  assert.equal(origin, "https://mny.ro");
+  const directives = FALLBACK_CONTENT_SECURITY_POLICY.split("; ");
+  assert.deepEqual(directives.filter((directive) => directive.includes(origin)), [`img-src 'self' data: ${origin}`]);
+});
+
 test("the fallback is exactly the pre-nonce production policy and the API policy denies everything", () => {
   assert.equal(
     FALLBACK_CONTENT_SECURITY_POLICY,
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mny.ro; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests"
   );
   assert.equal(API_CONTENT_SECURITY_POLICY, "default-src 'none'; frame-ancestors 'none'; base-uri 'none'");
   assert.equal(NONCE_REQUEST_HEADER, "x-nonce");
@@ -98,8 +106,11 @@ test("every document, the checkout and card pages included, gets the same nonce 
     const response = middleware(new NextRequest(`https://dezbatere.test${path}`));
     const policy = response.headers.get("content-security-policy");
     assert.equal(policy, nonceContentSecurityPolicy(nonceOf(policy), development), path);
-    // No processor's host in any policy: NETOPIA's page is a full redirect, and the first card form is gone (§2.19).
+    // No processor's page or script host in any policy: NETOPIA's page is a full redirect, and the first card form is
+    // gone. NETOPIA's logo host is allowed in img-src only, once (lib/billing/paymentMarks.ts netopiaLogoAddress).
     assert.doesNotMatch(policy, new RegExp(`${["x", "money"].join("")}|netopia|mobilpay`, "u"), path);
+    assert.equal(policy.split("https://mny.ro").length, 2, path);
+    assert.match(policy, /; img-src 'self' data: https:\/\/mny\.ro;/, path);
     assert.equal(response.headers.get("permissions-policy"), null, path);
   }
   const { default: config } = await import("../next.config.mjs");

@@ -1,5 +1,7 @@
 import { TypedDomainError } from "@debateai/kernel";
-import { microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline } from "@debateai/billing-core";
+import {
+  consumerCalendarDay, microsToDecimal, withdrawalDeadline, type SubscriptionState, type WithdrawalDeadline
+} from "@debateai/billing-core";
 import type { BillingInvoicesResponse, BillingSubscriptionResponse } from "@debateai/contract";
 import type { BillingRepository } from "@debateai/db";
 import type { BillingPolicy, PlanId } from "@debateai/register";
@@ -43,12 +45,16 @@ function served(input: WindowInput): boolean {
 }
 
 /**
- * The withdrawal deadline while the right is still open (ACTIVE, a withdrawal country, before it closes, and the plan
- * paid in a payment system this API serves (spec §2.5.4): its refund could not be sent to another one); else null.
+ * The withdrawal deadline while the right is still open (ACTIVE, or SUSPENDED by a payment dispute, a withdrawal
+ * country, before it closes, and the plan paid in a payment system this API serves: its refund could not be sent to
+ * another one); else null. The right lasts the whole period, so a plan paused by a dispute keeps its
+ * window and Settings shows the e-mail route; `recordWithdrawal` itself still takes only an ACTIVE plan.
  */
 function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
   const { state, taxCountry, policy, now } = input;
-  if (state.status !== "ACTIVE" || state.activatedAt === null || taxCountry === null) return null;
+  if ((state.status !== "ACTIVE" && state.status !== "SUSPENDED") || state.activatedAt === null || taxCountry === null) {
+    return null;
+  }
   if (!served(input)) return null;
   if (!policy.withdrawalCountries.includes(taxCountry)) return null;
   const deadline = withdrawalDeadline({ activatedAt: state.activatedAt, taxCountry, withdrawalDays: policy.withdrawalDays });
@@ -56,9 +62,9 @@ function openWithdrawal(input: WindowInput): WithdrawalDeadline | null {
 }
 
 /**
- * The instant the withdrawal right ends, or null when there is none: only while ACTIVE, for a tax country in
- * `withdrawalCountries` (every country the site serves since 10 November 2026; spec §2.5.6), before `withdrawalDeadline`'s close (14 calendar days, R2 Q-6;
- * a last day on a weekend moves to the Monday, W6).
+ * The instant the withdrawal right ends, or null when there is none: only while ACTIVE or SUSPENDED, for a tax
+ * country in `withdrawalCountries` (every country the site serves), before `withdrawalDeadline`'s close (14 calendar
+ * days; a last day on a Saturday, a Sunday or a Romanian public holiday moves to the next working day).
  */
 export function withdrawalOpenUntil(input: WindowInput): Date | null {
   return openWithdrawal(input)?.closesAt ?? null;
@@ -128,6 +134,9 @@ export function subscriptionView(input: WindowInput): SubscriptionView {
     scheduled_downgrade_plan_id: state.scheduledDowngradePlanId === null ? null : paidPlanOf(state.scheduledDowngradePlanId),
     withdrawal_open_until: iso(withdrawal?.closesAt ?? null),
     withdrawal_last_day: withdrawal?.lastDay ?? null,
+    // The withdrawal statement names the contract by its plan and the day it started, in the buyer's calendar.
+    started_on: state.activatedAt === null || input.taxCountry === null
+      ? null : consumerCalendarDay(state.activatedAt, input.taxCountry),
     can_upgrade: upgradeOffered(input),
     can_change_card: cardChangeOffered(input),
     can_revoke_cancel: revokeCancelOffered(input)

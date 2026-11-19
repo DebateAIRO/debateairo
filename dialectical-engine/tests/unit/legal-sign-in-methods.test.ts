@@ -56,10 +56,10 @@ describe("sign-in methods, in the English legal texts", () => {
     for (const text of [terms, privacy]) expect(text).not.toContain("Facebook");
   });
 
-  it("each change history names the sign-in change, in the entry of the version that brings it", () => {
-    expect(terms).toContain("Version 2.19 replaced version 2.18: section 6 says how you can sign in:");
+  it("the Privacy Policy's change history names the sign-in change in the 3.13 entry; Terms 1.0 has no change history", () => {
+    // Terms 1.0 is the first published text (owner's decision of 19 November 2026), so it names no earlier version.
+    expect(terms).not.toMatch(/Version \d+\.\d+ replaced version/u);
     expect(privacy).toContain("Version 3.13 replaced version 3.12: it says how you can sign in and what each way keeps:");
-    expect(terms).not.toContain("Version 2.18 also says how you can sign in");
     expect(privacy).not.toContain("Version 3.12 also says how you can sign in");
   });
 

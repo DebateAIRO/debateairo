@@ -268,6 +268,7 @@ apps/api/src/synthesis-check/verdict.ts
 apps/api/src/synthesis-check/worker.ts
 apps/api/src/turnstile.ts
 apps/api/src/ui-api-proof.ts
+apps/api/src/unfinished-signup-expiry.ts
 apps/api/src/verification-email.ts
 apps/api/src/web-researched.ts
 apps/evaluator-worker/src/index.ts
@@ -581,6 +582,7 @@ apps/ui/components/ArgumentFocusView.tsx
 apps/ui/components/AuthGate.tsx
 apps/ui/components/AuthShell.tsx
 apps/ui/components/BackupEmailVerification.tsx
+apps/ui/components/BetaNotice.tsx
 apps/ui/components/CanvasViewport.tsx
 apps/ui/components/ChallengePopover.tsx
 apps/ui/components/CheckRemovalNotice.tsx
@@ -838,6 +840,7 @@ apps/ui/lib/endSession.ts
 apps/ui/lib/focusGuard.ts
 apps/ui/lib/format.ts
 apps/ui/lib/i18n/I18nProvider.tsx
+apps/ui/lib/i18n/acceptLanguage.ts
 apps/ui/lib/i18n/auth.test.mjs
 apps/ui/lib/i18n/billing.test.mjs
 apps/ui/lib/i18n/catalog.test.mjs
@@ -1140,6 +1143,7 @@ packages/billing-core/src/money.ts
 packages/billing-core/src/payments.ts
 packages/billing-core/src/plan-lookup.ts
 packages/billing-core/src/ports.ts
+packages/billing-core/src/romanian-public-holidays.ts
 packages/billing-core/src/subscription.ts
 packages/billing-core/src/upgrade-credit.ts
 packages/billing-core/src/windows.ts
@@ -1329,6 +1333,7 @@ packages/db/src/migration-forward0179.ts
 packages/db/src/migration-forward0180.ts
 packages/db/src/migration-forward0181.ts
 packages/db/src/migration-forward0182.ts
+packages/db/src/migration-forward0183.ts
 packages/db/src/migration-forward0184.ts
 packages/db/src/migration-forward108.ts
 packages/db/src/migration-forward110.ts
@@ -1376,6 +1381,7 @@ packages/db/src/synthesis-check-erasure.ts
 packages/db/src/team-limit.ts
 packages/db/src/threat-reports.ts
 packages/db/src/tree-updates.ts
+packages/db/src/unfinished-signup-expiry.ts
 packages/db/src/web-evidence.ts
 packages/evaluator/src/blind-sample.ts
 packages/evaluator/src/consumer-postgres.ts

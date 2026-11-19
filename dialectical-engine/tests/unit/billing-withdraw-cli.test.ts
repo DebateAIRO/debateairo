@@ -47,7 +47,8 @@ describe("P14c the withdrawal command", () => {
     const record = parseWithdrawArguments(["--owner", OWNER, "--received", RECEIVED]);
     expect(renderWithdrawResult({ kind: "REFUNDING", refundMicros: 18_150_000, currency: "USD" }, record))
       .toContain("18.15 USD goes back to the card");
-    expect(renderWithdrawResult({ kind: "NOTHING_DUE" }, record)).toContain("nothing was due back");
+    expect(renderWithdrawResult({ kind: "NOTHING_DUE" }, record))
+      .toContain("nothing was due back. M8_RECEIVED is queued and is the only email.\n");
     const review = renderWithdrawResult({ kind: "OWNER_REVIEW" }, record);
     // First NETOPIA's admin for what the command cannot take back, then the settle with both amounts.
     expect(review).toContain("refund there what this command cannot take back");

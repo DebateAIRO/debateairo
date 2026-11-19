@@ -4,7 +4,7 @@ import type { PoolClient } from 'pg';
 import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-chain.js';
 
 /**
- * The staff re-key permit as one chain step after 0182, the MFA recovery control user index (migrations/lineage/README.md
+ * The staff re-key permit as one chain step after 0183, a sign-up not finished within 24 hours being deleted (migrations/lineage/README.md
  * "The staff re-key permit (0184)"). A staff key belongs to one site name, so after the site is renamed a staff member has
  * no key that works, and the older functions refuse to enrol a new one from password and authenticator code alone. This
  * step adds a permit an operator on the server arms for one person and one sign-in of theirs: it is used once, lasts at
@@ -22,7 +22,7 @@ const NAME='0184_staff_rekey_permit.sql';
 const VERSION='staff-rekey-permit-forward0184-v1';
 const MANIFEST_PATH='lineage/staff-rekey-permit-forward0184.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-130.sql';
-const PREVIOUS='0182_mfa_recovery_control_user_started.sql';
+const PREVIOUS='0183_unfinished_signup_expiry.sql';
 /** The nine functions the step creates, each digested whole (owner, definer, settings, volatility, definition digest, ACL). */
 const FUNCTIONS:readonly string[]=[
  // The two tests the others share: a working staff key under a name, and the permit a sign-in may use now.

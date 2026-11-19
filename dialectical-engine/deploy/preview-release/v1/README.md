@@ -87,6 +87,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
 | `database-ahead --older-source-manifest <old candidate api manifest> --newer-source-manifest <new candidate api manifest> --out <artifacts folder>/database-ahead-<older label>.json` | the database steps the newer release adds (each with both `n1` header lines) and its whole forward chain, for the older release's native verify (side-by-side spec §5); root installs it as `/etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older label>.json` and pins it with `prestart.mjs accept-ahead`; no new step: `DATABASE_AHEAD_NOT_NEEDED`, nothing written |
+| `site-inputs --operation report\|compose --from <the live settings version's verify plan> --site '<JSON object>' [--change '<input names>'] [--limits '<plan ids>'] [--out <artifacts folder>/site-inputs.json]` | the site's numbers for an upload (SB3): compares the owner's server file (`--site`, as one JSON object) with the hosted inputs of `--from`, input by input, plan by plan. `report` prints `{event,operation,lines,differing,limitPlans}` and takes neither list: each line says `SAME`, or `DIFFERENT` with the member and `higher`, `lower` or `changed` (or `NOTE` with advice); never an amount. `compose` needs `--out`; it writes the new version's hosted inputs there (the live ones, with exactly the inputs `--change` names taken from the file) and prints `{path,sha256,bytes,change,limits}`. It refuses, naming the inputs or plans in `fields`, unless `--change` is exactly the inputs that differ (`SITE_CHANGE_NOT_NAMED`, `SITE_CHANGE_NAMED_BUT_SAME`) and `--limits` exactly the plans whose limits get lower or change for the people already on them (`SITE_LIMITS_NOT_NAMED`, `SITE_LIMITS_NAMED_BUT_SAME`). `billing` must be the same on both sides (`SITE_BILLING_SWITCH_DIFFERS`); both must list the same plans (`SITE_PLAN_LIST_DIFFERS`); a side that is not the six hosted inputs, or a mix the native operator's check refuses, is `SITE_INPUTS_REFUSED` |
 
 ## Operator sequence for one release
 
@@ -663,6 +664,8 @@ billing on and a credit of the code's made-up row refuses too (`hosted-billing-p
 **The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`. Since R22 they live only in a
 root-owned file on the server, `/etc/debateai-v3-preview/hosted-billing-v1.json` (mode `0600`), never in this repository. It is
 the JSON object the table below describes, with `billing` set to anything: the steps set it. Every `HB` line below reads it.
+On the template layout an upload publishes a number from this file only where SB3's `NEWNUM` names it ("The site's
+numbers" under SB3 of "Side-by-side release (from T+1)"); every other number stays the live version's.
 
 | Input | Where it goes | Its value |
 |---|---|---|
@@ -2441,7 +2444,9 @@ already carries the call-concurrency row, so the per-debate lane limits can chan
 prices, the daily budget, funding) is refused and needs an upload. So are billing on or off, the room-read budget, the
 band, the runner's per-model limit (`perModelPerRunner`), the provider set, and anything that would need an env change.
 The check refuses such a version (`SETTINGS_SITE_MEMBER_DIFFERS`, `SETTINGS_NEEDS_ENV_CHANGE`) even when nothing else
-changed: a site rule changes with a new site version in a new release (side by side, with its practice).
+changed: a site rule changes with a new site version in a new release (side by side, with its practice). The site's
+numbers (plan prices and limits, the day's ceiling, the room-read budget, the abuse limits) change at that upload's
+SB3, from the owner's file, where its `NEWNUM` names them.
 
 **When.** Only on the template layout, once a release with Phase 2 is current (T+1 and later: `release-check.mjs status`
 works, and `settings-version.mjs status` answers). Before that, a register change is a publication plus the re-pin of
@@ -2543,7 +2548,9 @@ the base by the kit, so the script reads them from the active version's plans (S
 (`HB`, billing on), the checker or the answer seats (`DS` for the live DeepSeek checker, or `SEATS`), and role rotation
 off (`ROT`). Left as read, a plan never switches the checker back to GLM, billing off, or rotation on by accident. `HB`
 may change `perRunCeilingMicros` only; its `dailyCeilingMicros` and `askRoomReads` are site rules (the script and the
-check refuse a change). The JSON options have the shape the kit's section above gives (`--call-concurrency`,
+check refuse a change). A per-debate ceiling changed here leaves the owner's file
+(`/etc/debateai-v3-preview/hosted-billing-v1.json`) behind the live value: the next upload's SB3 says so, and its SB3c
+writes the live value into the file. The JSON options have the shape the kit's section above gives (`--call-concurrency`,
 `--length-guidance`, `--debate-shape`, `--answer-seats`); `--question-language` is added the same way. `SEATS` replaces
 the DeepSeek checker (one way to set the checker): set `DS=''` with it. For a new line-up, make its file first ("The line-up file" below). The native operator reads only
 this release's own plan file, so the plan is put in place for the one run and the verify plan goes back at once (a
@@ -2818,7 +2825,8 @@ silent skip.
   without the settings operator: its own site version). SB3 plans from it, as SV1 does: from the old release's verify
   plan while that is its site version, else from the kept `settings-v<version>` plans, with the hosted inputs, the
   checker or answer seats and rotation read from them, so the new site version keeps every activated debate setting.
-  SB9 and DR5 publish only a proposal based on it.
+  A hosted input comes from the owner's file instead only where SB3's `NEWNUM` names it ("The site's numbers" under
+  SB3). SB9 and DR5 publish only a proposal based on it.
 - **Never activate while an upload is between SB3 and SB13** (or DR6). SB13 and DR6 (and DR2, before the drained
   path's downtime starts) read the active version again and stop, nothing changed, when it is not the one SB3 planned
   from: switching would undo that activation.
@@ -3083,8 +3091,8 @@ product change: a problem in T is fixed forward.
 root with `bash -s`, `set -euo pipefail` first and the names file second (TA0 and TA1 make it), every guard written
 `… || { echo "<STEP>_NOT_DONE: …"; exit 1; }`, the last line `<STEP>_DONE`, and nothing more after a `_NOT_DONE`
 (read the way back and decide with the owner). The scripts print no env value other than `REGISTER_VERSION`,
-`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. Every
-trap of that section still holds:
+`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` and `NETOPIA_LOGO_ID` (not
+secret) and ports. Every trap of that section still holds:
 - `nat` always exits 0: its line is captured and tested (`OUT=$(nat "$F"); [ "$OUT" = "exit 0" ] || …`), never chained;
 - a pin writes `pinnedAt`, so a lock is compared without the pin times, or not re-pinned at all;
 - the build roster is `all-models`;
@@ -4258,9 +4266,9 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 
 **How each step runs.** As in the transition: one script per step, `set -euo pipefail`, the names file (SB1 makes it),
 `<STEP>_NOT_DONE` guards, `<STEP>_DONE` last, no env value printed except `REGISTER_VERSION`, `RELEASE_KEY`,
-`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. The traps of the
-transition hold, and so do the three house rules of "A normal release on a hosted base" (one-line option values, a
-service's own ready sign, nothing that only a first start creates). Two more:
+`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` and `NETOPIA_LOGO_ID` (not secret) and
+ports. The traps of the transition hold, and so do the three house rules of "A normal release on a hosted base"
+(one-line option values, a service's own ready sign, nothing that only a first start creates). Two more:
 - **One switch command at a time.** Each `release-switch.mjs` command takes
   `/etc/debateai-v3-preview/lifecycle/release-switch.lock`; another one meanwhile refuses `RELEASE_SWITCH_BUSY`. A lock
   left by an ssh drop names its path and how to clear it (WB4).
@@ -4284,11 +4292,14 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB1 | names file (the old release read from the release table), archive `$S`, copies | up | nothing to undo |
 | A2–A7, SB1b | staging, as in the hosted-base recipe; SB1b instead of A5 | up | nothing to undo |
 | SB2 | the practice (owner rule), at a quiet hour | up | none |
-| SB3 | register plan and proposal, in the new release's own native-plan file | up | nothing to undo |
+| SB3 | register plan and proposal, in the new release's own native-plan file; the site's numbers are the live ones, or the owner's file's where `NEWNUM` names them | up | nothing to undo (SB3b sets the plan aside) |
+| SB3b | only to run SB3 again: its plan, proposal and numbers record moved into `$S` | up | nothing to undo |
+| SB3c | only when the owner's numbers file must take numbers back from a settings version | up | the file before is in `$S` |
 | SB4 | the release check (read-only) | up | nothing to undo |
 | SB5 | the three env files; the database-ahead file | up | nothing to undo (unused files) |
 | SB5b | only when the payment marks list changes: the list in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB5c | only the first upload with NV-03 (or after going back to a release without it): the UI-to-API proof in the new release's api and ui files | up | nothing to undo (unused files; the ones before are in `$S`) |
+| SB5d | only when NETOPIA's logo id is first set or changes (or after going back to a release without it): the line in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB6 | the owner's fresh yes | up | – |
 | MT1, PM2, MT2 | only the first upload that lists the marks: Caddy's rule (see "Payment marks: the files and Caddy's rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |
 | SB7 | the online backup | up | nothing to undo |
@@ -4299,6 +4310,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB12 | the new API and website, not ready | up | WB1 |
 | SB13 | the switch | up | WB2 |
 | SB13b | the team member's test debate runs on the new release (read-only) | up | WB2 |
+| LOGOCHECK | only in an upload whose SB5d ran: NETOPIA's logo on the new release (read-only) | up | – |
 | SB13c | on the Mac: the PR that makes `tests/n1-baseline.json` name the new release | up | – (the next upload needs it) |
 | SB14 | later: the old release retired; its receipt | up | WB2 (its runner restarts in database-ahead mode) |
 | SB14b | only after a reboot or a runner crash during the drain: the runners start again | up | – |
@@ -4373,7 +4385,7 @@ ONP=$E/native-plan-$OLABEL.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 C=/etc/debateai-v3-preview/public/Caddyfile
 EDGE=/etc/debateai-v3-preview/ui-edge.caddy.secret
-HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json 2>/dev/null || true)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -4455,25 +4467,47 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
 LINEUP=''                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty
+NEWNUM=''                                                 # the numbers this upload takes from hosted-billing-v1.json, on purpose: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between; empty = the live numbers stay
+LIMITS=''                                                 # only with billingPlans in NEWNUM: the plans whose people get less or something else (read "What a change does to the people who already have a plan" below first), e.g. 'PLUS PRO'; else empty
 REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
-[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON (hosted-billing-v1.json does not read as JSON: put its last good copy back)"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
 [ ! -e "$NP" ] || { echo "SB3_NOT_DONE: $NP exists (look first)"; exit 1; }
-[ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "SB3_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
+[ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] && [ ! -e "$ART/site-inputs.json" ] || { echo "SB3_NOT_DONE: an earlier plan, proposal or numbers record exists (look first; SB3b sets them aside)"; exit 1; }
 # The base is the active settings version (kit v3): the old release's own verify plan while that is its site version,
 # else the verify plan SV2 kept for the activated version; the choices a plan does not carry from its base come with it.
 if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; CP=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-publish.json; fi
 [ "$(jq -r .approval.publication.registerVersion "$FROM")" = "$AV" ] && [ "$(jq -r .approval.snapshotSha256 "$CP")" = "$(jq -r .approval.publication.snapshotSha256 "$FROM")" ] || { echo "SB3_NOT_DONE: no kept verify and publish plan names the active settings version $AV ($FROM): ask"; exit 1; }
-HB=$(jq -c .hostedBilling "$FROM")
-[ "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB")" = "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: the active version's site inputs differ from HB_ON: ask"; exit 1; }
+# The numbers: the live version's, with exactly the inputs NEWNUM names taken from the file. Each line names an input, a
+# plan and a member and says SAME, or DIFFERENT with higher or lower; no amount is printed. Nothing is written on a stop.
+# Who holds a plan named in LIMITS: any open subscription whose history names it (a scheduled change counts for both plans).
+if [ -n "$LIMITS" ]; then
+  HOLD=$(psqlq "SELECT DISTINCT e.plan_id FROM billing.subscription_event e JOIN billing.subscription_latest_v s ON s.subscription_id = e.subscription_id WHERE s.kind NOT IN ('ENDED','WITHDRAWN','ERASURE_STOPPED')") || { echo "SB3_NOT_DONE: the open subscriptions could not be read (nothing was written): ask"; exit 1; }
+  for P in $LIMITS; do if [ "$P" = FREE ]; then echo "FREE: HELD by everyone without a paid plan"; elif grep -qxF "$P" <<<"$HOLD"; then echo "$P: HELD by at least one open subscription"; else echo "$P: nobody holds it now"; fi; done
+fi
+TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs
+[ -f "$TOOL" ] || { echo "SB3_NOT_DONE: $TOOL is missing: the new release is not staged (A2 to A7 first)"; exit 1; }
+if grep -qF "'site-inputs':" "$TOOL"; then
+  SI=$(rel site-inputs --operation report --from "$FROM" --site "$HB_ON") || { echo "SB3_NOT_DONE: the numbers could not be compared (the reason line above; nothing was written). SITE_INPUTS_REFUSED with --site: hosted-billing-v1.json does not have the six inputs. SITE_PLAN_LIST_DIFFERS: it lists other plans than the live version. INPUT_REFUSED, FROM_PLAN_INVALID or NATIVE_APPROVAL_REQUIRED: the live version's plan $FROM is not readable as a published hosted verify plan. Ask"; exit 1; }
+  jq -r '.lines[]' <<<"$SI"
+  rel site-inputs --operation compose --from "$FROM" --site "$HB_ON" ${NEWNUM:+--change "$NEWNUM"} ${LIMITS:+--limits "$LIMITS"} --out "$ART/site-inputs.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers are not as NEWNUM and LIMITS name them (the reason line above names the inputs or plans; nothing was written). ARGUMENTS_REFUSED with --change or --limits: that list is misspelled (exact names, one space between, none twice). SITE_CHANGE_NOT_NAMED: the file differs from the live numbers there: name the input in NEWNUM to publish the file's value, or keep the live value with SB3c. SITE_CHANGE_NAMED_BUT_SAME: take it out of NEWNUM. SITE_LIMITS_NOT_NAMED: the people already on that plan get less or something else: read what that does to them under this step first, then name the plan in LIMITS. SITE_LIMITS_NAMED_BUT_SAME: take it out of LIMITS. SITE_INPUTS_REFUSED: the mix is not allowed (a per-debate ceiling above the day's). SITE_BILLING_SWITCH_DIFFERS, FROM_PLAN_INVALID or anything else: ask"; exit 1; }
+  HB=$(jq -c .hostedBilling "$ART/site-inputs.json") && NAMED=$(jq -c .change "$ART/site-inputs.json") && jq -r --argjson seen "$(jq -c .lines <<<"$SI")" '(.lines - $seen)[]' "$ART/site-inputs.json" || { echo "SB3_NOT_DONE: $ART/site-inputs.json is unreadable (SB3b sets it aside): ask"; exit 1; }
+else
+  # A release older than the site-inputs command cannot publish changed numbers: the file must be the live numbers, whole.
+  HB=$(jq -c .hostedBilling "$FROM"); NAMED='[]'
+  [ -z "$NEWNUM$LIMITS" ] && [ "$(jq -cS 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; norm' <<<"$HB")" = "$(jq -cS 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; norm' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: this release's tool has no site-inputs command, so this upload cannot publish changed numbers, and hosted-billing-v1.json must be the live numbers: empty NEWNUM and LIMITS, and SB3c to put the live numbers back in the file (or upload a newer commit)"; exit 1; }
+fi
 SEATS=$(jq -c '.answerSeats // empty' "$CP"); ROT=$(jq -r '.roleRotation // empty' "$CP"); DS=$(jq -r 'if .answerSeats == null and .checkerChoice.checker == "deepseek" then "yes" else empty end' "$CP")
-echo "active settings version $AV; per-debate inputs $(jq -c '{perRunCeilingMicros}' <<<"$HB"); checker $([ -n "$DS" ] && echo deepseek || echo "${SEATS:-glm}"); rotation ${ROT:-on}"
+echo "active settings version $AV; numbers taken from the file: ${NEWNUM:-none}; plans named in LIMITS: ${LIMITS:-none}; checker $([ -n "$DS" ] && echo deepseek || echo "${SEATS:-glm}"); rotation ${ROT:-on}"
 rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" ${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} --out "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: the release tool refused the plan"; exit 1; }
 [ "$(jq -r .operation "$ART/native-plan-plan.json")" = plan ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-plan.json")" = on ] && [ "$(jq -r .sourceRoot "$ART/native-plan-plan.json")" = "$CAPI" ] || { echo "SB3_NOT_DONE: the plan is not this release's billing-on plan"; exit 1; }
 put "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: put of the plan failed"; exit 1; }
 OUT=$(nat "$ART/register-proposal.json"); echo "nat: $OUT"
-[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "SB3_NOT_DONE: the native operator refused the plan (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB1: ask)"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "SB3_NOT_DONE: the native operator refused the plan (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB1; with numbers named in NEWNUM also: the file's plans or limits are not lawful ones, for example a price that is not whole cents or a day share above the week's: check the file, then SB3b): ask"; exit 1; }
 [ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the proposal is not based on the active settings version $AV, or the old plan moved"; exit 1; }
+# The proposal is made from the database's own rows. Member by member, the numbers it changes there must be exactly
+# the inputs NEWNUM names: no more (the plan's numbers were not the database's) and no fewer (a change did not take).
+jq -e --argjson n "$NAMED" 'def pair(k): ([.delta[] | select(.rowKey == k)][0]) as $d | if $d == null then null else [($d.oldValueJsonText // "null" | fromjson), ($d.newValueJsonText | fromjson)] end; def moved(k; f): pair(k) as $v | ($v != null and (($v[0] | f) != ($v[1] | f))); {perRunCeilingMicros: moved("costEnvelopePolicy"; .per_run_ceiling_micros?), dailyCeilingMicros: moved("costEnvelopePolicy"; .daily_ceiling_micros?), askRoomReads: moved("admissionPolicy"; .ask_room_reads?), billingPlans: moved("billingPlans"; .), abuseLimits: moved("abuseLimits"; .)} | [to_entries[] | select(.value) | .key] | sort == ($n | sort)' "$ART/register-proposal.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names ($NAMED): the live plan's numbers are not the database's, or a named change did not take: ask (SB3b sets this plan aside)"; exit 1; }
 sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"
 jq -c '{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256}' "$ART/register-proposal.json"
 echo SB3_DONE
@@ -4484,13 +4518,199 @@ is the old release's own site version, the plan starts from the old release's ve
 activation of another version, from that version's kept plans (`/opt/debateai-v3-preview/artifacts/settings-v<version>/`,
 SV2 of "Changing debate settings without an upload"). The hosted inputs, the checker or the answer seats and role
 rotation are read from the same plans (a plan does not take them from its base), so the upload's site version keeps
-every activated debate setting; their site part must still equal `HB_ON`. `LINEUP` stays empty, except once: the first
+every activated debate setting. `LINEUP` stays empty, except once: the first
 upload with the line-up row (T+1) sets it to the file its first step printed ("The first upload with this change
 (T+1)" in "Changing debate settings without an upload"); from then on the line-up row comes with the active version.
 
-The owner reads the delta exactly as A9 says; the yes in SB6 names its `deltaSha256`. Gate files: A10's check. A changed
+**The site's numbers (`NEWNUM`, `LIMITS`).** The numbers live in the owner's file on the server,
+`/etc/debateai-v3-preview/hosted-billing-v1.json`: the per-debate ceiling, the day's ceiling, the room-read budget, the
+plans (prices and limits) and the abuse limits. The live settings version holds the numbers the site runs on. SB3
+compares the two, input by input, and prints one line each: `SAME`, or `DIFFERENT` with what moved (`higher`, `lower`,
+`changed`). It never prints an amount, so the output can be pasted anywhere.
+
+- **Nothing changes (most uploads).** Leave `NEWNUM` and `LIMITS` empty. Every line must say `SAME`. The new version gets
+  the live numbers.
+- **A number changes on purpose.** Edit a copy of the file, check the copy, put it in place ("Editing the owner's file"
+  below), then name each changed input in `NEWNUM`, for example `NEWNUM='billingPlans'` or
+  `NEWNUM='dailyCeilingMicros abuseLimits'`. The new version gets the file's value for the named inputs and the live
+  value for every other one. Do this before SB2: the practice runs with the file's numbers, so the file must already
+  hold what SB3 will publish. **If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**: the
+  practice is the only start of the new code on those numbers before the real one, and on the drained path the real
+  one is DR6, with the site down.
+- **The list must match what differs.** An input that differs and is not named stops the step
+  (`SITE_CHANGE_NOT_NAMED`): a number is never published by accident, and never left out without a word. An input that
+  is named and does not differ stops it too (`SITE_CHANGE_NAMED_BUT_SAME`). Nothing was written; fix the list or the
+  file and run SB3 again.
+- **The file is behind the live numbers.** This happens after a per-debate ceiling was changed by activation (SV1): the
+  file still holds the old value, and SB3 says `DIFFERENT perRunCeilingMicros`. Do not name it (that would publish the
+  old value again). Run SB3c with `KEEP='perRunCeilingMicros'`: it writes the live value into the file. Best before
+  SB2, for the same reason as above.
+- **Billing on or off never changes here.** Both sides must say on.
+
+**What a change does to the people who already have a plan.** The lines say it per plan. Read this before naming a
+plan's prices or limits; the tool cannot know who holds which plan.
+
+*Prices* (`prices` lines, and `currency_by_country`):
+- A subscriber's renewals keep charging the price recorded for that subscriber when they bought (Terms section 12),
+  after a rise and after a cut alike. No command moves an existing subscriber to a new price yet; that needs its own
+  tool, with the 30 days' notice the Terms promise.
+- A first purchase is charged, and then renewed, at the price the person was shown. Shown before the switch and paid
+  after it: still the old price.
+- **An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan
+  is renewed at depends on the release that showed it. A release that saves an upgrade's monthly price with its quote
+  renews at that price. An older release does not: the plan is then renewed at the new price, after the short renewal
+  notice instead of the Terms' 30 days. So **an upload whose old release is such an older one must not change a
+  plan's prices**: no `prices` line may print. That includes the first upload that carries the fix, because the
+  quotes still open at the switch were made by the old release. The old release saves that price when this line,
+  run with the upload's names file, prints 1 or more; a 0, or an error, means an older one:
+  `grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`.
+- A plan change by an existing subscriber uses the new list. After a rise, a move to a lower plan is recorded at that
+  plan's new price, which can be more than they pay today. The page shows the amount, but a downgrade panel left open
+  across the switch still shows the old one. After a cut, an upgrade is
+  refused while the higher plan's new price is not above what the person pays today.
+- A subscription keeps the currency it was bought in.
+
+*Limits* (`limits` lines: the month's credit, the day and week caps, the finish room, the closing reserve, Free's fixed
+gauges). The product reads them from the live version for everyone, and has no way yet to apply a new limit only from
+a person's next month. So a limit that goes **lower**, or changes with no up or down, does all of this to the people
+already on that plan, in the middle of a month they paid for:
+- Someone who already used more than the new credit can ask nothing new until their month ends; a running debate
+  pauses.
+- The day and week caps are counted again over the days already used this month, with the new, lower cap. Someone who
+  never went over a cap can find today's allowance already used, for several days.
+- A refund on cancelling or withdrawing is measured against the new credit: the same use is a larger share of a
+  smaller credit, so less comes back.
+- The Terms ask for more than a notice here: section 12 promises notice before limits get tighter, and section 14
+  lists lower limits among the changes people accept at their next sign-in and that apply only going forward. The
+  product has no acceptance step for limits.
+
+So: **do not lower a plan's limits while anyone holds that plan**, unless that is decided with eyes open. The step
+stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named in `LIMITS`, for example `LIMITS='PLUS'`; naming it is the
+owner's statement that nobody holds the plan, or that the people on it were told and what follows is accepted. For
+each plan named there SB3 prints `HELD` or `nobody holds it now`, read from the subscriptions that are open (test
+purchases count; Free is held by everyone without a paid plan). The reading errs to one side only: `HELD` is printed
+when an open subscription names the plan anywhere in its history, so also for a plan someone was on earlier and
+has since left, or is only scheduled to move to; `nobody holds it now` means no open subscription ever named it. It is
+a reading at SB3: people can still buy until the switch (on the drained path, until DR2), so a `nobody` that matters
+is read again right before the yes. It prints no count, and it does not stop the step: the decision stays the
+owner's.
+`LIMITS` must name exactly those plans (`SITE_LIMITS_NAMED_BUT_SAME` otherwise). The closing reserve works across
+plans: every paid plan's closing is admitted against the smallest paid reserve, so when that smallest one moves, every
+paid plan must be named.
+
+A limit that only goes **higher** needs no second naming. The people on the plan get more from the switch on, with
+three exceptions worth knowing: someone who changed plan this month keeps this month's stored credit until their next
+month; a debate still running on the old release finishes under the old limits; and a refund becomes larger (the
+same use is a smaller share of a larger credit). Raising the Plus credit alone lowers the size the pricing page shows
+for the other plans ("N times Plus"); the tool prints a line for each.
+
+*The site-wide numbers.* The day's ceiling, the room-read budget and the abuse limits reach everyone at the switch. A
+lower day's ceiling makes everyone wait until the next day (UTC) once it is reached, people with credit left included.
+The per-debate ceiling follows each debate: debates asked after the switch get the new one, debates already admitted
+keep theirs. `cancel_links_per_day` in the abuse limits bounds the cancel page that works without signing in, which the
+Terms promise: keep it comfortably above what one person needs.
+
+A `NOTE` line is advice, not a stop: a plan whose credit is no longer above the plan before it (an upgrade would add
+nothing), or a plan whose smallest window fell below the per-debate ceiling (one debate may use more than a day of
+it).
+
+**Editing the owner's file.** A file that no longer reads as JSON makes every step print jq's error instead of its
+numbers, so never edit it in place. Copy it, edit the copy, check the copy, and only then put it in place (root, one
+line at a time; the first line prints `COPY_READS` when the copy is JSON with the six inputs):
+
+```sh
+cp -p /etc/debateai-v3-preview/hosted-billing-v1.json /root/hosted-billing-v1.edit.json    # then edit /root/hosted-billing-v1.edit.json
+jq -e 'type == "object" and (keys | join(",")) == "abuseLimits,askRoomReads,billing,billingPlans,dailyCeilingMicros,perRunCeilingMicros"' /root/hosted-billing-v1.edit.json > /dev/null && echo COPY_READS
+cp -p /etc/debateai-v3-preview/hosted-billing-v1.json "/root/preview-archive/hosted-billing-v1.before-edit-$(date -u +%Y%m%dT%H%M%SZ).json"
+install -o root -g root -m 0600 /root/hosted-billing-v1.edit.json /etc/debateai-v3-preview/hosted-billing-v1.json.new && mv /etc/debateai-v3-preview/hosted-billing-v1.json.new /etc/debateai-v3-preview/hosted-billing-v1.json
+```
+
+SB3 keeps a record of what was compared and named in `$ART/site-inputs.json`. After the proposal is made it checks the
+proposal itself, which comes from the database's own rows: the numbers that change there (each ceiling, the room-read
+budget, the plans, the abuse limits) must be exactly the inputs `NEWNUM` names. So the delta the owner approves
+carries no number change nobody named, and no named change is missing from it.
+
+**A release older than this step.** When the new release's own tool has no `site-inputs` command, SB3 cannot publish
+changed numbers. It then needs `NEWNUM` and `LIMITS` empty and the file equal to the live numbers, whole; SB3c makes
+the file equal.
+
+The owner reads the delta as A9 says; the yes in SB6 names its `deltaSha256`. With `NEWNUM` not empty, use this line
+instead of A9's first one: it prints every row as A9 does, but for the four number rows only the names of the members
+that differ, never a value (SB3's lines above say which way each moved). It may be used for every upload: A9's own
+line prints the ceilings row whole whenever the new code moves another member of it. A9's watch list then names `costEnvelopePolicy`
+(a ceiling) or `admissionPolicy` (the room-read budget) when `NEWNUM` names them: that is the owner decision A9 asks for.
+
+```sh
+jq -r '["abuseLimits","admissionPolicy","billingPlans","costEnvelopePolicy"] as $own | .delta[] | "\(.change) \(.rowKey) (\(.reason))" + (if (.rowKey as $k | $own | index($k)) then "\n  members that differ (values not printed): " + ((.oldValueJsonText // "{}" | fromjson) as $o | (.newValueJsonText | fromjson) as $n | [$o + $n | keys[] | select($o[.] != $n[.])] | join(" ")) else "\n  old: \(.oldValueJsonText)\n  new: \(.newValueJsonText)" end)' "$ART/register-proposal.json"
+```
+
+Gate files: A10's check. A changed
 gate file follows spec §9's rule for gate rows: a change that only widens (adds a model, raises a bound) is deployed now,
 before SB4, as the gate README says; one that narrows waits until the old release has retired.
+
+### SB3b. SB3 once more (its plan, proposal and numbers record set aside)
+
+Only before SB6's yes, and never after SB8 or SB9 (on the drained path: before the yes before DR2, and never after
+DR4 or DR5): nothing may have been applied or published from this plan. Use it
+when SB3 stopped after it wrote a file, or when the numbers to publish changed after SB3. The files move into `$S`;
+nothing is deleted. Then run SB3 again; its new proposal has a new `deltaSha256`. After SB8 or SB9 it stops and says
+ask, also when SB9 itself refused and asked for a new plan: what was applied or published is read first, by hand.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB3b: SB3's plan, proposal and numbers record moved into S, so SB3 can run again. Nothing live changes.
+for F in native-plan-apply-and-plan.json native-apply-and-plan.json native-plan-publish.json register-published.json; do [ ! -e "$ART/$F" ] || { echo "SB3B_NOT_DONE: $ART/$F exists: SB8 or SB9 ran from this plan already: ask"; exit 1; }; done
+[ ! -e "$NP" ] || cmp -s "$ART/native-plan-plan.json" "$NP" || { echo "SB3B_NOT_DONE: $NP is not SB3's plan (look first)"; exit 1; }
+D=$S/sb3-$(date -u +%Y%m%dT%H%M%SZ)
+[ ! -e "$D" ] || { echo "SB3B_NOT_DONE: $D exists (this step ran a second ago: look first)"; exit 1; }
+install -d -o root -g root -m 0700 "$D"
+for F in "$NP" "$ART/native-plan-plan.json" "$ART/register-proposal.json" "$ART/site-inputs.json" "$S/plan-proposal.sha256"; do [ ! -e "$F" ] || mv "$F" "$D/" || { echo "SB3B_NOT_DONE: $F did not move into $D (look first)"; exit 1; }; done
+echo "set aside in $D: $(ls "$D" | tr '\n' ' ')"
+echo SB3B_DONE
+```
+
+### SB3c. Numbers written back into the owner's file (prints no value)
+
+The owner's file is never changed by an upload, so it can drift from the live numbers. This step writes the inputs
+named in `KEEP` into the file, from the live settings version (or from an older version's kept verify plan, `SRC`).
+The file as it was goes into `$S` first. Use it:
+- to keep a live number the file is behind on (`SITE_CHANGE_NOT_NAMED` for an input that was not meant to change);
+- to undo an edit of the file (best before SB2: the practice runs with the file's numbers). It needs a file that still
+  reads as JSON; one that does not is put back from its copy by hand ("Editing the owner's file" under SB3);
+- as the first half of the way back from published numbers, once the old release is gone ("The way back, side by
+  side": the numbers).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB3c: the inputs KEEP names, written into hosted-billing-v1.json from the live version's plan (or from SRC). The file before goes into S.
+KEEP=''                                                   # the inputs to write: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between
+SRC=''                                                    # empty = the live settings version; else the kept verify plan of the version whose numbers come back: the path that upload's own record names, jq -r .from.path <its artifacts folder>/site-inputs.json
+F=/etc/debateai-v3-preview/hosted-billing-v1.json
+printf '%s\n' "$KEEP" | grep -qxE '(perRunCeilingMicros|dailyCeilingMicros|askRoomReads|billingPlans|abuseLimits)( (perRunCeilingMicros|dailyCeilingMicros|askRoomReads|billingPlans|abuseLimits))*' || { echo "SB3C_NOT_DONE: KEEP is not input names with one space between"; exit 1; }
+[ ! -L "$F" ] && [ "$(stat -c '%a %U %h' "$F")" = "600 root 1" ] || { echo "SB3C_NOT_DONE: $F is not root's own 0600 file: ask"; exit 1; }
+if [ -z "$SRC" ]; then AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}; if [ "$AV" = "$OSITE" ]; then SRC=$S/native-plan.before.json; else SRC=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; fi
+  [ "$(jq -r .approval.publication.registerVersion "$SRC")" = "$AV" ] && [ "$(activev)" = "$AV" ] || { echo "SB3C_NOT_DONE: $SRC is not the plan of the live settings version (settings were activated since SB1?): ask"; exit 1; }
+fi
+[ "$(jq -r '.operation + " " + (.hostedBilling | keys | join(","))' "$SRC")" = "verify abuseLimits,askRoomReads,billing,billingPlans,dailyCeilingMicros,perRunCeilingMicros" ] || { echo "SB3C_NOT_DONE: $SRC is not a verify plan with the six hosted inputs"; exit 1; }
+umask 077
+TS=$(date -u +%Y%m%dT%H%M%SZ); B=$S/hosted-billing.before-sb3c-$TS.json; N=$S/hosted-billing.new-sb3c-$TS.json
+[ ! -e "$B" ] && [ ! -e "$N" ] || { echo "SB3C_NOT_DONE: $B or $N exists (this step ran a second ago: look first; nothing changed)"; exit 1; }
+cp -p "$F" "$B" && cmp -s "$F" "$B" || { echo "SB3C_NOT_DONE: the copy of the file failed (nothing changed)"; exit 1; }
+jq -s --arg keep "$KEEP" '.[0] as $file | .[1].hostedBilling as $n | reduce ($keep | split(" ")[]) as $k ($file; .[$k] = $n[$k])' "$F" "$SRC" > "$N" || { echo "SB3C_NOT_DONE: the new file could not be made (nothing changed; its draft is $N)"; exit 1; }
+[ "$(jq -r 'keys | join(",")' "$N")" = "abuseLimits,askRoomReads,billing,billingPlans,dailyCeilingMicros,perRunCeilingMicros" ] || { echo "SB3C_NOT_DONE: the file does not have exactly the six inputs (nothing changed; its draft is $N): ask"; exit 1; }
+install -o root -g root -m 0600 "$N" "$F.new" && mv "$F.new" "$F" && cmp -s "$N" "$F" || { echo "SB3C_NOT_DONE: the new file is not in place: compare $F with $B"; exit 1; }
+umask 022
+for K in perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits; do
+  if [ "$(jq -cS --arg k "$K" 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; .hostedBilling[$k] | norm' "$SRC")" = "$(jq -cS --arg k "$K" 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; .[$k] | norm' "$F")" ]; then echo "SAME $K"; else echo "DIFFERENT $K"; fi
+done
+echo "written from settings version $(jq -r .approval.publication.registerVersion "$SRC") ($SRC). The file before: $B; the file now: $N (both hold numbers: root only). The names file reads the file each time a step starts."
+echo SB3C_DONE
+```
+
+Each input in `KEEP` must now say `SAME`. An input that still says `DIFFERENT` is one the file keeps as its own: name
+it in SB3's `NEWNUM` to publish it, or write it back here too.
 
 ### SB4. The release check (read-only)
 
@@ -4583,7 +4803,8 @@ its own file as it is.
 
 PM1 comes first: every listed mark's file must be in `/etc/debateai-v3-preview/public/payment-marks/` (a listed mark
 without its file shows a broken image). An empty value is refused by the test site's settings reader (every
-`<name>=` line needs a value): to show no marks, leave the line out and skip this step. SB5b runs after SB5 and before
+`<name>=` line needs a value): to show no marks, leave the line out and skip this step. With NETOPIA's logo id set
+(SB5d), the website draws none of these marks: skip this step. SB5b runs after SB5 and before
 SB10, whose launch plans start the website from this file; it stops once `ui-launch.json` exists. At T+1 `lc` is still
 T's installed tools, whose SAME checks do not know the list yet, so the script checks the list's form itself: one to
 three of the names, lower-case, no spaces, each once.
@@ -4687,6 +4908,51 @@ echo "api-$LABEL.env and ui-$LABEL.env: the UI-to-API proof lines"
 echo SB5C_DONE
 ```
 
+### SB5d. NETOPIA's logo id, in the new release's ui file (only when it is first set or changes)
+
+NETOPIA asks for its logo on the site. The website shows NETOPIA's hosted picture when its setting `NETOPIA_LOGO_ID`
+holds the shop id NETOPIA shows you (1 to 12 digits; it is public, since it ends up in the page as part of the picture's
+address, `https://mny.ro/np-black-0.svg?id=<id>`). The visitor's browser loads the picture from NETOPIA's server, and
+the website's content policy lets images come from `https://mny.ro` and from no other outside host, so nothing is
+copied to the server and Caddy does not change. The picture already holds the Visa and Mastercard marks, so while the
+line is there the website draws none of the files of "Payment marks: the files and Caddy's rule": skip PM1, SB5b, MT1,
+PM2 and MT2. It shows only while billing is on, in the full footer and on the checkout's card step; the one-line footer
+never shows it.
+
+Each release derives its `ui-<label>.env` from the old release's file (SB5, or DR1 on the drained path), so once a
+release's file holds the line every later release carries it. SB5d runs the first time, when the id changes, and in the
+first upload after going back to a release whose ui file has no line. A release before this code refuses the name (its
+website starter lets through only the settings it lists, and stops with `PREVIEW_UI_STARTUP_REFUSED`), so the line
+never goes into `ui.env` or an older release's file; that matters on the way back too, which starts the old release
+from its own file as it is. A website of this code refuses to start on an id of another form, and its journal then
+says `PREVIEW_UI_STARTUP_REFUSED NETOPIA_LOGO_ID_INVALID`. SB5d runs after SB5 (or DR1) and before SB10 (or DR5),
+whose launch plans start the website from this file; it stops once `ui-launch.json` exists. `lc` is still the old
+release's tools here, whose SAME checks may not know the id yet, so the script checks its form itself. After the
+switch, LOGOCHECK (after SB13b) reads that the site shows the logo.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB5d: NETOPIA_LOGO_ID in the new release's own ui file (only when it is first set or changes; never a release before this code).
+ID='<the shop id NETOPIA shows you, digits only>'
+U=$E/ui-$LABEL.env
+printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "SB5D_NOT_DONE: ID is not 1 to 12 digits (nothing changed)"; exit 1; }
+[ -f "$U" ] && [ "$(stat -c '%a %U' "$U")" = "640 root" ] || { echo "SB5D_NOT_DONE: $U is not root's 0640 file (SB5 or DR1 first)"; exit 1; }
+[ ! -e "$ART/ui-launch.json" ] || { echo "SB5D_NOT_DONE: $ART/ui-launch.json exists: the launch plans are made already (nothing changed): ask"; exit 1; }
+grep -q "'NETOPIA_LOGO_ID'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" || { echo "SB5D_NOT_DONE: this release's website does not know NETOPIA_LOGO_ID (a release before this code would refuse to start; nothing changed)"; exit 1; }
+[ ! -e "$S/ui-$LABEL.env.before-logo" ] || { echo "SB5D_NOT_DONE: $S/ui-$LABEL.env.before-logo exists: SB5d ran for this release before (look first)"; exit 1; }
+cp -p "$U" "$S/ui-$LABEL.env.before-logo"
+( umask 077; awk '!/^NETOPIA_LOGO_ID=/' "$U" > "$U.new"; printf 'NETOPIA_LOGO_ID=%s\n' "$ID" >> "$U.new" )
+chown --reference="$U" "$U.new"
+chmod --reference="$U" "$U.new"
+mv "$U.new" "$U"
+[ "$(grep -c '^NETOPIA_LOGO_ID=' "$U")" = 1 ] && grep -qxF "NETOPIA_LOGO_ID=$ID" "$U" || { echo "SB5D_NOT_DONE: the line is not in $U exactly once (the file before is $S/ui-$LABEL.env.before-logo): ask"; exit 1; }
+diff <(awk '!/^NETOPIA_LOGO_ID=/' "$S/ui-$LABEL.env.before-logo") <(awk '!/^NETOPIA_LOGO_ID=/' "$U") >/dev/null && [ "$(stat -c '%a %U:%G' "$U")" = "$(stat -c '%a %U:%G' "$S/ui-$LABEL.env.before-logo")" ] || { echo "SB5D_NOT_DONE: another line, the mode or the owner of $U changed (the file before is $S/ui-$LABEL.env.before-logo): ask"; exit 1; }
+lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5D_NOT_DONE: a SAME check is BAD (above; the file before is $S/ui-$LABEL.env.before-logo)"; exit 1; }
+echo "ui-$LABEL.env: NETOPIA_LOGO_ID=$ID"
+echo SB5D_DONE
+```
+
 ### SB6. The owner's fresh yes
 
 Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
@@ -4694,6 +4960,8 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - the online backup;
 - the migrations by number (or "no migrations");
 - the publish of register V with its delta hash;
+- only when SB3's `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and either
+  that nobody holds them or the date the people on them were told;
 - the new commit and its release key;
 - the switch;
 - only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the
@@ -5031,6 +5299,46 @@ else echo "the old runner has stopped (retired, or check SB14)"; fi
 echo SB13B_DONE
 ```
 
+### LOGOCHECK. NETOPIA's logo on the new release (read-only)
+
+Only in an upload whose SB5d ran, right after SB13b (on the drained path too). It changes nothing. It reads the new
+website directly on its own port (`$UIP`: no site password, and with no session cookie the home page is the landing
+page) and checks that the line from SB5d is in the release's ui file, that the page's content policy lets the logo
+load, and, while billing is on (the home page links `/pricing` only then), that the home page shows NETOPIA's picture
+exactly once and none of the old mark files. With billing off it says so and does not stop: the logo shows by itself
+once billing is on. Last, it asks NETOPIA's server for the picture and prints the answer's headers that matter: it must
+be a 200 with an SVG, with no cookie and no redirect (the Privacy Policy and the Cookie Policy assume neither). Re-run it
+now and then: NETOPIA can change the picture at any time.
+
+Then look by eye, with the site password, in a private window: the home page's footer in the light and the dark theme
+(the logo on its white chip; a click opens netopia-payments.com in a new tab), a legal page, a phone width, and the
+checkout's card step (sign in, pick a plan, look at the logo under the button, and do not press the button).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# LOGOCHECK: read-only. NETOPIA's logo on the new release: the ui file's line, the page's policy, the home page, NETOPIA's answer.
+ID='<the shop id you gave SB5d>'
+LOGO="https://mny.ro/np-black-0.svg?id=$ID"
+printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "LOGOCHECK_NOT_DONE: ID is not 1 to 12 digits"; exit 1; }
+grep -qxF "NETOPIA_LOGO_ID=$ID" "$E/ui-$LABEL.env" || { echo "LOGOCHECK_NOT_DONE: ui-$LABEL.env does not hold the line NETOPIA_LOGO_ID=$ID (SB5d)"; exit 1; }
+P=$(curl -s -m 15 -o /dev/null -D - "http://127.0.0.1:$UIP/" | tr -d '\r' | grep -i '^content-security-policy:' || true)
+grep -qF "img-src 'self' data: https://mny.ro;" <<<"$P" || { echo "LOGOCHECK_NOT_DONE: the home page's policy does not let the logo load: ask"; exit 1; }
+H=$(curl -s -m 15 "http://127.0.0.1:$UIP/" || true)
+if grep -qF 'href="/pricing"' <<<"$H"; then
+  [ "$(grep -oF "src=\"$LOGO\"" <<<"$H" | grep -c .)" = 1 ] || { echo "LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once: ask"; exit 1; }
+  ! grep -qF 'src="/payment-marks/' <<<"$H" || { echo "LOGOCHECK_NOT_DONE: the home page still draws the old mark files: ask"; exit 1; }
+  echo "home page: billing on, NETOPIA's logo once"
+else
+  echo "home page: billing is off, so no logo (it shows by itself once billing is on)"
+fi
+R=$(curl -sI -m 15 "$LOGO" | tr -d '\r' | tr 'A-Z' 'a-z' || true)
+grep -E '^(http/|content-type:|content-length:|cache-control:|set-cookie:|location:)' <<<"$R" || true
+grep -qE '^http/[0-9.]+ 200' <<<"$R" && grep -qx 'content-type: image/svg+xml' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG: ask"; exit 1; }
+! grep -qE '^(set-cookie|location):' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected (the Privacy Policy and the Cookie Policy assume neither): ask"; exit 1; }
+echo LOGOCHECK_DONE
+```
+
 ### SB13c. The N-1 baseline names the live release (on the Mac)
 
 After SB13b the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
@@ -5186,6 +5494,19 @@ that reverts by itself (`SWITCH_REVERTED`) puts back the version that was active
 site version it activates nothing. WB1 and WB4 activate nothing (WB4 never writes the switch). Afterwards
 `lc settings-version.mjs status` prints the pointer.
 
+**The numbers (SB3's `NEWNUM`).** After a drained upload there is no WB2: see "The numbers on the drained path" in
+"Drained upload on the template layout". A way back that makes the old release current again (WB2) also brings the
+numbers before back, and nothing is typed: the plans, the day's ceiling, the room-read budget and the abuse limits are sealed
+in the old release's own site version, and the per-debate ceiling comes with the settings version WB2 activates.
+Purchases made while the new numbers were live keep the price they were bought at. **When the upload had raised a
+plan's limits, WB2 lowers them again**, for everyone on that plan, with everything "What a change does to the people
+who already have a plan" (under SB3) says about a lower limit; the owner's yes for WB2 names that. Once the old release
+is retired there is no switch back: put the numbers before into the owner's file with SB3c (`KEEP` = the inputs that
+upload named; `SRC` = the plan that upload compared with, which its record names:
+`jq -r .from.path <its artifacts folder>/site-inputs.json`), then publish them with the next upload, named in its
+`NEWNUM` like any other change, and with the plans in `LIMITS` where a limit goes down. The owner's file itself is
+never changed by an upload or by a way back; only the owner and SB3c write it.
+
 If SB10 swapped the operator folder, moving it back (`mv /opt/debateai-v3-preview/operator/lifecycle-v1
 "$S/operator-lifecycle-v1.<new label>"`, then `mv "$S/operator-lifecycle-v1.before" /opt/debateai-v3-preview/operator/lifecycle-v1`)
 is the owner's call after WB1 or WB2: the old release ran with the new tools since SB10. After SB8 the online backup is a
@@ -5297,14 +5618,18 @@ could not run beside the new database (spec §5's escape hatch). Then the upload
 template layout: a quiet moment, the old release stopped with nothing open, a cold copy, the migrations, and a switch
 with the old pair already stopped. SB1 to SB4 stand as they are (the names, the staging, the practice, the plan); SB5's
 database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. To add the
-UI-to-API proof on this path, run SB5c right after DR1. The first time
-the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule") go after DR1 and SB5b, before DR2.
+UI-to-API proof on this path, run SB5c right after DR1. To set or change NETOPIA's logo id on this path, run SB5d
+right after DR1. The first time the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule")
+go after DR1 and SB5b, before DR2.
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
 When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
 Register row (§5), as in SB6.
+When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
+plans, and either that nobody holds them or the date the people on them were told, as in SB6. On this path SB3b (SB3
+once more) is for before that yes, and never after DR4 or DR5.
 
 | Step | What | The site | The way back from here |
 |---|---|---|---|
@@ -5525,8 +5850,8 @@ systemctl start debateai-preview-backup.timer || { echo "DR6_NOT_DONE: the backu
 echo DR6_DONE
 ```
 
-Then SB13b (the team member's test debate) and, later, SB15 as usual. The old release has no retirement receipt (it
-never retired by itself); its `RETIRED` row says `DRAINED`.
+Then SB13b (the team member's test debate), LOGOCHECK when this upload ran SB5d, and, later, SB15 as usual. The old
+release has no retirement receipt (it never retired by itself); its `RETIRED` row says `DRAINED`.
 
 The switch accepts the old runner stopped only on this path (`--old-pair-stopped`). After `SWITCH_OUTCOME_UNKNOWN` (its
 `next` names `switch --finish … --old-pair-stopped`), or `BACKSTOP`/`TARGET` in `bad`, run WB4 with `bash -s -- drained`:
@@ -5556,6 +5881,15 @@ for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --
 [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --since "@$T1" -o cat --no-pager | grep '^PREVIEW_RUNNER_STARTED ' | grep -c "\"releaseKey\":\"$OKEY\"" || true)" -ge 1 ] || { echo "RBD_A_NOT_DONE: the old runner did not start cleanly"; exit 1; }
 echo RBD_A_DONE
 ```
+
+**The numbers on the drained path (SB3's `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to
+it (no WB2) once the upload is done. Numbers published by a drained upload come back in one of two ways only: rbD-B,
+which puts back DR3's cold copy and with it the old numbers, and loses everything written since DR3 (sign-ups, debates,
+payments); or SB3c (`KEEP` = the inputs the upload named; `SRC` = the plan it compared with, which its record names:
+`jq -r .from.path <that upload's artifacts folder>/site-inputs.json`) and then the next upload, with those inputs
+named in its `NEWNUM`. The second way loses nothing and takes one more upload. The folder is the one of the upload
+that published the numbers, not `$ART` of a later upload's names file: SB3c's last line names the settings version it
+wrote from, which must be the one before the change.
 
 **rbD-B: from DR4 on.** The new release stops (its runner only with nothing open), the cold copy's data and config
 folders come back (the current ones moved aside, never deleted), the lock goes back to its copy from SB1 (the new
@@ -5673,6 +6007,11 @@ echo MT2_DONE
 ```
 
 ### Payment marks: the files and Caddy's rule
+
+**NETOPIA's hosted logo replaces these files.** When the new release's ui file has `NETOPIA_LOGO_ID` (SB5d), the
+footer and the checkout show NETOPIA's own picture, loaded by the visitor's browser from NETOPIA's server; it already
+holds the Visa and Mastercard marks, and the website then draws none of the three files. With it, PM1, SB5b, MT1, PM2
+and MT2 are not needed. The three files and the steps below stay for a site without the logo id.
 
 **In plain words.** The website's footer and checkout show the NETOPIA, Visa and Mastercard marks at
 `/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg` (`deploy/vps/README.md`
