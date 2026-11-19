@@ -30,7 +30,8 @@ function refuse(code) {
  * A page answers in the language the visitor picked or, with no choice, in the one the browser prefers
  * (middleware.ts), so it says it varies with Accept-Language. Next replaces any Vary set before a page renders with its
  * own list, so the name is added as the headers go out. Only rendered pages and their navigation data (HTML and React
- * Server Component answers) get it: static files and /api answers do not depend on the browser's language.
+ * Server Component answers) get it here: /_next/static files and /api answers do not depend on the browser's language
+ * and do not vary. A file in public/ keeps the Vary the middleware gave it.
  */
 function varyPagesByLanguage(response) {
   const writeHead = response.writeHead;

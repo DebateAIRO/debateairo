@@ -191,6 +191,11 @@ async function assertFirstVisitLanguage(base, surface) {
     ["/terms", "a Romanian browser whose visitor picked English", { "accept-language": "ro", cookie: "debateai.locale=en-GB" }, 200, "en-GB", ENGLISH_TERMS, "<title>Terms of service"],
     ["/terms", "an English browser whose visitor picked Romanian", { "accept-language": "en-US,en", cookie: "debateai.locale=ro" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
     ["/terms", "a Romanian browser with an older cookie for a language no longer offered", { "accept-language": "ro", cookie: "debateai.locale=de" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
+    // Two copies of the locale cookie (one set for a parent domain, say): one offered copy is a choice, so the browser's
+    // language is not added, and the pages read the last copy as they always have.
+    ["/terms", "a Romanian browser with English, then an older language", { "accept-language": "ro", cookie: "debateai.locale=en; debateai.locale=de" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a Romanian browser with an older language, then English", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=en" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a Romanian browser with two older languages", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=fr" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
     // An explicit ?lang= still picks the legal text; the page around it follows the browser, as with a cookie.
     ["/terms?lang=en", "a Romanian browser asking for the English text", { "accept-language": "ro" }, 200, "ro", ENGLISH_TERMS, "<title>Termenii serviciului"],
     ["/terms", "a malformed header", { "accept-language": "ro;q=2, ;;; ,=,ro-;q=0.5,*;q=x" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
@@ -216,13 +221,19 @@ async function assertFirstVisitLanguage(base, surface) {
     assert.match(answer.header("cache-control") ?? "", /(?:^|,\s*)no-store(?:,|$)/u, `${surface} ${path}, ${label}: no-store`);
     assert.doesNotMatch(answer.header("set-cookie") ?? "", /debateai\.locale=/u, `${surface} ${path}, ${label}: the language is never stored`);
   }
-  // A static file is the same in every language, so it keeps one cache entry for everyone.
+  // A /_next/static chunk never reaches the middleware and is the same in every language, so it keeps one cache entry
+  // for everyone.
   const page = await getExactly(`${base}/terms`, { "accept-language": "ro" });
   const chunk = /<script\b[^>]*\bsrc="(\/_next\/static\/[^"]+\.js)"/u.exec(page.body)?.[1];
   assert(chunk !== undefined, `${surface} /terms: names a static script`);
   const asset = await getExactly(`${base}${chunk}`, { "accept-language": "ro" });
   assert.equal(asset.status, 200, `${surface} ${chunk}: served`);
   assert.doesNotMatch(asset.header("vary") ?? "", /accept-language/iu, `${surface} ${chunk}: a static file does not vary with the language`);
+  // A file from public/ does go through the middleware, so it carries the same Vary as a page; like a page it is never
+  // stored, so no cache keeps a copy of it per language either.
+  const publicFile = await getExactly(`${base}/consumer-protection/anpc-sal.png`, { "accept-language": "ro" });
+  assert.equal(publicFile.status, 200, `${surface} /consumer-protection/anpc-sal.png: served`);
+  assert.match(publicFile.header("cache-control") ?? "", /(?:^|,\s*)no-store(?:,|$)/u, `${surface} /consumer-protection/anpc-sal.png: no-store`);
 }
 
 /**
@@ -236,7 +247,11 @@ async function assertProxyFollowsFirstVisitLanguage(base, stubApi, surface) {
     ["an English browser that also reads Romanian", { "accept-language": "en-US,en;q=0.9,ro;q=0.8" }, null],
     ["a crawler that sends no Accept-Language", {}, null],
     ["a Romanian browser whose visitor picked English", { "accept-language": "ro", cookie: "debateai.locale=en-GB" }, "debateai.locale=en-GB"],
-    ["an English browser whose visitor picked Romanian", { "accept-language": "en", cookie: "debateai.locale=ro" }, "debateai.locale=ro"]
+    ["an English browser whose visitor picked Romanian", { "accept-language": "en", cookie: "debateai.locale=ro" }, "debateai.locale=ro"],
+    // The same two-copy cases as the pages above: the mails stay English where the pages do.
+    ["a Romanian browser with English, then an older language", { "accept-language": "ro", cookie: "debateai.locale=en; debateai.locale=de" }, "debateai.locale=en"],
+    ["a Romanian browser with an older language, then English", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=en" }, null],
+    ["a Romanian browser with two older languages", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=fr" }, "debateai.locale=ro"]
   ]) {
     const answer = await getExactly(`${base}/api/v1/session`, headers);
     assert.equal(answer.status, 401, `${surface} /api, ${label}: proxied`);
