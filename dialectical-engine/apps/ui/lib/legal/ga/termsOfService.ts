@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Na háiteanna ina gcuirimid Dialectical Engine ar fáil",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua agus an Íoslainn), sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin agus sa Chóiré Theas. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
+      { kind: "p", text: "Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua agus an Íoslainn), sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee agus Mississippi), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin agus sa Chóiré Theas. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Ní chuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu i Tennessee." },
+      { kind: "p", text: "Mississippi. Ní chuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu i Mississippi." },
       { kind: "p", text: "Fógraí agus baint anuas. Féadfar íomhánna dlúthchaidrimh neamhthoiliúla a thuairisciú trí ríomhphost chuig abuse@dezbatere.ro, gan cuntas, agus baintear iad laistigh de 48 uair an chloig ó iarratas bailí. Téann gearáin chóipchirt tríd an mbealach tuairiscithe i rannán 10." },
       { kind: "p", text: "Sonrach do stát. California: tá feidhm ag na téarmaí athnuachana uathoibríche i rannán 12; féadfaidh tú cealú ar líne am ar bith; coinnímid do thoiliú leis na téarmaí athnuachana ar feadh trí bliana ar a laghad. Nua-Eabhrac: féadfaidh tú cealú laistigh de 14 lá ó aon mhuirear ar phraghas méadaithe agus aisíocaíocht pro rata a fháil. Texas agus Nebraska: ní dhíolaimid sonraí pearsanta íogaire. Washington: tá feidhm ag ár bhFógra Príobháideachais Sonraí Sláinte Tomhaltóirí ag dezbatere.ro/privacy/us-health-data maidir le faisnéis a bhaineann le sláinte. Colorado: ní dhéanann aon ní sa tseirbhís cinntí iarmhartacha fút. Pléann ár mBeartas Príobháideachais, Iarscríbhinn B.2, le do shonraí agus le do chearta príobháideachais stáit." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "677c6a82fd006614cb057b024705bbe261a5da70e9d89f0af802ce0a4da600a5",
+  sha256: "b9479b0cc93aeed085607de6204ccac3e810c259b00e3636eb233b49a8ec03c2",
   eyebrow: "TÉARMAÍ SEIRBHÍSE · v2.18 · I bhFEIDHM 1 SAMHAIN 2026",
   title: "An méid lena n-aontaíonn tú",
   lede: "An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.",

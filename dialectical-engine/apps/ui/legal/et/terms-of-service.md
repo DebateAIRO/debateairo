@@ -48,7 +48,7 @@ Need andmed on püsivalt esitatud ka veebisaidil dezbatere.ro/legal. Teil on ala
 
 ## 2. Kus me Dialectical Engine-d pakume
 
-Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra ja Island), Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis ja Lõuna-Koreas. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas.
+Pakume Dialectical Engine-d inimestele, kes elavad Euroopa Liidus (27 riiki) ja Euroopa Majanduspiirkonnas (Norra ja Island), Moldovas, Ameerika Ühendriikides (välja arvatud Tennessee ja Mississippi), Kanadas, Austraalias, Uus-Meremaal, Singapuris, Jaapanis ja Lõuna-Koreas. Mujal me seda ei paku. Kui elate väljaspool neid riike, võib veebisait olla teile ligipääsetav, kuid me ei suuna teenust teile, ei võta teilt vastu makseid ning need Tingimused ja meie Privaatsuspoliitika ei ole kohandatud teie riigi õigusele. Lisas A sätestatakse, mida kohaldatakse igas meie teenindatavas piirkonnas.
 
 ## 3. Nende Tingimustega nõustumine
 
@@ -334,6 +334,8 @@ Nende Tingimuste põhiosa on kirjutatud teile. Lisaks: võite esitada hagi oma e
 ### A.2 Ameerika Ühendriigid
 
 **Tennessee.** Me ei paku Dialectical Engine-d inimestele, kes elavad Tennessees.
+
+**Mississippi.** Me ei paku Dialectical Engine-d inimestele, kes elavad Mississippis.
 
 **Teated ja sisu eemaldamine.** Nõusolekuta jagatud intiimkujutistest võib ilma kontota teatada e-kirjaga aadressil abuse@dezbatere.ro ning need eemaldatakse 48 tunni jooksul pärast kehtiva taotluse saamist. Autoriõiguse rikkumise kaebused esitatakse jaotises 10 kirjeldatud teatamiskanali kaudu.
 

@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hol kínáljuk a Dialectical Engine szolgáltatást",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia és Izland), Moldova, Egyesült Államok (Tennessee állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán és Dél-Korea. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
+      { kind: "p", text: "A Dialectical Engine szolgáltatást az alábbi országokban és régiókban élő személyeknek kínáljuk: Európai Unió (27 ország) és Európai Gazdasági Térség (Norvégia és Izland), Moldova, Egyesült Államok (Tennessee és Mississippi állam kivételével), Kanada, Ausztrália, Új-Zéland, Szingapúr, Japán és Dél-Korea. Máshol nem kínáljuk. Ha Ön ezeken az országokon kívül él, előfordulhat, hogy hozzáfér a webhelyhez, de a szolgáltatást nem Önnek szánjuk, Öntől fizetést nem fogadunk el, és e Feltételek, valamint Adatvédelmi szabályzatunk nem igazodik az Ön országának jogához. Az A. melléklet határozza meg az általunk kiszolgált egyes régiókban alkalmazandó szabályokat." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. A Dialectical Engine szolgáltatást nem kínáljuk a Tennessee államban élő személyeknek." },
+      { kind: "p", text: "Mississippi. A Dialectical Engine szolgáltatást nem kínáljuk a Mississippi államban élő személyeknek." },
       { kind: "p", text: "Értesítések és eltávolítások. A hozzájárulás nélkül megosztott intim képfelvételeket az abuse@dezbatere.ro címre küldött e-mailben, fiók nélkül be lehet jelenteni, és érvényes kérelem esetén 48 órán belül eltávolítjuk azokat. A szerzői jogi panaszokat a 10. szakaszban ismertetett bejelentési úton kell benyújtani." },
       { kind: "p", text: "Államspecifikus rendelkezések. Kalifornia: a 12. szakasz automatikus megújítási feltételei alkalmazandók; Ön bármikor lemondhatja előfizetését online; a megújítási feltételekhez adott hozzájárulását legalább három évig megőrizzük. New York: bármely emelt összegű terheléstől számított 14 napon belül lemondhatja előfizetését, és időarányos visszatérítést kaphat. Texas és Nebraska: érzékeny személyes adatokat nem értékesítünk. Washington: az egészséggel kapcsolatos adatokra a dezbatere.ro/privacy/us-health-data címen elérhető Fogyasztói egészségügyi adatokra vonatkozó adatvédelmi tájékoztatónk alkalmazandó. Colorado: a szolgáltatás semmilyen, Önre nézve jelentős következménnyel járó döntést nem hoz. Adatait és az állama szerinti adatvédelmi jogait Adatvédelmi szabályzatunk B.2 pontja szabályozza." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "ac70d3037c60bb7ebbdeb910f40c7d18a7a804401ef4943ebf63cc9949625489",
+  sha256: "a7c29276c45ed06f72780c61ed0f7a82cf9f67ddf5c40b00cc37690176c3da21",
   eyebrow: "SZOLGÁLTATÁSI FELTÉTELEK · v2.18 · HATÁLYOS 2026. NOVEMBER 1.",
   title: "Amit Ön elfogad",
   lede: "Az Ön és a DMS Merchandise Shop S.R.L. közötti szerződés közérthetően. Tizenkilenc szakasz és az A. melléklet — görgessen a végére.",

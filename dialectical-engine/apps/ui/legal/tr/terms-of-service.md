@@ -48,7 +48,7 @@ Bu bilgiler ayrıca dezbatere.ro/legal adresindeki sitede kalıcı olarak göste
 
 ## 2. Dialectical Engine'i nerelerde sunuyoruz
 
-Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda), Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da ve Güney Kore'de yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir.
+Dialectical Engine'i Avrupa Birliği'nde (27 ülke) ve Avrupa Ekonomik Alanı'nda (Norveç, İzlanda), Moldova'da, Amerika Birleşik Devletleri'nde (Tennessee ve Mississippi hariç), Kanada'da, Avustralya'da, Yeni Zelanda'da, Singapur'da, Japonya'da ve Güney Kore'de yaşayan kişilere sunuyoruz. Başka yerlerde sunmuyoruz. Bu ülkelerin dışında yaşıyorsanız siteye erişebilmeniz mümkün olsa da hizmeti size yöneltmiyor, sizden ödeme kabul etmiyor ve bu Koşulları ve Gizlilik Politikamızı ülkenizin hukukuna uyarlamıyoruz. Hizmet verdiğimiz her bölgede neyin geçerli olduğu Ek A'da belirtilmiştir.
 
 ## 3. Bu Koşulların kabulü
 
@@ -334,6 +334,8 @@ Bu Koşulların ana metni sizin için kaleme alınmıştır. Buna ek olarak: ya�
 ### A.2 Amerika Birleşik Devletleri
 
 **Tennessee.** Dialectical Engine'i Tennessee'de yaşayan kişilere sunmuyoruz.
+
+**Mississippi.** Dialectical Engine'i Mississippi'de yaşayan kişilere sunmuyoruz.
 
 **Bildirimler ve kaldırmalar.** Rıza olmaksızın paylaşılan mahrem görüntüler, hesap olmaksızın abuse@dezbatere.ro adresine e-posta ile bildirilebilir ve geçerli bir talebin ardından 48 saat içinde kaldırılır. Telif hakkı şikâyetleri 10. bölümdeki bildirim yolu üzerinden iletilir.
 

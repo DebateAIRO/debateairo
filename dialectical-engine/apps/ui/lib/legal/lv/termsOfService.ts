@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur mēs piedāvājam Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā un Islandē), Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā un Dienvidkorejā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
+      { kind: "p", text: "Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā un Islandē), Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī un Misisipi), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā un Dienvidkorejā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tenesī. Mēs nepiedāvājam Dialectical Engine personām, kuras dzīvo Tenesī." },
+      { kind: "p", text: "Misisipi. Mēs nepiedāvājam Dialectical Engine personām, kuras dzīvo Misisipi." },
       { kind: "p", text: "Paziņojumi un noņemšana. Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot, nosūtot e-pastu uz abuse@dezbatere.ro, bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek iesniegtas, izmantojot 10. sadaļā noteikto ziņošanas kārtību." },
       { kind: "p", text: "Štatu īpašie noteikumi. Kalifornija: piemēro 12. sadaļā noteiktos automātiskās atjaunošanas noteikumus; jūs jebkurā laikā varat atcelt abonementu tiešsaistē; mēs glabājam jūsu piekrišanu atjaunošanas noteikumiem vismaz trīs gadus. Ņujorka: varat atcelt abonementu 14 dienu laikā pēc jebkura maksājuma par paaugstinātu cenu un saņemt proporcionālu atmaksu. Teksasa un Nebraska: mēs nepārdodam sensitīvus personas datus. Vašingtona: mūsu Patērētāju veselības datu privātuma paziņojums vietnē dezbatere.ro/privacy/us-health-data attiecas uz informāciju par veselību. Kolorādo: nekas pakalpojumā nepieņem par jums lēmumus ar būtiskām sekām. Jūsu datiem un jūsu štata privātuma tiesībām piemēro mūsu Privātuma politikas B.2 pielikumu." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "d74af3ac6682853a86a25677c1f4aa9319bc4391ec9eaca20bf83a9203a2b1dd",
+  sha256: "eac1a72ba00632e9bbd9007b6de971dff2734f728110ed9c54a30fcae641c0bf",
   eyebrow: "PAKALPOJUMA NOTEIKUMI · v2.18 · SPĒKĀ NO 2026. GADA 1. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",

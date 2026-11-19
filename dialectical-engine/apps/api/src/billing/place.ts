@@ -123,7 +123,7 @@ const REGION_POSTCODE_INVALID: PaymentRegionDecision = Object.freeze({ kind: "PO
  * postal code doesn't fit (several: one the Terms exclude first, then the first in sorted order); else a postal code
  * that doesn't fit is sent back for correction when `postcodeMustFit`, and only in a country the policy closes
  * somewhere (where it could hide a closed region); else ALLOW. A region whose rule's reason is TERMS_EXCLUDED
- * (Tennessee, Terms §2 and Annex A.2) refuses with its own code, REGION_TERMS_EXCLUDED (the owner's choice of
+ * (Tennessee and Mississippi, Terms §2 and Annex A.2) refuses with its own code, REGION_TERMS_EXCLUDED (the owner's choice of
  * 3 November 2026); every other closed region with REGION_PAYMENT_UNAVAILABLE.
  */
 export function decidePaymentRegion(input: Readonly<{

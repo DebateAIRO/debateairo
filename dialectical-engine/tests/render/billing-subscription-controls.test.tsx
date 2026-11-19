@@ -477,8 +477,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now."],
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."],
-      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee).
-      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address."]
+      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee or Mississippi).
+      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee or Mississippi, so we can't take payment for this address."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);

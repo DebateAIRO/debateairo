@@ -211,7 +211,8 @@ describe("terms of service modal — rendered", () => {
     }
     // 131 until Switzerland's part (Annex A.5, one paragraph) left on 14 November 2026.
     // 131 again since section 8 gained its paragraph on DeepInfra on 16 November 2026.
-    expect(dialog().querySelectorAll(".policyText").length).toBe(131);
+    // 132 since Annex A.2 gained its paragraph on Mississippi on 18 November 2026.
+    expect(dialog().querySelectorAll(".policyText").length).toBe(132);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 

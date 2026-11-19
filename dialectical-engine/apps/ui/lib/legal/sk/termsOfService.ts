@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kde službu Dialectical Engine ponúkame",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Službu Dialectical Engine ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko a Island), Moldavsko, Spojené štáty (okrem Tennessee), Kanada, Austrália, Nový Zéland, Singapur, Japonsko a Južná Kórea. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
+      { kind: "p", text: "Službu Dialectical Engine ponúkame osobám, ktoré žijú v týchto krajinách a regiónoch: Európska únia (27 krajín) a Európsky hospodársky priestor (Nórsko a Island), Moldavsko, Spojené štáty (okrem Tennessee a Mississippi), Kanada, Austrália, Nový Zéland, Singapur, Japonsko a Južná Kórea. Inde ju neponúkame. Ak žijete mimo týchto krajín, môžete mať prístup k webovej lokalite, službu však na vás nezameriavame, neprijímame od vás platby a tieto Podmienky ani naše Zásady ochrany osobných údajov nie sú prispôsobené právu vašej krajiny. Príloha A stanovuje, čo platí v jednotlivých regiónoch, v ktorých službu poskytujeme." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Dialectical Engine neponúkame osobám, ktoré žijú v Tennessee." },
+      { kind: "p", text: "Mississippi. Dialectical Engine neponúkame osobám, ktoré žijú v Mississippi." },
       { kind: "p", text: "Oznámenia a odstraňovanie. Intímne snímky zdieľané bez súhlasu možno bez účtu nahlásiť e-mailom na adrese abuse@dezbatere.ro a budú odstránené do 48 hodín od platnej žiadosti. Sťažnosti týkajúce sa autorských práv sa podávajú postupom podľa časti 10." },
       { kind: "p", text: "Ustanovenia pre jednotlivé štáty. Kalifornia: uplatnia sa podmienky automatického obnovovania podľa časti 12; predplatné môžete kedykoľvek zrušiť online; váš súhlas s podmienkami obnovovania uchovávame najmenej tri roky. New York: do 14 dní od akejkoľvek platby so zvýšenou cenou môžete predplatné zrušiť a získať pomerné vrátenie peňazí. Texas a Nebraska: citlivé osobné údaje nepredávame. Washington: na informácie súvisiace so zdravím sa vzťahuje naše Oznámenie o ochrane údajov o zdraví spotrebiteľov na adrese dezbatere.ro/privacy/us-health-data. Colorado: nič v službe o vás neprijíma rozhodnutia so závažnými dôsledkami. Vaše údaje a vaše práva na ochranu súkromia podľa práva vášho štátu upravuje príloha B.2 našich Zásad ochrany osobných údajov." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "676f1c14863d7cf26dc60b590daf6b806c23c030a7788ec6fc31dabcc2887f25",
+  sha256: "512237f173e75f66d31a44c44476273220d24d7a2b865e7fed1194949545d3aa",
   eyebrow: "PODMIENKY POSKYTOVANIA SLUŽBY · v2.18 · ÚČINNÉ OD 1. NOVEMBRA 2026",
   title: "S čím súhlasíte",
   lede: "Zmluva medzi vami a DMS Merchandise Shop S.R.L. zrozumiteľným jazykom. Devätnásť častí a príloha A — prejdite až na koniec.",

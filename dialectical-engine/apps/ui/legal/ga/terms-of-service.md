@@ -48,7 +48,7 @@ Taispeántar na sonraí seo go buan ar an suíomh ag dezbatere.ro/legal freisin.
 
 ## 2. Na háiteanna ina gcuirimid Dialectical Engine ar fáil
 
-Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua agus an Íoslainn), sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin agus sa Chóiré Theas. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid.
+Cuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu san Aontas Eorpach (27 tír) agus sa Limistéar Eorpach Eacnamaíoch (an Iorua agus an Íoslainn), sa Mholdóiv, sna Stáit Aontaithe (ach amháin Tennessee agus Mississippi), i gCeanada, san Astráil, sa Nua-Shéalainn, i Singeapór, sa tSeapáin agus sa Chóiré Theas. Ní chuirimid ar fáil in aon áit eile é. Má tá cónaí ort lasmuigh de na tíortha sin, d'fhéadfá an suíomh a rochtain, ach ní dhírímid an tseirbhís ort, ní ghlacaimid íocaíocht uait, agus níl na Téarmaí seo ná ár mBeartas Príobháideachais curtha in oiriúint do dhlí do thíre. Leagtar amach in Iarscríbhinn A an méid a bhfuil feidhm aige i ngach réigiún dá bhfreastalaímid.
 
 ## 3. Glacadh leis na Téarmaí seo
 
@@ -334,6 +334,8 @@ Scríobhadh príomhchorp na dTéarmaí seo duit. Ina theannta sin: féadfaidh t�
 ### A.2 Stáit Aontaithe Mheiriceá
 
 **Tennessee.** Ní chuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu i Tennessee.
+
+**Mississippi.** Ní chuirimid Dialectical Engine ar fáil do dhaoine a bhfuil cónaí orthu i Mississippi.
 
 **Fógraí agus baint anuas.** Féadfar íomhánna dlúthchaidrimh neamhthoiliúla a thuairisciú trí ríomhphost chuig abuse@dezbatere.ro, gan cuntas, agus baintear iad laistigh de 48 uair an chloig ó iarratas bailí. Téann gearáin chóipchirt tríd an mbealach tuairiscithe i rannán 10.
 

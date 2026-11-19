@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Missä tarjoamme Dialectical Engine -palvelua",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja ja Islanti), Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa ja Etelä-Koreassa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
+      { kind: "p", text: "Tarjoamme Dialectical Engine -palvelua henkilöille, jotka asuvat Euroopan unionissa (27 maata) ja Euroopan talousalueella (Norja ja Islanti), Moldovassa, Yhdysvalloissa (lukuun ottamatta Tennesseetä ja Mississippiä), Kanadassa, Australiassa, Uudessa-Seelannissa, Singaporessa, Japanissa ja Etelä-Koreassa. Emme tarjoa sitä muualla. Jos asut näiden maiden ulkopuolella, saatat päästä sivustolle, mutta emme kohdista palvelua sinulle, emme ota sinulta vastaan maksuja, eikä näitä käyttöehtoja tai tietosuojakäytäntöämme ole mukautettu maasi lainsäädäntöön. Liitteessä A määritetään, mitä kullakin palvelemallamme alueella sovelletaan." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Emme tarjoa Dialectical Engine -palvelua henkilöille, jotka asuvat Tennesseessä." },
+      { kind: "p", text: "Mississippi. Emme tarjoa Dialectical Engine -palvelua henkilöille, jotka asuvat Mississippissä." },
       { kind: "p", text: "Ilmoitukset ja poistot. Ilman suostumusta jaetusta intiimistä kuva-aineistosta voi ilmoittaa ilman tiliä sähköpostitse osoitteeseen abuse@dezbatere.ro, ja se poistetaan 48 tunnin kuluessa pätevästä pyynnöstä. Tekijänoikeusvalitukset käsitellään kohdassa 10 tarkoitetun ilmoitusreitin kautta." },
       { kind: "p", text: "Osavaltiokohtaiset ehdot. Kalifornia: kohdan 12 automaattista uusimista koskevia ehtoja sovelletaan; voit peruuttaa verkossa milloin tahansa; säilytämme uusimisehtoja koskevan suostumuksesi vähintään kolme vuotta. New York: voit peruuttaa 14 päivän kuluessa korotetulla hinnalla tehdystä veloituksesta ja saada suhteutetun palautuksen. Texas ja Nebraska: emme myy arkaluonteisia henkilötietoja. Washington: osoitteessa dezbatere.ro/privacy/us-health-data oleva Consumer Health Data Privacy Notice -ilmoituksemme koskee terveyteen liittyviä tietoja. Colorado: palvelussa ei tehdä sinua koskevia merkittäviä päätöksiä. Tietojasi ja osavaltiosi lainsäädäntöön perustuvia tietosuojaoikeuksiasi käsitellään tietosuojakäytäntömme liitteessä B.2." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "83be1c035932587f2677902052efd819908b62b719f83f4e36ff38c156f80102",
+  sha256: "b23a45857aaee78aedcc6ee931f721955397218a43713ea213be9be59de8ffcd",
   eyebrow: "KÄYTTÖEHDOT · v2.18 · VOIMASSA 1. MARRASKUUTA 2026 ALKAEN",
   title: "Mihin sitoudut",
   lede: "Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.",

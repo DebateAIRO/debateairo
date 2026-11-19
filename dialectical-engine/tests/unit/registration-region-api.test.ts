@@ -93,9 +93,18 @@ describe("registration region API", () => {
     expect((await post(instance, { ...REGISTER_BODY, country: "US", us_state: "TX" })).statusCode).toBe(202);
     await instance.close();
   });
-  it("C10c closes Tennessee and no other state", () => {
+  it("C10d refuses a declared Mississippi residence the same way (owner's decision of 18 November 2026)", async () => {
+    const country = gate(); const { instance, register } = api(country.gate);
+    const response = await post(instance, { ...REGISTER_BODY, country: "US", us_state: "MS" });
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toEqual({ error: "STATE_SIGNUP_UNAVAILABLE" });
+    expect(register).not.toHaveBeenCalled();
+    expect(country.audit.recordCountryGateRefusal).not.toHaveBeenCalled();
+    await instance.close();
+  });
+  it("C10c closes Tennessee and Mississippi and no other state", () => {
     const refused = US_STATE_CODES.filter((state) => gate().gate.declaredSignupRefusal({ country: "US", usState: state }) !== null);
-    expect(refused).toEqual(["TN"]);
+    expect([...refused].sort()).toEqual(["MS", "TN"]);
   });
   it("C11 refuses exactly the closed drawn countries", () => {
     const closed = "DZ EG ET GH KE MA NG RW SN ZA TN UG CN IN ID MY PK PH TW TH VN LI RS CH UA GB BH IL JO KW LB OM QA SA TR AE CR MX PA AR BR CL CO EC PE UY FJ".split(" ");

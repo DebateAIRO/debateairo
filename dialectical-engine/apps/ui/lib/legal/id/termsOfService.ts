@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Tempat kami menawarkan Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia dan Islandia), Moldova, Amerika Serikat (kecuali Tennessee), Kanada, Australia, Selandia Baru, Singapura, Jepang, dan Korea Selatan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
+      { kind: "p", text: "Kami menawarkan Dialectical Engine kepada orang yang tinggal di Uni Eropa (27 negara) dan Wilayah Ekonomi Eropa (Norwegia dan Islandia), Moldova, Amerika Serikat (kecuali Tennessee dan Mississippi), Kanada, Australia, Selandia Baru, Singapura, Jepang, dan Korea Selatan. Kami tidak menawarkannya di tempat lain. Jika Anda tinggal di luar negara-negara tersebut, Anda mungkin dapat mengakses situs, tetapi kami tidak mengarahkan layanan kepada Anda, tidak menerima pembayaran dari Anda, dan Ketentuan ini serta Kebijakan Privasi kami tidak disesuaikan dengan hukum negara Anda. Lampiran A menetapkan hal-hal yang berlaku di setiap wilayah yang kami layani." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Kami tidak menawarkan Dialectical Engine kepada orang yang tinggal di Tennessee." },
+      { kind: "p", text: "Mississippi. Kami tidak menawarkan Dialectical Engine kepada orang yang tinggal di Mississippi." },
       { kind: "p", text: "Pemberitahuan dan penurunan konten. Gambar intim tanpa persetujuan dapat dilaporkan melalui email ke abuse@dezbatere.ro, tanpa akun, dan dihapus dalam waktu 48 jam sejak permintaan yang sah. Pengaduan hak cipta diajukan melalui jalur pelaporan dalam bagian 10." },
       { kind: "p", text: "Khusus negara bagian. California: ketentuan perpanjangan otomatis dalam bagian 12 berlaku; Anda dapat membatalkan secara daring kapan saja; kami menyimpan persetujuan Anda terhadap ketentuan perpanjangan selama sekurang-kurangnya tiga tahun. New York: Anda dapat membatalkan dalam waktu 14 hari sejak setiap tagihan dengan harga yang dinaikkan dan menerima pengembalian dana prorata. Texas dan Nebraska: kami tidak menjual data pribadi sensitif. Washington: Pemberitahuan Privasi Data Kesehatan Konsumen kami di dezbatere.ro/privacy/us-health-data berlaku atas informasi terkait kesehatan. Colorado: tidak ada hal dalam layanan yang mengambil keputusan berkonsekuensi mengenai Anda. Kebijakan Privasi kami, Lampiran B.2, mencakup data Anda dan hak privasi negara bagian Anda." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "fd2640dc6c43821e067d1fa3f28d95092624c44dc29b27fd8592b1ab9f6d0160",
+  sha256: "2075e85b83ddd0f0f30258b5bce76f8e7fe20fbec08cd3573f7b6b5947b88fbb",
   eyebrow: "KETENTUAN LAYANAN · v2.18 · BERLAKU 1 NOVEMBER 2026",
   title: "Hal yang Anda setujui",
   lede: "Kontrak antara Anda dan DMS Merchandise Shop S.R.L., dalam bahasa yang mudah dipahami. Sembilan belas bagian dan Lampiran A — gulir hingga akhir.",

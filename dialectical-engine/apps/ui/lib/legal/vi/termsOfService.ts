@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Nơi chúng tôi cung cấp Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy và Iceland), Moldova, Hoa Kỳ (trừ Tennessee), Canada, Australia, New Zealand, Singapore, Nhật Bản và Hàn Quốc. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
+      { kind: "p", text: "Chúng tôi cung cấp Dialectical Engine cho những người sống tại Liên minh Châu Âu (27 quốc gia) và Khu vực Kinh tế Châu Âu (Na Uy và Iceland), Moldova, Hoa Kỳ (trừ Tennessee và Mississippi), Canada, Australia, New Zealand, Singapore, Nhật Bản và Hàn Quốc. Chúng tôi không cung cấp dịch vụ tại nơi khác. Nếu sống ngoài các quốc gia đó, bạn vẫn có thể truy cập trang web, nhưng chúng tôi không hướng dịch vụ đến bạn, không chấp nhận thanh toán từ bạn, và các Điều khoản này cùng Chính sách quyền riêng tư của chúng tôi không được điều chỉnh cho phù hợp với pháp luật quốc gia của bạn. Phụ lục A quy định những nội dung áp dụng tại từng khu vực chúng tôi phục vụ." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Chúng tôi không cung cấp Dialectical Engine cho những người sống tại Tennessee." },
+      { kind: "p", text: "Mississippi. Chúng tôi không cung cấp Dialectical Engine cho những người sống tại Mississippi." },
       { kind: "p", text: "Thông báo và gỡ bỏ. Hình ảnh riêng tư không có sự đồng thuận có thể được báo cáo qua email tới abuse@dezbatere.ro mà không cần tài khoản, và được gỡ bỏ trong vòng 48 giờ kể từ khi nhận yêu cầu hợp lệ. Khiếu nại về quyền tác giả được xử lý theo kênh báo cáo tại mục 10." },
       { kind: "p", text: "Quy định riêng theo tiểu bang. California: điều khoản tự động gia hạn tại mục 12 được áp dụng; bạn có thể hủy trực tuyến bất kỳ lúc nào; chúng tôi lưu giữ sự đồng ý của bạn với điều khoản gia hạn trong ít nhất ba năm. New York: bạn có thể hủy trong vòng 14 ngày kể từ bất kỳ khoản thu nào theo giá đã tăng và nhận khoản hoàn tiền theo tỷ lệ. Texas và Nebraska: chúng tôi không bán dữ liệu cá nhân nhạy cảm. Washington: Thông báo quyền riêng tư về dữ liệu sức khỏe người tiêu dùng của chúng tôi tại dezbatere.ro/privacy/us-health-data áp dụng cho thông tin liên quan đến sức khỏe. Colorado: không nội dung nào trong dịch vụ đưa ra quyết định có hậu quả đối với bạn. Phụ lục B.2 trong Chính sách quyền riêng tư của chúng tôi quy định về dữ liệu của bạn và các quyền riêng tư của bạn theo luật tiểu bang." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "bf510d9954833651fbd24e4b5e496a281c2ecd9c3251ca4d4a60173dedb0d681",
+  sha256: "aff0b737fe9e8edff8cd5da45bdb0fb346b30e8d6001d845835e75cf41746c20",
   eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v2.18 · CÓ HIỆU LỰC 1 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",

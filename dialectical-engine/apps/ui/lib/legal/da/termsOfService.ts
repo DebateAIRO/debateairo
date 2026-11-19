@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Hvor vi tilbyder Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Vi tilbyder Dialectical Engine til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge og Island), Moldova, USA (undtagen Tennessee), Canada, Australien, New Zealand, Singapore, Japan og Sydkorea. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
+      { kind: "p", text: "Vi tilbyder Dialectical Engine til personer, der bor i Den Europæiske Union (27 lande) og Det Europæiske Økonomiske Samarbejdsområde (Norge og Island), Moldova, USA (undtagen Tennessee og Mississippi), Canada, Australien, New Zealand, Singapore, Japan og Sydkorea. Vi tilbyder ikke tjenesten andre steder. Hvis du bor uden for disse lande, kan du muligvis få adgang til webstedet, men vi retter ikke tjenesten mod dig, vi modtager ikke betaling fra dig, og disse vilkår og vores privatlivspolitik er ikke tilpasset lovgivningen i dit land. Bilag A angiver, hvad der gælder i hver region, vi betjener." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. Vi tilbyder ikke Dialectical Engine til personer, der bor i Tennessee." },
+      { kind: "p", text: "Mississippi. Vi tilbyder ikke Dialectical Engine til personer, der bor i Mississippi." },
       { kind: "p", text: "Meddelelser og fjernelse. Intime billeder uden samtykke kan anmeldes pr. e-mail til abuse@dezbatere.ro uden en konto og fjernes inden for 48 timer efter en gyldig anmodning. Klager over ophavsret følger anmeldelsesvejen i afsnit 10." },
       { kind: "p", text: "Delstatsspecifikt. Californien: Vilkårene om automatisk fornyelse i afsnit 12 gælder; du kan til enhver tid opsige online; vi opbevarer dit samtykke til fornyelsesvilkårene i mindst tre år. New York: Du kan opsige inden for 14 dage efter enhver debitering til en forhøjet pris og modtage en forholdsmæssig tilbagebetaling. Texas og Nebraska: Vi sælger ikke følsomme personoplysninger. Washington: Vores meddelelse om beskyttelse af forbrugersundhedsdata på dezbatere.ro/privacy/us-health-data gælder for helbredsrelaterede oplysninger. Colorado: Intet i tjenesten træffer afgørelser om dig med væsentlige konsekvenser. Vores privatlivspolitik, bilag B.2, dækker dine data og dine rettigheder efter delstaternes privatlivslove." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "34d650e778f07dee8f86f50ab4f38ecae411d13cc9de89e3f24d068042470ded",
+  sha256: "70c5655a9c0115be883a3a0a07bc5bd791f3f844f52c294558e84f527681e2d6",
   eyebrow: "TJENESTEVILKÅR · v2.18 · GÆLDENDE FRA 1. NOVEMBER 2026",
   title: "Det, du accepterer",
   lede: "Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.",

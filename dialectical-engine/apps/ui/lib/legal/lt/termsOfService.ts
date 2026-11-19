@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Kur siūlome Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje ir Islandijoje), Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje ir Pietų Korėjoje. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
+      { kind: "p", text: "Dialectical Engine siūlome žmonėms, gyvenantiems Europos Sąjungoje (27 valstybės) ir Europos ekonominėje erdvėje (Norvegijoje ir Islandijoje), Moldovoje, Jungtinėse Amerikos Valstijose (išskyrus Tenesį ir Misisipę), Kanadoje, Australijoje, Naujojoje Zelandijoje, Singapūre, Japonijoje ir Pietų Korėjoje. Kitur jos nesiūlome. Jei gyvenate ne šiose šalyse, svetainė jums gali būti pasiekiama, tačiau paslaugos jums nesiūlome, nepriimame iš jūsų mokėjimų, o šios Sąlygos ir mūsų Privatumo politika nėra pritaikytos jūsų šalies teisei. A priede nustatyta, kas taikoma kiekviename mūsų aptarnaujamame regione." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tenesis. Dialectical Engine nesiūlome žmonėms, gyvenantiems Tenesyje." },
+      { kind: "p", text: "Misisipė. Dialectical Engine nesiūlome žmonėms, gyvenantiems Misisipėje." },
       { kind: "p", text: "Pranešimai ir turinio pašalinimas. Apie be sutikimo bendrinamus intymius atvaizdus galima pranešti el. paštu abuse@dezbatere.ro, neturint paskyros; gavus pagrįstą prašymą jie pašalinami per 48 valandas. Skundai dėl autorių teisių teikiami 10 skyriuje nustatyta pranešimų teikimo tvarka." },
       { kind: "p", text: "Konkrečios valstijos. Kalifornija: taikomos 12 skyriuje nustatytos automatinio atnaujinimo sąlygos; bet kada galite atšaukti internetu; jūsų sutikimą su atnaujinimo sąlygomis saugome bent trejus metus. Niujorkas: galite per 14 dienų nuo bet kokio nurašymo padidinta kaina atšaukti ir gauti proporcingą pinigų grąžinimą. Teksasas ir Nebraska: neparduodame neskelbtinų asmens duomenų. Vašingtonas: mūsų Vartotojų sveikatos duomenų privatumo pranešimas adresu dezbatere.ro/privacy/us-health-data taikomas su sveikata susijusiai informacijai. Koloradas: paslauga nepriima jums reikšmingų sprendimų. Jūsų duomenims ir jūsų valstijos privatumo teisėms taikomas mūsų Privatumo politikos B priedo B.2 skirsnis." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "e0ada2c59ea316fcc8af266cbc3dc57046e453a075d71fbdfa729c250cac5ce9",
+  sha256: "e779bb1b18c4cf06ac672bb310747c2af775799960bd8bddb513df34827f771e",
   eyebrow: "PASLAUGŲ TEIKIMO SĄLYGOS · v2.18 · ĮSIGALIOJA 2026 M. LAPKRIČIO 1 D.",
   title: "Su kuo sutinkate",
   lede: "Jūsų ir DMS Merchandise Shop S.R.L. sutartis, paaiškinta paprastai. Devyniolika skyrių ir A priedas — slinkite iki pabaigos.",

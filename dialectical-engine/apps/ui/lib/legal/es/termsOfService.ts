@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Dónde ofrecemos Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "Ofrecemos Dialectical Engine a las personas que viven en la Unión Europea (27 países) y el Espacio Económico Europeo (Noruega e Islandia), Moldavia, Estados Unidos (salvo Tennessee), Canadá, Australia, Nueva Zelanda, Singapur, Japón y Corea del Sur. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio." }
+      { kind: "p", text: "Ofrecemos Dialectical Engine a las personas que viven en la Unión Europea (27 países) y el Espacio Económico Europeo (Noruega e Islandia), Moldavia, Estados Unidos (salvo Tennessee y Misisipi), Canadá, Australia, Nueva Zelanda, Singapur, Japón y Corea del Sur. No lo ofrecemos en ningún otro lugar. Si vive fuera de esos países, es posible que pueda acceder al sitio, pero no dirigimos el servicio a usted, no aceptamos pagos suyos y estos Términos y nuestra Política de privacidad no están adaptados a la legislación de su país. El anexo A establece qué se aplica en cada región en la que prestamos servicio." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. No ofrecemos Dialectical Engine a las personas que viven en Tennessee." },
+      { kind: "p", text: "Misisipi. No ofrecemos Dialectical Engine a las personas que viven en Misisipi." },
       { kind: "p", text: "Notificaciones y retiradas. Las imágenes íntimas no consentidas pueden denunciarse por correo electrónico a abuse@dezbatere.ro, sin una cuenta, y se retirarán en un plazo de 48 horas desde una solicitud válida. Las reclamaciones por derechos de autor siguen la vía de denuncia de la sección 10." },
       { kind: "p", text: "Disposiciones específicas de cada estado. California: se aplican las condiciones de renovación automática de la sección 12; puede cancelar en línea en cualquier momento; conservamos su consentimiento a las condiciones de renovación durante al menos tres años. Nueva York: puede cancelar en un plazo de 14 días desde cualquier cargo a un precio incrementado y recibir un reembolso proporcional. Texas y Nebraska: no vendemos datos personales sensibles. Washington: nuestro Aviso de privacidad sobre datos de salud del consumidor, disponible en dezbatere.ro/privacy/us-health-data, se aplica a la información relacionada con la salud. Colorado: nada de lo incluido en el servicio toma decisiones con efectos significativos sobre usted. Nuestra Política de privacidad, anexo B.2, cubre sus datos y los derechos de privacidad que le reconoce su estado." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "4168e7ff1dad42708d7b35c7b6d7ae66c59c1a513905d143d2d159a9ce8ab59e",
+  sha256: "458f08f9f6c7eb81eec99bf9ff46a6faf07fa98b9d692bd9911e5a9a7a6886be",
   eyebrow: "TÉRMINOS DE SERVICIO · v2.18 · EN VIGOR DESDE 1 DE NOVIEMBRE DE 2026",
   title: "Lo que usted acepta",
   lede: "El contrato entre usted y DMS Merchandise Shop S.R.L., en lenguaje claro. Diecinueve secciones y el anexo A — desplácese hasta el final.",

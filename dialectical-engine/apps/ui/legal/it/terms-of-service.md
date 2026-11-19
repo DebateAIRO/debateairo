@@ -48,7 +48,7 @@ Questi dati sono inoltre sempre disponibili sul sito all'indirizzo dezbatere.ro/
 
 ## 2. Dove offriamo Dialectical Engine
 
-Offriamo Dialectical Engine alle persone che vivono nell'Unione europea (27 Paesi) e nello Spazio economico europeo (Norvegia e Islanda), in Moldova, negli Stati Uniti (eccetto il Tennessee), in Canada, in Australia, in Nuova Zelanda, a Singapore, in Giappone e in Corea del Sud. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio.
+Offriamo Dialectical Engine alle persone che vivono nell'Unione europea (27 Paesi) e nello Spazio economico europeo (Norvegia e Islanda), in Moldova, negli Stati Uniti (eccetto il Tennessee e il Mississippi), in Canada, in Australia, in Nuova Zelanda, a Singapore, in Giappone e in Corea del Sud. Non lo offriamo altrove. Se vivi al di fuori di tali Paesi potresti riuscire ad accedere al sito, ma il servizio non è rivolto a te, non accettiamo pagamenti da te e le presenti Condizioni e la nostra Informativa sulla privacy non sono adeguate alla legge del tuo Paese. L'Allegato A stabilisce ciò che si applica in ciascuna regione in cui prestiamo il servizio.
 
 ## 3. Accettazione delle presenti Condizioni
 
@@ -334,6 +334,8 @@ Il corpo delle presenti Condizioni è redatto per te. Inoltre, puoi avviare un p
 ### A.2 Stati Uniti
 
 **Tennessee.** Non offriamo Dialectical Engine alle persone che vivono nel Tennessee.
+
+**Mississippi.** Non offriamo Dialectical Engine alle persone che vivono nel Mississippi.
 
 **Avvisi e rimozioni.** Le immagini intime non consensuali possono essere segnalate per email all'indirizzo abuse@dezbatere.ro, senza un account, e vengono rimosse entro 48 ore da una richiesta valida. I reclami relativi al diritto d'autore seguono la procedura di segnalazione della sezione 10.
 

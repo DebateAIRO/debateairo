@@ -62,7 +62,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     title: "Where we offer Dialectical Engine",
     accent: "--reasoning",
     blocks: [
-      { kind: "p", text: "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway and Iceland), Moldova, the United States (except Tennessee), Canada, Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
+      { kind: "p", text: "We offer Dialectical Engine to people who live in the European Union (27 countries) and the European Economic Area (Norway and Iceland), Moldova, the United States (except Tennessee and Mississippi), Canada, Australia, New Zealand, Singapore, Japan and South Korea. We do not offer it elsewhere. If you live outside those countries you may be able to reach the site, but we do not direct the service to you, we do not accept payment from you, and these Terms and our Privacy Policy are not adapted to the law of your country. Annex A sets out what applies in each region we serve." }
     ]
   },
   {
@@ -331,6 +331,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     accent: "--ink",
     blocks: [
       { kind: "p", text: "Tennessee. We do not offer Dialectical Engine to people who live in Tennessee." },
+      { kind: "p", text: "Mississippi. We do not offer Dialectical Engine to people who live in Mississippi." },
       { kind: "p", text: "Notices and takedowns. Non-consensual intimate imagery may be reported by email to abuse@dezbatere.ro, without an account, and is removed within 48 hours of a valid request. Copyright complaints go through the reporting route in section 10." },
       { kind: "p", text: "State-specific. California: the automatic-renewal terms in section 12 apply; you may cancel online at any time; we retain your consent to renewal terms for at least three years. New York: you may cancel within 14 days of any charge at an increased price and receive a pro-rata refund. Texas and Nebraska: we do not sell sensitive personal data. Washington: our Consumer Health Data Privacy Notice at dezbatere.ro/privacy/us-health-data applies to health-related information. Colorado: nothing in the service makes consequential decisions about you. Our Privacy Policy, Annex B.2, covers your data and your state privacy rights." }
     ]
@@ -372,7 +373,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "2.18",
-  sha256: "e09b79578c03fddd4047a3699516c730f374efe8e2612b04f0d3bc7cdbc32a03",
+  sha256: "50d4ae0faa65916b34745e2b2eda6a3c28543127b23009c74ab4cd202b7c1b34",
   eyebrow: "TERMS OF SERVICE · v2.18 · EFFECTIVE 1 NOVEMBER 2026",
   title: "What you agree to",
   lede: "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.",

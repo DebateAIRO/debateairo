@@ -48,7 +48,7 @@ Dialectical Engine darbību nodrošina **DMS Merchandise Shop S.R.L.**, Rumānij
 
 ## 2. Kur mēs piedāvājam Dialectical Engine
 
-Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā un Islandē), Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā un Dienvidkorejā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu.
+Mēs piedāvājam Dialectical Engine personām, kuras dzīvo Eiropas Savienībā (27 valstis) un Eiropas Ekonomikas zonā (Norvēģijā un Islandē), Moldovā, Amerikas Savienotajās Valstīs (izņemot Tenesī un Misisipi), Kanādā, Austrālijā, Jaunzēlandē, Singapūrā, Japānā un Dienvidkorejā. Citviet mēs to nepiedāvājam. Ja dzīvojat ārpus šīm valstīm, iespējams, varat piekļūt vietnei, taču mēs nevēršam pakalpojumu uz jums, nepieņemam no jums maksājumus, un šie Noteikumi un mūsu Privātuma politika nav pielāgoti jūsu valsts tiesību aktiem. A pielikumā noteikts, kas attiecas uz katru mūsu apkalpoto reģionu.
 
 ## 3. Piekrišana šiem Noteikumiem
 
@@ -334,6 +334,8 @@ Katrs ieraksts ir piemērojams personām, kuras dzīvo attiecīgajā reģionā, 
 ### A.2 Amerikas Savienotās Valstis
 
 **Tenesī.** Mēs nepiedāvājam Dialectical Engine personām, kuras dzīvo Tenesī.
+
+**Misisipi.** Mēs nepiedāvājam Dialectical Engine personām, kuras dzīvo Misisipi.
 
 **Paziņojumi un noņemšana.** Par bez piekrišanas kopīgotiem intīmiem attēliem var ziņot, nosūtot e-pastu uz abuse@dezbatere.ro, bez konta, un pēc derīga pieprasījuma tie tiek noņemti 48 stundu laikā. Autortiesību sūdzības tiek iesniegtas, izmantojot 10. sadaļā noteikto ziņošanas kārtību.
 
