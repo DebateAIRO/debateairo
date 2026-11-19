@@ -412,6 +412,21 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(client.revokeSubscriptionCancel).not.toHaveBeenCalled();
   });
 
+  it("keeps the withdrawal link on a plan paused by a payment dispute, and gives the e-mail route in place of the confirmation", async () => {
+    // The right lasts the whole 14 days. The server records a withdrawal only for an ACTIVE plan, so the panel sends a
+    // paused buyer to the e-mail route, which counts from the moment the e-mail arrives.
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ status: "SUSPENDED", renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false })
+    });
+    await render();
+    await click("Withdraw from contract here");
+    expect(text()).toContain("A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. "
+      + "You can withdraw now by email: send the model form, or any clear statement that you withdraw, to support@dezbatere.ro. "
+      + "It counts from the moment it reaches us, and we confirm it by email.");
+    expect(button("Confirm withdrawal")).toBeUndefined();
+    expect(client.withdrawSubscription).not.toHaveBeenCalled();
+  });
+
   it("during an outage at renewal (ruling Q-1) promises no past date, and a downgrade or a cancel names today", async () => {
     // NOW is October 3; the period ended on October 2 and the renewal is being retried quietly (up to 72 h).
     client.getBillingSubscription.mockResolvedValue({
@@ -650,8 +665,6 @@ describe("P20 SubscriptionControls (S1)", () => {
     for (const [failure, sentence] of [
       // Everyone served has the 14 days (owner's decision of 16 November 2026): the sentence names no place where they do not apply.
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_WINDOW_CLOSED"), "The 14-day withdrawal period has ended. You can still cancel at any time."],
-      // NV-45: a debate may still be using credit and more than a day of the window is left; nothing was written.
-      [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_DEBATE_RUNNING"), "A debate you started may still be using credit, so we can't tell yet how much you used. Please try again later. You still have more than a day to withdraw."],
       [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."]
     ] as const) {
       act(() => root.unmount());

@@ -161,7 +161,7 @@
   "billing.subscription.withdrawNothingDue": "Fatto. Il tuo piano è terminato. La parte già utilizzata copre l’intero prezzo, quindi non ti spetta alcun rimborso.",
   "billing.subscription.withdrawOwnerReview": "Il tuo piano è terminato. Su uno dei tuoi pagamenti è già stato effettuato un rimborso, quindi verificheremo cosa resta dovuto e ti scriveremo via e-mail entro 14 giorni.",
   "billing.subscription.withdrawWindowClosed": "Il periodo di recesso di 14 giorni è scaduto. Puoi comunque disdire in qualsiasi momento.",
-  "billing.subscription.withdrawDebateRunning": "Un dibattito che hai avviato potrebbe ancora usare credito, quindi non possiamo ancora sapere quanto ne hai utilizzato. Riprova più tardi. Hai ancora più di un giorno per recedere.",
+  "billing.subscription.withdrawWhilePaused": "A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. You can withdraw now by email: send the model form, or any clear statement that you withdraw, to {email}. It counts from the moment it reaches us, and we confirm it by email.",
   "billing.subscription.stillConfirming": "Stiamo ancora verificando con il fornitore dei pagamenti. Ricontrolla questa pagina tra qualche minuto.",
   "billing.subscription.actionFailed": "Non ha funzionato. Riprova.",
   "billing.subscription.invoices": "Fatture",

@@ -161,7 +161,7 @@
   "billing.subscription.withdrawNothingDue": "Klart. Ditt abonnemang har upphört. Den del du redan har använt täcker hela priset, så du har inget att få tillbaka.",
   "billing.subscription.withdrawOwnerReview": "Ditt abonnemang har upphört. En återbetalning har redan gjorts på en av dina betalningar, så vi kontrollerar vad som återstår att betala tillbaka och mejlar dig inom 14 dagar.",
   "billing.subscription.withdrawWindowClosed": "Ångerfristen på 14 dagar har löpt ut. Du kan fortfarande säga upp när som helst.",
-  "billing.subscription.withdrawDebateRunning": "En debatt som du har startat kanske fortfarande använder kredit, så vi kan ännu inte se hur mycket du har använt. Försök igen senare. Du har fortfarande mer än en dag på dig att ångra köpet.",
+  "billing.subscription.withdrawWhilePaused": "A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. You can withdraw now by email: send the model form, or any clear statement that you withdraw, to {email}. It counts from the moment it reaches us, and we confirm it by email.",
   "billing.subscription.stillConfirming": "Vi bekräftar det här med betalningsleverantören. Titta på den här sidan igen om några minuter.",
   "billing.subscription.actionFailed": "Det fungerade inte. Försök igen.",
   "billing.subscription.invoices": "Fakturor",

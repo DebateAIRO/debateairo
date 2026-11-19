@@ -71,6 +71,21 @@ describe("P12b the subscription as the person sees it", () => {
     expect(open({ status: "PAST_DUE" }, "RO", NOW)).toBeNull();
   });
 
+  it("keeps the window of a plan paused by a payment dispute, so Settings still shows the withdrawal and its e-mail route", () => {
+    // The right lasts the whole 14 days, a dispute or not. Recording stays ACTIVE-only (`recordWithdrawal`), so only
+    // the view opens; the page tells a paused buyer to withdraw by e-mail.
+    expect(view({ status: "SUSPENDED" })).toMatchObject({
+      status: "SUSPENDED", withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15"
+    });
+    expect(withdrawalOpenUntil({
+      state: state({ status: "SUSPENDED" }), taxCountry: "RO", policy: testBillingPolicy,
+      now: new Date("2026-10-15T21:00:00.000Z"), paymentEnvironment: "sandbox"
+    })).toBeNull();
+    for (const status of ["PAST_DUE", "ENDED", "WITHDRAWN"] as const) {
+      expect(view({ status }), status).toMatchObject({ withdrawal_open_until: null, withdrawal_last_day: null });
+    }
+  });
+
   it("opens the 14 days for every country the site serves, the United States and Japan among them (owner's decision of 16 November 2026)", () => {
     const input = (taxCountry: string, now: Date) => ({
       state: state(), taxCountry, policy: testBillingPolicy, now, paymentEnvironment: "sandbox" as const

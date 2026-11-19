@@ -161,7 +161,7 @@
   "billing.subscription.withdrawNothingDue": "Klaar. Uw abonnement is beëindigd. Het deel dat u al hebt gebruikt, dekt de volledige prijs, dus u hebt niets terug te krijgen.",
   "billing.subscription.withdrawOwnerReview": "Uw abonnement is beëindigd. Op een van uw betalingen is al een terugbetaling gedaan, dus we controleren wat er nog verschuldigd is en e-mailen u binnen 14 dagen.",
   "billing.subscription.withdrawWindowClosed": "De herroepingstermijn van 14 dagen is verstreken. U kunt nog steeds op elk moment opzeggen.",
-  "billing.subscription.withdrawDebateRunning": "Een debat dat u bent begonnen, gebruikt mogelijk nog tegoed, dus we kunnen nog niet zien hoeveel u hebt gebruikt. Probeer het later opnieuw. U hebt nog meer dan een dag om te herroepen.",
+  "billing.subscription.withdrawWhilePaused": "A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. You can withdraw now by email: send the model form, or any clear statement that you withdraw, to {email}. It counts from the moment it reaches us, and we confirm it by email.",
   "billing.subscription.stillConfirming": "We bevestigen dit nog bij de betaalprovider. Bekijk deze pagina over een paar minuten opnieuw.",
   "billing.subscription.actionFailed": "Dat is niet gelukt. Probeer het opnieuw.",
   "billing.subscription.invoices": "Facturen",

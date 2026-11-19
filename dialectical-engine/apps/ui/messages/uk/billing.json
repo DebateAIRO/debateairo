@@ -161,7 +161,7 @@
   "billing.subscription.withdrawNothingDue": "Готово. Ваш план завершено. Уже використана частина покриває всю ціну, тому повертати нічого.",
   "billing.subscription.withdrawOwnerReview": "Ваш план завершено. За одним із ваших платежів уже було здійснено повернення, тому ми перевіримо, що ще належить, і напишемо вам протягом 14 днів.",
   "billing.subscription.withdrawWindowClosed": "14-денний строк відмови минув. Скасувати підписку можна будь-коли.",
-  "billing.subscription.withdrawDebateRunning": "Дебати, які ви розпочали, можливо, ще використовують кредит, тому ми поки не можемо сказати, скільки ви використали. Спробуйте ще раз пізніше. У вас ще є більше доби, щоб відмовитися від договору.",
+  "billing.subscription.withdrawWhilePaused": "A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. You can withdraw now by email: send the model form, or any clear statement that you withdraw, to {email}. It counts from the moment it reaches us, and we confirm it by email.",
   "billing.subscription.stillConfirming": "Ми ще підтверджуємо це в платіжного провайдера. Перегляньте цю сторінку знову за кілька хвилин.",
   "billing.subscription.actionFailed": "Не вийшло. Спробуйте ще раз.",
   "billing.subscription.invoices": "Рахунки",

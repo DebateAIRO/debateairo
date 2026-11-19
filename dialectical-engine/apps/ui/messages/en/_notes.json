@@ -23,6 +23,7 @@
   "billing.checkout.doNotPayAgain": "Shown after the waiting screen gives up: the payment may still be in progress, so the person must not pay twice.",
   "billing.subscription.withdrawHint": "{date} is the LAST day the person may still withdraw (that day included), in their own calendar. The refund is measured by the plan's credit used, never by days.",
   "billing.subscription.withdrawWindowClosed": "Keep '14-day': it is the withdrawal period. Everyone has it, wherever they live: name no country or region.",
+  "billing.subscription.withdrawWhilePaused": "Shown in Settings when a card dispute has paused the plan inside the 14 days. {email} is the company's contact address. Say plainly that the withdrawal by email counts from the moment the email arrives; keep 'model form': it is the model withdrawal form.",
   "billing.subscription.stepUpExpired": "The password and code were right; only the confirmation expired or was already used. Do not ask the person to check their password.",
   "billing.subscription.upgradeInProgress": "An earlier upgrade payment is still waiting for the bank or the payment provider; nothing new was charged.",
   "billing.checkout.erasurePending": "The person asked to delete their account (a 7-day wait). They can cancel that deletion in Settings.",

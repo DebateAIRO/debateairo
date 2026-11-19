@@ -4300,11 +4300,18 @@ values at the prompt:
 read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
 ```
 
-If it prints `WITHDRAWAL_DEBATE_RUNNING`, nothing was written: the statement arrived less than an hour ago, more than
-a day of the 14 is left, and a debate the person started before it may still be using credit. Run the same command
-again later with the same arrival time. Once the arrival is an hour old, or inside the last day of the 14, the command
-records it at once. A debate whose runner has stopped does not hold it up for long: its claim lapses, and a debate
-counts as possibly writing its story only for an hour after its last charge.
+The command records the withdrawal at once, also while a debate the person started is still running, and so does
+Settings: the credit used is what had been charged for the calls sent before the statement, and anything the debate
+sends after it is not the person's to pay.
+
+**If the plan is paused by a card dispute.** While a plan is paused (`SUSPENDED`), Settings still shows "Withdraw from
+contract here" for the whole 14 days, but its panel tells the person to withdraw by email, because neither Settings
+nor the command records a withdrawal for a paused plan (the command prints `NOT_SUBSCRIBED` and writes nothing). When
+such a statement arrives, reply to the person at once that you have received it, with the date and time it arrived,
+and keep that arrival time. Once the dispute is decided: if it is won, the plan is active again; run the command with
+`--received` set to that arrival time, and it settles the withdrawal as usual (a statement sent in time counts however
+late you run it). If it is lost, the plan has ended and the bank has given the disputed payment back; settle anything
+still due by hand, as described below for a deleted account.
 
 **If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
 live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so

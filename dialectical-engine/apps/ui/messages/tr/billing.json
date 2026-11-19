@@ -161,7 +161,7 @@
   "billing.subscription.withdrawNothingDue": "Tamam. Planınız sona erdi. Önceden kullandığınız kısım fiyatın tamamını karşılıyor, bu nedenle geri ödenecek bir tutar yok.",
   "billing.subscription.withdrawOwnerReview": "Planınız sona erdi. Ödemelerinizden birine zaten iade yapılmış, bu yüzden hâlâ ne borçlu olduğumuzu kontrol edip 14 gün içinde size e-posta göndereceğiz.",
   "billing.subscription.withdrawWindowClosed": "14 günlük cayma süresi doldu. Yine de istediğiniz zaman iptal edebilirsiniz.",
-  "billing.subscription.withdrawDebateRunning": "Başlattığınız bir tartışma hâlâ kredi kullanıyor olabilir, bu yüzden ne kadar kullandığınızı henüz bilemiyoruz. Lütfen daha sonra tekrar deneyin. Cayma hakkınızı kullanmak için hâlâ bir günden fazla süreniz var.",
+  "billing.subscription.withdrawWhilePaused": "A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. You can withdraw now by email: send the model form, or any clear statement that you withdraw, to {email}. It counts from the moment it reaches us, and we confirm it by email.",
   "billing.subscription.stillConfirming": "Bunu hâlâ ödeme sağlayıcısıyla doğruluyoruz. Birkaç dakika sonra bu sayfaya yeniden bakın.",
   "billing.subscription.actionFailed": "Bu işe yaramadı. Lütfen yeniden deneyin.",
   "billing.subscription.invoices": "Faturalar",

@@ -135,7 +135,7 @@ const REQUIRED = [
   "billing.subscription.stepUpExpired",
   "billing.subscription.withdrawConfirm", "billing.subscription.withdrawDone",
   "billing.subscription.withdrawNothingDue", "billing.subscription.withdrawOwnerReview",
-  "billing.subscription.withdrawWindowClosed", "billing.subscription.stillConfirming",
+  "billing.subscription.withdrawWindowClosed", "billing.subscription.withdrawWhilePaused", "billing.subscription.stillConfirming",
   "billing.subscription.actionFailed", "billing.subscription.invoices", "billing.subscription.noInvoices",
   "billing.subscription.invoiceRow", "billing.subscription.creditNote", "billing.subscription.openInvoice",
   "billing.card.title", "billing.card.intro", "billing.card.noHoldNote", "billing.card.save",

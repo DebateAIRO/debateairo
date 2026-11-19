@@ -6,6 +6,7 @@ import { contractClient } from "@/lib/api";
 import { formatLongDate, formatMoney, planName } from "@/lib/billing/format";
 import type { PaidPlanId } from "@/lib/billing/plans";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
+import { COMPANY } from "@/lib/legal/pages";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 import { ChargeStatusPoller } from "./ChargeStatusPoller";
@@ -137,8 +138,6 @@ function withdrawDoneText(catalog: MessageCatalog, locale: LocaleCode, refund: s
 function withdrawFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
   if (code === "WITHDRAWAL_WINDOW_CLOSED") return Object.freeze({ key: "billing.subscription.withdrawWindowClosed", reload: true });
-  // NV-45 (409): a debate may still be using credit and more than a day of the window is left; nothing was written.
-  if (code === "WITHDRAWAL_DEBATE_RUNNING") return Object.freeze({ key: "billing.subscription.withdrawDebateRunning", reload: false });
   // A timeout after P12d queued the refund: the refund may be under way, so say so and read the state again.
   if (outcomeUnknown(failure)) return STILL_CONFIRMING;
   // Any other answer (NOT_SUBSCRIBED: withdrawn or ended meanwhile): read the state again, blame nobody.
@@ -243,9 +242,12 @@ export function SubscriptionControls({
   if (loaded !== "READY") return null;
   const live = subscription !== null && LIVE_STATUSES.has(subscription.status) ? subscription : null;
   const date = (iso: string | null): string => (iso === null ? "" : formatLongDate(locale, iso));
-  // The button follows the closing instant; the sentence names the last day in the person's calendar (P12b).
-  const withdrawOpen = live !== null && live.status === "ACTIVE" && live.withdrawal_open_until !== null
-    && live.withdrawal_last_day !== null && new Date(live.withdrawal_open_until).getTime() > now().getTime();
+  // The button follows the closing instant; the sentence names the last day in the person's calendar. A plan paused by
+  // a payment dispute keeps the link for the whole window: its panel gives the e-mail route, because the server
+  // records a withdrawal only for an ACTIVE plan.
+  const withdrawOpen = live !== null && (live.status === "ACTIVE" || live.status === "SUSPENDED")
+    && live.withdrawal_open_until !== null && live.withdrawal_last_day !== null
+    && new Date(live.withdrawal_open_until).getTime() > now().getTime();
   const currentRank = live === null ? -1 : rankOf(live.plan_id);
   const nextRenewal = live === null ? null : live.renews_on ?? live.current_period_end;
   const nowMs = now().getTime();
@@ -262,9 +264,9 @@ export function SubscriptionControls({
   const nextRenewalText = nextRenewal === null ? "" : Date.parse(nextRenewal) <= nowMs ? today : date(nextRenewal);
 
   /**
-   * OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a, recital 37; owner ruling 2026-11-04): the button opens the
-   * statement and "Confirmați retragerea" sends it. A signed-in person, social sign-in included, is not asked to
-   * identify again: no password and no authenticator code.
+   * OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a, recital 37): the button opens the statement and "Confirmați
+   * retragerea" sends it. A signed-in person, social sign-in included, is not asked to identify again: no password and
+   * no authenticator code.
    */
   function withdraw(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -483,8 +485,8 @@ export function SubscriptionControls({
               </div>
             </div>
           ) : null}
-          {/* Design Document v2 (19c): the withdrawal is its own block above a rule: the link, then until when and what
-              comes back. The confirmation opens under them. */}
+          {/* The withdrawal is its own block above a rule: the link, then until when and what comes back. The
+              confirmation opens under them; for a plan paused by a dispute, the e-mail route opens there instead. */}
           {withdrawOpen || panel === "WITHDRAW" ? (
             <div className="subBlock" data-subscription-withdraw>
               {withdrawOpen ? (
@@ -493,7 +495,12 @@ export function SubscriptionControls({
                 </button>
               ) : null}
               <p className="subHint">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
-              {panel === "WITHDRAW" ? (
+              {panel === "WITHDRAW" && paused ? (
+                <p className="setCardNote" data-withdraw-while-paused>
+                  {t(catalog, "billing.subscription.withdrawWhilePaused", { email: COMPANY.emails.general })}
+                </p>
+              ) : null}
+              {panel === "WITHDRAW" && !paused ? (
                 <form onSubmit={withdraw}>
                   <div className="setCardRow">
                     <button type="submit" className="setBtn" disabled={busy}>{t(catalog, "billing.subscription.withdrawConfirm")}</button>
