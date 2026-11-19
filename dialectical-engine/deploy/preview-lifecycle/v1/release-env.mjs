@@ -7,7 +7,7 @@
 // same spending gates, scope, team, who may start debates (PREVIEW_ASKS_OPEN_TO) and secrets. The SAME check reads
 // the files back and says, check by check, that two releases share what they must share and never share what they
 // must not, and that each release's website's payment marks list, when it has one, is a list of netopia, visa and
-// mastercard.
+// mastercard, and its NETOPIA logo id, when it has one, is 1 to 12 digits.
 //
 //   release-env.mjs derive --service api|ui|runner --from <file> --label <label> --slot A|B --release-key <key>
 //       <file>: /etc/debateai-v3-preview/auth-dev-v1/<service>.env or <service>-<older label>.env (root-owned, 0640).
@@ -26,7 +26,7 @@
 import { lstat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { PREVIEW_NETOPIA_LIVE_BASE, PREVIEW_NETOPIA_SANDBOX_BASES, RELEASE_KEY_PATTERN, isPaymentMarksList, parseEnvironmentText, readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
+import { PREVIEW_NETOPIA_LIVE_BASE, PREVIEW_NETOPIA_SANDBOX_BASES, RELEASE_KEY_PATTERN, isNetopiaLogoId, isPaymentMarksList, parseEnvironmentText, readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
 import { PREVIEW_SLOTS } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { LAYOUT, RELEASE_LABEL, atomicWrite, canonicalJson, envPathFor, logLine } from './common.mjs';
 
@@ -148,9 +148,10 @@ function paymentSystemChecks(releases) {
 /**
  * Side-by-side spec §10, the SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
  * preview configuration, the team, the deployment mode, the site version and the release key; its website names the
- * API's release key; its ports and API address are its slot's; and its payment marks list, when it has one, is a list
- * of netopia, visa and mastercard (environment.mjs isPaymentMarksList; never compared across releases, since a release
- * may change it on purpose). Across releases (two only): every API and runner file names the same spending gates and
+ * API's release key; its ports and API address are its slot's; its payment marks list, when it has one, is a list
+ * of netopia, visa and mastercard (environment.mjs isPaymentMarksList); and its NETOPIA logo id, when it has one, is 1 to
+ * 12 digits (isNetopiaLogoId). Neither is compared across releases, since a release may change them on purpose.
+ * Across releases (two only): every API and runner file names the same spending gates and
  * scope, deployment mode, workflow and team, and every API file that names a restore fence names the same one
  * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Last, who may
  * start debates (asksOpenChecks). Returns every check, OK or not, in a fixed order.
@@ -168,7 +169,8 @@ export function sameChecks(releases) {
     const { uiPort, apiPort } = PREVIEW_SLOTS[slot];
     out.push(result(`SLOT_API_PORT:${label}`, api.API_PORT === apiPort), result(`SLOT_PORT:${label}`, ui.PORT === uiPort),
       result(`SLOT_DIALECTICAL_API_BASE:${label}`, ui.DIALECTICAL_API_BASE === `http://127.0.0.1:${apiPort}`),
-      result(`UI_PAYMENT_MARKS_AVAILABLE:${label}`, ui.PAYMENT_MARKS_AVAILABLE === undefined || isPaymentMarksList(ui.PAYMENT_MARKS_AVAILABLE)));
+      result(`UI_PAYMENT_MARKS_AVAILABLE:${label}`, ui.PAYMENT_MARKS_AVAILABLE === undefined || isPaymentMarksList(ui.PAYMENT_MARKS_AVAILABLE)),
+      result(`UI_NETOPIA_LOGO_ID:${label}`, ui.NETOPIA_LOGO_ID === undefined || isNetopiaLogoId(ui.NETOPIA_LOGO_ID)));
   }
 
   // The public name (PUBLIC_APP_URL): a release's website and API answer as the same one, and two live releases too,
