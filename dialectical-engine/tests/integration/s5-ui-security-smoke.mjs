@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer as createHttpServer } from "node:http";
+import { createServer as createHttpServer, request as httpRequest } from "node:http";
 import { connect, createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -67,7 +67,10 @@ async function availablePort() {
  */
 async function startStubApi() {
   const seen = [];
+  // Kept apart from `seen`, whose rows the address and proof checks compare whole.
+  const cookies = [];
   const server = createHttpServer((request, response) => {
+    cookies.push(request.headers.cookie ?? null);
     seen.push({
       forwardedFor: request.headers["x-forwarded-for"] ?? null,
       edgeSecret: request.headers["x-debateai-edge-secret"] ?? null,
@@ -90,6 +93,7 @@ async function startStubApi() {
   return {
     base: `http://127.0.0.1:${address.port}`,
     last: () => seen[seen.length - 1] ?? null,
+    lastCookie: () => cookies[cookies.length - 1] ?? null,
     stop: () => new Promise((resolveClosed) => {
       server.closeAllConnections();
       server.close(() => resolveClosed());
@@ -138,6 +142,123 @@ function assertHydrationHtml(html, nonce, surface, path) {
   }
   const themeBootstrap = openingTags.find((tag) => html.slice(html.indexOf(tag)).includes("debateai.mode"));
   assert(themeBootstrap !== undefined && themeBootstrap.includes(`nonce="${nonce}"`), `${surface} ${path}: the app-owned theme bootstrap is nonced`);
+}
+
+/**
+ * A GET that sends exactly `headers` (and Host): fetch() adds an `accept-language: *` of its own, so it cannot stand in
+ * for a crawler that sends no Accept-Language at all.
+ */
+function getExactly(url, headers) {
+  return new Promise((resolveResponse, reject) => {
+    const request = httpRequest(url, { headers }, (response) => {
+      const chunks = [];
+      response.on("data", (chunk) => chunks.push(chunk));
+      response.on("error", reject);
+      response.on("end", () => resolveResponse({
+        status: response.statusCode,
+        header: (name) => {
+          const value = response.headers[name];
+          return Array.isArray(value) ? value.join(", ") : value ?? null;
+        },
+        body: Buffer.concat(chunks).toString("utf8")
+      }));
+    });
+    request.on("error", reject);
+    request.end();
+  });
+}
+
+/** The language the root layout drew the page in, from its `<html lang>`. */
+function documentLanguage(html) {
+  return /<html\b[^>]*\blang="([^"]*)"/u.exec(html)?.[1] ?? null;
+}
+
+/**
+ * A visitor who has not picked a language sees Romanian when the browser prefers Romanian, English otherwise, and the
+ * cookie the language list writes always wins. The middleware hands the pages that language as a cookie on this request
+ * only; the unit tests see the header it returns, and only a built server proves Next's cookies() reads it. Every answer
+ * says it varies with Accept-Language and is never stored, so no page is kept in one language for everyone.
+ */
+async function assertFirstVisitLanguage(base, surface) {
+  const ENGLISH_TERMS = "Who we are and how to reach us";
+  const ROMANIAN_TERMS = "Cine suntem";
+  const cases = [
+    ["/terms", "a crawler that sends no Accept-Language", {}, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a Romanian browser", { "accept-language": "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
+    ["/terms", "a Moldovan browser", { "accept-language": "ro-MD" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
+    ["/terms", "an English browser that also reads Romanian", { "accept-language": "en-US,en;q=0.9,ro;q=0.8" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a German browser", { "accept-language": "de-DE,de;q=0.9" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a Romanian browser whose visitor picked English", { "accept-language": "ro", cookie: "debateai.locale=en-GB" }, 200, "en-GB", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "an English browser whose visitor picked Romanian", { "accept-language": "en-US,en", cookie: "debateai.locale=ro" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
+    ["/terms", "a Romanian browser with an older cookie for a language no longer offered", { "accept-language": "ro", cookie: "debateai.locale=de" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
+    // Two copies of the locale cookie (one set for a parent domain, say): one offered copy is a choice, so the browser's
+    // language is not added, and the pages read the last copy as they always have.
+    ["/terms", "a Romanian browser with English, then an older language", { "accept-language": "ro", cookie: "debateai.locale=en; debateai.locale=de" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a Romanian browser with an older language, then English", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=en" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/terms", "a Romanian browser with two older languages", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=fr" }, 200, "ro", ROMANIAN_TERMS, "<title>Termenii serviciului"],
+    // An explicit ?lang= still picks the legal text; the page around it follows the browser, as with a cookie.
+    ["/terms?lang=en", "a Romanian browser asking for the English text", { "accept-language": "ro" }, 200, "ro", ENGLISH_TERMS, "<title>Termenii serviciului"],
+    ["/terms", "a malformed header", { "accept-language": "ro;q=2, ;;; ,=,ro-;q=0.5,*;q=x" }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    // Only the first kilobyte is read: Romanian named past it does not count.
+    ["/terms", "an oversized header", { "accept-language": `${"de,".repeat(2_000)}ro` }, 200, "en", ENGLISH_TERMS, "<title>Terms of service"],
+    ["/", "a Romanian browser on the home page", { "accept-language": "ro" }, 200, "ro", null, null],
+    ["/", "a crawler on the home page", {}, 200, "en", null, null],
+    ["/s5-first-visit-missing-route", "a Romanian browser on a missing page", { "accept-language": "ro" }, 404, "ro", null, null],
+    // A link followed inside the site fetches the next page's navigation data, not a document.
+    ["/terms", "a Romanian browser's navigation data", { "accept-language": "ro", rsc: "1" }, 200, null, ROMANIAN_TERMS, null],
+    // The report download reads the cookie header itself, not through Next's cookie store; it is not a rendered page.
+    ["/debate/s5-first-visit/report", "a Romanian browser asking for a report while signed out", { "accept-language": "ro" }, 401, null, "Autentificați-vă pentru a descărca acest raport.", null],
+    ["/debate/s5-first-visit/report", "a crawler asking for a report", {}, 401, null, "Sign in to download this report.", null],
+    ["/debate/s5-first-visit/report", "a Romanian browser whose visitor picked English, asking for a report", { "accept-language": "ro", cookie: "debateai.locale=en-GB" }, 401, null, "Sign in to download this report.", null]
+  ];
+  for (const [path, label, headers, status, language, text, title] of cases) {
+    const answer = await getExactly(`${base}${path}`, headers);
+    assert.equal(answer.status, status, `${surface} ${path}, ${label}: status`);
+    assert.equal(documentLanguage(answer.body), language, `${surface} ${path}, ${label}: <html lang>`);
+    if (text !== null) assert(answer.body.includes(text), `${surface} ${path}, ${label}: the text is in the expected language`);
+    if (title !== null) assert(answer.body.includes(title), `${surface} ${path}, ${label}: the tab title is in the page's language`);
+    assert.match(answer.header("vary") ?? "", /(?:^|,\s*)Accept-Language(?:,|$)/iu, `${surface} ${path}, ${label}: Vary names Accept-Language`);
+    assert.match(answer.header("cache-control") ?? "", /(?:^|,\s*)no-store(?:,|$)/u, `${surface} ${path}, ${label}: no-store`);
+    assert.doesNotMatch(answer.header("set-cookie") ?? "", /debateai\.locale=/u, `${surface} ${path}, ${label}: the language is never stored`);
+  }
+  // A /_next/static chunk never reaches the middleware and is the same in every language, so it keeps one cache entry
+  // for everyone.
+  const page = await getExactly(`${base}/terms`, { "accept-language": "ro" });
+  const chunk = /<script\b[^>]*\bsrc="(\/_next\/static\/[^"]+\.js)"/u.exec(page.body)?.[1];
+  assert(chunk !== undefined, `${surface} /terms: names a static script`);
+  const asset = await getExactly(`${base}${chunk}`, { "accept-language": "ro" });
+  assert.equal(asset.status, 200, `${surface} ${chunk}: served`);
+  assert.doesNotMatch(asset.header("vary") ?? "", /accept-language/iu, `${surface} ${chunk}: a static file does not vary with the language`);
+  // A file from public/ does go through the middleware, so it carries the same Vary as a page; like a page it is never
+  // stored, so no cache keeps a copy of it per language either.
+  const publicFile = await getExactly(`${base}/consumer-protection/anpc-sal.png`, { "accept-language": "ro" });
+  assert.equal(publicFile.status, 200, `${surface} /consumer-protection/anpc-sal.png: served`);
+  assert.match(publicFile.header("cache-control") ?? "", /(?:^|,\s*)no-store(?:,|$)/u, `${surface} /consumer-protection/anpc-sal.png: no-store`);
+}
+
+/**
+ * The /api proxy follows the same rule, so a mail a page sends (the cancel link's, for one) is in the language the
+ * visitor saw: the API takes the mail's language from the locale cookie, and the proxy forwards the browser's Romanian
+ * as that cookie when the visitor has picked none.
+ */
+async function assertProxyFollowsFirstVisitLanguage(base, stubApi, surface) {
+  for (const [label, headers, forwarded] of [
+    ["a Romanian browser", { "accept-language": "ro-RO,ro;q=0.9" }, "debateai.locale=ro"],
+    ["an English browser that also reads Romanian", { "accept-language": "en-US,en;q=0.9,ro;q=0.8" }, null],
+    ["a crawler that sends no Accept-Language", {}, null],
+    ["a Romanian browser whose visitor picked English", { "accept-language": "ro", cookie: "debateai.locale=en-GB" }, "debateai.locale=en-GB"],
+    ["an English browser whose visitor picked Romanian", { "accept-language": "en", cookie: "debateai.locale=ro" }, "debateai.locale=ro"],
+    // The same two-copy cases as the pages above: the mails stay English where the pages do.
+    ["a Romanian browser with English, then an older language", { "accept-language": "ro", cookie: "debateai.locale=en; debateai.locale=de" }, "debateai.locale=en"],
+    ["a Romanian browser with an older language, then English", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=en" }, null],
+    ["a Romanian browser with two older languages", { "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=fr" }, "debateai.locale=ro"]
+  ]) {
+    const answer = await getExactly(`${base}/api/v1/session`, headers);
+    assert.equal(answer.status, 401, `${surface} /api, ${label}: proxied`);
+    assert.equal(stubApi.lastCookie(), forwarded, `${surface} /api, ${label}: the locale cookie the API receives`);
+    // Only the mails the API sends follow the language; its answers do not, so they do not vary with it.
+    assert.doesNotMatch(answer.header("vary") ?? "", /accept-language/iu, `${surface} /api, ${label}: no Vary on the language`);
+  }
 }
 
 async function waitForServer(child, url, log) {
@@ -287,6 +408,8 @@ async function smoke(surface) {
     const notFoundNonce = assertDocumentPolicy(notFound, surface, "/404");
     assertHydrationHtml(await notFound.text(), notFoundNonce, surface, "/404");
 
+    await assertFirstVisitLanguage(base, surface);
+
     // L3-F3 C-2: a path the middleware matcher excludes still carries the
     // edge's fail-closed fallback policy.
     const excluded = await fetch(`${base}/_next/static/s5-missing-chunk.js`);
@@ -323,6 +446,8 @@ async function smoke(surface) {
       assert.deepEqual(stubApi.last(), { forwardedFor: expected, edgeSecret: null, uiApiProof }, `${surface}: ${label}`);
     }
 
+    await assertProxyFollowsFirstVisitLanguage(base, stubApi, surface);
+
     await assertRefusesToStart(root, { DIALECTICAL_UI_TRUSTED_PROXIES: "10.0.0.0/8" }, "DIALECTICAL_UI_TRUSTED_PROXIES_INVALID");
     await assertRefusesToStart(root, { DIALECTICAL_UI_EDGE_SECRET_PATH: worldReadablePath }, "DIALECTICAL_UI_EDGE_SECRET_INVALID");
     // Side-by-side C12: no key, or a key the build was not stamped for, refuses to start.
@@ -357,7 +482,7 @@ async function smoke(surface) {
     // Side-by-side C12 (spec §6): a planned stop is never a failure.
     assert.equal(await stopServer(child), 0, `${surface}: SIGTERM closes the server and exits 0`);
 
-    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, no image optimizer, trusted-proxy client ip, upgrade teardown, release key + /readyz + clean SIGTERM PASS\n`);
+    process.stdout.write(`${surface}: live 200 + 404 nonce CSP, fallback CSP, static API CSP, first-visit language on pages and /api, no image optimizer, trusted-proxy client ip, upgrade teardown, release key + /readyz + clean SIGTERM PASS\n`);
   } finally {
     await stopServer(child);
     await stubApi.stop();
