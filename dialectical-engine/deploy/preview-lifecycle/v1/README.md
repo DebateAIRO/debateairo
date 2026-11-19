@@ -19,6 +19,7 @@ launchers still re-check every byte exactly as before.
 | `alert.mjs` | That email: "Preview: <unit> gave up after N restarts", the time in UTC and Bucharest, the last 20 log lines with secrets blanked. A crash that systemd is still fixing by itself sends nothing. At most one per service per 30 minutes. |
 | `backup.mjs` | A checked copy of the preview database every night at 03:15 Bucharest time; the 7 newest are kept. A local safety net, not an off-site backup. |
 | `unlock-team-tools.mjs` | `systemctl start debateai-preview-team-unlock` turns team (staff) tools on for one hour, then they lock again by themselves. It writes as a database login that has no password, reached only from one dedicated no-login OS user (the auth DB batch step; step 7). |
+| `rekey-staff-key.mjs` | Run by hand, as root, when a staff member has no staff key that works under the name the site answers as (after a rename). `rekey-staff-key.mjs arm-owner <sign-in code>` (or `arm-user <account id> <sign-in code>`) writes one permit that lasts at most 15 minutes, is bound to the sign-in the operator names by its code, and lets that person enrol one key on the Team page with password and authenticator code. It opens the staff recovery login for the one call and resets it; the name comes from the API file. `deploy/preview-auth-dev/v1/MAIN-SITE.md` (5.7) has the steps. |
 
 ## Decisions you should know about
 
@@ -185,6 +186,7 @@ launchers still re-check every byte exactly as before.
 ```text
 prestart.mjs  common.mjs  alert.mjs  backup.mjs  release-guard.mjs  release-table.mjs
 unlock-team-tools.mjs  jit-creator-actor.mjs  self-capture-actor.mjs  readiness-writer-actor.mjs
+rekey-staff-key.mjs
 release-switch.mjs  release-check.mjs  release-retire.mjs  release-env.mjs  release-archive.mjs
 unit-templates.mjs  migration-steps.mjs  settings-version.mjs
 systemd/debateai-preview.target

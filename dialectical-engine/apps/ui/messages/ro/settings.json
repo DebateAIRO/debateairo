@@ -83,6 +83,7 @@
   "settings.sessions.current": "Sesiunea actuală",
   "settings.sessions.other": "Altă sesiune",
   "settings.sessions.lastSeen": "Ultima activitate: {date}",
+  "settings.sessions.signInCode": "Codul acestei sesiuni: {code}. Deosebește această sesiune de celelalte ale dumneavoastră; nu este o parolă.",
   "settings.sessions.revokeLabel": "Revocați sesiunea {sessionId}",
   "settings.sessions.revoke": "Revocați",
   "settings.sessions.revokeAll": "Revocați toate sesiunile",
