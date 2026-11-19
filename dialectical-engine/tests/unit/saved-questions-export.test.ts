@@ -1,6 +1,6 @@
 /**
  * V4 start step, Task 39e (saved questions spec 2026-11-04 §3.9; owner answer S4 A): THE QUESTIONS NOT STARTED YET IN THE DATA EXPORT.
- * account.json gains `questions_not_started` (never `kept_questions`, the removed threat reports' name): per question, the question
+ * account.json gains `questions_not_started` (never `kept_questions`, which the threat reports already use): per question, the question
  * as it reads, the line the AIs read, the answers, the paths and the other suggestions, How wide, Quick look or Thorough, the carry-on
  * tick, and when it was first and last saved, each opened under the question's own key. No signed reference, hash, key name or envelope
  * goes out. A question whose key is gone is deleted in effect and left out; a key that is there but does not open fails the export.
@@ -126,7 +126,7 @@ describe("the questions not started yet in account.json", () => {
     expect(Object.keys(account.questions_not_started[0]).sort()).toEqual(["answers", "carry_on_to_report", "created_at", "how_wide", "mode",
       "other_suggestions", "own_words", "paths", "question", "read_question", "saved_at"]);
     expect(account).not.toHaveProperty("saved_questions");
-    expect(account).not.toHaveProperty("kept_questions");
+    expect(account.kept_questions).toEqual([]);
   });
 
   it("a question whose key is gone is left out and the export succeeds; a key that is there but does not open fails it", async () => {
@@ -180,22 +180,22 @@ describe("the questions not started yet in account.json", () => {
 });
 
 describe("the worker reads 0162's reader", () => {
-  it("as one more function in its role witness (twenty-four since the threat-report reader left it), and beside the snapshot in readRaw", async () => {
+  it("as one more function in its role witness (twenty-five, after 0157's moderation reader), and beside the snapshot in readRaw", async () => {
     const seen: unknown[][] = [];
     const principal = (name: string, workerCount: number) => ({ principal: name, authorization_member: name === "request",
       worker_member: name === "worker", request_count: name === "request" ? 4 : 0, worker_count: workerCount, privileged: false });
     const pool = (name: string, workerCount: number) => ({ query: async (_sql: string, params: unknown[]) => {
       seen.push(params); return { rows: [principal(name, workerCount)] }; } });
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never)).resolves.toBeUndefined();
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 25) as never)).resolves.toBeUndefined();
     expect(seen[1]?.[1]).toContain("identity.read_data_export_saved_questions(uuid,uuid)");
-    expect((seen[1]?.[1] as string[]).length).toBe(24);
-    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 23) as never))
+    expect((seen[1]?.[1] as string[]).length).toBe(25);
+    await expect(assertDataExportDatabaseRoles(pool("request", 0) as never, pool("worker", 24) as never))
       .rejects.toThrow("DATA_EXPORT_DATABASE_ROLE_MUST_BE_ISOLATED");
 
     const sql: string[] = [];
     const reader = { query: async (text: string) => {
       sql.push(text);
-      return { rows: [{ snapshot: { user: {} }, page_memory: null, saved_questions: [{ saved_question_id: "q" }] }] };
+      return { rows: [{ snapshot: { user: {} }, threat_reports: [], page_memory: null, saved_questions: [{ saved_question_id: "q" }] }] };
     } };
     const raw = await new PostgresDataExportSource(reader as never).readRaw("export", "worker");
     expect(sql[0]).toContain("identity.read_data_export_saved_questions($1,$2) saved_questions");

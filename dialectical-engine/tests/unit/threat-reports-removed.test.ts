@@ -10,12 +10,16 @@ import { renderReadme } from "../../apps/api/src/data-export/readme.js";
 import { SUPPORT_PAGE_ROUTES } from "../../packages/support-kb/src/catalog.js";
 import { snapshotA } from "../fixtures/data-export/snapshot-a.js";
 import { readZip } from "../support/zip-reader.js";
+import { readFileSync } from "node:fs";
+import * as db from "@debateai/db";
+import { startThreatReportErasure } from "../../apps/api/src/staff/threat-report-closure.js";
 import { TEST_APP_ORIGIN, testHttpIdentity, testSessionApplication } from "../support/httpSession.js";
 
 /**
- * 2026-11-19: the dormant staff threat reports were removed from the code (PR A; the database objects and the
- * THREAT_REPORT capability stay until the migration that drops them). Nothing may serve, show, mail or export a kept
- * question: no /v1/admin/threat-reports route, no staff page, no alert mail, and no kept_questions in the export.
+ * 2026-11-19: the staff-facing parts of the dormant threat reports were removed (PR A; the database objects and the
+ * THREAT_REPORT capability stay until the migration that drops them). No route, staff page, alert mail or decision
+ * intent can show a kept question. Reports a database may still hold from before 0171 are still erased when due by
+ * the hourly sweep, and still given back to their asker in the export (kept_questions), until that migration.
  */
 const application = {
   withContentLease: async (_id: string, use: () => unknown) => use(), submit: async () => ({ run_ref: "run:test", status: "QUEUED" }),
@@ -63,13 +67,36 @@ describe("the threat reports are gone", () => {
       threat_report_ref: "33333333-3333-4333-8333-333333333333", recorded_at: "2026-11-01T00:00:00.000Z" }).success).toBe(true);
   });
 
-  it("exports no kept_questions and its README describes none", () => {
-    expect(RAW_SECTIONS).not.toContain("threat_reports");
-    expect(KEEP_COLUMNS).not.toHaveProperty("threat_reports");
-    expect(snapshotA.account).not.toHaveProperty("kept_questions");
+  it("keeps the hourly erase sweep, and only the sweep, of the threat-report jobs", async () => {
+    expect(Object.getOwnPropertyNames(db.PostgresThreatReportRepository.prototype).filter(name => name !== "constructor")).toEqual(["eraseDue"]);
+    const main = readFileSync("apps/api/src/main.ts", "utf8");
+    expect(main).toContain("startThreatReportErasure({ repository: new PostgresThreatReportRepository(pool) }, releaseWatcher)");
+    expect(main).toContain('api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));');
+    expect(main).not.toMatch(/startThreatReportAlerts|threatReportEmail|beforeKeyDestruction:/u);
+    // The sweep ticks only while this release is current, and calls the database's own clock.
+    const calls: unknown[][] = [];
+    let current = false;
+    const timer = startThreatReportErasure({ repository: { eraseDue: async (...args: unknown[]) => { calls.push(args); return 0; } }, everyMs: 5 },
+      { ownIsCurrent: () => current });
+    try {
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(calls).toEqual([]);
+      current = true;
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls.every(args => args.length === 0)).toBe(true);
+    } finally { clearInterval(timer); }
+  });
+
+  it("still exports the reports a database may hold, as kept_questions, and the README says so plainly", () => {
+    expect(RAW_SECTIONS).toContain("threat_reports");
+    expect(KEEP_COLUMNS.threat_reports).toEqual(["question", "kept_at"]);
     const archive = readZip(buildArchive(snapshotA, loadArchiveCatalog("en")).zip);
     const account = JSON.parse(archive.find(entry => entry.name === "account.json")!.bytes.toString("utf8"));
-    expect(Object.keys(account)).not.toContain("kept_questions");
-    expect(renderReadme()).not.toMatch(/kept[ _]questions?|staff review/iu);
+    expect(Object.keys(account)).toContain("kept_questions");
+    const readme = renderReadme();
+    expect(readme).toContain("Questions an earlier version of our question check kept for staff review, if any are still held, appear in account.json with when each was kept (kept_questions).");
+    expect(readme).toContain("erasure requests, any questions an earlier question check kept for staff review, reading level");
+    expect(readme).not.toContain("the text and time of each question kept for staff review");
   });
 });

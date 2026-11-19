@@ -106,8 +106,8 @@ describe("0128 threat report database boundary", () => {
     expect(budget).toHaveProperty("recordQuestionCheckSpend", expect.any(Function));
   });
 
-  it("no longer exports the threat report repository from the database package (2026-11-19: the feature was removed)", () => {
-    expect(db).not.toHaveProperty("PostgresThreatReportRepository");
+  it("exports the threat report repository with only the retention sweep (2026-11-19: the staff screens were removed)", () => {
+    expect(Object.getOwnPropertyNames(db.PostgresThreatReportRepository.prototype).filter(name => name !== "constructor")).toEqual(["eraseDue"]);
   });
 });
 

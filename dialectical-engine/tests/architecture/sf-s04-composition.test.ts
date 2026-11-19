@@ -11,10 +11,13 @@ describe("S04 production composition", () => {
     expect(source).toContain("questionCheck,");
   });
 
-  // 2026-11-19: the dormant threat reports were removed; nothing alerts, erases or holds an email for them.
-  it("starts no threat-report worker and holds no email before destroying the user key", () => {
+  // 2026-11-19: the staff threat reports were removed. Nothing alerts or holds an email for them, but reports a database may
+  // still hold are erased when due, so the hourly sweep stays (gated, and cleared on close) until the schema goes.
+  it("starts only the threat-report erase sweep, and holds no email before destroying the user key", () => {
     const source = main();
-    expect(source).not.toMatch(/startThreatReport|threatReportEmail|ThreatReportRepository/u);
+    expect(source).toContain("const threatReportErasureTimer = startThreatReportErasure({ repository: new PostgresThreatReportRepository(pool) }, releaseWatcher);");
+    expect(source).toContain('api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));');
+    expect(source).not.toMatch(/startThreatReportAlerts|threatReportEmail/u);
     expect(source).not.toContain("beforeKeyDestruction:");
   });
 

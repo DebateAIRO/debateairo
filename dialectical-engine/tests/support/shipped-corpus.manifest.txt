@@ -218,6 +218,7 @@ apps/api/src/staff/routes.ts
 apps/api/src/staff/runtime.ts
 apps/api/src/staff/team-allowances.ts
 apps/api/src/staff/team-limit.ts
+apps/api/src/staff/threat-report-closure.ts
 apps/api/src/staff/webauthn-codec.ts
 apps/api/src/staff/webauthn-verifier.ts
 apps/api/src/staff/webauthn.ts
@@ -1367,6 +1368,7 @@ packages/db/src/start-paths.ts
 packages/db/src/support.ts
 packages/db/src/synthesis-check-erasure.ts
 packages/db/src/team-limit.ts
+packages/db/src/threat-reports.ts
 packages/db/src/tree-updates.ts
 packages/db/src/web-evidence.ts
 packages/evaluator/src/blind-sample.ts

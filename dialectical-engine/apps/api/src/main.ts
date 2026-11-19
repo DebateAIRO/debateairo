@@ -90,7 +90,7 @@ import {
   readCustodyAuthorizationHeader
 } from "@debateai/crypto";
 import type { PreparedPublicationCipher } from "@debateai/crypto";
-import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
+import { PostgresPublicFlagRepository, PostgresPublicReviewRepository, PostgresTeamLimitRepository, AcceptanceRepository, AccountErasureCoordinator, API_DATABASE_POOLS, BillingJobQueries, BillingRepository, assertAccountErasureDatabaseRole, assertContentProvisionDatabaseRole, assertPublicationCleanupDatabaseRole, assertPublicationDatabaseRoleSeparation, assertSupportDatabaseRole, assertSupportKeyCoverage, configureContentEncryption, createPool, createSupportControlPlanePool, EntitlementRepository, PostgresInternalAllowanceRepository, PostgresAccountErasureRepository, PostgresAuthenticationRiskSignalRepository, PostgresEmailChangeRepository, PostgresIdentityRepository, PostgresLegacyRunClaimRepository, PostgresPrivateRunErasureRepository, PostgresPublicationCheckRecordRepository, PostgresPublicationRepository, PostgresRecoveryStartRepository, PostgresSessionRepository, PostgresStaffPrerequisiteProducer, PostgresStaffRepository, PostgresSupportShredRepository, PrivateRunErasureCoordinator, ProviderProbeRepository, RunWaitRepository, ServeDisclosureRepository, PostgresThreatReportRepository, SynthesisCheckErasureCoordinator, PostgresSynthesisCheckErasureRepository } from "@debateai/db";
 import { recordSpendWaiver } from "@debateai/db";
 import { crossAccount, crossAccountPool, setCrossAccountTarget } from "@debateai/db";
 // FIX-S01-p1b (COR-B1): the boot attestations' routes, from the module itself (packages/db/src/index.ts is hash-pinned
@@ -200,6 +200,7 @@ import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
 import { readQuestionSubjects } from "./question-check/subjects.js";
 import { startTeamLimitNotices } from "./staff/team-limit.js";
+import { startThreatReportErasure } from "./staff/threat-report-closure.js";
 import { accountEmailReader } from "./staff/account-email.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession, readOwnerAnswer } from "./owner-read.js";
@@ -1483,6 +1484,9 @@ const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightE
   await publicFlagMailRepository.settleStuck();
   await moderationStatementRepository.deleteWordsDue();
 }, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
+// The staff threat reports were removed (2026-11-19); reports a database may still hold from before 0171 are still erased when due,
+// until the migration that drops the schema. The sweep runs on the system login (the cross-account marker holds it since 0171).
+const threatReportErasureTimer = startThreatReportErasure({ repository: new PostgresThreatReportRepository(pool) }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
@@ -2297,6 +2301,7 @@ api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
 api.addHook("onClose",async () => clearInterval(moderationNoticesTimer));
 api.addHook("onClose",async () => clearInterval(allowanceNoticesTimer));
+api.addHook("onClose",async () => clearInterval(threatReportErasureTimer));
 api.addHook("onClose",async () => clearInterval(synthesisCheckTimer));
 api.addHook("onClose",async () => { if (dataExportTimer !== undefined) clearInterval(dataExportTimer); });
 api.addHook("onClose",async () => billingRuntime?.stop());
