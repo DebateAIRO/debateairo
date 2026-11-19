@@ -14,6 +14,8 @@ import chromeRomanian from "../../apps/ui/messages/ro/chrome.json" with { type: 
  */
 const provided = vi.hoisted(() => ({ catalog: {} as Record<string, string> }));
 vi.mock("@/lib/i18n/I18nProvider", () => ({ useChromeI18n: () => ({ locale: "ro", catalog: provided.catalog }) }));
+const navigation = vi.hoisted(() => ({ refresh: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: navigation.refresh }) }));
 
 import PageError from "../../apps/ui/app/error.js";
 import GlobalError from "../../apps/ui/app/global-error.js";
@@ -52,7 +54,10 @@ describe("the page shown when a page fails (app/error.tsx)", () => {
     expect(retry.textContent).toBe(words["chrome.error.retry"]);
     const home = page.querySelector("a")!;
     expect([home.textContent, home.getAttribute("href")]).toEqual([words["chrome.footer.home"], "/"]);
+    navigation.refresh.mockClear();
     await act(async () => { retry.click(); });
+    // Try again asks the server for the page again, then clears the error: reset alone would redraw the failed result.
+    expect(navigation.refresh).toHaveBeenCalledTimes(1);
     expect(reset).toHaveBeenCalledTimes(1);
     expect(page.textContent).not.toContain("secret server detail");
     expect(page.textContent).not.toContain("digest-123");

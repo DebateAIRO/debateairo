@@ -355,18 +355,22 @@ describe("crisis words, the consent, the team and the switch", () => {
     expect(plan(clean).paths).toHaveLength(5);
   });
 
-  // The ask's caps on the check (crisisCheckTexts): one own text that spells past crisisCheckMaxChars() (ﷺ is 18 letters), or own
-  // words that together spell past crisisCheckRequestMaxChars() (ﬃ is three letters; twenty own paths of 3,000 each), are never
-  // checked in part: the crisis answer, nothing stored. A large document in ordinary words is still read in full and saved.
-  it.each([
-    ["an own path that spells past the check's cap", { plan: { paths: [savedOwnPath("p9", "\u{FDFA}".repeat(1_000))] } }],
-    ["own paths that together spell past the request's cap", { plan: { more: Array.from({ length: 20 },
-      (_, n) => savedOwnPath(`m${n}`, `${n}${"\u{FB03}".repeat(997)}`)) } }]
-  ])("%s: CRISIS_SUPPORT_OFFERED, nothing stored", async (_name, parts) => {
+  // The check's cap for one text: an own text that spells past crisisCheckMaxChars() (ﷺ is 18 letters) is never checked in
+  // part: the crisis answer, nothing stored. Own texts are not capped together: a saved page keeps every rewrite and Undo
+  // step, so many texts that each stay under the cap are read in full and saved (ﬃ is three letters; twenty own paths).
+  it("an own path that spells past the check's cap: CRISIS_SUPPORT_OFFERED, nothing stored", async () => {
     const w = await world();
-    const flood = savedDocOf(ANA_SIGNS, parts as never);
+    const flood = savedDocOf(ANA_SIGNS, { plan: { paths: [savedOwnPath("p9", "\u{FDFA}".repeat(1_000))] } } as never);
     await expect(w.service.create(ANA, createBody(flood), gateFor(ANA))).rejects.toEqual(refusedWith("CRISIS_SUPPORT_OFFERED"));
     expect(w.store.rows.size).toBe(0);
+  });
+
+  it("many own paths that each stay under the cap are saved, however long they are together", async () => {
+    const w = await world();
+    const long = savedDocOf(ANA_SIGNS, { plan: { more: Array.from({ length: 20 },
+      (_, n) => savedOwnPath(`m${n}`, `${n}${"\u{FB03}".repeat(997)}`)) } } as never);
+    const { id } = await w.service.create(ANA, createBody(long), gateFor(ANA));
+    expect(await w.keys.listByOwner(ANA.ownerRef)).toEqual([id]);
   });
 
   it("twenty own paths of 1,000 ordinary characters each are read in full and saved", async () => {

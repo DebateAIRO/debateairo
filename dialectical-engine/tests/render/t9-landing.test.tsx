@@ -407,7 +407,9 @@ describe("T9-C4 landing content", () => {
     expect(hero?.textContent).not.toContain("rounds argued this week");
     const facts = [...(hero?.querySelectorAll(".lpStatBar > li") ?? [])];
     expect(facts.map((item) => item.classList.contains("lpStatRule") ? "rule" : "fact")).toEqual(["fact", "rule", "fact"]);
-    expect(pricing?.textContent).toContain("Start free. No card needed. On the Free plan, your questions are public.");
+    expect(pricing?.textContent).toContain("Start free. No card needed.");
+    // This line shows only while billing is off, where no question is published, so it says nothing about public questions.
+    expect(pricing?.textContent).not.toContain("questions are public");
     expect(pricing?.textContent).not.toContain("[PLACEHOLDER]");
     expect(pricing?.querySelector('a[href="/pricing"]')).toBeNull();
   });

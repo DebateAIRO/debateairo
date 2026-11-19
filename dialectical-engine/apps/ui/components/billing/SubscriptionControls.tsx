@@ -151,6 +151,7 @@ export function SubscriptionControls({
   client = contractClient,
   now = () => new Date(),
   renewalConsent = null,
+  testMode = false,
   goToPayment = (url: string): void => { window.location.assign(url); }
 }: Readonly<{
   catalog?: MessageCatalog;
@@ -159,6 +160,8 @@ export function SubscriptionControls({
   now?: () => Date;
   /** Spec §2.18: the card-saving sentence's manifest pair in this locale; null: the upgrade offers no payment. */
   renewalConsent?: Readonly<{ version: string; sha256: string }> | null;
+  /** Card payments run on the payment sandbox: the upgrade shows the test-mode note before the payment page, as the checkout does. */
+  testMode?: boolean;
   /** Spec §2.10: NETOPIA's page for the upgrade is reached by a top-level navigation. */
   goToPayment?: (url: string) => void;
 }>) {
@@ -416,6 +419,7 @@ export function SubscriptionControls({
                   onChange={(event) => setUpgradeAgreed(event.target.checked)} />
                 <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, upgrade.quote.recurring_total, upgrade.quote.currency) })}</span>
               </label>
+              {testMode ? <p className="billingNote" role="note">{t(catalog, "billing.testMode.notice")}</p> : null}
               <div className="setCardRow">
                 <button type="button" className="setBtn subBtnPrimary" disabled={busy || !upgradeAgreed || renewalConsent === null}
                   onClick={() => { void run(async () => {

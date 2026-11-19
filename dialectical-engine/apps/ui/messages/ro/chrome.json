@@ -77,6 +77,6 @@
   "chrome.release.reload": "Reîncărcați",
   "chrome.release.madeByNewer": "Această dezbatere a fost creată de o versiune mai nouă a site-ului. Reîncărcați pagina sau încercați din nou peste câteva minute.",
   "chrome.error.title": "Ceva nu a funcționat",
-  "chrome.error.body": "Această pagină nu a putut fi afișată din cauza unei erori de partea noastră. Vă rugăm să încercați din nou.",
+  "chrome.error.body": "Această pagină nu a putut fi afișată din cauza unei erori din partea noastră. Vă rugăm să încercați din nou.",
   "chrome.error.retry": "Încercați din nou"
 }

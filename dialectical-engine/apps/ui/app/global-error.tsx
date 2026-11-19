@@ -36,7 +36,8 @@ export default function GlobalError({ reset }: Readonly<{ error: Error & { diges
               <h1>{t(catalog, "chrome.error.title")}</h1>
               <p className="muted" role="alert">{t(catalog, "chrome.error.body")}</p>
               <p>
-                <button type="button" className="btn" onClick={() => reset()}>{t(catalog, "chrome.error.retry")}</button>
+                {/* The layout itself failed, so the whole page is loaded again from the server. */}
+                <button type="button" className="btn" onClick={() => { reset(); window.location.reload(); }}>{t(catalog, "chrome.error.retry")}</button>
               </p>
               <p>
                 {/* A full load, not a client move: the layout that failed is built again from the server. */}

@@ -77,7 +77,7 @@
   "home.pricingCopyTaxIncluded": "Start free. Paid plans start at {price} a month, tax included. Cancel whenever.",
   "home.pricingCopyNoTax": "Start free. Paid plans start at {price} a month, no tax added. Cancel whenever.",
   "home.pricingCopyChoose": "Start free. Paid plans are priced with your country's tax included. Cancel whenever.",
-  "home.pricingCopyFree": "Start free. No card needed. On the Free plan, your questions are public.",
+  "home.pricingCopyFree": "Start free. No card needed.",
   "home.pricingLink": "See the plans",
   "home.card1Text": "Remote-first companies should generally use location-independent salary bands for engineers performing equivalent work, while allowing transparent adjustments for legally required costs, scarce skills, and role scope.",
   "home.card2Text": "Remote-first companies should pay a single global rate for a given role and level, because compensation is owed for the work delivered rather than for the worker’s postal code: two engineers at the same level producing comparable value contribute equally to the firm’s output.",
