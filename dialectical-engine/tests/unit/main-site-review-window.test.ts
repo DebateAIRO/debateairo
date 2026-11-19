@@ -81,6 +81,18 @@ describe('the lines the window scripts share', () => {
     expect(script('CLOSED')).toContain(`${guard}flag 'the site password: the NETOPIA review window is open`);
     expect(PWON).toContain('if wopen "$C"; then wclose PWON; fi');
   });
+
+  it('the staff steps either refuse on dezbatere.ro, where the window opens, or never touch Caddy', () => {
+    for (const step of ['NAME2', 'STAFFOFF', 'STAFFON']) {
+      expect(script(step)).toContain('[ "$HOST" = v3-preview.dezbatere.ro ] || { echo "' + step + '_NOT_DONE: ');
+    }
+    const name3 = script('NAME3').split('\n').filter(line => !line.startsWith('#'));
+    expect(name3[2]).toBe('cmp -s "$C" "$M/name/Caddyfile.phase1" || { echo "NAME3_NOT_DONE: the live Caddyfile is not the prepared one (nothing was stopped): look"; exit 1; }');
+    for (const step of ['REKEYCHECK', 'STAFFMAIN', 'REKEY']) {
+      const body = script(step).split('\n').filter(line => !line.startsWith('#')).join('\n');
+      expect(body).not.toMatch(/\$C\b|[Cc]addy/u);
+    }
+  });
 });
 
 /** REVIEW_OPEN's address pattern, as Caddy's CEL `matches` gets it (RE2); it uses nothing JavaScript reads otherwise. */

@@ -1099,6 +1099,7 @@ restarts the API, still on the test name, so you see that the API starts without
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFOFF: the staff screens off, on the test name: the one line STAFF_ACCESS_POLICY_VERSION=2 taken out of the API file (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
+# The NETOPIA review window (5.8) opens only on dezbatere.ro, and this step runs only on the test name, so with the window open it refuses.
 K=$M/name/api-$LABEL.env.before-staffoff-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFOFF_NOT_DONE: the API already answers as $HOST; nothing changed: ask"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true); AL=$(grep -c '^INTERNAL_ALLOWANCE_' "$A" || true)
@@ -1163,6 +1164,7 @@ relay's drop-in, the main Caddyfile and the main mail plan.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # NAME2: the switch prepared: env copies, the relay drop-in, the main Caddyfile, the main mail plan. Nothing live changes.
+# The NETOPIA review window (5.8) opens only on dezbatere.ro, after the rename, so with the window open this step refuses (the API answers as dezbatere.ro).
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "NAME2_NOT_DONE: the API already answers as $HOST"; exit 1; }
 [ "$(grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' "$A" || true)" = 1 ] || { echo "NAME2_NOT_DONE: the API is not in hosted mode (it would refuse PREVIEW_MAIN_ORIGIN_NOT_HOSTED)"; exit 1; }
 SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
@@ -1261,6 +1263,7 @@ would loop after closing.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # NAME3: the site answers as dezbatere.ro: env files, the relay drop-in, Caddy and the mail plan, in one stop window.
+# The NETOPIA review window (5.8) opens only after the rename, so with the window open this step refuses before it stops anything (the live Caddyfile is not NAME1's).
 cmp -s "$C" "$M/name/Caddyfile.phase1" || { echo "NAME3_NOT_DONE: the live Caddyfile is not the prepared one (nothing was stopped): look"; exit 1; }
 [ ! -e "$TDROP" ] || { echo "NAME3_NOT_DONE: $TDROP exists (nothing was stopped): look"; exit 1; }
 SN=$(grep -cE '^STAFF_WEBAUTHN_(ORIGIN|RP_ID)=' "$A" || true)
@@ -1342,9 +1345,9 @@ Then, by hand:
 
 A few minutes down, like the switch (the API's start alone takes a minute or more). It works from any state NAME3
 left. It starts nothing until both env files name the test name and every SAME check is OK. It refuses, with nothing
-stopped, while the site is open to everyone (PWON first) or while payments are real (PAY_BACK first): part 9's order.
-Once it has stopped the website and the API, every `NAME5_NOT_DONE` up to the API's start means the site is down: ask
-at once.
+stopped, while the site is open to everyone (PWON first), while the NETOPIA review window is open (REVIEW_CLOSE or
+PWON first, 5.8) or while payments are real (PAY_BACK first): part 9's order. Once it has stopped the website and
+the API, every `NAME5_NOT_DONE` up to the API's start means the site is down: ask at once.
 
 ```sh
 set -euo pipefail
@@ -1407,6 +1410,7 @@ later one, as long as STAFFOFF once took the line out on this server.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFON: the staff screens back on the test name: the line STAFF_ACCESS_POLICY_VERSION=2 back into the API file, then the API restarts.
+# The NETOPIA review window (5.8) opens only on dezbatere.ro, and this step runs only on the test name, so with the window open it refuses.
 K=$M/name/api-$LABEL.env.before-staffon-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "STAFFON_NOT_DONE: the API answers as $HOST; on dezbatere.ro the step is STAFFMAIN (5.7); nothing changed"; exit 1; }
 P=$(grep -c '^STAFF_ACCESS_POLICY_VERSION=' "$A" || true)
@@ -1466,6 +1470,10 @@ this document. It takes about half an hour. You need the server (as root), a bro
 authenticator and your hardware key. It works while payments are real; STAFFMAIN restarts the API, so pick a quiet
 minute with no checkout open.
 
+Do it before you open the NETOPIA review window (5.8) if you can. It works with the window open too: STAFFMAIN and
+REKEY never touch Caddy, and the Team page stays behind the site password. But while STAFFMAIN restarts the API, the
+open pages show an error, to NETOPIA's reviewer too.
+
 In that upload, SB4's operator review (part 2) lists this step's files among the others: the new
 `deploy/preview-lifecycle/v1/rekey-staff-key.mjs`, and the changed `unlock-team-tools.mjs`, `jit-creator-actor.mjs`
 and that folder's `README.md`. STAFFMAIN and REKEY need the upload's operator folder swap and its database step to
@@ -1490,6 +1498,7 @@ have run; each checks that first, and REKEYCHECK (below) says so before the day.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # REKEYCHECK: whether this server can do 5.7 (read-only): the release, the tools folder, the database step, and the database's own rule for the login REKEY uses.
+# The NETOPIA review window (5.8) may be open: this step only reads.
 BAD=''; chk() { echo "NOT READY: $1"; BAD=yes; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] || chk 'this release does not carry the staff re-key (the upload first)'
 [ -f "$L/rekey-staff-key.mjs" ] || chk "the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first)"
@@ -1520,6 +1529,7 @@ them first.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # STAFFMAIN: the staff screens on, on dezbatere.ro: the API file's two staff name lines name dezbatere.ro and the line STAFF_ACCESS_POLICY_VERSION=2 is in it (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
+# The NETOPIA review window (5.8) may be open: this step changes the API file and restarts the API, never Caddy. While the API restarts, the open pages show an error.
 K=$M/name/api-$LABEL.env.before-staffmain-$(date -u +%Y%m%dT%H%M%SZ)
 [ "$HOST" = dezbatere.ro ] || { echo "STAFFMAIN_NOT_DONE: the API answers as $HOST; on the test name the step is STAFFON (5.5b); nothing changed"; exit 1; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "STAFFMAIN_NOT_DONE: this release, or the tools folder, does not carry the staff re-key (the upload first, with its tools-folder swap); nothing changed"; exit 1; }
@@ -1569,6 +1579,7 @@ change your password after this step; it cannot use the permit either way.
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # REKEY: the operator's yes for ONE new staff key of the Owner account, under the name the site answers as: one permit in the database (15 minutes, one use, for the sign-in whose code you type). Nothing restarts; no file changes.
+# The NETOPIA review window (5.8) may be open: this step changes neither Caddy nor the API.
 grep -qx 'STAFF_ACCESS_POLICY_VERSION=2' "$A" || { echo "REKEY_NOT_DONE: the staff screens are off (STAFFMAIN first); nothing changed"; exit 1; }
 [ -f "$L/rekey-staff-key.mjs" ] || { echo "REKEY_NOT_DONE: the tools folder does not carry rekey-staff-key.mjs (the upload's tools-folder swap first); nothing changed"; exit 1; }
 [ "$(psqlq "SELECT COALESCE((SELECT auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')" || true)" = scram-sha-256 ] || { echo "REKEY_NOT_DONE: the database's pg_hba.conf does not admit debateai_prod_staff_recovery on the local socket with scram-sha-256 (REKEYCHECK says the same), so the tool cannot connect; adding the line is a reviewed change: ask; nothing changed"; exit 1; }
@@ -1669,7 +1680,8 @@ password: sign-in, sign-up, debates and buying. 5.8b says what to check on the o
 
 **Before you start:** do 5.8a first, on your Mac (below REVIEW_CLOSE): REVIEW_MACTEST must end with
 `REVIEW_MACTEST_DONE`. Then check: NAME4 passed and you did the checks by hand of 5.4; billing is on (`/pricing`
-exists); the site password is on; no upload is running.
+exists); the site password is on; no upload is running. Do 5.7 (your staff key) first if you can: STAFFMAIN restarts
+the API, and with the window open the open pages would show an error meanwhile.
 
 **What opens, for reading only:** the home page, `/pricing`, `/terms` and `/privacy` (with their earlier versions),
 `/legal`, `/cookies`, `/providers`, `/ai-transparency`, `/privacy/us-health-data`, `/cancel` and `/withdraw`, and the
@@ -1916,6 +1928,8 @@ change is kept. Ask. The file with the window stays in `/root/preview-archive/ma
 - NAME5, PWOFF1 and SIGNUPS refuse: close the window first.
 - PWNEW, ASKS_OPEN, ASKS_CLOSE, MAIL_CLOSE, PAY_SWITCH and PAY_BACK work as written: they check the password on the
   Log in page, which the window never opens.
+- REKEYCHECK, STAFFMAIN and REKEY (5.7) work as written: they never touch Caddy. NAME2, NAME3, STAFFOFF and STAFFON
+  refuse, as they do whenever the site answers as dezbatere.ro.
 - CLOSED says `NOT CLOSED: the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.8)`.
 - A later upload leaves the window as it is (5.6). Do not upload while NETOPIA is reviewing.
 
@@ -2183,6 +2197,7 @@ your identity, checks your shop's profile (it looks at the open site), and sends
 **6. After NETOPIA's approval and the signed contract:** NETOPIA switches live and saved-card (recurring) payments on.
 Then come the NETOPIA checks of 1.1 and part 7, on a later day. Every part-7 script works with the window open, and at
 PAY_SWITCH the test-mode note leaves the open pages by itself. Close the window as 5.8 says ("Closing the window").
+
 ---
 
 ## 6. Friends' test, with test payments
