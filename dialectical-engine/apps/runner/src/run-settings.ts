@@ -6,6 +6,7 @@ import {
   costEnvelopeBand,
   costEnvelopeCeilings,
   closingReservesOf,
+  createBillingPlansInForce,
   debateCallLaneLimits,
   readBillingPlans,
   readCallConcurrencyPolicy,
@@ -222,9 +223,14 @@ export async function readRunnerSiteContext(input: Readonly<{
   const allowances = new PostgresInternalAllowanceRepository(pool);
   // Side-by-side spec §9: no funding read and no funding refusal at boot. A grant is checked against the policy of the
   // version it was issued with, never the pointer, so a funding selection made after boot works without a restart.
+  // A person's month keeps the plan numbers it started with (billing-core plans-in-force.ts), so a limit lowered by an
+  // upload never pauses a debate in a month that started before it.
+  const plansInForce = billingPlans === null ? undefined
+    : createBillingPlansInForce({ pool, ownVersion: environment.REGISTER_VERSION, ownPlans: billingPlans });
   const fundingAllowance = billingPlans === null ? undefined : new FundingAwarePersonAllowanceSource({
     allowances,entitlements:{...fundingEntitlements.readOnlyPort(),readRunFundingBasis:(runId)=>fundingEntitlements.readRunFundingBasis(runId)},
-    plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000
+    plans:billingPlans,closeBasisPoints:envelopeBand?.closeBasisPoints ?? 10000,
+    ...(plansInForce === undefined ? {} : { plansInForce })
   });
   const sharedWallTerms = costEnvelopePolicy === null
     ? null
@@ -235,7 +241,8 @@ export async function readRunnerSiteContext(input: Readonly<{
           : fundingAllowance ?? new BillingPersonAllowanceSource({
               entitlements: new EntitlementRepository(pool).readOnlyPort(),
               plans: billingPlans,
-              closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints
+              closeBasisPoints: envelopeBand === null ? 10_000 : envelopeBand.closeBasisPoints,
+              ...(plansInForce === undefined ? {} : { plansInForce })
             }),
         owners: modelSpendStore
       });

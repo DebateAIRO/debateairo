@@ -47,6 +47,6 @@ describe("B7b the API root wakes the line", () => {
     // Side-by-side spec §13 (S9): the room is built after the admission loader; its day is the SITE's money row, which
     // the "ask-room" readiness answer carries (`runPolicy`).
     expect(main).toMatch(/entitlements,\s*billingPlans,\s*\.\.\.\(fundedAllowance === undefined \? \{\} : \{\s*funding:\s*fundedAllowance\s*\}\),\s*dailyCeilingMicros:\s*runPolicy\.dailyCeilingMicros,/u);
-    expect(main).toContain("return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans });");
+    expect(main).toContain("return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans, plansInForce });");
   });
 });

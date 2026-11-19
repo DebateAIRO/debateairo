@@ -803,7 +803,7 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off',
   // S18 fix round 1: the choices a plan does not take from its base, read from the active version's publish plan.
   DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off',
-  // SB3's two lists: the inputs the upload takes from the owner's file, and the plans whose people get less.
+  // SB3's two lists: the inputs the upload takes from the owner's file, and the plans whose limits change, up or down.
   NEWNUM: 'billingPlans dailyCeilingMicros', LIMITS: 'PLUS PRO'
 });
 
@@ -1501,12 +1501,14 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       const same = await upload(JSON.parse(JSON.stringify(live)));
       expect(same.proposal.changedKeys).toEqual(['nodeRuntimeVersion']);
       expect(same.verdict).toBe('NUMBERS_OK');
-      // A higher day's ceiling, more Plus credit and a higher abuse limit, all three named.
+      // A higher day's ceiling, more Plus credit and a higher abuse limit, all three named; Plus is named too, since a
+      // raised limit cannot be taken back for a month.
       const file = JSON.parse(JSON.stringify(live));
       file.dailyCeilingMicros += 11_000_000;
       file.billingPlans.plans[1].monthly_credit_micros += 1_100_000;
       file.abuseLimits.flag_per_site_day += 11;
-      const changed = await upload(file, { change: 'abuseLimits billingPlans dailyCeilingMicros' });
+      await expect(upload(file, { change: 'abuseLimits billingPlans dailyCeilingMicros' })).rejects.toMatchObject({ code: 'SITE_LIMITS_NOT_NAMED', fields: ['PLUS'] });
+      const changed = await upload(file, { change: 'abuseLimits billingPlans dailyCeilingMicros', limits: 'PLUS' });
       expect([...changed.proposal.changedKeys].sort()).toEqual(['abuseLimits', 'billingPlans', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
       expect(changed.verdict).toBe('NUMBERS_OK');
       // The very same proposal against another list of names stops.
@@ -1631,10 +1633,20 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       'The reading errs to one side only: `HELD` is printed when an open subscription names the plan anywhere in its history',
       '**If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**',
       'For each plan named there SB3 prints `HELD` or `nobody holds it now`',
-      'has no way yet to apply a new limit only from a person\'s next month',
-      'The day and week caps are counted again over the days already used this month, with the new, lower cap.',
-      'A refund on cancelling or withdrawing is measured against the new credit',
-      '**do not lower a plan\'s limits while anyone holds that plan**',
+      'Each person\'s month keeps the numbers it started with.',
+      '**A lower limit** reaches each person when their own next month starts, never before.',
+      'No day already used is counted again, nobody is stopped in a month they already started, and no running debate pauses.',
+      '**A higher limit** reaches everyone on the plan at the switch.',
+      '**A higher limit cannot be taken back inside a month.**',
+      'A credit lowered later never makes a refund smaller',
+      'A raised reserve does not make new questions stop earlier in a month already started.',
+      'The product sends no notice and has no acceptance step for limits.',
+      '**a plan whose limits change, up or down, is named in `LIMITS`.**',
+      'Naming a plan whose limit goes **lower**, or whose line says `changed`, is the owner\'s statement that the people on that plan were told first (Terms section 12), or that nobody holds it',
+      'a paid plan named only because the smallest paid reserve moved is one of these',
+      'Naming a plan whose limit goes **higher** is the owner\'s statement that the number was checked twice, because it cannot be taken back for a month.',
+      'A day or week cap added where the plan had none is a lower limit',
+      'every such line ends "at the switch"',
       'when that smallest one moves, every paid plan must be named',
       'Do not name it (that would publish the old value again). Run SB3c with `KEEP=\'perRunCeilingMicros\'`',
       '**Editing the owner\'s file.**',
@@ -1642,16 +1654,27 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
     ]) expect(flat, text).toContain(text);
     const back = sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ');
     expect(back).toContain('A way back that makes the old release current again (WB2) also brings the numbers before back');
-    expect(back).toContain('**When the upload had raised a plan\'s limits, WB2 lowers them again**');
+    expect(back).toContain('**When the upload had raised a plan\'s limits, WB2 does not take the raise back from the people whose month saw it**');
+    expect(back).toContain('When the upload had lowered a limit, WB2 brings the higher number back for everyone at once.');
+    // The line that tells whether the old release keeps a month on its own numbers looks for a name the API's composition really has.
+    expect(back).toContain('`grep -c createBillingPlansInForce "$OCAPI/dialectical-engine/apps/api/src/main.ts"`');
+    expect(read('apps/api/src/main.ts')).toContain('createBillingPlansInForce({');
+    // The guide no longer says a lower limit reaches a month already started, or that a way back lowers a raise again.
+    for (const gone of ['hit everyone', 'counted again over the days already used', 'WB2 lowers them again', 'do not lower a plan\'s limits while anyone holds']) {
+      expect(flat, gone).not.toContain(gone);
+      expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' '), gone).not.toContain(gone);
+    }
     expect(back).toContain('put the numbers before into the owner\'s file with SB3c');
     // The yes names a number change and, for a named plan, that nobody holds it or when its people were told.
-    expect(sectionOf(guide, '### SB6. The owner\'s fresh yes').replace(/\s+/g, ' ')).toContain('only when SB3\'s `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told');
+    expect(sectionOf(guide, '### SB6. The owner\'s fresh yes').replace(/\s+/g, ' ')).toContain('only when SB3\'s `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the people on it were told, and for each one whose limit goes higher that the number was checked twice');
     // The line that tells whether the old release saves an upgrade's shown price looks for a name the upgrade code really has.
     expect(flat).toContain('`grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`');
     expect(read('apps/api/src/billing/upgrade.ts')).toContain('export function monthlyQuoteIdOf(');
     // The drained path never runs SB6: its own yes names the same, and its numbers have their own way back (no WB2 after DR6).
     const drainedFlat = drained.replace(/\s+/g, ' ');
-    expect(drainedFlat).toContain('When SB3\'s `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those plans, and either that nobody holds them or the date the people on them were told, as in SB6.');
+    expect(drainedFlat).toContain('When SB3\'s `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the people on it were told, and for each one whose limit goes higher that the number was checked twice, as in SB6.');
+    // The runbook the owner follows on upload day says the same two statements for its own yes before DR2.
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ')).toContain('your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher, that you checked the number twice.');
     expect(drainedFlat).toContain('**The numbers on the drained path (SB3\'s `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to it (no WB2) once the upload is done.');
     // Both places that send the reader there quote the paragraph's own first words.
     expect(back).toContain('After a drained upload there is no WB2: see "The numbers on the drained path"');

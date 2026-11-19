@@ -2,7 +2,8 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  microsToDecimal, upgradeMonthCreditOverrideMicros, upgradeProrationMicros, type PriceCurrency, type SubscriptionState
+  microsToDecimal, monthCreditInForce, upgradeMonthCreditOverrideMicros, upgradeProrationMicros, type PlansInForcePort,
+  type PriceCurrency, type SubscriptionState
 } from "@debateai/billing-core";
 import type { BillingUpgradeQuoteResponse, BillingUpgradeResponse } from "@debateai/contract";
 import type { BillingRepository, ChargeRow, EntitlementRepository, QuoteRow } from "@debateai/db";
@@ -434,13 +435,16 @@ const laterOf = (left: Date | null, right: Date | null): Date | null =>
  * the quote and the payment, and the person is renewed at the price they saw, as after a first purchase. A payment
  * verified after a renewal moved the period is refunded in full by the settlement and writes nothing; reaching this
  * function with one is an error. N12: on NETOPIA, UPGRADED also carries the upgrade's saved card (`cardTokenId`, spec
- * §2.15.2).
+ * §2.15.2). `creditPlans`: the plans the site served from the period's start to the quote; both plans' credits are the
+ * ones this month has (`monthCreditInForce`), so the stored credit is counted in the same numbers as the month's
+ * limits. Absent: `plans` alone.
  */
 export function upgradeSucceededWrites(input: Readonly<{
   state: SubscriptionState; charge: ChargeRow; quote: QuoteRow; plans: BillingPlans;
   currentMonthCreditOverrideMicros: number | null; now: Date;
   /** The net the plan renews at from now on: the monthly quote's, shown to the person with the upgrade. */
   recurringNetMicros: number;
+  creditPlans?: ReadonlyArray<BillingPlans>;
   /** N12: the token N10 chose at the decision (null: the payment saved no usable card). */
   cardTokenId?: string | null;
 }>): UpgradeSucceededWrites {
@@ -451,12 +455,12 @@ export function upgradeSucceededWrites(input: Readonly<{
       "BILLING_SUBSCRIPTION_EVENTS_INVALID", "An upgrade applies only in the period it was quoted in, with an announced total"
     );
   }
-  const oldPlan = planById(plans, state.planId);
-  const newPlan = planById(plans, quote.planId);
+  const creditPlans = input.creditPlans ?? [plans];
+  const oldPlanCreditMicros = monthCreditInForce(creditPlans, state.planId);
   const monthCreditOverrideMicros = upgradeMonthCreditOverrideMicros({
-    currentMonthCreditMicros: input.currentMonthCreditOverrideMicros ?? oldPlan.monthlyCreditMicros,
-    oldPlanCreditMicros: oldPlan.monthlyCreditMicros,
-    newPlanCreditMicros: newPlan.monthlyCreditMicros,
+    currentMonthCreditMicros: input.currentMonthCreditOverrideMicros ?? oldPlanCreditMicros,
+    oldPlanCreditMicros,
+    newPlanCreditMicros: monthCreditInForce(creditPlans, quote.planId),
     periodStart: state.currentPeriodStart, periodEnd: state.currentPeriodEnd, at: quote.createdAt
   });
   return Object.freeze({
@@ -513,6 +517,7 @@ export function createUpgradeSettlement(deps: Readonly<{
     | "quote">;
   entitlements: Pick<EntitlementRepository, "append">;
   plans: BillingPlans;
+  plansInForce?: PlansInForcePort;
 }>): ChargeSettlement {
   return Object.freeze({
     async succeeded(context: SettlementContext): Promise<SettlementResult> {
@@ -545,9 +550,12 @@ export function createUpgradeSettlement(deps: Readonly<{
         since: subscription.currentPeriodStart, until: now
       }, client);
       const monthly = await monthlyQuoteOf(deps.repository, quote, client);
+      const creditPlans = deps.plansInForce === undefined ? undefined
+        : await deps.plansInForce.between(subscription.currentPeriodStart, quote.createdAt);
       const writes = upgradeSucceededWrites({
         state: subscription, charge, quote, plans: deps.plans, currentMonthCreditOverrideMicros: currentOverride, now,
         recurringNetMicros: monthly?.netMicros ?? planNetPrice(planById(deps.plans, quote.planId), subscription.currency),
+        ...(creditPlans === undefined ? {} : { creditPlans }),
         ...(context.payment === null ? {} : { cardTokenId: context.payment.cardTokenId })
       });
       await appendChecked(deps.repository, client, { state: subscription, events: context.events }, writes.subscriptionEvent);

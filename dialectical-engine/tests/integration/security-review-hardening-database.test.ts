@@ -2282,7 +2282,9 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",
   ] as const;
   const PUBLIC = [
-    "core.latest_provider_probes(text[])", "core.read_current_release()", "core.read_release_state(text)", "core.resolve_run_ref(uuid)",
+    "core.latest_provider_probes(text[])", "core.read_current_release()",
+    // 0185: the switches the site made (release keys and instants), no account's data.
+    "core.read_release_history()", "core.read_release_state(text)", "core.resolve_run_ref(uuid)",
     "core.run_is_published(uuid,uuid)", "identity.outbound_mail_today()", "identity.public_author_name_gone(uuid)", "identity.public_review_held(uuid)",
     "identity.read_public_debate_reports(uuid)", "identity.read_public_debate_updates(uuid)", "identity.read_public_dig_parent(uuid,uuid)",
     "identity.read_public_flag_target(uuid)", "identity.read_public_review_overlay(uuid)", "identity.read_public_tree_of_run(uuid)",

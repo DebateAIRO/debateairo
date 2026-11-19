@@ -105,6 +105,7 @@ import {
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
+  createBillingPlansInForce,
   readBillingPlans,
   readBillingPolicy,
   readBillingEnvironmentGroup,
@@ -678,14 +679,21 @@ const askRoomReadiness = environment.DEPLOYMENT_MODE === "hosted" && siteCostEnv
       // was issued with, never the pointer, and a new ask reads the pointer only to know whether funding is switched on.
       // So a selection made by another release (another version or content, switched on or off) needs no restart here.
       // The team's funding tools are the staff runtime's (createStaffRuntime: one api.funding.selection_differs line).
+      // A person's month keeps the plan numbers it started with (billing-core plans-in-force.ts): every reader of a
+      // person's limits in this process, the refund and the upgrade credit included, asks this one reader.
+      const plansInForce = billingPlans === null ? undefined
+        : createBillingPlansInForce({ pool, ownVersion: environment.REGISTER_VERSION, ownPlans: billingPlans });
       const fundedAllowance = entitlements === null || billingPlans === null ? undefined
-        : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
+        : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints,...(plansInForce === undefined ? {} : { plansInForce })});
       // Since C17 the `?? new BillingPersonAllowanceSource(...)` fallback is unreachable (billing on → always
       // funding-aware); kept until its wiring pins are retired with it.
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
-        : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
-      return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans });
+        : fundedAllowance ?? new BillingPersonAllowanceSource({
+          entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints,
+          ...(plansInForce === undefined ? {} : { plansInForce })
+        });
+      return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans, plansInForce });
     })
   : undefined;
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
@@ -1929,6 +1937,7 @@ const billingRuntime = billingConnectors === null
     return createBillingRuntime({
       cancelLinksPerDay: abuseLimits.cancelLinksPerDay,
       pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
+      ...(askRoomReadiness?.plansInForce === undefined ? {} : { plansInForce: askRoomReadiness.plansInForce }),
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
       mail: {
