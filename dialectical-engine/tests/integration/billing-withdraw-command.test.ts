@@ -228,11 +228,12 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
   it("refuses a statement that arrived after the window closed or is dated ahead, and settles nothing not handed over", async () => {
     const now = new Date();
     const seeded = await seedNetopiaSubscription(database.pool, {
-      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 20 * DAY), taxCountry: "DE"
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 23 * DAY), taxCountry: "DE"
     });
-    // Day 19 after the activation: past the 14 calendar days (R2 Q-6) in any time zone.
+    // Day 21 after the activation: past the 14 calendar days and the longest run of days off that can follow them
+    // (Good Friday to a Tuesday 1 May moves the last day by five), in any time zone.
     await expect(recordOwnerWithdrawal(stores(), {
-      ownerRef: seeded.ownerRef, receivedAt: new Date(seeded.periodStart.getTime() + 19 * DAY)
+      ownerRef: seeded.ownerRef, receivedAt: new Date(seeded.periodStart.getTime() + 21 * DAY)
     })).rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
     await expect(recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt: new Date(now.getTime() + 60_000) }))
       .rejects.toThrow("BILLING_WITHDRAW_RECEIVED_IN_FUTURE");
@@ -539,6 +540,24 @@ describe("W6 Settings and the owner's command: the refund after an upgrade, the 
     await expect((await viaSettings("w6-tuesday", saturday, tuesdayMidnight, 0)).run())
       .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
     await expect((await viaCommand(saturday, tuesdayMidnight, 0)).run()).rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
+  }, 20_000);
+
+  it("keeps a window whose 14th day is a Romanian public holiday open to the next working day, in Settings and by the command", async () => {
+    // Romania, activated Friday 27 March 2026: the 14th day is Good Friday, 10 April, followed by Saturday, Easter
+    // Sunday and Easter Monday, so the window closes at Tuesday 14 April's midnight, Bucharest summer time (21:00 UTC).
+    const goodFriday = (ownerRef: string) => seedNetopiaSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date("2026-03-27T09:00:00.000Z"), taxCountry: "RO"
+    });
+    const tuesdayEvening = new Date("2026-04-14T20:59:00.000Z");
+    const wednesdayMidnight = new Date("2026-04-14T21:00:00.000Z");
+    const refund = (await (await viaSettings("w5-easter-tuesday", goodFriday, tuesdayEvening, 0)).run()).refundMicros;
+    expect(refund).toBe(24_200_000);
+    expect(await (await viaCommand(goodFriday, tuesdayEvening, 0)).run())
+      .toEqual({ kind: "REFUNDING", refundMicros: refund, currency: "USD" });
+    await expect((await viaSettings("w5-easter-wednesday", goodFriday, wednesdayMidnight, 0)).run())
+      .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
+    await expect((await viaCommand(goodFriday, wednesdayMidnight, 0)).run())
+      .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
   }, 20_000);
 });
 

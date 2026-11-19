@@ -1,4 +1,5 @@
 import { TypedDomainError } from "@debateai/kernel";
+import { isRomanianPublicHoliday } from "./romanian-public-holidays.js";
 
 export type WithdrawalDeadline = Readonly<{
   /** The last day of the window in the consumer's calendar (ISO date), for the "withdraw until {date}" line. */
@@ -55,14 +56,13 @@ function localMidnight(civilUtcMidnight: number, zone: string): Date {
 }
 
 /**
- * Spec §2.5.6 "within withdrawal_days of the first ACTIVATED", counted as the owner ruled (R2 Q-6): 14 calendar days
- * from the first activation — the activation's own day is not counted, so the first day is the next one — in the
- * consumer's time zone (the tax country's calendar), ending at the end of the last day. W6 (P2-I9, superseding Q-6
- * for weekends only): a last day that falls on a Saturday or a Sunday moves to the next Monday, as Regulation (EEC,
- * Euratom) No 1182/71 art. 3(4) ends such a period (Directive 2011/83/EU recital 41 applies it). Public holidays do
- * not move it yet: they need a per-country table and counsel, a recorded go-live blocker. Business days are used
- * otherwise only for A7's notice rule (kept for NETOPIA until N-23 is answered). This function is the one place the counting lives, so a later
- * ruling changes it here alone.
+ * The withdrawal window: 14 calendar days (the register's `withdrawalDays`) from the first activation, counted in the
+ * consumer's calendar (the tax country's time zone). The activation's own day is not counted, so the first day is the
+ * next one, and the window ends at the end of the last day. When the last day is a Saturday, a Sunday or a Romanian
+ * public holiday, the window ends at the end of the next working day instead, as Regulation (EEC, Euratom) No 1182/71
+ * art. 3(4) and the Romanian Civil Code art. 2554 end such a period (Directive 2011/83/EU recital 41 applies the
+ * Regulation). The Romanian holidays apply to every buyer: they are exact for a Romanian buyer and can only lengthen
+ * anyone else's window. This function is the one place the counting lives.
  */
 export function withdrawalDeadline(input: Readonly<{
   activatedAt: Date; taxCountry: string; withdrawalDays: number;
@@ -76,14 +76,21 @@ export function withdrawalDeadline(input: Readonly<{
   const dayMs = 86_400_000;
   const { dateZone, closeZone } = consumerZones(input.taxCountry);
   const start = localCalendarDate(input.activatedAt, dateZone);
-  const lastCounted = Date.UTC(start.year, start.month - 1, start.day + input.withdrawalDays);
-  // A civil date's weekday is the same in every zone; Saturday (6) moves two days, Sunday (0) one.
-  const weekday = new Date(lastCounted).getUTCDay();
-  const lastDay = lastCounted + (weekday === 6 ? 2 : weekday === 0 ? 1 : 0) * dayMs;
+  let lastDay = Date.UTC(start.year, start.month - 1, start.day + input.withdrawalDays);
+  // A civil date's weekday is the same in every zone. Each day off moves the end one day on, as often as needed.
+  while (!isWorkingDay(lastDay)) lastDay += dayMs;
   return Object.freeze({
-    lastDay: new Date(lastDay).toISOString().slice(0, 10),
+    lastDay: civilDate(lastDay),
     closesAt: localMidnight(lastDay + dayMs, closeZone)
   });
+}
+
+const civilDate = (civilUtcMidnight: number): string => new Date(civilUtcMidnight).toISOString().slice(0, 10);
+
+/** Monday to Friday and not a Romanian public holiday (Labour Code art. 139(1)). */
+function isWorkingDay(civilUtcMidnight: number): boolean {
+  const weekday = new Date(civilUtcMidnight).getUTCDay();
+  return weekday !== 0 && weekday !== 6 && !isRomanianPublicHoliday(civilDate(civilUtcMidnight));
 }
 
 /** Directive 2011/83/EU art. 13(1) (RO: OUG 34/2014 art. 13(1)): the refund is due within 14 days of the withdrawal. */

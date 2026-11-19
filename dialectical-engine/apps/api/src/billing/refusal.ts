@@ -56,7 +56,8 @@ export type BillingRefusalCode =
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
    * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
-   * Saturday or Sunday moves to the Monday, W6), or a tax country outside `withdrawalCountries` (409).
+   * Saturday, a Sunday or a Romanian public holiday moves to the next working day), or a tax country outside
+   * `withdrawalCountries` (409).
    */
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
