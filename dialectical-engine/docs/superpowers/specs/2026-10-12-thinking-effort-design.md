@@ -235,7 +235,7 @@ change is needed. A unit test pins that the estimate is the same with and withou
 
 ## 6. Test protocol
 
-**Step A — does each level really work?** This step is a few cents.
+**Step A — does each level really work?** This step makes a few small calls.
 - One practice formats run with `--lanes PANEL --samples 1` and every new level for every AI.
 - Each new level counts as working only when:
   - the vendor accepts it (HTTP 200, usage valid);

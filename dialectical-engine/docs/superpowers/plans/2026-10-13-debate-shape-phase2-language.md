@@ -180,7 +180,7 @@ The pre-flight scan (`.superpowers/sdd/2026-10-13-debate-shape-phase2-language/p
 
 - On the preview, the fast call goes through the existing guarded fetch (`createPreviewGuardedFetch`) to the Anthropic gate. The gate has no run concept, so the call is a site cost in the Anthropic daily pot by construction. No app-side row is written.
 - On hosted, the fast call is enabled only when the run-less spend record of Task 19 exists (capability check at boot). Until then hosted runs with eld + site language and no rewrite.
-- Each preview call reserves the Haiku row's whole output bound (about $0.0165) and settles at its real cost (about $0.00005).
+- Each preview call reserves the Haiku row's whole output bound and settles at its real cost, one small fast call.
 
 **Sealed values**
 
@@ -325,15 +325,15 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
     - The code-owned opposite-answer template (P2b Task 2) has entries only for our 35. An outside debate whose choose step names one answer gets the English template.
 - **Serbian or Bosnian in Latin script on the Croatian site** (ruling CR-2).
   - eld would read them as Croatian, so `hr` is a site that ALWAYS asks the fast AI (`FAST_CHECK_ALWAYS_SITES` in `decide.ts`), like `ga`, `id`, `mt` and every site Task 3 measures with a confident near-neighbour confusion.
-  - The fast AI then names Serbian (`sr-Latn`). Each extra check costs about $0.00005.
+  - The fast AI then names Serbian (`sr-Latn`). Each extra check is one small fast call.
   - With the fast AI down, the fallback still reads eld (Croatian): the never-block rule wins there.
 - **Local mode with no paid AI.** eld and the site language decide, and no rewrite is offered.
   - "Paid AI available" means the preview with an Anthropic gate socket, or hosted with an Anthropic support target and Task 19 applied.
   - A preview with no Anthropic gate socket has NO fast check (eld + site language); it never takes the hosted route, even in hosted mode (#163), because the API never holds a vendor key on the preview (ruling L-ROUTE, CR-6, pre-flight PF-L35).
   - A plain local install (relays or subscriptions) has no paid fast check.
 - **A signed-out (legacy) person's question** is decided by eld and the site language only, with no rewrite offered (ruling L-NOCONSENT): no consent is recorded for them, so their question never reaches the fast AI.
-- **eld also reads each clause** of a question (ruling L-MIX). When two clauses read confidently as different languages, the fast AI is asked even on a site eld would otherwise settle. Cost if the clause rule is too eager: one extra fast call (about $0.00005) on some single-language questions; if it misses a mix, the question is locked in the site language with no offer (today's lock).
-- **Each fast check uses one of the preview gate's daily call slots** (`max_paid_posts_per_day`) and briefly holds about $0.0165 of the $2 Anthropic pot until it settles.
+- **eld also reads each clause** of a question (ruling L-MIX). When two clauses read confidently as different languages, the fast AI is asked even on a site eld would otherwise settle. Cost if the clause rule is too eager: one extra small fast call on some single-language questions; if it misses a mix, the question is locked in the site language with no offer (today's lock).
+- **Each fast check uses one of the preview gate's daily call slots** (`max_paid_posts_per_day`) and briefly holds its reservation in the Anthropic pot until it settles.
 - **The real-mix pop-up charges the route's request limiter twice** (D1, CR-1). The debate allowance and billing are charged once, by the request that starts the debate.
 - **The fast check's instruction text and settings live in the optional row `questionLanguagePolicy`.** Absent means the code's start values (Claude Haiku 5.5 `claude-haiku-5-5`, effort low, 5 s, the default text in Task 4). An owner edit is a new register version.
 - **The planner-disagreement record never reaches people** (ruling CR-3). It is an operator-only map note, stored with the run's map (encrypted with the run's content) and read by the practice report and operators. It is not a condition mark, so the honesty drawer, the story and the debate page never show it (rule: no engine internals in user-facing text).
@@ -345,7 +345,7 @@ These are the spec's defaults as built. The ones marked **RISK** are where the c
 Kept as the record. Folded into the task text on 2026-10-13 (see "Amendments 2026-10-13"): CR-1 → D1, Task 0 Step 4, Task 11; CR-2 → Owner-visible defaults, Tasks 3, 7; CR-3 → Goal, Review Focus, Owner-visible defaults, Tasks 14, 15, Owner steps, cross-plan amendment 2 (dropped); CR-4 → Contract deviation 1, Task 0 Step 5, Task 4; CR-5 → D2, Tasks 8, 10, 12, 18; CR-6 → Tasks 6, 12; CR-7 → Owner steps 8.
 
 - **CR-1 (charged twice, D1).** If the route's "per-person admission charge" is only the anti-spam request limiter, charging it for the offer request is accepted. If it touches the person's debate allowance or money (daily/monthly debates, credit, billing hold), the offer request must NOT consume it: the offer returns before any allowance or billing step, and only the resubmission is charged. Task 0's pre-flight says which one it is, with file:line.
-- **CR-2 (Croatian site and near neighbours).** Sites where eld can be confidently wrong about a near neighbour always ask the fast AI: `ga`, `id`, `mt` (eld lacks them), `hr` (Serbian/Bosnian in Latin script), plus every site Task 3 measures with a confident near-neighbour confusion. One constant in `decide.ts`, filled from Task 3's numbers. Each extra check costs about $0.00005.
+- **CR-2 (Croatian site and near neighbours).** Sites where eld can be confidently wrong about a near neighbour always ask the fast AI: `ga`, `id`, `mt` (eld lacks them), `hr` (Serbian/Bosnian in Latin script), plus every site Task 3 measures with a confident near-neighbour confusion. One constant in `decide.ts`, filled from Task 3's numbers. Each extra check is one small fast call.
 - **CR-3 (planner disagreement is measurement only).** `LANGUAGE_PLANNER_DISAGREES` never reaches people: not in the honesty drawer, the story or any page text (rule: no engine internals in user-facing text). Record it in an operator-only channel (a run note or record the practice report and operators read), not as a user-visible condition mark. If the kernel's condition marks have no operator-only kind, do NOT add it to `CONDITION_MARKS`; then the mark-count pins stay at P2b's value, and cross-plan amendment 2 is dropped.
 - **CR-4 (thinking off).** After Task 0 merges origin/dev (it brings the owner's thinking-effort setting, PR #149), check whether the preview gates (TypeScript and Python) accept thinking off for Haiku. If they do, the row's start value is off. Otherwise `low`, as in Contract deviation 1.
 - **CR-5 (check-reference key).** The HMAC key must be the same for every API process of one deployment. Derive it (HKDF, purpose label `question-language-check-v1`) from an existing server secret the API already loads, if one fits. Only if none exists, keep the per-process random key and document the single-process limit. A reference that fails on another process must never show the person the pop-up twice in a row for the same question: the page re-runs the check, and a second offer for the same question hash within 15 minutes is answered with the fallback lock (the site language or eld's confident language) instead of another pop-up.
@@ -398,7 +398,7 @@ Kept as the record. Folded into the task text on 2026-10-13 (see "Amendments 202
    - the lock;
    - the planner's `question_language`.
 
-   Output goes to `language.jsonl` + `report.md` in the outside-the-repository report folder. Expected cost is under $0.05.
+   Output goes to `language.jsonl` + `report.md` in the outside-the-repository report folder. The run's report gives what it spent.
 3. **The language cases** are fixed in code like the other practice questions, with a site language each:
 
 | id | site | question (shape of it) | expected lock | offer? |
@@ -1141,7 +1141,7 @@ The rule has no memory term, so it may pick `large` (about 138 MB resident in th
 - **The pure controls** (`pureControls`): every legal sentence of all 35 locales, plus every Romanian sentence without diacritics. These are single-language questions.
 - **A confident segment** (`eldSegmentConfident`): `code !== null && reliable && letters >= segmentMinLetters` (letters of plain words only: Task 2's clause rule, so names, brands and borrowed capitalised words can never make a segment confident alone).
 - **eld sees a mix** (`eldSeesMix`): at least two confident segments with different codes.
-- **mixCaught**: the built questions for which eld sees a mix. **pureFlagged**: the pure controls for which eld sees a mix (each one costs one extra fast call, about $0.00005, on a site eld would otherwise settle).
+- **mixCaught**: the built questions for which eld sees a mix. **pureFlagged**: the pure controls for which eld sees a mix (each one costs one extra small fast call on a site eld would otherwise settle).
 - **The choice rule** (`chooseSegmentMinLetters`), over `segmentMinLetters` in 12, 20, 30 and 40: keep the rows with `pureFlagged * 20 <= pure` (at most 5% of single-language questions pay an extra call); take the largest `mixCaught`; on a tie, the LARGER `segmentMinLetters` (fewer false flags). No row left → `null`: STOP and report the table to the controller. A chosen row that catches fewer than 80% of the joins (`mixCaught * 10 < joins * 8`) is kept but reported to the controller: a missed mix only falls back to today's lock (the site language, no offer).
 
 - [ ] **Step 1: Move the extractor.** Create `tools/question-language-tune/legal-sentences.ts` with the #158 code (from `tests/unit/argument-language.test.ts`, the block that starts `function legalSentences`, about lines 324–335), exported, plus the built mixed set:
@@ -2090,7 +2090,7 @@ export function anthropicFastCheckTransport(deps: Readonly<{
 
 `TypedDomainError`'s code is a plain `string` (`packages/kernel/src/index.ts`), so the computed code is fine. If `anthropicMessagesRequestBody` returns an object rather than a string, pass `JSON.stringify(body)` to `fetch` (the projection above already measures the string form). Add the file to the manifest.
 
-Implementer note (pre-flight PF-L17): the preview facts hold — `createPreviewGuardedFetch(ports)` (`packages/providers/src/preview-test.ts` ~663); the API already builds `previewFetch` (`apps/api/src/main.ts` ~511); the Anthropic gate's peers include the API (`deploy/preview-gate/v3/README-anthropic.md` ~331). `anthropicBodyAccepted` and the Python `body_valid` accept exactly `model`, `max_tokens` (≤ 32768), `messages`, an optional `system` and `output_config.effort`; this body passes and reserves about $0.0165. At effort `low`, thinking counts against `max_tokens: 600`: a cut-off reply reads UNREADABLE and falls back (never a block). On hosted, the key is the support target's (`SUPPORT_MODEL_TARGET_JSON`, resolved inside `createSupportModelAdapter`), so no new credential (CR-6); the preview never sets it.
+Implementer note (pre-flight PF-L17): the preview facts hold — `createPreviewGuardedFetch(ports)` (`packages/providers/src/preview-test.ts` ~663); the API already builds `previewFetch` (`apps/api/src/main.ts` ~511); the Anthropic gate's peers include the API (`deploy/preview-gate/v3/README-anthropic.md` ~331). `anthropicBodyAccepted` and the Python `body_valid` accept exactly `model`, `max_tokens` (≤ 32768), `messages`, an optional `system` and `output_config.effort`; this body passes, and the gate reserves the row's whole output bound for it. At effort `low`, thinking counts against `max_tokens: 600`: a cut-off reply reads UNREADABLE and falls back (never a block). On hosted, the key is the support target's (`SUPPORT_MODEL_TARGET_JSON`, resolved inside `createSupportModelAdapter`), so no new credential (CR-6); the preview never sets it.
 
 - [ ] **Step 4: Run it and expect PASS**
 
@@ -2285,7 +2285,7 @@ export type LanguageDecision =
  * Ruling CR-2: the sites where eld may be confidently wrong about a near neighbour, so the fast AI always checks even
  * when eld names the site language: the three eld lacks (ga, id, mt), Croatian (Serbian and Bosnian in Latin script
  * read as Croatian), and every site Task 3 measured with a confident cross-locale confusion (ELD_CONFUSED_SITES).
- * Each extra check costs about $0.00005. The fallback (fast AI down) still uses eld: never block.
+ * Each extra check is one small fast call. The fallback (fast AI down) still uses eld: never block.
  */
 export const FAST_CHECK_ALWAYS_SITES: readonly string[] = Object.freeze(
   [...new Set([...SITE_LANGUAGES_ELD_LACKS, "hr", ...ELD_CONFUSED_SITES])].sort());
@@ -3031,7 +3031,7 @@ export function questionLanguageAskContractMember(lock: QuestionLanguageLock | n
 
 `ownerScopeOf`'s legacy form must match how Task 8 binds the reference. Both use the same `ownerScope` string from this one function, so they agree by construction. Note the offer-memory entry is set BEFORE the safeParse; that is harmless (a refused offer then answers a repeat with REPEAT_OFFER, also a lock). Add the file to the manifest.
 
-Implementer note (pre-flight PF-L26): the REPEAT_OFFER memory is an in-process `Map`. There is one API process today (`deploy/vps/systemd/debateai-api.service`); a restart or a second process loses it, and then the page's "once per submit" rule (Task 18) is the only guard. The repeat check runs after the fast call, so a repeat still pays one call (about $0.00005). The time limit lives in Task 5 (`AbortSignal.timeout`), not here. `onDecided` carries the original question line: wire it only to practice (P2d), never to a logger.
+Implementer note (pre-flight PF-L26): the REPEAT_OFFER memory is an in-process `Map`. There is one API process today (`deploy/vps/systemd/debateai-api.service`); a restart or a second process loses it, and then the page's "once per submit" rule (Task 18) is the only guard. The repeat check runs after the fast call, so a repeat still pays one small fast call. The time limit lives in Task 5 (`AbortSignal.timeout`), not here. `onDecided` carries the original question line: wire it only to practice (P2d), never to a logger.
 
 - [ ] **Step 4: Run it and expect PASS**
 
@@ -4632,7 +4632,7 @@ Print the map hash with `pnpm exec tsx -e 'import {mapPromptContractHash} from "
    - P2b's open owner notes still stand: fix the re-claim bug (task chip task_205182c8) before turning the shape on in hosted mode, and re-check `serve_reserve_basis_points`.
 2. **The optional row `questionLanguagePolicy`.** Publish it only to change the provider/model, switch the check off, or edit the instruction. Absent means the start values. Preview: an optional source row of the v2/v3 kit (kit v3, from #163, supersedes v2 for the hosted preview: Task 0 Step 2b and Task 12 make both carry it, through the plan key `questionLanguage` / flag `--question-language`; pre-flight PF-L63). Hosted: the optional file member.
 3. **Server gate check.** The preview Anthropic gate must accept `claude-haiku-5-5` with effort `low` from the API's process. It already does for the support relay's model row, but confirm the API's socket access on the server before turning the shape row on.
-4. **Hosted:** apply migration 0117 (Task 19) before hosted's first shape debate. Until then hosted runs eld + site language with no rewrite (short Chinese, Japanese, Korean, Hebrew and Greek questions are then read from their alphabet: final review I3). Hosted records each check AFTER the call (its framed message is about 5.2 KB, so one check costs about $0.00013); if that record fails (`api.question_language.spend_unrecorded`), the day's pot under-counts by that one call, as the support chat already does (pre-flight PF-L60). A failed record never fails the ask: after a refused grant, a missing writer or a check violation (42501, 42883, 23514), or three failed records in a row, the spend-record breaker latches and the fast check stays off until a restart (`api.question_language.spend_record_down`; ruling of Task 19). The fast check is also skipped, never blocking, while the day's site pot is at its ceiling (ruling L-POT; an unreadable pot counts as full). The hosted PREVIEW never takes this route (ruling L-ROUTE): with no Anthropic gate socket it runs eld + site language.
+4. **Hosted:** apply migration 0117 (Task 19) before hosted's first shape debate. Until then hosted runs eld + site language with no rewrite (short Chinese, Japanese, Korean, Hebrew and Greek questions are then read from their alphabet: final review I3). Hosted records each check AFTER the call (its framed message is about 5.2 KB, about 1,300 input tokens: one small fast call); if that record fails (`api.question_language.spend_unrecorded`), the day's pot under-counts by that one call, as the support chat already does (pre-flight PF-L60). A failed record never fails the ask: after a refused grant, a missing writer or a check violation (42501, 42883, 23514), or three failed records in a row, the spend-record breaker latches and the fast check stays off until a restart (`api.question_language.spend_record_down`; ruling of Task 19). The fast check is also skipped, never blocking, while the day's site pot is at its ceiling (ruling L-POT; an unreadable pot counts as full). The hosted PREVIEW never takes this route (ruling L-ROUTE): with no Anthropic gate socket it runs eld + site language.
 5. **Wording picks:**
    - **(a) The pop-up title.** Option 1 «Your question's language / Limba întrebării» (in code); 2 «One language for your question / O singură limbă pentru întrebare»; 3 «Check your question's language / Verifică limba întrebării».
    - **(b) The Romanian body's register.** The spec's text uses «ta» (informal) while the RO catalogue elsewhere uses the polite plural. In code: the spec's informal text, adjusted for filled names (Contract deviation 4).

@@ -22,7 +22,7 @@ opening. Three problems follow:
 
 The new shape has two stages.
 
-**Stage 1, the map.** It is cheap and wide, about $0.01–0.02:
+**Stage 1, the map.** It is cheap and wide:
 
 1. One call picks the angles to look from. Three are always included: the strongest case for the opposite answer, what
    the person asking is probably worried about, and the practical "what should I do".
@@ -130,8 +130,8 @@ redaction and outside-the-repository report folder as `formats`.
   AI and maker, exactly what it could see (blind, or the ids of what it was shown), its order position, timing, tokens,
   cost, format check and the reply text. `report.json` and `report.md` hold counts, cost, time, slips and fallbacks per
   arm. The tool computes no quality score; scoring is the owners' private method.
-- **Measurement run.** One run, all five preview AIs, within the owners' test budget (expected
-  about $0.5–1). Before the run there is a `--dry` mode with scripted answers, which spends nothing.
+- **Measurement run.** One run, all five preview AIs, within the owners' test budget. Before the
+  run there is a `--dry` mode with scripted answers, which spends nothing.
 - **Decision.** The owners' private method picks the opening. The owner is told only when the data contradicts S1.
 
 ## 3. Phase 2: the whole shape in the runner

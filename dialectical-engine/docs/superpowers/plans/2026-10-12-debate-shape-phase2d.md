@@ -76,7 +76,7 @@ Tasks 1–3:
 - Task 2 rewritten for `--register-next`: without it, `--shape-policy` publishes the practice's own version as planned; with it, practice.ts hands the policy to `composePracticeNextRegisterVersion` (new optional `debateShape`, passed to `buildPreviewSourceRowsV2`'s existing argument) and nothing more is published; Step 5(c) keeps today's block, the five pinned strings and both progress messages, and only widens the `const settings` expression; old Steps 5(d)/5(e) deleted (done in today's code); `shapeRowChange` names the row's change in either path; a guard refuses a policy the version does not carry; a unit case for the flag combination; `answer-writer-v3-register-12` in Step 6 (pre-flight PF-D1; controller ruling D-REGNEXT).
 - Task 2: `PRACTICE_CODE_HASH_ROW_KEYS` holds `conformanceContractHash` too; the expected key order and the hash test follow (pre-flight PF-D7).
 - Task 2 Step 5(a): one value import from `@debateai/register` replaces today's type-only line (pre-flight PF-D8).
-- Task 2: what a shape debate does from this task on (one Haiku fast check, about $0.00013; site "en" before Task 7b); the red-first message; no `noUnusedLocals` (pre-flight PF-D10).
+- Task 2: what a shape debate does from this task on (one small Haiku fast check; site "en" before Task 7b); the red-first message; no `noUnusedLocals` (pre-flight PF-D10).
 
 Task 4 and Task 5:
 - Task 4: a shape run whose map answers were not argued (`mapAnswersArgued` false) is NOT_PROVEN `SHAPE_NOT_EXERCISED:MAP_ANSWERS_NOT_ARGUED`, its opening `TODAYS_OPENING`; tests, verdict doc and commit say so (pre-flight PF-D11; controller ruling D-NOTARGUED).
@@ -753,7 +753,7 @@ The tool gained `--register-next` after this plan was first written: it publishe
 - without `--register-next`, `--shape-policy` publishes the practice's own version, as planned;
 - with `--register-next`, the policy is handed to `composePracticeNextRegisterVersion`, which passes it to the preview publish kit's own source build (`buildPreviewSourceRowsV2`'s existing `debateShape` argument). The code's next version then carries the row, through the server's own publisher path, and nothing more is published. A second version on top would have undone every row the code's next version changed.
 
-What a `--shape-policy` debate does from this task on (pre-flight PF-D10): one fast language check by Haiku through the Anthropic gate during the ask (about $0.00013; not a ledger `MODEL_CALL` row). Before Task 7b the ask carries no `site_language`, so the site is "en", an always-ask site: a Romanian question is locked FAST "ro" (or `FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE` on a mix, ruling L-POPUP-FIRST). A register without a `questionLanguagePolicy` row uses the code's start values.
+What a `--shape-policy` debate does from this task on (pre-flight PF-D10): one fast language check by Haiku through the Anthropic gate during the ask (one small call; not a ledger `MODEL_CALL` row). Before Task 7b the ask carries no `site_language`, so the site is "en", an always-ask site: a Romanian question is locked FAST "ro" (or `FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE` on a mix, ruling L-POPUP-FIRST). A register without a `questionLanguagePolicy` row uses the code's start values.
 
 **Files:**
 - Modify: `tools/preview-practice/practice-register-import.ts` (append; `composePracticeNextRegisterVersion` gains an optional `debateShape`)
@@ -3836,7 +3836,7 @@ with:
 (a) In "## What this is, in plain words", change "Three modes:" (README:20) to "Four modes:" (pre-flight PF-D28), and add a bullet after **openings**:
 
 ```markdown
-- **language**: the question-language practice (no debate, under <amount>). Nine fixed questions are each read the way the
+- **language**: the question-language practice (no debate, a few small calls). Nine fixed questions are each read the way the
   site will read them before a debate, and the report says which language each would be locked to. See "The question
   language".
 ```
@@ -3864,7 +3864,7 @@ With the new shape on, the site fixes the language of each question before the d
   were no fast AI: its language must come from its alphabet. The fast AI is still asked, so its reading is written
   down.
 - It writes `language.jsonl` (one line per question, never the question's text), `report.json` and `report.md`.
-- It costs under $0.05 and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
+- It makes a few small calls (the report gives what it spent) and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
   170 seconds to plan a question's angles.
 
 | Id | Site | Must lock | Offer the rewrite |
@@ -3961,7 +3961,7 @@ Then:
   `questionLanguagePolicy` row, if any). Nothing else.
 ```
 
-(e) In "## Money and time (rough)", add: `- language: under $0.05, about 5 to 20 minutes.` (pre-flight PF-D28)
+(e) In "## Money and time (rough)", add: `- language: a few small calls (the run's report gives what it spent), about 5 to 20 minutes.` (pre-flight PF-D28)
 
 (f) In "## Files", add after the `practice-shape.ts` bullet:
 
@@ -4570,7 +4570,7 @@ Expected: every one PASS. A red one is reported with its file and case; fix only
 | The start-values file is exactly the start values (`mapStepBounds` written, no `enabled`) | Task 1 (the file and its test) |
 | A row switched off (`enabled: false`) is no row | Task 1 (refused in a `--shape-policy` file); Task 2 (`debateShapeInForce` on the register's row) |
 | P2L as a precondition; P2d runs last | Global Constraints ("Order"); Task 0 Step 3b |
-| Language mode: eld, the fast check always asked, one `MAP:angles` per case, the lock as the decider computes it, `language.jsonl` + report in the outside-the-repository folder, under $0.05 | Task 7b (`runPracticeLanguage`, `practiceLanguageOutcome`, `runPracticeLanguageMode`; unit tests; the integration case counts nine fast checks and pins every lock's source) |
+| Language mode: eld, the fast check always asked, one `MAP:angles` per case, the lock as the decider computes it, `language.jsonl` + report in the outside-the-repository folder, a few small calls | Task 7b (`runPracticeLanguage`, `practiceLanguageOutcome`, `runPracticeLanguageMode`; unit tests; the integration case counts nine fast checks and pins every lock's source) |
 | The nine language cases: P2L's table word for word, then the P2L final review's I3 (`lang-zh-short`, the fast check off) and I1 (`lang-ku-arab`, Sorani on the Arabic site) (pre-flight PF-D25, controller ruling D-CASES) | Task 7b (`PRACTICE_LANGUAGE_CASES`; a test pins every field, and the two added questions' letter counts) |
 | Pass bar: no wrong lock, every real mix offered; rewrites judged by the owners from report.md; planner never counted | Task 7b (`practiceLanguageVerdict` on FAIL / NOT_PROVEN / PASS; report.md shows question and rewrite side by side; the planner test) |
 | CR-3: the planner's disagreement is operator-only, never a condition mark | Task 0 Step 3b (not in `CONDITION_MARKS`); Task 7b (read through `readMapResultForRun` into the practice report only; no mark expected or counted) |

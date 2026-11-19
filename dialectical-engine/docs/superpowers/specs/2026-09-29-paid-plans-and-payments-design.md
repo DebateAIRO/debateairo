@@ -455,7 +455,7 @@ Paths are relative to `dialectical-engine/`. Line numbers are at `origin/dev` 24
   - Login is HTTP Basic with the API key. A sandbox exists. There is no Node SDK.
   - All target countries are covered except Brazil. It does not do Romanian e-Factura.
 - **SmartBill:**
-  - The API needs the Platinum plan (€8.94 a month, 700 documents included, then €0.017 each).
+  - The API needs SmartBill's Platinum plan.
   - Invoices in any currency at the BNR rate, with automatic e-Factura sending.
   - The limit is 3 calls a second; going over blocks access for 10 minutes.
   - The exact endpoints are confirmed in plan task P2-SB-0.
