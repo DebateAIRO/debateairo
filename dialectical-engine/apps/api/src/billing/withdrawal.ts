@@ -53,37 +53,36 @@ const stillHeld = (paid: ReadonlyArray<PaidTransaction>): number =>
 const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
 
 /**
- * Spec §2.5.6 withdraw. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
- * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one PAYMENT_REFUND job per payment, split newest first) —
- * and only then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last
- * refund (RefundDesk's WITHDRAWAL follow-up). The same transaction queues the acknowledgement on a durable medium
- * (OUG 34/2014 art. 11^1(7); Directive 2011/83/EU art. 11(3)) for every withdrawal it records, M8_RECEIVED: the
- * statement's date and time in the buyer's own zone with the offset named, the plan and the day it started, the
- * buyer's name (read when the email is sent, never queued), then the refund on its way, nothing due back (it is then
- * the only email), or the owner's check.
+ * Records a withdrawal. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
+ * refund intents (RefundDesk: REFUND_REQUESTED and one PAYMENT_REFUND job per payment, split newest first) — and only
+ * then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last refund
+ * (RefundDesk's WITHDRAWAL follow-up). The same transaction queues the acknowledgement on a durable medium (OUG
+ * 34/2014 art. 11^1(7); Directive 2011/83/EU art. 11(3)) for every withdrawal it records, M8_RECEIVED: the statement's
+ * date and time in the buyer's own zone with the offset named, the plan and the day it started, the buyer's name (read
+ * when the email is sent, never queued), then the refund on its way, nothing due back (it is then the only email), or
+ * the owner's check.
  *
- * The refund (owner's decision of 16 November 2026, one rule for every country the site serves): what the payments
- * made up to `withdrewAt` still hold, added up, times the share of the plan credit not used, floored to cents once
- * (`withdrawalRefundMicros`). The days gone by do not count: nothing used gives the whole price back, and the whole
- * credit used gives nothing back. The credit is the one in force at `withdrewAt` (A6's override after an upgrade) and
- * the credit used is what was spent from the period start to it ("withdrawal after an upgrade: the paid total is the
- * sum of all successful charges since the first activation"); both are read before the lock, so a plan or period that
- * changed meanwhile is refused and nothing is written. The credit used counts calls by when they were sent, and only
- * those charged by the time it is read. A debate still running never holds a withdrawal up: once the person confirms,
- * the law counts the statement as made (OUG 34/2014 art. 11^1(7)-(8)), so it is recorded at once and settled with what
- * has been charged; a call sent before it and charged later is not counted, in the person's favour, and calls sent
- * after it were never theirs to pay. C1 (P2-W6): a payment whose SUCCEEDED is after `withdrewAt` (an
- * upgrade paid after the emailed statement arrived, before the owner ran the command) takes no share: it goes back
- * whole, what it still holds, on top of that amount. The refund is still split newest first, so such a payment is the
- * first to go back.
+ * The refund, one rule for every country the site serves: what the payments made up to `withdrewAt` still hold, added
+ * up, times the share of the plan credit not used, floored to cents once (`withdrawalRefundMicros`). The days gone by
+ * do not count: nothing used gives the whole price back, and the whole credit used gives nothing back. The credit is
+ * the one in force at `withdrewAt` (the upgrade's override, after an upgrade) and the credit used is what was spent
+ * from the period start to it, so after an upgrade the paid total is every successful charge since the first
+ * activation; both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is
+ * written. The credit used counts calls by when they were sent, and only those charged by the time it is read. A
+ * debate still running never holds a withdrawal up: once the person confirms, the law counts the statement as made
+ * (OUG 34/2014 art. 11^1(7)-(8)), so it is recorded at once and settled with what has been charged; a call sent before
+ * it and charged later is not counted, in the person's favour, and calls sent after it were never theirs to pay. A
+ * payment whose SUCCEEDED is after `withdrewAt` (an upgrade paid after the emailed statement arrived, before the owner
+ * ran the command) takes no share: it goes back whole, what it still holds, on top of that amount. The refund is still
+ * split newest first, so such a payment is the first to go back.
  *
- * D6a F20(c): when a refund made in NETOPIA's admin touched any paid payment (`providerRefunded`, whose
- * refunded amount is only an upper bound), or when a transaction already holds a refund request
- * (`REFUND_TRANSACTION_ALREADY_REFUNDED`), the refund due cannot be taken from our rows: the withdrawal is recorded
- * (the plan ends now) with `refund_by_owner`, and no intent and no M8 are written. The owner settles it with
- * `pnpm billing:withdraw --owner <ref> --refund <amount> --dashboard <amount>` (P14c); P16b's summary lists it until
- * then. W9 (P2-I11): the owner is emailed at once (O2_WITHDRAWAL, reason WITHDRAWAL_BY_OWNER, with the refund's 14-day
- * deadline counted from `withdrewAt`), in the same transaction, so the deadline never waits for the quarterly O1.
+ * When a refund made in NETOPIA's admin touched any paid payment (`providerRefunded`, whose refunded amount is only an
+ * upper bound), or when a transaction already holds a refund request (`REFUND_TRANSACTION_ALREADY_REFUNDED`), the
+ * refund due cannot be taken from our rows: the withdrawal is recorded (the plan ends now) with `refund_by_owner`, and
+ * no intent and no M8 are written. The owner settles it with `pnpm billing:withdraw --owner <ref> --refund <amount>
+ * --dashboard <amount>`; the owner summary lists it until then. The owner is also emailed at once (O2_WITHDRAWAL,
+ * reason WITHDRAWAL_BY_OWNER, with the refund's 14-day deadline counted from `withdrewAt`), in the same transaction, so
+ * the deadline never waits for the quarterly O1.
  */
 export async function recordWithdrawal(deps: WithdrawalDeps, request: WithdrawalRequest): Promise<WithdrawalOutcome> {
   const now = deps.clock();
@@ -166,7 +165,7 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     });
     // The person is told at once what has happened (M8_RECEIVED). RefundDesk queues M8 after the last refund; with
     // nothing due back no refund moves, so the acknowledgement is the only email; a withdrawal handed to the owner gets
-    // its M8 when the owner settles it (P14c).
+    // its M8 when the owner settles it with the command.
     const customer = await deps.billing.customerByOwner(ownerRef, client);
     const withdrawalDate = withdrewAt.toISOString();
     if (customer !== null) {
@@ -212,8 +211,8 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
 
 /**
  * The Settings route: now, for the signed-in session alone. OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a,
- * recital 37; owner ruling 2026-11-04): a person already signed in withdraws without identifying again, so no
- * password, authenticator code or step-up grant is asked; the page's "Confirmați retragerea" is the confirmation.
+ * recital 37): a person already signed in withdraws without identifying again, so no password, authenticator code or
+ * step-up grant is asked; the page's "Confirmați retragerea" is the confirmation.
  */
 export async function withdraw(deps: WithdrawalDeps, input: Readonly<{
   authenticated: AuthenticatedSession; mailLocale?: string;
