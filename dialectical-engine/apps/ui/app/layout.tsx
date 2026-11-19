@@ -10,6 +10,7 @@ import { LegalDocumentsProvider } from "@/components/consent/LegalDocumentsProvi
 import { SupportConversationGuard } from "@/components/support/SupportConversationGuard";
 import { ConsentCatalogProvider } from "@/components/consent/useConsentCatalog";
 import { cookies } from "next/headers";
+import { lineFooterBilling } from "@/lib/billing/footerBilling";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { getLocale, isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -84,6 +85,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await requestLocale();
   const localeDefinition = getLocale(locale);
+  // Started first, so the one-line footer's plans read (at most one a minute) runs beside the catalogue loads.
+  const lineBilling = lineFooterBilling();
   const [chrome, debateViews, support, home, consentNamespace, legalNamespace, privacy, terms, auth] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "debateViews"),
@@ -148,7 +151,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
                 </main>
                 <CookieConsent />
-                <SiteFooter variant="line" />
+                <SiteFooter variant="line" billing={await lineBilling} />
                 <SupportConversationGuard />
                 <DocumentTitle brand="Dialectical Engine" />
                 {/* Keyboard audit, 12 Nov: a control switched off or removed under focus never drops focus to the page. */}

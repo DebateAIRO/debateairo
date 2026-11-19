@@ -74,6 +74,11 @@ installUiApiProof(uiApiProof);
 for (const key of ["XMONEY_SDK_ORIGIN"]) {
   if (process.env[key] !== undefined) console.warn(JSON.stringify({ event: "ui.setting.retired", key }));
 }
+// NETOPIA's hosted logo: the shop id NETOPIA shows the merchant, 1 to 12 digits (lib/billing/paymentMarks.ts
+// NETOPIA_LOGO_ID_FORM; this file can import only .mjs files, so the form is written out again). Any other value refuses
+// to start, so a typo never ships a broken image address. The code is named, never the value.
+const netopiaLogoId = process.env.NETOPIA_LOGO_ID;
+if (netopiaLogoId !== undefined && !/^[0-9]{1,12}$/.test(netopiaLogoId)) throw refuse("NETOPIA_LOGO_ID_INVALID");
 // L3-F6: the API proxy route vouches for the stamped client address only when THIS
 // front door is in front of it. A bare `next start` never sets the marker, so a
 // client-supplied `x-debateai-client-ip` is dropped there instead of being forwarded.

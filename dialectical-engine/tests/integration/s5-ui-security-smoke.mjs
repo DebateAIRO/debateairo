@@ -14,7 +14,7 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 // (apps/ui/content-security-policy.mjs). A matcher-excluded path must still
 // carry it: nothing is served without a policy.
 // (The Turnstile sources joined the policy at HEAD without this copy following; NV-03's run brought it up to date.)
-const FALLBACK_CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
+const FALLBACK_CONTENT_SECURITY_POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mny.ro; font-src 'self'; connect-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; upgrade-insecure-requests";
 const API_CONTENT_SECURITY_POLICY = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 const NONCE_SOURCE = /script-src 'self' 'nonce-([A-Za-z0-9+/=]{22,})' 'strict-dynamic'(?:;|$)/;
 const INJECTED_NONCE = "AAAAAAAAAAAAAAAAAAAAAA==";
@@ -456,6 +456,8 @@ async function smoke(surface) {
     // NV-03: a website that trusts a proxy refuses to start without a proof, and with a proof equal to its edge secret.
     await assertRefusesToStart(root, { DIALECTICAL_UI_TRUSTED_PROXIES: "127.0.0.1" }, "DIALECTICAL_UI_API_PROOF_REQUIRED");
     await assertRefusesToStart(root, { DIALECTICAL_UI_EDGE_SECRET_PATH: secretPath, DIALECTICAL_UI_API_PROOF_PATH: secretPath }, "DIALECTICAL_UI_API_PROOF_REUSES_EDGE_SECRET");
+    // NETOPIA's logo id must be 1 to 12 digits, or the website does not start (a typo never ships a broken image address).
+    await assertRefusesToStart(root, { NETOPIA_LOGO_ID: "12a" }, "NETOPIA_LOGO_ID_INVALID");
 
     // Side-by-side C12 (spec §6): /readyz is answered by the edge from its own API's /readyz, for Caddy's probe with
     // the edge secret as for any caller. The stub API answers 401 to everything, which is not a readiness answer.
