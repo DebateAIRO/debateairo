@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Tóm tắt
-eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v2.19 · CÓ HIỆU LỰC 19 THÁNG 11 NĂM 2026
+eyebrow: ĐIỀU KHOẢN DỊCH VỤ · v1.0 · CÓ HIỆU LỰC 19 THÁNG 11 NĂM 2026
 title: Những điều bạn đồng ý
 lede: Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.
-endMarker: HẾT ĐIỀU KHOẢN · v2.19
+endMarker: HẾT ĐIỀU KHOẢN · v1.0
 bodyLabel: Nội dung Điều khoản dịch vụ
 annexTitle: Phụ lục A — Điều khoản theo khu vực
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LUẬT ĐIỀU CHỈNH
 -->
 
-**Version 2.19 · Effective 19 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
+**Version 1.0 · Effective 19 tháng 11 năm 2026 · Các phiên bản trước tại dezbatere.ro/terms/versions · Ngôn ngữ: tiếng Việt.**
 
 **In short.** Bạn phải từ 18 tuổi trở lên. Dialectical Engine xây dựng các lập luận bằng mô hình AI và mọi nội dung do dịch vụ tạo ra đều có thể sai — đó không phải là lời tư vấn. Trên gói miễn phí, các cuộc tranh luận của bạn trở thành công khai khi kết thúc, sau khi AI kiểm tra; trên gói trả phí, chúng là riêng tư trừ khi bạn công khai chúng. Khi đã công khai, bất kỳ ai cũng có thể đọc một cuộc tranh luận, và nó vẫn công khai. Văn bản bạn gửi được chuyển đến các nhà cung cấp AI nêu trong Sổ đăng ký nhà cung cấp của chúng tôi, chủ yếu là DeepInfra, tại Hoa Kỳ. Điều khoản của DeepInfra, Anthropic và Perplexity không cho phép họ huấn luyện mô hình bằng văn bản đó; mục 8 cho biết chúng tôi chưa xác nhận điều này đối với công ty nào. Hãy báo cáo nội dung bất hợp pháp tại support@dezbatere.ro dù bạn có tài khoản hay không. Luật Romania điều chỉnh, nhưng các biện pháp bảo vệ người tiêu dùng tại nơi bạn sinh sống vẫn được bảo đảm.
 
@@ -251,30 +251,6 @@ Chúng tôi thông báo trước cho bạn trên một phương tiện bền v�
 
 **Đối với các Điều khoản này.** Chúng tôi có thể thay đổi các Điều khoản này vì các loại lý do tương tự. Đối với thay đổi không làm giảm quyền của bạn, chúng tôi đăng phiên bản mới kèm bản tóm tắt nội dung thay đổi và gửi email cho bạn ít nhất **30 ngày** trước khi phiên bản có hiệu lực; tiếp tục sử dụng Dialectical Engine sau ngày đó có nghĩa là bạn chấp nhận phiên bản mới, và bạn có thể đóng tài khoản trước ngày đó. Đối với thay đổi làm giảm quyền của bạn — bao gồm tăng giá đối với gói hiện có, hạ thấp giới hạn, loại bỏ tính năng, cách sử dụng mới đối với nội dung của bạn, hoặc thay đổi về trách nhiệm, luật điều chỉnh hay giải quyết tranh chấp — chúng tôi yêu cầu bạn chấp nhận rõ ràng phiên bản mới vào lần đăng nhập tiếp theo, và thay đổi chỉ áp dụng về sau. Chúng tôi không bao giờ áp dụng thay đổi hồi tố và không bao giờ dùng mục này để thay đổi nội dung cốt lõi mà bạn đã thanh toán giữa kỳ mà không cho bạn một lối thoát. Các phiên bản trước vẫn được cung cấp tại dezbatere.ro/terms/versions.
 
-Phiên bản 2.18 thay thế phiên bản 2.17: Phụ lục A.3 nêu rằng ở Quebec, các cuộc tranh luận trên gói trả phí cũng mặc định là riêng tư, còn các cuộc tranh luận trên gói miễn phí là công khai, như mục 9 nêu; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi. Phiên bản 2.18 cũng nêu tên DeepInfra, công ty nhận phần lớn văn bản của một cuộc tranh luận, cho biết DeepInfra chuyển yêu cầu của một mô hình đến một công ty đối tác, và cho biết chúng tôi đã xác nhận đối với những nhà cung cấp nào rằng điều khoản của họ không cho phép huấn luyện bằng nội dung của bạn (mục 8).
-
-Phiên bản 2.17 thay thế phiên bản 2.16: mục 10 nêu rõ khi nào AI đọc báo cáo được gửi bằng nút Báo cáo và khi nào một người đọc, rằng nút này yêu cầu bạn tuyên bố thiện chí, rằng chúng tôi xác nhận báo cáo và thông báo quyết định cho bạn qua email, và rằng các bản nêu lý do được gửi qua email và lưu giữ trong tài khoản của bạn; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
-
-Phiên bản 2.16 thay thế phiên bản 2.15: mục 12 nêu tên các gói trả phí, Plus, Pro và Max, và các mục 12 và 15 không còn chứa ghi chú soạn thảo; phạm vi trách nhiệm của chúng tôi và mọi quyền trong các Điều khoản này đều không thay đổi.
-
-Phiên bản 2.15 thay thế phiên bản 2.14: mục 12 nêu rằng giá của chúng tôi được hiển thị trước thuế, dưới dạng giá + VAT, và rằng thuế được cộng thêm ở trang thanh toán.
-
-Phiên bản 2.14 thay thế phiên bản 2.13: mục 18 và Phụ lục A nêu ANPC (SAL) là kênh giải quyết tranh chấp thay thế.
-
-Phiên bản 2.13 thay thế phiên bản 2.12: mục 12 nêu dòng chữ tiếng Romania trên nút thanh toán.
-
-Phiên bản 2.12 thay thế phiên bản 2.11: mục 10 nêu rằng người đã đăng nhập cũng có thể sử dụng nút Báo cáo trên bất kỳ cuộc tranh luận công khai nào, rằng AI đọc báo cáo được gửi bằng nút đó bên cạnh văn bản công khai, và điều gì xảy ra sau đó.
-
-Phiên bản 2.11 thay thế phiên bản 2.10: mục 9 nêu rằng chúng tôi có thể tạm ẩn một cuộc tranh luận công khai trong khi rà soát, đồng thời gỡ bỏ hoặc sửa một phần của nó.
-
-Phiên bản 2.10 thay thế phiên bản 2.9: mục 9 nêu rằng các cuộc tranh luận trên gói miễn phí là công khai, rằng một cuộc tranh luận công khai không thể hủy công khai và vẫn công khai sau khi bạn đóng tài khoản, rằng bất kỳ ai có tín dụng đều có thể đóng góp vào một cuộc tranh luận công khai hoặc viết báo cáo về nó, và rằng một cuộc tranh luận công khai vẫn mở sau khi tác giả đầu tiên của nó đã rời đi; mục 11 nêu việc đóng tài khoản tác động thế nào đến các cuộc tranh luận công khai của bạn.
-
-Phiên bản 2.9 thay thế phiên bản 2.8: mục 8 được bổ sung đoạn “Biểu đồ và số liệu thống kê do chúng tôi tạo ra”, quy định ai sở hữu các biểu đồ trong một báo cáo tranh luận và cấp cho bạn giấy phép sử dụng các biểu đồ đó.
-
-Phiên bản 2.8 thay thế phiên bản 2.7: bước kiểm tra câu hỏi cũng từ chối một câu hỏi về cách phạm tội hoặc thoát khỏi hình phạt, hoặc về việc liệu ai đó có nên phạm tội hay không, chẳng hạn như mua hoặc bán trái phép ma túy hay vũ khí, trộm cắp hoặc trốn thuế, và không lưu giữ câu hỏi đó; một câu hỏi về việc liệu một luật có nên thay đổi hay không vẫn bắt đầu một cuộc tranh luận (mục 7). Phiên bản này cũng đặt ra một nguyên tắc duy nhất cho các câu hỏi về ma túy và cho phép một câu hỏi về việc liệu luật về tự tử, an tử hoặc chết có hỗ trợ có nên thay đổi hay không bắt đầu một cuộc tranh luận (mục 7), và bước kiểm tra câu hỏi không còn lưu giữ bất kỳ câu hỏi nào để nhóm của chúng tôi đọc (mục 7 và 10); màn hình từ chối một câu hỏi là bản nêu lý do của chúng tôi cho mọi câu hỏi mà theo mục 7 không bắt đầu một cuộc tranh luận (mục 10).
-
-Phiên bản 2.7 thay thế phiên bản 2.6: phiên bản này bổ sung bước kiểm tra câu hỏi, đọc từng câu hỏi trước khi một cuộc tranh luận bắt đầu, từ chối một số, và lưu giữ để nhóm của chúng tôi đọc từng câu hỏi bị từ chối đe dọa, lên kế hoạch hoặc hỏi liệu hoặc làm thế nào để làm hại một người khác hoặc những người khác, dù có nêu tên hay không, kể cả tấn công những người không nêu tên, hoặc hỏi cách chế tạo vũ khí, chất nổ, chất độc hoặc ma túy hoặc cách hỗ trợ một hành vi khủng bố, hoặc ca ngợi hành vi đó (mục 7, 8, 10 và 11); bước kiểm tra đọc phần tổng hợp của mỗi cuộc tranh luận đã kết thúc, việc phê duyệt mà một cuộc tranh luận bị gắn cờ cần có trước khi được công khai, và các cuộc tranh luận mà bước kiểm tra đó xóa (mục 5, 8, 9, 10 và 11); những gì trò chuyện hỗ trợ gửi đến mô hình Claude của Anthropic, việc nó không lưu giữ gì từ những gì bạn viết và không mở trường hợp nào, và việc nút “Trò chuyện với nhân viên hỗ trợ” của nó hiển thị địa chỉ hỗ trợ của chúng tôi (mục 8 và 10); và các quy tắc tại mục 7 cấm ngôn từ thù hận dưới mọi hình thức, hướng dẫn chế tạo vũ khí hoặc ma túy, nội dung cổ vũ tự tử hoặc làm hại người khác và xúc phạm tôn giáo, đồng thời nêu những câu hỏi nào không bắt đầu một cuộc tranh luận.
-
 ## 15. Trách nhiệm
 
 **Những trách nhiệm chúng tôi không giới hạn.** Không nội dung nào trong các Điều khoản này loại trừ hoặc giới hạn trách nhiệm của chúng tôi đối với trường hợp tử vong hoặc thương tích cá nhân do sự bất cẩn của chúng tôi, gian lận hoặc trình bày sai mang tính gian lận, bất cẩn nghiêm trọng hoặc hành vi sai trái cố ý, hoặc bất kỳ vấn đề nào khác mà pháp luật không cho phép giới hạn. Nếu bạn là người tiêu dùng, không nội dung nào ở đây loại bỏ các quyền theo luật định của bạn, bao gồm quyền yêu cầu đưa dịch vụ không phù hợp về trạng thái phù hợp, quyền được giảm giá hoặc hoàn tiền, hoặc bất kỳ bảo đảm nào được áp dụng theo pháp luật quốc gia nơi bạn sống.
@@ -305,7 +281,7 @@ Cách chúng tôi xử lý dữ liệu cá nhân được quy định trong **Ch
 
 **Tòa án, nếu bạn sống tại EU hoặc EEA.** Bạn có thể khởi kiện chúng tôi tại tòa án Romania hoặc tòa án của quốc gia nơi bạn sống. Chúng tôi chỉ có thể khởi kiện bạn tại tòa án của quốc gia nơi bạn sống.
 
-**Người tiêu dùng tại nơi khác.** Nếu sống ngoài EU và EEA, không nội dung nào trong các Điều khoản này hạn chế bất kỳ quyền nào bạn có theo pháp luật quốc gia của mình để khởi kiện tại tòa án của quốc gia đó, hoặc bất kỳ quyền nào theo pháp luật đó mà không thể từ bỏ — bao gồm quyền bảo đảm của người tiêu dùng nếu bạn sống tại Australia hoặc New Zealand; Código de Defesa do Consumidor nếu bạn sống tại Brazil; và luật bảo vệ người tiêu dùng của tiểu bang nếu bạn sống tại Hoa Kỳ.
+**Người tiêu dùng tại nơi khác.** Nếu sống ngoài EU và EEA, không nội dung nào trong các Điều khoản này hạn chế bất kỳ quyền nào bạn có theo pháp luật quốc gia của mình để khởi kiện tại tòa án của quốc gia đó, hoặc bất kỳ quyền nào theo pháp luật đó mà không thể từ bỏ — bao gồm quyền bảo đảm của người tiêu dùng nếu bạn sống tại Australia hoặc New Zealand; và luật bảo vệ người tiêu dùng của tiểu bang nếu bạn sống tại Hoa Kỳ.
 
 **Trước khi khởi kiện ra tòa.** Hãy liên hệ với chúng tôi tại support@dezbatere.ro; hầu hết vấn đề đều có thể khắc phục, và chúng tôi đặt mục tiêu trả lời trong vòng 5 ngày làm việc. Nếu là người tiêu dùng tại Romania hoặc EU, bạn có thể sử dụng phương thức giải quyết tranh chấp thay thế thông qua ANPC (SAL), reclamatiisal.anpc.ro; chúng tôi không cam kết tham gia thủ tục đó. Khiếu nại về quyết định kiểm duyệt tuân theo mục 10, là một kênh riêng biệt.
 

@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Ukratko
-eyebrow: UVJETI KORIŠTENJA · v2.19 · NA SNAZI OD 19. STUDENOGA 2026.
+eyebrow: UVJETI KORIŠTENJA · v1.0 · NA SNAZI OD 19. STUDENOGA 2026.
 title: Na što pristajete
 lede: Ugovor između vas i društva DMS Merchandise Shop S.R.L., jednostavnim jezikom. Devetnaest odjeljaka i Prilog A — pomaknite se do kraja.
-endMarker: KRAJ UVJETA · v2.19
+endMarker: KRAJ UVJETA · v1.0
 bodyLabel: Tekst Uvjeta korištenja
 annexTitle: Prilog A — Regionalni uvjeti
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 MJERODAVNO PRAVO
 -->
 
-**Version 2.19 · Effective 19. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
+**Version 1.0 · Effective 19. studenoga 2026. · Prethodne verzije na dezbatere.ro/terms/versions · Jezik: hrvatski.**
 
 **In short.** Morate imati najmanje 18 godina. Dialectical Engine izrađuje argumente pomoću modela umjetne inteligencije i sve što generira može biti pogrešno — to nije savjet. Na besplatnom planu vaše su rasprave javne kada završe, nakon provjere umjetnom inteligencijom; na plaćenom planu privatne su osim ako ih objavite. Kada je rasprava javna, svatko je može pročitati i ona ostaje javna. Tekst koji pošaljete prosljeđuje se pružateljima usluga umjetne inteligencije navedenima u našem Registru pružatelja, uglavnom pružatelju DeepInfra, u Sjedinjenim Američkim Državama. Uvjeti društava DeepInfra, Anthropic i Perplexity ne dopuštaju im treniranje modela na njemu; odjeljak 8. navodi za koje društvo to još nismo potvrdili. Nezakonit sadržaj prijavite na support@dezbatere.ro, bez obzira na to imate li račun. Primjenjuje se rumunjsko pravo, ali zadržavate zaštitu potrošača prema svojem lokalnom pravu.
 
@@ -251,30 +251,6 @@ Na trajnom mediju unaprijed vas obavještavamo što se mijenja i kada. Ako promj
 
 **Promjene ovih Uvjeta.** Ove Uvjete možemo mijenjati zbog istih vrsta razloga. Za promjene koje ne umanjuju vaša prava objavljujemo novu verziju sa sažetkom promjena i šaljemo vam e-poruku najmanje **30 dana** prije njezina stupanja na snagu; nastavak uporabe Dialectical Engine-a nakon tog datuma znači da je prihvaćate, a prije toga možete zatvoriti račun. Za promjene koje umanjuju vaša prava — uključujući povećanja cijena postojećeg plana, niža ograničenja, uklonjene značajke, nove načine uporabe vašeg sadržaja ili promjene odgovornosti, mjerodavnog prava ili rješavanja sporova — tražimo da izričito prihvatite novu verziju pri sljedećoj prijavi, a promjena se primjenjuje samo ubuduće. Promjenu nikada ne primjenjujemo retroaktivno i ovaj odjeljak nikada ne upotrebljavamo za izmjenu bitnog sadržaja onoga što ste platili usred razdoblja bez omogućavanja izlaska iz ugovora. Prethodne verzije ostaju dostupne na dezbatere.ro/terms/versions.
 
-Verzija 2.18 zamijenila je verziju 2.17: Prilog A.3 navodi da su i u Quebecu rasprave na plaćenom planu prema zadanim postavkama privatne, a rasprave na besplatnom planu javne, kako je navedeno u 9. odjeljku; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni. Verzija 2.18 navodi i DeepInfra, društvo koje prima većinu teksta rasprave, kaže da za jedan model prosljeđuje zahtjeve partnerskom društvu te navodi za koje smo pružatelje potvrdili da njihovi uvjeti ne dopuštaju treniranje na vašem sadržaju (8. odjeljak).
-
-Verzija 2.17 zamijenila je verziju 2.16: odjeljak 10. navodi kada prijavu podnesenu gumbom Prijavite čita umjetna inteligencija, a kada čovjek, da gumb traži vašu izjavu u dobroj vjeri, da prijavu potvrđujemo i odluku vam priopćujemo e-poštom te da se obrazloženja šalju e-poštom i čuvaju u vašem računu; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni.
-
-Verzija 2.16 zamijenila je verziju 2.15: odjeljak 12. navodi plaćene planove, Plus, Pro i Max, a odjeljci 12. i 15. više ne sadrže napomene iz izrade nacrta; ono za što odgovaramo i svako pravo iz ovih Uvjeta ostaju nepromijenjeni.
-
-Verzija 2.15 zamijenila je verziju 2.14: odjeljak 12. navodi da su naše cijene prikazane bez poreza, kao cijena + PDV, i da se porez dodaje na naplati.
-
-Verzija 2.14 zamijenila je verziju 2.13: odjeljak 18. i Prilog A navode ANPC (SAL) kao put za alternativno rješavanje sporova.
-
-Verzija 2.13 zamijenila je verziju 2.12: odjeljak 12. navodi rumunjski tekst gumba za plaćanje.
-
-Verzija 2.12 zamijenila je verziju 2.11: odjeljak 10. navodi da prijavljena osoba može upotrijebiti i gumb Prijavite na bilo kojoj javnoj raspravi, da umjetna inteligencija čita prijavu podnesenu tim gumbom uz javni tekst i što se tada događa.
-
-Verzija 2.11 zamijenila je verziju 2.10: odjeljak 9. navodi da javnu raspravu možemo sakriti dok je pregledavamo, a dio nje ukloniti ili ispraviti.
-
-Verzija 2.10 zamijenila je verziju 2.9: odjeljak 9. navodi da su rasprave na besplatnom planu javne, da se javna rasprava ne može povući iz objave ni izbrisati i da ostaje javna nakon što zatvorite račun, da svatko s kreditom može doprinijeti javnoj raspravi ili o njoj napisati izvješće te da javna rasprava ostaje otvorena nakon što je njezin prvi autor otišao; odjeljak 11. navodi što zatvaranje čini s vašim javnim raspravama.
-
-Verzija 2.9 zamijenila je verziju 2.8: odjeljku 8. dodan je odlomak „Grafikoni i statistike koje izrađujemo”, koji određuje kome pripadaju grafikoni u izvješću o raspravi i daje vam licenciju za njihovu upotrebu.
-
-Verzija 2.8 zamijenila je verziju 2.7: provjera pitanja odbija i pitanje kako počiniti kazneno djelo ili izbjeći kaznu za njega, ili treba li ga netko počiniti, na primjer nezakonito kupovati ili prodavati drogu ili oružje, krasti ili utajiti porez, i ne čuva ga; pitanje treba li promijeniti neki zakon i dalje pokreće raspravu (odjeljak 7.). Također uvodi jednu granicu za droge i dopušta da pitanje treba li promijeniti zakon o samoubojstvu, eutanaziji ili potpomognutom umiranju pokrene raspravu (odjeljak 7.), a provjera pitanja više ne čuva nijedno pitanje za naš tim (odjeljci 7. i 10.); zaslon koji odbija pitanje jest naše obrazloženje za svako pitanje koje prema odjeljku 7. ne pokreće raspravu (odjeljak 10.).
-
-Verzija 2.7 zamijenila je verziju 2.6: dodaje provjeru pitanja, koja čita svako pitanje prije nego što rasprava započne, neka odbija, a svako odbijeno pitanje, koje prijeti nanošenjem štete drugoj osobi ili drugim osobama, imenovanima ili ne, uključujući napad na neimenovane osobe, planira takvu štetu ili pita treba li i kako nanijeti štetu drugoj osobi ili drugim osobama, ili koje pita kako izraditi oružje, eksploziv, otrove ili droge ili kako podržati teroristički čin, ili ga veliča, čuva kako bi ga čitao naš tim (odjeljci 7., 8., 10. i 11.); provjeru koja čita sintezu svake završene rasprave, odobrenje koje označena rasprava treba prije nego što se može objaviti i rasprave koje ta provjera briše (odjeljci 5., 8., 9., 10. i 11.); što chat za podršku šalje modelu Claude tvrtke Anthropic, da ne čuva ništa od onoga što napišete i ne otvara slučaj te da njegov gumb „Razgovor s osobom” prikazuje našu adresu za podršku (odjeljci 8. i 10.); te pravila u odjeljku 7. koja zabranjuju govor mržnje bilo koje vrste, upute za izradu oružja ili droga, sadržaj koji potiče na samoubojstvo ili nanošenje štete drugim ljudima i vrijeđanje religije te navode koja pitanja ne pokreću raspravu.
-
 ## 15. Odgovornost
 
 **Što ne ograničavamo.** Ništa u ovim Uvjetima ne isključuje niti ograničava našu odgovornost za smrt ili tjelesnu ozljedu uzrokovanu našim nemarom, za prijevaru ili prijevarno lažno prikazivanje, za krajnju nepažnju ili namjerno protupravno postupanje, ni za bilo što drugo što se prema zakonu ne može ograničiti. Ako ste potrošač, ništa ovdje ne ukida vaša zakonska prava, uključujući pravo na usklađivanje neusklađene usluge, sniženje cijene ili povrat, odnosno bilo koje jamstvo koje se primjenjuje prema pravu države u kojoj živite.
@@ -305,7 +281,7 @@ Način na koji postupamo s osobnim podacima utvrđen je u **Pravilima o privatno
 
 **Sudovi ako živite u EU-u ili EGP-u.** Postupak protiv nas možete pokrenuti pred sudovima Rumunjske ili pred sudovima države u kojoj živite. Mi protiv vas možemo pokrenuti postupak samo pred sudovima države u kojoj živite.
 
-**Potrošači drugdje.** Ako živite izvan EU-a i EGP-a, ništa u ovim Uvjetima ne ograničava bilo koje pravo koje imate prema pravu svoje države da podnesete zahtjev njezinim sudovima niti bilo koje pravo kojeg se prema tom pravu ne možete odreći — uključujući, ako živite u Australiji ili Novom Zelandu, prava iz jamstava za potrošače; ako živite u Brazilu, prava iz zakona Código de Defesa do Consumidor; i ako živite u Sjedinjenim Američkim Državama, prava iz zakona vaše savezne države o zaštiti potrošača.
+**Potrošači drugdje.** Ako živite izvan EU-a i EGP-a, ništa u ovim Uvjetima ne ograničava bilo koje pravo koje imate prema pravu svoje države da podnesete zahtjev njezinim sudovima niti bilo koje pravo kojeg se prema tom pravu ne možete odreći — uključujući, ako živite u Australiji ili Novom Zelandu, prava iz jamstava za potrošače; i ako živite u Sjedinjenim Američkim Državama, prava iz zakona vaše savezne države o zaštiti potrošača.
 
 **Prije obraćanja sudu.** Obratite nam se na support@dezbatere.ro; većina se stvari može riješiti, a cilj nam je odgovoriti u roku od 5 radnih dana. Ako ste potrošač u Rumunjskoj ili EU-u, možete se koristiti alternativnim rješavanjem sporova putem ANPC (SAL), reclamatiisal.anpc.ro; ne obvezujemo se sudjelovati u tom postupku. Pritužbe na odluke o moderiranju podnose se prema odjeljku 10., što je zaseban postupak.
 

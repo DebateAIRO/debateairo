@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Go hachomair
-eyebrow: TÉARMAÍ SEIRBHÍSE · v2.19 · I bhFEIDHM 19 SAMHAIN 2026
+eyebrow: TÉARMAÍ SEIRBHÍSE · v1.0 · I bhFEIDHM 19 SAMHAIN 2026
 title: An méid lena n-aontaíonn tú
 lede: An conradh idir tú agus DMS Merchandise Shop S.R.L., i bhfriotal soiléir. Naoi rannán déag agus Iarscríbhinn A — scrollaigh go dtí an deireadh.
-endMarker: DEIREADH NA dTÉARMAÍ · v2.19
+endMarker: DEIREADH NA dTÉARMAÍ · v1.0
 bodyLabel: Téacs na dTéarmaí Seirbhíse
 annexTitle: Iarscríbhinn A — Téarmaí réigiúnacha
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 AN DLÍ RIALAITHE
 -->
 
-**Version 2.19 · Effective 19 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
+**Version 1.0 · Effective 19 Samhain 2026 · Leaganacha roimhe seo ag dezbatere.ro/terms/versions · Teanga: Gaeilge.**
 
 **In short.** Ní mór duit a bheith 18 mbliana d'aois nó os a chionn. Tógann Dialectical Engine argóintí le samhlacha IS agus d'fhéadfadh gach rud a ghineann sé a bheith mícheart — ní comhairle é. Ar an bplean saor in aisce, bíonn do dhíospóireachtaí poiblí nuair a bhíonn siad críochnaithe, tar éis seiceála IS; ar phlean íoctha bíonn siad príobháideach mura bhfoilsíonn tú iad. Nuair a bhíonn díospóireacht phoiblí, is féidir le duine ar bith í a léamh, agus fanann sí poiblí. Seoltar téacs a chuireann tú isteach chuig na soláthraithe IS atá liostaithe inár gClár Soláthraithe, DeepInfra den chuid is mó, sna Stáit Aontaithe. Ní cheadaíonn téarmaí DeepInfra, Anthropic agus Perplexity dóibh samhlacha a oiliúint air; insíonn rannán 8 cén chuideachta nár dheimhnigh muid é seo fúithi go fóill. Tuairiscigh ábhar neamhdhleathach ag support@dezbatere.ro cibé acu atá cuntas agat nó nach bhfuil. Is é dlí na Rómáine an dlí rialaithe, ach coimeádann tú do chosaintí áitiúla tomhaltóra.
 
@@ -251,30 +251,6 @@ Insímid duit roimh ré, ar mheán marthanach, cad atá ag athrú agus cathain. 
 
 **Ar na Téarmaí seo.** Féadfaimid na Téarmaí seo a athrú ar na cineálacha céanna cúiseanna. I gcás athruithe nach laghdaíonn do chearta, foilsímid an leagan nua le hachoimre ar an méid a d'athraigh agus seolaimid ríomhphost chugat **30 lá ar a laghad** sula dtagann sé i bhfeidhm; má leanann tú d'úsáid Dialectical Engine tar éis an dáta sin, ciallaíonn sé go nglacann tú leis, agus féadfaidh tú do chuntas a dhúnadh roimhe sin. I gcás athruithe a laghdaíonn do chearta — lena n-áirítear méaduithe praghais ar phlean atá ann cheana, teorainneacha níos ísle, gnéithe a baineadh, úsáidí nua as d'ábhar, nó athruithe ar dhliteanas, ar an dlí rialaithe nó ar réiteach díospóidí — iarraimid ort glacadh go sainráite leis an leagan nua ag do chéad síniú isteach eile, agus ní bhíonn feidhm ag an athrú ach feasta. Ní dhéanaimid athrú aisghníomhach riamh, agus ní úsáidimid an rannán seo riamh chun croílár an mhéid ar íoc tú as a athrú i lár téarma gan bealach amach a thairiscint duit. Fanann leaganacha roimhe seo ar fáil ag dezbatere.ro/terms/versions.
 
-Tháinig leagan 2.18 in ionad leagan 2.17: deir Iarscríbhinn A.3 go mbíonn díospóireachtaí i Québec freisin príobháideach mar réamhshocrú ar phlean íoctha agus poiblí ar an bplean saor in aisce, mar atá leagtha amach i rannán 9; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo. Ainmníonn leagan 2.18 freisin DeepInfra, an chuideachta a fhaigheann an chuid is mó de théacs díospóireachta; deir sé go gcuireann DeepInfra iarratais ó shamhail amháin ar aghaidh chuig cuideachta atá ina comhpháirtí aige; agus insíonn sé cé na soláthraithe ar dheimhnigh muid nach gceadaíonn a dtéarmaí oiliúint ar d'ábhar (rannán 8).
-
-Tháinig leagan 2.17 in ionad leagan 2.16: deir rannán 10 cathain a léann IS tuairisc a dhéantar leis an gcnaipe Tuairiscigh agus cathain a léann duine í, go n-iarrann an cnaipe do dhearbhú de mheon macánta, go n-admhaímid tuairisc agus go n-insímid ár gcinneadh duit ar ríomhphost, agus go seoltar ráitis ar chúiseanna ar ríomhphost agus go gcoinnítear i do chuntas iad; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo.
-
-Tháinig leagan 2.16 in ionad leagan 2.15: ainmníonn rannán 12 na pleananna íoctha, Plus, Pro agus Max, agus níl nótaí dréachtaithe i rannáin 12 agus 15 a thuilleadh; níl aon athrú ar a bhfuilimid faoi dhliteanas ina leith, ná ar aon cheart sna Téarmaí seo.
-
-Tháinig leagan 2.15 in ionad leagan 2.14: deir rannán 12 go dtaispeántar ár bpraghsanna gan cháin, mar phraghas + CBL, agus go gcuirtear an cháin leo ag an tseiceáil amach.
-
-Tháinig leagan 2.14 in ionad leagan 2.13: ainmníonn rannán 18 agus Iarscríbhinn A ANPC (SAL) mar an bealach chun réiteach malartach díospóidí a fháil.
-
-Tháinig leagan 2.13 in ionad leagan 2.12: tugann rannán 12 an fhoclaíocht Rómáinise atá ar an gcnaipe íocaíochta.
-
-Tháinig leagan 2.12 in ionad leagan 2.11: deir rannán 10 gur féidir le duine atá sínithe isteach an cnaipe Tuairiscigh a úsáid freisin ar aon díospóireacht phoiblí, go léann IS tuairisc a dhéantar leis taobh leis an téacs poiblí, agus cad a tharlaíonn ansin.
-
-Tháinig leagan 2.11 in ionad leagan 2.10: deir rannán 9 gur féidir linn díospóireacht phoiblí a cheilt agus í á hathbhreithniú againn, agus cuid di a bhaint nó a cheartú.
-
-Tháinig leagan 2.10 in ionad leagan 2.9: deir rannán 9 go bhfuil díospóireachtaí ar an bplean saor in aisce poiblí, nach féidir díospóireacht phoiblí a dhífhoilsiú agus go bhfanann sí poiblí tar éis duit do chuntas a dhúnadh, go bhféadfaidh duine ar bith a bhfuil creidmheas aige rannchuidiú le díospóireacht phoiblí nó tuarascáil a scríobh uirthi, agus go bhfanann díospóireacht phoiblí ar oscailt tar éis don chéad údar imeacht; deir rannán 11 cad a dhéanann dúnadh do do dhíospóireachtaí poiblí.
-
-Tháinig leagan 2.9 in ionad leagan 2.8: cuirtear an mhír «Cairteacha agus staitisticí a ghinimid» le rannán 8, a deir cé leis na cairteacha i dtuarascáil díospóireachta agus a thugann ceadúnas duit iad a úsáid.
-
-Tháinig leagan 2.8 in ionad leagan 2.7: diúltaíonn ár seiceáil ceiste freisin do cheist a fhiafraíonn conas coir a dhéanamh nó éalú ó phionós ina leith, nó cé acu ar cheart do dhuine coir a dhéanamh, mar shampla drugaí nó airm a cheannach nó a dhíol go mídhleathach, goid nó imghabháil cánach, agus ní choinnímid í; tosaíonn ceist faoi cé acu ar cheart dlí a athrú díospóireacht i gcónaí (rannán 7). Socraíonn sé freisin aon chritéar amháin do dhrugaí agus ligeann sé do cheist faoi cé acu ar cheart an dlí maidir le féinmharú, eotanáis nó bás cuidithe a athrú díospóireacht a thosú (rannán 7), agus ní choinníonn ár seiceáil ceiste aon cheist dár bhfoireann a thuilleadh (rannáin 7 agus 10); is é an scáileán a dhiúltaíonn do cheist ár ráiteas ar chúiseanna i gcás gach ceiste nach dtosaíonn díospóireacht faoi rannán 7 (rannán 10).
-
-Tháinig leagan 2.7 in ionad leagan 2.6: cuireann sé an tseiceáil ceiste leis, a léann gach ceist sula dtosaíonn díospóireacht, a dhiúltaíonn do chuid acu, agus a choinníonn gach ceist dhiúltaithe a bhagraíonn dochar a dhéanamh do dhuine eile nó do dhaoine eile, ainmnithe nó gan ainm, ionsaí ar dhaoine gan ainm san áireamh, a phleanálann dochar den sórt sin, nó a fhiafraíonn ar cheart é a dhéanamh nó conas é a dhéanamh, nó a iarrann conas airm, pléascáin, nimh nó drugaí a dhéanamh nó conas gníomh sceimhlitheoireachta a thacú, nó a mholann ceann le go léifidh ár bhfoireann í (rannáin 7, 8, 10 agus 11); an tseiceáil a léann sintéis gach díospóireachta críochnaithe, an formheas a theastaíonn ó dhíospóireacht mharcáilte sula bhféadfar í a fhoilsiú, agus na díospóireachtaí a scriosann an tseiceáil sin (rannáin 5, 8, 9, 10 agus 11); an méid a sheolann an comhrá tacaíochta chuig samhail Claude de chuid Anthropic, an fhíric nach gcoinníonn sé aon ní den méid a scríobhann tú agus nach n-osclaíonn sé aon chás, agus an fhíric go dtaispeánann a chnaipe «Labhair le duine» ár seoladh tacaíochta (rannáin 8 agus 10); agus rialacha i rannán 7 a thoirmisceann óráid fhuatha de gach cineál, treoracha le haghaidh monarú arm nó drugaí, ábhar a spreagann féinmharú nó dochar a dhéanamh do dhaoine eile, agus maslú reiligiúnach, agus a deir na ceisteanna nach dtosaíonn díospóireacht uathu.
-
 ## 15. Dliteanas
 
 **An méid nach dteorannaímid.** Ní eisiann ná ní theorannaíonn aon ní sna Téarmaí seo ár ndliteanas i leith báis nó díobhála pearsanta arb í ár bhfaillí is cúis leis, i leith calaoise nó míráitis chalaoisigh, i leith mórfhaillí nó mí-iompair thoiliúil, ná i leith aon ní eile nach féidir a theorannú go dleathach. Más tomhaltóir thú, ní bhaineann aon ní anseo do chearta reachtúla, lena n-áirítear an ceart go dtabharfaí seirbhís neamhchomhréireach chun comhréireachta, nó an ceart chun laghdaithe praghais nó aisíocaíochta, nó aon ráthaíocht a bhfuil feidhm aici faoi dhlí na tíre ina bhfuil cónaí ort.
@@ -305,7 +281,7 @@ Leagtar amach sa **Bheartas Príobháideachais** ag dezbatere.ro/privacy conas a
 
 **Cúirteanna, má tá cónaí ort san AE nó sa LEE.** Féadfaidh tú imeachtaí a thionscnamh inár gcoinne i gcúirteanna na Rómáine nó i gcúirteanna na tíre ina bhfuil cónaí ort. Ní fhéadfaimid imeachtaí a thionscnamh i do choinne ach i gcúirteanna na tíre ina bhfuil cónaí ort.
 
-**Tomhaltóirí in áiteanna eile.** Má tá cónaí ort lasmuigh den AE agus den LEE, ní chuireann aon ní sna Téarmaí seo teorainn le haon cheart atá agat faoi dhlí do thíre éileamh a thabhairt os comhair a cúirteanna, ná le haon cheart faoin dlí sin nach féidir a tharscaoileadh — lena n-áirítear, má tá cónaí ort san Astráil nó sa Nua-Shéalainn, do chearta ráthaíochta tomhaltóra; má tá cónaí ort sa Bhrasaíl, an Código de Defesa do Consumidor; agus má tá cónaí ort sna Stáit Aontaithe, dlíthe cosanta tomhaltóirí do stáit.
+**Tomhaltóirí in áiteanna eile.** Má tá cónaí ort lasmuigh den AE agus den LEE, ní chuireann aon ní sna Téarmaí seo teorainn le haon cheart atá agat faoi dhlí do thíre éileamh a thabhairt os comhair a cúirteanna, ná le haon cheart faoin dlí sin nach féidir a tharscaoileadh — lena n-áirítear, má tá cónaí ort san Astráil nó sa Nua-Shéalainn, do chearta ráthaíochta tomhaltóra; agus má tá cónaí ort sna Stáit Aontaithe, dlíthe cosanta tomhaltóirí do stáit.
 
 **Sula dtéann tú chun cúirte.** Déan teagmháil linn ag support@dezbatere.ro; is féidir formhór na nithe a réiteach, agus tá sé mar aidhm againn freagra a thabhairt laistigh de 5 lá oibre. Más tomhaltóir thú sa Rómáin nó san AE, féadfaidh tú réiteach malartach díospóidí a úsáid trí ANPC (SAL), reclamatiisal.anpc.ro; ní thugaimid gealltanas páirt a ghlacadh sa nós imeachta sin. Leanann gearáin faoi chinntí modhnóireachta rannán 10, ar bealach ar leith é.
 

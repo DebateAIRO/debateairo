@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In breve
-eyebrow: CONDIZIONI DI SERVIZIO · v2.19 · IN VIGORE DAL 19 NOVEMBRE 2026
+eyebrow: CONDIZIONI DI SERVIZIO · v1.0 · IN VIGORE DAL 19 NOVEMBRE 2026
 title: Ciò che accetti
 lede: Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.
-endMarker: FINE DELLE CONDIZIONI · v2.19
+endMarker: FINE DELLE CONDIZIONI · v1.0
 bodyLabel: Testo delle Condizioni di servizio
 annexTitle: Allegato A — Condizioni regionali
 jumps:
@@ -21,7 +21,7 @@ jumps:
 18 LEGGE APPLICABILE
 -->
 
-**Version 2.19 · Effective 19 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
+**Version 1.0 · Effective 19 novembre 2026 · Versioni precedenti su dezbatere.ro/terms/versions · Lingua: italiano.**
 
 **In short.** Devi avere almeno 18 anni. Dialectical Engine costruisce argomentazioni con modelli di IA e tutto ciò che genera può essere errato — non costituisce consulenza. Nel piano gratuito i tuoi dibattiti sono pubblici una volta conclusi, dopo la verifica dell’IA; nel piano a pagamento sono privati, salvo che tu non li pubblichi. Una volta pubblico, chiunque può leggere un dibattito, e questo resta pubblico. Il testo che invii viene trasmesso ai fornitori di IA elencati nel nostro Registro dei fornitori, principalmente DeepInfra, negli Stati Uniti. Le condizioni di DeepInfra, Anthropic e Perplexity non consentono loro di addestrare modelli su di esso; la sezione 8 indica per quale società non lo abbiamo ancora confermato. Segnala i contenuti illegali a support@dezbatere.ro, indipendentemente dal fatto che tu abbia un account. Si applica la legge rumena, ma le tutele locali dei consumatori restano impregiudicate.
 
@@ -251,30 +251,6 @@ Ti comunichiamo anticipatamente, su un supporto durevole, cosa cambia e quando. 
 
 **Alle presenti Condizioni.** Possiamo modificare le presenti Condizioni per le medesime categorie di motivi. In caso di modifiche che non riducono i tuoi diritti, pubblichiamo la nuova versione con una sintesi delle modifiche e ti inviamo un'email almeno **30 giorni** prima della sua entrata in vigore; continuando a utilizzare Dialectical Engine dopo tale data accetti la modifica e puoi chiudere il tuo account prima di allora. In caso di modifiche che riducono i tuoi diritti — compresi aumenti di prezzo di un piano esistente, limiti inferiori, funzionalità eliminate, nuovi utilizzi dei tuoi contenuti o modifiche alla responsabilità, alla legge applicabile o alla risoluzione delle controversie — ti chiediamo di accettare espressamente la nuova versione al tuo accesso successivo e la modifica si applica soltanto per il futuro. Non apportiamo mai una modifica retroattiva e non utilizziamo mai la presente sezione per modificare, durante il relativo periodo, il nucleo di ciò per cui hai pagato senza offrirti una via d'uscita. Le versioni precedenti restano disponibili all'indirizzo dezbatere.ro/terms/versions.
 
-La versione 2.18 ha sostituito la versione 2.17: l'Allegato A.3 indica che anche in Québec i dibattiti sono privati per impostazione predefinita nel piano a pagamento e pubblici nel piano gratuito, come dice la sezione 9; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato. La versione 2.18 nomina anche DeepInfra, la società che riceve la maggior parte del testo di un dibattito, indica che DeepInfra inoltra le richieste di un modello a una società partner e indica per quali fornitori abbiamo confermato che le loro condizioni non consentono l'addestramento sui tuoi contenuti (sezione 8).
-
-La versione 2.17 ha sostituito la versione 2.16: la sezione 10 indica quando un'IA legge una segnalazione fatta con il pulsante Segnala e quando la legge una persona, che il pulsante ti chiede la tua dichiarazione di buona fede, che confermiamo la ricezione di una segnalazione e ti comunichiamo la nostra decisione via email, e che le motivazioni vengono inviate via email e conservate nel tuo account; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato.
-
-La versione 2.16 ha sostituito la versione 2.15: la sezione 12 indica i piani a pagamento, Plus, Pro e Max, e le sezioni 12 e 15 non contengono più note di redazione; ciò di cui rispondiamo, e ogni diritto previsto dalle presenti Condizioni, resta invariato.
-
-La versione 2.15 ha sostituito la versione 2.14: la sezione 12 afferma che i nostri prezzi sono indicati al netto delle imposte, come prezzo + IVA, e che l'imposta viene aggiunta al momento del pagamento.
-
-La versione 2.14 ha sostituito la versione 2.13: la sezione 18 e l'Allegato A indicano ANPC (SAL) come via per la risoluzione alternativa delle controversie.
-
-La versione 2.13 ha sostituito la versione 2.12: la sezione 12 indica la dicitura in rumeno del pulsante di pagamento.
-
-La versione 2.12 ha sostituito la versione 2.11: la sezione 10 afferma che una persona che ha effettuato l'accesso può usare anche il pulsante Segnala su qualsiasi dibattito pubblico, che un'IA legge una segnalazione fatta con il pulsante accanto al testo pubblico, e che cosa succede poi.
-
-La versione 2.11 ha sostituito la versione 2.10: la sezione 9 afferma che possiamo nascondere temporaneamente un dibattito pubblico mentre lo esaminiamo, e rimuoverne o correggerne una parte.
-
-La versione 2.10 ha sostituito la versione 2.9: la sezione 9 afferma che i dibattiti del piano gratuito sono pubblici, che un dibattito pubblico non può essere oggetto di revoca della pubblicazione e resta pubblico dopo la chiusura dell’account, che chiunque abbia credito può contribuire a un dibattito pubblico o scrivere un report su di esso, e che un dibattito pubblico resta aperto dopo l’uscita del suo primo autore; la sezione 11 spiega che cosa comporta la chiusura per i tuoi dibattiti pubblici.
-
-La versione 2.9 ha sostituito la versione 2.8: la sezione 8 acquisisce il paragrafo «Grafici e statistiche che generiamo», che stabilisce a chi appartengono i grafici contenuti nel report di un dibattito e ti concede una licenza per utilizzarli.
-
-La versione 2.8 ha sostituito la versione 2.7: la verifica delle domande rifiuta anche una domanda su come commettere un reato o farla franca, o su se qualcuno dovrebbe commetterne uno, come comprare o vendere illegalmente droghe o armi, rubare o evadere le tasse, e non la conserva; una domanda su se una legge dovrebbe cambiare fa ancora iniziare un dibattito (sezione 7). Fissa inoltre un unico criterio per le droghe e consente che una domanda su se la legge relativa al suicidio, all'eutanasia o alla morte assistita dovrebbe cambiare faccia iniziare un dibattito (sezione 7), e la verifica delle domande non conserva più alcuna domanda per il nostro team (sezioni 7 e 10); la schermata che rifiuta una domanda è la nostra motivazione per ogni domanda con cui, secondo la sezione 7, non inizia un dibattito (sezione 10).
-
-La versione 2.7 ha sostituito la versione 2.6: aggiunge la verifica delle domande, che legge ogni domanda prima che un dibattito inizi, ne rifiuta alcune e conserva, affinché il nostro team la legga, ogni domanda rifiutata che minaccia, pianifica o chiede se o come nuocere a un'altra persona o ad altre persone, nominate o meno, compreso un attacco a persone non nominate, oppure che chiede come fabbricare armi, esplosivi, veleni o droghe o come sostenere un atto terroristico, o che ne fa apologia (sezioni 7, 8, 10 e 11); la verifica che legge la sintesi di ogni dibattito concluso, l'approvazione di cui un dibattito contrassegnato ha bisogno prima di poter essere pubblicato e i dibattiti che tale verifica cancella (sezioni 5, 8, 9, 10 e 11); che cosa la chat di supporto invia al modello Claude di Anthropic, che non conserva nulla di ciò che scrivi e non apre alcun caso, e che il suo pulsante «Parla con una persona» mostra il nostro indirizzo di supporto (sezioni 8 e 10); e regole della sezione 7 che vietano i discorsi d'odio di qualsiasi tipo, le istruzioni per la fabbricazione di armi o droghe, i contenuti che incoraggiano al suicidio o a nuocere ad altre persone e l'offesa religiosa, e indicano quali domande non fanno iniziare un dibattito.
-
 ## 15. Responsabilità
 
 **Ciò che non limitiamo.** Nulla nelle presenti Condizioni esclude o limita la nostra responsabilità per morte o lesioni personali causate dalla nostra negligenza, per frode o dichiarazioni fraudolente, per colpa grave o dolo oppure per qualsiasi altro fatto la cui responsabilità non possa essere legalmente limitata. Se sei un consumatore, nulla in questa sede elimina i diritti che ti spettano per legge, compreso il diritto di ottenere che un servizio non conforme sia reso conforme oppure una riduzione del prezzo o un rimborso, o qualsiasi garanzia applicabile ai sensi della legge del Paese in cui vivi.
@@ -305,7 +281,7 @@ Il modo in cui trattiamo i dati personali è descritto nell'**Informativa sulla 
 
 **Foro competente se vivi nell'UE o nel SEE.** Puoi avviare un procedimento nei nostri confronti presso i tribunali della Romania oppure presso i tribunali del Paese in cui vivi. Noi possiamo avviare un procedimento nei tuoi confronti esclusivamente presso i tribunali del Paese in cui vivi.
 
-**Consumatori in altri Paesi.** Se vivi al di fuori dell'UE e del SEE, nulla nelle presenti Condizioni limita qualsiasi diritto che ti spetta ai sensi della legge del tuo Paese di proporre una domanda dinanzi ai suoi tribunali, né qualsiasi diritto previsto da tale legge al quale non sia possibile rinunciare — compresi, se vivi in Australia o Nuova Zelanda, i diritti relativi alle garanzie dei consumatori; se vivi in Brasile, il Código de Defesa do Consumidor; e, se vivi negli Stati Uniti, le norme a tutela dei consumatori del tuo Stato.
+**Consumatori in altri Paesi.** Se vivi al di fuori dell'UE e del SEE, nulla nelle presenti Condizioni limita qualsiasi diritto che ti spetta ai sensi della legge del tuo Paese di proporre una domanda dinanzi ai suoi tribunali, né qualsiasi diritto previsto da tale legge al quale non sia possibile rinunciare — compresi, se vivi in Australia o Nuova Zelanda, i diritti relativi alle garanzie dei consumatori; e, se vivi negli Stati Uniti, le norme a tutela dei consumatori del tuo Stato.
 
 **Prima di adire un tribunale.** Contattaci all'indirizzo support@dezbatere.ro; la maggior parte dei problemi può essere risolta e ci proponiamo di rispondere entro 5 giorni lavorativi. Se sei un consumatore in Romania o nell'UE, puoi ricorrere alla risoluzione alternativa delle controversie tramite ANPC (SAL), reclamatiisal.anpc.ro; non ci impegniamo a partecipare a tale procedura. I reclami relativi alle decisioni di moderazione seguono la sezione 10, che costituisce una procedura distinta.
 

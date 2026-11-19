@@ -55,7 +55,6 @@
   "legal.versions.meta": "Alla versioner vi har publicerat, med den senaste först",
   "legal.versions.current": "Gällande",
   "legal.versions.read": "Läs",
-  "legal.versions.unpublished.note": "Inte publicerad som en egen text. Dess ändringar ingår i version 2.8.",
   "legal.versions.v2.note": "Den version som visas för dig när du registrerar dig.",
   "legal.versions.none": "Ingen tidigare version har publicerats. När villkoren ändras finns den version de ersätter kvar att läsa här.",
   "legal.privacyVersions.eyebrow": "Integritetspolicy",
