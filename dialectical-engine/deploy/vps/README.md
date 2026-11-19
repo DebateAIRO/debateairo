@@ -4310,10 +4310,23 @@ sends after it is not the person's to pay.
 contract here" for the whole 14 days, but its panel tells the person to withdraw by email, because neither Settings
 nor the command records a withdrawal for a paused plan (the command prints `NOT_SUBSCRIBED` and writes nothing). When
 such a statement arrives, reply to the person at once that you have received it, with the date and time it arrived,
-and keep that arrival time. Once the dispute is decided: if it is won, the plan is active again; run the command with
-`--received` set to that arrival time, and it settles the withdrawal as usual (a statement sent in time counts however
-late you run it). If it is lost, the plan has ended and the bank has given the disputed payment back; settle anything
-still due by hand, as described below for a deleted account.
+and keep that arrival time. The refund is due within 14 days of that arrival, and a card dispute often takes several
+weeks, so work out what is due at once, as described below, without waiting for the outcome. Do not refund it in
+NETOPIA's admin while the dispute is open: if the dispute is then lost, the person gets the money twice. If the dispute
+is still open a few days before those 14 days end, ask NETOPIA how to make the refund.
+
+Once the dispute is decided, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above) and go by what
+it prints:
+
+- `RESUMED`: the dispute was won before the paid month ended, and the plan is active again. Run the command above
+  with `--received` set to that arrival time, and it settles the withdrawal as usual (a statement sent in time counts
+  however late you run it).
+- `RESOLVED_AFTER_END`: the dispute was won after the paid month ended, so the plan has ended and is not resumed, and
+  the command above prints `NOT_SUBSCRIBED`. Settle the withdrawal by hand, as described below for a deleted account.
+- `STILL_DISPUTED`: another payment of the plan is still disputed, and the plan stays paused. Wait for that outcome
+  too.
+- `ENDED_DISPUTE` (lost), or the site ended the plan by itself on a lost dispute (NETOPIA's status 10): the bank has
+  given the disputed payment back. Settle anything still due by hand, as described below for a deleted account.
 
 **If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
 live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so
