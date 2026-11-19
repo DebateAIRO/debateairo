@@ -26,7 +26,7 @@ export function previewAskProxyCeiling(
   configuredOrigin: string | undefined = PREVIEW_ORIGIN
 ): number | undefined {
   if (input.method !== "POST" || input.path.length !== 2 || input.path[0] !== "v1"
-    || input.path[1] !== "asks" || !PREVIEW_ASK_ORIGINS.includes(configuredOrigin)
+    || input.path[1] !== "asks" || !PREVIEW_ASK_ORIGINS.some(listed => listed === configuredOrigin)
     || input.origin !== configuredOrigin || previewFreeModelIdsJson === undefined) return undefined;
   return parsePreviewRosterFlag(previewFreeModelIdsJson) === undefined ? undefined : PREVIEW_ASK_ADMISSION_TIMEOUT_MS;
 }
