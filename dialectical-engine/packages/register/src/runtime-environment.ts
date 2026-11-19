@@ -1,4 +1,4 @@
-import { parsePreviewEnvironmentConfig, parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
+import { parsePreviewAsksOpenTo, parsePreviewEnvironmentConfig, parsePreviewProviderTestConfig, parsePreviewTeamUserIds } from "@debateai/providers";
 import { isAbsolute } from "node:path";
 import { internalAllowancePolicyFromValue } from "./internal-allowance-policy.js";
 import {
@@ -508,6 +508,11 @@ const apiEnvironmentShape = {
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
     /** Step 1: the preview's team (identity user ids); parsed with the preview configuration below. */
     PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
+    /**
+     * Who may start debates instead of the team: absent (the team rule), "everyone" or "everyone-with-test-payments".
+     * A string here so the shared parser (parsePreviewAsksOpenTo) names every refusal.
+     */
+    PREVIEW_ASKS_OPEN_TO: z.string().max(32).optional(),
     KEK_PATH: kekPath,
     SUPPORT_KEK_PATH: kekPath,
     /**
@@ -863,7 +868,11 @@ export function parseApiEnvironment(
   const environment = validateApiEnvironment(parseEnvironmentSource(apiEnvironmentShape, source));
   const preview = parsePreviewEnvironment(source.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
   return { ...environment, STAFF_ACCESS: staffAccess, ...preview,
-    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined) };
+    PREVIEW_TEAM_USER_IDS: parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined),
+    PREVIEW_ASKS_OPEN: parsePreviewAsksOpenTo(environment.PREVIEW_ASKS_OPEN_TO, {
+      previewConfigured: preview.PREVIEW_GATE_SETTINGS !== undefined,
+      teamKeyPresent: environment.PREVIEW_TEAM_USER_IDS_JSON !== undefined,
+      hosted: environment.DEPLOYMENT_MODE === "hosted" }) };
 }
 
 /**
@@ -1106,6 +1115,8 @@ const runnerEnvironmentShape = {
      * Same rules as the API's (parsed with the preview configuration below).
      */
     PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
+    /** The API's same setting, parsed by the same rules, so the runner's start gate agrees with the API's routes. */
+    PREVIEW_ASKS_OPEN_TO: z.string().max(32).optional(),
     KEK_PATH: kekPath,
     /**
      * V-3, fix wave A-C2. The runner's half of a changeover. It holds ONE
@@ -1184,6 +1195,10 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
   const preview = parsePreviewEnvironment(environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON);
   const previewTeamUserIds = parsePreviewTeamUserIds(environment.PREVIEW_TEAM_USER_IDS_JSON, preview.PREVIEW_GATE_SETTINGS !== undefined);
   const deploymentMode = resolveDeploymentMode(environment.DEBATEAI_DEPLOYMENT_MODE, environment.NODE_ENV);
+  const previewAsksOpen = parsePreviewAsksOpenTo(environment.PREVIEW_ASKS_OPEN_TO, {
+    previewConfigured: preview.PREVIEW_GATE_SETTINGS !== undefined,
+    teamKeyPresent: environment.PREVIEW_TEAM_USER_IDS_JSON !== undefined,
+    hosted: deploymentMode === "hosted" });
   // Side-by-side §1: the same check as the API's, so a runner never serves under another release's name.
   const releaseKey = assertReleaseKeyForRegister(environment.RELEASE_KEY, environment.REGISTER_VERSION, deploymentMode);
   return {
@@ -1191,6 +1206,7 @@ export function parseRunnerEnvironment(source: EnvironmentSource) {
     RELEASE_KEY: releaseKey,
     ...preview,
     PREVIEW_TEAM_USER_IDS: previewTeamUserIds,
+    PREVIEW_ASKS_OPEN: previewAsksOpen,
     DEPLOYMENT_MODE: deploymentMode
   };
 }

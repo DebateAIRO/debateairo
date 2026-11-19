@@ -234,6 +234,7 @@ import {
 } from "./account-erasure.js";
 import { runErasureReconcileChain } from "./erasure-reconcile-chain.js";
 import { installBootCustody } from "./boot-custody.js";
+import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine } from "./preview-asks-open.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, settingsVersionPassed, siteCapBootLine } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
@@ -1015,6 +1016,14 @@ if (billingConnectors?.paymentEnvironment === "sandbox") {
     });
   });
 }
+// PREVIEW_ASKS_OPEN_TO: asks open to strangers only with the room built and on the payment system the value names
+// (./preview-asks-open.ts). A refusal names its code; once open, one content-free line says which opening runs.
+boot.runSync("preview-asks-open", () => assertPreviewAsksOpenBoot({
+  asksOpen: environment.PREVIEW_ASKS_OPEN, roomComposed: askRoom !== undefined,
+  paymentEnvironment: billingConnectors?.paymentEnvironment ?? null
+}));
+const previewAsksOpenLine = previewAsksOpenBootLine(environment.PREVIEW_ASKS_OPEN);
+if (previewAsksOpenLine !== null) console.warn(previewAsksOpenLine);
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
 // ledger (A-I2) because the construction refuses a store path that is not one
@@ -1271,6 +1280,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...admissionSettingsOfVersion(siteAdmission),
   // Step 1: the preview's team; keyed on the env's gate part (ruling R25).
   ...(previewGate === undefined ? {} : { previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  // PREVIEW_ASKS_OPEN_TO: any signed-in account may ask instead of the team; the waker then starts any account's runs.
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   // Side-by-side spec §1: every run this API admits carries its own checked release key.
   releaseKey: environment.RELEASE_KEY,
@@ -2049,6 +2060,7 @@ const api = buildApi({
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
   // line-up over the gate part). `admissionView` below carries the active version's: the room read's class counts it (SA6).
   ...(previewGate === undefined ? {} : { previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   application,
   stories: ownerStories,
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of

@@ -154,6 +154,7 @@ apps/api/src/password-reset-routes.ts
 apps/api/src/password-reset.ts
 apps/api/src/person-room-picker.ts
 apps/api/src/phone-profile.ts
+apps/api/src/preview-asks-open.ts
 apps/api/src/preview-budget-estimate.ts
 apps/api/src/provider-discovery.ts
 apps/api/src/public-flag.ts
