@@ -148,6 +148,11 @@
   text-wrap: pretty;
   overflow-wrap: anywhere;
 }
+/* A paragraph's lead-in ("Delivery.", "Cancelling."), bold as the draft marks it, so a reader finds it by eye. */
+.legalSection p strong {
+  font-weight: 700;
+  color: var(--ink);
+}
 .legalSection ul {
   display: flex;
   flex-direction: column;

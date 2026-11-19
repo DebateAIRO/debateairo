@@ -19,7 +19,9 @@
  * markdown tables (rendered as lists, cells joined with an em dash) and `- ` bullet lists.
  * Emphasis, links and autolinks are reduced to their visible text; escaped and HTML-entity
  * brackets become plain brackets, because the drafts use square brackets to mark what counsel
- * still has to fill in and the product renders those marks verbatim.
+ * still has to fill in and the product renders those marks verbatim. A paragraph that opens with a
+ * bold run ("**Delivery.** …") also carries that run as `lead`, so the page can draw it bold; its
+ * `text` is the same either way.
  *
  * `tests/unit/legal-documents-data.test.ts` pins that the committed modules equal this script's
  * output, so edit the draft and regenerate — never the module.
@@ -344,9 +346,22 @@ export function parseBlocks(lines) {
       index += 1;
       continue;
     }
-    blocks.push({ kind: "p", text: inlineText(paragraph.join(" ")) });
+    blocks.push(paragraphBlock(paragraph.join(" ")));
   }
   return blocks;
+}
+
+/**
+ * One paragraph block. When the draft opens the paragraph with a bold run, the block also carries
+ * that run's visible text as `lead`, so the page can draw the paragraph's lead-in bold; `text` is the
+ * whole paragraph either way. A lead that is not exactly the start of `text` is left out, so the words
+ * on the page can never differ from `text`. The key is absent, not empty, when there is no lead.
+ */
+function paragraphBlock(raw) {
+  const text = inlineText(raw);
+  const bold = /^\s*\*\*(.+?)\*\*/.exec(raw);
+  const lead = bold === null ? "" : inlineText(bold[1]);
+  return lead.length > 0 && text.startsWith(lead) ? { kind: "p", lead, text } : { kind: "p", text };
 }
 
 /**
@@ -525,7 +540,11 @@ export function buildLegalDocument(markdown, key) {
 const str = (value) => JSON.stringify(value);
 
 function renderBlock(block) {
-  if (block.kind === "p") return `      { kind: "p", text: ${str(block.text)} }`;
+  if (block.kind === "p") {
+    return block.lead === undefined
+      ? `      { kind: "p", text: ${str(block.text)} }`
+      : `      { kind: "p", lead: ${str(block.lead)}, text: ${str(block.text)} }`;
+  }
   const items = block.items.map((item) => `        ${str(item)}`).join(",\n");
   if (block.table === undefined) return `      {\n        kind: "list",\n        items: [\n${items}\n        ]\n      }`;
   const rows = block.table.rows.map((row) => `            ${str(row)}`).join(",\n");

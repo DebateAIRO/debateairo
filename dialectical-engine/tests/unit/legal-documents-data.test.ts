@@ -5,6 +5,7 @@ import {
   buildLegalDocument,
   inlineText,
   LEGAL_DOCUMENT_SOURCES,
+  parseBlocks,
   renderLegalModule
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { POLICY_JUMP, POLICY_SECTIONS, PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
@@ -65,6 +66,23 @@ describe("legal documents — generated data", () => {
       "utf8"
     ).replace("## 1. Who is responsible", "## 01. Who is responsible");
     expect(() => buildLegalDocument(markdown, "privacy")).toThrow(/numbered headings/);
+  });
+
+  it("gives a paragraph a lead only for its opening bold run, plain, and always the start of its text", () => {
+    for (const document of [TERMS_OF_SERVICE, PRIVACY_POLICY]) {
+      const leads = document.sections.flatMap((entry) => entry.blocks.flatMap((block) => (block.kind === "p" && block.lead !== undefined ? [block] : [])));
+      expect(leads.length, document.key).toBeGreaterThan(10);
+      for (const block of leads) {
+        expect(block.lead!.length, block.text.slice(0, 40)).toBeGreaterThan(0);
+        expect(block.text.startsWith(block.lead!), block.lead).toBe(true);
+        expect(MARKDOWN_RESIDUE.test(block.lead!), block.lead).toBe(false);
+      }
+    }
+    // A bold run in the middle of a paragraph is not a lead, and an opening one becomes one.
+    expect(parseBlocks(["Cancel from **Settings → Subscription** at any time."])).toEqual([
+      { kind: "p", text: "Cancel from Settings → Subscription at any time." }
+    ]);
+    expect(parseBlocks(["**Delivery.** Nothing is shipped."])).toEqual([{ kind: "p", lead: "Delivery.", text: "Delivery. Nothing is shipped." }]);
   });
 
   describe("Terms of Service", () => {
@@ -302,6 +320,15 @@ describe("legal documents — generated data", () => {
         "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, will be available; each unlocks the full model roster and lets you set the debate gauges yourself."
       );
       expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's credit, however many days have passed"))).toBe(true);
+    });
+
+    it("carries section 12's bold lead-ins as leads, each the start of its paragraph's text", () => {
+      const leads = section(TERMS_OF_SERVICE, "12").blocks.flatMap((block) => (block.kind === "p" && block.lead !== undefined ? [block.lead] : []));
+      expect(leads).toEqual(expect.arrayContaining(["Cancelling.", "Delivery.", "Statutory rights first."]));
+      const delivery = section(TERMS_OF_SERVICE, "12").blocks.find((block) => block.kind === "p" && block.lead === "Delivery.");
+      expect(delivery).toEqual({ kind: "p", lead: "Delivery.", text: expect.stringMatching(/^Delivery\. Dialectical Engine is an online service/u) });
+      // The free-plan paragraph opens with no bold run, so it carries no lead key at all.
+      expect(Object.keys(section(TERMS_OF_SERVICE, "12").blocks[0]!)).toEqual(["kind", "text"]);
     });
 
     it("gives everyone the 14-day withdrawal in section 13, refunded by the plan's credit not used (owner's decision of 16 November 2026)", () => {

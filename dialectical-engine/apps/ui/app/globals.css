@@ -11569,6 +11569,10 @@ a:focus-visible {
   color: var(--text-2);
   text-wrap: pretty;
 }
+/* A paragraph's lead-in, bold as on the legal pages. */
+.policyText strong {
+  font-weight: 700;
+}
 
 .policyItems {
   margin: 9px 0 0 38px;
