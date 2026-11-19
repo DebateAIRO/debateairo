@@ -197,6 +197,9 @@ test("each sentence shown before a paid click names the money it moves (A7: the 
   assert.match(english["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} a month before tax\..*with tax, once the change is scheduled/u);
   assert.doesNotMatch(english["billing.subscription.downgradeConfirm"], /\+ tax/u);
   assert.match(catalogue("ro")["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} pe lună fără taxe\..*cu taxe, după ce schimbarea este programată/u);
+  // Romanian is an offered language: the refusal of a downgrade whose price changed is said in Romanian, not in the
+  // English that stands in for the languages still to be translated.
+  assert.equal(catalogue("ro")["billing.subscription.downgradePriceChanged"], "Prețul acestui abonament s-a schimbat cât timp pagina era deschisă, așa că nu s-a programat nimic. Alegeți-l din nou pentru a vedea prețul actual.");
   // Spec §1.3: "$20.00 + $4.20 VAT (21%, Romania)" — the tax amount, not only its rate.
   assert.match(english["billing.checkout.taxLabel"], /\{tax\}/);
   assert.match(english["billing.consent.renewal"], /\{total\}/);

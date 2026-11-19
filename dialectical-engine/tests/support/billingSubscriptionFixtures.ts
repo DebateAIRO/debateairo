@@ -23,7 +23,6 @@ import { StubCardPayments } from "./stub-card-payments.js";
 
 /** A generated records key: tests never hold a real one. */
 export const TEST_RECORDS_KEY = Buffer.alloc(32, 7);
-/** Stands for PUBLIC_APP_URL (R-7) in every billing link a test reads. */
 /**
  * The lower plan's price as a downgrade confirmation shows it under `plans` (default: the test plans), in the two
  * shapes a test sends it: the route's body fields and `scheduleDowngrade`'s argument.
@@ -37,6 +36,7 @@ export function shownDowngradePrice(
   });
 }
 
+/** Stands for PUBLIC_APP_URL (R-7) in every billing link a test reads. */
 export const TEST_PUBLIC_APP_URL = "https://dezbatere.test";
 
 const TEST_AGREEMENT_SHA256 = createHash("sha256").update("renewal agreement (test)", "utf8").digest("hex");
