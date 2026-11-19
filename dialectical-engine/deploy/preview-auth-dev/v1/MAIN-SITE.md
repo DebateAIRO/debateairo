@@ -90,8 +90,7 @@ if the server shows something else.
 
 **The upload day, and the days after.** Part 1 is the day before. Parts 2 to 5, up to and including the review window
 (5.8), fit in one day: the upload, your sandbox test, mail, the name, your staff key there (5.7) and the window. Real
-payments do not: NETOPIA's
-point of sale is not enrolled yet, and four of NETOPIA's steps remain:
+payments do not: NETOPIA's point of sale is not enrolled yet, and four of NETOPIA's steps remain:
 1. you enrol the point of sale in NETOPIA's admin and tick its conditions, once the window is open (5.8b);
 2. NETOPIA checks your identity;
 3. NETOPIA checks your shop's profile, and looks at https://dezbatere.ro without a password;
@@ -152,8 +151,8 @@ go on a second time, that friends' test closes and the site password changes (7.
   payments are real and the site is open: closing asks would lock paying customers out of their questions, and
   closing mail would send buyers outside the allow-list no confirmation (M1, with the Terms) and no receipt (M2). PWON
   first.
-- **The site password comes off last:** after mail is open, after real payments work, and after asks are open to
-  everyone.
+- **The site password comes off last:** after mail is open, after real payments work, after your staff key works on
+  dezbatere.ro (5.7), and after asks are open to everyone.
 - **NETOPIA's logo comes only with an upload.** Its line (`NETOPIA_LOGO_ID`) goes into the new release's own website
   file in the release guide's SB5d, right after DR1; no step of this document adds it, and it never goes into an
   older release's file. It changes nothing in Caddy, so it does not depend on the site password or the name.
@@ -2225,8 +2224,8 @@ your identity, checks your shop's profile (it looks at the open site), and sends
 - The home page, the plans with prices, the Terms and the Privacy Policy (with earlier versions), the company details
   and contact page, the cookie policy, the AI model providers, the AI transparency notice, Cancel and Withdraw can be
   read without a password.
-- Sign-in, account creation, debates and the order page ask for an access password for now. They open to everyone in
-  a later update, after the contract.
+- Sign-in, account creation, debates and the order page ask for an access password for now. They open to everyone
+  later, after the contract.
 - Card payments run on NETOPIA's test system (sandbox) until NETOPIA switches live payments on, and the home page and
   the plans page say so: "Mod de test: plățile de pe acest site nu sunt reale și nu se iau bani" (in English: "Test
   mode: payments on this site are not real and no money is taken").
