@@ -78,7 +78,7 @@ describe("S10 rendered erasure boundaries",()=>{
         await act(async ()=>{ button("Delete private debate").click(); });
         const checkbox=document.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
         await act(async ()=>{ checkbox.click(); });
-        const form=button("Permanently delete private debate").closest("form")!;
+        const form=button("Delete private debate").closest("form")!;
         await act(async ()=>{ form.dispatchEvent(new dom.window.Event(
           "submit",{ bubbles:true,cancelable:true }
         )); });
@@ -114,7 +114,7 @@ describe("S10 rendered erasure boundaries",()=>{
       await flush();
       await act(async ()=>{ button("Delete private debate").click(); });
       await act(async ()=>{ document.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click(); });
-      const form=button("Permanently delete private debate").closest("form")!;
+      const form=button("Delete private debate").closest("form")!;
       await act(async ()=>{ form.dispatchEvent(new dom.window.Event(
         "submit",{ bubbles:true,cancelable:true }
       )); });

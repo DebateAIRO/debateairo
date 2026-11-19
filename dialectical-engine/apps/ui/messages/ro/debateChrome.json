@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Dezbatere privată",
   "debateChrome.privateDebateDeleted": "Dezbatere privată ștearsă",
   "debateChrome.privateDebateDeletionProcessing": "Ștergerea dezbaterii private este în curs",
-  "debateChrome.privateDebateDeletedDetail": "Această dezbatere este un marcaj fără conținut. Conținutul său privat criptat este definitiv ilizibil.",
+  "debateChrome.privateDebateDeletedDetail": "Această dezbatere este un marcaj fără conținut. Conținutul său privat criptat nu mai poate fi citit aici. Copiile noastre de rezervă îl pot conține în continuare (Politica de confidențialitate, secțiunea 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Conținutul privat nu mai este disponibil cât timp se finalizează eliminarea definitivă a cheilor.",
   "debateChrome.tree.building": "Se construiește arborele de argumente…",
   "debateChrome.tree.notProduced": "Nu a fost produs niciun arbore de argumente pentru această dezbatere.",

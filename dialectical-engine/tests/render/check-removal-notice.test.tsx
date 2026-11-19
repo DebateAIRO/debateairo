@@ -145,7 +145,8 @@ describe("S01 removal notice", () => {
 
   it("orders the title, explanation, help numbers, five reasons and Close", () => {
     const html = notice();
-    const phrases = ["We deleted this debate", "We do not keep it, and it cannot be restored.",
+    const phrases = ["We deleted this debate",
+      "It is gone from the service, and it cannot be restored, unless we restore the whole service from a backup that still holds it.",
       'class="crisisSupportCountry"', "Only this debate was deleted.",
       "Our automatic check of its conclusion found", "This decision was made by an automated tool",
       "Ground: our Terms of Service", "To complain, write to office@dezbatere.ro", ">Close</button>"];

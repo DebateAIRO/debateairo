@@ -119,7 +119,7 @@ describe("deleting a private debate", () => {
     expect(document.activeElement).toBe(button(pub["public.publication.deletePrivateEllipsis"]));
   });
 
-  it("Cancel on the security check returns focus to Permanently delete", async () => {
+  it("Cancel on the security check returns focus to Delete private debate", async () => {
     await mount(client());
     await press(button(pub["public.publication.deletePrivateEllipsis"]));
     await press(checkbox(pub["public.publication.deleteAcknowledgement"]));
