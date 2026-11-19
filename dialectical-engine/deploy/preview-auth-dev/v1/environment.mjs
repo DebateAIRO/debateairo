@@ -1,8 +1,9 @@
 import { setGlobalProxyFromEnv } from 'node:http';
 import { refuse, withPrivateBytes } from './custody.mjs';
-import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY, PREVIEW_SOCKET } from './turnstile-custody.mjs';
+import { PREVIEW_SOCKET } from './turnstile-custody.mjs';
 import { PREVIEW_EGRESS_PROXY_URL } from './egress-proxy.mjs';
-import { namedRefusal } from './startup-refusals.mjs';
+import { namedRefusal, refuseNamed } from './startup-refusals.mjs';
+import { publicSiteOf } from './public-origins.mjs';
 const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUTHN_RP_ID','STAFF_INDEPENDENT_ALERT_CONFIG_PATH','STAFF_ALERT_OPERATOR_MODULE_PATH','STAFF_ALERT_OPERATOR_MODULE_SHA256',
  'INTERNAL_ALLOWANCE_POLICY_VERSION','INTERNAL_ALLOWANCE_CURRENCY','INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS','INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP','INTERNAL_ALLOWANCE_POLICY_SOURCE_REF'];
 /**
@@ -163,6 +164,19 @@ function assertReleaseKey(service,configured,publication,approved) {
   ||!RELEASE_KEY_PATTERN.test(configured.RELEASE_KEY??'')||configured.RELEASE_KEY!==expectedReleaseKey(publication,approved.sourceRevision))refuse();
  if(service==='runner'&&['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'].some(key=>typeof configured[key]!=='string'||!configured[key].endsWith(`-${configured.RELEASE_KEY}`)))refuse();
 }
+/**
+ * The public name the API answers as: exactly one listed origin (public-origins.mjs), the main site's only in hosted
+ * mode, where the spending gates and the per-person limits are in the path; and with staff passkeys (policy 2), the
+ * staff origin and relying party are that same name. It runs before the API's own parser, which refuses some of these
+ * too but without a name, so the journal says which setting is wrong. Returns the listed site.
+ */
+function apiPublicSite(configured) {
+ const site=publicSiteOf(configured.PUBLIC_APP_URL);
+ if(!site)refuseNamed('PREVIEW_ORIGIN_NOT_LISTED');
+ if(site.hostedOnly&&configured.DEBATEAI_DEPLOYMENT_MODE!=='hosted')refuseNamed('PREVIEW_MAIN_ORIGIN_NOT_HOSTED');
+ if(configured.STAFF_ACCESS_POLICY_VERSION==='2'&&(configured.STAFF_WEBAUTHN_ORIGIN!==site.origin||configured.STAFF_WEBAUTHN_RP_ID!==site.hostname))refuseNamed('PREVIEW_STAFF_ORIGIN_MISMATCH');
+ return site;
+}
 export function parseEnvironmentText(text) {
  try{
   if(typeof text!=='string'||Buffer.byteLength(text)>32768||/[\0\r]/.test(text))refuse();const out={};
@@ -185,13 +199,17 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   assertReleaseKey(service,configured,publication,approved);
   const environment={...configured,PATH:'/usr/local/bin:/usr/bin:/bin'};
   if(service==='ui'){
-   if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
+   // The website answers as one listed public name (public-origins.mjs), with that name's Turnstile site key.
+   const site=publicSiteOf(configured.PUBLIC_APP_URL);
+   if(!site)refuseNamed('PREVIEW_ORIGIN_NOT_LISTED');
+   if(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==site.turnstileSiteKey)refuseNamed('PREVIEW_ORIGIN_SITE_KEY_MISMATCH');
+   if(configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
     ||configured.DIALECTICAL_API_BASE!==`http://127.0.0.1:${approved.apiPort}`
-    ||!isReviewedModelRosterFlag(configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==runtime?.builtModelRosterFlag
-    ||(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==PREVIEW_SITE_KEY))refuse();
+    ||!isReviewedModelRosterFlag(configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==runtime?.builtModelRosterFlag)refuse();
    return {environment:Object.freeze(environment),selectedRegisterVersion:null,deploymentMode:'local'};
   }
   if(REFUSED_ON_PREVIEW.some(key=>configured[key]!==undefined))refuse();
+  const site=service==='api'?apiPublicSite(configured):undefined;
   const normalized=service==='api'?runtime.parseApiEnvironment(configured):runtime.parseRunnerEnvironment(configured);
   // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team);
   // any of its three forms (addition D14: the gate part, PREVIEW_GATE_SETTINGS, is present for each).
@@ -199,10 +217,11 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   if(!['local','hosted'].includes(mode)||normalized.DEPLOYMENT_MODE!==mode||String(normalized.REGISTER_VERSION)!==publication.registerVersion
     ||(mode==='hosted'&&normalized.PREVIEW_GATE_SETTINGS===undefined))refuse();
   if(service==='api'){
-   if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
+   if(configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
     ||configured.MAIL_SENDMAIL_PATH!==approved.mailExecutable||configured.MAIL_FROM!==approved.mailFrom
     ||(configured.TURNSTILE_SOCKET_PATH!==undefined&&configured.TURNSTILE_SOCKET_PATH!==PREVIEW_SOCKET))refuse();
-   if(normalized.STAFF_ACCESS.policyVersion===2&&(normalized.STAFF_ACCESS.origin!==PREVIEW_ORIGIN||normalized.STAFF_ACCESS.rpId!=='v3-preview.dezbatere.ro'))refuse();
+   // The same rule on the parser's own reading of the staff settings.
+   if(normalized.STAFF_ACCESS.policyVersion===2&&(normalized.STAFF_ACCESS.origin!==site.origin||normalized.STAFF_ACCESS.rpId!==site.hostname))refuseNamed('PREVIEW_STAFF_ORIGIN_MISMATCH');
    // Social configuration is admitted by the final product's parser only when its whole pair is present.
    if((configured.SOCIAL_SOCKET_PATH===undefined)!==(configured.SOCIAL_PROVIDERS_JSON===undefined))refuse();
    if(mode==='hosted')assertHostedApiValues(configured);
