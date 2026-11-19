@@ -160,12 +160,41 @@ describe("privacy policy modal — rendered", () => {
       expect(paragraphs, `section ${POLICY_SECTIONS[index]!.no} paragraphs`).toEqual(
         blocks.filter((block) => block.kind === "p").map((block) => block.text)
       );
-      const bullets = [...section.querySelectorAll(".policyItemText")].map(
-        (element) => element.textContent
-      );
+      // A table row keeps its visible text untouched (aria-hidden) and adds one sr-only copy that names
+      // each value's column; what a sighted reader sees is the row text alone, so compare that.
+      const visibleText = (element: Element) => {
+        const copy = element.cloneNode(true) as Element;
+        copy.querySelectorAll(".srOnly").forEach((hidden) => hidden.remove());
+        return copy.textContent;
+      };
+      const bullets = [...section.querySelectorAll(".policyItemText")].map(visibleText);
       expect(bullets, `section ${POLICY_SECTIONS[index]!.no} bullets`).toEqual(
         blocks.flatMap((block) => (block.kind === "list" ? [...block.items] : []))
       );
+      const spoken = [...section.querySelectorAll(".policyItemText .srOnly")].map((element) => element.textContent);
+      const expectedSpoken = blocks.flatMap((block) =>
+        block.kind === "list" && block.table !== undefined
+          ? block.table.rows.map((row) =>
+              row
+                .flatMap((cell, column) => {
+                  if (cell.length === 0) return [];
+                  const name = block.table!.head[column] ?? "";
+                  return [`${name ? `${name}: ` : ""}${cell}${/[.!?;:…。！？]$/u.test(cell) ? " " : ". "}`];
+                })
+                .join("")
+            )
+          : []
+      );
+      expect(spoken, `section ${POLICY_SECTIONS[index]!.no} spoken rows`).toEqual(expectedSpoken);
+      for (const copy of section.querySelectorAll(".policyItemText .srOnly")) {
+        const host = copy.parentElement as HTMLElement;
+        // The visible run comes first and is hidden from screen readers; the copy follows in its own box.
+        expect(host.parentElement!.firstElementChild!.getAttribute("aria-hidden")).toBe("true");
+        // The copy is absolutely positioned: an empty positioned box must hold it, or the copies overflow the modal's
+        // frame (outside the scrolling text) and make the frame scrollable too. The box holds no visible text.
+        expect(host.style.position).toBe("relative");
+        expect(host.childNodes.length).toBe(1);
+      }
     }
     const expectedParagraphs = POLICY_SECTIONS.reduce(
       (total, section) => total + section.blocks.filter((block) => block.kind === "p").length,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
+import { announce } from "@/components/Toast";
 
 /*
  * map-f10 (V4 screen review, 3 Nov): the drawn map and the outline are one keyboard stop each. Inside, the arrow keys move:
@@ -79,6 +80,21 @@ function rowsOf(box: HTMLElement): HTMLElement[] {
  *  disabled (PickBox), so it is still found here; a row with no box (a path, "Show more", a read-only map) finds none. */
 function pickBoxOf(row: HTMLElement): HTMLInputElement | null {
   return row.parentElement?.querySelector<HTMLInputElement>(":scope > label > input[type=checkbox]") ?? null;
+}
+
+/**
+ * a11y (2026-11-19): Space ticks the row's pick box while focus stays on the row, so a screen reader hears nothing; the
+ * only change is a word inside the focused row's name, which is not reliably spoken. Once React has drawn the new state,
+ * the row's own note (`data-pick-note`: "Picked to dig together", or the kind of open question) is said through the
+ * page's polite announcer, the same words a sighted reader sees change. A row with no note says nothing.
+ */
+function sayPickNote(box: HTMLElement, rowId: string | undefined): void {
+  if (rowId === undefined) return;
+  window.setTimeout(() => {
+    const row = rowsOf(box).find((candidate) => candidate.dataset.row === rowId);
+    const note = row?.querySelector("[data-pick-note]")?.textContent?.trim();
+    if (note) announce(note);
+  }, 0);
 }
 
 /** The row a focused element is (or sits in), when focus is inside the map now; else null. */
@@ -219,7 +235,10 @@ export function useMapKeys(ref: RefObject<HTMLElement | null>, handlers: Handler
         const pick = pickBoxOf(row);
         if (pick === null) return;
         event.preventDefault();
-        if (!pick.disabled) pick.click();
+        if (!pick.disabled) {
+          pick.click();
+          sayPickNote(box, row.dataset.row);
+        }
         return;
       }
       default:

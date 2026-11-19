@@ -189,8 +189,11 @@ describe("legal documents follow the interface locale", () => {
       expect(dialog.hasAttribute("dir"), `${locale}: the dialog sets no dir`).toBe(false);
       for (const { name } of LEGAL_INVENTORY) {
         const escaped=name.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
-        const written=(dialog.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`,"g"))?.length ?? 0;
-        const isolated = [...dialog.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
+        // Counted on what is drawn: a table row's sr-only spoken copy (`.srOnly`) repeats its names for screen readers.
+        const drawn = dialog.cloneNode(true) as Element;
+        drawn.querySelectorAll(".srOnly").forEach((copy) => copy.remove());
+        const written=(drawn.textContent ?? "").match(new RegExp(`${escaped}(?![A-Za-z0-9_.-])`,"g"))?.length ?? 0;
+        const isolated = [...drawn.querySelectorAll("[dir='ltr']")].filter((node) => node.textContent === name).length;
         expect(written, `${locale}: ${name} is in the policy`).toBeGreaterThan(0);
         expect(isolated, `${locale} ${mode}: every ${name} is its own left-to-right run`).toBe(written);
       }

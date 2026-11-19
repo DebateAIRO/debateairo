@@ -90,7 +90,7 @@ function OpenRow(props: Readonly<{ question: V4OpenQuestion; pieces: MapPiecesPr
         <span className="v4MapNote">
           <OpenWord catalog={pieces.catalog} />
           {question.star ? <span className="v4MapStarWords">{t(pieces.catalog, "v4.map.starHint")}</span> : null}
-          <span>{openNote(question, picked, pieces.catalog)}</span>
+          <span data-pick-note="">{openNote(question, picked, pieces.catalog)}</span>
         </span>
         {selected ? <span className="v4OutHere">{t(pieces.catalog, "v4.outline.here")}</span> : null}
         {pieces.changed.has(id) ? <NewDot catalog={pieces.catalog} /> : null}

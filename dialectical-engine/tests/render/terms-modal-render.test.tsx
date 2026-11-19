@@ -200,7 +200,12 @@ describe("terms of service modal — rendered", () => {
         `section ${TERMS_SECTIONS[index]!.no} paragraphs`
       ).toEqual(blocks.filter((block) => block.kind === "p").map((block) => block.text));
       expect(
-        [...section.querySelectorAll(".policyItemText")].map((element) => element.textContent),
+        // What is drawn: a table row's sr-only spoken copy (`.srOnly`) is for screen readers only.
+        [...section.querySelectorAll(".policyItemText")].map((element) => {
+          const drawn = element.cloneNode(true) as Element;
+          drawn.querySelectorAll(".srOnly").forEach((copy) => copy.remove());
+          return drawn.textContent;
+        }),
         `section ${TERMS_SECTIONS[index]!.no} bullets`
       ).toEqual(blocks.flatMap((block) => (block.kind === "list" ? [...block.items] : [])));
 

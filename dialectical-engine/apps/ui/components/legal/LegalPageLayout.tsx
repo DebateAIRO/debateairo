@@ -17,6 +17,7 @@ export function LegalPageLayout({
   title,
   meta,
   billing = null,
+  locale,
   children
 }: {
   current: LegalPageKey;
@@ -27,11 +28,17 @@ export function LegalPageLayout({
   meta: string;
   /** Paid plans (P21, R3-4): what the full footer shows of billing; left out, nothing about paying shows. */
   billing?: SiteFooterBilling | null;
+  /**
+   * The language the navigation and the text are in, when the page loaded them for `?lang=` rather than for the
+   * reader's cookie: `<html lang>` follows the cookie, so without this a screen reader reads, say, Arabic text with
+   * an English voice (WCAG 3.1.2). The footer is outside it and stays in the cookie's language.
+   */
+  locale?: string;
   children: ReactNode;
 }) {
   return (
     <div className="screen scroll legalPage">
-      <div className="legalGrid">
+      <div className="legalGrid" lang={locale}>
         <nav className="legalNav" aria-label={t(legalCatalog, "legal.navLabel")}>
           <span className="legalNavHead" aria-hidden>
             {t(chromeCatalog, "chrome.legalPages")}
