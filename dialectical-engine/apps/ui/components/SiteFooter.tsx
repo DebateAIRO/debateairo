@@ -58,6 +58,8 @@ function linkItems(links: ReadonlyArray<FooterLink>, catalog: MessageCatalog) {
 /** DB-IP Lite's CC BY 4.0 licence asks for this credit link on the site (spec §1.5, §2.10); A14 keeps it billing-free. */
 const DBIP_URL = "https://db-ip.com";
 
+/** Where NETOPIA's hosted logo links, as NETOPIA's own logo component does. */
+const NETOPIA_URL = "https://netopia-payments.com/";
 
 /**
  * ANPC's pictogram for alternative dispute resolution (SAL), the consumer-protection link Romanian law asks a shop to show
@@ -134,11 +136,28 @@ const MARK_IMAGES = [
 ] as const satisfies ReadonlyArray<Readonly<{ mark: keyof PaymentMarks; src: string; altKey: string }>>;
 
 /**
- * The marks that the server's `PAYMENT_MARKS_AVAILABLE` setting names (`availablePaymentMarks()`, read by a server page), in
- * one group: the full footer's, and the checkout's under its Continue button (N25b). Nothing at all when it names none.
+ * The payment marks in one group: the full footer's, and the checkout's under its Continue button. NETOPIA's hosted
+ * logo (the NETOPIA_LOGO_ID setting, `netopiaLogoAddress()`), when a server page hands it over, is the whole group: its
+ * picture already holds the Visa and Mastercard marks, so the files the `PAYMENT_MARKS_AVAILABLE` setting names
+ * (`availablePaymentMarks()`) are not drawn beside it. Nothing at all when neither setting names any.
  */
-export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
+export function PaymentMarksGroup({ marks, netopiaLogo = null }: { marks: PaymentMarks; netopiaLogo?: string | null }) {
   const { catalog } = useChromeI18n();
+  if (netopiaLogo !== null) {
+    const netopia = t(catalog, "chrome.footer.netopia");
+    // The picture shows the three brands, whose names are the same in every locale.
+    const alt = [netopia, t(catalog, "chrome.footer.visa"), t(catalog, "chrome.footer.mastercard")].join(", ");
+    return (
+      <div className="siteFooterMarks" role="group" aria-label={t(catalog, "chrome.footer.paymentMarks")}>
+        <a className="siteFooterNetopia" href={NETOPIA_URL} target="_blank" rel="noopener noreferrer" title={netopia}>
+          {/* Lazy: the browser asks NETOPIA's server only when the footer comes near the screen, and the server render
+              adds no preload for it. No referrer: NETOPIA's server is not told which page the visitor is on. No
+              crossOrigin: NETOPIA's server allows no cross-origin read, and a plain image needs none. */}
+          <img src={netopiaLogo} alt={alt} width={418} height={75} loading="lazy" referrerPolicy="no-referrer" />
+        </a>
+      </div>
+    );
+  }
   const shown = MARK_IMAGES.filter(({ mark }) => marks[mark]);
   if (shown.length === 0) return null;
   return (
@@ -163,10 +182,10 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
  *
  * Paid plans extend the `full` shape through the optional `billing` facts a server page hands over
  * (`siteFooterBilling()`, `billingPageFooter()`, the landing's `landingPlans`): the DB-IP credit always, and while billing
- * is on the pricing, delivery, cancel and withdraw links and the marks that the server's `PAYMENT_MARKS_AVAILABLE`
- * setting names (NETOPIA's logo, Visa, Mastercard: `PaymentMarksGroup`). The `line` shape gets only whether billing is
- * on (`lineFooterBilling()`, read by the root layout) and then adds the cancel and withdraw links; it never shows a
- * mark, since its one line has no room for them and it is on every page.
+ * is on the pricing, delivery, cancel and withdraw links and the payment marks (`PaymentMarksGroup`): NETOPIA's hosted
+ * logo when its setting is set, otherwise the files the server's `PAYMENT_MARKS_AVAILABLE` setting names. The `line`
+ * shape gets only whether billing is on (`lineFooterBilling()`, read by the root layout) and then adds the cancel and
+ * withdraw links; it never shows a mark or the logo, since its one line has no room for them and it is on every page.
  * Without the prop (local mode alike) nothing about paying shows in either shape.
  */
 export function SiteFooter(
@@ -205,6 +224,9 @@ export function SiteFooter(
   const billing = props.billing ?? null;
   const billingOn = billing?.billingOn === true;
   const marks = billing !== null && billing.billingOn ? billing.marks : NO_MARKS;
+  // The same gate as the marks: NETOPIA's logo shows only while billing is on. `?? null` covers billing facts built
+  // without the field.
+  const netopiaLogo = billing !== null && billing.billingOn ? billing.netopiaLogo ?? null : null;
   const visibleProductLinks = PRODUCT_LINKS.filter(({ href }) => href !== "/help" || offered === "offered");
   const productLinks: ReadonlyArray<FooterLink> = billingOn
     ? [...visibleProductLinks, ...BILLING_PRODUCT_LINKS]
@@ -264,7 +286,7 @@ export function SiteFooter(
         <span className="siteFooterHead">{t(catalog, "chrome.footer.consumerProtection")}</span>
         <AnpcSalBadge />
       </div>
-      <PaymentMarksGroup marks={marks} />
+      <PaymentMarksGroup marks={marks} netopiaLogo={netopiaLogo} />
       <div className="siteFooterBase">
         <span className="siteFooterCopyright">{copyright}</span>
         <MadeInRomania />

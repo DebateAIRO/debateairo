@@ -90,6 +90,25 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
     expect(document.body.textContent).not.toContain("The plans can't be shown right now.");
   });
 
+  it("with NETOPIA_LOGO_ID set, each page NETOPIA reads shows NETOPIA's hosted logo once in its footer, and no mark file", async () => {
+    const before = process.env.NETOPIA_LOGO_ID;
+    // A made-up shop id: the real one is never in the repository.
+    process.env.NETOPIA_LOGO_ID = "123456";
+    try {
+      for (const [path, render] of PAGES) {
+        const footer = (await page(render)).querySelector("footer.siteFooterFull")!;
+        const images = [...footer.querySelectorAll('.siteFooterMarks[role="group"] img')];
+        expect(images.map((image) => [image.getAttribute("src"), image.getAttribute("alt")]), path)
+          .toEqual([["https://mny.ro/np-black-0.svg?id=123456", "NETOPIA Payments, Visa, Mastercard"]]);
+        expect(footer.querySelector('a.siteFooterNetopia[href="https://netopia-payments.com/"]'), path).not.toBeNull();
+        expect(footer.querySelector('img[src^="/payment-marks/"]'), path).toBeNull();
+      }
+    } finally {
+      if (before === undefined) delete process.env.NETOPIA_LOGO_ID;
+      else process.env.NETOPIA_LOGO_ID = before;
+    }
+  });
+
   it("billing on with every country closed: /withdraw and /cancel keep their own content", async () => {
     expect((await page(WithdrawPage)).body.textContent).toContain("within 14 days of subscribing");
     const cancel = await page(CancelPage);

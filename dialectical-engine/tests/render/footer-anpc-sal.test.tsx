@@ -36,8 +36,8 @@ const expectBadge = (root: Element): void => {
 
 describe("ANPC's SAL badge in the site footer (design 15a full, 15b one line, 15c phone)", () => {
   it("the full footer shows it in every billing state, under a CONSUMER PROTECTION head", () => {
-    const off: SiteFooterBilling = { billingOn: false, marks: ALL_MARKS };
-    const on: SiteFooterBilling = { billingOn: true, marks: ALL_MARKS };
+    const off: SiteFooterBilling = { billingOn: false, marks: ALL_MARKS, netopiaLogo: null };
+    const on: SiteFooterBilling = { billingOn: true, marks: ALL_MARKS, netopiaLogo: null };
     for (const root of [full(), full(null), full(off), full(on)]) {
       expectBadge(root);
       const row = root.querySelector(".siteFooterConsumer")!;
@@ -48,8 +48,10 @@ describe("ANPC's SAL badge in the site footer (design 15a full, 15b one line, 15
   });
 
   it("the full footer's row sits after the link columns, before the card marks and the copyright line (15a)", () => {
-    const children = [...full({ billingOn: true, marks: ALL_MARKS }).children].map((child) => child.className);
-    expect(children).toEqual(["siteFooterColumns", "siteFooterConsumer", "siteFooterMarks", "siteFooterBase"]);
+    for (const netopiaLogo of [null, "https://mny.ro/np-black-0.svg?id=123456"]) {
+      const children = [...full({ billingOn: true, marks: ALL_MARKS, netopiaLogo }).children].map((child) => child.className);
+      expect(children).toEqual(["siteFooterColumns", "siteFooterConsumer", "siteFooterMarks", "siteFooterBase"]);
+    }
   });
 
   it("the one-line footer ends with it, after cookie preferences (15b)", () => {

@@ -16,7 +16,8 @@ const NONCE_GRAMMAR = /^[A-Za-z0-9+/]{22}==$/;
 
 const STATIC_DIRECTIVES = Object.freeze([
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
+  // NETOPIA's hosted logo (lib/billing/paymentMarks.ts netopiaLogoAddress): the one image the site loads from another host.
+  "img-src 'self' data: https://mny.ro",
   "font-src 'self'",
   "connect-src 'self' https://challenges.cloudflare.com",
   "frame-src https://challenges.cloudflare.com",

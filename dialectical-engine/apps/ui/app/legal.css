@@ -564,6 +564,38 @@
 
 /* ---------- Paid plans (P21, R3-4): the card marks, the DB-IP credit, one archived text ---------- */
 .siteFooterMarks { display: flex; gap: 10px; align-items: center; max-width: 1180px; margin: 22px auto 0; }
-.siteFooterMarks img { width: auto; height: 24px; }
+/* Each mark file on a white chip in both themes, as ANPC's badge: a dark wordmark would vanish on the dark footer. */
+.siteFooterMarks > img { width: auto; height: 24px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+/* NETOPIA's hosted logo: one picture of NETOPIA's mark and the Visa and Mastercard marks, dark artwork on a clear
+   background, so it sits on a white chip in both themes too. NETOPIA's box is at most 250 x 50: 245 x 44 here, 223 x 40
+   on a phone. */
+.siteFooterNetopia {
+  display: flex;
+  flex: none;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  /* A high-contrast mode would replace the white with the system colour and hide the dark artwork. */
+  forced-color-adjust: none;
+}
+.siteFooterNetopia:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.siteFooterNetopia img { position: relative; display: block; width: 245px; max-width: 100%; height: auto; aspect-ratio: 418 / 75; object-fit: contain; }
+/* Only an image that did not load draws ::after: its alt text on the white chip, instead of a broken-image icon. */
+.siteFooterNetopia img::after {
+  content: attr(alt);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  color: #1a1a1a;
+  font: 600 12px/1.25 var(--font-sans);
+}
+@media (max-width: 760px) {
+  .siteFooterNetopia img { width: 223px; }
+}
 .siteFooterBase .siteFooterCredit { font-size: 11px; color: var(--muted); }
 .legalArchiveText { margin-top: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

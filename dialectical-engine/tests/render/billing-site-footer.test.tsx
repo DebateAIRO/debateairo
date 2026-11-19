@@ -21,9 +21,12 @@ const full = (billing: SiteFooterBilling | null): Element =>
 const fullWithoutProp = (): Element => markup(<SiteFooter variant="full" />).querySelector("footer.siteFooterFull")!;
 const hrefs = (root: Element): string[] => [...root.querySelectorAll("a")].map((link) => link.getAttribute("href") ?? "");
 const on = (visa: boolean, mastercard: boolean, netopia = false): SiteFooterBilling =>
-  ({ billingOn: true, marks: { netopia, visa, mastercard } });
-const OFF_WITH_MARKS: SiteFooterBilling = { billingOn: false, marks: { netopia: true, visa: true, mastercard: true } };
+  ({ billingOn: true, marks: { netopia, visa, mastercard }, netopiaLogo: null });
+const OFF_WITH_MARKS: SiteFooterBilling = { billingOn: false, marks: { netopia: true, visa: true, mastercard: true }, netopiaLogo: null };
 const NO_MARKS = { netopia: false, visa: false, mastercard: false };
+const ALL_MARKS = { netopia: true, visa: true, mastercard: true };
+/** NETOPIA's hosted logo for a made-up shop id (the real one is never in the repository). */
+const LOGO = "https://mny.ro/np-black-0.svg?id=123456";
 const BILLING_LINKS = ["/pricing", "/terms#legal-section-12", "/cancel", "/withdraw"];
 const line = (billing?: { billingOn: boolean } | null): Element =>
   markup(billing === undefined ? <SiteFooter variant="line" /> : <SiteFooter variant="line" billing={billing} />)
@@ -119,20 +122,92 @@ describe("P21 the site footer, extended for paid plans (R3-4; the card processor
     expect(root.querySelector('[role="group"]')).toBeNull();
   });
 
-  it("takes billing's state from the one plans read, and the marks from the PAYMENT_MARKS_AVAILABLE setting", async () => {
-    const before = process.env.PAYMENT_MARKS_AVAILABLE;
+  it("takes billing's state from the one plans read, the marks from PAYMENT_MARKS_AVAILABLE and the logo from NETOPIA_LOGO_ID", async () => {
+    const before = { marks: process.env.PAYMENT_MARKS_AVAILABLE, logo: process.env.NETOPIA_LOGO_ID };
     try {
       delete process.env.PAYMENT_MARKS_AVAILABLE;
+      delete process.env.NETOPIA_LOGO_ID;
       mocks.billingOn = false;
-      expect(await siteFooterBilling()).toEqual({ billingOn: false, marks: NO_MARKS });
+      expect(await siteFooterBilling()).toEqual({ billingOn: false, marks: NO_MARKS, netopiaLogo: null });
       mocks.billingOn = true;
-      expect(await siteFooterBilling()).toEqual({ billingOn: true, marks: NO_MARKS });
-      expect(billingPageFooter()).toEqual({ billingOn: true, marks: NO_MARKS });
+      expect(await siteFooterBilling()).toEqual({ billingOn: true, marks: NO_MARKS, netopiaLogo: null });
+      expect(billingPageFooter()).toEqual({ billingOn: true, marks: NO_MARKS, netopiaLogo: null });
       process.env.PAYMENT_MARKS_AVAILABLE = "netopia,mastercard";
       expect(billingPageFooter().marks).toEqual({ netopia: true, visa: false, mastercard: true });
+      process.env.NETOPIA_LOGO_ID = "123456";
+      expect(billingPageFooter().netopiaLogo).toBe(LOGO);
+      expect((await siteFooterBilling()).netopiaLogo).toBe(LOGO);
+      process.env.NETOPIA_LOGO_ID = "12a";
+      expect(billingPageFooter().netopiaLogo).toBeNull();
     } finally {
-      if (before === undefined) delete process.env.PAYMENT_MARKS_AVAILABLE;
-      else process.env.PAYMENT_MARKS_AVAILABLE = before;
+      if (before.marks === undefined) delete process.env.PAYMENT_MARKS_AVAILABLE;
+      else process.env.PAYMENT_MARKS_AVAILABLE = before.marks;
+      if (before.logo === undefined) delete process.env.NETOPIA_LOGO_ID;
+      else process.env.NETOPIA_LOGO_ID = before.logo;
+    }
+  });
+});
+
+describe("NETOPIA's hosted logo in the full footer", () => {
+  const withLogo = (billingOn: boolean): SiteFooterBilling => ({ billingOn, marks: ALL_MARKS, netopiaLogo: LOGO });
+
+  it("while billing is on: one picture, linked to NETOPIA's site in a new tab, instead of every mark file", () => {
+    const root = full(withLogo(true));
+    const groups = root.querySelectorAll('[role="group"]');
+    expect(groups).toHaveLength(1);
+    expect(groups[0]!.getAttribute("aria-label")).toBe("Cards we accept");
+    expect(groups[0]!.className).toBe("siteFooterMarks");
+    const links = groups[0]!.querySelectorAll("a");
+    expect(links).toHaveLength(1);
+    expect(links[0]!.getAttribute("href")).toBe("https://netopia-payments.com/");
+    expect(links[0]!.getAttribute("target")).toBe("_blank");
+    expect(links[0]!.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(links[0]!.getAttribute("title")).toBe("NETOPIA Payments");
+    const images = [...root.querySelectorAll("img")].filter((image) => image.closest(".siteFooterAnpc") === null);
+    expect(images).toHaveLength(1);
+    const image = images[0]!;
+    expect(image.getAttribute("src")).toBe(LOGO);
+    expect(image.getAttribute("alt")).toBe("NETOPIA Payments, Visa, Mastercard");
+    expect(image.getAttribute("loading")).toBe("lazy");
+    expect(image.getAttribute("referrerpolicy")).toBe("no-referrer");
+    expect(image.hasAttribute("crossorigin")).toBe(false);
+    expect(root.querySelector('img[src^="/payment-marks/"]')).toBeNull();
+  });
+
+  it("while billing is off, or without billing facts: no logo and nothing from NETOPIA's server", () => {
+    for (const root of [full(withLogo(false)), full(null), fullWithoutProp()]) {
+      expect(root.querySelector('[role="group"]')).toBeNull();
+      expect(root.innerHTML).not.toContain("mny.ro");
+    }
+  });
+
+  it("sits on a white chip in both themes, inside NETOPIA's 250 x 50 box; each mark file has its own white chip too", () => {
+    const css = readFileSync(resolve("apps/ui/app/legal.css"), "utf8");
+    const rule = (selector: string): string => {
+      const at = css.indexOf(`\n${selector} {`);
+      expect(at, selector).toBeGreaterThan(-1);
+      return css.slice(at, css.indexOf("}", at));
+    };
+    expect(rule(".siteFooterMarks > img")).toContain("background: #fff;");
+    expect(rule(".siteFooterMarks > img")).toContain("height: 24px;");
+    const chip = rule(".siteFooterNetopia");
+    for (const part of ["background: #fff;", "border: 1px solid var(--line);", "forced-color-adjust: none;", "max-width: 100%;"]) expect(chip).toContain(part);
+    // 245 x 44 (418 x 75 scaled), 223 x 40 on a phone: both inside 250 x 50.
+    const image = rule(".siteFooterNetopia img");
+    for (const part of ["width: 245px;", "height: auto;", "aspect-ratio: 418 / 75;", "object-fit: contain;"]) expect(image).toContain(part);
+    expect(245 * 75 / 418).toBeLessThanOrEqual(50);
+    expect(css).toMatch(/@media \(max-width: 760px\) \{\s*\.siteFooterNetopia img \{ width: 223px; \}\s*\}/);
+    // The phone width comes after the base rule, so it wins.
+    expect(css.indexOf(".siteFooterNetopia img { width: 223px; }")).toBeGreaterThan(css.indexOf("\n.siteFooterNetopia img {"));
+    // An image that did not load shows its alt text on the chip, never a broken-image icon.
+    expect(rule(".siteFooterNetopia img::after")).toContain("content: attr(alt);");
+  });
+
+  it("builds its alt text from the brand keys, the same in every locale", () => {
+    for (const locale of readdirSync(resolve("apps/ui/messages"))) {
+      const chrome = JSON.parse(readFileSync(resolve("apps/ui/messages", locale, "chrome.json"), "utf8")) as Record<string, string>;
+      expect([chrome["chrome.footer.netopia"], chrome["chrome.footer.visa"], chrome["chrome.footer.mastercard"]].join(", "), locale)
+        .toBe("NETOPIA Payments, Visa, Mastercard");
     }
   });
 });

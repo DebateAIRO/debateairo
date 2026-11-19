@@ -1,23 +1,26 @@
-import { availablePaymentMarks, type PaymentMarks } from "./paymentMarks.js";
+import { availablePaymentMarks, netopiaLogoAddress, type PaymentMarks } from "./paymentMarks.js";
 import { billingIsOn } from "./serverBilling.js";
 
-/** What the full site footer shows of paid plans: whether billing is on, and the card marks the server's setting names. */
-export type SiteFooterBilling = Readonly<{ billingOn: boolean; marks: PaymentMarks }>;
+/**
+ * What the full site footer shows of paid plans: whether billing is on, the card marks the server's setting names, and
+ * NETOPIA's hosted logo when its setting (NETOPIA_LOGO_ID) is set, which then replaces the marks.
+ */
+export type SiteFooterBilling = Readonly<{ billingOn: boolean; marks: PaymentMarks; netopiaLogo: string | null }>;
 
 /** What the one-line footer shows of paid plans: only whether billing is on, for its cancel and withdraw links. */
 export type LineFooterBilling = Readonly<{ billingOn: boolean }>;
 
 /**
  * For the legal pages, which render whether billing is on or off: one plans read (billingIsOn(), false only on the
- * plans route's 404), and the marks from the PAYMENT_MARKS_AVAILABLE setting.
+ * plans route's 404), the marks from the PAYMENT_MARKS_AVAILABLE setting and NETOPIA's logo from NETOPIA_LOGO_ID.
  */
 export async function siteFooterBilling(): Promise<SiteFooterBilling> {
-  return Object.freeze({ billingOn: await billingIsOn(), marks: availablePaymentMarks() });
+  return Object.freeze({ billingOn: await billingIsOn(), marks: availablePaymentMarks(), netopiaLogo: netopiaLogoAddress() });
 }
 
 /** For the pages that take money (/pricing, /checkout, /checkout/return, /cancel, /withdraw): not found unless billing is on. */
 export function billingPageFooter(): SiteFooterBilling {
-  return Object.freeze({ billingOn: true, marks: availablePaymentMarks() });
+  return Object.freeze({ billingOn: true, marks: availablePaymentMarks(), netopiaLogo: netopiaLogoAddress() });
 }
 
 /** How long the one-line footer reuses one plans read. Billing is switched on or off rarely, and that footer is on every page. */

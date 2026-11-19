@@ -54,6 +54,7 @@ export function CheckoutFlow({
   navigate = leaveFor,
   goToPayment = leaveForPayment,
   paymentMarks = NO_MARKS,
+  netopiaLogo = null,
   testMode = false
 }: Readonly<{
   planId: PaidPlanId;
@@ -65,6 +66,8 @@ export function CheckoutFlow({
   goToPayment?: (url: string) => void;
   /** Spec §2.18 (N25b): the marks the PAYMENT_MARKS_AVAILABLE setting names, read on the server by the page; none by default. */
   paymentMarks?: PaymentMarks;
+  /** NETOPIA's hosted logo (the NETOPIA_LOGO_ID setting), read on the server by the page; when set it replaces the marks. */
+  netopiaLogo?: string | null;
   /** True while the server's card payments run on NETOPIA's sandbox (the page reads it from the plans list); none by default. */
   testMode?: boolean;
 }>) {
@@ -488,8 +491,9 @@ export function CheckoutFlow({
             </button>
             {continueBlocker !== null ? <span id="checkout-continue-hint" className="srOnly">{t(catalog, continueBlocker.key)}</span> : null}
           </div>
-          {/* Spec §2.18: NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer. */}
-          <PaymentMarksGroup marks={paymentMarks} />
+          {/* NETOPIA's logo and the card marks NETOPIA's shop approval asks for on the checkout, as in the footer: its hosted
+              logo when the page hands one over, otherwise the marks. */}
+          <PaymentMarksGroup marks={paymentMarks} netopiaLogo={netopiaLogo} />
         </section>
       ) : null}
     </section>
