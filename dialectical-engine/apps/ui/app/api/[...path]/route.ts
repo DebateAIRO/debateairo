@@ -6,6 +6,7 @@ import {
   AGE_REFUSAL_COOKIE_VALUE
 } from "@debateai/contract";
 import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../../../trusted-client-ip.mjs";
+import { requestFirstVisitLocale } from "../../../lib/i18n/acceptLanguage.js";
 import { isLocale } from "../../../lib/i18n/locales.js";
 
 type ProxyContext = Readonly<{
@@ -89,8 +90,11 @@ const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_N
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 /**
- * The language list's cookie, forwarded so the API writes its mails in the reader's language. Only an offered interface
- * language travels: an older cookie naming another language shows English pages, so the API falls back to English too.
+ * The language list's cookie, forwarded so the API writes its mails in the language the reader's pages are in. Only an
+ * offered interface language travels. Without one (no cookie, or an older cookie naming a language the site no longer
+ * offers) the pages follow the browser's Accept-Language (middleware.ts), so the proxy forwards that language as the
+ * cookie, and a reader who sees Romanian pages gets Romanian mails; when that is English nothing is added, and the API
+ * falls back to English.
  */
 const LOCALE_COOKIE_NAME = "debateai.locale";
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
@@ -154,7 +158,7 @@ function createUpstreamHeaders(request: Request): Headers {
       && (new URL(request.url).pathname !== NETOPIA_NOTIFY_UI_PATH || value.length > VERIFICATION_TOKEN_MAX_LENGTH)) continue;
     headers.set(name, value);
   }
-  const cookie = filteredSessionCookies(request.headers.get("cookie"));
+  const cookie = filteredSessionCookies(request.headers.get("cookie"), request.headers.get("accept-language"));
   if (cookie !== null) headers.set("cookie", cookie);
   const clientIp = behindOwnEdge() ? normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER)) : null;
   if (clientIp !== null) {
@@ -166,12 +170,12 @@ function createUpstreamHeaders(request: Request): Headers {
   return headers;
 }
 
-function filteredSessionCookies(raw: string | null): string | null {
-  if (raw === null || /[\r\n\0]/.test(raw)) return null;
+function filteredSessionCookies(raw: string | null, acceptLanguage: string | null): string | null {
+  if (raw !== null && /[\r\n\0]/.test(raw)) return null;
   const selected = new Map<string, string>();
   const social = new Map<string, string | null>();
   let localeSeen = false;
-  for (const member of raw.split(";")) {
+  for (const member of (raw ?? "").split(";")) {
     const index = member.indexOf("=");
     if (index < 1) {
       if ([...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME].some((name) => member.trim() === name)) return null;
@@ -203,6 +207,10 @@ function filteredSessionCookies(raw: string | null): string | null {
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
+  // The middleware asks the same question for the pages: the browser's language is added only when no copy of the
+  // locale cookie names an offered language, so a second copy never makes the mails differ from the pages.
+  const browserLocale = requestFirstVisitLocale(raw, acceptLanguage);
+  if (browserLocale !== null) selected.set(LOCALE_COOKIE_NAME, browserLocale);
   const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME, ...SOCIAL_COOKIE_NAMES].flatMap((name) => {
     const value = selected.get(name) ?? social.get(name) ?? undefined;
     return value === undefined ? [] : [`${name}=${value}`];

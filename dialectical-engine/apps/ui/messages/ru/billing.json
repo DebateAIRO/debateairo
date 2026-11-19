@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Этот тариф не выше вашего текущего. Чтобы перейти на более низкий тариф, выберите его для следующего продления.",
   "billing.subscription.downgradeNotLower": "Этот тариф не ниже вашего текущего.",
   "billing.subscription.downgradeNotAvailableNow": "Ваш тариф продлевается прямо сейчас, поэтому смену пока нельзя запланировать. Изменить его можно сразу после продления.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Перейти на {plan} при следующем продлении? Стоимость — {price} в месяц + налог, с {date}.",
   "billing.subscription.downgradeYes": "Да, перейти на {plan}",
   "billing.subscription.downgraded": "Готово. {date} вы перейдёте на {plan} за {total} в месяц с учётом налога.",

@@ -11,7 +11,7 @@ import { scheduleDowngrade } from "../../apps/api/src/billing/subscription-actio
 import { quoteUpgrade } from "../../apps/api/src/billing/upgrade.js";
 import { PROFILE_ADDRESS_ONLY, testBillingPolicy, testRegionalPlans } from "../support/billingFixtures.js";
 import { startBillingHarness, TEST_PUBLIC_APP_URL, type BillingHarness } from "../support/billingHarness.js";
-import { subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
+import { shownDowngradePrice, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
 import { fakeTaxMicros } from "../support/fake-tax-engine.js";
 
 /**
@@ -272,7 +272,7 @@ describe("RON, EUR and USD end to end under one price list (Part C)", () => {
     expect(await chargesOfKind(max.subscriptionId, "INITIAL")).toEqual([
       expect.objectContaining({ currency: "RON", netMicros: 1_000_000_000 })
     ]);
-    await scheduleDowngrade(deps, max.ownerRef, "PRO");
+    await scheduleDowngrade(deps, max.ownerRef, "PRO", shownDowngradePrice("PRO", "RON", testRegionalPlans).shown);
     const scheduled = (await h.repository.subscriptionEvents(max.subscriptionId)).find((event) => event.kind === "DOWNGRADE_SCHEDULED");
     expect(scheduled?.data).toMatchObject({ recurring_net_micros: 250_000_000 });
     expect(h.tax.quotedCurrencies.at(-1)).toBe("RON");

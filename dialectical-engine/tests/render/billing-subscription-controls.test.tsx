@@ -359,7 +359,8 @@ describe("P20 SubscriptionControls (S1)", () => {
       subscription: subscription({ plan_id: "MAX", scheduled_downgrade_plan_id: "PLUS" })
     });
     await click("Yes, move to Plus");
-    expect(client.downgradeSubscription).toHaveBeenCalledWith("PLUS");
+    // The confirm sends the price it showed, so the server schedules the downgrade only at that price.
+    expect(client.downgradeSubscription).toHaveBeenCalledWith("PLUS", { netPrice: PLANS.plans[1]!.net_prices.USD, currency: "USD" });
     const paragraphs = [...container.querySelectorAll("p")].map((paragraph) => paragraph.textContent);
     expect(paragraphs).toContain("Done. You'll move to Plus on 29 October 2026, for $24.20 a month, tax included.");
     expect(paragraphs).toContain("You'll move to Plus on 29 October 2026.");
@@ -620,6 +621,21 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain("Your plan is renewing right now, so a change can't be scheduled yet. You can change it as soon as the renewal has gone through.");
     expect(text()).not.toContain("That didn't work. Please try again.");
     expect(client.getBillingSubscription.mock.calls.length).toBe(readsBeforeRenewing);
+    // DOWNGRADE_PRICE_CHANGED: the plan's price changed between the confirmation and the click, so nothing was
+    // scheduled; say so, read the card again, and let the person choose again at the price now shown.
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.downgradeSubscription.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "x", "DOWNGRADE_PRICE_CHANGED"));
+    await render();
+    await click("Change plan");
+    await click("Move to Pro at renewal");
+    const readsBeforeChanged = client.getBillingSubscription.mock.calls.length;
+    await click("Yes, move to Pro");
+    expect(client.downgradeSubscription).toHaveBeenLastCalledWith("PRO", { netPrice: PLANS.plans[2]!.net_prices.USD, currency: "USD" });
+    expect(text()).toContain("That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.");
+    expect(text()).not.toContain("That didn't work. Please try again.");
+    expect(client.getBillingSubscription.mock.calls.length).toBeGreaterThan(readsBeforeChanged);
+    expect(button("Yes, move to Pro")).toBeUndefined();
   });
 
   it("asks for the updated Terms first when D6b's routes answer LEGAL_REACCEPTANCE_REQUIRED, never 'try again'", async () => {

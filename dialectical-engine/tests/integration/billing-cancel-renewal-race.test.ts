@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { foldSubscription } from "@debateai/billing-core";
 import { startBillingHarness, type BillingHarness } from "../support/billingHarness.js";
 import { testHttpIdentity } from "../support/httpSession.js";
-import { mountSubscriptionRoutes, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
+import { mountSubscriptionRoutes, shownDowngradePrice, subscriptionDeps } from "../support/billingSubscriptionFixtures.js";
 
 let h: BillingHarness;
 beforeAll(async () => { h = await startBillingHarness(); }, 120_000);
@@ -143,7 +143,7 @@ async function downgrade(identity: ReturnType<typeof testHttpIdentity>, plan: "P
   try {
     return await api.inject({
       method: "POST", url: "/v1/billing/subscription/downgrade",
-      headers: { "x-test-session": identity.rawSessionToken }, payload: { plan_id: plan }
+      headers: { "x-test-session": identity.rawSessionToken }, payload: { plan_id: plan, ...shownDowngradePrice(plan).body }
     });
   } finally {
     await api.close();

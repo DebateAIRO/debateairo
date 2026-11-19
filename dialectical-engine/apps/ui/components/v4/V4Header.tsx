@@ -7,6 +7,7 @@ import type { ReadingLevel } from "@/lib/v4/types";
 import { V4QuotaPill } from "./V4QuotaPill";
 import { V4AccountMenu, type V4HeaderSession } from "./V4AccountMenu";
 import { allMapsHref } from "./V4MapShelf";
+import { BetaBadge } from "@/components/BetaNotice";
 
 /** Which of the header's pages the person is on: the ask page (and every page of a question), or "My questions". */
 export type V4HeaderPlace = "ask" | "questions";
@@ -32,6 +33,8 @@ export type V4HeaderPlace = "ask" | "questions";
  * Design Document v2 (16 Nov 2026):
  *  - The brand is the wordmark alone, "Dialectical Engine" in the display face with "Engine" in the brand colour; the
  *    diamond mark stays only as the phone's one-row brand, and the "V4 preview" badge is gone.
+ * While the site is in Beta, a small "Beta" mark follows the wordmark on every V4 page (on a phone it follows the diamond
+ * mark). It is inside the brand's link, so a screen reader hears it with the site's name.
  *  - Beside it, the header's own links: Ask, My questions (signed-in people only, as the page is theirs) and How it
  *    works. The link of the page the person is on is underlined in the brand colour and is `aria-current`. On a phone
  *    the links step back (the one-row rule above); the brand and the account menu still reach the same pages.
@@ -86,7 +89,8 @@ export function V4Header({
         <Link href="/v4" className="v4HdrBrand" onClick={onBrandClick}>
           {/* On a phone the wordmark is hidden on screen (v4-base.css) and stays the link's name; the mark shows there. */}
           <span className="v4HdrMark" aria-hidden="true" />
-          <span className="v4HdrName">Dialectical <span className="v4HdrNameAccent">Engine</span></span>
+          <span className="v4HdrName">Dialectical <span className="v4HdrNameAccent">Engine</span></span>{" "}
+          <BetaBadge className="v4HdrBeta" />
         </Link>
         <nav className="v4HdrNav" aria-label={t(catalog, "v4.header.nav.label")}>
           <Link href="/v4" className="v4HdrNavLink" aria-current={place === "ask" ? "page" : undefined} onClick={onBrandClick}>

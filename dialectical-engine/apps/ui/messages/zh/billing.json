@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "该方案并不高于您当前的方案。如需改为较低的方案，请为下次续订选择它。",
   "billing.subscription.downgradeNotLower": "该方案并不低于您当前的方案。",
   "billing.subscription.downgradeNotAvailableNow": "您的方案正在续订中，因此暂时无法安排更改。续订完成后即可更改。",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "在下次续订时改为 {plan}？自 {date} 起每月 {price} + 税。",
   "billing.subscription.downgradeYes": "是，改为 {plan}",
   "billing.subscription.downgraded": "完成。您将于 {date} 改为 {plan}，每月 {total}（含税）。",

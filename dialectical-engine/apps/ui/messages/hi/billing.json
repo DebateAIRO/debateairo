@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "वह योजना आपकी मौजूदा योजना से ऊँची नहीं है। निचली योजना पर जाने के लिए उसे अपने अगले नवीनीकरण के लिए चुनें।",
   "billing.subscription.downgradeNotLower": "वह योजना आपकी मौजूदा योजना से निचली नहीं है।",
   "billing.subscription.downgradeNotAvailableNow": "आपकी योजना अभी नवीनीकृत हो रही है, इसलिए अभी कोई बदलाव निर्धारित नहीं किया जा सकता। नवीनीकरण पूरा होते ही आप इसे बदल सकते हैं।",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "अपने अगले नवीनीकरण पर {plan} पर जाएँ? इसकी कीमत {date} से {price} प्रति माह + कर है।",
   "billing.subscription.downgradeYes": "हाँ, {plan} पर जाएँ",
   "billing.subscription.downgraded": "हो गया। आप {date} को {plan} पर चले जाएँगे, कर सहित {total} प्रति माह में।",

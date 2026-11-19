@@ -101,11 +101,11 @@ const controlKeys = Object.freeze({
   "open-public-debate": ["support", "support.action.openPublicDebate"],
 });
 
-// cookie-compliance S05 (SPEC-v5 R13, V-22): the 10 KEY rows of the capability table of record — the page link the
-// screen shows for that product area. The other 10 capability names are written by hand in src/capability-names.ts.
-// Paid plans (P24, merge with #62): five of the nine paid-plan pages have such a link — the footer's Pricing, Cancel a
-// plan and Withdraw from a plan, the Settings card's Update card, and the privacy policy's All versions of this policy;
-// the other four (checkout, its return page, the two archived texts) are TRANSLATE rows in src/capability-names.ts.
+// The KEY rows of the capability table: a product area that a page link on the screen names is called, in every other
+// language, by that link's own words. The other capability names are written by hand in src/capability-names.ts.
+// Five of the nine paid-plan pages have such a link — the footer's Pricing, Cancel a plan and Withdraw from contract,
+// the Settings card's Update card, and the privacy policy's All versions of this policy; the other four (checkout, its
+// return page, the two archived texts) are TRANSLATE rows in src/capability-names.ts.
 const capabilityKeys = Object.freeze({
   "ai-transparency": ["chrome", "chrome.aiTransparency"],
   "legal-notice": ["chrome", "chrome.legal.notice"],

@@ -7,6 +7,7 @@ import {
   askQuestionMaxBytes, detectCrisis, purposeAnswerSentence, SavedQuestionDocSchema, savedQuestionOwnWords, WEB_CONTRACT_LIMITS, type AskClarifyEarlier, type AskClarifyResponse, type ClarifyQuestion, type PurposeLines,
   type QuestionLanguageOffer, type SavedQuestionDoc, type SavedQuestionRead, type SavedQuestionSummary
 } from "@debateai/contract";
+import { BetaNote } from "@/components/BetaNotice";
 import { alreadyWaitingShown, RoomNotice } from "@/components/billing/RoomNotice";
 import { useQuestionLanguageChoice } from "@/components/QuestionLanguageChoice";
 import { useQuestionRefusal } from "@/components/QuestionRefusal";
@@ -2055,6 +2056,8 @@ function V4AskForm({
     <>
       {header}
       {updateBanner}
+      {/* The page a person starts on says the site is in Beta, right under the header and above both steps. */}
+      <BetaNote className="v4BetaNote" />
       {pendingView !== null ? pendingView : step === "ask" ? (
         <div ref={stepOne} className="v4AskMain" id="page-content" tabIndex={-1}>
           {/* Task 76c (choose-f21, answer Q3): the page opened on a started question's entry: one line at the top, with its map. */}

@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Цей план не вищий за ваш поточний. Щоб перейти на нижчий план, оберіть його для наступного подовження.",
   "billing.subscription.downgradeNotLower": "Цей план не нижчий за ваш поточний.",
   "billing.subscription.downgradeNotAvailableNow": "Ваш план подовжується просто зараз, тому зміну поки не можна запланувати. Змінити його можна одразу після подовження.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Перейти на {plan} під час наступного подовження? Вартість — {price} на місяць + податок, з {date}.",
   "billing.subscription.downgradeYes": "Так, перейти на {plan}",
   "billing.subscription.downgraded": "Готово. {date} ви перейдете на {plan} за {total} на місяць з урахуванням податку.",

@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "See pakett ei ole teie praegusest paketist kõrgem. Madalamale paketile üleminekuks valige see järgmiseks uuendamiseks.",
   "billing.subscription.downgradeNotLower": "See pakett ei ole teie praegusest paketist madalam.",
   "billing.subscription.downgradeNotAvailableNow": "Teie pakett uueneb praegu, seega ei saa muudatust veel ajastada. Saate seda muuta kohe, kui uuendamine on läbi läinud.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Kas minna järgmisel uuendamisel üle paketile {plan}? See maksab {price} kuus + maks, alates {date}.",
   "billing.subscription.downgradeYes": "Jah, mine üle paketile {plan}",
   "billing.subscription.downgraded": "Valmis. Lähete {date} üle paketile {plan} hinnaga {total} kuus koos maksuga.",

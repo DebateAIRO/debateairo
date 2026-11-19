@@ -157,7 +157,7 @@ describe("ask-d6 A: the round account button", () => {
     expect(initialOf("@example.com")).toBeNull();
   });
 
-  it("the menu holds My questions, Language, Light or dark, Settings, the classic view once, then Sign out", async () => {
+  it("the menu holds My questions, Language, Light or dark, Settings, Report a problem, the classic view once, then Sign out", async () => {
     await mount(header({ classicHref: "/debate/11111111-1111-4111-8111-111111111111" }));
     // journey-f19: the header itself shows no classic link.
     expect(document.querySelector(".v4Hdr a[href^='/debate/']")).toBeNull();
@@ -167,6 +167,7 @@ describe("ask-d6 A: the round account button", () => {
       CATALOG["v4.header.menu.language"],
       CATALOG["v4.header.menu.theme"],
       CATALOG["v4.header.menu.settings"],
+      "Report a problem",
       CATALOG["v4.common.classicView"],
       CATALOG["v4.header.menu.signOut"]
     ]);
@@ -175,7 +176,9 @@ describe("ask-d6 A: the round account button", () => {
     // ask-d5 B: "My questions" is All my maps, with no level (the 5 Nov ruling), though the page hands the header one.
     expect(items()[0]!.getAttribute("href")).toBe("/v4?maps=all");
     expect(items()[3]!.getAttribute("href")).toBe("/settings");
-    expect(items()[4]!.getAttribute("href")).toBe("/debate/11111111-1111-4111-8111-111111111111");
+    // While the site is in Beta: a report starts as a mail to the support address.
+    expect(items()[4]!.getAttribute("href")).toMatch(/^mailto:support@dezbatere\.ro\?subject=/u);
+    expect(items()[5]!.getAttribute("href")).toBe("/debate/11111111-1111-4111-8111-111111111111");
     expect(document.querySelectorAll("[data-v4-menu=classic]")).toHaveLength(1);
   });
 
@@ -183,7 +186,7 @@ describe("ask-d6 A: the round account button", () => {
     await mount(header({ classicHref: null }));
     await openMenu();
     expect(items().map((item) => item.textContent)).not.toContain(CATALOG["v4.common.classicView"]);
-    expect(items()).toHaveLength(5);
+    expect(items()).toHaveLength(6);
   });
 
   it("given a classic address, the menu shows 'Open in the classic view' to it once, just above Sign out (what question 12 B builds on)", async () => {
@@ -208,7 +211,9 @@ describe("ask-d6 A: the round account button", () => {
     await mount(<V4AccountMenu catalog={CATALOG} level="expert" classicHref="/debate/11111111-1111-4111-8111-111111111111" session="IN" />);
     await openMenu();
     const hrefs = items().map((item) => item.getAttribute("href")).filter((href): href is string => href !== null);
-    expect(hrefs).toEqual(["/v4?maps=all", "/settings", "/debate/11111111-1111-4111-8111-111111111111"]);
+    // The report's mail is not a page of the site, and carries no level either.
+    expect(hrefs.filter((href) => !href.startsWith("mailto:"))).toEqual(["/v4?maps=all", "/settings", "/debate/11111111-1111-4111-8111-111111111111"]);
+    expect(hrefs.filter((href) => href.startsWith("mailto:")).every((href) => !/level|expert/u.test(href))).toBe(true);
   });
 
   it("Language closes the menu and opens the site's language list under the button; Escape gives focus back to it", async () => {

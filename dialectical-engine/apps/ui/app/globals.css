@@ -1634,6 +1634,51 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
   text-align: center;
 }
 
+/* The site is in Beta: a small mark beside the site's name, and one quiet sentence where a person starts. The sentence
+   is grey and small so it never competes with the page's own first line; its link starts a mail to our support address. */
+.betaBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--muted-border);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.betaNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Written with the sentence's class and the element so it also wins over the home page's own link rule (`.lpRoot a`). */
+.betaNote a.betaNoteLink {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.betaNote a.betaNoteLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* On the public home page it follows the hero's AI line. */
+.lpBetaNote { margin-top: 18px; }
+
 .newVersionNotePage {
   margin: 48px auto;
   max-width: 560px;

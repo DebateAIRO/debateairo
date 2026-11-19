@@ -45,7 +45,7 @@ const PLANS = Object.freeze({
     { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "30" }
   ]
 });
-const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
+const BILLING_LINKS = ["/pricing", "/terms#legal-section-12", "/cancel", "/withdraw"];
 const page = async (render: () => Promise<JSX.Element>): Promise<Document> =>
   new JSDOM(renderToStaticMarkup(await render())).window.document;
 
@@ -91,6 +91,25 @@ describe("NETOPIA's check: billing on with every country closed for payment, on 
     // Where the withdrawal function is, and the page that explains it, also while no country can pay.
     expect(document.querySelector(".pricingFaq")?.textContent).toContain("Can I withdraw after I subscribe?");
     expect(document.querySelector('.pricingFaq a[href="/withdraw"]')?.textContent).toBe("Withdraw from contract");
+  });
+
+  it("with NETOPIA_LOGO_ID set, each page NETOPIA reads shows NETOPIA's hosted logo once in its footer, and no mark file", async () => {
+    const before = process.env.NETOPIA_LOGO_ID;
+    // A made-up shop id: the real one is never in the repository.
+    process.env.NETOPIA_LOGO_ID = "123456";
+    try {
+      for (const [path, render] of PAGES) {
+        const footer = (await page(render)).querySelector("footer.siteFooterFull")!;
+        const images = [...footer.querySelectorAll('.siteFooterMarks[role="group"] img')];
+        expect(images.map((image) => [image.getAttribute("src"), image.getAttribute("alt")]), path)
+          .toEqual([["https://mny.ro/np-black-0.svg?id=123456", "NETOPIA Payments, Visa, Mastercard"]]);
+        expect(footer.querySelector('a.siteFooterNetopia[href="https://netopia-payments.com/"]'), path).not.toBeNull();
+        expect(footer.querySelector('img[src^="/payment-marks/"]'), path).toBeNull();
+      }
+    } finally {
+      if (before === undefined) delete process.env.NETOPIA_LOGO_ID;
+      else process.env.NETOPIA_LOGO_ID = before;
+    }
   });
 
   it("billing on with every country closed: /withdraw and /cancel keep their own content", async () => {

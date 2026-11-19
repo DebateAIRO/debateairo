@@ -145,6 +145,7 @@
   "billing.subscription.upgradeNotHigher": "Tämä tilaus ei ole nykyistä tilaustasi ylempi. Jos haluat siirtyä alempaan tilaukseen, valitse se seuraavaa uusimista varten.",
   "billing.subscription.downgradeNotLower": "Tämä tilaus ei ole nykyistä tilaustasi alempi.",
   "billing.subscription.downgradeNotAvailableNow": "Tilauksesi uusiutuu juuri nyt, joten muutosta ei voi vielä ajastaa. Voit muuttaa sitä heti, kun uusiminen on käsitelty.",
+  "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
   "billing.subscription.downgradeConfirm": "Siirrytäänkö {plan}-tilaukseen seuraavan uusimisen yhteydessä? Se maksaa {price} kuukaudessa + vero, {date} alkaen.",
   "billing.subscription.downgradeYes": "Kyllä, siirry {plan}-tilaukseen",
   "billing.subscription.downgraded": "Valmista. Siirryt {plan}-tilaukseen {date} hintaan {total} kuukaudessa veroineen.",

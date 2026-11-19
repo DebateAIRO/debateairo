@@ -14,8 +14,8 @@ import { languageOfferLocale, localeDirection, questionLocale } from "../../apps
 
 /**
  * The site offers English and Romanian as interface languages. The other 33 catalogues stay in the repository: they
- * are not listed, a locale cookie naming one reads as English (pages and mails alike), but a debate argued in one of
- * those languages is still tagged, drawn and worded in it.
+ * are not listed, a locale cookie naming one counts as no choice (pages and mails alike: English, or Romanian for a
+ * browser that prefers it), but a debate argued in one of those languages is still tagged, drawn and worded in it.
  */
 const codes = (definitions: readonly { code: string }[]) => definitions.map(({ code }) => code);
 
@@ -92,14 +92,17 @@ describe("the /api proxy forwards the locale cookie only for an offered language
     else process.env.DIALECTICAL_API_BASE = originalBase;
   });
 
-  async function forwardedCookie(cookie: string): Promise<string | null> {
+  async function forwardedCookie(cookie: string | null, acceptLanguage?: string): Promise<string | null> {
     process.env.DIALECTICAL_API_BASE = "http://acceptance.local:8790";
     let forwarded = new Headers();
     globalThis.fetch = (async (_url, init) => {
       forwarded = new Headers(init?.headers);
       return new Response("{}", { headers: { "content-type": "application/json" } });
     }) as typeof fetch;
-    const response = await route.GET(new Request("https://ui.example.test/api/v1/public/debates", { headers: { cookie } }),
+    const headers = new Headers();
+    if (cookie !== null) headers.set("cookie", cookie);
+    if (acceptLanguage !== undefined) headers.set("accept-language", acceptLanguage);
+    const response = await route.GET(new Request("https://ui.example.test/api/v1/public/debates", { headers }),
       { params: Promise.resolve({ path: ["v1", "public", "debates"] }) });
     expect(response.status).toBe(200);
     return forwarded.get("cookie");
@@ -118,5 +121,52 @@ describe("the /api proxy forwards the locale cookie only for an offered language
         .toBe(`__Host-debateai-session=${SESSION}`);
     }
     expect(await forwardedCookie("debateai.locale=de")).toBeNull();
+  });
+
+  // A visitor who has not picked a language sees Romanian pages when the browser prefers Romanian (middleware.ts); the
+  // mails a public page sends, the cancel link's for one, must then be Romanian too.
+  it("forwards Romanian for a Romanian browser with no language cookie, as the pages show it", async () => {
+    for (const acceptLanguage of ["ro", "ro-RO,ro;q=0.9,en-US;q=0.8,en;q=0.7", "ro-MD"]) {
+      expect(await forwardedCookie(null, acceptLanguage), acceptLanguage).toBe("debateai.locale=ro");
+      expect(await forwardedCookie(`__Host-debateai-session=${SESSION}`, acceptLanguage), acceptLanguage)
+        .toBe(`__Host-debateai-session=${SESSION}; debateai.locale=ro`);
+      // An older cookie naming a language the site no longer offers counts as no choice, as on the pages.
+      expect(await forwardedCookie(`__Host-debateai-session=${SESSION}; debateai.locale=de`, acceptLanguage), acceptLanguage)
+        .toBe(`__Host-debateai-session=${SESSION}; debateai.locale=ro`);
+    }
+  });
+
+  it("adds nothing for an English browser, a browser that names no offered language, or a crawler", async () => {
+    for (const acceptLanguage of [undefined, "en-US,en;q=0.9,ro;q=0.8", "en", "de-DE,de", "*", "ro;q=0", "ro;q=bad"]) {
+      expect(await forwardedCookie(null, acceptLanguage), String(acceptLanguage)).toBeNull();
+      expect(await forwardedCookie(`__Host-debateai-session=${SESSION}; debateai.locale=de`, acceptLanguage), String(acceptLanguage))
+        .toBe(`__Host-debateai-session=${SESSION}`);
+    }
+  });
+
+  it("never overrides the language the visitor picked in the language list", async () => {
+    for (const locale of ["en", "en-US", "en-GB"]) {
+      expect(await forwardedCookie(`debateai.locale=${locale}`, "ro-RO,ro"), locale).toBe(`debateai.locale=${locale}`);
+    }
+    expect(await forwardedCookie("debateai.locale=ro", "en-US,en")).toBe("debateai.locale=ro");
+  });
+
+  // The middleware asks the same question for the pages (tests/unit/ui-middleware-locale.test.ts): with "en; de" the pages
+  // read de and are English, with "de; en" they read en, so the mails stay English in both, whatever the browser says.
+  it("adds nothing when any copy of a doubled locale cookie names an offered language", async () => {
+    expect(await forwardedCookie("debateai.locale=en; debateai.locale=de", "ro-RO,ro")).toBe("debateai.locale=en");
+    expect(await forwardedCookie("debateai.locale=de; debateai.locale=en", "ro-RO,ro")).toBeNull();
+    expect(await forwardedCookie(`__Host-debateai-session=${SESSION}; debateai.locale=de; debateai.locale= en-GB `, "ro"))
+      .toBe(`__Host-debateai-session=${SESSION}`);
+  });
+
+  it("forwards the browser's language when no copy of a doubled locale cookie names an offered language", async () => {
+    expect(await forwardedCookie("debateai.locale=de; debateai.locale=fr", "ro")).toBe("debateai.locale=ro");
+    expect(await forwardedCookie("xdebateai.locale=en", "ro")).toBe("debateai.locale=ro");
+  });
+
+  it("forwards no cookie at all for a cookie header the proxy refuses, whatever the browser's language", async () => {
+    expect(await forwardedCookie(`__Host-debateai-session=${SESSION}; __Host-debateai-session=${SESSION}`, "ro")).toBeNull();
+    expect(await forwardedCookie("__Host-debateai-session=short", "ro")).toBeNull();
   });
 });

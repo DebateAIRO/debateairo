@@ -46,6 +46,11 @@ export type BillingRefusalCode =
   | "DOWNGRADE_NOT_LOWER"
   /** P12b (P2 review fix round 1, finding 1): the renewal charge for the next period is already written (409). */
   | "DOWNGRADE_NOT_AVAILABLE_NOW"
+  /**
+   * The lower plan's price is not the one the confirmation showed (the plan prices changed while the page was open);
+   * nothing is written (409).
+   */
+  | "DOWNGRADE_PRICE_CHANGED"
   /** P12c: the upgrade target is not dearer than the plan in force, or than the price this subscriber pays (422). */
   | "UPGRADE_NOT_HIGHER"
   /** P12c: an earlier upgrade has no outcome yet, or another process holds the subscription's lease (409). */
