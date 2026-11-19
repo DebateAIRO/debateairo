@@ -149,8 +149,13 @@ const REQUIRED = [
   "billing.cancelPage.sent", "billing.cancelPage.confirmTitle", "billing.cancelPage.confirmLede", "billing.cancelPage.confirm",
   "billing.cancelPage.done", "billing.cancelPage.linkInvalid", "billing.cancelPage.signedInHint",
   "billing.cancelPage.nothingToCancel",
-  "billing.withdrawPage.title", "billing.withdrawPage.who", "billing.withdrawPage.refund", "billing.withdrawPage.how",
-  "billing.withdrawPage.byEmail", "billing.withdrawPage.signIn", "billing.withdrawPage.settings"
+  "billing.withdrawPage.title", "billing.withdrawPage.who", "billing.withdrawPage.refund", "billing.withdrawPage.intro",
+  "billing.withdrawPage.onlineTitle", "billing.withdrawPage.step1", "billing.withdrawPage.step2",
+  "billing.withdrawPage.afterConfirm", "billing.withdrawPage.byEmailTitle", "billing.withdrawPage.byEmail",
+  "billing.withdrawPage.inTime", "billing.withdrawPage.formTitle",
+  ...["instruction", "to", "notice", "orderedOn", "name", "address", "signature", "date"]
+    .map((line) => `billing.withdrawPage.form.${line}`),
+  "billing.withdrawPage.signIn", "billing.withdrawPage.settings"
 ];
 
 // R3-4: the colleague's legal pages and footer (PR #42) keep their own namespaces; P21 extends them there.
@@ -256,6 +261,20 @@ test("the withdrawal sentences give everyone the 14 days and one refund rule, in
     assert.doesNotMatch(value, /the larger of|days used|pro rata/iu, `${key} keeps the earlier refund rule`);
     assert.doesNotMatch(value, /\b(?:EU|EEA|UK)\b|European Union|European Economic Area|United Kingdom/u, `${key} names a region`);
     assert.doesNotMatch(value, /(?:doesn't|does not|may not) apply where you live/iu, `${key} says the right may not apply`);
+  }
+});
+
+test("/withdraw carries the page's one name and names the Settings buttons by their own labels", () => {
+  const english = catalogue("en");
+  const romanian = catalogue("ro");
+  assert.equal(english["billing.withdrawPage.title"], "Withdraw from contract");
+  assert.equal(romanian["billing.withdrawPage.title"], "Retragere din contract");
+  // The page reads the labels from the Settings buttons' keys, so each step keeps its placeholder in every locale.
+  for (const { code } of LOCALES) {
+    const billing = catalogue(code);
+    assert.ok(billing["billing.withdrawPage.step1"].includes("{withdraw}"), `${code}: step1 names the withdraw button`);
+    assert.ok(billing["billing.withdrawPage.step2"].includes("{confirm}"), `${code}: step2 names the confirm button`);
+    assert.equal(Object.hasOwn(billing, "billing.withdrawPage.how"), false, `${code}: the one-line route is gone`);
   }
 });
 

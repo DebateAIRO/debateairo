@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { JSDOM } from "jsdom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -27,6 +29,7 @@ import TermsPage from "../../apps/ui/app/terms/page.js";
 import TermsVersionsPage from "../../apps/ui/app/terms/versions/page.js";
 import WithdrawPage from "../../apps/ui/app/withdraw/page.js";
 import { COMPANY } from "../../apps/ui/lib/legal/pages.js";
+import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 
 const page = async (render: () => Promise<JSX.Element>): Promise<Document> =>
   new JSDOM(renderToStaticMarkup(await render())).window.document;
@@ -96,23 +99,64 @@ describe("P21 the pages the card processor requires, on the colleague's legal pa
     expect(vat?.querySelector("td")?.textContent).toBe("RO45935221");
   });
 
-  it("/withdraw explains the right, sends the person to sign in and to Settings, and names the email route (Q-9)", async () => {
+  it("/withdraw explains the right, the two steps in Settings with the buttons' own labels, the email route and the model form", async () => {
     const document = await page(WithdrawPage);
-    // Owner's decision of 16 November 2026: the right is everyone's, and the refund is the price times the share of the
-    // plan's credit not used. Days elapsed do not count.
-    const paragraphs = [...document.querySelectorAll(".billingInner > p")].map((paragraph) => paragraph.textContent);
-    expect(paragraphs[0]).toBe("Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, without giving a reason.");
-    expect(paragraphs[1]).toBe(
+    const inner = document.querySelector(".billingInner")!;
+    expect(inner.querySelector("h1")?.textContent).toBe("Withdraw from contract");
+    // The right is everyone's, and the refund is the price times the share of the plan's credit not used.
+    const paragraphs = [...inner.querySelectorAll(":scope > p")].map((paragraph) => paragraph.textContent);
+    expect(paragraphs.slice(0, 3)).toEqual([
+      "Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, without giving a reason.",
       "You get back the price minus the share of the plan's credit you have used, however many days have passed."
-        + " If you have used none, you get the full price back. The money goes back to your card, and the plan ends at once."
+        + " If you have used none, you get the full price back. The money goes back to your card, and the plan ends at once.",
+      "This page explains how to withdraw. You withdraw in your account, in two steps, or by email."
+    ]);
+    expect(inner.textContent).not.toMatch(/\b(?:EU|EEA|UK)\b|the larger of|days used/u);
+    // The two steps name the very labels the Settings buttons carry, read from the same keys, as labels, not controls.
+    expect([...inner.querySelectorAll("h2")].map((heading) => heading.textContent))
+      .toEqual(["In your account, in two steps", "By email", "Model withdrawal form"]);
+    const steps = [...inner.querySelectorAll("ol[data-withdraw-steps] > li")];
+    expect(steps.map((step) => step.textContent)).toEqual([
+      `Sign in and open Settings. Under Subscription, press “${billingEnglish["billing.subscription.withdraw"]}”.`,
+      "Check your name, your plan and the day it started, and the email address we will write to. Then press"
+        + ` “${billingEnglish["billing.subscription.withdrawConfirm"]}”.`
+    ]);
+    expect(steps.map((step) => step.querySelector(".withdrawLabel")?.textContent))
+      .toEqual(["Withdraw from contract here", "Confirm withdrawal"]);
+    expect(inner.querySelector("[data-withdraw-after-confirm]")?.textContent)
+      .toBe("Your plan ends at once, and we email you a confirmation with the date and time of your withdrawal.");
+    expect(document.querySelector('a[href="/login?next=%2Fsettings"]')?.textContent).toBe("Sign in");
+    expect(document.querySelector('.billingInner a[href="/settings"]')?.textContent).toBe("Open Settings");
+    // The email route (Terms §13: the model form or any clear statement), and when a withdrawal is in time.
+    expect(inner.querySelector("[data-withdraw-by-email]")?.textContent).toBe(
+      `Send the model form below, or any clear statement that you withdraw, to ${COMPANY.emails.general}, from the email`
+        + " address of your account if you can. We record your withdrawal as of the moment your email reaches us, and"
+        + " confirm it by email."
     );
-    const body = document.querySelector(".billingInner")?.textContent ?? "";
-    expect(body).not.toMatch(/\b(?:EU|EEA|UK)\b|the larger of|days used/u);
-    expect(document.querySelector('a[href="/login?next=%2Fsettings"]')).not.toBeNull();
-    expect(document.querySelector('a[href="/settings"]')).not.toBeNull();
-    // Terms §13 lets a consumer withdraw by the model form or any clear statement; the owner carries it out.
-    expect(document.querySelector("[data-withdraw-by-email]")?.textContent).toBe(
-      `You can also send the model withdrawal form from your confirmation email, or any clear statement that you withdraw, to ${COMPANY.emails.general}. We carry it out and confirm it by email.`
+    expect(inner.querySelector("[data-withdraw-in-time]")?.textContent).toBe(
+      "Your withdrawal is in time if you send it before the withdrawal period ends. If you have a plan, Settings shows its last day."
     );
+    // The model form is the one the confirmation email attaches, line for line, with the company's facts filled in.
+    const mail = JSON.parse(readFileSync(resolve("packages/mail-templates/messages/en/mail.json"), "utf8")) as Record<string, string>;
+    const filled = (line: string) => line.replace("{merchantName}", COMPANY.legalName)
+      .replace("{merchantAddress}", COMPANY.registeredOffice).replace("{merchantEmail}", COMPANY.emails.general);
+    expect([...inner.querySelectorAll("[data-withdraw-form] p")].map((line) => line.textContent)).toEqual(
+      ["instruction", "to", "notice", "orderedOn", "name", "address", "signature", "date"]
+        .map((field) => filled(mail[`mail.withdrawalForm.${field}`]!))
+    );
+    // The page takes no withdrawal itself: no form, no field, no button, and no sentence saying it does.
+    expect(inner.querySelector("form, input, textarea, button")).toBeNull();
+    expect(inner.textContent).not.toMatch(/withdraw (?:here|on this page)|this page (?:records|takes)/iu);
+  });
+
+  it("/withdraw in Romanian carries the page's one name and the Romanian labels of the Settings buttons", async () => {
+    mocks.locale = "ro";
+    const document = await page(WithdrawPage);
+    const inner = document.querySelector(".billingInner")!;
+    expect(inner.querySelector("h1")?.textContent).toBe("Retragere din contract");
+    expect([...inner.querySelectorAll("ol[data-withdraw-steps] .withdrawLabel")].map((label) => label.textContent))
+      .toEqual(["Retrageți-vă din contract aici", "Confirmați retragerea"]);
+    expect(inner.querySelector("[data-withdraw-form] p")?.textContent)
+      .toBe("Completați și returnați acest formular numai dacă doriți să vă retrageți din contract.");
   });
 });
