@@ -4274,9 +4274,11 @@ same day it arrives. It works out the refund itself: the price times the share o
 not used, so a person who used none gets the whole price back. It records the
 withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
 the 14 days), ends the plan, queues the refund, and emails the person at once that their withdrawal was received
-(M8_RECEIVED, "We've received your withdrawal", dated when the statement arrived). The confirmation that the money
-went back (M8) follows once the refund is done; when nothing is due back, M8 goes at once instead and is the only
-email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday, a Sunday or a Romanian
+(M8_RECEIVED, "We've received your withdrawal"). That email repeats the statement: the date and time it arrived, in
+the person's own time zone with the offset named (UTC when their country has several zones), the plan and the day it
+started, and their name as the billing details hold it. The confirmation that the money went back (M8) follows once
+the refund is done; when nothing is due back, the acknowledgement says so and is the only email. A withdrawal made
+in Settings sends the same emails. When the 14th day is a Saturday, a Sunday or a Romanian
 public holiday (Labour Code art. 139(1), with Orthodox Good Friday, Easter and Rusalii), the person still has until the
 end of the next working day, whatever country they live in; the command counts it the same way. When Parliament adds a
 public holiday, it is added in `packages/billing-core/src/romanian-public-holidays.ts`.

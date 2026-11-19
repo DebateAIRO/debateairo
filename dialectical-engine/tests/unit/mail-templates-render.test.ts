@@ -91,6 +91,9 @@ const SAMPLE: Readonly<Record<string, string>> = Object.freeze({
   chargeRef: "0123456789abcdef0123456789abcdef",
   reasonCode: "PAYMENT_CONFIGURATION_REFUSED",
   withdrawalDate: "2026-10-12T08:30:00.000Z",
+  // The withdrawal statement's content in its acknowledgement: the day the plan started and the buyer's name.
+  startDate: "2026-10-01",
+  buyerName: "Ana Popescu",
   refundDeadline: "2026-10-26T08:30:00.000Z",
   refundReason: "WITHDRAWAL",
   ownerRef: "0b4e2a9c-6f1d-4c3e-9a7b-2d5f8e1c0a93",
@@ -624,22 +627,83 @@ describe("P17 renderMail", () => {
     expect(Object.keys(MAIL_TEMPLATES.O3.params).sort()).toEqual(["jobKind", "nextSteps", "reasonCode", "reference"]);
   });
 
-  it("acknowledges a withdrawal at once, saying only what has happened (W9, P2-I11's M8_RECEIVED)", () => {
-    const refunding = renderMail("M8_RECEIVED", "en", paramsFor("M8_RECEIVED"));
+  it("acknowledges a withdrawal at once with the statement, its date and time in the buyer's zone, and the buyer's name", () => {
+    // OUG 34/2014 art. 11^1(7): the acknowledgement carries the statement's content and the date and time it was sent.
+    // A click at 00:30 on 20 November in Bucharest is still 19 November in UTC: the email prints the buyer's own date
+    // and time and names the offset, so the instant is never in doubt.
+    const params: Record<string, string> = {
+      ...paramsFor("M8_RECEIVED"), withdrawalDate: "2026-11-19T22:30:00.000Z", startDate: "2026-11-12", timeZone: "Europe/Bucharest"
+    };
+    const refunding = renderMail("M8_RECEIVED", "en", params);
     expect(refunding.subject).toBe("We've received your withdrawal");
-    expect(refunding.text).toContain("We received your withdrawal from your Plus plan on 12 October 2026. Your plan has ended.");
-    expect(refunding.text).toContain("We're refunding $12.10 to your card and will email you again when it's done.");
+    expect(refunding.text).toContain([
+      "We have received your withdrawal statement of 20 November 2026, 00:30 (GMT+2). Your Plus plan has ended.",
+      "Your statement: you withdraw from the contract for the Plus plan, which started on 12 November 2026.",
+      "Name: Ana Popescu",
+      "We're refunding $12.10 to your card and will email you again when it's done."
+    ].join("\n\n"));
     // Never "refunded" before the money moved: M8 says that, after the refund.
     expect(refunding.text).not.toMatch(/refunded|confirmed/u);
-    const { refundAmount: _amount, ...byOwner } = paramsFor("M8_RECEIVED");
+    const romanian = renderMail("M8_RECEIVED", "ro", params);
+    expect(romanian.subject).toBe("Am primit retragerea dumneavoastră");
+    expect(romanian.text).toContain([
+      "Am primit declarația dumneavoastră de retragere din 20 noiembrie 2026, 00:30 (GMT+2). Abonamentul dumneavoastră Plus s-a încheiat.",
+      "Declarația dumneavoastră: vă retrageți din contractul pentru abonamentul Plus, început pe 12 noiembrie 2026.",
+      "Nume: Ana Popescu"
+    ].join("\n\n"));
+    // Summer time names its own offset; a country with several zones gets UTC, named.
+    expect(renderMail("M8_RECEIVED", "en", { ...params, withdrawalDate: "2026-06-30T21:15:00.000Z" }).text)
+      .toContain("We have received your withdrawal statement of 1 July 2026, 00:15 (GMT+3).");
+    expect(renderMail("M8_RECEIVED", "en", { ...params, timeZone: "UTC" }).text)
+      .toContain("We have received your withdrawal statement of 19 November 2026, 22:30 (UTC).");
+    // Every locale prints the time and the offset, in CLDR's own form of the time ("0:30", "00.30") and order.
+    for (const locale of MAIL_LOCALES) {
+      expect(renderMail("M8_RECEIVED", locale, params).text, locale).toMatch(/0?0[:.]30\b.*\(GMT\+2\)/u);
+    }
+
+    // Nothing due back: the acknowledgement says so and is the only email, with the same date and time.
+    const nothing = renderMail("M8_RECEIVED", "en", { ...params, refundAmount: "0.00" }).text;
+    expect(nothing).toContain("We have received your withdrawal statement of 20 November 2026, 00:30 (GMT+2).");
+    expect(nothing).toContain("The part of the plan's credit you used covers the whole price, so nothing is due back to you.");
+    expect(nothing).not.toContain("We're refunding");
+    expect(nothing).not.toContain("$0.00");
+    expect(nothing).not.toContain("A refund was already made");
+
+    // A refund the owner settles names no amount, and says the owner checks what is still due.
+    const { refundAmount: _amount, ...byOwner } = params;
     const review = renderMail("M8_RECEIVED", "en", byOwner).text;
-    expect(review).toContain("We received your withdrawal from your Plus plan on 12 October 2026. Your plan has ended.");
+    expect(review).toContain("We have received your withdrawal statement of 20 November 2026, 00:30 (GMT+2). Your Plus plan has ended.");
     expect(review).toContain(
       "A refund was already made on one of your payments, so we'll check what is still due and email you within 14 days."
     );
     expect(review).not.toContain("We're refunding");
+    expect(review).not.toContain("nothing is due back");
+
+    // An acknowledgement whose name could not be read, or one queued before the statement's facts, leaves those
+    // lines out and still reads whole.
+    const { buyerName: _name, startDate: _start, ...bare } = params;
+    const older = renderMail("M8_RECEIVED", "en", bare).text;
+    expect(older).toContain("We have received your withdrawal statement of 20 November 2026, 00:30 (GMT+2).");
+    expect(older).not.toContain("Name:");
+    expect(older).not.toContain("Your statement:");
+    expect(MAIL_TEMPLATES.M8_RECEIVED.params).toEqual({ plan: "plan", withdrawalDate: "datetime" });
+    expect(MAIL_TEMPLATES.M8_RECEIVED.optional).toEqual({ startDate: "date", buyerName: "text", refundAmount: "amount" });
     expect(MAIL_TEMPLATES.M8_RECEIVED.subject).not.toBe(MAIL_TEMPLATES.M8.subject);
-    expect(renderMail("M8_RECEIVED", "ro", paramsFor("M8_RECEIVED")).subject).toBe("Am primit retragerea dumneavoastră");
+  });
+
+  it("takes a zone only as a real IANA zone, and only for a template that prints a date and time", () => {
+    // The zone is a param any template with a date and time accepts, as the currency is for an amount. Without it a
+    // date and time stays in UTC with no label: the data-export email's sentence names UTC itself.
+    expect(renderMail("DATA_EXPORT", "en", {
+      requested: "2026-10-09T15:43:12.000Z", expires: "2026-10-10T15:43:12.000Z", downloadUrl: SAMPLE.downloadUrl!
+    }).text).toContain("10 October 2026, 15:43 UTC");
+    const m8 = paramsFor("M8_RECEIVED");
+    for (const bad of ["Mars/Olympus", "", "Europe/Bucharest\nBcc: x", "../../etc/passwd", "a".repeat(80)]) {
+      expect(codeOf(() => renderMail("M8_RECEIVED", "en", { ...m8, timeZone: bad })), JSON.stringify(bad)).toBe("MAIL_TEMPLATE_PARAM_INVALID");
+    }
+    // A template that prints no date and time takes no zone.
+    expect(codeOf(() => renderMail("M8", "en", { plan: "PLUS", refundAmount: "12.10", timeZone: "Europe/Bucharest" })))
+      .toBe("MAIL_TEMPLATE_PARAM_UNKNOWN");
   });
 
   it("never asks the owner to refund a job the charge records no request for (P2-I5's REFUND_NOT_REQUESTED)", () => {

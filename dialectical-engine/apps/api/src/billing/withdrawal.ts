@@ -1,7 +1,8 @@
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundMicros, type PriceCurrency
+  consumerCalendarDay, consumerTimeZone, microsToDecimal, withdrawalRefundDeadline, withdrawalRefundMicros,
+  type PriceCurrency
 } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
 import { planById } from "@debateai/register";
@@ -55,10 +56,11 @@ const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
  * Spec §2.5.6 withdraw. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
  * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one PAYMENT_REFUND job per payment, split newest first) —
  * and only then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last
- * refund (RefundDesk's WITHDRAWAL follow-up), or goes now when nothing is due back. W9 (P2-I11): the same transaction
- * queues the acknowledgement of receipt (Directive 2011/83/EU art. 11(3)) for every withdrawal it records: M8_RECEIVED
- * ("we received your withdrawal on …; we're refunding {amount}", or the owner's check), or, when nothing is due back,
- * M8 itself, which then says everything at once.
+ * refund (RefundDesk's WITHDRAWAL follow-up). The same transaction queues the acknowledgement on a durable medium
+ * (OUG 34/2014 art. 11^1(7); Directive 2011/83/EU art. 11(3)) for every withdrawal it records, M8_RECEIVED: the
+ * statement's date and time in the buyer's own zone with the offset named, the plan and the day it started, the
+ * buyer's name (read when the email is sent, never queued), then the refund on its way, nothing due back (it is then
+ * the only email), or the owner's check.
  *
  * The refund (owner's decision of 16 November 2026, one rule for every country the site serves): what the payments
  * made up to `withdrewAt` still hold, added up, times the share of the plan credit not used, floored to cents once
@@ -162,30 +164,30 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ENDED_WITHDRAWAL", effectiveAt: now,
       subscriptionId: state.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
     });
-    // Nothing to refund: nothing will move, so M8 goes now, and it is the acknowledgement too. Otherwise the person is
-    // told at once only what has happened (W9, M8_RECEIVED: the refund on its way, or the owner's check), and
-    // RefundDesk queues M8 after the last refund; a withdrawal handed to the owner gets its M8 when the owner settles
-    // it (P14c).
+    // The person is told at once what has happened (M8_RECEIVED). RefundDesk queues M8 after the last refund; with
+    // nothing due back no refund moves, so the acknowledgement is the only email; a withdrawal handed to the owner gets
+    // its M8 when the owner settles it (P14c).
     const customer = await deps.billing.customerByOwner(ownerRef, client);
     const withdrawalDate = withdrewAt.toISOString();
     if (customer !== null) {
-      const recipient = { kind: "CUSTOMER", customerId: customer.customerId } as const;
       // S01-C13 (R-17): the withdraw request's language, when the request carries one.
       const language = request.mailLocale === undefined ? {} : { locale: request.mailLocale };
-      await enqueueEmail(deps.billing, client, !byOwner && allocations.length === 0
-        ? {
-          template: "M8", recipient, dedupeRef: state.subscriptionId,
-          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros), currency: state.currency }, notBefore: now,
-          ...language
-        }
-        : {
-          template: "M8_RECEIVED", recipient, dedupeRef: state.subscriptionId,
-          params: byOwner
-            ? { plan: state.planId, withdrawalDate }
-            : { plan: state.planId, withdrawalDate, refundAmount: microsToDecimal(refundMicros), currency: state.currency },
-          notBefore: now,
-          ...language
-        });
+      // The statement as the buyer made it: its instant in their own zone, and the day the plan started in their own
+      // calendar, the one the 14 days are counted in.
+      const statement = {
+        plan: state.planId, withdrawalDate, timeZone: consumerTimeZone(taxCountry),
+        ...(taxCountry === null ? {} : { startDate: consumerCalendarDay(activatedAt, taxCountry) })
+      };
+      await enqueueEmail(deps.billing, client, {
+        template: "M8_RECEIVED", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
+        dedupeRef: state.subscriptionId,
+        // "0.00" when nothing is due back; no amount when the owner settles the refund.
+        params: byOwner
+          ? statement
+          : { ...statement, refundAmount: microsToDecimal(refundMicros), currency: state.currency },
+        notBefore: now, resolve: { buyerName: true },
+        ...language
+      });
     }
     if (byOwner) {
       // W9 (P2-I11): the owner's own alert, never left to the quarterly O1 (English only, no customer data).

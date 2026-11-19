@@ -85,6 +85,11 @@ export type BillingEmailRequest = Readonly<{
    * (every system row, R-18) sends the profile's, as before.
    */
   locale?: string;
+  /**
+   * Personal text the email needs, read at send time from the billing profile, never written into the queue.
+   * `buyerName`: the payer's name, which a withdrawal's acknowledgement repeats (param `buyerName`).
+   */
+  resolve?: Readonly<{ buyerName?: boolean }>;
 }>;
 
 type EmailOutboxJob = Readonly<{
@@ -95,9 +100,21 @@ type EmailOutboxJob = Readonly<{
 }>;
 
 /**
+ * The payer's name as the billing profile holds it: first and last name, or a profile's older single name. Null when
+ * there is none, or when it would not fit the email's one short line (the renderer's `text` rule: at most 200
+ * characters, no control character), so the email goes out without the name rather than not at all.
+ */
+function buyerNameOf(profile: BillingProfile): string | null {
+  const joined = [profile.firstName, profile.lastName].filter((part): part is string => part !== null).join(" ").trim();
+  const name = joined !== "" ? joined : (profile.name ?? "").trim();
+  return name === "" || name.length > 200 || /[\u0000-\u001f\u007f]/u.test(name) ? null : name;
+}
+
+/**
  * The queue never holds an address: the EMAIL job resolves it at send time (W8, P2-I12: the account's current address,
  * the billing profile's only after the account is erased). It holds the template, the customer id and the params;
- * params are amounts, dates, plan ids and our own URLs, never personal text.
+ * params are amounts, dates, plan ids and our own URLs, never personal text. A name the email repeats is resolved at
+ * send time too (`resolve.buyer_name`).
  */
 export function emailJob(request: BillingEmailRequest): EmailOutboxJob {
   const payload: Record<string, string | number | boolean | null> = {
@@ -113,6 +130,7 @@ export function emailJob(request: BillingEmailRequest): EmailOutboxJob {
     payload["notice.announced_total_micros"] = request.notice.announcedTotalMicros;
   }
   if (request.locale !== undefined) payload.locale = request.locale;
+  if (request.resolve?.buyerName === true) payload["resolve.buyer_name"] = true;
   for (const attachment of request.attachments ?? []) {
     for (const [name, value] of Object.entries(attachment.fields)) payload[`attach.${attachment.kind}.${name}`] = value;
   }
@@ -161,6 +179,7 @@ export function createEmailJobHandler(deps: Readonly<{
     if (typeof template !== "string" || !TEMPLATE_IDS.has(template)) return dead("EMAIL_PAYLOAD_INVALID");
     let to: string;
     let locale: string;
+    const params: Record<string, string> = fieldsWithPrefix(job.payload, "param.");
     if (recipient === "OWNER") {
       to = deps.ownerReportEmail;
       locale = "en";
@@ -180,6 +199,10 @@ export function createEmailJobHandler(deps: Readonly<{
       // S01-C13 (R-18): the row's own language (a user action's, R-12) wins; a system row has none and keeps the profile's.
       const requested = job.payload.locale;
       locale = typeof requested === "string" && requested.length > 0 ? requested : profile.locale;
+      if (job.payload["resolve.buyer_name"] === true) {
+        const buyerName = buyerNameOf(profile);
+        if (buyerName !== null) params.buyerName = buyerName;
+      }
     } else {
       return dead("EMAIL_PAYLOAD_INVALID");
     }
@@ -203,7 +226,7 @@ export function createEmailJobHandler(deps: Readonly<{
       to,
       templateId: template as BillingMailTemplateId,
       locale,
-      params: Object.freeze(fieldsWithPrefix(job.payload, "param.")),
+      params: Object.freeze(params),
       attachments: Object.freeze(resolved)
     }));
     if (deps.sent !== undefined) await deps.sent(job, now);

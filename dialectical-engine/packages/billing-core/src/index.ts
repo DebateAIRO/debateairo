@@ -67,5 +67,11 @@ export { SELLER_COMPANY, isUnverifiedCompanyFact, type SellerCompany, type Selle
 
 // The 14 calendar days of the withdrawal right, in the consumer's own calendar; a last day on a Saturday, a Sunday or
 // a Romanian public holiday moves to the next working day.
-export { withdrawalDeadline, withdrawalRefundDeadline, type WithdrawalDeadline } from "./withdrawal-deadline.js";
+export {
+  consumerCalendarDay,
+  consumerTimeZone,
+  withdrawalDeadline,
+  withdrawalRefundDeadline,
+  type WithdrawalDeadline
+} from "./withdrawal-deadline.js";
 export { isRomanianPublicHoliday, orthodoxEasterSunday, romanianPublicHolidays } from "./romanian-public-holidays.js";

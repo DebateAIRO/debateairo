@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Pool as AccountPool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
-import { foldSubscription, microsToDecimal } from "@debateai/billing-core";
+import { consumerCalendarDay, foldSubscription, microsToDecimal } from "@debateai/billing-core";
 import { renderMail } from "@debateai/mail-templates";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
@@ -144,11 +144,16 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       .toMatchObject({ planId: "FREE", cause: "ENDED_WITHDRAWAL" });
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.providerPaymentId, expected]]);
     expect(await m8Of(seeded.subscriptionId)).toEqual([]);
-    // W9 (P2-I11): the acknowledgement goes at once, dated when the statement arrived, never "refunded".
-    expect((await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
+    // The acknowledgement goes at once, dated when the statement arrived, in the buyer's zone, never "refunded"; it
+    // names the day the plan started in the buyer's calendar, and the name only when it is sent.
+    const acknowledged = (await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload);
+    expect(acknowledged).toEqual([expect.objectContaining({
       template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS",
-      "param.withdrawalDate": receivedAt.toISOString(), "param.refundAmount": microsToDecimal(expected)
+      "param.withdrawalDate": receivedAt.toISOString(), "param.refundAmount": microsToDecimal(expected),
+      "param.timeZone": "Europe/Bucharest", "param.startDate": consumerCalendarDay(seeded.periodStart, "RO"),
+      "resolve.buyer_name": true
     })]);
+    expect(renderedText(acknowledged[0]!)).toMatch(/We have received your withdrawal statement of .+, \d{2}:\d{2} \(GMT\+[23]\)\./u);
     expect(await emailOf("O2_WITHDRAWAL", seeded.subscriptionId)).toEqual([]);
     await refundThroughOwner(seeded.initialChargeId, new Date(receivedAt.getTime() + 14 * DAY));
     expect((await m8Of(seeded.subscriptionId))[0]?.payload)
@@ -261,7 +266,8 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     // the 14-day deadline counted from when the statement arrived.
     const acknowledged = (await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload);
     expect(acknowledged).toEqual([expect.objectContaining({
-      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.withdrawalDate": receivedAt.toISOString()
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.withdrawalDate": receivedAt.toISOString(),
+      "param.timeZone": "Europe/Bucharest", "resolve.buyer_name": true
     })]);
     expect(acknowledged[0]).not.toHaveProperty("param.refundAmount");
     expect((await emailOf("O2_WITHDRAWAL", seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({

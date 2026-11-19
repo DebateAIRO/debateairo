@@ -93,6 +93,28 @@ function isWorkingDay(civilUtcMidnight: number): boolean {
   return weekday !== 0 && weekday !== 6 && !isRomanianPublicHoliday(civilDate(civilUtcMidnight));
 }
 
+/**
+ * The civil date of `instant` in the consumer's calendar (the tax country's date zone, the one the 14 days are counted
+ * in), as an ISO date: the day a plan started, as the withdrawal statement and its acknowledgement name it.
+ */
+export function consumerCalendarDay(instant: Date, taxCountry: string): string {
+  if (!Number.isFinite(instant.getTime())) {
+    throw new TypedDomainError("BILLING_PERIOD_INVALID", "The instant is not a date");
+  }
+  const day = localCalendarDate(instant, consumerZones(taxCountry).dateZone);
+  return civilDate(Date.UTC(day.year, day.month - 1, day.day));
+}
+
+/**
+ * The time zone a consumer's clock reads in, for the date and time an email prints: the tax country's own zone, or
+ * UTC when the country has several zones or none on the list, so the printed time is never a guess.
+ */
+export function consumerTimeZone(taxCountry: string | null): string {
+  if (taxCountry === null) return "UTC";
+  const { dateZone, closeZone } = consumerZones(taxCountry);
+  return dateZone === closeZone ? dateZone : "UTC";
+}
+
 /** Directive 2011/83/EU art. 13(1) (RO: OUG 34/2014 art. 13(1)): the refund is due within 14 days of the withdrawal. */
 const WITHDRAWAL_REFUND_DAYS = 14;
 
