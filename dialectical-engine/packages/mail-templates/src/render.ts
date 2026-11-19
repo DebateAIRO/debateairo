@@ -128,6 +128,38 @@ function amountCurrencyOf(params: Readonly<Record<string, string>>): PriceCurren
 }
 
 /**
+ * The zone an email prints its dates and times in, `params.timeZone`, which any template with a datetime param accepts
+ * without declaring it, as it accepts the currency. A withdrawal's acknowledgement names the buyer's zone, so the time
+ * of the statement reads as the buyer's clock read it. Absent: UTC, with no label, as before (the data-export email's
+ * sentence names UTC itself).
+ */
+const TIME_ZONE_PARAM = "timeZone";
+const TIME_ZONE_SHAPE = /^[A-Za-z][A-Za-z0-9_+-]*(?:\/[A-Za-z0-9_+-]+){0,2}$/u;
+
+function timeZoneOf(params: Readonly<Record<string, string>>): string | null {
+  const value = params[TIME_ZONE_PARAM];
+  if (value === undefined) return null;
+  if (value.length > 64 || !TIME_ZONE_SHAPE.test(value)) throw invalid(TIME_ZONE_PARAM);
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value });
+  } catch {
+    throw invalid(TIME_ZONE_PARAM);
+  }
+  return value;
+}
+
+/**
+ * The offset of `zone` at `at`, named the same way in every language so the reader can always work out the instant:
+ * "GMT+2", "GMT+3", "GMT" for a zone on Greenwich time, and "UTC" for UTC itself.
+ */
+function offsetName(at: Date, zone: string): string {
+  if (zone === "UTC" || zone === "Etc/UTC") return "UTC";
+  const part = new Intl.DateTimeFormat("en-US", { timeZone: zone, timeZoneName: "shortOffset" })
+    .formatToParts(at).find((entry) => entry.type === "timeZoneName");
+  return part?.value ?? zone;
+}
+
+/**
  * The one url rule of the emails: an https link with no user or password, in its canonical form (`URL#toString`), at
  * most 2,048 characters. Returns that canonical form, or null when the value is not such a link. A url param renders
  * only when it already equals its canonical form, so a caller holding a foreign link passes it through this first.
@@ -155,7 +187,8 @@ function dateTagOf(locale: MailLocale): string {
 
 /** The shown segment of a param, or null for a flag (checked, never printed). */
 function formatParam(
-  kind: MailParamKind, name: string, value: string, locale: MailLocale, catalogue: Catalogue, currency: PriceCurrency
+  kind: MailParamKind, name: string, value: string, locale: MailLocale, catalogue: Catalogue, currency: PriceCurrency,
+  timeZone: string | null
 ): Segment | null {
   switch (kind) {
     case "plan": {
@@ -174,16 +207,19 @@ function formatParam(
     case "datetime": {
       const at = new Date(value);
       if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(value) || !Number.isFinite(at.getTime())) throw invalid(name);
+      const zone = timeZone ?? "UTC";
+      // A named zone is printed with its offset, so the instant can be read back from the email alone.
+      const label = timeZone === null ? "" : ` (${offsetName(at, timeZone)})`;
       if (locale !== "en" && locale !== "ro") {
         // CLDR supplies the join and any words around the time (for example Arabic "في" and Hindi "बजे").
         return { kind: "text", value: new Intl.DateTimeFormat(locale, {
-          dateStyle: "long", timeStyle: "short", hourCycle: "h23", timeZone: "UTC"
-        }).format(at) };
+          dateStyle: "long", timeStyle: "short", hourCycle: "h23", timeZone: zone
+        }).format(at) + label };
       }
       // Q5 pins the English comma; the existing Romanian export mail contract also pins that form.
-      const date = new Intl.DateTimeFormat(dateTagOf(locale), { dateStyle: "long", timeZone: "UTC" }).format(at);
-      const time = new Intl.DateTimeFormat(dateTagOf(locale), { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" }).format(at);
-      return { kind: "text", value: `${date}, ${time}` };
+      const date = new Intl.DateTimeFormat(dateTagOf(locale), { dateStyle: "long", timeZone: zone }).format(at);
+      const time = new Intl.DateTimeFormat(dateTagOf(locale), { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: zone }).format(at);
+      return { kind: "text", value: `${date}, ${time}${label}` };
     }
     case "url":
       // A canonical serialisation holds no whitespace, so this is the rule's whole check.
@@ -282,25 +318,28 @@ export function renderMail(
     : mailCatalogues[mailLocale];
   const optional: Readonly<Record<string, MailParamKind>> = template.optional ?? {};
   const showsAmount = Object.values({ ...template.params, ...optional }).includes("amount");
+  const showsDateTime = Object.values({ ...template.params, ...optional }).includes("datetime");
   for (const name of Object.keys(params)) {
     if (showsAmount && name === AMOUNT_CURRENCY_PARAM) continue;
+    if (showsDateTime && name === TIME_ZONE_PARAM) continue;
     if (!Object.hasOwn(template.params, name) && !Object.hasOwn(optional, name)) {
       throw new MailTemplateError("MAIL_TEMPLATE_PARAM_UNKNOWN", name);
     }
   }
   const currency = amountCurrencyOf(params);
+  const timeZone = timeZoneOf(params);
   const values = new Map<string, Segment>(merchantValues(company));
   for (const [name, kind] of Object.entries(template.params)) {
     const raw = params[name];
     if (raw === undefined) throw new MailTemplateError("MAIL_TEMPLATE_PARAM_MISSING", name);
-    const segment = formatParam(kind, name, raw, mailLocale, catalogue, currency);
+    const segment = formatParam(kind, name, raw, mailLocale, catalogue, currency, timeZone);
     if (segment !== null) values.set(name, segment);
   }
   // An optional param left out has no value, so only a sentence shown when it is present may name it.
   for (const [name, kind] of Object.entries(optional)) {
     const raw = params[name];
     if (raw === undefined) continue;
-    const segment = formatParam(kind, name, raw, mailLocale, catalogue, currency);
+    const segment = formatParam(kind, name, raw, mailLocale, catalogue, currency, timeZone);
     if (segment !== null) values.set(name, segment);
   }
   const lookup = (key: string): string => {

@@ -18,11 +18,10 @@ import { testHttpIdentity } from "../support/httpSession.js";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 
 /**
- * NV-45 in real SQL: a withdrawal's credit used counts the vendor-reported RUN/STORY charges of the person's
- * SUBSCRIPTION debates for calls SENT before the instant (the attempt's `ledger.call_prompt` row), whenever they were
- * charged. While more than a day of the window is left and the statement is under an hour old, a debate that may
- * still be sending (a live claim, or a story still to be written) makes the person try again later, with nothing
- * written and the step-up grant unspent; otherwise the withdrawal is recorded at once. CI skips this directory.
+ * In real SQL: a withdrawal's credit used counts the vendor-reported RUN/STORY charges of the person's SUBSCRIPTION
+ * debates for calls SENT before the instant (the attempt's `ledger.call_prompt` row), charged by the time the
+ * withdrawal is read. A debate still running (a live claim, or a story still to be written) never holds it up: the
+ * statement is recorded at the click and settled at once with what has been charged. CI skips this directory.
  */
 let database: TestDatabase;
 
@@ -156,25 +155,29 @@ async function subscriber(label: string, input: Readonly<{ activatedAt: Date; cl
   return { ownerRef, seeded, api, withdraw, refundAt, withdrawn, byOwner };
 }
 
-describe("NV-45 a withdrawal waits for a debate that may still be using credit, while there is time", () => {
-  it("waits for a debate held by a live runner: nothing written, the grant unspent, then records once it ends", async () => {
+describe("a withdrawal confirmed while a debate runs is recorded at the click, never turned away", () => {
+  it("records at once while a live runner holds a debate, deducting what that debate has charged", async () => {
     const now = new Date();
     const person = await subscriber("nv45-live", { activatedAt: new Date(now.getTime() - HOUR), clock: now });
     const run = await ownedRun(person.ownerRef);
-    await pin(run, person.ownerRef, new Date(now.getTime() - MINUTE));
-    const job = await claimedJob(run);
-    const refused = await person.withdraw();
-    expect(refused.statusCode).toBe(409);
-    expect(refused.json()).toMatchObject({ error: "WITHDRAWAL_DEBATE_RUNNING" });
-    expect(await person.withdrawn()).toEqual([]);
-    await settled(job);
-    // The SAME grant: the refusal came before the owner lock, so it was never spent.
-    expect((await person.withdraw()).statusCode).toBe(200);
-    expect(await person.withdrawn()).toHaveLength(1);
+    await pin(run, person.ownerRef, new Date(now.getTime() - 10 * MINUTE));
+    await claimedJob(run);
+    const charged = randomUUID();
+    await prompt(run, charged, new Date(now.getTime() - 3 * MINUTE));
+    await chargeAt(run, 500_000, new Date(now.getTime() - 2 * MINUTE), "RUN", charged);
+    // A call sent before the click whose charge has not arrived when the withdrawal is read: not counted, in the
+    // person's favour.
+    await prompt(run, randomUUID(), new Date(now.getTime() - 30_000));
+    const response = await person.withdraw();
+    expect(response.statusCode).toBe(200);
+    expect(person.refundAt(500_000)).toBeLessThan(person.refundAt(0));
+    expect(await person.withdrawn()).toEqual([
+      expect.objectContaining({ data: expect.objectContaining({ refund_micros: person.refundAt(500_000) }) })
+    ]);
     await person.api.close();
   });
 
-  it("waits for a debate writing its story after its job is DONE (review r1, B2)", async () => {
+  it("records at once while a debate writes its story after its job is DONE", async () => {
     const now = new Date();
     const person = await subscriber("nv45-story", { activatedAt: new Date(now.getTime() - HOUR), clock: now });
     const run = await ownedRun(person.ownerRef);
@@ -187,14 +190,27 @@ describe("NV-45 a withdrawal waits for a debate that may still be using credit, 
     await settled(job);
     // The story's first call is on its way: its prompt is written, no charge and no serve.answer_story row yet.
     await prompt(run, randomUUID(), new Date(now.getTime() - 30_000));
-    const refused = await person.withdraw();
-    expect(refused.statusCode).toBe(409);
-    expect(refused.json()).toMatchObject({ error: "WITHDRAWAL_DEBATE_RUNNING" });
-    expect(await person.withdrawn()).toEqual([]);
+    const response = await person.withdraw();
+    expect(response.statusCode).toBe(200);
+    expect(await person.withdrawn()).toEqual([
+      expect.objectContaining({ data: expect.objectContaining({ refund_micros: person.refundAt(500_000) }) })
+    ]);
     await person.api.close();
   });
 
-  it("guard: a finished debate does not wait, and its charge is deducted", async () => {
+  it("the owner's command records a fresh statement at once while a debate runs", async () => {
+    const now = new Date();
+    const person = await subscriber("nv45-owner-live", { activatedAt: new Date(now.getTime() - HOUR), clock: now });
+    const arrival = new Date(now.getTime() - 5 * MINUTE);
+    const run = await ownedRun(person.ownerRef);
+    await pin(run, person.ownerRef, new Date(arrival.getTime() - MINUTE));
+    await claimedJob(run);
+    expect(await person.byOwner(arrival)).toMatchObject({ refundMicros: person.refundAt(0) });
+    expect(await person.withdrawn()).toHaveLength(1);
+    await person.api.close();
+  });
+
+  it("guard: a finished debate's charge is deducted", async () => {
     const now = new Date();
     const person = await subscriber("nv45-finished", { activatedAt: new Date(now.getTime() - 3 * HOUR), clock: now });
     const run = await ownedRun(person.ownerRef);
@@ -242,7 +258,7 @@ describe("NV-45 the credit used is read by when each call was SENT", () => {
     const person = await subscriber("nv45-last-minutes", { activatedAt, clock: now });
     const run = await ownedRun(person.ownerRef);
     await pin(run, person.ownerRef, new Date(now.getTime() - MINUTE));
-    // A live claim on the database clock: without the margin this would wait.
+    // A live claim on the database clock never holds the withdrawal up.
     await claimedJob(run);
     const attempt = randomUUID();
     await prompt(run, attempt, new Date(now.getTime() - 30_000));
@@ -275,7 +291,7 @@ describe("NV-45 the credit used is read by when each call was SENT", () => {
     await person.api.close();
   });
 
-  it("guard: an old statement is never held up by a live debate (review r1, minor 1)", async () => {
+  it("guard: an old statement is recorded at once while a debate runs", async () => {
     const now = new Date();
     const person = await subscriber("nv45-old-statement", { activatedAt: new Date(now.getTime() - 3 * HOUR), clock: now });
     const arrival = new Date(now.getTime() - 2 * HOUR);
@@ -287,7 +303,7 @@ describe("NV-45 the credit used is read by when each call was SENT", () => {
     await person.api.close();
   });
 
-  it("guard: a debate admitted more than a day before the instant is not waited for (review r2, minor 11)", async () => {
+  it("guard: a debate admitted more than a day before the instant does not hold the withdrawal up", async () => {
     const now = new Date();
     const person = await subscriber("nv45-old-run", { activatedAt: new Date(now.getTime() - 3 * DAY), clock: now });
     const run = await ownedRun(person.ownerRef);

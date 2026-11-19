@@ -46,6 +46,11 @@ export type BillingRefusalCode =
   | "DOWNGRADE_NOT_LOWER"
   /** P12b (P2 review fix round 1, finding 1): the renewal charge for the next period is already written (409). */
   | "DOWNGRADE_NOT_AVAILABLE_NOW"
+  /**
+   * The lower plan's price is not the one the confirmation showed (the plan prices changed while the page was open);
+   * nothing is written (409).
+   */
+  | "DOWNGRADE_PRICE_CHANGED"
   /** P12c: the upgrade target is not dearer than the plan in force, or than the price this subscriber pays (422). */
   | "UPGRADE_NOT_HIGHER"
   /** P12c: an earlier upgrade has no outcome yet, or another process holds the subscription's lease (409). */
@@ -55,17 +60,13 @@ export type BillingRefusalCode =
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
-   * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
-   * Saturday or Sunday moves to the Monday, W6), or a tax country outside `withdrawalCountries` (409).
+   * The withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
+   * Saturday, a Sunday or a Romanian public holiday moves to the next working day), or a tax country outside
+   * `withdrawalCountries` (409).
    */
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
   | "STEP_UP_REQUIRED"
-  /**
-   * NV-45: a debate the person started before the withdrawal may still be using credit, and more than a day of the
-   * window is left; nothing was written and the grant was not spent (409).
-   */
-  | "WITHDRAWAL_DEBATE_RUNNING"
   /** P12e (A2): a renewal's charge may have reached NETOPIA; the card can change once its outcome is recorded. */
   | "CARD_CHANGE_NOT_AVAILABLE_NOW"
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */

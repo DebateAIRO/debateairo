@@ -93,6 +93,8 @@ const REQUIRED = [
   "billing.pricing.freeFeatures", "billing.pricing.paidFeatures", "billing.pricing.startFree", "billing.pricing.choose",
   "billing.pricing.unavailable", "billing.pricing.faqTitle", "billing.pricing.faqLimitsQuestion",
   "billing.pricing.faqLimitsAnswer", "billing.pricing.faqCancelQuestion", "billing.pricing.faqCancelAnswer",
+  "billing.pricing.faqWithdrawQuestion", "billing.pricing.faqWithdrawAnswer",
+  "billing.checkout.withdrawalWhere", "billing.checkout.withdrawalLink",
   "billing.pricing.faqTaxQuestionIncluded", "billing.pricing.faqTaxAnswerIncluded", "billing.pricing.faqTaxAnswerNoTax",
   "billing.pricing.faqTaxAnswerChoose", "billing.pricing.termsLink", "billing.pricing.privacyLink",
   "billing.checkout.eyebrow", "billing.checkout.title", "billing.checkout.country", "billing.checkout.region",
@@ -132,10 +134,14 @@ const REQUIRED = [
   "billing.subscription.cancelConfirmSuspended", "billing.subscription.wontRenew",
   "billing.subscription.cancelYes", "billing.subscription.keep",
   "billing.subscription.revoke", "billing.subscription.withdraw", "billing.subscription.withdrawHint",
+  "billing.subscription.withdrawStatementTitle", "billing.subscription.withdrawStatementText",
+  "billing.subscription.withdrawStatementName", "billing.subscription.withdrawStatementContract",
+  "billing.subscription.withdrawStatementEmail", "billing.subscription.withdrawStatementEmailAccount",
+  "billing.subscription.withdrawStatementChangeEmail",
   "billing.subscription.stepUpExpired",
   "billing.subscription.withdrawConfirm", "billing.subscription.withdrawDone",
   "billing.subscription.withdrawNothingDue", "billing.subscription.withdrawOwnerReview",
-  "billing.subscription.withdrawWindowClosed", "billing.subscription.stillConfirming",
+  "billing.subscription.withdrawWindowClosed", "billing.subscription.withdrawWhilePaused", "billing.subscription.stillConfirming",
   "billing.subscription.actionFailed", "billing.subscription.invoices", "billing.subscription.noInvoices",
   "billing.subscription.invoiceRow", "billing.subscription.creditNote", "billing.subscription.openInvoice",
   "billing.card.title", "billing.card.intro", "billing.card.noHoldNote", "billing.card.save",
@@ -145,8 +151,13 @@ const REQUIRED = [
   "billing.cancelPage.sent", "billing.cancelPage.confirmTitle", "billing.cancelPage.confirmLede", "billing.cancelPage.confirm",
   "billing.cancelPage.done", "billing.cancelPage.linkInvalid", "billing.cancelPage.signedInHint",
   "billing.cancelPage.nothingToCancel",
-  "billing.withdrawPage.title", "billing.withdrawPage.who", "billing.withdrawPage.refund", "billing.withdrawPage.how",
-  "billing.withdrawPage.byEmail", "billing.withdrawPage.signIn", "billing.withdrawPage.settings"
+  "billing.withdrawPage.title", "billing.withdrawPage.who", "billing.withdrawPage.refund", "billing.withdrawPage.intro",
+  "billing.withdrawPage.onlineTitle", "billing.withdrawPage.step1", "billing.withdrawPage.step2",
+  "billing.withdrawPage.afterConfirm", "billing.withdrawPage.byEmailTitle", "billing.withdrawPage.byEmail",
+  "billing.withdrawPage.inTime", "billing.withdrawPage.formTitle",
+  ...["instruction", "to", "notice", "orderedOn", "name", "address", "signature", "date"]
+    .map((line) => `billing.withdrawPage.form.${line}`),
+  "billing.withdrawPage.signIn", "billing.withdrawPage.settings"
 ];
 
 // R3-4: the colleague's legal pages and footer (PR #42) keep their own namespaces; P21 extends them there.
@@ -197,6 +208,9 @@ test("each sentence shown before a paid click names the money it moves (A7: the 
   assert.match(english["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} a month before tax\..*with tax, once the change is scheduled/u);
   assert.doesNotMatch(english["billing.subscription.downgradeConfirm"], /\+ tax/u);
   assert.match(catalogue("ro")["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} pe lună fără taxe\..*cu taxe, după ce schimbarea este programată/u);
+  // Romanian is an offered language: the refusal of a downgrade whose price changed is said in Romanian, not in the
+  // English that stands in for the languages still to be translated.
+  assert.equal(catalogue("ro")["billing.subscription.downgradePriceChanged"], "Prețul acestui abonament s-a schimbat cât timp pagina era deschisă, așa că nu s-a programat nimic. Alegeți-l din nou pentru a vedea prețul actual.");
   // Spec §1.3: "$20.00 + $4.20 VAT (21%, Romania)" — the tax amount, not only its rate.
   assert.match(english["billing.checkout.taxLabel"], /\{tax\}/);
   assert.match(english["billing.consent.renewal"], /\{total\}/);
@@ -213,6 +227,8 @@ test("each refusal D6b's routes answer is worded as the server means it, in Engl
     "billing.subscription.downgradeNotLower": "That plan isn't lower than your current plan.",
     // DOWNGRADE_NOT_AVAILABLE_NOW (409): the renewal charge for the next period is already written at the current plan.
     "billing.subscription.downgradeNotAvailableNow": "Your plan is renewing right now, so a change can't be scheduled yet. You can change it as soon as the renewal has gone through.",
+    // DOWNGRADE_PRICE_CHANGED (409): the lower plan no longer costs what the confirmation showed.
+    "billing.subscription.downgradePriceChanged": "That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.",
     // WITHDRAWAL_WINDOW_CLOSED (409): the 14 days are over. Everyone served has the right (owner's decision of
     // 16 November 2026), so the sentence no longer says it may not apply where the person lives.
     "billing.subscription.withdrawWindowClosed": "The 14-day withdrawal period has ended. You can still cancel at any time.",
@@ -253,6 +269,64 @@ test("the withdrawal sentences give everyone the 14 days and one refund rule, in
     assert.doesNotMatch(value, /\b(?:EU|EEA|UK)\b|European Union|European Economic Area|United Kingdom/u, `${key} names a region`);
     assert.doesNotMatch(value, /(?:doesn't|does not|may not) apply where you live/iu, `${key} says the right may not apply`);
   }
+});
+
+test("/withdraw carries the page's one name and names the Settings buttons by their own labels", () => {
+  const english = catalogue("en");
+  const romanian = catalogue("ro");
+  assert.equal(english["billing.withdrawPage.title"], "Withdraw from contract");
+  assert.equal(romanian["billing.withdrawPage.title"], "Retragere din contract");
+  // The page reads the labels from the Settings buttons' keys, so each step keeps its placeholder in every locale.
+  for (const { code } of LOCALES) {
+    const billing = catalogue(code);
+    assert.ok(billing["billing.withdrawPage.step1"].includes("{withdraw}"), `${code}: step1 names the withdraw button`);
+    assert.ok(billing["billing.withdrawPage.step2"].includes("{confirm}"), `${code}: step2 names the confirm button`);
+    assert.equal(Object.hasOwn(billing, "billing.withdrawPage.how"), false, `${code}: the one-line route is gone`);
+  }
+});
+
+test("the plans page and the checkout name the withdrawal function by the Settings buttons' own labels", () => {
+  // OUG 34/2014 art. 6(1)(h): before the contract, where the withdrawal function is. The sentences quote the buttons,
+  // so they must quote them as the buttons read, in English and in Romanian.
+  for (const code of ["en", "ro"]) {
+    const billing = catalogue(code);
+    const withdraw = billing["billing.subscription.withdraw"];
+    const confirm = billing["billing.subscription.withdrawConfirm"];
+    assert.ok(billing["billing.checkout.withdrawalWhere"].includes(withdraw), `${code}: the checkout names ${withdraw}`);
+    assert.ok(billing["billing.checkout.withdrawalWhere"].includes(confirm), `${code}: the checkout names ${confirm}`);
+    assert.ok(billing["billing.pricing.faqWithdrawAnswer"].includes(withdraw), `${code}: the plans page names ${withdraw}`);
+    // The confirmation email (M1) says where the button is, by the same label.
+    const mail = JSON.parse(readFileSync(join(root, "../../packages/mail-templates/messages", code, "mail.json"), "utf8"));
+    assert.ok(mail["mail.M1.withdrawal"].includes(withdraw), `${code}: M1 names ${withdraw}`);
+  }
+  const english = catalogue("en");
+  assert.equal(english["billing.checkout.withdrawalWhere"],
+    "You can withdraw within {days} days of subscribing, without giving a reason: in Settings, under Subscription, press “Withdraw from contract here”, then “Confirm withdrawal”.");
+  assert.equal(english["billing.pricing.faqWithdrawQuestion"], "Can I withdraw after I subscribe?");
+});
+
+test("/pricing and /cancel say the plans renew monthly until cancelled, and the refund of the unused part as Terms §12 does", () => {
+  const english = catalogue("en");
+  assert.equal(english["billing.pricing.lede"],
+    "Paid plans are monthly subscriptions, paid in advance, that renew every month until you cancel. Every paid plan has the same features and differs only in AI credit each month, with a daily and a weekly share so it lasts all month.");
+  const refund = "If you cancel during a month you have paid for, you can also ask at support@dezbatere.ro for a refund of the share of that month's price you have not used, measured by the plan's credit, however many days have passed; once we refund, the plan ends.";
+  assert.equal(english["billing.pricing.faqCancelAnswer"],
+    `Yes, at any time, in Settings or on the cancel page without signing in. You keep your plan until the month you paid for ends. ${refund}`);
+  assert.equal(english["billing.cancelPage.lede"],
+    `Cancelling stops the renewal: you keep your plan until the end of the month you paid for. ${refund} Enter the email address of your account. We'll send you a link that cancels your plan. You don't need to sign in.`);
+  // The same refund rule, in the same words, as the English Terms (section 12, "Statutory rights first.").
+  const terms = readFileSync(join(root, "legal/en/terms-of-service.md"), "utf8");
+  for (const words of ["measured by the plan's credit, however many days have passed", "Ask at support@dezbatere.ro; once we refund, the plan ends."]) {
+    assert.ok(terms.includes(words), `Terms §12 says: ${words}`);
+  }
+  for (const key of ["billing.pricing.faqCancelAnswer", "billing.cancelPage.lede"]) {
+    assert.ok(english[key].includes("once we refund, the plan ends"), key);
+  }
+  const romanian = catalogue("ro");
+  for (const key of ["billing.pricing.faqCancelAnswer", "billing.cancelPage.lede"]) {
+    assert.ok(romanian[key].includes("odată ce am rambursat, abonamentul încetează"), `ro ${key}`);
+  }
+  assert.ok(romanian["billing.pricing.lede"].startsWith("Abonamentele plătite sunt lunare, se plătesc în avans și se reînnoiesc în fiecare lună până când le anulați."));
 });
 
 test("a plan paused by a payment dispute is cancelled with true words, in English exactly (P2-W10)", () => {

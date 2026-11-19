@@ -111,11 +111,12 @@ describe("P17 mail catalogues", () => {
           continue;
         }
         for (const condition of conditionsOf(paragraph)) {
-          // Only the `then` sentence of a `present` test on that very param may read an optional param.
+          // Only the `then` sentence of a test that holds only when that very param is present may read an optional
+          // param: a `present` test, or a `nonzero` test (an amount left out is never nonzero).
           for (const key of [condition.then, ...(condition.otherwise === null ? [] : [condition.otherwise])]) {
             for (const name of placeholders(english[key]!).filter((candidate) => optional.has(candidate))) {
-              expect(condition.test === "present" && condition.ifParam === name && key === condition.then, `${id} ${key} reads {${name}}`)
-                .toBe(true);
+              expect((condition.test === "present" || condition.test === "nonzero") && condition.ifParam === name
+                && key === condition.then, `${id} ${key} reads {${name}}`).toBe(true);
             }
           }
           const kind = declared[condition.ifParam];

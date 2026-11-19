@@ -72,7 +72,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
@@ -485,6 +485,87 @@ describe('the preview release guide: transition T, side by side, the way back, t
     // An empty value is refused by the settings reader: no marks means no line. The drained path edits after DR1.
     expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB5b. '))!)).toMatch(/leave the\s+line out/);
     expect(drained).toContain('To change the payment marks on this path, run SB5b right after DR1.');
+  });
+
+  it('SB5d adds NETOPIA\'s logo id only to a release whose website knows it, before its launch plans, in the id\'s form', () => {
+    const sb5d = scriptOf('SB5D').lines;
+    expect(sideBySide.indexOf('\n### SB5d. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB5c. '));
+    expect(sideBySide.indexOf('\n### SB5d. ')).toBeLessThan(sideBySide.indexOf('\n### SB6. '));
+    const at = (needle: string) => { const found = sb5d.findIndex(line => line.includes(needle) && line.includes('SB5D_NOT_DONE')); expect(found, needle).toBeGreaterThan(-1); return found; };
+    // The website of a release starts from its own UI folder: that folder's environment.mjs must admit the setting.
+    const knows = at('grep -q "\'NETOPIA_LOGO_ID\'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs"');
+    expect(read('deploy/preview-auth-dev/v1/environment.mjs')).toContain("'NETOPIA_LOGO_ID'");
+    const plans = at('[ ! -e "$ART/ui-launch.json" ]');
+    const form = at("grep -qxE '[0-9]{1,12}'");
+    const before = at('[ ! -e "$S/ui-$LABEL.env.before-logo" ]');
+    const edit = sb5d.findIndex(line => line.startsWith('cp -p "$U" "$S/ui-$LABEL.env.before-logo"'));
+    const moved = sb5d.findIndex(line => line.startsWith('mv "$U.new" "$U"'));
+    const same = sb5d.findIndex(line => line.startsWith('lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" ||'));
+    for (const guard of [knows, plans, form, before]) expect(guard).toBeLessThan(edit);
+    expect(edit).toBeLessThan(moved);
+    expect(moved).toBeLessThan(same);
+    // Only the new release's own ui file: never the live one an older release reads.
+    for (const line of sb5d.filter(code)) expect(line, line).not.toMatch(/\$E\/ui\.env\b/);
+    // The id's form, run by bash: what the website and the test site's check (UI_NETOPIA_LOGO_ID) accept, and nothing else.
+    const id = (value: string) => {
+      try { return execFileSync('bash', ['-c', ['set -euo pipefail', `ID='${value}'`, sb5d[form], 'echo ID_OK'].join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+    };
+    for (const good of ['1', '123456', '000000000001']) expect(id(good), good).toBe('ID_OK');
+    for (const bad of ['', '12a', '1234567890123', ' 1', '1 ', '-1', '１２']) expect(id(bad), bad).toMatch(/^SB5D_NOT_DONE: /);
+    // The drained path edits after DR1; the marks' steps are skipped while the logo id is set.
+    expect(drained.replace(/\s+/g, ' ')).toContain("To set or change NETOPIA's logo id on this path, run SB5d right after DR1.");
+    expect(sectionOf(guide, PAYMENT_MARKS).replace(/\s+/g, ' ')).toContain('With it, PM1, SB5b, MT1, PM2 and MT2 are not needed.');
+    expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB5b. '))!).replace(/\s+/g, ' '))
+      .toContain('With NETOPIA\'s logo id set (SB5d), the website draws none of these marks: skip this step.');
+    const table = sideBySide.split('\n');
+    expect(table.findIndex(line => line.startsWith('| SB5d |'))).toBe(table.findIndex(line => line.startsWith('| SB5c |')) + 1);
+  });
+
+  it('LOGOCHECK only reads, after SB13b: the ui file\'s line, the page\'s policy, the logo once while billing is on, NETOPIA\'s answer', async () => {
+    const check = scriptOf('LOGOCHECK').lines;
+    expect(sideBySide.indexOf('\n### LOGOCHECK. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB13b. '));
+    expect(sideBySide.indexOf('\n### LOGOCHECK. ')).toBeLessThan(sideBySide.indexOf('\n### SB13c. '));
+    const table = sideBySide.split('\n');
+    expect(table.findIndex(line => line.startsWith('| LOGOCHECK |'))).toBe(table.findIndex(line => line.startsWith('| SB13b |')) + 1);
+    expect(drained.replace(/\s+/g, ' ')).toContain('Then SB13b (the team member\'s test debate), LOGOCHECK when this upload ran SB5d, and, later, SB15 as usual.');
+    // It changes nothing: no file is written, moved or copied, no service or tool runs.
+    for (const line of check.filter(code)) {
+      expect(line, line).not.toMatch(/(^|[\s;&|(])(cp|mv|install|chown|chmod|systemctl|lc|rel|pre|cslots|tee)\s/);
+      expect(line.replace(/2?>\s*\/dev\/null/g, ''), line).not.toMatch(/[^<2&]>{1,2}\s*["$\/\w]/);
+    }
+    // The address it looks for is the website's own (paymentMarks.ts netopiaLogoAddress), and the policy line is the CSP's.
+    const { netopiaLogoAddress } = await import('../../apps/ui/lib/billing/paymentMarks.js');
+    expect(check).toContain('LOGO="https://mny.ro/np-black-0.svg?id=$ID"');
+    expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: '42' })).toBe('https://mny.ro/np-black-0.svg?id=42');
+    const { FALLBACK_CONTENT_SECURITY_POLICY } = await import('../../apps/ui/' + 'content-security-policy.mjs') as { FALLBACK_CONTENT_SECURITY_POLICY: string };
+    expect(check.join('\n')).toContain('grep -qF "img-src \'self\' data: https://mny.ro;" <<<"$P"');
+    expect(FALLBACK_CONTENT_SECURITY_POLICY).toContain("img-src 'self' data: https://mny.ro;");
+    // Billing is read from the home page's own /pricing link, which shows only while billing is on.
+    expect(check).toContain('if grep -qF \'href="/pricing"\' <<<"$H"; then');
+    // The home page and NETOPIA's answer, run by bash with curl answered from files: what passes and what stops.
+    const dir = mkdtempSync(join(tmpdir(), 'guide-logocheck-'));
+    try {
+      writeFileSync(join(dir, 'headers.txt'), "HTTP/1.1 200 OK\r\ncontent-security-policy: default-src 'self'; img-src 'self' data: https://mny.ro; font-src 'self'\r\n\r\n");
+      const run = (home: string, answer: string, ui = 'PORT=3200\nNETOPIA_LOGO_ID=42\n') => {
+        writeFileSync(join(dir, 'ui-rX.env'), ui);
+        writeFileSync(join(dir, 'home.html'), home);
+        writeFileSync(join(dir, 'answer.txt'), answer);
+        // curl answered from files: the logo's headers (-sI), the home page's headers (-D -), or the home page.
+        const curl = `curl() { case "$*" in *-sI*) cat '${dir}/answer.txt';; *-D*) cat '${dir}/headers.txt';; *) cat '${dir}/home.html';; esac; }`;
+        const body = check.slice(2).filter(line => !line.startsWith('ID='));
+        try { return execFileSync('bash', ['-c', ['set -euo pipefail', `E='${dir}'; LABEL=rX; UIP=3200; ID='42'`, curl, ...body].join('\n')], { encoding: 'utf8' }).trim().split('\n').at(-1); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim().split('\n').at(-1); }
+      };
+      const OK = 'HTTP/2 200\r\ncontent-type: image/svg+xml\r\ncontent-length: 8592\r\ncache-control: public, max-age=3600\r\n\r\n';
+      const logo = '<img src="https://mny.ro/np-black-0.svg?id=42" alt="NETOPIA Payments, Visa, Mastercard"/>';
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK)).toBe('LOGOCHECK_DONE');
+      // Billing off: no logo is expected, and the check still ends.
+      expect(run('<a href="/legal">Legal</a>', OK)).toBe('LOGOCHECK_DONE');
+      expect(run('<a href="/pricing">Pricing</a>', OK)).toMatch(/^LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}<img src="/payment-marks/visa.svg"/>`, OK)).toMatch(/^LOGOCHECK_NOT_DONE: the home page still draws the old mark files/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, 'HTTP/2 404\r\ncontent-type: text/html\r\n\r\n')).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, `${OK.trimEnd()}\r\nset-cookie: a=b\r\n\r\n`)).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK, 'PORT=3200\n')).toMatch(/^LOGOCHECK_NOT_DONE: ui-rX\.env does not hold the line/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('SB5c adds the proof lines only to a release that knows them, before its launch plans, with matching copies', () => {

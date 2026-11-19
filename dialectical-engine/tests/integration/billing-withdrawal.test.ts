@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { BillingJobQueries, BillingRepository, createPool, EntitlementRepository, migrate, type OutboxJob } from "@debateai/db";
-import { foldSubscription, microsToDecimal } from "@debateai/billing-core";
+import { consumerCalendarDay, foldSubscription, microsToDecimal } from "@debateai/billing-core";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { testBillingPolicy } from "../support/billingFixtures.js";
@@ -117,11 +117,17 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     expect(run.kick).toHaveBeenCalledTimes(1);
     // No "we refunded" email while the money has not moved.
     expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
-    // W9 (P2-I11): the acknowledgement of receipt, queued in the withdrawal's own transaction, says only what happened.
-    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([expect.objectContaining({
+    // The acknowledgement, queued in the withdrawal's own transaction, repeats the statement: its instant in the
+    // buyer's zone, the plan and the day it started in the buyer's calendar. The name is read when it is sent.
+    const acknowledged = await emailOf("M8_RECEIVED", run.seeded.subscriptionId);
+    expect(acknowledged).toEqual([expect.objectContaining({
       template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PRO",
-      "param.withdrawalDate": run.now.toISOString(), "param.refundAmount": microsToDecimal(expected)
+      "param.withdrawalDate": run.now.toISOString(), "param.refundAmount": microsToDecimal(expected),
+      "param.timeZone": "Europe/Bucharest", "param.startDate": consumerCalendarDay(run.seeded.periodStart, "RO"),
+      "resolve.buyer_name": true
     })]);
+    // The seeded payer is "Test Subscriber": the queue holds no name.
+    expect(JSON.stringify(acknowledged)).not.toMatch(/Subscriber|buyerName/u);
     expect(await emailOf("O2_WITHDRAWAL", run.seeded.subscriptionId)).toEqual([]);
     const jobs = await claimRefunds(refs);
     expect(jobs.map((job) => job.ref)).toEqual(refs);
@@ -272,15 +278,18 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     }
   });
 
-  it("writes no refund intent and sends M8 at once when the whole credit was used", async () => {
+  it("writes no refund intent when the whole credit was used, and the acknowledgement with its date and time is the only email", async () => {
     const run = await start("p12d-used", { activatedDaysAgo: 1, taxCountry: "RO", spentMicros: 6_600_000 });
     const response = await run.withdraw();
     expect(response.json()).toEqual({ refund: "0.00", currency: "USD" });
     expect(foldSubscription(await run.billing.subscriptionEvents(run.seeded.subscriptionId)).status).toBe("WITHDRAWN");
     expect(await refundRequests(run.billing, run.seeded.initialChargeId)).toEqual([]);
-    expect((await m8Of(run.seeded.subscriptionId))[0]?.payload).toMatchObject({ "param.refundAmount": "0.00" });
-    // W9: M8 is itself the acknowledgement here (queued in the same transaction), so no second email says the same.
-    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([]);
+    // Nothing will move, so no M8 follows: the acknowledgement says nothing is due back.
+    expect(await m8Of(run.seeded.subscriptionId)).toEqual([]);
+    expect(await emailOf("M8_RECEIVED", run.seeded.subscriptionId)).toEqual([expect.objectContaining({
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS", "param.withdrawalDate": run.now.toISOString(),
+      "param.refundAmount": "0.00", "param.timeZone": "Europe/Bucharest", "resolve.buyer_name": true
+    })]);
     expect(run.kick).not.toHaveBeenCalled();
     await run.api.close();
   });
@@ -332,7 +341,8 @@ describe("P12d withdrawal on real PostgreSQL", () => {
     // W9 (P2-I11): the person's acknowledgement names no amount; the owner is told at once, with the deadline.
     const acknowledged = await emailOf("M8_RECEIVED", run.seeded.subscriptionId);
     expect(acknowledged).toEqual([expect.objectContaining({
-      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS", "param.withdrawalDate": run.now.toISOString()
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS", "param.withdrawalDate": run.now.toISOString(),
+      "param.timeZone": "Europe/Bucharest", "resolve.buyer_name": true
     })]);
     expect(acknowledged[0]).not.toHaveProperty("param.refundAmount");
     expect(await emailOf("O2_WITHDRAWAL", run.seeded.subscriptionId)).toEqual([expect.objectContaining({

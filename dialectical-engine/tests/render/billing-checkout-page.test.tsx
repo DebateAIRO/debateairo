@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   ageAskedWith: [] as string[],
   consentMissingFor: null as string | null,
   marks: { netopia: false, visa: false, mastercard: false },
+  netopiaLogo: null as string | null,
   flowProps: [] as Record<string, unknown>[],
   pollerProps: [] as Record<string, unknown>[]
 }));
@@ -37,8 +38,8 @@ vi.mock("@/lib/billing/serverBilling", () => ({
   sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; },
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
-// The owner's artwork is read from the disk on the server (N25b); the flow and the footer get the same answer.
-vi.mock("@/lib/billing/paymentMarks", () => ({ availablePaymentMarks: () => mocks.marks }));
+// The marks and NETOPIA's hosted logo are read from the server's settings; the flow and the footer get the same answer.
+vi.mock("@/lib/billing/paymentMarks", () => ({ availablePaymentMarks: () => mocks.marks, netopiaLogoAddress: () => mocks.netopiaLogo }));
 vi.mock("@/components/billing/CheckoutFlow", () => ({
   CheckoutFlow: (props: Record<string, unknown>) => { mocks.flowProps.push(props); return null; }
 }));
@@ -66,6 +67,7 @@ beforeEach(() => {
   mocks.ageAskedWith = [];
   mocks.consentMissingFor = null;
   mocks.marks = { netopia: false, visa: false, mastercard: false };
+  mocks.netopiaLogo = null;
   mocks.flowProps = [];
   mocks.pollerProps = [];
   resetRedirects();
@@ -115,6 +117,19 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(html).toContain('src="/payment-marks/netopia.svg"');
     expect(html).toContain('src="/payment-marks/mastercard.svg"');
     expect(html).not.toContain('src="/payment-marks/visa.svg"');
+  });
+
+  it("hands the flow NETOPIA's hosted logo when its setting is set, and the footer under the flow shows it instead of the marks", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.marks = { netopia: true, visa: true, mastercard: true };
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[0]?.netopiaLogo).toBeNull();
+    // A made-up shop id: the real one is never in the repository.
+    mocks.netopiaLogo = "https://mny.ro/np-black-0.svg?id=123456";
+    const html = renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[1]?.netopiaLogo).toBe("https://mny.ro/np-black-0.svg?id=123456");
+    expect(html).toContain('src="https://mny.ro/np-black-0.svg?id=123456"');
+    expect(html).not.toContain('src="/payment-marks/');
   });
 
   it("tells the flow payments are test-only exactly while the plans list names NETOPIA's sandbox", async () => {

@@ -1,5 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createNonce, NONCE_REQUEST_HEADER, nonceContentSecurityPolicy } from "./content-security-policy.mjs";
+import { requestFirstVisitLocale } from "./lib/i18n/acceptLanguage.js";
+import { LOCALE_COOKIE } from "./lib/i18n/locales.js";
 
 /**
  * F-08 / L3-F3: every document gets a per-request nonce policy, the checkout and card pages included (spec 2026-10-05
@@ -13,8 +15,22 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set(NONCE_REQUEST_HEADER, nonce);
   requestHeaders.set("content-security-policy", policy);
+  // A visitor who has not picked a language in the language list sees the one the browser prefers: Romanian for a
+  // browser that ranks Romanian above English, English otherwise. Every page reads the language from the locale cookie,
+  // so this request alone carries it as that cookie, added last because Next's cookie store keeps the last of two.
+  // Nothing is stored and no cookie is set: the language list's own cookie, once written, always wins. The raw header is
+  // read, not Next's cookie store, which keeps only the last of two copies; the /api proxy asks the same question.
+  const cookie = request.headers.get("cookie")?.trim() ?? "";
+  const browserLocale = requestFirstVisitLocale(cookie, request.headers.get("accept-language"));
+  if (browserLocale !== null) {
+    requestHeaders.set("cookie", `${cookie === "" ? "" : `${cookie}; `}${LOCALE_COOKIE}=${browserLocale}`);
+  }
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set("content-security-policy", policy);
+  // The same address answers in either language, so the answer says it varies with Accept-Language. Next keeps this on
+  // the answers it does not render as pages, such as the report downloads, and on the files in public/, which do not
+  // need it but are never stored either; a rendered page gets Next's own Vary, and the edge (server.mjs) adds the name.
+  response.headers.append("vary", "Accept-Language");
   return response;
 }
 

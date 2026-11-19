@@ -16,7 +16,7 @@ import {
   BillingWithdrawRequestSchema,
   BillingWithdrawResponseSchema
 } from "@debateai/contract";
-import { microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { clientIpNetworkScope } from "../client-ip.js";
 import { mailLocaleOfCookieHeader } from "../mail-locale.js";
 import { readCardDetails, startCardChange } from "./card-change.js";
@@ -101,7 +101,9 @@ export function installSubscriptionRoutes(
     // Every downgrade prices the lower plan at the tax service: the same sealed per-owner budget as a quote.
     if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/downgrade", ownerRef)) return reply;
     return answer(reply, async () => {
-      await scheduleDowngrade(deps, ownerRef, parsed.data.plan_id);
+      await scheduleDowngrade(deps, ownerRef, parsed.data.plan_id, {
+        netMicros: decimalToMicros(parsed.data.net_price), currency: parsed.data.currency
+      });
       return reply.status(204).send();
     });
   });
@@ -154,7 +156,7 @@ export function installSubscriptionRoutes(
       agreement: parsed.data.renewal_terms
     }))));
   });
-  // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up.
+  // OUG 34/2014 art. 11^1: the signed-in session withdraws; the body is empty and no step-up is asked.
   api.post("/v1/billing/subscription/withdraw", policy("POST /v1/billing/subscription/withdraw"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;

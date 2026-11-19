@@ -67,6 +67,18 @@ describe('the release key in the narrowed environment',()=>{
   expect(()=>env.narrowEnvironment('runner',{...runner(),UI_API_PROOF_PATH:'/etc/debateai-v3-preview/ui-api-proof/api/proof.secret'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
   expect(()=>env.narrowEnvironment('api',{...api(KEY),DIALECTICAL_UI_API_PROOF_PATH:'/etc/debateai-v3-preview/ui-api-proof/ui.secret'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
  });
+ // NETOPIA's hosted logo: the website checks the id's form at start; the strict form is release-env's check too.
+ it('admits NETOPIA_LOGO_ID on the website, and on no other service',()=>{
+  const ui=(id:string)=>({NODE_ENV:'production',PUBLIC_APP_URL:'https://v3-preview.dezbatere.ro',PORT:'3100',DIALECTICAL_UI_HOST:'127.0.0.1',DIALECTICAL_API_BASE:'http://127.0.0.1:3101',NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON:env.PREVIEW_FREE_MODEL_IDS_JSON,RELEASE_KEY:KEY,NETOPIA_LOGO_ID:id});
+  const built={builtModelRosterFlag:env.PREVIEW_FREE_MODEL_IDS_JSON};
+  expect(env.narrowEnvironment('ui',ui('123456'),built,pin,plan).environment.NETOPIA_LOGO_ID).toBe('123456');
+  expect(()=>env.narrowEnvironment('api',{...api(KEY),NETOPIA_LOGO_ID:'123456'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+  expect(()=>env.narrowEnvironment('runner',{...runner(),NETOPIA_LOGO_ID:'123456'},runtime,pin,plan)).toThrow(/^PREVIEW_ENVIRONMENT_REFUSED$/);
+ });
+ it('isNetopiaLogoId takes 1 to 12 digits only',()=>{
+  for(const value of ['1','123456','000000000001'])expect(env.isNetopiaLogoId(value),value).toBe(true);
+  for(const value of ['','12a',' 1','1 ','-1','1234567890123',undefined,123456])expect(env.isNetopiaLogoId(value),String(value)).toBe(false);
+ });
  it('isPaymentMarksList takes only the strict form',()=>{
   expect(env.PAYMENT_MARK_NAMES).toEqual(['netopia','visa','mastercard']);
   expect(Object.isFrozen(env.PAYMENT_MARK_NAMES)).toBe(true);

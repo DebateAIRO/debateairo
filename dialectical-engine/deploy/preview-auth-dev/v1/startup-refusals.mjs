@@ -10,7 +10,9 @@ const NAMED_REFUSALS = Object.freeze([
   // and a live payment system beside a sandbox invoicer or the reverse.
   /^BILLING_OTHER_SYSTEM_RECORDS_OPEN:subscriptions=[0-9]{1,9}:charges=[0-9]{1,9}:jobs=[0-9]{1,9}$/,
   /^BILLING_RECORDS_DATED_AHEAD:rows=[0-9]{1,9}:jobs=[0-9]{1,9}$/,
-  /^BILLING_(?:LIVE_SANDBOX|STAGE_LIVE)_INVOICER_REFUSED$/
+  /^BILLING_(?:LIVE_SANDBOX|STAGE_LIVE)_INVOICER_REFUSED$/,
+  // The website's own start refusal for a NETOPIA logo id that is not 1 to 12 digits (apps/ui/server.mjs).
+  /^NETOPIA_LOGO_ID_INVALID$/
 ]);
 export const isNamedRefusal = code => typeof code === 'string' && code.length <= 120 && NAMED_REFUSALS.some(form => form.test(code));
 /** The named code an error carries (its cause, its code or its message, in that order), or undefined. */

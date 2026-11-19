@@ -25,8 +25,11 @@ describe("named startup refusals", () => {
   it("names only codes of the closed forms", () => {
     for (const code of [
       "PREVIEW_ORIGIN_NOT_LISTED", "PREVIEW_MAIN_ORIGIN_NOT_HOSTED", "PREVIEW_STAFF_ORIGIN_MISMATCH",
-      "PREVIEW_ASKS_OPEN_TO_INVALID", "PREVIEW_MAIL_ORIGIN_MISMATCH", "PREVIEW_LIVE_PAYMENTS_REFUSED:netopia-base"
+      "PREVIEW_ASKS_OPEN_TO_INVALID", "PREVIEW_MAIL_ORIGIN_MISMATCH", "PREVIEW_LIVE_PAYMENTS_REFUSED:netopia-base",
+      // The website's own start refusal (apps/ui/server.mjs): the journal names the setting, never its value.
+      "NETOPIA_LOGO_ID_INVALID"
     ]) expect(isNamedRefusal(code)).toBe(true);
+    for (const code of ["NETOPIA_LOGO_ID_INVALID:12a", "NETOPIA_LOGO_ID_INVALIDX", "netopia_logo_id_invalid"]) expect(isNamedRefusal(code)).toBe(false);
     for (const code of [
       "PREVIEW_ENVIRONMENT_REFUSED", "PREVIEW_MAIL_REFUSED https://dezbatere.ro", "PREVIEW_ORIGIN_NOT_LISTED:https://evil.test",
       "PREVIEW_MAIL_", "preview_mail_origin_mismatch", "PREVIEW_ORIGIN_NOT_LISTED\nx", "PREVIEW_LIVE_PAYMENTS_REFUSED:Secret1",
@@ -39,6 +42,10 @@ describe("named startup refusals", () => {
     expect(namedRefusal(Object.assign(new Error("x"), { code: "PREVIEW_MAIL_ORIGIN_MISMATCH" }))).toBe("PREVIEW_MAIL_ORIGIN_MISMATCH");
     expect(namedRefusal(new TypeError("PREVIEW_ASKS_OPEN_TO_INVALID"))).toBe("PREVIEW_ASKS_OPEN_TO_INVALID");
     expect(namedRefusal(new TypeError("PREVIEW_ENVIRONMENT_REFUSED"))).toBeUndefined();
+    // server.mjs's refuse(): the code is both the message and the code; the launcher prints it beside its one line.
+    const logo = Object.assign(new TypeError("NETOPIA_LOGO_ID_INVALID"), { code: "NETOPIA_LOGO_ID_INVALID" });
+    expect(namedRefusal(logo)).toBe("NETOPIA_LOGO_ID_INVALID");
+    expect(startupRefusedLine("PREVIEW_UI_STARTUP_REFUSED", logo)).toBe("PREVIEW_UI_STARTUP_REFUSED NETOPIA_LOGO_ID_INVALID");
     expect(namedRefusal(new TypeError("anything", { cause: "password=hunter2" }))).toBeUndefined();
     expect(namedRefusal(undefined)).toBeUndefined();
   });

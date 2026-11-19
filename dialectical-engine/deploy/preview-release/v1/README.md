@@ -3091,8 +3091,8 @@ product change: a problem in T is fixed forward.
 root with `bash -s`, `set -euo pipefail` first and the names file second (TA0 and TA1 make it), every guard written
 `… || { echo "<STEP>_NOT_DONE: …"; exit 1; }`, the last line `<STEP>_DONE`, and nothing more after a `_NOT_DONE`
 (read the way back and decide with the owner). The scripts print no env value other than `REGISTER_VERSION`,
-`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. Every
-trap of that section still holds:
+`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` and `NETOPIA_LOGO_ID` (not
+secret) and ports. Every trap of that section still holds:
 - `nat` always exits 0: its line is captured and tested (`OUT=$(nat "$F"); [ "$OUT" = "exit 0" ] || …`), never chained;
 - a pin writes `pinnedAt`, so a lock is compared without the pin times, or not re-pinned at all;
 - the build roster is `all-models`;
@@ -4266,9 +4266,9 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 
 **How each step runs.** As in the transition: one script per step, `set -euo pipefail`, the names file (SB1 makes it),
 `<STEP>_NOT_DONE` guards, `<STEP>_DONE` last, no env value printed except `REGISTER_VERSION`, `RELEASE_KEY`,
-`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. The traps of the
-transition hold, and so do the three house rules of "A normal release on a hosted base" (one-line option values, a
-service's own ready sign, nothing that only a first start creates). Two more:
+`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` and `NETOPIA_LOGO_ID` (not secret) and
+ports. The traps of the transition hold, and so do the three house rules of "A normal release on a hosted base"
+(one-line option values, a service's own ready sign, nothing that only a first start creates). Two more:
 - **One switch command at a time.** Each `release-switch.mjs` command takes
   `/etc/debateai-v3-preview/lifecycle/release-switch.lock`; another one meanwhile refuses `RELEASE_SWITCH_BUSY`. A lock
   left by an ssh drop names its path and how to clear it (WB4).
@@ -4299,6 +4299,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB5 | the three env files; the database-ahead file | up | nothing to undo (unused files) |
 | SB5b | only when the payment marks list changes: the list in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB5c | only the first upload with NV-03 (or after going back to a release without it): the UI-to-API proof in the new release's api and ui files | up | nothing to undo (unused files; the ones before are in `$S`) |
+| SB5d | only when NETOPIA's logo id is first set or changes (or after going back to a release without it): the line in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB6 | the owner's fresh yes | up | – |
 | MT1, PM2, MT2 | only the first upload that lists the marks: Caddy's rule (see "Payment marks: the files and Caddy's rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |
 | SB7 | the online backup | up | nothing to undo |
@@ -4309,6 +4310,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB12 | the new API and website, not ready | up | WB1 |
 | SB13 | the switch | up | WB2 |
 | SB13b | the team member's test debate runs on the new release (read-only) | up | WB2 |
+| LOGOCHECK | only in an upload whose SB5d ran: NETOPIA's logo on the new release (read-only) | up | – |
 | SB13c | on the Mac: the PR that makes `tests/n1-baseline.json` name the new release | up | – (the next upload needs it) |
 | SB14 | later: the old release retired; its receipt | up | WB2 (its runner restarts in database-ahead mode) |
 | SB14b | only after a reboot or a runner crash during the drain: the runners start again | up | – |
@@ -4801,7 +4803,8 @@ its own file as it is.
 
 PM1 comes first: every listed mark's file must be in `/etc/debateai-v3-preview/public/payment-marks/` (a listed mark
 without its file shows a broken image). An empty value is refused by the test site's settings reader (every
-`<name>=` line needs a value): to show no marks, leave the line out and skip this step. SB5b runs after SB5 and before
+`<name>=` line needs a value): to show no marks, leave the line out and skip this step. With NETOPIA's logo id set
+(SB5d), the website draws none of these marks: skip this step. SB5b runs after SB5 and before
 SB10, whose launch plans start the website from this file; it stops once `ui-launch.json` exists. At T+1 `lc` is still
 T's installed tools, whose SAME checks do not know the list yet, so the script checks the list's form itself: one to
 three of the names, lower-case, no spaces, each once.
@@ -4903,6 +4906,51 @@ diff <(awk '!/^DIALECTICAL_UI_API_PROOF_PATH=/' "$S/ui-$LABEL.env.before-proof")
 lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5C_NOT_DONE: a SAME check is BAD (above; the files before are in $S)"; exit 1; }
 echo "api-$LABEL.env and ui-$LABEL.env: the UI-to-API proof lines"
 echo SB5C_DONE
+```
+
+### SB5d. NETOPIA's logo id, in the new release's ui file (only when it is first set or changes)
+
+NETOPIA asks for its logo on the site. The website shows NETOPIA's hosted picture when its setting `NETOPIA_LOGO_ID`
+holds the shop id NETOPIA shows you (1 to 12 digits; it is public, since it ends up in the page as part of the picture's
+address, `https://mny.ro/np-black-0.svg?id=<id>`). The visitor's browser loads the picture from NETOPIA's server, and
+the website's content policy lets images come from `https://mny.ro` and from no other outside host, so nothing is
+copied to the server and Caddy does not change. The picture already holds the Visa and Mastercard marks, so while the
+line is there the website draws none of the files of "Payment marks: the files and Caddy's rule": skip PM1, SB5b, MT1,
+PM2 and MT2. It shows only while billing is on, in the full footer and on the checkout's card step; the one-line footer
+never shows it.
+
+Each release derives its `ui-<label>.env` from the old release's file (SB5, or DR1 on the drained path), so once a
+release's file holds the line every later release carries it. SB5d runs the first time, when the id changes, and in the
+first upload after going back to a release whose ui file has no line. A release before this code refuses the name (its
+website starter lets through only the settings it lists, and stops with `PREVIEW_UI_STARTUP_REFUSED`), so the line
+never goes into `ui.env` or an older release's file; that matters on the way back too, which starts the old release
+from its own file as it is. A website of this code refuses to start on an id of another form, and its journal then
+says `PREVIEW_UI_STARTUP_REFUSED NETOPIA_LOGO_ID_INVALID`. SB5d runs after SB5 (or DR1) and before SB10 (or DR5),
+whose launch plans start the website from this file; it stops once `ui-launch.json` exists. `lc` is still the old
+release's tools here, whose SAME checks may not know the id yet, so the script checks its form itself. After the
+switch, LOGOCHECK (after SB13b) reads that the site shows the logo.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB5d: NETOPIA_LOGO_ID in the new release's own ui file (only when it is first set or changes; never a release before this code).
+ID='<the shop id NETOPIA shows you, digits only>'
+U=$E/ui-$LABEL.env
+printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "SB5D_NOT_DONE: ID is not 1 to 12 digits (nothing changed)"; exit 1; }
+[ -f "$U" ] && [ "$(stat -c '%a %U' "$U")" = "640 root" ] || { echo "SB5D_NOT_DONE: $U is not root's 0640 file (SB5 or DR1 first)"; exit 1; }
+[ ! -e "$ART/ui-launch.json" ] || { echo "SB5D_NOT_DONE: $ART/ui-launch.json exists: the launch plans are made already (nothing changed): ask"; exit 1; }
+grep -q "'NETOPIA_LOGO_ID'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" || { echo "SB5D_NOT_DONE: this release's website does not know NETOPIA_LOGO_ID (a release before this code would refuse to start; nothing changed)"; exit 1; }
+[ ! -e "$S/ui-$LABEL.env.before-logo" ] || { echo "SB5D_NOT_DONE: $S/ui-$LABEL.env.before-logo exists: SB5d ran for this release before (look first)"; exit 1; }
+cp -p "$U" "$S/ui-$LABEL.env.before-logo"
+( umask 077; awk '!/^NETOPIA_LOGO_ID=/' "$U" > "$U.new"; printf 'NETOPIA_LOGO_ID=%s\n' "$ID" >> "$U.new" )
+chown --reference="$U" "$U.new"
+chmod --reference="$U" "$U.new"
+mv "$U.new" "$U"
+[ "$(grep -c '^NETOPIA_LOGO_ID=' "$U")" = 1 ] && grep -qxF "NETOPIA_LOGO_ID=$ID" "$U" || { echo "SB5D_NOT_DONE: the line is not in $U exactly once (the file before is $S/ui-$LABEL.env.before-logo): ask"; exit 1; }
+diff <(awk '!/^NETOPIA_LOGO_ID=/' "$S/ui-$LABEL.env.before-logo") <(awk '!/^NETOPIA_LOGO_ID=/' "$U") >/dev/null && [ "$(stat -c '%a %U:%G' "$U")" = "$(stat -c '%a %U:%G' "$S/ui-$LABEL.env.before-logo")" ] || { echo "SB5D_NOT_DONE: another line, the mode or the owner of $U changed (the file before is $S/ui-$LABEL.env.before-logo): ask"; exit 1; }
+lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5D_NOT_DONE: a SAME check is BAD (above; the file before is $S/ui-$LABEL.env.before-logo)"; exit 1; }
+echo "ui-$LABEL.env: NETOPIA_LOGO_ID=$ID"
+echo SB5D_DONE
 ```
 
 ### SB6. The owner's fresh yes
@@ -5251,6 +5299,46 @@ else echo "the old runner has stopped (retired, or check SB14)"; fi
 echo SB13B_DONE
 ```
 
+### LOGOCHECK. NETOPIA's logo on the new release (read-only)
+
+Only in an upload whose SB5d ran, right after SB13b (on the drained path too). It changes nothing. It reads the new
+website directly on its own port (`$UIP`: no site password, and with no session cookie the home page is the landing
+page) and checks that the line from SB5d is in the release's ui file, that the page's content policy lets the logo
+load, and, while billing is on (the home page links `/pricing` only then), that the home page shows NETOPIA's picture
+exactly once and none of the old mark files. With billing off it says so and does not stop: the logo shows by itself
+once billing is on. Last, it asks NETOPIA's server for the picture and prints the answer's headers that matter: it must
+be a 200 with an SVG, with no cookie and no redirect (the Privacy Policy and the Cookie Policy assume neither). Re-run it
+now and then: NETOPIA can change the picture at any time.
+
+Then look by eye, with the site password, in a private window: the home page's footer in the light and the dark theme
+(the logo on its white chip; a click opens netopia-payments.com in a new tab), a legal page, a phone width, and the
+checkout's card step (sign in, pick a plan, look at the logo under the button, and do not press the button).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# LOGOCHECK: read-only. NETOPIA's logo on the new release: the ui file's line, the page's policy, the home page, NETOPIA's answer.
+ID='<the shop id you gave SB5d>'
+LOGO="https://mny.ro/np-black-0.svg?id=$ID"
+printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "LOGOCHECK_NOT_DONE: ID is not 1 to 12 digits"; exit 1; }
+grep -qxF "NETOPIA_LOGO_ID=$ID" "$E/ui-$LABEL.env" || { echo "LOGOCHECK_NOT_DONE: ui-$LABEL.env does not hold the line NETOPIA_LOGO_ID=$ID (SB5d)"; exit 1; }
+P=$(curl -s -m 15 -o /dev/null -D - "http://127.0.0.1:$UIP/" | tr -d '\r' | grep -i '^content-security-policy:' || true)
+grep -qF "img-src 'self' data: https://mny.ro;" <<<"$P" || { echo "LOGOCHECK_NOT_DONE: the home page's policy does not let the logo load: ask"; exit 1; }
+H=$(curl -s -m 15 "http://127.0.0.1:$UIP/" || true)
+if grep -qF 'href="/pricing"' <<<"$H"; then
+  [ "$(grep -oF "src=\"$LOGO\"" <<<"$H" | grep -c .)" = 1 ] || { echo "LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once: ask"; exit 1; }
+  ! grep -qF 'src="/payment-marks/' <<<"$H" || { echo "LOGOCHECK_NOT_DONE: the home page still draws the old mark files: ask"; exit 1; }
+  echo "home page: billing on, NETOPIA's logo once"
+else
+  echo "home page: billing is off, so no logo (it shows by itself once billing is on)"
+fi
+R=$(curl -sI -m 15 "$LOGO" | tr -d '\r' | tr 'A-Z' 'a-z' || true)
+grep -E '^(http/|content-type:|content-length:|cache-control:|set-cookie:|location:)' <<<"$R" || true
+grep -qE '^http/[0-9.]+ 200' <<<"$R" && grep -qx 'content-type: image/svg+xml' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG: ask"; exit 1; }
+! grep -qE '^(set-cookie|location):' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected (the Privacy Policy and the Cookie Policy assume neither): ask"; exit 1; }
+echo LOGOCHECK_DONE
+```
+
 ### SB13c. The N-1 baseline names the live release (on the Mac)
 
 After SB13b the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
@@ -5530,8 +5618,9 @@ could not run beside the new database (spec §5's escape hatch). Then the upload
 template layout: a quiet moment, the old release stopped with nothing open, a cold copy, the migrations, and a switch
 with the old pair already stopped. SB1 to SB4 stand as they are (the names, the staging, the practice, the plan); SB5's
 database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. To add the
-UI-to-API proof on this path, run SB5c right after DR1. The first time
-the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule") go after DR1 and SB5b, before DR2.
+UI-to-API proof on this path, run SB5c right after DR1. To set or change NETOPIA's logo id on this path, run SB5d
+right after DR1. The first time the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule")
+go after DR1 and SB5b, before DR2.
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
@@ -5761,8 +5850,8 @@ systemctl start debateai-preview-backup.timer || { echo "DR6_NOT_DONE: the backu
 echo DR6_DONE
 ```
 
-Then SB13b (the team member's test debate) and, later, SB15 as usual. The old release has no retirement receipt (it
-never retired by itself); its `RETIRED` row says `DRAINED`.
+Then SB13b (the team member's test debate), LOGOCHECK when this upload ran SB5d, and, later, SB15 as usual. The old
+release has no retirement receipt (it never retired by itself); its `RETIRED` row says `DRAINED`.
 
 The switch accepts the old runner stopped only on this path (`--old-pair-stopped`). After `SWITCH_OUTCOME_UNKNOWN` (its
 `next` names `switch --finish … --old-pair-stopped`), or `BACKSTOP`/`TARGET` in `bad`, run WB4 with `bash -s -- drained`:
@@ -5918,6 +6007,11 @@ echo MT2_DONE
 ```
 
 ### Payment marks: the files and Caddy's rule
+
+**NETOPIA's hosted logo replaces these files.** When the new release's ui file has `NETOPIA_LOGO_ID` (SB5d), the
+footer and the checkout show NETOPIA's own picture, loaded by the visitor's browser from NETOPIA's server; it already
+holds the Visa and Mastercard marks, and the website then draws none of the three files. With it, PM1, SB5b, MT1, PM2
+and MT2 are not needed. The three files and the steps below stay for a site without the logo id.
 
 **In plain words.** The website's footer and checkout show the NETOPIA, Visa and Mastercard marks at
 `/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg` (`deploy/vps/README.md`
