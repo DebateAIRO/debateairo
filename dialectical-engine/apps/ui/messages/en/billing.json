@@ -141,7 +141,7 @@
   "billing.subscription.upgradeNotHigher": "That plan isn't higher than your current plan. To move to a lower plan, choose it for your next renewal.",
   "billing.subscription.downgradeNotLower": "That plan isn't lower than your current plan.",
   "billing.subscription.downgradeNotAvailableNow": "Your plan is renewing right now, so a change can't be scheduled yet. You can change it as soon as the renewal has gone through.",
-  "billing.subscription.downgradeConfirm": "Move to {plan} at your next renewal? It costs {price} a month + tax, from {date}.",
+  "billing.subscription.downgradeConfirm": "Move to {plan} at your next renewal? From {date}, it costs {price} a month before tax. This page shows the exact amount, with tax, once the change is scheduled.",
   "billing.subscription.downgradeYes": "Yes, move to {plan}",
   "billing.subscription.downgraded": "Done. You'll move to {plan} on {date}, for {total} a month, tax included.",
   "billing.subscription.downgradedNoTotal": "Done. You'll move to {plan} on {date}.",

@@ -141,7 +141,7 @@
   "billing.subscription.upgradeNotHigher": "Acest abonament nu este superior celui actual. Ca să treceți la un abonament inferior, alegeți-l pentru următoarea reînnoire.",
   "billing.subscription.downgradeNotLower": "Acest abonament nu este inferior celui actual.",
   "billing.subscription.downgradeNotAvailableNow": "Abonamentul dvs. se reînnoiește chiar acum, așa că o schimbare nu poate fi programată încă. Îl puteți schimba imediat ce reînnoirea s-a încheiat.",
-  "billing.subscription.downgradeConfirm": "Treceți la {plan} la următoarea reînnoire? Costă {price} pe lună + taxe, din {date}.",
+  "billing.subscription.downgradeConfirm": "Treceți la {plan} la următoarea reînnoire? Din {date}, costă {price} pe lună fără taxe. Pagina aceasta arată suma exactă, cu taxe, după ce schimbarea este programată.",
   "billing.subscription.downgradeYes": "Da, trec la {plan}",
   "billing.subscription.downgraded": "Gata. Treceți la {plan} pe {date}, pentru {total} pe lună, cu taxe incluse.",
   "billing.subscription.downgradedNoTotal": "Gata. Treceți la {plan} pe {date}.",

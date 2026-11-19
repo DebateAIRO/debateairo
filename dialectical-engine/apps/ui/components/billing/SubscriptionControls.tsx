@@ -391,7 +391,9 @@ export function SubscriptionControls({
           ) : null}
           {downgrade !== null ? (
             <div className="subPanel">
-              {/* Ruling Q-7: the lower plan's net price from GET /v1/billing/plans, "+ tax", from the renewal date. */}
+              {/* Ruling Q-7: the lower plan's price from GET /v1/billing/plans, from the renewal date. That answer prices
+                  tax only for the visitor's connection, not for the subscription's billing address, so the sentence
+                  calls this figure the price before tax; the total with tax (renewal_total) shows once it is scheduled. */}
               <p className="setCardNote">{t(catalog, "billing.subscription.downgradeConfirm", {
                 plan: planName(catalog, downgrade.planId), price: formatMoney(locale, downgrade.netPrice, downgrade.currency), date: nextRenewalText
               })}</p>

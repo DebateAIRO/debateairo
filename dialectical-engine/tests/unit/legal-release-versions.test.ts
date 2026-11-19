@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES, OFFERED_LOCALE_CODES } from "../../apps/ui/lib/i18n/locales.js";
 import { RELEASE_LEGAL_LOCALES } from "../../apps/ui/scripts/generate-legal-data.mjs";
+import { isLegalTextLocale, LEGAL_TEXT_LOCALE_CODES } from "../../apps/ui/lib/legal/legalTextLocales.js";
 import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import {
   PRIVACY_313_ENTRY,
@@ -103,5 +104,15 @@ describe("Terms 2.19 and Privacy Policy 3.13", () => {
     // Canada at sign-up. Each of those must be in the release check, or a text nobody checked or archived could be accepted.
     for (const code of OFFERED_LOCALE_CODES) expect(RELEASE_LEGAL_LOCALES).toContain(code);
     expect(RELEASE_LEGAL_LOCALES).toContain("fr");
+  });
+
+  it("the site shows legal texts in exactly the languages the release checks and archives", () => {
+    // LEGAL_TEXT_LOCALE_CODES is the site's copy (a page cannot load the release script): the offered interface
+    // languages and the Canada rule's languages. An explicit /terms?lang= or /privacy?lang= counts only for these.
+    expect([...LEGAL_TEXT_LOCALE_CODES].sort()).toEqual([...RELEASE_LEGAL_LOCALES].sort());
+    for (const code of ["en", "en-GB", "en-US", "ro", "fr"]) expect(isLegalTextLocale(code), code).toBe(true);
+    for (const value of ["de", "pl", "es", "zh", "RO", "fr-CA", "xx", "", null, undefined]) {
+      expect(isLegalTextLocale(value), String(value)).toBe(false);
+    }
   });
 });

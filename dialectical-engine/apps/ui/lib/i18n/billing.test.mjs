@@ -192,8 +192,11 @@ test("each sentence shown before a paid click names the money it moves (A7: the 
   // The upgrade's new monthly price is what the next renewal charges without a notice; it must be seen first.
   assert.match(english["billing.subscription.upgradeQuote"], /\{recurringTotal\}/);
   assert.match(english["billing.subscription.downgraded"], /\{total\}/);
-  // Ruling Q-7: before a downgrade, the lower plan's net price from the plans list, "+ tax", and the date it starts.
-  assert.match(english["billing.subscription.downgradeConfirm"], /\{price\}.*\+ tax.*\{date\}/u);
+  // Ruling Q-7: before a downgrade, the date it starts and the lower plan's net price from the plans list. Terms §12
+  // says prices include tax, so the figure is named as the price before tax, never as "+ tax".
+  assert.match(english["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} a month before tax\..*with tax, once the change is scheduled/u);
+  assert.doesNotMatch(english["billing.subscription.downgradeConfirm"], /\+ tax/u);
+  assert.match(catalogue("ro")["billing.subscription.downgradeConfirm"], /\{date\}.*\{price\} pe lună fără taxe\..*cu taxe, după ce schimbarea este programată/u);
   // Spec §1.3: "$20.00 + $4.20 VAT (21%, Romania)" — the tax amount, not only its rate.
   assert.match(english["billing.checkout.taxLabel"], /\{tax\}/);
   assert.match(english["billing.consent.renewal"], /\{total\}/);

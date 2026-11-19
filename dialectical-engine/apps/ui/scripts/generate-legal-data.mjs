@@ -59,7 +59,8 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
  * interface languages offered. French is here too because sign-up shows a person who picks Canada the French Terms and
  * Privacy Policy first and records their acceptance in French (apps/ui/components/consent/canadaLegalLanguage.ts).
  * The other languages' drafts stay in the repository and carry the same version number, but they are neither checked
- * nor archived until a release offers them again.
+ * nor archived until a release offers them again. The site keeps the same list as LEGAL_TEXT_LOCALE_CODES
+ * (apps/ui/lib/legal/legalTextLocales.ts) and shows legal texts only in those languages; a unit test holds the two equal.
  */
 export const RELEASE_LEGAL_LOCALES = Object.freeze(["en", "fr", "ro"]);
 
