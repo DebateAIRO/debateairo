@@ -146,14 +146,14 @@ function paymentSystemChecks(releases) {
 }
 
 /**
- * Side-by-side spec §10, the SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
+ * The SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
  * preview configuration, the team, the deployment mode, the site version and the release key; its website names the
  * API's release key; its ports and API address are its slot's; its payment marks list, when it has one, is a list
  * of netopia, visa and mastercard (environment.mjs isPaymentMarksList); and its NETOPIA logo id, when it has one, is 1 to
  * 12 digits (isNetopiaLogoId). Neither is compared across releases, since a release may change them on purpose.
  * Across releases (two only): every API and runner file names the same spending gates and
  * scope, deployment mode, workflow and team, and every API file that names a restore fence names the same one
- * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Last, who may
+ * (SAME_API_RESTORE_FENCE_PATH); the release keys, runner identities and ports all differ. Last, who may
  * start debates (asksOpenChecks). Returns every check, OK or not, in a fixed order.
  * The public name (PUBLIC_APP_URL) is held to one value too: a release's website and API name the same one
  * (SAME_UI_API_PUBLIC_APP_URL:<label>), and two releases name the same one (SAME_PUBLIC_APP_URL).
