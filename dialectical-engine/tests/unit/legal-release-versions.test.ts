@@ -30,7 +30,8 @@ const file = (code: string, name: string): string => readFileSync(resolve(root, 
 /**
  * A draft as these checks were written for it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts),
  * so as 3.14 left it, and the Terms as the first 1.0 text wrote them, with the corrections made before launch undone
- * (tests/support/legalTerms10.ts). The archive holds the corrected 1.0 text, so the archive check reads the file.
+ * (tests/support/legalTerms10.ts). Only the day and version check needs that text; the check that the Terms carry no
+ * change history, and the archive check, read the file the site serves.
  */
 const draft = (code: string, name: string): string =>
   name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : withoutTerms10Corrections(code, file(code, name));
@@ -82,7 +83,7 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
   });
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the Terms carry no change history, and section 14 ends where the history began", (code) => {
-    const terms = draft(code, "terms-of-service.md");
+    const terms = file(code, "terms-of-service.md");
     expect(terms, code).not.toMatch(/(^|\D)2\.(1?\d)(\D|$)/u);
     const section14 = terms.split(/^## 14\./mu)[1]!.split(/^## 15\./mu)[0]!;
     // The heading line and the three paragraphs on changes; the last still points to dezbatere.ro/terms/versions.
