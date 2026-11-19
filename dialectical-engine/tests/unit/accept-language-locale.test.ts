@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { firstVisitLocale, preferredOfferedLocale } from "../../apps/ui/lib/i18n/acceptLanguage.js";
+import {
+  cookieHeaderPicksLocale,
+  firstVisitLocale,
+  preferredOfferedLocale,
+  requestFirstVisitLocale
+} from "../../apps/ui/lib/i18n/acceptLanguage.js";
 
 /**
  * A visitor who has not picked a language sees the offered language (English or Romanian) their browser ranks highest:
@@ -103,5 +108,58 @@ describe("the language a visitor who has not picked one sees", () => {
     expect(firstVisitLocale("*")).toBeNull();
     expect(firstVisitLocale(null)).toBeNull();
     expect(firstVisitLocale("")).toBeNull();
+  });
+});
+
+/**
+ * The middleware (pages) and the /api proxy (mails) read different copies of a doubled locale cookie, the last and the
+ * first. Both add the browser's language only when no copy names an offered language, so neither adds it beside a
+ * choice the other one reads.
+ */
+describe("whether a Cookie header carries a language the visitor picked", () => {
+  it("is yes when any copy of the locale cookie names an offered language", () => {
+    for (const header of [
+      "debateai.locale=ro",
+      "debateai.locale=en-GB",
+      " debateai.locale = en-US ",
+      "debateai.locale=en; debateai.locale=de",
+      "debateai.locale=de; debateai.locale=en",
+      "debateai.consent=1;debateai.locale=fr;debateai.locale=ro;theme=dark"
+    ]) {
+      expect(cookieHeaderPicksLocale(header), header).toBe(true);
+      expect(requestFirstVisitLocale(header, "ro-RO,ro"), header).toBeNull();
+    }
+  });
+
+  it("is no when no copy names an offered language, and the browser's language then applies", () => {
+    for (const header of [
+      null,
+      undefined,
+      "",
+      ";;;",
+      "debateai.locale",
+      "debateai.locale=",
+      "debateai.locale=de",
+      "debateai.locale=de; debateai.locale=fr",
+      "debateai.locale=RO",
+      "debateai.locale=ro-RO",
+      "xdebateai.locale=en",
+      "debateai.localex=en",
+      "=debateai.locale=en",
+      "theme=debateai.locale=en"
+    ]) {
+      expect(cookieHeaderPicksLocale(header), String(header)).toBe(false);
+      expect(requestFirstVisitLocale(header, "ro-RO,ro"), String(header)).toBe("ro");
+      expect(requestFirstVisitLocale(header, "en-US,en;q=0.9,ro;q=0.8"), String(header)).toBeNull();
+      expect(requestFirstVisitLocale(header, null), String(header)).toBeNull();
+    }
+  });
+
+  it("reads a large Cookie header without trouble", () => {
+    const others = "other=value; ".repeat(1_000);
+    expect(cookieHeaderPicksLocale(`${others}debateai.locale=en`)).toBe(true);
+    const started = performance.now();
+    for (let round = 0; round < 1_000; round += 1) cookieHeaderPicksLocale(`${others}x=1`);
+    expect(performance.now() - started).toBeLessThan(2_000);
   });
 });

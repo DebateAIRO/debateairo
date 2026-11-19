@@ -80,6 +80,27 @@ describe("the first-visit language in the middleware", () => {
     expect(run({ "accept-language": "en", cookie: "debateai.locale=de" }).cookie).toBe("debateai.locale=de");
   });
 
+  // A second copy comes from a cookie set for a parent domain or edited by hand. Next's cookie store keeps only the last
+  // copy, so the middleware reads the raw header: one offered copy anywhere is a choice, as in the /api proxy
+  // (tests/unit/offered-locales.test.ts), and the pages then read the copy they read for any browser.
+  it("adds nothing when any copy of a doubled locale cookie names an offered language", () => {
+    for (const cookie of ["debateai.locale=en; debateai.locale=de", "debateai.locale=de; debateai.locale=en", "debateai.locale=de;debateai.locale= en-GB"]) {
+      const result = run({ "accept-language": "ro-RO,ro", cookie });
+      expect(result.cookie, cookie).toBe(cookie);
+    }
+    // With "en; de" the pages read de, which is not offered, so they are English, and the proxy forwards en.
+    expect(pageLocale("debateai.locale=en; debateai.locale=de")).toBe("de");
+    expect(pageLocale("debateai.locale=de; debateai.locale=en")).toBe("en");
+  });
+
+  it("adds the browser's language when no copy of a doubled locale cookie names an offered language", () => {
+    const result = run({ "accept-language": "ro", cookie: "debateai.locale=de; debateai.locale=fr" });
+    expect(result.cookie).toBe("debateai.locale=de; debateai.locale=fr; debateai.locale=ro");
+    expect(pageLocale(result.cookie)).toBe("ro");
+    // A name that only ends like the locale cookie's is no choice.
+    expect(run({ "accept-language": "ro", cookie: "xdebateai.locale=en" }).cookie).toBe("xdebateai.locale=en; debateai.locale=ro");
+  });
+
   // Next replaces this Vary on a rendered page with its own; server.mjs adds the name there (the built-server smoke).
   it("says its answer varies with Accept-Language, whatever it decided", () => {
     for (const headers of [{}, { "accept-language": "ro" }, { "accept-language": "en" }, { "accept-language": "ro", cookie: "debateai.locale=en-GB" }]) {

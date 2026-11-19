@@ -151,6 +151,20 @@ describe("the /api proxy forwards the locale cookie only for an offered language
     expect(await forwardedCookie("debateai.locale=ro", "en-US,en")).toBe("debateai.locale=ro");
   });
 
+  // The middleware asks the same question for the pages (tests/unit/ui-middleware-locale.test.ts): with "en; de" the pages
+  // read de and are English, with "de; en" they read en, so the mails stay English in both, whatever the browser says.
+  it("adds nothing when any copy of a doubled locale cookie names an offered language", async () => {
+    expect(await forwardedCookie("debateai.locale=en; debateai.locale=de", "ro-RO,ro")).toBe("debateai.locale=en");
+    expect(await forwardedCookie("debateai.locale=de; debateai.locale=en", "ro-RO,ro")).toBeNull();
+    expect(await forwardedCookie(`__Host-debateai-session=${SESSION}; debateai.locale=de; debateai.locale= en-GB `, "ro"))
+      .toBe(`__Host-debateai-session=${SESSION}`);
+  });
+
+  it("forwards the browser's language when no copy of a doubled locale cookie names an offered language", async () => {
+    expect(await forwardedCookie("debateai.locale=de; debateai.locale=fr", "ro")).toBe("debateai.locale=ro");
+    expect(await forwardedCookie("xdebateai.locale=en", "ro")).toBe("debateai.locale=ro");
+  });
+
   it("forwards no cookie at all for a cookie header the proxy refuses, whatever the browser's language", async () => {
     expect(await forwardedCookie(`__Host-debateai-session=${SESSION}; __Host-debateai-session=${SESSION}`, "ro")).toBeNull();
     expect(await forwardedCookie("__Host-debateai-session=short", "ro")).toBeNull();

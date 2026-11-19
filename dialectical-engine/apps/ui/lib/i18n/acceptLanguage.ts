@@ -1,4 +1,4 @@
-import { DEFAULT_LOCALE, OFFERED_LOCALE_CODES, type CatalogLocaleCode } from "./locales.js";
+import { DEFAULT_LOCALE, isLocale, LOCALE_COOKIE, OFFERED_LOCALE_CODES, type CatalogLocaleCode } from "./locales.js";
 
 /**
  * How much of an Accept-Language header is read. A browser sends a few dozen characters; a longer header is read only up
@@ -60,4 +60,31 @@ export function preferredOfferedLocale(header: string | null | undefined): Catal
 export function firstVisitLocale(header: string | null | undefined): CatalogLocaleCode | null {
   const preferred = preferredOfferedLocale(header);
   return preferred === DEFAULT_LOCALE ? null : preferred;
+}
+
+/**
+ * Whether a Cookie header carries a language the visitor picked: any locale cookie in it that names an offered
+ * language. A browser can send that cookie twice (a copy set for a parent domain, or one edited by hand), and the pages
+ * and the /api proxy each read a different copy, so one offered copy anywhere counts as a choice. Names and values are
+ * read as the /api proxy reads them: split at the first "=", spaces trimmed, nothing decoded.
+ */
+export function cookieHeaderPicksLocale(cookieHeader: string | null | undefined): boolean {
+  if (typeof cookieHeader !== "string") return false;
+  return cookieHeader.split(";").some((member) => {
+    const index = member.indexOf("=");
+    return index > 0 && member.slice(0, index).trim() === LOCALE_COOKIE && isLocale(member.slice(index + 1).trim());
+  });
+}
+
+/**
+ * The language a request is served in beside the cookies it carries, or null for none: the browser's first-visit
+ * language when the Cookie header carries no picked language, and nothing when it carries one, even a copy the reader
+ * does not use. The middleware (for the pages) and the /api proxy (for the mails) both ask this, so a visitor who
+ * picked a language never gets the browser's in either place, and one who did not gets it in both.
+ */
+export function requestFirstVisitLocale(
+  cookieHeader: string | null | undefined,
+  acceptLanguage: string | null | undefined
+): CatalogLocaleCode | null {
+  return cookieHeaderPicksLocale(cookieHeader) ? null : firstVisitLocale(acceptLanguage);
 }

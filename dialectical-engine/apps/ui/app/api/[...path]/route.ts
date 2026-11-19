@@ -6,7 +6,7 @@ import {
   AGE_REFUSAL_COOKIE_VALUE
 } from "@debateai/contract";
 import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../../../trusted-client-ip.mjs";
-import { firstVisitLocale } from "../../../lib/i18n/acceptLanguage.js";
+import { requestFirstVisitLocale } from "../../../lib/i18n/acceptLanguage.js";
 import { isLocale } from "../../../lib/i18n/locales.js";
 
 type ProxyContext = Readonly<{
@@ -207,7 +207,9 @@ function filteredSessionCookies(raw: string | null, acceptLanguage: string | nul
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const browserLocale = selected.has(LOCALE_COOKIE_NAME) ? null : firstVisitLocale(acceptLanguage);
+  // The middleware asks the same question for the pages: the browser's language is added only when no copy of the
+  // locale cookie names an offered language, so a second copy never makes the mails differ from the pages.
+  const browserLocale = requestFirstVisitLocale(raw, acceptLanguage);
   if (browserLocale !== null) selected.set(LOCALE_COOKIE_NAME, browserLocale);
   const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME, ...SOCIAL_COOKIE_NAMES].flatMap((name) => {
     const value = selected.get(name) ?? social.get(name) ?? undefined;
