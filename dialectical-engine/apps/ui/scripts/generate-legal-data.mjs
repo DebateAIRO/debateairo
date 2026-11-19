@@ -88,7 +88,7 @@ const DOCUMENTS = {
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
-    versionAnchor: "Version 3.14",
+    versionAnchor: "Version 3.15",
     numberedSections: 14,
     annexLetter: "B",
     annexParts: 6,

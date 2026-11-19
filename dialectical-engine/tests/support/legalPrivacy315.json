@@ -1,0 +1,2009 @@
+{
+ "ar": {
+  "sha256": "7b6430f487c1a9751aa6676459d1fa9238f9db7842673fdd3fda785ae60d13f5",
+  "swaps": [
+   [
+    "ة · v3.14 · سارية",
+    "ة · v3.15 · سارية"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " على خادمنا، لكن النسخ المشفرة على مخزن النسخ الاحتياطية المنفصل لدينا لا تُحذف تلقائيًا (القسم 7)"
+   ],
+   [
+    "",
+    ". ولا يتضمن سجل الموافقة على البيانات الحساسة (القسم 3) إلا إصدار الصياغة التي وافقت عليها ولغتك والتوقيت، ويُحذف مع حسابك"
+   ],
+   [
+    "",
+    "، ونحذف هذا السجل مع حسابك"
+   ],
+   [
+    "عند بدء الخطط المدفوع",
+    "الذي تديره شركة NETOPIA Financial Services S.A. في رومانيا، عند بدء الخطط المدفوعة. وتُدخل بيانات بطاقتك في صفحته، لا في صفحتنا، وهو يحتفظ ببطاقتك ليتمكن من خصم المبالغ منها عند كل تجديد. ومع كل دفعة نرسل إليه اسمك وعنوان بريدك الإلكتروني ورقم هاتفك، وعنوان الفوترة الخاص بك (الشارع والمدينة والمنطقة والرمز البريدي والبلد)، ورمز عميل يبقى هو نفسه لجميع مدفوعاتك، ومرجعنا للطلب، والمبلغ والعملة، ووصفًا موجزًا للدفعة، مثل اسم خطتك؛ وعندما يخصم المبلغ من بطاقتك المحفوظة عند التجديد، نرسل إليه أيضًا عنوان IP الذي دفعت منه بنفسك آخر مرة. وتطلب NETOPIA هذه البيانات مع كل دفعة بالبطاق"
+   ],
+   [
+    "",
+    "\n| حساب لم يكتمل تسجيله: لم يُتحقق من عنوان البريد الإلكتروني، أو لم تُعدّ خطوة تسجيل الدخول الثانية (مفتاح مرور أو تطبيق مصادقة) | 24 ساعة بعد بدء التسجيل | يُحذف مع كل ما يخص الحساب؛ ويمكن استخدام عنوان بريده الإلكتروني واسمه المستعار مرة أخرى. وتحتفظ سجلات القبول وسجل تدقيق الأمان بقيودها، كما تبين صفوفها |"
+   ],
+   [
+    "",
+    "على خادمنا؛ وتحتفظ نسخنا الاحتياطية بنسخ منه مدة أطول (صف النسخ الاحتياطية أدناه) "
+   ],
+   [
+    "النسخ الاحتياطية به حتى 8 أسابيع، كما هو الحال مع كل شيء آخر",
+    "نسخنا الاحتياطية به كما تحتفظ بكل شيء آخر (صف النسخ الاحتياطية أدناه)"
+   ],
+   [
+    " | عمر الحساب إضافة إلى 6 سنوات — وهي أطول مدة تقادم تنطبق علينا | تُحذف",
+    "، باستثناء الموافقة على البيانات الحساسة: شروط الخدمة التي قبلتها، والسياسة التي عُرضت عليك، وما وافقت عليه غير ذلك عند التسجيل وعند الدفع | عمر الحساب إضافة إلى 6 سنوات — وهي أطول مدة تقادم تنطبق علينا | تُحذف |\n| سجل موافقتك على البيانات الحساسة (القسم 3): إصدار الصياغة التي وافقت عليها، ولغتك، والتوقيت | طوال وجود الحساب | يُحذف مع الحساب"
+   ],
+   [
+    "ما يصل إلى 8 أسابيع بعد حذف النسخة الفعلية | يُكتب فوق",
+    "على خادمنا: ما يصل إلى 8 أسابيع بعد حذف النسخة الفعلية. وعلى مخزن النسخ الاحتياطية المنفصل لدينا: بلا حد زمني، لأن النسخ المشفرة هناك لا تُحذف تلقائيًا | على خادمنا، يُكتب فوقها. وتصف الصفوف الأخرى في هذا الجدول خادمنا. وتحتوي النسخ الموجودة على مخزن النسخ الاحتياطية المنفصل لدينا على قاعدة البيانات مع مفاتيح حسابك ومناظراتك (ولكن ليس مفاتيح الأسئلة التي لم تبدأها بعد)، ولذلك يمكن، إلى أن نزيلها، استعادة مناظرة محذوفة أو حساب مغلق من"
+   ],
+   [
+    "، وبعد ذلك لا نتمكن نحن ولا أي شخص آخر من قراءة السجلات المشفرة، ونحذف سجل حسابك. لا يدمر مفتاح النسخة العامة لمناظرة عامة عند الحذف: تبقى المناظرة عامة (القسم 6). نصف ذلك بأنه حذف لأن هذه هي نتيجته، ونحتفظ بتقييم موثق يستند إليه؛ وإذا أردت معرفة المزيد فاسألنا. ثمة ثلاثة أمور يجب معرفتها: سجل تدقيق الأمان لا يسمح إلا بالإضافة ولا يُحذف، لكنه لا يحتوي على معرفات مقروءة تخصك؛ وهناك عدد قليل من المناظرات القديمة يسبق نظام التشفير الحالي لدينا، وإذا كان ذلك ينطبق على حسابك فسنوضح لك ما يحققه الإغلاق بالنسبة إليها؛ نسخ البيانات التي سبق إرسالها إلى مزود خدمات ذكاء اصطناعي تخضع لشروط الاحتفاظ الخاصة بذلك المزود في السجل، وليس للحذف الذي نجريه",
+    " على خادمنا، وبعد ذلك لا نتمكن نحن ولا أي شخص آخر من قراءة السجلات المشفرة هناك، ونحذف سجل حسابك. لا يدمر مفتاح النسخة العامة لمناظرة عامة عند الحذف: تبقى المناظرة عامة (القسم 6). نصف ذلك بأنه حذف لأن هذه هي نتيجته على خادمنا، ونحتفظ بتقييم موثق يستند إليه؛ وإذا أردت معرفة المزيد فاسألنا. ثمة أربعة أمور يجب معرفتها: سجل تدقيق الأمان لا يسمح إلا بالإضافة ولا يُحذف، لكنه لا يحتوي على معرفات مقروءة تخصك؛ وهناك عدد قليل من المناظرات القديمة يسبق نظام التشفير الحالي لدينا، وإذا كان ذلك ينطبق على حسابك فسنوضح لك ما يحققه الإغلاق بالنسبة إليها؛ نسخ البيانات التي سبق إرسالها إلى مزود خدمات ذكاء اصطناعي تخضع لشروط الاحتفاظ الخاصة بذلك المزود في السجل، وليس للحذف الذي نجريه؛ ونسخنا الاحتياطية تحتفظ بالمفاتيح مع السجلات، ولذلك يمكن استعادة ما تحتويه نسخة احتياطية إلى أن تُزال تلك النسخة، كما أن النسخ الموجودة على مخزن النسخ الاحتياطية المنفصل لدينا لا تُحذف تلقائيًا (صف النسخ الاحتياطية أعلاه)"
+   ]
+  ]
+ },
+ "bg": {
+  "sha256": "d35606a180faf46241b341af09aa22d8c34c0704317a679a5c668c9c1879910c",
+  "swaps": [
+   [
+    "Т · v3.14 · В СИЛ",
+    "Т · v3.15 · В СИЛ"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " на нашия сървър, но шифрованите копия в отделното ни хранилище за резервни копия не се изтриват автоматично (раздел 7)"
+   ],
+   [
+    "",
+    ". Записът за съгласието за чувствителни данни (раздел 3) съдържа само версията на текста, с който сте се съгласили, езика Ви и момента и се изтрива заедно с профила Ви"
+   ],
+   [
+    "",
+    " и изтриваме този запис заедно с профила Ви"
+   ],
+   [
+    "когато стартират платените планове",
+    "управляван от NETOPIA Financial Services S.A. в Румъния, когато стартират платените планове. Данните на картата си въвеждате на неговата страница, а не на нашата, и той съхранява картата Ви, за да може да я таксува при всяко подновяване. С всяко плащане му изпращаме Вашето име, адрес на електронна поща и телефонен номер, адреса Ви за фактуриране (улица, град, област, пощенски код и държава), клиентски код, който е един и същ за всичките Ви плащания, нашия идентификатор на поръчката, сумата и валутата, както и кратко описание на плащането, например името на плана Ви; когато таксува запазената Ви карта при подновяване, му изпращаме и IP адреса, от който последно сте платили сами. NETOPIA изисква тези данни при всяко плащане с карта"
+   ],
+   [
+    "",
+    "\n| Профил, чиято регистрация не е завършена: адресът на електронната поща не е потвърден или не е настроена втората стъпка за влизане (ключ за достъп или приложение за удостоверяване) | 24 часа от началото на регистрацията | Изтрива се заедно с всичко, което принадлежи на профила; адресът му на електронна поща и псевдонимът могат да бъдат използвани отново. Записите за приемане и одитната следа за сигурност запазват своите вписвания, както е посочено в техните редове |"
+   ],
+   [
+    "",
+    "на нашия сървър; резервните ни копия пазят копия по-дълго (редът за резервните копия по-долу) "
+   ],
+   [
+    "копия ги пазят до 8 седмици, както всичко останало",
+    "ни копия ги пазят така, както пазят всичко останало (редът за резервните копия по-долу)"
+   ],
+   [
+    " | Срокът на профила плюс 6 години — най-дългият давностен срок, който се прилага спрямо нас | Изтриват се",
+    ", с изключение на съгласието за чувствителни данни: кои Условия сте приели, коя политика Ви е била показана и с какво друго сте се съгласили при регистрацията и при плащането | Срокът на профила плюс 6 години — най-дългият давностен срок, който се прилага спрямо нас | Изтриват се |\n| Записът за Вашето съгласие за чувствителни данни (раздел 3): версията на текста, с който сте се съгласили, езикът Ви и моментът | Докато профилът съществува | Изтрива се заедно с профила"
+   ],
+   [
+    "До 8 седмици след изтриването на работното копие | Презаписват се",
+    "На нашия сървър: до 8 седмици след изтриването на работното копие. В отделното ни хранилище за резервни копия: без ограничение във времето, защото шифрованите копия там не се изтриват автоматично | На нашия сървър се презаписват. Останалите редове на тази таблица описват нашия сървър. Копията в отделното хранилище за резервни копия съдържат базата данни заедно с ключовете към профила Ви и дебатите Ви (но не и ключовете към още нестартираните Ви въпроси), така че докато не ги премахнем, изтрит дебат или закрит профил все още може да бъде възстановен от тях"
+   ],
+   [
+    ", след което шифрованите записи не могат да бъдат прочетени от нас или от другиго, и изтриваме записа за профила Ви. Ключът към публичното копие на публичен дебат не се унищожава при изтриване: дебатът остава публичен (раздел 6). Описваме това като изтриване, защото такъв е ефектът му, и разполагаме с документирана оценка в подкрепа; ако искате да научите повече, попитайте ни. Три неща, които трябва да знаете: одитната следа за сигурност е само за добавяне и не се изтрива, но не съдържа четими Ваши идентификатори; малък брой по-стари дебати предхождат настоящата ни схема за шифроване и ако това се отнася за профила Ви, Ви уведомяваме какво постига закриването за тях; копията на данни, които вече са изпратени на доставчик на ИИ, се уреждат от условията за съхранение на този доставчик в Регистъра, а не от нашето изтриване",
+    " на нашия сървър, след което шифрованите записи там не могат да бъдат прочетени от нас или от другиго, и изтриваме записа за профила Ви. Ключът към публичното копие на публичен дебат не се унищожава при изтриване: дебатът остава публичен (раздел 6). Описваме това като изтриване, защото такъв е ефектът му на нашия сървър, и разполагаме с документирана оценка в подкрепа; ако искате да научите повече, попитайте ни. Четири неща, които трябва да знаете: одитната следа за сигурност е само за добавяне и не се изтрива, но не съдържа четими Ваши идентификатори; малък брой по-стари дебати предхождат настоящата ни схема за шифроване и ако това се отнася за профила Ви, Ви уведомяваме какво постига закриването за тях; копията на данни, които вече са изпратени на доставчик на ИИ, се уреждат от условията за съхранение на този доставчик в Регистъра, а не от нашето изтриване; и резервните ни копия съдържат ключовете заедно със записите, така че съдържанието на едно резервно копие може да бъде възстановено, докато това копие не бъде премахнато, а копията в отделното ни хранилище за резервни копия не се изтриват автоматично (редът за резервните копия по-горе)"
+   ]
+  ]
+ },
+ "cs": {
+  "sha256": "f44aa1485642486e86449d8bc76375d4a915a98553e13f3e1f6dd69c9575c07e",
+  "swaps": [
+   [
+    "Ů · v3.14 · ÚČINN",
+    "Ů · v3.15 · ÚČINN"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " na našem serveru, ale šifrované kopie v našem samostatném úložišti záloh se automaticky nemažou (oddíl 7)"
+   ],
+   [
+    "",
+    ". Záznam o souhlasu se zpracováním citlivých údajů (oddíl 3) obsahuje pouze verzi znění, se kterým jste souhlasili, váš jazyk a čas a vymaže se spolu s vaším účtem"
+   ],
+   [
+    "",
+    "; tento záznam vymažeme spolu s vaším účtem"
+   ],
+   [
+    "od spuštění placených tarifů",
+    "provozovaného společností NETOPIA Financial Services S.A. v Rumunsku, od spuštění placených tarifů. Údaje o kartě zadáváte na stránce poskytovatele, nikoli na naší, a poskytovatel vaši kartu uchovává, aby z ní mohl strhávat platby při každém obnovení. S každou platbou mu zasíláme vaše jméno, e-mailovou adresu a telefonní číslo, vaši fakturační adresu (ulici, město, region, PSČ a zemi), zákaznický kód, který zůstává stejný pro všechny vaše platby, naše referenční číslo objednávky, částku a měnu a krátký popis platby, například název vašeho tarifu; když při obnovení strhává platbu z vaší uložené karty, zasíláme mu také IP adresu, ze které jste naposledy platili sami. NETOPIA tyto údaje požaduje u každé platby kartou"
+   ],
+   [
+    "",
+    "\n| Účet, jehož registrace nebyla dokončena: e-mailová adresa nebyla ověřena nebo nebyl nastaven druhý krok přihlášení (přístupový klíč nebo ověřovací aplikace) | 24 hodin od zahájení registrace | Vymazán se vším, co k účtu patří; jeho e-mailovou adresu a pseudonym lze použít znovu. Záznamy o přijetí a bezpečnostní auditní stopa si své položky ponechávají, jak uvádějí jejich řádky |"
+   ],
+   [
+    "stane nečitelným",
+    "na našem serveru stane nečitelným; naše zálohy uchovávají kopie déle (viz řádek o zálohách níže)"
+   ],
+   [
+    "Zálohy je uchovávají až 8 týdnů, jako všechno ostatní",
+    "Naše zálohy je uchovávají stejně jako všechno ostatní (viz řádek o zálohách níže)"
+   ],
+   [
+    " | Po dobu existence účtu a dalších 6 let — nejdelší promlčecí lhůta, která se na nás vztahuje | Vymazány",
+    ", kromě souhlasu se zpracováním citlivých údajů: které Podmínky jste přijali, které zásady vám byly zobrazeny a s čím dalším jste souhlasili při registraci a při platbě | Po dobu existence účtu a dalších 6 let — nejdelší promlčecí lhůta, která se na nás vztahuje | Vymazány |\n| Záznam o vašem souhlasu se zpracováním citlivých údajů (oddíl 3): verze znění, se kterým jste souhlasili, váš jazyk a čas | Po dobu existence účtu | Vymazán spolu s účtem"
+   ],
+   [
+    "Až 8 týdnů po vymazání aktivní kopie | Přepsány",
+    "Na našem serveru: až 8 týdnů po vymazání aktivní kopie. V našem samostatném úložišti záloh: bez časového omezení, protože šifrované kopie v něm se automaticky nemažou | Na našem serveru přepsány. Ostatní řádky této tabulky popisují náš server. Kopie v samostatném úložišti záloh obsahují databázi spolu s klíči k vašemu účtu a vašim debatám (nikoli však klíče k otázkám, které jste dosud nezahájili), takže dokud je neodstraníme, lze z nich smazanou debatu nebo uzavřený účet stále obnovit"
+   ],
+   [
+    "zničí, po čemž zašifrované záznamy nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii veřejné debaty se při výmazu nezničí: debata zůstává veřejná (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět tři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem",
+    "na našem serveru zničí, po čemž zašifrované záznamy na něm nemůžeme přečíst my ani nikdo jiný, a záznam účtu vymažeme. Klíč k veřejné kopii veřejné debaty se při výmazu nezničí: debata zůstává veřejná (oddíl 6). Označujeme to jako výmaz, protože takový je jeho účinek na našem serveru, a máme pro něj zdokumentované posouzení; chcete-li vědět více, zeptejte se. Je třeba vědět čtyři věci: bezpečnostní auditní stopa je pouze doplňována a nemaže se, neobsahuje však žádné vaše čitelné identifikátory; malý počet starších debat vznikl před naším současným systémem šifrování, a pokud se to týká vašeho účtu, sdělíme vám, čeho u nich uzavření účtu dosáhne; kopie údajů, které již byly odeslány poskytovateli AI, se řídí podmínkami uchovávání daného poskytovatele v Registru, nikoli naším výmazem; a naše zálohy obsahují klíče spolu se záznamy, takže to, co obsahuje záložní kopie, lze obnovit, dokud tato kopie není odstraněna, a kopie v našem samostatném úložišti záloh se automaticky nemažou (viz řádek o zálohách výše)"
+   ]
+  ]
+ },
+ "da": {
+  "sha256": "cf789232b8d6b27609f0e7f917977f9f74bae278b6f2c1d85c1664f2b66cb321",
+  "swaps": [
+   [
+    "K · v3.14 · GÆLDE",
+    "K · v3.15 · GÆLDE"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " på vores server, men de krypterede kopier på vores separate lager til sikkerhedskopier slettes ikke automatisk (afsnit 7)"
+   ],
+   [
+    "",
+    ". Registreringen af samtykket til følsomme data (afsnit 3) indeholder kun den version af ordlyden, som du accepterede, dit sprog og tidspunktet, og den slettes sammen med din konto"
+   ],
+   [
+    "",
+    ", og vi sletter denne registrering sammen med din konto"
+   ],
+   [
+    "når betalte abonnementer starter",
+    "drevet af NETOPIA Financial Services S.A. i Rumænien, når betalte abonnementer starter. Du indtaster dine kortoplysninger på udbyderens side, ikke vores, og udbyderen gemmer dit kort, så den kan debitere det ved hver fornyelse. Ved hver betaling sender vi udbyderen dit navn, din e-mailadresse og dit telefonnummer, din faktureringsadresse (gade, by, region, postnummer og land), en kundekode, der er den samme for alle dine betalinger, vores reference for ordren, beløbet og valutaen samt en kort beskrivelse af betalingen, f.eks. navnet på dit abonnement; når udbyderen debiterer dit gemte kort ved en fornyelse, sender vi også den IP-adresse, du sidst selv betalte fra. NETOPIA beder om disse oplysninger ved hver kortbetaling"
+   ],
+   [
+    "",
+    "\n| En konto, hvis tilmelding ikke blev gennemført: e-mailadressen er ikke bekræftet, eller det andet trin ved login (en adgangsnøgle eller en godkendelsesapp) er ikke sat op | 24 timer efter at tilmeldingen begyndte | Slettes med alt, hvad der hører til kontoen; dens e-mailadresse og pseudonym kan bruges igen. Registreringerne af accept og samtykke og sikkerhedsrevisionssporet beholder deres poster, som deres rækker angiver |"
+   ],
+   [
+    "",
+    "på vores server; vores sikkerhedskopier opbevarer kopier længere (rækken om sikkerhedskopier nedenfor) "
+   ],
+   [
+    "Backup gemmer dem i op til 8 uger, som alt andet",
+    "Vores sikkerhedskopier opbevarer dem, som de opbevarer alt andet (rækken om sikkerhedskopier nedenfor)"
+   ],
+   [
+    " | Kontoens levetid plus 6 år — den længste forældelsesfrist, der gælder for os | Slettes",
+    ", undtagen samtykket til følsomme data: hvilke Vilkår du accepterede, hvilken politik du fik vist, og hvad du ellers gav samtykke til ved tilmelding og ved betalingen | Kontoens levetid plus 6 år — den længste forældelsesfrist, der gælder for os | Slettes |\n| Registreringen af dit samtykke til følsomme data (afsnit 3): den version af ordlyden, som du accepterede, dit sprog og tidspunktet | Mens kontoen findes | Slettes med kontoen"
+   ],
+   [
+    "Op til 8 uger efter at den aktive kopi er slettet | Overskrives",
+    "På vores server: op til 8 uger efter at den aktive kopi er slettet. På vores separate lager til sikkerhedskopier: ingen tidsgrænse, fordi de krypterede kopier dér ikke slettes automatisk | På vores server overskrives de. Tabellens øvrige rækker beskriver vores server. Kopierne på det separate lager til sikkerhedskopier indeholder databasen sammen med nøglerne til din konto og dine debatter (men ikke nøglerne til de spørgsmål, du endnu ikke har startet), så indtil vi fjerner dem, kan en slettet debat eller en lukket konto stadig gendannes fra dem"
+   ],
+   [
+    ", hvorefter de krypterede registreringer ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentlig debat destrueres ikke ved sletning: debatten forbliver offentlig (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Tre forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning",
+    " på vores server, hvorefter de krypterede registreringer dér ikke kan læses af os eller andre, og vi sletter din kontoregistrering. Nøglen til en offentlig kopi af en offentlig debat destrueres ikke ved sletning: debatten forbliver offentlig (afsnit 6). Vi beskriver dette som sletning, fordi det er virkningen på vores server, og vi har en dokumenteret vurdering, der underbygger det; spørg os, hvis du vil vide mere. Fire forhold bør fremhæves: Sikkerhedsrevisionssporet kan kun tilføjes til og slettes ikke, men indeholder ingen læsbare identifikatorer for dig; et mindre antal ældre debatter er fra før vores nuværende krypteringsordning, og hvis det gælder din konto, fortæller vi dig, hvad en lukning medfører for dem; kopier af data, der allerede er sendt til en AI-udbyder, er underlagt den pågældende udbyders opbevaringsvilkår i Registret, ikke vores sletning; og vores sikkerhedskopier indeholder nøglerne sammen med registreringerne, så det, en sikkerhedskopi indeholder, kan gendannes, indtil den pågældende kopi fjernes, og kopierne på vores separate lager til sikkerhedskopier slettes ikke automatisk (rækken om sikkerhedskopier ovenfor)"
+   ]
+  ]
+ },
+ "de": {
+  "sha256": "67f9faeda33d49bc68cb4d481ec9b6d3ef3e560a9687855b2a3723868721dcee",
+  "swaps": [
+   [
+    "G · v3.14 · GÜLTI",
+    "G · v3.15 · GÜLTI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "vernichtet",
+    "auf unserem Server vernichtet, die verschlüsselten Kopien in unserem separaten Sicherungsspeicher werden jedoch nicht automatisch gelöscht (Abschnitt 7)"
+   ],
+   [
+    "",
+    ". Der Nachweis der Einwilligung zu sensiblen Daten (Abschnitt 3) enthält nur die Fassung des Wortlauts, der Sie zugestimmt haben, Ihre Sprache und den Zeitpunkt und wird mit Ihrem Konto gelöscht"
+   ],
+   [
+    "",
+    " und löschen diesen Nachweis mit Ihrem Konto"
+   ],
+   [
+    " abgewickelt, sobald kostenpflichtige Tarife starten",
+    ", betrieben von NETOPIA Financial Services S.A. in Rumänien, abgewickelt, sobald kostenpflichtige Tarife starten. Sie geben Ihre Kartendaten auf seiner Seite ein, nicht auf unserer, und er speichert Ihre Karte, damit er sie bei jeder Verlängerung belasten kann. Mit jeder Zahlung übermitteln wir ihm Ihren Namen, Ihre E-Mail-Adresse und Ihre Telefonnummer, Ihre Rechnungsadresse (Straße, Ort, Region, Postleitzahl und Land), eine Kundenkennung, die für alle Ihre Zahlungen gleich bleibt, unsere Referenz für die Bestellung, den Betrag und die Währung sowie eine kurze Beschreibung der Zahlung, etwa den Namen Ihres Tarifs; wenn er Ihre gespeicherte Karte bei einer Verlängerung belastet, übermitteln wir außerdem die IP-Adresse, von der aus Sie zuletzt selbst bezahlt haben. NETOPIA verlangt diese Angaben bei jeder Kartenzahlung"
+   ],
+   [
+    "",
+    "\n| Ein Konto, dessen Registrierung nicht abgeschlossen wurde: die E-Mail-Adresse nicht bestätigt oder der zweite Anmeldeschritt (ein Passkey oder eine Authenticator-App) nicht eingerichtet | 24 Stunden nach Beginn der Registrierung | Gelöscht, mit allem, was zu dem Konto gehört; seine E-Mail-Adresse und sein Pseudonym können wieder verwendet werden. Die Nachweise über Annahme und Einwilligung und das Sicherheitsprotokoll behalten ihre Einträge, wie in ihren Zeilen angegeben |"
+   ],
+   [
+    "unlesbar werden",
+    "auf unserem Server unlesbar werden; unsere Sicherungen bewahren Kopien länger auf (die Zeile zu den Sicherungen weiter unten)"
+   ],
+   [
+    "Backups bewahren sie bis zu 8 Wochen auf, wie alles andere auch",
+    "Unsere Sicherungen bewahren sie so auf wie alles andere (die Zeile zu den Sicherungen weiter unten)"
+   ],
+   [
+    " | Lebensdauer des Kontos zuzüglich 6 Jahren – die längste für uns geltende Verjährungsfrist | G",
+    ", ausgenommen die Einwilligung zu sensiblen Daten: welche Nutzungsbedingungen Sie angenommen haben, welche Datenschutzerklärung Ihnen angezeigt wurde und wozu Sie bei der Registrierung und beim Bezahlen sonst noch zugestimmt haben | Lebensdauer des Kontos zuzüglich 6 Jahren – die längste für uns geltende Verjährungsfrist | Gelöscht |\n| Der Nachweis Ihrer Einwilligung zu sensiblen Daten (Abschnitt 3): die Fassung des Wortlauts, der Sie zugestimmt haben, Ihre Sprache und der Zeitpunkt | Solange das Konto besteht | Mit dem Konto g"
+   ],
+   [
+    "Bis zu 8 Wochen nach Löschung der aktiven Kopie | Überschrieb",
+    "Auf unserem Server: bis zu 8 Wochen nach Löschung der aktiven Kopie. In unserem separaten Sicherungsspeicher: ohne zeitliche Begrenzung, weil die verschlüsselten Kopien dort nicht automatisch gelöscht werden | Auf unserem Server überschrieben. Die übrigen Zeilen dieser Tabelle beschreiben unseren Server. Die Kopien im separaten Sicherungsspeicher enthalten die Datenbank zusammen mit den Schlüsseln zu Ihrem Konto und Ihren Debatten (nicht aber den Schlüsseln zu den Fragen, die Sie noch nicht gestartet haben); bis wir sie entfernen, lässt sich eine gelöschte Debatte oder ein geschlossenes Konto daher noch aus ihnen wiederherstell"
+   ],
+   [
+    "vernichtet; anschließend können die verschlüsselten Datensätze weder von uns noch von anderen gelesen werden, und wir löschen Ihren Kontodatensatz. Der Schlüssel zur öffentlichen Kopie einer öffentlichen Debatte wird bei der Löschung nicht vernichtet: Die Debatte bleibt öffentlich (Abschnitt 6). Wir bezeichnen dies als Löschung, weil es diese Wirkung hat, und verfügen hierzu über eine dokumentierte Bewertung; wenn Sie mehr erfahren möchten, fragen Sie uns. Drei Punkte sind zu beachten: Das Sicherheitsprotokoll ist nur ergänzbar und wird nicht gelöscht, enthält jedoch keine lesbaren Kennungen Ihrer Person; eine geringe Anzahl älterer Debatten entstand vor unserem aktuellen Verschlüsselungsverfahren, und sollte dies Ihr Konto betreffen, erläutern wir Ihnen, was die Schließung für diese Daten bewirkt; Kopien von Daten, die bereits an einen KI-Anbieter übermittelt wurden, unterliegen den Aufbewahrungsbedingungen dieses Anbieters im Verzeichnis und nicht unserer Löschung",
+    "auf unserem Server vernichtet; anschließend können die verschlüsselten Datensätze dort weder von uns noch von anderen gelesen werden, und wir löschen Ihren Kontodatensatz. Der Schlüssel zur öffentlichen Kopie einer öffentlichen Debatte wird bei der Löschung nicht vernichtet: Die Debatte bleibt öffentlich (Abschnitt 6). Wir bezeichnen dies als Löschung, weil es auf unserem Server diese Wirkung hat, und verfügen hierzu über eine dokumentierte Bewertung; wenn Sie mehr erfahren möchten, fragen Sie uns. Vier Punkte sind zu beachten: Das Sicherheitsprotokoll ist nur ergänzbar und wird nicht gelöscht, enthält jedoch keine lesbaren Kennungen Ihrer Person; eine geringe Anzahl älterer Debatten entstand vor unserem aktuellen Verschlüsselungsverfahren, und sollte dies Ihr Konto betreffen, erläutern wir Ihnen, was die Schließung für diese Daten bewirkt; Kopien von Daten, die bereits an einen KI-Anbieter übermittelt wurden, unterliegen den Aufbewahrungsbedingungen dieses Anbieters im Verzeichnis und nicht unserer Löschung; und unsere Sicherungen enthalten die Schlüssel zusammen mit den Datensätzen, sodass sich der Inhalt einer Sicherungskopie wiederherstellen lässt, bis diese Kopie entfernt wird, und die Kopien in unserem separaten Sicherungsspeicher werden nicht automatisch gelöscht (die Zeile zu den Sicherungen weiter oben)"
+   ]
+  ]
+ },
+ "el": {
+  "sha256": "41f4dac2bda0b8dfa203132267ebba8473238ac89293a7c3adc6dcf2aaf73753",
+  "swaps": [
+   [
+    "Υ · v3.14 · ΙΣΧΥΕ",
+    "Υ · v3.15 · ΙΣΧΥΕ"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " στον διακομιστή μας, αλλά τα κρυπτογραφημένα αντίγραφα στον ξεχωριστό χώρο αποθήκευσης αντιγράφων ασφαλείας μας δεν διαγράφονται αυτόματα (ενότητα 7)"
+   ],
+   [
+    "",
+    ". Η εγγραφή της συγκατάθεσης για ευαίσθητα δεδομένα (ενότητα 3) περιέχει μόνο την έκδοση της διατύπωσης με την οποία συμφωνήσατε, τη γλώσσα σας και τον χρόνο, και διαγράφεται μαζί με τον λογαριασμό σας"
+   ],
+   [
+    "",
+    ", και διαγράφουμε αυτή την εγγραφή μαζί με τον λογαριασμό σας"
+   ],
+   [
+    "όταν ξεκινήσουν τα επί πληρωμή προγράμμα",
+    "τον οποίο λειτουργεί η NETOPIA Financial Services S.A. στη Ρουμανία, όταν ξεκινήσουν τα επί πληρωμή προγράμματα. Τα στοιχεία της κάρτας σας τα πληκτρολογείτε στη δική του σελίδα, όχι στη δική μας, και αυτός τηρεί την κάρτα σας ώστε να μπορεί να τη χρεώνει σε κάθε ανανέωση. Με κάθε πληρωμή του στέλνουμε το όνομά σας, τη διεύθυνση email και τον αριθμό τηλεφώνου σας, τη διεύθυνση χρέωσής σας (οδό, πόλη, περιφέρεια, ταχυδρομικό κώδικα και χώρα), έναν κωδικό πελάτη που παραμένει ίδιος για όλες τις πληρωμές σας, τον δικό μας κωδικό αναφοράς της παραγγελίας, το ποσό και το νόμισμα, καθώς και μια σύντομη περιγραφή της πληρωμής, όπως το όνομα του προγράμματός σας· όταν χρεώνει την αποθηκευμένη κάρτα σας σε μια ανανέωση, του στέλνουμε επίσης τη διεύθυνση IP από την οποία πληρώσατε την τελευταία φορά εσείς οι ίδιοι. Η NETOPIA ζητά αυτά τα στοιχεία σε κάθε πληρωμή με κάρ"
+   ],
+   [
+    "",
+    "\n| Λογαριασμός του οποίου η εγγραφή δεν ολοκληρώθηκε: η διεύθυνση email δεν επαληθεύτηκε ή δεν ρυθμίστηκε το δεύτερο βήμα σύνδεσης (κλειδί πρόσβασης ή εφαρμογή ελέγχου ταυτότητας) | 24 ώρες από την έναρξη της εγγραφής | Διαγράφεται μαζί με ό,τι ανήκει στον λογαριασμό· η διεύθυνση email και το ψευδώνυμό του μπορούν να χρησιμοποιηθούν ξανά. Τα αρχεία αποδοχής και το αρχείο ελέγχου ασφαλείας διατηρούν τις καταχωρίσεις τους, όπως αναφέρουν οι αντίστοιχες γραμμές τους |"
+   ],
+   [
+    "",
+    "στον διακομιστή μας· τα αντίγραφα ασφαλείας μας διατηρούν αντίγραφα για περισσότερο χρόνο (η γραμμή για τα αντίγραφα ασφαλείας παρακάτω) "
+   ],
+   [
+    "τα διατηρούν έως 8 εβδομάδες, όπως και τα υπόλοιπα",
+    "μας τα διατηρούν όπως διατηρούν και όλα τα υπόλοιπα (η γραμμή για τα αντίγραφα ασφαλείας παρακάτω)"
+   ],
+   [
+    " | Διάρκεια ζωής του λογαριασμού συν 6 έτη — η μεγαλύτερη προθεσμία παραγραφής που εφαρμόζεται σε εμάς | Διαγράφονται",
+    ", εκτός από τη συγκατάθεση για ευαίσθητα δεδομένα: ποιους Όρους αποδεχθήκατε, ποια πολιτική σας παρουσιάστηκε και σε τι άλλο συμφωνήσατε κατά την εγγραφή και κατά την ολοκλήρωση της πληρωμής | Διάρκεια ζωής του λογαριασμού συν 6 έτη — η μεγαλύτερη προθεσμία παραγραφής που εφαρμόζεται σε εμάς | Διαγράφονται |\n| Η εγγραφή της συγκατάθεσής σας για ευαίσθητα δεδομένα (ενότητα 3): η έκδοση της διατύπωσης με την οποία συμφωνήσατε, η γλώσσα σας και ο χρόνος | Όσο υπάρχει ο λογαριασμός | Διαγράφεται μαζί με τον λογαριασμό"
+   ],
+   [
+    "Έως 8 εβδομάδες μετά τη διαγραφή του ενεργού αντιγράφου | Αντικαθίστανται",
+    "Στον διακομιστή μας: έως 8 εβδομάδες μετά τη διαγραφή του ενεργού αντιγράφου. Στον ξεχωριστό χώρο αποθήκευσης αντιγράφων ασφαλείας μας: χωρίς χρονικό όριο, επειδή τα κρυπτογραφημένα αντίγραφα εκεί δεν διαγράφονται αυτόματα | Στον διακομιστή μας, αντικαθίστανται. Οι υπόλοιπες γραμμές αυτού του πίνακα περιγράφουν τον διακομιστή μας. Τα αντίγραφα στον ξεχωριστό χώρο αποθήκευσης αντιγράφων ασφαλείας περιέχουν τη βάση δεδομένων μαζί με τα κλειδιά του λογαριασμού σας και των αντιπαραθέσεών σας (όχι όμως τα κλειδιά των ερωτήσεων που δεν έχετε ξεκινήσει ακόμη), οπότε, μέχρι να τα αφαιρέσουμε, μια διαγραμμένη αντιπαράθεση ή ένας κλειστός λογαριασμός μπορεί ακόμη να αποκατασταθεί από αυτά"
+   ],
+   [
+    ", κατόπιν της οποίας οι κρυπτογραφημένες εγγραφές δεν μπορούν να αναγνωστούν από εμάς ή από οποιονδήποτε άλλον, και διαγράφουμε την εγγραφή του λογαριασμού σας. Το κλειδί του δημόσιου αντιγράφου μιας δημόσιας αντιπαράθεσης δεν καταστρέφεται κατά τη διαγραφή: η αντιπαράθεση παραμένει δημόσια (ενότητα 6). Το περιγράφουμε ως διαγραφή επειδή αυτό είναι το αποτέλεσμά της και διαθέτουμε τεκμηριωμένη αξιολόγηση που το υποστηρίζει· εάν θέλετε να μάθετε περισσότερα, ρωτήστε μας. Τρία σημεία που πρέπει να γνωρίζετε: το αρχείο ελέγχου ασφαλείας δέχεται μόνο προσθήκη εγγραφών και δεν διαγράφεται, αλλά δεν περιέχει αναγνώσιμα αναγνωριστικά σας· ένας μικρός αριθμός παλαιότερων αντιπαραθέσεων προηγείται του τρέχοντος συστήματος κρυπτογράφησής μας και, εάν αυτό ισχύει για τον λογαριασμό σας, σας εξηγούμε τι επιτυγχάνει το κλείσιμο ως προς αυτές· αντίγραφα δεδομένων που έχουν ήδη αποσταλεί σε πάροχο ΤΝ διέπονται από τους όρους διατήρησης του συγκεκριμένου παρόχου στο Μητρώο και όχι από τη δική μας διαγραφή",
+    " στον διακομιστή μας, κατόπιν της οποίας οι κρυπτογραφημένες εγγραφές εκεί δεν μπορούν να αναγνωστούν από εμάς ή από οποιονδήποτε άλλον, και διαγράφουμε την εγγραφή του λογαριασμού σας. Το κλειδί του δημόσιου αντιγράφου μιας δημόσιας αντιπαράθεσης δεν καταστρέφεται κατά τη διαγραφή: η αντιπαράθεση παραμένει δημόσια (ενότητα 6). Το περιγράφουμε ως διαγραφή επειδή αυτό είναι το αποτέλεσμά της στον διακομιστή μας και διαθέτουμε τεκμηριωμένη αξιολόγηση που το υποστηρίζει· εάν θέλετε να μάθετε περισσότερα, ρωτήστε μας. Τέσσερα σημεία που πρέπει να γνωρίζετε: το αρχείο ελέγχου ασφαλείας δέχεται μόνο προσθήκη εγγραφών και δεν διαγράφεται, αλλά δεν περιέχει αναγνώσιμα αναγνωριστικά σας· ένας μικρός αριθμός παλαιότερων αντιπαραθέσεων προηγείται του τρέχοντος συστήματος κρυπτογράφησής μας και, εάν αυτό ισχύει για τον λογαριασμό σας, σας εξηγούμε τι επιτυγχάνει το κλείσιμο ως προς αυτές· αντίγραφα δεδομένων που έχουν ήδη αποσταλεί σε πάροχο ΤΝ διέπονται από τους όρους διατήρησης του συγκεκριμένου παρόχου στο Μητρώο και όχι από τη δική μας διαγραφή· και τα αντίγραφα ασφαλείας μας περιέχουν τα κλειδιά μαζί με τις εγγραφές, οπότε ό,τι περιέχει ένα αντίγραφο ασφαλείας μπορεί να αποκατασταθεί έως ότου αφαιρεθεί το αντίγραφο αυτό, και τα αντίγραφα στον ξεχωριστό χώρο αποθήκευσης αντιγράφων ασφαλείας μας δεν διαγράφονται αυτόματα (η γραμμή για τα αντίγραφα ασφαλείας παραπάνω)"
+   ]
+  ]
+ },
+ "en": {
+  "sha256": "fff5c25ac8689c4ce5e0cb6b58314b9223d8e8a9e421ec9bb17a98d26137e329",
+  "swaps": [
+   [
+    "Y · v3.14 · EFFEC",
+    "Y · v3.15 · EFFEC"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " on our server, but the encrypted copies on our separate backup storage are not deleted automatically (section 7)"
+   ],
+   [
+    "",
+    ". The record of the sensitive-data consent (section 3) holds only the version of the wording you agreed to, your language and the time, and it is deleted with your account"
+   ],
+   [
+    "",
+    ", and we delete this record with your account"
+   ],
+   [
+    "once paid plans star",
+    "run by NETOPIA Financial Services S.A. in Romania, once paid plans start. You type your card details on its page, not ours, and it keeps your card so that it can charge it at each renewal. With each payment we send it your name, email address and phone number, your billing address (street, city, region, postcode and country), a customer code that stays the same for all your payments, our reference for the order, the amount and the currency, and a short description of the payment, such as the name of your plan; when it charges your saved card at a renewal, we also send the IP address you last paid from yourself. NETOPIA asks for these details with every card paymen"
+   ],
+   [
+    "",
+    "\n| An account whose sign-up was not finished: the email address not verified, or the second sign-in step (a passkey or an authenticator app) not set up | 24 hours after the sign-up began | Deleted, with everything that belongs to the account; its email address and pseudonym can be used again. The acceptance records and the security audit trail keep their entries, as their rows say |"
+   ],
+   [
+    "",
+    "on our server; our backups keep copies longer (the row on backups below) "
+   ],
+   [
+    "Backups keep them for up to 8 weeks, as for everything else",
+    "Our backups keep them as they keep everything else (the row on backups below)"
+   ],
+   [
+    " | Life of the account plus 6 years — the longest limitation period that applies to us | Deleted",
+    ", except the sensitive-data consent: which Terms you accepted, which policy you were shown and what else you agreed to at sign-up and at checkout | Life of the account plus 6 years — the longest limitation period that applies to us | Deleted |\n| The record of your sensitive-data consent (section 3): the version of the wording you agreed to, your language and the time | While the account exists | Deleted with the account"
+   ],
+   [
+    "Up to 8 weeks after the live copy is deleted | Overwritten",
+    "On our server: up to 8 weeks after the live copy is deleted. On our separate backup storage: no time limit, because the encrypted copies there are not deleted automatically | On our server, overwritten. The other rows of this table describe our server. The copies on the separate backup storage hold the database together with the keys to your account and your debates (but not the keys to the questions you have not started yet), so until we remove them, a deleted debate or a closed account can still be restored from them"
+   ],
+   [
+    ", after which the encrypted records cannot be read by us or anyone else, and we delete your account record. The key to a public debate's public copy is not destroyed at deletion: the debate stays public (section 6). We describe this as deletion because that is its effect, and we hold a documented assessment behind it; if you want to know more, ask. Three things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion",
+    " on our server, after which the encrypted records there cannot be read by us or anyone else, and we delete your account record. The key to a public debate's public copy is not destroyed at deletion: the debate stays public (section 6). We describe this as deletion because that is its effect on our server, and we hold a documented assessment behind it; if you want to know more, ask. Four things to know: the security audit trail is append-only and is not deleted, but contains no readable identifiers of you; a small number of older debates predate our current encryption scheme, and if that applies to your account we tell you what closure achieves for them; copies of data already sent to an AI provider are governed by that provider's retention terms in the Register, not by our deletion; and our backups hold the keys together with the records, so what a backup copy holds can be restored until that copy is removed, and the copies on our separate backup storage are not deleted automatically (the row on backups above)"
+   ],
+   [
+    "",
+    "5 replaced version 3.14: it says which company runs our payment provider, NETOPIA Payments, and what we send it with each payment (section 5); that the record of your sensitive-data consent is deleted with your account, while the other acceptance and consent records are kept for 6 years after the account ends (sections 2, 3 and 7); that the encrypted copies on our separate backup storage are not deleted automatically, so a deleted debate or a closed account can be restored from them until they are removed, where it said that backups are kept for up to 8 weeks (section 7); and that an account whose sign-up is not finished within 24 hours is deleted (section 7). Version 3.1"
+   ]
+  ]
+ },
+ "es": {
+  "sha256": "a89ea287bd80116dd75575c1d2b51eef97614cd1c29220b60c5337cfa4a8483a",
+  "swaps": [
+   [
+    "D · v3.14 · EN VI",
+    "D · v3.15 · EN VI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " en nuestro servidor, pero las copias cifradas de nuestro almacenamiento independiente de copias de seguridad no se eliminan automáticamente (sección 7)"
+   ],
+   [
+    "",
+    ". El registro del consentimiento relativo a datos sensibles (sección 3) contiene solo la versión del texto que aceptó, su idioma y el momento, y se elimina con su cuenta"
+   ],
+   [
+    "",
+    ", y eliminamos este registro con su cuenta"
+   ],
+   [
+    "cuando comiencen los planes de pago",
+    "gestionado por NETOPIA Financial Services S.A. en Rumanía, cuando comiencen los planes de pago. Usted introduce los datos de su tarjeta en la página del proveedor, no en la nuestra, y este conserva su tarjeta para poder efectuar el cargo en ella en cada renovación. Con cada pago le enviamos su nombre, su dirección de correo electrónico y su número de teléfono, su dirección de facturación (calle, ciudad, región, código postal y país), un código de cliente que es el mismo para todos sus pagos, nuestra referencia del pedido, el importe y la moneda, y una breve descripción del pago, como el nombre de su plan; cuando efectúa el cargo en su tarjeta guardada en una renovación, le enviamos también la dirección IP desde la que usted mismo pagó por última vez. NETOPIA solicita estos datos en cada pago con tarjeta"
+   ],
+   [
+    "",
+    "\n| Una cuenta cuyo registro no se completó: la dirección de correo electrónico no se verificó, o no se configuró el segundo paso de inicio de sesión (una llave de acceso o una aplicación de autenticación) | 24 horas después de iniciarse el registro | Se elimina, con todo lo que pertenece a la cuenta; su dirección de correo electrónico y su seudónimo pueden volver a utilizarse. Los registros de aceptación y el registro de auditoría de seguridad conservan sus entradas, como indican sus filas |"
+   ],
+   [
+    "",
+    "en nuestro servidor; nuestras copias de seguridad conservan copias durante más tiempo (la fila sobre copias de seguridad, más abajo) "
+   ],
+   [
+    "Las copias de seguridad los conservan hasta 8 semanas, como todo lo demás",
+    "Nuestras copias de seguridad los conservan como conservan todo lo demás (la fila sobre copias de seguridad, más abajo)"
+   ],
+   [
+    " | Vida de la cuenta más 6 años: el plazo de prescripción más largo que nos resulta aplicable | Se eliminan",
+    ", salvo el consentimiento relativo a datos sensibles: qué Términos aceptó, qué política se le mostró y qué más aceptó al registrarse y al pagar | Vida de la cuenta más 6 años: el plazo de prescripción más largo que nos resulta aplicable | Se eliminan |\n| El registro de su consentimiento relativo a datos sensibles (sección 3): la versión del texto que aceptó, su idioma y el momento | Mientras exista la cuenta | Se elimina con la cuenta"
+   ],
+   [
+    "Hasta 8 semanas después de eliminarse la copia activa | Se sobrescriben",
+    "En nuestro servidor: hasta 8 semanas después de eliminarse la copia activa. En nuestro almacenamiento independiente de copias de seguridad: sin límite de tiempo, porque las copias cifradas que allí se guardan no se eliminan automáticamente | En nuestro servidor, se sobrescriben. Las demás filas de esta tabla describen nuestro servidor. Las copias del almacenamiento independiente de copias de seguridad contienen la base de datos junto con las claves de su cuenta y de sus debates (pero no las claves de las preguntas que aún no ha iniciado), de modo que, hasta que las eliminemos, un debate eliminado o una cuenta cerrada todavía pueden restaurarse a partir de ellas"
+   ],
+   [
+    ", tras lo cual ni nosotros ni ninguna otra persona podemos leer los registros cifrados, y eliminamos el registro de su cuenta. La clave de la copia pública de un debate público no se destruye al eliminar la cuenta: el debate sigue siendo público (apartado 6). Lo describimos como eliminación porque ese es su efecto y disponemos de una evaluación documentada que lo respalda; si desea saber más, pregúntenos. Debe saber tres cosas: el registro de auditoría de seguridad solo permite adiciones y no se elimina, pero no contiene identificadores suyos legibles; un reducido número de debates antiguos es anterior a nuestro sistema de cifrado actual y, si esto afecta a su cuenta, le explicaremos qué efecto tiene el cierre sobre ellos; las copias de datos que ya se hayan enviado a un proveedor de IA se rigen por las condiciones de conservación de dicho proveedor que figuran en el Registro, no por nuestra eliminación",
+    " en nuestro servidor, tras lo cual ni nosotros ni ninguna otra persona podemos leer los registros cifrados que allí se encuentran, y eliminamos el registro de su cuenta. La clave de la copia pública de un debate público no se destruye al eliminar la cuenta: el debate sigue siendo público (apartado 6). Lo describimos como eliminación porque ese es su efecto en nuestro servidor y disponemos de una evaluación documentada que lo respalda; si desea saber más, pregúntenos. Debe saber cuatro cosas: el registro de auditoría de seguridad solo permite adiciones y no se elimina, pero no contiene identificadores suyos legibles; un reducido número de debates antiguos es anterior a nuestro sistema de cifrado actual y, si esto afecta a su cuenta, le explicaremos qué efecto tiene el cierre sobre ellos; las copias de datos que ya se hayan enviado a un proveedor de IA se rigen por las condiciones de conservación de dicho proveedor que figuran en el Registro, no por nuestra eliminación; y nuestras copias de seguridad contienen las claves junto con los registros, de modo que lo que contiene una copia de seguridad puede restaurarse hasta que se elimine esa copia, y las copias de nuestro almacenamiento independiente de copias de seguridad no se eliminan automáticamente (la fila sobre copias de seguridad, más arriba)"
+   ]
+  ]
+ },
+ "et": {
+  "sha256": "013a51d37b62bd9e508c29246c3a495e60753cc4d9e3f4b878cccab058f63c6f",
+  "swaps": [
+   [
+    "A · v3.14 · KEHTI",
+    "A · v3.15 · KEHTI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " meie serveris, kuid meie eraldi varukoopiate hoidlas olevaid krüpteeritud koopiaid automaatselt ei kustutata (jaotis 7)"
+   ],
+   [
+    "",
+    ". Tundlike andmete nõusoleku kirje (jaotis 3) sisaldab ainult selle sõnastuse versiooni, millega nõustusite, teie keelt ja ajahetke ning see kustutatakse koos teie kontoga"
+   ],
+   [
+    "",
+    " ning kustutame selle kirje koos teie kontoga"
+   ],
+   [
+    "kui tasulised paketid algavad",
+    "mida haldab NETOPIA Financial Services S.A. Rumeenias, kui tasulised paketid algavad. Kaardiandmed sisestate pakkuja lehel, mitte meie omal, ja pakkuja säilitab teie kaardi, et sellelt igal uuendamisel tasu võtta. Iga maksega saadame pakkujale teie nime, e-posti aadressi ja telefoninumbri, teie arveldusaadressi (tänav, linn, piirkond, postiindeks ja riik), kliendikoodi, mis jääb kõigi teie maksete puhul samaks, meie viite tellimusele, summa ja valuuta ning makse lühikirjelduse, näiteks teie paketi nime; kui pakkuja võtab uuendamisel tasu teie salvestatud kaardilt, saadame ka IP-aadressi, millelt te viimati ise maksite. NETOPIA nõuab neid andmeid iga kaardimakse puhul"
+   ],
+   [
+    "",
+    "\n| Konto, mille registreerumine jäi lõpetamata: e-posti aadress on kinnitamata või sisselogimise teine samm (pääsuvõti või autentimisrakendus) on seadistamata | 24 tundi pärast registreerumise algust | Kustutatakse koos kõigega, mis kontole kuulub; selle e-posti aadressi ja pseudonüümi saab uuesti kasutada. Nõustumise ja nõusoleku kirjed ning turbeauditilogi säilitavad oma kanded, nagu nende ridades on öeldud |"
+   ],
+   [
+    "loetamatuks",
+    "meie serveris loetamatuks; meie varukoopiad säilitavad koopiaid kauem (vt allpool varukoopiate rida)"
+   ],
+   [
+    "Varundused säilitavad neid kuni 8 nädalat nagu kõike muudki",
+    "Meie varukoopiad säilitavad neid samamoodi nagu kõike muudki (vt allpool varukoopiate rida)"
+   ],
+   [
+    " | Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg | Kustutatakse",
+    ", välja arvatud tundlike andmete nõusolek: milliste Tingimustega nõustusite, millist poliitikat teile näidati ja millega veel nõustusite registreerumisel ja maksmisel | Konto kasutusaeg ja 6 aastat — pikim meile kohalduv aegumistähtaeg | Kustutatakse |\n| Teie tundlike andmete nõusoleku kirje (jaotis 3): selle sõnastuse versioon, millega nõustusite, teie keel ja ajahetk | Konto olemasolu ajal | Kustutatakse koos kontoga"
+   ],
+   [
+    "Kuni 8 nädalat pärast aktiivse koopia kustutamist | Kirjutatakse üle",
+    "Meie serveris: kuni 8 nädalat pärast aktiivse koopia kustutamist. Meie eraldi varukoopiate hoidlas: ajalist piirangut ei ole, sest sealseid krüpteeritud koopiaid automaatselt ei kustutata | Meie serveris kirjutatakse üle. Selle tabeli ülejäänud read kirjeldavad meie serverit. Eraldi varukoopiate hoidlas olevad koopiad sisaldavad andmebaasi koos teie konto ja väitluste võtmetega (kuid mitte veel alustamata küsimuste võtmeid), nii et kuni me need eemaldame, saab kustutatud väitluse või suletud konto neist ikka taastada"
+   ],
+   [
+    ", mille järel ei saa meie ega keegi teine krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaliku väitluse avaliku koopia võtit ei hävitata kustutamisel: väitlus jääb avalikuks (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab kolme asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnenud ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine",
+    " meie serveris, mille järel ei saa meie ega keegi teine sealseid krüpteeritud kirjeid lugeda, ning kustutame teie kontokirje. Avaliku väitluse avaliku koopia võtit ei hävitata kustutamisel: väitlus jääb avalikuks (jaotis 6). Nimetame seda kustutamiseks, sest selline on selle toime meie serveris, ja meil on selle kohta dokumenteeritud hinnang; kui soovite rohkem teada, küsige. Teadma peab nelja asja: turbeauditilogi on ainult lisatav ja seda ei kustutata, kuid see ei sisalda loetaval kujul tunnuseid, mis teid tuvastaksid; väike arv vanemaid väitlusi pärineb meie praegusele krüpteerimisskeemile eelnenud ajast ning kui see puudutab teie kontot, selgitame, mida sulgemine nende suhtes teeb; juba tehisintellekti pakkujale saadetud andmekoopiatele kehtivad registris esitatud pakkuja säilitamistingimused, mitte meiepoolne kustutamine; ning meie varukoopiad sisaldavad võtmeid koos kirjetega, nii et varukoopias olevat saab taastada seni, kuni see koopia eemaldatakse, ja meie eraldi varukoopiate hoidlas olevaid koopiaid automaatselt ei kustutata (vt eespool varukoopiate rida)"
+   ]
+  ]
+ },
+ "fi": {
+  "sha256": "337b6123fc2e71192ebbd8eaf526ec1bb2c2d664a3bde2103c3010d695fb6cb3",
+  "swaps": [
+   [
+    "Ö · v3.14 · VOIMA",
+    "Ö · v3.15 · VOIMA"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " palvelimellamme, mutta erillisessä varmuuskopiotallennustilassamme olevia salattuja kopioita ei poisteta automaattisesti (osio 7)"
+   ],
+   [
+    "",
+    ". Arkaluonteisia tietoja koskevan suostumuksen tietue (osio 3) sisältää vain hyväksymäsi sanamuodon version, kielesi ja ajankohdan, ja se poistetaan tilisi mukana"
+   ],
+   [
+    "",
+    ", ja poistamme tämän tietueen tilisi mukana"
+   ],
+   [
+    "kun maksulliset tilaukset alkavat",
+    "jota ylläpitää NETOPIA Financial Services S.A. Romaniassa, kun maksulliset tilaukset alkavat. Syötät korttitietosi sen sivulla, et meidän sivullamme, ja se säilyttää korttisi voidakseen veloittaa sitä jokaisen uusimisen yhteydessä. Jokaisen maksun yhteydessä lähetämme sille nimesi, sähköpostiosoitteesi ja puhelinnumerosi, laskutusosoitteesi (katuosoite, kaupunki, alue, postinumero ja maa), asiakaskoodin, joka pysyy samana kaikissa maksuissasi, oman viitteemme ostokselle, summan ja valuutan sekä lyhyen kuvauksen maksusta, kuten tilauksesi nimen; kun se veloittaa tallennettua korttiasi uusimisen yhteydessä, lähetämme lisäksi IP-osoitteen, josta viimeksi maksoit itse. NETOPIA pyytää näitä tietoja jokaisen korttimaksun yhteydessä"
+   ],
+   [
+    "",
+    "\n| Tili, jonka rekisteröityminen jäi kesken: sähköpostiosoitetta ei vahvistettu tai toista kirjautumisvaihetta (pääsyavainta tai todennussovellusta) ei otettu käyttöön | 24 tuntia rekisteröitymisen alkamisesta | Poistetaan kaikkine tiliin kuuluvine tietoineen; sen sähköpostiosoitetta ja nimimerkkiä voi käyttää uudelleen. Hyväksyntä- ja suostumustiedot sekä turvallisuuden kirjausketju säilyttävät merkintänsä niiden rivien mukaisesti |"
+   ],
+   [
+    "",
+    "palvelimellamme; varmuuskopiomme säilyttävät kopioita pidempään (alla oleva varmuuskopioita koskeva rivi) "
+   ],
+   [
+    "t säilyttävät niitä enintään 8 viikkoa kuten kaikkea muutakin",
+    "mme säilyttävät niitä samoin kuin kaikkea muutakin (alla oleva varmuuskopioita koskeva rivi)"
+   ],
+   [
+    " | Tilin elinkaari sekä 6 vuotta — pisin meihin sovellettava vanhentumisaika | Poistetaan",
+    ", lukuun ottamatta arkaluonteisia tietoja koskevaa suostumusta: mitkä Ehdot hyväksyit, mikä käytäntö sinulle näytettiin ja mihin muuhun suostuit rekisteröityessäsi ja kassalla | Tilin elinkaari sekä 6 vuotta — pisin meihin sovellettava vanhentumisaika | Poistetaan |\n| Arkaluonteisia tietoja koskevan suostumuksesi tietue (osio 3): hyväksymäsi sanamuodon versio, kielesi ja ajankohta | Niin kauan kuin tili on olemassa | Poistetaan tilin mukana"
+   ],
+   [
+    "Enintään 8 viikkoa aktiivisen kopion poistamisen jälkeen | Korvataan uusilla tiedoilla",
+    "Palvelimellamme: enintään 8 viikkoa aktiivisen kopion poistamisen jälkeen. Erillisessä varmuuskopiotallennustilassamme: ei aikarajaa, koska siellä olevia salattuja kopioita ei poisteta automaattisesti | Palvelimellamme korvataan uusilla tiedoilla. Taulukon muut rivit kuvaavat palvelintamme. Erillisessä varmuuskopiotallennustilassa olevat kopiot sisältävät tietokannan yhdessä tilisi ja väittelyjesi avainten kanssa (mutta eivät vielä aloittamattomien kysymystesi avaimia), joten poistettu väittely tai suljettu tili voidaan yhä palauttaa niistä, kunnes poistamme ne"
+   ],
+   [
+    ", minkä jälkeen me tai kukaan muukaan ei voi lukea salattuja tietueita, ja poistamme tilitietueesi. Julkisen väittelyn julkisen kopion avainta ei tuhoida poiston yhteydessä: väittely pysyy julkisena (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Kolme huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista",
+    " palvelimellamme, minkä jälkeen me tai kukaan muukaan ei voi lukea siellä olevia salattuja tietueita, ja poistamme tilitietueesi. Julkisen väittelyn julkisen kopion avainta ei tuhoida poiston yhteydessä: väittely pysyy julkisena (kohta 6). Kutsumme tätä poistamiseksi, koska sen vaikutus palvelimellamme on tämä, ja meillä on sen tueksi dokumentoitu arviointi; jos haluat lisätietoja, kysy meiltä. Neljä huomioitavaa asiaa: turvallisuuden kirjausketju on vain lisäyksiä salliva eikä sitä poisteta, mutta se ei sisällä luettavia tunnistetietojasi; pieni määrä vanhempia väittelyjä edeltää nykyistä salausjärjestelmäämme, ja jos tämä koskee tiliäsi, kerromme, mitä tilin sulkeminen niiden osalta saa aikaan; tekoälypalveluntarjoajalle jo lähetettyihin tietokopioihin sovelletaan kyseisen palveluntarjoajan Rekisterissä ilmoitettuja säilytysehtoja, ei meidän tekemäämme poistamista; ja varmuuskopiomme sisältävät avaimet yhdessä tietueiden kanssa, joten varmuuskopion sisältämät tiedot voidaan palauttaa, kunnes kyseinen kopio poistetaan, eikä erillisessä varmuuskopiotallennustilassamme olevia kopioita poisteta automaattisesti (yllä oleva varmuuskopioita koskeva rivi)"
+   ]
+  ]
+ },
+ "fr": {
+  "sha256": "b64adaa97d7d0fa855967e77251e0c1f8769ea92a70e4ef634c51cb61bb07379",
+  "swaps": [
+   [
+    "É · v3.14 · EN VI",
+    "É · v3.15 · EN VI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "les clés de vos données privées",
+    "sur notre serveur les clés de vos données privées, mais les copies chiffrées conservées sur notre stockage de sauvegarde distinct ne sont pas supprimées automatiquement (section 7)"
+   ],
+   [
+    "",
+    ". La preuve du consentement au traitement des données sensibles (section 3) ne contient que la version du texte que vous avez acceptée, votre langue et l'heure, et elle est supprimée avec votre compte"
+   ],
+   [
+    "",
+    ", et nous supprimons cet enregistrement avec votre compte"
+   ],
+   [
+    "dès le lancement des formules payantes",
+    "exploité par NETOPIA Financial Services S.A. en Roumanie, dès le lancement des formules payantes. Vous saisissez les données de votre carte sur sa page, et non sur la nôtre, et il conserve votre carte afin de pouvoir la débiter à chaque renouvellement. À chaque paiement, nous lui envoyons votre nom, votre adresse e-mail et votre numéro de téléphone, votre adresse de facturation (rue, ville, région, code postal et pays), un code client qui reste le même pour tous vos paiements, notre référence de la commande, le montant et la devise, ainsi qu'une courte description du paiement, par exemple le nom de votre formule ; lorsqu'il débite votre carte enregistrée lors d'un renouvellement, nous lui envoyons aussi l'adresse IP depuis laquelle vous avez payé vous-même la dernière fois. NETOPIA demande ces données pour chaque paiement par carte"
+   ],
+   [
+    "",
+    "\n| Un compte dont l'inscription n'a pas été menée à terme : l'adresse e-mail n'a pas été vérifiée, ou la deuxième étape de connexion (une clé d’accès ou une application d’authentification) n'a pas été configurée | 24 heures après le début de l'inscription | Supprimé, avec tout ce qui appartient au compte ; son adresse e-mail et son pseudonyme peuvent être réutilisés. Les preuves d'acceptation et le journal d'audit de sécurité conservent leurs entrées, comme l'indiquent leurs lignes |"
+   ],
+   [
+    "",
+    "sur notre serveur ; nos sauvegardes en conservent des copies plus longtemps (ligne « Sauvegardes » ci-dessous) "
+   ],
+   [
+    "Les sauvegardes les conservent jusqu’à 8 semaines, comme tout le reste",
+    "Nos sauvegardes les conservent comme tout le reste (ligne « Sauvegardes » ci-dessous)"
+   ],
+   [
+    " | Durée de vie du compte plus 6 ans — le délai de prescription le plus long qui nous est applicable | Supprimées",
+    ", sauf le consentement au traitement des données sensibles : les Conditions que vous avez acceptées, la politique qui vous a été présentée et ce que vous avez accepté d'autre lors de l'inscription et du paiement | Durée de vie du compte plus 6 ans — le délai de prescription le plus long qui nous est applicable | Supprimées |\n| Preuve de votre consentement au traitement des données sensibles (section 3) : la version du texte que vous avez acceptée, votre langue et l'heure | Tant que le compte existe | Supprimée avec le compte"
+   ],
+   [
+    "Jusqu'à 8 semaines après la suppression de la copie active | Écrasé",
+    "Sur notre serveur : jusqu'à 8 semaines après la suppression de la copie active. Sur notre stockage de sauvegarde distinct : sans limite de durée, car les copies chiffrées qui s'y trouvent ne sont pas supprimées automatiquement | Sur notre serveur, écrasées. Les autres lignes de ce tableau décrivent notre serveur. Les copies conservées sur le stockage de sauvegarde distinct contiennent la base de données ainsi que les clés de votre compte et de vos débats (mais pas les clés des questions que vous n’avez pas encore lancées) ; tant que nous ne les avons pas supprimées, un débat supprimé ou un compte clôturé peut donc encore être restauré à partir de ces copi"
+   ],
+   [
+    "; les enregistrements chiffrés ne peuvent alors plus être lus, ni par nous ni par quiconque, et nous supprimons l'enregistrement de votre compte. La clé de la copie publique d’un débat public n’est pas détruite lors de la suppression : le débat reste public (section 6). Nous qualifions cette opération de suppression parce que tel est son effet, et nous disposons d'une évaluation documentée à l'appui ; si vous souhaitez en savoir plus, demandez-nous. Trois choses sont à savoir : le journal d'audit de sécurité est inaltérable et n'est pas supprimé, mais il ne contient aucun identifiant lisible vous concernant ; un petit nombre de débats plus anciens sont antérieurs à notre système de chiffrement actuel et, si cela concerne votre compte, nous vous indiquons l'effet de sa clôture sur ces débats ; les copies des données déjà transmises à un fournisseur d'IA sont soumises aux conditions de conservation de ce fournisseur indiquées dans le Registre, et non à notre suppression",
+    "sur notre serveur ; les enregistrements chiffrés qui s'y trouvent ne peuvent alors plus être lus, ni par nous ni par quiconque, et nous supprimons l'enregistrement de votre compte. La clé de la copie publique d’un débat public n’est pas détruite lors de la suppression : le débat reste public (section 6). Nous qualifions cette opération de suppression parce que tel est son effet sur notre serveur, et nous disposons d'une évaluation documentée à l'appui ; si vous souhaitez en savoir plus, demandez-nous. Quatre choses sont à savoir : le journal d'audit de sécurité est inaltérable et n'est pas supprimé, mais il ne contient aucun identifiant lisible vous concernant ; un petit nombre de débats plus anciens sont antérieurs à notre système de chiffrement actuel et, si cela concerne votre compte, nous vous indiquons l'effet de sa clôture sur ces débats ; les copies des données déjà transmises à un fournisseur d'IA sont soumises aux conditions de conservation de ce fournisseur indiquées dans le Registre, et non à notre suppression ; enfin, nos sauvegardes contiennent les clés en même temps que les enregistrements, de sorte que ce que contient une copie de sauvegarde peut être restauré tant que cette copie n'a pas été supprimée, et les copies conservées sur notre stockage de sauvegarde distinct ne sont pas supprimées automatiquement (ligne « Sauvegardes » ci-dessus)"
+   ],
+   [
+    "",
+    "5 a remplacé la version 3.14 : elle indique quelle société exploite notre prestataire de paiement, NETOPIA Payments, et ce que nous lui envoyons à chaque paiement (section 5) ; que la preuve de votre consentement au traitement des données sensibles est supprimée avec votre compte, tandis que les autres preuves d'acceptation et de consentement sont conservées 6 ans après la fin du compte (sections 2, 3 et 7) ; que les copies chiffrées conservées sur notre stockage de sauvegarde distinct ne sont pas supprimées automatiquement, de sorte qu'un débat supprimé ou un compte clôturé peut en être restauré tant qu'elles n'ont pas été supprimées, alors qu'elle indiquait que les sauvegardes étaient conservées jusqu'à 8 semaines (section 7) ; et qu'un compte dont l'inscription n'est pas menée à terme dans les 24 heures est supprimé (section 7). La version 3.1"
+   ]
+  ]
+ },
+ "ga": {
+  "sha256": "98674c4686fd57dc3c8916143cdf4bb42541f6ef0cf38a5c64e1ee4d0014a5e9",
+  "swaps": [
+   [
+    "S · v3.14 · I bhF",
+    "S · v3.15 · I bhF"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " ar ár bhfreastalaí, ach ní scriostar go huathoibríoch na cóipeanna criptithe ar ár stóras cúltaca ar leith (rannán 7)"
+   ],
+   [
+    "",
+    ". Ní choinníonn taifead an toilithe le haghaidh sonraí íogaire (rannán 3) ach an leagan den fhoclaíocht lenar aontaigh tú, do theanga agus an t-am, agus scriostar é le do chuntas"
+   ],
+   [
+    "",
+    ", agus scriosaimid an taifead seo le do chuntas"
+   ],
+   [
+    "nuair a thosóidh pleananna íocth",
+    "arna reáchtáil ag NETOPIA Financial Services S.A. sa Rómáin, nuair a thosóidh pleananna íoctha. Cuireann tú sonraí do chárta isteach ar leathanach an tsoláthraí, ní ar ár leathanach féin, agus coinníonn sé do chárta ionas gur féidir leis muirear a ghearradh air ag gach athnuachan. Le gach íocaíocht seolaimid chuige d'ainm, do sheoladh ríomhphoist agus d'uimhir theileafóin, do sheoladh billeála (sráid, cathair, réigiún, cód poist agus tír), cód custaiméara a fhanann mar an gcéanna do d'íocaíochtaí go léir, ár dtagairt don ordú, an méid agus an t-airgeadra, agus cur síos gearr ar an íocaíocht, amhail ainm do phlean; nuair a ghearrann sé muirear ar do chárta sábháilte ag athnuachan, seolaimid chuige freisin an seoladh IP ónar íoc tú féin an uair dheireanach. Iarrann NETOPIA na sonraí seo le gach íocaíocht chárt"
+   ],
+   [
+    "",
+    "\n| Cuntas nár críochnaíodh a shíniú suas: níor fíoraíodh an seoladh ríomhphoist, nó níor socraíodh an dara céim sínithe isteach (eochair rochtana nó aip fíordheimhnithe) | 24 uair an chloig tar éis don síniú suas tosú | Scriostar é, mar aon le gach a mbaineann leis an gcuntas; is féidir a sheoladh ríomhphoist agus a ainm cleite a úsáid arís. Coinníonn na taifid ghlactha agus an rian iniúchóireachta slándála a n-iontrálacha, mar a deir a sraitheanna |"
+   ],
+   [
+    "",
+    "ar ár bhfreastalaí; coinníonn ár gcúltacaí cóipeanna níos faide (an tsraith faoi chúltacaí thíos) "
+   ],
+   [
+    "cúltacaí iad suas le 8 seachtaine, mar a dhéantar le gach ní eile",
+    "ár gcúltacaí iad mar a choinníonn siad gach ní eile (an tsraith faoi chúltacaí thíos)"
+   ],
+   [
+    " | Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn | Scriostar iad",
+    ", seachas an toiliú le haghaidh sonraí íogaire: cad iad na Téarmaí ar ghlac tú leo, cén beartas a taispeánadh duit agus cad eile ar aontaigh tú leis tráth sínithe suas agus nuair a d'íoc tú | Saolré an chuntais móide 6 bliana — an tréimhse theorann is faide a bhfuil feidhm aici maidir linn | Scriostar iad |\n| Taifead do thoilithe le haghaidh sonraí íogaire (rannán 3): an leagan den fhoclaíocht lenar aontaigh tú, do theanga agus an t-am | Fad atá an cuntas ann | Scriostar é leis an gcuntas"
+   ],
+   [
+    "Suas le 8 seachtaine tar éis don chóip bheo a bheith scriosta | Forscríobhtar iad",
+    "Ar ár bhfreastalaí: suas le 8 seachtaine tar éis don chóip bheo a bheith scriosta. Ar ár stóras cúltaca ar leith: gan teorainn ama, toisc nach scriostar go huathoibríoch na cóipeanna criptithe atá ann | Ar ár bhfreastalaí, forscríobhtar iad. Déanann na sraitheanna eile sa tábla seo cur síos ar ár bhfreastalaí. Coinníonn na cóipeanna ar an stóras cúltaca ar leith an bunachar sonraí mar aon leis na heochracha do do chuntas agus do do dhíospóireachtaí (ach ní na heochracha do na ceisteanna nár thosaigh tú fós), agus mar sin, go dtí go mbainfimid iad, is féidir díospóireacht scriosta nó cuntas dúnta a athchóiriú uathu fós"
+   ],
+   [
+    ", agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe a léamh, agus scriosaimid taifead do chuntais. Ní scriostar eochair na cóipe poiblí de dhíospóireacht phoiblí tráth scriosta: fanann an díospóireacht poiblí (rannán 6). Tugaimid scriosadh air seo toisc gurb é sin a éifeacht, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá trí rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh",
+    " ar ár bhfreastalaí, agus ina dhiaidh sin ní féidir linne ná le haon duine eile na taifid chriptithe atá ann a léamh, agus scriosaimid taifead do chuntais. Ní scriostar eochair na cóipe poiblí de dhíospóireacht phoiblí tráth scriosta: fanann an díospóireacht poiblí (rannán 6). Tugaimid scriosadh air seo toisc gurb é sin a éifeacht ar ár bhfreastalaí, agus tá measúnú doiciméadaithe againn a thacaíonn leis; más mian leat tuilleadh eolais a fháil, cuir ceist orainn. Tá ceithre rud le tabhairt faoi deara: ní féidir ach cur leis an rian iniúchóireachta slándála agus ní scriostar é, ach níl aon aitheantóir inléite fút ann; tá líon beag díospóireachtaí níos sine ann a tháinig roimh ár scéim chriptithe reatha, agus má bhaineann sé sin le do chuntas insímid duit cad a dhéanann an dúnadh dóibh; tá cóipeanna sonraí a seoladh cheana chuig soláthraí IS faoi réir théarmaí coinneála an tsoláthraí sin sa Chlár, seachas faoinár scriosadh; agus coinníonn ár gcúltacaí na heochracha mar aon leis na taifid, agus mar sin is féidir a bhfuil i gcóip chúltaca a athchóiriú go dtí go mbaintear an chóip sin, agus ní scriostar go huathoibríoch na cóipeanna ar ár stóras cúltaca ar leith (an tsraith faoi chúltacaí thuas)"
+   ]
+  ]
+ },
+ "he": {
+  "sha256": "1175d298d418bfa35cac61f87e0f495d8297017c0b9eef555e2a457b4465e77a",
+  "swaps": [
+   [
+    "ת · v3.14 · בתוקף",
+    "ת · v3.15 · בתוקף"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " בשרת שלנו, אך העותקים המוצפנים באחסון הגיבויים הנפרד שלנו אינם נמחקים באופן אוטומטי (סעיף 7)"
+   ],
+   [
+    "",
+    ". רישום ההסכמה לנתונים רגישים (סעיף 3) מכיל רק את גרסת הנוסח שלה הסכמתם, את שפתכם ואת המועד, והוא נמחק יחד עם חשבונכם"
+   ],
+   [
+    "",
+    ", ומוחקים רישום זה יחד עם חשבונכם"
+   ],
+   [
+    "כאשר יתחילו תוכניות בתשלום",
+    "המופעל בידי NETOPIA Financial Services S.A. ברומניה, כאשר יתחילו תוכניות בתשלום. את פרטי הכרטיס אתם מקלידים בדף שלו, לא בדף שלנו, והוא שומר את הכרטיס שלכם כדי שיוכל לחייב אותו בכל חידוש. עם כל תשלום אנו שולחים לו את שמכם, את כתובת הדוא״ל ואת מספר הטלפון שלכם, את כתובת החיוב שלכם (רחוב, עיר, אזור, מיקוד ומדינה), קוד לקוח שנשאר זהה בכל התשלומים שלכם, את האסמכתה שלנו להזמנה, את הסכום ואת המטבע, ותיאור קצר של התשלום, כגון שם התוכנית שלכם; כאשר הוא מחייב את הכרטיס השמור שלכם בעת חידוש, אנו שולחים לו גם את כתובת ה-IP שממנה שילמתם בעצמכם בפעם האחרונה. NETOPIA מבקשת פרטים אלה בכל תשלום בכרטיס"
+   ],
+   [
+    "",
+    "\n| חשבון שההרשמה אליו לא הושלמה: כתובת הדוא״ל לא אומתה, או ששלב הכניסה השני (מפתח גישה או אפליקציית אימות) לא הוגדר | 24 שעות מתחילת ההרשמה | נמחק, יחד עם כל מה ששייך לחשבון; ניתן להשתמש שוב בכתובת הדוא״ל ובכינוי שלו. רישומי הקבלה ויומן ביקורת האבטחה שומרים את הרשומות שלהם, כמפורט בשורות שלהם |"
+   ],
+   [
+    "",
+    "בשרת שלנו; הגיבויים שלנו שומרים עותקים זמן רב יותר (השורה על גיבויים להלן) "
+   ],
+   [
+    "גיבויים שומרים אותם עד 8 שבועות, כמו כל השאר",
+    "הגיבויים שלנו שומרים אותם כפי שהם שומרים כל דבר אחר (השורה על גיבויים להלן)"
+   ],
+   [
+    " | חיי החשבון ועוד 6 שנים — תקופת ההתיישנות הארוכה ביותר החלה עלינו | נמחקים",
+    ", למעט ההסכמה לנתונים רגישים: אילו תנאים קיבלתם, איזו מדיניות הוצגה לכם ולמה עוד הסכמתם בעת ההרשמה ובעת התשלום | חיי החשבון ועוד 6 שנים — תקופת ההתיישנות הארוכה ביותר החלה עלינו | נמחקים |\n| רישום ההסכמה שלכם לנתונים רגישים (סעיף 3): גרסת הנוסח שלה הסכמתם, שפתכם והמועד | כל עוד החשבון קיים | נמחק יחד עם החשבון"
+   ],
+   [
+    "עד 8 שבועות לאחר מחיקת העותק הפעיל | נדרסים",
+    "בשרת שלנו: עד 8 שבועות לאחר מחיקת העותק הפעיל. באחסון הגיבויים הנפרד שלנו: ללא הגבלת זמן, משום שהעותקים המוצפנים שם אינם נמחקים באופן אוטומטי | בשרת שלנו, נדרסים. שאר השורות בטבלה זו מתארות את השרת שלנו. העותקים באחסון הגיבויים הנפרד שלנו מכילים את מסד הנתונים יחד עם המפתחות לחשבונכם ולדיונים שלכם (אך לא את המפתחות לשאלות שעוד לא התחלתם), ולכן עד שנסיר אותם, עדיין ניתן לשחזר מהם דיון שנמחק או חשבון שנסגר"
+   ],
+   [
+    ", ולאחר מכן הרשומות המוצפנות אינן ניתנות לקריאה בידינו או בידי כל אדם אחר, ואנו מוחקים את רשומת החשבון. המפתח לעותק הציבורי של דיון ציבורי אינו מושמד בעת המחיקה: הדיון נשאר ציבורי (סעיף 6). אנו מתארים זאת כמחיקה משום שזו תוצאתה, וברשותנו הערכה מתועדת התומכת בכך; אם תרצו לדעת עוד, שאלו אותנו. יש לדעת שלושה דברים: יומן ביקורת האבטחה מיועד לצירוף בלבד ואינו נמחק, אך אינו מכיל מזהים קריאים שלכם; מספר קטן של דיונים ישנים קודמים לשיטת ההצפנה הנוכחית שלנו, ואם הדבר חל על חשבונכם נסביר לכם מה מושג בסגירתו; עותקי נתונים שכבר נשלחו לספק בינה מלאכותית כפופים לתנאי השמירה של אותו ספק במרשם, ולא למחיקה שלנו",
+    " בשרת שלנו, ולאחר מכן הרשומות המוצפנות שם אינן ניתנות לקריאה בידינו או בידי כל אדם אחר, ואנו מוחקים את רשומת החשבון. המפתח לעותק הציבורי של דיון ציבורי אינו מושמד בעת המחיקה: הדיון נשאר ציבורי (סעיף 6). אנו מתארים זאת כמחיקה משום שזו תוצאתה בשרת שלנו, וברשותנו הערכה מתועדת התומכת בכך; אם תרצו לדעת עוד, שאלו אותנו. יש לדעת ארבעה דברים: יומן ביקורת האבטחה מיועד לצירוף בלבד ואינו נמחק, אך אינו מכיל מזהים קריאים שלכם; מספר קטן של דיונים ישנים קודמים לשיטת ההצפנה הנוכחית שלנו, ואם הדבר חל על חשבונכם נסביר לכם מה מושג בסגירתו; עותקי נתונים שכבר נשלחו לספק בינה מלאכותית כפופים לתנאי השמירה של אותו ספק במרשם, ולא למחיקה שלנו; והגיבויים שלנו מחזיקים את המפתחות יחד עם הרשומות, ולכן ניתן לשחזר את מה שעותק גיבוי מכיל עד שעותק זה יוסר, והעותקים באחסון הגיבויים הנפרד שלנו אינם נמחקים באופן אוטומטי (השורה על גיבויים לעיל)"
+   ]
+  ]
+ },
+ "hi": {
+  "sha256": "d80eebc4b93859bf8baf8d88d36313c8d96612ea025c8afe64986ed8896c56ed",
+  "swaps": [
+   [
+    "ि · v3.14 · प्रभा",
+    "ि · v3.15 · प्रभा"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "आपके निजी डेटा की कुंजियाँ नष्ट हो जाती हैं",
+    "हमारे सर्वर पर आपके निजी डेटा की कुंजियाँ नष्ट हो जाती हैं, लेकिन हमारे अलग बैकअप भंडारण पर रखी कूटबद्ध प्रतियाँ अपने-आप नहीं हटतीं (धारा 7)"
+   ],
+   [
+    "",
+    "। संवेदनशील डेटा के लिए सहमति (धारा 3) के अभिलेख में केवल पाठ का वह संस्करण जिस पर आपने सहमति दी, आपकी भाषा और समय होते हैं, और वह आपके खाते के साथ हटा दिया जाता है"
+   ],
+   [
+    "",
+    ", और यह अभिलेख हम आपके खाते के साथ हटा देते हैं"
+   ],
+   [
+    "",
+    ", जो रोमानिया में NETOPIA Financial Services S.A. द्वारा संचालित है। आप अपने कार्ड का विवरण उसके पृष्ठ पर टाइप करते हैं, हमारे पृष्ठ पर नहीं, और वह आपका कार्ड रखता है ताकि हर नवीकरण पर उससे शुल्क ले सके। हर भुगतान के साथ हम उसे आपका नाम, ईमेल पता और फ़ोन नंबर, आपका बिलिंग पता (सड़क, शहर, क्षेत्र, डाक कोड और देश), एक ग्राहक कोड जो आपके सभी भुगतानों के लिए एक ही रहता है, ऑर्डर के लिए हमारा संदर्भ, राशि और मुद्रा, और भुगतान का एक संक्षिप्त विवरण, जैसे आपकी योजना का नाम, भेजते हैं; जब वह नवीकरण पर आपके सहेजे गए कार्ड से शुल्क लेता है, तो हम उसे वह IP पता भी भेजते हैं जिससे आपने पिछली बार स्वयं भुगतान किया था। NETOPIA हर कार्ड भुगतान के साथ ये विवरण माँगता है"
+   ],
+   [
+    "",
+    "\n| ऐसा खाता जिसका साइन-अप पूरा नहीं हुआ: ईमेल पता सत्यापित नहीं हुआ, या साइन-इन का दूसरा चरण (पासकी या ऑथेंटिकेटर ऐप) सेट नहीं किया गया | साइन-अप शुरू होने के 24 घंटे बाद | खाते से जुड़ी हर चीज़ के साथ हटाया गया; उसका ईमेल पता और छद्मनाम फिर से उपयोग किए जा सकते हैं। स्वीकृति अभिलेख और सुरक्षा लेखापरीक्षा विवरण अपनी प्रविष्टियाँ रखते हैं, जैसा उनकी पंक्तियों में बताया गया है |"
+   ],
+   [
+    "अपठनीय हो जाती है",
+    "हमारे सर्वर पर अपठनीय हो जाती है; हमारे बैकअप इसकी प्रतियाँ अधिक समय तक रखते हैं (नीचे बैकअप वाली पंक्ति)"
+   ],
+   [
+    "बैकअप इन्हें अन्य सब चीज़ों की तरह अधिकतम 8 सप्ताह तक रखते हैं",
+    "हमारे बैकअप इन्हें वैसे ही रखते हैं जैसे बाकी सब कुछ रखते हैं (नीचे बैकअप वाली पंक्ति)"
+   ],
+   [
+    " | खाते की अवधि और उसके बाद 6 वर्ष — हम पर लागू सबसे लंबी परिसीमा अवधि |",
+    ", संवेदनशील डेटा के लिए सहमति को छोड़कर: आपने कौन-सी शर्तें स्वीकार कीं, आपको कौन-सी नीति दिखाई गई और साइन-अप तथा भुगतान के समय आपने और किस बात पर सहमति दी | खाते की अवधि और उसके बाद 6 वर्ष — हम पर लागू सबसे लंबी परिसीमा अवधि | हटाया गया |\n| संवेदनशील डेटा के लिए आपकी सहमति का अभिलेख (धारा 3): पाठ का वह संस्करण जिस पर आपने सहमति दी, आपकी भाषा और समय | खाता रहने तक | खाते के साथ"
+   ],
+   [
+    "सजीव प्रति हटने के बाद अधिकतम 8 सप्ताह तक | अधिलेखित",
+    "हमारे सर्वर पर: सजीव प्रति हटने के बाद अधिकतम 8 सप्ताह तक। हमारे अलग बैकअप भंडारण पर: कोई समय-सीमा नहीं, क्योंकि वहाँ की कूटबद्ध प्रतियाँ अपने-आप नहीं हटतीं | हमारे सर्वर पर, अधिलेखित। इस तालिका की अन्य पंक्तियाँ हमारे सर्वर का वर्णन करती हैं। अलग बैकअप भंडारण पर रखी प्रतियों में डेटाबेस के साथ आपके खाते और आपके वाद-विवादों की कुंजियाँ भी होती हैं (लेकिन अभी तक शुरू न किए गए प्रश्नों की कुंजियाँ नहीं), इसलिए जब तक हम उन्हें हटा नहीं देते, हटाया गया वाद-विवाद या बंद खाता उनसे अब भी पुनर्स्थापित किया जा सकता है"
+   ],
+   [
+    "वे कुंजियाँ नष्ट हो जाती हैं, जिसके बाद कूटबद्ध अभिलेख न तो हम और न कोई अन्य पढ़ सकता है, और हम आपका खाता अभिलेख हटा देते हैं। सार्वजनिक वाद-विवाद की सार्वजनिक प्रति की कुंजी हटाने के समय नष्ट नहीं होती; वाद-विवाद सार्वजनिक ही रहता है (अनुभाग 6)। हम इसे हटाना कहते हैं क्योंकि इसका प्रभाव यही है, और इसके समर्थन में हमारे पास दस्तावेजीकृत आकलन है; यदि आप और जानना चाहते हैं तो पूछें। जानने योग्य तीन बातें: सुरक्षा लेखापरीक्षा विवरण केवल-परिशिष्ट है और हटाया नहीं जाता, किंतु उसमें आपकी कोई पठनीय पहचान नहीं होती; कुछ पुराने वाद-विवाद हमारी वर्तमान कूटलेखन योजना से पहले के हैं, और यदि यह आपके खाते पर लागू होता है तो हम बताते हैं कि खाता बंद करने से उनके संबंध में क्या होता है; AI प्रदाता को पहले ही भेजे गए डेटा की प्रतियाँ पंजिका में उस प्रदाता की प्रतिधारण शर्तों द्वारा शासित होती हैं, हमारे हटाने द्वारा नहीं",
+    "हमारे सर्वर पर वे कुंजियाँ नष्ट हो जाती हैं, जिसके बाद वहाँ के कूटबद्ध अभिलेख न तो हम और न कोई अन्य पढ़ सकता है, और हम आपका खाता अभिलेख हटा देते हैं। सार्वजनिक वाद-विवाद की सार्वजनिक प्रति की कुंजी हटाने के समय नष्ट नहीं होती; वाद-विवाद सार्वजनिक ही रहता है (अनुभाग 6)। हम इसे हटाना कहते हैं क्योंकि हमारे सर्वर पर इसका प्रभाव यही है, और इसके समर्थन में हमारे पास दस्तावेजीकृत आकलन है; यदि आप और जानना चाहते हैं तो पूछें। जानने योग्य चार बातें: सुरक्षा लेखापरीक्षा विवरण केवल-परिशिष्ट है और हटाया नहीं जाता, किंतु उसमें आपकी कोई पठनीय पहचान नहीं होती; कुछ पुराने वाद-विवाद हमारी वर्तमान कूटलेखन योजना से पहले के हैं, और यदि यह आपके खाते पर लागू होता है तो हम बताते हैं कि खाता बंद करने से उनके संबंध में क्या होता है; AI प्रदाता को पहले ही भेजे गए डेटा की प्रतियाँ पंजिका में उस प्रदाता की प्रतिधारण शर्तों द्वारा शासित होती हैं, हमारे हटाने द्वारा नहीं; और हमारे बैकअप कुंजियों को अभिलेखों के साथ ही रखते हैं, इसलिए किसी बैकअप प्रति में जो कुछ है उसे तब तक पुनर्स्थापित किया जा सकता है जब तक वह प्रति हटाई नहीं जाती, और हमारे अलग बैकअप भंडारण पर रखी प्रतियाँ अपने-आप नहीं हटतीं (ऊपर बैकअप वाली पंक्ति)"
+   ]
+  ]
+ },
+ "hr": {
+  "sha256": "cdf2d760b09fb55f639d45210061469d6735794caa86397f3df49fc1fed85855",
+  "swaps": [
+   [
+    "I · v3.14 · NA SN",
+    "I · v3.15 · NA SN"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " na našem poslužitelju, ali šifrirane kopije u našem zasebnom spremištu sigurnosnih kopija ne brišu se automatski (odjeljak 7.)"
+   ],
+   [
+    "",
+    ". Zapis o privoli za osjetljive podatke (odjeljak 3.) sadržava samo verziju teksta na koji ste pristali, vaš jezik i vrijeme, a briše se zajedno s vašim računom"
+   ],
+   [
+    "",
+    ", a taj zapis brišemo zajedno s vašim računom"
+   ],
+   [
+    "ada plaćeni planovi započnu",
+    "ojim upravlja društvo NETOPIA Financial Services S.A. u Rumunjskoj, kada plaćeni planovi započnu. Podatke o kartici unosite na njegovoj stranici, a ne na našoj, a on čuva vašu karticu kako bi je mogao teretiti pri svakom obnavljanju. Uz svako plaćanje šaljemo mu vaše ime, adresu e-pošte i broj telefona, vašu adresu za naplatu (ulicu, grad, regiju, poštanski broj i zemlju), kod kupca koji je isti za sva vaša plaćanja, našu oznaku narudžbe, iznos i valutu te kratak opis plaćanja, primjerice naziv vašeg plana; kada pri obnavljanju tereti vašu spremljenu karticu, šaljemo mu i IP adresu s koje ste posljednji put sami platili. NETOPIA traži te podatke pri svakom plaćanju karticom"
+   ],
+   [
+    "",
+    "\n| Račun čija registracija nije dovršena: adresa e-pošte nije potvrđena ili drugi korak prijave (pristupni ključ ili aplikacija za autentifikaciju) nije postavljen | 24 sata od početka registracije | Briše se zajedno sa svime što pripada računu; njegova adresa e-pošte i pseudonim mogu se ponovno upotrijebiti. Evidencija prihvaćanja i sigurnosni revizijski trag zadržavaju svoje unose, kako je navedeno u njihovim retcima |"
+   ],
+   [
+    "postaje nečitljiv",
+    "na našem poslužitelju postaje nečitljiv; naše sigurnosne kopije dulje čuvaju kopije (redak o sigurnosnim kopijama u nastavku)"
+   ],
+   [
+    "Sigurnosne kopije ih čuvaju do 8 tjedana, kao i sve ostalo",
+    "Naše sigurnosne kopije čuvaju ih kao i sve ostalo (redak o sigurnosnim kopijama u nastavku)"
+   ],
+   [
+    " | Trajanje računa uz još 6 godina — najdulji rok zastare koji se na nas primjenjuje | Briše se",
+    ", osim privole za osjetljive podatke: koje ste Uvjete prihvatili, koja su vam pravila prikazana i na što ste još pristali pri registraciji i pri plaćanju | Trajanje računa uz još 6 godina — najdulji rok zastare koji se na nas primjenjuje | Briše se |\n| Zapis o vašoj privoli za osjetljive podatke (odjeljak 3.): verzija teksta na koji ste pristali, vaš jezik i vrijeme | Dok račun postoji | Briše se zajedno s računom"
+   ],
+   [
+    "Do 8 tjedana nakon brisanja aktivnog primjerka | Prepisuju se",
+    "Na našem poslužitelju: do 8 tjedana nakon brisanja aktivnog primjerka. U našem zasebnom spremištu sigurnosnih kopija: bez vremenskog ograničenja, jer se šifrirane kopije ondje ne brišu automatski | Na našem poslužitelju prepisuju se. Ostali retci ove tablice opisuju naš poslužitelj. Kopije u zasebnom spremištu sigurnosnih kopija sadržavaju bazu podataka zajedno s ključevima vašeg računa i vaših rasprava (ali ne i ključeve još nepokrenutih pitanja), pa se, dok ih ne uklonimo, izbrisana rasprava ili zatvoreni račun iz njih još mogu vratiti"
+   ],
+   [
+    ", nakon čega ni mi ni itko drugi ne može pročitati šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije javne rasprave ne uništava se pri brisanju: rasprava ostaje javna (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati tri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju se uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje",
+    " na našem poslužitelju, nakon čega ni mi ni itko drugi ne može pročitati ondje pohranjene šifrirane zapise, a zapis o vašem računu brišemo. Ključ javne kopije javne rasprave ne uništava se pri brisanju: rasprava ostaje javna (odjeljak 6). To opisujemo kao brisanje jer je takav njegov učinak na našem poslužitelju i o tome imamo dokumentiranu procjenu; ako želite znati više, pitajte nas. Trebate znati četiri stvari: sigurnosni revizijski trag može se samo dopunjavati i ne briše se, ali ne sadržava vaše čitljive identifikatore; mali broj starijih rasprava prethodi našoj trenutačnoj shemi šifriranja, a ako se to odnosi na vaš račun, obavijestit ćemo vas o tome što zatvaranje računa znači za te rasprave; na kopije podataka već poslane pružatelju usluga umjetne inteligencije primjenjuju se uvjeti čuvanja tog pružatelja navedeni u Registru, a ne naše brisanje; i naše sigurnosne kopije čuvaju ključeve zajedno sa zapisima, pa se ono što neka sigurnosna kopija sadržava može vratiti dok se ta kopija ne ukloni, a kopije u našem zasebnom spremištu sigurnosnih kopija ne brišu se automatski (redak o sigurnosnim kopijama iznad)"
+   ]
+  ]
+ },
+ "hu": {
+  "sha256": "19d3f30d2ec849184b79b3d4b15375d434f3242840f2a70bd7aa0ebbcaf7dcd7",
+  "swaps": [
+   [
+    "T · v3.14 · HATÁL",
+    "T · v3.15 · HATÁL"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " a kiszolgálónkon, de a különálló biztonsági mentési tárhelyünkön lévő titkosított másolatok nem törlődnek automatikusan (7. szakasz)"
+   ],
+   [
+    "",
+    ". A különleges adatokra vonatkozó hozzájárulás nyilvántartása (3. szakasz) csak a szöveg Ön által elfogadott verzióját, az Ön nyelvét és az időpontot tartalmazza, és a fiókjával együtt töröljük"
+   ],
+   [
+    "",
+    ", és ezt a nyilvántartást a fiókjával együtt töröljük"
+   ],
+   [
+    "Paymentsen keresztül történnek, amint elindulnak a fizetős csomagok",
+    "Financial Services S.A. által Romániában működtetett NETOPIA Paymentsen keresztül történnek, amint elindulnak a fizetős csomagok. A kártyaadatait a szolgáltató oldalán adja meg, nem a miénken, és a szolgáltató megőrzi a kártyáját, hogy minden megújításkor megterhelhesse. Minden fizetéskor elküldjük neki az Ön nevét, e-mail-címét és telefonszámát, számlázási címét (utca, város, régió, irányítószám és ország), egy ügyfélkódot, amely minden fizetésénél ugyanaz, a megrendelésre vonatkozó saját hivatkozásunkat, az összeget és a pénznemet, valamint a fizetés rövid leírását, például csomagja nevét; amikor egy megújításkor megterheli az Ön elmentett kártyáját, azt az IP-címet is elküldjük neki, amelyről Ön legutóbb saját maga fizetett. A NETOPIA minden kártyás fizetésnél bekéri ezeket az adatokat"
+   ],
+   [
+    "",
+    "\n| Fiók, amelynek regisztrációja nem fejeződött be: az e-mail-címet nem erősítették meg, vagy a második bejelentkezési lépést (jelkulcs vagy hitelesítő alkalmazás) nem állították be | A regisztráció megkezdése után 24 óráig | Töröljük, a fiókhoz tartozó minden adattal együtt; e-mail-címe és álneve újra felhasználható. Az elfogadási nyilvántartások és a biztonsági auditnapló megőrzik bejegyzéseiket, ahogy a saját soruk mondja |"
+   ],
+   [
+    "olvashatatlanná válik",
+    "a kiszolgálónkon olvashatatlanná válik; biztonsági mentéseink hosszabb ideig őriznek róla másolatokat (lásd lent a biztonsági mentésekről szóló sort)"
+   ],
+   [
+    "A biztonsági mentések legfeljebb 8 hétig őrzik őket, mint mindent mást",
+    "Biztonsági mentéseink ugyanúgy őrzik őket, mint minden mást (lásd lent a biztonsági mentésekről szóló sort)"
+   ],
+   [
+    " | A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő | T",
+    ", a különleges adatokra vonatkozó hozzájárulás kivételével: mely Feltételeket fogadta el, mely szabályzatot jelenítettük meg Önnek, és mi mással értett egyet a regisztrációkor és a fizetéskor | A fiók élettartama plusz 6 év — a ránk alkalmazandó leghosszabb elévülési idő | Töröljük |\n| A különleges adatokra vonatkozó hozzájárulásának nyilvántartása (3. szakasz): a szöveg Ön által elfogadott verziója, az Ön nyelve és az időpont | A fiók fennállásáig | A fiókkal együtt t"
+   ],
+   [
+    "z élő példány törlése után legfeljebb 8 hétig | Felülírju",
+    " kiszolgálónkon: az élő példány törlése után legfeljebb 8 hétig. A különálló biztonsági mentési tárhelyünkön: időkorlát nélkül, mert az ott lévő titkosított másolatok nem törlődnek automatikusan | A kiszolgálónkon felülírjuk. A táblázat többi sora a kiszolgálónkra vonatkozik. A különálló biztonsági mentési tárhelyen lévő másolatok az adatbázist a fiókja és vitái kulcsaival együtt tartalmazzák (a még el nem indított kérdések kulcsait azonban nem), így amíg el nem távolítjuk őket, egy törölt vita vagy egy megszüntetett fiók még visszaállítható belőlü"
+   ],
+   [
+    ", ami után a titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A nyilvános vita nyilvános másolatának kulcsa a törléskor nem semmisül meg: a vita nyilvános marad (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Három dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk",
+    " a kiszolgálónkon, ami után az ott lévő titkosított rekordokat sem mi, sem más nem tudja elolvasni, továbbá töröljük fiókrekordját. A nyilvános vita nyilvános másolatának kulcsa a törléskor nem semmisül meg: a vita nyilvános marad (6. szakasz). Ezt azért nevezzük törlésnek, mert ez a hatása a kiszolgálónkon, és ezt dokumentált értékeléssel támasztjuk alá; ha többet szeretne tudni, kérdezzen bennünket. Négy dolgot fontos tudni: a biztonsági auditnapló csak hozzáfűzhető és nem törlődik, de nem tartalmaz Önről olvasható azonosítókat; néhány régebbi vita a jelenlegi titkosítási rendszerünk előtti időből származik, és ha ez az Ön fiókjára vonatkozik, közöljük, hogy a megszüntetés mit eredményez náluk; a már MI-szolgáltatónak küldött adatmásolatokra az adott szolgáltató Nyilvántartásban szereplő megőrzési feltételei vonatkoznak, nem a mi törlésünk; továbbá biztonsági mentéseink a kulcsokat a rekordokkal együtt tartalmazzák, így ami egy biztonsági másolatban van, az visszaállítható, amíg az adott másolatot el nem távolítjuk, a különálló biztonsági mentési tárhelyünkön lévő másolatok pedig nem törlődnek automatikusan (lásd fent a biztonsági mentésekről szóló sort)"
+   ]
+  ]
+ },
+ "id": {
+  "sha256": "b9b6e57246d080ef7e474ad1569a7e3c5488412da64fb2bdf867bf42a1bb3e6d",
+  "swaps": [
+   [
+    "I · v3.14 · BERLA",
+    "I · v3.15 · BERLA"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " di server kami, tetapi salinan terenkripsi di penyimpanan cadangan terpisah kami tidak dihapus secara otomatis (bagian 7)"
+   ],
+   [
+    "",
+    ". Catatan persetujuan data sensitif (bagian 3) hanya berisi versi redaksi yang Anda setujui, bahasa Anda, dan waktunya, dan catatan itu dihapus bersama akun Anda"
+   ],
+   [
+    "",
+    ", dan kami menghapus catatan ini bersama akun Anda"
+   ],
+   [
+    "setelah paket berbayar dimulai",
+    "yang dijalankan oleh NETOPIA Financial Services S.A. di Rumania, setelah paket berbayar dimulai. Anda mengetikkan detail kartu Anda di halamannya, bukan di halaman kami, dan penyedia tersebut menyimpan kartu Anda agar dapat menagihnya pada setiap perpanjangan. Pada setiap pembayaran, kami mengirimkan kepadanya nama, alamat email, dan nomor telepon Anda, alamat penagihan Anda (jalan, kota, wilayah, kode pos, dan negara), kode pelanggan yang tetap sama untuk semua pembayaran Anda, referensi kami untuk pesanan tersebut, jumlah dan mata uangnya, serta deskripsi singkat pembayaran, seperti nama paket Anda; saat penyedia tersebut menagih kartu tersimpan Anda pada perpanjangan, kami juga mengirimkan alamat IP yang terakhir Anda gunakan saat membayar sendiri. NETOPIA meminta detail ini pada setiap pembayaran dengan kartu"
+   ],
+   [
+    "",
+    "\n| Akun yang pendaftarannya belum selesai: alamat email belum diverifikasi, atau langkah masuk kedua (kunci sandi atau aplikasi autentikator) belum disiapkan | 24 jam setelah pendaftaran dimulai | Dihapus, beserta semua hal yang menjadi milik akun tersebut; alamat email dan nama samarannya dapat digunakan lagi. Catatan penerimaan dan jejak audit keamanan tetap menyimpan entrinya, sebagaimana dijelaskan dalam barisnya masing-masing |"
+   ],
+   [
+    "",
+    "di server kami; cadangan kami menyimpan salinannya lebih lama (baris tentang cadangan di bawah) "
+   ],
+   [
+    "menyimpannya hingga 8 minggu, sama seperti semua hal lainnya",
+    "kami menyimpannya sebagaimana cadangan itu menyimpan semua hal lainnya (baris tentang cadangan di bawah)"
+   ],
+   [
+    " | Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami | Dihapus",
+    ", kecuali persetujuan data sensitif: Ketentuan mana yang Anda terima, kebijakan mana yang ditampilkan kepada Anda, dan apa lagi yang Anda setujui saat pendaftaran dan saat melakukan pembayaran | Masa berlaku akun ditambah 6 tahun — periode pembatasan terpanjang yang berlaku bagi kami | Dihapus |\n| Catatan persetujuan data sensitif Anda (bagian 3): versi redaksi yang Anda setujui, bahasa Anda, dan waktunya | Selama akun ada | Dihapus bersama akun"
+   ],
+   [
+    "Hingga 8 minggu setelah salinan aktif dihapus | Ditimp",
+    "Di server kami: hingga 8 minggu setelah salinan aktif dihapus. Di penyimpanan cadangan terpisah kami: tanpa batas waktu, karena salinan terenkripsi di sana tidak dihapus secara otomatis | Di server kami, ditimpa. Baris lain dalam tabel ini menjelaskan server kami. Salinan di penyimpanan cadangan terpisah kami memuat basis data beserta kunci akun dan debat Anda (tetapi tidak kunci pertanyaan yang belum Anda mulai), sehingga sampai kami menghapusnya, debat yang telah dihapus atau akun yang telah ditutup masih dapat dipulihkan dariny"
+   ],
+   [
+    ", setelah itu catatan terenkripsi tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat publik tidak dimusnahkan saat penghapusan: debat tetap publik (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Tiga hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami",
+    " di server kami, setelah itu catatan terenkripsi di sana tidak dapat dibaca oleh kami atau siapa pun, dan kami menghapus catatan akun Anda. Kunci salinan publik dari debat publik tidak dimusnahkan saat penghapusan: debat tetap publik (bagian 6). Kami menyebutnya penghapusan karena demikianlah akibatnya di server kami, dan kami memiliki penilaian terdokumentasi yang mendasarinya; jika Anda ingin mengetahui lebih lanjut, silakan bertanya. Empat hal yang perlu diketahui: jejak audit keamanan hanya dapat ditambahi, bukan diubah atau dihapus; jejak tersebut tetap disimpan, tetapi tidak berisi pengenal Anda yang dapat dibaca; sejumlah kecil debat lama mendahului skema enkripsi kami saat ini, dan jika hal itu berlaku pada akun Anda, kami memberi tahu apa yang dicapai penutupan terhadapnya; salinan data yang telah dikirim kepada penyedia AI diatur oleh ketentuan retensi penyedia tersebut dalam Daftar, bukan oleh penghapusan kami; dan cadangan kami menyimpan kunci bersama dengan catatannya, sehingga apa yang dimuat suatu salinan cadangan dapat dipulihkan sampai salinan itu dihapus, dan salinan di penyimpanan cadangan terpisah kami tidak dihapus secara otomatis (baris tentang cadangan di atas)"
+   ]
+  ]
+ },
+ "it": {
+  "sha256": "5c7011f2fbd8ad73db743d0d40dd2e9f7e52f47d65255f495aec1801ebf4b11e",
+  "swaps": [
+   [
+    "Y · v3.14 · IN VI",
+    "Y · v3.15 · IN VI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " sul nostro server, ma le copie cifrate nel nostro archivio di backup separato non vengono cancellate automaticamente (sezione 7)"
+   ],
+   [
+    "",
+    ". La registrazione del consenso relativo ai dati sensibili (sezione 3) contiene solo la versione del testo che hai accettato, la tua lingua e il momento, e viene cancellata con il tuo account"
+   ],
+   [
+    "",
+    ", e cancelliamo questa registrazione con il tuo account"
+   ],
+   [
+    "dall'avvio dei piani a pagamento",
+    "gestito da NETOPIA Financial Services S.A. in Romania, dall'avvio dei piani a pagamento. Inserisci i dati della tua carta nella pagina del fornitore, non nella nostra, e il fornitore conserva la tua carta per poterla addebitare a ogni rinnovo. Con ogni pagamento gli inviamo il tuo nome, il tuo indirizzo email e il tuo numero di telefono, il tuo indirizzo di fatturazione (via, città, regione, codice postale e Paese), un codice cliente che resta lo stesso per tutti i tuoi pagamenti, il nostro riferimento dell'ordine, l'importo e la valuta, e una breve descrizione del pagamento, come il nome del tuo piano; quando addebita la tua carta salvata a un rinnovo, gli inviamo anche l'indirizzo IP da cui hai pagato tu stesso l'ultima volta. NETOPIA richiede questi dati per ogni pagamento con carta"
+   ],
+   [
+    "",
+    "\n| Un account la cui iscrizione non è stata completata: l'indirizzo email non verificato, oppure il secondo passaggio di accesso (una passkey o un'app di autenticazione) non configurato | 24 ore dall'inizio dell'iscrizione | Cancellato, con tutto ciò che appartiene all'account; il suo indirizzo email e il suo pseudonimo possono essere utilizzati di nuovo. I registri di accettazione e il registro di controllo della sicurezza conservano le loro voci, come indicano le rispettive righe |"
+   ],
+   [
+    "",
+    "sul nostro server; i nostri backup ne conservano copie più a lungo (la riga sui backup più sotto) "
+   ],
+   [
+    "backup le conservano fino a 8 settimane, come per tutto il resto",
+    "nostri backup le conservano come conservano tutto il resto (la riga sui backup più sotto)"
+   ],
+   [
+    " | Durata dell'account più 6 anni — il termine di prescrizione più lungo a noi applicabile | Cancellati",
+    ", tranne il consenso relativo ai dati sensibili: quali Condizioni hai accettato, quale informativa ti è stata mostrata e cos'altro hai accettato all'iscrizione e al pagamento | Durata dell'account più 6 anni — il termine di prescrizione più lungo a noi applicabile | Cancellati |\n| La registrazione del tuo consenso relativo ai dati sensibili (sezione 3): la versione del testo che hai accettato, la tua lingua e il momento | Finché l'account esiste | Cancellata con l'account"
+   ],
+   [
+    "Fino a 8 settimane dopo la cancellazione della copia attiva | Sovrascritti",
+    "Sul nostro server: fino a 8 settimane dopo la cancellazione della copia attiva. Nel nostro archivio di backup separato: nessun limite di tempo, perché le copie cifrate che vi si trovano non vengono cancellate automaticamente | Sul nostro server, sovrascritti. Le altre righe di questa tabella descrivono il nostro server. Le copie nell'archivio di backup separato contengono il database insieme alle chiavi del tuo account e dei tuoi dibattiti (ma non le chiavi delle domande che non hai ancora avviato), quindi, finché non le rimuoviamo, un dibattito cancellato o un account chiuso può ancora essere ripristinato a partire da esse"
+   ],
+   [
+    ", dopodiché i record cifrati non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblico non viene distrutta alla cancellazione: il dibattito resta pubblico (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono tre aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione",
+    " sul nostro server, dopodiché i record cifrati che vi si trovano non possono più essere letti da noi o da chiunque altro, e cancelliamo il record del tuo account. La chiave della copia pubblica di un dibattito pubblico non viene distrutta alla cancellazione: il dibattito resta pubblico (sezione 6). Definiamo questa operazione cancellazione perché tale è il suo effetto sul nostro server e disponiamo di una valutazione documentata che la supporta; se desideri saperne di più, chiedicelo. Vi sono quattro aspetti da conoscere: il registro di controllo della sicurezza è di sola aggiunta e non viene cancellato, ma non contiene identificativi leggibili che ti riguardino; un numero limitato di dibattiti meno recenti precede il nostro attuale sistema di cifratura e, se ciò riguarda il tuo account, ti comunicheremo quale effetto produce la chiusura su di essi; le copie dei dati già inviate a un fornitore di IA sono disciplinate dalle condizioni di conservazione di tale fornitore indicate nel Registro, non dalla nostra cancellazione; e i nostri backup contengono le chiavi insieme ai record, quindi ciò che contiene una copia di backup può essere ripristinato finché quella copia non viene rimossa, e le copie nel nostro archivio di backup separato non vengono cancellate automaticamente (la riga sui backup più sopra)"
+   ]
+  ]
+ },
+ "ja": {
+  "sha256": "5f85098dc8bb6fa42f355f4a63e09be80632e6310f1dcca066d0de9e3cd03c5d",
+  "swaps": [
+   [
+    "ー · v3.14 · 発効日 2",
+    "ー · v3.15 · 発効日 2"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "非公開データの鍵が破棄されます",
+    "当社サーバー上の非公開データの鍵が破棄されますが、当社の別個のバックアップストレージ上の暗号化されたコピーは自動的には削除されません（第7節）"
+   ],
+   [
+    "",
+    "。機微データへの同意（第3節）の記録には、お客様が同意した文言の版、お客様の言語および時刻のみが含まれ、この記録はお客様のアカウントとともに削除されます"
+   ],
+   [
+    "",
+    "、この記録をお客様のアカウントとともに削除し"
+   ],
+   [
+    "当社の決済プロバイダーであるNETOPIA Paymentsを通じて行われ",
+    "ルーマニアのNETOPIA Financial Services S.A.が運営する、当社の決済プロバイダーであるNETOPIA Paymentsを通じて行われます。カード情報は、お客様が当社のページではなく同社のページで入力し、同社は更新のたびに請求できるようお客様のカードを保持します。各支払いの際、当社は同社に、お客様の氏名、メールアドレスおよび電話番号、請求先住所（番地、市区町村、地域、郵便番号および国）、お客様のすべての支払いで同じままの顧客コード、当社の注文参照番号、金額と通貨、ならびにプラン名など支払いの簡単な説明を送信します。更新時に同社が保存済みのカードに請求する場合は、お客様が最後にご自身で支払いを行った際のIPアドレスも送信します。NETOPIAは、カード支払いのたびにこれらの情報を求め"
+   ],
+   [
+    "",
+    "\n| 登録が完了していないアカウント：メールアドレスが確認されていないもの、またはサインインの第2段階（パスキーまたは認証アプリ）が設定されていないもの | 登録開始から24時間 | アカウントに属するすべてのものとともに削除。そのメールアドレスと仮名は再び使用できます。承諾の記録およびセキュリティ監査証跡は、それぞれの行に記載のとおり、その記録を保持します |"
+   ],
+   [
+    "内容を読めない状態にします",
+    "当社サーバー上の内容を読めない状態にします。当社のバックアップはそれより長くコピーを保持します（下記のバックアップの行）"
+   ],
+   [
+    "バックアップは、他のすべての情報と同様に最長8週間保持されます",
+    "当社のバックアップは、他のすべての情報と同様にこれらを保持します（下記のバックアップの行）"
+   ],
+   [
+    " | アカウントの存続期間に6年を加えた期間（当社に適用される最長の時効期間） | ",
+    "（機微データへの同意を除く）：お客様が承諾した利用規約、お客様に提示されたポリシー、および登録時とお支払い時にお客様が同意したその他の事項 | アカウントの存続期間に6年を加えた期間（当社に適用される最長の時効期間） | 削除 |\n| 機微データへの同意の記録（第3節）：お客様が同意した文言の版、お客様の言語および時刻 | アカウントが存在する間 | アカウントとともに"
+   ],
+   [
+    "稼働中のコピーの削除後、最長8週間 | 上書き",
+    "当社サーバー上：稼働中のコピーの削除後、最長8週間。当社の別個のバックアップストレージ上：期限なし。そこにある暗号化されたコピーは自動的には削除されないためです | 当社サーバー上では上書き。この表の他の行は当社サーバーについて記載しています。別個のバックアップストレージ上のコピーには、データベースとともに、お客様のアカウントおよびディベートの鍵が含まれます（ただし、まだ開始していない質問の鍵は含まれません）。そのため、当社がこれらを削除するまでは、削除されたディベートや閉鎖されたアカウントをそこから復元できます"
+   ],
+   [
+    "これらの鍵が破棄され、その後、暗号化された記録は当社にも他の誰にも読み取れなくなり、当社はお客様のアカウント記録を削除します。公開ディベートの公開用コピーの鍵は、削除時には破棄されません。ディベートは公開されたままとなります（第6節）。この効果を有するため、当社はこれを削除と表現しており、それを裏付ける文書化された評価を保有しています。詳細を希望する場合はお問い合わせください。留意すべき点は3つあります。セキュリティ監査証跡は追記専用で削除されませんが、お客様を識別できる判読可能な情報を含みません。少数の古いディベートは現在の暗号化方式より前に作成されており、お客様のアカウントが該当する場合、閉鎖によって何が実現されるかを説明します。AIプロバイダーへすでに送信されたデータのコピーには、当社による削除ではなく、登録簿に記載された当該プロバイダーの保存条件が適用されます",
+    "当社サーバー上のこれらの鍵が破棄され、その後、そこにある暗号化された記録は当社にも他の誰にも読み取れなくなり、当社はお客様のアカウント記録を削除します。公開ディベートの公開用コピーの鍵は、削除時には破棄されません。ディベートは公開されたままとなります（第6節）。当社サーバー上でこの効果を有するため、当社はこれを削除と表現しており、それを裏付ける文書化された評価を保有しています。詳細を希望する場合はお問い合わせください。留意すべき点は4つあります。セキュリティ監査証跡は追記専用で削除されませんが、お客様を識別できる判読可能な情報を含みません。少数の古いディベートは現在の暗号化方式より前に作成されており、お客様のアカウントが該当する場合、閉鎖によって何が実現されるかを説明します。AIプロバイダーへすでに送信されたデータのコピーには、当社による削除ではなく、登録簿に記載された当該プロバイダーの保存条件が適用されます。また、当社のバックアップは鍵を記録とともに保持しているため、バックアップのコピーに含まれる内容は、そのコピーが削除されるまで復元可能であり、当社の別個のバックアップストレージ上のコピーは自動的には削除されません（上記のバックアップの行）"
+   ]
+  ]
+ },
+ "ko": {
+  "sha256": "6947f3224f626c4808e6d4c931b905d81fd8a89a3670d5f1943b3653ead23f70",
+  "swaps": [
+   [
+    "침 · v3.14 · 시행일 2",
+    "침 · v3.15 · 시행일 2"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "비공개 데이터의 키가 파기됩니다",
+    "당사 서버에 있는 비공개 데이터의 키가 파기되지만, 당사의 별도 백업 저장소에 있는 암호화된 사본은 자동으로 삭제되지 않습니다(제7조)"
+   ],
+   [
+    "",
+    ". 민감정보 동의(제3조) 기록에는 귀하가 동의한 문구의 버전, 귀하의 언어 및 시각만 포함되며, 이 기록은 귀하의 계정과 함께 삭제됩니다"
+   ],
+   [
+    "",
+    "하며, 이 기록을 귀하의 계정과 함께 삭제"
+   ],
+   [
+    "당사의 결제 제공업체인 NETOPIA Payments를 통해 이루어집",
+    "루마니아의 NETOPIA Financial Services S.A.가 운영하는 당사의 결제 제공업체인 NETOPIA Payments를 통해 이루어집니다. 카드 정보는 귀하가 당사 페이지가 아닌 해당 업체의 페이지에서 입력하며, 해당 업체는 갱신 시마다 대금을 청구할 수 있도록 귀하의 카드를 보관합니다. 당사는 결제할 때마다 해당 업체에 귀하의 이름, 이메일 주소 및 전화번호, 청구지 주소(도로명, 도시, 지역, 우편번호 및 국가), 귀하의 모든 결제에 동일하게 유지되는 고객 코드, 주문에 대한 당사의 참조번호, 금액과 통화, 그리고 요금제 이름 등 결제에 대한 간단한 설명을 보냅니다. 해당 업체가 갱신 시 저장된 카드에 대금을 청구할 때에는 귀하가 마지막으로 직접 결제한 IP 주소도 보냅니다. NETOPIA는 카드 결제 때마다 이러한 정보를 요구합"
+   ],
+   [
+    "",
+    "\n| 가입이 완료되지 않은 계정: 이메일 주소가 인증되지 않았거나 로그인 2단계(패스키 또는 인증 앱)가 설정되지 않은 계정 | 가입을 시작한 후 24시간 | 계정에 속한 모든 것과 함께 삭제. 해당 이메일 주소와 가명은 다시 사용할 수 있습니다. 수락 기록과 보안 감사 추적 기록은 각 행에 적힌 대로 해당 항목을 보존합니다 |"
+   ],
+   [
+    "콘텐츠를 읽을 수 없게 함",
+    "당사 서버에서 콘텐츠를 읽을 수 없게 함. 당사의 백업은 사본을 더 오래 보관함(아래 백업 행)"
+   ],
+   [
+    "백업은 다른 모든 항목과 마찬가지로 최대 8주 동안 보관합니다",
+    "당사의 백업은 다른 모든 항목을 보관하는 것과 마찬가지로 이를 보관합니다(아래 백업 행)"
+   ],
+   [
+    " | 계정 존속 기간에 6년을 더한 기간 — 당사에 적용되는 가장 긴 시효기간 |",
+    "(민감정보 동의 제외): 귀하가 수락한 이용약관, 귀하에게 제시된 방침, 그리고 가입 시와 결제 시 귀하가 동의한 그 밖의 사항 | 계정 존속 기간에 6년을 더한 기간 — 당사에 적용되는 가장 긴 시효기간 | 삭제 |\n| 귀하의 민감정보 동의 기록(제3조): 귀하가 동의한 문구의 버전, 귀하의 언어 및 시각 | 계정이 존재하는 동안 | 계정과 함께"
+   ],
+   [
+    "실시간 사본이 삭제된 후 최대 8주 | 덮어쓰기",
+    "당사 서버: 실시간 사본이 삭제된 후 최대 8주. 당사의 별도 백업 저장소: 기한 없음. 그곳의 암호화된 사본은 자동으로 삭제되지 않기 때문임 | 당사 서버에서는 덮어쓰기. 이 표의 다른 행은 당사 서버에 관한 것임. 별도 백업 저장소의 사본에는 데이터베이스와 함께 귀하의 계정 및 토론의 키가 들어 있으므로(아직 시작하지 않은 질문의 키는 제외), 당사가 이를 제거할 때까지는 삭제된 토론이나 폐쇄된 계정을 그 사본에서 여전히 복원할 수 있음"
+   ],
+   [
+    "해당 키가 파기되고, 이후 암호화된 기록은 당사나 다른 누구도 읽을 수 없게 되며 당사는 귀하의 계정 기록을 삭제합니다. 공개 토론의 공개 사본에 대한 키는 삭제 시 파기되지 않으며, 해당 토론은 공개 상태로 남습니다(제6조). 이것이 실제 효과이므로 당사는 이를 삭제라고 표현하고, 이를 뒷받침하는 문서화된 평가를 보유합니다. 자세한 내용을 원하면 문의하십시오. 알아야 할 세 가지 사항이 있습니다. 보안 감사 추적 기록은 추가 전용이라 삭제되지 않지만 귀하를 식별할 수 있는 판독 가능한 정보를 포함하지 않습니다. 소수의 오래된 토론은 현행 암호화 체계보다 먼저 생성되었으며 귀하의 계정이 해당하는 경우 폐쇄의 효과를 알려드립니다. AI 제공업체에 이미 전송된 데이터 사본에는 당사의 삭제가 아니라 등록부에 기재된 해당 제공업체의 보유 조건이 적용됩니다",
+    "당사 서버에 있는 해당 키가 파기되고, 이후 그곳의 암호화된 기록은 당사나 다른 누구도 읽을 수 없게 되며 당사는 귀하의 계정 기록을 삭제합니다. 공개 토론의 공개 사본에 대한 키는 삭제 시 파기되지 않으며, 해당 토론은 공개 상태로 남습니다(제6조). 이것이 당사 서버에서의 실제 효과이므로 당사는 이를 삭제라고 표현하고, 이를 뒷받침하는 문서화된 평가를 보유합니다. 자세한 내용을 원하면 문의하십시오. 알아야 할 네 가지 사항이 있습니다. 보안 감사 추적 기록은 추가 전용이라 삭제되지 않지만 귀하를 식별할 수 있는 판독 가능한 정보를 포함하지 않습니다. 소수의 오래된 토론은 현행 암호화 체계보다 먼저 생성되었으며 귀하의 계정이 해당하는 경우 폐쇄의 효과를 알려드립니다. AI 제공업체에 이미 전송된 데이터 사본에는 당사의 삭제가 아니라 등록부에 기재된 해당 제공업체의 보유 조건이 적용됩니다. 그리고 당사의 백업은 기록과 함께 키를 보관하므로, 백업 사본에 들어 있는 내용은 그 사본이 제거될 때까지 복원될 수 있으며, 당사의 별도 백업 저장소에 있는 사본은 자동으로 삭제되지 않습니다(위 백업 행)"
+   ]
+  ]
+ },
+ "lt": {
+  "sha256": "441913ce7a1d15127fe7cc386e6a1b48ab989bd08a004b4af23afc8ef2539c16",
+  "swaps": [
+   [
+    "A · v3.14 · ĮSIGA",
+    "A · v3.15 · ĮSIGA"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " mūsų serveryje, tačiau užšifruotos kopijos mūsų atskiroje atsarginių kopijų saugykloje automatiškai neištrinamos (7 skyrius)"
+   ],
+   [
+    "",
+    ". Sutikimo tvarkyti neskelbtinus duomenis įraše (3 skyrius) saugoma tik formuluotės, su kuria sutikote, versija, jūsų kalba ir laikas, ir šis įrašas ištrinamas kartu su jūsų paskyra"
+   ],
+   [
+    "",
+    ", o šį įrašą ištriname kartu su jūsų paskyra"
+   ],
+   [
+    "pradėjus taikyti mokamus planus",
+    "kurią valdo NETOPIA Financial Services S.A. Rumunijoje, pradėjus taikyti mokamus planus. Kortelės duomenis įvedate teikėjo puslapyje, o ne mūsų, ir teikėjas išsaugo jūsų kortelę, kad galėtų iš jos nuskaičiuoti lėšas kiekvieno atnaujinimo metu. Su kiekvienu mokėjimu teikėjui siunčiame jūsų vardą, pavardę, el. pašto adresą ir telefono numerį, jūsų atsiskaitymo adresą (gatvę, miestą, regioną, pašto kodą ir šalį), kliento kodą, kuris visiems jūsų mokėjimams išlieka tas pats, mūsų užsakymo nuorodą, sumą ir valiutą bei trumpą mokėjimo aprašymą, pavyzdžiui, jūsų plano pavadinimą; kai atnaujinimo metu teikėjas nuskaičiuoja lėšas iš jūsų išsaugotos kortelės, siunčiame ir IP adresą, iš kurio paskutinį kartą mokėjote patys. NETOPIA šių duomenų prašo atliekant kiekvieną mokėjimą kortele"
+   ],
+   [
+    "",
+    "\n| Paskyra, kurios registracija nebuvo užbaigta: el. pašto adresas nepatvirtintas arba nenustatytas antrasis prisijungimo veiksmas (slaptaraktis arba autentifikavimo programėlė) | Praėjus 24 valandoms nuo registracijos pradžios | Ištrinama kartu su viskuo, kas priklauso paskyrai; jos el. pašto adresą ir slapyvardį galima naudoti iš naujo. Sutikimo su sąlygomis ir kitų sutikimų įrašai bei saugumo audito žurnalo įrašai išsaugomi, kaip nurodyta atitinkamose eilutėse |"
+   ],
+   [
+    "perskaityti nebegalima",
+    "mūsų serveryje perskaityti nebegalima; mūsų atsarginėse kopijose kopijos saugomos ilgiau (žr. toliau eilutę apie atsargines kopijas)"
+   ],
+   [
+    "Atsarginėse kopijose jie saugomi iki 8 savaičių, kaip ir visa kita",
+    "Mūsų atsarginėse kopijose jie saugomi taip pat, kaip ir visa kita (žr. toliau eilutę apie atsargines kopijas)"
+   ],
+   [
+    " | Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą | Ištrinami",
+    ", išskyrus sutikimą tvarkyti neskelbtinus duomenis: su kokiomis Sąlygomis sutikote, kokia politika jums buvo parodyta ir su kuo dar sutikote registruodamiesi ir apmokėdami | Paskyros gyvavimo laiką ir dar 6 metus — ilgiausią mums taikomą senaties terminą | Ištrinami |\n| Jūsų sutikimo tvarkyti neskelbtinus duomenis įrašas (3 skyrius): formuluotės, su kuria sutikote, versija, jūsų kalba ir laikas | Kol paskyra egzistuoja | Ištrinamas kartu su paskyra"
+   ],
+   [
+    "Iki 8 savaičių po to, kai aktyvioji kopija ištrinama | Perrašomos",
+    "Mūsų serveryje: iki 8 savaičių po to, kai aktyvioji kopija ištrinama. Mūsų atskiroje atsarginių kopijų saugykloje: be laiko apribojimo, nes užšifruotos kopijos ten automatiškai neištrinamos | Mūsų serveryje perrašomos. Kitose šios lentelės eilutėse aprašomas mūsų serveris. Kopijose atskiroje atsarginių kopijų saugykloje saugoma duomenų bazė kartu su jūsų paskyros ir debatų raktais (bet ne dar nepradėtų klausimų raktais), todėl, kol jų nepašaliname, iš jų vis dar galima atkurti ištrintus debatus ar uždarytą paskyrą"
+   ],
+   [
+    ", todėl nei mes, nei kas nors kitas nebegali perskaityti užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Viešo debato viešos kopijos raktas ištrynimo metu nesunaikinamas: debatas lieka viešas (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti tris dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas",
+    " mūsų serveryje, todėl nei mes, nei kas nors kitas nebegali perskaityti ten esančių užšifruotų įrašų, be to, ištriname jūsų paskyros įrašą. Viešo debato viešos kopijos raktas ištrynimo metu nesunaikinamas: debatas lieka viešas (6 skyrius). Tai vadiname ištrynimu, nes toks yra šio veiksmo rezultatas mūsų serveryje, ir turime jį pagrindžiantį dokumentuotą vertinimą; jei norite sužinoti daugiau, klauskite. Svarbu žinoti keturis dalykus: į saugumo audito žurnalą įrašai tik pridedami, esamų įrašų negalima keisti, o pats žurnalas neištrinamas, tačiau jame nėra perskaitomų jūsų identifikatorių; nedidelis skaičius senesnių debatų sukurtas anksčiau nei dabartinė šifravimo schema, ir jei tai taikoma jūsų paskyrai, paaiškinsime, ką jiems reiškia paskyros uždarymas; DI paslaugų teikėjui jau išsiųstoms duomenų kopijoms taikomos to teikėjo Registre nurodytos saugojimo sąlygos, o ne mūsų atliekamas ištrynimas; be to, mūsų atsarginėse kopijose raktai saugomi kartu su įrašais, todėl tai, kas yra atsarginėje kopijoje, galima atkurti, kol ta kopija nepašalinta, o kopijos mūsų atskiroje atsarginių kopijų saugykloje automatiškai neištrinamos (žr. aukščiau eilutę apie atsargines kopijas)"
+   ]
+  ]
+ },
+ "lv": {
+  "sha256": "3f7fd29adc316cb08161b1fbcd30184093543924d6ca6d30d9c17a9b5fda5766",
+  "swaps": [
+   [
+    "A · v3.14 · SPĒKĀ",
+    "A · v3.15 · SPĒKĀ"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " mūsu serverī, taču šifrētās kopijas mūsu atsevišķajā dublējumkopiju glabātuvē netiek dzēstas automātiski (7. sadaļa)"
+   ],
+   [
+    "",
+    ". Piekrišanas sensitīvu datu apstrādei ieraksts (3. sadaļa) satur tikai formulējuma versiju, kurai piekritāt, jūsu valodu un laiku, un tas tiek dzēsts kopā ar jūsu kontu"
+   ],
+   [
+    "",
+    ", un dzēšam šo ierakstu kopā ar jūsu kontu"
+   ],
+   [
+    "pēc maksas plānu ieviešanas",
+    "ko Rumānijā darbina NETOPIA Financial Services S.A., pēc maksas plānu ieviešanas. Kartes datus jūs ievadāt tā lapā, nevis mūsējā, un tas saglabā jūsu karti, lai katrā atjaunošanas reizē varētu no tās iekasēt maksu. Ar katru maksājumu mēs tam nosūtām jūsu vārdu un uzvārdu, e-pasta adresi un tālruņa numuru, jūsu norēķinu adresi (iela, pilsēta, reģions, pasta indekss un valsts), klienta kodu, kas visiem jūsu maksājumiem ir vienāds, mūsu atsauci uz pasūtījumu, summu un valūtu, kā arī īsu maksājuma aprakstu, piemēram, jūsu plāna nosaukumu; kad tas atjaunošanas reizē iekasē maksu no jūsu saglabātās kartes, mēs nosūtām arī IP adresi, no kuras jūs pēdējo reizi pats veicāt maksājumu. NETOPIA šos datus pieprasa katram kartes maksājumam"
+   ],
+   [
+    "",
+    "\n| Konts, kura reģistrācija netika pabeigta: e-pasta adrese nav verificēta vai nav iestatīts otrais pierakstīšanās solis (piekļuves atslēga vai autentifikatora lietotne) | 24 stundas pēc reģistrācijas sākuma | Tiek dzēsts kopā ar visu, kas pieder kontam; tā e-pasta adresi un pseidonīmu var izmantot atkārtoti. Piekrišanas un akceptēšanas ierakstos un drošības audita pierakstā attiecīgie ieraksti saglabājas, kā norādīts to rindās |"
+   ],
+   [
+    "",
+    "mūsu serverī; mūsu dublējumkopijās kopijas tiek glabātas ilgāk (skatīt rindu par dublējumkopijām tālāk) "
+   ],
+   [
+    "Dublējumos tās tiek glabātas līdz 8 nedēļām, kā ar visu pārējo",
+    "Mūsu dublējumkopijās tās tiek glabātas tāpat kā viss pārējais (skatīt rindu par dublējumkopijām tālāk)"
+   ],
+   [
+    " | Konta darbības laiks plus 6 gadi — ilgākais mums piemērojamais noilguma termiņš | Tiek dzēsti",
+    ", izņemot piekrišanu sensitīvu datu apstrādei: kurus Noteikumus akceptējāt, kuru politiku jums parādīja un kam vēl piekritāt reģistrācijas laikā un norēķinoties | Konta darbības laiks plus 6 gadi — ilgākais mums piemērojamais noilguma termiņš | Tiek dzēsti |\n| Jūsu piekrišanas sensitīvu datu apstrādei ieraksts (3. sadaļa): formulējuma versija, kurai piekritāt, jūsu valoda un laiks | Kamēr konts pastāv | Tiek dzēsts kopā ar kontu"
+   ],
+   [
+    "Līdz 8 nedēļām pēc aktīvās kopijas dzēšanas | Tiek pārrakstītas",
+    "Mūsu serverī: līdz 8 nedēļām pēc aktīvās kopijas dzēšanas. Mūsu atsevišķajā dublējumkopiju glabātuvē: bez laika ierobežojuma, jo šifrētās kopijas tur netiek dzēstas automātiski | Mūsu serverī tiek pārrakstītas. Pārējās šīs tabulas rindas apraksta mūsu serveri. Kopijas atsevišķajā dublējumkopiju glabātuvē satur datubāzi kopā ar jūsu konta un debašu atslēgām (bet ne to jautājumu atslēgām, kurus vēl neesat sācis), tāpēc, kamēr mēs tās neesam noņēmuši, no tām joprojām var atjaunot izdzēstas debates vai slēgtu kontu"
+   ],
+   [
+    ", pēc tam šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publiskas debates publiskās kopijas atslēga dzēšanas laikā netiek iznīcināta: debate paliek publiska (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina trīs lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana",
+    " mūsu serverī, pēc tam tur esošos šifrētos ierakstus vairs nevar nolasīt ne mēs, ne kāds cits, un mēs dzēšam jūsu konta ierakstu. Publiskas debates publiskās kopijas atslēga dzēšanas laikā netiek iznīcināta: debate paliek publiska (6. sadaļa). Mēs to saucam par dzēšanu, jo tāds ir šīs darbības rezultāts mūsu serverī, un mūsu rīcībā ir to pamatojošs dokumentēts novērtējums; ja vēlaties uzzināt vairāk, jautājiet. Ir jāzina četras lietas: drošības audita pieraksts ir tikai papildināms un netiek dzēsts, taču tajā nav lasāmu jūsu identifikatoru; neliels skaits vecāku debašu ir izveidots pirms mūsu pašreizējās šifrēšanas shēmas, un, ja tas attiecas uz jūsu kontu, mēs jums paskaidrosim, ko slēgšana panāk attiecībā uz tām; uz datu kopijām, kas jau nosūtītas MI pakalpojumu sniedzējam, attiecas Reģistrā norādītie šā pakalpojumu sniedzēja glabāšanas noteikumi, nevis mūsu veiktā dzēšana; turklāt mūsu dublējumkopijās atslēgas glabājas kopā ar ierakstiem, tāpēc to, kas ir dublējumkopijā, var atjaunot, līdz šī kopija tiek noņemta, un kopijas mūsu atsevišķajā dublējumkopiju glabātuvē netiek dzēstas automātiski (skatīt rindu par dublējumkopijām iepriekš)"
+   ]
+  ]
+ },
+ "mt": {
+  "sha256": "01484d13680776408eeb9c244f853460d34c85d602112545a8813b89e31e91c4",
+  "swaps": [
+   [
+    "A · v3.14 · EFFET",
+    "A · v3.15 · EFFET"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " fuq is-server tagħna, iżda l-kopji kriptati fil-ħażna separata tagħna tal-kopji ta’ riżerva ma jitħassrux awtomatikament (taqsima 7)"
+   ],
+   [
+    "",
+    ". Ir-rekord tal-kunsens għal data sensittiva (taqsima 3) fih biss il-verżjoni tal-kliem li qbilt magħha, il-lingwa tiegħek u l-ħin, u jitħassar mal-kont tiegħek"
+   ],
+   [
+    "",
+    ", u nħassru dan ir-rekord mal-kont tiegħek"
+   ],
+   [
+    "ladarba jibdew il-pjanijiet bi ħlas",
+    "immexxi minn NETOPIA Financial Services S.A. fir-Rumanija, ladarba jibdew il-pjanijiet bi ħlas. Id-dettalji tal-karta tiegħek iddaħħalhom fuq il-paġna tal-fornitur, mhux fuq tagħna, u l-fornitur iżomm il-karta tiegħek biex ikun jista’ jiddebitaha f’kull tiġdid. Ma’ kull ħlas nibagħtulu ismek, l-indirizz elettroniku u n-numru tat-telefon tiegħek, l-indirizz tal-kontijiet tiegħek (it-triq, il-belt, ir-reġjun, il-kodiċi postali u l-pajjiż), kodiċi tal-klijent li jibqa’ l-istess għall-ħlasijiet kollha tiegħek, ir-referenza tagħna għall-ordni, l-ammont u l-munita, u deskrizzjoni qasira tal-ħlas, bħall-isem tal-pjan tiegħek; meta jiddebita l-karta salvata tiegħek f’tiġdid, nibagħtulu wkoll l-indirizz IP minn fejn ħallast int stess l-aħħar darba. NETOPIA titlob dawn id-dettalji ma’ kull ħlas bil-karta"
+   ],
+   [
+    "",
+    "\n| Kont li r-reġistrazzjoni tiegħu ma tlestietx: l-indirizz elettroniku ma ġiex ivverifikat, jew it-tieni pass tad-dħul (passkey jew app tal-awtentikazzjoni) ma ġiex issettjat | 24 siegħa wara li tkun bdiet ir-reġistrazzjoni | Jitħassar, flimkien ma’ kull ma jappartjeni lill-kont; l-indirizz elettroniku u l-psewdonimu tiegħu jistgħu jerġgħu jintużaw. Ir-rekords tal-aċċettazzjoni u r-reġistru tal-awditjar tas-sigurtà jżommu l-entrati tagħhom, kif jgħidu r-ringieli tagħhom |"
+   ],
+   [
+    "",
+    "fuq is-server tagħna; il-kopji ta’ riżerva tagħna jżommu kopji għal aktar żmien (ir-ringiela dwar il-kopji ta’ riżerva hawn taħt) "
+   ],
+   [
+    "backups iżommuhom sa 8 ġimgħat, bħal kull ħaġa oħra",
+    "kopji ta’ riżerva tagħna jżommuhom kif iżommu kull ħaġa oħra (ir-ringiela dwar il-kopji ta’ riżerva hawn taħt)"
+   ],
+   [
+    " | Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina | Jitħassru",
+    ", ħlief il-kunsens għal data sensittiva: liema Termini aċċettajt, liema politika rajt u x’aktar qbilt miegħu waqt ir-reġistrazzjoni u meta tħallas | Il-ħajja tal-kont flimkien ma’ 6 snin — l-itwal perjodu ta’ preskrizzjoni li japplika għalina | Jitħassru |\n| Ir-rekord tal-kunsens tiegħek għal data sensittiva (taqsima 3): il-verżjoni tal-kliem li qbilt magħha, il-lingwa tiegħek u l-ħin | Sakemm jeżisti l-kont | Jitħassar mal-kont"
+   ],
+   [
+    "Sa 8 ġimgħat wara li titħassar il-kopja attiva | Jinkitbu fuq",
+    "Fuq is-server tagħna: sa 8 ġimgħat wara li titħassar il-kopja attiva. Fil-ħażna separata tagħna tal-kopji ta’ riżerva: l-ebda limitu ta’ żmien, għax il-kopji kriptati hemmhekk ma jitħassrux awtomatikament | Fuq is-server tagħna, jinkitbu fuqhom. Ir-ringieli l-oħra ta’ din it-tabella jiddeskrivu s-server tagħna. Il-kopji fil-ħażna separata tal-kopji ta’ riżerva fihom il-bażi tad-data flimkien maċ-ċwievet tal-kont tiegħek u tad-dibattiti tiegħek (iżda mhux iċ-ċwievet tal-mistoqsijiet li għadek ma bdejtx), għalhekk sakemm inneħħuhom, dibattitu mħassar jew kont magħluq xorta jista’ jiġi rrestawrat minn"
+   ],
+   [
+    ", u wara dan ir-rekords kriptati ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Iċ-ċavetta tal-kopja pubblika ta’ dibattitu pubbliku ma tinqerdix waqt it-tħassir: id-dibattitu jibqa’ pubbliku (taqsima 6). Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm tliet affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; il-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna",
+    " fuq is-server tagħna, u wara dan ir-rekords kriptati li jinsabu hemm ma jistgħux jinqraw minna jew minn ħaddieħor, u nħassru r-rekord tal-kont tiegħek. Iċ-ċavetta tal-kopja pubblika ta’ dibattitu pubbliku ma tinqerdix waqt it-tħassir: id-dibattitu jibqa’ pubbliku (taqsima 6). Niddeskrivu dan bħala tħassir għax dak huwa l-effett tiegħu fuq is-server tagħna, u għandna valutazzjoni dokumentata li ssostnih; jekk trid tkun taf aktar, staqsina. Hemm erba’ affarijiet li għandek tkun taf: ir-reġistru tal-awditjar tas-sigurtà huwa wieħed li miegħu jiżdied biss u ma jitħassarx, iżda ma fih ebda identifikatur tiegħek li jista’ jinqara; għadd żgħir ta’ dibattiti antiki ġew qabel l-iskema ta’ kriptaġġ attwali tagħna, u jekk dan japplika għall-kont tiegħek ngħidulek x’jikseb għalihom l-għeluq; il-kopji tad-data li jkunu diġà ntbagħtu lil fornitur tal-IA huma rregolati mit-termini taż-żamma ta’ dak il-fornitur fir-Reġistru, mhux mit-tħassir tagħna; u l-kopji ta’ riżerva tagħna fihom iċ-ċwievet flimkien mar-rekords, għalhekk dak li jkun hemm f’kopja ta’ riżerva jista’ jiġi rrestawrat sakemm dik il-kopja titneħħa, u l-kopji fil-ħażna separata tagħna tal-kopji ta’ riżerva ma jitħassrux awtomatikament (ir-ringiela dwar il-kopji ta’ riżerva hawn fuq)"
+   ]
+  ]
+ },
+ "nl": {
+  "sha256": "9ca16fad8dde44fc4b257082d27f2e7b2861dda4327edfc96ab712383f789d2c",
+  "swaps": [
+   [
+    "D · v3.14 · VAN K",
+    "D · v3.15 · VAN K"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "vernietigd",
+    "op onze server vernietigd, maar de versleutelde kopieën op onze afzonderlijke back-upopslag worden niet automatisch verwijderd (hoofdstuk 7)"
+   ],
+   [
+    "",
+    ". De vastlegging van de toestemming voor gevoelige gegevens (hoofdstuk 3) bevat alleen de versie van de tekst waarmee u hebt ingestemd, uw taal en het tijdstip, en wordt met uw account verwijderd"
+   ],
+   [
+    "",
+    ", en wij verwijderen deze vastlegging met uw account"
+   ],
+   [
+    "zodra betaalde abonnementen van start gaan",
+    "beheerd door NETOPIA Financial Services S.A. in Roemenië, zodra betaalde abonnementen van start gaan. U voert uw kaartgegevens in op de pagina van de aanbieder, niet op de onze, en de aanbieder bewaart uw kaart, zodat die bij elke verlenging kan worden belast. Bij elke betaling sturen wij de aanbieder uw naam, e-mailadres en telefoonnummer, uw factuuradres (straat, plaats, regio, postcode en land), een klantcode die voor al uw betalingen dezelfde blijft, onze referentie voor de bestelling, het bedrag en de valuta, en een korte omschrijving van de betaling, zoals de naam van uw abonnement; wanneer de aanbieder uw opgeslagen kaart bij een verlenging belast, sturen wij ook het IP-adres van waaruit u de laatste keer zelf hebt betaald. NETOPIA vraagt bij elke kaartbetaling om deze gegevens"
+   ],
+   [
+    "",
+    "\n| Een account waarvan de registratie niet is voltooid: het e-mailadres niet geverifieerd, of de tweede aanmeldstap (een passkey of een authenticator-app) niet ingesteld | 24 uur nadat de registratie begon | Verwijderd, met alles wat bij het account hoort; het e-mailadres en het pseudoniem ervan kunnen opnieuw worden gebruikt. De vastleggingen van aanvaarding en toestemming en het beveiligingsauditlogboek behouden hun vermeldingen, zoals in hun rijen staat |"
+   ],
+   [
+    "nleesbaar wordt",
+    "p onze server onleesbaar wordt; onze back-ups bewaren kopieën langer (de rij over back-ups hieronder)"
+   ],
+   [
+    "Back-ups bewaren ze tot 8 weken, net als al het andere",
+    "Onze back-ups bewaren ze zoals ze al het andere bewaren (de rij over back-ups hieronder)"
+   ],
+   [
+    " | Levensduur van het account plus 6 jaar — de langste verjaringstermijn die op ons van toepassing is | Verwijderd",
+    ", behalve de toestemming voor gevoelige gegevens: welke Voorwaarden u aanvaardde, welk beleid aan u werd getoond en waarmee u verder hebt ingestemd bij registratie en bij het afrekenen | Levensduur van het account plus 6 jaar — de langste verjaringstermijn die op ons van toepassing is | Verwijderd |\n| De vastlegging van uw toestemming voor gevoelige gegevens (hoofdstuk 3): de versie van de tekst waarmee u hebt ingestemd, uw taal en het tijdstip | Zolang het account bestaat | Verwijderd met het account"
+   ],
+   [
+    "Tot 8 weken nadat de actuele kopie is verwijderd | Overschrev",
+    "Op onze server: tot 8 weken nadat de actuele kopie is verwijderd. Op onze afzonderlijke back-upopslag: geen termijn, omdat de versleutelde kopieën daar niet automatisch worden verwijderd | Op onze server overschreven. De andere rijen van deze tabel beschrijven onze server. De kopieën op de afzonderlijke back-upopslag bevatten de database samen met de sleutels tot uw account en uw debatten (maar niet de sleutels tot de vragen die u nog niet hebt gestart), zodat een verwijderd debat of een gesloten account daaruit nog kan worden hersteld totdat wij ze verwijder"
+   ],
+   [
+    "vernietigd, waarna de versleutelde gegevens niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. De sleutel van de openbare kopie van een openbaar debat wordt bij verwijdering niet vernietigd: het debat blijft openbaar (paragraaf 6). Wij omschrijven dit als verwijdering omdat dit het effect ervan is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Drie zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering",
+    "op onze server vernietigd, waarna de versleutelde gegevens daar niet meer door ons of anderen kunnen worden gelezen, en verwijderen wij de vastlegging van uw account. De sleutel van de openbare kopie van een openbaar debat wordt bij verwijdering niet vernietigd: het debat blijft openbaar (paragraaf 6). Wij omschrijven dit als verwijdering omdat dit het effect ervan op onze server is, en wij beschikken over een gedocumenteerde beoordeling die dit onderbouwt; vraag het ons als u meer wilt weten. Vier zaken die u moet weten: het beveiligingsauditlogboek is uitsluitend voor toevoegingen bestemd en wordt niet verwijderd, maar bevat geen leesbare identificatoren van u; een klein aantal oudere debatten dateert van vóór ons huidige versleutelingsschema, en als dit voor uw account geldt, vertellen wij u wat sluiting voor die debatten bewerkstelligt; kopieën van gegevens die reeds naar een AI-aanbieder zijn gestuurd, vallen onder de bewaarbepalingen van die aanbieder in het Register, niet onder onze verwijdering; en onze back-ups bevatten de sleutels samen met de gegevens, zodat wat een back-upkopie bevat kan worden hersteld totdat die kopie is verwijderd, en de kopieën op onze afzonderlijke back-upopslag worden niet automatisch verwijderd (de rij over back-ups hierboven)"
+   ]
+  ]
+ },
+ "pl": {
+  "sha256": "acb80665b441316ab8d1f1aba6bfe7a49c3f6cad6536b769489c28a59b2c6d7a",
+  "swaps": [
+   [
+    "I · v3.14 · OBOWI",
+    "I · v3.15 · OBOWI"
+   ],
+   [
+    "2016/679) · v3.14",
+    "2016/679) · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " na naszym serwerze, ale zaszyfrowane kopie w naszym oddzielnym magazynie kopii zapasowych nie są usuwane automatycznie (sekcja 7)"
+   ],
+   [
+    "",
+    ". Zapis zgody na przetwarzanie danych wrażliwych (sekcja 3) zawiera tylko wersję zaakceptowanej przez Ciebie treści, Twój język oraz czas i jest usuwany wraz z Twoim kontem"
+   ],
+   [
+    "",
+    ", a ten zapis usuwamy wraz z Twoim kontem"
+   ],
+   [
+    "o uruchomieniu planów płatnych",
+    "rowadzonego przez NETOPIA Financial Services S.A. w Rumunii, po uruchomieniu planów płatnych. Dane karty wpisujesz na stronie dostawcy, a nie na naszej, a dostawca przechowuje Twoją kartę, aby móc ją obciążać przy każdym odnowieniu. Przy każdej płatności przesyłamy mu Twoje imię i nazwisko, adres e-mail i numer telefonu, Twój adres rozliczeniowy (ulicę, miasto, region, kod pocztowy i kraj), kod klienta, który pozostaje taki sam dla wszystkich Twoich płatności, nasz numer referencyjny zamówienia, kwotę i walutę oraz krótki opis płatności, na przykład nazwę Twojego planu; gdy obciąża Twoją zapisaną kartę przy odnowieniu, przesyłamy mu też adres IP, z którego ostatnio płaciłeś samodzielnie. NETOPIA wymaga tych danych przy każdej płatności kartą"
+   ],
+   [
+    "",
+    "\n| Konto, którego rejestracja nie została dokończona: adres e-mail nie został zweryfikowany albo drugi krok logowania (klucz dostępu lub aplikacja uwierzytelniająca) nie został skonfigurowany | 24 godziny od rozpoczęcia rejestracji | Zostaje usunięte wraz ze wszystkim, co należy do konta; jego adres e-mail i pseudonim mogą zostać ponownie użyte. Rejestry akceptacji i dziennik audytu bezpieczeństwa zachowują swoje wpisy, jak podają ich wiersze |"
+   ],
+   [
+    "",
+    "na naszym serwerze; nasze kopie zapasowe przechowują kopie dłużej (wiersz o kopiach zapasowych poniżej) "
+   ],
+   [
+    "Kopie zapasowe przechowują je do 8 tygodni, jak wszystko inne",
+    "Nasze kopie zapasowe przechowują je tak jak wszystko inne (wiersz o kopiach zapasowych poniżej)"
+   ],
+   [
+    " | Przez okres istnienia konta oraz 6 lat — najdłuższy mający do nas zastosowanie termin przedawnienia | Zostają usunięte",
+    ", z wyjątkiem zgody na przetwarzanie danych wrażliwych: które Warunki świadczenia usług zaakceptowałeś, którą politykę Ci przedstawiono i na co jeszcze się zgodziłeś podczas rejestracji i przy płatności | Przez okres istnienia konta oraz 6 lat — najdłuższy mający do nas zastosowanie termin przedawnienia | Zostają usunięte |\n| Zapis Twojej zgody na przetwarzanie danych wrażliwych (sekcja 3): wersja zaakceptowanej przez Ciebie treści, Twój język oraz czas | Przez okres istnienia konta | Zostaje usunięty wraz z kontem"
+   ],
+   [
+    "Do 8 tygodni od usunięcia kopii aktywnej | Zostają nadpisane",
+    "Na naszym serwerze: do 8 tygodni od usunięcia kopii aktywnej. W naszym oddzielnym magazynie kopii zapasowych: bez limitu czasu, ponieważ znajdujące się tam zaszyfrowane kopie nie są usuwane automatycznie | Na naszym serwerze zostają nadpisane. Pozostałe wiersze tej tabeli opisują nasz serwer. Kopie w oddzielnym magazynie kopii zapasowych zawierają bazę danych wraz z kluczami do Twojego konta i Twoich debat (ale nie kluczami do pytań, których jeszcze nie rozpocząłeś), więc dopóki ich nie usuniemy, usuniętą debatę lub zamknięte konto nadal można z nich przywrócić"
+   ],
+   [
+    ", po czym zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Klucz publicznej kopii publicznej debaty nie zostaje zniszczony podczas usuwania konta: debata pozostaje publiczna (punkt 6). Opisujemy to jako usunięcie, ponieważ taki jest jego skutek, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o trzech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania",
+    " na naszym serwerze, po czym znajdujące się tam zaszyfrowane rekordy nie mogą zostać odczytane przez nas ani nikogo innego, a my usuwamy rekord Twojego konta. Klucz publicznej kopii publicznej debaty nie zostaje zniszczony podczas usuwania konta: debata pozostaje publiczna (punkt 6). Opisujemy to jako usunięcie, ponieważ taki jest jego skutek na naszym serwerze, i dysponujemy udokumentowaną oceną uzasadniającą to określenie; jeśli chcesz dowiedzieć się więcej, zapytaj. Należy wiedzieć o czterech rzeczach: dziennik audytu bezpieczeństwa pozwala wyłącznie na dopisywanie i nie jest usuwany, lecz nie zawiera czytelnych identyfikatorów dotyczących Ciebie; niewielka liczba starszych debat powstała przed wprowadzeniem obecnego schematu szyfrowania, a jeśli dotyczy to Twojego konta, informujemy Cię, jaki skutek ma dla nich jego zamknięcie; kopie danych już wysłanych dostawcy AI podlegają warunkom przechowywania tego dostawcy podanym w Rejestrze, a nie naszemu procesowi usuwania; ponadto nasze kopie zapasowe zawierają klucze wraz z rekordami, więc to, co zawiera kopia zapasowa, można przywrócić, dopóki ta kopia nie zostanie usunięta, a kopie w naszym oddzielnym magazynie kopii zapasowych nie są usuwane automatycznie (wiersz o kopiach zapasowych powyżej)"
+   ]
+  ]
+ },
+ "pt": {
+  "sha256": "de1717ba8bc01dc3625d8efec3080f9b0163cb0a4624c696d0a2f01b5f9b470d",
+  "swaps": [
+   [
+    "E · v3.14 · EM VI",
+    "E · v3.15 · EM VI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " no nosso servidor, mas as cópias cifradas no nosso armazenamento separado de cópias de segurança não são eliminadas automaticamente (secção 7)"
+   ],
+   [
+    "",
+    ". O registo do consentimento para dados sensíveis (secção 3) contém apenas a versão do texto que aceitou, o seu idioma e o momento, e é eliminado com a sua conta"
+   ],
+   [
+    "",
+    ", e eliminamos este registo com a sua conta"
+   ],
+   [
+    "quando os planos pagos tiverem iníci",
+    "gerido pela NETOPIA Financial Services S.A. na Roménia, quando os planos pagos tiverem início. Introduz os dados do seu cartão na página do prestador, e não na nossa, e o prestador guarda o seu cartão para o poder debitar em cada renovação. Com cada pagamento, enviamos-lhe o seu nome, o seu endereço de correio eletrónico e o seu número de telefone, o seu endereço de faturação (rua, cidade, região, código postal e país), um código de cliente que se mantém igual para todos os seus pagamentos, a nossa referência da encomenda, o montante e a moeda, e uma breve descrição do pagamento, como o nome do seu plano; quando debita o seu cartão guardado numa renovação, enviamos-lhe também o endereço IP a partir do qual pagou pessoalmente pela última vez. A NETOPIA solicita estes dados em cada pagamento com cartã"
+   ],
+   [
+    "",
+    "\n| Uma conta cujo registo não foi concluído: o endereço de correio eletrónico não foi verificado, ou o segundo passo de início de sessão (uma chave de acesso ou uma aplicação de autenticação) não foi configurado | 24 horas após o início do registo | É eliminada, com tudo o que pertence à conta; o seu endereço de correio eletrónico e o seu pseudónimo podem voltar a ser utilizados. Os registos de aceitação e o registo de auditoria de segurança mantêm as suas entradas, como indicam as respetivas linhas |"
+   ],
+   [
+    "",
+    "no nosso servidor; as nossas cópias de segurança mantêm cópias durante mais tempo (a linha sobre cópias de segurança, abaixo) "
+   ],
+   [
+    "cópias de segurança mantêm-nas até 8 semanas, como acontece com tudo o resto",
+    "nossas cópias de segurança mantêm-nas tal como mantêm tudo o resto (a linha sobre cópias de segurança, abaixo)"
+   ],
+   [
+    " | Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável | São eliminados",
+    ", exceto o consentimento para dados sensíveis: que Termos aceitou, que política lhe foi apresentada e o que mais aceitou no registo e no momento do pagamento | Vida útil da conta acrescida de 6 anos — o prazo de prescrição mais longo que nos é aplicável | São eliminados |\n| O registo do seu consentimento para dados sensíveis (secção 3): a versão do texto que aceitou, o seu idioma e o momento | Enquanto a conta existir | É eliminado com a conta"
+   ],
+   [
+    "Até 8 semanas após a eliminação da cópia ativa | São substituíd",
+    "No nosso servidor: até 8 semanas após a eliminação da cópia ativa. No nosso armazenamento separado de cópias de segurança: sem limite de tempo, porque as cópias cifradas que aí se encontram não são eliminadas automaticamente | No nosso servidor, são substituídas. As outras linhas desta tabela descrevem o nosso servidor. As cópias no armazenamento separado de cópias de segurança contêm a base de dados juntamente com as chaves da sua conta e dos seus debates (mas não as chaves das perguntas que ainda não iniciou), pelo que, até as removermos, um debate eliminado ou uma conta encerrada ainda podem ser restaurados a partir del"
+   ],
+   [
+    ", após o que os registos cifrados não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. A chave da cópia pública de um debate público não é destruída na eliminação: o debate continua público (secção 6). Descrevemo-lo como eliminação porque esse é o seu efeito, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber três coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação",
+    " no nosso servidor, após o que os registos cifrados que aí se encontram não podem ser lidos por nós nem por qualquer outra pessoa, e eliminamos o registo da sua conta. A chave da cópia pública de um debate público não é destruída na eliminação: o debate continua público (secção 6). Descrevemo-lo como eliminação porque esse é o seu efeito no nosso servidor, e dispomos de uma avaliação documentada que o fundamenta; se quiser saber mais, pergunte-nos. Deve saber quatro coisas: o registo de auditoria de segurança é exclusivamente aditivo e não é eliminado, mas não contém identificadores legíveis a seu respeito; um pequeno número de debates antigos é anterior ao nosso atual sistema de cifragem e, se isso se aplicar à sua conta, informamo-lo sobre o efeito que o encerramento terá sobre eles; as cópias de dados já enviadas a um fornecedor de IA são regidas pelas condições de conservação desse fornecedor constantes do Registo, e não pela nossa eliminação; e as nossas cópias de segurança contêm as chaves juntamente com os registos, pelo que o conteúdo de uma cópia de segurança pode ser restaurado até essa cópia ser removida, e as cópias no nosso armazenamento separado de cópias de segurança não são eliminadas automaticamente (a linha sobre cópias de segurança, acima)"
+   ]
+  ]
+ },
+ "ro": {
+  "sha256": "85787da39177fc6e4e2c7cd1620c5ab734063538f2f6acc530b89416a35c01bc",
+  "swaps": [
+   [
+    "E · v3.14 · ÎN VI",
+    "E · v3.15 · ÎN VI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "cheile datelor dumneavoastră private",
+    "pe serverul nostru cheile datelor dumneavoastră private, dar copiile criptate din spațiul nostru separat de stocare a copiilor de rezervă nu se șterg automat (secțiunea 7)"
+   ],
+   [
+    "",
+    ". Evidența consimțământului privind datele sensibile (secțiunea 3) cuprinde doar versiunea formulării pe care ați acceptat-o, limba dumneavoastră și momentul acordării și se șterge odată cu contul dumneavoastră"
+   ],
+   [
+    "",
+    " și ștergem această evidență odată cu contul dumneavoastră"
+   ],
+   [
+    "dată ce încep planurile cu plată",
+    "perat de NETOPIA Financial Services S.A. din România, odată ce încep planurile cu plată. Datele cardului le introduceți pe pagina acestuia, nu pe a noastră, iar el vă păstrează cardul pentru a-l putea debita la fiecare reînnoire. La fiecare plată îi trimitem numele, adresa de e-mail și numărul de telefon, adresa de facturare (strada, localitatea, regiunea, codul poștal și țara), un cod de client care rămâne același pentru toate plățile dumneavoastră, referința noastră pentru comandă, suma și moneda, precum și o scurtă descriere a plății, de exemplu numele planului; când vă debitează cardul salvat la o reînnoire, îi trimitem și adresa IP de la care ați plătit ultima dată personal. NETOPIA cere aceste date la fiecare plată cu cardul"
+   ],
+   [
+    "",
+    "\n| Un cont a cărui înregistrare nu a fost finalizată: adresa de e-mail nu a fost verificată sau al doilea pas de autentificare (o cheie de acces sau o aplicație de autentificare) nu a fost configurat | 24 de ore de la începerea înregistrării | Șters, cu tot ce ține de cont; adresa de e-mail și pseudonimul pot fi folosite din nou. Evidențele privind acceptarea și jurnalul de audit al securității își păstrează înregistrările, așa cum arată rândurile lor |"
+   ],
+   [
+    "",
+    "pe serverul nostru; copiile noastre de rezervă îl păstrează mai mult timp (rândul „Copii de siguranță” de mai jos) "
+   ],
+   [
+    "de rezervă le păstrează până la 8 săptămâni, ca toate celelalte",
+    "noastre de rezervă le păstrează la fel ca pe toate celelalte (rândul „Copii de siguranță” de mai jos)"
+   ],
+   [
+    " | Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică | Șterse",
+    ", cu excepția consimțământului privind datele sensibile: ce Termeni ați acceptat, ce politică vi s-a prezentat și ce altceva ați acceptat la înregistrare și la plată | Durata de viață a contului plus 6 ani — cel mai lung termen de prescripție care ni se aplică | Șterse |\n| Evidența consimțământului dumneavoastră privind datele sensibile (secțiunea 3): versiunea formulării pe care ați acceptat-o, limba dumneavoastră și momentul acordării | Cât timp există contul | Ștearsă odată cu contul"
+   ],
+   [
+    "ână la 8 săptămâni după ștergerea copiei active | Suprascris",
+    "e serverul nostru: până la 8 săptămâni după ștergerea copiei active. În spațiul nostru separat de stocare a copiilor de rezervă: fără limită de timp, deoarece copiile criptate de acolo nu se șterg automat | Pe serverul nostru, suprascrise. Celelalte rânduri ale acestui tabel descriu serverul nostru. Copiile din spațiul separat de stocare cuprind baza de date împreună cu cheile contului și ale dezbaterilor dumneavoastră (dar nu și cheile întrebărilor pe care nu le-ați pornit încă), așa că, până când le eliminăm, o dezbatere ștearsă sau un cont închis pot fi încă restaurate din el"
+   ],
+   [
+    ", după care înregistrările criptate nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Cheia copiei publice a unei dezbateri publice nu este distrusă la ștergere: dezbaterea rămâne publică (secțiunea 6). Numim acest lucru ștergere deoarece acesta este efectul său și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute trei aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi",
+    " pe serverul nostru, după care înregistrările criptate de acolo nu mai pot fi citite de noi sau de altcineva, iar noi ștergem înregistrarea contului. Cheia copiei publice a unei dezbateri publice nu este distrusă la ștergere: dezbaterea rămâne publică (secțiunea 6). Numim acest lucru ștergere deoarece acesta este efectul său pe serverul nostru și deținem o evaluare documentată care îl susține; dacă doriți mai multe informații, întrebați-ne. Trebuie cunoscute patru aspecte: jurnalul de audit al securității este exclusiv cu adăugare și nu se șterge, dar nu conține identificatori lizibili despre dumneavoastră; un număr mic de dezbateri mai vechi precedă schema noastră actuală de criptare, iar dacă aceasta este situația contului dumneavoastră vă explicăm ce efect are închiderea asupra lor; copiile datelor deja trimise unui furnizor de IA sunt guvernate de condițiile de păstrare ale furnizorului din Registru, nu de ștergerea efectuată de noi; iar copiile noastre de rezervă cuprind cheile împreună cu înregistrările, așa că ceea ce conține o copie de rezervă poate fi restaurat până când acea copie este eliminată, iar copiile din spațiul nostru separat de stocare a copiilor de rezervă nu se șterg automat (rândul „Copii de siguranță” de mai sus)"
+   ],
+   [
+    "",
+    "5 a înlocuit versiunea 3.14: arată ce companie operează furnizorul nostru de plăți, NETOPIA Payments, și ce îi trimitem la fiecare plată (secțiunea 5); că evidența consimțământului dumneavoastră privind datele sensibile se șterge odată cu contul, în timp ce celelalte evidențe privind acceptarea și consimțământul se păstrează 6 ani după încetarea contului (secțiunile 2, 3 și 7); că copiile criptate din spațiul nostru separat de stocare a copiilor de rezervă nu se șterg automat, așa că o dezbatere ștearsă sau un cont închis pot fi restaurate din ele până când sunt eliminate, acolo unde spunea că copiile de rezervă se păstrează până la 8 săptămâni (secțiunea 7); și că un cont a cărui înregistrare nu este finalizată în 24 de ore se șterge (secțiunea 7). Versiunea 3.1"
+   ]
+  ]
+ },
+ "ru": {
+  "sha256": "a7567f0f5e3f9fd23f3ab67f2df941af04fab189fb1161a61e667060cc587e9e",
+  "swaps": [
+   [
+    "И · v3.14 · ДЕЙСТ",
+    "И · v3.15 · ДЕЙСТ"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " на нашем сервере, но зашифрованные копии в нашем отдельном хранилище резервных копий автоматически не удаляются (раздел 7)"
+   ],
+   [
+    "",
+    ". Запись о согласии на обработку данных особых категорий (раздел 3) содержит только версию текста, с которым вы согласились, ваш язык и время и удаляется вместе с вашей учётной записью"
+   ],
+   [
+    "",
+    ", а при удалении вашей учётной записи удаляем и эту запись"
+   ],
+   [
+    "после запуска платных тарифов",
+    "которым управляет компания NETOPIA Financial Services S.A. в Румынии, после запуска платных тарифов. Данные карты вы вводите на его странице, а не на нашей, и он хранит вашу карту, чтобы списывать с неё оплату при каждом продлении. С каждым платежом мы передаём ему ваши имя, адрес электронной почты и номер телефона, ваш платёжный адрес (улицу, город, регион, почтовый индекс и страну), код клиента, одинаковый для всех ваших платежей, наш идентификатор заказа, сумму и валюту, а также краткое описание платежа, например название вашего тарифа; когда он списывает оплату с вашей сохранённой карты при продлении, мы также передаём ему IP-адрес, с которого вы в последний раз платили сами. NETOPIA запрашивает эти данные при каждой оплате картой"
+   ],
+   [
+    "",
+    "\n| Учётная запись, регистрация которой не была завершена: адрес электронной почты не подтверждён или не настроен второй шаг входа (ключ доступа или приложение-аутентификатор) | 24 часа с начала регистрации | Удаляется вместе со всем, что относится к учётной записи; её адрес электронной почты и псевдоним можно использовать снова. Записи о принятии и журнал аудита безопасности сохраняют свои данные, как указано в их строках |"
+   ],
+   [
+    "становится нечитаемым",
+    "на нашем сервере становится нечитаемым; наши резервные копии хранят копии дольше (строка о резервных копиях ниже)"
+   ],
+   [
+    "Резервные копии хранят их до 8 недель, как и всё остальное",
+    "Наши резервные копии хранят их так же, как и всё остальное (строка о резервных копиях ниже)"
+   ],
+   [
+    " | Срок существования учётной записи плюс 6 лет — самый длительный применимый к нам срок исковой давности | Удаляются",
+    ", кроме согласия на обработку данных особых категорий: какие Условия вы приняли, какая политика была вам показана и на что ещё вы согласились при регистрации и при оформлении оплаты | Срок существования учётной записи плюс 6 лет — самый длительный применимый к нам срок исковой давности | Удаляются |\n| Запись о вашем согласии на обработку данных особых категорий (раздел 3): версия текста, с которым вы согласились, ваш язык и время | Пока существует учётная запись | Удаляется вместе с учётной записью"
+   ],
+   [
+    "До 8 недель после удаления рабочей копии | Перезаписываются",
+    "На нашем сервере: до 8 недель после удаления рабочей копии. В нашем отдельном хранилище резервных копий: без ограничения срока, поскольку зашифрованные копии там автоматически не удаляются | На нашем сервере перезаписываются. Остальные строки этой таблицы описывают наш сервер. Копии в отдельном хранилище резервных копий содержат базу данных вместе с ключами к вашей учётной записи и вашим дебатам (но не ключи к ещё не начатым вопросам), поэтому, пока мы их не удалим, удалённые дебаты или закрытую учётную запись всё ещё можно из них восстановить"
+   ],
+   [
+    "уничтожаются, после чего ни мы, ни кто-либо другой не может прочитать зашифрованные записи; сама учётная запись также удаляется. Ключ к публичной копии дебатов при удалении не уничтожается: дебаты остаются публичными (раздел 6). Мы называем это удалением, поскольку таков его результат, и располагаем подтверждающей документированной оценкой; подробности можно запросить. Важно знать три обстоятельства: в журнал аудита безопасности записи можно только добавлять, и он не удаляется, но не содержит читаемых идентификаторов; небольшое число старых дебатов создано до нынешней схемы шифрования, и если это относится к вашей учётной записи, мы сообщим, к какому результату приведёт закрытие для этих дебатов; копии данных, уже переданные поставщику ИИ, регулируются его условиями хранения в Реестре, а не нашим удалением",
+    "на нашем сервере уничтожаются, после чего ни мы, ни кто-либо другой не может прочитать находящиеся там зашифрованные записи; сама учётная запись также удаляется. Ключ к публичной копии дебатов при удалении не уничтожается: дебаты остаются публичными (раздел 6). Мы называем это удалением, поскольку таков его результат на нашем сервере, и располагаем подтверждающей документированной оценкой; подробности можно запросить. Важно знать четыре обстоятельства: в журнал аудита безопасности записи можно только добавлять, и он не удаляется, но не содержит читаемых идентификаторов; небольшое число старых дебатов создано до нынешней схемы шифрования, и если это относится к вашей учётной записи, мы сообщим, к какому результату приведёт закрытие для этих дебатов; копии данных, уже переданные поставщику ИИ, регулируются его условиями хранения в Реестре, а не нашим удалением; и наши резервные копии хранят ключи вместе с записями, поэтому то, что содержится в резервной копии, можно восстановить, пока эта копия не удалена, а копии в нашем отдельном хранилище резервных копий автоматически не удаляются (строка о резервных копиях выше)"
+   ]
+  ]
+ },
+ "sk": {
+  "sha256": "05866833fad33e7d95cb6c2909b89db2578f25683a6732526ce26d745a253724",
+  "swaps": [
+   [
+    "V · v3.14 · ÚČINN",
+    "V · v3.15 · ÚČINN"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " na našom serveri, šifrované kópie v našom samostatnom úložisku záloh sa však automaticky nevymažú (časť 7)"
+   ],
+   [
+    "",
+    ". Záznam o súhlase s citlivými údajmi (časť 3) obsahuje iba verziu znenia, s ktorým ste súhlasili, váš jazyk a čas, a vymaže sa spolu s vaším účtom"
+   ],
+   [
+    "",
+    ", a tento záznam vymažeme spolu s vaším účtom"
+   ],
+   [
+    "po spustení platených programov",
+    "ktorého prevádzkuje spoločnosť NETOPIA Financial Services S.A. v Rumunsku, po spustení platených programov. Údaje o karte zadávate na jeho stránke, nie na našej, a on vašu kartu uchováva, aby z nej mohol strhávať platby pri každom obnovení. Pri každej platbe mu posielame vaše meno, e-mailovú adresu a telefónne číslo, vašu fakturačnú adresu (ulicu, mesto, región, PSČ a krajinu), kód zákazníka, ktorý je rovnaký pre všetky vaše platby, naše označenie objednávky, sumu a menu a krátky popis platby, napríklad názov vášho programu; keď pri obnovení strhne platbu z vašej uloženej karty, posielame mu aj IP adresu, z ktorej ste naposledy platili sami. NETOPIA tieto údaje vyžaduje pri každej platbe kartou"
+   ],
+   [
+    "",
+    "\n| Účet, ktorého registrácia nebola dokončená: e-mailová adresa nebola overená alebo nebol nastavený druhý krok prihlásenia (prístupový kľúč alebo overovacia aplikácia) | 24 hodín od začatia registrácie | Vymaže sa spolu so všetkým, čo k účtu patrí; jeho e-mailovú adresu a pseudonym možno znovu použiť. Záznamy o prijatí a bezpečnostný auditný záznam si svoje položky ponechávajú, ako uvádzajú ich riadky |"
+   ],
+   [
+    "stane nečitateľným",
+    "na našom serveri stane nečitateľným; naše zálohy uchovávajú kópie dlhšie (riadok o zálohách nižšie)"
+   ],
+   [
+    "Zálohy ich uchovávajú až 8 týždňov, rovnako ako všetko ostatné",
+    "Naše zálohy ich uchovávajú rovnako ako všetko ostatné (riadok o zálohách nižšie)"
+   ],
+   [
+    " | Počas existencie účtu a ďalších 6 rokov — najdlhšia premlčacia lehota, ktorá sa na nás vzťahuje | Vymažú sa",
+    ", okrem súhlasu s citlivými údajmi: ktoré podmienky ste prijali, ktoré zásady vám boli zobrazené a s čím ďalším ste súhlasili pri registrácii a pri platbe | Počas existencie účtu a ďalších 6 rokov — najdlhšia premlčacia lehota, ktorá sa na nás vzťahuje | Vymažú sa |\n| Záznam o vašom súhlase s citlivými údajmi (časť 3): verzia znenia, s ktorým ste súhlasili, váš jazyk a čas | Počas existencie účtu | Vymaže sa spolu s účtom"
+   ],
+   [
+    "jviac 8 týždňov po vymazaní živej kópie | Prepíšu sa",
+    " našom serveri: najviac 8 týždňov po vymazaní živej kópie. V našom samostatnom úložisku záloh: bez časového obmedzenia, pretože šifrované kópie sa tam automaticky nevymazávajú | Na našom serveri sa prepíšu. Ostatné riadky tejto tabuľky opisujú náš server. Kópie v samostatnom úložisku záloh obsahujú databázu spolu s kľúčmi k vášmu účtu a vašim debatám (nie však kľúče k zatiaľ nezačatým otázkam), takže kým ich neodstránime, odstránenú debatu alebo zrušený účet z nich možno stále obnoviť"
+   ],
+   [
+    "zničia, takže my ani nikto iný už nedokáže šifrované záznamy prečítať, a záznam vášho účtu vymažeme. Kľúč k verejnej kópii debaty sa pri odstránení nezničí: debata zostáva verejná (časť 6). Označujeme to ako vymazanie, pretože taký je jeho účinok, a máme preň zdokumentované posúdenie; ak chcete vedieť viac, opýtajte sa. Mali by ste vedieť tri veci: bezpečnostný auditný záznam je nemenný a nevymazáva sa, neobsahuje však žiadne vaše čitateľné identifikátory; malý počet starších debát vznikol pred našou súčasnou schémou šifrovania, a ak sa to týka vášho účtu, oznámime vám, čo odstránenie účtu znamená pre tieto debaty; kópie údajov, ktoré už boli odoslané poskytovateľovi umelej inteligencie, sa riadia podmienkami uchovávania daného poskytovateľa uvedenými v registri, nie naším vymazaním",
+    "na našom serveri zničia, takže my ani nikto iný už nedokáže šifrované záznamy, ktoré sú tam, prečítať, a záznam vášho účtu vymažeme. Kľúč k verejnej kópii debaty sa pri odstránení nezničí: debata zostáva verejná (časť 6). Označujeme to ako vymazanie, pretože taký je jeho účinok na našom serveri, a máme preň zdokumentované posúdenie; ak chcete vedieť viac, opýtajte sa. Mali by ste vedieť štyri veci: bezpečnostný auditný záznam je nemenný a nevymazáva sa, neobsahuje však žiadne vaše čitateľné identifikátory; malý počet starších debát vznikol pred našou súčasnou schémou šifrovania, a ak sa to týka vášho účtu, oznámime vám, čo odstránenie účtu znamená pre tieto debaty; kópie údajov, ktoré už boli odoslané poskytovateľovi umelej inteligencie, sa riadia podmienkami uchovávania daného poskytovateľa uvedenými v registri, nie naším vymazaním; a naše zálohy obsahujú kľúče spolu so záznamami, takže to, čo obsahuje záložná kópia, možno obnoviť, kým sa táto kópia neodstráni, a kópie v našom samostatnom úložisku záloh sa automaticky nevymazávajú (riadok o zálohách vyššie)"
+   ]
+  ]
+ },
+ "sl": {
+  "sha256": "dd69c6d04c3368004eb90edcc8aa44211ee524d3db268a59182597c97475a837",
+  "swaps": [
+   [
+    "I · v3.14 · VELJA",
+    "I · v3.15 · VELJA"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " na našem strežniku, šifrirane kopije v naši ločeni shrambi varnostnih kopij pa se ne izbrišejo samodejno (razdelek 7)"
+   ],
+   [
+    "",
+    ". Evidenca privolitve za občutljive podatke (razdelek 3) vsebuje samo različico besedila, v katero ste privolili, vaš jezik in čas, in se izbriše skupaj z vašim računom"
+   ],
+   [
+    "",
+    ", to evidenco pa izbrišemo skupaj z vašim računom"
+   ],
+   [
+    "o se plačljivi paketi začnej",
+    "i ga upravlja družba NETOPIA Financial Services S.A. v Romuniji, ko se plačljivi paketi začnejo. Podatke o kartici vnesete na njegovi strani, ne na naši, on pa vašo kartico hrani, da jo lahko bremeni ob vsakem podaljšanju. Ob vsakem plačilu mu pošljemo vaše ime, e-poštni naslov in telefonsko številko, vaš naslov za obračun (ulico, kraj, regijo, poštno številko in državo), kodo stranke, ki je enaka za vsa vaša plačila, našo oznako naročila, znesek in valuto ter kratek opis plačila, na primer ime vašega paketa; ko ob podaljšanju bremeni vašo shranjeno kartico, mu pošljemo tudi naslov IP, s katerega ste nazadnje plačali sami. NETOPIA te podatke zahteva pri vsakem plačilu s kartic"
+   ],
+   [
+    "",
+    "\n| Račun, katerega registracija ni bila dokončana: e-poštni naslov ni bil preverjen ali drugi korak prijave (ključ za dostop ali aplikacija za preverjanje pristnosti) ni bil nastavljen | 24 ur od začetka registracije | Izbriše se skupaj z vsem, kar pripada računu; njegov e-poštni naslov in psevdonim je mogoče znova uporabiti. Evidence sprejetja in varnostna revizijska sled ohranijo svoje vnose, kot navajajo njihove vrstice |"
+   ],
+   [
+    "i mogoče prebrati",
+    "a našem strežniku ni mogoče prebrati; naše varnostne kopije hranijo kopije dlje (vrstica o varnostnih kopijah spodaj)"
+   ],
+   [
+    "Varnostne kopije jih hranijo do 8 tednov, kot vse ostalo",
+    "Naše varnostne kopije jih hranijo tako, kot hranijo vse ostalo (vrstica o varnostnih kopijah spodaj)"
+   ],
+   [
+    " | Življenjska doba računa in še 6 let — najdaljši zastaralni rok, ki velja za nas | Izbrišejo se",
+    ", razen privolitve za občutljive podatke: katere Pogoje ste sprejeli, kateri pravilnik vam je bil prikazan in v kaj drugega ste privolili ob registraciji in ob plačilu | Življenjska doba računa in še 6 let — najdaljši zastaralni rok, ki velja za nas | Izbrišejo se |\n| Evidenca vaše privolitve za občutljive podatke (razdelek 3): različica besedila, v katero ste privolili, vaš jezik in čas | Dokler račun obstaja | Izbriše se skupaj z računom"
+   ],
+   [
+    "Do 8 tednov po izbrisu žive kopije | Prepišejo se",
+    "Na našem strežniku: do 8 tednov po izbrisu žive kopije. V naši ločeni shrambi varnostnih kopij: brez časovne omejitve, ker se šifrirane kopije tam ne izbrišejo samodejno | Na našem strežniku se prepišejo. Druge vrstice te tabele opisujejo naš strežnik. Kopije v ločeni shrambi varnostnih kopij vsebujejo bazo podatkov skupaj s ključi do vašega računa in vaših razprav (ne pa ključev do vprašanj, ki jih še niste začeli), zato je mogoče izbrisano razpravo ali zaprt račun iz njih še obnoviti, dokler jih ne odstranimo"
+   ],
+   [
+    ", zato šifriranih zapisov ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ do javne kopije razprave se ob izbrisu ne uniči: razprava ostane javna (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate tri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris",
+    " na našem strežniku, zato šifriranih zapisov tam ne moremo več prebrati ne mi ne kdo drug, zapis vašega računa pa izbrišemo. Ključ do javne kopije razprave se ob izbrisu ne uniči: razprava ostane javna (razdelek 6). To opisujemo kot izbris, ker je tak njegov učinek na našem strežniku, in imamo dokumentirano oceno, ki to podpira; če želite izvedeti več, vprašajte. Vedeti morate štiri stvari: varnostna revizijska sled omogoča samo dodajanje in se ne izbriše, vendar ne vsebuje vaših berljivih identifikatorjev; majhno število starejših razprav je nastalo pred našo sedanjo shemo šifriranja in če to velja za vaš račun, vam pojasnimo učinek zaprtja; kopije podatkov, ki so že bile poslane ponudniku umetne inteligence, urejajo pogoji hrambe tega ponudnika v Registru, ne naš izbris; in naše varnostne kopije hranijo ključe skupaj z zapisi, zato je mogoče tisto, kar vsebuje varnostna kopija, obnoviti, dokler ta kopija ni odstranjena, kopije v naši ločeni shrambi varnostnih kopij pa se ne izbrišejo samodejno (vrstica o varnostnih kopijah zgoraj)"
+   ]
+  ]
+ },
+ "sv": {
+  "sha256": "81a3104833bd0c0bc66457d90a1a9ba2370104320b0b43bb9243fd5035f681a2",
+  "swaps": [
+   [
+    "Y · v3.14 · GÄLLE",
+    "Y · v3.15 · GÄLLE"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " på vår server, men de krypterade kopiorna i vår separata lagring för säkerhetskopior raderas inte automatiskt (avsnitt 7)"
+   ],
+   [
+    "",
+    ". Posten om samtycket till känsliga uppgifter (avsnitt 3) innehåller endast vilken version av formuleringen du godkände, ditt språk och tidpunkten, och den raderas tillsammans med ditt konto"
+   ],
+   [
+    "",
+    ", och vi raderar denna post tillsammans med ditt konto"
+   ],
+   [
+    "när betalabonnemang börjar erbjudas",
+    "som drivs av NETOPIA Financial Services S.A. i Rumänien, när betalabonnemang börjar erbjudas. Du anger dina kortuppgifter på leverantörens sida, inte på vår, och leverantören sparar ditt kort för att kunna debitera det vid varje förnyelse. Vid varje betalning skickar vi leverantören ditt namn, din e-postadress och ditt telefonnummer, din faktureringsadress (gata, ort, region, postnummer och land), en kundkod som är densamma för alla dina betalningar, vår referens för beställningen, beloppet och valutan samt en kort beskrivning av betalningen, till exempel namnet på ditt abonnemang; när leverantören debiterar ditt sparade kort vid en förnyelse skickar vi också den IP-adress som du senast själv betalade från. NETOPIA begär dessa uppgifter vid varje kortbetalning"
+   ],
+   [
+    "",
+    "\n| Ett konto vars registrering inte slutfördes: e-postadressen har inte verifierats, eller det andra inloggningssteget (en lösennyckel eller en autentiseringsapp) har inte konfigurerats | 24 timmar efter att registreringen påbörjades | Raderas, med allt som hör till kontot; dess e-postadress och pseudonym kan användas igen. Uppgifterna om godkännanden och samtycken och säkerhetsloggen behåller sina poster, som deras rader anger |"
+   ],
+   [
+    "",
+    "på vår server; våra säkerhetskopior behåller kopior längre (raden om säkerhetskopior nedan) "
+   ],
+   [
+    "Säkerhetskopior behåller dem i upp till 8 veckor, som för allt annat",
+    "Våra säkerhetskopior behåller dem på samma sätt som allt annat (raden om säkerhetskopior nedan)"
+   ],
+   [
+    " | Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss | Raderas",
+    ", utom samtycket till känsliga uppgifter: vilka villkor du godkände, vilken policy som visades för dig och vad du i övrigt godkände vid registreringen och i kassan | Kontots livstid plus 6 år — den längsta preskriptionstid som gäller för oss | Raderas |\n| Posten om ditt samtycke till känsliga uppgifter (avsnitt 3): vilken version av formuleringen du godkände, ditt språk och tidpunkten | Medan kontot finns | Raderas med kontot"
+   ],
+   [
+    "Upp till 8 veckor efter att den aktiva kopian har raderats | Skrivs över",
+    "På vår server: upp till 8 veckor efter att den aktiva kopian har raderats. I vår separata lagring för säkerhetskopior: ingen tidsgräns, eftersom de krypterade kopiorna där inte raderas automatiskt | På vår server skrivs de över. Tabellens övriga rader beskriver vår server. Kopiorna i den separata lagringen för säkerhetskopior innehåller databasen tillsammans med nycklarna till ditt konto och dina debatter (men inte nycklarna till de frågor som du inte har startat än), så tills vi tar bort dem kan en raderad debatt eller ett avslutat konto fortfarande återställas från dem"
+   ],
+   [
+    ", varefter de krypterade posterna inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en offentlig debatts offentliga kopia förstörs inte vid radering: debatten förblir offentlig (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till tre saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering",
+    " på vår server, varefter de krypterade posterna där inte kan läsas av oss eller någon annan, och vi raderar din kontopost. Nyckeln till en offentlig debatts offentliga kopia förstörs inte vid radering: debatten förblir offentlig (avsnitt 6). Vi beskriver detta som radering eftersom det är den faktiska effekten på vår server, och vi har en dokumenterad bedömning som styrker detta; fråga oss om du vill veta mer. Du bör känna till fyra saker: säkerhetsloggen kan endast utökas och raderas inte, men innehåller inga läsbara identifierare för dig; ett litet antal äldre debatter skapades före vårt nuvarande krypteringssystem, och om detta gäller ditt konto förklarar vi vad ett avslutande innebär för dem; kopior av uppgifter som redan har skickats till en AI-leverantör omfattas av den leverantörens lagringsvillkor i registret, inte av vår radering; och våra säkerhetskopior innehåller nycklarna tillsammans med posterna, så det som en säkerhetskopia innehåller kan återställas tills den kopian tas bort, och kopiorna i vår separata lagring för säkerhetskopior raderas inte automatiskt (raden om säkerhetskopior ovan)"
+   ]
+  ]
+ },
+ "tr": {
+  "sha256": "5480e5e94b7f779925c1659594e95d5ee3d0b3ff2e2dcbd81ebcd8806b7ca79f",
+  "swaps": [
+   [
+    "I · v3.14 · YÜRÜR",
+    "I · v3.15 · YÜRÜR"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "özel verilerinizin anahtarlarını imha eder",
+    "sunucumuzdaki özel verilerinizin anahtarlarını imha eder, ancak ayrı yedek depolama alanımızdaki şifreli kopyalar otomatik olarak silinmez (bölüm 7)"
+   ],
+   [
+    "",
+    ". Hassas veri rızasının kaydı (bölüm 3) yalnızca kabul ettiğiniz metnin sürümünü, dilinizi ve zamanı içerir ve hesabınızla birlikte silinir"
+   ],
+   [
+    "",
+    " ve bu kaydı hesabınızla birlikte sileriz"
+   ],
+   [
+    " ödeme sağlayıcımız NETOPIA Payments üzerinden yapılı",
+    ", Romanya'daki NETOPIA Financial Services S.A. tarafından işletilen ödeme sağlayıcımız NETOPIA Payments üzerinden yapılır. Kart bilgilerinizi bizim sayfamıza değil, onun sayfasına girersiniz; o da her yenilemede kartınızdan tahsilat yapabilmek için kartınızı saklar. Her ödemede ona adınızı, e-posta adresinizi ve telefon numaranızı, fatura adresinizi (sokak, şehir, bölge, posta kodu ve ülke), tüm ödemeleriniz için aynı kalan bir müşteri kodunu, siparişe ilişkin referansımızı, tutarı ve para birimini ve planınızın adı gibi kısa bir ödeme açıklamasını göndeririz; bir yenilemede kayıtlı kartınızdan tahsilat yaptığında, en son kendiniz ödeme yaptığınız IP adresini de göndeririz. NETOPIA bu bilgileri her kartlı ödemede iste"
+   ],
+   [
+    "",
+    "\n| Kaydı tamamlanmamış bir hesap: e-posta adresi doğrulanmamış veya ikinci oturum açma adımı (bir geçiş anahtarı veya bir kimlik doğrulayıcı uygulama) ayarlanmamış | Kaydın başlamasından 24 saat sonra | Hesaba ait her şeyle birlikte silinir; e-posta adresi ve takma adı yeniden kullanılabilir. Kabul kayıtları ve güvenlik denetim izi, kendi satırlarında belirtildiği gibi, girdilerini korur |"
+   ],
+   [
+    "okunamaz hâle gelir",
+    "sunucumuzda okunamaz hâle gelir; yedeklerimiz kopyaları daha uzun süre tutar (aşağıdaki yedeklerle ilgili satır)"
+   ],
+   [
+    "meler bunları en fazla 8 hafta tutar, diğer her şeyde olduğu gibi",
+    "rimiz bunları diğer her şeyi tuttukları gibi tutar (aşağıdaki yedeklerle ilgili satır)"
+   ],
+   [
+    " | Hesabın ömrü artı 6 yıl — bizim için geçerli en uzun zamanaşımı süresi | S",
+    ", hassas veri rızası hariç: hangi Koşulları kabul ettiğiniz, size hangi politikanın gösterildiği ve kayıt sırasında ve ödeme sırasında başka neyi kabul ettiğiniz | Hesabın ömrü artı 6 yıl — bizim için geçerli en uzun zamanaşımı süresi | Silinir |\n| Hassas veri rızanızın kaydı (bölüm 3): kabul ettiğiniz metnin sürümü, diliniz ve zaman | Hesap var olduğu sürece | Hesapla birlikte s"
+   ],
+   [
+    "Canlı kopya silindikten sonra en fazla 8 hafta | Üzerine yazılı",
+    "Sunucumuzda: canlı kopya silindikten sonra en fazla 8 hafta. Ayrı yedek depolama alanımızda: süre sınırı yok, çünkü oradaki şifreli kopyalar otomatik olarak silinmez | Sunucumuzda üzerine yazılır. Bu tablonun diğer satırları sunucumuzu anlatır. Ayrı yedek depolama alanındaki kopyalar, veritabanını hesabınızın ve tartışmalarınızın anahtarlarıyla birlikte içerir (ancak henüz başlatmadığınız soruların anahtarlarını içermez); bu nedenle biz bu kopyaları kaldırana kadar silinmiş bir tartışma veya kapatılmış bir hesap bunlardan hâlâ geri yüklenebili"
+   ],
+   [
+    "bu anahtarları imha eder; bunun ardından şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Herkese açık bir tartışmanın herkese açık kopyasının anahtarı silme sırasında imha edilmez: tartışma herkese açık kalır (bölüm 6). Etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken üç husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir",
+    "sunucumuzdaki bu anahtarları imha eder; bunun ardından oradaki şifreli kayıtlar bizim veya başka herhangi birinin okuyamayacağı hâle gelir ve hesap kaydınızı sileriz. Herkese açık bir tartışmanın herkese açık kopyasının anahtarı silme sırasında imha edilmez: tartışma herkese açık kalır (bölüm 6). Sunucumuzdaki etkisi bu olduğu için bunu silme olarak tanımlarız ve bunun dayanağı olan belgelenmiş bir değerlendirmeyi tutarız; daha fazla bilgi edinmek isterseniz sorabilirsiniz. Bilmeniz gereken dört husus vardır: güvenlik denetim izi yalnızca ekleme yapılabilir niteliktedir ve silinmez, ancak size ait okunabilir tanımlayıcı içermez; az sayıdaki eski tartışma mevcut şifreleme düzenimizden daha eskidir ve bu durum hesabınız için geçerliyse kapatmanın bunlar bakımından ne sağladığını size bildiririz; bir yapay zekâ sağlayıcısına daha önce gönderilmiş veri kopyaları bizim silme işlemimize değil, o sağlayıcının Sicildeki saklama koşullarına tabidir; ayrıca yedeklerimiz anahtarları kayıtlarla birlikte tutar, bu nedenle bir yedek kopyanın içerdiği şey o kopya kaldırılana kadar geri yüklenebilir ve ayrı yedek depolama alanımızdaki kopyalar otomatik olarak silinmez (yukarıdaki yedeklerle ilgili satır)"
+   ]
+  ]
+ },
+ "uk": {
+  "sha256": "174a1324adfa66aa0010e9b3776614d733b3c473e5b4bbcaea5cffe50fce5ac9",
+  "swaps": [
+   [
+    "І · v3.14 · ЧИННА",
+    "І · v3.15 · ЧИННА"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " на нашому сервері, але зашифровані копії в нашому окремому сховищі резервних копій не видаляються автоматично (розділ 7)"
+   ],
+   [
+    "",
+    ". Запис про згоду щодо чутливих даних (розділ 3) містить лише версію тексту, з яким ви погодилися, вашу мову та час, і видаляється разом із вашим обліковим записом"
+   ],
+   [
+    "",
+    " і видаляємо цей запис разом із вашим обліковим записом"
+   ],
+   [
+    "щойно почнуть діяти платні плани",
+    "яким керує компанія NETOPIA Financial Services S.A. у Румунії, щойно почнуть діяти платні плани. Дані картки ви вводите на його сторінці, а не на нашій, і він зберігає вашу картку, щоб списувати з неї кошти під час кожного поновлення. З кожним платежем ми надсилаємо йому ваше ім’я, адресу електронної пошти та номер телефону, вашу платіжну адресу (вулицю, місто, регіон, поштовий індекс і країну), код клієнта, однаковий для всіх ваших платежів, наш ідентифікатор замовлення, суму та валюту, а також короткий опис платежу, наприклад назву вашого плану; коли він списує кошти з вашої збереженої картки під час поновлення, ми також надсилаємо йому IP-адресу, з якої ви востаннє платили самі. NETOPIA запитує ці дані під час кожної оплати карткою"
+   ],
+   [
+    "",
+    "\n| Обліковий запис, реєстрацію якого не завершено: адресу електронної пошти не підтверджено або не налаштовано другий крок входу (ключ доступу чи застосунок-автентифікатор) | 24 години від початку реєстрації | Видаляється разом з усім, що належить до облікового запису; його адресу електронної пошти та псевдонім можна використати знову. Записи про прийняття та журнал аудиту безпеки зберігають свої дані, як зазначено в їхніх рядках |"
+   ],
+   [
+    "стає нечитабельним",
+    "на нашому сервері стає нечитабельним; наші резервні копії зберігають копії довше (рядок про резервні копії нижче)"
+   ],
+   [
+    "Резервні копії зберігають їх до 8 тижнів, як і все інше",
+    "Наші резервні копії зберігають їх так само, як і все інше (рядок про резервні копії нижче)"
+   ],
+   [
+    " | Строк існування облікового запису плюс 6 років — найдовший застосовний до нас строк позовної давності | Видаляються",
+    ", крім згоди щодо чутливих даних: які Умови ви прийняли, яку політику вам показали та на що ще ви погодилися під час реєстрації та під час оформлення оплати | Строк існування облікового запису плюс 6 років — найдовший застосовний до нас строк позовної давності | Видаляються |\n| Запис про вашу згоду щодо чутливих даних (розділ 3): версія тексту, з яким ви погодилися, ваша мова та час | Поки обліковий запис існує | Видаляється разом з обліковим записом"
+   ],
+   [
+    "До 8 тижнів після видалення робочої копії | Перезаписуються",
+    "На нашому сервері: до 8 тижнів після видалення робочої копії. У нашому окремому сховищі резервних копій: без обмеження строку, оскільки зашифровані копії там не видаляються автоматично | На нашому сервері перезаписуються. Інші рядки цієї таблиці описують наш сервер. Копії в окремому сховищі резервних копій містять базу даних разом із ключами до вашого облікового запису та ваших дебатів (але не ключі до ще не розпочатих запитань), тому, доки ми їх не видалимо, видалені дебати або закритий обліковий запис усе ще можна з них відновити"
+   ],
+   [
+    ", після чого ані ми, ані будь-хто інший не може прочитати зашифровані записи, а ми видаляємо запис облікового запису. Ключ до загальнодоступної копії загальнодоступних дебатів під час видалення не знищується: дебати залишаються загальнодоступними (розділ 6). Ми називаємо це видаленням, оскільки саме таким є його наслідок, і маємо документовану оцінку цього підходу; якщо ви бажаєте дізнатися більше, запитайте. Варто знати три речі: журнал аудиту безпеки доступний лише для доповнення й не видаляється, але не містить ваших читабельних ідентифікаторів; невелика кількість старіших дебатів передує нашій поточній схемі шифрування, і якщо це стосується вашого облікового запису, ми повідомимо, який результат матиме для них закриття; копії даних, уже надіслані постачальнику ШІ, регулюються умовами зберігання такого постачальника в Реєстрі, а не нашим видаленням",
+    " на нашому сервері, після чого ані ми, ані будь-хто інший не може прочитати зашифровані записи, що там зберігаються, а ми видаляємо запис облікового запису. Ключ до загальнодоступної копії загальнодоступних дебатів під час видалення не знищується: дебати залишаються загальнодоступними (розділ 6). Ми називаємо це видаленням, оскільки саме таким є його наслідок на нашому сервері, і маємо документовану оцінку цього підходу; якщо ви бажаєте дізнатися більше, запитайте. Варто знати чотири речі: журнал аудиту безпеки доступний лише для доповнення й не видаляється, але не містить ваших читабельних ідентифікаторів; невелика кількість старіших дебатів передує нашій поточній схемі шифрування, і якщо це стосується вашого облікового запису, ми повідомимо, який результат матиме для них закриття; копії даних, уже надіслані постачальнику ШІ, регулюються умовами зберігання такого постачальника в Реєстрі, а не нашим видаленням; і наші резервні копії зберігають ключі разом із записами, тому те, що містить резервна копія, можна відновити, доки цю копію не видалено, а копії в нашому окремому сховищі резервних копій не видаляються автоматично (рядок про резервні копії вище)"
+   ]
+  ]
+ },
+ "vi": {
+  "sha256": "8f9ccc6e8fcda92543bb16bfd1444a345b7b1e509311e3cbaeef168757530769",
+  "swaps": [
+   [
+    "Ư · v3.14 · CÓ HI",
+    "Ư · v3.15 · CÓ HI"
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "",
+    " trên máy chủ của chúng tôi, nhưng các bản sao đã mã hóa trên kho lưu trữ sao lưu riêng biệt của chúng tôi không bị xóa tự động (mục 7)"
+   ],
+   [
+    "",
+    ". Hồ sơ về sự đồng ý về dữ liệu nhạy cảm (mục 3) chỉ chứa phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm, và hồ sơ này bị xóa cùng với tài khoản của bạn"
+   ],
+   [
+    "",
+    ", và chúng tôi xóa hồ sơ này cùng với tài khoản của bạn"
+   ],
+   [
+    "khi các gói trả phí bắt đầu",
+    "do NETOPIA Financial Services S.A. tại Romania vận hành, khi các gói trả phí bắt đầu. Bạn nhập thông tin thẻ trên trang của nhà cung cấp này, không phải trên trang của chúng tôi, và nhà cung cấp này lưu giữ thẻ của bạn để có thể trừ tiền vào thẻ ở mỗi lần gia hạn. Với mỗi khoản thanh toán, chúng tôi gửi cho nhà cung cấp này tên, địa chỉ email và số điện thoại của bạn, địa chỉ lập hóa đơn của bạn (đường phố, thành phố, vùng, mã bưu chính và quốc gia), một mã khách hàng giữ nguyên cho mọi khoản thanh toán của bạn, mã tham chiếu đơn hàng của chúng tôi, số tiền và loại tiền tệ, và một mô tả ngắn về khoản thanh toán, chẳng hạn như tên gói của bạn; khi nhà cung cấp này trừ tiền vào thẻ đã lưu của bạn lúc gia hạn, chúng tôi cũng gửi địa chỉ IP mà bạn đã tự mình dùng để thanh toán lần gần nhất. NETOPIA yêu cầu các thông tin này với mỗi khoản thanh toán bằng thẻ"
+   ],
+   [
+    "",
+    "\n| Tài khoản chưa hoàn tất đăng ký: địa chỉ email chưa được xác minh, hoặc bước đăng nhập thứ hai (khóa truy cập hoặc ứng dụng xác thực) chưa được thiết lập | 24 giờ sau khi bắt đầu đăng ký | Bị xóa, cùng với mọi thứ thuộc về tài khoản; địa chỉ email và bút danh của tài khoản đó có thể được sử dụng lại. Hồ sơ chấp nhận và dấu vết kiểm toán bảo mật vẫn giữ các mục của chúng, như các hàng tương ứng nêu rõ |"
+   ],
+   [
+    "",
+    "trên máy chủ của chúng tôi; các bản sao lưu của chúng tôi giữ bản sao lâu hơn (hàng về bản sao lưu bên dưới) "
+   ],
+   [
+    "Bản sao lưu giữ chúng tối đa 8 tuần, như với mọi thứ khác",
+    "Các bản sao lưu của chúng tôi giữ chúng như giữ mọi thứ khác (hàng về bản sao lưu bên dưới)"
+   ],
+   [
+    " | Vòng đời tài khoản cộng 6 năm — thời hiệu dài nhất áp dụng cho chúng tôi | Bị xóa",
+    ", trừ sự đồng ý về dữ liệu nhạy cảm: bạn đã chấp nhận Điều khoản nào, bạn đã được cho xem chính sách nào và bạn đã đồng ý những gì khác khi đăng ký và khi thanh toán | Vòng đời tài khoản cộng 6 năm — thời hiệu dài nhất áp dụng cho chúng tôi | Bị xóa |\n| Hồ sơ về sự đồng ý về dữ liệu nhạy cảm của bạn (mục 3): phiên bản câu chữ mà bạn đã đồng ý, ngôn ngữ của bạn và thời điểm | Trong thời gian tài khoản tồn tại | Bị xóa cùng với tài khoản"
+   ],
+   [
+    "ối đa 8 tuần sau khi bản đang hoạt động bị xóa | Bị ghi đè",
+    "rên máy chủ của chúng tôi: tối đa 8 tuần sau khi bản đang hoạt động bị xóa. Trên kho lưu trữ sao lưu riêng biệt của chúng tôi: không giới hạn thời gian, vì các bản sao đã mã hóa ở đó không bị xóa tự động | Trên máy chủ của chúng tôi, bị ghi đè. Các hàng khác của bảng này mô tả máy chủ của chúng tôi. Các bản sao trên kho lưu trữ sao lưu riêng biệt của chúng tôi chứa cơ sở dữ liệu cùng với các khóa của tài khoản và các cuộc tranh luận của bạn (nhưng không chứa khóa của các câu hỏi bạn chưa bắt đầu), vì vậy cho đến khi chúng tôi gỡ bỏ chúng, một cuộc tranh luận đã xóa hoặc một tài khoản đã đóng vẫn có thể được khôi phục từ đó"
+   ],
+   [
+    ", sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai của một cuộc tranh luận công khai không bị hủy khi xóa: cuộc tranh luận vẫn công khai (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có ba điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi",
+    " trên máy chủ của chúng tôi, sau đó chúng tôi và bất kỳ ai khác đều không thể đọc được các hồ sơ đã mã hóa ở đó, đồng thời chúng tôi xóa hồ sơ tài khoản của bạn. Khóa của bản sao công khai của một cuộc tranh luận công khai không bị hủy khi xóa: cuộc tranh luận vẫn công khai (mục 6). Chúng tôi gọi đây là xóa vì đó chính là tác dụng của việc này trên máy chủ của chúng tôi và chúng tôi lưu giữ bản đánh giá được lập thành văn bản làm căn cứ; nếu bạn muốn biết thêm, hãy hỏi. Có bốn điều cần biết: dấu vết kiểm toán bảo mật chỉ được phép ghi nối tiếp và không bị xóa, nhưng không chứa mã định danh nào của bạn có thể đọc được; một số ít cuộc tranh luận cũ có trước cơ chế mã hóa hiện tại của chúng tôi, và nếu điều đó áp dụng cho tài khoản của bạn, chúng tôi sẽ cho bạn biết việc đóng tài khoản có tác dụng gì đối với chúng; các bản sao dữ liệu đã được gửi đến nhà cung cấp AI chịu sự điều chỉnh của điều khoản lưu giữ của nhà cung cấp đó trong Sổ đăng ký, chứ không phải việc xóa của chúng tôi; và các bản sao lưu của chúng tôi giữ các khóa cùng với các hồ sơ, vì vậy những gì một bản sao lưu chứa có thể được khôi phục cho đến khi bản sao lưu đó bị gỡ bỏ, và các bản sao trên kho lưu trữ sao lưu riêng biệt của chúng tôi không bị xóa tự động (hàng về bản sao lưu ở trên)"
+   ]
+  ]
+ },
+ "zh": {
+  "sha256": "263db103ff5d4cb38433e7230995dea26bf97720e777108568f22aff80a40977",
+  "swaps": [
+   [
+    "策 · v3.14 · 生效日期 ",
+    "策 · v3.15 · 生效日期 "
+   ],
+   [
+    " 2016/679 · v3.14",
+    " 2016/679 · v3.15"
+   ],
+   [
+    "sion 3.14 · Effec",
+    "sion 3.15 · Effec"
+   ],
+   [
+    "您私密数据的密钥",
+    "我们服务器上您私密数据的密钥，但我们的独立备份存储中的加密副本不会被自动删除（第 7 节）"
+   ],
+   [
+    "",
+    "。敏感数据同意（第 3 节）的记录仅包含您所同意的文本版本、您的语言和时间，并会随您的账户一并删除"
+   ],
+   [
+    "",
+    "，并会随您的账户一并删除该记录"
+   ],
+   [
+    "",
+    "，该服务由位于罗马尼亚的 NETOPIA Financial Services S.A. 运营。您在其页面而非我们的页面上输入银行卡详情，它会保存您的银行卡，以便在每次续订时扣款。每次付款时，我们会向其发送您的姓名、电子邮件地址和电话号码，您的账单地址（街道、城市、地区、邮政编码和国家），一个在您所有付款中保持不变的客户代码，我们的订单参考编号，金额和币种，以及对该笔付款的简短说明，例如您的套餐名称；当它在续订时从您保存的银行卡扣款时，我们还会发送您上一次亲自付款时使用的 IP 地址。NETOPIA 在每次银行卡付款时都会要求提供这些信息"
+   ],
+   [
+    "",
+    "\n| 未完成注册的账户：电子邮件地址未经验证，或未设置登录的第二步（通行密钥或身份验证器应用） | 注册开始后 24 小时 | 连同属于该账户的所有内容一并删除；其电子邮件地址和化名可再次使用。接受记录和安全审计记录会保留其中的条目，如各自所在行所述 |"
+   ],
+   [
+    "无法读取",
+    "在我们的服务器上无法读取；我们的备份会将副本保留更长时间（下方关于备份的一行）"
+   ],
+   [
+    "备份最多保留 8 周，与其他所有内容相同",
+    "我们的备份会像保留其他所有内容一样保留这些内容（下方关于备份的一行）"
+   ],
+   [
+    " | 账户存续期间加 6 年，即适用于我们的最长诉讼时效 | ",
+    "（敏感数据同意除外）：您接受的《条款》、向您展示的政策，以及您在注册和结账时同意的其他事项 | 账户存续期间加 6 年，即适用于我们的最长诉讼时效 | 删除 |\n| 您的敏感数据同意记录（第 3 节）：您所同意的文本版本、您的语言和时间 | 账户存续期间 | 随账户一并"
+   ],
+   [
+    "实时副本删除后最长 8 周 | 覆盖",
+    "在我们的服务器上：实时副本删除后最长 8 周。在我们的独立备份存储中：无时间限制，因为其中的加密副本不会被自动删除 | 在我们的服务器上予以覆盖。本表其他各行描述的是我们的服务器。独立备份存储中的副本同时包含数据库以及您账户和辩论的密钥（但不包含尚未开始的问题的密钥），因此在我们将其移除之前，已删除的辩论或已关闭的账户仍可从中恢复"
+   ],
+   [
+    "这些密钥，此后我们或任何其他人均无法读取加密记录；我们还会删除账户记录。公开辩论的公开副本密钥在删除账户时不会被销毁：该辩论保持公开（第6节）。我们将此称为删除，是因为其效果正是如此，并且我们备有支持该结论的书面评估；如需进一步了解，请提出询问。需要注意三点：安全审计记录仅可追加且不会删除，但其中不含可读取的您的标识符；少量较早的辩论早于我们现行加密方案，如果您的账户涉及这种情况，我们会告知关闭账户对这些辩论的实际效果；已经发送给 AI 提供商的数据副本受《名录》中该提供商的保留条款约束，而不受我们的删除操作约束",
+    "我们服务器上的这些密钥，此后我们或任何其他人均无法读取那里的加密记录；我们还会删除账户记录。公开辩论的公开副本密钥在删除账户时不会被销毁：该辩论保持公开（第6节）。我们将此称为删除，是因为其在我们服务器上的效果正是如此，并且我们备有支持该结论的书面评估；如需进一步了解，请提出询问。需要注意四点：安全审计记录仅可追加且不会删除，但其中不含可读取的您的标识符；少量较早的辩论早于我们现行加密方案，如果您的账户涉及这种情况，我们会告知关闭账户对这些辩论的实际效果；已经发送给 AI 提供商的数据副本受《名录》中该提供商的保留条款约束，而不受我们的删除操作约束；此外，我们的备份将密钥与记录一同保存，因此在某一备份副本被移除之前，其所含内容均可恢复，而我们的独立备份存储中的副本不会被自动删除（上方关于备份的一行）"
+   ]
+  ]
+ }
+}

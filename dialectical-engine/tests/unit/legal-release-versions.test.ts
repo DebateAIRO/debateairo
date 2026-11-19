@@ -19,17 +19,23 @@ import {
   withoutPrivacy314,
   withoutPrivacy314Number
 } from "../support/legalPrivacy314.js";
+import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
 
 /**
  * Terms of Service 2.19 and Privacy Policy 3.13, effective 19 November 2026 (tests/support/legalRelease.ts). Every
  * language's drafts carry the new numbers and the new date in their own date words; English's change histories name
  * what changed since the archived 2.18 and 3.12, whose own entries read again as those texts wrote them; nobody has to
  * accept again; and the Terms versions page lists 2.18 as a past version. Privacy 3.14 followed on the same day
- * (tests/support/legalPrivacy314.ts); the 3.13 checks below read the Privacy Policy with 3.14 undone.
+ * (tests/support/legalPrivacy314.ts); the 3.13 checks below read the Privacy Policy with 3.14 undone. Privacy 3.15
+ * followed on the same day too (tests/support/legalPrivacy315.ts, tests/unit/legal-privacy-315.test.ts): every Privacy
+ * check below reads the draft with 3.15 undone first.
  */
 
 const root = process.cwd();
-const draft = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+/** A draft as 3.14 left it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts), the Terms as they are. */
+const draft = (code: string, name: string): string =>
+  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : file(code, name);
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
