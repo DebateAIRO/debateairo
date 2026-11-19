@@ -83,6 +83,7 @@
   "settings.sessions.current": "Aktuel session",
   "settings.sessions.other": "Anden session",
   "settings.sessions.lastSeen": "Sidst set {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Tilbagekald session {sessionId}",
   "settings.sessions.revoke": "Tilbagekald",
   "settings.sessions.revokeAll": "Tilbagekald alle sessioner",

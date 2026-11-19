@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Contactpunt voor autoriteiten — office@dezbatere.ro — Roemeens en Engels",
         "Bevelen tot verwijdering van terroristische inhoud (Verordening (EU) 2021/784) — office@dezbatere.ro — ons contactpunt voor deze bevelen; Roemeens en Engels; zie hoofdstuk 10",
         "Vertegenwoordigers in andere landen — Vermeld in Bijlage A voor de regio's waar wij er een hebben aangesteld"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Statutaire zetel","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Roemenië"],
+            ["Handelsregisternummer","J2022000426271"],
+            ["Uniek registratienummer (CUI)","45935221 · BTW: RO45935221"],
+            ["Maatschappelijk kapitaal","RON 5.000"],
+            ["Algemeen contact","support@dezbatere.ro"],
+            ["Telefoon","+40 748 793 490"],
+            ["Juridische kennisgevingen","support@dezbatere.ro"],
+            ["Privacy en gegevensbescherming","privacy@dezbatere.ro"],
+            ["Melden van illegale inhoud","support@dezbatere.ro — zie hoofdstuk 10"],
+            ["Contactpunt voor autoriteiten","office@dezbatere.ro — Roemeens en Engels"],
+            ["Bevelen tot verwijdering van terroristische inhoud (Verordening (EU) 2021/784)","office@dezbatere.ro — ons contactpunt voor deze bevelen; Roemeens en Engels; zie hoofdstuk 10"],
+            ["Vertegenwoordigers in andere landen","Vermeld in Bijlage A voor de regio's waar wij er een hebben aangesteld"]
+          ]
+        }
       },
       { kind: "p", text: "Deze gegevens worden ook permanent op de site getoond op dezbatere.ro/legal. U kunt altijd een persoon bereiken, niet alleen onze assistent; hoofdstuk 10 legt uit hoe." }
     ]

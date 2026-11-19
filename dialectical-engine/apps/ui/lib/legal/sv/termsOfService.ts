@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Kontaktpunkt för myndigheter — office@dezbatere.ro — rumänska och engelska",
         "Avlägsnandeorder för terrorisminnehåll (förordning (EU) 2021/784) — office@dezbatere.ro — vår kontaktpunkt för sådana order; rumänska och engelska; se avsnitt 10",
         "Företrädare i andra länder — Anges i bilaga A för de regioner där vi har utsett en företrädare"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Registrerat säte","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumänien"],
+            ["Registreringsnummer i handelsregistret","J2022000426271"],
+            ["Unikt registreringsnummer (CUI)","45935221 · Moms: RO45935221"],
+            ["Aktiekapital","5 000 RON"],
+            ["Allmän kontakt","support@dezbatere.ro"],
+            ["Telefon","+40 748 793 490"],
+            ["Rättsliga meddelanden","support@dezbatere.ro"],
+            ["Integritet och dataskydd","privacy@dezbatere.ro"],
+            ["Rapportering av olagligt innehåll","support@dezbatere.ro — se avsnitt 10"],
+            ["Kontaktpunkt för myndigheter","office@dezbatere.ro — rumänska och engelska"],
+            ["Avlägsnandeorder för terrorisminnehåll (förordning (EU) 2021/784)","office@dezbatere.ro — vår kontaktpunkt för sådana order; rumänska och engelska; se avsnitt 10"],
+            ["Företrädare i andra länder","Anges i bilaga A för de regioner där vi har utsett en företrädare"]
+          ]
+        }
       },
       { kind: "p", text: "Dessa uppgifter visas även permanent på webbplatsen på dezbatere.ro/legal. Du kan alltid nå en person, inte bara vår assistent; avsnitt 10 förklarar hur." }
     ]

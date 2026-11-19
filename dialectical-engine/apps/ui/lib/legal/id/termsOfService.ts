@@ -52,7 +52,24 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
         "Titik kontak untuk otoritas — office@dezbatere.ro — bahasa Rumania dan Inggris",
         "Perintah penghapusan untuk konten terorisme (Peraturan (EU) No 2021/784) — office@dezbatere.ro — titik kontak kami untuk perintah ini; bahasa Rumania dan Inggris; lihat bagian 10",
         "Perwakilan di negara lain — Tercantum dalam Lampiran A untuk wilayah tempat kami telah menunjuk perwakilan"
-        ]
+        ],
+        table: {
+          head: ["",""],
+          rows: [
+            ["Kantor terdaftar","Str. 1 Decembrie 1918 nr. 80A, Piatra Neamț, Rumania"],
+            ["Nomor Daftar Perdagangan","J2022000426271"],
+            ["Kode pendaftaran tunggal (CUI)","45935221 · PPN: RO45935221"],
+            ["Modal saham","RON 5.000"],
+            ["Kontak umum","support@dezbatere.ro"],
+            ["Telepon","+40 748 793 490"],
+            ["Pemberitahuan hukum","support@dezbatere.ro"],
+            ["Privasi dan perlindungan data","privacy@dezbatere.ro"],
+            ["Pelaporan konten ilegal","support@dezbatere.ro — lihat bagian 10"],
+            ["Titik kontak untuk otoritas","office@dezbatere.ro — bahasa Rumania dan Inggris"],
+            ["Perintah penghapusan untuk konten terorisme (Peraturan (EU) No 2021/784)","office@dezbatere.ro — titik kontak kami untuk perintah ini; bahasa Rumania dan Inggris; lihat bagian 10"],
+            ["Perwakilan di negara lain","Tercantum dalam Lampiran A untuk wilayah tempat kami telah menunjuk perwakilan"]
+          ]
+        }
       },
       { kind: "p", text: "Rincian ini juga ditampilkan secara permanen di situs pada dezbatere.ro/legal. Anda selalu dapat menghubungi seseorang, bukan hanya asisten kami; bagian 10 menjelaskan caranya." }
     ]

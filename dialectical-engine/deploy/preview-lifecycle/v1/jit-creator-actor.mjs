@@ -1,4 +1,4 @@
-// Runs ONLY as the postgres OS user, started by unlock-team-tools.mjs through the reviewed
+// Runs ONLY as the postgres OS user, started by unlock-team-tools.mjs (and rekey-staff-key.mjs) through the reviewed
 // postgres-peer channel: peer packet on FD3, argv exactly `--credential-fd 3`, environment
 // exactly PATH/LANG/LC_ALL/TZ. Control (and, for open, the password) arrive on stdin only.
 // The password never reaches SQL: it becomes a SCRAM-SHA-256 verifier here, and only that is sent.

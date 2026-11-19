@@ -83,6 +83,7 @@
   "settings.sessions.current": "Aktuell session",
   "settings.sessions.other": "Annan session",
   "settings.sessions.lastSeen": "Senast aktiv {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Återkalla session {sessionId}",
   "settings.sessions.revoke": "Återkalla",
   "settings.sessions.revokeAll": "Återkalla alla sessioner",

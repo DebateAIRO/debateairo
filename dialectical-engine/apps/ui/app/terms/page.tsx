@@ -13,6 +13,7 @@ export default async function TermsPage({searchParams}:{searchParams?:Promise<{l
   return (
     <LegalPageLayout
       current="terms"
+      locale={locale}
       chromeCatalog={chromeCatalog}
       legalCatalog={legalCatalog}
       eyebrow={document.eyebrow}

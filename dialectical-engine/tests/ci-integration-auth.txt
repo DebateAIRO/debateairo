@@ -63,6 +63,8 @@ tests/integration/staff-http-database.test.ts
 tests/integration/staff-object-privacy.test.ts
 tests/integration/staff-security-acceptance.test.ts
 tests/integration/staff-webauthn-database.test.ts
+# 0184: a staff member's one key under a new site name, only with an operator's permit (and never without one).
+tests/integration/staff-rekey-permit.test.ts
 tests/integration/owner-one-key.test.ts
 # Spawns one tsx child under a 5 s commit deadline (kill-ceremony case): the only timing-bounded case on this list.
 tests/integration/owner-bootstrap-recovery.test.ts

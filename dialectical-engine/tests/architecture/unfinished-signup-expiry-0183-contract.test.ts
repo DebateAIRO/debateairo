@@ -39,10 +39,11 @@ const bodyOf = (sql: string, name: string): string => {
 };
 
 describe("0183: a sign-up not finished within 24 hours is deleted", () => {
-  it("C-T is the chain's step right after 0182, with its own loader and no amendment (later steps follow it)", async () => {
+  it("C-T is the chain step right after 0182, with its own loader and no amendment", async () => {
     const chain = read("packages/db/src/migration-forward-chain.ts");
     expect(chain).toContain("import { loadForward0183 } from './migration-forward0183.js';");
-    expect(chain).toContain("loadForward0181,loadForward0182,loadForward0183");
+    // Not the last step any more: later steps follow it in STEPS, as 0184 does.
+    expect(chain).toContain("loadForward0181,loadForward0182,loadForward0183,");
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((step) => step.name);
     expect(names.slice(names.indexOf(NAME) - 1, names.indexOf(NAME) + 1)).toEqual([PREVIOUS, NAME]);

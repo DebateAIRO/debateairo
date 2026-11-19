@@ -13,7 +13,7 @@ const NAME = "0185_release_history.sql";
 const VERSION = "release-history-forward0185-v1";
 const MANIFEST_PATH = "lineage/release-history-forward0185.json";
 const VERIFIER_PATH = "lineage/verify-effective-capabilities-130.sql";
-const PREVIOUS = "0183_unfinished_signup_expiry.sql";
+const PREVIOUS = "0184_staff_rekey_permit.sql";
 const FUNCTIONS: readonly string[] = ["core.read_release_history()"];
 const AMENDS: readonly never[] = [];
 const fail = (detail: string): never => { throw Error(`MIGRATION_FORWARD0185_${detail}`); };

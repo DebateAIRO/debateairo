@@ -395,7 +395,7 @@ export async function peerWriterWorks({ lookupReadinessUser: lookup, readinessRu
 }
 
 /** Opens a pool and keeps it only if the one identity row is accepted; otherwise ends it and refuses with `code`. */
-async function openCheckedPool({ Pool, options, sql, accepted, code }) {
+export async function openCheckedPool({ Pool, options, sql, accepted, code }) {
   const pool = new Pool(options);
   try {
     const rows = (await pool.query(sql)).rows;
@@ -404,10 +404,11 @@ async function openCheckedPool({ Pool, options, sql, accepted, code }) {
   } catch (error) { await pool.end().catch(() => undefined); throw error; }
 }
 
-const INTERIM_IDENTITY_SQL = `SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,
+/** Who a recovery-login connection really is; rekey-staff-key.mjs asks the same before it arms a permit. */
+export const INTERIM_IDENTITY_SQL = `SELECT session_user::text session,current_user::text role,current_database() database,current_setting('port')::int port,
   rolvaliduntil>clock_timestamp() AND rolvaliduntil<=clock_timestamp()+interval '5 minutes' bounded,
   NOT(rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication OR rolbypassrls) no_elevated_powers FROM pg_roles WHERE rolname=session_user`;
-const interimIdentityAccepted = (row, layout) => row.session === 'debateai_prod_staff_recovery' && row.role === 'debateai_prod_staff_recovery'
+export const interimIdentityAccepted = (row, layout) => row.session === 'debateai_prod_staff_recovery' && row.role === 'debateai_prod_staff_recovery'
   && row.database === layout.database && row.port === layout.pgPort && !!row.bounded && !!row.no_elevated_powers;
 
 /**
@@ -505,7 +506,7 @@ async function apiIdentity(plan, label) {
   return { uid: plan.serviceUid, gid: plan.serviceGid, groups: [...groups].sort((a, b) => a - b) };
 }
 
-async function readCa() {
+export async function readCa() {
   return withPrivateBytes(LAYOUT.postgresCa, { root: dirname(LAYOUT.postgresCa), uid: 0, mode: 0o644, maxBytes: 65536 }, raw => Buffer.from(raw).toString('utf8'));
 }
 
