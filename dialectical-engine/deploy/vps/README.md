@@ -2602,6 +2602,8 @@ The paid-vendor probe spends at most `max_tokens: 512` per target per staleness 
 
 `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
 
+The API has one more start-up refusal, for the test server's setup only and never on this host: `PREVIEW_PROVIDER_ORIGIN_INVALID`. It means `PREVIEW_PROVIDER_TEST_CONFIG_JSON` is set and `PUBLIC_APP_URL` is neither `https://v3-preview.dezbatere.ro` nor, in hosted mode, `https://dezbatere.ro`. The test server's launcher refuses the same case first, with its own named code (`PREVIEW_ORIGIN_NOT_LISTED` or `PREVIEW_MAIN_ORIGIN_NOT_HOSTED`), so this code shows only when the API is started without the launcher (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 10).
+
 ### The credential-file contract
 
 The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
