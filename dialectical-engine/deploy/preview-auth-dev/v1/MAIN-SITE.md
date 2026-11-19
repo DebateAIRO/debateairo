@@ -34,8 +34,9 @@ setting stops that service, and the journal names the setting with a short code.
   editing the service file itself.
 - *The release guide* is `deploy/preview-release/v1/README.md`.
 - *M1, M2, M8* are mails to the buyer: M1 is the confirmation with the Terms, M2 the receipt, M8 the mail that
-  confirms a withdrawal's refund. *O2_REFUND_DUE* and *O3* are mails to you: O2_REFUND_DUE is a refund you must make
-  in NETOPIA's admin; O3 is a billing job that failed for good (for example an invoice SmartBill refused).
+  confirms a withdrawal's refund. *O2_REFUND_DUE*, *O2_WITHDRAWAL* and *O3* are mails to you: O2_REFUND_DUE is a
+  refund you must make in NETOPIA's admin; O2_WITHDRAWAL is a withdrawal whose refund you must settle by hand; O3 is a
+  billing job that failed for good (for example an invoice SmartBill refused).
 - *A bcrypt hash* is the scrambled form of the site password that Caddy keeps. The password itself is never stored.
 
 **How to run a server step.** Each block that starts with `set -euo pipefail` is one script.
@@ -54,8 +55,8 @@ while you type, and nothing you type goes on a command line. Never paste a key, 
 with Claude.
 
 **Amounts on the screen.** Some steps print amounts: GATES and the scripts that call it (the day's spend of each
-spending gate), REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a GitHub issue or a
-pull request. When you ask for help, give the step's last line, and say which step it was.
+spending gate), WITHDRAWOTHER, REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a
+GitHub issue or a pull request. When you ask for help, give the step's last line, and say which step it was.
 
 **`<…>` in a block** is a value you fill in before you run it. `rNN` is the upload's number, as in the release guide.
 
@@ -81,15 +82,25 @@ if the server shows something else.
 can all be done in one day, unless one of these holds you up:
 - Mail opens only when SES shows Production access. Amazon's review can take up to a day, so ask for it the day
   before (1.4).
-- Cancel your own sandbox plans: a cancelled plan blocks nothing. A sandbox purchase as a Romanian buyer blocks real
-  payments for about 14.6 hours. A payment page that anyone left unfinished blocks them for up to 24 hours (3.2, 6).
+- Cancel your own sandbox plans: a cancelled plan does not block real payments. The account that holds it cannot buy a
+  live plan until that plan's month ends, so pay with another team account (7.2). A sandbox purchase as a Romanian
+  buyer blocks real payments for about 14.6 hours. A payment page that anyone left unfinished blocks them for up to
+  24 hours (3.2, 6).
 - ANAF's answer to an invoice or a credit note can take hours. Record it when it comes (7.9).
 - The refund of the first real payment may be recorded only the next day (7.10). Going back to the sandbox (7.11)
   waits for it and for its credit note.
 
 It is fine to end the day with real payments on, behind the new site password, with asks for the team only: that is
-the state part 7 leaves. Part 8 (opening to everyone) does not have to be the same day, and it needs the staff key on
-dezbatere.ro first (5.4).
+the state part 7 leaves. Part 8 (opening to everyone) does not have to be the same day. It needs the staff key on
+dezbatere.ro, and you settle that before part 7 (5.4, step 5).
+
+**If your real payment comes before a friends' test.** Parts 6 and 7 can swap. Do parts 1 to 5, then part 7, and
+skip 7.0: nobody else has had the site password yet. Friends can then come in while payments are real: run ASKS_OPEN
+(6.1) with the line `V=everyone`, and stop there, so the site password stays on. They use the Free plan. Tell them
+not to press **Abonați-vă și plătiți** (Subscribe and pay): payments are real, a plan one of them buys renews every
+month until they cancel it in Settings, and PAY_BACK waits for it. When your own refund and its credit note are
+recorded, run ASKS_CLOSE (6.3), then PAY_BACK (7.11), then part 6 as written, with test payments. Before real payments
+go on a second time, that friends' test closes and the site password changes (7.0), as the order rules say.
 
 **The order rules.** The code enforces most of them; the scripts check the rest before they change anything.
 - **Mail before the name.** With today's mail plan (v1), the API refuses to start on the main name
@@ -116,7 +127,8 @@ dezbatere.ro first (5.4).
   guide's PM2), it must run while the site password is on: the tool refuses a Caddy file without the password. It
   also runs only before NAME1, the first step of the main name (5.6).
 - **Never open or close a lock during an upload**, from SB3 to the end of DR6 (or SB13), and never while a second
-  release is staged or draining. The locks' names file below stops you when a release is staged or draining.
+  release is staged or draining. The locks' names file below stops you when a release is staged or draining. Only
+  the brakes (a) and (b) of 6.5 may run during an upload: the gates' `stop`, and PWON (the site password back).
 
 ---
 
@@ -453,11 +465,11 @@ case "$HOST" in v3-preview.dezbatere.ro|dezbatere.ro) ;; *) echo "NAMES_NOT_DONE
 KEYS='^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|NETOPIA_API_KEY_PATH|NETOPIA_IPN_KEYS_PATH|QUADERNO_API_BASE_URL|QUADERNO_API_KEY_PATH|SMARTBILL_API_BASE_URL|SMARTBILL_CREDENTIALS_PATH|SMARTBILL_SERIES|OWNER_REPORT_EMAIL_PATH|PREVIEW_LIVE_PAYMENTS)='
 inv() { journalctl -o cat --no-pager _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value "$1")"; }
 said() { [ "$(inv "$API" | grep -c "$@" || true)" -gt 0 ]; }
-apiup() { local t i; sleep 1; t=$(date +%s); systemctl restart "$API" || echo 'systemctl restart of the API returned non-zero'
+apiup() { local t i; sleep 1; t=$(date +%s); systemctl reset-failed "$API" 2>/dev/null || true; systemctl restart "$API" || echo 'systemctl restart of the API returned non-zero'
   for i in $(seq 1 80); do [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; [ "$(systemctl is-active "$API" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_MAIL_MODE|api\.boot\.failed|api\.preview\.asks_open|PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED' | cut -c1-300 || true
   [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && [ "$(systemctl is-active "$API" || true)" = active ]; }
-webup() { local t i c=000; sleep 1; t=$(date +%s); systemctl restart "$WEB" || echo 'systemctl restart of the website returned non-zero'
+webup() { local t i c=000; sleep 1; t=$(date +%s); systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$WEB" || echo 'systemctl restart of the website returned non-zero'
   for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_UI_STARTUP_REFUSED' | cut -c1-300 || true
   [ "$c" = 200 ] && [ "$(journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_UI_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(systemctl is-active "$WEB" || true)" = active ]; }
@@ -491,6 +503,8 @@ cause.
 
 What the helpers do, in short:
 - `apiup` restarts the API and waits for its start line (or its refusal); `webup` does the same for the website.
+  Each first clears systemd's count of recent starts: systemd refuses a fifth start of the API or the website within
+  15 minutes, and a way back must never be refused for that.
 - `inv` shows a service's journal since its last start; `said` asks whether the API's journal since its last start
   holds a line.
 - `gates` shows the three spending gates; `gatesok` says whether all three are active with their window open.
@@ -570,8 +584,8 @@ echo SANDBOXLIST_DONE
 exit 0
 ```
 
-A plan you cancelled still shows here, with kind `CANCEL_REQUESTED`. That is closed enough for real payments: PAY0
-and the live start do not count it. A plan with kind `CREATED` is a payment page someone left unfinished: it ends by
+A plan you cancelled still shows here, usually with kind `CANCEL_REQUESTED` (or `CARD_SAVED`, if its card arrived
+after the cancel). That is closed enough for real payments: PAY0 and the live start do not count it. A plan with kind `CREATED` is a payment page someone left unfinished: it ends by
 itself about 24 hours after its `at` time.
 
 - **Your own sandbox accounts** (the ones from earlier sandbox purchases too): sign in to each and **Cancel** in
@@ -654,7 +668,8 @@ echo MAIL_ALLOW_DONE
 exit 0
 ```
 
-The API restarts (a few seconds of 502). Expect the line `PREVIEW_MAIL_MODE {"mode":"allow-list",…}`, then
+The API restarts: pages that need the API fail for a minute or more (`apiup` waits up to about 4 minutes). The same
+holds for every step that restarts the API. Expect the line `PREVIEW_MAIL_MODE {"mode":"allow-list",…}`, then
 `MAIL_ALLOW_DONE`.
 
 Test it with your own allow-listed account:
@@ -970,7 +985,8 @@ Expect the SAME list (all `OK`, with `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`), t
 {…"origin":"https://dezbatere.ro"}` with the same mode as before, `PREVIEW_API_STARTED …`), then `NAME3_DONE`. The
 runner reads no public name and is not restarted.
 
-If a refusal line shows, part 10 says what it means. Whatever it says: run NAME5 at once, then read it calmly.
+If a refusal line shows, part 10 says what it means. Whatever it says: run NAME5 at once, then read it calmly. While
+the API is refused, systemd tries it again every 30 seconds; NAME5 stops that.
 
 ### 5.4 The checks after the switch
 
@@ -1008,8 +1024,9 @@ Then, by hand:
    the staff key to the name the API answers as. The key enrolled on the test name does not work on dezbatere.ro, so
    staff tools (Admin → Team, Hide now) need the staff key enrolled again under dezbatere.ro. How to enrol it again for
    an existing owner is **to confirm on the server**; it may need the owner-access ceremony. Until then, staff work
-   needs NAME5 (the test name), and NAME5 refuses once payments are real (part 7). Settle this before part 8: while
-   the site is open to everyone, Hide now is the only way to take a published debate down.
+   needs NAME5 (the test name), and NAME5 refuses once payments are real (part 7), until PAY_BACK, which takes days.
+   So settle this right after these checks, before part 7. Part 8 needs it: while the site is open to everyone, Hide
+   now is the only way to take a published debate down.
 6. Open `/sign-up` and see the Turnstile check pass.
 7. Start one team question and check it is not cut at 55 seconds.
 
@@ -1198,8 +1215,8 @@ questions from accounts not on the team. `open work now` counts the debates hand
 closing does not stop those (above).
 
 **Closing the friends' test.** After ASKS_CLOSE, run SANDBOXLIST (3.3) and settle every refund. The friends' test is
-closed only when PAY0 (7.1) prints all zeros. Then change the site password the friends had (PWNEW, 7.0) before any
-step of part 7.
+closed only when PAY0 (7.1; it only reads) prints all zeros. Change the site password the friends had (PWNEW, 7.0)
+before 7.2.
 
 ### 6.4 What bounds spending (setting names only; your figures)
 
@@ -1267,6 +1284,7 @@ set -euo pipefail
 W=$M/password/Caddyfile.signups; O=$M/password/Caddyfile.open; TS=$(date -u +%Y%m%dT%H%M%SZ); PREV=$M/password/Caddyfile.before-signups-$TS
 [ -s "$W" ] || { echo "SIGNUPS_NOT_DONE: $W is missing (make the edited copy first; nothing changed)"; exit 1; }
 OFF=no; if [ -e "$O" ]; then cmp -s "$C" "$O" || { echo "SIGNUPS_NOT_DONE: the live Caddyfile is not the copy PWOFF2 put in place (between PWOFF1 and PWOFF2?); nothing changed: ask"; exit 1; }; OFF=yes; fi
+[ ! -e "$M/password/Caddyfile.before-open" ] || ! cmp -s "$C" "$M/password/Caddyfile.before-open" || { echo "SIGNUPS_NOT_DONE: PWOFF1 ran but the password is still on: finish PWOFF2, or run PWON to drop its copies, then run this again; nothing changed"; exit 1; }
 RULE=$(printf '%s\n' '@signup {' 'method POST' 'path /api/v1/auth/register /api/v1/auth/social/signup/complete /api/v1/auth/resend-verification' '}' 'respond @signup 503')
 diff "$C" "$W" || true
 ADD=$(diff "$C" "$W" | sed -n 's/^>[[:space:]]*//p' || true); DEL=$(diff "$C" "$W" | sed -n 's/^<[[:space:]]*//p' || true)
@@ -1282,22 +1300,28 @@ if [ "$(systemctl is-active caddy || true)" != active ]; then
   [ "$(systemctl is-active caddy || true)" = active ] || { echo "SIGNUPS_NOT_DONE: the file before is back, but Caddy did not start on it either: the site is DOWN: ask at once"; exit 1; }
   echo "SIGNUPS_NOT_DONE: Caddy did not start on the copy; the file before is back and Caddy restarted on it"; exit 1
 fi
-if [ "$OFF" = yes ]; then cp -p "$C" "$O"; cmp -s "$C" "$O" || { echo "SIGNUPS_NOT_DONE: the rule is $WHAT, but $O was not updated, so PWON would refuse: ask at once"; exit 1; }; fi
+if [ "$OFF" = yes ]; then { cp -p "$C" "$O" && cmp -s "$C" "$O"; } || { echo "SIGNUPS_NOT_DONE: the rule is $WHAT, but $O was not updated, so PWON would refuse: ask at once"; exit 1; }; fi
 mv "$W" "$W.$TS"
-echo "the rule is $WHAT; a test sign-up request is answered $(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "https://$HOST/api/v1/auth/register" || true)"
+SC=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "https://$HOST/api/v1/auth/register" || true)
+echo "the rule is $WHAT; a test sign-up request is answered $SC"
+if [ "$OFF" = yes ]; then case "$WHAT/$SC" in added/503) ;; added/*) echo "SIGNUPS_NOT_DONE: the rule is in the live Caddyfile, but a test sign-up is answered $SC, not 503, so sign-ups go on (the five lines are not where Caddy reaches them): if sign-ups must stop now, run PWON (brake b); then ask"; exit 1;; 'taken out/503') echo "SIGNUPS_NOT_DONE: the rule is taken out, but a test sign-up is still answered 503: ask"; exit 1;; esac; fi
 echo SIGNUPS_DONE
 exit 0
 ```
 
 Expect the diff (the five lines), then `the rule is added; a test sign-up request is answered 503` (with the password
-off), then `SIGNUPS_DONE`. **To take (c) off**, do the same three steps, but in step 2 delete the same five lines
-instead. PWON (b) works with (c) in or out: it puts back the Caddyfile from before part 8, without the rule.
+off), then `SIGNUPS_DONE`. With the password off, SIGNUPS checks that 503 itself: if the rule is in but the answer
+is not 503, the lines are in a place Caddy does not reach, and it says `SIGNUPS_NOT_DONE`. With the password on, the
+answer may be the password's 401, which says nothing about the rule, so the script does not check it then. **To take
+(c) off**, do the same three steps, but in step 2 delete the same five lines instead. PWON (b) works with (c) in or
+out: it puts back the Caddyfile that PWOFF1 kept. If you added (c) before PWOFF1, it is still in after PWON; take it
+out with SIGNUPS.
 
 (d) **Asks back to the team only:** ASKS_CLOSE (6.3). While payments are real it runs only with the password on, so
 PWON (b) comes first.
 
-(a) and (b) work at any time, even during an upload. (c) and (d) do not: wait until the upload is over (their names
-file stops them while an upload is under way).
+(a) and (b) work at any time, even during an upload. (c) and (d) do not: wait until the upload is over. Their names
+file stops them only once the new release is staged, not from the start of the upload, so do not count on it.
 
 To see spend: GATES (6.2), and the gates' halt e-mails.
 
@@ -1312,6 +1336,8 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
   with `everyone` (part 8), never with the friends' value.
 - If a friends' test ran (part 6): it is closed (PAY0, 7.1, prints all zeros), and the site password is a new one
   that the friends never had (PWNEW, 7.0).
+- Your staff key works on dezbatere.ro (5.4, step 5). If it does not, ask before you go on: from PAY_SWITCH on, NAME5
+  refuses until PAY_BACK, so the test name is no way round.
 - The site password is on. While payments are real and asks are closed, the API refuses a checkout or a plan upgrade
   from any account not on the team (403 `PREVIEW_TEAM_ONLY`; the page shows its general error). Keep the password on
   anyway while mail is on the allow-list: a buyer outside it would get no M1 or M2.
@@ -1388,7 +1414,7 @@ Close them as in 3.3. Wait until payment checks and jobs have run. Then:
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
 # PAY0: the sandbox's open records, counted (read-only). Every count must be 0 before real payments.
-Q1=$(psqlq "SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED', 'CANCEL_REQUESTED')")
+Q1=$(psqlq "SELECT count(*) FROM billing.subscription_latest_v s JOIN billing.subscription_event c ON c.subscription_id = s.subscription_id AND c.kind = 'CREATED' WHERE jsonb_extract_path_text(c.data, 'payment_environment') = 'sandbox' AND s.kind NOT IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED') AND NOT (COALESCE((SELECT x.kind FROM billing.subscription_event x WHERE x.subscription_id = s.subscription_id AND x.kind IN ('CANCEL_REQUESTED', 'CANCEL_REVOKED') ORDER BY x.seq DESC LIMIT 1), '') = 'CANCEL_REQUESTED' AND COALESCE((SELECT y.kind FROM billing.subscription_event y WHERE y.subscription_id = s.subscription_id AND y.kind IN ('ACTIVATED', 'RECOVERED', 'RESUMED', 'PAST_DUE', 'SUSPENDED') ORDER BY y.seq DESC LIMIT 1), '') IN ('ACTIVATED', 'RECOVERED', 'RESUMED'))")
 Q2=$(psqlq "SELECT count(*) FROM billing.charge c WHERE c.payment_environment = 'sandbox' AND NOT EXISTS (SELECT 1 FROM billing.charge_event f WHERE f.charge_id = c.charge_id AND f.kind IN ('SUCCEEDED', 'FAILED')) AND NOT EXISTS (SELECT 1 FROM billing.subscription_latest_v s WHERE s.subscription_id = c.subscription_id AND s.kind IN ('ENDED', 'WITHDRAWN', 'ERASURE_STOPPED'))")
 Q3=$(psqlq "SELECT count(*) FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.payment_environment = 'sandbox' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR c.charge_id = j.ref))")
 Q4=$( { find /var/lib/debateai-v3-preview/api/billing-notice-spool -type f 2>/dev/null || true; } | wc -l)
@@ -1423,8 +1449,8 @@ Any plan row, even a cancelled sandbox plan, makes the live checkout answer "alr
 
 PAY_ACCOUNT also checks that the account is on the team (its user id is in the API file's
 `PREVIEW_TEAM_USER_IDS_JSON`). While asks are closed, the live checkout answers any other account with 403
-`PREVIEW_TEAM_ONLY` (the page shows its general error). If no team account of yours is free of plans, stop and ask
-before part 7: adding an account to the team is not in this document.
+`PREVIEW_TEAM_ONLY` (the page shows its general error). If no team account of yours is free of plans, stop here and
+ask before 7.3: adding an account to the team is not in this document.
 
 ### 7.3 The live key files (typed by you; nothing is printed)
 
@@ -1443,7 +1469,7 @@ printf '%s\n' "$V" | put_secret "$B/live-quaderno-api-key" || { echo "PAY_KEYS_N
 V=''; read -rs -p 'SmartBill e-mail:token (hidden): ' V < /dev/tty || true; echo
 [ -n "$V" ] || { echo "PAY_KEYS_NOT_DONE: the SmartBill line was empty; the NETOPIA and Quaderno keys are saved (to start again, remove those two files first)"; exit 1; }
 printf '%s\n' "$V" | put_secret "$B/live-smartbill-credentials" || { echo "PAY_KEYS_NOT_DONE: the SmartBill line was not saved (above); the NETOPIA and Quaderno keys are saved: ask"; exit 1; }; unset V
-install -o root -g root -m 0644 /root/netopia-live-public.pem "$B/live-netopia-ipn-keys.pem"; echo 'saved the live public key'
+install -o root -g root -m 0644 /root/netopia-live-public.pem "$B/live-netopia-ipn-keys.pem" || { echo "PAY_KEYS_NOT_DONE: the three secrets are saved, but NETOPIA's live public key was not copied: ask"; exit 1; }; echo 'saved the live public key'
 stat -c '%a %U %n' "$B" "$B"/*
 echo PAY_KEYS_DONE
 exit 0
@@ -1499,16 +1525,19 @@ livedrop "$QL"
 journalctl -u "$EGU" -n 5 -o cat --no-pager
 MC=$(modecheck "$QL"); echo "$MC"
 [ "$MC" = 'egress: live' ] || { sandboxdrop; echo "PAY_EGRESS_NOT_DONE: the proxy does not answer live for this label; the drop-in is removed"; exit 1; }
-systemd-run --pipe --wait --collect --uid="$AU" --gid="$AGRP" -p IPAddressDeny=any -p IPAddressAllow=localhost "$N" -e "require('http').setGlobalProxyFromEnv({HTTPS_PROXY:'http://127.0.0.1:3180',NO_PROXY:'localhost,127.0.0.1,[::1]'});const t=u=>fetch(u,{signal:AbortSignal.timeout(15000)}).then(r=>console.log(u,'answered',r.status),()=>console.log(u,'refused'));t('https://secure.netopia-payments.com/api').then(()=>t('https://ws.smartbill.ro/SBORO/api')).then(()=>t('https://secure-sandbox.netopia-payments.com/'))"
+PR=$(systemd-run --pipe --wait --collect --uid="$AU" --gid="$AGRP" -p IPAddressDeny=any -p IPAddressAllow=localhost "$N" -e "require('http').setGlobalProxyFromEnv({HTTPS_PROXY:'http://127.0.0.1:3180',NO_PROXY:'localhost,127.0.0.1,[::1]'});const t=u=>fetch(u,{signal:AbortSignal.timeout(15000)}).then(r=>console.log(u,'answered',r.status),()=>console.log(u,'refused'));t('https://secure.netopia-payments.com/api').then(()=>t('https://ws.smartbill.ro/SBORO/api')).then(()=>t('https://secure-sandbox.netopia-payments.com/'))" || true)
+printf '%s\n' "$PR"
+grep -qE '^https://secure\.netopia-payments\.com/api answered [0-9]+$' <<<"$PR" && grep -qE '^https://ws\.smartbill\.ro/SBORO/api answered [0-9]+$' <<<"$PR" && grep -qxF 'https://secure-sandbox.netopia-payments.com/ refused' <<<"$PR" || { sandboxdrop; echo "PAY_EGRESS_NOT_DONE: the live form does not let through exactly NETOPIA's live address and SmartBill (the three lines above); the drop-in is removed: run PAY_UNDO (below) to check the sandbox form, then ask"; exit 1; }
 echo PAY_EGRESS_DONE
 exit 0
 ```
 
 Expect: the journal line `{"event":"preview.egress.listening","host":"127.0.0.1","port":3180,"payments":"live"}`;
 `egress: live`; then NETOPIA's live address and SmartBill `answered` (any status) and the sandbox address `refused`;
-then `PAY_EGRESS_DONE`. If the last three lines are wrong, run PAY_UNDO (below) and ask. The proxy file from before
-stays in `/root/preview-archive/main-site/pay/egress-proxy.mjs.before`; PAY_EGRESS puts it back by itself if the
-proxy does not start on the new file.
+then `PAY_EGRESS_DONE`. The script checks those three lines itself. If one is wrong, it removes the live form and says
+`PAY_EGRESS_NOT_DONE`: run PAY_UNDO (below), then ask. The proxy file from before stays in
+`/root/preview-archive/main-site/pay/egress-proxy.mjs.before`; PAY_EGRESS puts it back by itself if the proxy does not
+start on the new file.
 
 ### 7.6 Switch the API to real payments
 
@@ -1633,7 +1662,9 @@ corrected in SmartBill and sent again.
 If the invoice job died with an O3 mail (`INVOICE_SERVICE_REFUSED`, for example the CIF form): first check that
 SmartBill issued nothing, and ask. Then either issue it by hand in SmartBill and record it (INVOICE_RECORD), or, after
 the cause is fixed, send the job again (INVOICE_REQUEUE). For a credit note's job, write `--kind CREDIT_NOTE` instead
-of `--kind INVOICE`.
+of `--kind INVOICE`. Fill in `<ref>` with the charge reference the O3 mail names (the long code after the word
+`charge`), and `<SERIES-NUMBER>` with the number SmartBill shows on the invoice you issued by hand, as
+`<series>-<number>`. The command in the O3 mail is written for another server: use these blocks instead.
 
 ```sh
 set -euo pipefail
@@ -1685,7 +1716,7 @@ W3=$(psqlq "SELECT count(*) FROM billing.charge_event r WHERE r.kind = 'REFUND_R
 W4=$(psqlq "SELECT count(*) FROM billing.subscription_event w JOIN billing.subscription_event c ON c.subscription_id = w.subscription_id AND c.kind = 'CREATED' WHERE w.kind = 'WITHDRAWN' AND jsonb_extract_path_text(w.data, 'refund_by_owner') = 'true' AND jsonb_extract_path_text(c.data, 'payment_environment') = 'live' AND NOT EXISTS (SELECT 1 FROM billing.withdrawal_owner_settlement s WHERE s.subscription_id = w.subscription_id)")
 W5=$(psqlq "SELECT count(*) FROM billing.outbox j WHERE j.done_at IS NULL AND j.dead_at IS NULL AND EXISTS (SELECT 1 FROM billing.charge c WHERE c.payment_provider = 'netopia' AND c.payment_environment = 'live' AND (c.charge_id = jsonb_extract_path_text(j.payload, 'charge_id') OR c.charge_id = jsonb_extract_path_text(j.payload, 'external_order_id') OR (j.kind IN ('QUADERNO_RECORD_SALE', 'SMARTBILL_INVOICE') AND c.charge_id = j.ref)))")
 echo "live plans not over $W1; live payments not final $W2; live refunds not recorded $W3; withdrawals not settled $W4; open live jobs $W5"
-[ "$W1/$W2/$W3/$W4/$W5" = 0/0/0/0/0 ] || { echo "PAY_BACK_NOT_DONE: live work is open (above); nothing changed: wait for the jobs, record or settle, then run this again"; exit 1; }
+[ "$W1/$W2/$W3/$W4/$W5" = 0/0/0/0/0 ] || { echo "PAY_BACK_NOT_DONE: live work is open (above); nothing changed: wait for the jobs and record the refunds, then run this again; if count 4 is not 0, or count 3 stays above 0 while a card dispute is open, ask"; exit 1; }
 [ "$(swap "$M/pay/sandbox.lines")" = swapped ] || { echo "PAY_BACK_NOT_DONE: the swap did not finish (compare the API file with $M/pay/api-$LABEL.env.before-live); the proxy and the running API are unchanged: ask"; exit 1; }
 sandboxdrop
 journalctl -u "$EGU" -n 3 -o cat --no-pager
@@ -1698,9 +1729,10 @@ exit 0
 
 What the five counts mean: 1. live plans not over (a pending cancel counts; a plan ended because its account was
 deleted does not); 2. live payments not final on an open plan; 3. live refunds not yet recorded (one an open dispute
-holds counts too); 4. withdrawals handed to you and not yet settled with
-`withdraw-cli.ts --owner <ref> --refund <amount> --dashboard <amount>`; 5. open jobs of live charges (credit note,
-invoice, payment check, refund).
+holds counts too: REFUNDDONE refuses it, and the API's own sandbox start does not count it, so only this script waits
+for it: ask); 4. withdrawals handed to you (an O2_WITHDRAWAL mail) and not yet settled: the mail names the owner
+reference, and its command is written for another server, so ask before you settle one; 5. open jobs of live charges
+(credit note, invoice, payment check, refund).
 
 Expect the five counts at 0, a proxy line with no `"payments"` field, the API's start line, the sandbox billing check,
 then `PAY_BACK_DONE`. The sandbox start refuses by itself while live work is open, with
@@ -1723,8 +1755,10 @@ the line. Two more rules, for the release guide's drained upload (DR1 to DR6):
   sandbox.** rbD-B puts back DR3's cold copy of the database, so it would lose every real payment, NETOPIA notice,
   invoice and credit note written since then, while the cards stay charged and the invoices stay issued in SmartBill,
   Quaderno and ANAF. The old release could then issue some of them a second time. LIVEAFTER also counts the invoices
-  and credit notes started since the cold copy. If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B:
-  fix forward, and ask.
+  and credit notes started, issued or recorded since the cold copy, ANAF's answers recorded since then, and the
+  invoice and credit-note jobs that ran since then (the old release would run such a job again, even one that was
+  waiting for SmartBill at the cold copy). If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B: fix
+  forward, and ask.
 
 ```sh
 set -euo pipefail
@@ -1736,8 +1770,11 @@ LC=$(psqlq "SELECT count(*) FROM billing.charge WHERE payment_environment = 'liv
 LE=$(psqlq "SELECT count(*) FROM billing.charge_event WHERE payment_environment = 'live' AND at > to_timestamp($T0)")
 LN=$(psqlq "SELECT count(*) FROM billing.payment_notice WHERE payment_environment = 'live' AND received_at > to_timestamp($T0)")
 LI=$(psqlq "SELECT count(*) FROM billing.invoice_intent i JOIN billing.charge c ON c.charge_id = i.charge_id WHERE c.payment_environment = 'live' AND i.requested_at > to_timestamp($T0)")
-echo "since the cold copy: live payments $LC; live payment events $LE; live NETOPIA notices $LN; live invoices or credit notes started $LI"
-[ "$LC/$LE/$LN/$LI" = 0/0/0/0 ] || { echo "LIVEAFTER_NOT_DONE: real-payment records or invoices were written after the cold copy: never rbD-B; fix forward, and ask"; exit 1; }
+LD=$(psqlq "SELECT count(*) FROM billing.invoice i JOIN billing.charge c ON c.charge_id = i.charge_id WHERE c.payment_environment = 'live' AND i.at > to_timestamp($T0)")
+LS=$(psqlq "SELECT count(*) FROM billing.invoice_status_event s JOIN billing.invoice i ON i.invoice_id = s.invoice_id JOIN billing.charge c ON c.charge_id = i.charge_id WHERE c.payment_environment = 'live' AND s.at > to_timestamp($T0)")
+LJ=$(psqlq "SELECT count(*) FROM billing.outbox j JOIN billing.charge c ON c.charge_id = split_part(j.ref, ':', 1) WHERE c.payment_environment = 'live' AND j.kind IN ('SMARTBILL_INVOICE', 'SMARTBILL_STORNO', 'QUADERNO_RECORD_SALE', 'QUADERNO_RECORD_REFUND') AND (j.claimed_at > to_timestamp($T0) OR j.done_at > to_timestamp($T0) OR j.dead_at > to_timestamp($T0))")
+echo "since the cold copy: live payments $LC; live payment events $LE; live NETOPIA notices $LN; live invoices or credit notes started $LI, issued or recorded $LD; their e-Factura answers $LS; their jobs run $LJ"
+[ "$LC/$LE/$LN/$LI/$LD/$LS/$LJ" = 0/0/0/0/0/0/0 ] || { echo "LIVEAFTER_NOT_DONE: real-payment records or invoices were written, or invoice jobs ran, after the cold copy: never rbD-B; fix forward, and ask"; exit 1; }
 echo LIVEAFTER_DONE
 exit 0
 ```
@@ -1751,7 +1788,8 @@ plan file and the API's mode line); real payments work (part 7); the staff key w
 open Admin → Team → public review, and check that your staff key is accepted: without it nothing published can be
 hidden while the site is open, and the way back to the test name is closed while payments are real); the payment marks
 are on the site if you want them (only an upload made before part 5 adds them, 1.1; if they are missing, ask before
-you take the password off); you have decided your numbers and gate pots (1.7, 6.4).
+you take the password off); you have decided your numbers and gate pots (1.7, 6.4); and you have read the
+warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
 
 ### 8.1 Asks open to everyone
 
@@ -1855,12 +1893,17 @@ exit 0
 Close in this order. Each step is safe to stop after. The scripts hold you to it. While the site is open, PAY_BACK and
 NAME5 refuse, and so do ASKS_CLOSE and MAIL_CLOSE if payments are real. While payments are real, NAME5 refuses too.
 
+**If the password was ever off with real payments on (part 8), stop and ask before step 1.** Someone outside the
+team may then hold a paid plan. A paid plan renews every month on its saved card until its owner cancels it, and
+both ways to cancel (Settings, and the `/cancel` link in the plan's mails) are behind the site password. Once the
+password is back, such a plan never ends, PAY_BACK never passes, and that person is still charged every month while
+they cannot even open the site. Never end their plan yourself. PWON as a brake (6.5 (b)) still works at any time.
+
 1. **The site password back:** PWON (8.4).
 2. **Asks back to the team:** ASKS_CLOSE (6.3).
 3. **Payments back to the sandbox:** PAY_BACK (7.11). It waits until every live plan is over and every refund and
-   credit note is recorded. After a test payment alone that takes days. Once anyone else has a paid plan, it waits
-   until each such plan has ended (never end them yourself). Meanwhile the password stays on, and steps 4 to 6 wait
-   too.
+   credit note is recorded. After your test payment alone, that takes days. Meanwhile the password stays on, and
+   steps 4 to 6 wait too.
 4. **The name back to the test name:** NAME5 (5.5). It also moves the mail plan back to the test name.
 5. **Mail back to the allow-list:** MAIL_CLOSE (4.4), then check the v1 file is the kept one:
    `sha256sum /etc/debateai-v3-preview/auth-dev-v1/mail-plan.json` must print the digest of 4.1.
@@ -1894,8 +1937,10 @@ Where it shows:
 - **SAME**: `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` prints `BAD <check>`.
 - **Per request or per mail** (the last two rows): the service keeps running and refuses that one request or mail.
 
-In every other case the service is not running. The scripts above put the setting before back by themselves; if you
-set a value by hand, put back the file you changed and restart that service.
+In every other case the service is not running, except for the SAME rows and `MODE_OTHER_ACCOUNT`, which stop
+nothing by themselves (NAME3 and NAME5 run SAME after they stopped the site, and their last line says so). The scripts
+above put the setting before back by themselves; if you set a value by hand, put back the file you changed and restart
+that service.
 
 | Code | Where | What it means | What to do |
 |---|---|---|---|
