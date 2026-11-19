@@ -21,6 +21,7 @@ import {
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { legalReleaseProblems } from "../../apps/ui/scripts/legal-release-check.mjs";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { PRIVACY_315_SWAPS } from "../support/legalPrivacy315.js";
 
 /**
  * English first: a change to the legal wording is made in English only while work goes on. The languages a release
@@ -43,10 +44,23 @@ const sha = (text: string): string => createHash("sha256").update(text, "utf8").
 
 /**
  * The repository's drafts, as the release check's cases below read them. They need every translation to have the
- * English structure, and since Terms 1.0 carries no change history (the 2.x entries, one of which a lagging translation
- * lacked, left with the renumbering), every language's Terms already has it.
+ * English structure. Since Terms 1.0 carries no change history (the 2.x entries, one of which a lagging translation
+ * lacked, left with the renumbering), every language's Terms already has it. The Privacy Policy's section 4 row gained
+ * in 3.15 a second legal basis, for taking payment (one more "Art. " reference, which the locale check counts), that
+ * the translations which lag do not have yet: that row reads as 3.14 wrote its last cell in English and in each
+ * translation that follows it (tests/support/legalPrivacy315.ts).
  */
-const releaseDraft = repoDraft;
+const TRANSLATIONS_RECORD = parseLegalTranslations(JSON.parse(readFileSync(resolve(process.cwd(), LEGAL_TRANSLATIONS_PATH), "utf8")));
+const releaseDraft = (locale: string, kind: Kind): string => {
+  const text = repoDraft(locale, kind);
+  if (kind !== "PRIVACY") return text;
+  if (locale !== "en" && !legalTranslationFollows(TRANSLATIONS_RECORD, kind, locale, sha(repoDraft("en", kind)))) return text;
+  const basis = PRIVACY_315_SWAPS[locale]!.swaps.filter(([, after]) => after.includes("Art. 6(1)(b)"));
+  expect(basis, `${locale}: the 3.15 legal basis for taking payment`).toHaveLength(1);
+  const [before, after] = basis[0]!;
+  expect(text.split(after), `${locale}: the 3.15 basis, once`).toHaveLength(2);
+  return text.replace(after, () => before);
+};
 
 /** An English-only edit that also changes the structure: one new paragraph at the end of section 6. */
 const NEW_PARAGRAPH = "A paragraph that exists only in English so far.";

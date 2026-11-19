@@ -90,7 +90,7 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v3.15 · EFFECTIVE 19 NOVEMBER 2026"
+      "PRIVACY POLICY · v3.15 · EFFECTIVE 21 NOVEMBER 2026"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(

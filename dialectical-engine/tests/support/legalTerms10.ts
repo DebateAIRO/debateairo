@@ -2,21 +2,31 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Terms of Service 1.0, the launch text. 1.0 is still the only version, so the corrections made to it before launch
- * change the 1.0 text itself and add no change history: the archived 1.0 copies are rebuilt from the corrected text.
- * The corrections, so that the Terms say what the code does:
- *   - section 11: closing an account makes the data unreadable only where its keys are destroyed, not in the copies the
- *     backups keep, so the account and private debates can be restored from those copies until they are gone; and the
- *     record of the consent given before the first debate is deleted with the account, while the other acceptance and
- *     consent records stay. It said "permanently unreadable".
- *   - section 9: a debate our check deletes cannot be restored unless the whole service is restored from a backup that
- *     still holds it.
+ * Terms of Service 1.0, the launch text, effective 21 November 2026. 1.0 is still the only version, so the corrections
+ * made to it before launch change the 1.0 text itself and add no change history: the archived 1.0 copies are rebuilt
+ * from the corrected text. The corrections, so that the Terms say what the code and the payment provider's conditions
+ * require:
+ *   - section 1: we are the merchant, selling in our own name and on our own account and issuing the invoices; not a
+ *     marketplace, intermediary or agent; the AI companies are suppliers and NETOPIA Payments processes card payments;
+ *   - section 12: its title names payment, delivery, cancellation and refunds, and the paid plans "are" available;
+ *   - section 13: how to withdraw, with the Settings button once signed in or by email, and that a withdrawal sent
+ *     before the 14 days end is in time;
+ *   - Annex A.6, South Korea: each consent is asked on its own, and we send no marketing messages;
+ *   - sections 8, 9 and 11: the backups keep copies, some with the keys, so the licence does not end for those copies,
+ *     a debate our check deletes is not kept in the live service but can come back with a whole-service restore, and
+ *     closing an account makes the data unreadable only in the live service; the record of the consent given before
+ *     the first debate is deleted with the account, while the other acceptance and consent records stay. Section 11
+ *     said "permanently unreadable".
  *
  * Every language's corrected draft is its first 1.0 draft (whose sha256 the manifest held before the corrections) plus
  * the swaps in legalTerms10.json, generated from the two texts: each pair is [first text, corrected text], the
- * corrected text unique in the draft. `withoutTerms10Corrections` undoes them, so a check can prove that nothing else
- * changed.
+ * corrected text unique in the draft. English, Romanian and French carry every correction; the other languages carry
+ * the day and the section 9 and 11 sentences as first translated, and lag the English until a release offers them.
+ * `withoutTerms10Corrections` undoes them, so a check can prove that nothing else changed.
  */
+
+/** The day of November 2026 on which the corrected 1.0 takes effect, as every language's eyebrow and version line write it. */
+export const TERMS_10_DAY = "21";
 
 type Swaps = Readonly<Record<string, Readonly<{ sha256: string; swaps: readonly (readonly [string, string])[] }>>>;
 

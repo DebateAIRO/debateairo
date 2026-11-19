@@ -133,7 +133,7 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v1.0 · EFFECTIVE 19 NOVEMBER 2026"
+      "TERMS OF SERVICE · v1.0 · EFFECTIVE 21 NOVEMBER 2026"
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(

@@ -14,6 +14,7 @@ import {
   withoutPrivacy314Number
 } from "../support/legalPrivacy314.js";
 import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
+import { withoutTerms10Corrections } from "../support/legalTerms10.js";
 
 /**
  * Terms of Service 1.0 and Privacy Policy 3.13, effective 19 November 2026. The Terms start again at 1.0 (owner's
@@ -28,10 +29,11 @@ const root = process.cwd();
 const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
 /**
  * A draft as these checks were written for it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts),
- * so as 3.14 left it, and the Terms as they are, since 1.0 is still their only version.
+ * so as 3.14 left it, and the Terms as the first 1.0 text wrote them, with the corrections made before launch undone
+ * (tests/support/legalTerms10.ts). The archive holds the corrected 1.0 text, so the archive check reads the file.
  */
 const draft = (code: string, name: string): string =>
-  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : file(code, name);
+  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : withoutTerms10Corrections(code, file(code, name));
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
@@ -107,7 +109,7 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
     for (const code of ["en", "ro", "fr"]) {
       const entries = Object.values(archive[code]!);
       expect(entries.map((item) => item.version), code).toEqual(["1.0"]);
-      expect(readFileSync(resolve(root, entries[0]!.path), "utf8"), code).toBe(draft(code, "terms-of-service.md"));
+      expect(readFileSync(resolve(root, entries[0]!.path), "utf8"), code).toBe(file(code, "terms-of-service.md"));
     }
   });
 
