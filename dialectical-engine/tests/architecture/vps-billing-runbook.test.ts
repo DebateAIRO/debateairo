@@ -385,6 +385,32 @@ describe("P22 the Billing runbook", () => {
     }
   });
 
+  it("gives a withdrawal emailed while a dispute pauses the plan a route for every outcome, and keeps its refund's 14 days", () => {
+    const flat = billing.replace(/\s+/gu, " ");
+    const paused = flat.slice(flat.indexOf("**If the plan is paused by a card dispute.**"),
+      flat.indexOf("**If the person has scheduled their account deletion.**"));
+    for (const needle of [
+      "The refund is due within 14 days of that arrival",
+      "work out what is due at once, as described below, without waiting for the outcome",
+      "Do not refund it in NETOPIA's admin while the dispute is open",
+      "- `RESUMED`: the dispute was won before the paid month ended, and the plan is active again. Run the command above"
+        + " with `--received` set to that arrival time",
+      // A dispute won after the paid month has ended never resumes the plan, so the command cannot take the withdrawal.
+      "- `RESOLVED_AFTER_END`: the dispute was won after the paid month ended, so the plan has ended and is not resumed,"
+        + " and the command above prints `NOT_SUBSCRIBED`. Settle the withdrawal by hand, as described below for a deleted"
+        + " account.",
+      "- `STILL_DISPUTED`: another payment of the plan is still disputed, and the plan stays paused.",
+      "- `ENDED_DISPUTE` (lost), or the site ended the plan by itself on a lost dispute"
+    ]) {
+      expect(paused, needle).toContain(needle);
+    }
+    // The four answers are the dispute command's own words for a paused plan's outcome.
+    const command = read("apps/api/src/billing/dispute-cli.ts");
+    for (const result of ["RESUMED", "RESOLVED_AFTER_END", "STILL_DISPUTED", "ENDED_DISPUTE"]) {
+      expect(command, result).toContain(`case "${result}":`);
+    }
+  });
+
   it("F6b fix round 1: the emailed refund command previews first, the held row's command is the host form, §3's refusal", () => {
     const flat = billing.replace(/\s+/gu, " ");
     const refund = flat.slice(flat.indexOf("**A refund handed to you.**"),

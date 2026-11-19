@@ -4274,10 +4274,14 @@ same day it arrives. It works out the refund itself: the price times the share o
 not used, so a person who used none gets the whole price back. It records the
 withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
 the 14 days), ends the plan, queues the refund, and emails the person at once that their withdrawal was received
-(M8_RECEIVED, "We've received your withdrawal", dated when the statement arrived). The confirmation that the money
-went back (M8) follows once the refund is done; when nothing is due back, M8 goes at once instead and is the only
-email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday or a Sunday, the person
-still has until the end of the next Monday; the command counts it the same way.
+(M8_RECEIVED, "We've received your withdrawal"). That email repeats the statement: the date and time it arrived, in
+the person's own time zone with the offset named (UTC when their country has several zones), the plan and the day it
+started, and their name as the billing details hold it. The confirmation that the money went back (M8) follows once
+the refund is done; when nothing is due back, the acknowledgement says so and is the only email. A withdrawal made
+in Settings sends the same emails. When the 14th day is a Saturday, a Sunday or a Romanian
+public holiday (Labour Code art. 139(1), with Orthodox Good Friday, Easter and Rusalii), the person still has until the
+end of the next working day, whatever country they live in; the command counts it the same way. When Parliament adds a
+public holiday, it is added in `packages/billing-core/src/romanian-public-holidays.ts`.
 
 First find the person's owner reference from the account address. Send the address on stdin to
 `pnpm billing:withdraw --owner-of-email`; it prints `owner_ref: <uuid>` or `owner_ref: none`.
@@ -4298,11 +4302,31 @@ values at the prompt:
 read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
 ```
 
-If it prints `WITHDRAWAL_DEBATE_RUNNING`, nothing was written: the statement arrived less than an hour ago, more than
-a day of the 14 is left, and a debate the person started before it may still be using credit. Run the same command
-again later with the same arrival time. Once the arrival is an hour old, or inside the last day of the 14, the command
-records it at once. A debate whose runner has stopped does not hold it up for long: its claim lapses, and a debate
-counts as possibly writing its story only for an hour after its last charge.
+The command records the withdrawal at once, also while a debate the person started is still running, and so does
+Settings: the credit used is what had been charged for the calls sent before the statement, and anything the debate
+sends after it is not the person's to pay.
+
+**If the plan is paused by a card dispute.** While a plan is paused (`SUSPENDED`), Settings still shows "Withdraw from
+contract here" for the whole 14 days, but its panel tells the person to withdraw by email, because neither Settings
+nor the command records a withdrawal for a paused plan (the command prints `NOT_SUBSCRIBED` and writes nothing). When
+such a statement arrives, reply to the person at once that you have received it, with the date and time it arrived,
+and keep that arrival time. The refund is due within 14 days of that arrival, and a card dispute often takes several
+weeks, so work out what is due at once, as described below, without waiting for the outcome. Do not refund it in
+NETOPIA's admin while the dispute is open: if the dispute is then lost, the person gets the money twice. If the dispute
+is still open a few days before those 14 days end, ask NETOPIA how to make the refund.
+
+Once the dispute is decided, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above) and go by what
+it prints:
+
+- `RESUMED`: the dispute was won before the paid month ended, and the plan is active again. Run the command above
+  with `--received` set to that arrival time, and it settles the withdrawal as usual (a statement sent in time counts
+  however late you run it).
+- `RESOLVED_AFTER_END`: the dispute was won after the paid month ended, so the plan has ended and is not resumed, and
+  the command above prints `NOT_SUBSCRIBED`. Settle the withdrawal by hand, as described below for a deleted account.
+- `STILL_DISPUTED`: another payment of the plan is still disputed, and the plan stays paused. Wait for that outcome
+  too.
+- `ENDED_DISPUTE` (lost), or the site ended the plan by itself on a lost dispute (NETOPIA's status 10): the bank has
+  given the disputed payment back. Settle anything still due by hand, as described below for a deleted account.
 
 **If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
 live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so
