@@ -3623,6 +3623,16 @@
       "grants": [
         "EXECUTE ON FUNCTION staff.public_review_act_grounded(jsonb,uuid,jsonb,jsonb,jsonb,jsonb,jsonb,text)"
       ]
+    },
+    {
+      "roleName": "debateai_rls_all_accounts",
+      "source": "migrations/0183_unfinished_signup_expiry.sql",
+      "grants": [
+        "EXECUTE ON FUNCTION identity.read_unfinished_signups_due(integer)",
+        "EXECUTE ON FUNCTION identity.expire_unfinished_signup(uuid)",
+        "EXECUTE ON FUNCTION identity.read_unfinished_signup_key_cleanup(integer)",
+        "EXECUTE ON FUNCTION identity.complete_unfinished_signup_key_cleanup(uuid)"
+      ]
     }
   ],
   "privilegeRevocations": [
