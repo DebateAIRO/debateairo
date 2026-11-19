@@ -197,7 +197,7 @@
   "billing.cancelPage.linkInvalid": "This link has expired or was already used. Ask for a new one below.",
   "billing.cancelPage.nothingToCancel": "This link didn't cancel anything. Check your plan in Settings.",
   "billing.cancelPage.signedInHint": "Signed in? You can also cancel in Settings.",
-  "billing.withdrawPage.title": "Withdraw from your contract",
+  "billing.withdrawPage.title": "Withdraw from contract",
   "billing.withdrawPage.who": "Wherever you live, you can withdraw from a paid plan within 14 days of subscribing, without giving a reason.",
   "billing.withdrawPage.refund": "You get back the price minus the share of the plan's credit you have used, however many days have passed. If you have used none, you get the full price back. The money goes back to your card, and the plan ends at once.",
   "billing.withdrawPage.how": "Sign in and open Settings, then Subscription, then “Withdraw from contract here”.",

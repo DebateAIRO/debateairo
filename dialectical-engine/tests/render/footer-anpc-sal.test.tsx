@@ -66,7 +66,7 @@ describe("ANPC's SAL badge in the site footer (design 15a full, 15b one line, 15
     const height = png.readUInt32BE(20);
     const image = line().querySelector("a.siteFooterAnpc img")!;
     expect([width, height]).toEqual([Number(image.getAttribute("width")), Number(image.getAttribute("height"))]);
-    // Twice the tallest size the CSS draws (44px), so the badge stays sharp on a 2x screen.
+    // The CSS draws it at most 50px tall; 88px keeps it close to sharp on a 2x screen.
     expect(height).toBeGreaterThanOrEqual(88);
   });
 
@@ -79,11 +79,15 @@ describe("ANPC's SAL badge in the site footer (design 15a full, 15b one line, 15
     }
   });
 
-  it("legal.css draws it 44px tall in the full footer, 22px on the line, 40px on a phone, and the line makes room", () => {
+  it("legal.css draws it in a 250 x 50 box in the full footer at every width, 22px on the line, and the line makes room", () => {
     const css = readFileSync(resolve("apps/ui/app/legal.css"), "utf8");
-    expect(css).toMatch(/\.siteFooterAnpc img \{ display: block; width: auto; height: 44px; \}/);
-    expect(css).toMatch(/\.siteFooterLine \.siteFooterAnpc img \{ height: 22px; \}/);
-    expect(css).toMatch(/@media \(max-width: 760px\) \{[\s\S]*\.siteFooterConsumer \.siteFooterAnpc img \{ height: 40px; \}/);
+    // ANPC's order: 250 (wide) x 50 (high) pixels on the home page. The artwork keeps its proportions inside the box.
+    expect(css).toMatch(/\.siteFooterAnpc img \{ display: block; width: 250px; height: 50px; object-fit: contain; \}/);
+    // The one line keeps the small badge: without `width: auto` it would take the full footer's 250px box.
+    expect(css).toMatch(/\.siteFooterLine \.siteFooterAnpc img \{ width: auto; height: 22px; \}/);
+    // No width overrides the box: no phone rule, and nothing else sizes the full footer's badge.
+    expect(css).not.toMatch(/\.siteFooterConsumer \.siteFooterAnpc img/);
+    expect(css.match(/\.siteFooterAnpc img \{/g)).toHaveLength(2);
     // The canvas gives the line exactly this much room: the 28px chip, 10px of padding above and below, the 1px top border.
     expect(css).toMatch(/\.appShell \{ --site-footer-line-h: 49px; \}/);
   });

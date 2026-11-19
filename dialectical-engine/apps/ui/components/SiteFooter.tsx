@@ -2,14 +2,16 @@
 
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
-import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
+import type { LineFooterBilling, SiteFooterBilling } from "@/lib/billing/footerBilling";
 import type { PaymentMarks } from "@/lib/billing/paymentMarks";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
-import { t } from "@/lib/i18n/translate";
-import { ADR_URL, COMPANY, LEGAL_PAGES } from "@/lib/legal/pages";
+import { t, type MessageCatalog } from "@/lib/i18n/translate";
+import { ADR_URL, COMPANY, isUnverified, LEGAL_PAGES } from "@/lib/legal/pages";
 import { useSupportOffered } from "@/components/support/availability";
 
 const PRODUCT_NAME = "Dialectical Engine";
+
+type FooterLink = Readonly<{ href: string; labelKey: string }>;
 
 const PRODUCT_LINKS = [
   { href: "/", labelKey: "chrome.footer.home" },
@@ -18,18 +20,44 @@ const PRODUCT_LINKS = [
 ] as const;
 
 /**
- * Paid plans (spec 2026-09-29 §2.10, R3-4), shown only while billing is on: each page is "not found" otherwise.
- * Pricing joins the PRODUCT column; cancel and withdraw are consumer rights, so they join the LEGAL column, which
- * also stays on a phone (legal.css hides the PRODUCT column there).
+ * Shown only while billing is on: the pricing, cancel and withdraw pages are "not found" otherwise, and the delivery
+ * rules in Terms section 12 concern only a buyer. Pricing joins the PRODUCT column; delivery, cancel and withdraw are
+ * consumer information, so they join the LEGAL column. The one-line footer shows cancel and withdraw too, so a buyer
+ * finds both from every page; the delivery rules stay with the full footer.
  */
 const BILLING_PRODUCT_LINKS = [{ href: "/pricing", labelKey: "chrome.footer.pricing" }] as const;
+const CANCEL_LINK = { href: "/cancel", labelKey: "chrome.footer.cancel" } as const;
+const WITHDRAW_LINK = { href: "/withdraw", labelKey: "chrome.footer.withdraw" } as const;
 const BILLING_LEGAL_LINKS = [
-  { href: "/cancel", labelKey: "chrome.footer.cancel" },
-  { href: "/withdraw", labelKey: "chrome.footer.withdraw" }
+  { href: "/terms#legal-section-12", labelKey: "chrome.footer.delivery" },
+  CANCEL_LINK,
+  WITHDRAW_LINK
 ] as const;
+const LINE_BILLING_LINKS = [CANCEL_LINK, WITHDRAW_LINK] as const;
+
+/** A mail address as a link, or as plain text while it still waits for the owner (the brackets /legal shows too). */
+function FooterEmail({ address }: { address: string }) {
+  return (
+    <bdi>
+      {isUnverified(address) ? address : <a className="siteFooterLink" href={`mailto:${address}`}>{address}</a>}
+    </bdi>
+  );
+}
+
+/** One list item per link, in the footer's link style. */
+function linkItems(links: ReadonlyArray<FooterLink>, catalog: MessageCatalog) {
+  return links.map(({ href, labelKey }) => (
+    <li key={href}>
+      <a className="siteFooterLink" href={href}>
+        {t(catalog, labelKey)}
+      </a>
+    </li>
+  ));
+}
 
 /** DB-IP Lite's CC BY 4.0 licence asks for this credit link on the site (spec §1.5, §2.10); A14 keeps it billing-free. */
 const DBIP_URL = "https://db-ip.com";
+
 
 /**
  * ANPC's pictogram for alternative dispute resolution (SAL), the consumer-protection link Romanian law asks a shop to show
@@ -41,7 +69,10 @@ const ANPC_SAL_TITLE = "ANPC – Soluționarea alternativă a litigiilor";
 const ANPC_SAL_ALT = `${ANPC_SAL_TITLE}. Detalii`;
 const ANPC_SAL_SRC = "/consumer-protection/anpc-sal.png";
 
-/** Both footer shapes show it, billing on or off; legal.css sizes it per shape (44px full, 22px one line, 40px phone). */
+/**
+ * Both footer shapes show it, billing on or off. legal.css sizes it per shape: a 250 × 50 box in the full footer at
+ * every width, the size ANPC's order sets for the home page; 22px high on the one line.
+ */
 function AnpcSalBadge() {
   return (
     <a className="siteFooterAnpc" href={ADR_URL} target="_blank" rel="noopener noreferrer" title={ANPC_SAL_TITLE} lang="ro">
@@ -130,26 +161,24 @@ export function PaymentMarksGroup({ marks }: { marks: PaymentMarks }) {
  * footer hides it through `.appShell:has(.siteFooterFull) > .siteFooterLine` in `app/legal.css`,
  * so no page has to know which footer the layout drew.
  *
- * Paid plans (P21, R3-4) extend the `full` shape only, through the optional `billing` facts a server page hands over
+ * Paid plans extend the `full` shape through the optional `billing` facts a server page hands over
  * (`siteFooterBilling()`, `billingPageFooter()`, the landing's `landingPlans`): the DB-IP credit always, and while billing
- * is on the pricing, cancel and withdraw links and the marks that the server's `PAYMENT_MARKS_AVAILABLE` setting names
- * (NETOPIA's logo, Visa, Mastercard: `PaymentMarksGroup`). Without the prop (local mode alike) nothing about paying shows. The `line` shape
- * never knows billing's state: it renders on every page.
+ * is on the pricing, delivery, cancel and withdraw links and the marks that the server's `PAYMENT_MARKS_AVAILABLE`
+ * setting names (NETOPIA's logo, Visa, Mastercard: `PaymentMarksGroup`). The `line` shape gets only whether billing is
+ * on (`lineFooterBilling()`, read by the root layout) and then adds the cancel and withdraw links; it never shows a
+ * mark, since its one line has no room for them and it is on every page.
+ * Without the prop (local mode alike) nothing about paying shows in either shape.
  */
-export function SiteFooter({ variant, billing = null }: { variant: "full" | "line"; billing?: SiteFooterBilling | null }) {
+export function SiteFooter(
+  props: Readonly<{ variant: "full"; billing?: SiteFooterBilling | null }> | Readonly<{ variant: "line"; billing?: LineFooterBilling | null }>
+) {
   const { catalog } = useChromeI18n();
   const offered = useSupportOffered();
   const copyright = `© ${new Date().getFullYear()} ${COMPANY.legalName}`;
   const cookiePreferences = t(catalog, "chrome.footer.cookiePreferences");
-  const legalLinks = LEGAL_PAGES.map(({ href, labelKey }) => (
-    <li key={href}>
-      <a className="siteFooterLink" href={href}>
-        {t(catalog, labelKey)}
-      </a>
-    </li>
-  ));
+  const legalLinks = linkItems(LEGAL_PAGES, catalog);
 
-  if (variant === "line") {
+  if (props.variant === "line") {
     return (
       <footer className="siteFooterLine" aria-label={t(catalog, "chrome.footer.label")}>
         <span className="siteFooterCopyright">{copyright}</span>
@@ -157,6 +186,7 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
         <nav aria-label={t(catalog, "chrome.legalPages")}>
           <ul className="siteFooterLineLinks">
             {legalLinks}
+            {props.billing?.billingOn === true ? linkItems(LINE_BILLING_LINKS, catalog) : null}
             <li>
               <CookiePreferencesButton className="siteFooterLink" label={cookiePreferences} />
             </li>
@@ -172,21 +202,14 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
     );
   }
 
+  const billing = props.billing ?? null;
   const billingOn = billing?.billingOn === true;
   const marks = billing !== null && billing.billingOn ? billing.marks : NO_MARKS;
   const visibleProductLinks = PRODUCT_LINKS.filter(({ href }) => href !== "/help" || offered === "offered");
-  const productLinks: ReadonlyArray<Readonly<{ href: string; labelKey: string }>> = billingOn
+  const productLinks: ReadonlyArray<FooterLink> = billingOn
     ? [...visibleProductLinks, ...BILLING_PRODUCT_LINKS]
     : visibleProductLinks;
-  const billingLegalLinks = billingOn
-    ? BILLING_LEGAL_LINKS.map(({ href, labelKey }) => (
-      <li key={href}>
-        <a className="siteFooterLink" href={href}>
-          {t(catalog, labelKey)}
-        </a>
-      </li>
-    ))
-    : null;
+  const billingLegalLinks = billingOn ? linkItems(BILLING_LEGAL_LINKS, catalog) : null;
 
   return (
     <footer className="siteFooterFull" aria-label={t(catalog, "chrome.footer.label")}>
@@ -198,26 +221,31 @@ export function SiteFooter({ variant, billing = null }: { variant: "full" | "lin
             </span>
             <span className="siteFooterBrandName">{PRODUCT_NAME}</span>
           </span>
+          {/* The seller's facts, all from COMPANY, as the /legal page states them: who sells, where its registered
+              office is, its tax and trade-register codes, and how to reach it (support, and privacy for the GDPR). */}
+          <span>{COMPANY.legalName}</span>
+          <span>{t(catalog, "chrome.footer.office", { office: COMPANY.registeredOffice })}</span>
+          <span>{t(catalog, "chrome.footer.codes", { cui: COMPANY.cui, register: COMPANY.tradeRegisterNo })}</span>
           <span>
-            {COMPANY.legalName} · {t(catalog, "chrome.footer.location")}
+            {t(catalog, "chrome.footer.phone")}{" "}
+            <bdi>
+              {isUnverified(COMPANY.phone)
+                ? COMPANY.phone
+                : <a className="siteFooterLink" href={`tel:${COMPANY.phone.replace(/\s/g, "")}`}>{COMPANY.phone}</a>}
+            </bdi>
           </span>
-          <a className="siteFooterLink" href={`mailto:${COMPANY.emails.privacy}`}>
-            {COMPANY.emails.privacy}
-          </a>
+          <span>
+            {t(catalog, "chrome.footer.email")}{" "}
+            <FooterEmail address={COMPANY.emails.general} />
+            {" · "}
+            <FooterEmail address={COMPANY.emails.privacy} />
+          </span>
         </div>
         <nav className="siteFooterColumn" aria-label={t(catalog, "chrome.footer.product")}>
           <span className="siteFooterHead" aria-hidden>
             {t(catalog, "chrome.footer.product")}
           </span>
-          <ul>
-            {productLinks.map(({ href, labelKey }) => (
-              <li key={href}>
-                <a className="siteFooterLink" href={href}>
-                  {t(catalog, labelKey)}
-                </a>
-              </li>
-            ))}
-          </ul>
+          <ul>{linkItems(productLinks, catalog)}</ul>
         </nav>
         <nav className="siteFooterColumn" aria-label={t(catalog, "chrome.legalPages")}>
           <span className="siteFooterHead" aria-hidden>

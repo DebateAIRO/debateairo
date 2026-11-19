@@ -45,7 +45,7 @@ const PLANS = Object.freeze({
     { plan_id: "MAX" as const, net_prices: { USD: "200.00", EUR: "200.00", RON: "1000.00" }, total_price: "238.00", allowance_vs_plus: "30" }
   ]
 });
-const BILLING_LINKS = ["/pricing", "/cancel", "/withdraw"];
+const BILLING_LINKS = ["/pricing", "/terms#legal-section-12", "/cancel", "/withdraw"];
 const page = async (render: () => Promise<JSX.Element>): Promise<Document> =>
   new JSDOM(renderToStaticMarkup(await render())).window.document;
 

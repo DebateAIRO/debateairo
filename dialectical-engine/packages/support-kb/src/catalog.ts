@@ -483,7 +483,7 @@ export const SUPPORT_CAPABILITIES: readonly SupportCapability[] = Object.freeze(
   capability({
     id: "billing-withdraw",
     route: "/withdraw",
-    labels: labels("Withdraw from a plan", "Retragerea dintr-un abonament"),
+    labels: labels("Withdraw from contract", "Retragere din contract"),
     audience: "any",
     availability: "public",
     disposition: "action",

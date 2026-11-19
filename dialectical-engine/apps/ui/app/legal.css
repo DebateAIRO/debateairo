@@ -405,7 +405,9 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.siteFooterAnpc img { display: block; width: auto; height: 44px; }
+/* ANPC's order sets 250 x 50 pixels for the pictogram on the home page: the box is exactly that at every width, and the
+   artwork keeps its proportions inside it. 250px and the chip fit the narrowest phone's footer. */
+.siteFooterAnpc img { display: block; width: 250px; height: 50px; object-fit: contain; }
 
 /* ---------- 15b in-app footer: one line ---------- */
 
@@ -445,7 +447,8 @@
 .siteFooterLineLinks { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
 .siteFooterLine .siteFooterLink { font-size: 10.5px; font-weight: 600; }
 .siteFooterLine .siteFooterAnpc { padding: 2px 4px; border-radius: 6px; }
-.siteFooterLine .siteFooterAnpc img { height: 22px; }
+/* The one line keeps the small badge; `width: auto` undoes the full footer's 250px box. */
+.siteFooterLine .siteFooterAnpc img { width: auto; height: 22px; }
 
 /* 15b on the debate canvas: the canvas is exactly one viewport tall, so it gives
    the footer its line instead of pushing the footer below the fold. The line is the
@@ -515,18 +518,24 @@
   .legalTable td { padding: 2px 0; border: 0; }
 
   .siteFooterFull { padding: 26px 24px 36px; }
+  /* A phone shows the whole footer, stacked: the company's facts, the PRODUCT column with Pricing, and every legal
+     link. Every footer link is a 44px tap target; the company block's links sit inside its lines. */
   .siteFooterColumns { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .siteFooterColumn:not(:has(.siteFooterLegalGrid)),
-  .siteFooterCompany > :not(.siteFooterBrand) { display: none; }
+  .siteFooterColumn ul:not(.siteFooterLegalGrid) { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 4px; }
   .siteFooterColumn ul.siteFooterLegalGrid { gap: 0 16px; margin-top: 4px; }
-  .siteFooterLegalGrid .siteFooterLink {
+  .siteFooterColumn .siteFooterLink {
     display: flex;
     align-items: center;
     min-height: 44px;
     font-size: 13px;
   }
+  .siteFooterCompany .siteFooterLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
   .siteFooterConsumer { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 20px; }
-  .siteFooterConsumer .siteFooterAnpc img { height: 40px; }
   .siteFooterBase { flex-wrap: wrap; gap: 8px 14px; margin-top: 20px; padding-top: 14px; }
   /* On a phone the made-in sentence takes the row under the copyright, whole; it breaks only if a
      language's sentence is wider than the screen. */
