@@ -79,11 +79,11 @@ deadlock detector ends one side with SQLSTATE 40P01, which is not retried: eithe
 INVALID index and the next `apply-and-plan` repairs it) or the older release's start, which is restarted after this
 release's run ends. Rerun the side that failed.
 
-**The staff re-key permit (0183).** `apply-and-plan` applies it after 0182, in one transaction (`n1: expand`): one new
+**The staff re-key permit (0184).** `apply-and-plan` applies it after 0182, in one transaction (`n1: expand`): one new
 table, `staff.rekey_permit`, and nine new functions beside the older ones, which keep their bodies and grants, so the
 serving release runs beside it as before. The table's two references take SHARE ROW EXCLUSIVE on `identity."user"` and
 on `staff.subject` until the step commits: sign-ups and other writes to those two tables wait for it (reads do not), as
-for 0178's new tables. If the run ends `MIGRATION_LOCK_TIMEOUT 0183_…`, a long transaction held one of them; rerun it.
+for 0178's new tables. If the run ends `MIGRATION_LOCK_TIMEOUT 0184_…`, a long transaction held one of them; rerun it.
 What the step is for, and the owner's steps afterwards, are in `MAIN-SITE.md` 5.7.
 
 ## Environment and startup

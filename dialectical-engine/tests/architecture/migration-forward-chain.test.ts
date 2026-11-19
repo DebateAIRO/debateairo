@@ -725,25 +725,25 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second");
   });
 
-  it("chains the staff re-key permit 0183 after 0182 as an expand step that keeps 0130's verifier, and documents it", async () => {
+  it("chains the staff re-key permit 0184 after 0182 as an expand step that keeps 0130's verifier, and documents it", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
     // The chain head: one table and nine functions, applied inside the step's own transaction like every step but the index builds.
-    expect(names.slice(-2)).toEqual(["0182_mfa_recovery_control_user_started.sql", "0183_staff_rekey_permit.sql"]);
+    expect(names.slice(-2)).toEqual(["0182_mfa_recovery_control_user_started.sql", "0184_staff_rekey_permit.sql"]);
     const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
     expect(previous.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
-    expect(JSON.parse((await bytesOf("lineage/staff-rekey-permit-forward0183.json")).toString("utf8"))).toEqual({
-      version: "staff-rekey-permit-forward0183-v1",
+    expect(JSON.parse((await bytesOf("lineage/staff-rekey-permit-forward0184.json")).toString("utf8"))).toEqual({
+      version: "staff-rekey-permit-forward0184-v1",
       baseRecipeSha256: plan.recipeSha256,
       previous: {
         name: "0182_mfa_recovery_control_user_started.sql",
         manifestSha256: sha256(await bytesOf("lineage/mfa-recovery-control-user-started-forward0182.json")),
         verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql"))
       },
-      migration: { name: "0183_staff_rekey_permit.sql", sha256: sha256(await bytesOf("0183_staff_rekey_permit.sql")) },
+      migration: { name: "0184_staff_rekey_permit.sql", sha256: sha256(await bytesOf("0184_staff_rekey_permit.sql")) },
       verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) }
     });
-    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/staff-rekey-permit-forward0183.json")));
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/staff-rekey-permit-forward0184.json")));
     expect(step.previousName).toBe(previous.name);
     expect(step.previousManifestSha256).toBe(previous.manifestSha256);
     expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
@@ -753,7 +753,7 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(step.replayVerifierSql).toBeUndefined();
     expect(step.amendsPostconditionsOf).toBeUndefined();
     // The loader digests every function and table the SQL creates, and nothing the SQL does not create.
-    const loader = await readFile(new URL("migration-forward0183.ts", DB_SOURCE), "utf8");
+    const loader = await readFile(new URL("migration-forward0184.ts", DB_SOURCE), "utf8");
     const listed = (name: string): string[] => [...loader.slice(loader.indexOf(`const ${name}`), loader.indexOf("];", loader.indexOf(`const ${name}`)))
       .matchAll(/'([a-z_]+\.[a-z_0-9]+)(?:\([^()]*\))?'/gu)].map((match) => match[1]!);
     const created = (pattern: RegExp): string[] => [...step.sql.matchAll(pattern)].map((match) => match[1]!);
@@ -761,16 +761,16 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
     expect(listed("TABLES")).toEqual(created(/^CREATE TABLE IF NOT EXISTS ([a-z_]+\.[a-z_0-9]+) \(/gmu));
     expect(listed("TABLES")).toEqual(["staff.rekey_permit"]);
     const readme = (await bytesOf("lineage/README.md")).toString("utf8");
-    const section = readme.slice(readme.indexOf("## The staff re-key permit (0183)"));
-    expect(section.startsWith("## The staff re-key permit (0183)")).toBe(true);
-    for (const needle of ["0182", "0183_staff_rekey_permit.sql", "staff-rekey-permit-forward0183.json", "packages/db/src/migration-forward0183.ts",
-      "MIGRATION_FORWARD0183_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+    const section = readme.slice(readme.indexOf("## The staff re-key permit (0184)"));
+    expect(section.startsWith("## The staff re-key permit (0184)")).toBe(true);
+    for (const needle of ["0182", "0184_staff_rekey_permit.sql", "staff-rekey-permit-forward0184.json", "packages/db/src/migration-forward0184.ts",
+      "MIGRATION_FORWARD0184_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "verify-effective-capabilities-130.sql", "replayVerifierSql",
       "previous.manifestSha256", "migration.sha256", "renumber", "staff.rekey_permit", "staff.arm_rekey", "staff.step_up_prerequisite_v2",
       "staff.begin_owned_webauthn_v2", "staff.read_owned_webauthn_challenge_v2", "staff.complete_owned_webauthn_registration_v2",
       "staff.rekey_key_present", "staff.rekey_permit_current", "staff.rekey_challenge_current", "identity.staff_insert_rekey_webauthn_key"
     ]) expect(section, needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the MFA recovery control user index (0182, below) the seventy-second, and the staff re-key permit (0183, below) the seventy-third. A step is added");
+      "the MFA recovery control user index (0182, below) the seventy-second, and the staff re-key permit (0184, below) the seventy-third. A step is added");
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {

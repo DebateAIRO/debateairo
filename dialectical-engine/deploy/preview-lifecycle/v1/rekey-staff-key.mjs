@@ -9,7 +9,7 @@
 // Plain words: a staff key belongs to one site name, and an account that is already staff may not
 // add a key with password and authenticator code alone (a stolen password must never add one). This
 // tool is the operator's yes for ONE person and ONE key: it writes a permit in the database
-// (migrations/0183_staff_rekey_permit.sql, staff.arm_rekey) that lasts at most 15 minutes, is bound
+// (migrations/0184_staff_rekey_permit.sql, staff.arm_rekey) that lasts at most 15 minutes, is bound
 // to the sign-in the operator named, and is used up when that person's key ceremony starts.
 // The person then enrols the key on the Team page with password and code, while the team tools are
 // unlocked. The key change writes the usual audit row and sends the usual independent alert.

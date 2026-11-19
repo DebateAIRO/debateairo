@@ -11,7 +11,7 @@ import { createSystemTwin } from '../support/rls-logins.js';
 import { startTestDatabase, type TestDatabase } from '../support/testDatabase.js';
 
 /**
- * 0183: a staff member whose staff key belongs to another site name enrols one key under the current name, once, with
+ * 0184: a staff member whose staff key belongs to another site name enrols one key under the current name, once, with
  * password and authenticator code, only while an operator's permit is current, and only from the sign-in the operator named. The site's current name here is the
  * fixtures' (admin.example.test); OLD_NAME stands for the name the site answered as before it was renamed.
  */

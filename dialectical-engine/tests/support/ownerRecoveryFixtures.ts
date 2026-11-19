@@ -26,7 +26,7 @@ export type OwnerCandidate=Awaited<ReturnType<typeof ownerCandidate>>;
  * marker's, so `staff` is a login shaped as the API's system login, on which main.ts builds its staff repository (X14).
  */
 /**
- * For a database that stops before 0183: the staff repository's key ceremony calls 0183's `_v2` entry points, which such a
+ * For a database that stops before 0184: the staff repository's key ceremony calls 0184's `_v2` entry points, which such a
  * database does not have. This hands the repository the same pool with those four calls under the names the release of
  * that schema called (the functions the `_v2` ones stand beside).
  */

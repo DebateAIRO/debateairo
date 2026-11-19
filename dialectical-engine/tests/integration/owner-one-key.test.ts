@@ -104,7 +104,7 @@ it('upgrades all original migrations with a pending native two-key command witho
   const target=await ownerCandidate(database.pool),generation=randomUUID(),verifier=digest('upgrade-offline-proof'),commandId=randomUUID(),operationId=randomUUID(),nonce=Buffer.alloc(32,12).toString('base64url');
   await jit.query('SELECT staff.install_owner_recovery_generation($1,$2,$3)',[generation,verifier,randomUUID()]);
   await jit.query('SELECT staff.prepare_owner_command_v2($1,$2,$3,$4,$5,$6,$7::text[],$8,$9,$10,$11)',[commandId,'BOOTSTRAP',target.userId,null,null,false,target.credentialIds,operationId,digest(nonce),generation,verifier]);
-  // Before 0094 (and so before 0171) the owned ceremony was still the runtime role's, under its names from before 0183.
+  // Before 0094 (and so before 0171) the owned ceremony was still the runtime role's, under its names from before 0184.
   const receipts=await ownerNativeReceipts(runtime,target,commandId,nonce,poolBeforeRekeyStep(runtime));
   const evidence=async()=>({command:(await database.pool.query('SELECT * FROM staff.owner_command WHERE command_id=$1',[commandId])).rows,receipts:(await database.pool.query('SELECT * FROM staff.owner_possession_receipt WHERE command_id=$1 ORDER BY receipt_id',[commandId])).rows,prerequisites:(await database.pool.query('SELECT * FROM staff.prerequisite_receipt WHERE command_id=$1 ORDER BY receipt_id',[commandId])).rows});
   const before=await evidence(),ddl=await readFile('migrations/0094_owner_one_verified_key.sql','utf8');await database.pool.query(ddl);expect(await evidence()).toEqual(before);

@@ -1,4 +1,4 @@
--- 0183 · A staff member's key under a new site name (migrations/lineage/README.md "The staff re-key permit (0183)").
+-- 0184 · A staff member's key under a new site name (migrations/lineage/README.md "The staff re-key permit (0184)").
 --
 -- A staff key belongs to one site name: the database stores the name and the origin with each key and offers a ceremony
 -- only the keys of the name the API answers as. After the site is renamed, a staff member therefore has no key that

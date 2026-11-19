@@ -5,7 +5,7 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
 
 /**
  * The staff re-key permit as one chain step after 0182, the MFA recovery control user index (migrations/lineage/README.md
- * "The staff re-key permit (0183)"). A staff key belongs to one site name, so after the site is renamed a staff member has
+ * "The staff re-key permit (0184)"). A staff key belongs to one site name, so after the site is renamed a staff member has
  * no key that works, and the older functions refuse to enrol a new one from password and authenticator code alone. This
  * step adds a permit an operator on the server arms for one person and one sign-in of theirs: it is used once, lasts at
  * most 15 minutes, and lets an ACTIVE staff member with no working staff key under the site's current name enrol one key
@@ -18,9 +18,9 @@ import type { ForwardStepAnchor, ForwardStepPlan } from './migration-forward-cha
  * its own. Its checks are its postcondition (below), compared on every later migrate(); it has no supplemental verifier,
  * so no replayVerifierSql. Its n1 header (`-- n1: expand`, `-- n1: keeps-verifier`) is read from its SQL by the chain.
  */
-const NAME='0183_staff_rekey_permit.sql';
-const VERSION='staff-rekey-permit-forward0183-v1';
-const MANIFEST_PATH='lineage/staff-rekey-permit-forward0183.json';
+const NAME='0184_staff_rekey_permit.sql';
+const VERSION='staff-rekey-permit-forward0184-v1';
+const MANIFEST_PATH='lineage/staff-rekey-permit-forward0184.json';
 const VERIFIER_PATH='lineage/verify-effective-capabilities-130.sql';
 const PREVIOUS='0182_mfa_recovery_control_user_started.sql';
 /** The nine functions the step creates, each digested whole (owner, definer, settings, volatility, definition digest, ACL). */
@@ -42,7 +42,7 @@ const FUNCTIONS:readonly string[]=[
 ];
 /** The one table the step creates, digested whole (owner, ACL, columns, constraints, indexes, triggers, rules, sequence ACL), as 0178 digests its tables. */
 const TABLES:readonly string[]=['staff.rekey_permit'];
-const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0183_${detail}`);};
+const fail=(detail:string):never=>{throw Error(`MIGRATION_FORWARD0184_${detail}`);};
 const sha=(value:string|Buffer)=>createHash('sha256').update(value).digest('hex');
 const exactKeys=(value:unknown,keys:readonly string[]):value is Record<string,unknown>=>typeof value==='object'&&value!==null&&!Array.isArray(value)&&Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key));
 const digest=(value:unknown):value is string=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
@@ -69,7 +69,7 @@ async function postconditionEvidence(client:PoolClient):Promise<string>{
  return sha(JSON.stringify({functions,tables}));
 }
 
-export async function loadForward0183(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
+export async function loadForward0184(anchor:ForwardStepAnchor):Promise<ForwardStepPlan>{
  const directory=new URL('../../../migrations/',import.meta.url);
  const bytes=await readFile(new URL(MANIFEST_PATH,directory));const raw:unknown=JSON.parse(bytes.toString('utf8'));
  if(!exactKeys(raw,['version','baseRecipeSha256','previous','migration','verifier'])||raw.version!==VERSION||raw.baseRecipeSha256!==anchor.baseRecipeSha256

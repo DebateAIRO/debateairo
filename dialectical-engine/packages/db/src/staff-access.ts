@@ -414,8 +414,8 @@ function nextCursor(position: unknown): string | null {
 }
 /**
  * Runtime pool only; the authorization repository remains separate. Source hashes precede BEGIN.
- * It calls 0183's `step_up_prerequisite_v2`, which is 0085's check for everyone but a staff member whose sign-in holds an
- * operator's current re-key permit (migrations/0183_staff_rekey_permit.sql): that person passes it once, to enrol a key
+ * It calls 0184's `step_up_prerequisite_v2`, which is 0085's check for everyone but a staff member whose sign-in holds an
+ * operator's current re-key permit (migrations/0184_staff_rekey_permit.sql): that person passes it once, to enrol a key
  * under the site's current name.
  */
 export class PostgresStaffPrerequisiteProducer implements StaffPrerequisiteProducer {
@@ -453,7 +453,7 @@ function invitation(value: InvitationContext): InvitationContext { return Object
 /**
  * This adapter accepts trusted server-domain inputs; SQL owns all security clocks/state. Since 0171 its grant, acceptance, capability check and
  * owned key ceremony are the cross-account marker's, so main.ts builds every staff route's repository on the request pool's system login (X14).
- * A key registration's start, read and completion call 0183's `_v2` entry points: each is the older function for every case but a
+ * A key registration's start, read and completion call 0184's `_v2` entry points: each is the older function for every case but a
  * registration started under an operator's re-key permit, which only the `_v2` functions accept.
  */
 export class PostgresStaffRepository implements StaffRepository, StaffWebAuthnRepository, StaffManagementRepository, StaffTargetInvitationChannels {
