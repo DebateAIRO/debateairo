@@ -900,6 +900,7 @@ apps/ui/lib/legal/ja/privacyPolicy.ts
 apps/ui/lib/legal/ja/termsOfService.ts
 apps/ui/lib/legal/ko/privacyPolicy.ts
 apps/ui/lib/legal/ko/termsOfService.ts
+apps/ui/lib/legal/legalTextLocales.ts
 apps/ui/lib/legal/localized-modules.d.ts
 apps/ui/lib/legal/lt/privacyPolicy.ts
 apps/ui/lib/legal/lt/termsOfService.ts
