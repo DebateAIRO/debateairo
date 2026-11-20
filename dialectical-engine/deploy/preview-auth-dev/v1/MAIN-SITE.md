@@ -431,8 +431,7 @@ Do this **before DR2** of the upload, while the old release still runs on the te
 2. If one should not be public: tell the team first (each hide e-mails the debate's author). Then Admin → Team →
    public review → **Hide now**. Each hide needs the staff hardware key, and the staff key you have now works only on the test name.
 3. If the Team page shows open reports, settle them now too. Publication reviews (**Publication reviews**, Cereri de
-   publicare) and threat reports (**Threat reports**, Rapoarte despre amenințări) open from the links on the Team page
-   once your key is verified. Settling usually needs the team tools unlocked: if the page says
+   publicare) open from the link on the Team page once your key is verified. Settling usually needs the team tools unlocked: if the page says
    `Team tools are locked…` (in step 2 or 3), run `systemctl start debateai-preview-team-unlock` as root. It unlocks
    them for one hour.
 4. Optional: you, and anyone on the team who wants to, can delete your own private test debates with "Delete private
@@ -1258,7 +1257,7 @@ Expect the `taken out` line, the API's start lines (`PREVIEW_API_STARTED …`), 
 
 **While the staff screens are off**, nobody can:
 - hide a published debate by hand (Hide now);
-- settle a report the AI check did not accept, or decide a publication review or a threat report;
+- settle a report the AI check did not accept, or decide a publication review;
 - invite, grant or disable a staff member, or change the team limit (Admin → Team);
 - read the staff audit page.
 
@@ -1272,7 +1271,7 @@ payments are real (part 7). The site password keeps it small: only people who kn
 - **The Report button.** It needs no staff. If the same AI check agrees with a report, the debate hides at once (once
   per debate). With the line at 0, or when the check does not agree, the report waits for a person, and nobody can act
   on it until the staff screens come back.
-- **Staff mails.** You still get the mails that say a report or a threat report waits, or that a debate was hidden
+- **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
   by itself. You cannot open them in the app until the staff screens come back. That is expected.
 
 **Never open the site to everyone (part 8) while the staff screens are off, or while no staff key works under

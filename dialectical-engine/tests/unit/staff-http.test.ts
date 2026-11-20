@@ -100,7 +100,7 @@ describe("staff second CSRF token on privileged mutations", () => {
     };
   }
   // EU AI Act Art. 50(2) (owner rule, 16 Nov 2026: "everything has to be machine-readable"): a team page that carries the
-  // AI check's findings is marked; an empty queue and a page with no AI word (the threat reports' count) are not.
+  // AI check's findings is marked; an empty queue is not.
   it("marks the publication-review queue that lists the AI check's categories, and not a team page without AI content", async () => {
     const reviewRef = "77777777-7777-4777-8777-777777777777";
     let items: unknown[] = [{ review_ref: reviewRef, asked_at: "2026-11-16T09:00:00.000Z", ask_ordinal: 1, categories: ["TERRORISM"] }];
@@ -108,8 +108,7 @@ describe("staff second CSRF token on privileged mutations", () => {
     const access = staffServerAccess(sessions);
     const server = buildApi({ application, sessions, allowedOrigin: TEST_APP_ORIGIN, staffPolicyVersion: 2, staffAccess: access,
       staff: { access, sessions,
-        publicationReviews: { list: async () => ({ items, order: "ASKED_AT_ASC" }) },
-        threatReports: { repository: { countUnread: async () => 0 } } } } as never);
+        publicationReviews: { list: async () => ({ items, order: "ASKED_AT_ASC" }) } } } as never);
     try {
       const staffHeaders = headers();
       const queue = await server.inject({ method: "GET", url: "/v1/admin/publication-reviews", headers: staffHeaders });
@@ -119,10 +118,6 @@ describe("staff second CSRF token on privileged mutations", () => {
       const empty = await server.inject({ method: "GET", url: "/v1/admin/publication-reviews", headers: staffHeaders });
       expect(empty.statusCode).toBe(200);
       expect(empty.headers[AI_GENERATED_HEADER]).toBeUndefined();
-      const summary = await server.inject({ method: "GET", url: "/v1/admin/threat-reports/summary", headers: staffHeaders });
-      expect(summary.statusCode).toBe(200);
-      expect(summary.json()).toEqual({ unread: 0 });
-      expect(summary.headers[AI_GENERATED_HEADER]).toBeUndefined();
     } finally {
       await server.close();
     }

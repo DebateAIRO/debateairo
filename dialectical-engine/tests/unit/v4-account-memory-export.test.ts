@@ -188,7 +188,7 @@ describe("V4 account memory in the data export", () => {
   it("names the new account records in the README", () => {
     expect(renderReadme()).toContain(
       // 0132/0133 (the Perplexity plan) append the investigations and the reserve events to the same line.
-      "account.json — account, channels, region, age checks, erasure requests, kept questions, reading level, debate visits, dig links, "
+      "account.json — account, channels, region, age checks, erasure requests, any questions an earlier question check kept for staff review, reading level, debate visits, dig links, "
         + "investigations and reserve events, and when an AI read your question before a debate, when the AIs before Start ran for you and which kind each was, the reports you made with the Report button with how each was closed and which emails we sent you about it, and your moderation notices: each statement of reasons in full, and the earlier notices we emailed.");
   });
 });

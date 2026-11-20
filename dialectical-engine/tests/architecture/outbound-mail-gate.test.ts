@@ -153,14 +153,15 @@ describe("every account mail passes the outbound mail gate before the sendmail s
       return main.slice(match.index, end + 1);
     });
     // Sign-up, consumer account, password reset, email recovery, recovery address, email change, erasure notices, and
-    // the templated threat-report alerts, billing, data export and the owner's limit alert; and V4's six: the team-limit,
+    // the templated billing, data export and the owner's limit alert; and V4's six: the team-limit,
     // allowance, public-review and public-flag notices, the moderation statements and the answers to people who report.
-    expect(constructions).toHaveLength(17);
+    // (The threat-report alert's sender went with the threat reports, 2026-11-19.)
+    expect(constructions).toHaveLength(16);
     for (const construction of constructions) {
       expect(construction).toMatch(/environment\.MAIL_SENDMAIL_PATH/);
       expect(construction).toMatch(/gate\s*:\s*outboundMailGate\b/);
     }
-    expect(main.match(/environment\.MAIL_SENDMAIL_PATH/g) ?? []).toHaveLength(17);
+    expect(main.match(/environment\.MAIL_SENDMAIL_PATH/g) ?? []).toHaveLength(16);
   });
 
   it("a sender built without a gate refuses to exist", () => {
