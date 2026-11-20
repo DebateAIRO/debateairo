@@ -11,6 +11,7 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  * 0157, amended in place) moves those from 48 on by one more, and its two section 7 rows those from 161 on by two more.
  * The paragraph that names DeepInfra in section 5 (16 November 2026, 3.12 amended in place) and its blank line move those from 99 on by two more.
  * Privacy 3.14's section 4 lost its product-news row (we send no marketing email), so the indexes from 90 on moved back by one.
+ * Privacy 3.15's unfinished sign-up row in section 7 moves those from 146 on by one more.
  */
 const read = (locale: string, name: string): string => readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, name), "utf8");
 const privacy = (locale: string): string[] => read(locale, "privacy-policy.md").split("\n");
@@ -49,11 +50,11 @@ describe("the Report button and the six months in the legal texts", () => {
     for (const at of [47, 48]) expect(cells(policy[at]!), `${code}: section 2's row at ${at}`).toHaveLength(3);
     expect(policy[48]!.startsWith("| **"), `${code}: the moderation notices row`).toBe(true);
     expect(policy[49]!.startsWith("| **"), `${code}: section 2 goes on after it`).toBe(true);
-    for (const at of [160, 161, 162, 163, 164]) expect(cells(policy[at]!), `${code}: section 7 row at ${at}`).toHaveLength(3);
-    for (const at of [160, 161, 162, 163]) expect(policy[at]!).not.toContain("Anthropic");
-    expect(policy[164]!, `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
-    expect(cells(policy[161]!).join(" "), `${code}: decision 36's six months`).toContain("6");
-    expect(cells(policy[162]!).join(" "), `${code}: the notices' twelve months`).toContain("12");
+    for (const at of [161, 162, 163, 164, 165]) expect(cells(policy[at]!), `${code}: section 7 row at ${at}`).toHaveLength(3);
+    for (const at of [161, 162, 163, 164]) expect(policy[at]!).not.toContain("Anthropic");
+    expect(policy[165]!, `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
+    expect(cells(policy[162]!).join(" "), `${code}: decision 36's six months`).toContain("6");
+    expect(cells(policy[163]!).join(" "), `${code}: the notices' twelve months`).toContain("12");
     expect(policy[90]!, `${code}: section 4 points at section 5`).toMatch(/5/u);
     // The paragraph still names the model for the two other checks, so the marker is the count: the report sentence, which comes last, adds no third mention.
     const section5 = policy[96]!;

@@ -60,6 +60,21 @@ export function withNames(text: string): ReactNode {
 }
 
 /**
+ * A paragraph's words. When the draft opens the paragraph with a bold run ("Delivery.", "Cancelling."), that run is
+ * drawn bold, so a reader can find the paragraph by eye; the words a reader gets are `text` either way. Used by the
+ * legal pages below and by the policy modal (`consent/LegalDocumentModal.tsx`), so the two cannot differ.
+ */
+export function LegalParagraphText({ block }: { block: Extract<LegalBlock, { kind: "p" }> }): ReactNode {
+  if (block.lead === undefined || !block.text.startsWith(block.lead)) return withNames(block.text);
+  return (
+    <>
+      <strong>{withNames(block.lead)}</strong>
+      {withNames(block.text.slice(block.lead.length))}
+    </>
+  );
+}
+
+/**
  * What a screen reader hears for one row of a legal table rendered as a list: each value after its
  * column name, "Category: Account. What, exactly: Email …". Null for a plain list item (no table, or
  * no cells for this row), which renders exactly as before.
@@ -96,7 +111,9 @@ function NumberedSections({ sections }: { sections: readonly NumberedSection[] }
         <LegalSection no={no} title={title} key={no}>
           {blocks.map((block, index) =>
             block.kind === "p" ? (
-              <p key={index}>{withNames(block.text)}</p>
+              <p key={index}>
+                <LegalParagraphText block={block} />
+              </p>
             ) : (
               <ul key={index}>
                 {block.items.map((item, itemIndex) => {
@@ -442,14 +459,16 @@ const PURPOSE_KEYS: Readonly<Record<ProviderPurpose, string>> = {
   reportCheck: "legal.providers.purpose.reportCheck",
   clarifyQuestions: "legal.providers.purpose.clarifyQuestions",
   suggestPaths: "legal.providers.purpose.suggestPaths",
-  support: "legal.providers.purpose.support"
+  support: "legal.providers.purpose.support",
+  payments: "legal.providers.purpose.payments"
 };
 
 const FLAG_KEYS: Readonly<Record<ProviderRegisterEntry["zeroRetention"] | ProviderRegisterEntry["training"], string>> = {
   yes: "legal.providers.yes",
   no: "legal.providers.no",
   unconfirmed: "legal.providers.unconfirmed",
-  notNeeded: "legal.providers.zeroNotNeeded"
+  notNeeded: "legal.providers.zeroNotNeeded",
+  notApplicable: "legal.providers.notApplicable"
 };
 
 /**
@@ -458,7 +477,7 @@ const FLAG_KEYS: Readonly<Record<ProviderRegisterEntry["zeroRetention"] | Provid
  * It renders exactly the `entries` it is given (the page passes `providerRegister` of the API's
  * companies); the catalogues carry only labels and the words around them. Addition D24 (owner
  * 2026-10-22: providers only, not the models): no row names a model, so a model change never
- * changes the page.
+ * changes the page. Privacy 3.15: the page also lists the payment provider, whose AI-only facts read "not applicable".
  */
 export function LegalProvidersBody({ legalCatalog, entries }: {
   legalCatalog: MessageCatalog;

@@ -4,7 +4,7 @@ import * as React from "react";
 
 import type { LegalDocument } from "../../lib/legalDocument";
 import type { CatalogLocaleCode } from "@/lib/i18n/locales";
-import { legalRowSpoken, withNames } from "../legal/LegalBodies";
+import { LegalParagraphText, legalRowSpoken, withNames } from "../legal/LegalBodies";
 import type { LegalLanguageSwitch } from "./canadaLegalLanguage";
 import { backdropCloseHandler, prefersReducedMotion, useModalSurface } from "./modalSemantics";
 import { useHideOutside } from "@/components/dialogSurface";
@@ -242,7 +242,7 @@ export function LegalDocumentModal({
                 {section.blocks.map((block, blockIndex) =>
                   block.kind === "p" ? (
                     <p key={blockIndex} className="policyText">
-                      {withNames(block.text)}
+                      <LegalParagraphText block={block} />
                     </p>
                   ) : (
                     <div key={blockIndex} className="policyItems">

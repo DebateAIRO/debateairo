@@ -13,6 +13,8 @@ import {
   withoutPrivacy314,
   withoutPrivacy314Number
 } from "../support/legalPrivacy314.js";
+import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
+import { withoutTerms10Corrections } from "../support/legalTerms10.js";
 
 /**
  * Terms of Service 1.0 and Privacy Policy 3.13, effective 19 November 2026. The Terms start again at 1.0 (owner's
@@ -24,7 +26,15 @@ import {
  */
 
 const root = process.cwd();
-const draft = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+/**
+ * A draft as these checks were written for it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts),
+ * so as 3.14 left it, and the Terms as the first 1.0 text wrote them, with the corrections made before launch undone
+ * (tests/support/legalTerms10.ts). Only the day and version check needs that text; the check that the Terms carry no
+ * change history, and the archive check, read the file the site serves.
+ */
+const draft = (code: string, name: string): string =>
+  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : withoutTerms10Corrections(code, file(code, name));
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
@@ -73,7 +83,7 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
   });
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the Terms carry no change history, and section 14 ends where the history began", (code) => {
-    const terms = draft(code, "terms-of-service.md");
+    const terms = file(code, "terms-of-service.md");
     expect(terms, code).not.toMatch(/(^|\D)2\.(1?\d)(\D|$)/u);
     const section14 = terms.split(/^## 14\./mu)[1]!.split(/^## 15\./mu)[0]!;
     // The heading line and the three paragraphs on changes; the last still points to dezbatere.ro/terms/versions.
@@ -100,7 +110,7 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
     for (const code of ["en", "ro", "fr"]) {
       const entries = Object.values(archive[code]!);
       expect(entries.map((item) => item.version), code).toEqual(["1.0"]);
-      expect(readFileSync(resolve(root, entries[0]!.path), "utf8"), code).toBe(draft(code, "terms-of-service.md"));
+      expect(readFileSync(resolve(root, entries[0]!.path), "utf8"), code).toBe(file(code, "terms-of-service.md"));
     }
   });
 
