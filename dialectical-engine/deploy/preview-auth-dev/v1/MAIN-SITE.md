@@ -506,6 +506,15 @@ of the month. With made-up numbers:
   includes your own account and every test account: after an upload that publishes lower numbers, each of them still
   has the larger ones until its own next month starts, at most about 31 days. An account created after the switch has
   the new numbers from its first day.
+- **The Amazon gate, for OpenAI's GPT-6 Luna (the first upload that carries it).** The release guide's section "The
+  Amazon Bedrock gate: the upload that brings it" has the four pieces, and `deploy/preview-gate/v3/README-bedrock.md`
+  the gate's own steps. In short: before SB4, the three older gates get this release's gate code and units, and the
+  Amazon gate is installed and `active` (its limits typed on the server, in its GO; write no amounts here); right
+  after DR1, BEDROCK_ENV adds the gate's socket and Luna's address to the new release's two files. **The key is typed
+  by you at the server's hidden prompt** (`preview_key.py install bedrock`), never on a command line and never pasted
+  into a chat. Luna joins the debates later, by a settings activation, only after the probe has passed twice and the
+  Privacy Policy and the Terms on the site name Amazon. Put the key's end date in your calendar: a key past its end
+  date stops the Amazon gate (`README-bedrock.md`, "A new key").
 - **The first upload that carries this rule.** The release before it does not know the rule. If you go back to that
   release (the release guide's way back), it measures everyone against its own numbers at once, as before; "cannot be
   taken back inside a month" holds only between releases that both carry the rule.
@@ -767,6 +776,7 @@ EG=/opt/debateai-v3-preview/operator/egress-v1; EGU=debateai-preview-egress.serv
 TDROP=/etc/systemd/system/debateai-preview-turnstile.service.d/20-public-origin.conf
 EDROP=/etc/systemd/system/debateai-preview-egress.service.d/50-live-payments.conf
 GPX=/opt/debateai-v3-preview/operator/perplexity-budget-v1; PPX=/var/lib/debateai-v3-preview/provider-perplexity-authority-v1
+GBR=/opt/debateai-v3-preview/operator/bedrock-budget-v1; PBR=/var/lib/debateai-v3-preview/provider-bedrock-authority-v1
 HOST=$(sed -n 's|^PUBLIC_APP_URL=https://||p' "$A")
 case "$HOST" in v3-preview.dezbatere.ro|dezbatere.ro) ;; *) echo "NAMES_NOT_DONE: $A does not name one of the two names exactly once: look"; exit 1;; esac
 KEYS='^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|NETOPIA_API_KEY_PATH|NETOPIA_IPN_KEYS_PATH|QUADERNO_API_BASE_URL|QUADERNO_API_KEY_PATH|SMARTBILL_API_BASE_URL|SMARTBILL_CREDENTIALS_PATH|SMARTBILL_SERIES|OWNER_REPORT_EMAIL_PATH|PREVIEW_LIVE_PAYMENTS)='
@@ -786,8 +796,8 @@ notify() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: appl
 hsts() { curl -s -o /dev/null -D - -X POST -H 'Content-Type: application/json' --data '{}' "https://$1/api/v1/billing/netopia/notify" | tr -d '\r' | tr 'A-Z' 'a-z' | grep '^strict-transport-security:' || true; }
 order() { cad adapt --config "$1" --adapter caddyfile 2>/dev/null | jq -r --arg h "$2" '[.apps.http.servers[].routes[] | select(.match[0].host[0]==$h) | .handle[] | .. | objects | select(has("handler")) | .handler] | join(" > ")'; }
 nblock() { awk -v site="$2 {" '{t=$0; sub(/^[ \t]+/,"",t)} !s&&$0==site{s=1;next} s&&!p&&t=="@netopia_notify {"{p=1} p{print t; d+=gsub(/\{/,"{",t)-gsub(/\}/,"}",t); if(t=="handle @netopia_notify {")h=1; if(h&&d==0)exit}' "$1"; }
-gates() { printf 'deepinfra '; gs "$GD" "$PD" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; printf 'anthropic '; gs "$GAN" "$PAN" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; printf 'perplexity '; gs "$GPX" "$PPX" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; }
-gatesok() { [ "$(gs "$GD" "$PD" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ] && [ "$(gs "$GAN" "$PAN" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ] && [ "$(gs "$GPX" "$PPX" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ]; }
+gates() { printf 'deepinfra '; gs "$GD" "$PD" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; printf 'anthropic '; gs "$GAN" "$PAN" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; printf 'perplexity '; gs "$GPX" "$PPX" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; printf 'bedrock '; gs "$GBR" "$PBR" | jq -c '{state, window_open, today_spend_usd, remaining_today_usd}'; }
+gatesok() { [ "$(gs "$GD" "$PD" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ] && [ "$(gs "$GAN" "$PAN" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ] && [ "$(gs "$GPX" "$PPX" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ] && [ "$(gs "$GBR" "$PBR" | jq -r '"\(.state) \(.window_open)"')" = 'active true' ]; }
 RUNAPI() { systemd-run --quiet --pipe --wait --collect --uid="$AU" --gid="$AGRP" --property=EnvironmentFile="$A" --setenv=NODE_USE_ENV_PROXY=1 --setenv=HTTPS_PROXY=http://127.0.0.1:3180 "--setenv=NO_PROXY=localhost,127.0.0.1,[::1],$HOST" --working-directory="$CAPI/dialectical-engine" "$N" --import tsx "$@"; }
 modecheck() { ( cd "$CAPI/dialectical-engine" && "$N" --input-type=module -e "const m=await import('./deploy/preview-auth-dev/v1/start-check-payments.mjs'); const r=await import('./deploy/preview-auth-dev/v1/startup-refusals.mjs'); await m.assertEgressIsLive({quadernoHost:process.argv[1]+'.quadernoapp.com'}).then(()=>console.log('egress: live'),e=>console.log('egress:',r.namedRefusal(e)??'refused'))" "$1" ); }
 put_secret() { runuser -u "$AU" -- /bin/sh -c 'umask 077; f=$1; [ ! -e "$f" ] || { echo "$f exists: stop" >&2; exit 1; }; IFS= read -r v && [ -n "$v" ] && printf "%s\n" "$v" > "$f.new" && mv -n "$f.new" "$f" && echo "saved $f"' sh "$1"; }
@@ -814,7 +824,8 @@ What the helpers do, in short:
   15 minutes, and a way back must never be refused for that.
 - `inv` shows a service's journal since its last start; `said` asks whether the API's journal since its last start
   holds a line.
-- `gates` shows the three spending gates; `gatesok` says whether all three are active with their window open.
+- `gates` shows the four spending gates (DeepInfra, Anthropic, Perplexity, Amazon Bedrock); `gatesok` says whether all
+  four are active with their window open.
 - `RUNAPI` runs one of the API's billing tools as the API's user, with the API's settings.
 - `modecheck` asks the egress proxy which form it runs in; `swap` replaces the payment lines of the API file;
   `livedrop` and `sandboxdrop` put the egress proxy in its live or its sandbox form.
@@ -2386,7 +2397,7 @@ debate that no account owns. Keep `/root/preview-archive/main-site/asks`: closin
 ```sh
 set -euo pipefail
 . /root/preview-archive/main-site/names.sh
-# GATES: the three spending gates (read-only).
+# GATES: the four spending gates (read-only).
 gates
 echo GATES_DONE
 exit 0
@@ -2466,6 +2477,7 @@ up the day for everyone.
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/bedrock-budget-v1/preview_budget_authority.py stop --private /var/lib/debateai-v3-preview/provider-bedrock-authority-v1
 ```
 
 Open them again with each gate's `activate`:
@@ -2474,6 +2486,7 @@ Open them again with each gate's `activate`:
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 --go /etc/debateai-v3-preview/provider-anthropic-go-v1.json
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1 --go /etc/debateai-v3-preview/provider-perplexity-go-v1.json
+/usr/bin/python3 -I /opt/debateai-v3-preview/operator/bedrock-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-bedrock-authority-v1 --go /etc/debateai-v3-preview/provider-bedrock-go-v1.json
 ```
 
 (b) **Close the site to strangers:** PWON (part 8.4), when the password is off or the NETOPIA review window (5.8) is

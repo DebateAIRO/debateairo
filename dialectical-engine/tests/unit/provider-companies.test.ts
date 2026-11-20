@@ -34,11 +34,11 @@ const at = (baseUrl: string, providerRef = "test:target"): ProviderDiscoveryTarg
   Object.freeze({ providerRef, maker: "Maker", baseUrl, model: "test-model" });
 
 describe("providerCompaniesOfTargets (addition D24)", () => {
-  it("the preview's five reviewed models, through their refs, reach Anthropic and DeepInfra", () => {
+  it("the preview's six reviewed models, through their refs, reach Amazon, Anthropic and DeepInfra", () => {
     const targets = reviewedTargets(PREVIEW_REVIEWED_PROVIDER_REFS);
     expect(new Set(targets.map((target) => target.model))).toEqual(new Set(PREVIEW_MODEL_ROWS.map((row) => row.model)));
-    expect(new Set(targets.map((target) => target.model)).size).toBe(5);
-    expect(providerCompaniesOfTargets(targets)).toEqual(["anthropic", "deepinfra"]);
+    expect(new Set(targets.map((target) => target.model)).size).toBe(6);
+    expect(providerCompaniesOfTargets(targets)).toEqual(["amazon", "anthropic", "deepinfra"]);
     expect(Object.isFrozen(providerCompaniesOfTargets(targets))).toBe(true);
   });
 
@@ -88,7 +88,7 @@ describe("providerCompaniesOfTargets (addition D24)", () => {
     const catalogue = pages.match(/const REVIEWED_PROVIDER_COMPANIES[^=]*= Object\.freeze\(\[([\s\S]*?)\]\s*as const\)/u)?.[1];
     expect(catalogue).toBeDefined();
     const keys = [...(catalogue ?? "").matchAll(/\["([a-z]+)",/gu)].map((match) => match[1]);
-    expect(keys).toEqual(["anthropic", "deepinfra"]);
+    expect(keys).toEqual(["anthropic", "deepinfra", "amazon"]);
     for (const company of new Set(Object.values(PROVIDER_COMPANY_HOSTS))) expect(keys, company).toContain(company);
   });
 });
@@ -111,6 +111,6 @@ describe("web search is not a debater", () => {
     const reviewed = reviewedTargets(PREVIEW_REVIEWED_PROVIDER_REFS);
     const searchTarget = Object.freeze({ ...reviewed[0]!, baseUrl: "https://api.perplexity.ai" });
     expect(() => assertPreviewTargetSet([searchTarget, ...reviewed.slice(1)])).toThrowError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
-    expect(providerCompaniesOfTargets(reviewed)).toEqual(["anthropic", "deepinfra"]);
+    expect(providerCompaniesOfTargets(reviewed)).toEqual(["amazon", "anthropic", "deepinfra"]);
   });
 });

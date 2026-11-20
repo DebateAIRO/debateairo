@@ -201,6 +201,8 @@ class UnitFileTests(unittest.TestCase):
                                                         '-/etc/debateai-v3-preview/provider-anthropic-go-v1.json',
                                                         '-/var/lib/debateai-v3-preview/provider-perplexity-authority-v1',
                                                         '-/etc/debateai-v3-preview/provider-perplexity-go-v1.json',
+                                                        '-/var/lib/debateai-v3-preview/provider-bedrock-authority-v1',
+                                                        '-/etc/debateai-v3-preview/provider-bedrock-go-v1.json',
                                                         '-/var/lib/debateai-v3-preview/provider-google-authority-v1',
                                                         '-/etc/debateai-v3-preview/provider-google-go-v1.json'})
         self.assertLessEqual(set(v2_hidden), set(hidden))
@@ -276,7 +278,7 @@ class UnitFileTests(unittest.TestCase):
         self.assertTrue(gate.CAPS_PATH.startswith('/etc/debateai-v3-preview/'))
         # Its folder is one the gates already read, and nothing hides it from a gate (the units that serve) or a probe.
         units = sorted((V3 / 'systemd').glob('*-budget.service'))
-        self.assertEqual(len(units), 3)
+        self.assertEqual(len(units), 4)
         for unit in units:
             for hidden in (' '.join(values(unit, 'InaccessiblePaths')) or '').split():
                 with self.subTest(unit=unit.name, hidden=hidden):

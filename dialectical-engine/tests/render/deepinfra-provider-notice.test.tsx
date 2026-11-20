@@ -80,13 +80,15 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
 });
 
 describe("with no answer from the API, the page lists every reviewed company", () => {
-  it("lists DeepInfra and its partner just before Perplexity and the support chat's model, and no model", () => {
+  it("lists DeepInfra and its partner, then Amazon, just before Perplexity and the support chat's model, and no model", () => {
     for (const companies of [null, []]) {
       const register = providerRegister(companies);
       expect(register.at(-1)?.key).toBe("support");
       expect(register.at(-2)?.key).toBe("perplexity");
-      expect(register.at(-3)?.key).toBe("deepinfra-partner");
-      expect(register.at(-4)?.key).toBe("deepinfra");
+      // Amazon Bedrock's checked row follows DeepInfra's two.
+      expect(register.at(-3)?.key).toBe("amazon");
+      expect(register.at(-4)?.key).toBe("deepinfra-partner");
+      expect(register.at(-5)?.key).toBe("deepinfra");
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={register} />);
       expect(html).toContain('id="legal-provider-deepinfra"');
       expect(html).toContain("Deep Infra Inc.");

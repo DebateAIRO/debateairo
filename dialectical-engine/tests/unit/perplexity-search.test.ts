@@ -504,7 +504,7 @@ describe("the preview configuration names the search gate's socket (perplexity_b
     premium_model_ids: ["zai-org/GLM-5.3-Flash", "deepseek-ai/DeepSeek-V4.1-Flash"] };
 
   it("is an optional socket key of every form that names sockets, in the same folder, never another gate's socket", () => {
-    expect(PREVIEW_GATE_SOCKET_KEYS).toEqual({ anthropic: "anthropic_budget_socket", perplexity: "perplexity_budget_socket" });
+    expect(PREVIEW_GATE_SOCKET_KEYS).toEqual({ anthropic: "anthropic_budget_socket", bedrock: "bedrock_budget_socket", perplexity: "perplexity_budget_socket" });
     const config = parsePreviewProviderTestConfig(JSON.stringify({ ...BASE_CONFIG, ...ROSTERS, perplexity_budget_socket: SEARCH_SOCKET }))!;
     expect(config.perplexity_budget_socket).toBe(SEARCH_SOCKET);
     expect(previewGateSocket(config, "perplexity")).toBe(SEARCH_SOCKET);
@@ -534,7 +534,7 @@ describe("the preview configuration names the search gate's socket (perplexity_b
   });
 
   it("the search gate is a gate, never a model provider: no roster, no model row, no debater", () => {
-    expect(PREVIEW_PROVIDER_NAMES).toEqual(["deepinfra", "anthropic"]);
+    expect(PREVIEW_PROVIDER_NAMES).toEqual(["deepinfra", "anthropic", "bedrock"]);
     expect(() => parsePreviewProviderTestConfig(JSON.stringify({ ...BASE_CONFIG, perplexity_budget_socket: SEARCH_SOCKET,
       free_model_ids: ["perplexity-search-fast"], premium_model_ids: ["perplexity-search-fast"] })))
       .toThrowError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");

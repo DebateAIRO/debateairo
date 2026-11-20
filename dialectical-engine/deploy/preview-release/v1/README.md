@@ -3063,6 +3063,117 @@ echo "the new release passes its own site version $V"
   preview's ask (1,260 s); the providers page no longer reads it. The UI start-up check still demands that
   `ui.env` and the build name the same list.
 
+## The Amazon Bedrock gate: the upload that brings it
+
+**In plain words.** From this release on the site can use OpenAI's GPT-6 Luna, which Amazon serves through its own
+spending gate (`deploy/preview-gate/v3/README-bedrock.md`). The upload that first carries this code has four extra
+pieces of server work. None of them makes anyone's debate use Luna: that comes last, by a settings activation, and
+only after the probe has passed and the Privacy Policy names Amazon.
+
+Why the upload cannot skip them:
+- **The gate code changed for every gate.** The two gate files hold the Amazon profile, and each gate's GO binds their
+  hashes. A10's check ("Gate files") prints `does NOT match this release` for the three older gates until they are
+  redeployed. The change only widens (it adds a model and a gate), so it is deployed now, before SB4.
+- **The release tools count four gates.** This release's `common.mjs` lists the Amazon gate beside the DeepInfra and
+  Anthropic ones. Once the new tools are in place (SB10, or DR5 on the drained path, when `LIFE=yes`), the release
+  check, a settings activation and the switch ask that the Amazon gate is installed, runs this release's gate code and
+  is `active`. A gate with no key is `active` too; it simply cannot make a call. So the key and the probe never hold
+  an upload back, but the gate's folder, GO and service do.
+- **The register this release publishes names Luna's address.** A register version made by this code lists the seven
+  reviewed model references, `preview:gpt-6-luna` last. The API and the runner refuse to start when their own list of
+  model addresses is not exactly the register's (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`). So the new release's env
+  files get Luna's row and the gate's socket in this upload (piece 3), whether or not Luna is ever used.
+
+This was written from the code and the other gates' steps. It has not been rehearsed on the server: run the Mac check
+("Before an upload: the Mac check") on the commit first, and stop and ask at the first line that does not say what
+this section expects.
+
+**Piece 1, before SB4: the three older gates on this release's gate code, and their units.** With the owner's yes, when
+nobody is using the site:
+1. For the DeepInfra, Anthropic and Perplexity gates: `deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", steps
+   1 to 6, each with its own folder, GO and service (copy the two gate files and `gate_watch.py`, write the GO again
+   changing only the two hashes, restart, `activate`).
+2. `README-bedrock.md`, install step 3a: the six older units are installed again from this release, so that they hide
+   the Amazon gate's folder. Its restart can be the same restart as item 1.
+3. `/opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py` is this release's copy (`README-bedrock.md`,
+   install step 1 installs it).
+
+**Piece 2, before SB4: the Amazon gate itself.** `README-bedrock.md`, install steps 0 to 7 (the AWS console, the
+folder, the addresses, the state folder, the key at the hidden prompt, the GO with the owner's figures, `init` and
+`activate`, the units and the start). The key (step 4) and the probe (step 8) may wait for a quieter hour; steps 1 to
+3, 5, 6 and 7 may not. Then A10's check once more, with the Amazon gate added: all four lines must say
+`match this release` and all four `state` lines `active`.
+
+```sh
+NEW=$CAPI/dialectical-engine/packages/providers/ops; test -f "$NEW/preview_budget_authority.py" && test -f "$NEW/preview_budget_helper.py" && echo "release gate files found"
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+same() { [ -n "$NB" ] && [ -n "$NH" ] && [ "$(sha256sum "$1/preview_budget_authority.py" | cut -d' ' -f1)" = "$NB" ] && [ "$(sha256sum "$1/preview_budget_helper.py" | cut -d' ' -f1)" = "$NH" ] && [ "$(jq -r .bridge_sha256 "$2")" = "$NB" ] && [ "$(jq -r .helper_sha256 "$2")" = "$NH" ]; }
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1 perplexity:perplexity-budget-v1:provider-perplexity-authority-v1:provider-perplexity-go-v1 bedrock:bedrock-budget-v1:provider-bedrock-authority-v1:provider-bedrock-go-v1; do
+  IFS=: read -r NAME FOLDER STATE GOFILE <<<"$G"
+  if same "/opt/debateai-v3-preview/operator/$FOLDER" "/etc/debateai-v3-preview/$GOFILE.json"; then echo "$NAME gate files and GO match this release"; else echo "$NAME does NOT match this release: stop"; fi
+  echo "$NAME state $(/usr/bin/python3 -I "/opt/debateai-v3-preview/operator/$FOLDER/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" | jq -r .state)"
+done
+```
+
+At SB4, `GATE_ROWS_N1` prints `changed since the switch: review <sha256>`: the owner reviews the gate files (this
+check) and gives that digest as `GRR`. `LIFECYCLE_FILES` prints `changed` too (the tools' list of gates and the gate's
+e-mails): the owner reviews that change and sets `LIFE=yes`.
+
+**Piece 3, right after the env files are written (SB5, or DR1 on the drained path): the gate's socket and Luna's
+address in the new release's files.** In `api-$LABEL.env` and `runner-$LABEL.env` alike. The old release's files stay
+as they are (a release older than this code refuses a key it does not know). Luna's row is printed by the new
+release's own code, so it is exactly the reviewed row; no value is typed by hand and none is printed here.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# BEDROCK_ENV: bedrock_budget_socket and Luna's target row in api- and runner-<LABEL>.env. Nothing else changes; no value is printed.
+KC=PREVIEW_PROVIDER_TEST_CONFIG_JSON; KT=PROVIDER_DISCOVERY_TARGETS_JSON; SOCK=/run/debateai-v3-preview/bedrock-budget-v1.sock
+ROW=$( cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs --input-type=module -e 'import { previewTargetJsonRow } from "./packages/providers/src/preview-models.ts"; console.log(JSON.stringify(previewTargetJsonRow("preview:gpt-6-luna")));' ) || { echo "BEDROCK_ENV_NOT_DONE: the release's code did not print Luna's row"; exit 1; }
+[ "$(jq -r '[.provider_ref, .model] | join(" ")' <<<"$ROW")" = "preview:gpt-6-luna us.openai.gpt-6-luna" ] || { echo "BEDROCK_ENV_NOT_DONE: the row is not Luna's"; exit 1; }
+for SVC in api runner; do
+  F=$E/$SVC-$LABEL.env; D=$S/$SVC-$LABEL.env.before-bedrock
+  for K in $KC $KT; do [ "$(grep -c "^$K=" "$F")" = 1 ] || { echo "BEDROCK_ENV_NOT_DONE: $K is not in $SVC-$LABEL.env exactly once"; exit 1; }; done
+  [ -e "$D" ] || { cp -p "$F" "$D"; chmod 0600 "$D"; }
+  MODE=$(stat -c '%a %U:%G' "$F")
+  C=$(sed -n "s/^$KC=//p" "$F" | jq -ce --arg s "$SOCK" 'if has("bedrock_budget_socket") then . else . + {bedrock_budget_socket: $s} end | select(.bedrock_budget_socket == $s)') || { echo "BEDROCK_ENV_NOT_DONE: $SVC-$LABEL.env names another Amazon socket: ask"; exit 1; }
+  T=$(sed -n "s/^$KT=//p" "$F" | jq -ce --argjson row "$ROW" 'if any(.[]; .provider_ref == $row.provider_ref) then . else . + [$row] end | select(.[-1] == $row)') || { echo "BEDROCK_ENV_NOT_DONE: $SVC-$LABEL.env holds another row for Luna, or not last: ask"; exit 1; }
+  cp -p "$F" "$F.bedrock"
+  C="$C" T="$T" awk -v kc="$KC" -v kt="$KT" 'index($0, kc "=") == 1 { print kc "=" ENVIRON["C"]; next } index($0, kt "=") == 1 { print kt "=" ENVIRON["T"]; next } { print }' "$F" > "$F.bedrock"
+  diff <(grep -v -e "^$KC=" -e "^$KT=" "$D") <(grep -v -e "^$KC=" -e "^$KT=" "$F.bedrock") > /dev/null || { echo "BEDROCK_ENV_NOT_DONE: another line of $SVC-$LABEL.env would change ($F.bedrock is only a draft)"; exit 1; }
+  [ "$(stat -c '%a %U:%G' "$F.bedrock")" = "$MODE" ] || { echo "BEDROCK_ENV_NOT_DONE: the draft's mode or owner differs ($F.bedrock)"; exit 1; }
+  mv "$F.bedrock" "$F"
+  echo "$SVC-$LABEL.env: $(sed -n "s/^$KT=//p" "$F" | jq 'length') model addresses, the Amazon socket $(sed -n "s/^$KC=//p" "$F" | jq -r 'if .bedrock_budget_socket then "named" else "MISSING" end')"
+done
+[ "$(sed -n "s/^$KC=//p" "$E/api-$LABEL.env")" = "$(sed -n "s/^$KC=//p" "$E/runner-$LABEL.env")" ] && [ "$(sed -n "s/^$KT=//p" "$E/api-$LABEL.env" | jq -cS .)" = "$(sed -n "s/^$KT=//p" "$E/runner-$LABEL.env" | jq -cS .)" ] || { echo "BEDROCK_ENV_NOT_DONE: the API's and the runner's values differ (the copies before: $S/*-$LABEL.env.before-bedrock)"; exit 1; }
+echo BEDROCK_ENV_DONE
+```
+
+What to expect: each of the two lines says `7 model addresses, the Amazon socket named`, then `BEDROCK_ENV_DONE`. Run
+it once; a second run changes nothing. The way back for this piece is the copy it kept
+(`$S/<service>-$LABEL.env.before-bedrock`), before anything of the new release has started.
+
+The website's own file (`ui-$LABEL.env`) does not change: its build list is only the page's fallback, and the page
+reads the live line-up from the API. The AI providers page lists Amazon Web Services from this upload on, with its
+checked entry, because the API reaches its address. The paragraphs of the Privacy Policy and the Terms that name
+Amazon are a separate change; Luna is not switched on for anyone before they are live (piece 4).
+
+**Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload. In this order:
+1. The key, if it is not in yet, and the probe, twice (`README-bedrock.md`, install steps 4 and 8). Every field must
+   show its "Good" value. The day after, the gate's `today_spend_usd` of the probe's day against the AWS Billing page.
+2. The Privacy Policy and the Terms that name Amazon are live on the site.
+3. `README-bedrock.md`, "Switch it on", step 1 (start at boot and the two watchers).
+4. The activation: "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds
+   `us.openai.gpt-6-luna` to `free_model_ids` and `premium_model_ids` (the owner's choice). SV4 refuses
+   while the Amazon gate does not switch Luna on (`SETTINGS_GATE_MODEL_DISABLED:bedrock:us.openai.gpt-6-luna`), does
+   not answer (`SETTINGS_GATE_UNANSWERED:bedrock`), or runs other gate code than the release's
+   (`SETTINGS_GATE_HELPER_DIFFERS:bedrock`).
+
+**The way back.** Taking Luna out of the debates is an activation without it (SV6, or a new line-up); no upload. The
+gate itself can stay installed and unused: `stop` makes sure it spends nothing. Going back to a release from before
+this one works as for any release (its own env files never got the new key or row); its older tools read two gates
+and ignore this one.
+
 ## Transition release T (one last drained upload)
 
 **In plain words.** R19 has no fences: a restarted R19 runner would pick up a newer release's debates and could mark

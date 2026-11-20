@@ -660,6 +660,52 @@ describe('spending-gate notices', () => {
     expect(b.sent[0]!).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/perplexity-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-perplexity-authority-v1');
   });
 
+  it('the Amazon Bedrock gate has its own four notices, and a refused key says to put a new key in first', async () => {
+    const halted = 'debateai-preview-notice@bedrock-halted-uncertain_charge.service';
+    expect(alert.parseAlertArgs(['--notice', 'bedrock-halted-uncertain_charge'])).toEqual({ unit: halted, test: false, notice: { kind: 'bedrock-halted', code: 'uncertain_charge', unit: halted } });
+    expect(alert.parseAlertArgs(['--notice', 'bedrock-addresses-mismatch'])).toMatchObject({ notice: { kind: 'bedrock-addresses', code: 'mismatch' } });
+    expect(alert.parseAlertArgs(['--notice', 'bedrock-unbilled-3_2026_11_20'])).toMatchObject({ notice: { kind: 'bedrock-unbilled', code: '3_2026_11_20' } });
+    expect(alert.parseAlertArgs(['--notice', 'bedrock-booked-1_2026_11_20'])).toMatchObject({ notice: { kind: 'bedrock-booked', code: '1_2026_11_20' } });
+    for (const name of ['bedrock-halted-Bad', 'bedrock-unbilled-x_2026_11_20', 'bedrock-booked-1_2026_02_31', 'bedrock-other-x']) {
+      expect(alert.parseAlertArgs(['--notice', name]), name).toBeNull();
+    }
+    const activate = '  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/bedrock-budget-v1/preview_budget_authority.py activate --private /var/lib/debateai-v3-preview/provider-bedrock-authority-v1 --go /etc/debateai-v3-preview/provider-bedrock-go-v1.json';
+    const layout = server();
+    const h = harness(layout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'bedrock-halted-uncertain_charge']), layout, deps: h.deps });
+    const mail = h.sent[0]!;
+    expect(mail).toContain('Subject: Preview: Amazon Bedrock spending gate stopped: uncertain_charge');
+    expect(mail).toContain('Check the reason first');
+    expect(mail).not.toContain('Amazon refused the key');
+    expect(mail).toContain(activate);
+    expect(mail).toContain('systemctl status debateai-preview-bedrock-budget.service');
+    expect(mail).not.toMatch(/\$|usd|deepinfra|anthropic|perplexity/i);
+    // The gate's own name for a key Amazon refused (wrong, deleted or past its end date).
+    const keyLayout = server();
+    const k = harness(keyLayout, { ...notMe, readJournal: async () => { throw new Error('a halt notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'bedrock-halted-provider_key_refused']), layout: keyLayout, deps: k.deps });
+    const refused = k.sent[0]!.replace(/\s+/g, ' ');
+    expect(refused).toContain('Subject: Preview: Amazon Bedrock spending gate stopped: provider_key_refused');
+    expect(refused).toContain('Amazon refused the key: it is wrong, was deleted, or has passed its end date. Put a new key in first');
+    expect(refused).toContain('"A new key"');
+    expect(refused).not.toContain('Check the reason first');
+    expect(k.sent[0]!).toContain(activate);
+    const asked: string[] = [];
+    const second = server();
+    const g = harness(second, { ...notMe, readJournal: async (name: string) => { asked.push(name); return ['{"status": "refused", "error": "BEDROCK_ADDRESSES_OUTSIDE_RANGES", "outside": ["203.0.113.9"]}']; } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'bedrock-addresses-mismatch']), layout: second, deps: g.deps });
+    expect(asked).toEqual(['debateai-preview-bedrock-addresses.service']);
+    const update = g.sent[0]!;
+    expect(update).toContain('Subject: Preview: Amazon Bedrock gate address list needs an update (mismatch)');
+    expect(update).not.toContain('203.0.113.9');
+    expect(update).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/bedrock-budget-v1/bedrock_addresses.py update --dropin /etc/systemd/system/debateai-preview-bedrock-budget.service.d/50-bedrock-addresses.conf --ranges /root/preview-archive/aws-ip-ranges.json && systemctl restart debateai-preview-bedrock-budget');
+    const third = server();
+    const b = harness(third, { ...notMe, readJournal: async () => { throw new Error('a booked notice reads no journal'); } });
+    await alert.runAlert({ ...alert.parseAlertArgs(['--notice', 'bedrock-booked-1_2026_11_20']), layout: third, deps: b.deps });
+    expect(b.sent[0]!).toContain('Subject: Preview: Amazon Bedrock gate: 1 call booked at its maximum today (2026-11-20)');
+    expect(b.sent[0]!).toContain('  /usr/bin/python3 -I /opt/debateai-v3-preview/operator/bedrock-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-bedrock-authority-v1');
+  });
+
   // 2026-10-12 ruling: a high daily count of unbilled refusals ALERTS (once a day per gate), never halts.
   describe('daily unbilled-refusal alert', () => {
     const deepinfra = 'debateai-preview-notice@gate-unbilled-100_2026_10_12.service';

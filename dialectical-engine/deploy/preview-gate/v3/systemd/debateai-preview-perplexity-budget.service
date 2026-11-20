@@ -66,6 +66,7 @@ InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-team-authority-v2 -/etc
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 -/etc/debateai-v3-preview/provider-deepinfra-go-v3.json
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-anthropic-authority-v1 -/etc/debateai-v3-preview/provider-anthropic-go-v1.json
 InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-google-authority-v1 -/etc/debateai-v3-preview/provider-google-go-v1.json
+InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-bedrock-authority-v1 -/etc/debateai-v3-preview/provider-bedrock-go-v1.json
 # IPv4 only: no AF_INET6 socket can even be opened, so a connect to an IPv6 answer fails at once
 # and the transport moves on to the IPv4 one (the drop-in lists IPv4 addresses only).
 RestrictAddressFamilies=AF_UNIX AF_INET

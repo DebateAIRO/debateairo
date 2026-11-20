@@ -7,6 +7,7 @@ import en from "../../apps/ui/messages/en/legal.json";
 import ro from "../../apps/ui/messages/ro/legal.json";
 import { LegalProvidersBody } from "../../apps/ui/components/legal/LegalBodies.js";
 import {
+  AMAZON_BEDROCK_PROVIDER,
   ANTHROPIC_PREVIEW_PROVIDER,
   DEEPINFRA_PARTNER_PROVIDER,
   DEEPINFRA_PROVIDER,
@@ -76,8 +77,11 @@ const CASES: ReadonlyArray<readonly [label: string, companies: readonly string[]
   ["the answer's order does not matter", ["deepinfra", "anthropic"], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
   ["deepinfra alone (the GLM-only set)", ["deepinfra"], ["deepinfra", PARTNER, "perplexity", "support"]],
   ["anthropic alone", ["anthropic"], ["claude", "perplexity", "support"]],
-  ["no answer", null, ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
-  ["an empty answer", [], ["claude", "deepinfra", PARTNER, "perplexity", "support"]],
+  ["no answer", null, ["claude", "deepinfra", PARTNER, "amazon", "perplexity", "support"]],
+  ["an empty answer", [], ["claude", "deepinfra", PARTNER, "amazon", "perplexity", "support"]],
+  // Amazon Bedrock serves one debate model: its row comes after DeepInfra's two, whatever the answer's order.
+  ["amazon + anthropic + deepinfra", ["amazon", "anthropic", "deepinfra"], ["claude", "deepinfra", PARTNER, "amazon", "perplexity", "support"]],
+  ["deepinfra + amazon", ["deepinfra", "amazon"], ["deepinfra", PARTNER, "amazon", "perplexity", "support"]],
   ["deepinfra + an unknown host", ["deepinfra", ACME], ["deepinfra", PARTNER, ACME, "perplexity", "support"]],
   ["perplexity named by the API is still listed once", ["deepinfra", "perplexity"], ["deepinfra", PARTNER, "perplexity", "support"]]
 ];
@@ -196,7 +200,10 @@ describe("the hosted site's cloud rows never show (owner, 10 October 2026; addit
       for (const key of ["gpt", "gemini", "grok", "qwen"]) expect(keysOf(entries), key).not.toContain(key);
       for (const hosted of MODEL_PROVIDERS) expect(entries).not.toContain(hosted);
       for (const catalog of [en, ro]) {
-        const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={entries} />);
+        const rendered = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={entries} />);
+        // Amazon's row is headed "Amazon (OpenAI models)" and says that OpenAI, the maker of the model it serves, does not
+        // receive the text: the two places the name may stand.
+        const html = rendered.split(escaped(catalog["legal.providers.retentionAmazon"]!)).join("").split(escaped(AMAZON_BEDROCK_PROVIDER.provider!)).join("");
         for (const key of ["gpt", "gemini", "grok", "qwen"]) expect(html, key).not.toContain(`id="legal-provider-${key}"`);
         for (const company of ["OpenAI", "OpenAI Ireland Limited", "X.AI LLC", "xAI", "Google"]) expect(html, company).not.toContain(company);
         expect(html).not.toContain(escaped(catalog["legal.providers.ownServers"]));

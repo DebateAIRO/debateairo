@@ -72,8 +72,9 @@ describe("the Anthropic row equals its parity file and keeps the per-call cap", 
   it("is a provider-keyed addition: DeepInfra's four rows first, then Claude Haiku", () => {
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.deepinfra.map(row => row.model)).toEqual([GLM, DEEPSEEK, MIMO, QWEN]);
     expect(PREVIEW_MODEL_ROWS_BY_PROVIDER.anthropic.map(row => row.model)).toEqual([HAIKU]);
-    expect(PREVIEW_MODEL_ROWS.map(row => row.model)).toEqual([GLM, DEEPSEEK, MIMO, QWEN, HAIKU]);
-    expect(PREVIEW_REVIEWED_PROVIDER_REFS.at(-1)).toBe(HAIKU_REF);
+    // The five rows of the DeepInfra and Anthropic gates, in order; a later provider's rows follow them.
+    expect(PREVIEW_MODEL_ROWS.map(row => row.model).slice(0, 5)).toEqual([GLM, DEEPSEEK, MIMO, QWEN, HAIKU]);
+    expect(PREVIEW_REVIEWED_PROVIDER_REFS.indexOf(HAIKU_REF)).toBe(5);
   });
   it("field for field, the row the gate reserves at", () => {
     expect(fixtureFile.schema).toBe("preview-model-rows-v2");

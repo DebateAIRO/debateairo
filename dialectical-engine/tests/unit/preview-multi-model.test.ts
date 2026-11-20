@@ -384,7 +384,8 @@ describe("reviewed thinking-level menus (spec 2026-10-12 §4.1)", () => {
       [DEEPSEEK]: [["high", "low", "none"], "high"],
       [MIMO]: [["default", "none"], "default"],
       [QWEN]: [["default", "low", "medium", "none"], "default"],
-      "claude-haiku-5-5": [["high", "medium", "low"], "high"]
+      "claude-haiku-5-5": [["high", "medium", "low"], "high"],
+      "us.openai.gpt-6-luna": [["high", "medium", "low", "none"], "high"]
     });
   });
   it("the guarded fetch accepts exactly the menu, and 'default' only as an absent member", async () => {
@@ -424,7 +425,7 @@ describe("Qwen3.8-Flash (owner swap 2026-10-10): no effort, no JSON, bound 32768
       efforts: ["default", "low", "medium", "none"], defaultEffort: "default", jsonObject: false, contextWindowTokens: 1_000_000,
       sampling: QWEN_SAMPLING });
     expect(PREVIEW_REVIEWED_PROVIDER_REFS).toEqual(["preview:fixture-a", "preview:fixture-b", "preview:deepseek-v4-1-flash", "preview:mimo-v2-6-pro", "preview:qwen-3-8-flash",
-      "preview:claude-haiku-5-5"]); // PR B: Anthropic's ref after DeepInfra's.
+      "preview:claude-haiku-5-5", "preview:gpt-6-luna"]); // PR B: Anthropic's ref after DeepInfra's; then Amazon Bedrock's.
     expect(previewTargetJsonRow("preview:qwen-3-8-flash")).toEqual({ provider_ref: "preview:qwen-3-8-flash",
       base_url: "https://api.deepinfra.com/v1/openai", model: QWEN, input_price_micros_per_million: 113_000,
       output_price_micros_per_million: 382_000, context_window_tokens: 1_000_000 });
