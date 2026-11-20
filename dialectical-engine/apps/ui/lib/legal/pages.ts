@@ -428,7 +428,8 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
 export const AMAZON_BEDROCK_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "amazon",
-  provider: "Amazon Web Services (Amazon Bedrock)",
+  // The owner's heading: the company, and whose models it serves us. The page names no model.
+  provider: "Amazon (OpenAI models)",
   models: "GPT-6 Luna (OpenAI)",
   entity: "Amazon Web Services EMEA SARL",
   homeCountryKey: "legal.providers.luxembourg",
