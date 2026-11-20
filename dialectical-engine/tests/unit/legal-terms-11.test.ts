@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import { sha256Of, TERMS_11_DAY, TERMS_11_ENTRY, TERMS_11_SWAPS, terms10Sha256, withoutTerms11 } from "../support/legalTerms11.js";
+import { preReset10Sha256, withoutReset10 } from "../support/legalReset10.js";
 
 /**
  * Terms of Service 1.1 (tests/support/legalTerms11.ts): section 8 names Amazon Web Services, which serves one of the
@@ -11,16 +11,15 @@ import { sha256Of, TERMS_11_DAY, TERMS_11_ENTRY, TERMS_11_SWAPS, terms10Sha256, 
  * entry.
  * Every language is its 1.0 draft plus the recorded swaps and nothing else; English is pinned word for word; Romanian
  * and French carry the same paragraph, sentences and entry; the other languages carry only the new number; and
- * /terms/versions lists 1.1 in force and 1.0 with a link to its archived text.
+ * /terms/versions listed 1.1 in force and 1.0 with a link to its archived text. Launch then renumbered the text 1.0
+ * (tests/support/legalReset10.ts); these checks read each draft with the reset undone, and the archive and
+ * /terms/versions hold only the launch 1.0 text (tests/unit/legal-reset-10.test.ts).
  */
 
 const root = process.cwd();
-const draft = (code: string): string => readFileSync(resolve(root, "apps/ui/legal", code, "terms-of-service.md"), "utf8");
-const manifest = (): {
-  reacceptance: Record<string, string | null>;
-  documents: Record<string, Record<string, { version: string; sha256: string }>>;
-  archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
-} => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
+/** A language's Terms as 1.1 wrote them: the draft with the 1.0 reset undone. */
+const draft = (code: string): string =>
+  withoutReset10("TERMS", code, readFileSync(resolve(root, "apps/ui/legal", code, "terms-of-service.md"), "utf8"));
 
 const section = (text: string, no: number): string => {
   const body = new RegExp(`^## ${no}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(text)?.[1];
@@ -60,7 +59,7 @@ describe("Terms of Service 1.1: Amazon Web Services serves one of the debate mod
     }
     expect(text, `${code}: no line names 1.0 as the current version`).not.toMatch(/ v1\.0( ·|$)|\*\*Version 1\.0 · /mu);
     expect(sha256Of(withoutTerms11(code, text)), `${code}: undoing 1.1 gives back the 1.0 draft byte for byte`).toBe(terms10Sha256(code));
-    expect(manifest().documents.TERMS![code], `${code}: the manifest`).toEqual({ version: "1.1", sha256: sha256Of(text) });
+    expect(sha256Of(text), `${code}: the text the manifest held at 1.1`).toBe(preReset10Sha256("TERMS", code));
     // The languages the release offers carry the wording; the others carry the number in its three places and nothing else.
     expect(TERMS_11_SWAPS[code]!.swaps.length, `${code}: the changes`).toBe(RELEASED.includes(code) ? 7 : 3);
     // Section 14 is its heading and three paragraphs on changes, then the history: one entry where the wording is carried.
@@ -119,21 +118,7 @@ describe("Terms of Service 1.1: Amazon Web Services serves one of the debate mod
     }
   });
 
-  it("lists 1.1 in force and 1.0 with its archived text, the archive holds both in English, Romanian and French, and nobody is asked to accept again", () => {
-    expect(TERMS_VERSIONS).toEqual([
-      { version: "1.1", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
-      { version: "1.0", noteKey: "legal.archive.meta", current: false, href: `/terms/versions/${terms10Sha256("en")}` }
-    ]);
-    const archive = manifest().archive.TERMS!;
-    for (const code of RELEASED) {
-      const current = Object.entries(archive[code]!).filter(([, entry]) => entry.version === "1.1");
-      expect(current, code).toHaveLength(1);
-      expect(readFileSync(resolve(root, current[0]![1].path), "utf8"), code).toBe(draft(code));
-      const previous = archive[code]![terms10Sha256(code)];
-      expect(previous?.version, `${code}: the 1.0 text the swaps undo to`).toBe("1.0");
-      expect(readFileSync(resolve(root, previous!.path), "utf8"), `${code}: the archived 1.0 text is untouched`).toBe(withoutTerms11(code, draft(code)));
-    }
+  it("records the 1.1 swaps for every language", () => {
     expect(Object.keys(TERMS_11_SWAPS).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
-    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
   });
 });

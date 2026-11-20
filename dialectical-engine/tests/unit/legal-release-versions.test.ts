@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import { LOCALES, OFFERED_LOCALE_CODES } from "../../apps/ui/lib/i18n/locales.js";
 import { RELEASE_LEGAL_LOCALES } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { isLegalTextLocale, LEGAL_TEXT_LOCALE_CODES } from "../../apps/ui/lib/legal/legalTextLocales.js";
-import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_313_ENTRY, PRIVACY_RELEASE_SWAPS } from "../support/legalRelease.js";
 import {
   PRIVACY_314_ENTRY,
@@ -16,7 +15,8 @@ import {
 import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
 import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
 import { withoutTerms10Corrections } from "../support/legalTerms10.js";
-import { terms10Sha256, withoutTerms11 } from "../support/legalTerms11.js";
+import { withoutTerms11 } from "../support/legalTerms11.js";
+import { withoutReset10ForFile } from "../support/legalReset10.js";
 
 /**
  * Terms of Service 1.0 and Privacy Policy 3.13, effective 19 November 2026. The Terms start again at 1.0 (owner's
@@ -25,36 +25,31 @@ import { terms10Sha256, withoutTerms11 } from "../support/legalTerms11.js";
  * carry the numbers and the date in their own date words; the Privacy Policy's history names what changed since the
  * archived 3.12, whose own entry reads again as that text wrote it (tests/support/legalRelease.ts). Privacy 3.14
  * followed on the same day (tests/support/legalPrivacy314.ts); the 3.13 checks below read it with 3.14 undone.
- * Privacy 3.16 and Terms 1.1 came later (tests/support/legalPrivacy316.ts, legalTerms11.ts) and are undone first.
+ * Privacy 3.16 and Terms 1.1 came later (tests/support/legalPrivacy316.ts, legalTerms11.ts), and launch then renumbered
+ * both texts 1.0 (tests/support/legalReset10.ts); the reset and those versions are undone first. The archive no longer
+ * holds any of these texts, so nothing here reads it.
  */
 
 const root = process.cwd();
 const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
-/** A language's Terms as 1.0 wrote them: the file the site serves with 1.1 undone. */
-const terms10 = (code: string): string => withoutTerms11(code, file(code, "terms-of-service.md"));
+/** A draft as it stood before launch renumbered it 1.0: Privacy 3.16, Terms 1.1. */
+const preReset = (code: string, name: string): string => withoutReset10ForFile(name, code, file(code, name));
+/** A language's Terms as 1.0 wrote them before launch: the pre-reset text with 1.1 undone. */
+const terms10 = (code: string): string => withoutTerms11(code, preReset(code, "terms-of-service.md"));
 /**
  * A draft as these checks were written for it: the Privacy Policy with 3.16 and 3.15 undone
  * (tests/support/legalPrivacy316.ts, legalPrivacy315.ts), so as 3.14 left it, and the Terms as the first 1.0 text wrote
  * them, with 1.1 and the corrections made before launch undone (tests/support/legalTerms11.ts, legalTerms10.ts). Only
- * the day and version check needs the first 1.0 text; the check that 1.0 carries no change history, and the archive
- * check, read the 1.0 text as it was published.
+ * the day and version check needs the first 1.0 text; the check that 1.0 carries no change history reads the 1.0 text
+ * as it was first published.
  */
 const draft = (code: string, name: string): string =>
   name === "privacy-policy.md"
-    ? withoutPrivacy315(code, withoutPrivacy316(code, file(code, name)))
+    ? withoutPrivacy315(code, withoutPrivacy316(code, preReset(code, name)))
     : withoutTerms10Corrections(code, terms10(code));
 const manifest = (): {
   reacceptance: Record<string, string | null>;
-  archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
 } => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
-
-/** The one archived English text of `version`. */
-const archivedEnglish = (kind: "TERMS" | "PRIVACY", version: string): { sha256: string; text: string } => {
-  const entries = Object.entries(manifest().archive[kind]!.en!).filter(([, entry]) => entry.version === version);
-  expect(entries, `${kind} ${version}`).toHaveLength(1);
-  const [sha256, entry] = entries[0]!;
-  return { sha256, text: readFileSync(resolve(root, entry.path), "utf8") };
-};
 
 /** From the entry of `version` up to the entry of the version before it. */
 const entry = (text: string, version: string, previous: string): string => {
@@ -99,27 +94,15 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
     expect(parts[3], code).toContain("dezbatere.ro/terms/versions");
   });
 
-  it("the Privacy Policy's history opens with the 3.13 entry, and the 3.12 entry reads as the archived 3.12 wrote it", () => {
+  it("the Privacy Policy's history opens with the 3.13 entry, then the 3.12 entry", () => {
     const privacy = withoutPrivacy314(draft("en", "privacy-policy.md"));
     expect(privacy).toContain(`\nThis policy was last updated on 19 November 2026. ${PRIVACY_313_ENTRY} Version 3.12 replaced version 3.11:`);
-    expect(entry(privacy, "3.12", "3.11")).toBe(entry(archivedEnglish("PRIVACY", "3.12").text, "3.12", "3.11"));
+    expect(entry(privacy, "3.12", "3.11").length).toBeGreaterThan(0);
     expect(privacy).not.toMatch(/Version 3\.12 also (names DeepInfra|says how you can sign in)/u);
   });
 
-  it("sets the Terms floor at 1.0, the first published text, and keeps the Privacy Policy's at 3.2", () => {
-    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
-  });
-
-  it("lists 1.0 as the first of the Terms, and the archive holds one English, Romanian and French 1.0 text and no 2.x text", () => {
-    expect(TERMS_VERSIONS.at(-1))
-      .toEqual({ version: "1.0", noteKey: "legal.archive.meta", current: false, href: `/terms/versions/${terms10Sha256("en")}` });
-    const archive = manifest().archive.TERMS!;
-    expect(Object.keys(archive).sort()).toEqual(["en", "fr", "ro"]);
-    for (const code of ["en", "ro", "fr"]) {
-      const entries = Object.values(archive[code]!);
-      expect(entries.map((item) => item.version).sort(), code).toEqual(["1.0", "1.1"]);
-      expect(readFileSync(resolve(root, entries.find((item) => item.version === "1.0")!.path), "utf8"), code).toBe(terms10(code));
-    }
+  it("sets both floors at 1.0, the first published texts", () => {
+    expect(manifest().reacceptance).toEqual({ PRIVACY: "1.0", TERMS: "1.0" });
   });
 
   it("checks and archives the legal texts of every interface language the site offers, and French for Canada", () => {
@@ -150,25 +133,14 @@ describe("Privacy Policy 3.14: the marketing promises leave", () => {
     expect(text, `${code}: no line names 3.13 as the current version`).not.toMatch(/ v3\.13( ·|$)|\*\*Version 3\.13 · /mu);
   });
 
-  it("English is the archived 3.13 text with the number, the 3.14 entry and the four marketing promises changed, and nothing else", () => {
+  it("English names 3.14 where it named 3.13, adds the 3.14 entry and drops the four marketing promises", () => {
     const now = draft("en", "privacy-policy.md");
     for (const [before, after] of [...PRIVACY_314_RELEASE_SWAPS, ...PRIVACY_314_MARKETING_SWAPS]) {
       expect(now.split(after), after.slice(0, 50)).toHaveLength(2);
       expect(now, before.slice(0, 50)).not.toContain(before);
     }
-    expect(withoutPrivacy314(now)).toBe(archivedEnglish("PRIVACY", "3.13").text);
     expect(now).toContain(`\nThis policy was last updated on 19 November 2026. ${PRIVACY_314_ENTRY} ${PRIVACY_313_ENTRY} Version 3.12 replaced`);
     expect(now).not.toMatch(/product news \|/u);
     expect(now).not.toMatch(/\bCASL\b/u);
-  });
-
-  it("the archive holds the English, Romanian and French 3.14 texts, and asks nobody to accept again", () => {
-    const archive = manifest().archive.PRIVACY!;
-    for (const code of ["en", "ro", "fr"]) {
-      const current = Object.entries(archive[code]!).filter(([, entry]) => entry.version === "3.14");
-      expect(current, code).toHaveLength(1);
-      expect(readFileSync(resolve(root, current[0]![1].path), "utf8"), code).toBe(draft(code, "privacy-policy.md"));
-    }
-    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
   });
 });

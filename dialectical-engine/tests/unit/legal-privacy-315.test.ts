@@ -12,6 +12,7 @@ import {
   withoutPrivacy315
 } from "../support/legalPrivacy315.js";
 import { privacy315Sha256, withoutPrivacy316 } from "../support/legalPrivacy316.js";
+import { withoutReset10 } from "../support/legalReset10.js";
 
 /**
  * Privacy Policy 3.15 (tests/support/legalPrivacy315.ts): what NETOPIA receives, sees and sends back, and where its
@@ -20,18 +21,14 @@ import { privacy315Sha256, withoutPrivacy316 } from "../support/legalPrivacy316.
  * taking payment, Cloudflare's bot check, HTTPS, no trackers, and paid plans no longer "to start". Every language is
  * its 3.14 draft plus the recorded swaps and nothing else; English is pinned word for word; every language has
  * English's rows and names NETOPIA's company in section 5; Romanian and French drop what English drops. Privacy 3.16
- * followed (tests/support/legalPrivacy316.ts); these checks read each draft with 3.16 undone.
+ * followed (tests/support/legalPrivacy316.ts), then launch renumbered the text 1.0 (tests/support/legalReset10.ts); these
+ * checks read each draft with the reset and 3.16 undone. The archive no longer holds any 3.x text.
  */
 
 const root = process.cwd();
-/** A language's Privacy Policy as 3.15 wrote it: the draft with 3.16 undone. */
+/** A language's Privacy Policy as 3.15 wrote it: the draft with the 1.0 reset and 3.16 undone. */
 const draft = (code: string): string =>
-  withoutPrivacy316(code, readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8"));
-const manifest = (): {
-  reacceptance: Record<string, string | null>;
-  documents: Record<string, Record<string, { version: string; sha256: string }>>;
-  archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
-} => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
+  withoutPrivacy316(code, withoutReset10("PRIVACY", code, readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8")));
 
 const section = (text: string, no: number): string => {
   const body = new RegExp(`^## ${no}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(text)?.[1];
@@ -185,15 +182,7 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinis
     }
   });
 
-  it("the archive holds the English, Romanian and French 3.15 texts and their 3.14 texts, and asks nobody to accept again", () => {
-    const archive = manifest().archive.PRIVACY!;
-    for (const code of RELEASED) {
-      const current = Object.entries(archive[code]!).filter(([, entry]) => entry.version === "3.15");
-      expect(current, code).toHaveLength(1);
-      expect(readFileSync(resolve(root, current[0]![1].path), "utf8"), code).toBe(draft(code));
-      expect(archive[code]![privacy314Sha256(code)]?.version, `${code}: the 3.14 text the swaps undo to`).toBe("3.14");
-    }
+  it("records the 3.15 swaps for every language", () => {
     expect(Object.keys(PRIVACY_315_SWAPS).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
-    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
   });
 });

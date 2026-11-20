@@ -41,9 +41,11 @@ describe("sign-in methods, in the English legal texts", () => {
   it("both texts name Google, Apple and X sign-in where the sign-in page offers it, and the phone number as no way to sign in", () => {
     for (const [name, text] of [["terms-of-service.md", terms], ["privacy-policy.md", privacy]] as const) {
       expect(text, name).toContain("Google, Apple or X");
-      expect(text, name).toContain("where the sign-in page offers it");
       expect(text, name).toMatch(/phone number[^.]*(not a way to sign in|cannot sign in with it)/u);
     }
+    // The Privacy Policy said "where the sign-in page offers it" only in its 3.13 history entry, which the 1.0 text no
+    // longer carries; the Terms say it in section 6.
+    expect(terms).toContain("where the sign-in page offers it");
     expect(privacy).toContain("we send no text messages to it");
     expect(privacy).toContain("X's permission screen also lists reading your posts");
   });
@@ -56,12 +58,9 @@ describe("sign-in methods, in the English legal texts", () => {
     for (const text of [terms, privacy]) expect(text).not.toContain("Facebook");
   });
 
-  it("the Privacy Policy's change history names the sign-in change in the 3.13 entry; the Terms' history starts after it, at 1.1", () => {
-    // Terms 1.0, the first published text, already said how you sign in, so the Terms' history names no sign-in change:
-    // its one entry is 1.1's.
-    expect([...terms.matchAll(/Version (\d+\.\d+) replaced version/gu)].map((match) => match[1])).toEqual(["1.1"]);
-    expect(privacy).toContain("Version 3.13 replaced version 3.12: it says how you can sign in and what each way keeps:");
-    expect(privacy).not.toContain("Version 3.12 also says how you can sign in");
+  it("neither 1.0 text carries a change history: both already say how you sign in", () => {
+    // Launch starts both texts at 1.0, the first published texts (owner's decisions of 19 and 20 November 2026).
+    for (const text of [terms, privacy]) expect([...text.matchAll(/(Version|version) \d+\.\d+ replaced/gu)]).toEqual([]);
   });
 
   it("says the recovery email address is optional, and that Settings shows the whole phone number only after you confirm it is you", () => {

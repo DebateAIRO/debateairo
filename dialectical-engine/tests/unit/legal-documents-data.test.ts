@@ -12,6 +12,7 @@ import { POLICY_JUMP, POLICY_SECTIONS, PRIVACY_POLICY } from "../../apps/ui/lib/
 import { TERMS_JUMP, TERMS_OF_SERVICE, TERMS_SECTIONS } from "../../apps/ui/lib/termsOfService.js";
 import type { LegalDocument, LegalSection } from "../../apps/ui/lib/legalDocument.js";
 import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
+import { withoutReset10 } from "../support/legalReset10.js";
 
 /**
  * The two legal documents the sign-up gate shows are DATA generated from the drafts under
@@ -89,12 +90,12 @@ describe("legal documents — generated data", () => {
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.1 · EFFECTIVE 20 NOVEMBER 2026");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.0 · EFFECTIVE 20 NOVEMBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
       );
-      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.1");
+      expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.0");
       expect(TERMS_OF_SERVICE.contact).toBe("support@dezbatere.ro");
       expect(TERMS_OF_SERVICE.bodyLabel).toBe("Terms of Service text");
       expect(TERMS_OF_SERVICE.sectionIdPrefix).toBe("terms-section-");
@@ -192,9 +193,13 @@ describe("legal documents — generated data", () => {
     // FIX-SF-S03-p3; one member without it measures 0.08, one changed word 0.49).
     it("renders the crisis-phrase exception in the same words in the four members, in every locale", () => {
       const marker = /(?<!\*)\*[^*\n]{1,40}?[:：]\*(?!\*)/u;
-      // Read with Privacy 3.16 undone: its paragraph on Amazon stands in three languages only, and these lines are compared by index.
+      // Read with the 1.0 reset and Privacy 3.16 undone: its paragraph on Amazon stands in three languages only, and these
+      // lines are compared by index.
       const read = (locale: string) =>
-        withoutPrivacy316(locale, readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/privacy-policy.md`), "utf8")).split("\n");
+        withoutPrivacy316(
+          locale,
+          withoutReset10("PRIVACY", locale, readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/privacy-policy.md`), "utf8"))
+        ).split("\n");
       const english = read("en");
       const rows = english.flatMap((line, index) => (line.includes(CRISIS_EXCEPTION) ? [index] : []));
       const members = rows.flatMap((index) => english[index]!.split(marker).flatMap((part, segment) => (part.includes(CRISIS_EXCEPTION) ? [[index, segment] as const] : [])));
@@ -471,12 +476,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.16 · EFFECTIVE 20 NOVEMBER 2026");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v1.0 · EFFECTIVE 20 NOVEMBER 2026");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.16");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.0");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");
