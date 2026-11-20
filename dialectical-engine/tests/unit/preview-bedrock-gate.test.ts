@@ -201,7 +201,7 @@ describe("the Luna target is checked against its row, and older reviewed sets ke
   });
   it("the Register's Amazon entry holds the facts and the wording the owner approved", () => {
     expect(providerRegister(["amazon"])[0]).toBe(AMAZON_BEDROCK_PROVIDER);
-    expect(AMAZON_BEDROCK_PROVIDER).toMatchObject({ key: "amazon", provider: "Amazon Web Services (Amazon Bedrock)",
+    expect(AMAZON_BEDROCK_PROVIDER).toMatchObject({ key: "amazon", provider: "Amazon (OpenAI models)",
       entity: "Amazon Web Services EMEA SARL", homeCountryKey: "legal.providers.luxembourg", locationKey: "legal.providers.unitedStates",
       retentionKey: "legal.providers.retentionAmazon", zeroRetention: "no", training: "no", basisKey: "legal.providers.basisAmazon",
       contact: "aws-EU-privacy@amazon.com", checkedOn: "2026-11-20", purposesConfirmed: true });
