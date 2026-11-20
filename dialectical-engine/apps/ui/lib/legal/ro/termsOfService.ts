@@ -258,8 +258,7 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [
       { kind: "p", lead: "Cu privire la serviciu.", text: "Cu privire la serviciu. Dezvoltăm în mod continuu Dialectical Engine, iar îmbunătățirile de rutină, remedierile și modificările gamei de modele au loc fără notificare. Atunci când efectuăm o modificare care depășește ceea ce este necesar pentru menținerea funcționării serviciului conform descrierii, o facem numai pentru unul dintre următoarele motive: respectarea unei cerințe legale sau de reglementare; soluționarea unei probleme de securitate sau de abuz; faptul că un furnizor de modele modifică, restricționează sau retrage un model ori o funcție de care depindem; adaptarea la un mediu tehnic pe care nu îl controlăm; sau adăugarea, îmbunătățirea ori retragerea unei funcții într-un mod care nu presupune costuri suplimentare pentru dumneavoastră." },
       { kind: "p", text: "Vă informăm în avans, pe un suport durabil, ce se modifică și când. Dacă modificarea are un efect negativ mai mult decât minor asupra accesului la serviciu sau a utilizării acestuia, puteți înceta contractul fără costuri în termen de 30 de zile de la informare sau de la data la care modificarea produce efecte, luându-se în considerare data mai recentă, iar noi rambursăm orice sumă plătită în avans pentru perioada neutilizată." },
-      { kind: "p", lead: "Cu privire la acești Termeni.", text: "Cu privire la acești Termeni. Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin 30 de zile înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions." },
-      { kind: "p", text: "Versiunea 1.1 a înlocuit versiunea 1.0: numește Amazon Web Services, care pune la dispoziție unul dintre modelele de dezbatere, creat de OpenAI, în Statele Unite, și arată ce păstrează Amazon (secțiunea 8)." }
+      { kind: "p", lead: "Cu privire la acești Termeni.", text: "Cu privire la acești Termeni. Putem modifica acești Termeni pentru aceleași tipuri de motive. Pentru modificările care nu vă reduc drepturile, publicăm noua versiune însoțită de un rezumat al modificărilor și vă trimitem un e-mail cu cel puțin 30 de zile înainte ca aceasta să producă efecte; continuarea utilizării Dialectical Engine după data respectivă înseamnă că o acceptați și vă puteți închide contul înainte de acea dată. Pentru modificările care vă reduc drepturile — inclusiv majorarea prețurilor unui plan existent, reducerea limitelor, eliminarea unor funcții, noi utilizări ale conținutului dumneavoastră sau modificări privind răspunderea, legea aplicabilă ori soluționarea litigiilor — vă solicităm să acceptați în mod expres noua versiune la următoarea autentificare, iar modificarea se aplică numai pentru viitor. Nu aplicăm niciodată retroactiv o modificare și nu folosim niciodată această secțiune pentru a modifica, pe parcursul termenului, esența serviciului pentru care ați plătit fără să vă oferim o posibilitate de încetare. Versiunile anterioare rămân disponibile la dezbatere.ro/terms/versions." }
     ]
   },
   {
@@ -379,12 +378,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "1.1",
-  sha256: "502111218257b700a96464723d6fee1bad196016e1c862d0beb5e23f6a9f0ae1",
-  eyebrow: "TERMENII SERVICIULUI · v1.1 · ÎN VIGOARE DE LA 20 NOIEMBRIE 2026",
+  version: "1.0",
+  sha256: "3799e2f0bf2cf9b8a67eb088fd165ba9fd934a516c2fdf66bdef8ec1096dbd25",
+  eyebrow: "TERMENII SERVICIULUI · v1.0 · ÎN VIGOARE DE LA 20 NOIEMBRIE 2026",
   title: "Ce acceptați",
   lede: "Contractul dintre dumneavoastră și DMS Merchandise Shop S.R.L., într-un limbaj clar. Nouăsprezece secțiuni și Anexa A — derulați până la final.",
-  endMarker: "SFÂRȘITUL TERMENILOR · v1.1",
+  endMarker: "SFÂRȘITUL TERMENILOR · v1.0",
   contact: "support@dezbatere.ro",
   bodyLabel: "Textul Termenilor serviciului",
   sectionIdPrefix: "terms-section-",

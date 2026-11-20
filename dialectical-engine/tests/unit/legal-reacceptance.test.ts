@@ -75,7 +75,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
     // A valid manifest's floor never exceeds the current version (final review I-2; parseLegalManifest
     // refuses it): the owner raises the floor TO the current Terms, and a person whose last acceptance is
     // an older version owes them.
-    const { repository } = fakeAcceptances({ TERMS: "0.9", PRIVACY_SHOWN: "3.0" });
+    const { repository } = fakeAcceptances({ TERMS: "0.9", PRIVACY_SHOWN: "0.9" });
     const revised = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW
     });
@@ -161,7 +161,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
   it("records only the documents owed when some are posted that are not", async () => {
     // The floor sits AT the current Terms (a valid manifest, final review I-2), the last Terms acceptance
     // below it; the Privacy Policy has no floor and a record, so it is not owed.
-    const { repository, recorded } = fakeAcceptances({ TERMS: "0.9", PRIVACY_SHOWN: "3.0" });
+    const { repository, recorded } = fakeAcceptances({ TERMS: "0.9", PRIVACY_SHOWN: "0.9" });
     const floors = { TERMS: currentDocument("TERMS", "ro")!.version, PRIVACY: null } as const;
     const legal = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW,

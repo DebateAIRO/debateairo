@@ -16,6 +16,7 @@ import { PRIVACY_SIGN_IN_SWAPS, withoutSignIn } from "../support/legalSignIn.js"
 import { PRIVACY_314_RELEASE_SWAPS, withoutPrivacy314, withoutPrivacy314Number } from "../support/legalPrivacy314.js";
 import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
 import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
+import { preReset10Sha256, withoutReset10 } from "../support/legalReset10.js";
 
 /**
  * Privacy Policy 3.12 (V4 start step, plan Task 83; the owner's Day-1 answers 13 and 14 of 3 Nov 2026,
@@ -39,10 +40,12 @@ import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
  * section 14's 3.12 entry gains a sentence. This is in all 35 languages.
  *
  * Every locale's draft that still has its 3.12 body (STILL_312: all but the translations brought up to 3.13 for the
- * release) is compared, line by line, with its last 3.11 text in the archive: two rows and one paragraph
- * more, and only the lines below differ. The rest of the change log stays byte for byte, so `legal-report-button`'s
- * pin still finds 3.11, 3.10 and 3.9 on that line. English is pinned word for word; the 34 translations are drafts for
- * native readers, checked by their structure.
+ * release) was compared, line by line, with its last 3.11 text in the archive: two rows and one paragraph more, and
+ * only the lines below differed. Launch renumbered the policy 1.0 (owner's decision of 20 November 2026,
+ * tests/support/legalReset10.ts), and the archive no longer holds any 3.x text, so those line-by-line comparisons and
+ * the checks of section 14's 3.12 entry against the 3.11 log left. What stays reads each draft with the reset undone:
+ * the new rows, the Next paragraph, the owner's answers, and the Register; the text itself is held byte for byte by
+ * the hash the manifest recorded before the reset (`legal-privacy-316`).
  */
 
 /**
@@ -474,11 +477,11 @@ const as312 = (code: string, text: string): string => {
  * 3.14's marketing lines are not put back: withoutMarketing takes them out of the 3.11 text instead. English also says how you sign in (English
  * first; see tests/support/legalSignIn.ts) and carries the 3.13 entry in section 14 (tests/support/legalRelease.ts):
  * both are undone here, so the lines below compare as they did before, and `legal-sign-in-methods` and
- * `legal-release-versions` pin the new English. Privacy 3.16 and 3.15 (tests/support/legalPrivacy316.ts,
- * legalPrivacy315.ts) are undone first, in every language. The manifest checks hash the file as it is (draftBytes).
+ * `legal-release-versions` pin the new English. The 1.0 reset, Privacy 3.16 and 3.15 (tests/support/legalReset10.ts,
+ * legalPrivacy316.ts, legalPrivacy315.ts) are undone first, in every language.
  */
 const draftText = (code: string): string => {
-  const text = withoutPrivacy315(code, withoutPrivacy316(code, draftBytes(code).toString("utf8")));
+  const text = withoutPrivacy315(code, withoutPrivacy316(code, withoutReset10("PRIVACY", code, draftBytes(code).toString("utf8"))));
   return code === "en"
     ? withoutSignIn(withoutRelease(withoutPrivacy314(text, PRIVACY_314_RELEASE_SWAPS), PRIVACY_RELEASE_SWAPS), PRIVACY_SIGN_IN_SWAPS)
     : as312(code, withoutPrivacy314Number(text));
@@ -717,110 +720,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   it("leaves out of the 3.12 line checks only French and Romanian, the translations brought up to date for the release", () => {
     const left = LOCALES.map(({ code }) => code).filter((code) => !STILL_312.includes(code));
     expect([...left].sort()).toEqual(["fr", "ro"]);
-    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "3.16", sha256: englishNow });
-  });
-
-  it.each(STILL_312.map((code) => [code]))("%s: two rows and one paragraph more, and only the listed lines differ from the last 3.11 text", (code) => {
-    const sha256 = PRIOR[code]!;
-    const archived = manifest().archive.PRIVACY?.[code]?.[sha256];
-    expect(archived, `${code}: the prior text is in the archive index`).toEqual({ version: "3.11", path: `apps/ui/legal/archive/${code}/${sha256}.md` });
-    const priorBytes = readFileSync(resolve(root, archived!.path));
-    expect(createHash("sha256").update(priorBytes).digest("hex"), `${code}: the archived bytes`).toBe(sha256);
-    const prior = withoutSwitzerland(code, lines(priorBytes.toString("utf8")));
-    const next = lines(draftText(code));
-
-    expect(next, `${code}: the line count is 3.11's, the two new rows, and the new paragraph with its blank line`).toHaveLength(prior.length + INSERTED.length);
-    const rows = cookieRows(code);
-    const syncedRows = next.flatMap((line, index) => (!INSERTED.includes(index) && line !== prior[priorIndex(index)] && rows.has(line) ? [index] : []));
-    expect(syncedRows.every((index) => prior[priorIndex(index)]!.startsWith("| `")), `${code}: only §13 cookie rows are synced`).toBe(true);
-    const differing = next.flatMap((line, index) => (!INSERTED.includes(index) && (line === prior[priorIndex(index)] || syncedRows.includes(index)) ? [] : [index]));
-    expect(differing, `${code}: the changed lines`).toEqual([...CHANGED, QUEBEC, ASIA_PACIFIC, FLAGGED, ...KEPT_AFTER_CLOSURE, ...(code === "en" ? [WEB_SEARCH_PARAGRAPH] : []), ...(code in DO_NOT_TRACK_FIXED ? [DO_NOT_TRACK] : [])].sort((a, b) => a - b));
-    // Section 6's flagged-debates paragraph only loses a stretch (the take-down sentence); section 6's paragraph on the
-    // name and section 10's Objection row only gain one; section 4's publishing row is rewritten and keeps its shape.
-    expect(insertionOf(prior[priorIndex(FLAGGED)]!, next[FLAGGED]!), `${code}: section 6's flagged-debates paragraph only loses a stretch`).not.toBeNull();
-    for (const at of KEPT_AFTER_CLOSURE.slice(1)) {
-      expect(insertionOf(next[at]!, prior[priorIndex(at)]!), `${code}: line ${at} only gains a stretch of text`).not.toBeNull();
-    }
-    expect(cells(next[KEPT_AFTER_CLOSURE[0]!]!), `${code}: section 4's publishing row keeps its shape`).toHaveLength(3);
-    // Section 13's Do Not Track paragraph: only el and nl change, and only to say the signal has nothing to switch off.
-    expect(next[DO_NOT_TRACK], `${code}: section 13's Do Not Track paragraph`).toContain("Do Not Track");
-    if (code in DO_NOT_TRACK_FIXED) expect(next[DO_NOT_TRACK], `${code}: the signal has nothing to switch off`).toContain(DO_NOT_TRACK_FIXED[code]);
-    // Annex B.3: one clause of the Quebec part changes, and the new one points to section 6.
-    const quebecBefore = prior[priorIndex(QUEBEC)]!;
-    const quebecAfter = next[QUEBEC]!;
-    expect(quebecBefore, `${code}: Annex B.3's paragraph in 3.11`).toContain("Commission d'accès à l'information");
-    let head = 0;
-    while (quebecBefore[head] === quebecAfter[head]) head += 1;
-    let foot = 0;
-    while (foot < Math.min(quebecBefore.length, quebecAfter.length) - head && quebecBefore.at(-1 - foot) === quebecAfter.at(-1 - foot)) foot += 1;
-    expect(head, `${code}: the change is in the Quebec part`).toBeGreaterThan(quebecBefore.indexOf("Commission d'accès à l'information"));
-    expect(quebecAfter.slice(head, quebecAfter.length - foot), `${code}: the new clause points to section 6`).toMatch(/6/u);
-    expect(quebecBefore.slice(head, quebecBefore.length - foot), `${code}: the old clause pointed nowhere`).not.toMatch(/\d/u);
-    // The Asia-Pacific paragraph lost its last part and nothing else: what is left is the start of the 3.11 line.
-    const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
-    expect(asiaPacific.startsWith(next[ASIA_PACIFIC]!) && next[ASIA_PACIFIC]!.length < asiaPacific.length, `${code}: the Asia-Pacific paragraph only loses its end`).toBe(true);
-    expect(asiaPacific.slice(next[ASIA_PACIFIC]!.length), `${code}: the part that left is one part, Taiwan's`).toMatch(/^ ?\*[^*]+\*[^*]+$/u);
-
-    const dates = DATES[code]!;
-    expect(next[EYEBROW], `${code}: the eyebrow names 3.12`).toMatch(/ v3\.12 · /u);
-    onlyDateChanged(next[EYEBROW]!, prior[EYEBROW]!, dates.eyebrow, `${code}: the eyebrow`);
-    expect(next[END_MARKER], `${code}: the end marker`).toBe(prior[END_MARKER]!.replace(/v3\.11$/u, "v3.12"));
-    expect(next[VERSION_LINE]!.startsWith("**Version 3.12 · Effective "), `${code}: the version line`).toBe(true);
-    onlyDateChanged(next[VERSION_LINE]!, prior[VERSION_LINE]!, dates.line, `${code}: the version line`);
-    expect(next[NEXT_LINE]!.trim(), `${code}: the Next sentence is a plain paragraph`).toMatch(/^[^|#\-<]/u);
-
-    // Section 14: the first sentence takes the new date; the new entry comes next; the rest is the 3.11 line unchanged.
-    const log = next[CHANGE_LOG]!;
-    const priorLog = prior[priorIndex(CHANGE_LOG)]!;
-    const tail = priorLog.slice(entryStart(priorLog, "3.11"));
-    expect(log.endsWith(tail), `${code}: from the 3.11 entry to the end, the log is unchanged`).toBe(true);
-    const start = entryStart(log, "3.12");
-    onlyDateChanged(log.slice(0, start), priorLog.slice(0, entryStart(priorLog, "3.11")), dates.updated, `${code}: the log's first sentence`);
-    const entry = log.slice(start, log.length - tail.length);
-    expect(entry, `${code}: the new entry names 3.12 and the version it replaced`).toMatch(/3\.12[^]*3\.11/u);
-    expect(entry, `${code}: the new entry names no older version`).not.toMatch(/3\.10|3\.9/u);
-    expect(entry, `${code}: the new entry names sections 2 and 5`).toMatch(/2[^]*5/u);
-    expect(entry, `${code}: the new entry ends its sentence before the 3.11 entry`).toMatch(/[.。।] ?$/u);
-    expect(log.includes("3.11") && log.includes("3.10") && log.includes("3.9"), `${code}: legal-report-button's pin still finds the old log`).toBe(true);
-  });
-
-  it("English reads exactly as the owner approved", () => {
-    const next = lines(draftText("en"));
-    const prior = priorLines("en");
-    expect(next[EYEBROW]).toBe("eyebrow: PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026");
-    expect(next[END_MARKER]).toBe("endMarker: END OF POLICY · GDPR (EU) 2016/679 · v3.12");
-    expect(next[VERSION_LINE]).toBe("**Version 3.12 · Effective 4 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**");
-    expect(next[SAVED_ROW_AT]).toBe(SAVED_ROW);
-    expect(next[NEXT_LINE]).toBe(`${NEXT_SENTENCE} ${TAB_SENTENCE}`);
-    for (const [at, change] of Object.entries(SWAPPED_AT)) {
-      expect(next[Number(at)], change).toBe(swapped(prior[priorIndex(Number(at))]!, SWAPS[change]!));
-    }
-    expect(next[SAVED_RETENTION_AT]).toBe(SAVED_RETENTION_ROW);
-    // The leftover take-down sentence goes, and nothing else on that line changes.
-    expect(prior[priorIndex(FLAGGED)]!.split(TAKE_DOWN)).toHaveLength(2);
-    expect(next[FLAGGED]).toBe(prior[priorIndex(FLAGGED)]!.replace(` ${TAKE_DOWN}`, ""));
-    expect(draftText("en")).not.toContain(TAKE_DOWN);
-    // Taiwan's part goes from the end of the Asia-Pacific paragraph, and nothing before it changes.
-    const asiaPacific = prior[priorIndex(ASIA_PACIFIC)]!;
-    expect(asiaPacific.split(TAIWAN)).toHaveLength(2);
-    expect(next[ASIA_PACIFIC]).toBe(asiaPacific.slice(0, asiaPacific.indexOf(TAIWAN)));
-    expect(next[ASIA_PACIFIC]!.endsWith("as the Personal Information Protection Act requires.")).toBe(true);
-    expect(draftText("en")).not.toContain("Taiwan");
-    // Quebec: Free debates are public there too, as section 6 says; nothing else in Annex B.3 changes.
-    expect(prior[priorIndex(QUEBEC)]!.split(QUEBEC_BEFORE)).toHaveLength(2);
-    expect(next[QUEBEC]).toBe(prior[priorIndex(QUEBEC)]!.replace(QUEBEC_BEFORE, QUEBEC_AFTER));
-    expect(draftText("en")).not.toContain(QUEBEC_BEFORE);
-    const priorLog = prior[priorIndex(CHANGE_LOG)]!;
-    const tail = priorLog.slice(priorLog.indexOf("Version 3.11 replaced version 3.10:"));
-    expect(next[CHANGE_LOG]).toBe(`This policy was last updated on 4 November 2026. ${CHANGE_ENTRY} ${CHANGE_ENTRY_TAB} ${CHANGE_ENTRY_DEEPINFRA} ${tail}`);
-    // 16 November 2026: the paragraph on DeepInfra, and the four lines that name the three companies.
-    expect([next[DEEPINFRA_AT], next[DEEPINFRA_AT + 1]]).toEqual([DEEPINFRA_PARAGRAPH, ""]);
-    expect(next[DEEPINFRA_AT + 2]!.startsWith("**Web search through Perplexity.**")).toBe(true);
-    for (const at of NAMED) expect(next[at], `line ${at}`).toBe(swapped(prior[priorIndex(at)]!, [NAMED_SWAPS[at]!]));
-    const text = draftText("en");
-    expect(text).not.toContain("not used to train models");
-    expect(text).not.toContain("against our account");
-    expect(text).not.toContain("we do not permit our providers to");
+    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "1.0", sha256: englishNow });
   });
 
   it("English says the owner's answers S1 A, S3 A and S4 A", () => {
@@ -828,24 +728,21 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     const next = lines(text);
     const row = next[SAVED_ROW_AT]!;
     const kept = next[SAVED_RETENTION_AT]!;
-    const entry = entryOf("en");
     // S1 A: the browser tab keeps the words only.
     expect(text).not.toMatch(/site update/u);
     // S3 A: up to 20, and nothing goes without you.
     expect(row).toContain("We keep up to 20");
-    expect(entry).toContain("up to 20 at a time");
     expect(text).not.toMatch(/\bsixth\b|\bthe oldest\b/iu);
     // S4 A: a key of its own for each question, destroyed at Delete and at Start.
     expect(row).toContain("It is stored encrypted under keys specific to your account and to that question.");
     expect(cells(kept)[2]).toContain("When you delete it, or start it, the key specific to that question is destroyed, so it can no longer be read, and the record is deleted.");
-    expect(entry).toContain("encrypted under keys specific to your account and to that question");
-    for (const line of [row, kept, entry]) {
+    for (const line of [row, kept]) {
       expect(line).not.toContain("Deleted when you delete it.");
       expect(line).not.toContain("under a key specific to your account");
     }
   });
 
-  it.each(STILL_312.map((code) => [code]))("%s: the new rows, the Next paragraph and the 3.12 entry", (code) => {
+  it.each(STILL_312.map((code) => [code]))("%s: the new rows and the Next paragraph", (code) => {
     const pins = AS_83[code]!;
     const gap = sentenceGap(code);
     const text = draftText(code);
@@ -876,134 +773,16 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     // S1 A: no line keeps Task 83b's "after a site update your chosen paths".
     expect(text, `${code}: Task 83b's site-update clause is gone`).not.toContain(CLAUSE_83B[code]!);
 
-    // Section 14: Task 83's 3.12 entry, unchanged, then one sentence on the questions not started yet, then (16 November
-    // 2026) one sentence on DeepInfra.
-    const entry = entryOf(code);
-    expect(entry.endsWith(gap), `${code}: the locale's gap before the 3.11 entry`).toBe(true);
-    const whole = entry.slice(0, entry.length - gap.length);
-    const lastAt = lastSentenceStart(whole);
-    const named312 = whole.slice(lastAt);
-    expect(named312, `${code}: the last log sentence of 3.12 names DeepInfra`).toMatch(/^[^]*3\.12[^]*DeepInfra[^]*[.。।]$|^[^]*DeepInfra[^]*3\.12[^]*[.。।]$/u);
-    expect(named312, `${code}: it names no older version`).not.toMatch(/3\.11|3\.10|3\.9/u);
-    for (const section of [4, 5]) expect(named312.replace("3.12", ""), `${code}: it names section ${section}`).toMatch(new RegExp(`(^|\\D)${section}(\\D|$)`, "u"));
-    expect(whole.slice(0, lastAt).endsWith(gap), `${code}: the locale's gap before the DeepInfra sentence`).toBe(true);
-    const also = oneSentenceAfter(whole.slice(0, lastAt - gap.length), pins.entry, code, `${code}: the 3.12 entry`);
-    expect(also, `${code}: the added log sentence names 3.12`).toMatch(/3\.12/u);
-    expect(also, `${code}: the added log sentence names no older version`).not.toMatch(/3\.11|3\.10|3\.9/u);
-    const named = also.replace("3.12", "");
-    for (const section of [2, 3, 4, 6, 7, 9, 10]) {
-      expect(named, `${code}: the added log sentence names section ${section}`).toMatch(new RegExp(`(^|\\D)${section}(\\D|$)`, "u"));
-    }
-    expect(named, `${code}: the added log sentence says up to 20 (S3 A)`).toMatch(/(^|\D)20(\D|$)/u);
-
-    if (code === "en") {
-      expect(also).toBe(CHANGE_ENTRY_TAB);
-      expect(named312).toBe(CHANGE_ENTRY_DEEPINFRA);
-    } else {
-      expect(named312, `${code}: the DeepInfra log sentence is translated`).not.toBe(CHANGE_ENTRY_DEEPINFRA);
+    if (code !== "en") {
       expect(row, `${code}: section 2's row is translated`).not.toBe(SAVED_ROW);
       expect(kept, `${code}: section 7's row is translated`).not.toBe(SAVED_RETENTION_ROW);
       expect(said.slice(2).join(gap), `${code}: the Next sentences are translated`).not.toBe(sentencesOf(`${NEXT_SENTENCE} ${TAB_SENTENCE}`).slice(2).join(" "));
-      expect(also, `${code}: the log sentence is translated`).not.toBe(CHANGE_ENTRY_TAB);
     }
   });
 
-  it.each(STILL_312.map((code) => [code]))("%s: the other changed lines keep their shape", (code) => {
-    const next = lines(draftText(code));
-    const prior = priorLines(code);
-    const pair = (at: number): readonly [string, string] => [next[at]!, prior[priorIndex(at)]!];
-    const grows = (now: string, was: string, label: string): void => {
-      expect(now.startsWith(was) && now.length > was.length, `${code}: ${label} grows at its end`).toBe(true);
-    };
-
-    // Sections 3, 6 and 9: plain paragraphs that grow. Section 6 gains one sentence and nothing else; 3 and 9 change within.
-    for (const at of [SENSITIVE_INFORMATION, FREE, SECURITY]) {
-      const [now, was] = pair(at);
-      expect(now, `${code}: line ${at} is a plain paragraph`).toMatch(/^[^|#\-<]/u);
-      expect(now.length, `${code}: line ${at} grows`).toBeGreaterThan(was.length);
-    }
-    for (const at of [SENSITIVE_INFORMATION, SECURITY]) {
-      const [now, was] = pair(at);
-      expect(sentencesOf(now), `${code}: line ${at} keeps its sentences`).toHaveLength(sentencesOf(was).length);
-    }
-    const [free, wasFree] = pair(FREE);
-    expect(insertionOf(free, wasFree), `${code}: section 6 gains one stretch of text and nothing else changes`).not.toBeNull();
-    expect(sentencesOf(free), `${code}: section 6 gains one sentence`).toHaveLength(sentencesOf(wasFree).length + 1);
-
-    // Section 4: the basis stays; the contract row's purpose and data and the sensitive row's data grow at their end;
-    // the question check's data changes, its purpose stays.
-    const [contract, wasContract] = pair(CONTRACT).map(cells) as [string[], string[]];
-    expect(contract, `${code}: the contract row's shape`).toHaveLength(3);
-    expect(contract[2], `${code}: the contract row's basis`).toBe(wasContract[2]);
-    grows(contract[0]!, wasContract[0]!, "the contract row's purpose");
-    grows(contract[1]!, wasContract[1]!, "the contract row's data");
-    const [consent, wasConsent] = pair(SENSITIVE_CONSENT).map(cells) as [string[], string[]];
-    expect(consent, `${code}: the sensitive row's shape`).toHaveLength(3);
-    expect([consent[0], consent[2]], `${code}: the sensitive row's purpose and basis`).toEqual([wasConsent[0], wasConsent[2]]);
-    grows(consent[1]!, wasConsent[1]!, "the sensitive row's data");
-    const [check, wasCheck] = pair(QUESTION_CHECK).map(cells) as [string[], string[]];
-    expect(check, `${code}: the question check's shape`).toHaveLength(3);
-    expect([check[0], check[2]], `${code}: the question check's purpose and basis`).toEqual([wasCheck[0], wasCheck[2]]);
-    expect(check[1]!.length, `${code}: the question check's data grows`).toBeGreaterThan(wasCheck[1]!.length);
-
-    // Section 10: each right keeps its name; Access grows at its end; Erasure and Withdraw consent grow within.
-    for (const at of [ACCESS, ERASURE, WITHDRAW]) {
-      const [now, was] = pair(at).map(cells) as [string[], string[]];
-      expect(now, `${code}: the right at ${at}`).toHaveLength(2);
-      expect(now[0], `${code}: the right's name at ${at}`).toBe(was[0]);
-      expect(now[1]!.length, `${code}: the right at ${at} grows`).toBeGreaterThan(was[1]!.length);
-      if (at === ACCESS) grows(now[1]!, was[1]!, "the Access row");
-      else expect(sentencesOf(now[1]!), `${code}: the right at ${at} keeps its sentences`).toHaveLength(sentencesOf(was[1]!).length);
-    }
-  });
-
-  // 16 November 2026: DeepInfra is named, and no line says flatly any more that the text is not used to train models.
-  it.each(STILL_312.map((code) => [code]))("%s: section 5 names DeepInfra, and four lines name the three companies", (code) => {
-    const next = lines(draftText(code));
-    const prior = priorLines(code);
-    // The new paragraph: a bold lead-in as its neighbour's, the brand and the company, then the Perplexity paragraph as it was.
-    const paragraph = next[DEEPINFRA_AT]!;
-    expect(paragraph, `${code}: a bold lead-in and nothing else in bold`).toMatch(/^\*\*[^*]+\*\*[^*]+$/u);
-    expect(paragraph, `${code}: the lead-in names DeepInfra`).toMatch(/^\*\*[^*]*DeepInfra[^*]*\*\*/u);
-    expect(paragraph, `${code}: the company`).toContain("Deep Infra Inc.");
-    expect(next[DEEPINFRA_AT + 1], `${code}: its own paragraph`).toBe("");
-    if (code !== "en") expect(next[WEB_SEARCH_PARAGRAPH], `${code}: the Perplexity paragraph follows, unchanged`).toBe(prior[priorIndex(WEB_SEARCH_PARAGRAPH)]);
-    expect(next[DEEPINFRA_AT + 2], `${code}: the Perplexity paragraph`).toMatch(/^\*\*[^*]*Perplexity[^*]*\*\*/u);
-    expect(sentencesOf(paragraph).length, `${code}: about as many sentences as the English`).toBeGreaterThanOrEqual(4);
-    if (code !== "en") expect(paragraph, `${code}: translated`).not.toBe(DEEPINFRA_PARAGRAPH);
-    // The four lines: one stretch of each changes, and only the new stretch names the three companies.
-    for (const at of NAMED) {
-      const now = next[at]!;
-      const was = prior[priorIndex(at)]!;
-      let head = 0;
-      while (head < Math.min(now.length, was.length) && now[head] === was[head]) head += 1;
-      let foot = 0;
-      while (foot < Math.min(now.length, was.length) - head && now.at(-1 - foot) === was.at(-1 - foot)) foot += 1;
-      const added = now.slice(head, now.length - foot);
-      const removed = was.slice(head, was.length - foot);
-      expect(head + foot, `${code}: line ${at} keeps the rest of its paragraph`).toBeGreaterThan(at === TRAINING ? 20 : was.length / 3);
-      expect(added.length, `${code}: line ${at} grows`).toBeGreaterThan(removed.length);
-      // English names Perplexity for the transfer mechanism only: its search terms do not forbid training (WEB_SEARCH_PARAGRAPH).
-      for (const name of code === "en" && at !== TRANSFERS ? ["DeepInfra", "Anthropic"] : ["DeepInfra", "Anthropic", "Perplexity"]) {
-        expect(added, `${code}: line ${at} names ${name}`).toContain(name);
-        expect(removed, `${code}: line ${at} did not name ${name}`).not.toContain(name);
-      }
-      if (code !== "en") expect(added, `${code}: line ${at} is translated`).not.toContain(NAMED_SWAPS[at]![1]);
-    }
-  });
-
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.16 for the draft's exact bytes", (code) => {
-    const current = manifest().documents.PRIVACY?.[code];
-    expect(current).toEqual({ version: "3.16", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
-  });
-
-  // The archive holds one 3.12 text per language, the one the versions page lists. The texts changed after it took them,
-  // so the drafts carry 3.16 now and none of them is that archived 3.12 text.
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, and the 3.16 draft is another", (code) => {
-    const draft = createHash("sha256").update(draftBytes(code)).digest("hex");
-    const archived = Object.entries(manifest().archive.PRIVACY?.[code] ?? {}).filter(([, entry]) => entry.version === "3.12");
-    expect(archived).toHaveLength(1);
-    expect(archived.map(([sha256]) => sha256)).not.toContain(draft);
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the draft, with the reset undone, is the text the manifest held at 3.16", (code) => {
+    const preReset = withoutReset10("PRIVACY", code, draftBytes(code).toString("utf8"));
+    expect(createHash("sha256").update(preReset, "utf8").digest("hex")).toBe(preReset10Sha256("PRIVACY", code));
   });
 });
 

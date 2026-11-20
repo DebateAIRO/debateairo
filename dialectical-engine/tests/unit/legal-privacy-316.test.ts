@@ -11,24 +11,23 @@ import {
   sha256Of,
   withoutPrivacy316
 } from "../support/legalPrivacy316.js";
+import { preReset10Sha256, withoutReset10 } from "../support/legalReset10.js";
 
 /**
  * Privacy Policy 3.16 (tests/support/legalPrivacy316.ts): the policy names Amazon Web Services, which serves one of
  * the debate models, made by OpenAI, through Amazon Bedrock, and names no model. Every language is its 3.15 draft plus the recorded
  * swaps and nothing else; English is pinned word for word; Romanian and French carry the same paragraph, sentences and
  * history entry; the other languages carry only the new number; and the policy says of Amazon what the Register's
- * entry says.
+ * entry says. Launch then renumbered the text 1.0 (tests/support/legalReset10.ts); these checks read each draft with the
+ * reset undone, and the archive no longer holds any 3.x text.
  */
 
 const root = process.cwd();
-const draft = (code: string): string => readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8");
+/** A language's Privacy Policy as 3.16 wrote it: the draft with the 1.0 reset undone. */
+const draft = (code: string): string =>
+  withoutReset10("PRIVACY", code, readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8"));
 const messages = (code: string): Record<string, string> =>
   JSON.parse(readFileSync(resolve(root, "apps/ui/messages", code, "legal.json"), "utf8")) as Record<string, string>;
-const manifest = (): {
-  reacceptance: Record<string, string | null>;
-  documents: Record<string, Record<string, { version: string; sha256: string }>>;
-  archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
-} => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
 
 const section = (text: string, no: number): string => {
   const body = new RegExp(`^## ${no}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(text)?.[1];
@@ -73,7 +72,7 @@ describe("Privacy Policy 3.16: Amazon Web Services serves one of the debate mode
     }
     expect(text, `${code}: no line names 3.15 as the current version`).not.toMatch(/ v3\.15( ·|$)|\*\*Version 3\.15 · /mu);
     expect(sha256Of(withoutPrivacy316(code, text)), `${code}: undoing 3.16 gives back the 3.15 draft byte for byte`).toBe(privacy315Sha256(code));
-    expect(manifest().documents.PRIVACY![code], `${code}: the manifest`).toEqual({ version: "3.16", sha256: sha256Of(text) });
+    expect(sha256Of(text), `${code}: the text the manifest held at 3.16`).toBe(preReset10Sha256("PRIVACY", code));
     // The languages the release offers carry the wording; the others carry the number in its three places and nothing else.
     expect(PRIVACY_316_SWAPS[code]!.swaps.length, `${code}: the changes`).toBe(RELEASED.includes(code) ? 9 : 3);
     // One paragraph and its blank line more than 3.15, in the languages that carry the wording.
@@ -149,15 +148,7 @@ describe("Privacy Policy 3.16: Amazon Web Services serves one of the debate mode
     expect(draft(code), code).not.toMatch(/GPT|Luna|ChatGPT/u);
   });
 
-  it("the archive holds the English, Romanian and French 3.16 texts and their 3.15 texts, and asks nobody to accept again", () => {
-    const archive = manifest().archive.PRIVACY!;
-    for (const code of RELEASED) {
-      const current = Object.entries(archive[code]!).filter(([, entry]) => entry.version === "3.16");
-      expect(current, code).toHaveLength(1);
-      expect(readFileSync(resolve(root, current[0]![1].path), "utf8"), code).toBe(draft(code));
-      expect(archive[code]![privacy315Sha256(code)]?.version, `${code}: the 3.15 text the swaps undo to`).toBe("3.15");
-    }
+  it("records the 3.16 swaps for every language", () => {
     expect(Object.keys(PRIVACY_316_SWAPS).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
-    expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
   });
 });

@@ -628,7 +628,5 @@ export type TermsVersion = Readonly<{
  * keeps no archive of them). When the terms change, the version they replace gets a row that links to its archived text.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "1.1", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
-  { version: "1.0", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/ededde3121849da64e892fbd2c86a5127446eabc0fb68b510a5719ad4a507c0d" }
+  { version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }
 ]);

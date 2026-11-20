@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
+import { withoutReset10 } from "../support/legalReset10.js";
 
 /**
  * Terms 2.12 and Privacy 3.11, R22 decisions 35 and 36: the Report button, a report's six months, and the sealed originals' six months.
@@ -15,9 +16,12 @@ import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
  * Privacy 3.15's unfinished sign-up row in section 7 moves those from 146 on by one more.
  * Privacy 3.16's paragraph on Amazon in section 5 stands in English, Romanian and French only, so the lines are read
  * with 3.16 undone (tests/support/legalPrivacy316.ts) and every language keeps the same rows at the same places.
+ * Launch renumbered the texts 1.0 (tests/support/legalReset10.ts), so those lines are read with the reset undone first;
+ * the 1.0 Privacy Policy carries no change history.
  */
 const read = (locale: string, name: string): string => readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, name), "utf8");
-const privacy = (locale: string): string[] => withoutPrivacy316(locale, read(locale, "privacy-policy.md")).split("\n");
+const privacy = (locale: string): string[] =>
+  withoutPrivacy316(locale, withoutReset10("PRIVACY", locale, read(locale, "privacy-policy.md"))).split("\n");
 const terms = (locale: string): string[] => read(locale, "terms-of-service.md").split("\n");
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
@@ -37,12 +41,12 @@ describe("the Report button and the six months in the legal texts", () => {
     expect(privacy("en")[96]).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
   });
 
-  it("nothing in the English live text still calls it a control, and only the 3.10 history still calls it a link", () => {
+  it("nothing in the English live text still calls it a control or a link", () => {
     expect(read("en", "terms-of-service.md")).not.toMatch(/Report\*\* control/u);
     const policy = read("en", "privacy-policy.md");
     expect(policy).not.toMatch(/Report\*\* control/u);
-    expect(policy.split("Report link").length - 1).toBe(1);
-    expect(policy.indexOf("Report link")).toBeGreaterThan(policy.indexOf("Version 3.10 replaced version 3.9"));
+    // The 3.10 history entry was the last place that said "Report link"; the 1.0 text carries no history.
+    expect(policy).not.toContain("Report link");
   });
 
   it.each(LOCALES.map(({ code }) => [code]))("%s: the same rows at the same places, the versions and the addresses", (code) => {
