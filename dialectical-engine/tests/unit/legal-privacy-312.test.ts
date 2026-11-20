@@ -1022,7 +1022,9 @@ describe("the Register names the two jobs before a debate starts", () => {
   // the support chat's) and what to look into on DeepInfra's and Anthropic's rows, else the support chat's. The
   // company DeepInfra forwards one model to (16 November 2026) is one of the AIs that suggest what to look into.
   it.each([
-    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra", "deepinfra-partner"]],
+    // Amazon Bedrock's model is a line-up model like DeepInfra's, so its row names the same job.
+    ["no answer from the API (the whole reviewed catalogue)", null, ["claude"], ["claude", "deepinfra", "deepinfra-partner", "amazon"]],
+    ["targets on Anthropic, DeepInfra and Amazon", ["anthropic", "deepinfra", "amazon"], ["claude"], ["claude", "deepinfra", "deepinfra-partner", "amazon"]],
     ["targets on DeepInfra only", ["deepinfra"], ["support"], ["deepinfra", "deepinfra-partner", "support"]],
     ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"], ["claude"], ["claude", "deepinfra", "deepinfra-partner"]],
     ["a target on a host no catalogue row knows", ["host:api.acme.example"], ["support"], ["support"]]
