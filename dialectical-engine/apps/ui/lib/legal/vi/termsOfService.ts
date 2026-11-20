@@ -377,12 +377,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "1.0",
-  sha256: "c06988e87a5a0a4dd6fa1e45ead21763a6b03f9f8fdb15cfb546f13dff5a7900",
-  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v1.0 · CÓ HIỆU LỰC 20 THÁNG 11 NĂM 2026",
+  version: "1.1",
+  sha256: "942130786c26b21c233b14ea36c714e1d1fe7797a6e4a4206b19752191f74778",
+  eyebrow: "ĐIỀU KHOẢN DỊCH VỤ · v1.1 · CÓ HIỆU LỰC 20 THÁNG 11 NĂM 2026",
   title: "Những điều bạn đồng ý",
   lede: "Hợp đồng giữa bạn và DMS Merchandise Shop S.R.L., được trình bày bằng ngôn ngữ dễ hiểu. Mười chín mục và Phụ lục A — cuộn đến cuối.",
-  endMarker: "HẾT ĐIỀU KHOẢN · v1.0",
+  endMarker: "HẾT ĐIỀU KHOẢN · v1.1",
   contact: "support@dezbatere.ro",
   bodyLabel: "Nội dung Điều khoản dịch vụ",
   sectionIdPrefix: "terms-section-",

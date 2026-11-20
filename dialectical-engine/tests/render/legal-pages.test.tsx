@@ -353,16 +353,21 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
-  // Version 1.0 is the first published text (owner's decision of 19 November 2026: the pre-launch 2.x drafts were never
-  // offered to the public and are not kept), so the page lists it alone and says no earlier version exists.
-  it("names the current version, linked to its text, and says no earlier version has been published", () => {
+  // Version 1.0 is the first published text (the pre-launch 2.x drafts were never offered to the public and are not
+  // kept). Since 1.1 replaced it, the page lists both, and 1.0's row opens its archived text.
+  it("names the current version, linked to its text, then 1.0, linked to its archived text", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
-    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.0"]);
-    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
+    expect(rows[0]?.querySelector(".legalVersionTag")?.textContent).toBe(legalEnglish["legal.versions.current"]);
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.1", "1.0"]);
+    expect(rows[1]?.querySelector("a")?.getAttribute("href")).toMatch(/^\/terms\/versions\/[0-9a-f]{64}$/u);
+    expect(rows[1]?.querySelector(".legalVersionTag")).toBeNull();
+    expect(rows[1]?.querySelector("p")?.textContent).toBe(legalEnglish["legal.archive.meta"]);
+    // The "no earlier version" line is for a list of one.
+    expect(view.querySelector(".legalVersionsNone")).toBeNull();
   });
 
   it("has a row for every version from 1.0 to the current one, newest first, so a skipped number shows up here", () => {

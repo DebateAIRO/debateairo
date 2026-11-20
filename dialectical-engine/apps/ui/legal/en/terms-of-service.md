@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v1.0 · EFFECTIVE 20 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v1.1 · EFFECTIVE 20 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
-endMarker: END OF TERMS · v1.0
+endMarker: END OF TERMS · v1.1
 bodyLabel: Terms of Service text
 annexTitle: Annex A — Regional terms
 jumps:
@@ -21,9 +21,9 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 1.0 · Effective 20 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 1.1 · Effective 20 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
-**In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to the AI providers listed in our Provider Register, mainly DeepInfra, in the United States. The terms of DeepInfra and Anthropic do not allow them to train models on it; section 8 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 8). Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
+**In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to the AI providers listed in our Provider Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on it; section 8 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 8). Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 
 ## 1. Who we are and how to reach us
 
@@ -124,13 +124,15 @@ If you are unsure whether something is allowed, ask us before you post it.
 
 **Your content stays yours.** You keep any rights you have in the questions, claims, annotations and challenges you submit. You grant us a non-exclusive, worldwide, royalty-free licence to host, store, reproduce, adapt and process that content for the purposes of operating the service: running the debate, storing it so you can reopen and replay it, providing support, meeting our legal obligations, and — only if you choose to publish — the purposes in section 9. This licence ends when the content is deleted, except for the copies in our backups (Privacy Policy, section 7), or as section 9 or the law requires.
 
-**We do not train on your content.** The terms of DeepInfra and Anthropic do not allow them to use your content to train or improve their models either. We have checked this in the terms each of them publishes for its customers; the Provider Register shows the result for each provider, and when we checked. We have not confirmed it for the partner company DeepInfra passes one model's requests to (below), and the Register says so. Web search is different, and the paragraph on Perplexity below says how.
+**We do not train on your content.** The terms of DeepInfra, Anthropic and Amazon do not allow them to use your content to train or improve their models either. We have checked this in the terms each of them publishes for its customers; the Provider Register shows the result for each provider, and when we checked. We have not confirmed it for the partner company DeepInfra passes one model's requests to (below), and the Register says so. Web search is different, and the paragraph on Perplexity below says how.
 
 **How your content reaches AI providers.** To run a debate we send text to one or more external model providers. What a provider receives is your question, the steering annotations you set, and statements the engine composes during the debate — so a provider sees text derived from and built around what you typed, not only your original words. It never receives your email address, your account identifiers, your session records or your payment details. When a debate finishes, we also send its synthesis to a model that checks it for four categories — possible terrorism, hate speech of any kind, tendencies to suicide or harming other people, and crafting weapons or drugs — as section 9 explains. You see the finished debate once that check has answered, at most two minutes after the debate finishes, unless the check deletes it (section 9). Before a debate starts, we also send its question, with nothing that identifies you, to a model that checks whether the debate may start (sections 7 and 10).
 
 **What the support chat sends.** The support assistant is also an AI model. When you write to it, we send your message to an external model provider, Anthropic, so that its model Claude can answer, together with the help articles it bases its answer on. Before sending, we mask anything that looks like a password, a one-time code or a key. We do not retain what you write in the chat, but Anthropic may keep it for the period stated in our AI Provider Register (below). We do not attach your email address, your account identifiers or your payment details, but the model receives anything else you type in the chat, so do not write there anything you would not want it to read.
 
 **Debate models through DeepInfra.** Most of a debate's text goes to **DeepInfra** (Deep Infra Inc., United States), which serves most of the AI models that write and judge a debate and is listed in the Provider Register. DeepInfra runs these models on its own servers in the United States and, under its terms, does not store the text or train models on it. For one of the models it passes the requests to a partner company, which it does not name, under that company's own privacy terms; the Register gives that company an entry of its own, with the facts we have not confirmed yet. DeepInfra never receives your email address, your account identifiers, your session records or your payment details.
+
+**A debate model through Amazon.** One of the AI models that write and judge a debate, OpenAI's GPT-6 Luna, is served by **Amazon Web Services** (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States and is listed in the Provider Register. OpenAI, the company that made the model, does not receive your text, and Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Amazon never receives your email address, your account identifiers, your session records or your payment details.
 
 **Web search through Perplexity.** To find evidence for a debate, the models may search the web through **Perplexity** (Perplexity AI, Inc., United States), which is listed in the Provider Register. What Perplexity receives is the short search phrases the models write from the debate, much like the few words you would type into a search engine; they can contain words from your question. It never receives your email address, your account identifiers, your session records or your payment details. Perplexity's terms let it keep these search phrases and the results, and use them for its own business, such as improving its search.
 
@@ -250,6 +252,8 @@ Annex A states any further withdrawal or cooling-off right that the law of your 
 We tell you in advance, on a durable medium, what is changing and when. If the change has more than a minor negative effect on your access to or use of the service, you may terminate free of charge within **30 days** of being told, or of the change taking effect, whichever is later, and we refund any prepaid amount for the unused period.
 
 **To these Terms.** We may change these Terms for the same kinds of reasons. For changes that do not reduce your rights, we post the new version with a summary of what changed and email you at least **30 days** before it takes effect; continuing to use Dialectical Engine after that date means you accept it, and you may close your account before then. For changes that reduce your rights — including price increases on an existing plan, lower limits, removed features, new uses of your content, or changes to liability, governing law or dispute resolution — we ask you to accept the new version expressly at your next sign-in, and the change applies only going forward. We never make a change retroactive, and we never use this section to change the core of what you have paid for mid-term without offering you a way out. Prior versions stay available at dezbatere.ro/terms/versions.
+
+Version 1.1 replaced version 1.0: it names Amazon Web Services, which serves one of the debate models (OpenAI's GPT-6 Luna) in the United States, and says what Amazon keeps (section 8).
 
 ## 15. Liability
 

@@ -377,12 +377,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "1.0",
-  sha256: "6b103b8c32ca0c9e4c1531cbcb71e7484466e19f5b264eeb1523b185392f480a",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v1.0 · SPĒKĀ NO 2026. GADA 20. NOVEMBRA",
+  version: "1.1",
+  sha256: "9e245528bcf7df5d2f4c66908f3e83125ef99317af7658c19a322dded2b594f1",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v1.1 · SPĒKĀ NO 2026. GADA 20. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
-  endMarker: "NOTEIKUMU BEIGAS · v1.0",
+  endMarker: "NOTEIKUMU BEIGAS · v1.1",
   contact: "support@dezbatere.ro",
   bodyLabel: "Pakalpojuma noteikumu teksts",
   sectionIdPrefix: "terms-section-",

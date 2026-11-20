@@ -5,18 +5,22 @@ import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import { firstTerms10Sha256, TERMS_10_DAY, TERMS_10_SWAPS, withoutTerms10Corrections } from "../support/legalTerms10.js";
+import { terms10Sha256, withoutTerms11 } from "../support/legalTerms11.js";
 
 /**
  * Terms of Service 1.0 as corrected before launch (tests/support/legalTerms10.ts): who sells, section 12's title and
  * the plans on sale, how to withdraw, South Korea's consents, and what the backups keep: section 11 no longer says that
  * closing an account makes the data "permanently unreadable", section 9 says a deleted debate comes back only if the
  * whole service is restored from a backup, and section 8's licence does not end for the copies in the backups. Every
- * language is its first 1.0 draft plus the recorded swaps and nothing else; English is pinned word for word; the Terms
- * still carry no change history.
+ * language is its first 1.0 draft plus the recorded swaps and nothing else; English is pinned word for word; 1.0
+ * carries no change history. Terms 1.1 followed (tests/support/legalTerms11.ts); these checks read each draft with 1.1
+ * undone.
  */
 
 const root = process.cwd();
-const draft = (code: string): string => readFileSync(resolve(root, "apps/ui/legal", code, "terms-of-service.md"), "utf8");
+/** A language's Terms as 1.0 wrote them: the draft with 1.1 undone. */
+const draft = (code: string): string =>
+  withoutTerms11(code, readFileSync(resolve(root, "apps/ui/legal", code, "terms-of-service.md"), "utf8"));
 const sha = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
 const messages = (code: string): Record<string, string> =>
   JSON.parse(readFileSync(resolve(root, "apps/ui/messages", code, "billing.json"), "utf8")) as Record<string, string>;
@@ -73,7 +77,7 @@ describe("Terms of Service 1.0: the corrections made before launch", () => {
     }
     expect(sha(withoutTerms10Corrections(code, text)), `${code}: undoing the corrections gives back the first 1.0 draft byte for byte`)
       .toBe(firstTerms10Sha256(code));
-    expect(manifest().documents.TERMS![code], `${code}: the manifest`).toEqual({ version: "1.0", sha256: sha(text) });
+    expect(sha(text), `${code}: the text the manifest held at 1.0`).toBe(terms10Sha256(code));
     // Sections 9 and 11 changed in every language, and no language gains a change history: section 14 is still its
     // heading and its three paragraphs on changes.
     expect(TERMS_10_SWAPS[code]!.swaps.length, `${code}: sections 9 and 11 changed`).toBeGreaterThanOrEqual(4);
@@ -139,8 +143,9 @@ describe("Terms of Service 1.0: the corrections made before launch", () => {
     }
   });
 
-  it("lists 1.0 alone as the Terms, the archive holds the corrected English, Romanian and French 1.0 texts, and nobody is asked to accept again", () => {
-    expect(TERMS_VERSIONS).toEqual([{ version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }]);
+  it("lists 1.0 with a link to its archived text, the archive holds the corrected English, Romanian and French 1.0 texts, and nobody is asked to accept again", () => {
+    expect(TERMS_VERSIONS.filter(({ version }) => version === "1.0"))
+      .toEqual([{ version: "1.0", noteKey: "legal.archive.meta", current: false, href: `/terms/versions/${terms10Sha256("en")}` }]);
     const archive = manifest().archive.TERMS!;
     for (const code of ["en", "ro", "fr"]) {
       const current = Object.entries(archive[code]!).filter(([, entry]) => entry.version === "1.0");

@@ -493,12 +493,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "3.15",
-  sha256: "01ce3da7be05283063e042dd0f33e17ba5ebb0e7697cab9eebcb98ba2ef7c71a",
-  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.15 · I bhFEIDHM 20 SAMHAIN 2026",
+  version: "3.16",
+  sha256: "3c259431c82be97ece98d8faad7eae4671d94b901d38391ef55143d665dd5a76",
+  eyebrow: "BEARTAS PRÍOBHÁIDEACHAIS · v3.16 · I bhFEIDHM 20 SAMHAIN 2026",
   title: "An méid a stórálaimid, agus an fáth",
   lede: "Do chearta agus ár n-oibleagáidí faoin GDPR (EU) 2016/679, i bhfriotal soiléir. Ceithre rannán déag agus Iarscríbhinn B — scrollaigh go dtí an deireadh.",
-  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.15",
+  endMarker: "DEIREADH AN BHEARTAIS · GDPR (EU) 2016/679 · v3.16",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Téacs an Bheartais Príobháideachais",
   sectionIdPrefix: "policy-section-",
