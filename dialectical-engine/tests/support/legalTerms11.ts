@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 
 /**
  * Terms of Service 1.1, effective 20 November 2026, the first change to the launch text. One of the models that write
- * and judge a debate, OpenAI's GPT-6 Luna, is served by Amazon Web Services through Amazon Bedrock, so section 8 names
- * Amazon before that model reaches anyone:
+ * and judge a debate, a model made by OpenAI, is served by Amazon Web Services through Amazon Bedrock, so section 8
+ * names Amazon before that model reaches anyone. It names the two companies and not the model, as the Privacy Policy
+ * and the Register's heading do:
  *   - a paragraph "A debate model through Amazon", the Privacy Policy's (section 5 there) shortened: the contract is
  *     with Amazon Web Services EMEA SARL in Luxembourg, the model runs in the United States, OpenAI does not receive
  *     the text, neither Amazon nor OpenAI may train on it, and Amazon keeps nothing except requests its automatic
@@ -25,7 +26,7 @@ import { resolve } from "node:path";
 export const TERMS_11_DAY = "20";
 
 export const TERMS_11_ENTRY =
-  "Version 1.1 replaced version 1.0: it names Amazon Web Services, which serves one of the debate models (OpenAI's GPT-6 Luna) in the United States, and says what Amazon keeps (section 8).";
+  "Version 1.1 replaced version 1.0: it names Amazon Web Services, which serves one of the debate models, made by OpenAI, in the United States, and says what Amazon keeps (section 8).";
 
 type Swaps = Readonly<Record<string, Readonly<{ sha256: string; swaps: readonly (readonly [string, string])[] }>>>;
 

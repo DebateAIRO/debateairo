@@ -6,8 +6,9 @@ import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import { sha256Of, TERMS_11_DAY, TERMS_11_ENTRY, TERMS_11_SWAPS, terms10Sha256, withoutTerms11 } from "../support/legalTerms11.js";
 
 /**
- * Terms of Service 1.1 (tests/support/legalTerms11.ts): section 8 names Amazon Web Services, which serves OpenAI's
- * GPT-6 Luna, one of the debate models, through Amazon Bedrock, and section 14 gains the Terms' first history entry.
+ * Terms of Service 1.1 (tests/support/legalTerms11.ts): section 8 names Amazon Web Services, which serves one of the
+ * debate models, made by OpenAI, through Amazon Bedrock, and names no model; section 14 gains the Terms' first history
+ * entry.
  * Every language is its 1.0 draft plus the recorded swaps and nothing else; English is pinned word for word; Romanian
  * and French carry the same paragraph, sentences and entry; the other languages carry only the new number; and
  * /terms/versions lists 1.1 in force and 1.0 with a link to its archived text.
@@ -31,7 +32,7 @@ const RELEASED = ["en", "ro", "fr"];
 
 /** English, word for word: section 8's paragraph on Amazon, the Privacy Policy's shortened. */
 const AMAZON =
-  "**A debate model through Amazon.** One of the AI models that write and judge a debate, OpenAI's GPT-6 Luna, is served by **Amazon Web Services** (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States and is listed in the Provider Register. OpenAI, the company that made the model, does not receive your text, and Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Amazon never receives your email address, your account identifiers, your session records or your payment details.";
+  "**A debate model through Amazon.** One of the AI models that write and judge a debate, a model made by OpenAI, is served by **Amazon Web Services** (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States and is listed in the Provider Register. OpenAI, the company that made the model, does not receive your text, and Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Amazon never receives your email address, your account identifiers, your session records or your payment details.";
 /** English, word for word: whose terms forbid training, in the summary and in section 8, each exactly once. */
 const ENGLISH_SENTENCES = [
   "The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on it; section 8 says for which company we have not confirmed this yet.",
@@ -92,7 +93,7 @@ describe("Terms of Service 1.1: Amazon Web Services serves one of the debate mod
     const paragraph = added[0]!;
     expect(all[all.indexOf(paragraph) - 1], `${code}: after DeepInfra's`).toContain("Deep Infra Inc.");
     expect(all[all.indexOf(paragraph) + 1], `${code}: before Perplexity's`).toContain("Perplexity AI, Inc.");
-    for (const token of ["**Amazon Web Services** (", "Amazon Web Services EMEA SARL", "GPT-6 Luna"]) {
+    for (const token of ["**Amazon Web Services** (", "Amazon Web Services EMEA SARL"]) {
       expect(paragraph.split(token), `${code}: ${token}, once`).toHaveLength(2);
     }
     expect(paragraph.match(/OpenAI/gu), `${code}: OpenAI as the maker, not receiving, and not training`).toHaveLength(3);
@@ -102,9 +103,13 @@ describe("Terms of Service 1.1: Amazon Web Services serves one of the debate mod
     expect(paragraph, `${code}: nothing about Europe`).not.toMatch(/Europ|\bEU\b|\bUE\b/u);
     expect(text, `${code}: the old no-training sentence`).not.toContain(GONE[code]!);
     expect(text.match(/DeepInfra, (d’)?Anthropic (and|și|et) (d’)?Amazon/gu), `${code}: the three companies, in the summary and section 8`).toHaveLength(2);
-    // The history entry is section 14's last paragraph, and names the two versions, the company, the model and the section.
+    // The history entry is section 14's last paragraph, and names the two versions, the company, the model's maker and the section.
     const entry = paragraphs(section(text, 14)).at(-1)!;
-    expect(entry, `${code}: the entry`).toMatch(/1\.1[^.]*1\.0[^.]*Amazon Web Services[^.]*GPT-6 Luna[^.]*8\)\.$/u);
+    expect(entry, `${code}: the entry`).toMatch(/1\.1[^.]*1\.0[^.]*Amazon Web Services[^.]*OpenAI[^.]*8\)\.$/u);
+  });
+
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the Terms name no model served through Amazon, and not OpenAI's own app", (code) => {
+    expect(draft(code), code).not.toMatch(/GPT|Luna|ChatGPT/u);
   });
 
   it("the other languages carry no paragraph on Amazon Bedrock and no history entry yet", () => {

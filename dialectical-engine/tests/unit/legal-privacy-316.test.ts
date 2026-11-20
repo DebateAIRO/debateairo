@@ -13,8 +13,8 @@ import {
 } from "../support/legalPrivacy316.js";
 
 /**
- * Privacy Policy 3.16 (tests/support/legalPrivacy316.ts): the policy names Amazon Web Services, which serves OpenAI's
- * GPT-6 Luna, one of the debate models, through Amazon Bedrock. Every language is its 3.15 draft plus the recorded
+ * Privacy Policy 3.16 (tests/support/legalPrivacy316.ts): the policy names Amazon Web Services, which serves one of
+ * the debate models, made by OpenAI, through Amazon Bedrock, and names no model. Every language is its 3.15 draft plus the recorded
  * swaps and nothing else; English is pinned word for word; Romanian and French carry the same paragraph, sentences and
  * history entry; the other languages carry only the new number; and the policy says of Amazon what the Register's
  * entry says.
@@ -40,7 +40,7 @@ const RELEASED = ["en", "ro", "fr"];
 
 /** English, word for word: section 5's paragraph on Amazon. */
 const AMAZON =
-  "**A debate model through Amazon.** One of the AI models that write and judge a debate, OpenAI's GPT-6 Luna, is served by Amazon Web Services (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States. OpenAI, the company that made the model, does not receive your text. Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Like every AI provider, Amazon never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.";
+  "**A debate model through Amazon.** One of the AI models that write and judge a debate, a model made by OpenAI, is served by Amazon Web Services (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States. OpenAI, the company that made the model, does not receive your text. Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Like every AI provider, Amazon never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.";
 /** English, word for word: what else 3.16 says, each exactly once. */
 const ENGLISH_SENTENCES = [
   // The summary, section 4 and section 5: whose terms forbid training.
@@ -103,7 +103,7 @@ describe("Privacy Policy 3.16: Amazon Web Services serves one of the debate mode
     expect(all[all.indexOf(paragraph) - 1], `${code}: after DeepInfra's`).toContain("Deep Infra Inc.");
     expect(all[all.indexOf(paragraph) + 1], `${code}: before Perplexity's`).toContain("Perplexity AI, Inc.");
     expect(paragraph.startsWith("**"), `${code}: a bold lead-in`).toBe(true);
-    for (const token of ["Amazon Web Services (", "Amazon Web Services EMEA SARL", "GPT-6 Luna"]) {
+    for (const token of ["Amazon Web Services (", "Amazon Web Services EMEA SARL"]) {
       expect(paragraph.split(token), `${code}: ${token}, once`).toHaveLength(2);
     }
     expect(paragraph.match(/OpenAI/gu), `${code}: OpenAI as the maker, not receiving, and not training`).toHaveLength(3);
@@ -136,13 +136,17 @@ describe("Privacy Policy 3.16: Amazon Web Services serves one of the debate mode
       const log = section(draft(code), 14);
       expect(log.indexOf("3.16"), code).toBeGreaterThan(-1);
       expect(log.indexOf("3.16"), `${code}: newest first`).toBeLessThan(log.indexOf("3.14"));
-      expect(log, `${code}: names Amazon Web Services and the model`).toMatch(/3\.16[^.]*3\.15[^.]*Amazon Web Services[^.]*GPT-6 Luna/u);
+      expect(log, `${code}: names Amazon Web Services and the model's maker`).toMatch(/3\.16[^.]*3\.15[^.]*Amazon Web Services[^.]*OpenAI/u);
       expect(log, `${code}: the day`).toMatch(new RegExp(`(?<!\\d)${PRIVACY_316_DAY} (noiembrie|novembre) 2026`, "u"));
     }
     for (const { code } of LOCALES.filter(({ code }) => !RELEASED.includes(code))) {
       expect(section(draft(code), 14), code).not.toMatch(/3\.16/u);
       expect(draft(code), `${code}: no paragraph on Amazon Bedrock yet`).not.toContain("Amazon Bedrock");
     }
+  });
+
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the policy names no model served through Amazon, and not OpenAI's own app", (code) => {
+    expect(draft(code), code).not.toMatch(/GPT|Luna|ChatGPT/u);
   });
 
   it("the archive holds the English, Romanian and French 3.16 texts and their 3.15 texts, and asks nobody to accept again", () => {

@@ -126,7 +126,7 @@
    ],
    [
     "",
-    "\n**A debate model through Amazon.** One of the AI models that write and judge a debate, OpenAI's GPT-6 Luna, is served by Amazon Web Services (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States. OpenAI, the company that made the model, does not receive your text. Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Like every AI provider, Amazon never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.\n"
+    "\n**A debate model through Amazon.** One of the AI models that write and judge a debate, a model made by OpenAI, is served by Amazon Web Services (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States. OpenAI, the company that made the model, does not receive your text. Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Like every AI provider, Amazon never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.\n"
    ],
    [
     "* The terms of DeepInfra and Anthropic do not allow them to us",
@@ -138,7 +138,7 @@
    ],
    [
     "",
-    ". Version 3.16 replaced version 3.15: it names Amazon Web Services, which serves one of the debate models (OpenAI's GPT-6 Luna) in the United States, and says what Amazon keeps and on what basis the data is transferred (sections 4 and 5)"
+    ". Version 3.16 replaced version 3.15: it names Amazon Web Services, which serves one of the debate models, made by OpenAI, in the United States, and says what Amazon keeps and on what basis the data is transferred (sections 4 and 5)"
    ]
   ]
  },
@@ -218,7 +218,7 @@
    ],
    [
     "",
-    "\n**Un modèle de débat via Amazon.** L'un des modèles d'IA qui rédigent et évaluent un débat, GPT-6 Luna d'OpenAI, est fourni par Amazon Web Services (son service Amazon Bedrock), au titre de notre contrat avec Amazon Web Services EMEA SARL au Luxembourg. Amazon exécute ce modèle aux États-Unis. OpenAI, l'entreprise qui a créé le modèle, ne reçoit pas votre texte. Les conditions d'Amazon ne permettent ni à Amazon ni à OpenAI d'entraîner des modèles dessus. Amazon ne conserve pas le texte, à une exception près : les requêtes que son filtre automatique contre les usages abusifs signale sont conservées jusqu'à 30 jours, aux États-Unis, et Amazon peut les examiner. Comme tout fournisseur d'IA, Amazon ne reçoit jamais votre adresse e-mail, les identifiants de votre compte ou de votre session, votre adresse IP ni vos données de paiement. Il figure dans le Registre, et les règles relatives aux transferts énoncées ci-dessous s'appliquent à lui.\n"
+    "\n**Un modèle de débat via Amazon.** L'un des modèles d'IA qui rédigent et évaluent un débat, un modèle créé par OpenAI, est fourni par Amazon Web Services (son service Amazon Bedrock), au titre de notre contrat avec Amazon Web Services EMEA SARL au Luxembourg. Amazon exécute ce modèle aux États-Unis. OpenAI, l'entreprise qui a créé le modèle, ne reçoit pas votre texte. Les conditions d'Amazon ne permettent ni à Amazon ni à OpenAI d'entraîner des modèles dessus. Amazon ne conserve pas le texte, à une exception près : les requêtes que son filtre automatique contre les usages abusifs signale sont conservées jusqu'à 30 jours, aux États-Unis, et Amazon peut les examiner. Comme tout fournisseur d'IA, Amazon ne reçoit jamais votre adresse e-mail, les identifiants de votre compte ou de votre session, votre adresse IP ni vos données de paiement. Il figure dans le Registre, et les règles relatives aux transferts énoncées ci-dessous s'appliquent à lui.\n"
    ],
    [
     "s.** Les conditions de DeepInfra et d'Anthropic ne leur permettent pas d'utilis",
@@ -230,7 +230,7 @@
    ],
    [
     "",
-    ". La version 3.16 a remplacé la version 3.15 : elle nomme Amazon Web Services, qui fournit l'un des modèles de débat (GPT-6 Luna d'OpenAI) aux États-Unis, et indique ce qu'Amazon conserve et sur quel fondement les données sont transférées (sections 4 et 5)"
+    ". La version 3.16 a remplacé la version 3.15 : elle nomme Amazon Web Services, qui fournit l'un des modèles de débat, créé par OpenAI, aux États-Unis, et indique ce qu'Amazon conserve et sur quel fondement les données sont transférées (sections 4 et 5)"
    ]
   ]
  },
@@ -514,7 +514,7 @@
    ],
    [
     "",
-    "\n**Un model de dezbatere prin Amazon.** Unul dintre modelele de IA care scriu și evaluează o dezbatere, GPT-6 Luna al OpenAI, este pus la dispoziție de Amazon Web Services (prin serviciul său Amazon Bedrock), în baza contractului nostru cu Amazon Web Services EMEA SARL din Luxemburg. Amazon rulează acest model în Statele Unite. OpenAI, compania care a creat modelul, nu primește textul dumneavoastră. Potrivit condițiilor Amazon, nici Amazon, nici OpenAI nu pot antrena modele pe baza lui. Amazon nu păstrează textul, cu o singură excepție: solicitările pe care filtrul său automat împotriva utilizării abuzive le marchează sunt păstrate până la 30 de zile, în Statele Unite, iar Amazon le poate examina. La fel ca orice furnizor de IA, Amazon nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului sau ai sesiunii, adresa IP ori datele de plată. Este inclus în Registru, iar regulile privind transferurile de mai jos se aplică și în cazul său.\n"
+    "\n**Un model de dezbatere prin Amazon.** Unul dintre modelele de IA care scriu și evaluează o dezbatere, un model creat de OpenAI, este pus la dispoziție de Amazon Web Services (prin serviciul său Amazon Bedrock), în baza contractului nostru cu Amazon Web Services EMEA SARL din Luxemburg. Amazon rulează acest model în Statele Unite. OpenAI, compania care a creat modelul, nu primește textul dumneavoastră. Potrivit condițiilor Amazon, nici Amazon, nici OpenAI nu pot antrena modele pe baza lui. Amazon nu păstrează textul, cu o singură excepție: solicitările pe care filtrul său automat împotriva utilizării abuzive le marchează sunt păstrate până la 30 de zile, în Statele Unite, iar Amazon le poate examina. La fel ca orice furnizor de IA, Amazon nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului sau ai sesiunii, adresa IP ori datele de plată. Este inclus în Registru, iar regulile privind transferurile de mai jos se aplică și în cazul său.\n"
    ],
    [
     ".** Condițiile DeepInfra și Anthropic nu le permit să utilize",
@@ -526,7 +526,7 @@
    ],
    [
     "",
-    ". Versiunea 3.16 a înlocuit versiunea 3.15: numește Amazon Web Services, care pune la dispoziție unul dintre modelele de dezbatere (GPT-6 Luna al OpenAI) în Statele Unite, și arată ce păstrează Amazon și pe ce temei sunt transferate datele (secțiunile 4 și 5)"
+    ". Versiunea 3.16 a înlocuit versiunea 3.15: numește Amazon Web Services, care pune la dispoziție unul dintre modelele de dezbatere, creat de OpenAI, în Statele Unite, și arată ce păstrează Amazon și pe ce temei sunt transferate datele (secțiunile 4 și 5)"
    ]
   ]
  },

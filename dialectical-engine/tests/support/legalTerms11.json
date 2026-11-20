@@ -126,11 +126,11 @@
    ],
    [
     "",
-    "\n\n**A debate model through Amazon.** One of the AI models that write and judge a debate, OpenAI's GPT-6 Luna, is served by **Amazon Web Services** (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States and is listed in the Provider Register. OpenAI, the company that made the model, does not receive your text, and Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Amazon never receives your email address, your account identifiers, your session records or your payment details."
+    "\n\n**A debate model through Amazon.** One of the AI models that write and judge a debate, a model made by OpenAI, is served by **Amazon Web Services** (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States and is listed in the Provider Register. OpenAI, the company that made the model, does not receive your text, and Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Amazon never receives your email address, your account identifiers, your session records or your payment details."
    ],
    [
     "",
-    "\nVersion 1.1 replaced version 1.0: it names Amazon Web Services, which serves one of the debate models (OpenAI's GPT-6 Luna) in the United States, and says what Amazon keeps (section 8).\n"
+    "\nVersion 1.1 replaced version 1.0: it names Amazon Web Services, which serves one of the debate models, made by OpenAI, in the United States, and says what Amazon keeps (section 8).\n"
    ]
   ]
  },
@@ -210,11 +210,11 @@
    ],
    [
     "",
-    "\n\n**Un modèle de débat via Amazon.** L’un des modèles d’IA qui rédigent et évaluent un débat, GPT-6 Luna d’OpenAI, est fourni par **Amazon Web Services** (son service Amazon Bedrock), au titre de notre contrat avec Amazon Web Services EMEA SARL au Luxembourg. Amazon exécute ce modèle aux États-Unis et figure dans le Registre des fournisseurs. OpenAI, l’entreprise qui a créé le modèle, ne reçoit pas votre texte, et les conditions d’Amazon ne permettent ni à Amazon ni à OpenAI d’entraîner des modèles dessus. Amazon ne conserve pas le texte, à une exception près : les requêtes que son filtre automatique contre les usages abusifs signale sont conservées jusqu’à 30 jours, aux États-Unis, et Amazon peut les examiner. Amazon ne reçoit jamais votre adresse e-mail, les identifiants de votre compte, vos enregistrements de session ni vos informations de paiement."
+    "\n\n**Un modèle de débat via Amazon.** L’un des modèles d’IA qui rédigent et évaluent un débat, un modèle créé par OpenAI, est fourni par **Amazon Web Services** (son service Amazon Bedrock), au titre de notre contrat avec Amazon Web Services EMEA SARL au Luxembourg. Amazon exécute ce modèle aux États-Unis et figure dans le Registre des fournisseurs. OpenAI, l’entreprise qui a créé le modèle, ne reçoit pas votre texte, et les conditions d’Amazon ne permettent ni à Amazon ni à OpenAI d’entraîner des modèles dessus. Amazon ne conserve pas le texte, à une exception près : les requêtes que son filtre automatique contre les usages abusifs signale sont conservées jusqu’à 30 jours, aux États-Unis, et Amazon peut les examiner. Amazon ne reçoit jamais votre adresse e-mail, les identifiants de votre compte, vos enregistrements de session ni vos informations de paiement."
    ],
    [
     "",
-    "\nLa version 1.1 a remplacé la version 1.0 : elle nomme Amazon Web Services, qui fournit l’un des modèles de débat (GPT-6 Luna d’OpenAI) aux États-Unis, et indique ce qu’Amazon conserve (section 8).\n"
+    "\nLa version 1.1 a remplacé la version 1.0 : elle nomme Amazon Web Services, qui fournit l’un des modèles de débat, créé par OpenAI, aux États-Unis, et indique ce qu’Amazon conserve (section 8).\n"
    ]
   ]
  },
@@ -498,11 +498,11 @@
    ],
    [
     "",
-    "\n\n**Un model de dezbatere prin Amazon.** Unul dintre modelele de IA care scriu și evaluează o dezbatere, GPT-6 Luna al OpenAI, este pus la dispoziție de **Amazon Web Services** (prin serviciul său Amazon Bedrock), în baza contractului nostru cu Amazon Web Services EMEA SARL din Luxemburg. Amazon rulează acest model în Statele Unite și este inclus în Registrul furnizorilor de IA. OpenAI, compania care a creat modelul, nu primește textul dumneavoastră, iar, potrivit condițiilor Amazon, nici Amazon, nici OpenAI nu pot antrena modele pe baza lui. Amazon nu păstrează textul, cu o singură excepție: solicitările pe care filtrul său automat împotriva utilizării abuzive le marchează sunt păstrate până la 30 de zile, în Statele Unite, iar Amazon le poate examina. Amazon nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului, înregistrările sesiunilor sau datele de plată."
+    "\n\n**Un model de dezbatere prin Amazon.** Unul dintre modelele de IA care scriu și evaluează o dezbatere, un model creat de OpenAI, este pus la dispoziție de **Amazon Web Services** (prin serviciul său Amazon Bedrock), în baza contractului nostru cu Amazon Web Services EMEA SARL din Luxemburg. Amazon rulează acest model în Statele Unite și este inclus în Registrul furnizorilor de IA. OpenAI, compania care a creat modelul, nu primește textul dumneavoastră, iar, potrivit condițiilor Amazon, nici Amazon, nici OpenAI nu pot antrena modele pe baza lui. Amazon nu păstrează textul, cu o singură excepție: solicitările pe care filtrul său automat împotriva utilizării abuzive le marchează sunt păstrate până la 30 de zile, în Statele Unite, iar Amazon le poate examina. Amazon nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului, înregistrările sesiunilor sau datele de plată."
    ],
    [
     "",
-    "\nVersiunea 1.1 a înlocuit versiunea 1.0: numește Amazon Web Services, care pune la dispoziție unul dintre modelele de dezbatere (GPT-6 Luna al OpenAI) în Statele Unite, și arată ce păstrează Amazon (secțiunea 8).\n"
+    "\nVersiunea 1.1 a înlocuit versiunea 1.0: numește Amazon Web Services, care pune la dispoziție unul dintre modelele de dezbatere, creat de OpenAI, în Statele Unite, și arată ce păstrează Amazon (secțiunea 8).\n"
    ]
   ]
  },

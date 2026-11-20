@@ -3,9 +3,10 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 /**
- * Privacy Policy 3.16, effective 20 November 2026. One of the models that write and judge a debate, OpenAI's GPT-6
- * Luna, is served by Amazon Web Services through Amazon Bedrock, so the policy names Amazon before that model reaches
- * anyone:
+ * Privacy Policy 3.16, effective 20 November 2026. One of the models that write and judge a debate, a model made by
+ * OpenAI, is served by Amazon Web Services through Amazon Bedrock, so the policy names Amazon before that model reaches
+ * anyone. It names the two companies and not the model, as the Register's heading does ("Amazon (OpenAI models)"), so
+ * the text stays true when the model served there changes:
  *   - section 5 gains the paragraph "A debate model through Amazon": the contract is with Amazon Web Services EMEA
  *     SARL in Luxembourg, the model runs in the United States, OpenAI does not receive the text, neither Amazon nor
  *     OpenAI may train on it, and Amazon keeps nothing except requests its automatic abuse filter flags, for up to 30
@@ -27,7 +28,7 @@ import { resolve } from "node:path";
 export const PRIVACY_316_DAY = "20";
 
 export const PRIVACY_316_ENTRY =
-  "Version 3.16 replaced version 3.15: it names Amazon Web Services, which serves one of the debate models (OpenAI's GPT-6 Luna) in the United States, and says what Amazon keeps and on what basis the data is transferred (sections 4 and 5).";
+  "Version 3.16 replaced version 3.15: it names Amazon Web Services, which serves one of the debate models, made by OpenAI, in the United States, and says what Amazon keeps and on what basis the data is transferred (sections 4 and 5).";
 
 type Swaps = Readonly<Record<string, Readonly<{ sha256: string; swaps: readonly (readonly [string, string])[] }>>>;
 
