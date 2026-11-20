@@ -1,0 +1,669 @@
+{
+ "ar": {
+  "sha256": "8c4cfbb28ab430172357da0db6dd032d369b372214303a1fd9366501ae092af2",
+  "swaps": [
+   [
+    "ة · v3.15 · سارية",
+    "ة · v3.16 · سارية"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "bg": {
+  "sha256": "49527e4aac7a1835f4fe5a370922750ab03fec2349e74e26a29746117dedbd5b",
+  "swaps": [
+   [
+    "Т · v3.15 · В СИЛ",
+    "Т · v3.16 · В СИЛ"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "cs": {
+  "sha256": "11ac81004ac43ebe6bdde702e89b74d0b4239c1c54f4867d65695969131e43e2",
+  "swaps": [
+   [
+    "Ů · v3.15 · ÚČINN",
+    "Ů · v3.16 · ÚČINN"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "da": {
+  "sha256": "a0a67cc2c3d794c83e08bba1dbb8c1ae9f4417fdb9f16543cca22d2ddb97c7a9",
+  "swaps": [
+   [
+    "K · v3.15 · GÆLDE",
+    "K · v3.16 · GÆLDE"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "de": {
+  "sha256": "2099b8554a51a86c4c4b4078cdf6a667fdc8c1dd0393dac5c11996155be068a6",
+  "swaps": [
+   [
+    "G · v3.15 · GÜLTI",
+    "G · v3.16 · GÜLTI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "el": {
+  "sha256": "c198db34afc5e4bff6873f8aa606d15f61aa815f9023eb62cdd38128f087e7df",
+  "swaps": [
+   [
+    "Υ · v3.15 · ΙΣΧΥΕ",
+    "Υ · v3.16 · ΙΣΧΥΕ"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "en": {
+  "sha256": "118c3c225eb64dbfb219297a46f213279a35b00046f6d3b327be3eb62d6ffe1b",
+  "swaps": [
+   [
+    "Y · v3.15 · EFFEC",
+    "Y · v3.16 · EFFEC"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ],
+   [
+    ". The terms of DeepInfra and Anthropic do not allow them to tr",
+    ". The terms of DeepInfra, Anthropic and Amazon do not allow them to tr"
+   ],
+   [
+    "d the terms of DeepInfra and Anthropic do not allow them to; s",
+    "d the terms of DeepInfra, Anthropic and Amazon do not allow them to; s"
+   ],
+   [
+    "",
+    "\n**A debate model through Amazon.** One of the AI models that write and judge a debate, a model made by OpenAI, is served by Amazon Web Services (its service Amazon Bedrock), under our contract with Amazon Web Services EMEA SARL in Luxembourg. Amazon runs this model in the United States. OpenAI, the company that made the model, does not receive your text. Amazon's terms do not allow Amazon or OpenAI to train models on it. Amazon does not keep the text, with one exception: requests that its automatic abuse filter flags are kept for up to 30 days, in the United States, and Amazon may review them. Like every AI provider, Amazon never receives your email address, your account or session identifiers, your IP address or your payment details. It is listed in the Register, and the transfer rules below apply to it.\n"
+   ],
+   [
+    "* The terms of DeepInfra and Anthropic do not allow them to us",
+    "* The terms of DeepInfra, Anthropic and Amazon do not allow them to us"
+   ],
+   [
+    "",
+    "Amazon relies on the EU–US Data Privacy Framework, with the standard contractual clauses in its terms for any transfer the Framework does not cover. "
+   ],
+   [
+    "",
+    ". Version 3.16 replaced version 3.15: it names Amazon Web Services, which serves one of the debate models, made by OpenAI, in the United States, and says what Amazon keeps and on what basis the data is transferred (sections 4 and 5)"
+   ]
+  ]
+ },
+ "es": {
+  "sha256": "7f3bc10661e47ca7662c1c53692e3a58f6cb5280033903c752a4353f68845a05",
+  "swaps": [
+   [
+    "D · v3.15 · EN VI",
+    "D · v3.16 · EN VI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "et": {
+  "sha256": "6de0e7144e30e851a75fe90a20ff62030e068416eb4083eeabcc6451becf7c56",
+  "swaps": [
+   [
+    "A · v3.15 · KEHTI",
+    "A · v3.16 · KEHTI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "fi": {
+  "sha256": "c8885e6efc0d1f24e8691928f1adbbe586b5c8a7f955727f780c005af3995eda",
+  "swaps": [
+   [
+    "Ö · v3.15 · VOIMA",
+    "Ö · v3.16 · VOIMA"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "fr": {
+  "sha256": "c48f43f3ef83803553f54f22c2543c2a7bc29ea571c91dec7b296e767b1802ed",
+  "swaps": [
+   [
+    "É · v3.15 · EN VI",
+    "É · v3.16 · EN VI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ],
+   [
+    "nis. Les conditions de DeepInfra et d'Anthropic ne leur permettent pas d'entraî",
+    "nis. Les conditions de DeepInfra, d'Anthropic et d'Amazon ne leur permettent pas d'entraî"
+   ],
+   [
+    ", et les conditions de DeepInfra et d'Anthropic ne leur permettent pas de le fa",
+    ", et les conditions de DeepInfra, d'Anthropic et d'Amazon ne leur permettent pas de le fa"
+   ],
+   [
+    "",
+    "\n**Un modèle de débat via Amazon.** L'un des modèles d'IA qui rédigent et évaluent un débat, un modèle créé par OpenAI, est fourni par Amazon Web Services (son service Amazon Bedrock), au titre de notre contrat avec Amazon Web Services EMEA SARL au Luxembourg. Amazon exécute ce modèle aux États-Unis. OpenAI, l'entreprise qui a créé le modèle, ne reçoit pas votre texte. Les conditions d'Amazon ne permettent ni à Amazon ni à OpenAI d'entraîner des modèles dessus. Amazon ne conserve pas le texte, à une exception près : les requêtes que son filtre automatique contre les usages abusifs signale sont conservées jusqu'à 30 jours, aux États-Unis, et Amazon peut les examiner. Comme tout fournisseur d'IA, Amazon ne reçoit jamais votre adresse e-mail, les identifiants de votre compte ou de votre session, votre adresse IP ni vos données de paiement. Il figure dans le Registre, et les règles relatives aux transferts énoncées ci-dessous s'appliquent à lui.\n"
+   ],
+   [
+    "s.** Les conditions de DeepInfra et d'Anthropic ne leur permettent pas d'utilis",
+    "s.** Les conditions de DeepInfra, d'Anthropic et d'Amazon ne leur permettent pas d'utilis"
+   ],
+   [
+    "",
+    "Amazon s'appuie sur le cadre de protection des données UE–États-Unis et, pour tout transfert que ce cadre ne couvre pas, sur les clauses contractuelles types figurant dans ses conditions. "
+   ],
+   [
+    "",
+    ". La version 3.16 a remplacé la version 3.15 : elle nomme Amazon Web Services, qui fournit l'un des modèles de débat, créé par OpenAI, aux États-Unis, et indique ce qu'Amazon conserve et sur quel fondement les données sont transférées (sections 4 et 5)"
+   ]
+  ]
+ },
+ "ga": {
+  "sha256": "01ce3da7be05283063e042dd0f33e17ba5ebb0e7697cab9eebcb98ba2ef7c71a",
+  "swaps": [
+   [
+    "S · v3.15 · I bhF",
+    "S · v3.16 · I bhF"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "he": {
+  "sha256": "b2da6e0a07f796734e3821f6a389060aee703126c9551ae173439b5ba5ddabfb",
+  "swaps": [
+   [
+    "ת · v3.15 · בתוקף",
+    "ת · v3.16 · בתוקף"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "hi": {
+  "sha256": "9fc6c122e0b074bd778e26928e710dd05a38ac2c9484e200d44e4fd00731fbf5",
+  "swaps": [
+   [
+    "ि · v3.15 · प्रभा",
+    "ि · v3.16 · प्रभा"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "hr": {
+  "sha256": "6f6ecacd849dc7eb0a0467bdac7ec93d1f1a63f06b412d11aca708e1e74e7a89",
+  "swaps": [
+   [
+    "I · v3.15 · NA SN",
+    "I · v3.16 · NA SN"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "hu": {
+  "sha256": "43de9fe92c2df0eece79bc8675ba02aceca29c0d0a7644ef777467a12d9c82f7",
+  "swaps": [
+   [
+    "T · v3.15 · HATÁL",
+    "T · v3.16 · HATÁL"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "id": {
+  "sha256": "6a447543c1e89bb3897ed9a8071301d13b96297955b98df57fec6bd1c601b388",
+  "swaps": [
+   [
+    "I · v3.15 · BERLA",
+    "I · v3.16 · BERLA"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "it": {
+  "sha256": "5ead6fee111d8a8faa64b646b970c9a08948210949b9a7145758b5a4f02a915c",
+  "swaps": [
+   [
+    "Y · v3.15 · IN VI",
+    "Y · v3.16 · IN VI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "ja": {
+  "sha256": "c46609797e007263e5bc7657f5122ddc41d56937566b46cb5b135c6ee26d9bfe",
+  "swaps": [
+   [
+    "ー · v3.15 · 発効日 2",
+    "ー · v3.16 · 発効日 2"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "ko": {
+  "sha256": "b363a1721888ec38b5e6c732dc015bdd65f61b4e696c054ebe0202cd83922757",
+  "swaps": [
+   [
+    "침 · v3.15 · 시행일 2",
+    "침 · v3.16 · 시행일 2"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "lt": {
+  "sha256": "f0e17e241ee109058d148551a881ac9817111513eec1684a566f83e09e3da7a4",
+  "swaps": [
+   [
+    "A · v3.15 · ĮSIGA",
+    "A · v3.16 · ĮSIGA"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "lv": {
+  "sha256": "db30e0eb2c57f44c83be98423d44158e31eb440a1f4ee3e4d4e9000d102a5cfe",
+  "swaps": [
+   [
+    "A · v3.15 · SPĒKĀ",
+    "A · v3.16 · SPĒKĀ"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "mt": {
+  "sha256": "6a6c7c1e38395c163a3d8c7b3d226c994aa355c0137ed64039c1777b89ab52d1",
+  "swaps": [
+   [
+    "A · v3.15 · EFFET",
+    "A · v3.16 · EFFET"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "nl": {
+  "sha256": "c40c54bf341e6a4e4689be9eb8d6a0457e070641b206868d98a48cc1119b8f08",
+  "swaps": [
+   [
+    "D · v3.15 · VAN K",
+    "D · v3.16 · VAN K"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "pl": {
+  "sha256": "01ad81647603edab326693290ac48ae34a61867d61577468c3c66255033d4564",
+  "swaps": [
+   [
+    "I · v3.15 · OBOWI",
+    "I · v3.16 · OBOWI"
+   ],
+   [
+    ") · v3.15\nbodyLab",
+    ") · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "pt": {
+  "sha256": "aaf0a349d442988f57339cbeef0e60439593d3487cfcaf18c72887dd7e8003b0",
+  "swaps": [
+   [
+    "E · v3.15 · EM VI",
+    "E · v3.16 · EM VI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "ro": {
+  "sha256": "837e45cec68e37d60e11ebaecbd8a41f0f2bf8c1e77896f4be8bd8366bce40e3",
+  "swaps": [
+   [
+    "E · v3.15 · ÎN VI",
+    "E · v3.16 · ÎN VI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ],
+   [
+    "te. Condițiile DeepInfra și Anthropic nu le permit să antrene",
+    "te. Condițiile DeepInfra, Anthropic și Amazon nu le permit să antrene"
+   ],
+   [
+    "iar condițiile DeepInfra și Anthropic nu le permit să o facă;",
+    "iar condițiile DeepInfra, Anthropic și Amazon nu le permit să o facă;"
+   ],
+   [
+    "",
+    "\n**Un model de dezbatere prin Amazon.** Unul dintre modelele de IA care scriu și evaluează o dezbatere, un model creat de OpenAI, este pus la dispoziție de Amazon Web Services (prin serviciul său Amazon Bedrock), în baza contractului nostru cu Amazon Web Services EMEA SARL din Luxemburg. Amazon rulează acest model în Statele Unite. OpenAI, compania care a creat modelul, nu primește textul dumneavoastră. Potrivit condițiilor Amazon, nici Amazon, nici OpenAI nu pot antrena modele pe baza lui. Amazon nu păstrează textul, cu o singură excepție: solicitările pe care filtrul său automat împotriva utilizării abuzive le marchează sunt păstrate până la 30 de zile, în Statele Unite, iar Amazon le poate examina. La fel ca orice furnizor de IA, Amazon nu primește niciodată adresa dumneavoastră de e-mail, identificatorii contului sau ai sesiunii, adresa IP ori datele de plată. Este inclus în Registru, iar regulile privind transferurile de mai jos se aplică și în cazul său.\n"
+   ],
+   [
+    ".** Condițiile DeepInfra și Anthropic nu le permit să utilize",
+    ".** Condițiile DeepInfra, Anthropic și Amazon nu le permit să utilize"
+   ],
+   [
+    "",
+    "Amazon se bazează pe Cadrul UE–SUA privind confidențialitatea datelor, iar pentru orice transfer pe care Cadrul nu îl acoperă, pe clauzele contractuale standard din condițiile sale. "
+   ],
+   [
+    "",
+    ". Versiunea 3.16 a înlocuit versiunea 3.15: numește Amazon Web Services, care pune la dispoziție unul dintre modelele de dezbatere, creat de OpenAI, în Statele Unite, și arată ce păstrează Amazon și pe ce temei sunt transferate datele (secțiunile 4 și 5)"
+   ]
+  ]
+ },
+ "ru": {
+  "sha256": "1017bfa8e0807218a2720b159962d31ddedbf7edebefe2940d77109926225bfd",
+  "swaps": [
+   [
+    "И · v3.15 · ДЕЙСТ",
+    "И · v3.16 · ДЕЙСТ"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "sk": {
+  "sha256": "9072a49d4783c4d94ebdf147220cfde1bdcbaf6e8f4b1652cc9e312f22948225",
+  "swaps": [
+   [
+    "V · v3.15 · ÚČINN",
+    "V · v3.16 · ÚČINN"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "sl": {
+  "sha256": "59155e73d606cec874e11eaf93ae912f3756aad1d7217a7d1098c9bdaf0dddf2",
+  "swaps": [
+   [
+    "I · v3.15 · VELJA",
+    "I · v3.16 · VELJA"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "sv": {
+  "sha256": "560b367fd0aaa79036853beb643ae68c23df8d47b05226711ed40063f4b7dbde",
+  "swaps": [
+   [
+    "Y · v3.15 · GÄLLE",
+    "Y · v3.16 · GÄLLE"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "tr": {
+  "sha256": "c0ba3c54a5010d92d7f981053af1bdea9249e62656a95f9cae9745ae9a98b9ec",
+  "swaps": [
+   [
+    "I · v3.15 · YÜRÜR",
+    "I · v3.16 · YÜRÜR"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "uk": {
+  "sha256": "fc5978e1b2ec52985889472f90cc6360173c4da281b01f71f836bfe415b80897",
+  "swaps": [
+   [
+    "І · v3.15 · ЧИННА",
+    "І · v3.16 · ЧИННА"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "vi": {
+  "sha256": "b51b7d004d21e365d1e1ff990ed78b97f3d5d0e4a48342cc51defd89fb17af34",
+  "swaps": [
+   [
+    "Ư · v3.15 · CÓ HI",
+    "Ư · v3.16 · CÓ HI"
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ },
+ "zh": {
+  "sha256": "ed35f0b4fab79e2b5263c972cf965e633d7192ef6d5fb6f39a8c3016675a44f8",
+  "swaps": [
+   [
+    "策 · v3.15 · 生效日期 ",
+    "策 · v3.16 · 生效日期 "
+   ],
+   [
+    "9 · v3.15\nbodyLab",
+    "9 · v3.16\nbodyLab"
+   ],
+   [
+    "sion 3.15 · Effec",
+    "sion 3.16 · Effec"
+   ]
+  ]
+ }
+}

@@ -14,7 +14,9 @@ import {
   withoutPrivacy314Number
 } from "../support/legalPrivacy314.js";
 import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
+import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
 import { withoutTerms10Corrections } from "../support/legalTerms10.js";
+import { terms10Sha256, withoutTerms11 } from "../support/legalTerms11.js";
 
 /**
  * Terms of Service 1.0 and Privacy Policy 3.13, effective 19 November 2026. The Terms start again at 1.0 (owner's
@@ -23,18 +25,24 @@ import { withoutTerms10Corrections } from "../support/legalTerms10.js";
  * carry the numbers and the date in their own date words; the Privacy Policy's history names what changed since the
  * archived 3.12, whose own entry reads again as that text wrote it (tests/support/legalRelease.ts). Privacy 3.14
  * followed on the same day (tests/support/legalPrivacy314.ts); the 3.13 checks below read it with 3.14 undone.
+ * Privacy 3.16 and Terms 1.1 came later (tests/support/legalPrivacy316.ts, legalTerms11.ts) and are undone first.
  */
 
 const root = process.cwd();
 const file = (code: string, name: string): string => readFileSync(resolve(root, "apps/ui/legal", code, name), "utf8");
+/** A language's Terms as 1.0 wrote them: the file the site serves with 1.1 undone. */
+const terms10 = (code: string): string => withoutTerms11(code, file(code, "terms-of-service.md"));
 /**
- * A draft as these checks were written for it: the Privacy Policy with 3.15 undone (tests/support/legalPrivacy315.ts),
- * so as 3.14 left it, and the Terms as the first 1.0 text wrote them, with the corrections made before launch undone
- * (tests/support/legalTerms10.ts). Only the day and version check needs that text; the check that the Terms carry no
- * change history, and the archive check, read the file the site serves.
+ * A draft as these checks were written for it: the Privacy Policy with 3.16 and 3.15 undone
+ * (tests/support/legalPrivacy316.ts, legalPrivacy315.ts), so as 3.14 left it, and the Terms as the first 1.0 text wrote
+ * them, with 1.1 and the corrections made before launch undone (tests/support/legalTerms11.ts, legalTerms10.ts). Only
+ * the day and version check needs the first 1.0 text; the check that 1.0 carries no change history, and the archive
+ * check, read the 1.0 text as it was published.
  */
 const draft = (code: string, name: string): string =>
-  name === "privacy-policy.md" ? withoutPrivacy315(code, file(code, name)) : withoutTerms10Corrections(code, file(code, name));
+  name === "privacy-policy.md"
+    ? withoutPrivacy315(code, withoutPrivacy316(code, file(code, name)))
+    : withoutTerms10Corrections(code, terms10(code));
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   archive: Record<string, Record<string, Record<string, { version: string; path: string }>>>;
@@ -82,10 +90,9 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the Terms carry no change history, and section 14 ends where the history began", (code) => {
-    const terms = file(code, "terms-of-service.md");
-    expect(terms, code).not.toMatch(/(^|\D)2\.(1?\d)(\D|$)/u);
-    const section14 = terms.split(/^## 14\./mu)[1]!.split(/^## 15\./mu)[0]!;
+  it.each(LOCALES.map(({ code }) => [code]))("%s: no Terms text names a 2.x version, and the 1.0 Terms carry no change history: section 14 ends where the history began", (code) => {
+    expect(file(code, "terms-of-service.md"), code).not.toMatch(/(^|\D)2\.(1?\d)(\D|$)/u);
+    const section14 = terms10(code).split(/^## 14\./mu)[1]!.split(/^## 15\./mu)[0]!;
     // The heading line and the three paragraphs on changes; the last still points to dezbatere.ro/terms/versions.
     const parts = section14.trim().split("\n\n");
     expect(parts, code).toHaveLength(4);
@@ -103,14 +110,15 @@ describe("Terms 1.0 and Privacy Policy 3.13", () => {
     expect(manifest().reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "1.0" });
   });
 
-  it("lists 1.0 alone as the Terms, and the archive holds the English, Romanian and French 1.0 texts and no other", () => {
-    expect(TERMS_VERSIONS).toEqual([{ version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }]);
+  it("lists 1.0 as the first of the Terms, and the archive holds one English, Romanian and French 1.0 text and no 2.x text", () => {
+    expect(TERMS_VERSIONS.at(-1))
+      .toEqual({ version: "1.0", noteKey: "legal.archive.meta", current: false, href: `/terms/versions/${terms10Sha256("en")}` });
     const archive = manifest().archive.TERMS!;
     expect(Object.keys(archive).sort()).toEqual(["en", "fr", "ro"]);
     for (const code of ["en", "ro", "fr"]) {
       const entries = Object.values(archive[code]!);
-      expect(entries.map((item) => item.version), code).toEqual(["1.0"]);
-      expect(readFileSync(resolve(root, entries[0]!.path), "utf8"), code).toBe(file(code, "terms-of-service.md"));
+      expect(entries.map((item) => item.version).sort(), code).toEqual(["1.0", "1.1"]);
+      expect(readFileSync(resolve(root, entries.find((item) => item.version === "1.0")!.path), "utf8"), code).toBe(terms10(code));
     }
   });
 

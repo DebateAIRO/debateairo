@@ -11,6 +11,7 @@ import {
   sha256Of,
   withoutPrivacy315
 } from "../support/legalPrivacy315.js";
+import { privacy315Sha256, withoutPrivacy316 } from "../support/legalPrivacy316.js";
 
 /**
  * Privacy Policy 3.15 (tests/support/legalPrivacy315.ts): what NETOPIA receives, sees and sends back, and where its
@@ -18,11 +19,14 @@ import {
  * sign-ups deleted after 24 hours or once their last link expires; the invoices we issue ourselves, the legal basis for
  * taking payment, Cloudflare's bot check, HTTPS, no trackers, and paid plans no longer "to start". Every language is
  * its 3.14 draft plus the recorded swaps and nothing else; English is pinned word for word; every language has
- * English's rows and names NETOPIA's company in section 5; Romanian and French drop what English drops.
+ * English's rows and names NETOPIA's company in section 5; Romanian and French drop what English drops. Privacy 3.16
+ * followed (tests/support/legalPrivacy316.ts); these checks read each draft with 3.16 undone.
  */
 
 const root = process.cwd();
-const draft = (code: string): string => readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8");
+/** A language's Privacy Policy as 3.15 wrote it: the draft with 3.16 undone. */
+const draft = (code: string): string =>
+  withoutPrivacy316(code, readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8"));
 const manifest = (): {
   reacceptance: Record<string, string | null>;
   documents: Record<string, Record<string, { version: string; sha256: string }>>;
@@ -111,7 +115,7 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinis
     }
     expect(text, `${code}: no line names 3.14 as the current version`).not.toMatch(/ v3\.14( ·|$)|\*\*Version 3\.14 · /mu);
     expect(sha256Of(withoutPrivacy315(code, text)), `${code}: undoing 3.15 gives back the 3.14 draft byte for byte`).toBe(privacy314Sha256(code));
-    expect(manifest().documents.PRIVACY![code], `${code}: the manifest`).toEqual({ version: "3.15", sha256: sha256Of(text) });
+    expect(sha256Of(text), `${code}: the text the manifest held at 3.15`).toBe(privacy315Sha256(code));
     // The languages the release offers carry every change and the history entry; the others carry only the NETOPIA,
     // consent-record, backup and unfinished sign-up sentences as first translated for them, and the day.
     expect(PRIVACY_315_SWAPS[code]!.swaps.length > 30, `${code}: every change`).toBe(RELEASED.includes(code));

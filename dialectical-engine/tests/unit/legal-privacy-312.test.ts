@@ -15,6 +15,7 @@ import { PRIVACY_RELEASE_SWAPS, withoutRelease } from "../support/legalRelease.j
 import { PRIVACY_SIGN_IN_SWAPS, withoutSignIn } from "../support/legalSignIn.js";
 import { PRIVACY_314_RELEASE_SWAPS, withoutPrivacy314, withoutPrivacy314Number } from "../support/legalPrivacy314.js";
 import { withoutPrivacy315 } from "../support/legalPrivacy315.js";
+import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
 
 /**
  * Privacy Policy 3.12 (V4 start step, plan Task 83; the owner's Day-1 answers 13 and 14 of 3 Nov 2026,
@@ -473,11 +474,11 @@ const as312 = (code: string, text: string): string => {
  * 3.14's marketing lines are not put back: withoutMarketing takes them out of the 3.11 text instead. English also says how you sign in (English
  * first; see tests/support/legalSignIn.ts) and carries the 3.13 entry in section 14 (tests/support/legalRelease.ts):
  * both are undone here, so the lines below compare as they did before, and `legal-sign-in-methods` and
- * `legal-release-versions` pin the new English. Privacy 3.15 (tests/support/legalPrivacy315.ts) is undone first, in every
- * language. The manifest checks hash the file as it is (draftBytes).
+ * `legal-release-versions` pin the new English. Privacy 3.16 and 3.15 (tests/support/legalPrivacy316.ts,
+ * legalPrivacy315.ts) are undone first, in every language. The manifest checks hash the file as it is (draftBytes).
  */
 const draftText = (code: string): string => {
-  const text = withoutPrivacy315(code, draftBytes(code).toString("utf8"));
+  const text = withoutPrivacy315(code, withoutPrivacy316(code, draftBytes(code).toString("utf8")));
   return code === "en"
     ? withoutSignIn(withoutRelease(withoutPrivacy314(text, PRIVACY_314_RELEASE_SWAPS), PRIVACY_RELEASE_SWAPS), PRIVACY_SIGN_IN_SWAPS)
     : as312(code, withoutPrivacy314Number(text));
@@ -716,7 +717,7 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
   it("leaves out of the 3.12 line checks only French and Romanian, the translations brought up to date for the release", () => {
     const left = LOCALES.map(({ code }) => code).filter((code) => !STILL_312.includes(code));
     expect([...left].sort()).toEqual(["fr", "ro"]);
-    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "3.15", sha256: englishNow });
+    for (const code of left) expect(translatedFrom[code], code).toEqual({ version: "3.16", sha256: englishNow });
   });
 
   it.each(STILL_312.map((code) => [code]))("%s: two rows and one paragraph more, and only the listed lines differ from the last 3.11 text", (code) => {
@@ -991,14 +992,14 @@ describe("Privacy Policy 3.12: what happens when you press Next, and the questio
     }
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.15 for the draft's exact bytes", (code) => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the manifest carries 3.16 for the draft's exact bytes", (code) => {
     const current = manifest().documents.PRIVACY?.[code];
-    expect(current).toEqual({ version: "3.15", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
+    expect(current).toEqual({ version: "3.16", sha256: createHash("sha256").update(draftBytes(code)).digest("hex") });
   });
 
   // The archive holds one 3.12 text per language, the one the versions page lists. The texts changed after it took them,
-  // so the drafts carry 3.15 now and none of them is that archived 3.12 text.
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, and the 3.15 draft is another", (code) => {
+  // so the drafts carry 3.16 now and none of them is that archived 3.12 text.
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the archive holds one 3.12 text, and the 3.16 draft is another", (code) => {
     const draft = createHash("sha256").update(draftBytes(code)).digest("hex");
     const archived = Object.entries(manifest().archive.PRIVACY?.[code] ?? {}).filter(([, entry]) => entry.version === "3.12");
     expect(archived).toHaveLength(1);

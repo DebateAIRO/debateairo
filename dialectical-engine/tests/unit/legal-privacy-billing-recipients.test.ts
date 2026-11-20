@@ -102,7 +102,7 @@ describe("Privacy Policy 3.11 names SmartBill, Quaderno, RO e-Factura and the ba
     for (const name of ["SmartBill", "Quaderno", "Recrea Systems, S.L.", "RO e-Factura", "ANAF"]) {
       expect(generated, `${code}: the generated data names ${name}`).toContain(name);
     }
-    expect(markdown(code), `${code}: now version 3.15`).toMatch(/v3\.15 /u);
+    expect(markdown(code), `${code}: now version 3.16`).toMatch(/v3\.16 /u);
   });
 
   it("every one of the 35 languages", () => {

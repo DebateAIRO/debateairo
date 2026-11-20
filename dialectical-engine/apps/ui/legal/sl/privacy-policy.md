@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: Na kratko
-eyebrow: PRAVILNIK O ZASEBNOSTI · v3.15 · VELJA OD 20. NOVEMBRA 2026
+eyebrow: PRAVILNIK O ZASEBNOSTI · v3.16 · VELJA OD 20. NOVEMBRA 2026
 title: Kaj hranimo in zakaj
 lede: Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.
-endMarker: KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.15
+endMarker: KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v3.16
 bodyLabel: Besedilo pravilnika o zasebnosti
 annexTitle: Priloga B — Regionalne določbe o zasebnosti
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 PIŠKOTKI
 -->
 
-**Version 3.15 · Effective 20. novembra 2026 · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 3.16 · Effective 20. novembra 2026 · Prejšnje različice na dezbatere.ro/privacy/versions · Upravljavec: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Zbiramo podatke, ki jih potrebuje račun, in to, kar vnesete v svoje razprave. To, kar napišete pomočniku za podporo, gre njegovemu modelu umetne inteligence, da vam lahko odgovori, in ničesar od tega ne hranimo. Vaša vprašanja se pošljejo ponudnikom umetne inteligence, navedenim v našem Registru, predvsem ponudniku DeepInfra, v Združenih državah. Pogoji družb DeepInfra, Anthropic in Perplexity jim ne dovoljujejo učenja modelov na tem, kar napišete; razdelek 5 pojasnjuje, za katero družbo tega še nismo potrdili. Naš ponudnik gostovanja hrani vaš račun in vaše razprave v Londonu v Združenem kraljestvu; razdelek 5 pojasnjuje, kam še gredo vaši podatki. Na brezplačnem paketu so razprave po zaključku javne, po preverjanju z umetno inteligenco; na plačljivem paketu so zasebne, razen če jih objavite. Z izbrisom računa se uničijo ključi vaših zasebnih podatkov na našem strežniku, šifrirane kopije v naši ločeni shrambi varnostnih kopij pa se ne izbrišejo samodejno (razdelek 7); javne razprave ostanejo javne, vaš psevdonim pa se iz njih odstrani. Dosegljivi smo na privacy@dezbatere.ro, osebe, navedene v razpravi, pa nam lahko pišejo brez računa.
 

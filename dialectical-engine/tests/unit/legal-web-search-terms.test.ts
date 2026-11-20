@@ -24,10 +24,10 @@ describe("web search, in the English legal texts", () => {
 
   it("the no-training promise names the model providers we have checked, never Perplexity", () => {
     for (const [name, text] of [["terms-of-service.md", terms], ["privacy-policy.md", privacy]] as const) {
-      expect(text, name).toContain("The terms of DeepInfra and Anthropic do not allow them to use your content to train or improve their models");
+      expect(text, name).toContain("The terms of DeepInfra, Anthropic and Amazon do not allow them to use your content to train or improve their models");
       expect(text, name).not.toMatch(COVERS_SEARCH);
     }
-    expect(privacy).toContain("the terms of DeepInfra and Anthropic do not allow them to; section 5 says for which company we have not confirmed this yet, and what the web search provider may do with the search phrases the models write.");
+    expect(privacy).toContain("the terms of DeepInfra, Anthropic and Amazon do not allow them to; section 5 says for which company we have not confirmed this yet, and what the web search provider may do with the search phrases the models write.");
   });
 
   it("each text points from the promise to the web search paragraph", () => {

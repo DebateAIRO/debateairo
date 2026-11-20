@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
+import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
 
 /**
  * Terms 2.12 and Privacy 3.11, R22 decisions 35 and 36: the Report button, a report's six months, and the sealed originals' six months.
@@ -12,9 +13,11 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  * The paragraph that names DeepInfra in section 5 (16 November 2026, 3.12 amended in place) and its blank line move those from 99 on by two more.
  * Privacy 3.14's section 4 lost its product-news row (we send no marketing email), so the indexes from 90 on moved back by one.
  * Privacy 3.15's unfinished sign-up row in section 7 moves those from 146 on by one more.
+ * Privacy 3.16's paragraph on Amazon in section 5 stands in English, Romanian and French only, so the lines are read
+ * with 3.16 undone (tests/support/legalPrivacy316.ts) and every language keeps the same rows at the same places.
  */
 const read = (locale: string, name: string): string => readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, name), "utf8");
-const privacy = (locale: string): string[] => read(locale, "privacy-policy.md").split("\n");
+const privacy = (locale: string): string[] => withoutPrivacy316(locale, read(locale, "privacy-policy.md")).split("\n");
 const terms = (locale: string): string[] => read(locale, "terms-of-service.md").split("\n");
 const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
 
