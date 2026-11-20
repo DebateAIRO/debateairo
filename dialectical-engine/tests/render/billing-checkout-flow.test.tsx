@@ -544,14 +544,19 @@ describe("N25b the payment marks under Continue (spec §2.18)", () => {
     client.createBillingQuote.mockResolvedValue(quote());
     // A made-up shop id: the real one is never in the repository.
     await renderWithMarks({ netopia: true, visa: true, mastercard: true }, "https://mny.ro/np-black-0.svg?id=123456");
-    expect(marksImages()).toEqual([["https://mny.ro/np-black-0.svg?id=123456", "NETOPIA Payments, Visa, Mastercard"]]);
+    // The version for a light background and the one for a dark background; the style sheet shows the theme's.
+    expect(marksImages()).toEqual([
+      ["https://mny.ro/np-black-0.svg?id=123456", "NETOPIA Payments, Visa, Mastercard"],
+      ["https://mny.ro/np-white-0.svg?id=123456", "NETOPIA Payments, Visa, Mastercard"]
+    ]);
     const group = container.querySelector('[role="group"]')!;
     expect(group.previousElementSibling?.contains(button("billing.checkout.continueToCard")!)).toBe(true);
     const link = group.querySelector("a")!;
     expect([link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("rel")])
       .toEqual(["https://netopia-payments.com/", "_blank", "noopener noreferrer"]);
-    const image = group.querySelector("img")!;
-    expect([image.getAttribute("loading"), image.getAttribute("referrerpolicy"), image.hasAttribute("crossorigin")]).toEqual(["lazy", "no-referrer", false]);
+    for (const image of group.querySelectorAll("img")) {
+      expect([image.getAttribute("loading"), image.getAttribute("referrerpolicy"), image.hasAttribute("crossorigin")]).toEqual(["lazy", "no-referrer", false]);
+    }
     expect(container.querySelector('img[src^="/payment-marks/"]')).toBeNull();
   });
 });

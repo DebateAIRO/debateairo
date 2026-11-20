@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
-  availablePaymentMarks, NETOPIA_LOGO_ID_FORM, NETOPIA_LOGO_SETTING, netopiaLogoAddress, PAYMENT_MARK_NAMES, PAYMENT_MARKS_SETTING
+  availablePaymentMarks, NETOPIA_LOGO_ID_FORM, NETOPIA_LOGO_SETTING, netopiaLogoAddress, netopiaLogoOnDark, PAYMENT_MARK_NAMES, PAYMENT_MARKS_SETTING
 } from "../../apps/ui/lib/billing/paymentMarks.js";
 
 const NONE = { netopia: false, visa: false, mastercard: false };
@@ -51,6 +51,17 @@ describe("NETOPIA's hosted logo: the NETOPIA_LOGO_ID setting gives one image add
     expect(netopiaLogoAddress({})).toBeNull();
     expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: "123456" })).toBe("https://mny.ro/np-black-0.svg?id=123456");
     for (const id of GOOD) expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: id }), id).toBe(`https://mny.ro/np-black-0.svg?id=${id}`);
+  });
+
+  it("has a white-on-dark version of the same picture, at the same host and with the same id", () => {
+    expect(netopiaLogoOnDark("https://mny.ro/np-black-0.svg?id=123456")).toBe("https://mny.ro/np-white-0.svg?id=123456");
+    for (const id of GOOD) {
+      const onLight = netopiaLogoAddress({ NETOPIA_LOGO_ID: id })!;
+      const onDark = netopiaLogoOnDark(onLight);
+      expect(onDark, id).toBe(`https://mny.ro/np-white-0.svg?id=${id}`);
+      // The content policy allows one outside image host, so both versions must come from it.
+      expect(new URL(onDark).origin, id).toBe(new URL(onLight).origin);
+    }
   });
 
   it("gives no address for any value that is not 1 to 12 digits", () => {

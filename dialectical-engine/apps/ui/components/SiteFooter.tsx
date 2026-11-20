@@ -3,7 +3,7 @@
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { CookiePreferencesButton } from "@/components/legal/CookiePreferencesButton";
 import type { LineFooterBilling, SiteFooterBilling } from "@/lib/billing/footerBilling";
-import type { PaymentMarks } from "@/lib/billing/paymentMarks";
+import { netopiaLogoOnDark, type PaymentMarks } from "@/lib/billing/paymentMarks";
 import { useChromeI18n } from "@/lib/i18n/I18nProvider";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import { ADR_URL, COMPANY, isUnverified, LEGAL_PAGES } from "@/lib/legal/pages";
@@ -141,6 +141,10 @@ const MARK_IMAGES = [
  * logo (the NETOPIA_LOGO_ID setting, `netopiaLogoAddress()`), when a server page hands it over, is the whole group: its
  * picture already holds the Visa and Mastercard marks, so the files the `PAYMENT_MARKS_AVAILABLE` setting names
  * (`availablePaymentMarks()`) are not drawn beside it. Nothing at all when neither setting names any.
+ *
+ * The logo comes in two versions, as NETOPIA's own logo script draws it: blue wordmarks for a light background, white
+ * ones for a dark background. Both are in the page and legal.css shows the one for the theme, so a theme switch needs
+ * no script here.
  */
 export function PaymentMarksGroup({ marks, netopiaLogo = null }: { marks: PaymentMarks; netopiaLogo?: string | null }) {
   const { catalog } = useChromeI18n();
@@ -152,9 +156,11 @@ export function PaymentMarksGroup({ marks, netopiaLogo = null }: { marks: Paymen
       <div className="siteFooterMarks" role="group" aria-label={t(catalog, "chrome.footer.paymentMarks")}>
         <a className="siteFooterNetopia" href={NETOPIA_URL} target="_blank" rel="noopener noreferrer" title={netopia}>
           {/* Lazy: the browser asks NETOPIA's server only when the footer comes near the screen, and the server render
-              adds no preload for it. No referrer: NETOPIA's server is not told which page the visitor is on. No
-              crossOrigin: NETOPIA's server allows no cross-origin read, and a plain image needs none. */}
-          <img src={netopiaLogo} alt={alt} width={418} height={75} loading="lazy" referrerPolicy="no-referrer" />
+              adds no preload for it; a lazy image that is not displayed is not asked for at all, so only the theme's
+              version loads. No referrer: NETOPIA's server is not told which page the visitor is on. No crossOrigin:
+              NETOPIA's server allows no cross-origin read, and a plain image needs none. */}
+          <img className="siteFooterNetopiaOnLight" src={netopiaLogo} alt={alt} width={418} height={75} loading="lazy" referrerPolicy="no-referrer" />
+          <img className="siteFooterNetopiaOnDark" src={netopiaLogoOnDark(netopiaLogo)} alt={alt} width={418} height={75} loading="lazy" referrerPolicy="no-referrer" />
         </a>
       </div>
     );

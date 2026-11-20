@@ -4932,7 +4932,8 @@ echo SB5C_DONE
 
 NETOPIA asks for its logo on the site. The website shows NETOPIA's hosted picture when its setting `NETOPIA_LOGO_ID`
 holds the shop id NETOPIA shows you (1 to 12 digits; it is public, since it ends up in the page as part of the picture's
-address, `https://mny.ro/np-black-0.svg?id=<id>`). The visitor's browser loads the picture from NETOPIA's server, and
+address, `https://mny.ro/np-black-0.svg?id=<id>`; the dark theme shows NETOPIA's version for a dark background,
+`np-white-0.svg`, with the same id). The visitor's browser loads the picture from NETOPIA's server, and
 the website's content policy lets images come from `https://mny.ro` and from no other outside host, so nothing is
 copied to the server and Caddy does not change. The picture already holds the Visa and Mastercard marks, so while the
 line is there the website draws none of the files of "Payment marks: the files and Caddy's rule": skip PM1, SB5b, MT1,
@@ -5332,7 +5333,8 @@ be a 200 with an SVG, with no cookie and no redirect (the Privacy Policy and the
 now and then: NETOPIA can change the picture at any time.
 
 Then look by eye, with the site password, in a private window: the home page's footer in the light and the dark theme
-(the logo on its white chip; a click opens netopia-payments.com in a new tab), a legal page, a phone width, and the
+(blue wordmarks on a white chip in the light theme, white wordmarks with no chip in the dark theme; a click opens
+netopia-payments.com in a new tab), a legal page, a phone width, and the
 checkout's card step (sign in, pick a plan, look at the logo under the button, and do not press the button).
 
 ```sh

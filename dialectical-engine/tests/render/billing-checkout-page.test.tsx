@@ -39,7 +39,12 @@ vi.mock("@/lib/billing/serverBilling", () => ({
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
 // The marks and NETOPIA's hosted logo are read from the server's settings; the flow and the footer get the same answer.
-vi.mock("@/lib/billing/paymentMarks", () => ({ availablePaymentMarks: () => mocks.marks, netopiaLogoAddress: () => mocks.netopiaLogo }));
+// The two settings readers are stand-ins; the footer's pure helper for the dark-background logo stays the real one.
+vi.mock("@/lib/billing/paymentMarks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/billing/paymentMarks")>()),
+  availablePaymentMarks: () => mocks.marks,
+  netopiaLogoAddress: () => mocks.netopiaLogo
+}));
 vi.mock("@/components/billing/CheckoutFlow", () => ({
   CheckoutFlow: (props: Record<string, unknown>) => { mocks.flowProps.push(props); return null; }
 }));
@@ -129,6 +134,7 @@ describe("P19 /checkout and /checkout/return", () => {
     const html = renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
     expect(mocks.flowProps[1]?.netopiaLogo).toBe("https://mny.ro/np-black-0.svg?id=123456");
     expect(html).toContain('src="https://mny.ro/np-black-0.svg?id=123456"');
+    expect(html).toContain('src="https://mny.ro/np-white-0.svg?id=123456"');
     expect(html).not.toContain('src="/payment-marks/');
   });
 
