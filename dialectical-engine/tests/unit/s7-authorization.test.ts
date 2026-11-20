@@ -203,10 +203,6 @@ const EXPECTED_AUTHORIZATION_MATRIX = Object.freeze([
   // No static capability: the handler selects TEAM_DISABLE or EMERGENCY_DISABLE from the strict mode.
   { route: "POST /v1/admin/team/{staffId}/disable", auth: "staff", resource: "staff-team", action: "disable" },
   { route: "GET /v1/admin/audit", auth: "staff", staffCapability: "AUDIT_READ", resource: "staff-audit", action: "list" },
-  { route: "GET /v1/admin/threat-reports", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "list" },
-  { route: "GET /v1/admin/threat-reports/summary", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "summary" },
-  { route: "GET /v1/admin/threat-reports/{reportRef}", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "read" },
-  { route: "POST /v1/admin/threat-reports/{reportRef}/decision", auth: "staff", staffCapability: "THREAT_REPORT", resource: "staff-threat-report", action: "decide" },
   { route: "GET /v1/admin/publication-reviews", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "list" },
   { route: "GET /v1/admin/publication-reviews/{reviewRef}", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "read" },
   { route: "POST /v1/admin/publication-reviews/{reviewRef}/approve", auth: "staff", staffCapability: "PUBLICATION_REVIEW", resource: "staff-publication-review", action: "approve" },
@@ -377,9 +373,10 @@ describe("S7 deny-by-default authorization", () => {
     // The WHOLE inventory, staff rows included, row for row (no route family is filtered out).
     const order=(a:{route:string},b:{route:string})=>a.route<b.route?-1:a.route>b.route?1:0;
     expect([...authorizationPolicyInventory].sort(order)).toEqual([...EXPECTED_AUTHORIZATION_MATRIX].sort(order));
-    // 37 staff contract routes (five of them the team limit's, four decision 33's public review, two decision 35's report queue) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
-    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(42);
-    expect(staffContractInventory.routes).toHaveLength(37);
+    // 33 staff contract routes (five of them the team limit's, four decision 33's public review, two decision 35's report queue; the four
+    // threat-report routes went with the threat reports, 2026-11-19) + the two internal-allowance routes + decision 32's three (the Owner's allowance for a member).
+    expect(EXPECTED_AUTHORIZATION_MATRIX.filter(policy => policy.route.includes(" /v1/admin/"))).toHaveLength(38);
+    expect(staffContractInventory.routes).toHaveLength(33);
     // The merged closed inventory adds the twenty-one external recovery routes to the current ordinary inventory and 20 staff/internal
     // allowance routes; set equality and Fastify mounting above check each one. NETOPIA's card page (N13) adds
     // GET /v1/billing/subscription/card, the auth DB batch's four MFA-recovery wait routes, beside dev's 158, and
@@ -400,7 +397,8 @@ describe("S7 deny-by-default authorization", () => {
     // DELETE …/{id}): 210.
     // 0157 adds the statements of reasons (GET /v1/account/moderation-statements): 211 with the union.
     // The verify that also sets the password (POST /v1/auth/verify-email/password) adds one: 212.
-    expect(contractInventory.routes).toHaveLength(212);
+    // The threat reports' four staff routes were removed (2026-11-19): 208.
+    expect(contractInventory.routes).toHaveLength(208);
     expect(contractInventory.routes.filter(route => route.includes("/v1/admin/internal-allowances"))).toHaveLength(2);
   });
 

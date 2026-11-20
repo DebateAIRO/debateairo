@@ -42,7 +42,6 @@ export type MailPurpose =
   | "billing"
   | "data-export"
   | "owner-notice"
-  | "threat-report-alert"
   | "team-notice"
   | "moderation-notice"
   | "owner-limit-alert";
@@ -63,7 +62,6 @@ const PURPOSE_CLASS: Readonly<Record<MailPurpose, MailPurposeClass>> = Object.fr
   "password-reset": "security",
   "email-recovery": "security",
   "owner-notice": "security",
-  "threat-report-alert": "security",
   // V4 (moved onto the V4 line 2026-11-07; class awaiting the owner's confirmation): the team's content-free notices to its Owner,
   // partner and members (team limit, allowances, public review steps, reports on a public debate) are owner notices, so security.
   "team-notice": "security",

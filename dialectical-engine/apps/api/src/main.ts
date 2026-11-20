@@ -79,7 +79,6 @@ import {
   assertPublicationSecretDomains,
   configureCustodyGroup,
   ContentCipher,
-  type CryptoEnvelope,
   decrypt,
   openRecord,
   FilePublicationKeyStore,
@@ -203,10 +202,9 @@ import { createPublicationReviewStaffService } from "./publication-review/staff.
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
 import { readQuestionSubjects } from "./question-check/subjects.js";
-import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
 import { startTeamLimitNotices } from "./staff/team-limit.js";
-import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
-import { threatReportEmailReader } from "./staff/threat-reports.js";
+import { startThreatReportErasure } from "./staff/threat-report-closure.js";
+import { accountEmailReader } from "./staff/account-email.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
@@ -1220,21 +1218,18 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,mappingPool:crossAccountPool(pool, "X14"),keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
-const threatReportRepository = new PostgresThreatReportRepository(pool);
-// Row-level security (X27, merge onto synthesis-flag S04): a staff request reads the reported account's address, another
+// Row-level security (X27, merge onto synthesis-flag S04): the staff notice loops read another account's address, another
 // account's identity row, so the reader runs on the cross-account target.
-const readThreatReportRecipientEmail = threatReportEmailReader(crossAccountPool(pool, "X27"), dekStore);
+const readAccountEmail = accountEmailReader(crossAccountPool(pool, "X27"), dekStore);
 // Decision 24: 0142's definers only, and the notices open the named account's address through the same reader.
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
 const publicFlagRepository = new PostgresPublicFlagRepository(pool);
-const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), {publicAppUrl: environment.PUBLIC_APP_URL}),
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
-  threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
   teamLimit: { repository: teamLimitRepository },
   publicFlags: { repository: publicFlagRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
     if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
@@ -1427,25 +1422,11 @@ const accountErasureRepository = new PostgresAccountErasureRepository(
 const accountErasure = new AccountErasureCoordinator(
   accountErasureRepository,dekStore,runKeyStore,publicationCipher,
   new PostgresSupportShredRepository(supportPool),{
-    readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
-      'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
-    )).rows[0]?.email_ciphertext ?? null,
-    beforeKeyDestruction: threatReportEmailHold(threatReportRepository),
     // V4 start step, Task 39e (owner answer S4 A): closing the account destroys every question key it finds by the owner_ref, then the
     // account key (Task 39d's step); the same store the service and the export use.
     savedQuestionKeys
   }
 );
-const threatReportAlertsTimer = startThreatReportAlerts({
-  repository: threatReportRepository,
-  mail: new TemplatedMailSender({
-    executable: environment.MAIL_SENDMAIL_PATH,
-    from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs,
-    gate: outboundMailGate
-  }),
-  readRecipientEmail: readThreatReportStaffEmail
-}, releaseWatcher);
 const teamLimitNoticesTimer = startTeamLimitNotices({
   repository: teamLimitRepository,
   mail: new TemplatedMailSender({
@@ -1454,7 +1435,7 @@ const teamLimitNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // Decision 32: the Owner's and the member's notices about an allowance, through the same loop and mail.
 const allowanceNoticesTimer = startTeamLimitNotices({
@@ -1465,7 +1446,7 @@ const allowanceNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // Decision 33: both accounts hear of every review step, content-free, through the same loop.
 const publicReviewNoticesTimer = startTeamLimitNotices({
@@ -1476,7 +1457,7 @@ const publicReviewNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // Decision 35: both accounts hear that a debate was hidden automatically or a report waits, content-free.
 const publicFlagNoticesTimer = startTeamLimitNotices({
@@ -1487,7 +1468,7 @@ const publicFlagNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // 0157: every person a review step affects gets a statement of reasons (DSA Art 17). It replaces 0156's content-free notice: this release no longer
 // claims 0156's queue, so nobody gets both from it; twelve months on, the typed facts and the quote go.
@@ -1513,7 +1494,9 @@ const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightE
   await publicFlagMailRepository.settleStuck();
   await moderationStatementRepository.deleteWordsDue();
 }, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
-const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
+// The staff threat reports were removed (2026-11-19); reports a database may still hold from before 0171 are still erased when due,
+// until the migration that drops the schema. The sweep runs on the system login (the cross-account marker holds it since 0171).
+const threatReportErasureTimer = startThreatReportErasure({ repository: new PostgresThreatReportRepository(pool) }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
@@ -2334,7 +2317,6 @@ const supportSweepTimer = gatedInterval(releaseWatcher, () => {
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(restoreFenceTimer));
-api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));

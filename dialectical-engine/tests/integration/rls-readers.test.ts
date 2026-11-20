@@ -63,7 +63,7 @@ import {
 import { PostgresModelSpendStore, PostgresRecentRunUsageSource } from "@debateai/budget";
 import type { CalibrationStrategy, RecordedProperScore, RegisteredProperScore } from "@debateai/settlement";
 import { DekBillingRecipientReader } from "../../apps/api/src/billing/account-email.js";
-import { threatReportEmailReader } from "../../apps/api/src/staff/threat-reports.js";
+import { accountEmailReader } from "../../apps/api/src/staff/account-email.js";
 import { openBillingOperatorPool } from "../../apps/api/src/billing/operator-connection.js";
 import { PREVIEW_MEASURED_USAGE_SQL, PREVIEW_UNFINISHED_RUNS_SQL } from "../../apps/api/src/preview-budget-estimate.js";
 import { PostgresAskAdmissionGate } from "../../apps/api/src/release-state.js";
@@ -833,13 +833,13 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
     expect(sightings("X26", login, seen)).toEqual([]);
   });
 
-  it("S7.1-X27 threatReportEmailReader on crossAccountPool(pool, \"X27\") (apps/api/src/staff/threat-reports.ts:30, the staff threat report read; apps/api/src/main.ts) on debateai_dev_api_system finds the addresses of A and of B", async () => {
-    // Merged from origin/dev (synthesis-flag S04): inside a staff request (here A's session) the reader looks up the
-    // reported account's address, another account's identity row. The key store records whose row was found and stops
+  it("S7.1-X27 accountEmailReader on crossAccountPool(pool, \"X27\") (apps/api/src/staff/account-email.ts, the staff notice loops' address read; apps/api/src/main.ts) on debateai_dev_api_system finds the addresses of A and of B", async () => {
+    // Merged from origin/dev (synthesis-flag S04, once the staff threat report's reader): the reader looks up another
+    // account's identity row (here inside A's session). The key store records whose row was found and stops
     // before any decryption.
     const { pool, login } = reader(crossAccountPool(api.runtime, "X27"), "debateai_dev_api_system");
     const found: string[] = [];
-    const read = threatReportEmailReader(pool, { load: async (userId: string) => {
+    const read = accountEmailReader(pool, { load: async (userId: string) => {
       found.push(userId);
       throw new TypeError("RLS_C7_DEK_UNUSED");
     } } as never);

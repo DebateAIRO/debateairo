@@ -619,7 +619,8 @@ export async function collectSnapshot(input: {
         reports_you_made: reportsYouMade,
         moderation_notices: moderationNotices,
         earlier_moderation_notices: earlierNotices,
-        // V4 start step, Task 39e: the questions not started yet (never `kept_questions`, which the threat reports use).
+        // V4 start step, Task 39e: the questions not started yet (never `kept_questions`, the threat reports' name: until the
+        // migration that drops them, rows an earlier question check kept are still exported there while the sweep has not erased them).
         questions_not_started: await collectQuestionsNotStarted(raw, claim, decrypt),
       },
       security: {

@@ -27,7 +27,7 @@ export const ACCOUNT_CREDENTIAL_SETTING = "debateai.session_credential";
 /**
  * The readers a call site names (SPEC-v4 §6): X10, X18a-X18g, X18j, X20, X22, X23, X24 inside their reader methods in
  * packages/*; X21 in apps/api/src/preview-budget-estimate.ts; X11, X14, X18h, and since the merge onto synthesis-flag X27
- * (the staff threat report's recipient address) and X28 (the staff publication review), and since the security review X38 (the
+ * (the staff notice loops' account address reader, once the staff threat report's) and X28 (the staff publication review), and since the security review X38 (the
  * Report button's settlement, after its judge), X30 to X33 (the writers of the site's day a request pays for: the language check,
  * the question check, the clarify charge and the synthesis check) and X37 (the ask-time discovery's record of each provider probe it
  * makes), in apps/api/src/main.ts, X29 (a report press's seal under the public debate's own run, upload check Task 9) in

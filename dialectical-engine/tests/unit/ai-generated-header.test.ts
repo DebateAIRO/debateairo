@@ -90,8 +90,7 @@ describe("the AI-generated mark", () => {
     }
     expect(carriesAiGeneratedContent("GET /v1/runs/{id}/publication-review", { flagged: false, categories: [] })).toBe(false);
     expect(carriesAiGeneratedContent("GET /v1/runs/{id}/publication-review", { flagged: true, categories: ["HATE_SPEECH"] })).toBe(true);
-    for (const route of ["GET /v1/admin/public-review", "GET /v1/admin/threat-reports", "GET /v1/admin/threat-reports/summary",
-      "GET /v1/admin/threat-reports/{reportRef}", "GET /v1/admin/audit", "GET /v1/admin/team", "GET /v1/admin/team-limit",
+    for (const route of ["GET /v1/admin/public-review", "GET /v1/admin/audit", "GET /v1/admin/team", "GET /v1/admin/team-limit",
       "GET /v1/admin/team-allowances", "GET /v1/admin/enrollment", "POST /v1/admin/publication-reviews/{reviewRef}/approve",
       "POST /v1/admin/public-review/{id}/step", "POST /v1/admin/public-reports/{id}/dismiss"]) {
       expect(AI_GENERATED_ROUTES.has(route), route).toBe(false);
