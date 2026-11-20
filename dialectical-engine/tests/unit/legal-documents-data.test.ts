@@ -5,6 +5,7 @@ import {
   buildLegalDocument,
   inlineText,
   LEGAL_DOCUMENT_SOURCES,
+  parseBlocks,
   renderLegalModule
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { POLICY_JUMP, POLICY_SECTIONS, PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
@@ -67,10 +68,27 @@ describe("legal documents — generated data", () => {
     expect(() => buildLegalDocument(markdown, "privacy")).toThrow(/numbered headings/);
   });
 
+  it("gives a paragraph a lead only for its opening bold run, plain, and always the start of its text", () => {
+    for (const document of [TERMS_OF_SERVICE, PRIVACY_POLICY]) {
+      const leads = document.sections.flatMap((entry) => entry.blocks.flatMap((block) => (block.kind === "p" && block.lead !== undefined ? [block] : [])));
+      expect(leads.length, document.key).toBeGreaterThan(10);
+      for (const block of leads) {
+        expect(block.lead!.length, block.text.slice(0, 40)).toBeGreaterThan(0);
+        expect(block.text.startsWith(block.lead!), block.lead).toBe(true);
+        expect(MARKDOWN_RESIDUE.test(block.lead!), block.lead).toBe(false);
+      }
+    }
+    // A bold run in the middle of a paragraph is not a lead, and an opening one becomes one.
+    expect(parseBlocks(["Cancel from **Settings → Subscription** at any time."])).toEqual([
+      { kind: "p", text: "Cancel from Settings → Subscription at any time." }
+    ]);
+    expect(parseBlocks(["**Delivery.** Nothing is shipped."])).toEqual([{ kind: "p", lead: "Delivery.", text: "Delivery. Nothing is shipped." }]);
+  });
+
   describe("Terms of Service", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(TERMS_OF_SERVICE.key).toBe("terms");
-      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.0 · EFFECTIVE 19 NOVEMBER 2026");
+      expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.0 · EFFECTIVE 20 NOVEMBER 2026");
       expect(TERMS_OF_SERVICE.title).toBe("What you agree to");
       expect(TERMS_OF_SERVICE.lede).toBe(
         "The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end."
@@ -299,9 +317,18 @@ describe("legal documents — generated data", () => {
 
     it("opens section 12 with the free plan and the three paid plans, no drafting note", () => {
       expect(texts(section(TERMS_OF_SERVICE, "12"))[0]).toBe(
-        "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, will be available; each unlocks the full model roster and lets you set the debate gauges yourself."
+        "Dialectical Engine offers a free plan. Three paid plans, Plus, Pro and Max, are available; each unlocks the full model roster and lets you set the debate gauges yourself."
       );
       expect(allTexts(TERMS_OF_SERVICE).some((text) => text.includes("we refund the share of that period's price you have not used, measured by the plan's credit, however many days have passed"))).toBe(true);
+    });
+
+    it("carries section 12's bold lead-ins as leads, each the start of its paragraph's text", () => {
+      const leads = section(TERMS_OF_SERVICE, "12").blocks.flatMap((block) => (block.kind === "p" && block.lead !== undefined ? [block.lead] : []));
+      expect(leads).toEqual(expect.arrayContaining(["Cancelling.", "Delivery.", "Statutory rights first."]));
+      const delivery = section(TERMS_OF_SERVICE, "12").blocks.find((block) => block.kind === "p" && block.lead === "Delivery.");
+      expect(delivery).toEqual({ kind: "p", lead: "Delivery.", text: expect.stringMatching(/^Delivery\. Dialectical Engine is an online service/u) });
+      // The free-plan paragraph opens with no bold run, so it carries no lead key at all.
+      expect(Object.keys(section(TERMS_OF_SERVICE, "12").blocks[0]!)).toEqual(["kind", "text"]);
     });
 
     it("gives everyone the 14-day withdrawal in section 13, refunded by the plan's credit not used (owner's decision of 16 November 2026)", () => {
@@ -309,8 +336,10 @@ describe("legal documents — generated data", () => {
       // not used. Days elapsed do not count: nothing used gives the full price back.
       expect(texts(section(TERMS_OF_SERVICE, "13"))).toEqual([
         "Wherever you live, you may withdraw from a paid subscription within 14 days of subscribing, without giving a reason."
-          + " Use the Withdraw from contract page at dezbatere.ro/withdraw, the model form in the confirmation email,"
-          + " or write to support@dezbatere.ro; we confirm receipt on a durable medium.",
+          + " Once signed in, open Settings → Subscription, press “Withdraw from contract here” and then “Confirm withdrawal”."
+          + " You can also send the model form attached to your confirmation email, or any clear statement that you withdraw,"
+          + " to support@dezbatere.ro. The Withdraw from contract page at dezbatere.ro/withdraw explains both ways."
+          + " A withdrawal sent before the 14 days end is in time, and we confirm receipt on a durable medium.",
         "If you asked us to start the service immediately — by ticking the box at checkout — and then withdraw,"
           + " you pay only for the share of the plan's credit you have used by then, however many days have passed,"
           + " and we refund the rest of the price: if you have used 30% of the credit, we refund 70% of the price;"
@@ -439,12 +468,12 @@ describe("legal documents — generated data", () => {
   describe("Privacy Policy", () => {
     it("carries the modal chrome derived from the draft's version line", () => {
       expect(PRIVACY_POLICY.key).toBe("privacy");
-      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.14 · EFFECTIVE 19 NOVEMBER 2026");
+      expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v3.15 · EFFECTIVE 20 NOVEMBER 2026");
       expect(PRIVACY_POLICY.title).toBe("What we store, and why");
       expect(PRIVACY_POLICY.lede).toBe(
         "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end."
       );
-      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.14");
+      expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.15");
       expect(PRIVACY_POLICY.contact).toBe("privacy@dezbatere.ro");
       expect(PRIVACY_POLICY.bodyLabel).toBe("Privacy Policy text");
       expect(PRIVACY_POLICY.sectionIdPrefix).toBe("policy-section-");

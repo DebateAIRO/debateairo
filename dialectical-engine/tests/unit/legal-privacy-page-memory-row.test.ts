@@ -60,10 +60,10 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
 
   it("English has the new rows where the owner placed them", () => {
     // 0157: the moderation notices row in section 2, and its two rows in section 7; Privacy 3.12: the questions not started yet,
-    // one row in each.
+    // one row in each. Privacy 3.15: section 7 gains the unfinished sign-up row, and its acceptance row becomes two.
     expect(englishCollect).toBe(17);
     expect(cells(tableRows("en", 2)[COLLECT_AT - 1]!)[0]).toBe("**Debate content**");
-    expect(englishRetain).toBe(30);
+    expect(englishRetain).toBe(32);
     const names = tableRows("en", 7).map((row) => cells(row)[0]);
     expect(names.indexOf("Page settings and visits")).toBeGreaterThan(names.indexOf("Provider return records and retrieval references"));
     expect(names.indexOf("Provider return records and retrieval references")).toBeGreaterThanOrEqual(0);
@@ -85,7 +85,7 @@ describe("Privacy Policy 3.8 says what the debate pages keep in the account (R22
     expect(kept[2], `${code}: deletion with the debate points at section 6`).toMatch(/6/u);
     const purpose = cells(tableRows(code, 4)[0]!)[1]!;
     expect(purpose.toLocaleLowerCase(code), `${code}: section 4's first row lists it`).toContain(label.toLocaleLowerCase(code));
-    expect(markdown(code), `${code}: now version 3.14`).toMatch(/v3\.14 /u);
+    expect(markdown(code), `${code}: now version 3.15`).toMatch(/v3\.15 /u);
   });
 
   it.each(Object.entries(PINNED))("%s: the rows and the change-log sentence read exactly as approved", (code, pinned) => {
