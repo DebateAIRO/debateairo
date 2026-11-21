@@ -60,8 +60,8 @@ describe("launch starts the Terms of Service and the Privacy Policy at 1.0", () 
 
   it("the English pages say 1.0", () => {
     expect([TERMS_OF_SERVICE.version, PRIVACY_POLICY.version]).toEqual(["1.0", "1.0"]);
-    expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.0 · EFFECTIVE 20 NOVEMBER 2026");
-    expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v1.0 · EFFECTIVE 20 NOVEMBER 2026");
+    expect(TERMS_OF_SERVICE.eyebrow).toBe("TERMS OF SERVICE · v1.0 · EFFECTIVE 22 NOVEMBER 2026");
+    expect(PRIVACY_POLICY.eyebrow).toBe("PRIVACY POLICY · v1.0 · EFFECTIVE 22 NOVEMBER 2026");
     expect(TERMS_OF_SERVICE.endMarker).toBe("END OF TERMS · v1.0");
     expect(PRIVACY_POLICY.endMarker).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.0");
   });

@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Röviden
-eyebrow: ADATVÉDELMI SZABÁLYZAT · v1.0 · HATÁLYOS 2026. NOVEMBER 20.
+eyebrow: ADATVÉDELMI SZABÁLYZAT · v1.0 · HATÁLYOS 2026. NOVEMBER 22.
 title: Mit tárolunk és miért
 lede: Az Ön jogai és a GDPR (EU) 2016/679 szerinti kötelezettségeink közérthetően. Tizennégy szakasz és a B. melléklet — görgessen a végéig.
 endMarker: A SZABÁLYZAT VÉGE · GDPR (EU) 2016/679 · v1.0
@@ -19,7 +19,7 @@ jumps:
 13 SÜTIK
 -->
 
-**Version 1.0 · Effective 2026. november 20. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.0 · Effective 2026. november 22. · Korábbi változatok: dezbatere.ro/privacy/versions · Adatkezelő: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Gyűjtjük a fiók működéséhez szükséges adatokat és azt, amit Ön a vitáiba beír. Amit a támogatási asszisztensnek ír, az az MI-modelljéhez jut el, hogy válaszolhasson Önnek, és ebből semmit nem őrzünk meg. Kérdéseit a Nyilvántartásunkban felsorolt MI-szolgáltatókhoz továbbítjuk, főként az Egyesült Államokban működő DeepInfra szolgáltatóhoz. A DeepInfra, az Anthropic és a Perplexity feltételei nem engedik meg nekik, hogy modelljeiket az Ön által beírtakon betanítsák; hogy melyik vállalat esetében még nem erősítettük ezt meg, azt az 5. szakasz mondja el. Tárhelyszolgáltatónk az Ön fiókját és vitáit Londonban, az Egyesült Királyságban tárolja; hogy adatai még hová jutnak, azt az 5. szakasz mondja el. Az ingyenes csomagon a viták befejezésük után, MI-ellenőrzést követően nyilvánosak; fizetős csomagon magánjellegűek, amíg Ön közzé nem teszi őket. Fiókja törlése megsemmisíti magánjellegű adatainak kulcsait a kiszolgálónkon, de a különálló biztonsági mentési tárhelyünkön lévő titkosított másolatok nem törlődnek automatikusan (7. szakasz); a nyilvános viták nyilvánosak maradnak, de belőlük eltávolítjuk az Ön álnevét. A privacy@dezbatere.ro címen érhet el bennünket, a vitában megnevezett személyek pedig fiók nélkül is írhatnak nekünk.
 

@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "94b1a93cc59fea9e49656b0bc18a314f126fdb11e9ac44b5dd1e9704194418c9",
-  eyebrow: "PRAVILNIK O ZASEBNOSTI · v1.0 · VELJA OD 20. NOVEMBRA 2026",
+  sha256: "b874123ba858098f43c1ae7f5ec15955e4bc848fc97aa18719f0d79bd029e6e4",
+  eyebrow: "PRAVILNIK O ZASEBNOSTI · v1.0 · VELJA OD 22. NOVEMBRA 2026",
   title: "Kaj hranimo in zakaj",
   lede: "Vaše pravice in naše obveznosti po GDPR (EU) 2016/679 v razumljivem jeziku. Štirinajst razdelkov in Priloga B — pomaknite se do konca.",
   endMarker: "KONEC PRAVILNIKA · GDPR (EU) 2016/679 · v1.0",

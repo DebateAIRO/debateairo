@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: KÄYTTÖEHDOT · v1.0 · VOIMASSA 20. MARRASKUUTA 2026 ALKAEN
+eyebrow: KÄYTTÖEHDOT · v1.0 · VOIMASSA 22. MARRASKUUTA 2026 ALKAEN
 title: Mihin sitoudut
 lede: Sinun ja DMS Merchandise Shop S.R.L.:n välinen sopimus selkeällä kielellä. Yhdeksäntoista kohtaa ja liite A — vieritä loppuun.
 endMarker: KÄYTTÖEHTOJEN LOPPU · v1.0
@@ -21,7 +21,7 @@ jumps:
 18 SOVELLETTAVA LAKI
 -->
 
-**Version 1.0 · Effective 20. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
+**Version 1.0 · Effective 22. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/terms/versions · Kieli: suomi.**
 
 **In short.** Sinun on oltava vähintään 18-vuotias. Dialectical Engine muodostaa argumentteja tekoälymalleilla, ja kaikki sen tuottama voi olla virheellistä — se ei ole neuvontaa. Maksuttomassa tilauksessa väittelysi ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Kun väittely on julkinen, kuka tahansa voi lukea sen, ja se pysyy julkisena. Lähettämäsi teksti toimitetaan palveluntarjoajarekisterissämme luetelluille tekoälypalveluntarjoajille, pääasiassa DeepInfralle Yhdysvalloissa. DeepInfran, Anthropicin ja Perplexityn ehdot eivät salli niiden kouluttaa malleja sillä; kohdassa 8 kerrotaan, minkä yrityksen osalta emme ole vielä vahvistaneet tätä. Ilmoita lainvastaisesta sisällöstä osoitteeseen support@dezbatere.ro riippumatta siitä, onko sinulla tiliä. Sopimukseen sovelletaan Romanian lakia, mutta paikallinen kuluttajansuojasi säilyy.
 

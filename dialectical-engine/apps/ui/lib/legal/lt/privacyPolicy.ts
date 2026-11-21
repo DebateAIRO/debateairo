@@ -494,8 +494,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "6bf4f2bb6e931d3669b6bc00f33b88198f423a23f2bde076187ecb4cacd5c7e9",
-  eyebrow: "PRIVATUMO POLITIKA · v1.0 · ĮSIGALIOJA 2026 M. LAPKRIČIO 20 D.",
+  sha256: "c769cb474a2574bfcf8f2453a4264b440ed1c788f48128b3f6a61ac13228f42d",
+  eyebrow: "PRIVATUMO POLITIKA · v1.0 · ĮSIGALIOJA 2026 M. LAPKRIČIO 22 D.",
   title: "Ką saugome ir kodėl",
   lede: "Jūsų teisės ir mūsų pareigos pagal GDPR (EU) 2016/679, paaiškintos paprastai. Keturiolika skyrių ir B priedas — slinkite iki pabaigos.",
   endMarker: "POLITIKOS PABAIGA · GDPR (EU) 2016/679 · v1.0",
