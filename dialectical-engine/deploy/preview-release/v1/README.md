@@ -3066,58 +3066,168 @@ echo "the new release passes its own site version $V"
 ## The Amazon Bedrock gate: the upload that brings it
 
 **In plain words.** From this release on the site can use OpenAI's GPT-6 Luna, which Amazon serves through its own
-spending gate (`deploy/preview-gate/v3/README-bedrock.md`). The upload that first carries this code has four extra
-pieces of server work. None of them makes anyone's debate use Luna: that comes last, by a settings activation, and
-only after the probe has passed and the Privacy Policy names Amazon.
+spending gate (`deploy/preview-gate/v3/README-bedrock.md`). The upload that first carries this code has three pieces of
+server work, and a fourth piece comes later, on a day of its own. None of the three makes anyone's debate use Luna, and
+none sends Amazon anything: Luna joins the debates only at piece 4, by a settings activation, after the owner's probe
+has passed and, when anyone outside the team has an account by then, after the Privacy Policy notice ("What Amazon
+receives, and the notice", below).
+
+In the order the upload meets them:
+
+| When | What | Its check |
+|---|---|---|
+| before SB2, on the Mac | Luna's address in the practice's copy of `settings.env` | LUNAROW |
+| after SB2 (in any case after SB1), before SB3 | piece 1: the DeepInfra, Anthropic and Perplexity gates on this release's gate code, and their units | GATES4 |
+| right after piece 1, before SB3 | piece 2: the Amazon gate installed and `active`, without its key | GATES4 |
+| SB4 | the gate files reviewed (`GRR`) and the changed operator files reviewed (`LIFE=yes`) | SB4 |
+| right after the env files (SB5; on the drained path, DR1) | piece 3: the gate's socket and Luna's address in the new release's two files | BEDROCK_ENV |
+| right before the owner's yes (SB6; on the drained path, the yes before DR2) | everything the switch and the new services will ask of the gates | GATEREADY |
+| any day after the upload, on its own | piece 4: the key, the probe, the notice when it is owed, Luna in the line-up | the probe |
+
+Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload's window from SB3 to the end of the
+switch (SB13; on the drained path, DR6), where only the brakes may run (`deploy/preview-auth-dev/v1/MAIN-SITE.md`,
+"The order rules"). Piece 2 installs the Amazon gate's units and its address drop-in: those are the one exception to
+MAIN-SITE.md part 2's "install no new drop-in".
 
 Why the upload cannot skip them:
 - **The gate code changed for every gate.** The two gate files hold the Amazon profile, and each gate's GO binds their
-  hashes. A10's check ("Gate files") prints `does NOT match this release` for the three older gates until they are
-  redeployed. The change only widens (it adds a model and a gate), so it is deployed now, before SB4.
-- **The release tools count four gates.** This release's `common.mjs` lists the Amazon gate beside the DeepInfra and
-  Anthropic ones. Once the new tools are in place (SB10, or DR5 on the drained path, when `LIFE=yes`), the release
-  check, a settings activation and the switch ask that the Amazon gate is installed, runs this release's gate code and
-  is `active`. A gate with no key is `active` too; it simply cannot make a call. So the key and the probe never hold
-  an upload back, but the gate's folder, GO and service do.
+  hashes. GATES4 prints `NOT this release` for the three older gates until they are redeployed. The change only widens
+  (it adds a model and a gate): the older gates on the new code still serve the running release as before. So it is
+  deployed after SB1 and before SB3 (pieces 1 and 2).
+- **The release tools count three gates.** This release's `common.mjs` lists the Amazon gate beside the DeepInfra and
+  Anthropic ones (the Perplexity gate is not on the tools' list; piece 1 moves it to the new code all the same, and
+  MAIN-SITE.md's ASKS_OPEN asks for it). Once the new tools are in place (SB10, or DR5 on the drained path, when
+  `LIFE=yes`), the release check, a settings activation and the switch ask that the Amazon gate is installed, runs this
+  release's gate code and is `active` (`SWITCH_PRECONDITION_FAILED` naming `gates`, `SETTINGS_GATE_HELPER_DIFFERS:bedrock`
+  or `GATE_FILES_UNREADABLE` otherwise). A gate with no key is `active` too; it simply cannot make a call. So the key and
+  the probe never hold an upload back, but the gate's folder, GO and service do.
 - **The register this release publishes names Luna's address.** A register version made by this code lists the seven
   reviewed model references, `preview:gpt-6-luna` last. The API and the runner refuse to start when their own list of
   model addresses is not exactly the register's (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`). So the new release's env
-  files get Luna's row and the gate's socket in this upload (piece 3), whether or not Luna is ever used.
+  files get Luna's row and the gate's socket in this upload (piece 3), whether or not Luna is ever used. The practice
+  (SB2) runs this code's next register too, so it refuses the same way until its own copy of the settings has the row
+  (LUNAROW).
 
 This was written from the code and the other gates' steps. It has not been rehearsed on the server: run the Mac check
 ("Before an upload: the Mac check") on the commit first, and stop and ask at the first line that does not say what
 this section expects.
 
-**Piece 1, before SB4: the three older gates on this release's gate code, and their units.** With the owner's yes, when
-nobody is using the site:
-1. For the DeepInfra, Anthropic and Perplexity gates: `deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", steps
-   1 to 6, each with its own folder, GO and service (copy the two gate files and `gate_watch.py`, write the GO again
-   changing only the two hashes, restart, `activate`).
-2. `README-bedrock.md`, install step 3a: the six older units are installed again from this release, so that they hide
-   the Amazon gate's folder. Its restart can be the same restart as item 1.
-3. `/opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py` is this release's copy (`README-bedrock.md`,
-   install step 1 installs it).
+**Before SB2, on the Mac: Luna's address in the practice's settings (LUNAROW).** S-2 copies `settings.env` from the
+running release's runner file, which lists six model addresses. The practice runs this code's next register, which
+lists seven, so it stops with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` before the debate starts (nothing is spent).
+LUNAROW adds Luna's row, printed by this commit's own code (the row BEDROCK_ENV adds on the server), to the copy in
+`$P` only; the server's files do not change. Save the block on the Mac, outside the project folder
+(`rm -f ~/luna-row.sh; nano ~/luna-row.sh`, paste, Ctrl-O, Enter, Ctrl-X), then, in the Terminal where S-5 set `P`,
+run `bash ~/luna-row.sh <the full path of the dialectical-engine folder> "$P/settings.env"`.
 
-**Piece 2, before SB4: the Amazon gate itself.** `README-bedrock.md`, install steps 0 to 7 (the AWS console, the
-folder, the addresses, the state folder, the key at the hidden prompt, the GO with the owner's figures, `init` and
-`activate`, the units and the start). The key (step 4) and the probe (step 8) may wait for a quieter hour; steps 1 to
-3, 5, 6 and 7 may not. Then A10's check once more, with the Amazon gate added: all four lines must say
-`match this release` and all four `state` lines `active`.
-
-```sh
-NEW=$CAPI/dialectical-engine/packages/providers/ops; test -f "$NEW/preview_budget_authority.py" && test -f "$NEW/preview_budget_helper.py" && echo "release gate files found"
-NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
-same() { [ -n "$NB" ] && [ -n "$NH" ] && [ "$(sha256sum "$1/preview_budget_authority.py" | cut -d' ' -f1)" = "$NB" ] && [ "$(sha256sum "$1/preview_budget_helper.py" | cut -d' ' -f1)" = "$NH" ] && [ "$(jq -r .bridge_sha256 "$2")" = "$NB" ] && [ "$(jq -r .helper_sha256 "$2")" = "$NH" ]; }
-for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1 perplexity:perplexity-budget-v1:provider-perplexity-authority-v1:provider-perplexity-go-v1 bedrock:bedrock-budget-v1:provider-bedrock-authority-v1:provider-bedrock-go-v1; do
-  IFS=: read -r NAME FOLDER STATE GOFILE <<<"$G"
-  if same "/opt/debateai-v3-preview/operator/$FOLDER" "/etc/debateai-v3-preview/$GOFILE.json"; then echo "$NAME gate files and GO match this release"; else echo "$NAME does NOT match this release: stop"; fi
-  echo "$NAME state $(/usr/bin/python3 -I "/opt/debateai-v3-preview/operator/$FOLDER/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" | jq -r .state)"
-done
+```bash
+#!/usr/bin/env bash
+# LUNAROW: Luna's model address, printed by this commit's own code, added last to the practice's copy of settings.env on the Mac. Nothing on the server changes; no value is printed.
+set -euo pipefail
+REPO=$(cd "${1:?usage: bash luna-row.sh <the dialectical-engine folder> <the settings.env of the practice>}" && pwd)
+F=${2:?usage: bash luna-row.sh <the dialectical-engine folder> <the settings.env of the practice>}
+KT=PROVIDER_DISCOVERY_TARGETS_JSON
+nd() { echo "LUNAROW_NOT_DONE: $1"; exit 1; }
+[ -f "$F" ] || nd "$F is not a file (S-5 copies settings.env into the folder P)"
+[ "$(grep -c "^$KT=" "$F" || true)" = 1 ] || nd "$KT is not in $F exactly once: ask"
+ROW=$(zsh -lic "cd '$REPO' && node --import ./node_modules/tsx/dist/loader.mjs --input-type=module -e 'import { previewTargetJsonRow } from \"./packages/providers/src/preview-models.ts\"; console.log(JSON.stringify(previewTargetJsonRow(\"preview:gpt-6-luna\")));'" | tail -n 1) || nd "this commit's code did not print Luna's row (are the packages installed?)"
+[ "$(jq -r '[.provider_ref, .model] | join(" ")' <<<"$ROW" 2>/dev/null || true)" = "preview:gpt-6-luna us.openai.gpt-6-luna" ] || nd "the row the code printed is not Luna's: ask"
+T=$(sed -n "s/^$KT=//p" "$F" | jq -ce --argjson row "$ROW" 'if any(.[]; .provider_ref == $row.provider_ref) then . else . + [$row] end | select(.[-1] == $row)') || nd "$F holds another row for Luna, or Luna's row is not last: ask"
+[ -e "$F.before-luna" ] || cp -p "$F" "$F.before-luna"
+cp -p "$F" "$F.luna"
+T="$T" awk -v kt="$KT" 'index($0, kt "=") == 1 { print kt "=" ENVIRON["T"]; next } { print }' "$F" > "$F.luna"
+diff <(grep -v "^$KT=" "$F.before-luna") <(grep -v "^$KT=" "$F.luna") > /dev/null || nd "another line of $F would change ($F.luna is only a draft): ask"
+mv "$F.luna" "$F"
+N=$(sed -n "s/^$KT=//p" "$F" | jq 'length'); W=$(sed -n "s/^$KT=//p" "$F" | jq -r 'if .[-1].provider_ref == "preview:gpt-6-luna" then "last" else "NOT last" end')
+echo "settings.env: $N model addresses, Luna's row $W"
+echo LUNAROW_DONE
 ```
 
-At SB4, `GATE_ROWS_N1` prints `changed since the switch: review <sha256>`: the owner reviews the gate files (this
-check) and gives that digest as `GRR`. `LIFECYCLE_FILES` prints `changed` too (the tools' list of gates and the gate's
-e-mails): the owner reviews that change and sets `LIFE=yes`.
+What to expect: `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. A second run changes nothing; the
+copy before is `$P/settings.env.before-luna`. Then the practice runs as before. Its line `practising on this code's
+next version` lists the rows the next version changes and adds; they must match SB3's delta (the hosted-base recipe's
+"match"), and this release's delta adds Luna to the register's models. Luna itself sits out of the practice debate: no
+line-up seats it, and the practice reaches only the DeepInfra and Anthropic gates. A new S-2 copy (for a second
+practice) needs LUNAROW again.
+
+**Piece 1, after SB2 and before SB3: the three older gates on this release's gate code, and their units.** With the
+owner's yes, at a quiet hour (each gate's `status` shows `in_flight` 0), in one root shell (`sudo -i`) kept for pieces 1
+and 2, each block pasted there in turn (they are not scripts of MAIN-SITE.md's form: a value one block sets, such as
+`R`, is read by the next):
+1. For the DeepInfra, Anthropic and Perplexity gates, one after the other: `deploy/preview-gate/v3/README.md`, "Redeploy
+   (2026-10-12)", steps 1 to 6, each with its own folder, GO, service and README:
+
+   | Gate | `G` | `GO` | service | install step 1 of |
+   |---|---|---|---|---|
+   | DeepInfra | `/opt/debateai-v3-preview/operator/deepinfra-budget-v3` | `/etc/debateai-v3-preview/provider-deepinfra-go-v3.json` | `debateai-preview-provider-budget.service` | `README.md` |
+   | Anthropic | `/opt/debateai-v3-preview/operator/anthropic-budget-v1` | `/etc/debateai-v3-preview/provider-anthropic-go-v1.json` | `debateai-preview-anthropic-budget.service` | `README-anthropic.md` |
+   | Perplexity | `/opt/debateai-v3-preview/operator/perplexity-budget-v1` | `/etc/debateai-v3-preview/provider-perplexity-go-v1.json` | `debateai-preview-perplexity-budget.service` | `README-perplexity.md` |
+
+   Step 3 installs the gate files and `gate_watch.py` with install step 1 of the gate's own README. Its `R` is this
+   upload's release folder: `. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine` (in that order: the names
+   file sets an `R` of its own), and its `R ok` line must print. Step 4 writes the GO again changing only its two hashes
+   (`ONLY_HASHES_CHANGED`); step 6's `activate` must show `"state": "active"`.
+2. `README-bedrock.md`, install step 3a: the six older units are installed again from this release, so that they hide
+   the Amazon gate's folder. Read its differences first (step 3a's first block). Its restart can be the same restart as
+   item 1's step 5.
+3. `/opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py` becomes this release's copy (`README-bedrock.md`,
+   install step 1 installs it, in piece 2).
+
+Piece 1 changes no limit, so the running release's runner keeps the number of calls at once it read from each gate at
+its own start: do not restart it for this. The new release's runner reads every gate at its start (SB11; on the drained
+path, DR6).
+
+**Piece 2, right after piece 1 and before SB3: the Amazon gate, without its key.** `README-bedrock.md`, install steps 0
+to 3, 3a (done in piece 1), 5, 6 and 7: the AWS console, the folder, the addresses, the state folder, the GO with the
+owner's figures, `init` and `activate`, the units and the start. Install step 4 (the key) and step 8 (the probe) wait for
+piece 4 ("Why the key waits for piece 4", below). The owner has ready before piece 2 starts:
+- in the AWS console (install step 0): the subscription to GPT-6 Luna active, and quota in `us-east-1` for its United
+  States route; one long-term Bedrock API key with an end date, kept in the password manager, its end date in the
+  calendar with a reminder two weeks before (the key can also be made on piece 4's day); a budget alert for the AWS
+  account (Amazon has no hard spending limit); and an AWS account e-mail address somebody reads;
+- the two figures for the gate's GO (install step 5): its daily pot and its daily number of calls, chosen so that all
+  four gates' pots fit under the caps file's team total and its per-GO maximum, or with another gate's pot lowered
+  first: `activate` refuses `TEAM_TOTAL_BUDGET_EXCEEDED` otherwise. They are typed on the server only;
+- the yes for pieces 1 and 2, at a quiet hour.
+
+Then GATES4, run as a script (`set -euo pipefail` first, as MAIN-SITE.md says under "How to run a server step"):
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# GATES4: each of the four spending gates runs this release's gate code (its two files, and the two hashes in its GO) and is active. Read-only.
+NEW=$CAPI/dialectical-engine/packages/providers/ops
+[ -f "$NEW/preview_budget_authority.py" ] && [ -f "$NEW/preview_budget_helper.py" ] || { echo "GATES4_NOT_DONE: this release's gate files are not in $NEW (SB1 and A2 first)"; exit 1; }
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+dg() { { sha256sum "$1" 2>/dev/null || true; } | cut -d' ' -f1; }
+gv() { jq -r "$1 // empty" "$2" 2>/dev/null || true; }
+NOT=''
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1 perplexity:perplexity-budget-v1:provider-perplexity-authority-v1:provider-perplexity-go-v1 bedrock:bedrock-budget-v1:provider-bedrock-authority-v1:provider-bedrock-go-v1; do
+  IFS=: read -r NAME FOLDER STATE GOFILE <<<"$G"
+  F=/opt/debateai-v3-preview/operator/$FOLDER; GO=/etc/debateai-v3-preview/$GOFILE.json
+  if [ "$(dg "$F/preview_budget_authority.py")" = "$NB" ] && [ "$(dg "$F/preview_budget_helper.py")" = "$NH" ] && [ "$(gv .bridge_sha256 "$GO")" = "$NB" ] && [ "$(gv .helper_sha256 "$GO")" = "$NH" ]; then CODE='this release'; else CODE='NOT this release'; fi
+  ST=$( { /usr/bin/python3 -I "$F/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" 2>/dev/null || true; } | jq -r '.state // empty' 2>/dev/null || true)
+  echo "$NAME: gate code $CODE; state ${ST:-unread}"
+  [ "$CODE" = 'this release' ] && [ "$ST" = active ] || NOT="$NOT $NAME"
+done
+[ -z "$NOT" ] || { echo "GATES4_NOT_DONE: not on this release's gate code, or not active:$NOT"; exit 1; }
+echo GATES4_DONE
+exit 0
+```
+
+What to expect: four lines `<gate>: gate code this release; state active` (deepinfra, anthropic, perplexity, bedrock),
+then `GATES4_DONE`. `GATES4_NOT_DONE` names the gates that are not there yet: `NOT this release` on an older gate means
+its redeploy (piece 1, item 1) is not finished; on `bedrock`, piece 2's install steps 1, 5 and 6. A state other than
+`active` (or `unread`: the folder or the state folder is missing) means that gate's `activate` (piece 1, step 6; piece
+2, install step 6). Go on to SB3 only after `GATES4_DONE`.
+
+**At SB4.** SB4 runs the running release's tools, which know only the DeepInfra and Anthropic gates. After piece 1
+their folders and GOs differ from what the last switch recorded, so `GATE_ROWS_N1` prints
+`changed since the switch: review <sha256>`: the owner reviews the gate files (GATES4 said they are this release's) and
+gives that digest as `GRR`. `LIFECYCLE_FILES` prints `changed: …` too, and among the files are
+`deploy/preview-lifecycle/v1/common.mjs` (the tools' list of gates now holds the Amazon gate) and `alert.mjs` (the
+Amazon gate's halt and address e-mails): the owner reviews that change and sets `LIFE=yes`. No check of SB4 reads the
+Perplexity or the Amazon gate's folder: GATES4 is their review.
 
 **Piece 3, right after the env files are written (SB5, or DR1 on the drained path): the gate's socket and Luna's
 address in the new release's files.** In `api-$LABEL.env` and `runner-$LABEL.env` alike. The old release's files stay
@@ -3153,26 +3263,134 @@ What to expect: each of the two lines says `7 model addresses, the Amazon socket
 it once; a second run changes nothing. The way back for this piece is the copy it kept
 (`$S/<service>-$LABEL.env.before-bedrock`), before anything of the new release has started.
 
-The website's own file (`ui-$LABEL.env`) does not change: its build list is only the page's fallback, and the page
-reads the live line-up from the API. The AI providers page lists Amazon Web Services from this upload on, with its
-checked entry, because the API reaches its address. The paragraphs of the Privacy Policy and the Terms that name
-Amazon are a separate change; Luna is not switched on for anyone before they are live (piece 4).
+**Right before the owner's yes (SB6; on the drained path, the yes before DR2): GATEREADY.** It only reads. It asks
+what the switch (SB13 or DR6) and the new runner and API will ask at their start, while the site is still up, so a
+missing piece stops the upload before the downtime instead of at DR6, after the migrations.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# GATEREADY: before the downtime, what the switch and the new runner and API will ask of the gates and of the two env files. Read-only; prints no value.
+NEW=$CAPI/dialectical-engine/packages/providers/ops; SOCK=/run/debateai-v3-preview/bedrock-budget-v1.sock
+KC=PREVIEW_PROVIDER_TEST_CONFIG_JSON; KT=PROVIDER_DISCOVERY_TARGETS_JSON
+[ -f "$NEW/preview_budget_authority.py" ] && [ -f "$NEW/preview_budget_helper.py" ] || { echo "GATEREADY_NOT_DONE: this release's gate files are not in $NEW: ask"; exit 1; }
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+dg() { { sha256sum "$1" 2>/dev/null || true; } | cut -d' ' -f1; }
+gv() { jq -r "$1 // empty" "$2" 2>/dev/null || true; }
+MISS=''; miss() { echo "MISSING ($1): $2"; case "$MISS," in *", $1,"*) ;; *) MISS="$MISS, $1";; esac; }
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3:1 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1:1 perplexity:perplexity-budget-v1:provider-perplexity-authority-v1:provider-perplexity-go-v1:1 bedrock:bedrock-budget-v1:provider-bedrock-authority-v1:provider-bedrock-go-v1:2; do
+  IFS=: read -r NAME FOLDER STATE GOFILE PIECE <<<"$G"
+  F=/opt/debateai-v3-preview/operator/$FOLDER; GO=/etc/debateai-v3-preview/$GOFILE.json
+  if [ "$(dg "$F/preview_budget_authority.py")" = "$NB" ] && [ "$(dg "$F/preview_budget_helper.py")" = "$NH" ] && [ "$(gv .bridge_sha256 "$GO")" = "$NB" ] && [ "$(gv .helper_sha256 "$GO")" = "$NH" ]; then CODE='this release'; else CODE='NOT this release'; fi
+  SJ=$(/usr/bin/python3 -I "$F/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" 2>/dev/null || true)
+  ST=$(jq -r '.state // empty' <<<"$SJ" 2>/dev/null || true); WO=$(jq -r 'if type == "object" and has("window_open") then (.window_open | tostring) else empty end' <<<"$SJ" 2>/dev/null || true)
+  echo "$NAME gate: code $CODE; state ${ST:-unread}; window open ${WO:-unread}"
+  [ "$CODE" = 'this release' ] || miss "piece $PIECE" "the $NAME gate does not run this release's gate code"
+  [ "$ST" = active ] && [ "$WO" = true ] || miss "piece $PIECE" "the $NAME gate is not active with its window open (its activate; a gate still active needs its stop first)"
+done
+[ "$(systemctl is-active debateai-preview-bedrock-budget || true)" = active ] || miss "piece 2" "the Amazon gate's service is not running (install step 7)"
+for SVC in api runner; do
+  EF=$E/$SVC-$LABEL.env
+  if [ ! -f "$EF" ]; then miss "piece 3" "$SVC-$LABEL.env does not exist yet (DR1 or SB5 first, then BEDROCK_ENV)"; continue; fi
+  if [ "$(grep -c "^$KT=" "$EF" || true)" != 1 ] || [ "$(grep -c "^$KC=" "$EF" || true)" != 1 ]; then miss ask "$SVC-$LABEL.env does not hold its two lines $KT and $KC exactly once each"; continue; fi
+  T=$(sed -n "s/^$KT=//p" "$EF")
+  N=$(jq 'length' <<<"$T" 2>/dev/null || echo unread)
+  L=$(jq -r 'if any(.[]; .provider_ref == "preview:gpt-6-luna") then "there" else "MISSING" end' <<<"$T" 2>/dev/null || echo unread)
+  K=$(sed -n "s/^$KC=//p" "$EF" | jq -r --arg s "$SOCK" 'if .bedrock_budget_socket == $s then "named" elif has("bedrock_budget_socket") then "OTHER" else "MISSING" end' 2>/dev/null || echo unread)
+  CHK=$(cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin T="$T" /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs --input-type=module -e 'import { PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef } from "./packages/providers/src/preview-models.ts"; import { assertDeploymentProviderTargets, assertPricedProviderTargets, parseProviderDiscoveryTargets } from "./packages/providers/src/index.ts"; import { assertPreviewTargetSet } from "./packages/providers/src/preview-test.ts"; const configured = PREVIEW_REVIEWED_PROVIDER_REFS.map((providerRef) => ({ providerRef, maker: previewModelRowForRef(providerRef).maker, adapterKind: previewModelRowForRef(providerRef).adapterKind })); try { const targets = parseProviderDiscoveryTargets(process.env.T, configured); assertDeploymentProviderTargets(targets, { mode: "hosted", nodeEnv: "production" }); assertPricedProviderTargets(targets, "hosted"); assertPreviewTargetSet(targets); console.log(`accepted ${targets.length}`); } catch (error) { console.log(`refused ${error instanceof Error ? error.message : "UNREAD"}`); }' 2>/dev/null) || CHK='not run'
+  echo "$SVC-$LABEL.env: $N model addresses; Luna's address $L; the Amazon socket $K; this release's start check of the addresses: $CHK"
+  if [ "$L" != there ] || [ "$K" != named ]; then miss "piece 3" "$SVC-$LABEL.env lacks Luna's address or the Amazon socket (BEDROCK_ENV)"
+  else case "$CHK" in "accepted "*) ;; *) miss ask "the new $SVC would refuse these addresses at its start ($CHK)";; esac; fi
+done
+if [ -f "$E/api-$LABEL.env" ] && [ -f "$E/runner-$LABEL.env" ]; then
+  [ "$(sed -n "s/^$KC=//p" "$E/api-$LABEL.env")" = "$(sed -n "s/^$KC=//p" "$E/runner-$LABEL.env")" ] && [ "$(sed -n "s/^$KT=//p" "$E/api-$LABEL.env" | jq -cS . 2>/dev/null || true)" = "$(sed -n "s/^$KT=//p" "$E/runner-$LABEL.env" | jq -cS . 2>/dev/null || true)" ] || miss ask "the API's and the runner's files differ in these two lines"
+fi
+[ -z "$MISS" ] || { echo "GATEREADY_NOT_DONE: not ready for the downtime: ${MISS#, } (the MISSING lines above); nothing changed and the site is up: no yes, no downtime"; exit 1; }
+echo GATEREADY_DONE
+exit 0
+```
+
+What to expect: four gate lines `<gate> gate: code this release; state active; window open true`, two lines
+`<service>-<LABEL>.env: 7 model addresses; Luna's address there; the Amazon socket named; this release's start check
+of the addresses: accepted 7`, then `GATEREADY_DONE`. On `GATEREADY_NOT_DONE` the last line names what is missing, and
+each `MISSING` line above it says which gate or file: `piece 1` (an older gate not on this release's code, or not
+`active` with its window open: piece 1), `piece 2` (the Amazon gate: piece 2's install steps 1 to 7), `piece 3`
+(BEDROCK_ENV not run, or not done), `ask` (anything else, for example a model address the new code would refuse). Do
+that piece, run GATEREADY again, and give the yes only after `GATEREADY_DONE`.
+
+**What GATEREADY checks, and what only DR5 and DR6 can show.** Before DR5 every `lc` command runs the running
+release's tools, which know only the DeepInfra and Anthropic gates. So GATEREADY asks the same questions as this
+release's tools, with plain commands and with this release's own code: each gate's two files and its GO's two hashes
+against this release's (the switch's `SETTINGS_GATE_HELPER_DIFFERS`), each gate's `state` from its own `status` (the
+switch's `SWITCH_PRECONDITION_FAILED` naming `gates`, and `GATE_FILES_UNREADABLE` when a folder or GO is missing), and
+the runner's own start check of the model addresses, run by this release's code (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`
+and the reviewed rows). It asks for the Perplexity gate too, which this release's tools do not list. Three things it
+cannot check, and DR5 and DR6 do: the register version DR5 publishes is the one the new services compare the addresses
+with (GATEREADY compares them with the seven models this code publishes, which SB3's delta showed); the switch's live
+check asks each gate, as the new API's user, which models it serves, and needs the new release pinned (DR5) and its
+tools in place (it needs no answer from the Amazon gate while no line-up seats Luna); and the new runner and API start
+only at DR6.
+
+**What Amazon receives, and the notice.** The website's own file (`ui-$LABEL.env`) does not change: its build list is
+only the page's fallback, and the page reads the live line-up from the API. The AI providers page lists Amazon Web
+Services from this upload on (from the switch), with its checked Register row, because the API reaches its address. The
+Privacy Policy and the Terms of this release (version 1.0) already name Amazon; they go live with this upload. Amazon
+receives nothing before piece 4: no line-up seats Luna, and without the key the gate refuses the API's checks of Luna
+before anything is sent.
+- **No Privacy Policy §14 notice is owed at this upload**: Amazon receives nothing until Luna is switched on, and only
+  the owner's and the team's accounts exist. The owner's yes before the switch (SB6; on the drained path, the yes before
+  DR2) says so ("The providers page", "A company listed before it receives anything").
+- **Before piece 4 the notice is owed when any account outside the team exists by then**: by e-mail and in the
+  product, naming Amazon and what it will receive, and piece 4's activation waits until the time to object has passed.
+
+**Why the key waits for piece 4.** Once the key and Luna's row are both in, the API checks Luna through the gate at
+every ask: it probes every declared model whose last check is old, not only the line-up's. The first real Amazon call
+would then come from someone's ask, before the owner's own probe, and with the halt watcher not yet started, so a halt
+would e-mail nobody. Without the key the gate refuses that check before anything is set aside: nothing is sent, nothing
+is charged, the gate does not halt, and Luna is simply left out. Debates run on the other models exactly as before, and
+visitors see nothing. So the key goes in on piece 4's day, right before the owner's first probe.
+
+**Until piece 4: what the unused Amazon gate does.**
+- **It closes itself after 31 days.** Piece 2's `activate` opens its window for 31 days (`open_days`). With no key no
+  call reaches it, so its `state` stays `active` and `window_open` turns `false`. The release tools ask only for
+  `active`, so later uploads go on; but MAIN-SITE.md's ASKS_OPEN (6.1, 8.1) refuses while any gate's window is closed.
+  Then run the Amazon gate's `stop`, then its `activate` (MAIN-SITE.md 6.5): `activate` alone refuses a gate whose
+  state is still `active`. Once the key is in, the first call after the 31 days halts the gate
+  (`open_window_expired`), and its `activate` opens it again.
+- **After a reboot it is not running.** Its unit has no `[Install]`, and the boot drop-in that starts it with the site
+  comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied, and Luna's
+  checks at ask time fail at once (Luna is left out). `systemctl start debateai-preview-bedrock-budget` starts it;
+  "Switch it on" step 1 does.
 
 **Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload. In this order:
-1. The key, if it is not in yet, and the probe, twice (`README-bedrock.md`, install steps 4 and 8). Every field must
-   show its "Good" value. The day after, the gate's `today_spend_usd` of the probe's day against the AWS Billing page.
-2. The Privacy Policy and the Terms that name Amazon are live on the site.
-3. `README-bedrock.md`, "Switch it on", step 1 (start at boot and the two watchers).
-4. The activation: "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds
+1. At a quiet hour: the key at the hidden prompt (`README-bedrock.md`, install step 4), and right after it the probe,
+   twice (install step 8). Every field must show its "Good" value. The day after, the gate's `today_spend_usd` of the
+   probe's day against the AWS Billing page.
+2. The Privacy Policy and the Terms that name Amazon are live on the site (they are, from this upload on).
+3. When any account outside the team exists: the Privacy Policy §14 notice sent, by e-mail and in the product, and its
+   time to object passed ("What Amazon receives, and the notice", above).
+4. `README-bedrock.md`, "Switch it on", step 1 (the gate running, start at boot and the two watchers, and the runner
+   restarted when it could not read the gate at its start).
+5. The activation: "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds
    `us.openai.gpt-6-luna` to `free_model_ids` and `premium_model_ids` (the owner's choice). SV4 refuses
    while the Amazon gate does not switch Luna on (`SETTINGS_GATE_MODEL_DISABLED:bedrock:us.openai.gpt-6-luna`), does
    not answer (`SETTINGS_GATE_UNANSWERED:bedrock`), or runs other gate code than the release's
    (`SETTINGS_GATE_HELPER_DIFFERS:bedrock`).
 
 **The way back.** Taking Luna out of the debates is an activation without it (SV6, or a new line-up); no upload. The
-gate itself can stay installed and unused: `stop` makes sure it spends nothing. Going back to a release from before
-this one works as for any release (its own env files never got the new key or row); its older tools read two gates
-and ignore this one.
+gate itself can stay installed and unused: `stop` makes sure it spends nothing.
+- **The upload stops after piece 1 or 2, before the downtime** (a `_NOT_DONE` before DR2, or no yes). The running
+  release keeps serving: the older gates' new code serves it as before. But its own settings activations (SV4, SV6) are
+  refused with `SETTINGS_GATE_HELPER_DIFFERS`, because they compare the gates' code with the running release's own
+  gate files. That lasts until this release is uploaded, or until each older gate's files and GO go back
+  (`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", "To go back"). The Amazon gate can stay, stopped.
+- **rbD-A (before DR4)**: the old release starts as it was, from its own env files; its settings activations are refused
+  as above.
+- **rbD-B (from DR4 on)**: the database goes back, and the old release starts from its own env files, which never got
+  the new key or Luna's row. Its brakes work (each gate's `stop`). But DR5 swapped the shared operator folder, and
+  rbD-B does not put it back: the tools in place are this release's and list the Amazon gate, and the gates run this
+  release's code. So every settings activation on the old release is refused (`SETTINGS_GATE_HELPER_DIFFERS`) until a
+  later upload brings this code again. If one is needed before that, ask.
 
 ## Transition release T (one last drained upload)
 
