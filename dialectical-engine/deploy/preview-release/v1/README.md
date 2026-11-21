@@ -3125,9 +3125,10 @@ Why the upload cannot skip them:
   Anthropic ones (the Perplexity gate is not on the tools' list; piece 1 moves it to the new code all the same, and
   MAIN-SITE.md's ASKS_OPEN asks for it). Once the new tools are in place (SB10, or DR5 on the drained path, when
   `LIFE=yes`), the release check, a settings activation and the switch ask that the Amazon gate is installed, runs this
-  release's gate code and is `active` (`SWITCH_PRECONDITION_FAILED` naming `gates`, `SETTINGS_GATE_HELPER_DIFFERS:bedrock`
-  or `GATE_FILES_UNREADABLE` otherwise). A gate with no key is `active` too; it simply cannot make a call. So the key and
-  the probe never hold an upload back, but the gate's folder, GO and service do.
+  release's gate code and is `active` (`SWITCH_PRECONDITION_FAILED` naming `gates`,
+  `SETTINGS_GATE_HELPER_DIFFERS:bedrock` or `GATE_FILES_UNREADABLE` otherwise). A gate with no key is `active` too; it
+  simply cannot make a call. So the key and the probe never hold an upload back, but the gate's folder, GO and service
+  do.
 - **The register this release publishes names Luna's address.** A register version made by this code lists the seven
   reviewed model references, `preview:gpt-6-luna` last. The API and the runner refuse to start when their own list of
   model addresses is not exactly the register's (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`). So the new release's env
@@ -3170,8 +3171,8 @@ echo "settings.env: $N model addresses, Luna's row $W"
 echo LUNAROW_DONE
 ```
 
-What to expect: `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. A second run changes nothing; the
-copy before is `$P/settings.env.before-luna`. Then the practice runs as before. Its line `practising on this code's
+What to expect: `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. A second run changes nothing;
+the copy before is `$P/settings.env.before-luna`. Then the practice runs as before. Its line `practising on this code's
 next version` lists the rows the next version changes and adds; they must match SB3's delta (the hosted-base recipe's
 "match"), and this release's delta adds Luna to the register's models. Luna itself sits out of the practice debate: no
 line-up seats it, and the practice reaches only the DeepInfra and Anthropic gates. A new S-2 copy (for a second
@@ -3206,8 +3207,9 @@ path, DR6).
 
 **Piece 2, right after piece 1 and before SB3: the Amazon gate, without its key.** `README-bedrock.md`, install steps 0
 to 3, 3a (done in piece 1), 5, 6 and 7: the AWS console, the folder, the addresses, the state folder, the GO with the
-owner's figures, `init` and `activate`, the units and the start. Install step 4 (the key) and step 8 (the probe) wait for
-piece 4 ("Why the key waits for piece 4", below). The owner has ready before piece 2 starts:
+owner's figures, `init` and `activate`, the units and the start. Install step 4 (the key) and step 8 (the probe) wait
+for piece 4 ("Why the key waits for piece 4", below). The owner has ready before piece 2 starts:
+
 - in the AWS console (install step 0): the subscription to GPT-6 Luna active, and quota in `us-east-1` for its United
   States route; one long-term Bedrock API key with an end date, kept in the password manager, its end date in the
   calendar with a reminder two weeks before (the key can also be made on piece 4's day); a budget alert for the AWS
@@ -3345,12 +3347,12 @@ each `MISSING` line above it says which gate or file: `piece 1` (an older gate n
 (BEDROCK_ENV not run, or not done), `ask` (anything else, for example a model address the new code would refuse). Do
 that piece, run GATEREADY again, and give the yes only after `GATEREADY_DONE`.
 
-**What GATEREADY checks, and what only DR5 and DR6 can show.** Before DR5 every `lc` command runs the running
-release's tools, which know only the DeepInfra and Anthropic gates. So GATEREADY asks the same questions as this
-release's tools, with plain commands and with this release's own code: each gate's two files and its GO's two hashes
-against this release's (the switch's `SETTINGS_GATE_HELPER_DIFFERS`), each gate's `state` from its own `status` (the
-switch's `SWITCH_PRECONDITION_FAILED` naming `gates`, and `GATE_FILES_UNREADABLE` when a folder or GO is missing), and
-the runner's own start check of the model addresses, run by this release's code (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`
+**What GATEREADY checks, and what only DR5 and DR6 can show.** Before DR5 every `lc` command runs the running release's
+tools, which know only the DeepInfra and Anthropic gates. So GATEREADY asks the same questions as this release's tools,
+with plain commands and with this release's own code: each gate's two files and its GO's two hashes against this
+release's (the switch's `SETTINGS_GATE_HELPER_DIFFERS`), each gate's `state` from its own `status` (the switch's
+`SWITCH_PRECONDITION_FAILED` naming `gates`, and `GATE_FILES_UNREADABLE` when a folder or GO is missing), and the
+runner's own start check of the model addresses, run by this release's code (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`
 and the reviewed rows). It asks for the Perplexity gate too, which this release's tools do not list. Three things it
 cannot check, and DR5 and DR6 do: the register version DR5 publishes is the one the new services compare the addresses
 with (GATEREADY compares them with the seven models this code publishes, which SB3's delta showed); the switch's live
@@ -4811,7 +4813,9 @@ HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
 ```
 
-The pass bar and the row match are the hosted-base recipe's.
+The pass bar and the row match are the hosted-base recipe's. On the upload that brings the Amazon gate, LUNAROW adds
+Luna's address to `$P/settings.env` first, or the practice stops with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`; pieces
+1 and 2 come after SB2 and before SB3 ("The Amazon Bedrock gate: the upload that brings it").
 
 ### SB3. The register plan and its proposal, in the new release's own native-plan file
 
