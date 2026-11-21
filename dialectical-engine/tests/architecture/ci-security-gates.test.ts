@@ -47,14 +47,18 @@ describe("CI security gates (F-03)", () => {
       "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration"
     ]);
   });
-  // 2026-11-01: side by side halves verify's test step, but test runs in parallel have frozen a 16 GB Mac and the
-  // integration suites' timing bounds need the machine to themselves. So it is one setting on one CI step, off elsewhere.
-  it("runs test files side by side only in verify's gate step", () => {
+  // 2026-11-01: side by side halves verify's test step, but test runs in parallel have frozen a 16 GB Mac. So it is a
+  // setting on CI steps only, off everywhere else. The auth-integration step has it too: each of its files starts a
+  // PostgreSQL of its own, and one at a time they made the slowest required check. The registration suite's timing
+  // bounds need the machine to themselves, so its workflow never sets it.
+  it("runs test files side by side only in the two test steps of the security workflow", () => {
     const wf = read(".github/workflows/security.yml");
     const setting = 'env: { CI_TEST_FILES_SIDE_BY_SIDE: "1" }';
     const verify = wf.slice(wf.indexOf("\n  verify:\n"), wf.indexOf("\n  auth-integration:\n"));
-    expect(wf.split("CI_TEST_FILES_SIDE_BY_SIDE")).toHaveLength(2);
+    const integration = wf.slice(wf.indexOf("\n  auth-integration:\n"), wf.indexOf("\n  secrets:\n"));
+    expect(wf.split("CI_TEST_FILES_SIDE_BY_SIDE")).toHaveLength(3);
     expect(verify).toContain(`- run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate\n        ${setting}\n`);
+    expect(`${integration}\n`).toContain(`- run: node tools/source-map-hotfix.mjs integration # pnpm run test:ci-integration\n        ${setting}\n`);
     expect(read(".github/workflows/registration-integration.yml")).not.toContain("CI_TEST_FILES_SIDE_BY_SIDE");
     expect(read("dialectical-engine/vitest.config.ts")).toContain('fileParallelism: process.env.CI_TEST_FILES_SIDE_BY_SIDE === "1",');
   });

@@ -5,8 +5,9 @@
 # (tests/support/testDatabase.ts; ubuntu installs @embedded-postgres/linux-x64) and runs the real migrations, so
 # these are the only checks that prove, against SQL, the rules the unit suites can only fake: the server-side resend
 # limit, the 30-day absolute session cut-off, phone masking and recovery-email lifecycle in storage, reset and
-# MFA-recovery non-enumeration, the staff boundary and the upgrade path. Files run one at a time
-# (vitest.config.ts fileParallelism: false). Failures are judged against tests/ci-known-red.txt like the unit gate;
+# MFA-recovery non-enumeration, the staff boundary and the upgrade path. On CI the files run side by side (the job
+# sets CI_TEST_FILES_SIDE_BY_SIDE); on a developer machine they run one at a time (vitest.config.ts). Failures are
+# judged against tests/ci-known-red.txt like the unit gate;
 # host-sensitive cases (timing / memory tripwires) are reported but never gate, via tests/ci-flaky.txt.
 #
 # A file is listed only when it needs nothing outside the repository (no Docker, network, provider keys or host
