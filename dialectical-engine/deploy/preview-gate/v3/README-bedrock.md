@@ -59,9 +59,18 @@ One reviewed model:
 
 - **Not tried against Amazon before the first probe.** The request and reply shapes were written from OpenAI's and
   Amazon's documentation (read 2026-11-20). Amazon's pages do not show a real answer of this model. The probe (step 8)
-  is the first real call, and it is built to show exactly the three things the documentation leaves open: the model
-  name the reply carries, the token counts it reports, and how the cache is reported. If the probe halts, Luna stays
-  switched off and nothing else is affected; the fix is a reviewed code change and a later upload.
+  is built to show exactly the three things the documentation leaves open: the model name the reply carries, the token
+  counts it reports, and how the cache is reported. If the probe halts, Luna stays switched off and nothing else is
+  affected; the fix is a reviewed code change and a later upload.
+- **The key goes in right before the first probe, never at the upload.** Once the key and Luna's address (the app's
+  settings, "Switch it on" step 5) are both in, the API checks Luna through this gate at every ask: it probes every
+  model it declares whose last check is old, not only the line-up's. Each such check is a real paid call, made by
+  someone's ask. Without the key the gate refuses those checks before anything is set aside: nothing is sent or
+  charged, the gate does not halt, and Luna is simply left out of the debates, which run on the other models as before.
+  So step 4 waits for Luna's own day ("Switch it on"): after the notice's time to object when the notice is owed, and
+  after the halt watcher and the address timer run, right before the probe (step 8). The line-up activation follows
+  the next day, after the bill check. So these paid checks run for about a day before Luna joins the debates, and
+  always with the halt watcher on.
 - **Busy answers bill nothing and never halt.** HTTP 429 (too many requests), 503 (service unavailable) and 529
   (overloaded), each with Amazon's error text and no token count: the call is released, nothing is charged, the day's
   record keeps a $0 `released_unbilled` entry, and that call alone fails with `PROVIDER_REFUSED_UNBILLED`. After 2 of
@@ -116,15 +125,21 @@ The gate code is shared, and each GO binds the hashes of its gate's two code fil
 new files and a GO with the two new hashes, then `activate`, each with the owner's yes: README.md "Redeploy
 (2026-10-12)" steps 1-6 for the DeepInfra, Anthropic and Perplexity gates, each with its own folder, GO and service.
 Order: those three first, then this gate's `init` and `activate` (step 6). An older gate's code does not know this
-gate's pot, so its `activate` would not count it in the team total.
+gate's pot, so its `activate` would not count it in the team total. In the upload, all of this runs after SB2 and
+before SB3 (the release guide's pieces 1 and 2), never from SB3 to the switch, where only the brakes may run.
 
 The release tools now count this gate among the server's gates. From this upload on, a release check and a settings
 activation ask that this gate too is installed, runs this release's gate code and is `active`. That needs install
-steps 1 to 7 below. It does not need the key or the probe: a gate with no key is `active` and simply cannot make a call.
+steps 1 to 3, 3a, 5, 6 and 7 below. It does not need the key or the probe: a gate with no key is `active` and simply
+cannot make a call.
 
 ## Install (operator, as root: `sudo -i`, in this order)
 
-**0. In the AWS console (the OWNER, in a browser).**
+At the upload that brings this gate: steps 1 to 3, 3a, 5, 6 and 7. On Luna's own day ("Switch it on"): steps 0, 4
+and 8.
+
+**0. In the AWS console (the OWNER, in a browser), before the key (step 4).** The upload does not need it: do it on
+Luna's own day, or any day before.
 1. The subscription to "OpenAI GPT-6 Luna (Amazon Bedrock Edition)" is active, and the Region `us-east-1` shows quota
    for the cross-Region (United States) route of the model (Service Quotas, Amazon Bedrock).
 2. Create one long-term Bedrock API key (Amazon Bedrock, "API keys", long-term). Choose an end date and write it in
@@ -135,11 +150,12 @@ steps 1 to 7 below. It does not need the key or the probe: a gate with no key is
    no hard spending limit; the alert is its only warning, independent of the gate.
 4. Check that the AWS account's email address is one somebody reads ("Decisions you should know about").
 
-**1. Gate folder.** Set `R` to the reviewed release's `dialectical-engine` folder on the server; the second command
-must print `R ok`.
+**1. Gate folder.** Set `R` to the reviewed release's `dialectical-engine` folder on the server. The upload's names
+file names it (fill in `rNN`, the upload's number; the names file sets an `R` of its own, so set this one after it).
+Type these blocks in one root shell, in order: a later block reads `R`. The second command must print `R ok`.
 
 ```sh
-R=/opt/debateai-v3-preview/releases/REVIEWED_RELEASE/dialectical-engine
+. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine
 test -f "$R/deploy/preview-gate/v3/bedrock_addresses.py" && echo 'R ok'
 ```
 
@@ -188,6 +204,18 @@ Anthropic and Perplexity units and their halt watchers hide the Amazon key folde
 today do not. So they are replaced first, systemd re-reads them, the gates restart, and the hiding is checked as live.
 Only then does step 4 put the Amazon key on the server.
 
+First read what changes (this only reads):
+
+```sh
+( D=$R/deploy/preview-gate/v3/systemd; for U in debateai-preview-provider-budget.service debateai-preview-gate-halt-watch.service debateai-preview-anthropic-budget.service debateai-preview-anthropic-halt-watch.service debateai-preview-perplexity-budget.service debateai-preview-perplexity-halt-watch.service; do echo "== $U"; diff "/etc/systemd/system/$U" "$D/$U" || true; done )
+```
+
+Each unit should show one added line and nothing else:
+`> InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-bedrock-authority-v1 -/etc/debateai-v3-preview/provider-bedrock-go-v1.json`.
+Any other difference: stop and ask before the install below, which would overwrite it (the unit on the server was
+changed by hand, for example the Anthropic unit's address list, which it carries inline, or it came from an older
+release). To confirm on the server.
+
 ```sh
 ( set -eu; test -d "$R/deploy/preview-gate/v3"; S=$R/deploy/preview-gate/v3/systemd
 install -o root -g root -m 0644 $S/debateai-preview-provider-budget.service $S/debateai-preview-gate-halt-watch.service $S/debateai-preview-anthropic-budget.service $S/debateai-preview-anthropic-halt-watch.service $S/debateai-preview-perplexity-budget.service $S/debateai-preview-perplexity-halt-watch.service /etc/systemd/system/
@@ -199,11 +227,21 @@ for U in provider-budget gate-halt-watch anthropic-budget anthropic-halt-watch p
 
 What to expect: `active` three times, then `1` six times (each unit's hidden paths name the Amazon folder and GO). If a
 line shows `0`, stop: do not install the Amazon key. (Restart when nobody is using the site: calls in flight finish
-first.) This step can share its restart with "New code for every gate" above.
+first.) In the upload this step comes right after "New code for every gate", which restarted the same three gates. Its
+restart is their second one. That is harmless: they stay `active`.
 
-**4. The Amazon key. The OWNER runs this, at the server's terminal (an agent never does).** The command asks for the
-key with a hidden prompt: paste it and press Enter; nothing shows while you paste. It never takes the key from the
-command line, a pipe or the environment, and it never prints it.
+**4. The Amazon key. The OWNER runs this, at the server's terminal (an agent never does).** Not at the upload: on the
+day of the probe, right before step 8, after "Switch it on" steps 1 and 2 ("Decisions you should know about", "The key
+goes in right before the first probe"). First check, as step 3a did at the upload, that the six older gate units still
+hide this gate's folder and GO. This only reads. It must print `1` six times; if a line shows `0`, stop: do not put
+the key in.
+
+```sh
+for U in provider-budget gate-halt-watch anthropic-budget anthropic-halt-watch perplexity-budget perplexity-halt-watch; do systemctl show -p InaccessiblePaths debateai-preview-$U.service | grep -c 'provider-bedrock-authority-v1.*provider-bedrock-go-v1.json'; done
+```
+
+Then the key. The command asks for it with a hidden prompt: paste it and press Enter; nothing shows while you paste.
+It never takes the key from the command line, a pipe or the environment, and it never prints it.
 
 ```sh
 /usr/bin/python3 -I /opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py install bedrock
@@ -220,7 +258,7 @@ another gate's key, and `FOLDER_NOT_SAFE` when step 3 was not done. Nothing is w
 |---|---|---|
 | `schema` | `preview-provider-budget-go-v3` | The gate's GO format. |
 | `provider` | `"bedrock"` | This gate's provider. |
-| `enabled_models` | `["us.openai.gpt-6-luna"]` | The one reviewed model. The app cannot use it until "Switch it on". |
+| `enabled_models` | `["us.openai.gpt-6-luna"]` | The one reviewed model. No debate seats it until "Switch it on"; once the key is in, the API's checks at each ask reach it (step 4). |
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration: the app asks every gate with its one `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the other GOs. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for the other gates. |
@@ -228,7 +266,36 @@ another gate's key, and `FOLDER_NOT_SAFE` when step 3 was not done. Nothing is w
 | `max_paid_posts_per_day` | the owner's figure | A second fuse. |
 | `max_concurrent_calls` | `4` | The owner's choice. |
 | `max_final_writer_calls` | `1` | Luna may be seated as a final writer (a request of up to 1 MiB, an answer of up to 128,000 tokens); one such call at a time. |
-| `open_days` | `31` | The maximum. After that the gate halts by itself, and you run `activate` again. |
+| `open_days` | `31` | The maximum. After that the gate halts by itself at its next call, and you run `activate` again. While no call reaches it (no key yet), its `state` stays `active` with `window_open` false: then `stop`, then `activate`. |
+
+First see which pot fits (after step 1, with the caps file in place). This only reads. It prints amounts on your screen
+only: never paste them into a chat, an issue or a pull request. It prints each other gate's pot, the caps file's two
+figures, and the range of pots `activate` accepts for this gate: from the smallest pot that carries four calls in
+flight, one of them a final writer (below it, `CONCURRENCY_EXCEEDS_BUDGET`), to what the other pots leave under the
+team total, at most the per-GO cap (above it, `TEAM_TOTAL_BUDGET_EXCEEDED`).
+
+```sh
+/usr/bin/python3 -I - /opt/debateai-v3-preview/operator/bedrock-budget-v1 <<'PY'
+import sys
+from decimal import ROUND_CEILING, Decimal
+sys.path.insert(0, sys.argv[1])
+import preview_budget_authority as gate
+gate.load_helper()
+smallest = gate.in_flight_worst_case(gate.profile_of("bedrock"), ["us.openai.gpt-6-luna"], 4, 1).quantize(Decimal("0.01"), ROUND_CEILING)
+most, total = gate.read_caps()
+others = {name: gate.other_gate_budget(go, name, gate.CAPS_OWNER_UID) for name, (_state, go) in sorted(gate.GATE_PATHS.items()) if name != "bedrock"}
+largest = min(most, total - sum(others.values()))
+print("\n".join(f"{name}: pot {pot}" for name, pot in others.items()))
+print(f"caps file: team total {total}, one GO at most {most}")
+print(f"the Amazon pot activate accepts: from {smallest} to {largest}" if smallest <= largest else f"NO ROOM: the Amazon pot must be at least {smallest}, and only {largest} is left: lower another gate's pot first")
+PY
+```
+
+A gate that is not installed shows pot `0`. Choose the daily pot inside the printed range. `NO ROOM`: first lower
+another gate's pot, as README.md "Change the daily budget or another limit" shows (the same steps for every gate, each
+with its own GO and folder: a new GO, then `stop` and `activate`); in an upload, that too runs before SB3. Then run
+this block again. A Python error instead of these lines
+(for example `ROOT_CAPS_REQUIRED`: no caps file): stop and ask.
 
 ```sh
 G=/opt/debateai-v3-preview/operator/bedrock-budget-v1
@@ -252,8 +319,9 @@ What to expect: `init` prints `"state": "initialized"` and `"provider": "bedrock
 `"state": "active"`, `"window_open": true` and `daily_budget_usd` the figure you wrote. A refusal is one line with
 `"status": "refused"` and a code, for example `ROOT_CAPS_REQUIRED` or `ROOT_CAPS_INVALID` (the caps file),
 `ROOT_GO_INVALID` (a GO field or a file hash), `CONCURRENCY_EXCEEDS_BUDGET` (the pot cannot carry four calls in flight,
-one of them a final writer: ask the owner), `HELPER_CUSTODY_INVALID`, or `TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together
-are above the team total: lower one first).
+one of them a final writer: it is below the range step 5's first block printed), `HELPER_CUSTODY_INVALID`, or
+`TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together are above the team total: lower another gate's pot first, as step 5
+says).
 
 **7. Install the units and start the gate.** The boot drop-in comes later ("Switch it on").
 
@@ -277,6 +345,12 @@ What to expect:
 - `active`. The journal shows the address check's `"status": "ok"`, then `"status": "serving"` with
   `"provider": "bedrock"` and `"max_concurrent_calls": 4`.
 - The socket is `666 root:root socket`. Anyone may connect, but the gate answers only uids 994 and 992.
+
+**Until "Switch it on".** Nothing starts this gate at boot: its unit has no `[Install]`, and the boot drop-in comes at
+"Switch it on". After a reboot, start it by hand (`systemctl start debateai-preview-bedrock-budget`) when you need it;
+meanwhile its `state` on disk stays `active`, and the API's checks of Luna fail at once, so Luna is left out. Its 31
+days run from step 6's `activate`: while no call reaches it, `window_open` turns `false` after them, and the owner's
+runbook's ASKS_OPEN refuses until its `stop`, then its `activate` (`deploy/preview-auth-dev/v1/MAIN-SITE.md`, 6.5).
 
 **8. Probe (one paid call, a small fraction of a cent). It must pass before Luna is switched on.** Probe when nobody is
 using the site. The command runs the probe inside its own fence, as the other gates' probes do: its own unit name, the
@@ -322,29 +396,72 @@ is switched on for users.
 
 ## Switch it on
 
-**Only after** the step-8 probe has passed twice (each field shows its "Good" value), **and** the Privacy Policy and
-the Terms on the site name Amazon Web Services (the AI providers page lists it by itself, as soon as the server's
-settings name its address). Until then Luna stays out of the line-up.
+Luna's own day (the release guide's piece 4): any day after the upload, never during one. Do the steps in this order.
+Luna joins the debates only at the last step (6), and only after all of these: the step-8 probe has passed twice
+(each field shows its "Good" value), **and** the Privacy Policy and the Terms on the site name Amazon Web Services
+(the AI providers page lists it by itself, as soon as the server's settings name its address), **and**, when any
+account outside the team exists by then, the Privacy Policy section 14 notice has gone out (by e-mail and in the
+product, naming Amazon and what it will receive) and its time to object has passed (the upload guide's section "The
+providers page"). An account outside the team is an account of anyone other than the owner and the team. The owner's
+own test sign-ups do not count; a friend's or NETOPIA's tester's do. When unsure, ask.
 
-**1. Start at boot, and the two watchers.** Each watcher run by hand should print `"status": "ok"`.
+**1. The notice, when it is owed.** When any account outside the team exists, the notice goes out first, and every step
+below waits until its time to object has passed. The key waits too: once it is in, every ask makes a paid check of
+Luna ("Decisions you should know about"). When no such account exists, go on to step 2.
+
+**2. The gate running, start at boot, and the two watchers.** This needs no key. First set `R`, as install step 1
+does, but from the newest upload's names file (fill in `rNN`, that upload's number: its release is the current one,
+and every release since the one that brought this gate carries the boot drop-in). Type both blocks in one root shell,
+in order: the second block reads `R`. The second command must print `R ok`.
 
 ```sh
-( set -eu; test -d "$R/deploy/preview-gate/v3"
+. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine
+test -f "$R/deploy/preview-gate/v3/systemd/debateai-preview.target.d/50-bedrock-gate.conf" && echo 'R ok'
+```
+
+The gate itself first: after a reboot since the install nothing started it. Each watcher run by hand should print
+`"status": "ok"`.
+
+```sh
+systemctl start debateai-preview-bedrock-budget; systemctl is-active debateai-preview-bedrock-budget
+( set -eu; test -f "$R/deploy/preview-gate/v3/systemd/debateai-preview.target.d/50-bedrock-gate.conf"
 install -d -o root -g root -m 0755 /etc/systemd/system/debateai-preview.target.d
 install -o root -g root -m 0644 $R/deploy/preview-gate/v3/systemd/debateai-preview.target.d/50-bedrock-gate.conf /etc/systemd/system/debateai-preview.target.d/
 systemctl daemon-reload )
+systemctl show -p Wants debateai-preview.target | grep -c debateai-preview-bedrock-budget
 systemctl start debateai-preview-bedrock-halt-watch.timer debateai-preview-bedrock-addresses.timer
 systemctl start debateai-preview-bedrock-halt-watch.service; journalctl -u debateai-preview-bedrock-halt-watch -n 2 -o cat
 systemctl start debateai-preview-bedrock-addresses.service; journalctl -u debateai-preview-bedrock-addresses -n 2 -o cat
 ```
 
-**2. The app's two settings (they come with the upload).** The upload guide's section "The Amazon Bedrock gate: the
+What to expect: `active`; then `1`, which says the boot drop-in is in place (the site's target now starts this gate
+and its two watchers at boot); then the two watchers' `"status": "ok"`. A `0` there, or a line `R: unbound variable`:
+the drop-in is not in place. Set `R` with the first block, then run the second block again.
+
+**3. The key and the probe, at a quiet hour, in one sitting.** First `status` (Daily operations): if `window_open` is
+`false` (more than 31 days since the upload's `activate`), run this gate's `stop` ("Emergency off", level 1), then its
+`activate` ("Re-open after a halt", step 4). Then install step 0 in the AWS console, if it is not done yet. Then
+install step 4 (the key), and right after it install step 8 (the probe, twice). Every field must show its "Good"
+value. The day after, compare the probe day's spend with the AWS Billing page (the end of step 8).
+
+**4. The runner.** It reads each gate's number of calls at once only at its start, and runs a gate it could not read
+one call at a time (`GATE_CAPACITY_UNREAD`). If the gate was not running when the current release's runner last
+started (after a reboot, for example), its journal shows that line for this gate:
+
+```sh
+U='debateai-preview-runner@<the current release label>'; journalctl -o cat --no-pager _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value "$U")" | grep GATE_CAPACITY_UNREAD | grep -c bedrock
+```
+
+A count above 0: restart that runner when no debate is running (`systemctl restart "$U"`), before the line-up
+activation (step 6). To confirm on the server.
+
+**5. The app's two settings (they come with the upload).** The upload guide's section "The Amazon Bedrock gate: the
 upload that brings it" (`deploy/preview-release/v1/README.md`) adds them to the new release's files:
 - the API's and the runner's preview configuration carries `bedrock_budget_socket` with the value
   `/run/debateai-v3-preview/bedrock-budget-v1.sock`;
 - their list of model addresses (`PROVIDER_DISCOVERY_TARGETS_JSON`) carries Luna's row (`preview:gpt-6-luna`).
 
-**3. The line-up, by a settings activation** (no upload, no restart): a new line-up file with
+**6. The line-up, by a settings activation** (no upload, no restart): a new line-up file with
 `us.openai.gpt-6-luna` added to `free_model_ids` and `premium_model_ids` (the owner's choice: both plans, as a
 sixth AI), then the plan, the publish, the check, the owner's fresh yes and the activation
 (`deploy/preview-release/v1/README.md`, "The line-up, the thinking levels and the answer seats", part "A model that is
@@ -464,3 +581,5 @@ replies written from the documentation. Only the server shows:
   (any field the gate does not know halts); and the charge against Amazon's own bill the day after.
 - The API (uid 994) can ask `/remaining` on the new socket; any other account is closed at once.
 - The halt email arrives once per halt, with this gate's own re-open command.
+- While no key is in, the API's checks of Luna at ask time are refused by the gate before anything is set aside, with
+  no halt (`status` keeps `halts` as it was and `today_spend_usd` at 0).

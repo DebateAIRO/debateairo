@@ -34,10 +34,11 @@ setting stops that service, and the journal names the setting with a short code.
 - *A drop-in* is a small extra file next to a systemd service file. It changes one line of the service without
   editing the service file itself.
 - *The release guide* is `deploy/preview-release/v1/README.md`.
-- *M1, M2, M8* are mails to the buyer: M1 is the confirmation with the Terms, M2 the receipt, M8 the mail that
-  confirms a withdrawal's refund. *O2_REFUND_DUE*, *O2_WITHDRAWAL* and *O3* are mails to you: O2_REFUND_DUE is a
-  refund you must make in NETOPIA's admin; O2_WITHDRAWAL is a withdrawal whose refund you must settle by hand; O3 is a
-  billing job that failed for good (for example an invoice SmartBill refused).
+- *M1, M2, M8* are mails to the buyer: M1 is the confirmation (with the Terms the account accepted, as a file, when they
+  are the launch texts: 7.8), M2 the receipt, M8 the mail that confirms a withdrawal's refund. *O2_REFUND_DUE*,
+  *O2_WITHDRAWAL* and *O3* are mails to you: O2_REFUND_DUE is a refund you must make in NETOPIA's admin; O2_WITHDRAWAL
+  is a withdrawal whose refund you must settle by hand; O3 is a billing job that failed for good (for example an invoice
+  SmartBill refused).
 - *A bcrypt hash* is the scrambled form of the site password that Caddy keeps. The password itself is never stored.
 - *A stranger* is a browser that sends no site password and holds no sign-in cookie of this site.
 - *The NETOPIA review window* (5.8) lets strangers read the public pages of dezbatere.ro; everything else keeps the
@@ -64,7 +65,7 @@ while you type, and nothing you type goes on a command line. Never paste a key, 
 with Claude.
 
 **Amounts on the screen.** Some steps print amounts: GATES and the scripts that call it (the day's spend of each
-spending gate), WITHDRAWOTHER, REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a
+spending gate), the Amazon gate's range of pots (part 2), WITHDRAWOTHER, REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a
 GitHub issue or a pull request. When you ask for help, give the step's last line, and say which step it was.
 
 **`<…>` in a block** is a value you fill in before you run it. `rNN` is the upload's number, as in the release guide.
@@ -77,7 +78,7 @@ if the server shows something else.
 | Part | What | The site | The way back |
 |---|---|---|---|
 | 1 | before the upload: the companies, DNS, mail, old debates, your numbers | unchanged | nothing to undo |
-| 2 | the upload, every lock closed | the release guide's downtime | the release guide's way back |
+| 2 | the upload, every lock closed, with the Amazon gate's upload-day steps | the release guide's downtime | the release guide's way back |
 | 3 | your sandbox payment test, on the test name, behind the password | unchanged | close the sandbox records |
 | 4 | mail: allow-list on the new path, then open | password on | MAIL_CLOSE |
 | 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
@@ -89,8 +90,11 @@ if the server shows something else.
 | 10 | every named refusal code | – | – |
 
 **The upload day, and the days after.** Part 1 is the day before. Parts 2 to 5, up to and including the review window
-(5.8), fit in one day: the upload, your sandbox test, mail, the name, your staff key there (5.7) and the window. Real
-payments do not: NETOPIA's point of sale is not enrolled yet, and four of NETOPIA's steps remain:
+(5.8), fit in one day: the upload, your sandbox test, mail, the name, your staff key there (5.7) and the window. The
+upload also brings the spending gate for one more AI model, OpenAI's GPT-6 Luna, served by Amazon: its upload-day
+steps are in part 2 (on the Mac before SB2, between SB2 and SB3, at SB4, right after DR1 and before your yes). Luna
+itself is switched on later, on a day of its own (the release guide's piece 4), not on the upload day. Real payments do
+not fit in the upload day: NETOPIA's point of sale is not enrolled yet, and four of NETOPIA's steps remain:
 1. you enrol the point of sale in NETOPIA's admin and tick its conditions, once the window is open (5.8b);
 2. NETOPIA checks your identity;
 3. NETOPIA checks your shop's profile, and looks at https://dezbatere.ro without a password;
@@ -163,7 +167,8 @@ go on a second time, that friends' test closes and the site password changes (7.
 - **Never open or close a lock during an upload**, from SB3 to the end of DR6 (or SB13), and never while a second
   release is staged or draining. The locks' names file below stops you when a release is staged or draining. Only
   the brakes (a), (b) and (b2) of 6.5 may run during an upload: the gates' `stop`, PWON (the site password back) and
-  REVIEW_CLOSE (the review window closed).
+  REVIEW_CLOSE (the review window closed). The gates' new code and the Amazon gate of part 2 restart gates and run
+  `activate`: they are no brakes, so they run after SB2 and before SB3, never in this window.
 
 ---
 
@@ -434,6 +439,10 @@ Do this **before DR2** of the upload, while the old release still runs on the te
    publicare) open from the link on the Team page once your key is verified. Settling usually needs the team tools unlocked: if the page says
    `Team tools are locked…` (in step 2 or 3), run `systemctl start debateai-preview-team-unlock` as root. It unlocks
    them for one hour.
+   If the Team page also shows **Threat reports** (Rapoarte despre amenințări) with unread ones, read and decide them
+   now: this upload removes that screen and its mail for good, so before DR2 is the last moment anyone can read a kept
+   report. A report nobody reads is deleted by itself 30 days after it was kept. After the upload the Team page's
+   invite form still offers the permission "Read threat reports"; it opens nothing.
 4. Optional: you, and anyone on the team who wants to, can delete your own private test debates with "Delete private
    debate…" on the classic page `/debate/<id>`. A delete is permanent.
 
@@ -482,7 +491,9 @@ of the month. With made-up numbers:
   credit (nobody is stopped in a month they already started, and no running debate pauses), for the week cap, and for
   Free. The Terms still ask two things of you that the product does not do by itself: tell people before a limit
   gets tighter (section 12), and ask them to accept the new Terms at their next sign-in before a lower limit applies to
-  them (section 14).
+  them (section 14). A later Terms version that makes people accept again at sign-in does not reach the accounts made
+  before the launch texts (yours and the team's): the version numbers they accepted are higher than the launch ones.
+  Ask before you count on it for them.
 - **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
 - **A day or week cap added where the plan had none** is a lower limit: it starts with each person's own next month.
   One taken away is a higher limit.
@@ -505,15 +516,8 @@ of the month. With made-up numbers:
   includes your own account and every test account: after an upload that publishes lower numbers, each of them still
   has the larger ones until its own next month starts, at most about 31 days. An account created after the switch has
   the new numbers from its first day.
-- **The Amazon gate, for OpenAI's GPT-6 Luna (the first upload that carries it).** The release guide's section "The
-  Amazon Bedrock gate: the upload that brings it" has the four pieces, and `deploy/preview-gate/v3/README-bedrock.md`
-  the gate's own steps. In short: before SB4, the three older gates get this release's gate code and units, and the
-  Amazon gate is installed and `active` (its limits typed on the server, in its GO; write no amounts here); right
-  after DR1, BEDROCK_ENV adds the gate's socket and Luna's address to the new release's two files. **The key is typed
-  by you at the server's hidden prompt** (`preview_key.py install bedrock`), never on a command line and never pasted
-  into a chat. Luna joins the debates later, by a settings activation, only after the probe has passed twice and the
-  Privacy Policy and the Terms on the site name Amazon. Put the key's end date in your calendar: a key past its end
-  date stops the Amazon gate (`README-bedrock.md`, "A new key").
+- **The Amazon gate (OpenAI's GPT-6 Luna)** is no plan limit: what this upload does for it, and what you decide first,
+  is in part 2. Its pot and its daily number of calls go into its GO on the server, like the other gates' (below).
 - **The first upload that carries this rule.** The release before it does not know the rule. If you go back to that
   release (the release guide's way back), it measures everyone against its own numbers at once, as before; "cannot be
   taken back inside a month" holds only between releases that both carry the rule.
@@ -617,8 +621,17 @@ Every line `SAME`: leave `NEWNUM` and `LIMITS` empty; SB3 publishes the live num
 Upload with the release guide's "Drained upload on the template layout": SB1 to SB4, then DR1 to DR6, then SB13b. Do
 not restate or change the recipe. Every lock stays closed during it: add no `PREVIEW_ASKS_OPEN_TO`, no
 `PREVIEW_LIVE_PAYMENTS` and no other `PUBLIC_APP_URL` to any env file, leave `mail-plan.json` as the v1 file, install
-no new drop-in, and keep the site password on. Never add a new setting to the old release's own files: a release older
-than this code refuses a key it does not know, and a way back starts it from its own files.
+no new drop-in (the one exception: the Amazon gate's own units and address drop-in, below), and keep the site password
+on. Never add a new setting to the old release's own files: a release older than this code refuses a key it does not
+know, and a way back starts it from its own files.
+
+**This upload also brings the Amazon gate**: the spending gate for OpenAI's GPT-6 Luna, which Amazon serves (the
+release guide's section "The Amazon Bedrock gate: the upload that brings it", and
+`deploy/preview-gate/v3/README-bedrock.md`). Luna itself is not switched on in this upload: that is the release
+guide's piece 4, on a day of its own, after the upload. The list below carries what the upload needs for the gate, in
+order: Luna's address in the practice's settings before SB2; the gates' new code and the Amazon gate after SB2 and
+before SB3; two more things at SB4; Luna's address in the new release's files right after DR1; and GATEREADY before
+your yes.
 
 **First, on the Mac: the legal texts of the commit you upload.** This server's upload path never runs the legal check,
 so run it yourself before SB1. Open Terminal and go to the `dialectical-engine` folder of your copy of the code (with
@@ -634,10 +647,53 @@ The first line must be the same 40 characters as SB1's `REV`; if it is not, stop
 what is missing (for example a translation of the Terms or the Privacy Policy that is older than the English text),
 and only a new commit fixes that.
 
-What this release adds to that recipe:
-- **MAILPLAN once more, right before DR1.** Run MAILPLAN (1.5) again immediately before DR1, and stop the upload
-  unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
-  inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
+The Terms and the Privacy Policy (version 1.0) name the day they take effect, and that day is the upload day: they go
+live on the site at DR6. Check the day on the Mac, in the same folder:
+
+```sh
+grep -ho 'Effective [0-9]* [A-Za-z]* 2026' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
+```
+
+It must print `Effective 22 November 2026` twice: the upload day. If it prints another day, or the upload moves to
+another day, stop before SB1 and ask: the day is part of the texts, so a new day needs a new commit. At your first
+sign-in after the upload, neither you nor the team is asked to accept the texts again: your earlier acceptances count.
+
+The steps this release adds to that recipe, in the order you meet them:
+- **Before SB2, on the Mac: LUNAROW.** The practice runs this release's next register, which lists a seventh model,
+  Luna. S-2's copy of the settings lists six, so without LUNAROW the practice stops at once with
+  `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` (nothing is spent). Run the release guide's LUNAROW (in the Amazon gate's
+  section, which says how to save and run it) in S-6's second terminal, where you set `P` to S-5's folder: after
+  S-5's `scp`, before S-6's `formats`. S-5's own terminal is busy with its `ssh -N`. Expect
+  `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. Then the practice as usual: its line
+  `practising on this code's next version` lists the rows the next version changes and adds, which must match SB3's
+  delta, and Luna sits out of the practice debate. A new S-2 copy, or S-5's `scp` run again, brings the six-row
+  settings back: run LUNAROW again after it.
+- **After SB2 and before SB3: the gates' new code, and the Amazon gate (the release guide's pieces 1 and 2), then
+  GATES4.** Never later: from SB3 to the end of DR6 only the brakes may run (the order rules). These steps restart the
+  gates, run `activate`, and install the Amazon gate's units and its address drop-in: that is allowed here, although
+  this part says "install no new drop-in". Have ready first:
+  - your two figures for the Amazon gate's GO (its daily pot and its daily number of calls), typed only on the server
+    (install step 5; write them nowhere else). Install step 5's first block prints on your screen the range of pots
+    `activate` accepts: from the smallest that carries four calls at once to what the other gates' pots leave under the
+    team total in the caps file. Below it `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`, above it
+    `TEAM_TOTAL_BUDGET_EXCEEDED`. If it prints `NO ROOM`, lower another gate's pot first, still before SB3 (the release
+    guide's "Before piece 1, have ready" says how);
+  - a quiet hour, and your yes for the gates' restarts.
+
+  The AWS console work (`README-bedrock.md`, install step 0: Luna's subscription and quota, the key, a budget alert, an
+  AWS account e-mail address someone reads) is for Luna's own day. The upload does not wait for it.
+
+  Then, in one root shell (`sudo -i`), as the release guide's pieces 1 and 2 say: the DeepInfra, Anthropic and
+  Perplexity gates on this release's gate code (`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", steps 1 to
+  6, for each; then README-bedrock's install step 3a, whose six `1` lines are the check of the units), then the Amazon
+  gate (README-bedrock's install steps 1 to 3, 5, 6 and 7). **Do not put the Amazon key in now** (install step 4): it goes in on Luna's own day, after the notice when it
+  is owed and after the gate's watchers start, right before your first probe (README-bedrock's "Switch it on"). Once
+  the key and Luna's address are both in, the site checks Luna through the gate at every question someone asks, which
+  is a real paid call; without the key nothing is sent to Amazon or charged, and debates run as before.
+  Last, the release guide's GATES4: expect four lines `<gate>: gate code this release; state active`, then
+  `GATES4_DONE`. Go on to SB3 only then. If the upload stops after this step, the running release keeps serving, but
+  its settings activations are refused until this release is uploaded (the release guide's "The way back" in that
+  section).
 - **Your numbers (1.7), at SB3.** SB3 publishes a number from `hosted-billing-v1.json` only where you name it in
   `NEWNUM` (and a plan whose limits change, up or down, in `LIMITS`), and stops when the file differs anywhere you did not name.
   SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
@@ -645,21 +701,54 @@ What this release adds to that recipe:
   is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or
   is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher,
   that you checked the number twice.
-- **NETOPIA's logo** (1.1): SB5d right after DR1, before your yes (the release guide's "owner's yes") and DR2, with
-  the shop id. Skip PM1, SB5b, MT1, PM2 and MT2. After SB13b, run the release guide's LOGOCHECK. It only reads, and
-  must end with `LOGOCHECK_DONE`: part 5 waits for it.
-- **UNFINISHED, right before your yes and DR2** (below). The new release deletes sign-ups that were never finished.
-  UNFINISHED counts the ones it deletes at DR6, and your yes before DR2 names that count.
 - **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
   `deploy/preview-auth-dev/v1/public-origins.mjs`, `startup-refusals.mjs`, `start-check-mail.mjs`,
   `start-check-payments.mjs`, this `MAIN-SITE.md`, `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
   your numbers, 1.7) and `deploy/preview-lifecycle/v1/rekey-staff-key.mjs` (the staff key under a new name, 5.7); and
   changed ones: `environment.mjs`, `egress-proxy.mjs`,
   `mail-handoff.mjs`, `launch-api.mjs`, `launch-runner.mjs`, `launch-ui.mjs`, `README.md`,
-  `deploy/preview-lifecycle/v1/release-env.mjs`, `unlock-team-tools.mjs`, `jit-creator-actor.mjs` and that folder's
-  `README.md`, `deploy/preview-release/v1/release-artifacts.mjs` and its `README.md`.
+  `deploy/preview-lifecycle/v1/release-env.mjs`, `unlock-team-tools.mjs`, `jit-creator-actor.mjs`, `common.mjs` (the
+  tools' list of spending gates, which now holds the Amazon gate), `alert.mjs` (the Amazon gate's halt and address
+  e-mails) and that folder's `README.md`, `deploy/preview-release/v1/release-artifacts.mjs` and its `README.md`.
   Review them, then run SB4 again with `LIFE=yes`. On the drained path, DR5 runs SB10's operator folder swap by hand
   first, as the release guide says.
+  After the gates' new code (above), SB4 also stops on `GATE_ROWS_N1` with `changed since the switch: review <digest>`:
+  the DeepInfra and Anthropic gates' files changed. GATES4 was your review of those files: copy that digest between
+  the quotes of `GRR=''` at the top of SB4, and run SB4 again (with `LIFE=yes` too). SB4 knows only those two gates;
+  GATES4 is the review of the Perplexity and the Amazon gates' files.
+- **MAILPLAN once more, right before DR1.** Run MAILPLAN (1.5) again immediately before DR1, and stop the upload
+  unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
+  inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
+- **BEDROCK_ENV, right after DR1** (the release guide's piece 3, before your yes and DR2). It adds the Amazon gate's
+  socket and Luna's address to the new release's API and runner files; the old release's files do not change. Expect
+  `api-<LABEL>.env: 7 model addresses, the Amazon socket named`, the same line for `runner-<LABEL>.env`, then
+  `BEDROCK_ENV_DONE`.
+- **NETOPIA's logo** (1.1): SB5d right after DR1, before your yes (the release guide's "owner's yes") and DR2, with
+  the shop id. Skip PM1, SB5b, MT1, PM2 and MT2. After SB13b, run the release guide's LOGOCHECK. It only reads, and
+  must end with `LOGOCHECK_DONE`: part 5 waits for it.
+- **UNFINISHED, right before your yes and DR2** (below). The new release deletes sign-ups that were never finished.
+  UNFINISHED counts the ones it deletes at DR6, and your yes before DR2 names that count.
+- **GATEREADY, right before your yes and DR2** (in the release guide's Amazon section). It only reads. It asks, while
+  the site is still up, what DR6 and the new runner and API will ask of the four gates and of the new release's two
+  files, so a missing piece stops the upload here and not at DR6, after the migrations. Expect four lines
+  `<gate> gate: code this release; state active; window open true`, two lines `<service>-<LABEL>.env: 7 model
+  addresses; Luna's address there; the Amazon socket named; this release's start check of the addresses: accepted 7`,
+  then `GATEREADY_DONE`. On `GATEREADY_NOT_DONE` its last line names what is missing (`piece 1`, `piece 2`, `piece 3`
+  or `ask`) and the `MISSING` lines above it say which gate or file. Nothing has changed and the site is up. You are
+  inside the window where only the brakes may run (the order rules), so:
+  - `piece 3`: run BEDROCK_ENV, then GATEREADY again;
+  - `piece 1`, `piece 2` or `ask`: no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and
+    ask.
+
+  Give no yes before `GATEREADY_DONE`.
+- **Your yes before DR2, for the Amazon gate.** Besides what the release guide's yes names, your numbers and the
+  UNFINISHED count (above), it names `GATEREADY_DONE`, and says that no Privacy Policy section 14 notice is owed at this
+  upload: Amazon receives nothing until Luna is switched on, and only your and the team's accounts exist. Your own test
+  sign-ups (4.3) do not count as accounts outside the team; a friend's or NETOPIA's tester's would. If someone outside
+  the team already has an account, ask before the yes. Amazon's dated Register row comes with this release, and from DR6 the AI providers page lists Amazon while Luna stays off. Before
+  Luna is switched on (the release guide's piece 4), if any account outside the team exists by then, the notice goes
+  out first (by e-mail and in the product, naming Amazon and what it will receive), and the Amazon key and Luna wait
+  until the time to object has passed.
 - **The new SAME lines.** DR1's `same` still runs the old tools, so it prints no new line. After DR5's folder swap,
   `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` also prints `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`,
   `OK SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<LABEL>`, `OK VALID_PREVIEW_ASKS_OPEN_TO:<LABEL>` and
@@ -671,6 +760,8 @@ What this release adds to that recipe:
   one line, with rNN filled in (it reads the upload's names file, so `$LABEL` is the new release):
   `bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -n 80 -o cat --no-pager | grep -E "STARTUP_REFUSED|PREVIEW_MAIL_MODE|api.boot.failed"'`.
   A `PREVIEW_MAIL_…` code means `mail-plan.json` (part 1.5). Stop and ask before you choose the way back.
+- **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
+  database never took a live payment, so the count is 0 and the API starts as before.
 - **MONTHNUMBERS, after DR6.** To keep each person's month on the numbers it started with, the new API and runner read
   the database's record of release switches through a function this release adds (migration `0185_release_history.sql`).
   SB13b's team debate may be paid from a team grant, which never reads that record, so check it once by hand. The
@@ -694,8 +785,11 @@ What this release adds to that recipe:
   paid from a team grant, open the page that shows your usage, or ask one question: it must answer as usual. A
   `MONTHNUMBERS_NOT_DONE` line, or a refused question there while team debates work: stop and ask. This block was
   written on the Mac and has not been run on the server yet.
-- **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
-  database never took a live payment, so the count is 0 and the API starts as before.
+- **Until Luna's own day: the Amazon gate unused.** Its window closes 31 days after its `activate` (piece 2). With no
+  key, no call reaches it, so it stays `active` with `window_open` false, and ASKS_OPEN (6.1, 8.1) refuses then: run
+  its `stop` line, then its `activate` line (6.5). After a reboot nothing starts it (its start at boot comes with Luna's
+  day); that changes nothing for the debates, and `systemctl start debateai-preview-bedrock-budget` starts it. Put the
+  key's end date in your calendar: a key past its end date stops the Amazon gate (`README-bedrock.md`, "A new key").
 
 **The unfinished sign-ups (UNFINISHED).** From this release on, a sign-up not finished within 24 hours is deleted.
 Not finished means the account still waits for its e-mail link to be opened (`pending_verification`) or for its second
@@ -1027,7 +1121,8 @@ Test it:
 2. Sign up with each, behind the site password.
 3. The verification mail must reach the Inbox (not Spam), and its link must finish the sign-up.
 4. "Show original" / "View raw message" must show SPF, DKIM (`d=dezbatere.ro`) and DMARC pass.
-5. Then start the deletion of both test accounts in Settings (it runs 7 days later).
+5. Then start the deletion of both test accounts in Settings (it runs 7 days later). They are your own test sign-ups:
+   for the Amazon notice (part 2) they are not accounts outside the team.
 
 If either test fails: run MAIL_CLOSE (4.4). Take the site password off only after both pass.
 
@@ -1272,7 +1367,8 @@ payments are real (part 7). The site password keeps it small: only people who kn
   per debate). With the line at 0, or when the check does not agree, the report waits for a person, and nobody can act
   on it until the staff screens come back.
 - **Staff mails.** You still get the mails that say a report waits, or that a debate was hidden
-  by itself. You cannot open them in the app until the staff screens come back. That is expected.
+  by itself. You cannot open them in the app until the staff screens come back. That is expected. (The threat report
+  screen and its mail are gone since this upload: 1.6.)
 
 **Never open the site to everyone (part 8) while the staff screens are off, or while no staff key works under
 dezbatere.ro.** PWOFF1 (8.2) refuses in both cases.
@@ -1805,7 +1901,7 @@ password: sign-in, sign-up, debates and buying. 5.8b says what to check on the o
 exists); the site password is on; no upload is running. Do 5.7 (your staff key) first if you can: STAFFMAIN restarts
 the API, and with the window open the open pages would show an error meanwhile.
 
-**What opens, for reading only:** the home page, `/pricing`, `/terms` and `/privacy` (with their earlier versions),
+**What opens, for reading only:** the home page, `/pricing`, `/terms` and `/privacy` (with their versions pages),
 `/legal`, `/cookies`, `/providers`, `/ai-transparency`, `/privacy/us-health-data`, `/cancel` and `/withdraw`, and the
 files these pages load (scripts, fonts, the icon, the ANPC badge). NETOPIA's logo needs nothing from the window: the
 visitor's browser loads it from NETOPIA's own server. The form on `/cancel` works too: it mails a link only to an
@@ -1952,20 +2048,21 @@ systemctl restart caddy || echo 'systemctl restart of Caddy returned non-zero'; 
 probes
 [ -z "$BAD" ] || back "a check failed (above)"
 rm -f "$RW.lines"
-echo "NETOPIA's logo on the open home page: $(body "$U/" | grep -oE 'src="https://mny[.]ro/np-black-0[.]svg[?]id=[0-9]+"' | grep -c . || true) time(s) (1: shown; 0: this release has no logo id: ask before you enrol the point of sale, 5.8b)"
+HP=$(body "$U/")
+echo "NETOPIA's logo on the open home page: $(grep -oE 'src="https://mny[.]ro/np-black-0[.]svg[?]id=[0-9]+"' <<<"$HP" | grep -c . || true) time(s) for the light theme, $(grep -oE 'src="https://mny[.]ro/np-white-0[.]svg[?]id=[0-9]+"' <<<"$HP" | grep -c . || true) for the dark (1 and 1: shown; 0 and 0: this release has no logo id: ask before you enrol the point of sale, 5.8b)"
 echo "the plans page shows the test-mode note: $(body "$U/pricing" | grep -c 'Test mode:' || true) time(s)"
 echo "open now to strangers: the home page, /pricing, Terms and Privacy with their versions, /legal, /cookies, /providers, /ai-transparency, /privacy/us-health-data, /cancel and /withdraw, their files, and the /cancel form"
 echo REVIEW_OPEN_DONE
 exit 0
 ```
 
-Expect the diff (one `< basic_auth {` line and the window's lines), the two handler lines, and a line that says
-nothing is linked from `/terms/versions` (the Terms have no earlier version yet). Then three information lines:
-NETOPIA's logo `1 time(s)`; the test-mode note `1` or more `time(s)` while payments are on NETOPIA's sandbox (0 once
-real payments are on, 7.6); what is open now. Then `REVIEW_OPEN_DONE`. A 0 for the logo, or for the note while
-payments are on the sandbox: ask before 5.8b. A `LOOK:` line changes nothing: read it, and ask before you write to
-NETOPIA. On a later run, with the window open, expect `the review window is open already: checks only, nothing
-changes`, the `/terms/versions` line and `REVIEW_OPEN_DONE`.
+Expect the diff (one `< basic_auth {` line and the window's lines), the two handler lines, and a line that says nothing
+is linked from `/terms/versions` (its one entry, version 1.0, is `/terms` itself). Then three information lines:
+NETOPIA's logo `1 time(s) for the light theme, 1 for the dark`; the test-mode note `1` or more `time(s)` while payments
+are on NETOPIA's sandbox (0 once real payments are on, 7.6); what is open now. Then `REVIEW_OPEN_DONE`. A 0 for either
+logo, or for the note while payments are on the sandbox: ask before 5.8b. A `LOOK:` line changes nothing: read it, and
+ask before you write to NETOPIA. On a later run, with the window open, expect `the review window is open already: checks
+only, nothing changes`, the `/terms/versions` line and `REVIEW_OPEN_DONE`.
 
 If it says `REVIEW_OPEN_NOT_DONE`, read the reason:
 - On the first run (the window was closed), a failed check puts the file before back, and every page asks for the
@@ -1977,8 +2074,9 @@ If it says `REVIEW_OPEN_NOT_DONE`, read the reason:
 on mobile data.
 1. Open https://dezbatere.ro. You must see no password box: not while the page loads, not while you scroll, and not
    in the next minute.
-2. Open every page link in the footer, and one earlier version of the Privacy Policy (from `/privacy/versions`). Each
-   opens with no password box, except Settings (Setări), which shows the password box as Log in does. The phone and
+2. Open every page link in the footer, and the Privacy Policy's versions page (`/privacy/versions`) with its one entry,
+   version 1.0 (its Read link; no earlier version exists yet, and the page says so). Each opens with no password box,
+   except Settings (Setări), which shows the password box as Log in does. The phone and
    e-mail links open your phone and mail apps; the NETOPIA, ANPC and DB-IP links open those sites. **Report a problem**
    (Raportați o problemă) is no page: it opens your mail program with a draft to the company's address, as does the
    **Tell us** (Scrieți-ne) link in the home page's Beta sentence.
@@ -2299,9 +2397,9 @@ your identity, checks your shop's profile (it looks at the open site), and sends
 
 **4. What to tell NETOPIA** (in your own words, with the enrolment):
 - The site is https://dezbatere.ro.
-- The home page, the plans with prices, the Terms and the Privacy Policy (with earlier versions), the company details
-  and contact page, the cookie policy, the AI model providers, the AI transparency notice, Cancel and Withdraw can be
-  read without a password.
+- The home page, the plans with prices, the Terms and the Privacy Policy (each with its versions page), the company
+  details and contact page, the cookie policy, the AI model providers, the AI transparency notice, Cancel and Withdraw
+  can be read without a password.
 - Sign-in, account creation, debates and the order page ask for an access password for now. They open to everyone
   later, after the contract.
 - Card payments run on NETOPIA's test system (sandbox) until NETOPIA switches live payments on, and the home page and
@@ -2383,6 +2481,11 @@ exit 0
 
 Expect `payments: sandbox`, the SAME list, the API's lines with `{"event":"api.preview.asks_open","to":"everyone-with-test-payments"}`,
 then `ASKS_OPEN_DONE`.
+
+If it stops with `a spending gate is not active with its window open` and the gates' lines show `bedrock` with
+`"state":"active","window_open":false`, the Amazon gate's 31 days are over while Luna is still off (part 2, "Until
+Luna's own day"). With your yes, run the Amazon gate's `stop` line, then its `activate` line (6.5; `activate` alone
+refuses a gate that is still `active`), then ASKS_OPEN again.
 
 The runner needs no restart. Its file already says open, and its start rule acts only when it starts. At its next
 start it prints `{"kind":"DEBATEAI_RUNNER_STARTUP","event":"PREVIEW_ASKS_OPEN","to":"<value>"}` and fails only a
@@ -2869,7 +2972,12 @@ private person with a Romanian address (Bucharest needs "Sector 1-6"), in the Ro
 total on the checkout before you press **Abonați-vă și plătiți**. On NETOPIA's page, pay with your own card and 3-D
 Secure.
 
-Expect: back on the site the plan is active; M1 with the Terms; NETOPIA's own e-mail; then M2 with SmartBill's PDF.
+Expect: back on the site the plan is active; M1; NETOPIA's own e-mail; then M2 with SmartBill's PDF. M1 carries the
+Terms as a file only for an account that accepted the launch Terms (version 1.0): every account made after this upload.
+For an account made before it (yours, and the team's), M1 says where the current Terms are online and carries no file,
+and the API's journal shows `billing.mail.attachment_missing` with `MAIL_TERMS_NOT_ARCHIVED`: that is expected, not a
+fault. Every team account on this server was made before this upload, and this document adds none to the team (7.2), so
+this first real payment's M1 comes without the file. That is expected too.
 
 ```sh
 set -euo pipefail
@@ -3207,6 +3315,9 @@ know none of these settings, and they answer only as the test name.
   Before you choose it, run LIVEAFTER (7.12) with this upload's rNN. If it does not end with `LIVEAFTER_DONE`, never
   go back, even after PAY_BACK: the invoice, the credit note and the refund stay in SmartBill, ANAF and NETOPIA,
   while our records of them would be gone. Fix forward, and ask.
+- **Settings activations on the release before** are refused after rbD-B (`SETTINGS_GATE_HELPER_DIFFERS`): the
+  gates keep this release's gate code, and the shared tools stay this release's and list the Amazon gate. The release
+  before runs and its brakes work; a line-up change waits for the next upload of this code. Ask if one cannot wait.
 - **The unfinished sign-ups the new release deleted** (UNFINISHED, part 2: at DR6 and every ten minutes after) come
   back with DR3's cold copy, but without their key folders, which the new release destroyed. Those sign-ups cannot be
   finished, and their addresses and pseudonyms stay taken, until a release with this code runs again and deletes them

@@ -6,7 +6,8 @@
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -521,7 +522,7 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(table.findIndex(line => line.startsWith('| SB5d |'))).toBe(table.findIndex(line => line.startsWith('| SB5c |')) + 1);
   });
 
-  it('LOGOCHECK only reads, after SB13b: the ui file\'s line, the page\'s policy, the logo once while billing is on, NETOPIA\'s answer', async () => {
+  it('LOGOCHECK only reads, after SB13b: the ui file\'s line, the page\'s policy, each theme\'s logo once while billing is on, NETOPIA\'s two answers', async () => {
     const check = scriptOf('LOGOCHECK').lines;
     expect(sideBySide.indexOf('\n### LOGOCHECK. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB13b. '));
     expect(sideBySide.indexOf('\n### LOGOCHECK. ')).toBeLessThan(sideBySide.indexOf('\n### SB13c. '));
@@ -534,9 +535,13 @@ describe('the preview release guide: transition T, side by side, the way back, t
       expect(line.replace(/2?>\s*\/dev\/null/g, ''), line).not.toMatch(/[^<2&]>{1,2}\s*["$\/\w]/);
     }
     // The address it looks for is the website's own (paymentMarks.ts netopiaLogoAddress), and the policy line is the CSP's.
-    const { netopiaLogoAddress } = await import('../../apps/ui/lib/billing/paymentMarks.js');
+    const { netopiaLogoAddress, netopiaLogoOnDark } = await import('../../apps/ui/lib/billing/paymentMarks.js');
     expect(check).toContain('LOGO="https://mny.ro/np-black-0.svg?id=$ID"');
     expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: '42' })).toBe('https://mny.ro/np-black-0.svg?id=42');
+    // The dark theme's picture is the website's own swap of the light one (SiteFooter.tsx draws both).
+    expect(check).toContain('DARK=${LOGO/np-black-0/np-white-0}');
+    expect(netopiaLogoOnDark(netopiaLogoAddress({ NETOPIA_LOGO_ID: '42' })!)).toBe('https://mny.ro/np-white-0.svg?id=42');
+    expect(check).toContain('for A in "$LOGO" "$DARK"; do');
     const { FALLBACK_CONTENT_SECURITY_POLICY } = await import('../../apps/ui/' + 'content-security-policy.mjs') as { FALLBACK_CONTENT_SECURITY_POLICY: string };
     expect(check.join('\n')).toContain('grep -qF "img-src \'self\' data: https://mny.ro;" <<<"$P"');
     expect(FALLBACK_CONTENT_SECURITY_POLICY).toContain("img-src 'self' data: https://mny.ro;");
@@ -546,18 +551,24 @@ describe('the preview release guide: transition T, side by side, the way back, t
     const dir = mkdtempSync(join(tmpdir(), 'guide-logocheck-'));
     try {
       writeFileSync(join(dir, 'headers.txt'), "HTTP/1.1 200 OK\r\ncontent-security-policy: default-src 'self'; img-src 'self' data: https://mny.ro; font-src 'self'\r\n\r\n");
-      const run = (home: string, answer: string, ui = 'PORT=3200\nNETOPIA_LOGO_ID=42\n') => {
+      const run = (home: string, answer: string, ui = 'PORT=3200\nNETOPIA_LOGO_ID=42\n', dark = answer) => {
         writeFileSync(join(dir, 'ui-rX.env'), ui);
         writeFileSync(join(dir, 'home.html'), home);
         writeFileSync(join(dir, 'answer.txt'), answer);
-        // curl answered from files: the logo's headers (-sI), the home page's headers (-D -), or the home page.
-        const curl = `curl() { case "$*" in *-sI*) cat '${dir}/answer.txt';; *-D*) cat '${dir}/headers.txt';; *) cat '${dir}/home.html';; esac; }`;
+        writeFileSync(join(dir, 'dark.txt'), dark);
+        // curl answered from files: each picture's headers (-sI), the home page's headers (-D -), or the home page.
+        const curl = `curl() { case "$*" in *-sI*np-white-0*) cat '${dir}/dark.txt';; *-sI*) cat '${dir}/answer.txt';; *-D*) cat '${dir}/headers.txt';; *) cat '${dir}/home.html';; esac; }`;
         const body = check.slice(2).filter(line => !line.startsWith('ID='));
         try { return execFileSync('bash', ['-c', ['set -euo pipefail', `E='${dir}'; LABEL=rX; UIP=3200; ID='42'`, curl, ...body].join('\n')], { encoding: 'utf8' }).trim().split('\n').at(-1); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim().split('\n').at(-1); }
       };
       const OK = 'HTTP/2 200\r\ncontent-type: image/svg+xml\r\ncontent-length: 8592\r\ncache-control: public, max-age=3600\r\n\r\n';
-      const logo = '<img src="https://mny.ro/np-black-0.svg?id=42" alt="NETOPIA Payments, Visa, Mastercard"/>';
+      const light = '<img src="https://mny.ro/np-black-0.svg?id=42" alt="NETOPIA Payments, Visa, Mastercard"/>';
+      const logo = `${light}<img src="https://mny.ro/np-white-0.svg?id=42" alt="NETOPIA Payments, Visa, Mastercard"/>`;
       expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK)).toBe('LOGOCHECK_DONE');
+      // The dark theme's picture missing from the page, or NETOPIA answering it badly, stops it too.
+      expect(run(`<a href="/pricing">Pricing</a>${light}`, OK)).toMatch(/^LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK, undefined, 'HTTP/2 404\r\ncontent-type: text/html\r\n\r\n')).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG for https:\/\/mny\.ro\/np-white-0\.svg\?id=42/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK, undefined, `${OK.trimEnd()}\r\nlocation: https://example.invalid/\r\n\r\n`)).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected for https:\/\/mny\.ro\/np-white-0/);
       // Billing off: no logo is expected, and the check still ends.
       expect(run('<a href="/legal">Legal</a>', OK)).toBe('LOGOCHECK_DONE');
       expect(run('<a href="/pricing">Pricing</a>', OK)).toMatch(/^LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once/);
@@ -1082,7 +1093,7 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     // Owner 2026-10-23 (OA2): Privacy Policy 3.5 §14 and §5 stay, so an upload that adds a new AI company tells people
     // first and notes the change in the Register, before its switch; every other upload skips the step.
     for (const text of ['**A new AI company: tell people first, and note it in the Register (only an upload that adds one).**',
-      'The Privacy Policy (version 3.6) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
+      'The Privacy Policy (its sections 14 and 5) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
       '**Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email and in the product, and given time to object.',
       'the switch (SB13; on the drained path, the downtime at DR2) waits until the notice has gone out and that time has passed.',
       'There is no tool for this in the release kit: the owner sends the notice.',
@@ -1101,6 +1112,20 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(sb6).toContain('- only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the product, on which date) and its time to object has passed, and that the company\'s dated Register row (§5) is in this release ("The providers page");');
     expect(sb6.indexOf('a new AI company')).toBeLessThan(sb6.indexOf('- the Caddy payment-marks rule (PM2), when this upload adds it.'));
     expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated Register row (§5), as in SB6.');
+    // A company the page lists while no line-up seats its models (the Amazon gate's upload) receives nothing yet: no
+    // notice at that upload while only the team's accounts exist, and the notice before the activation that seats it.
+    for (const text of ['**A company listed before it receives anything.** A company is added when it starts receiving data.',
+      'When only the owner\'s and the team\'s accounts exist at such an upload, it owes no §14 notice: the company receives nothing at it.',
+      'The notice is then owed before the activation that first seats one of its models, when any account outside the team exists by then, and that activation waits until the time to object has passed.',
+      'When accounts outside the team exist already at such an upload, ask before its yes.',
+      'An account outside the team is an account of anyone other than the owner and the team: the owner\'s own test sign-ups (MAIN-SITE.md 4.3) do not count; a friend\'s or NETOPIA\'s tester\'s do.']) expect(providers, text).toContain(text);
+    // Every yes that says no notice is owed also says to ask when someone outside the team already has an account.
+    expect(sb6).toContain('when someone outside the team already has an account, ask before this yes');
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When someone outside the team already has an account then, ask before that yes ("The providers page").');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ')).toContain('If someone outside the team already has an account, ask before the yes.');
+    expect(providers.indexOf('A company listed before it receives anything')).toBeLessThan(providers.indexOf('A company leaves the targets one release later.'));
+    expect(sb6).toContain('- only when this upload lists a company that no line-up seats yet (the upload that brings the Amazon gate): that no §14 notice is owed now, and why,');
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE.');
     // The page's old promise and the step that said no notice goes out stay gone.
     for (const gone of ['Advance notice first', 'We tell you before a new provider receives any data', 'No notice goes out first'])
       expect(guide.replace(/\s+/g, ' '), gone).not.toContain(gone);
@@ -1699,4 +1724,210 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       expect(reads(JSON.stringify({ ...numbers(), extra: 11 }))).toBe('');
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
+});
+
+describe('the upload that brings the Amazon gate: its steps come where the upload meets them, and stop before the downtime', async () => {
+  const ROOT = resolve(import.meta.dirname, '../..');
+  const bedrock = sectionOf(guide, '## The Amazon Bedrock gate: the upload that brings it');
+  const flat = bedrock.replace(/\s+/g, ' ');
+  const whole = blocksOf(guide);
+  /** The one block of the whole guide whose lines name `step` as `# <step>: …`. */
+  const named = (step: string) => {
+    const found = whole.filter(block => block.lines.some(line => line.startsWith(`# ${step}: `)));
+    expect(found, step).toHaveLength(1);
+    return [...found[0]!.lines];
+  };
+  const NODE = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node';
+  const { PREVIEW_REVIEWED_PROVIDER_REFS, previewTargetJsonRow } = await import('../../packages/providers/src/preview-models.js');
+  const ROWS = PREVIEW_REVIEWED_PROVIDER_REFS.map(ref => previewTargetJsonRow(ref));
+  const OPS = join(ROOT, 'packages/providers/ops');
+  const sha = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
+  const GATES = [
+    ['deepinfra', 'deepinfra-budget-v3', 'provider-deepinfra-authority-v3', 'provider-deepinfra-go-v3'],
+    ['anthropic', 'anthropic-budget-v1', 'provider-anthropic-authority-v1', 'provider-anthropic-go-v1'],
+    ['perplexity', 'perplexity-budget-v1', 'provider-perplexity-authority-v1', 'provider-perplexity-go-v1'],
+    ['bedrock', 'bedrock-budget-v1', 'provider-bedrock-authority-v1', 'provider-bedrock-go-v1']
+  ] as const;
+  const SOCKETS = { budget_socket: '/run/debateai-v3-preview/budget-v3.sock', deployment: 'preview', requested_thinking_level: 'high', scope_id: 'preview-deepinfra-v3-20261010', anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock' };
+  type State = 'all right' | 'one gate on old code' | 'the Amazon gate missing' | 'six addresses' | 'the Amazon window closed' | 'a row the code refuses';
+
+  /** A made-up server in a new folder: the four gates, their GOs and states, the Amazon service and the two env files. */
+  function server(state: State) {
+    const dir = mkdtempSync(join(tmpdir(), 'guide-bedrock-'));
+    mkdirSync(join(dir, 'capi'));
+    symlinkSync(ROOT, join(dir, 'capi', 'dialectical-engine'));
+    mkdirSync(join(dir, 'etc', 'auth-dev-v1'), { recursive: true });
+    mkdirSync(join(dir, 'S'));
+    for (const [name, folder, privateDir, go] of GATES) {
+      if (state === 'the Amazon gate missing' && name === 'bedrock') continue;
+      mkdirSync(join(dir, 'operator', folder), { recursive: true });
+      mkdirSync(join(dir, 'var', privateDir), { recursive: true });
+      for (const file of ['preview_budget_authority.py', 'preview_budget_helper.py']) copyFileSync(join(OPS, file), join(dir, 'operator', folder, file));
+      // An older gate's files and GO agree with each other, never with the release.
+      if (state === 'one gate on old code' && name === 'anthropic') writeFileSync(join(dir, 'operator', folder, 'preview_budget_helper.py'), `${readFileSync(join(OPS, 'preview_budget_helper.py'), 'utf8')}\n# an older copy\n`);
+      writeFileSync(join(dir, 'etc', `${go}.json`), JSON.stringify({ provider: name, bridge_sha256: sha(join(dir, 'operator', folder, 'preview_budget_authority.py')), helper_sha256: sha(join(dir, 'operator', folder, 'preview_budget_helper.py')) }));
+      writeFileSync(join(dir, 'var', privateDir, 'state.json'), JSON.stringify({ state: 'active', window_open: !(state === 'the Amazon window closed' && name === 'bedrock') }));
+    }
+    writeFileSync(join(dir, 'service'), state === 'the Amazon gate missing' ? 'inactive' : 'active');
+    // The two env files as BEDROCK_ENV leaves them, or as DR1 leaves them (six addresses, no Amazon socket).
+    const six = state === 'six addresses';
+    const rows = six ? ROWS.slice(0, 6) : state === 'a row the code refuses' ? ROWS.map((row, index) => index === 2 ? { ...row, context_window_tokens: 1000 } : row) : ROWS;
+    const config = six ? SOCKETS : { ...SOCKETS, bedrock_budget_socket: '/run/debateai-v3-preview/bedrock-budget-v1.sock' };
+    for (const service of ['api', 'runner']) writeFileSync(join(dir, 'etc', 'auth-dev-v1', `${service}-rX.env`), `REGISTER_VERSION=20\nPREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(config)}\nPROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(rows)}\nNODE_ENV=production\n`, { mode: 0o600 });
+    return dir;
+  }
+  /** A server step run by bash on that made-up server: its own lines after the names file, the paths moved into it, python, systemctl and stat answered from it. */
+  function step(dir: string, lines: readonly string[]) {
+    const body = lines.slice(2).map(line => line
+      .replaceAll('/opt/debateai-v3-preview/operator/', `${dir}/operator/`).replaceAll('/var/lib/debateai-v3-preview/', `${dir}/var/`)
+      .replaceAll('/etc/debateai-v3-preview/', `${dir}/etc/`).replaceAll('/usr/bin/python3 -I', 'stubpy').replaceAll(NODE, process.execPath));
+    const setup = ['set -euo pipefail', `E='${dir}/etc/auth-dev-v1'; LABEL=rX; CAPI='${dir}/capi'; S='${dir}/S'`,
+      'stubpy() { [ -f "$1" ] && cat "$4/state.json"; }',
+      `systemctl() { if [ "$(cat '${dir}/service')" = active ]; then echo active; else echo inactive; return 3; fi; }`,
+      "stat() { echo '600 root:root'; }"];
+    const out = spawnSync('bash', ['-c', [...setup, ...body].join('\n')], { encoding: 'utf8' });
+    return out.stdout.trim().split('\n');
+  }
+
+  it('the section and the drained path say when each step runs, and nothing of it runs from SB3 to the switch', () => {
+    const rows = bedrock.split('\n').filter(line => line.startsWith('| ') && !line.startsWith('| When') && !line.startsWith('|---'));
+    expect(rows.map(row => row.split('|')[1]!.trim())).toEqual([
+      'before SB2, on the Mac', 'after SB2 (in any case after SB1), before SB3', 'right after piece 1, before SB3', 'SB4',
+      'right after the env files (SB5; on the drained path, DR1)', 'right before the owner\'s yes (SB6; on the drained path, the yes before DR2)',
+      'any day after the upload, on its own'
+    ]);
+    // GATES4 reads each gate's code and state, never its unit: piece 1's units are checked by step 3a's own lines.
+    expect(rows.map(row => row.split('|')[3]!.trim())).toEqual(['LUNAROW', 'step 3a\'s six `1` lines, then GATES4', 'GATES4', 'SB4', 'BEDROCK_ENV', 'GATEREADY', 'the probe']);
+    expect(named('GATES4').join('\n')).not.toContain('InaccessiblePaths');
+    for (const text of ['Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload\'s window from SB3 to the end of the switch',
+      'those are the one exception to MAIN-SITE.md part 2\'s "install no new drop-in"', 'deployed after SB2 and before SB3 (pieces 1 and 2)',
+      // The upload needs nothing from the AWS console; the running runner keeps what it read at its start.
+      'The AWS console work (`README-bedrock.md`, install step 0: Luna\'s subscription and quota, the key, a budget alert, an AWS account e-mail address somebody reads) belongs to piece 4. The upload does not wait for it.',
+      'Install step 0 (the AWS console), step 4 (the key) and step 8 (the probe) wait for piece 4',
+      'The gate README\'s paragraph right after its step 6 ("Restart the runner only after BOTH gates are `active`") does not apply here',
+      '`deploy/preview-lifecycle/v1/common.mjs` (the tools\' list of gates now holds the Amazon gate) and `alert.mjs`',
+      '**No Privacy Policy §14 notice is owed at this upload**', '**Before piece 4 the notice is owed when any account outside the team exists by then**',
+      'So the key goes in on piece 4\'s day, right before the owner\'s first probe.', '**It closes itself after 31 days.**', '**After a reboot it is not running.**',
+      'every settings activation on the old release is refused (`SETTINGS_GATE_HELPER_DIFFERS`) until a later upload brings this code again.'])
+      expect(flat, text).toContain(text);
+    for (const gone of ['Piece 1, before SB4', 'Piece 2, before SB4', 'its older tools read two gates', 'are a separate change', 'The release tools count four gates'])
+      expect(flat, gone).not.toContain(gone);
+    // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. From the
+    // key on every ask makes a paid check of Luna, so the key never waits through the notice's time to object unwatched.
+    // S-5's terminal keeps its ssh -N running, so LUNAROW runs in S-6's second terminal, where P is set again; an scp of
+    // S-5 brings the server's settings back.
+    const practice = read('tools/preview-practice/README.md').replace(/\s+/g, ' ');
+    expect(practice).toContain('Leave the `ssh -N` running in its own terminal.');
+    expect(practice).toContain('In a second terminal, from the worktree\'s `dialectical-engine` folder (set `D` and `P` to the same folders as in S-5)');
+    for (const text of ['Run it in S-6\'s second terminal, where you set `P` to S-5\'s folder (S-5\'s own terminal is busy with its `ssh -N`): after S-5\'s `scp`, and before S-6\'s `formats`.',
+      'or S-5\'s `scp` run again, brings the server\'s six-row `settings.env` back: run LUNAROW again after it.'])
+      expect(flat, text).toContain(text);
+    expect(flat).not.toContain('in the Terminal where S-5 set `P`');
+    // GATEREADY runs inside the window from SB3 to the switch: only piece 3 is done there; a gate is never redeployed,
+    // restarted or activated then.
+    for (const text of ['- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.',
+      'no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and ask.'])
+      expect(flat, text).toContain(text);
+    for (const gone of ['Do that piece, run GATEREADY again', 'its activate; a gate still active needs its stop first'])
+      expect(flat, gone).not.toContain(gone);
+    const piece4 = flat.slice(flat.indexOf('**Piece 4, any day after the upload: Luna in the line-up.**'), flat.indexOf('**The way back.**'));
+    const order = ['1. When any account outside the team exists', '2. "Switch it on", step 2', 'the key at the hidden prompt', '5. The activation'].map(text => piece4.indexOf(text));
+    expect(Math.min(...order), piece4).toBeGreaterThan(0);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(drained.replace(/\s+/g, ' ')).toContain('On the upload that brings the Amazon gate, run BEDROCK_ENV (piece 3) right after DR1 too, and GATEREADY right before the yes before DR2');
+  });
+
+  it('LUNAROW, GATES2, GATES4, BEDROCK_ENV and GATEREADY are scripts of the runbook\'s form, and parse', () => {
+    for (const name of ['GATES2', 'GATES4', 'BEDROCK_ENV', 'GATEREADY']) {
+      const lines = named(name);
+      expect(lines[0], name).toBe('set -euo pipefail');
+      expect(lines[1], name).toBe(NAMES_LINE);
+      expect(lines.filter(line => line !== 'exit 0').at(-1), name).toBe(`echo ${name}_DONE`);
+      for (const line of lines) {
+        for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${name}: ${line}`).toBe(name);
+        if (line.includes('_NOT_DONE')) expect(line, `${name}: ${line}`).toMatch(/exit 1/);
+      }
+      expect(spawnSync('bash', ['-n'], { input: lines.join('\n') }).status, name).toBe(0);
+    }
+    const luna = named('LUNAROW');
+    expect(luna.slice(0, 3)).toEqual(['#!/usr/bin/env bash', expect.stringMatching(/^# LUNAROW: /), 'set -euo pipefail']);
+    expect(luna.at(-1)).toBe('echo LUNAROW_DONE');
+    expect(spawnSync('bash', ['-n'], { input: luna.join('\n') }).status).toBe(0);
+    // The practice's row and the server's are printed by the same call of the release's own code.
+    expect(luna.join('\n')).toContain('previewTargetJsonRow(\\"preview:gpt-6-luna\\")');
+    expect(named('BEDROCK_ENV').join('\n')).toContain('previewTargetJsonRow("preview:gpt-6-luna")');
+    // GATES4 and GATEREADY ask for the gates of this release's tools, and for the Perplexity gate the tools do not list.
+    for (const name of ['GATES4', 'GATEREADY']) for (const [, folder, privateDir, go] of GATES) for (const part of [folder, privateDir, go]) expect(named(name).join('\n'), `${name} ${part}`).toContain(part);
+  });
+
+  it('GATES4 and GATEREADY say which piece is missing in each state the server can be in, before the downtime', () => {
+    const last = (lines: string[]) => lines.at(-1);
+    const cases: ReadonlyArray<readonly [State, string, RegExp]> = [
+      ['all right', 'GATES4_DONE', /^GATEREADY_DONE$/],
+      ['one gate on old code', 'GATES4_NOT_DONE: not on this release\'s gate code, or not active: anthropic', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 1 \(/],
+      ['the Amazon gate missing', 'GATES4_NOT_DONE: not on this release\'s gate code, or not active: bedrock', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 2 \(/],
+      ['the Amazon window closed', 'GATES4_DONE', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 2 \(/],
+      ['six addresses', 'GATES4_DONE', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 3 \(/],
+      ['a row the code refuses', 'GATES4_DONE', /^GATEREADY_NOT_DONE: not ready for the downtime: ask \(/]
+    ];
+    for (const [state, gates4, ready] of cases) {
+      const dir = server(state);
+      try {
+        expect(last(step(dir, named('GATES4'))), state).toBe(gates4);
+        const out = step(dir, named('GATEREADY'));
+        expect(last(out), `${state}: ${out.join('\n')}`).toMatch(ready);
+        if (state === 'all right') {
+          expect(out).toContain('bedrock gate: code this release; state active; window open true');
+          expect(out).toContain('api-rX.env: 7 model addresses; Luna\'s address there; the Amazon socket named; this release\'s start check of the addresses: accepted 7');
+          expect(last(step(dir, named('GATES2')))).toBe('GATES2_DONE');
+        }
+        if (state === 'one gate on old code') {
+          expect(out).toContain('MISSING (piece 1): the anthropic gate does not run this release\'s gate code');
+          expect(last(step(dir, named('GATES2')))).toBe('GATES2_NOT_DONE: not on this release\'s gate code, or not active: anthropic');
+        }
+        if (state === 'the Amazon gate missing') expect(out).toContain('MISSING (piece 2): the Amazon gate\'s service is not running');
+        if (state === 'the Amazon window closed') expect(out).toContain('MISSING (piece 2): the bedrock gate is not active with its window open (its status says why)');
+        if (state === 'a row the code refuses') expect(out.join('\n')).toContain('the new api would refuse these addresses at its start (refused PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID)');
+        if (state === 'six addresses') {
+          // DR1's files, then piece 3: BEDROCK_ENV adds the socket and Luna's row, and GATEREADY passes.
+          expect(out).toContain('api-rX.env: 6 model addresses; Luna\'s address MISSING; the Amazon socket MISSING; this release\'s start check of the addresses: refused PROVIDER_DISCOVERY_TARGET_SET_MISMATCH');
+          const env = step(dir, named('BEDROCK_ENV'));
+          expect(env.slice(-3)).toEqual(['api-rX.env: 7 model addresses, the Amazon socket named', 'runner-rX.env: 7 model addresses, the Amazon socket named', 'BEDROCK_ENV_DONE']);
+          expect(last(step(dir, named('GATEREADY')))).toBe('GATEREADY_DONE');
+          expect(last(step(dir, named('BEDROCK_ENV')))).toBe('BEDROCK_ENV_DONE');
+        }
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+  }, 120_000);
+
+  it('LUNAROW adds the release\'s own row for Luna, last, to the practice\'s copy of the settings, once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'guide-lunarow-'));
+    try {
+      // zsh is the Mac's login shell (node comes from it there); here bash stands in, with this test's node first on PATH.
+      const lines = named('LUNAROW');
+      writeFileSync(join(dir, 'luna-row.sh'), [...lines.slice(0, 3), 'zsh() { shift; bash -c "$1"; }', ...lines.slice(3)].join('\n'));
+      const env = { ...process.env, PATH: `${resolve(process.execPath, '..')}:${process.env.PATH ?? ''}` };
+      const run = (file: string) => spawnSync('bash', [join(dir, 'luna-row.sh'), ROOT, file], { encoding: 'utf8', env }).stdout.trim().split('\n');
+      const settings = join(dir, 'settings.env');
+      // S-2's copy ends without a newline.
+      const before = `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(SOCKETS)}\nPROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(ROWS.slice(0, 6))}\nREGISTER_VERSION=20\nDEBATEAI_DEPLOYMENT_MODE=hosted`;
+      writeFileSync(settings, before, { mode: 0o600 });
+      expect(run(settings).slice(-2)).toEqual(['settings.env: 7 model addresses, Luna\'s row last', 'LUNAROW_DONE']);
+      const targets = (text: string) => JSON.parse(/^PROVIDER_DISCOVERY_TARGETS_JSON=(.*)$/m.exec(text)![1]!);
+      expect(targets(readFileSync(settings, 'utf8'))).toEqual(ROWS);
+      expect(readFileSync(`${settings}.before-luna`, 'utf8')).toBe(before);
+      expect(readFileSync(settings, 'utf8').replace(/^PROVIDER_DISCOVERY_TARGETS_JSON=.*$/m, '')).toBe(`${before.replace(/^PROVIDER_DISCOVERY_TARGETS_JSON=.*$/m, '')}\n`);
+      // A second run changes nothing.
+      const once = readFileSync(settings, 'utf8');
+      expect(run(settings).at(-1)).toBe('LUNAROW_DONE');
+      expect(readFileSync(settings, 'utf8')).toBe(once);
+      // Luna's row anywhere but last, or the line twice: it stops and changes nothing.
+      const moved = join(dir, 'moved.env');
+      writeFileSync(moved, `PROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify([ROWS[6], ...ROWS.slice(0, 6)])}\n`);
+      expect(run(moved).at(-1)).toMatch(/^LUNAROW_NOT_DONE: .* holds another row for Luna, or Luna's row is not last: ask$/);
+      writeFileSync(moved, 'PROVIDER_DISCOVERY_TARGETS_JSON=[]\nPROVIDER_DISCOVERY_TARGETS_JSON=[]\n');
+      expect(run(moved).at(-1)).toMatch(/^LUNAROW_NOT_DONE: PROVIDER_DISCOVERY_TARGETS_JSON is not in .* exactly once: ask$/);
+      expect(existsSync(`${moved}.before-luna`)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 60_000);
 });
