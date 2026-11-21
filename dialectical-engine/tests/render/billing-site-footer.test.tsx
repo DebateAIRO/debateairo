@@ -31,6 +31,8 @@ const NO_MARKS = { netopia: false, visa: false, mastercard: false };
 const ALL_MARKS = { netopia: true, visa: true, mastercard: true };
 /** NETOPIA's hosted logo for a made-up shop id (the real one is never in the repository). */
 const LOGO = "https://mny.ro/np-black-0.svg?id=123456";
+/** The same logo in NETOPIA's version for a dark background. */
+const LOGO_ON_DARK = "https://mny.ro/np-white-0.svg?id=123456";
 const BILLING_LINKS = ["/pricing", "/terms#legal-section-12", "/cancel", "/withdraw"];
 const line = (billing?: { billingOn: boolean } | null): Element =>
   markup(billing === undefined ? <SiteFooter variant="line" /> : <SiteFooter variant="line" billing={billing} />)
@@ -171,14 +173,20 @@ describe("NETOPIA's hosted logo in the full footer", () => {
     expect(links[0]!.getAttribute("target")).toBe("_blank");
     expect(links[0]!.getAttribute("rel")).toBe("noopener noreferrer");
     expect(links[0]!.getAttribute("title")).toBe("NETOPIA Payments");
+    // Two versions of the one picture, both inside the link: the style sheet shows the one for the theme.
     const images = [...root.querySelectorAll("img")].filter((image) => image.closest(".siteFooterAnpc") === null);
-    expect(images).toHaveLength(1);
-    const image = images[0]!;
-    expect(image.getAttribute("src")).toBe(LOGO);
-    expect(image.getAttribute("alt")).toBe("NETOPIA Payments, Visa, Mastercard");
-    expect(image.getAttribute("loading")).toBe("lazy");
-    expect(image.getAttribute("referrerpolicy")).toBe("no-referrer");
-    expect(image.hasAttribute("crossorigin")).toBe(false);
+    expect(images.map((image) => [image.className, image.getAttribute("src")])).toEqual([
+      ["siteFooterNetopiaOnLight", LOGO],
+      ["siteFooterNetopiaOnDark", LOGO_ON_DARK]
+    ]);
+    for (const image of images) {
+      expect(image.parentElement).toBe(links[0]);
+      expect(image.getAttribute("alt")).toBe("NETOPIA Payments, Visa, Mastercard");
+      // Lazy is also what keeps the version that is not displayed from being asked for.
+      expect(image.getAttribute("loading")).toBe("lazy");
+      expect(image.getAttribute("referrerpolicy")).toBe("no-referrer");
+      expect(image.hasAttribute("crossorigin")).toBe(false);
+    }
     expect(root.querySelector('img[src^="/payment-marks/"]')).toBeNull();
   });
 
@@ -189,7 +197,7 @@ describe("NETOPIA's hosted logo in the full footer", () => {
     }
   });
 
-  it("sits on a white chip in both themes, inside NETOPIA's 250 x 50 box; each mark file has its own white chip too", () => {
+  it("sits on a white chip in the light theme, inside NETOPIA's 250 x 50 box; each mark file has its own white chip in both themes", () => {
     const css = readFileSync(resolve("apps/ui/app/legal.css"), "utf8");
     const rule = (selector: string): string => {
       const at = css.indexOf(`\n${selector} {`);
@@ -212,6 +220,24 @@ describe("NETOPIA's hosted logo in the full footer", () => {
     expect(css.indexOf(".siteFooterNetopia img { width: 223px; }")).toBeGreaterThan(css.indexOf("\n.siteFooterNetopia img {"));
     // An image that did not load shows its alt text on the chip, never a broken-image icon.
     expect(rule(".siteFooterNetopia img::after")).toContain("content: attr(alt);");
+  });
+
+  it("shows the white version with no chip in the dark theme, and the blue one on its chip everywhere else", () => {
+    const css = readFileSync(resolve("apps/ui/app/legal.css"), "utf8");
+    // Outside the dark theme's rules the white version is never displayed.
+    expect(css).toContain("\n.siteFooterNetopia .siteFooterNetopiaOnDark { display: none; }\n");
+    // The dark theme's rules hold only on a screen that is not in a high-contrast mode: paper and such a mode keep the chip.
+    const start = css.indexOf("\n@media screen and (forced-colors: none) {\n  html[data-mode=\"chamber\"] .siteFooterNetopia ");
+    expect(start).toBeGreaterThan(css.indexOf("\n.siteFooterNetopia .siteFooterNetopiaOnDark { display: none; }\n"));
+    const dark = css.slice(start, css.indexOf("\n}", start));
+    expect(dark).toContain('html[data-mode="chamber"] .siteFooterNetopia { padding: 5px 0; border: 0; background: transparent; }');
+    expect(dark).toContain('html[data-mode="chamber"] .siteFooterNetopia .siteFooterNetopiaOnLight { display: none; }');
+    expect(dark).toContain('html[data-mode="chamber"] .siteFooterNetopia .siteFooterNetopiaOnDark { display: block; }');
+    // The logo keeps its height when the theme changes: 4px padding and a 1px border, or 5px padding and no border.
+    expect(css).toMatch(/\n\.siteFooterNetopia \{[^}]*padding: 4px 6px;[^}]*border: 1px solid var\(--line\);/);
+    // No other rule names the dark theme for the logo, and the light theme has no rule of its own.
+    expect(css.split('html[data-mode="chamber"] .siteFooterNetopia').length - 1).toBe(3);
+    expect(css).not.toMatch(/data-mode="terracotta"\][^{]*siteFooterNetopia/);
   });
 
   it("builds its alt text from the brand keys, the same in every locale", () => {
