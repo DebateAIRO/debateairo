@@ -491,7 +491,9 @@ of the month. With made-up numbers:
   credit (nobody is stopped in a month they already started, and no running debate pauses), for the week cap, and for
   Free. The Terms still ask two things of you that the product does not do by itself: tell people before a limit
   gets tighter (section 12), and ask them to accept the new Terms at their next sign-in before a lower limit applies to
-  them (section 14).
+  them (section 14). A later Terms version that makes people accept again at sign-in does not reach the accounts made
+  before the launch texts (yours and the team's): the version numbers they accepted are higher than the launch ones.
+  Ask before you count on it for them.
 - **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
 - **A day or week cap added where the plan had none** is a lower limit: it starts with each person's own next month.
   One taken away is a higher limit.
