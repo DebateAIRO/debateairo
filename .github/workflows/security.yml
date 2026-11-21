@@ -28,7 +28,7 @@ jobs:
       # It runs tests/unit, tests/architecture and tests/render (V, 2026-09-28) under vitest but
       # fails only on failures that are not on the recorded list; a listed test that passes three
       # runs in a row fails the gate until its entry is deleted (V-4).
-      # Test files run side by side here only (2026-11-01): 31 minutes one at a time, 10 to 16 minutes side by side.
+      # Test files run side by side here (2026-11-01): 31 minutes one at a time, 10 to 16 minutes side by side.
       - run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate
         env: { CI_TEST_FILES_SIDE_BY_SIDE: "1" }
       - run: node tools/source-map-hotfix.mjs audit # pnpm audit --audit-level=moderate
@@ -39,6 +39,9 @@ jobs:
   # (@embedded-postgres/linux-x64; no Docker, network or secrets). Separate job: it runs in parallel with `verify`
   # (about four minutes of tests on the Mac). The ~34-minute registration/verification-mail suite is NOT here: it has its
   # own workflow, registration-integration.yml, which runs only when a path that can affect it changes, nightly and by hand.
+  # The files run side by side here: each one has its own PostgreSQL on its own port, so they share nothing but the
+  # machine. One at a time the 77 files took 17 to 42 minutes on a runner; the suites whose timing bounds need a quiet
+  # machine are the registration ones, which keep their own workflow and still run one at a time.
   auth-integration:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -52,6 +55,7 @@ jobs:
       - run: node tools/source-map-hotfix.mjs install # pnpm install --frozen-lockfile
       - run: node tools/source-map-hotfix.mjs generate # pnpm run generate:contract
       - run: node tools/source-map-hotfix.mjs integration # pnpm run test:ci-integration
+        env: { CI_TEST_FILES_SIDE_BY_SIDE: "1" }
   secrets:
     runs-on: ubuntu-latest
     env:
