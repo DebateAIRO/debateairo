@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Lorsque nous modifions la présente politique, nous publions la nouvelle version avec un résumé des modifications et une nouvelle date d'entrée en vigueur, et conservons les versions antérieures à l'adresse dezbatere.ro/privacy/versions. Si une modification ajoute une nouvelle finalité ou un nouveau destinataire, nous vous en informons par e-mail et dans le produit avant le début du nouveau traitement, et vous laissons le temps de vous y opposer. Lorsqu'une nouvelle finalité dépend de votre consentement — par exemple, si nous souhaitions un jour utiliser du contenu pour améliorer des modèles — nous sollicitons ce consentement séparément et spécifiquement ; nous ne considérons jamais l'acceptation de Conditions mises à jour comme un consentement à un nouveau traitement. Pour les clarifications qui ne modifient en rien nos pratiques, nous publions simplement la nouvelle version." },
-      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 20 novembre 2026." }
+      { kind: "p", text: "La présente politique a été mise à jour pour la dernière fois le 22 novembre 2026." }
     ]
   },
   {
@@ -495,8 +495,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "8685ac6ae8912520b4d98a3d99eb7a515774b6ba0b27d68dc6b8f32e88616c28",
-  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v1.0 · EN VIGUEUR LE 20 NOVEMBRE 2026",
+  sha256: "27578f11545991be6668c4bd9a75d74d455373458f3a38dcfa15b8dbbbcdd4bd",
+  eyebrow: "POLITIQUE DE CONFIDENTIALITÉ · v1.0 · EN VIGUEUR LE 22 NOVEMBRE 2026",
   title: "Ce que nous conservons, et pourquoi",
   lede: "Vos droits et nos obligations au titre du GDPR (EU) 2016/679, en termes clairs. Quatorze sections et l'annexe B — faites défiler jusqu'à la fin.",
   endMarker: "FIN DE LA POLITIQUE · GDPR (EU) 2016/679 · v1.0",

@@ -378,8 +378,8 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
   version: "1.0",
-  sha256: "6b103b8c32ca0c9e4c1531cbcb71e7484466e19f5b264eeb1523b185392f480a",
-  eyebrow: "PAKALPOJUMA NOTEIKUMI · v1.0 · SPĒKĀ NO 2026. GADA 20. NOVEMBRA",
+  sha256: "21db7e54e014487b3ba560c9e377eac75c22209e8a21871f019f7f5b5c4e1f94",
+  eyebrow: "PAKALPOJUMA NOTEIKUMI · v1.0 · SPĒKĀ NO 2026. GADA 22. NOVEMBRA",
   title: "Kam jūs piekrītat",
   lede: "Līgums starp jums un DMS Merchandise Shop S.R.L., izklāstīts vienkāršā valodā. Deviņpadsmit sadaļas un A pielikums — ritiniet līdz beigām.",
   endMarker: "NOTEIKUMU BEIGAS · v1.0",

@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: TERMS OF SERVICE · v1.0 · EFFECTIVE 20 NOVEMBER 2026
+eyebrow: TERMS OF SERVICE · v1.0 · EFFECTIVE 22 NOVEMBER 2026
 title: What you agree to
 lede: The contract between you and DMS Merchandise Shop S.R.L., in plain language. Nineteen sections and Annex A — scroll to the end.
 endMarker: END OF TERMS · v1.0
@@ -21,7 +21,7 @@ jumps:
 18 GOVERNING LAW
 -->
 
-**Version 1.0 · Effective 20 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
+**Version 1.0 · Effective 22 November 2026 · Previous versions at dezbatere.ro/terms/versions · Language: English.**
 
 **In short.** You must be 18 or over. Dialectical Engine builds arguments with AI models and everything it generates may be wrong — it is not advice. On the Free plan your debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Once public, anyone can read a debate, and it stays public. Text you submit is sent to the AI providers listed in our Provider Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on it; section 8 says for which company we have not confirmed this yet. The web search provider receives only the short search phrases the models write (section 8). Report illegal content at support@dezbatere.ro whether or not you have an account. Romanian law governs, but your local consumer protections stay with you.
 

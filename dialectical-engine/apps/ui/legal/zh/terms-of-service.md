@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: 简要说明
-eyebrow: 服务条款 · v1.0 · 生效日期 2026 年 11 月 20 日
+eyebrow: 服务条款 · v1.0 · 生效日期 2026 年 11 月 22 日
 title: 您同意的内容
 lede: 以通俗语言说明您与 DMS Merchandise Shop S.R.L. 之间的合同。共十九节及附件 A — 请滚动至末尾。
 endMarker: 服务条款结束 · v1.0
@@ -21,7 +21,7 @@ jumps:
 18 适用法律
 -->
 
-**Version 1.0 · Effective 2026 年 11 月 20 日 · 历史版本见 dezbatere.ro/terms/versions · 语言：中文。**
+**Version 1.0 · Effective 2026 年 11 月 22 日 · 历史版本见 dezbatere.ro/terms/versions · 语言：中文。**
 
 **In short.** 您必须年满 18 周岁。Dialectical Engine 使用人工智能模型构建论证，其生成的一切内容均可能有误 — 这些内容并非建议。在免费方案上，您的辩论在结束后经 AI 检测即会公开；在付费方案上，除非您主动发布，否则辩论为私密。辩论一经公开，任何人均可阅读，且会保持公开。您提交的文本会发送给《AI 提供商名录》中列明的 AI 提供商，主要是位于美国的 DeepInfra。DeepInfra、Anthropic 和 Perplexity 的条款不允许它们使用这些文本训练模型；第 8 节说明我们尚未确认这一点的是哪家公司。无论您是否拥有账户，均可通过 support@dezbatere.ro 举报违法内容。适用罗马尼亚法律，但您所在地的消费者保护仍对您有效。
 

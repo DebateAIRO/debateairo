@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Lyhyesti
-eyebrow: TIETOSUOJAKÄYTÄNTÖ · v1.0 · VOIMASSA 20. MARRASKUUTA 2026 ALKAEN
+eyebrow: TIETOSUOJAKÄYTÄNTÖ · v1.0 · VOIMASSA 22. MARRASKUUTA 2026 ALKAEN
 title: Mitä säilytämme ja miksi
 lede: Oikeutesi ja velvollisuutemme GDPR (EU) 2016/679 -asetuksen nojalla selkeällä kielellä. Neljätoista osiota ja liite B — vieritä loppuun asti.
 endMarker: TIETOSUOJAKÄYTÄNNÖN LOPPU · GDPR (EU) 2016/679 · v1.0
@@ -19,7 +19,7 @@ jumps:
 13 EVÄSTEET
 -->
 
-**Version 1.0 · Effective 20. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.0 · Effective 22. marraskuuta 2026 · Aiemmat versiot osoitteessa dezbatere.ro/privacy/versions · Rekisterinpitäjä: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** Keräämme tilin toimintaan tarvittavat tiedot sekä sen, mitä kirjoitat väittelyihisi. Se, mitä kirjoitat tukipalveluavustajalle, välitetään sen tekoälymallille, jotta se voi vastata sinulle, emmekä säilytä siitä mitään. Kysymyksesi lähetetään Rekisterissämme luetelluille tekoälypalveluntarjoajille, pääasiassa DeepInfralle Yhdysvalloissa. DeepInfran, Anthropicin ja Perplexityn ehdot eivät salli niiden kouluttaa malleja sillä, mitä kirjoitat; osiossa 5 kerrotaan, minkä yrityksen osalta emme ole vielä vahvistaneet tätä. Säilytyspalveluntarjoajamme säilyttää tilisi ja väittelysi Lontoossa, Yhdistyneessä kuningaskunnassa; osiossa 5 kerrotaan, minne tietosi muuten päätyvät. Maksuttomassa tilauksessa väittelyt ovat valmistuttuaan julkisia tekoälytarkistuksen jälkeen; maksullisessa tilauksessa ne ovat yksityisiä, ellet julkaise niitä. Tilisi poistaminen tuhoaa yksityisten tietojesi avaimet palvelimellamme, mutta erillisessä varmuuskopiotallennustilassamme olevia salattuja kopioita ei poisteta automaattisesti (osio 7); julkiset väittelyt pysyvät julkisina, ja nimimerkkisi poistetaan niistä. Voit ottaa meihin yhteyttä osoitteessa privacy@dezbatere.ro, ja väittelyssä nimetyt henkilöt voivat kirjoittaa meille ilman tiliä.
 

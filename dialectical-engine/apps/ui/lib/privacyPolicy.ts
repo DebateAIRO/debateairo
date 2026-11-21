@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version." },
-      { kind: "p", text: "This policy was last updated on 20 November 2026." }
+      { kind: "p", text: "This policy was last updated on 22 November 2026." }
     ]
   },
   {
@@ -495,8 +495,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "0da4942ab5bdb02a502598ade75bdbdae87ae764e00b7c2b2c87d2067aa7df69",
-  eyebrow: "PRIVACY POLICY · v1.0 · EFFECTIVE 20 NOVEMBER 2026",
+  sha256: "36dadf57172bbc2452dcd363e3aa416c38a97816e3fae3ff1a284cc7d3948d3e",
+  eyebrow: "PRIVACY POLICY · v1.0 · EFFECTIVE 22 NOVEMBER 2026",
   title: "What we store, and why",
   lede: "Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.",
   endMarker: "END OF POLICY · GDPR (EU) 2016/679 · v1.0",

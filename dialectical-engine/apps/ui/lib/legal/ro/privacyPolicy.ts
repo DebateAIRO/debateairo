@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "Când modificăm această politică, publicăm noua versiune împreună cu un rezumat al modificărilor și o nouă dată de intrare în vigoare și păstrăm versiunile anterioare la dezbatere.ro/privacy/versions. Pentru o modificare care adaugă un scop sau un destinatar nou, vă informăm prin e-mail și în produs înainte de începerea noii prelucrări și vă acordăm timp pentru a vă opune. Dacă un scop nou depinde de consimțământul dumneavoastră — de exemplu, dacă am dori vreodată să folosim conținutul pentru îmbunătățirea modelelor — solicităm consimțământul separat și specific; nu considerăm niciodată acceptarea Termenilor actualizați drept consimțământ pentru o prelucrare nouă. Pentru clarificări care nu schimbă nimic din ceea ce facem, publicăm pur și simplu noua versiune." },
-      { kind: "p", text: "Această politică a fost actualizată ultima dată la 20 noiembrie 2026." }
+      { kind: "p", text: "Această politică a fost actualizată ultima dată la 22 noiembrie 2026." }
     ]
   },
   {
@@ -495,8 +495,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "34040a7890cfee76e251370a4494cbe8b8868083df0b4529d0018c55423c6418",
-  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v1.0 · ÎN VIGOARE DE LA 20 NOIEMBRIE 2026",
+  sha256: "f6bf70e3b029df9fb92d103c606ce5ce9113c7ae24c815b4319adb47889b9ef9",
+  eyebrow: "POLITICA DE CONFIDENȚIALITATE · v1.0 · ÎN VIGOARE DE LA 22 NOIEMBRIE 2026",
   title: "Ce stocăm și de ce",
   lede: "Drepturile dumneavoastră și obligațiile noastre în temeiul GDPR (EU) 2016/679, într-un limbaj clar. Paisprezece secțiuni și Anexa B — derulați până la final.",
   endMarker: "SFÂRȘITUL POLITICII · GDPR (EU) 2016/679 · v1.0",
