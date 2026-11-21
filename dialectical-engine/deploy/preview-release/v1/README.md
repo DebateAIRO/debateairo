@@ -3321,9 +3321,9 @@ for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-
   ST=$(jq -r '.state // empty' <<<"$SJ" 2>/dev/null || true); WO=$(jq -r 'if type == "object" and has("window_open") then (.window_open | tostring) else empty end' <<<"$SJ" 2>/dev/null || true)
   echo "$NAME gate: code $CODE; state ${ST:-unread}; window open ${WO:-unread}"
   [ "$CODE" = 'this release' ] || miss "piece $PIECE" "the $NAME gate does not run this release's gate code"
-  [ "$ST" = active ] && [ "$WO" = true ] || miss "piece $PIECE" "the $NAME gate is not active with its window open (its activate; a gate still active needs its stop first)"
+  [ "$ST" = active ] && [ "$WO" = true ] || miss "piece $PIECE" "the $NAME gate is not active with its window open (its status says why)"
 done
-[ "$(systemctl is-active debateai-preview-bedrock-budget || true)" = active ] || miss "piece 2" "the Amazon gate's service is not running (install step 7)"
+[ "$(systemctl is-active debateai-preview-bedrock-budget || true)" = active ] || miss "piece 2" "the Amazon gate's service is not running"
 for SVC in api runner; do
   EF=$E/$SVC-$LABEL.env
   if [ ! -f "$EF" ]; then miss "piece 3" "$SVC-$LABEL.env does not exist yet (DR1 or SB5 first, then BEDROCK_ENV)"; continue; fi
@@ -3348,10 +3348,16 @@ exit 0
 What to expect: four gate lines `<gate> gate: code this release; state active; window open true`, two lines
 `<service>-<LABEL>.env: 7 model addresses; Luna's address there; the Amazon socket named; this release's start check
 of the addresses: accepted 7`, then `GATEREADY_DONE`. On `GATEREADY_NOT_DONE` the last line names what is missing, and
-each `MISSING` line above it says which gate or file: `piece 1` (an older gate not on this release's code, or not
-`active` with its window open: piece 1), `piece 2` (the Amazon gate: piece 2's install steps 1 to 7), `piece 3`
-(BEDROCK_ENV not run, or not done), `ask` (anything else, for example a model address the new code would refuse). Do
-that piece, run GATEREADY again, and give the yes only after `GATEREADY_DONE`.
+each `MISSING` line above it says which gate or file. Nothing has changed and the site is up. GATEREADY runs inside the
+window from SB3 to the switch, where pieces 1 and 2 never run, so what you may do depends on the name:
+- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.
+- `piece 1` or `piece 2` (a gate not on this release's code, not `active` with its window open, or the Amazon gate's
+  service not running): no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and ask. A gate
+  that halted by itself, for example, needs its halt reason read before anyone opens it again. "The way back" below
+  says what stopping here means.
+- `ask` (anything else, for example a model address the new code would refuse): no yes; stop and ask.
+
+Give the yes only after `GATEREADY_DONE`.
 
 **What GATEREADY checks, and what only DR5 and DR6 can show.** Before DR5 every `lc` command runs the running release's
 tools, which know only the DeepInfra and Anthropic gates. So GATEREADY asks the same questions as this release's tools,
@@ -3360,11 +3366,12 @@ release's (the switch's `SETTINGS_GATE_HELPER_DIFFERS`), each gate's `state` fro
 `SWITCH_PRECONDITION_FAILED` naming `gates`, and `GATE_FILES_UNREADABLE` when a folder or GO is missing), and the
 runner's own start check of the model addresses, run by this release's code (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`
 and the reviewed rows). It asks for the Perplexity gate too, which this release's tools do not list. Three things it
-cannot check, and DR5 and DR6 do: the register version DR5 publishes is the one the new services compare the addresses
-with (GATEREADY compares them with the seven models this code publishes, which SB3's delta showed); the switch's live
-check asks each gate, as the new API's user, which models it serves, and needs the new release pinned (DR5) and its
-tools in place (it needs no answer from the Amazon gate while no line-up seats Luna); and the new runner and API start
-only at DR6.
+cannot check; DR5 and DR6 do:
+- The register version DR5 publishes is the one the new services compare the addresses with. GATEREADY compares them
+  with the seven models this code publishes, which SB3's delta showed.
+- The switch's live check asks each gate, as the new API's user, which models it serves. It needs the new release
+  pinned (DR5) and its tools in place. It needs no answer from the Amazon gate while no line-up seats Luna.
+- The new runner and API start only at DR6.
 
 **What Amazon receives, and the notice.** The website's own file (`ui-$LABEL.env`) does not change: its build list is
 only the page's fallback, and the page reads the live line-up from the API. The AI providers page lists Amazon Web

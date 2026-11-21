@@ -1809,6 +1809,13 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       expect(flat, gone).not.toContain(gone);
     // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. From the
     // key on every ask makes a paid check of Luna, so the key never waits through the notice's time to object unwatched.
+    // GATEREADY runs inside the window from SB3 to the switch: only piece 3 is done there; a gate is never redeployed,
+    // restarted or activated then.
+    for (const text of ['- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.',
+      'no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and ask.'])
+      expect(flat, text).toContain(text);
+    for (const gone of ['Do that piece, run GATEREADY again', 'its activate; a gate still active needs its stop first'])
+      expect(flat, gone).not.toContain(gone);
     const piece4 = flat.slice(flat.indexOf('**Piece 4, any day after the upload: Luna in the line-up.**'), flat.indexOf('**The way back.**'));
     const order = ['1. When any account outside the team exists', '2. "Switch it on", step 2', 'the key at the hidden prompt', '5. The activation'].map(text => piece4.indexOf(text));
     expect(Math.min(...order), piece4).toBeGreaterThan(0);
@@ -1864,7 +1871,8 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
           expect(out).toContain('MISSING (piece 1): the anthropic gate does not run this release\'s gate code');
           expect(last(step(dir, named('GATES2')))).toBe('GATES2_NOT_DONE: not on this release\'s gate code, or not active: anthropic');
         }
-        if (state === 'the Amazon gate missing') expect(out).toContain('MISSING (piece 2): the Amazon gate\'s service is not running (install step 7)');
+        if (state === 'the Amazon gate missing') expect(out).toContain('MISSING (piece 2): the Amazon gate\'s service is not running');
+        if (state === 'the Amazon window closed') expect(out).toContain('MISSING (piece 2): the bedrock gate is not active with its window open (its status says why)');
         if (state === 'a row the code refuses') expect(out.join('\n')).toContain('the new api would refuse these addresses at its start (refused PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID)');
         if (state === 'six addresses') {
           // DR1's files, then piece 3: BEDROCK_ENV adds the socket and Luna's row, and GATEREADY passes.

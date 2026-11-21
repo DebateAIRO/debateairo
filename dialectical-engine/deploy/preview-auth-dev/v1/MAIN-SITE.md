@@ -732,8 +732,13 @@ The steps this release adds to that recipe, in the order you meet them:
   `<gate> gate: code this release; state active; window open true`, two lines `<service>-<LABEL>.env: 7 model
   addresses; Luna's address there; the Amazon socket named; this release's start check of the addresses: accepted 7`,
   then `GATEREADY_DONE`. On `GATEREADY_NOT_DONE` its last line names what is missing (`piece 1`, `piece 2`, `piece 3`
-  or `ask`) and the `MISSING` lines above it say which gate or file. Nothing has changed and the site is up: do that
-  piece, run GATEREADY again, and give no yes before `GATEREADY_DONE`.
+  or `ask`) and the `MISSING` lines above it say which gate or file. Nothing has changed and the site is up. You are
+  inside the window where only the brakes may run (the order rules), so:
+  - `piece 3`: run BEDROCK_ENV, then GATEREADY again;
+  - `piece 1`, `piece 2` or `ask`: no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and
+    ask.
+
+  Give no yes before `GATEREADY_DONE`.
 - **Your yes before DR2, for the Amazon gate.** Besides what the release guide's yes names, your numbers and the
   UNFINISHED count (above), it names `GATEREADY_DONE`, and says that no Privacy Policy section 14 notice is owed at this
   upload: Amazon receives nothing until Luna is switched on, and only your and the team's accounts exist. Amazon's dated
