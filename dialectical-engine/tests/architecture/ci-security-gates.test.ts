@@ -55,7 +55,8 @@ describe("CI security gates (F-03)", () => {
   // bounds need the machine to themselves, so its workflow never sets it.
   it("runs test files side by side only in the two test steps of the security workflow", () => {
     const wf = read(".github/workflows/security.yml");
-    const setting = 'env: { CI_TEST_FILES_SIDE_BY_SIDE: "1", CI_TEST_PART: "${{ matrix.part }}/4" }';
+    const setting = 'env:\n          CI_TEST_FILES_SIDE_BY_SIDE: "1"\n          CI_TEST_PART: "${{ matrix.part }}/4"\n          CI_CHANGED_SINCE: ' +
+      "${{ github.event_name == 'pull_request' && github.base_ref == 'dev' && github.event.pull_request.base.sha || '' }}";
     const verify = wf.slice(wf.indexOf("\n  verify-tests:\n"), wf.indexOf("\n  verify:\n"));
     const integration = wf.slice(wf.indexOf("\n  auth-integration-tests:\n"), wf.indexOf("\n  auth-integration:\n"));
     expect(wf.split("CI_TEST_FILES_SIDE_BY_SIDE")).toHaveLength(3);
@@ -122,6 +123,21 @@ describe("CI security gates (F-03)", () => {
         others.length === 0 ? '[ "$TEST_PARTS" = "success" ]' : '[ "$STATIC_CHECKS" = "success" ] && [ "$TEST_PARTS" = "success" ]'
       );
     }
+  });
+  // A text-only pull request (legal texts, documents) runs only the tests that can notice it. That is safe only while
+  // the whole suite still runs somewhere: the setting must be empty on a push, so dev runs everything after the merge,
+  // and it applies to pull requests into dev alone. Both test steps need the base commit in their checkout to compare.
+  it("narrows the tests only for a pull request into dev, and never on a push", () => {
+    const wf = read(".github/workflows/security.yml");
+    const setting = "CI_CHANGED_SINCE: ${{ github.event_name == 'pull_request' && github.base_ref == 'dev' && github.event.pull_request.base.sha || '' }}";
+    expect(wf.split("          CI_CHANGED_SINCE: ")).toHaveLength(3);
+    expect(wf.split(`          ${setting}\n`)).toHaveLength(3);
+    for (const [from, to] of [["verify-tests", "verify"], ["auth-integration-tests", "auth-integration"]] as const) {
+      const job = wf.slice(wf.indexOf(`\n  ${from}:\n`), wf.indexOf(`\n  ${to}:\n`));
+      expect(job, from).toContain(setting);
+      expect(job, from).toContain("# v4.4.0\n        with: { fetch-depth: 0 }\n");
+    }
+    for (const workflow of workflowFiles().filter((name) => !name.endsWith("/security.yml"))) expect(read(workflow), workflow).not.toContain("CI_CHANGED_SINCE");
   });
   // 2026-10-09: the registration/verification-mail suite alone takes ~34 minutes, so it is NOT run on every pull request.
   // Its own workflow runs it when a path that can change its outcome changes, nightly against dev, and by hand.
