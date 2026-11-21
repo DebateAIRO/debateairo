@@ -24,6 +24,9 @@ type GateModule = {
   confirmStale: (input: { stale: string[]; rerunPasses: string[][] }) => { confirmed: string[]; cleared: string[] };
   gateExitCode: (input: { newFailures: string[]; confirmedStale: string[] }) => number;
   STALE_CONFIRMATION_RERUNS: number;
+  parsePart: (value: string | undefined) => null | { invalid: string; index?: undefined; count?: undefined } | { index: number; count: number; invalid?: undefined };
+  partFiles: (files: string[], part: { index: number; count: number }) => string[];
+  unlistedTargets: (targets: string[], listed: string[]) => string[];
 };
 // Dynamic import by URL: the gate is plain Node ESM with no type declarations, and a literal
 // specifier would make `tsc --noEmit` demand one.
@@ -217,6 +220,39 @@ describe("CI known-red gate — a confirmed stale entry fails (V-4)", () => {
     expect(gate.gateExitCode({ newFailures: [], confirmedStale: [fixed] })).toBe(1);
     expect(gate.gateExitCode({ newFailures: [brandNew], confirmedStale: [] })).toBe(1);
     expect(gate.gateExitCode({ newFailures: [brandNew], confirmedStale: [fixed] })).toBe(1);
+  });
+});
+
+// One run split over several machines (CI_TEST_PART): every machine cuts the same sorted list, so the parts must
+// hold every file exactly once, and a setting that is not <index>/<count> must stop the run.
+describe("one run split into parts (CI_TEST_PART)", () => {
+  const files = Array.from({ length: 23 }, (_, index) => `tests/unit/f${String(index).padStart(2, "0")}.test.ts`);
+
+  it("reads <index>/<count>, and nothing when the setting is absent", () => {
+    expect(gate.parsePart(undefined)).toBeNull();
+    expect(gate.parsePart("")).toBeNull();
+    expect(gate.parsePart("1/4")).toEqual({ index: 1, count: 4 });
+    expect(gate.parsePart("4/4")).toEqual({ index: 4, count: 4 });
+  });
+  it("refuses any other setting, so a typo can neither run everything everywhere nor nothing somewhere", () => {
+    for (const value of ["0/4", "5/4", "1/0", "1", "/4", "1/4 ", " 1/4", "1/4/2", "a/b", "-1/4", "1.5/4", "100/100", "01/4"]) {
+      expect(gate.parsePart(value), value).toEqual({ invalid: value });
+    }
+  });
+  it("gives every file to exactly one part, whatever order and however often the files arrive", () => {
+    for (const count of [1, 2, 3, 4, 7, 23, 30]) {
+      const shuffled = [...files].reverse().concat(files.slice(0, 5));
+      const parts = Array.from({ length: count }, (_, index) => gate.partFiles(shuffled, { index: index + 1, count }));
+      expect(parts.flat().sort(), String(count)).toEqual(files);
+      expect(new Set(parts.flat()).size, String(count)).toBe(files.length);
+      expect(Math.max(...parts.map((part) => part.length)) - Math.min(...parts.map((part) => part.length)), String(count)).toBeLessThanOrEqual(1);
+      expect(parts).toEqual(Array.from({ length: count }, (_, index) => gate.partFiles(files, { index: index + 1, count })));
+    }
+  });
+  it("names a listed test file vitest's own listing does not hold, and checks no directory target", () => {
+    expect(gate.unlistedTargets(["tests/unit", "tests/unit/f00.test.ts", "tests/integration/gone.test.ts"], files))
+      .toEqual(["tests/integration/gone.test.ts"]);
+    expect(gate.unlistedTargets(["tests/unit", "tests/unit/f00.test.ts"], files)).toEqual([]);
   });
 });
 

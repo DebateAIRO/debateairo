@@ -41,9 +41,11 @@ describe("CI security gates (F-03)", () => {
     const wf = read(".github/workflows/security.yml");
     for (const needle of [`node-version: ${declaredNodeFloor()}`, "gitleaks", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
     expect(executableGateCommands(wf)).toEqual([
-      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck",
-      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate",
-      // job auth-integration (2026-10-09); the registration suite has its own workflow (see below)
+      // job verify-static
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck", "pnpm audit --audit-level=moderate",
+      // job verify-tests, once per part
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-gate",
+      // job auth-integration-tests (2026-10-09), once per part; the registration suite has its own workflow (see below)
       "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration"
     ]);
   });
@@ -53,9 +55,9 @@ describe("CI security gates (F-03)", () => {
   // bounds need the machine to themselves, so its workflow never sets it.
   it("runs test files side by side only in the two test steps of the security workflow", () => {
     const wf = read(".github/workflows/security.yml");
-    const setting = 'env: { CI_TEST_FILES_SIDE_BY_SIDE: "1" }';
-    const verify = wf.slice(wf.indexOf("\n  verify:\n"), wf.indexOf("\n  auth-integration:\n"));
-    const integration = wf.slice(wf.indexOf("\n  auth-integration:\n"), wf.indexOf("\n  secrets:\n"));
+    const setting = 'env: { CI_TEST_FILES_SIDE_BY_SIDE: "1", CI_TEST_PART: "${{ matrix.part }}/4" }';
+    const verify = wf.slice(wf.indexOf("\n  verify-tests:\n"), wf.indexOf("\n  verify:\n"));
+    const integration = wf.slice(wf.indexOf("\n  auth-integration-tests:\n"), wf.indexOf("\n  auth-integration:\n"));
     expect(wf.split("CI_TEST_FILES_SIDE_BY_SIDE")).toHaveLength(3);
     expect(verify).toContain(`- run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate\n        ${setting}\n`);
     expect(`${integration}\n`).toContain(`- run: node tools/source-map-hotfix.mjs integration # pnpm run test:ci-integration\n        ${setting}\n`);
@@ -66,7 +68,7 @@ describe("CI security gates (F-03)", () => {
   // rules, and `verify` never ran tests/integration. A separate job runs the curated list through the same gate.
   it("runs the curated auth/security integration suites in their own job, through the known-red gate", async () => {
     const wf = read(".github/workflows/security.yml");
-    const job = wf.slice(wf.indexOf("\n  auth-integration:\n"), wf.indexOf("\n  secrets:\n"));
+    const job = wf.slice(wf.indexOf("\n  auth-integration-tests:\n"), wf.indexOf("\n  auth-integration:\n"));
     expect(wf).toMatch(/^  pull_request: \{ branches: \[main, dev\] \}$/m);
     expect(wf).not.toContain("registration-integration:");
     expect(job).toContain("runs-on: ubuntu-latest");
@@ -87,6 +89,38 @@ describe("CI security gates (F-03)", () => {
       "registration-database", "account-flow-release-upgrade", "staff-access-database", "staff-http-database",
       "staff-security-acceptance", "staff-disable-races", "staff-webauthn-database"]) {
       expect(targets, name).toContain(`tests/integration/${name}.test.ts`);
+    }
+  });
+  // The two required checks are named `verify` and `auth-integration`. Each runs its tests as parts on several
+  // machines, so three things must hold or a pull request could merge with tests that ran nowhere: the parts in the
+  // matrix are exactly 1..N for the N the test step divides by; the job with the required name waits for the parts;
+  // and it runs whatever happened to them (a skipped job counts as passed for a required check) and passes only on
+  // their success.
+  it("splits each required check into parts that cover every file, behind a last job that keeps the required name", () => {
+    const wf = read(".github/workflows/security.yml");
+    const jobNames = [...wf.matchAll(/^  ([\w-]+):$/gm)].map((match) => match[1]);
+    const body = (name: string): string => {
+      const start = wf.indexOf(`\n  ${name}:\n`);
+      const next = jobNames[jobNames.indexOf(name) + 1];
+      expect(start, name).toBeGreaterThanOrEqual(0);
+      return wf.slice(start, next === undefined ? wf.length : wf.indexOf(`\n  ${next}:\n`));
+    };
+    for (const [required, parts, others] of [["verify", "verify-tests", ["verify-static"]], ["auth-integration", "auth-integration-tests", []]] as const) {
+      expect(jobNames.filter((name) => name === required), required).toHaveLength(1);
+      const tests = body(parts);
+      const matrix = /^    strategy: \{ fail-fast: false, matrix: \{ part: \[([\d, ]+)\] \} \}$/m.exec(tests)?.[1]?.split(", ").map(Number);
+      const divisor = Number(/CI_TEST_PART: "\$\{\{ matrix\.part \}\}\/(\d+)"/.exec(tests)?.[1]);
+      expect(divisor, parts).toBeGreaterThanOrEqual(2);
+      expect(matrix, parts).toEqual(Array.from({ length: divisor }, (_, index) => index + 1));
+      expect(tests.split('CI_TEST_PART: "')).toHaveLength(2);
+      const last = body(required);
+      expect(last).toContain(`\n    needs: [${[...others, parts].join(", ")}]\n    if: always()\n`);
+      for (const needed of [...others, parts]) expect(last).toContain(`\${{ needs.${needed}.result }}`);
+      const script = last.slice(last.indexOf("        run: |\n") + "        run: |\n".length).split("\n");
+      const lastLine = script.filter((line, index) => script.slice(0, index + 1).every((earlier) => earlier.startsWith("          "))).at(-1);
+      expect(lastLine?.trim()).toBe(
+        others.length === 0 ? '[ "$TEST_PARTS" = "success" ]' : '[ "$STATIC_CHECKS" = "success" ] && [ "$TEST_PARTS" = "success" ]'
+      );
     }
   });
   // 2026-10-09: the registration/verification-mail suite alone takes ~34 minutes, so it is NOT run on every pull request.
