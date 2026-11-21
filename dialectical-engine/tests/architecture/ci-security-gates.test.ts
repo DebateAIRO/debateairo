@@ -1,6 +1,6 @@
 // tests/architecture/ci-security-gates.test.ts
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 const gitRoot = resolve(import.meta.dirname, "../../..");
@@ -102,9 +102,31 @@ describe("CI security gates (F-03)", () => {
     const paths = [...pullRequest.matchAll(/^      - "([^"]+)"$/gm)].map((match) => match[1]);
     for (const path of ["dialectical-engine/migrations/**", "dialectical-engine/packages/db/**", "dialectical-engine/apps/api/src/registration*",
       "dialectical-engine/apps/api/src/sessions.ts", "dialectical-engine/apps/api/src/turnstile.ts",
-      "dialectical-engine/tests/integration/registration-database.test.ts", "dialectical-engine/tests/support/**",
+      "dialectical-engine/tests/integration/registration-database.test.ts",
       "dialectical-engine/tests/ci-integration-registration.txt", "dialectical-engine/tools/ci-known-red.mjs",
       ".github/workflows/registration-integration.yml"]) expect(paths, path).toContain(path);
+    // The suite's helpers are listed one by one, never as the whole folder: tests/support holds the helpers of every
+    // other suite, and a new one there used to start this 50-minute run. The list must hold every helper the suite
+    // loads, directly or through another helper, and the master-key list its guard reads.
+    expect(paths).not.toContain("dialectical-engine/tests/support/**");
+    const product = resolve(gitRoot, "dialectical-engine");
+    const loaded = new Set<string>();
+    const pending = ["tests/integration/registration-database.test.ts"];
+    while (pending.length > 0) {
+      const file = pending.pop()!;
+      if (loaded.has(file)) continue;
+      loaded.add(file);
+      for (const match of read(`dialectical-engine/${file}`).matchAll(/\b(?:from|import)\s*\(?\s*"(\.{1,2}\/[^"]+)"/gu)) {
+        const target = relative(product, resolve(product, dirname(file), match[1]!)).split(sep).join("/").replace(/\.js$/u, ".ts");
+        if (target.startsWith("tests/support/") && existsSync(resolve(product, target))) pending.push(target);
+      }
+    }
+    const helpers = [...loaded].filter((file) => file.startsWith("tests/support/")).sort();
+    expect(helpers).toContain("tests/support/testDatabase.ts");
+    expect(helpers).toContain("tests/support/master-key-guard.ts");
+    for (const helper of [...helpers, "tests/support/master-key-files.txt"]) expect(paths, helper).toContain(`dialectical-engine/${helper}`);
+    expect(paths.filter((path) => path!.startsWith("dialectical-engine/tests/support/")).sort())
+      .toEqual([...helpers, "tests/support/master-key-files.txt"].map((helper) => `dialectical-engine/${helper}`).sort());
     // Every listed path names something that exists, so a rename cannot silently stop the trigger.
     const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
     expect(scripts["test:ci-integration-registration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-registration.txt");
