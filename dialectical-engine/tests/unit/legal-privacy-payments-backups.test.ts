@@ -1,34 +1,17 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { PRIVACY_314_ENTRY } from "../support/legalPrivacy314.js";
-import {
-  PRIVACY_315_DAY,
-  PRIVACY_315_ENTRY,
-  PRIVACY_315_SWAPS,
-  privacy314Sha256,
-  sha256Of,
-  withoutPrivacy315
-} from "../support/legalPrivacy315.js";
-import { privacy315Sha256, withoutPrivacy316 } from "../support/legalPrivacy316.js";
-import { withoutReset10 } from "../support/legalReset10.js";
+import { legalText } from "../support/legalText.js";
 
 /**
- * Privacy Policy 3.15 (tests/support/legalPrivacy315.ts): what NETOPIA receives, sees and sends back, and where its
- * own notice is; the sensitive-data consent record going with the account; the backups as they really are; unfinished
- * sign-ups deleted after 24 hours or once their last link expires; the invoices we issue ourselves, the legal basis for
- * taking payment, Cloudflare's bot check, HTTPS, no trackers, and paid plans no longer "to start". Every language is
- * its 3.14 draft plus the recorded swaps and nothing else; English is pinned word for word; every language has
- * English's rows and names NETOPIA's company in section 5; Romanian and French drop what English drops. Privacy 3.16
- * followed (tests/support/legalPrivacy316.ts), then launch renumbered the text 1.0 (tests/support/legalReset10.ts); these
- * checks read each draft with the reset and 3.16 undone. The archive no longer holds any 3.x text.
+ * What the Privacy Policy says about payments, the consent record, the backups and unfinished sign-ups: what NETOPIA
+ * receives, sees and sends back, and where its own notice is; the sensitive-data consent record going with the
+ * account; the backups as they really are; unfinished sign-ups deleted after 24 hours or once their last link
+ * expires; the invoices we issue ourselves, the legal basis for taking payment, Cloudflare's bot check, HTTPS and no
+ * trackers. English is pinned word for word; every language has English's rows and names NETOPIA's company in section
+ * 5; Romanian and French, the other languages the release offers, have dropped what English dropped.
  */
 
-const root = process.cwd();
-/** A language's Privacy Policy as 3.15 wrote it: the draft with the 1.0 reset and 3.16 undone. */
-const draft = (code: string): string =>
-  withoutPrivacy316(code, withoutReset10("PRIVACY", code, readFileSync(resolve(root, "apps/ui/legal", code, "privacy-policy.md"), "utf8")));
+const draft = (code: string): string => legalText("PRIVACY", code);
 
 const section = (text: string, no: number): string => {
   const body = new RegExp(`^## ${no}\\.[^\\n]*\\n([\\s\\S]*?)^## `, "mu").exec(text)?.[1];
@@ -51,7 +34,7 @@ const SENSITIVE_CONSENT =
   "| The record of your sensitive-data consent (section 3): the version of the wording you agreed to, your language and the time | While the account exists | Deleted with the account |";
 const BACKUPS =
   "| Backups | On our server: a copy of the database made each night, of which we keep the last 7; and the copies of the database made when we upload a new version of the service, some of which also hold the keys to your account and your debates, which we keep until we remove them. At OVHcloud: the automated backups it makes of our server's disk for us, with everything on it, the keys included, each kept until newer ones replace it | We do not encrypt these copies ourselves, and we send none of them anywhere else. None of them is deleted when you close your account or delete a debate, so until a copy is gone, a closed account or a deleted debate it holds can come back if we restore the whole service from it. The other rows of this table describe the live service |";
-/** English, word for word: what 3.15 says, each exactly once. */
+/** English, word for word, each exactly once. */
 const ENGLISH_SENTENCES = [
   // The summary, and section 3's health information.
   "Deleting your account destroys the keys to your private data in the live service, but it does not delete our backups, and some of them hold those keys (section 7);",
@@ -91,35 +74,14 @@ const ENGLISH_SENTENCES = [
   "Overseas recipients of your personal information are the companies named in section 5,"
 ];
 
-/** What 3.14 or the first draft of 3.15 said that 3.15 no longer says, in each language the release offers. */
+/** Wordings that are gone, in each language the release offers: they must not come back. */
 const GONE: Readonly<Record<string, readonly string[]>> = {
   en: ["once paid plans start", "these processors handle data for us", "Cloudflare delivers our pages", "Cloudflare carries traffic", "issues your invoices", "We do not permit any processor", "No other party collects", "the processors named in section 5", "separate backup storage", "which cannot read them", "Up to 8 weeks after the live copy is deleted", "and we do not send it your data", "will be available"],
   ro: ["odată ce încep planurile cu plată", "următoarele persoane împuternicite prelucrează", "Cloudflare distribuie paginile", "Cloudflare transportă traficul", "vă emite facturile", "Nu permitem niciunei persoane împuternicite", "Nicio altă parte nu colectează", "persoanele împuternicite menționate în secțiunea 5", "spațiul nostru separat de stocare", "care nu le poate citi"],
   fr: ["lancement des formules payantes", "les sous-traitants suivants traitent", "Cloudflare diffuse nos pages", "Cloudflare achemine le trafic", "émet vos factures", "Nous n'autorisons aucun sous-traitant", "Aucun autre tiers ne collecte", "les sous-traitants mentionnés à la section 5", "stockage de sauvegarde distinct", "qui ne peut pas les lire"]
 };
 
-describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinished sign-ups and the plans on sale", () => {
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the draft is its 3.14 text with only the recorded 3.15 changes", (code) => {
-    const text = draft(code);
-    const lines = text.split("\n");
-    expect(lines[4], `${code}: the eyebrow`).toContain(" v3.15 · ");
-    expect(lines[7], `${code}: the end marker`).toMatch(/ v3\.15$/u);
-    expect(lines[21]!.startsWith("**Version 3.15 · Effective "), `${code}: the version line`).toBe(true);
-    // The effective day stands once in every language's own date words, in the eyebrow and in the version line.
-    for (const date of [lines[4]!.split(" · ").at(-1)!, lines[21]!.split(" · ")[1]!]) {
-      expect(date.match(new RegExp(`(?<!\\d)${PRIVACY_315_DAY}(?!\\d)`, "gu")), `${code}: ${date}`).toHaveLength(1);
-      expect(date, `${code}: the year`).toContain("2026");
-    }
-    expect(text, `${code}: no line names 3.14 as the current version`).not.toMatch(/ v3\.14( ·|$)|\*\*Version 3\.14 · /mu);
-    expect(sha256Of(withoutPrivacy315(code, text)), `${code}: undoing 3.15 gives back the 3.14 draft byte for byte`).toBe(privacy314Sha256(code));
-    expect(sha256Of(text), `${code}: the text the manifest held at 3.15`).toBe(privacy315Sha256(code));
-    // The languages the release offers carry every change and the history entry; the others carry only the NETOPIA,
-    // consent-record, backup and unfinished sign-up sentences as first translated for them, and the day.
-    expect(PRIVACY_315_SWAPS[code]!.swaps.length > 30, `${code}: every change`).toBe(RELEASED.includes(code));
-    // The 3.15 entry stands on the history's one line, so every language keeps English's line count.
-    expect(lines, `${code}: the line count`).toHaveLength(draft("en").split("\n").length);
-  });
-
+describe("Privacy Policy: NETOPIA, the consent record, the backups, unfinished sign-ups and the plans on sale", () => {
   it.each(LOCALES.map(({ code }) => [code]))("%s: section 5 names NETOPIA's company, and section 7 has English's rows", (code) => {
     const text = draft(code);
     const recipients = section(text, 5).split("\n").filter((line) => line.includes("NETOPIA"));
@@ -128,14 +90,15 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinis
     const retention = rows(section(text, 7));
     expect(retention, `${code}: section 7 rows`).toHaveLength(rows(section(draft("en"), 7)).length);
     for (const row of retention) expect(cells(row), `${code}: ${row.slice(0, 40)}`).toHaveLength(3);
-    // Two rows more than 3.14: the unfinished sign-up and the sensitive-data consent record.
-    expect(retention, `${code}: two rows more than 3.14`).toHaveLength(rows(section(withoutPrivacy315(code, text), 7)).length + 2);
-    const added = retention.filter((row) => !withoutPrivacy315(code, text).includes(row));
-    expect(added.some((row) => /(^|\D)24(\D|$)/u.test(cells(row)[1]!)), `${code}: a new row keeps something 24 hours`).toBe(true);
-    expect(added.some((row) => /(^|\D)6(\D|$)/u.test(cells(row)[1]!)), `${code}: the acceptance row keeps 6 years`).toBe(true);
+    // Two rows keep something 24 hours (the email links and the unfinished sign-up), and the acceptance records keep
+    // their 6 years. The translations not offered yet write some numbers in words, so this counts rows, not places.
+    const keeping = (number: number): number =>
+      retention.filter((row) => new RegExp(`(^|\\D)${number}(\\D|$)`, "u").test(cells(row)[1]!)).length;
+    expect(keeping(24), `${code}: rows that keep something 24 hours`).toBeGreaterThanOrEqual(2);
+    expect(keeping(6), `${code}: rows that keep something 6 months or years`).toBeGreaterThanOrEqual(1);
   });
 
-  it("English says it in the words of 3.15, and the history opens with the one 3.15 entry", () => {
+  it("English says it in the approved words", () => {
     const text = draft("en");
     for (const sentence of ENGLISH_SENTENCES) expect(text.split(sentence), sentence.slice(0, 60)).toHaveLength(2);
     const retention = rows(section(text, 7));
@@ -149,12 +112,9 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinis
     expect(text).not.toContain("and it cannot be restored. The first time");
     // Section 5 names NETOPIA in one paragraph only: the sentence on the Register does not name it.
     expect(section(text, 5).split("\n").filter((line) => line.includes("NETOPIA"))).toHaveLength(1);
-    expect(text).toContain(`\nThis policy was last updated on ${PRIVACY_315_DAY} November 2026. ${PRIVACY_315_ENTRY} ${PRIVACY_314_ENTRY} Version 3.13 replaced`);
-    // One entry for everything since 3.14: no later number.
-    expect(text).not.toMatch(/Version 3\.1[6-9]\b/u);
   });
 
-  it.each(RELEASED.map((code) => [code]))("%s: nothing 3.15 drops is left, and the protected names stand as in English", (code) => {
+  it.each(RELEASED.map((code) => [code]))("%s: nothing English dropped is left, and the protected names stand as in English", (code) => {
     const text = draft(code);
     for (const phrase of GONE[code]!) expect(text, `${code}: ${phrase}`).not.toContain(phrase);
     const recipients = section(text, 5).split("\n").filter((line) => line.includes("NETOPIA"))[0]!;
@@ -165,24 +125,5 @@ describe("Privacy Policy 3.15: NETOPIA, the consent record, the backups, unfinis
     expect(text.split("Art. ").length, `${code}: as many Art. references as English`).toBe(draft("en").split("Art. ").length);
     expect(section(text, 9), `${code}: section 9 names HTTPS`).toMatch(/HTTPS[\s\S]*TLS/u);
     expect(section(text, 13), `${code}: section 13 names the two companies`).toMatch(/NETOPIA[^\n]*Cloudflare/u);
-    // Section 14 still names SmartBill once, in the 3.11 entry: the 3.15 entry does not name it.
-    expect(section(text, 14).match(/SmartBill/gu), `${code}: SmartBill once in section 14`).toHaveLength(1);
-  });
-
-  it("Romanian and French carry the one 3.15 history entry, newest first; the other languages carry none", () => {
-    for (const code of ["ro", "fr"]) {
-      const log = section(draft(code), 14);
-      expect(log.indexOf("3.15"), code).toBeGreaterThan(-1);
-      expect(log.indexOf("3.15"), `${code}: newest first`).toBeLessThan(log.indexOf("3.14"));
-      expect(log, `${code}: names NETOPIA Payments`).toContain("NETOPIA Payments");
-      expect(log, `${code}: the day`).toMatch(new RegExp(`(?<!\\d)${PRIVACY_315_DAY} (noiembrie|novembre) 2026`, "u"));
-    }
-    for (const { code } of LOCALES.filter(({ code }) => !RELEASED.includes(code))) {
-      expect(section(draft(code), 14), code).not.toMatch(/3\.15/u);
-    }
-  });
-
-  it("records the 3.15 swaps for every language", () => {
-    expect(Object.keys(PRIVACY_315_SWAPS).sort()).toEqual(LOCALES.map(({ code }) => code).sort());
   });
 });

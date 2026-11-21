@@ -2,28 +2,17 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
-import { withoutReset10 } from "../support/legalReset10.js";
+import { cells, legalLines, sectionLine } from "../support/legalText.js";
 
 /**
- * Terms 2.12 and Privacy 3.11, R22 decisions 35 and 36: the Report button, a report's six months, and the sealed originals' six months.
- * English is pinned word for word; every language must have the same rows at the same places, and the old "control" and the old "link" are gone from the live text.
- * Privacy 3.12 (plan Task 83c) adds a row after section 2's "Page settings and visits" and another after section 7's, so
- * the privacy indexes from 44 on moved by one, and those from 153 on by two (0-based, as below). Privacy 3.11's moderation notices row (V4,
- * 0157, amended in place) moves those from 48 on by one more, and its two section 7 rows those from 161 on by two more.
- * The paragraph that names DeepInfra in section 5 (16 November 2026, 3.12 amended in place) and its blank line move those from 99 on by two more.
- * Privacy 3.14's section 4 lost its product-news row (we send no marketing email), so the indexes from 90 on moved back by one.
- * Privacy 3.15's unfinished sign-up row in section 7 moves those from 146 on by one more.
- * Privacy 3.16's paragraph on Amazon in section 5 stands in English, Romanian and French only, so the lines are read
- * with 3.16 undone (tests/support/legalPrivacy316.ts) and every language keeps the same rows at the same places.
- * Launch renumbered the texts 1.0 (tests/support/legalReset10.ts), so those lines are read with the reset undone first;
- * the 1.0 Privacy Policy carries no change history.
+ * The Report button, a report's six months, and the sealed originals' six months, in the Terms and the Privacy Policy.
+ * English is pinned word for word; every language must have the same rows at the same places, and the old "control" and
+ * the old "link" are gone from the live text. Rows and paragraphs are named by their section and their place in it
+ * (tests/support/legalText.ts).
  */
 const read = (locale: string, name: string): string => readFileSync(resolve(process.cwd(), "apps/ui/legal", locale, name), "utf8");
-const privacy = (locale: string): string[] =>
-  withoutPrivacy316(locale, withoutReset10("PRIVACY", locale, read(locale, "privacy-policy.md"))).split("\n");
-const terms = (locale: string): string[] => read(locale, "terms-of-service.md").split("\n");
-const cells = (row: string): string[] => row.split("|").slice(1, -1).map((cell) => cell.trim());
+const privacy = (locale: string): string[] => legalLines("PRIVACY", locale);
+const terms = (locale: string): string[] => legalLines("TERMS", locale);
 
 describe("the Report button and the six months in the legal texts", () => {
   it("English says it in the words drafted for the owner", () => {
@@ -38,7 +27,7 @@ describe("the Report button and the six months in the legal texts", () => {
     const reportsRow = privacy("en").find((line) => line.startsWith("| **Reports you make** |"));
     expect(cells(reportsRow!)[1]).toContain("Only admins who review can see your name");
     expect(read("en", "privacy-policy.md")).not.toMatch(/two people/iu);
-    expect(privacy("en")[96]).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
+    expect(sectionLine(privacy("en"), 5, 2)).toContain("If you use the Report button on a public debate, we send the words of your report and the public text of the debate to an AI, which checks the report; we add nothing that identifies you or your account.");
   });
 
   it("nothing in the English live text still calls it a control or a link", () => {
@@ -49,30 +38,28 @@ describe("the Report button and the six months in the legal texts", () => {
     expect(policy).not.toContain("Report link");
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the same rows at the same places, the versions and the addresses", (code) => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the same rows at the same places, and the addresses", (code) => {
     const policy = privacy(code);
     const contract = terms(code);
-    // 0157 (Privacy 3.11, amended in place) under this branch's 3.12 (one row more in section 2 before it, one in section 7): section 2's moderation
-    // notices row follows the reports row; section 7's two rows follow decision 36's.
-    for (const at of [47, 48]) expect(cells(policy[at]!), `${code}: section 2's row at ${at}`).toHaveLength(3);
-    expect(policy[48]!.startsWith("| **"), `${code}: the moderation notices row`).toBe(true);
-    expect(policy[49]!.startsWith("| **"), `${code}: section 2 goes on after it`).toBe(true);
-    for (const at of [161, 162, 163, 164, 165]) expect(cells(policy[at]!), `${code}: section 7 row at ${at}`).toHaveLength(3);
-    for (const at of [161, 162, 163, 164]) expect(policy[at]!).not.toContain("Anthropic");
-    expect(policy[165]!, `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
-    expect(cells(policy[162]!).join(" "), `${code}: decision 36's six months`).toContain("6");
-    expect(cells(policy[163]!).join(" "), `${code}: the notices' twelve months`).toContain("12");
-    expect(policy[90]!, `${code}: section 4 points at section 5`).toMatch(/5/u);
+    // Section 2's moderation notices row follows the reports row; section 7's two rows follow the sealed originals' row.
+    const collected = (below: number): string => sectionLine(policy, 2, below);
+    const kept = (below: number): string => sectionLine(policy, 7, below);
+    for (const below of [18, 19]) expect(cells(collected(below)), `${code}: section 2's row ${below} lines down`).toHaveLength(3);
+    expect(collected(19).startsWith("| **"), `${code}: the moderation notices row`).toBe(true);
+    expect(collected(20).startsWith("| **"), `${code}: section 2 goes on after it`).toBe(true);
+    for (const below of [27, 28, 29, 30, 31]) expect(cells(kept(below)), `${code}: section 7's row ${below} lines down`).toHaveLength(3);
+    for (const below of [27, 28, 29, 30]) expect(kept(below)).not.toContain("Anthropic");
+    expect(kept(31), `${code}: the new rows sit before the support chat's`).toContain("Anthropic");
+    expect(cells(kept(28)).join(" "), `${code}: decision 36's six months`).toContain("6");
+    expect(cells(kept(29)).join(" "), `${code}: the notices' twelve months`).toContain("12");
+    expect(sectionLine(policy, 4, 21), `${code}: section 4 points at section 5`).toMatch(/5/u);
     // The paragraph still names the model for the two other checks, so the marker is the count: the report sentence, which comes last, adds no third mention.
-    const section5 = policy[96]!;
+    const section5 = sectionLine(policy, 5, 2);
     const mentions = [...section5.matchAll(/Claude Haiku 5\.5/gu)].map((match) => match.index);
     expect(mentions, `${code}: section 5 names the model for the synthesis and the question checks only`).toHaveLength(2);
     expect(section5.match(/Haiku/gu), `${code}: no other spelling of the model`).toHaveLength(2);
     // ...and the report sentence is still there after the last mention: what follows it is longer than the stretch between the two mentions. Without the sentence it is at most 0.7 of that in every language, with it at least 1.36.
     expect(section5.length - mentions[1]!, `${code}: the report sentence follows the question check's`).toBeGreaterThan(mentions[1]! - mentions[0]!);
-    const log = policy.find((line) => line.includes("3.11") && line.includes("3.10") && line.includes("3.9"));
-    expect(log, `${code}: the change log`).toBeDefined();
-    expect(log!.indexOf("3.11"), `${code}: newest first`).toBeLessThan(log!.indexOf("3.9"));
     // Terms 1.0 is the first published text and carries no change log (owner's decision of 19 November 2026).
     expect(contract.join("\n"), `${code}: no Terms change log`).not.toMatch(/replaced (version )?2\.\d+|2\.12/u);
     expect(contract.filter((line) => line.includes("support@dezbatere.ro")).length).toBeGreaterThan(0);

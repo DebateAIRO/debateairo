@@ -11,8 +11,7 @@ import {
 import { POLICY_JUMP, POLICY_SECTIONS, PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_JUMP, TERMS_OF_SERVICE, TERMS_SECTIONS } from "../../apps/ui/lib/termsOfService.js";
 import type { LegalDocument, LegalSection } from "../../apps/ui/lib/legalDocument.js";
-import { withoutPrivacy316 } from "../support/legalPrivacy316.js";
-import { withoutReset10 } from "../support/legalReset10.js";
+import { legalLines } from "../support/legalText.js";
 
 /**
  * The two legal documents the sign-up gate shows are DATA generated from the drafts under
@@ -193,15 +192,21 @@ describe("legal documents — generated data", () => {
     // FIX-SF-S03-p3; one member without it measures 0.08, one changed word 0.49).
     it("renders the crisis-phrase exception in the same words in the four members, in every locale", () => {
       const marker = /(?<!\*)\*[^*\n]{1,40}?[:：]\*(?!\*)/u;
-      // Read with the 1.0 reset and Privacy 3.16 undone: its paragraph on Amazon stands in three languages only, and these
-      // lines are compared by index.
-      const read = (locale: string) =>
-        withoutPrivacy316(
-          locale,
-          withoutReset10("PRIVACY", locale, readFileSync(resolve(process.cwd(), `apps/ui/legal/${locale}/privacy-policy.md`), "utf8"))
-        ).split("\n");
-      const english = read("en");
+      // A line is named by the heading above it and its place under that heading, which every language shares; a
+      // paragraph that only some languages have yet, under another heading, moves nothing.
+      const read = (locale: string) => {
+        const lines = legalLines("PRIVACY", locale);
+        const headings = lines.flatMap((line, index) => (/^#{2,3} /u.test(line) ? [index] : []));
+        return { lines, headings };
+      };
+      const englishText = read("en");
+      const english = englishText.lines;
       const rows = english.flatMap((line, index) => (line.includes(CRISIS_EXCEPTION) ? [index] : []));
+      /** An English line's heading (by its count from the top) and how far under it the line stands. */
+      const place = (index: number): readonly [number, number] => {
+        const heading = englishText.headings.findLastIndex((at) => at <= index);
+        return [heading, index - englishText.headings[heading]!];
+      };
       const members = rows.flatMap((index) => english[index]!.split(marker).flatMap((part, segment) => (part.includes(CRISIS_EXCEPTION) ? [[index, segment] as const] : [])));
       expect(members).toHaveLength(4);
       const shared = (parts: readonly string[]) => {
@@ -217,9 +222,14 @@ describe("legal documents — generated data", () => {
       const locales = readdirSync(resolve(process.cwd(), "apps/ui/legal")).filter((name) => /^[a-z]{2}$/.test(name) && name !== "en");
       expect(locales).toHaveLength(34);
       for (const locale of locales) {
-        const lines = read(locale);
-        const parts = members.map(([index, segment]) => lines[index]?.split(marker)[segment] ?? "");
-        const k = (shared(parts).length / (lines[rows[0]!] ?? "").length) / base;
+        const { lines, headings } = read(locale);
+        expect(headings, `${locale}: the headings`).toHaveLength(englishText.headings.length);
+        const at = (index: number): string => {
+          const [heading, below] = place(index);
+          return lines[headings[heading]! + below] ?? "";
+        };
+        const parts = members.map(([index, segment]) => at(index).split(marker)[segment] ?? "");
+        const k = (shared(parts).length / at(rows[0]!).length) / base;
         expect(k, `${locale} k=${k.toFixed(2)}`).toBeGreaterThan(0.75);
       }
     });

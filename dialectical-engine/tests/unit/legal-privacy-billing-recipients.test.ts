@@ -15,7 +15,7 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  *     document to by account setting (apps/api/src/billing/invoice-smartbill.ts);
  *   - OVHcloud for the backups, beside the hosting.
  * 3.11 was never published, so the version stayed; section 14's 3.11 entry said what it also names, until launch
- * renumbered the text 1.0 and section 14 lost its history (tests/support/legalReset10.ts).
+ * renumbered the text 1.0 and section 14 lost its history (tests/unit/legal-reset-10.test.ts).
  *
  * Privacy 3.15: we issue the invoices ourselves, as the seller, through SmartBill or Quaderno, so the recipients
  * paragraph no longer reads as if another company sold the plan; and the OVHcloud backup is its own automated backup

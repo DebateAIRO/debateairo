@@ -21,9 +21,6 @@ import {
 } from "../../apps/ui/scripts/generate-legal-data.mjs";
 import { legalReleaseProblems } from "../../apps/ui/scripts/legal-release-check.mjs";
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
-import { PRIVACY_315_SWAPS } from "../support/legalPrivacy315.js";
-import { PRIVACY_316_SWAPS } from "../support/legalPrivacy316.js";
-import { TERMS_11_SWAPS } from "../support/legalTerms11.js";
 
 /**
  * English first: a change to the legal wording is made in English only while work goes on. The languages a release
@@ -45,33 +42,16 @@ const committedArchive = (): LegalArchiveIndex =>
 const sha = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
 
 /**
- * The repository's drafts, as the release check's cases below read them. They need every translation to have the
- * English structure. The Privacy Policy's section 4 row gained in 3.15 a second legal basis, for taking payment (one
- * more "Art. " reference, which the locale check counts), that the translations which lag do not have yet: that row
- * reads as 3.14 wrote its last cell in English and in each translation that follows it
- * (tests/support/legalPrivacy315.ts). Privacy 3.16 and Terms 1.1 added paragraphs the lagging translations do not have
- * either (the one on Amazon in each document, and the Terms' first history entry, which left again when launch
- * renumbered both texts 1.0, tests/support/legalReset10.ts): English and each translation that follows it read without
- * them (tests/support/legalPrivacy316.ts, legalTerms11.ts).
+ * The drafts the release check's cases below read. They need every translation to have the English structure, and
+ * the repository's translations that lag the English text do not have it yet. So each lagging language reads as the
+ * French text, a translation that follows the English one: a repository in which every language has caught up.
  */
 const TRANSLATIONS_RECORD = parseLegalTranslations(JSON.parse(readFileSync(resolve(process.cwd(), LEGAL_TRANSLATIONS_PATH), "utf8")));
-const ADDED_PARAGRAPHS = { PRIVACY: [PRIVACY_316_SWAPS, 1], TERMS: [TERMS_11_SWAPS, 1] } as const;
+const follows = (locale: string, kind: Kind): boolean =>
+  locale === "en" || legalTranslationFollows(TRANSLATIONS_RECORD, kind, locale, sha(repoDraft("en", kind)));
 const releaseDraft = (locale: string, kind: Kind): string => {
-  if (locale !== "en" && !legalTranslationFollows(TRANSLATIONS_RECORD, kind, locale, sha(repoDraft("en", kind)))) return repoDraft(locale, kind);
-  const [swaps, count] = ADDED_PARAGRAPHS[kind];
-  // The Terms' 1.1 history entry is one of 1.1's added paragraphs, but the 1.0 text no longer carries it.
-  const added = swaps[locale]!.swaps.filter(([before, after]) => before === "" && after.startsWith("\n") && !/^\n[^\n]*1\.1[^\n]*1\.0/u.test(after));
-  expect(added, `${locale}: the paragraphs ${kind} gained`).toHaveLength(count);
-  const text = added.reduce((current, [, after]) => {
-    expect(current.split(after), `${locale}: ${after.slice(0, 40)}, once`).toHaveLength(2);
-    return current.replace(after, () => "");
-  }, repoDraft(locale, kind));
-  if (kind !== "PRIVACY") return text;
-  const basis = PRIVACY_315_SWAPS[locale]!.swaps.filter(([, after]) => after.includes("Art. 6(1)(b)"));
-  expect(basis, `${locale}: the 3.15 legal basis for taking payment`).toHaveLength(1);
-  const [before, after] = basis[0]!;
-  expect(text.split(after), `${locale}: the 3.15 basis, once`).toHaveLength(2);
-  return text.replace(after, () => before);
+  expect(follows("fr", kind), `${kind}: French follows the English text`).toBe(true);
+  return repoDraft(follows(locale, kind) ? locale : "fr", kind);
 };
 
 /** An English-only edit that also changes the structure: one new paragraph at the end of section 6. */
