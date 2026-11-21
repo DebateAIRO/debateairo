@@ -1809,6 +1809,15 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       expect(flat, gone).not.toContain(gone);
     // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. From the
     // key on every ask makes a paid check of Luna, so the key never waits through the notice's time to object unwatched.
+    // S-5's terminal keeps its ssh -N running, so LUNAROW runs in S-6's second terminal, where P is set again; an scp of
+    // S-5 brings the server's settings back.
+    const practice = read('tools/preview-practice/README.md').replace(/\s+/g, ' ');
+    expect(practice).toContain('Leave the `ssh -N` running in its own terminal.');
+    expect(practice).toContain('In a second terminal, from the worktree\'s `dialectical-engine` folder (set `D` and `P` to the same folders as in S-5)');
+    for (const text of ['Run it in S-6\'s second terminal, where you set `P` to S-5\'s folder (S-5\'s own terminal is busy with its `ssh -N`): after S-5\'s `scp`, and before S-6\'s `formats`.',
+      'or S-5\'s `scp` run again, brings the server\'s six-row `settings.env` back: run LUNAROW again after it.'])
+      expect(flat, text).toContain(text);
+    expect(flat).not.toContain('in the Terminal where S-5 set `P`');
     // GATEREADY runs inside the window from SB3 to the switch: only piece 3 is done there; a gate is never redeployed,
     // restarted or activated then.
     for (const text of ['- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.',

@@ -661,11 +661,13 @@ sign-in after the upload, neither you nor the team is asked to accept the texts 
 The steps this release adds to that recipe, in the order you meet them:
 - **Before SB2, on the Mac: LUNAROW.** The practice runs this release's next register, which lists a seventh model,
   Luna. S-2's copy of the settings lists six, so without LUNAROW the practice stops at once with
-  `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` (nothing is spent). After S-5 has copied the settings into `$P`, run the
-  release guide's LUNAROW (in the Amazon gate's section, which says how to save and run it). Expect
+  `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` (nothing is spent). Run the release guide's LUNAROW (in the Amazon gate's
+  section, which says how to save and run it) in S-6's second terminal, where you set `P` to S-5's folder: after
+  S-5's `scp`, before S-6's `formats`. S-5's own terminal is busy with its `ssh -N`. Expect
   `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. Then the practice as usual: its line
   `practising on this code's next version` lists the rows the next version changes and adds, which must match SB3's
-  delta, and Luna sits out of the practice debate. A new S-2 copy needs LUNAROW again.
+  delta, and Luna sits out of the practice debate. A new S-2 copy, or S-5's `scp` run again, brings the six-row
+  settings back: run LUNAROW again after it.
 - **After SB2 and before SB3: the gates' new code, and the Amazon gate (the release guide's pieces 1 and 2), then
   GATES4.** Never later: from SB3 to the end of DR6 only the brakes may run (the order rules). These steps restart the
   gates, run `activate`, and install the Amazon gate's units and its address drop-in: that is allowed here, although

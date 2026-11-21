@@ -3145,8 +3145,9 @@ running release's runner file, which lists six model addresses. The practice run
 lists seven, so it stops with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` before the debate starts (nothing is spent).
 LUNAROW adds Luna's row, printed by this commit's own code (the row BEDROCK_ENV adds on the server), to the copy in
 `$P` only; the server's files do not change. Save the block on the Mac, outside the project folder
-(`rm -f ~/luna-row.sh; nano ~/luna-row.sh`, paste, Ctrl-O, Enter, Ctrl-X), then, in the Terminal where S-5 set `P`,
-run `bash ~/luna-row.sh <the full path of the dialectical-engine folder> "$P/settings.env"`.
+(`rm -f ~/luna-row.sh; nano ~/luna-row.sh`, paste, Ctrl-O, Enter, Ctrl-X). Run it in S-6's second terminal, where you
+set `P` to S-5's folder (S-5's own terminal is busy with its `ssh -N`): after S-5's `scp`, and before S-6's `formats`.
+Run `bash ~/luna-row.sh <the full path of the dialectical-engine folder> "$P/settings.env"`.
 
 ```bash
 #!/usr/bin/env bash
@@ -3176,7 +3177,7 @@ the copy before is `$P/settings.env.before-luna`. Then the practice runs as befo
 next version` lists the rows the next version changes and adds; they must match SB3's delta (the hosted-base recipe's
 "match"), and this release's delta adds Luna to the register's models. Luna itself sits out of the practice debate: no
 line-up seats it, and the practice reaches only the DeepInfra and Anthropic gates. A new S-2 copy (for a second
-practice) needs LUNAROW again.
+practice), or S-5's `scp` run again, brings the server's six-row `settings.env` back: run LUNAROW again after it.
 
 **Before piece 1, have ready:**
 - the two figures for the Amazon gate's GO (`README-bedrock.md`, install step 5): its daily pot and its daily number of
