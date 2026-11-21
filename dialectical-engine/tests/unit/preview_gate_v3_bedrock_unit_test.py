@@ -258,6 +258,28 @@ class ReadmeTests(unittest.TestCase):
         self.assertLess(probe, switch_on)
         self.assertIn('It must pass before Luna is switched on.', self.readme[probe:switch_on])
 
+    def test_the_key_waits_for_the_probe_and_switch_on_starts_the_gate_first(self):
+        flat = ' '.join(self.readme.split())
+        # Once the key and Luna's address are both in, the API checks Luna at every ask: the key goes in right before
+        # the owner's first probe, never at the upload.
+        self.assertIn('**The key goes in right before the first probe, never at the upload.**', flat)
+        step4, step5 = self.readme.index('**4. The Amazon key.'), self.readme.index('**5. The GO')
+        self.assertIn('Not at the upload: on the day of the probe, right before step 8', ' '.join(self.readme[step4:step5].split()))
+        # R is the upload's own release folder, read from its names file, never a typed placeholder.
+        self.assertIn('. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine', self.readme)
+        self.assertNotIn('REVIEWED_RELEASE', self.readme)
+        # Step 3a reads what the install would change before it installs.
+        step, key = self.readme.index('**3a. Re-install the six older gate units'), self.readme.index('**4. The Amazon key.')
+        block = self.readme[step:key]
+        self.assertLess(block.index('diff "/etc/systemd/system/$U" "$D/$U"'), block.index('install -o root -g root -m 0644 $S/debateai-preview-provider-budget.service'))
+        # Nothing starts the gate at boot before "Switch it on", so its step 1 starts the gate before anything else,
+        # and it waits for the notice when anyone outside the team has an account.
+        switch_on = self.readme[self.readme.index('## Switch it on'):self.readme.index('## Daily operations')]
+        self.assertLess(switch_on.index('systemctl start debateai-preview-bedrock-budget; systemctl is-active debateai-preview-bedrock-budget'),
+                        switch_on.index('50-bedrock-gate.conf /etc/systemd/system/debateai-preview.target.d/'))
+        self.assertIn('when any account outside the team exists by then, the Privacy Policy section 14 notice has gone out', ' '.join(switch_on.split()))
+        self.assertIn('GATE_CAPACITY_UNREAD', switch_on)
+
     def test_every_other_gates_probe_line_hides_the_bedrock_gate(self):
         for name in ('README.md', 'README-anthropic.md', 'README-perplexity.md'):
             with self.subTest(readme=name):
