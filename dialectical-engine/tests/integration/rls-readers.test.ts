@@ -25,9 +25,11 @@
  * member origin/dev added before the merge (1667370dd, the runner's boot preload), and the two synthesis-flag's settlement
  * check claim added (packages/serve/src/synthesis-check.ts, X26, merge onto 76b76f4ba), and, since the merge with the
  * security fixes of audit run 3, the runner's stale-READY listing (NV-25, X1) and the estimator's rewritten sample (NV-49,
- * X20, in place of the probe's estimate.ts member), covers them EXACT, each member once, and the rule
+ * X20, in place of the probe's estimate.ts member), and the owner's cost read-out (its dearest-runs read, on the runner's
+ * login only) and the three reads of the API's start check that holds a switch to the payment sandbox while live charges
+ * have open work (X11), covers them EXACT, each member once, and the rule
  * `probes/REQ-FIX-RLS-2/unkeyed-reads.py` (ported below, verbatim in its regular expressions) re-run on this head tree finds
- * no member that is not one of the 70 (matched by file and SQL text).
+ * no member that is not one of the 74 (matched by file and SQL text).
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
@@ -914,7 +916,7 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
       .toEqual({ before: 2, after: [], answered: [login], legal: before.reduce((sum, row) => sum + row.n, 0) + 2 });
   });
 
-  it("S7.1-R44 the classification constant (D37's three lists, 70 members: the probe's 66, dev's 1667370dd, synthesis-flag's two claim reads and audit run 3's NV-25 listing; NV-49 rewrote the probe's estimate.ts member) covers probes/REQ-FIX-RLS-2/unkeyed-reads.tsv EXACT, each member once", async () => {
+  it("S7.1-R44 the classification constant (D37's three lists, 74 members: the probe's 66, dev's 1667370dd, synthesis-flag's two claim reads, audit run 3's NV-25 listing, the cost read-out's dearest runs and the sandbox start check's three reads; NV-49 rewrote the probe's estimate.ts member) covers probes/REQ-FIX-RLS-2/unkeyed-reads.tsv EXACT, each member once", async () => {
     const classified = Object.entries(R44_CLASSIFICATION).flatMap(([kind, members]) => members.map(([member]) => ({ kind, member })));
     const counts = new Map<string, number>();
     for (const { member } of classified) counts.set(member, (counts.get(member) ?? 0) + 1);
@@ -924,12 +926,12 @@ describe("row-level security S01 C7: every cross-account reader still sees both 
       twice: [...counts].filter(([, n]) => n > 1).map(([member]) => member),
       missing: base.filter((member) => !counts.has(member)),
       extra: [...counts.keys()].filter((member) => !base.includes(member))
-    }).toEqual({ lists: { reader: 60, perAccount: 5, neverT1: 5 }, twice: [], missing: [], extra: [] });
-    // R36/R44 at head: the rule re-run on this tree; every member must be one of the 70 (same file, same SQL text).
+    }).toEqual({ lists: { reader: 63, perAccount: 5, neverT1: 6 }, twice: [], missing: [], extra: [] });
+    // R36/R44 at head: the rule re-run on this tree; every member must be one of the 74 (same file, same SQL text).
     const head = await unkeyedReads(PRODUCT_ROOT);
     const known = new Set(R44_BASE_MEMBERS.map(([member, sql]) => `${member.split(":")[0]}\t${sql}`));
     const unclassified = head.filter(({ file, sql }) => !known.has(`${file}\t${sql}`)).map(({ file, line, sql }) => `${file}:${line}\t${sql}`);
-    expect({ head: head.length, unclassified }).toEqual({ head: 70, unclassified: [] });
+    expect({ head: head.length, unclassified }).toEqual({ head: 74, unclassified: [] });
   });
 });
 
@@ -1050,6 +1052,14 @@ const R44_BASE_MEMBERS: readonly (readonly [string, string])[] = Object.freeze([
   ["packages/serve/src/synthesis-check.ts:81", "SELECT request.request_id,request.run_id,request.answer_id, request.answer_version,request.requested_at FROM serve.synthesis_check_request A"],
   ["packages/serve/src/synthesis-check.ts:110", "SELECT clock_timestamp() < requested_at + make_interval(secs => $2::double precision / 1000.0) AS fresh FROM serve.synthesis_check_request W"],
   ["packages/settlement/src/index.ts:713", "SELECT answer_outcome_id, model_id, model_version, provider, task_class, prior, posterior, resolved_outcome, proper_score_total, proper_scor"],
+  // The cost read-out's dearest runs: the owner's command that adds up what AI calls cost across every account.
+  ["packages/budget/src/cost-readout.ts:442", "WITH per_run AS ( SELECT s.run_id, sum(s.charge_micros) AS charge_micros, count(*) AS charges FROM ledger.model_spend s WHERE s.charged_on B"],
+  // The API's start check that holds a switch to the payment sandbox while live NETOPIA charges still have open work:
+  // the live plans' events, the open charges and their open jobs. Their labels carry the function's name because
+  // billing.ts:772 already names another member (the records-dated-ahead read, listed when it stood at that line).
+  ["packages/db/src/billing.ts:772 openNetopiaChargeWork", "SELECT ${SUBSCRIPTION_EVENT_COLUMNS} FROM billing.subscription_event AS event WHERE event.subscription_id IN ( SELECT created.subscription_i"],
+  ["packages/db/src/billing.ts:786 openNetopiaChargeWork", "SELECT charge.subscription_id, NOT EXISTS ( SELECT 1 FROM billing.charge_event AS final WHERE final.charge_id = charge.charge_id AND final.k"],
+  ["packages/db/src/billing.ts:810 openNetopiaChargeWork", "SELECT count(*) AS open_jobs FROM billing.outbox AS job WHERE job.done_at IS NULL AND job.dead_at IS NULL AND EXISTS ( SELECT 1 FROM billing"],
 ]);
 const R44_IDENTIFIERS: readonly string[] = Object.freeze([
   "abstention_id", "acceptance_id", "alias_revocation_id", "alias_row_id", "answer_id", "answer_outcome_id",
@@ -1097,6 +1107,9 @@ const R44_CLASSIFICATION: Readonly<Record<"reader" | "perAccount" | "neverT1", r
     ...[138, 162, 206, 234, 260, 304, 395, 405].map((line) => [`packages/db/src/billing-jobs.ts:${line}`, "X11"] as const),
     ...[301, 650, 698, 714, 722, 744, 772, 875, 986, 1017, 1130, 1202, 1236, 1275, 1330, 1355, 1380, 1414, 1454, 1509, 1531, 1619]
       .map((line) => [`packages/db/src/billing.ts:${line}`, "X11"] as const),
+    // The sandbox start check's reads: the same API pool outside any request, so the API's system login, as its
+    // neighbour openNetopiaSubscriptionCount (billing.ts:744) above.
+    ...[772, 786, 810].map((line) => [`packages/db/src/billing.ts:${line} openNetopiaChargeWork`, "X11"] as const),
     ["packages/db/src/identity.ts:556", "X18d"], ["packages/db/src/identity.ts:606", "X18e"], ["packages/db/src/identity.ts:710", "X18f"],
     ["packages/db/src/index.ts:1603", "X24"],
     ["packages/db/src/publication.ts:593", "X10"],
@@ -1118,7 +1131,8 @@ const R44_CLASSIFICATION: Readonly<Record<"reader" | "perAccount" | "neverT1", r
     ["packages/evaluator/src/consumer-postgres.ts:99", "evaluator logins (X5, the evaluator API)"],
     ["packages/evaluator/src/index.ts:3121", "evaluator logins (X5, the evaluator API)"],
     ["packages/evaluator/src/index.ts:3609", "evaluator logins (X5, the evaluator API)"],
-    ["packages/evaluator/src/index.ts:3651", "evaluator logins (X5, the evaluator API)"]
+    ["packages/evaluator/src/index.ts:3651", "evaluator logins (X5, the evaluator API)"],
+    ["packages/budget/src/cost-readout.ts:442", "the owner's cost read-out command, on the runner's login only, which may read every account; in production it refuses any other login"]
   ])
 });
 
