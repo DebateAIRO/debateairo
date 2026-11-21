@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { PRIVACY_SIGN_IN_SWAPS, TERMS_SIGN_IN_SWAPS } from "../support/legalSignIn.js";
 
 /**
  * How you sign in, in the English Terms and Privacy Policy (18 November 2026). The texts named only a password, an
@@ -14,6 +13,24 @@ import { PRIVACY_SIGN_IN_SWAPS, TERMS_SIGN_IN_SWAPS } from "../support/legalSign
  */
 
 const root = process.cwd();
+
+/** Each pair is [the wording that is gone, the wording the text carries now]. */
+const PRIVACY_SIGN_IN: readonly (readonly [string, string])[] = [
+  [
+    "password (stored as a hash, never in clear); your two-factor authentication secret (encrypted); ten recovery codes (stored as hashes); your pseudonym | You, at registration |",
+    "password (stored as a hash, never in clear), unless you signed up with Google, Apple or X and have none; your two-factor authentication secret (encrypted), if you use an authenticator app; ten recovery codes (stored as hashes); for each passkey you create, the public key and identifier your device gives us, a count of its uses, whether it can be synced between your devices and is backed up, how your device reaches it, the name you give it, if any, and when it was created, last used or removed (the face, fingerprint or PIN check of a passkey happens on your device, and nothing of it reaches us); if you sign in with Google, Apple or X, which of them and the identifier it gives you there (that company also sends us your name and email address there: we use them only to fill in the sign-up form, keep them in our server's memory for at most 5 minutes and do not store them, and if the email address you give us is one Google or Apple has confirmed, we do not send you a verification email; X's permission screen also lists reading your posts, but we ask X only for your identifier, your name and your confirmed email address; that company learns that you use our service, under its own privacy policy); a phone number, if you choose to give one (stored encrypted, and Settings shows only its last four digits unless you confirm it is you and ask to see the whole number; we do not check that it is yours, it is not a way to sign in, and we send no text messages to it); your pseudonym | You, at registration and in Settings; Google, Apple or X, if you sign in with one of them |"
+  ],
+  [
+    "Passwords are hashed with Argon2id. Two-factor authentication is mandatory.",
+    "Passwords are hashed with Argon2id. Signing in always takes two checks. A password is never enough on its own, and neither is a Google, Apple or X account: after it you must also give a code from your authenticator app, use a passkey or enter one of your recovery codes. A passkey signs you in on its own because it makes both checks itself: you must have the device it is on, and unlock it with your face, fingerprint or PIN. Your account must always keep a passkey or an authenticator app."
+  ]
+];
+const TERMS_SIGN_IN: readonly (readonly [string, string])[] = [
+  [
+    "You register with an email address, a password, a recovery email address and two-factor authentication, which is mandatory. We give you a random **pseudonym**, which is the name shown on anything you publish. It cannot be changed. Keep your password, your authentication app and your recovery codes safe.",
+    "You register with an email address, and you may add a recovery email address and a phone number; we do not check that the number is yours, and you cannot sign in with it. You sign in with a passkey, which uses your device's usual face, fingerprint or PIN check, or with your password, or, where the sign-in page offers it, with your Google, Apple or X account. A password, or a Google, Apple or X account, is never enough on its own: you must also give a code from your authentication app, use a passkey or enter one of your recovery codes, and your account must always keep a passkey or an authentication app. If you sign in with Google, Apple or X, that company's own terms also apply between you and it. We give you a random **pseudonym**, which is the name shown on anything you publish. It cannot be changed. Keep your password, your passkeys, your authentication app and your recovery codes safe."
+  ]
+];
 const legal = (name: string): string => readFileSync(resolve(root, "apps/ui/legal/en", name), "utf8");
 
 describe("sign-in methods, in the English legal texts", () => {
@@ -21,10 +38,10 @@ describe("sign-in methods, in the English legal texts", () => {
   const privacy = legal("privacy-policy.md");
 
   it("each text carries the new sign-in wording, once, and the replaced wording is gone", () => {
-    for (const [name, text, swaps] of [["privacy-policy.md", privacy, PRIVACY_SIGN_IN_SWAPS], ["terms-of-service.md", terms, TERMS_SIGN_IN_SWAPS]] as const) {
-      for (const [before, after] of swaps) {
-        expect(text.split(after), name).toHaveLength(2);
-        expect(text, `${name}: the old wording is gone`).not.toContain(before);
+    for (const [name, text, swaps] of [["privacy-policy.md", privacy, PRIVACY_SIGN_IN], ["terms-of-service.md", terms, TERMS_SIGN_IN]] as const) {
+      for (const [gone, now] of swaps) {
+        expect(text.split(now), name).toHaveLength(2);
+        expect(text, `${name}: the old wording is gone`).not.toContain(gone);
       }
     }
   });

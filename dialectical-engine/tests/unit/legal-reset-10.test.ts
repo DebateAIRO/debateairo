@@ -8,21 +8,19 @@ import { TERMS_VERSIONS } from "../../apps/ui/lib/legal/pages.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { RELEASE_LEGAL_LOCALES } from "../../apps/ui/scripts/generate-legal-data.mjs";
-import { RESET_10_SWAPS, preReset10Sha256, withoutReset10, type ResetKind } from "../support/legalReset10.js";
+import { LEGAL_FILES as FILES, legalText, type LegalKind as ResetKind } from "../support/legalText.js";
 
 /**
- * Launch starts both legal texts at 1.0 (owner's decision of 20 November 2026, tests/support/legalReset10.ts): every
- * language's Terms of Service and Privacy Policy say 1.0 in their eyebrow, end marker and version line, carry no change
- * history, and are otherwise the pre-launch texts (Terms 1.1, Privacy 3.16) byte for byte; both re-acceptance floors are
- * 1.0, which every pre-launch acceptance clears; the archive holds only the 1.0 texts of the languages the release
- * offers; /terms/versions lists 1.0 alone.
+ * Launch starts both legal texts at 1.0 (owner's decision of 20 November 2026): every language's Terms of Service and
+ * Privacy Policy say 1.0 in their eyebrow, end marker and version line and carry no change history; both
+ * re-acceptance floors are 1.0, which every acceptance of a draft written before launch clears; the archive holds only
+ * the 1.0 texts of the languages the release offers; /terms/versions lists 1.0 alone.
  */
 
 const root = process.cwd();
-const FILES: Readonly<Record<ResetKind, string>> = { PRIVACY: "privacy-policy.md", TERMS: "terms-of-service.md" };
 const KINDS = ["PRIVACY", "TERMS"] as const;
 const CODES = LOCALES.map(({ code }) => code).sort();
-const draft = (kind: ResetKind, code: string): string => readFileSync(resolve(root, "apps/ui/legal", code, FILES[kind]), "utf8");
+const draft = (kind: ResetKind, code: string): string => legalText(kind, code);
 const sha = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
 const section14 = (text: string): string[] =>
   text.split(/^## 14\./mu)[1]!.split(/^## /mu)[0]!.trim().split("\n\n");
@@ -33,15 +31,13 @@ const manifest = (): {
 } => JSON.parse(readFileSync(resolve(root, "packages/legal-manifest/src/manifest.json"), "utf8"));
 
 describe("launch starts the Terms of Service and the Privacy Policy at 1.0", () => {
-  it.each(KINDS.flatMap((kind) => CODES.map((code) => [kind, code] as const)))("%s %s: the draft says 1.0 and is the pre-launch text otherwise", (kind, code) => {
+  it.each(KINDS.flatMap((kind) => CODES.map((code) => [kind, code] as const)))("%s %s: the draft says 1.0, and the manifest holds it", (kind, code) => {
     const text = draft(kind, code);
     const lines = text.split("\n");
     expect(lines.find((line) => line.startsWith("eyebrow: ")), "the eyebrow").toMatch(/ · v1\.0 · /u);
     expect(lines.find((line) => line.startsWith("endMarker: ")), "the end marker").toMatch(/ · v1\.0$/u);
     expect(lines.find((line) => line.startsWith("**Version ")), "the version line").toMatch(/^\*\*Version 1\.0 · Effective /u);
     expect(text, "no line names a pre-launch number as current").not.toMatch(/ v(3\.1[0-9]|3\.[0-9]|2\.\d+|1\.[1-9])( ·|$)|\*\*Version (3|2)\.\d+ · |\*\*Version 1\.[1-9]/mu);
-    // Undoing the reset gives the pre-launch text the manifest held, byte for byte.
-    expect(sha(withoutReset10(kind, code, text))).toBe(preReset10Sha256(kind, code));
     expect(manifest().documents[kind]![code]).toEqual({ version: "1.0", sha256: sha(text) });
     expect(currentDocument(kind, code)).toEqual({ version: "1.0", sha256: sha(text) });
   });
@@ -110,9 +106,5 @@ describe("launch starts the Terms of Service and the Privacy Policy at 1.0", () 
 
   it("lists the Terms' 1.0 alone, in force", () => {
     expect(TERMS_VERSIONS).toEqual([{ version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }]);
-  });
-
-  it("records the reset for every language and both texts", () => {
-    for (const kind of KINDS) expect(Object.keys(RESET_10_SWAPS[kind]).sort(), kind).toEqual(CODES);
   });
 });

@@ -157,7 +157,7 @@ describe("Privacy Policy §13 — the twenty-one actual stored items in every lo
   });
 
   // The 3.6, 3.7 and 3.8 change-history summaries were checked here until launch renumbered the policy 1.0 and section 14
-  // lost its history (owner's decision of 20 November 2026, tests/support/legalReset10.ts).
+  // lost its history (owner's decision of 20 November 2026, tests/unit/legal-reset-10.test.ts).
 
   it("every other locale's §13 keeps the English block shape, the literal Do Not Track, and no English paragraph", () => {
     const english = blocks(section13("en"));

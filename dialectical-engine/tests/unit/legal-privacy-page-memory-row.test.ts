@@ -10,7 +10,7 @@ import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
  * data; section 7 gains its retention row after "Provider return records and retrieval references": kept while the
  * account exists, deleted with the account, and (R22 item 16) a debate's last visit and its links are also deleted with
  * that debate. Section 14's 3.8 entry said so until launch renumbered the text 1.0 and section 14 lost its history
- * (tests/support/legalReset10.ts). 3.8 was never published (V-80 deploy-day marker), so the version stayed.
+ * (tests/unit/legal-reset-10.test.ts). 3.8 was never published (V-80 deploy-day marker), so the version stayed.
  *
  * Every locale: the same rows at the same places, the section 7 row named as the section 2 row, section 4's first row
  * naming it, and the deletion with the debate pointing at section 6. English and Romanian, the texts counsel reviews,
