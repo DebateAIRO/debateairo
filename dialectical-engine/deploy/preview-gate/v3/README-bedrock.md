@@ -130,7 +130,8 @@ before SB3 (the release guide's pieces 1 and 2), never from SB3 to the switch, w
 
 The release tools now count this gate among the server's gates. From this upload on, a release check and a settings
 activation ask that this gate too is installed, runs this release's gate code and is `active`. That needs install
-steps 1 to 7 below. It does not need the key or the probe: a gate with no key is `active` and simply cannot make a call.
+steps 1 to 3, 3a, 5, 6 and 7 below. It does not need the key or the probe: a gate with no key is `active` and simply
+cannot make a call.
 
 ## Install (operator, as root: `sudo -i`, in this order)
 
