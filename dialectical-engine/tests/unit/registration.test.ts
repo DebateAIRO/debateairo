@@ -1704,8 +1704,9 @@ describe("T1 rework1 P2 — Argon2 pool failures share one auth envelope", () =>
 // lost capacity. Registration alone now waits 28,000 ms; resend keeps 18,000.
 //
 // Every lifecycle assertion below is driven by an explicit barrier, a held
-// permit, or a test-local deadline. Nothing here sleeps for 28 seconds of wall
-// time, and the two tests that assert the EXACT ruled deadlines read them off
+// permit, or a test-local deadline that the test holds and fires itself
+// (rework7HoldDeadline), so none of them races the clock. Nothing here sleeps
+// for 28 seconds of wall time, and the two tests that assert the EXACT ruled deadlines read them off
 // the unmodified production policy.
 // ==========================================================================
 
@@ -2194,6 +2195,49 @@ async function rework7Settle(): Promise<void> {
 
 function rework7Code(error: unknown): string {
   return (error as { code?: string }).code ?? `RAW:${String(error)}`;
+}
+
+/**
+ * Holds every timer armed with exactly `delayMs` and returns `fire`, which runs the held timers' own callbacks.
+ *
+ * The mail queue's wait deadline is a real timer. A test that shortens it and then looks at the queue is racing that
+ * timer: on a busy machine the event-loop turns before the look can take longer than the deadline, the waiter is
+ * already gone, and the test fails although the code is right. Holding the timer leaves the product's callback and the
+ * delay it asked for untouched and takes only the clock out of the race.
+ */
+function rework7HoldDeadline(delayMs: number): Readonly<{ armed(): number; fire(): void; restore(): void }> {
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  const held = new Map<unknown, () => void>();
+  let armed = 0;
+  const set = vi.spyOn(globalThis, "setTimeout").mockImplementation(((
+    handler: TimerHandler, delay?: number, ...rest: unknown[]
+  ) => {
+    if (delay !== delayMs) return realSetTimeout(handler as () => void, delay, ...rest);
+    armed += 1;
+    // A real timer that never comes due stands in for the held one, so the code has a handle to clear.
+    const placeholder = realSetTimeout(() => undefined, 2 ** 31 - 1);
+    (placeholder as unknown as { unref?: () => void }).unref?.();
+    held.set(placeholder, handler as () => void);
+    return placeholder;
+  }) as unknown as typeof setTimeout);
+  // A deadline the code clears (a waiter that got its permit) is dropped: firing must not run it.
+  const clear = vi.spyOn(globalThis, "clearTimeout").mockImplementation(((timer?: Parameters<typeof clearTimeout>[0]) => {
+    held.delete(timer);
+    realClearTimeout(timer);
+  }) as typeof clearTimeout);
+  return Object.freeze({
+    armed: () => armed,
+    fire: () => {
+      const due = [...held];
+      held.clear();
+      for (const [placeholder, run] of due) {
+        realClearTimeout(placeholder as Parameters<typeof clearTimeout>[0]);
+        run();
+      }
+    },
+    restore: () => { set.mockRestore(); clear.mockRestore(); }
+  });
 }
 
 const REWORK8_STILL_PENDING = "REWORK8_STILL_PENDING_AT_THE_CLOSED_LOOKUP_GATE";
@@ -2691,6 +2735,8 @@ describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and re
       password: secret,
       channel: { registrationMailDispatchQueueWaitTimeoutMs: 40 }
     });
+    // The test fires the 40 ms deadline itself, after it has seen the waiter in the queue.
+    const deadline = rework7HoldDeadline(40);
     const unhandled: unknown[] = [];
     const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
     process.on("unhandledRejection", onUnhandled);
@@ -2703,7 +2749,9 @@ describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and re
       await rework7Settle();
       // NON-VACUITY: it is genuinely waiting when the deadline is armed.
       expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+      expect(deadline.armed()).toBe(1);
 
+      deadline.fire();
       expect(await attempt).toBe("AUTH_MAIL_BUSY");
       await rework7Settle();
 
@@ -2722,6 +2770,7 @@ describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and re
       }
       expect(unhandled).toEqual([]);
     } finally {
+      deadline.restore();
       process.off("unhandledRejection", onUnhandled);
       harness.restore();
     }
@@ -2729,6 +2778,8 @@ describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and re
 
   it("still times a queued resend out on its own 18-second-derived deadline", async () => {
     const harness = rework7Harness({ channel: { mailDispatchQueueWaitTimeoutMs: 40 } });
+    // The test fires the 40 ms deadline itself, after it has seen the waiter in the queue.
+    const deadline = rework7HoldDeadline(40);
     try {
       await harness.holdMailPermits(
         harness.policy.channel.maxConcurrentVerificationDispatches
@@ -2737,12 +2788,15 @@ describe("T1 rework7 A2 — the registration mail-permit deadline is 28 s and re
         .then(() => "SUCCESS", (error: unknown) => rework7Code(error));
       await rework7Settle();
       expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+      expect(deadline.armed()).toBe(1);
+      deadline.fire();
       expect(await attempt).toBe("AUTH_MAIL_BUSY");
       await rework7Settle();
       expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
       // A resend holds no admission slot: the budget is registration-only.
       expect(harness.occupancy()).toMatchObject({ admitted: 0, admissions: 0, releases: 0 });
     } finally {
+      deadline.restore();
       harness.restore();
     }
   });
@@ -2839,6 +2893,8 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
       // The only shortened value is the test-only mail reservation deadline.
       channel: { registrationMailDispatchQueueWaitTimeoutMs: 40 }
     });
+    // The test fires that deadline itself, after it has seen the target in the mail queue.
+    const deadline = rework7HoldDeadline(40);
     const unhandled: unknown[] = [];
     const onUnhandled = (reason: unknown): void => { unhandled.push(reason); };
     process.on("unhandledRejection", onUnhandled);
@@ -2906,10 +2962,14 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
       expect(harness.pendingHashes()).toBe(1);
       expect(inspected.registrationPasswordReferencesHeld).toBe(0);
       expect(harness.service.mailDispatchOccupancy().queued).toBe(0);
+      // No mail deadline is armed while the password is still being hashed.
+      expect(deadline.armed()).toBe(0);
 
       harness.settleHashes(1);
       await rework7Settle();
       expect(harness.service.mailDispatchOccupancy().queued).toBe(1);
+      expect(deadline.armed()).toBe(1);
+      deadline.fire();
       expect(await attempt).toBe("AUTH_MAIL_BUSY");
       await rework7Settle();
 
@@ -2939,6 +2999,7 @@ describe("T1 rework8 F1/F2 — password work may not outlive its admission token
       }
       expect(unhandled).toEqual([]);
     } finally {
+      deadline.restore();
       harness.settleHashes(harness.pendingHashes());
       await rework7Settle();
       process.off("unhandledRejection", onUnhandled);
