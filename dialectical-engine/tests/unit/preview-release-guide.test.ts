@@ -1791,9 +1791,15 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       'right after the env files (SB5; on the drained path, DR1)', 'right before the owner\'s yes (SB6; on the drained path, the yes before DR2)',
       'any day after the upload, on its own'
     ]);
-    expect(rows.map(row => row.split('|')[3]!.trim())).toEqual(['LUNAROW', 'GATES4', 'GATES4', 'SB4', 'BEDROCK_ENV', 'GATEREADY', 'the probe']);
+    // GATES4 reads each gate's code and state, never its unit: piece 1's units are checked by step 3a's own lines.
+    expect(rows.map(row => row.split('|')[3]!.trim())).toEqual(['LUNAROW', 'step 3a\'s six `1` lines, then GATES4', 'GATES4', 'SB4', 'BEDROCK_ENV', 'GATEREADY', 'the probe']);
+    expect(named('GATES4').join('\n')).not.toContain('InaccessiblePaths');
     for (const text of ['Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload\'s window from SB3 to the end of the switch',
-      'those are the one exception to MAIN-SITE.md part 2\'s "install no new drop-in"', 'deployed after SB1 and before SB3 (pieces 1 and 2)',
+      'those are the one exception to MAIN-SITE.md part 2\'s "install no new drop-in"', 'deployed after SB2 and before SB3 (pieces 1 and 2)',
+      // The upload needs nothing from the AWS console; the running runner keeps what it read at its start.
+      'The AWS console work (`README-bedrock.md`, install step 0: Luna\'s subscription and quota, the key, a budget alert, an AWS account e-mail address somebody reads) belongs to piece 4. The upload does not wait for it.',
+      'Install step 0 (the AWS console), step 4 (the key) and step 8 (the probe) wait for piece 4',
+      'The gate README\'s paragraph right after its step 6 ("Restart the runner only after BOTH gates are `active`") does not apply here',
       '`deploy/preview-lifecycle/v1/common.mjs` (the tools\' list of gates now holds the Amazon gate) and `alert.mjs`',
       '**No Privacy Policy §14 notice is owed at this upload**', '**Before piece 4 the notice is owed when any account outside the team exists by then**',
       'So the key goes in on piece 4\'s day, right before the owner\'s first probe.', '**It closes itself after 31 days.**', '**After a reboot it is not running.**',

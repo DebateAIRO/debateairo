@@ -65,7 +65,7 @@ while you type, and nothing you type goes on a command line. Never paste a key, 
 with Claude.
 
 **Amounts on the screen.** Some steps print amounts: GATES and the scripts that call it (the day's spend of each
-spending gate), WITHDRAWOTHER, REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a
+spending gate), the Amazon gate's range of pots (part 2), WITHDRAWOTHER, REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a
 GitHub issue or a pull request. When you ask for help, give the step's last line, and say which step it was.
 
 **`<…>` in a block** is a value you fill in before you run it. `rNN` is the upload's number, as in the release guide.
@@ -670,19 +670,21 @@ The steps this release adds to that recipe, in the order you meet them:
   GATES4.** Never later: from SB3 to the end of DR6 only the brakes may run (the order rules). These steps restart the
   gates, run `activate`, and install the Amazon gate's units and its address drop-in: that is allowed here, although
   this part says "install no new drop-in". Have ready first:
-  - in the AWS console (`README-bedrock.md`, install step 0): Luna's subscription active and its quota in `us-east-1`;
-    one long-term Bedrock key with an end date, in your password manager, with the end date in your calendar and a
-    reminder two weeks before (you may also make the key on Luna's own day); a budget alert; and an AWS account e-mail
-    address that someone reads;
   - your two figures for the Amazon gate's GO (its daily pot and its daily number of calls), typed only on the server
-    (install step 5; write them nowhere else). All four gates' pots must fit the team total in the caps file, or
-    `activate` refuses `TEAM_TOTAL_BUDGET_EXCEEDED`: then lower another gate's pot first;
+    (install step 5; write them nowhere else). Install step 5's first block prints on your screen the range of pots
+    `activate` accepts: from the smallest that carries four calls at once to what the other gates' pots leave under the
+    team total in the caps file. Below it `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`, above it
+    `TEAM_TOTAL_BUDGET_EXCEEDED`. If it prints `NO ROOM`, lower another gate's pot first, still before SB3 (the release
+    guide's "Before piece 1, have ready" says how);
   - a quiet hour, and your yes for the gates' restarts.
+
+  The AWS console work (`README-bedrock.md`, install step 0: Luna's subscription and quota, the key, a budget alert, an
+  AWS account e-mail address someone reads) is for Luna's own day. The upload does not wait for it.
 
   Then, in one root shell (`sudo -i`), as the release guide's pieces 1 and 2 say: the DeepInfra, Anthropic and
   Perplexity gates on this release's gate code (`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", steps 1 to
-  6, for each; then README-bedrock's install step 3a), then the Amazon gate (README-bedrock's install steps 0 to 3, 5, 6
-  and 7). **Do not put the Amazon key in now** (install step 4): it goes in on Luna's own day, after the notice when it
+  6, for each; then README-bedrock's install step 3a, whose six `1` lines are the check of the units), then the Amazon
+  gate (README-bedrock's install steps 1 to 3, 5, 6 and 7). **Do not put the Amazon key in now** (install step 4): it goes in on Luna's own day, after the notice when it
   is owed and after the gate's watchers start, right before your first probe (README-bedrock's "Switch it on"). Once
   the key and Luna's address are both in, the site checks Luna through the gate at every question someone asks, which
   is a real paid call; without the key nothing is sent to Amazon or charged, and debates run as before.

@@ -3104,7 +3104,7 @@ In the order the upload meets them:
 | When | What | Its check |
 |---|---|---|
 | before SB2, on the Mac | Luna's address in the practice's copy of `settings.env` | LUNAROW |
-| after SB2 (in any case after SB1), before SB3 | piece 1: the DeepInfra, Anthropic and Perplexity gates on this release's gate code, and their units | GATES4 |
+| after SB2 (in any case after SB1), before SB3 | piece 1: the DeepInfra, Anthropic and Perplexity gates on this release's gate code, and their units | step 3a's six `1` lines, then GATES4 |
 | right after piece 1, before SB3 | piece 2: the Amazon gate installed and `active`, without its key | GATES4 |
 | SB4 | the gate files reviewed (`GRR`) and the changed operator files reviewed (`LIFE=yes`) | SB4 |
 | right after the env files (SB5; on the drained path, DR1) | piece 3: the gate's socket and Luna's address in the new release's two files | BEDROCK_ENV |
@@ -3120,7 +3120,7 @@ Why the upload cannot skip them:
 - **The gate code changed for every gate.** The two gate files hold the Amazon profile, and each gate's GO binds their
   hashes. GATES4 prints `NOT this release` for the three older gates until they are redeployed. The change only widens
   (it adds a model and a gate): the older gates on the new code still serve the running release as before. So it is
-  deployed after SB1 and before SB3 (pieces 1 and 2).
+  deployed after SB2 and before SB3 (pieces 1 and 2).
 - **The release tools count three gates.** This release's `common.mjs` lists the Amazon gate beside the DeepInfra and
   Anthropic ones (the Perplexity gate is not on the tools' list; piece 1 moves it to the new code all the same, and
   MAIN-SITE.md's ASKS_OPEN asks for it). Once the new tools are in place (SB10, or DR5 on the drained path, when
@@ -3178,10 +3178,22 @@ next version` lists the rows the next version changes and adds; they must match 
 line-up seats it, and the practice reaches only the DeepInfra and Anthropic gates. A new S-2 copy (for a second
 practice) needs LUNAROW again.
 
-**Piece 1, after SB2 and before SB3: the three older gates on this release's gate code, and their units.** With the
-owner's yes, at a quiet hour (each gate's `status` shows `in_flight` 0), in one root shell (`sudo -i`) kept for pieces 1
-and 2, each block pasted there in turn (they are not scripts of MAIN-SITE.md's form: a value one block sets, such as
-`R`, is read by the next):
+**Before piece 1, have ready:**
+- the two figures for the Amazon gate's GO (`README-bedrock.md`, install step 5): its daily pot and its daily number of
+  calls. They are typed on the server only. Install step 5's first block prints, on the screen only, the range of pots
+  `activate` accepts: from the smallest pot that carries four calls in flight (below it, `CONCURRENCY_EXCEEDS_BUDGET`)
+  to what the other gates' pots leave under the caps file's team total, at most its per-GO cap (above it,
+  `TEAM_TOTAL_BUDGET_EXCEEDED`). When it prints `NO ROOM`, another gate's pot is lowered first, still before SB3
+  (`deploy/preview-gate/v3/README.md`, "Change the daily budget or another limit");
+- the yes for pieces 1 and 2, and a quiet hour.
+
+The AWS console work (`README-bedrock.md`, install step 0: Luna's subscription and quota, the key, a budget alert, an
+AWS account e-mail address somebody reads) belongs to piece 4. The upload does not wait for it.
+
+**Piece 1, after SB2 and before SB3: the three older gates on this release's gate code, and their units.** Pieces 1
+and 2 need the owner's yes and a quiet hour: each gate's `status` shows `in_flight` 0. Open one root shell (`sudo -i`)
+and keep it for both pieces. Paste each block into it in turn: a later block reads a value, such as `R`, that an
+earlier block set. (These blocks are not scripts of MAIN-SITE.md's form.)
 1. For the DeepInfra, Anthropic and Perplexity gates, one after the other: `deploy/preview-gate/v3/README.md`, "Redeploy
    (2026-10-12)", steps 1 to 6, each with its own folder, GO, service and README:
 
@@ -3196,28 +3208,22 @@ and 2, each block pasted there in turn (they are not scripts of MAIN-SITE.md's f
    file sets an `R` of its own), and its `R ok` line must print. Step 4 writes the GO again changing only its two hashes
    (`ONLY_HASHES_CHANGED`); step 6's `activate` must show `"state": "active"`.
 2. `README-bedrock.md`, install step 3a: the six older units are installed again from this release, so that they hide
-   the Amazon gate's folder. Read its differences first (step 3a's first block). Its restart can be the same restart as
-   item 1's step 5.
+   the Amazon gate's folder. Read its differences first (step 3a's first block). Its second block restarts the three
+   gates once more. That is harmless: they stay `active`. Its last lines must print `1` six times. GATES4 does not read
+   the units, so these six lines are piece 1's check of them.
 3. `/opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py` becomes this release's copy (`README-bedrock.md`,
    install step 1 installs it, in piece 2).
 
 Piece 1 changes no limit, so the running release's runner keeps the number of calls at once it read from each gate at
-its own start: do not restart it for this. The new release's runner reads every gate at its start (SB11; on the drained
-path, DR6).
+its own start: do not restart it for this. The gate README's paragraph right after its step 6 ("Restart the runner
+only after BOTH gates are `active`") does not apply here: a runner reads each gate only at its own start, and piece 1
+changes nothing it read. The new release's runner reads every gate at its start (SB11; on the drained path, DR6).
 
-**Piece 2, right after piece 1 and before SB3: the Amazon gate, without its key.** `README-bedrock.md`, install steps 0
-to 3, 3a (done in piece 1), 5, 6 and 7: the AWS console, the folder, the addresses, the state folder, the GO with the
-owner's figures, `init` and `activate`, the units and the start. Install step 4 (the key) and step 8 (the probe) wait
-for piece 4 ("Why the key waits for piece 4", below). The owner has ready before piece 2 starts:
-
-- in the AWS console (install step 0): the subscription to GPT-6 Luna active, and quota in `us-east-1` for its United
-  States route; one long-term Bedrock API key with an end date, kept in the password manager, its end date in the
-  calendar with a reminder two weeks before (the key can also be made on piece 4's day); a budget alert for the AWS
-  account (Amazon has no hard spending limit); and an AWS account e-mail address somebody reads;
-- the two figures for the gate's GO (install step 5): its daily pot and its daily number of calls, chosen so that all
-  four gates' pots fit under the caps file's team total and its per-GO maximum, or with another gate's pot lowered
-  first: `activate` refuses `TEAM_TOTAL_BUDGET_EXCEEDED` otherwise. They are typed on the server only;
-- the yes for pieces 1 and 2, at a quiet hour.
+**Piece 2, right after piece 1 and before SB3: the Amazon gate, without its key.** `README-bedrock.md`, install steps 1
+to 3, 3a (done in piece 1), 5, 6 and 7: the folder, the addresses, the state folder, the GO with the owner's figures
+(after step 5's first block, which prints the range of pots that fit), `init` and `activate`, the units and the start.
+Install step 0 (the AWS console), step 4 (the key) and step 8 (the probe) wait for piece 4 ("Why the key waits for
+piece 4", below).
 
 Then GATES4, run as a script (`set -euo pipefail` first, as MAIN-SITE.md says under "How to run a server step"):
 
