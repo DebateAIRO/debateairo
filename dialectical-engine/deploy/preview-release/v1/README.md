@@ -537,18 +537,32 @@ thinking-levels redeploy was done before, because the file's hash changed again.
 gates against THIS release's gate files (in the candidate API folder `$CAPI` named in step 0 of
 the operator sequence; the gate README installs the same two files from the same place). An old
 gate file with its old GO would agree with each other, so each gate's two installed files and the
-two hashes in its GO must all equal this release's files. The first line must print
-`release gate files found`, each gate's line must say `match this release`, and each `state` line
-must say `active`:
+two hashes in its GO must all equal this release's files. GATES2 below checks this; run it as a
+script (`set -euo pipefail` first, then the upload's names file, whose `$CAPI` is the candidate API
+folder; `deploy/preview-auth-dev/v1/MAIN-SITE.md`, "How to run a server step"). Each gate's line must
+say `gate code this release; state active`, and the last line `GATES2_DONE`:
 
 ```sh
-NEW=$CAPI/dialectical-engine/packages/providers/ops; test -f "$NEW/preview_budget_authority.py" && test -f "$NEW/preview_budget_helper.py" && echo "release gate files found"
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# GATES2: the DeepInfra and the Anthropic gates run this release's gate code (their two files, and the two hashes in each GO) and are active. Read-only.
+NEW=$CAPI/dialectical-engine/packages/providers/ops
+[ -f "$NEW/preview_budget_authority.py" ] && [ -f "$NEW/preview_budget_helper.py" ] || { echo "GATES2_NOT_DONE: this release's gate files are not in $NEW"; exit 1; }
 NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
-same() { [ -n "$NB" ] && [ -n "$NH" ] && [ "$(sha256sum "$1/preview_budget_authority.py" | cut -d' ' -f1)" = "$NB" ] && [ "$(sha256sum "$1/preview_budget_helper.py" | cut -d' ' -f1)" = "$NH" ] && [ "$(jq -r .bridge_sha256 "$2")" = "$NB" ] && [ "$(jq -r .helper_sha256 "$2")" = "$NH" ]; }
-if same /opt/debateai-v3-preview/operator/deepinfra-budget-v3 /etc/debateai-v3-preview/provider-deepinfra-go-v3.json; then echo "deepinfra gate files and GO match this release"; else echo "deepinfra does NOT match this release: stop"; fi
-echo "deepinfra state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 | jq -r .state)"
-if same /opt/debateai-v3-preview/operator/anthropic-budget-v1 /etc/debateai-v3-preview/provider-anthropic-go-v1.json; then echo "anthropic gate files and GO match this release"; else echo "anthropic does NOT match this release: stop"; fi
-echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 | jq -r .state)"
+dg() { { sha256sum "$1" 2>/dev/null || true; } | cut -d' ' -f1; }
+gv() { jq -r "$1 // empty" "$2" 2>/dev/null || true; }
+NOT=''
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1; do
+  IFS=: read -r NAME FOLDER STATE GOFILE <<<"$G"
+  F=/opt/debateai-v3-preview/operator/$FOLDER; GO=/etc/debateai-v3-preview/$GOFILE.json
+  if [ "$(dg "$F/preview_budget_authority.py")" = "$NB" ] && [ "$(dg "$F/preview_budget_helper.py")" = "$NH" ] && [ "$(gv .bridge_sha256 "$GO")" = "$NB" ] && [ "$(gv .helper_sha256 "$GO")" = "$NH" ]; then CODE='this release'; else CODE='NOT this release'; fi
+  ST=$( { /usr/bin/python3 -I "$F/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" 2>/dev/null || true; } | jq -r '.state // empty' 2>/dev/null || true)
+  echo "$NAME: gate code $CODE; state ${ST:-unread}"
+  [ "$CODE" = 'this release' ] && [ "$ST" = active ] || NOT="$NOT $NAME"
+done
+[ -z "$NOT" ] || { echo "GATES2_NOT_DONE: not on this release's gate code, or not active:$NOT"; exit 1; }
+echo GATES2_DONE
+exit 0
 ```
 
 Anything else means stop: do not publish the row until both gates run the new code.
@@ -1195,8 +1209,12 @@ As in `deploy/vps/README.md` §14.9 step 1, without the clock move. On an accoun
 allow-listed: open the pricing page, choose Plus, pick the United States as the country, answer the
 "Do you live in …" question with yes, give a state, press **Subscribe and pay**, and on NETOPIA's
 sandbox page pay with the test card 9900 0048 1022 5098 (any future expiry, CVV 111). Expect: back on
-the site, the plan active within seconds; the confirmation (M1, with the Terms attached) and the
-receipt (M2) at that allow-listed inbox; Settings shows the saved card; the invoice in Quaderno's
+the site, the plan active within seconds; the confirmation (M1) and the receipt (M2) at that
+allow-listed inbox. M1 attaches the Terms the account accepted when the archive holds that text: an
+account that accepted Terms 1.0 (every account made since the launch texts went live) gets the file;
+an account made before them gets M1 without a file, saying where the current Terms are online, and the
+API's journal shows `billing.mail.attachment_missing` with `MAIL_TERMS_NOT_ARCHIVED` (expected, not a
+fault); Settings shows the saved card; the invoice in Quaderno's
 sandbox. Then, on a second allow-listed account (the first already has Plus), the 3-D Secure test card
 9900 0091 8421 4768: write down how the bank's check looked. A Romanian buyer's purchase goes to the
 dummy SmartBill and fails harmlessly: do not pay as one here. Renewals need the moved billing clock,
@@ -1949,10 +1967,11 @@ jq -r '["billingPolicy","costEnvelopePolicy","admissionPolicy","storyCostEnvelop
 
 ### A10. Gate files
 
-Run the check of "Publishing the call-concurrency row", Step 0 above (the `same` lines). Both gates must print
-`match this release`, and both `state` lines `active`. If A2 listed a changed gate file, stop: that gate is
-redeployed first, as `deploy/preview-gate/v3/README.md` says, with the owner's yes. In R19 nothing had changed, so
-there was nothing to install.
+Run GATES2 ("Publishing the call-concurrency row", Step 0 above). Both gates' lines must say
+`gate code this release; state active`, and the last line `GATES2_DONE`. If A2 listed a changed gate file, stop: that
+gate is redeployed first, as `deploy/preview-gate/v3/README.md` says, with the owner's yes. In R19 nothing had changed,
+so there was nothing to install. From the upload that brings the Amazon gate on, GATES4 checks all four gates instead
+("The Amazon Bedrock gate: the upload that brings it").
 
 ### The practice (on the Mac; owner rule: before every upload)
 
@@ -3034,7 +3053,7 @@ echo "the new release passes its own site version $V"
   that release is current, and its intro keeps saying "This list is kept up to date automatically. It always shows the
   companies we currently send data to." (owner, 2026-10-23).
 - **A new AI company: tell people first, and note it in the Register (only an upload that adds one).** The Privacy
-  Policy (version 3.6) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
+  Policy (its sections 14 and 5) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
   1. **Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email
      and in the product, and given time to object. So the owner tells the users which company is added and what it will
      receive, by email and in the product, and the switch (SB13; on the drained path, the downtime at DR2) waits until
@@ -3051,6 +3070,14 @@ echo "the new release passes its own site version $V"
   No legal text changes for this step, and no Privacy Policy version. The yes before the switch names both (SB6; the
   drained path's yes before DR2). An upload that adds no new company skips this step: so does every activation (a
   line-up or model change) and a new model of a company the page already names.
+- **A company listed before it receives anything.** A company is added when it starts receiving data. An upload can
+  list a company on the page while no line-up seats any of its models: its gate is installed, and no debate uses it
+  (the upload that brings the Amazon gate, "The Amazon Bedrock gate: the upload that brings it"). When only the owner's
+  and the team's accounts exist at such an upload, it owes no §14 notice: the company receives nothing at it. Its yes
+  says so instead (that no notice is owed, and why), and the company's dated Register row is in the release as above.
+  The notice is then owed before the activation that first seats one of its models, when any account outside the team
+  exists by then, and that activation waits until the time to object has passed. When accounts outside the team exist
+  already at such an upload, ask before its yes.
 - **A company leaves the targets one release later.** The page shows only what the API it is served by can reach, but
   after a switch the old release's runner keeps finishing its own debates for up to 6 hours, still sending text to the
   companies it used. So take a company's targets out only in an upload after the release that stopped using it (by an
@@ -5076,8 +5103,8 @@ after a side-by-side upload) is not in `REV`: merge it into dev, take a `REV` af
 
 Two checks may need the owner first, and then a second run with their answer filled in at the top:
 - `GATE_ROWS_N1` fails with `no snapshot of the switch: review <sha256>` (the first upload after T: T was seeded, never
-  switched to) or `changed since the switch: review <sha256>`. The owner checks the gate files (A10's check) and gives
-  the printed digest as `GRR`.
+  switched to) or `changed since the switch: review <sha256>`. The owner checks the gate files (GATES2, A10's check; on
+  the upload that brings the Amazon gate, GATES4) and gives the printed digest as `GRR`.
 - `LIFECYCLE_FILES` fails with `changed: <files>` when the new release changed the shared operator folder
   (`deploy/preview-lifecycle`, `deploy/preview-auth-dev`, `deploy/preview-release`). The owner reviews those files; with
   `LIFE=yes` the check passes (`changed (reviewed)`) and SB10 swaps the folder.
@@ -5318,6 +5345,9 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the
   product, on which date) and its time to object has passed, and that the company's dated Register row (§5) is in this
   release ("The providers page");
+- only when this upload lists a company that no line-up seats yet (the upload that brings the Amazon gate): that no
+  §14 notice is owed now, and why, and that its dated Register row is in this release ("The providers page", "A
+  company listed before it receives anything");
 - the Caddy payment-marks rule (PM2), when this upload adds it.
 
 For example: "Yes, upload r21 to the test site side by side: take the online backup, apply migrations 0126 and 0127,
@@ -5655,11 +5685,12 @@ echo SB13B_DONE
 Only in an upload whose SB5d ran, right after SB13b (on the drained path too). It changes nothing. It reads the new
 website directly on its own port (`$UIP`: no site password, and with no session cookie the home page is the landing
 page) and checks that the line from SB5d is in the release's ui file, that the page's content policy lets the logo
-load, and, while billing is on (the home page links `/pricing` only then), that the home page shows NETOPIA's picture
-exactly once and none of the old mark files. With billing off it says so and does not stop: the logo shows by itself
-once billing is on. Last, it asks NETOPIA's server for the picture and prints the answer's headers that matter: it must
-be a 200 with an SVG, with no cookie and no redirect (the Privacy Policy and the Cookie Policy assume neither). Re-run it
-now and then: NETOPIA can change the picture at any time.
+load, and, while billing is on (the home page links `/pricing` only then), that the home page shows NETOPIA's two
+pictures exactly once each (the light theme's `np-black-0.svg` and the dark theme's `np-white-0.svg`, the same shop id)
+and none of the old mark files. With billing off it says so and does not stop: the logo shows by itself once billing is
+on. Last, it asks NETOPIA's server for both pictures and prints the headers that matter of each answer: each must be a
+200 with an SVG, with no cookie and no redirect (the Privacy Policy and the Cookie Policy assume neither). Re-run it now
+and then: NETOPIA can change the pictures at any time.
 
 Then look by eye, with the site password, in a private window: the home page's footer in the light and the dark theme
 (blue wordmarks on a white chip in the light theme, white wordmarks with no chip in the dark theme; a click opens
@@ -5672,22 +5703,26 @@ set -euo pipefail
 # LOGOCHECK: read-only. NETOPIA's logo on the new release: the ui file's line, the page's policy, the home page, NETOPIA's answer.
 ID='<the shop id you gave SB5d>'
 LOGO="https://mny.ro/np-black-0.svg?id=$ID"
+DARK=${LOGO/np-black-0/np-white-0}
 printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "LOGOCHECK_NOT_DONE: ID is not 1 to 12 digits"; exit 1; }
 grep -qxF "NETOPIA_LOGO_ID=$ID" "$E/ui-$LABEL.env" || { echo "LOGOCHECK_NOT_DONE: ui-$LABEL.env does not hold the line NETOPIA_LOGO_ID=$ID (SB5d)"; exit 1; }
 P=$(curl -s -m 15 -o /dev/null -D - "http://127.0.0.1:$UIP/" | tr -d '\r' | grep -i '^content-security-policy:' || true)
 grep -qF "img-src 'self' data: https://mny.ro;" <<<"$P" || { echo "LOGOCHECK_NOT_DONE: the home page's policy does not let the logo load: ask"; exit 1; }
 H=$(curl -s -m 15 "http://127.0.0.1:$UIP/" || true)
 if grep -qF 'href="/pricing"' <<<"$H"; then
-  [ "$(grep -oF "src=\"$LOGO\"" <<<"$H" | grep -c .)" = 1 ] || { echo "LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once: ask"; exit 1; }
+  [ "$(grep -oF "src=\"$LOGO\"" <<<"$H" | grep -c .)" = 1 ] && [ "$(grep -oF "src=\"$DARK\"" <<<"$H" | grep -c .)" = 1 ] || { echo "LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once in each theme's picture: ask"; exit 1; }
   ! grep -qF 'src="/payment-marks/' <<<"$H" || { echo "LOGOCHECK_NOT_DONE: the home page still draws the old mark files: ask"; exit 1; }
-  echo "home page: billing on, NETOPIA's logo once"
+  echo "home page: billing on, NETOPIA's logo once for the light theme and once for the dark"
 else
   echo "home page: billing is off, so no logo (it shows by itself once billing is on)"
 fi
-R=$(curl -sI -m 15 "$LOGO" | tr -d '\r' | tr 'A-Z' 'a-z' || true)
-grep -E '^(http/|content-type:|content-length:|cache-control:|set-cookie:|location:)' <<<"$R" || true
-grep -qE '^http/[0-9.]+ 200' <<<"$R" && grep -qx 'content-type: image/svg+xml' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG: ask"; exit 1; }
-! grep -qE '^(set-cookie|location):' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected (the Privacy Policy and the Cookie Policy assume neither): ask"; exit 1; }
+for A in "$LOGO" "$DARK"; do
+  echo "NETOPIA's answer for $A:"
+  R=$(curl -sI -m 15 "$A" | tr -d '\r' | tr 'A-Z' 'a-z' || true)
+  grep -E '^(http/|content-type:|content-length:|cache-control:|set-cookie:|location:)' <<<"$R" || true
+  grep -qE '^http/[0-9.]+ 200' <<<"$R" && grep -qx 'content-type: image/svg+xml' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG for $A: ask"; exit 1; }
+  ! grep -qE '^(set-cookie|location):' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected for $A (the Privacy Policy and the Cookie Policy assume neither): ask"; exit 1; }
+done
 echo LOGOCHECK_DONE
 ```
 
@@ -5978,13 +6013,16 @@ with the old pair already stopped. SB1 to SB4 stand as they are (the names, the 
 database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. To add the
 UI-to-API proof on this path, run SB5c right after DR1. To set or change NETOPIA's logo id on this path, run SB5d
 right after DR1. The first time the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule")
-go after DR1 and SB5b, before DR2.
+go after DR1 and SB5b, before DR2. On the upload that brings the Amazon gate, run BEDROCK_ENV (piece 3) right after DR1
+too, and GATEREADY right before the yes before DR2 ("The Amazon Bedrock gate: the upload that brings it", which also
+says what runs between SB2 and SB3, and at SB4).
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
 When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
-Register row (§5), as in SB6.
+Register row (§5), as in SB6. When it only lists a company that no line-up seats yet (the upload that brings the
+Amazon gate), the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE.
 When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
 plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the
 people on it were told, and for each one whose limit goes higher that the number was checked twice, as in SB6. On this path SB3b (SB3
