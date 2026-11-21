@@ -16,6 +16,11 @@
 // (see partFiles). The parts 1..<count> together run every file exactly once, and each part judges its own failures
 // against the same lists.
 //
+// A text-only pull request runs fewer tests: with CI_CHANGED_SINCE=<base commit> in the environment the tool reads
+// what changed since that commit and, when it is only legal texts or documentation, runs the test files that can
+// notice it (tools/ci-fast-path.mjs). The whole suite then runs on dev after the merge. Any doubt (no such commit, a
+// file of another kind) runs everything.
+//
 // V-4 (ruled 2026-09-21, follow-up included): the list may only SHRINK, so a listed test that has
 // started passing must fail the gate until its entry is deleted. The owner's wording was "three
 // consecutive default-branch runs"; the coordinator ruled the same intent without cross-run state.
@@ -31,6 +36,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyChange, selectTests } from "./ci-fast-path.mjs";
 
 const PRODUCT_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const ALLOWLIST_PATH = resolve(PRODUCT_ROOT, "tests/ci-known-red.txt");
@@ -326,6 +332,33 @@ function listTestFiles(targets) {
   }
 }
 
+/** The files changed between `base` and the checked-out commit, as repository paths, or a `problem` string. */
+function changedSince(base) {
+  if (!/^[0-9a-f]{40}$/.test(base)) return { problem: "CI_CHANGED_SINCE is not a full commit id" };
+  const run = spawnSync("git", ["diff", "--name-only", "--no-renames", base, "HEAD"], {
+    cwd: PRODUCT_ROOT,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "ignore"]
+  });
+  if (run.error) return { problem: `could not start git: ${run.error.message}` };
+  if (run.status !== 0) return { problem: `git could not compare with ${base} (exit ${run.status})` };
+  return { files: run.stdout.split("\n").filter((line) => line !== "") };
+}
+
+/** The text-only change this run may narrow itself to (classifyChange's verdict), or `null` for the whole suite. */
+function fastPathFromEnvironment() {
+  const base = process.env.CI_CHANGED_SINCE;
+  if (base === undefined || base === "") return null;
+  const change = changedSince(base);
+  const verdict = change.problem !== undefined ? { fast: false, reason: change.problem } : classifyChange(change.files);
+  if (!verdict.fast) {
+    console.log(`CI_GATE_FAST_PATH off: ${verdict.reason}; running every test file`);
+    return null;
+  }
+  return verdict;
+}
+
 function main(args) {
   const { targets: dirs, invalid: invalidTargets, excluded } = expandTargets(args);
   if (invalidTargets.length > 0) {
@@ -363,9 +396,11 @@ function main(args) {
   const notRun = exclusionReport(excluded);
   for (const line of notRun) console.log(line);
 
-  // What this run hands to vitest: the targets as given, or this machine's part of the files they name.
+  // What this run hands to vitest: the targets as given; or the files they name, cut down to the ones that can
+  // notice a text-only change, and then to this machine's part.
+  const fastPath = fastPathFromEnvironment();
   let runTargets = dirs;
-  if (part !== null) {
+  if (part !== null || fastPath !== null) {
     const listing = listTestFiles(dirs);
     if (listing.problem !== undefined) {
       console.error(`${listing.problem}; refusing to report a green gate`);
@@ -377,11 +412,23 @@ function main(args) {
       for (const path of unlisted) console.error(`  ${path}`);
       return 1;
     }
-    runTargets = partFiles(listing.files, part);
-    console.log(`CI_GATE_PART ${part.index}/${part.count} files=${runTargets.length} of ${new Set(listing.files).size}`);
+    let files = [...new Set(listing.files)].sort();
+    if (fastPath !== null) {
+      const selected = selectTests(files, fastPath, (file) => readFileSync(resolve(PRODUCT_ROOT, file), "utf8"));
+      console.log(`CI_GATE_FAST_PATH on: only ${fastPath.legal ? "legal texts and " : ""}documents changed; running the ${selected.length} of ${files.length} test files that can notice it. Every test runs on dev after the merge.`);
+      files = selected;
+    }
+    runTargets = part === null ? files : partFiles(files, part);
+    if (part !== null) console.log(`CI_GATE_PART ${part.index}/${part.count} files=${runTargets.length} of ${files.length}`);
     if (runTargets.length === 0) {
-      console.error("this part holds no test file; refusing to report a green gate");
-      return 1;
+      if (fastPath === null) {
+        console.error("this part holds no test file; refusing to report a green gate");
+        return 1;
+      }
+      // A text-only change may leave a part, or a whole list, with nothing that can notice it.
+      console.log("CI_GATE_SCOPE files=0 tests=0");
+      console.log("no test file here can notice this text-only change; nothing to run");
+      return 0;
     }
   }
 
