@@ -3109,7 +3109,7 @@ In the order the upload meets them:
 | SB4 | the gate files reviewed (`GRR`) and the changed operator files reviewed (`LIFE=yes`) | SB4 |
 | right after the env files (SB5; on the drained path, DR1) | piece 3: the gate's socket and Luna's address in the new release's two files | BEDROCK_ENV |
 | right before the owner's yes (SB6; on the drained path, the yes before DR2) | everything the switch and the new services will ask of the gates | GATEREADY |
-| any day after the upload, on its own | piece 4: the key, the probe, the notice when it is owed, Luna in the line-up | the probe |
+| any day after the upload, on its own | piece 4: the notice when it is owed, the gate's watchers, the key and the probe, Luna in the line-up | the probe |
 
 Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload's window from SB3 to the end of the
 switch (SB13; on the drained path, DR6), where only the brakes may run (`deploy/preview-auth-dev/v1/MAIN-SITE.md`,
@@ -3370,14 +3370,17 @@ before anything is sent.
   the owner's and the team's accounts exist. The owner's yes before the switch (SB6; on the drained path, the yes before
   DR2) says so ("The providers page", "A company listed before it receives anything").
 - **Before piece 4 the notice is owed when any account outside the team exists by then**: by e-mail and in the
-  product, naming Amazon and what it will receive, and piece 4's activation waits until the time to object has passed.
+  product, naming Amazon and what it will receive. The rest of piece 4, the key included, waits until the time to
+  object has passed.
 
 **Why the key waits for piece 4.** Once the key and Luna's row are both in, the API checks Luna through the gate at
 every ask: it probes every declared model whose last check is old, not only the line-up's. The first real Amazon call
 would then come from someone's ask, before the owner's own probe, and with the halt watcher not yet started, so a halt
 would e-mail nobody. Without the key the gate refuses that check before anything is set aside: nothing is sent, nothing
 is charged, the gate does not halt, and Luna is simply left out. Debates run on the other models exactly as before, and
-visitors see nothing. So the key goes in on piece 4's day, right before the owner's first probe.
+visitors see nothing. So the key goes in on piece 4's day, right before the owner's first probe. On that day it also
+comes after the notice's time to object, when the notice is owed, and after the halt watcher and the address timer have
+started: from the key on, every ask makes a paid check of Luna, so the activation follows the next day.
 
 **Until piece 4: what the unused Amazon gate does.**
 - **It closes itself after 31 days.** Piece 2's `activate` opens its window for 31 days (`open_days`). With no key no
@@ -3389,18 +3392,22 @@ visitors see nothing. So the key goes in on piece 4's day, right before the owne
 - **After a reboot it is not running.** Its unit has no `[Install]`, and the boot drop-in that starts it with the site
   comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied, and Luna's
   checks at ask time fail at once (Luna is left out). `systemctl start debateai-preview-bedrock-budget` starts it;
-  "Switch it on" step 1 does.
+  "Switch it on" step 2 does.
 
-**Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload. In this order:
-1. At a quiet hour: the key at the hidden prompt (`README-bedrock.md`, install step 4), and right after it the probe,
-   twice (install step 8). Every field must show its "Good" value. The day after, the gate's `today_spend_usd` of the
-   probe's day against the AWS Billing page.
-2. The Privacy Policy and the Terms that name Amazon are live on the site (they are, from this upload on).
-3. When any account outside the team exists: the Privacy Policy §14 notice sent, by e-mail and in the product, and its
-   time to object passed ("What Amazon receives, and the notice", above).
-4. `README-bedrock.md`, "Switch it on", step 1 (the gate running, start at boot and the two watchers, and the runner
-   restarted when it could not read the gate at its start).
-5. The activation: "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds
+**Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload, and never during one.
+`README-bedrock.md`, "Switch it on", carries each step. In this order:
+1. When any account outside the team exists: the Privacy Policy §14 notice sent, by e-mail and in the product, and its
+   time to object passed ("What Amazon receives, and the notice", above). Nothing below starts before that.
+2. "Switch it on", step 2: the gate running, start at boot and the two watchers. It needs no key. Its first block sets
+   `R` from the newest upload's names file and must print `R ok`; its last lines must show `1` (the boot drop-in in
+   place) and the two watchers' `"status": "ok"`.
+3. At a quiet hour, in one sitting ("Switch it on", step 3): the AWS console (install step 0), if not done yet; the key
+   at the hidden prompt (install step 4, which first checks that the older units still hide the Amazon folder); and
+   right after it the probe, twice (install step 8). Every field must show its "Good" value. The day after, the
+   gate's `today_spend_usd` of the probe's day against the AWS Billing page.
+4. The runner restarted, when it could not read the gate at its start ("Switch it on", step 4).
+5. The activation ("Switch it on", step 6; the Privacy Policy and the Terms that name Amazon are live on the site from
+   this upload on): "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds
    `us.openai.gpt-6-luna` to `free_model_ids` and `premium_model_ids` (the owner's choice). SV4 refuses
    while the Amazon gate does not switch Luna on (`SETTINGS_GATE_MODEL_DISABLED:bedrock:us.openai.gpt-6-luna`), does
    not answer (`SETTINGS_GATE_UNANSWERED:bedrock`), or runs other gate code than the release's

@@ -682,9 +682,10 @@ The steps this release adds to that recipe, in the order you meet them:
   Then, in one root shell (`sudo -i`), as the release guide's pieces 1 and 2 say: the DeepInfra, Anthropic and
   Perplexity gates on this release's gate code (`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", steps 1 to
   6, for each; then README-bedrock's install step 3a), then the Amazon gate (README-bedrock's install steps 0 to 3, 5, 6
-  and 7). **Do not put the Amazon key in now** (install step 4): it goes in on Luna's own day, right before your first
-  probe. Once the key and Luna's address are both in, the site checks Luna through the gate at every question someone
-  asks, which is a real paid call; without the key nothing is sent to Amazon or charged, and debates run as before.
+  and 7). **Do not put the Amazon key in now** (install step 4): it goes in on Luna's own day, after the notice when it
+  is owed and after the gate's watchers start, right before your first probe (README-bedrock's "Switch it on"). Once
+  the key and Luna's address are both in, the site checks Luna through the gate at every question someone asks, which
+  is a real paid call; without the key nothing is sent to Amazon or charged, and debates run as before.
   Last, the release guide's GATES4: expect four lines `<gate>: gate code this release; state active`, then
   `GATES4_DONE`. Go on to SB3 only then. If the upload stops after this step, the running release keeps serving, but
   its settings activations are refused until this release is uploaded (the release guide's "The way back" in that
@@ -736,8 +737,8 @@ The steps this release adds to that recipe, in the order you meet them:
   upload: Amazon receives nothing until Luna is switched on, and only your and the team's accounts exist. Amazon's dated
   Register row comes with this release, and from DR6 the AI providers page lists Amazon while Luna stays off. Before
   Luna is switched on (the release guide's piece 4), if any account outside the team exists by then, the notice goes
-  out first (by e-mail and in the product, naming Amazon and what it will receive), and Luna waits until the time to
-  object has passed.
+  out first (by e-mail and in the product, naming Amazon and what it will receive), and the Amazon key and Luna wait
+  until the time to object has passed.
 - **The new SAME lines.** DR1's `same` still runs the old tools, so it prints no new line. After DR5's folder swap,
   `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` also prints `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`,
   `OK SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<LABEL>`, `OK VALID_PREVIEW_ASKS_OPEN_TO:<LABEL>` and

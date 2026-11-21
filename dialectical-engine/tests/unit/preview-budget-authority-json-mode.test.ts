@@ -98,7 +98,7 @@ describe('production preview spending guard optional JSON mode', () => {
   it('checks the Amazon Bedrock gate systemd files, its address check against published ranges and its README offline', () => {
     const result = runPython('tests/unit/preview_gate_v3_bedrock_unit_test.py', 10000);
     expect(result.status, result.stderr).toBe(0);
-    expect(result.stderr).toContain('Ran 23 tests');
+    expect(result.stderr).toContain('Ran 25 tests');
     expect(summaryLine(result.stderr)).toBe('OK');
   });
 });

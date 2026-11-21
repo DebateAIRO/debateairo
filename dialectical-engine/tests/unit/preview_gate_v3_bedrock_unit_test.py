@@ -10,6 +10,7 @@ import json
 import re
 import shutil
 import socket
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -279,6 +280,58 @@ class ReadmeTests(unittest.TestCase):
                         switch_on.index('50-bedrock-gate.conf /etc/systemd/system/debateai-preview.target.d/'))
         self.assertIn('when any account outside the team exists by then, the Privacy Policy section 14 notice has gone out', ' '.join(switch_on.split()))
         self.assertIn('GATE_CAPACITY_UNREAD', switch_on)
+
+    def test_switch_on_sets_r_proves_the_boot_dropin_and_puts_the_key_in_after_the_watchers(self):
+        switch_on = self.readme[self.readme.index('## Switch it on'):self.readme.index('## Daily operations')]
+        # Luna's day comes in a new root shell: R is set there from the newest names file before the drop-in is installed.
+        names = switch_on.index('. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine')
+        self.assertLess(names, switch_on.index('test -f "$R/deploy/preview-gate/v3/systemd/debateai-preview.target.d/50-bedrock-gate.conf" && echo \'R ok\''))
+        install = switch_on.index('50-bedrock-gate.conf /etc/systemd/system/debateai-preview.target.d/')
+        self.assertLess(names, install)
+        # The target's Wants proves the drop-in is read, so a skipped install cannot pass as done.
+        self.assertLess(install, switch_on.index('systemctl show -p Wants debateai-preview.target | grep -c debateai-preview-bedrock-budget'))
+        # The notice (when owed), then the watchers, then the key and the probe, then the runner, then the line-up.
+        steps = [switch_on.index(head) for head in ('**1. The notice, when it is owed.**', '**2. The gate running, start at boot, and the two watchers.**',
+                                                    '**3. The key and the probe', '**4. The runner.**', '**6. The line-up, by a settings activation**')]
+        self.assertEqual(steps, sorted(steps))
+        self.assertLess(steps[1], switch_on.index('systemctl start debateai-preview-bedrock-halt-watch.timer debateai-preview-bedrock-addresses.timer'))
+        self.assertLess(switch_on.index('systemctl start debateai-preview-bedrock-halt-watch.timer'), steps[2])
+        # The key's step first re-checks, read-only, that the older units still hide this gate's folder and GO.
+        step4, step5 = self.readme.index('**4. The Amazon key.'), self.readme.index('**5. The GO')
+        key = self.readme[step4:step5]
+        self.assertLess(key.index('systemctl show -p InaccessiblePaths debateai-preview-$U.service'), key.index('preview_key.py install bedrock'))
+        self.assertIn('after "Switch it on" steps 1 and 2', ' '.join(key.split()))
+
+    def test_the_pot_range_block_prints_what_activate_accepts(self):
+        # Step 5's first block, run on made-up caps and GO files; the gate's own test seams stand in for root's custody.
+        block = re.search(r"<<'PY'\n(.*?)\nPY\n", self.readme, re.S).group(1)
+        self.assertIn('gate.load_helper()', block.splitlines())
+        check = ('\nworst = gate.in_flight_worst_case(gate.profile_of("bedrock"), ["us.openai.gpt-6-luna"], 4, 1)'
+                 '\nassert worst <= smallest < worst + Decimal("0.01"), (worst, smallest)\nprint("CHECKED")\n')
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            for name in ('preview_budget_authority.py', 'preview_budget_helper.py'):
+                shutil.copy(GATE.parent / name, base / name)
+            (base / 'caps.json').write_text(json.dumps({'schema': 'preview-provider-budget-caps-v1', 'max_go_budget_usd': '33.00',
+                                                         'team_total_budget_usd': '44.00'}))
+            seams = ("import os; gate.load_helper(skip_custody_for_tests=True); gate.CAPS_PATH = %r; gate.CAPS_OWNER_UID = os.getuid(); "
+                     "gate.GATE_PATHS = {n: ('-', %r + '/' + n + '.json') for n in ('deepinfra', 'anthropic', 'perplexity', 'google', 'bedrock')}"
+                     % (str(base / 'caps.json'), folder))
+
+            def run(pot):
+                for name in ('deepinfra', 'anthropic', 'perplexity'):
+                    (base / ('%s.json' % name)).write_text(json.dumps({'schema': 'preview-provider-budget-go-v3', 'provider': name,
+                                                                       'daily_budget_usd': pot}))
+                done = subprocess.run([sys.executable, '-I', '-', str(base)], input=block.replace('gate.load_helper()', seams) + check,
+                                      capture_output=True, text=True, check=False)
+                self.assertEqual(done.returncode, 0, done.stderr)
+                return done.stdout.splitlines()
+            lines = run('10.00')
+            self.assertEqual(lines[:5], ['anthropic: pot 10.00', 'deepinfra: pot 10.00', 'google: pot 0', 'perplexity: pot 10.00',
+                                         'caps file: team total 44.00, one GO at most 33.00'])
+            self.assertRegex(lines[5], r'^the Amazon pot activate accepts: from [0-9]+\.[0-9]{2} to 14\.00$')
+            self.assertEqual(lines[6], 'CHECKED')
+            self.assertRegex(run('15.00')[5], r"^NO ROOM: the Amazon pot must be at least [0-9]+\.[0-9]{2}, and only -1\.00 is left: lower another gate's pot first$")
 
     def test_every_other_gates_probe_line_hides_the_bedrock_gate(self):
         for name in ('README.md', 'README-anthropic.md', 'README-perplexity.md'):

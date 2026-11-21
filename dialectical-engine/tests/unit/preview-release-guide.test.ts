@@ -1801,6 +1801,12 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       expect(flat, text).toContain(text);
     for (const gone of ['Piece 1, before SB4', 'Piece 2, before SB4', 'its older tools read two gates', 'are a separate change', 'The release tools count four gates'])
       expect(flat, gone).not.toContain(gone);
+    // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. From the
+    // key on every ask makes a paid check of Luna, so the key never waits through the notice's time to object unwatched.
+    const piece4 = flat.slice(flat.indexOf('**Piece 4, any day after the upload: Luna in the line-up.**'), flat.indexOf('**The way back.**'));
+    const order = ['1. When any account outside the team exists', '2. "Switch it on", step 2', 'the key at the hidden prompt', '5. The activation'].map(text => piece4.indexOf(text));
+    expect(Math.min(...order), piece4).toBeGreaterThan(0);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(drained.replace(/\s+/g, ' ')).toContain('On the upload that brings the Amazon gate, run BEDROCK_ENV (piece 3) right after DR1 too, and GATEREADY right before the yes before DR2');
   });
 
