@@ -1117,7 +1117,12 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     for (const text of ['**A company listed before it receives anything.** A company is added when it starts receiving data.',
       'When only the owner\'s and the team\'s accounts exist at such an upload, it owes no §14 notice: the company receives nothing at it.',
       'The notice is then owed before the activation that first seats one of its models, when any account outside the team exists by then, and that activation waits until the time to object has passed.',
-      'When accounts outside the team exist already at such an upload, ask before its yes.']) expect(providers, text).toContain(text);
+      'When accounts outside the team exist already at such an upload, ask before its yes.',
+      'An account outside the team is an account of anyone other than the owner and the team: the owner\'s own test sign-ups (MAIN-SITE.md 4.3) do not count; a friend\'s or NETOPIA\'s tester\'s do.']) expect(providers, text).toContain(text);
+    // Every yes that says no notice is owed also says to ask when someone outside the team already has an account.
+    expect(sb6).toContain('when someone outside the team already has an account, ask before this yes');
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When someone outside the team already has an account then, ask before that yes ("The providers page").');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ')).toContain('If someone outside the team already has an account, ask before the yes.');
     expect(providers.indexOf('A company listed before it receives anything')).toBeLessThan(providers.indexOf('A company leaves the targets one release later.'));
     expect(sb6).toContain('- only when this upload lists a company that no line-up seats yet (the upload that brings the Amazon gate): that no §14 notice is owed now, and why,');
     expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE.');

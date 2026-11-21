@@ -3077,7 +3077,9 @@ echo "the new release passes its own site version $V"
   says so instead (that no notice is owed, and why), and the company's dated Register row is in the release as above.
   The notice is then owed before the activation that first seats one of its models, when any account outside the team
   exists by then, and that activation waits until the time to object has passed. When accounts outside the team exist
-  already at such an upload, ask before its yes.
+  already at such an upload, ask before its yes. An account outside the team is an account of anyone other than the
+  owner and the team: the owner's own test sign-ups (MAIN-SITE.md 4.3) do not count; a friend's or NETOPIA's tester's
+  do. When unsure, ask.
 - **A company leaves the targets one release later.** The page shows only what the API it is served by can reach, but
   after a switch the old release's runner keeps finishing its own debates for up to 6 hours, still sending text to the
   companies it used. So take a company's targets out only in an upload after the release that stopped using it (by an
@@ -3382,7 +3384,8 @@ receives nothing before piece 4: no line-up seats Luna, and without the key the 
 before anything is sent.
 - **No Privacy Policy §14 notice is owed at this upload**: Amazon receives nothing until Luna is switched on, and only
   the owner's and the team's accounts exist. The owner's yes before the switch (SB6; on the drained path, the yes before
-  DR2) says so ("The providers page", "A company listed before it receives anything").
+  DR2) says so ("The providers page", "A company listed before it receives anything", which also says what counts as
+  an account outside the team). If someone outside the team already has an account at the upload, ask before that yes.
 - **Before piece 4 the notice is owed when any account outside the team exists by then**: by e-mail and in the
   product, naming Amazon and what it will receive. The rest of piece 4, the key included, waits until the time to
   object has passed.
@@ -5372,7 +5375,8 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
   release ("The providers page");
 - only when this upload lists a company that no line-up seats yet (the upload that brings the Amazon gate): that no
   §14 notice is owed now, and why, and that its dated Register row is in this release ("The providers page", "A
-  company listed before it receives anything");
+  company listed before it receives anything"; when someone outside the team already has an account, ask before this
+  yes);
 - the Caddy payment-marks rule (PM2), when this upload adds it.
 
 For example: "Yes, upload r21 to the test site side by side: take the online backup, apply migrations 0126 and 0127,
@@ -6047,7 +6051,8 @@ number (and which one is not expand-only), the publish with its delta hash, and 
 When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
 Register row (§5), as in SB6. When it only lists a company that no line-up seats yet (the upload that brings the
-Amazon gate), the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE.
+Amazon gate), the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE. When
+someone outside the team already has an account then, ask before that yes ("The providers page").
 When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
 plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the
 people on it were told, and for each one whose limit goes higher that the number was checked twice, as in SB6. On this path SB3b (SB3

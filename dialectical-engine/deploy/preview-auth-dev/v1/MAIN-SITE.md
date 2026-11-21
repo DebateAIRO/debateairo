@@ -743,8 +743,9 @@ The steps this release adds to that recipe, in the order you meet them:
   Give no yes before `GATEREADY_DONE`.
 - **Your yes before DR2, for the Amazon gate.** Besides what the release guide's yes names, your numbers and the
   UNFINISHED count (above), it names `GATEREADY_DONE`, and says that no Privacy Policy section 14 notice is owed at this
-  upload: Amazon receives nothing until Luna is switched on, and only your and the team's accounts exist. Amazon's dated
-  Register row comes with this release, and from DR6 the AI providers page lists Amazon while Luna stays off. Before
+  upload: Amazon receives nothing until Luna is switched on, and only your and the team's accounts exist. Your own test
+  sign-ups (4.3) do not count as accounts outside the team; a friend's or NETOPIA's tester's would. If someone outside
+  the team already has an account, ask before the yes. Amazon's dated Register row comes with this release, and from DR6 the AI providers page lists Amazon while Luna stays off. Before
   Luna is switched on (the release guide's piece 4), if any account outside the team exists by then, the notice goes
   out first (by e-mail and in the product, naming Amazon and what it will receive), and the Amazon key and Luna wait
   until the time to object has passed.
@@ -1120,7 +1121,8 @@ Test it:
 2. Sign up with each, behind the site password.
 3. The verification mail must reach the Inbox (not Spam), and its link must finish the sign-up.
 4. "Show original" / "View raw message" must show SPF, DKIM (`d=dezbatere.ro`) and DMARC pass.
-5. Then start the deletion of both test accounts in Settings (it runs 7 days later).
+5. Then start the deletion of both test accounts in Settings (it runs 7 days later). They are your own test sign-ups:
+   for the Amazon notice (part 2) they are not accounts outside the team.
 
 If either test fails: run MAIL_CLOSE (4.4). Take the site password off only after both pass.
 
