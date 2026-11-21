@@ -199,6 +199,24 @@ describe('the addresses the window opens', () => {
     'apps/ui/components/BetaNotice.tsx'
   ];
 
+  it('the window\'s text names only the versions the versions pages list', () => {
+    // The archive holds each Privacy text a versions page lists; the Terms list is TERMS_VERSIONS.
+    const manifest = JSON.parse(read('packages/legal-manifest/src/manifest.json')) as { archive: Record<string, Record<string, Record<string, { version: string }>>> };
+    const privacyVersions = new Set(Object.values(manifest.archive.PRIVACY!.en!).map(entry => entry.version));
+    const flat = runbook.replace(/\s+/g, ' ');
+    if (privacyVersions.size === 1) {
+      for (const gone of ['one earlier version of the Privacy Policy', '(with earlier versions)', '(with their earlier versions)']) expect(flat, gone).not.toContain(gone);
+      expect(flat).toContain(`the Privacy Policy's versions page (\`/privacy/versions\`) with its one entry, version ${[...privacyVersions][0]}`);
+    }
+    if (TERMS_VERSIONS.length === 1) {
+      expect(TERMS_VERSIONS[0]!.href).toBe('/terms');
+      expect(flat).toContain(`nothing is linked from \`/terms/versions\` (its one entry, version ${TERMS_VERSIONS[0]!.version}, is \`/terms\` itself)`);
+    }
+    // The window's logo line counts both of NETOPIA's pictures, as the footer draws them.
+    expect(OPEN).toContain('np-black-0[.]svg[?]id=[0-9]+');
+    expect(OPEN).toContain('np-white-0[.]svg[?]id=[0-9]+');
+  });
+
   it('every site address the public pages write is open, or closed on purpose', () => {
     const written = PUBLIC_SOURCES.flatMap(path => [...read(path).matchAll(/"(\/[^"\s]*)"/gu)]
       .map(match => ({ path, address: match[1]!.split('#')[0]! })));
