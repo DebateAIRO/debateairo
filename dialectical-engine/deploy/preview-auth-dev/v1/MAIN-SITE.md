@@ -2974,7 +2974,8 @@ Expect: back on the site the plan is active; M1; NETOPIA's own e-mail; then M2 w
 Terms as a file only for an account that accepted the launch Terms (version 1.0): every account made after this upload.
 For an account made before it (yours, and the team's), M1 says where the current Terms are online and carries no file,
 and the API's journal shows `billing.mail.attachment_missing` with `MAIL_TERMS_NOT_ARCHIVED`: that is expected, not a
-fault. To see the file, pay with a team account made after the upload.
+fault. Every team account on this server was made before this upload, and this document adds none to the team (7.2), so
+this first real payment's M1 comes without the file. That is expected too.
 
 ```sh
 set -euo pipefail
