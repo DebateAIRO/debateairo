@@ -110,10 +110,20 @@ What changes in the steps:
 |---|---|
 | S-0 | unchanged |
 | S-1 | unchanged: the same read-only export; the newest version is the kit-v3 one the preview runs |
-| S-2 | unchanged commands; `cut -d= -f1` shows `DEBATEAI_DEPLOYMENT_MODE` among the keys and the file says `hosted` (check with `grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' /root/practice/settings.env`, which must print 1) |
+| S-2 | unchanged commands; `cut -d= -f1` shows `DEBATEAI_DEPLOYMENT_MODE` among the keys and the file says `hosted` (check with `grep -c '^DEBATEAI_DEPLOYMENT_MODE=hosted$' /root/practice/settings.env`, which must print 1). It copies the shared settings files, not the running release's own (S-2 says what can differ) |
 | S-3, S-5, S-7 | unchanged |
+| S-3b | also part of every release practice on the hosted preview (the release guide's SB2): SB2 builds its billing value on the Mac from S-3b's `hosted-billing.json` |
 | S-4 | unchanged (the relay knows nothing of the mode) |
-| S-6 | the same commands. A release that needs a new register version: add `--register-next --hosted-billing '<the same JSON the plan will get>'` (and the plan's `--checker`, `--role-rotation`, `--call-concurrency` choices as below) |
+| S-6 | the same commands; formats with the line-up file S-6 writes. A release that needs a new register version: add `--register-next --hosted-billing '<the same JSON the plan will get>'` (and the plan's `--checker`, `--role-rotation`, `--call-concurrency` choices as below) |
+
+**An upload that switches the step before Start on.** The release guide's SB2 then practises with the same start-step
+row that SB3 publishes. That row file is SHAPEON's `$P/shape-on.json`: SHAPEON puts a copy into the server's practice
+folder, S-5's `scp` brings it to `$P`, and S-7 removes the server copy. It holds the same bytes SB3 publishes. S-6's
+own start-step shape file (`$P/start-step-shape.json`) is for the practice's throwaway register only, never for this.
+SB2's commands for that practice (the debate with the row, then the two start-step runs) are in the release guide;
+the commands in this guide stay as they are. The calls before Start then run on the real DeepInfra and Anthropic gates
+(the lists, the merge, the combine). Until the upload's piece 1 the Anthropic gate still takes 2 calls at once: those
+runs are slower, not refused.
 
 ### `--register-next` on the hosted preview (publish kit v3)
 
@@ -964,7 +974,8 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
 ## Operator steps
 
 Placeholders are shell variables you set first. `PREVIEW_SSH` is your own ssh host alias for the preview server (from
-your ssh config); this README never names a host.
+your ssh config; the owner's runbook, `deploy/preview-auth-dev/v1/MAIN-SITE.md`, says how to add it and check the
+server's key once); this README never names a host.
 
 ### S-0, Mac: the worktree and its toolchain (once per worktree)
 
@@ -1046,6 +1057,13 @@ rewrite only the practice's copy, never runner.env:
 A copy that does not read as expected (no `REGISTER_VERSION` or configuration line, an export that is not S-1's) is left
 as it was, with one line that quotes nothing. The last line prints the version written; it must be S-1's.
 
+Which files it copies: the shared `runner.env` and `api.env` in `/etc/debateai-v3-preview/auth-dev-v1/`, which no
+release has read since the transition to one set of files per release (each release reads its own
+`runner-<label>.env` and `api-<label>.env`). The release tools carry the other copied keys from one release's files
+to the next unchanged, so only the two values S-2 rewrites (the register version and the line-up lists) and the
+configuration line's search socket can differ: the shared file may not name `perplexity_budget_socket` even where the
+running release's files do. S-6's Plus start-step run needs that socket in the copy (see there).
+
 ```sh
 grep -E '^(PREVIEW_PROVIDER_TEST_CONFIG_JSON|PROVIDER_DISCOVERY_TARGETS_JSON|REGISTER_VERSION|DEBATEAI_DEPLOYMENT_MODE|NODE_ENV|CLAIM_MS|CLAIM_MARGIN_MS|MAX_RECOMPOSE|JUDGEMENT_NUMBER_KIND|JUDGEMENT_PRODUCER|PROPAGATION_NUMBER_KIND|PROPAGATION_PRODUCER|PROVIDER_PROBE_TIMEOUT_MS|PROVIDER_REF|VLLM_BASE_URL|VLLM_MODEL|VLLM_MAKER)=' /etc/debateai-v3-preview/auth-dev-v1/runner.env > /root/practice/settings.env
 grep -E '^(STRANGER_SAMPLE_RATE|BATTERY_VERSION|SETTLEMENT_WATCH_HANDLE)=' /etc/debateai-v3-preview/auth-dev-v1/api.env >> /root/practice/settings.env
@@ -1109,6 +1127,9 @@ without `max_final_writer_calls` gives none) and the hosted billing with `billin
 billing off). The GO files and the billing file are only read; the python lines print nothing and write two private files
 into the practice folder, which S-7 removes. Run it again after any GO change (the GO-change order is stop, edit, restart,
 activate).
+
+S-3b is also part of every release practice on the hosted preview (the release guide's SB2): SB2 builds its billing
+value on the Mac from S-3b's `hosted-billing.json` (S-5's `scp` brings it to `$P`), with billing set back to on.
 
 ```sh
 /usr/bin/python3 -I - /etc/debateai-v3-preview/provider-deepinfra-go-v3.json /etc/debateai-v3-preview/provider-anthropic-go-v1.json /etc/debateai-v3-preview/hosted-billing-v1.json /root/practice <<'PY'
@@ -1201,10 +1222,20 @@ ssh -N -o ExitOnForwardFailure=yes -o StreamLocalBindUnlink=yes -o StreamLocalBi
 In a second terminal, from the worktree's `dialectical-engine` folder (set `D` and `P` to the same folders as in
 S-5):
 
+formats asks with the line-up of the settings copy or of a `--line-up` file; it never reads the export. When the
+settings version carries the line-up (S-1 printed `line-up row: yes`), S-2's copy holds no line-up, so the first line
+below writes the export's newest version's line-up row into `$P/line-up.json` (the row as it is stored, without its
+`kind`). That is the line-up the debate then reads from the export. When S-1 printed `line-up row: no`, leave out the
+first line and the `--line-up` flag.
+
 ```sh
-PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --out "$P/formats-report"
+jq -ce '.versions[-1].register_version as $v | .rows[] | select(.register_version == $v and .row_key == "previewLineUpPolicy") | .value_json | fromjson | del(.kind)' "$P/register-export.json" > "$P/line-up.json"
+PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --line-up "$P/line-up.json" --out "$P/formats-report"
 echo "exit: $?"
 ```
+
+The `jq` line prints nothing; it ends with exit 4 and leaves an empty file when that version has no line-up row
+(formats then refuses the file before anything is spent).
 
 Only after formats passes: repeat S-3 (fresh gate status) and copy the two status files down again, then run the
 debate. Until the owners publish a register version that carries this code's prompt fingerprints, it runs with
@@ -1274,6 +1305,10 @@ the debate; then each dig (`--digs`): the debate's "+ N more to explore" first, 
 at most as many picks as paths, each its own path, joined to the investigation as the site does, and settled. The
 practice asks without billing, so it asks as `free` or `premium`; Plus is measured as `premium` with the Plus row's sizes.
 
+For an upload that switches the step before Start on, the row file is not this one: it is SHAPEON's `$P/shape-on.json`,
+the same bytes SB3 publishes, and the release guide's SB2 gives those commands ("Practising the hosted preview"). The
+shape file below is for the practice's throwaway register only.
+
 First the shape file, outside the repository (never committed): the export's own debateShapePolicy row of its newest
 version (so Free is the release's own lean row, never the start values), the start step's start values added, and
 `plans.premium` given that row's Plus sizes. The line prints nothing (the file is its only output); it refuses an
@@ -1302,7 +1337,10 @@ echo "exit: $?"
 Then the same with `--question en` (together the Free month: 2 questions at 3 paths and 2 digs; Free never searches the
 web, so these two need no search gate), then one Plus Quick question at 5 paths, which searches the web as the site does
 for a Plus run (V4 Task 91f): its web step reads the plan as Plus (`free` reads as Free), where the practice's ask, with
-billing kept off, pins none. It needs the relay's third socket (S-4, S-5) and the search gate's status (S-3):
+billing kept off, pins none. It needs the relay's third socket (S-4, S-5) and the search gate's status (S-3). Run it
+only when the practice's own settings name the search gate: `grep -c perplexity_budget_socket "$P/settings.env"` must
+print 1. S-2 copies that line from the shared `runner.env` (see S-2), which can lack the socket even where the running
+release's files name it; then skip this run (it would refuse before anything is spent) and tell the owner:
 
 ```sh
 scp "$PREVIEW_SSH:/home/ubuntu/practice/*-status.json" "$P/"
@@ -1713,7 +1751,10 @@ journalctl -u debateai-preview-practice-relay -o cat --no-pager | tail -n 3
 rm -rf /root/practice /home/ubuntu/practice /home/ubuntu/gate-relay.py
 ```
 
-Keep `$P` (the reports) as long as the owner wants them; it holds only our own practice text.
+The two `status` lines print each gate's pot and the day's spend: on your screen only, never pasted.
+
+`$P` holds the owner's figures from the server (the register export, the hosted billing, the gates' status files) as
+well as the reports. Keep it private, and remove it with `rm -rf "$P"` when the reports are no longer needed.
 
 ## Files
 

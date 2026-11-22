@@ -34,6 +34,7 @@ setting stops that service, and the journal names the setting with a short code.
 - *A drop-in* is a small extra file next to a systemd service file. It changes one line of the service without
   editing the service file itself.
 - *The release guide* is `deploy/preview-release/v1/README.md`.
+- *The upload folder* is the folder on your Mac at exactly the commit you upload (REV), made the day before (1.8).
 - *M1, M2, M8* are mails to the buyer: M1 is the confirmation (with the Terms the account accepted, as a file, when they
   are the launch texts: 7.8), M2 the receipt, M8 the mail that confirms a withdrawal's refund. *O2_REFUND_DUE*,
   *O2_WITHDRAWAL* and *O3* are mails to you: O2_REFUND_DUE is a refund you must make in NETOPIA's admin; O2_WITHDRAWAL
@@ -49,24 +50,60 @@ setting stops that service, and the journal names the setting with a short code.
 - *A Next.js page request* is the website's own background request when it moves to another page (Next.js is the
   website's framework).
 
-**How to run a server step.** Each block that starts with `set -euo pipefail` is one script.
+**How to run a server step.** Each block that starts with `set -euo pipefail` is one script. There are two ways to
+run one: the ordinary way, and the detached run.
+
+*The ordinary way* (every step while the site is up, unless its text says otherwise):
 1. On the server, as root, remove the last step's file and open an empty one:
    `rm -f /root/ms-step.sh; nano /root/ms-step.sh`. nano must show an empty file. If it shows any text, stop.
 2. Paste the whole block. Save (Ctrl-O, Enter) and close (Ctrl-X).
 3. Run it: `bash /root/ms-step.sh`.
 4. Read the last line. It says `<STEP>_DONE`, or `<STEP>_NOT_DONE: <why>`.
 
+*The detached run* (every downtime step of the upload, DR2 to DR6 and SWAP, both ways back, rbD-A and rbD-B, and
+every repair block of part 2's repair map). A step run the ordinary way lives in your ssh window: if the connection
+drops or the window closes, the script and the tools it runs stop where they stand, and most downtime steps cannot
+simply be run again. A detached run is handed to systemd, outside the window. It writes everything it prints into a
+log file, and it goes on to its end when the window is lost. (`nohup` is not enough: the tools that are node programs
+still stop when the window closes.)
+1. On the server, as root, set the last step's log aside, remove the last step's file and open an empty one:
+   `[ ! -e /root/ms-step.log ] || mv /root/ms-step.log "/root/ms-step-$(date -u +%H%M%S).log"; rm -f /root/ms-step.sh; nano /root/ms-step.sh`.
+   nano must show an empty file. Paste the whole block, fill in its `<…>` values, save and close. A detached step
+   cannot ask you anything while it runs: values such as DR5's `YES` are typed into the file before it starts.
+2. Start it:
+   `U=ms-step-$(date -u +%H%M%S); systemd-run --unit="$U" --collect --setenv=HOME=/root -p StandardOutput=file:/root/ms-step.log /bin/bash /root/ms-step.sh && echo "$U started"`.
+   It prints the unit's name and `<name> started` at once, and gives the prompt back. Its error lines go into the same
+   log.
+3. Watch it: `tail -n +1 -f /root/ms-step.log`. When the last line is the step's own `<STEP>_DONE` or
+   `<STEP>_NOT_DONE: …`, press Ctrl-C. Ctrl-C stops only the watching, never the step.
+4. Read the last line, as above.
+
+If the window is lost during a detached run, open a new one, connect, `sudo -i`, then:
+- `systemctl list-units 'ms-step-*' --all --no-legend`: a line means the step still runs. Wait, and run it again until it
+  prints nothing.
+- `tail -n 40 /root/ms-step.log`: the step's last lines.
+
+The step went on by itself. Never paste a downtime step a second time without reading its log first. The earlier
+steps' logs stay as `/root/ms-step-<time>.log`. TRYDETACH (1.8) tries this way once on the server, the day before the
+upload, with nothing at stake.
+
 After `<STEP>_NOT_DONE`, run nothing more. Read the reason. Do what the text under the block says, or ask. Every
 script checks first and changes things last, so a script that stops early has changed nothing, unless its message
-says otherwise. If a script stops with no `<STEP>_…` line at all, treat it as `<STEP>_NOT_DONE` and ask.
+says otherwise. If a script stops with no `<STEP>_…` line at all (and, for a detached run, nothing still runs), treat
+it as `<STEP>_NOT_DONE` and ask.
 
 **Typing a value.** A few steps ask you to type a key, a label or an address. Type it at the prompt. Keys are not shown
 while you type, and nothing you type goes on a command line. Never paste a key, a password or an address into a chat
 with Claude.
 
-**Amounts on the screen.** Some steps print amounts: GATES and the scripts that call it (the day's spend of each
-spending gate), the Amazon gate's range of pots (part 2), WITHDRAWOTHER, REFUNDDONE, and the tax summary of EFACTURA. Never paste those lines into a chat, a
-GitHub issue or a pull request. When you ask for help, give the step's last line, and say which step it was.
+**Amounts on the screen.** Any line that shows a daily pot, a spend, a price or a charge stays on your screen: never
+paste it into a chat, a GitHub issue or a pull request. Such lines come from GATES and the scripts that call it (the
+day's spend of each spending gate), each gate's own `status` lines, POTS and the Amazon gate's range of pots (1.8 and
+part 2), the practice (its closing line `team limit: … charged …`, the gate and ceiling lines of its `report.md`, the
+`PRE_START` lines of its `start-month.jsonl`, and S-7's two status lines), WITHDRAWOTHER, REFUNDDONE, and the tax
+summary of EFACTURA. The practice's folder `$P` on your Mac holds your figures from the server too: keep it private.
+When you ask for help, give the step's last line, and say which step it was. For the practice, give its verdict words
+only (for example `PRACTICE_VERDICT PASS`), also where the practice guide says to report in the chat.
 
 **`<…>` in a block** is a value you fill in before you run it. `rNN` is the upload's number, as in the release guide.
 
@@ -77,8 +114,8 @@ if the server shows something else.
 
 | Part | What | The site | The way back |
 |---|---|---|---|
-| 1 | before the upload: the companies, DNS, mail, old debates, your numbers | unchanged | nothing to undo |
-| 2 | the upload, every lock closed, with the Amazon gate's upload-day steps | the release guide's downtime | the release guide's way back |
+| 1 | before the upload: the companies, DNS, mail, old debates, your numbers; the day before (1.8): the checks, the staging, the practice | unchanged | nothing to undo |
+| 2 | the upload day, every lock closed: the gates, the checks, your yes, the downtime, the proofs after it (the step before Start goes on) | the release guide's downtime | the release guide's way back, and part 2's repair map |
 | 3 | your sandbox payment test, on the test name, behind the password | unchanged | close the sandbox records |
 | 4 | mail: allow-list on the new path, then open | password on | MAIL_CLOSE |
 | 5 | the main name, and your staff key on it (5.7) | password on | NAME5 |
@@ -89,12 +126,16 @@ if the server shows something else.
 | 9 | closing everything again | closed | – |
 | 10 | every named refusal code | – | – |
 
-**The upload day, and the days after.** Part 1 is the day before. Parts 2 to 5, up to and including the review window
-(5.8), fit in one day: the upload, your sandbox test, mail, the name, your staff key there (5.7) and the window. The
-upload also brings the spending gate for one more AI model, OpenAI's GPT-6 Luna, served by Amazon: its upload-day
-steps are in part 2 (on the Mac before SB2, between SB2 and SB3, at SB4, right after DR1 and before your yes). Luna
-itself is switched on later, on a day of its own (the release guide's piece 4), not on the upload day. Real payments do
-not fit in the upload day: NETOPIA's point of sale is not enrolled yet, and four of NETOPIA's steps remain:
+**The upload day, and the days after.** Part 1 ends with the day before the upload (1.8): the server's names and
+staging, the practice, and the checks that need no downtime. The practice runs that day, so the gates' daily pots of
+the upload day stay whole for the one test debate after the switch: that debate serves both SB13b and the proof of the
+step before Start. Parts 2 to 5, up to and including the review window (5.8), fit in the upload day: the upload, your
+sandbox test, mail, the name, your staff key there (5.7) and the window. The upload switches the step before Start on
+(part 2). It also brings the spending gate for one more AI model, OpenAI's GPT-6 Luna, served by Amazon: its steps are
+LUNAROW, the day before, before the practice (1.8), and in part 2 (the gates before SB3, two things at SB4,
+BEDROCK_ENV right after DR1, GATEREADY and GATELIVE before your yes). Luna itself is switched on later, on a day of
+its own (the release guide's piece 4), not on the upload day. Real payments do not fit in the upload day: NETOPIA's
+point of sale is not enrolled yet, and four of NETOPIA's steps remain:
 1. you enrol the point of sale in NETOPIA's admin and tick its conditions, once the window is open (5.8b);
 2. NETOPIA checks your identity;
 3. NETOPIA checks your shop's profile, and looks at https://dezbatere.ro without a password;
@@ -119,7 +160,8 @@ It is fine to end the upload day with the review window open and payments still 
 state 5.8 leaves. Part 7, on its own day, leaves real payments on, behind the site password, with asks for the team
 only. Do all staff work (Hide now) on the test name before the rename (1.6): a staff key belongs to one name, so from
 the rename on nobody can use the staff screens until their staff key is enrolled again under dezbatere.ro (5.7). Part
-8 (opening to everyone) waits for that.
+8 (opening to everyone) waits for that. On a server whose staff screens are off (STAFFCHECK, 1.6) there is no staff
+work to do before the rename: Hide now first comes back with 5.7 (STAFFMAIN, then REKEY).
 
 **A friends' test while NETOPIA reviews.** NETOPIA's steps leave days between the upload and part 7, so a friends'
 test (part 6) fits there, behind the site password, with the review window open. Close it before part 7: ASKS_CLOSE,
@@ -168,7 +210,10 @@ go on a second time, that friends' test closes and the site password changes (7.
   release is staged or draining. The locks' names file below stops you when a release is staged or draining. Only
   the brakes (a), (b) and (b2) of 6.5 may run during an upload: the gates' `stop`, PWON (the site password back) and
   REVIEW_CLOSE (the review window closed). The gates' new code and the Amazon gate of part 2 restart gates and run
-  `activate`: they are no brakes, so they run after SB2 and before SB3, never in this window.
+  `activate`: they are no brakes, so they run before SB3, never in this window. One exception, and only this one:
+  when GATEREADY prints `MISSING (piece 2): the Amazon gate's service is not running` after a reboot, and
+  `systemctl show -p Result,NRestarts debateai-preview-bedrock-budget` shows `Result=success` and `NRestarts=0`, run
+  `systemctl start debateai-preview-bedrock-budget`, then GATEREADY again. In any other case, stop and ask.
 
 ---
 
@@ -253,6 +298,10 @@ error, because Caddy has no site for it yet. You may do (b) to (e) at the start 
 ```sh
 dig +short dezbatere.ro A; dig +short www.dezbatere.ro A; dig +short CAA dezbatere.ro; dig +short v3-preview.dezbatere.ro A; dig +short v3-preview.dezbatere.ro AAAA
 ```
+
+Before (b), note what the DNS rows of dezbatere.ro and www.dezbatere.ro hold today, and the Worker's custom domains
+(a screenshot of each Cloudflare page is enough). No later step brings them back: closing the name (5.5) keeps it
+pointed at this server, and un-preparing it leaves dezbatere.ro with no site at all.
 
 (b) In Cloudflare → Workers & Pages, open the `dezbatere` Worker → Settings → Domains & Routes. Remove every custom
 domain or route on dezbatere.ro or www.dezbatere.ro. Remove any tunnel (cloudflared) CNAME for those names. Stop any
@@ -407,7 +456,7 @@ if [ "$P/$P2" = 1/1 ]; then
   echo "staff tools are on: do your staff work now (1.6); after a rename, enrol your staff key again under the new name (5.7)"
   [ "$AL" = 0 ] || echo "the file has team allowance lines: they need the staff tools on, so never run STAFFOFF here"
 elif [ "$P" = 0 ] || [ "$P/$P1" = 1/1 ]; then
-  echo "staff tools are off: Hide now does not exist on this server now; skip step 2 below (STAFFON, 5.5b, or STAFFMAIN, 5.7, puts them on)"
+  echo "staff tools are off: Hide now does not exist on this server now; skip step 2 below (after the rename, STAFFMAIN and REKEY, 5.7, put them on)"
 else
   echo "STAFFCHECK_NOT_DONE: the policy line is not one line STAFF_ACCESS_POLICY_VERSION=1 or =2: ask"; exit 1
 fi
@@ -420,16 +469,20 @@ Read the lines just before `STAFFCHECK_DONE`:
   (`STAFF_WEBAUTHN_ORIGIN`, `STAFF_WEBAUTHN_RP_ID`) name the name the site answers as. Do the steps below. If the next
   line says `the file has team allowance lines`, never run STAFFOFF on this server: the staff screens then stay on
   through the rename (5.1b). The count line above it (`team allowance lines: 0; …`) is not a warning.
-- `staff tools are off`: Hide now does not exist on this server now. Skip step 2 below. If a published debate must
-  not stay public, put the staff screens on first: STAFFON (5.5b) on the test name, or 5.7 on dezbatere.ro.
+- `staff tools are off`: Hide now does not exist on this server now. Skip step 2 below. Hide now comes back only with
+  5.7, after the rename: STAFFMAIN puts the staff screens on under dezbatere.ro, then REKEY lets you enrol your staff
+  key there. STAFFMAIN needs the upload's tools-folder swap (SWAP) and its database step (migration 0184), and the two
+  staff name lines and the three staff alert lines once each in the API file. STAFFON (5.5b) is no way round: it
+  works only on a server where STAFFOFF once took the staff screens off. Until 5.7 a published debate stays public
+  behind the site password; if one must not, ask.
 
 `the Report button's AI check line` is 1 when the AI check behind the public Report button is set up, and 0 when it is
 not (5.1b says why it matters).
 
-**Why now.** A staff key belongs to one site name. The one you enrolled works only on the test name. After the rename
-nobody's staff key works until the staff screens are on under dezbatere.ro and the key is enrolled again there (5.7:
-about half an hour, and it needs you at the server and at the browser). **This is your last chance for
-staff work (Hide now, reports, publication reviews) until then.**
+**Why now** (when STAFFCHECK said `staff tools are on`). A staff key belongs to one site name. The one you enrolled
+works only on the test name. After the rename nobody's staff key works until the staff screens are on under
+dezbatere.ro and the key is enrolled again there (5.7: about half an hour, and it needs you at the server and at the
+browser). **This is your last chance for staff work (Hide now, reports, publication reviews) until then.**
 
 Do this **before DR2** of the upload, while the old release still runs on the test name:
 1. Sign in. Open the home page's **Public** tab. Read every published debate.
@@ -614,159 +667,532 @@ Every line `SAME`: leave `NEWNUM` and `LIMITS` empty; SB3 publishes the live num
 `DIFFERENT`: decide before SB3 whether that input is a change you mean (name it in `NEWNUM`) or the file being behind
 (SB3c). `DIFFERENT billing` is never a number change: stop and ask.
 
----
+### 1.8 The day before the upload
 
-## 2. The upload, with every lock closed
+Everything here runs the day before the upload, with the site up, and nothing on the site changes. Do it in this
+order. The practice spends from the gates' daily pots, so it runs today: the upload day's pots stay whole for the one
+test debate after the switch, which serves both SB13b and the proof of the step before Start (part 2). Each step names
+its block and the last line it must print. On any other last line, run nothing more, and ask.
 
-Upload with the release guide's "Drained upload on the template layout": SB1 to SB4, then DR1 to DR6, then SB13b. Do
-not restate or change the recipe. Every lock stays closed during it: add no `PREVIEW_ASKS_OPEN_TO`, no
-`PREVIEW_LIVE_PAYMENTS` and no other `PUBLIC_APP_URL` to any env file, leave `mail-plan.json` as the v1 file, install
-no new drop-in (the one exception: the Amazon gate's own units and address drop-in, below), and keep the site password
-on. Never add a new setting to the old release's own files: a release older than this code refuses a key it does not
-know, and a way back starts it from its own files.
+**REV, the commit you upload.** REV is taken once, after every change for this upload is merged into dev. On the Mac:
+`git fetch origin dev && git rev-parse refs/remotes/origin/dev`. It prints 40 characters. From then until DR6 nothing
+new is uploaded: a later merge into dev does not change REV. Type it in full wherever a step asks for it (step 1 below,
+the Mac check, SB1).
 
-**This upload also brings the Amazon gate**: the spending gate for OpenAI's GPT-6 Luna, which Amazon serves (the
-release guide's section "The Amazon Bedrock gate: the upload that brings it", and
-`deploy/preview-gate/v3/README-bedrock.md`). Luna itself is not switched on in this upload: that is the release
-guide's piece 4, on a day of its own, after the upload. The list below carries what the upload needs for the gate, in
-order: Luna's address in the practice's settings before SB2; the gates' new code and the Amazon gate after SB2 and
-before SB3; two more things at SB4; Luna's address in the new release's files right after DR1; and GATEREADY before
-your yes.
+**1. A folder on the Mac at exactly REV (the upload folder).** In Terminal, go to your copy of the code (the folder
+that holds `dialectical-engine`), and run, with your own new folder's path and REV filled in:
 
-**First, on the Mac: the legal texts of the commit you upload.** This server's upload path never runs the legal check,
-so run it yourself before SB1. Open Terminal and go to the `dialectical-engine` folder of your copy of the code (with
-the packages installed, as in 1.2). Run:
+```sh
+git fetch origin dev
+git worktree add --detach <a new folder> <REV>
+git -C <the new folder> rev-parse HEAD
+git -C <the new folder> status --porcelain
+```
+
+The third line must print REV; the fourth must print nothing. Then install the packages there: the practice guide's
+S-0 (`tools/preview-practice/README.md`), run in the new folder's `dialectical-engine` folder; its digest line must be
+the one S-0 names. From here on that `dialectical-engine` folder is *the upload folder*: every Mac step of this
+document runs there (the legal check, the Mac check, the practice, and REVIEW_MACTEST in 5.8a). If `status --porcelain`
+ever prints a line there, a file was edited: make a new folder. The way back is `git worktree remove <the new folder>`.
+
+**2. The ssh name for the server (once).** The practice and the staging copy files between the Mac and the server
+through an ssh name of your own (`PREVIEW_SSH` in the practice guide). If you have none yet, add it by hand to
+`~/.ssh/config` on the Mac, with the server's address and your login there:
+
+```
+Host <a name you choose>
+    HostName <the server's address>
+    User <your login on the server>
+```
+
+Then run `ssh <the name> true`. The first time, ssh shows the server's key fingerprint and asks whether to go on.
+Before you type `yes`, compare it with what the server prints for `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`,
+run in a root session on the server that you already trust. Type `yes` only if the two are the same; otherwise stop and
+ask. From then on `ssh <the name> true` prints nothing. Use that name wherever the guides say `PREVIEW_SSH`.
+
+**3. The legal texts, on the Mac.** This server's upload path never runs the legal check, so run it yourself, in the
+upload folder:
 
 ```sh
 git rev-parse HEAD
 zsh -lic 'pnpm legal:release-check'
 ```
 
-The first line must be the same 40 characters as SB1's `REV`; if it is not, stop and ask. The last line must start
-`Legal texts: ready for release.` If it says `NOT ready for release`, stop before SB1 and ask: the lines above it say
-what is missing (for example a translation of the Terms or the Privacy Policy that is older than the English text),
-and only a new commit fixes that.
+The first line must be REV; if it is not, stop and ask. The last line must start `Legal texts: ready for release.` If
+it says `NOT ready for release`, stop and ask: the lines above it say what is missing (for example a translation of the
+Terms or the Privacy Policy that is older than the English text), and only a new commit fixes that.
 
 The Terms and the Privacy Policy (version 1.0) name the day they take effect, and that day is the upload day: they go
-live on the site at DR6. Check the day on the Mac, in the same folder:
+live on the site at DR6. Check the day, in the same folder:
 
 ```sh
 grep -ho 'Effective [0-9]* [A-Za-z]* 2026' apps/ui/legal/en/terms-of-service.md apps/ui/legal/en/privacy-policy.md
 ```
 
-It must print `Effective 22 November 2026` twice: the upload day. If it prints another day, or the upload moves to
-another day, stop before SB1 and ask: the day is part of the texts, so a new day needs a new commit. At your first
-sign-in after the upload, neither you nor the team is asked to accept the texts again: your earlier acceptances count.
+It must print the same line twice, `Effective <the upload day>`, with the day written out (day, month name, year). If
+it prints another day, or the upload moves to another day, stop and ask: the day is part of the texts, so a new day
+needs a new commit. At your first sign-in after the upload, neither you nor the team is asked to accept the texts
+again: your earlier acceptances count.
 
-The steps this release adds to that recipe, in the order you meet them:
-- **Before SB2, on the Mac: LUNAROW.** The practice runs this release's next register, which lists a seventh model,
-  Luna. S-2's copy of the settings lists six, so without LUNAROW the practice stops at once with
-  `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` (nothing is spent). Run the release guide's LUNAROW (in the Amazon gate's
-  section, which says how to save and run it) in S-6's second terminal, where you set `P` to S-5's folder: after
-  S-5's `scp`, before S-6's `formats`. S-5's own terminal is busy with its `ssh -N`. Expect
-  `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. Then the practice as usual: its line
-  `practising on this code's next version` lists the rows the next version changes and adds, which must match SB3's
-  delta, and Luna sits out of the practice debate. A new S-2 copy, or S-5's `scp` run again, brings the six-row
-  settings back: run LUNAROW again after it.
-- **After SB2 and before SB3: the gates' new code, and the Amazon gate (the release guide's pieces 1 and 2), then
-  GATES4.** Never later: from SB3 to the end of DR6 only the brakes may run (the order rules). These steps restart the
-  gates, run `activate`, and install the Amazon gate's units and its address drop-in: that is allowed here, although
-  this part says "install no new drop-in". Have ready first:
-  - your two figures for the Amazon gate's GO (its daily pot and its daily number of calls), typed only on the server
-    (install step 5; write them nowhere else). Install step 5's first block prints on your screen the range of pots
-    `activate` accepts: from the smallest that carries four calls at once to what the other gates' pots leave under the
-    team total in the caps file. Below it `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`, above it
-    `TEAM_TOTAL_BUDGET_EXCEEDED`. If it prints `NO ROOM`, lower another gate's pot first, still before SB3 (the release
-    guide's "Before piece 1, have ready" says how);
-  - a quiet hour, and your yes for the gates' restarts.
+**4. The Mac check, on REV.** In the upload folder: `zsh -lic 'node tools/upload-check/run.mjs --rev <REV>'`. It tries
+on the Mac three things the server does during an upload (the release guide's "Before an upload: the Mac check" says
+which, and what it needs). It can take a while: it first waits until the Mac has memory free. The last line must be
+`ALL PASSED`. `NOT PASSED`, or any other end: stop and ask.
 
-  The AWS console work (`README-bedrock.md`, install step 0: Luna's subscription and quota, the key, a budget alert, an
-  AWS account e-mail address someone reads) is for Luna's own day. The upload does not wait for it.
+**5. TRYDETACH: the detached run, tried once on the server.** The downtime steps of the upload day run as detached
+runs ("How to run a server step", at the start of this document). This step proves, with nothing at stake, that a step
+run that way goes on when the ssh window closes. Run it as a detached run:
 
-  Then, in one root shell (`sudo -i`), as the release guide's pieces 1 and 2 say: the DeepInfra, Anthropic and
-  Perplexity gates on this release's gate code (`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", steps 1 to
-  6, for each; then README-bedrock's install step 3a, whose six `1` lines are the check of the units), then the Amazon
-  gate (README-bedrock's install steps 1 to 3, 5, 6 and 7). **Do not put the Amazon key in now** (install step 4): it goes in on Luna's own day, after the notice when it
-  is owed and after the gate's watchers start, right before your first probe (README-bedrock's "Switch it on"). Once
-  the key and Luna's address are both in, the site checks Luna through the gate at every question someone asks, which
-  is a real paid call; without the key nothing is sent to Amazon or charged, and debates run as before.
-  Last, the release guide's GATES4: expect four lines `<gate>: gate code this release; state active`, then
-  `GATES4_DONE`. Go on to SB3 only then. If the upload stops after this step, the running release keeps serving, but
-  its settings activations are refused until this release is uploaded (the release guide's "The way back" in that
-  section).
-- **Your numbers (1.7), at SB3.** SB3 publishes a number from `hosted-billing-v1.json` only where you name it in
-  `NEWNUM` (and a plan whose limits change, up or down, in `LIMITS`), and stops when the file differs anywhere you did not name.
-  SITEINPUTS (1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both
-  lists empty. Two rules for this upload: change no plan price in it (1.7, the trap with upgrades), and when `NEWNUM`
-  is not empty, your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or
-  is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher,
-  that you checked the number twice.
-- **SB4's operator review.** `LIFECYCLE_FILES` lists the changed operator files. Among them are new files:
-  `deploy/preview-auth-dev/v1/public-origins.mjs`, `startup-refusals.mjs`, `start-check-mail.mjs`,
-  `start-check-payments.mjs`, this `MAIN-SITE.md`, `deploy/preview-release/v1/site-inputs.mjs` (the comparison of
-  your numbers, 1.7) and `deploy/preview-lifecycle/v1/rekey-staff-key.mjs` (the staff key under a new name, 5.7); and
-  changed ones: `environment.mjs`, `egress-proxy.mjs`,
-  `mail-handoff.mjs`, `launch-api.mjs`, `launch-runner.mjs`, `launch-ui.mjs`, `README.md`,
-  `deploy/preview-lifecycle/v1/release-env.mjs`, `unlock-team-tools.mjs`, `jit-creator-actor.mjs`, `common.mjs` (the
-  tools' list of spending gates, which now holds the Amazon gate), `alert.mjs` (the Amazon gate's halt and address
-  e-mails) and that folder's `README.md`, `deploy/preview-release/v1/release-artifacts.mjs` and its `README.md`.
-  Review them, then run SB4 again with `LIFE=yes`. On the drained path, DR5 runs SB10's operator folder swap by hand
-  first, as the release guide says.
-  After the gates' new code (above), SB4 also stops on `GATE_ROWS_N1` with `changed since the switch: review <digest>`:
-  the DeepInfra and Anthropic gates' files changed. GATES4 was your review of those files: copy that digest between
-  the quotes of `GRR=''` at the top of SB4, and run SB4 again (with `LIFE=yes` too). SB4 knows only those two gates;
-  GATES4 is the review of the Perplexity and the Amazon gates' files.
-- **MAILPLAN once more, right before DR1.** Run MAILPLAN (1.5) again immediately before DR1, and stop the upload
-  unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
-  inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
-- **BEDROCK_ENV, right after DR1** (the release guide's piece 3, before your yes and DR2). It adds the Amazon gate's
-  socket and Luna's address to the new release's API and runner files; the old release's files do not change. Expect
-  `api-<LABEL>.env: 7 model addresses, the Amazon socket named`, the same line for `runner-<LABEL>.env`, then
-  `BEDROCK_ENV_DONE`.
-- **NETOPIA's logo** (1.1): SB5d right after DR1, before your yes (the release guide's "owner's yes") and DR2, with
-  the shop id. Skip PM1, SB5b, MT1, PM2 and MT2. After SB13b, run the release guide's LOGOCHECK. It only reads, and
-  must end with `LOGOCHECK_DONE`: part 5 waits for it.
-- **UNFINISHED, right before your yes and DR2** (below). The new release deletes sign-ups that were never finished.
-  UNFINISHED counts the ones it deletes at DR6, and your yes before DR2 names that count.
-- **GATEREADY, right before your yes and DR2** (in the release guide's Amazon section). It only reads. It asks, while
-  the site is still up, what DR6 and the new runner and API will ask of the four gates and of the new release's two
-  files, so a missing piece stops the upload here and not at DR6, after the migrations. Expect four lines
-  `<gate> gate: code this release; state active; window open true`, two lines `<service>-<LABEL>.env: 7 model
-  addresses; Luna's address there; the Amazon socket named; this release's start check of the addresses: accepted 7`,
-  then `GATEREADY_DONE`. On `GATEREADY_NOT_DONE` its last line names what is missing (`piece 1`, `piece 2`, `piece 3`
-  or `ask`) and the `MISSING` lines above it say which gate or file. Nothing has changed and the site is up. You are
-  inside the window where only the brakes may run (the order rules), so:
-  - `piece 3`: run BEDROCK_ENV, then GATEREADY again;
-  - `piece 1`, `piece 2` or `ask`: no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and
-    ask.
+```sh
+set -euo pipefail
+# TRYDETACH: the detached run tried on this server: one line, a minute's wait, a second line, all written to the log while the ssh window is closed. Nothing changes.
+echo "TRYDETACH started at $(date -u +%H:%M:%S) UTC, as $(id -un), on $(systemctl --version | sed -n 1p)"
+sleep 60
+echo "TRYDETACH still ran at $(date -u +%H:%M:%S) UTC, after the window was closed"
+echo TRYDETACH_DONE
+exit 0
+```
 
-  Give no yes before `GATEREADY_DONE`.
-- **Your yes before DR2, for the Amazon gate.** Besides what the release guide's yes names, your numbers and the
-  UNFINISHED count (above), it names `GATEREADY_DONE`, and says that no Privacy Policy section 14 notice is owed at this
-  upload: Amazon receives nothing until Luna is switched on, and only your and the team's accounts exist. Your own test
-  sign-ups (4.3) do not count as accounts outside the team; a friend's or NETOPIA's tester's would. If someone outside
-  the team already has an account, ask before the yes. Amazon's dated Register row comes with this release, and from DR6 the AI providers page lists Amazon while Luna stays off. Before
-  Luna is switched on (the release guide's piece 4), if any account outside the team exists by then, the notice goes
-  out first (by e-mail and in the product, naming Amazon and what it will receive), and the Amazon key and Luna wait
-  until the time to object has passed.
-- **The new SAME lines.** DR1's `same` still runs the old tools, so it prints no new line. After DR5's folder swap,
-  `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` also prints `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`,
-  `OK SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<LABEL>`, `OK VALID_PREVIEW_ASKS_OPEN_TO:<LABEL>` and
-  `OK UI_NETOPIA_LOGO_ID:<LABEL>`. With two labels it also prints `OK SAME_PUBLIC_APP_URL`, `OK SAME_API_PAYMENT_SYSTEM`
-  and `OK SAME_PREVIEW_ASKS_OPEN_TO`.
-- **The mail plan check at start.** At DR6 the new API reads `mail-plan.json` before anything else of the API runs. Its
-  journal shows `PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}` before
-  `PREVIEW_API_STARTED`. If DR6 stops with "the new API did not start", read why before anything else. Paste this
-  one line, with rNN filled in (it reads the upload's names file, so `$LABEL` is the new release):
-  `bash -c '. /root/preview-archive/rNN-names.sh; journalctl -u "debateai-preview-api@$LABEL" -n 80 -o cat --no-pager | grep -E "STARTUP_REFUSED|PREVIEW_MAIL_MODE|api.boot.failed"'`.
-  A `PREVIEW_MAIL_…` code means `mail-plan.json` (part 1.5). Stop and ask before you choose the way back.
-- **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
-  database never took a live payment, so the count is 0 and the API starts as before.
-- **MONTHNUMBERS, after DR6.** To keep each person's month on the numbers it started with, the new API and runner read
-  the database's record of release switches through a function this release adds (migration `0185_release_history.sql`).
-  SB13b's team debate may be paid from a team grant, which never reads that record, so check it once by hand. The
-  check is read-only: it asks the record as the API's login and as the runner's login, and wants the new release as
-  its last line.
+As soon as `tail` shows the first line, close the Terminal window itself (do not press Ctrl-C). Wait two minutes. Open
+a new window, connect to the server, `sudo -i`, then run `systemctl list-units 'ms-step-*' --all --no-legend` (it must
+print nothing: the step is over) and `tail -n 40 /root/ms-step.log`. Expect the `started` line, the `still ran` line,
+then `TRYDETACH_DONE`. If the second line is missing, a detached run does not protect a step on this server: stop, and
+ask before the upload day.
+
+**6. SB1** (the release guide's "Drained upload on the template layout" starts with SB1 to SB4). `NN` is the next plain
+number after the highest `r<number>-names.sh` in `/root/preview-archive` (a name with a second part, like `r22-1`, or
+with a word, does not count); `REV` is the one above, typed in full. Expect `SB1_DONE`. Nothing live changes. Then run
+SITEINPUTS (1.7), and settle your numbers before the practice.
+
+**7. The staging.** As the release guide says under SB1: A2 (its Mac half makes the bundle; `OREV` is the names
+file's `OREV=` line, read on the server with `sed -n 's/^OREV=//p' /root/preview-archive/rNN-names.sh` and typed on the
+Mac), A3, A4 to A7, then SB1b instead of A5. Each ends with its own `_DONE` line, `A2_DONE` first and `SB1B_DONE`
+last. The long ones may run in the background, as the release guide says; the staging changes nothing live.
+
+**8. SHAPEON: the row of the step before Start** (the release guide's section "The step before Start, switched on in
+the upload"). It reads the live settings version's debate-shape row and checks what the step needs: the row switched
+on, the engine row in force, two models or more on each plan's line-up and no Luna there, and no scorecard row. It adds
+only the start values, taken from this release's own code, and proves that nothing else changed. It writes two
+one-line files into the upload's archive folder: `shape-on.json`, the row SB3 publishes on the upload day, and
+`shape-base.json`, the row as it is today (the step's own way back), plus a copy of `shape-on.json` for the practice.
+Expect a line like `shape row: base <n> bytes, with the start step <m> bytes; only startStep added; the release's
+parser: accepted`, then `SHAPEON_DONE`. On `SHAPEON_NOT_DONE`, its line names what is missing: ask. Nothing changed.
+
+**9. POTS: do four Anthropic calls at once fit, and the Amazon gate's range** (same section). It only reads. Expect
+the Anthropic gate's GO as it is (`calls at once 2, final writers 1`; with `4`, piece 1 has nothing to change there),
+the line `four calls at once fit the Anthropic
+pot: yes`, the Amazon gate's range of pots (on your screen only), then `POTS_DONE`.
+- `four calls at once fit the Anthropic pot: no`: decide before the upload day. Either raise the Anthropic gate's pot
+  (`deploy/preview-gate/v3/README.md`, "Change the daily budget or another limit"; the figures typed on the server
+  only), or go with two calls at once: the step works, only slower. Your yes before DR2 says which.
+- `NO ROOM` for the Amazon gate: decide before the upload day which other gate's pot is lowered (the release guide's
+  "Before piece 1, have ready" says how, and what a lower pot does).
+
+Write nothing of the range down outside the server: you type the Amazon gate's figures on the upload day, on the
+server only (part 2, step 3).
+
+**10. MAILTIME: how long this release's mail program takes to load.** From this release on, each mail's program loads
+its code afresh, inside the 4.5 seconds each mail has. This times the load on this server, in the staged release
+folder, and sends nothing: it hands the program an empty mail, which it refuses.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# MAILTIME: how long this release's mail program takes to load on this server, timed on an empty mail it refuses. Nothing is sent; nothing changes.
+F=$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/mail-handoff.mjs
+[ -f "$F" ] || { echo "MAILTIME_NOT_DONE: $F is missing (the staging first)"; exit 1; }
+FROM=$(sed -n 's/^MAIL_FROM=//p' "$E/api-$OLABEL.env")
+[ -n "$FROM" ] || { echo "MAILTIME_NOT_DONE: the running API's file has no MAIL_FROM line: ask"; exit 1; }
+T0=$(date +%s%N)
+OUT=$(runuser -u "$AU" -- "$N" "$F" -i -t -f "$FROM" < /dev/null 2>&1 || true)
+T1=$(date +%s%N)
+grep -q PREVIEW_MAIL_REFUSED <<<"$OUT" || { printf '%s\n' "$OUT" | tail -n 5 | cut -c1-300; echo "MAILTIME_NOT_DONE: the mail program did not load as far as its refusal (lines above): ask"; exit 1; }
+T=$(( (T1 - T0) / 1000000 ))
+echo "the mail program loads in $T ms; each mail has 4500 ms in all"
+[ "$T" -le 2000 ] || { echo "MAILTIME_NOT_DONE: the load takes more than 2 seconds: ask before the upload day"; exit 1; }
+echo MAILTIME_DONE
+exit 0
+```
+
+Expect the time line (well under 4 seconds), then `MAILTIME_DONE`. Above 2 seconds the step stops: ask. After the
+upload, a mail that runs out of time shows as `SENDMAIL_EXIT_1` or `SENDMAIL_TIMEOUT` (4.2).
+
+**11. The practice** (it spends real money from the gates' day). Run it as the release guide's SB2 says (its commands
+live there), with the practice guide's steps, in this order:
+- Server, as root: S-1, S-2, S-3, S-3b and S-4. S-4 starts the relay with the web-search socket only when the
+  practice's own `settings.env` (S-2's copy) names `perplexity_budget_socket`.
+- Mac: S-5. Its `scp` brings SHAPEON's copy of the row down with the other files. Then, in S-6's second terminal,
+  where you set `P` to S-5's folder: LUNAROW (the release guide's Amazon section). Expect `settings.env: 7 model
+  addresses, Luna's row last`, then `LUNAROW_DONE`. Without it the practice stops at once with
+  `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` (nothing is spent).
+- Mac: the line-up file, then `formats` with it, as SB2 says. Expect `PRACTICE_VERDICT PASS`.
+- Mac: SB2's debate with the row (`--shape-policy "$P/shape-on.json"`). Expect `PRACTICE_VERDICT PASS` (or
+  `PASS_WITH_WARNINGS`). Its line `practising on this code's next version` lists the rows the next version changes
+  and adds: they must be the ones SB3 publishes on the upload day, `debateShapePolicy` among them. Luna sits out.
+- Mac: SB2's run with the step before Start on the Free plan (three paths). Expect `PRACTICE_VERDICT PASS`, and one
+  `PRE_START` line in `$P/start-month/start-month.jsonl` (read it on your screen: it holds amounts).
+- Mac: SB2's run on the Plus plan (five paths), only when the practice's `settings.env` names
+  `perplexity_budget_socket`. Expect `PRACTICE_VERDICT PASS`.
+- Then S-7, on both sides: the relay stopped, and both gates still active (its two status lines are on your screen
+  only).
+
+The practice runs on the gates' old code (piece 1 comes on the upload day), with the Anthropic gate still at two calls
+at once: its runs before Start are slower, not refused. A new S-2 copy, or S-5's `scp` run again, brings the six-row
+`settings.env` back: run LUNAROW again after it. If your numbers file changes after the practice (1.7), run the
+practice again before SB3. Part 2 says what the practice proves, and what it does not ("What was tried before the
+downtime").
+
+**12. STAFFHBA: the staff recovery login's line in the database's access file**
+(`deploy/preview-lifecycle/v1/README.md`, STAFFHBA). REKEY (5.7) connects as that login after the rename, and the
+database lets it in only with that line. STAFFHBA keeps a copy of the file, adds the one line above the catch-all
+`local all all reject`, checks the file for errors and reloads the database (no restart). Run it today, so the
+upload's cold copy (DR3) holds the line. Expect `STAFFHBA_DONE`. Its way back is the copy it kept and a reload, as that guide says. REKEYCHECK (5.7) reads the line
+again after the upload.
+
+**At the end of the day before** you have seen, in this order: REV in the upload folder with nothing edited,
+`Legal texts: ready for release.` with the upload day twice, `ALL PASSED`, `TRYDETACH_DONE` after a closed window,
+`SB1_DONE`, the staging up to `SB1B_DONE`, `SHAPEON_DONE`, `POTS_DONE` (and your decision if it said `no` or `NO
+ROOM`), `MAILTIME_DONE`, the practice's `PRACTICE_VERDICT PASS` lines with the rows matching, S-7's gates active, and
+`STAFFHBA_DONE`. If one is missing, the upload day waits.
+
+---
+
+## 2. The upload day, with every lock closed
+
+Upload with the release guide's "Drained upload on the template layout". SB1, the staging and the practice (SB2) ran
+the day before (1.8). Today come the gates, SB3 and SB4, DR1 and the steps after it, your yes, the downtime (DR2 to
+DR6), and the checks after it. Do not restate or change the recipe. Every lock stays closed during it: add no
+`PREVIEW_ASKS_OPEN_TO`, no `PREVIEW_LIVE_PAYMENTS` and no other `PUBLIC_APP_URL` to any env file, leave
+`mail-plan.json` as the v1 file, install no new drop-in (two exceptions: the Amazon gate's units and address drop-in,
+piece 2; the restore fence's drop-in, FENCEDIR), and keep the site password on. Never add a new setting to the old
+release's own files: a release older than this code refuses a key it does not know, and a way back starts it from its
+own files.
+
+**The step before Start is switched on in this upload.** From DR6 on, a signed-in person who asks a question sees,
+after **Next** (Mai departe), a card **What we'll look into** (Ce vom cerceta): the AIs suggest paths to look into, the
+person picks, then presses **Start investigating** (Începeți investigația). The settings version this upload publishes
+carries the step: SHAPEON (1.8) built its row from the live row with only the start values added, and SB3 publishes
+it. What that means today:
+- At SB3, and when you read the delta (step 6), `debateShapePolicy` is among the changed rows, and A9's watch line
+  prints `STOP: debateShapePolicy`. That line is expected this once: the change is your choice. Any other watch-list
+  row is a stop.
+- In piece 1 the Anthropic gate goes from two calls at once to four (POTS said the day before whether its pot carries
+  them).
+- After DR6 come three proofs: STEPCHECK, a team member's test debate through the step, and STEPPROOF (steps 24 to
+  28).
+- If STEPCHECK or STEPPROOF shows the step off for a plan, the site still works: that plan's debates run as before,
+  without the card, and nothing is undone. The fix is a settings activation on a later day.
+
+**This upload also brings the Amazon gate**: the spending gate for OpenAI's GPT-6 Luna, which Amazon serves (the
+release guide's section "The Amazon Bedrock gate: the upload that brings it", and
+`deploy/preview-gate/v3/README-bedrock.md`). Luna itself is not switched on in this upload: that is the release
+guide's piece 4, on a day of its own, after the upload. What the upload needs for the gate, in order: Luna's address
+in the practice's settings (LUNAROW, the day before); the gates' new code and the Amazon gate before SB3; two more
+things at SB4; Luna's address in the new release's files right after DR1 (BEDROCK_ENV); and GATEREADY and GATELIVE
+before your yes. Web search needs no step of its own: DR1 copies the web-search gate's socket line from the running
+release's API and runner files.
+
+**How the steps run today.** Before the downtime, run each server step the ordinary way, except PRECHECK (a detached
+run, step 14). From DR2 to DR6, and for every repair block and way back, use the detached run only ("How to run a
+server step"). Each step below names the last line it must print. On any other last line, run nothing more: read the
+text under that step, or the repair map (after step 23), or ask. Never put a `.before-…` copy back by hand. After any
+`_NOT_DONE` from DR1 to SB5d, ask.
+
+### 2.1 Before the downtime (the site is up)
+
+**1. The texts' date is still today** (Mac, the upload folder). Run the date line of 1.8, step 3, again. It must print
+`Effective <today>` twice. If it prints another day, stop before piece 1 and ask.
+
+**2. GATESBEFORE** (server; the release guide's "Before piece 1"). It only reads: each older gate's start checks, run
+by hand as systemd would run them, then its state and its calls in flight. Expect one line per gate, `<gate>: start
+checks ok; state active; in flight 0`, then `GATESBEFORE_DONE`. On `GATESBEFORE_NOT_DONE`, its line names the gate and
+what to do: repair it with that gate's own steps before piece 1, or ask.
+
+**3. Pieces 1 and 2: the gates' new code, and the Amazon gate** (server; the release guide's pieces 1 and 2). Before
+SB3, never later: from SB3 to the end of DR6 only the brakes may run (the order rules). These steps restart the gates,
+run `activate`, and install the Amazon gate's units and its address drop-in (one of the two exceptions to "install no
+new drop-in"). Have ready first:
+- your two figures for the Amazon gate's GO (its daily pot and its daily number of calls), typed only on the server
+  (install step 5; write them nowhere else). The pot is written with exactly two decimals and at most two digits
+  before the point; the calls are a whole number from 1 to 5000, with no comma or space. A pot above the caps file's
+  per-GO cap is refused at `init` (`ROOT_GO_INVALID`); a calls figure that breaks the step's `jq` line leaves an empty
+  GO (`ROOT_GO_REQUIRED`). Install step 5's first block prints on your screen the range of pots `activate` accepts, as
+  POTS did the day before: below it `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`, above it
+  `TEAM_TOTAL_BUDGET_EXCEEDED`. A `NO ROOM` was settled the day before (1.8, step 9);
+- a quiet hour, and your yes for the gates' restarts.
+
+The AWS console work (`README-bedrock.md`, install step 0: Luna's subscription and quota, the key, a budget alert, an
+AWS account e-mail address someone reads) is for Luna's own day. The upload does not wait for it.
+
+Then, in one root shell (`sudo -i`), as the release guide's pieces 1 and 2 say:
+- the DeepInfra and Perplexity gates on this release's gate code: `deploy/preview-gate/v3/README.md`, "Redeploy
+  (2026-10-12)", steps 1 to 6, for each;
+- the Anthropic gate: Redeploy steps 1 to 3, then `README-anthropic.md`'s "V4 start step (2026-11): four calls at once
+  and this release's gate code": its step 2 in place of Redeploy step 4 (expect `["claude-haiku-5-5"]`, `4` and `1`),
+  and its step 3 in place of Redeploy steps 5 and 6. Piece 1 changes no limit, except the Anthropic gate's calls at
+  once (2 to 4) on the upload that switches the step on. Do not restart the running release's runner: it keeps the two
+  calls it read at its start, which is safe, and the new runner reads four at DR6. If `activate` refuses
+  `CONCURRENCY_EXCEEDS_BUDGET` (POTS makes it unexpected), do what `README-anthropic.md` says for that refusal, which
+  brings the gate back on two calls, then ask before you go on;
+- then README-bedrock's install step 3a: expect `active` three times, then `1` six times. A missing `active` line:
+  stop and ask;
+- then the Amazon gate: README-bedrock's install steps 1 to 3, 5, 6 and 7. **Do not put the Amazon key in now**
+  (install step 4): it goes in on Luna's own day, after the notice when it is owed and after the gate's watchers start,
+  right before your first probe (README-bedrock's "Switch it on"). Once the key and Luna's address are both in, the
+  site checks Luna through the gate at every question someone asks, which is a real paid call; without the key nothing
+  is sent to Amazon or charged, and debates run as before.
+
+Each gate's `activate` (Redeploy step 6; the Amazon gate's install step 6) must show, in its own output,
+`"provider": "<that gate>"`, `"state": "active"` and `"window_open": true`. A line with `"status": "refused"` means
+stop, whatever `status` shows afterwards.
+
+**If the window closes in the middle of piece 1:** open a new root shell and run GATES4 (step 4) first: it says which
+gate is not active, or not on this release's code. Set `G` and `GO` again from the release guide's table of piece 1,
+and `R` as piece 1 says, then finish that gate's steps. Never paste Redeploy step 1 again: it would copy the half-new
+state as if it were the old one. If you must go back instead ("To go back" in the gate guide), the right copy folder is
+that gate's `/root/preview-archive/redeploy-<time>-<gate folder>` whose time is just before the `halted_at` its
+`status` prints. An Amazon install cut between its steps 6 and 7: run step 7.
+
+**4. GATES4** (the release guide's Amazon section). Expect four lines `<gate>: gate code this release; state active`,
+then `GATES4_DONE`. Go on to SB3 only then. If the upload stops after this step, the running release keeps serving,
+but its settings activations are refused until this release is uploaded (the release guide's "The way back" in that
+section). Between here and your yes, look at your mail now and then: a gate that could not start mails you after four
+tries. Do not restart the server between piece 2 and your yes (the Amazon gate does not start at boot yet); a restart
+for system updates is a day of its own.
+
+**5. SB3, with the step before Start and your numbers.** At the top of SB3 set `STARTSTEP='yes'`: SB3 then publishes
+SHAPEON's row. Expect the delta line with `debateShapePolicy` among `changedKeys` (with the rows this release's code
+moves), then `debate shape: only the start step added`, then `SB3_DONE`. Anything else: run nothing more; before your
+yes, SB3b sets this plan aside; ask.
+
+Your numbers (1.7): SB3 publishes a number from `hosted-billing-v1.json` only where you name it in `NEWNUM` (and a plan
+whose limits change, up or down, in `LIMITS`), and stops when the file differs anywhere you did not name. SITEINPUTS
+(1.7) shows the same before SB3, one line per input. For an upload that changes no number, leave both lists empty. Two
+rules for this upload: change no plan price in it (1.7, the trap with upgrades), and when `NEWNUM` is not empty, your
+yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or is said to have
+changed, either that nobody holds it or the date its people were told; when its limit goes higher, that you checked
+the number twice.
+
+**6. The delta, read by you.** The release guide's reading of the delta after SB3 prints each changed row, old against
+new, then A9's watch line. On this upload the watch line must be `STOP: debateShapePolicy` and nothing else: that row
+is the step before Start, your choice, and no stop this once. Any other watch-list row is a stop: SB3b sets the plan
+aside; ask. Note the `deltaSha256`: your yes names it, and DR5's `YES` is that hash in full.
+
+**7. SB4, twice.** On this upload SB4 stops twice, and both stops are expected.
+- **The first run** prints the changed operator files (`LIFECYCLE_FILES`): the first 20 names, then `and <n> more`. The
+  full list is on the Mac, in the upload folder:
+  `git diff --name-only <OREV> <REV> -- deploy/preview-auth-dev deploy/preview-lifecycle deploy/preview-release`, where
+  `<OREV>` is the live release's commit, the names file's `OREV=` line (1.8, step 7). Review them. The same run stops
+  on `GATE_ROWS_N1` with `changed since the switch: review <digest>`: the DeepInfra and Anthropic gates' files changed
+  in piece 1, and GATES4 was your review of those files. Copy that digest between the quotes of `GRR=''` at the top of
+  SB4. SB4 knows only those two gates; GATES4 is the review of the Perplexity and the Amazon gates' files. The first
+  run's last line must be `SB4_NOT_DONE: DRAINED_PATH, and BAD too: <names>: …`, with `GATE_ROWS_N1` and
+  `LIFECYCLE_FILES` as the only names. Any other name there: stop and ask.
+- **The second run**, with `GRR` filled in and `LIFE=yes`, prints `changed (reviewed): <n> files`, and its last line
+  must be `SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use "Drained upload on
+  the template layout"`. That is the one expected `_NOT_DONE` of the day: go on.
+
+Two notes on the files: the restore fence's drop-in is installed by FENCEDIR (step 10), not by the tools-folder swap;
+and the swap (SWAP, step 21) changes nothing in Caddy.
+
+**8. MAILPLAN once more, right before DR1.** Run MAILPLAN (1.5) again immediately before DR1, and stop the upload
+unless it prints `MAILPLAN_DONE`. A plan that changed since the day before makes the new API refuse to start at DR6,
+inside the downtime (`PREVIEW_API_STARTUP_REFUSED PREVIEW_MAIL_…`). The release guide's own steps do not check this.
+
+**9. DR1** (the three new env files, copied from the running release's). Expect `DR1_DONE`.
+
+**10. FENCEDIR, SB5c and H11 step 2, in this order** (the release guide's H11 step 1, SB5c, H11 step 2). The new API
+refuses to start without `UI_API_PROOF_PATH` and `RESTORE_FENCE_PATH` in `api-<LABEL>.env`, and the new website
+without `DIALECTICAL_UI_API_PROOF_PATH` in `ui-<LABEL>.env`. These three steps make the fence folder (and its drop-in)
+and write those lines. Expect `FENCEDIR_DONE`, `SB5C_DONE`, then `H11_DONE`. They come before BEDROCK_ENV, which
+compares the files with the copy it keeps. PRECHECK (step 14) proves the lines before your yes; AFTERDR6 (step 25)
+reads the fence's state after the switch.
+
+**11. BEDROCK_ENV** (the release guide's piece 3). It adds the Amazon gate's socket and Luna's address to the new
+release's API and runner files; the old release's files do not change. Expect `api-<LABEL>.env: 7 model addresses,
+the Amazon socket named`, the same line for `runner-<LABEL>.env`, then `BEDROCK_ENV_DONE`.
+
+**12. SB5d: NETOPIA's logo** (1.1), with the shop id. Expect `SB5D_DONE`. Skip PM1, SB5b, MT1, PM2 and MT2. LOGOCHECK
+comes after the downtime (step 29).
+
+**13. UNFINISHED** (below, under "The unfinished sign-ups"). The new release deletes sign-ups that were never
+finished. UNFINISHED counts the ones it deletes at DR6, and your yes before DR2 names that count. Expect the count
+line, then `UNFINISHED_DONE`.
+
+**14. PRECHECK, as a detached run** (the release guide's drained section, after DR1). It only reads everything the new
+release, the database steps and the way back need that can be read with the site up: the new files' proof and fence
+lines and their modes, the fence folder against every key store and key file (`overlaps: 0`), publication's state,
+the logins, owners and schema the database steps expect, the data folder (no links, no part outside it), free space
+for the cold copy, connection limits, and the texts' date. Run it detached: that also proves, before the downtime,
+that this release's tools run that way. Expect one line per subject, then `PRECHECK_DONE`. On `PRECHECK_NOT_DONE`,
+the line names the subject: nothing changed and the site is up. Give no yes; ask.
+
+**15. GATEREADY** (the release guide's Amazon section). It only reads what is on disk: each gate's files, their
+hashes and their state, the Amazon gate's unit, and the new release's two files. Expect four lines `<gate> gate: code
+this release; state active; window open true`, two lines `<service>-<LABEL>.env: 7 model addresses; Luna's address
+there; the Amazon socket named; this release's start check of the addresses: accepted 7`, then `GATEREADY_DONE`. On
+`GATEREADY_NOT_DONE` its last line names what is missing (`piece 1`, `piece 2`, `piece 3` or `ask`) and the `MISSING`
+lines above it say which gate or file. Nothing has changed and the site is up. You are inside the window where only the
+brakes may run (the order rules), so:
+- `piece 3`: run BEDROCK_ENV, then GATEREADY again;
+- `MISSING (piece 2): the Amazon gate's service is not running` after a reboot: the one exception of the order rules
+  (run `systemctl show -p Result,NRestarts debateai-preview-bedrock-budget`; with `Result=success` and `NRestarts=0`,
+  run `systemctl start debateai-preview-bedrock-budget`, then GATEREADY again);
+- anything else under `piece 1`, `piece 2` or `ask`: no yes and no downtime. Do not redeploy, restart or `activate` a
+  gate now: stop and ask.
+
+**16. GATELIVE** (the release guide's Amazon section, right after GATEREADY). GATEREADY reads files; GATELIVE asks each
+running gate what the new API will ask it, as the new API's user, and changes nothing. Expect one line per gate,
+`service active; asked as the API: state active; window open true; calls at once <n>; models <k>` (no amount), then
+`GATELIVE_DONE`. On `GATELIVE_NOT_DONE`: no yes; ask.
+
+**What was tried before the downtime, and what was not.** Read this before your yes. Tried: the practice (on the
+Mac, with billing off: this code's ask and the runner's wiring on the live settings plus this code's next version, the
+new debate-shape row, and the step's calls before Start through the real DeepInfra and Anthropic gates); the Mac check
+(the tools folder, an install and a website build, every database step on an empty database, the production logins'
+roles); SB3's plan, which writes nothing; and PRECHECK, GATEREADY and GATELIVE, which read the new files, the
+database's shape and the gates as the new API will. Not tried anywhere: this release's database steps on the real data
+(PRECHECK reads what they need, but a database function changed by hand would still surprise them); the new API's
+start stages (the stage table under step 23); the tools-folder swap (SWAP); and the switch. These meet the server for
+the first time inside the downtime. That is why every downtime step runs detached, and why the repair map exists.
+
+**17. Your yes before DR2.** Give it in the live chat, fresh, right before DR2, and only after `GATELIVE_DONE`. Besides
+what the release guide's yes names (the downtime, the cold copy, the migrations, the publish with its delta hash, and
+the commit with its release key), it names:
+- `PRECHECK_DONE`, `GATEREADY_DONE` and `GATELIVE_DONE`;
+- the `deltaSha256` you noted (step 6), and that its `debateShapePolicy` change switches the step before Start on;
+- the Anthropic gate's calls at once after piece 1: four (or two, if POTS said `no` and you chose two);
+- the UNFINISHED count, for example "UNFINISHED: 37";
+- your numbers, when `NEWNUM` is not empty (step 5).
+
+For the Amazon gate, it also says that no Privacy Policy section 14 notice is owed at this upload: Amazon receives
+nothing until Luna is switched on, and only your and the team's accounts exist. Your own test sign-ups (4.3) do not
+count as accounts outside the team; a friend's or NETOPIA's tester's would. If someone outside the team already has an
+account, ask before the yes. Amazon's dated Register row comes with this release, and from DR6 the AI providers page
+lists Amazon while Luna stays off. Before Luna is switched on (the release guide's piece 4), if any account outside the
+team exists by then, the notice goes out first (by e-mail and in the product, naming Amazon and what it will receive),
+and the Amazon key and Luna wait until the time to object has passed.
+
+### 2.2 The downtime (each step a detached run)
+
+From DR2 until DR6 ends the site is down. Run each step as a detached run and read its log's last line. **If the
+window is lost** inside any of them: reconnect, `sudo -i`, and read the log ("How to run a server step"). The step
+went on by itself. Never paste a downtime step a second time without reading its log first.
+
+**18. DR2.** Expect `DR2_DONE`. Never restart the old runner by hand: if DR2 stops, its line says whether anything was
+stopped, and the repair map says what comes next.
+
+**19. DR3** (the cold copy). Expect `DR3_DONE`. If it stops after it stopped the database side, its line says the
+database is STOPPED or partly up: DBBACK (the repair map).
+
+**20. DR4** (the database steps). Expect `DR4_DONE`. If it stops, its log has a line `ledger <count>|<newest name>`.
+Compare it with SB1's (`bash -c '. /root/preview-archive/rNN-names.sh; cat "$S/ledger-before"; cat "$S/new-migrations.txt"'`
+prints SB1's line, then this release's steps in order):
+
+| The `ledger` line in DR4's log | What it means | Next (a detached run) |
+|---|---|---|
+| the same as SB1's | nothing was applied | DR4AGAIN, or rbD-A |
+| a count between SB1's and SB1's plus all of this release's steps | the steps stopped at the next name in `new-migrations.txt` | DR4AGAIN only when the log shows `[MIGRATION_LOCK_RETRY]` lines or the window was lost; otherwise rbD-B (ask first) |
+| SB1's count plus all of this release's steps, with the newest name | everything was applied; only the proposal was refused | ask |
+
+Why a step stopped is in DR4's log (the operator's error lines) and in `journalctl -u debateai-preview-postgresql`:
+PostgreSQL writes a failing statement to no other log.
+
+**21. SWAP** (the tools-folder swap, between DR4 and DR5). Expect `SWAP_DONE`. It puts this release's operator tools
+in place of the old ones, which it keeps in the upload's archive folder; when the tools are already this release's it
+says so and ends `SWAP_DONE`.
+
+**22. DR5.** Type the `deltaSha256` of your yes, in full, into its `YES` line before you start it. Expect `DR5_DONE`.
+
+**23. DR6.** Expect `DR6_DONE`: the downtime ends. At DR6 the new API reads `mail-plan.json` before anything else of
+the API runs; its journal shows `PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbatere.ro"}`
+before `PREVIEW_API_STARTED`.
+
+If DR6 stops because a service did not start, read why before anything else. Paste this one line, with rNN filled in
+(it reads the upload's names file, so `$LABEL` is the new release):
+
+```sh
+bash -c '. /root/preview-archive/rNN-names.sh; for S in runner api ui; do echo "== $S"; journalctl -u "debateai-preview-$S@$LABEL" -n 80 -o cat --no-pager | grep -E "STARTUP_REFUSED|PRESTART_REFUSED|PREVIEW_MAIL_MODE|api.boot.failed|STOPPED_ON_FAILURE" | cut -c1-300; done'
+```
+
+A refused API start shows a line `{"event":"api.boot.failed","stage":"<stage>"}`, then a bare
+`PREVIEW_API_STARTUP_REFUSED`: the stage says what it is about. The refusals come one at a time, so fixing one can
+show the next.
+
+| Stage, or line | What it is about | Then |
+|---|---|---|
+| `ui-api-proof` | the proof line in the new API file, or its proof file (SB5c) | LATELINES, then DR6AGAIN, then DR6 |
+| `restore-fence-path` | the fence line in the new API file (H11 step 2), or a fence folder above a key store or key file | the line missing: LATELINES, then DR6AGAIN, then DR6; the overlap: ask |
+| `restore-fence` | the fence folder itself | FENCEDIR, then DR6AGAIN, then DR6 |
+| `corpus-kek`, `publication-secret-domains`, `database-roles` | publication's keys and its clean-up login | ask |
+| `outbound-mail-policy`, `outbound-mail-store`, or a `PREVIEW_MAIL_…` code | the mail plan (1.5) | ask |
+| `pre-start-writer` | the database step that records the charges before Start | ask |
+| `preview-live-payments`, `preview-asks-open`, `saved-question-key-store` | payments, asks, or the saved questions' keys | ask |
+| a bare `PREVIEW_UI_STARTUP_REFUSED` (the website) | first the website's proof line or proof file (SB5c) | LATELINES, then DR6AGAIN, then DR6 |
+| `PREVIEW_LIFECYCLE_PRESTART_REFUSED`, or any other stage | a start rule outside this table | ask |
+
+Where the table says "ask", stop and ask before you choose the way back.
+
+**If a downtime step stops: the repair map.** With the site down, follow this table. Every repair block is in the
+release guide's "Drained upload on the template layout" and runs as a detached run. What the last column names is
+"stop and ask", even with the site down: never improvise there. After any way back, run GATES4.
+
+| What stopped | Read first | Repair block | Then | Stop and ask when |
+|---|---|---|---|---|
+| any downtime step, the window lost | the log, and whether the step still runs | none: the step went on | what its last line says | the log ends with no step line, and nothing runs |
+| DR2 | its last line | none | nothing was stopped (the line says so): fix the cause, then DR2 again; otherwise rbD-A | rbD-A stops |
+| DR3, after the database side was stopped | the last line; `systemctl is-active debateai-preview-postgresql debateai-preview-hatchet debateai-preview-hatchet-gateway` | DBBACK | `cold copy: complete and checked`: DR4, or rbD-A; `cold copy: partial, moved into …`: DR3 again, or rbD-A | Hatchet's address is not in the gateway's allow list; the gateway witness is not PASS |
+| DR4 | the `ledger` line against SB1's (the table under step 20); `[MIGRATION_LOCK_RETRY]` lines | DR4AGAIN (a lock wait, a lost window, or nothing applied) | DR4AGAIN's own last checks, then SWAP | a named step refusal (a `_DRIFT` or another code): rbD-B; everything applied but refused |
+| SWAP | its log | SWAP again (it skips what is already this release's) | DR5 | the folders still differ after the swap |
+| DR5 | the log's last printed line | DR5RESUME: before `PUBLISHED_<V>` it sets the unpublished files aside and says to run DR5 again; after it, it finishes DR5's lines | DR5 again, or DR6 | a refused publish; a version mismatch; a refused launch plan, pin or stage; the old release's entry changed |
+| DR6, a service did not start | the three journals and the stage table (step 23) | LATELINES, FENCEDIR, or none | DR6AGAIN, then DR6 | any stage the table sends to "ask"; a fence overlap |
+| DR6, the switch refused before it wrote | the switch's line | fix what it names, when that is a gate service that is not running | DR6AGAIN, then DR6 | anything else (a gate's `activate` is no brake) |
+| DR6, the switch `bad`, or its outcome unknown | WB4's first two lines (the release guide) | WB4 with the word `drained`, then DR6TAIL | AFTERDR6 | WB4 refuses |
+| rbD-A or rbD-B | its log | none | – | always; above all, never run rbD-B a second time after a line that says the database is STOPPED |
+| a second attempt with the same number, after a way back | – | AGAINSAME (before DR2, site up) | PRECHECK, GATEREADY, GATELIVE, a new yes, DR2 | free space is short; the old release is not the current one |
+
+WB4 takes the word `drained` as its argument: save it as the step file and start it with `… /bin/bash
+/root/ms-step.sh drained` at the end of the start line.
+
+### 2.3 After DR6 (the site is up, behind the password, asks closed)
+
+**24. STEPCHECK** (the release guide's "The step before Start, switched on in the upload"), first after `DR6_DONE`. It
+reads the active settings version's row (the step is in it, and on), the engine row, the line-ups (two models or more,
+no Luna), the database step of the charges before Start, then runs the settings check of the active version. Expect
+`the step can run on every plan, and one widest debate fits each gate's daily pot`, then `STEPCHECK_DONE`.
+- `STEPCHECK_NOT_DONE: the step is in the row but <codes>: …`: the site works without the step where the codes name a
+  plan (for example `START_STEP_UNREACHABLE:<plan>:ONE_MAKER`), and nothing is to undo. Go on with the upload's checks
+  and ask. The fix is a settings activation on a later day (the engine row, or a line-up with two makers), never
+  during an upload.
+- If the step is on but its calls fail on the site (the paths never come, or the card shows errors), its own way back
+  is a later settings version with the old row (`shape-base.json`), as that section says. Ask first.
+
+**25. AFTERDR6** (the release guide's drained section). It only reads. Expect `restore fence: INITIALISED 1`,
+`backup timer: active`, `old release: RETIRED`, `boot target: the new pair`, the runner's line, then `AFTERDR6_DONE`.
+On `AFTERDR6_NOT_DONE`: ask.
+
+**26. The test debate, through the step.** One debate serves both SB13b and the proof of the step. A team member (or
+you), with a team account, behind the site password (asks are closed, so only the team can ask): sign in, open the
+page to ask a question (`/v4`), type a question, press **Next** (Mai departe). The card **What we'll look into** (Ce
+vom cerceta) must appear, with paths the AIs suggest. Keep the paths it picked, or pick others, press **Start
+investigating** (Începeți investigația), and wait until the 5-second **Undo** (Anulați) has passed. The debate's page
+opens. Note its id: the last part of its address (`/v4/debate/<id>`). No card after **Next**: go on with step 27, then
+ask (STEPCHECK and STEPPROOF say why).
+
+**27. SB13b.** Expect `SB13B_DONE`. A line that says the debate is still READY: run SB13b again in a minute.
+`SB13B_NOT_DONE: the test debate FAILED: ask`: ask.
+
+**28. STEPPROOF** (same section as STEPCHECK), with the debate's id from step 26 in its `RID=''` line. It only reads.
+Expect `start paths: MENU width <w> paths <n>`, then `STEPPROOF_DONE`. `STEPPROOF_NOT_DONE: the test debate did not go
+through the step: ask`: the site works; ask.
+
+**29. LOGOCHECK** (the release guide). It only reads, and must end with `LOGOCHECK_DONE`: part 5 waits for it.
+
+**30. MONTHNUMBERS.** To keep each person's month on the numbers it started with, the new API and runner read the
+database's record of release switches through a function this release adds (migration `0185_release_history.sql`).
+SB13b's team debate may be paid from a team grant, which never reads that record, so check it once by hand. The check
+is read-only: it asks the record as the API's login and as the runner's login, and wants the new release as its last
+line.
 
   ```sh
   set -euo pipefail
@@ -781,10 +1207,36 @@ The steps this release adds to that recipe, in the order you meet them:
   exit 0
   ```
 
-  You should see `OK` for both logins, then `MONTHNUMBERS_DONE`. Then, signed in as a Free or paid account that is not
-  paid from a team grant, open the page that shows your usage, or ask one question: it must answer as usual. A
-  `MONTHNUMBERS_NOT_DONE` line, or a refused question there while team debates work: stop and ask. This block was
-  written on the Mac and has not been run on the server yet.
+You should see `OK` for both logins, then `MONTHNUMBERS_DONE`. Then, signed in as a Free or paid account that is not
+paid from a team grant, open the page that shows your usage, or ask one question: it must answer as usual. A
+`MONTHNUMBERS_NOT_DONE` line, or a refused question there while team debates work: stop and ask. This block was
+written on the Mac and has not been run on the server yet.
+
+**31. The unfinished sign-ups' pass.** Read its lines in the new API's journal, as "After DR6" under "The unfinished
+sign-ups" says (below).
+
+**32. One classic PDF report.** Open one older debate's classic page (`/debate/<id>`) and press **Download full report
+(PDF)** (Descărcați raportul complet (PDF)). The PDF must download. This release makes the report in a new way inside
+the website's sandbox, and nothing else tries it before real people do. If it fails, the site stays up: read the
+website's journal for `[STORY_REPORT_WORKER_ENDED]` or `[STORY_REPORT_RENDER_FAILED]`, and ask.
+
+**33. The step is proven on.** The upload is done. Go on with part 3.
+
+Later, on the Mac: the release guide's SB13c, so the next upload's SB4 finds the N-1 baseline on this release. Its pull
+request starts the N-1 check, which is expected to be red while drained steps are new (the check's own text says why).
+
+**Notes for the day.**
+- **The new SAME lines.** DR1's `same` still runs the old tools, so it prints no new line. After SWAP,
+  `lc release-env.mjs same --labels "$LABEL" --slots "$SLOT"` also prints `OK SAME_UI_API_PUBLIC_APP_URL:<LABEL>`,
+  `OK SAME_API_RUNNER_PREVIEW_ASKS_OPEN_TO:<LABEL>`, `OK VALID_PREVIEW_ASKS_OPEN_TO:<LABEL>` and
+  `OK UI_NETOPIA_LOGO_ID:<LABEL>`. With two labels it also prints `OK SAME_PUBLIC_APP_URL`, `OK SAME_API_PAYMENT_SYSTEM`
+  and `OK SAME_PREVIEW_ASKS_OPEN_TO`.
+- **The sandbox start counts one more thing.** The API's sandbox start also counts open live payment work. This
+  database never took a live payment, so the count is 0 and the API starts as before.
+- **Caddy's health check.** This upload does not change Caddy. Its two-slot health check is still the transition's (the
+  edge secret in the probe, a 1-second limit, out after one miss); nothing is worse than today. It changes only with
+  its own reviewed step, written for this server's Caddyfile, and run before NAME1 (5.1): after NAME1, every kept copy
+  pins the old lines (NAME2, NAME3, NAME5, NAME1_BACK, REVIEW_OPEN, PWOFF2 and PWON compare or restore them).
 - **Until Luna's own day: the Amazon gate unused.** Its window closes 31 days after its `activate` (piece 2). With no
   key, no call reaches it, so it stays `active` with `window_open` false, and ASKS_OPEN (6.1, 8.1) refuses then: run
   its `stop` line, then its `activate` line (6.5). After a reboot nothing starts it (its start at boot comes with Luna's
@@ -875,10 +1327,12 @@ case "$HOST" in v3-preview.dezbatere.ro|dezbatere.ro) ;; *) echo "NAMES_NOT_DONE
 KEYS='^(NETOPIA_API_BASE_URL|NETOPIA_POS_SIGNATURE|NETOPIA_API_KEY_PATH|NETOPIA_IPN_KEYS_PATH|QUADERNO_API_BASE_URL|QUADERNO_API_KEY_PATH|SMARTBILL_API_BASE_URL|SMARTBILL_CREDENTIALS_PATH|SMARTBILL_SERIES|OWNER_REPORT_EMAIL_PATH|PREVIEW_LIVE_PAYMENTS)='
 inv() { journalctl -o cat --no-pager _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value "$1")"; }
 said() { [ "$(inv "$API" | grep -c "$@" || true)" -gt 0 ]; }
-apiup() { local t i; sleep 1; t=$(date +%s); systemctl reset-failed "$API" 2>/dev/null || true; systemctl restart "$API" || echo 'systemctl restart of the API returned non-zero'
+apiup() { local t i c=000; sleep 1; t=$(date +%s); systemctl reset-failed "$API" 2>/dev/null || true; systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$API" || echo 'systemctl restart of the API returned non-zero'
   for i in $(seq 1 80); do [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; [ "$(systemctl is-active "$API" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_MAIL_MODE|api\.boot\.failed|api\.preview\.asks_open|PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED' | cut -c1-300 || true
-  [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && [ "$(systemctl is-active "$API" || true)" = active ]; }
+  [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" = 0 ] && [ "$(journalctl -u "$API" --since "@$t" -o cat --no-pager | grep -c '^PREVIEW_API_STARTED ' || true)" -gt 0 ] && [ "$(systemctl is-active "$API" || true)" = active ] || return 1
+  for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
+  [ "$c" = 200 ] || { echo "the API started, but the website does not answer its Log in page (systemctl is-active of the website: $(systemctl is-active "$WEB" || true))"; return 1; }; }
 webup() { local t i c=000; sleep 1; t=$(date +%s); systemctl reset-failed "$WEB" 2>/dev/null || true; systemctl restart "$WEB" || echo 'systemctl restart of the website returned non-zero'
   for i in $(seq 1 40); do c=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$UIP/login" || true); [ "$c" = 200 ] && break; [ "$(systemctl is-active "$WEB" || true)" = failed ] && break; sleep 3; done
   journalctl -u "$WEB" --since "@$t" -o cat --no-pager | grep -E 'PREVIEW_LIFECYCLE_PRESTART_REFUSED|PREVIEW_UI_STARTUP_REFUSED' | cut -c1-300 || true
@@ -911,10 +1365,17 @@ Expect the release line, then `LOCKS0_DONE`. **After a later upload**, edit only
 again: it refuses while the file exists). If any later script says `NAMES_NOT_DONE`, that first line is the usual
 cause.
 
+If LOCKS0's last line is `NAMES_NOT_DONE`, the file was written already, and LOCKS0 refuses a second run. Fix what the
+line names (when it names the release, the first line of the file, with `nano`), then run CLOSED (3.1), not LOCKS0. A
+`NAMES_NOT_DONE: a release is staged or draining` right after this upload means DR6's last lines did not all run
+(after WB4, DR6TAIL): ask.
+
 What the helpers do, in short:
-- `apiup` restarts the API and waits for its start line (or its refusal); `webup` does the same for the website.
-  Each first clears systemd's count of recent starts: systemd refuses a fifth start of the API or the website within
-  15 minutes, and a way back must never be refused for that.
+- `apiup` restarts the API and waits for its start line (or its refusal); then, because the website restarts with its
+  API, it waits for the website's Log in page too, and fails if the website does not answer it within about two
+  minutes (the line above the step's own says so). `webup` restarts the website alone and waits for the same page.
+  Each first clears systemd's count of recent starts, of both the API and the website: systemd refuses a fifth start
+  of either within 15 minutes, and a way back must never be refused for that.
 - `inv` shows a service's journal since its last start; `said` asks whether the API's journal since its last start
   holds a line.
 - `gates` shows the four spending gates (DeepInfra, Anthropic, Perplexity, Amazon Bedrock); `gatesok` says whether all
@@ -940,7 +1401,7 @@ said -xF 'PREVIEW_MAIL_MODE {"mode":"legacy","origin":"https://v3-preview.dezbat
 [ "$(curl -s -o /dev/null -w '%{http_code}' "https://$HOST/login")" = 401 ] || flag 'the site password: /login does not answer 401'
 ! grep -qE 'review_locked|review_quiet|review window begin' "$C" || flag 'the site password: the NETOPIA review window is open (REVIEW_CLOSE, 5.8)'
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" > "$M/same-closed.txt" || flag 'a SAME check is BAD (look at the file named below)'
-grep -qx "OK SAME_UI_API_PUBLIC_APP_URL:$LABEL" "$M/same-closed.txt" && grep -qx "OK VALID_PREVIEW_ASKS_OPEN_TO:$LABEL" "$M/same-closed.txt" || flag 'the tools folder does not carry the new SAME checks (DR5 folder swap)'
+grep -qx "OK SAME_UI_API_PUBLIC_APP_URL:$LABEL" "$M/same-closed.txt" && grep -qx "OK VALID_PREVIEW_ASKS_OPEN_TO:$LABEL" "$M/same-closed.txt" || flag 'the tools folder does not carry the new SAME checks (the tools-folder swap of the upload, SWAP)'
 [ -z "$OPEN" ] || { echo "CLOSED_NOT_DONE: a lock is not closed (above; SAME output: $M/same-closed.txt): ask"; exit 1; }
 echo CLOSED_DONE
 exit 0
@@ -1083,16 +1544,18 @@ echo MAIL_ALLOW_DONE
 exit 0
 ```
 
-The API restarts: pages that need the API fail for a minute or more (`apiup` waits up to about 4 minutes). The same
-holds for every step that restarts the API. Expect the line `PREVIEW_MAIL_MODE {"mode":"allow-list",…}`, then
-`MAIL_ALLOW_DONE`.
+The API restarts: pages that need the API fail for a minute or more (`apiup` waits up to about 4 minutes for the API,
+then up to about 2 more for the website). The same holds for every step that restarts the API. Expect the line
+`PREVIEW_MAIL_MODE {"mode":"allow-list",…}`, then `MAIL_ALLOW_DONE`.
 
 Test it with your own allow-listed account:
 1. Ask for a password reset (the reset family).
 2. Change a security setting, or enrol the hardware key again (a security notice, the account family).
 
-Both mails must arrive. If one does not, the journal shows `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`: run
-MAIL_CLOSE (4.4) and ask.
+Both mails must arrive. If one does not, the API's journal shows `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`
+or `code=SENDMAIL_TIMEOUT`. `SENDMAIL_EXIT_1` means the plan refused the mail, or, with a correct plan, that the mail
+program ran out of time (MAILTIME, 1.8, timed its load the day before); `SENDMAIL_TIMEOUT` is the time case past 5
+seconds. Ask before you run MAIL_CLOSE (4.4): it puts the v1 plan back, and the rename (part 5) refuses v1.
 
 ### 4.3 Open mail
 
@@ -1159,10 +1622,22 @@ LOGOCHECK ended with `LOGOCHECK_DONE`, **mail is on the v2 plan** (part 4.2 or 4
 (NAME2 stops if the API file has `SOCIAL_SOCKET_PATH`: its relay's callbacks name the test name). If you did not do
 1.3 (b) to (e), do them now.
 
-**The staff screens and the rename.** If STAFFCHECK (1.6) said `staff tools are on`:
-- **Run REKEYCHECK (5.7) now, while the site still answers as the test name.** It only reads. It says whether this
-  server can enrol a staff key again after the rename. If it says `NOT READY`, ask before you rename: after a rename
-  with STAFFOFF, nothing else looks at this until REKEY, when your staff key already does not work.
+This upload does not change Caddy. Its two-slot health check is still the transition's (the edge secret in the probe, a
+1-second limit, out after one miss); nothing is worse than before. It changes only with its own reviewed step, written
+for this server's Caddyfile, and run before NAME1: after NAME1, every kept copy pins the old lines (NAME2, NAME3,
+NAME5, NAME1_BACK, REVIEW_OPEN, PWOFF2 and PWON compare or restore them). Decide before NAME1 whether that step comes
+first.
+
+NAME3 and NAME5 restart the Turnstile relay, so its program must be where the relay's unit says. NAME2 (5.2) reads
+that path first and stops if the file is missing or not root's.
+
+**The staff screens and the rename.** **Run REKEYCHECK (5.7) first, whatever STAFFCHECK (1.6) said, while the site
+still answers as the test name.** It only reads. It says whether this server can enrol a staff key again after the
+rename. If it says `NOT READY`, ask before you rename: nothing else looks at this until REKEY, when your staff key
+already does not work. Its database line comes from STAFFHBA, the day before the upload (1.8); a missing line is added
+only by a reviewed step like STAFFHBA, best before an upload's DR3, so that the cold copy holds it.
+
+If STAFFCHECK (1.6) said `staff tools are on`:
 - The first time this server is renamed, run STAFFOFF (5.1b) after NAME1C and right before NAME2, and put the staff
   screens on again with STAFFMAIN (5.7) after the rename.
 - The exception: if STAFFCHECK said `the file has team allowance lines`, never run STAFFOFF (it refuses). The staff
@@ -1193,7 +1668,7 @@ set -euo pipefail
 grep -q publicSiteOf "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" || { echo "NAME1_NOT_DONE: this release does not carry the name lock"; exit 1; }
 [ "$HOST" = v3-preview.dezbatere.ro ] || { echo "NAME1_NOT_DONE: the API already answers as $HOST"; exit 1; }
 lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" > "$M/name/same-before-main.txt" || { cat "$M/name/same-before-main.txt"; echo "NAME1_NOT_DONE: a SAME check is BAD today: look"; exit 1; }
-grep -qx "OK SAME_UI_API_PUBLIC_APP_URL:$LABEL" "$M/name/same-before-main.txt" || { echo "NAME1_NOT_DONE: the tools folder does not carry the name checks (the upload's DR5 folder swap first)"; exit 1; }
+grep -qx "OK SAME_UI_API_PUBLIC_APP_URL:$LABEL" "$M/name/same-before-main.txt" || { echo "NAME1_NOT_DONE: the tools folder does not carry the name checks (the upload's tools-folder swap, SWAP, first)"; exit 1; }
 [ -e "$M/name/Caddyfile.before-dezbatere" ] || cp -a "$C" "$M/name/Caddyfile.before-dezbatere"
 cmp "$C" "$M/name/Caddyfile.before-dezbatere" || { echo "NAME1_NOT_DONE: the live Caddyfile is not the copy kept in $M/name: look"; exit 1; }
 ! grep -qE '^(https?://)?(www\.)?dezbatere\.ro[ ,{]' "$C" || { echo "NAME1_NOT_DONE: a dezbatere.ro block exists already: look"; exit 1; }
@@ -1347,7 +1822,7 @@ Expect the `taken out` line, the API's start lines (`PREVIEW_API_STARTED …`), 
 - If it stops with `the file before is back and the API restarted on it`, the staff screens are still on and nothing
   else changed. Run nothing more and ask.
 - If NAME2 then stops for another reason and you will not rename today, run STAFFON (5.5b). It puts the staff screens
-  back on the test name.
+  back on the test name. (If STAFFOFF said `the staff screens are off already`, there is nothing to put back.)
 - The way back is STAFFON (5.5b) on the test name, and STAFFMAIN (5.7) on dezbatere.ro.
 
 **While the staff screens are off**, nobody can:
@@ -1410,6 +1885,10 @@ done
 [ "$(systemctl cat debateai-preview-turnstile | grep -cE '^[[:space:]]*EnvironmentFile=' || true)" = 0 ] || { echo "NAME2_NOT_DONE: the installed relay unit reads an EnvironmentFile, which would win over the drop-in: look"; exit 1; }
 [ "$(systemctl cat debateai-preview-turnstile | grep -cE '^[[:space:]]*Environment=.*PUBLIC_APP_URL=' || true)" = 1 ] || { echo "NAME2_NOT_DONE: the relay unit does not set PUBLIC_APP_URL in exactly one Environment= line: look"; exit 1; }
 [ "$(relay)" = 'PUBLIC_APP_URL=https://v3-preview.dezbatere.ro' ] || { echo "NAME2_NOT_DONE: the running relay does not answer as the test name today: look"; exit 1; }
+RP=$(systemctl show -p ExecStart --value debateai-preview-turnstile | tr ' ;' '\n\n' | grep -m1 'siteverify-relay\.mjs' | sed -e 's/^argv\[\]=//' -e 's/^path=//' || true); RR=$(readlink -f "$RP" 2>/dev/null || true)
+[ -n "$RP" ] && [ -n "$RR" ] && [ "$(stat -c '%U %F' "$RR" 2>/dev/null || true)" = 'root regular file' ] && [ $(( 0$(stat -c %a "$RR") & 022 )) = 0 ] || { echo "NAME2_NOT_DONE: the relay's program (${RP:-not named in its unit}) is missing, not root's regular file, or writable by others; NAME3 and NAME5 restart the relay: ask"; exit 1; }
+[ "$RR" = "$RP" ] || case "$RR" in /opt/debateai-v3-preview/releases/*) echo "NAME2_NOT_DONE: the relay reaches its program through a link into a release folder ($RR): ask"; exit 1;; esac
+echo "the Turnstile relay runs $RR: never archive or remove the folder that holds it"
 ( umask 022; printf '[Service]\nEnvironment=PUBLIC_APP_URL=https://dezbatere.ro\n' > "$M/name/20-public-origin.conf" )
 [ "$(grep -cE '^[[:space:]]*@netopia_notify \{$' "$M/name/Caddyfile.before-dezbatere" || true)" = 1 ] || { echo "NAME2_NOT_DONE: not one notify handle"; exit 1; }
 ( umask 022; sed 's/v3-preview\.dezbatere\.ro/dezbatere.ro/g' "$M/name/Caddyfile.before-dezbatere" > "$M/name/Caddyfile.renamed"; cat >> "$M/name/Caddyfile.renamed" <<'EOF'
@@ -1468,6 +1947,11 @@ diff "$M/name/Caddyfile.before-dezbatere" "$M/name/Caddyfile.main" || true
 echo NAME2_DONE
 exit 0
 ```
+
+NAME2 also prints where the Turnstile relay runs its program from (`the Turnstile relay runs …`). NAME3 and NAME5
+restart that relay, so the file must stay there. If the path is inside a release folder under
+`/opt/debateai-v3-preview/releases/`, that release folder must stay as it is: never archive it (the release guide's
+SB15) and never remove it by hand. Moving the relay out of the release folders is a later day's reviewed step.
 
 **Read the last diff before you go on.** Only host names, the four HTTPS-header lines and the blocks added at the end
 may differ. Anything else: stop and ask. The rename changes the site address, `@wrongHost`, the `@wrongOrigin` check,
@@ -1614,8 +2098,9 @@ passkey entry works there again if you kept it; otherwise add the key as in 5.4,
 two staff name lines back with the name and leaves the policy line as it is. So if the staff screens were on, they
 are on again on the test name, and the staff key you first enrolled there works again (a staff key enrolled under
 dezbatere.ro stays in the database and works again after the next NAME3). If they were off, they stay off; STAFFON
-(5.5b) puts them on. To un-prepare the name later, run NAME1_BACK, then remove the DNS records and the Turnstile
-hostname.
+(5.5b) puts them on, on a server where STAFFOFF once took them off; otherwise ask. To un-prepare the name later, run
+NAME1_BACK, then remove the DNS records and the Turnstile hostname. Un-preparing leaves dezbatere.ro with no site at
+all: what it showed before, you noted in 1.3 (a).
 
 ### 5.5b The staff screens back on the test name (STAFFON)
 
@@ -1692,10 +2177,11 @@ Do it before you open the NETOPIA review window (5.8) if you can. It works with 
 REKEY never touch Caddy, and the Team page stays behind the site password. But while STAFFMAIN restarts the API, the
 open pages show an error, to NETOPIA's reviewer too.
 
-In that upload, SB4's operator review (part 2) lists this step's files among the others: the new
-`deploy/preview-lifecycle/v1/rekey-staff-key.mjs`, and the changed `unlock-team-tools.mjs`, `jit-creator-actor.mjs`
-and that folder's `README.md`. STAFFMAIN and REKEY need the upload's operator folder swap and its database step to
-have run; each checks that first, and REKEYCHECK (below) says so before the day.
+The upload brings this step's tool (`deploy/preview-lifecycle/v1/rekey-staff-key.mjs`); SB4's operator review covers
+it with the other changed files (part 2). STAFFMAIN and REKEY need the upload's tools-folder swap (SWAP) and its
+database step (migration 0184), and the two staff name lines and the three staff alert lines once each in the API
+file; REKEY also needs the database line STAFFHBA adds (1.8). Each checks that first, and REKEYCHECK (below) says so
+before the day.
 
 **What happens, in plain words.**
 - A staff key belongs to one site name. The one you enrolled belongs to the test name, so on dezbatere.ro the Team
@@ -1710,7 +2196,8 @@ have run; each checks that first, and REKEYCHECK (below) says so before the day.
 - With the permit you add the key on the Team page. The site writes the key change in the staff audit history and
   sends its key-change alert to the security alert address set on this server.
 
-**Before the day: is the server ready?** REKEYCHECK only reads. Run it any time after the upload:
+**Before the day: is the server ready?** REKEYCHECK only reads. Run it after the upload and before the rename,
+whatever STAFFCHECK (1.6) said:
 
 ```sh
 set -euo pipefail
@@ -1733,9 +2220,9 @@ Expect the line about the API file, then `REKEYCHECK_DONE`. If it says the datab
 the login: ask, before the day. REKEY connects to the database as the staff recovery login, on the database's local
 socket, with a password that exists for three minutes; the database lets that login in only if its `pg_hba.conf`
 holds the line `local debateai debateai_prod_staff_recovery scram-sha-256` (it is in
-`deploy/postgres/pg_hba.conf.template`) above any broader `local` line. Adding it means a copy of the file, the one
-line, a check of `pg_hba_file_rules` for errors and a reload; step 7 of `deploy/preview-lifecycle/v1/README.md` shows
-that kind of change. Do not edit that file alone.
+`deploy/postgres/pg_hba.conf.template`) above any broader `local` line. STAFFHBA
+(`deploy/preview-lifecycle/v1/README.md`), run the day before the upload (1.8), adds that line with a copy of the file,
+a check for errors and a reload, so the upload's cold copy holds it. If REKEYCHECK still says the line is missing, ask. Do not edit that file alone.
 
 **1. The staff screens on (skip if they are on already).** If the rename was done with the staff screens on, they are
 on already and STAFFMAIN says so. If it was done after STAFFOFF, STAFFMAIN puts the line
@@ -1749,7 +2236,7 @@ set -euo pipefail
 # STAFFMAIN: the staff screens on, on dezbatere.ro: the API file's two staff name lines name dezbatere.ro and the line STAFF_ACCESS_POLICY_VERSION=2 is in it (a copy kept), then the API restarts (a minute or more down). If the API refuses, the file before comes back.
 # The NETOPIA review window (5.8) may be open: this step changes the API file and restarts the API, never Caddy. While the API restarts, the open pages show an error.
 K=$M/name/api-$LABEL.env.before-staffmain-$(date -u +%Y%m%dT%H%M%SZ)
-[ "$HOST" = dezbatere.ro ] || { echo "STAFFMAIN_NOT_DONE: the API answers as $HOST; on the test name the step is STAFFON (5.5b); nothing changed"; exit 1; }
+[ "$HOST" = dezbatere.ro ] || { echo "STAFFMAIN_NOT_DONE: the API answers as $HOST; on the test name the step is STAFFON (5.5b), on a server where STAFFOFF once ran; nothing changed"; exit 1; }
 [ -f "$CAPI/dialectical-engine/migrations/0184_staff_rekey_permit.sql" ] && [ -f "$L/rekey-staff-key.mjs" ] || { echo "STAFFMAIN_NOT_DONE: this release, or the tools folder, does not carry the staff re-key (the upload first, with its tools-folder swap); nothing changed"; exit 1; }
 [ "$(psqlq "SELECT count(*) FROM pg_proc WHERE oid = to_regprocedure('staff.arm_rekey(uuid,text,text,text)')" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the database does not hold the staff re-key step (the upload's database step first); nothing changed: ask"; exit 1; }
 [ "$(grep -c '^STAFF_WEBAUTHN_ORIGIN=' "$A" || true)" = 1 ] && [ "$(grep -c '^STAFF_WEBAUTHN_RP_ID=' "$A" || true)" = 1 ] || { echo "STAFFMAIN_NOT_DONE: the API file does not hold each of the two staff name lines exactly once; nothing changed: ask"; exit 1; }
@@ -2159,8 +2646,8 @@ change is kept. Ask. The file with the window stays in `/root/preview-archive/ma
 
 On the Mac, in Terminal: run `brew install caddy` once, then `caddy version`, and write down what it prints. On the
 server, run `/usr/bin/caddy version`. If the two differ, go on: REVIEW_OPEN repeats the Caddy checks on the server and
-stops before any change if they fail there. In your copy of the code, `git rev-parse HEAD` must print the commit you
-uploaded (SB1's `REV`); if it does not, ask. If the website runs on your Mac, stop it first: it uses ports 3100 and
+stops before any change if they fail there. In the upload folder (1.8, step 1), `git rev-parse HEAD` must print the
+commit you uploaded (SB1's `REV`), and `git status --porcelain` must print nothing; if not, ask. If the website runs on your Mac, stop it first: it uses ports 3100 and
 3200, which the test needs. Save the block below the way you save a server step, but on the Mac, outside the project
 folder: `rm -f ~/review-mactest.sh; nano ~/review-mactest.sh`, paste, Ctrl-O, Enter, Ctrl-X. Then run
 `bash ~/review-mactest.sh <the full path of the dialectical-engine folder>`. Expect `file checks passed: …`, the
@@ -2689,6 +3176,14 @@ To see spend: GATES (6.2), and the gates' halt e-mails.
   PAY_BACK check the password on the Log in page, which the window never opens.
 - Never during an upload, and never while a second release runs or drains: two APIs on different payment systems on one
   database would end each other's billing jobs.
+- Each host-side fix of the security review (NV-51, NV-55's port reservation, NV-56, NV-57) is read on this server
+  (Hatchet's container: its user, capabilities and mounts; the `preview_root` map of the database's access file) and
+  either applied by a reviewed step or recorded as not needed here, with the reason. A read of the container may
+  already show it in the shape the fixes ask for: then record that.
+- The notify alarm (the release guide's H10) watches dezbatere.ro's notify address: install it before the first real
+  payment.
+- Decide whether real payments start with the billing notice spool. The release guide's H9, as written, targets the old
+  layout's files and cannot switch it on or off on this server; a rewrite in H11's shape comes first.
 
 ### 7.0 A new site password (after a friends' test, or after NETOPIA's tester had it)
 
@@ -2906,7 +3401,8 @@ exit 0
 ```
 
 The API writes its start line only after its launcher has re-checked the release, a minute or more after the restart;
-`apiup` waits up to about 4 minutes. Expect `PREVIEW_API_STARTED …`, then `PAY_SWITCH_DONE`.
+`apiup` waits up to about 4 minutes for it, and about 2 more for the website. Expect `PREVIEW_API_STARTED …`, then
+`PAY_SWITCH_DONE`.
 
 If it was refused, the line shows the cause. From the launcher (no `api.boot.failed` line before it):
 `PREVIEW_LIVE_PAYMENTS_REFUSED:value`, `:incomplete`, `:netopia-base`, `:quaderno-base`, `:smartbill-base`, `:paths`,
@@ -3150,7 +3646,8 @@ plan file and the API's mode line); real payments work (part 7); the staff scree
 on dezbatere.ro (5.7); with your staff key working, you have read the **Public** tab again and used Hide now on
 anything that went public while your staff key did not work and must not stay public (Free debates go public by themselves, 5.1b);
 NETOPIA's logo shows in the home page's footer (LOGOCHECK, part 2; if it is missing, ask before you take the password
-off); you have decided your numbers and gate pots (1.7, 6.4); and you have read the
+off); the security review's host-side fixes are applied or recorded (part 7's "Before you start"); you have
+decided your numbers and gate pots (1.7, 6.4); and you have read the
 warning in bold at the start of part 9: once strangers can buy, closing everything again needs help.
 
 ### 8.1 Asks open to everyone
@@ -3303,7 +3800,8 @@ brake (6.5 (b)) still works at any time.
    steps 4 to 6 wait too.
 4. **The name back to the test name:** NAME5 (5.5). It also moves the mail plan and the API file's two staff name
    lines back to the test name. If the staff screens were on, they are on again there, and the staff key you first
-   enrolled on the test name works again. If they were off and you want them, run STAFFON (5.5b) after NAME5.
+   enrolled on the test name works again. If they were off and you want them, run STAFFON (5.5b) after NAME5, on a
+   server where STAFFOFF once took them off; otherwise ask.
 5. **Mail back to the allow-list:** MAIL_CLOSE (4.4), then check the v1 file is the kept one:
    `sha256sum /etc/debateai-v3-preview/auth-dev-v1/mail-plan.json` must print the digest of 4.1.
 6. Run CLOSED (3.1). Expect `CLOSED_DONE`.
@@ -3318,6 +3816,8 @@ know none of these settings, and they answer only as the test name.
 - **Settings activations on the release before** are refused after rbD-B (`SETTINGS_GATE_HELPER_DIFFERS`): the
   gates keep this release's gate code, and the shared tools stay this release's and list the Amazon gate. The release
   before runs and its brakes work; a line-up change waits for the next upload of this code. Ask if one cannot wait.
+- **rbD-B brings back the database only.** Key folders destroyed after DR3 stay destroyed: an account deleted since
+  then comes back without its keys, like the unfinished sign-ups below.
 - **The unfinished sign-ups the new release deleted** (UNFINISHED, part 2: at DR6 and every ten minutes after) come
   back with DR3's cold copy, but without their key folders, which the new release destroyed. Those sign-ups cannot be
   finished, and their addresses and pseudonyms stay taken, until a release with this code runs again and deletes them
@@ -3395,6 +3895,14 @@ that service.
 | `BILLING_LIVE_SANDBOX_INVOICER_REFUSED` | API start, stage `billing-runtime` | live NETOPIA beside a sandbox Quaderno or SmartBill | sandbox back; fix `live.lines` |
 | `BILLING_STAGE_LIVE_INVOICER_REFUSED` | API start, stage `billing-runtime` | NETOPIA's sandbox beside a live Quaderno or SmartBill | put `sandbox.lines` back (PAY_BACK); ask |
 | bare `PREVIEW_API_STARTUP_REFUSED` after stage `billing-connectors` | API start | a live key file's owner or mode, or the form of the POS signature or series (not named, on purpose) | sandbox back; check 7.3 and 7.4 |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `ui-api-proof` | API start | the new API file's proof line, or its proof file, is missing (SB5c) | in an upload: the stage table of part 2 (DR6); otherwise put back the file you changed; ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `restore-fence-path` | API start | the fence line is missing (H11 step 2), or the fence folder lies above a key store or a key file | as above |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `restore-fence` | API start | the fence folder is missing, or not the API user's 0700 folder (FENCEDIR) | as above |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `outbound-mail-policy` or `outbound-mail-store` | API start | the mail plan, or the mail's own store | put the last good plan back (MAIL_CLOSE, or 1.5); ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `pre-start-writer` | API start | the database step that records the charges before Start is missing or refused | ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `saved-question-key-store` | API start | the saved questions' key store | ask |
+| bare `PREVIEW_API_STARTUP_REFUSED` after stage `corpus-kek`, `publication-secret-domains` or `database-roles` | API start | publication's keys or its clean-up login, set up but not as the code needs | ask |
+| bare `PREVIEW_UI_STARTUP_REFUSED` | launcher, website | in an upload, first the website file's proof line or its proof file (SB5c); otherwise a rule outside these locks | in an upload: the stage table of part 2 (DR6); otherwise put back the file you changed; ask |
 | bare `PREVIEW_API_STARTUP_REFUSED`, no stage line | launcher | a rule outside these locks, for example a stray key, or the payments line in local mode or on an older release | put back the file you changed; ask |
 | `PREVIEW_EGRESS_REFUSED` | the egress proxy's own journal; the unit fails | a bad label in the drop-in, or both forms at once | PAY_UNDO; check the label |
 | `MODE_OTHER_ACCOUNT` | the egress proxy's journal | the mode question named another Quaderno account | PAY_EGRESS with the label of `live.lines` |
@@ -3408,5 +3916,6 @@ that service.
 | `BAD SAME_PREVIEW_ASKS_OPEN_TO` | SAME, two releases | two releases disagree about asks | ask before any switch |
 | `BAD SAME_API_PAYMENT_SYSTEM` | SAME, two releases | two API files name different payment systems | ask before any switch |
 | `PREVIEW_TEAM_ONLY` (HTTP 403 from `/api/v1/billing/checkout` or `/api/v1/billing/subscription/upgrade`; the page shows its general error) | per request, the API | while payments are real and asks are closed, an account not on the team tried to buy or upgrade a plan; nothing was charged or written | expected; pay with a team account, or open asks (part 8) |
-| `PREVIEW_MAIL_REFUSED` (and the API's `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`) | per mail, the mail program | one mail was refused by the plan's rules (in allow-list mode: an address not on the list) | expected in allow-list mode for other addresses; otherwise MAIL_CLOSE and ask |
+| `PREVIEW_MAIL_REFUSED` (and the API's `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_EXIT_1`) | per mail, the mail program | one mail was refused by the plan's rules (in allow-list mode: an address not on the list); with a correct plan, on every mail: the mail program ran out of time before it handed the mail on | expected in allow-list mode for other addresses; otherwise ask before MAIL_CLOSE (4.2) |
+| `AUTH_MAIL_DELIVERY_FAILED … code=SENDMAIL_TIMEOUT` | per mail, the API | the mail program took more than 5 seconds and was stopped (MAILTIME, 1.8, timed its load) | ask before MAIL_CLOSE (4.2) |
 | a plain `401` with no password box (only while the NETOPIA review window, 5.8, is open) | per request, Caddy | a stranger's background request for a closed address: a Next.js page request, the account check (`/api/v1/session`), the help check (`/api/v1/geo/availability`) or the browser's own icon request (`/favicon.ico`, `/apple-touch-icon.png`); the page shows Log in and no Help, and no password box opens | expected; if a password box opens by itself over a public page, REVIEW_CLOSE, then ask |
