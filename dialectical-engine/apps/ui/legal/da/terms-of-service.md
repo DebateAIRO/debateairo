@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: Kort fortalt
-eyebrow: TJENESTEVILKÅR · v1.0 · GÆLDENDE FRA 22. NOVEMBER 2026
+eyebrow: TJENESTEVILKÅR · v1.0 · GÆLDENDE FRA 23. NOVEMBER 2026
 title: Det, du accepterer
 lede: Aftalen mellem dig og DMS Merchandise Shop S.R.L. i et klart sprog. Nitten afsnit og bilag A — rul ned til slutningen.
 endMarker: SLUT PÅ VILKÅRENE · v1.0
@@ -21,7 +21,7 @@ jumps:
 18 LOVVALG
 -->
 
-**Version 1.0 · Effective 22. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
+**Version 1.0 · Effective 23. november 2026 · Tidligere versioner på dezbatere.ro/terms/versions · Sprog: Dansk.**
 
 **In short.** Du skal være fyldt 18 år. Dialectical Engine opbygger argumenter ved hjælp af AI-modeller, og alt, hvad tjenesten genererer, kan være forkert — det er ikke rådgivning. På det gratis abonnement er dine debatter offentlige, når de er afsluttet, efter en AI-kontrol; på et betalt abonnement er de private, medmindre du offentliggør dem. Når en debat er offentlig, kan alle læse den, og den forbliver offentlig. Tekst, du indsender, sendes til de AI-udbydere, der er anført i vores udbyderregister, hovedsageligt DeepInfra, i USA. Vilkårene hos DeepInfra, Anthropic og Perplexity tillader dem ikke at træne modeller på den; afsnit 8 angiver, for hvilken virksomhed vi endnu ikke har bekræftet dette. Anmeld ulovligt indhold på support@dezbatere.ro, uanset om du har en konto eller ej. Rumænsk ret finder anvendelse, men du bevarer din lokale forbrugerbeskyttelse.
 
