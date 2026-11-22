@@ -2,7 +2,8 @@ import type { Pool } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import { readDeploymentMakerCapability } from "@debateai/critique";
 import {
-  PERPLEXITY_SEARCH_VENDOR, PREVIEW_REMAINING_TIMEOUT_MS, createPreviewRemainingRpcPort, previewGateSocket, previewModelRow,
+  PERPLEXITY_SEARCH_VENDOR, PREVIEW_PROVIDER_NAMES, PREVIEW_REMAINING_TIMEOUT_MS, createPreviewRemainingRpcPort, previewGateSocket,
+  previewModelRow,
   type PreviewGateName, type PreviewGateRemaining, type PreviewGateSettings, type PreviewLineUp
 } from "@debateai/providers";
 import {
@@ -533,8 +534,11 @@ export type GatePotRemainingReader = (gate: PreviewGateName, socket: string, sco
 const READ_REMAINING_WITH_POT: GatePotRemainingReader = (_gate, socket, scopeId) =>
   createPreviewRemainingRpcPort({ budget_socket: socket, scope_id: scopeId }, PREVIEW_REMAINING_TIMEOUT_MS, { dailyPot: true }).remaining();
 
-/** The gates in the order they are asked. */
-const GATE_POT_GATES: readonly PreviewGateName[] = Object.freeze(["deepinfra", "anthropic", PERPLEXITY_SEARCH_VENDOR]);
+/**
+ * Every gate a case can need, in the order they are asked: the model providers' gates (the Amazon gate among them, so a
+ * line-up that seats its model is weighed against its pot too), then the search gate.
+ */
+const GATE_POT_GATES: readonly PreviewGateName[] = Object.freeze([...PREVIEW_PROVIDER_NAMES, PERPLEXITY_SEARCH_VENDOR]);
 const NO_GATE_POT_FINDINGS: GatePotFindings = Object.freeze({ refusals: Object.freeze([]), warnings: Object.freeze([]) });
 
 /**

@@ -142,3 +142,8 @@ a273d069b8eadfecc62bab6caecbb2bca3e64654:dialectical-engine/tests/unit/public-re
 # settings. It names no POS and unlocks nothing; the real signature lives only in the server's own files. Classified by
 # reading it, as .gitleaks.toml describes.
 1bf8c89d5eec8ee1c757641e402d0e10d0eea8eb:dialectical-engine/tests/unit/lock-pay-release-env.test.ts:generic-api-key:12
+# 2026-11-22 — the release guide's test (PR #337): generic-api-key matched a made-up release key (a settings version
+# number, a dash and the hex digits 0 to 9, a, b in order) that a test hands to a guide block as its names-file value
+# OKEY. A release key is a public label, not a credential, and this one names no release. Classified by reading it, as
+# .gitleaks.toml describes.
+79dc23f4e2b133508c8fda9e788dc3c48ed0fe2d:dialectical-engine/tests/unit/preview-release-guide.test.ts:generic-api-key:2239

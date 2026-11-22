@@ -124,7 +124,8 @@ The gate code is shared, and each GO binds the hashes of its gate's two code fil
 (the Amazon profile, and the Amazon folder in the table of gates). So at this upload **the three older gates** get the
 new files and a GO with the two new hashes, then `activate`, each with the owner's yes: README.md "Redeploy
 (2026-10-12)" steps 1-6 for the DeepInfra, Anthropic and Perplexity gates, each with its own folder, GO and service.
-Order: those three first, then this gate's `init` and `activate` (step 6). An older gate's code does not know this
+On the upload that switches the step before Start on, the Anthropic gate takes README-anthropic.md's "V4 start step"
+steps 2 and 3 in place of the redeploy's steps 4 to 6. Order: those three first, then this gate's `init` and `activate` (step 6). An older gate's code does not know this
 gate's pot, so its `activate` would not count it in the team total. In the upload, all of this runs after SB2 and
 before SB3 (the release guide's pieces 1 and 2), never from SB3 to the switch, where only the brakes may run.
 
@@ -210,11 +211,12 @@ First read what changes (this only reads):
 ( D=$R/deploy/preview-gate/v3/systemd; for U in debateai-preview-provider-budget.service debateai-preview-gate-halt-watch.service debateai-preview-anthropic-budget.service debateai-preview-anthropic-halt-watch.service debateai-preview-perplexity-budget.service debateai-preview-perplexity-halt-watch.service; do echo "== $U"; diff "/etc/systemd/system/$U" "$D/$U" || true; done )
 ```
 
-Each unit should show one added line and nothing else:
+Each unit should show three lines and nothing else: the `== <unit>` line, a diff address line such as `71a72` (one
+line added after that line number), then the one added line:
 `> InaccessiblePaths=-/var/lib/debateai-v3-preview/provider-bedrock-authority-v1 -/etc/debateai-v3-preview/provider-bedrock-go-v1.json`.
 Any other difference: stop and ask before the install below, which would overwrite it (the unit on the server was
 changed by hand, for example the Anthropic unit's address list, which it carries inline, or it came from an older
-release). To confirm on the server.
+release).
 
 ```sh
 ( set -eu; test -d "$R/deploy/preview-gate/v3"; S=$R/deploy/preview-gate/v3/systemd
@@ -226,9 +228,12 @@ for U in provider-budget gate-halt-watch anthropic-budget anthropic-halt-watch p
 ```
 
 What to expect: `active` three times, then `1` six times (each unit's hidden paths name the Amazon folder and GO). If a
-line shows `0`, stop: do not install the Amazon key. (Restart when nobody is using the site: calls in flight finish
-first.) In the upload this step comes right after "New code for every gate", which restarted the same three gates. Its
-restart is their second one. That is harmless: they stay `active`.
+line shows `0`, stop: do not install the Amazon key. Fewer than three `active` lines is a stop too: a gate did not
+start, the part in brackets ended before its `active` lines, and the six `1` lines print all the same. Read that gate's
+journal and repair it as README.md "Redeploy (2026-10-12)" step 5 says (with `systemctl reset-failed` before the
+restart). (Restart when nobody is using the site: calls in flight finish first.) In the upload this step comes right
+after "New code for every gate", which restarted the same three gates. Its restart is their second one. That is
+harmless: they stay `active`.
 
 **4. The Amazon key. The OWNER runs this, at the server's terminal (an agent never does).** Not at the upload: on the
 day of the probe, right before step 8, after "Switch it on" steps 1 and 2 ("Decisions you should know about", "The key
@@ -262,8 +267,8 @@ another gate's key, and `FOLDER_NOT_SAFE` when step 3 was not done. Nothing is w
 | `scope_id` | `preview-deepinfra-v3-20261010` | The SAME `scope_id` as the app's preview configuration: the app asks every gate with its one `scope_id`. |
 | `target_host` | `vps-a156d797` | The server's host name, as in the other GOs. The gate refuses to run anywhere else. |
 | `allowed_peer_uids` | `[994, 992]` | The API (994) and the runner (992), as for the other gates. |
-| `daily_budget_usd` | the owner's figure | Amazon's share of the team total. `activate` refuses if all gates' GO files add up to more than the team total. |
-| `max_paid_posts_per_day` | the owner's figure | A second fuse. |
+| `daily_budget_usd` | the owner's figure, with exactly two decimals and at most two digits before the point | Amazon's share of the team total. `activate` refuses if all gates' GO files add up to more than the team total. |
+| `max_paid_posts_per_day` | the owner's figure, a whole number from 1 to 5000, with no comma or space | A second fuse. |
 | `max_concurrent_calls` | `4` | The owner's choice. |
 | `max_final_writer_calls` | `1` | Luna may be seated as a final writer (a request of up to 1 MiB, an answer of up to 128,000 tokens); one such call at a time. |
 | `open_days` | `31` | The maximum. After that the gate halts by itself at its next call, and you run `activate` again. While no call reaches it (no key yet), its `state` stays `active` with `window_open` false: then `stop`, then `activate`. |
@@ -271,11 +276,14 @@ another gate's key, and `FOLDER_NOT_SAFE` when step 3 was not done. Nothing is w
 First see which pot fits (after step 1, with the caps file in place). This only reads. It prints amounts on your screen
 only: never paste them into a chat, an issue or a pull request. It prints each other gate's pot, the caps file's two
 figures, and the range of pots `activate` accepts for this gate: from the smallest pot that carries four calls in
-flight, one of them a final writer (below it, `CONCURRENCY_EXCEEDS_BUDGET`), to what the other pots leave under the
-team total, at most the per-GO cap (above it, `TEAM_TOTAL_BUDGET_EXCEEDED`).
+flight, one of them a final writer (below it, `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`), to what the other pots
+leave under the team total (above it, `activate` refuses `TEAM_TOTAL_BUDGET_EXCEEDED`), at most the per-GO cap (above
+it, `init` refuses `ROOT_GO_INVALID`). In an upload, the release guide's POTS step prints the same range before the
+sitting, from the staged release, so a `NO ROOM` is known in time. `-B` keeps Python from writing a
+compiled copy into the gate's folder.
 
 ```sh
-/usr/bin/python3 -I - /opt/debateai-v3-preview/operator/bedrock-budget-v1 <<'PY'
+/usr/bin/python3 -I -B - /opt/debateai-v3-preview/operator/bedrock-budget-v1 <<'PY'
 import sys
 from decimal import ROUND_CEILING, Decimal
 sys.path.insert(0, sys.argv[1])
@@ -293,18 +301,36 @@ PY
 
 A gate that is not installed shows pot `0`. Choose the daily pot inside the printed range. `NO ROOM`: first lower
 another gate's pot, as README.md "Change the daily budget or another limit" shows (the same steps for every gate, each
-with its own GO and folder: a new GO, then `stop` and `activate`); in an upload, that too runs before SB3. Then run
-this block again. A Python error instead of these lines
+with its own GO and folder: a new GO, then `stop` and `activate`); in an upload, the owner decides it before the sitting,
+and it runs before SB3. A lowered gate has a smallest pot of its own (below it, its `activate` refuses
+`CONCURRENCY_EXCEEDS_BUDGET` and that gate stays halted), and a pot lowered below what that gate has already spent
+today leaves it no room until midnight. Then run this block again. A Python error instead of these lines
 (for example `ROOT_CAPS_REQUIRED`: no caps file): stop and ask.
+
+Before the GO is written, check the GO's three fixed words against the DeepInfra gate's GO. This only reads and
+prints no amount. The table's `scope_id` and `target_host` must equal that GO's, and its list of allowed accounts,
+root left out, must be the table's pair:
+
+```sh
+jq -r '"scope_id: " + (if .scope_id == "preview-deepinfra-v3-20261010" then "SAME" else "DIFFERENT" end), "target_host: " + (if .target_host == "vps-a156d797" then "SAME" else "DIFFERENT" end), "allowed_peer_uids without root: " + (if ([.allowed_peer_uids[] | select(. != 0)] | sort) == [992, 994] then "SAME" else "DIFFERENT" end)' /etc/debateai-v3-preview/provider-deepinfra-go-v3.json
+```
+
+What to expect: three lines, each ending `SAME`. A `DIFFERENT`: stop before step 6 and ask. `init` writes the scope
+into this gate's state for good, and a gate whose scope or accounts differ from the app's answers the app with a
+refusal while every check on the day still passes.
+
+Then the GO. The two figures are typed here only. The block writes the GO under a temporary name first and installs
+it only when it is whole JSON with this gate's provider and both figures in place; otherwise it prints
+`GO_NOT_WRITTEN: ...` and installs nothing. On success the last line prints the GO with the two figures: on your
+screen only, never pasted.
 
 ```sh
 G=/opt/debateai-v3-preview/operator/bedrock-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 DAILY_BUDGET=<the owner's figure>; DAILY_CALLS=<the owner's figure>
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"bedrock",enabled_models:["us.openai.gpt-6-luna"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:4,max_final_writer_calls:1,open_days:31}' > /root/preview-archive/provider-bedrock-go-v1.json
-install -o root -g root -m 0600 /root/preview-archive/provider-bedrock-go-v1.json /etc/debateai-v3-preview/provider-bedrock-go-v1.json
-jq -c . /etc/debateai-v3-preview/provider-bedrock-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"bedrock",enabled_models:["us.openai.gpt-6-luna"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:4,max_final_writer_calls:1,open_days:31}' > /root/preview-archive/provider-bedrock-go-v1.json.new
+if jq -e '.provider=="bedrock" and (.daily_budget_usd|type=="string") and (.max_paid_posts_per_day|type=="number")' /root/preview-archive/provider-bedrock-go-v1.json.new >/dev/null 2>&1; then mv /root/preview-archive/provider-bedrock-go-v1.json.new /root/preview-archive/provider-bedrock-go-v1.json && install -o root -g root -m 0600 /root/preview-archive/provider-bedrock-go-v1.json /etc/debateai-v3-preview/provider-bedrock-go-v1.json && jq -c . /etc/debateai-v3-preview/provider-bedrock-go-v1.json; else echo 'GO_NOT_WRITTEN: the GO did not come out whole (type the two figures again: the calls a whole number with no comma or space); nothing was installed'; false; fi
 ```
 
 **6. init, then activate.** Only after the three older gates run this release's code ("New code for every gate").
@@ -316,12 +342,16 @@ P=/var/lib/debateai-v3-preview/provider-bedrock-authority-v1; GO=/etc/debateai-v
 ```
 
 What to expect: `init` prints `"state": "initialized"` and `"provider": "bedrock"`; `activate` prints
-`"state": "active"`, `"window_open": true` and `daily_budget_usd` the figure you wrote. A refusal is one line with
-`"status": "refused"` and a code, for example `ROOT_CAPS_REQUIRED` or `ROOT_CAPS_INVALID` (the caps file),
-`ROOT_GO_INVALID` (a GO field or a file hash), `CONCURRENCY_EXCEEDS_BUDGET` (the pot cannot carry four calls in flight,
-one of them a final writer: it is below the range step 5's first block printed), `HELPER_CUSTODY_INVALID`, or
-`TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together are above the team total: lower another gate's pot first, as step 5
-says).
+`"provider": "bedrock"`, `"state": "active"`, `"window_open": true` and `daily_budget_usd` the figure you wrote (on
+your screen only, never pasted). A refusal is one line with `"status": "refused"` and a code, for example
+`ROOT_CAPS_REQUIRED` or `ROOT_CAPS_INVALID` (the caps file), `ROOT_GO_INVALID` (a GO field or a file hash; also a pot
+not written with exactly two decimals, or above the per-GO cap), `ROOT_GO_REQUIRED` (no GO file: step 5's GO block
+did not install one; run it again), `CONCURRENCY_EXCEEDS_BUDGET`
+(the pot cannot carry four calls in flight, one of them a final writer: it is below the range step 5's first block
+printed), `HELPER_CUSTODY_INVALID`, `ACTIVATION_REFUSED` (for example a `target_host` that is not this server's name),
+or `TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together are above the team total: lower another gate's pot first, as step 5
+says). A refused `init` writes nothing. After any refusal, fix what it names and run both lines again (when `init` had
+passed, the second `init` prints `STATE_ALREADY_EXISTS`, and the `activate` line under it still runs).
 
 **7. Install the units and start the gate.** The boot drop-in comes later ("Switch it on").
 
@@ -468,7 +498,10 @@ sixth AI), then the plan, the publish, the check, the owner's fresh yes and the 
 not switched on at its gate yet": step 1 there is this gate's work above, step 2 is the activation). The activation
 refuses while this gate does not switch Luna on, and while any gate runs other gate code than the release's. Luna's
 thinking menu is `high`, `medium`, `low`, `none`; its seat ref, for a seat such as the checker, is
-`preview:gpt-6-luna`.
+`preview:gpt-6-luna`. With the step before Start on, the settings check (the release guide's SV3) also weighs one
+widest debate against this gate's daily pot: a pot too small for it fails the check with
+`GATE_POT_BELOW_ONE_DEBATE:bedrock:...`, and a gate that does not answer the pot question gives
+`GATE_POT_UNANSWERED:bedrock`.
 
 To take Luna out again: first an activation with a line-up without it, then (once the debates on the older version
 have finished) a GO without it.

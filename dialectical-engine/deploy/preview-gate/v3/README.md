@@ -791,11 +791,17 @@ app's thinking levels). The gate checks MiMo's sampling exactly, so an old helpe
 call of an app with #154, and the new helper refuses an older app's temperature 1: app and helper go
 up together.
 
-For each gate, as root, when no debate is running (`status` shows `in_flight` 0). The commands are
-for the DeepInfra gate; for the Anthropic gate use
-`G=/opt/debateai-v3-preview/operator/anthropic-budget-v1`,
-`GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json`, its service
-`debateai-preview-anthropic-budget.service` and its README's step numbers.
+For each gate, as root, when no debate is running (`status` shows `in_flight` 0). The blocks of steps 1
+and 4 are written for the DeepInfra gate; for another gate, set `G` and `GO` from this table instead. Steps 2 and 6
+use that gate's `P` (its private state folder) too, and every step names that gate's own service and its README's
+step numbers:
+
+| Gate | `G` | `GO` | `P` | Service |
+|---|---|---|---|---|
+| DeepInfra | `/opt/debateai-v3-preview/operator/deepinfra-budget-v3` | `/etc/debateai-v3-preview/provider-deepinfra-go-v3.json` | `/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3` | `debateai-preview-provider-budget.service` |
+| Anthropic | `/opt/debateai-v3-preview/operator/anthropic-budget-v1` | `/etc/debateai-v3-preview/provider-anthropic-go-v1.json` | `/var/lib/debateai-v3-preview/provider-anthropic-authority-v1` | `debateai-preview-anthropic-budget.service` |
+| Perplexity | `/opt/debateai-v3-preview/operator/perplexity-budget-v1` | `/etc/debateai-v3-preview/provider-perplexity-go-v1.json` | `/var/lib/debateai-v3-preview/provider-perplexity-authority-v1` | `debateai-preview-perplexity-budget.service` |
+
 1. Keep a copy of both gate files and the GO:
 
    ```sh
@@ -803,7 +809,17 @@ for the DeepInfra gate; for the Anthropic gate use
    B=/root/preview-archive/redeploy-$(date -u +%Y%m%dT%H%M%SZ)-$(basename "$G"); install -d -o root -g root -m 0700 "$B"
    cp -a "$G/preview_budget_authority.py" "$G/preview_budget_helper.py" "$GO" "$B/" && echo "$B" && ls -l "$B"
    ```
-2. `stop` (Daily operations, "Emergency off", level 1).
+2. `stop` (Daily operations, "Emergency off", level 1), with this gate's own `G`, `GO` and `P` (set them first, from
+   the table). The line first checks that the three name one gate (the GO's `provider`), so a value left over from
+   another gate stops nothing and prints `NOT_ONE_GATE: set G, GO and P from the table`:
+
+   ```sh
+   if jq -e --arg g "$G" --arg p "$P" '.provider as $n | ($g | contains("/" + $n + "-budget-")) and ($p | contains("/provider-" + $n + "-authority-"))' "$GO" >/dev/null; then /usr/bin/python3 -I "$G/preview_budget_authority.py" stop --private "$P"; else echo "NOT_ONE_GATE: set G, GO and P from the table"; fi
+   ```
+
+   It prints `"state": "halted"` and a `reason`. The reason should be `operator_stop`; any other means the gate had
+   already halted by itself (the first reason stays while a gate is halted): read why ("Re-open after a halt") before
+   you go on.
 3. Install both gate files from the reviewed release (install step 1 of that gate's README) and
    check their hashes as that step says.
 4. Write the GO again, changing ONLY its two hashes. The `diff` is for reading: it shows the two
@@ -821,12 +837,37 @@ for the DeepInfra gate; for the Anthropic gate use
    ```
    `deploy/preview-release/v1/README.md` "Publishing the call-concurrency row", step 0, checks both
    files and both hashes against the release and stops on any difference.
-5. Restart the gate's service (`debateai-preview-provider-budget.service`,
-   `debateai-preview-anthropic-budget.service`) so the running gate loads the new code.
-6. `activate` (owner's yes); `status` must show `state` `active`.
+5. Restart the gate's service (the table's last column) so the running gate loads the new code, then check it runs:
+   `systemctl is-active <the service>` must print `active`. A start check that refuses shows only systemd's
+   `Job for ... failed` here; its code is in the journal (`journalctl -u <the service> -n 20 -o cat`). Repair what
+   it names ("DeepInfra moved", "A start refused with `MODEL_NOT_LISTED`" below; README-perplexity.md, "Daily
+   operations", the paragraph on `PERPLEXITY_ADDRESSES_CHANGED`; for the Anthropic gate, ask),
+   then run `systemctl reset-failed <the service>` before the repair's own restart: the unit retries by itself every
+   30 seconds, and after four tries systemd refuses every start for 15 minutes.
+6. `activate` (owner's yes), with this gate's own `G`, `GO` and `P`, checked as in step 2:
 
-To go back: `stop`, put the three files from `$B` back in place (`install -o root -g root -m 0600`
-for the GO, the gate files as install step 1 installs them), restart the service and `activate`.
+   ```sh
+   if jq -e --arg g "$G" --arg p "$P" '.provider as $n | ($g | contains("/" + $n + "-budget-")) and ($p | contains("/provider-" + $n + "-authority-"))' "$GO" >/dev/null; then /usr/bin/python3 -I "$G/preview_budget_authority.py" activate --private "$P" --go "$GO"; else echo "NOT_ONE_GATE: set G, GO and P from the table"; fi
+   ```
+
+   Its own output must show `"provider"` with this gate's name (`deepinfra`, `anthropic` or `perplexity`),
+   `"state": "active"` and `"window_open": true`. The same line also shows the day's pot and spend: on your screen
+   only, never pasted. A line with `"status": "refused"` means stop, whatever `status` shows afterwards: a gate that
+   was never stopped keeps its old GO and refuses every call while `status` still says `active`.
+
+To go back: `stop`, put the three files from that gate's copy folder back in place (`install -o root -g root -m 0600`
+for the GO, the gate files as install step 1 installs them), restart the service and `activate` (step 6's line and
+pass sign). `$B` names the copy of the gate whose step 1 ran last; for another gate, use its own folder (below).
+
+After a closed window (the root shell was lost in the middle of these steps): open a new root shell and first read
+where every gate stands with the release guide's GATES4 (it only reads). Set `G`, `GO` and `P` again from the table
+for the gate you were on (`R` for step 3: as the release guide's piece 1 says). Never paste step 1 again: it would
+copy the half-new state and point `B` at that copy. Then finish that gate's remaining steps (each step can run again:
+`stop` on a halted gate only adds a history line, and steps 3 and 4 write the same bytes again), or go back. The right
+copy folder for a way back is that gate's `/root/preview-archive/redeploy-<time>-<gate folder>` with the latest time
+before the `halted_at` its `status` prints (`ls -d /root/preview-archive/redeploy-*-<gate folder>` lists them, oldest
+first; older ones come from earlier redeploys). The Amazon gate's install (README-bedrock.md), cut between its steps 6
+and 7: run step 7.
 
 Restart the runner only after BOTH gates are `active`: the runner reads each gate's number of calls
 at once once, at start-up, from the gate's `/remaining`. A gate it cannot read then runs ONE call at
@@ -835,6 +876,8 @@ a time until the runner's next restart, and the runner's journal shows
 gate is stopped, redeployed or restarted later, restart the runner after it is `active` again. The
 runner prints no line naming the call-concurrency setting; during the first debate after the
 restart, a gate's `status` showing `in_flight` above 1 is the proof that calls run together.
+In an upload's piece 1 the running release's runner is not restarted for this: the release guide's piece 1 says why
+(the new release's runner reads every gate at its own start).
 
 ## Length guidance LG-B (2026-10-15): installing this change
 
@@ -1097,6 +1140,11 @@ systemctl stop debateai-preview-provider-budget
 Until step 2, calls refuse ("stopped") and `/remaining` answers `window_open: false`: the gate
 only spends under the GO it was activated with. From the stop in step 2 until `activate` runs, a
 new call gets `AUTHORITY_HALTED` instead.
+
+Root may still be on the DeepInfra and Anthropic GOs' `allowed_peer_uids` (an earlier stopgap, so that tools run as
+root could ask those two gates). The release tools of the V4 start step ask every gate as the API's user, so root
+comes off on a later day, one gate at a time, with this recipe (the one value: the list), never between an upload's
+SB3 and its switch (DR6 on the drained path).
 
 **DeepInfra moved (the hourly check emailed, or a start refused with
 `DEEPINFRA_ADDRESSES_CHANGED`).** As in v2, with the v3 folder:
