@@ -917,6 +917,7 @@ function billingSubscription(now = Date.now()) {
       renewal_total: open ? "24.20" : null, currency: "EUR", scheduled_downgrade_plan_id: null,
       withdrawal_open_until: open ? iso(started + 14 * day) : null,
       withdrawal_last_day: open ? iso(started + 13 * day).slice(0, 10) : null,
+      started_on: iso(started).slice(0, 10),
       can_upgrade: open, can_change_card: open, can_revoke_cancel: false
     }
   };

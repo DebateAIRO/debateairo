@@ -757,7 +757,10 @@ const DRAFTED_UNTIL_CLICK_TEST: readonly string[] = Object.freeze([
   "v4.failed.keepsFailing",
   // V4 start step, Task 57n (owner 8 Nov, "Drop it, like digs"): a question that keeps failing because the AIs were unavailable gives its
   // reason without "Please try again in a while." (the home sentence cut), shown at the click-test.
-  "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE"
+  "v4.failed.keepsFailingReason.MODELS_UNAVAILABLE",
+  // A Start refused because an AI the plan needs cannot be reached right now: V4's own plain sentence instead of /new's "coordinator"
+  // one, which also offered a plan choice V4 does not have (a draft).
+  "v4.askError.aisBusy"
 ]);
 
 function sources(): Array<{ path: string; text: string }> {
@@ -1454,5 +1457,18 @@ describe("V4 start step, Task 82: the choosing card's drafts use plain words", (
       "v4.money.startsWait.PERSON_MONTH_NO_REPORT"
     ]));
     expect(later.filter((key) => START_STEP_ENGINE_WORDS.test(catalog[key]!)).map((key) => `${key}: ${catalog[key]}`)).toEqual([]);
+  });
+});
+
+describe("plain words before the first friends' test: a Start refused for busy AIs, and the header's help link", () => {
+  it("a Start refused because an AI is not available says nothing was started or used, and names no coordinator, plan or model", () => {
+    expect(catalog["v4.askError.aisBusy"]).toBe(
+      "The AIs we need are busy right now. Nothing was started and nothing was used from your quota. Please try again in a few minutes.");
+    expect(catalog["v4.askError.aisBusy"]).not.toMatch(/coordinator|plan|model/iu);
+    expect(DRAFTED_UNTIL_CLICK_TEST).toContain("v4.askError.aisBusy");
+  });
+
+  it("the header's link to /help is called Help: that page is the help chat, not an explainer of how V4 works", () => {
+    expect(catalog["v4.header.nav.how"]).toBe("Help");
   });
 });

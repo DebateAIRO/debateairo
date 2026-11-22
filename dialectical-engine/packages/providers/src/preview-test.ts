@@ -12,10 +12,12 @@ import { ProviderSentBilledFailure, ProviderUnbilledRefusal } from "./unbilled-r
 import { createPreviewRemainingRpcPort, previewGateOffersFinalWriterTier, type PreviewGateRemaining, type PreviewRemainingPort } from "./preview-remaining.js";
 import { NO_BUSY_COORDINATION, type PreviewBusyCoordinator } from "./preview-busy.js";
 import {
-  PREVIEW_ANTHROPIC_COUNT_TOKENS_URL, PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_CALL_TIER_LIMITS, PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
+  PREVIEW_ANTHROPIC_COUNT_TOKENS_URL, PREVIEW_ANTHROPIC_MESSAGES_URL, PREVIEW_BEDROCK_CHAT_COMPLETIONS_URL, PREVIEW_CALL_TIER_LIMITS,
+  PREVIEW_DEEPINFRA_BASE_URL, PREVIEW_MODEL_ROWS,
   PREVIEW_REQUEST_BODY_MAX_BYTES, previewCallTierOfBody, previewModelRow, previewModelRowForRef, previewNanoUsdText,
   previewRefsAreReviewedSet, previewReservationNanoUsd, previewRostersHonourMakerRule, previewStorytellerOutputCap,
-  previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewProviderName
+  previewTierOutputBound, type PreviewCallTier, type PreviewEffort, type PreviewModelRow, type PreviewOutputTokensMember,
+  type PreviewProviderName
 } from "./preview-models.js";
 import { previewFinalWriterAsk, previewFinalWriterRoleOf, type PreviewFinalWriterPlan } from "./preview-final-writer.js";
 import {
@@ -79,6 +81,8 @@ export interface PreviewProviderTestConfig {
   readonly budget_socket: string;
   readonly scope_id: string;
   readonly anthropic_budget_socket?: string;
+  /** The Amazon Bedrock gate's socket (README-bedrock.md: bedrock-budget-v1.sock). A roster naming its model requires it. */
+  readonly bedrock_budget_socket?: string;
   /**
    * Perplexity plan 2026-10-30, task W2-1: the web search gate's socket (README-perplexity.md: perplexity-budget-v1.sock).
    * Search is a gate, never a model provider: no roster names it, and absent, no debate searches the web.
@@ -88,8 +92,8 @@ export interface PreviewProviderTestConfig {
   readonly thinking_levels?: PreviewThinkingLevels;
 }
 /** Each non-DeepInfra provider's optional socket key (a later provider adds its own key here). */
-export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<Record<Exclude<PreviewProviderName, "deepinfra">, "anthropic_budget_socket">> =
-  Object.freeze({ anthropic: "anthropic_budget_socket" });
+export const PREVIEW_PROVIDER_SOCKET_KEYS: Readonly<{ anthropic: "anthropic_budget_socket"; bedrock: "bedrock_budget_socket" }> =
+  Object.freeze({ anthropic: "anthropic_budget_socket", bedrock: "bedrock_budget_socket" });
 /**
  * Perplexity plan W2-1: every spending gate the app can call: the model providers' gates and the web search gate. The
  * search gate is not a model provider (PreviewProviderName stays the providers with model rows).
@@ -98,7 +102,8 @@ export type PreviewGateName = PreviewProviderName | typeof PERPLEXITY_SEARCH_VEN
 /** The web search gate's optional socket key. */
 export const PREVIEW_SEARCH_SOCKET_KEY = "perplexity_budget_socket" as const;
 /** Each non-DeepInfra gate's optional socket key: the providers' keys, then the search gate's. */
-export const PREVIEW_GATE_SOCKET_KEYS: Readonly<Record<Exclude<PreviewGateName, "deepinfra">, "anthropic_budget_socket" | "perplexity_budget_socket">> =
+export const PREVIEW_GATE_SOCKET_KEYS: Readonly<Record<Exclude<PreviewGateName, "deepinfra">,
+  "anthropic_budget_socket" | "bedrock_budget_socket" | "perplexity_budget_socket">> =
   Object.freeze({ ...PREVIEW_PROVIDER_SOCKET_KEYS, perplexity: PREVIEW_SEARCH_SOCKET_KEY });
 const PREVIEW_SOCKET_PATTERN = /^\/run\/debateai-v3-preview\/[a-z0-9-]+\.sock$/u;
 /**
@@ -213,6 +218,43 @@ export function previewTeamAdmits(
   return userId !== undefined && teamUserIds !== undefined && teamUserIds.includes(userId);
 }
 /**
+ * Who may start debates on the preview when the team rule is lifted, read from PREVIEW_ASKS_OPEN_TO. Absent: the team
+ * rule as above. "everyone": any signed-in account. "everyone-with-test-payments": the same, while payments are the
+ * sandbox's; the two names keep the boot line truthful about which payment system strangers meet. Each name is accepted
+ * only exactly.
+ */
+export const PREVIEW_ASKS_OPEN_TO_VALUES = Object.freeze(["everyone", "everyone-with-test-payments"] as const);
+export type PreviewAsksOpenTo = typeof PREVIEW_ASKS_OPEN_TO_VALUES[number];
+/**
+ * The API and the runner both parse the setting here, so they decide alike. Refused at boot: any other value; no preview
+ * configuration (the spending gates would not be in the path); a team list in the same file (one file, one meaning);
+ * local mode (no room, so no per-person ceiling). Each refusal is a TypeError whose message is its code.
+ */
+export function parsePreviewAsksOpenTo(
+  source: string | undefined, context: Readonly<{ previewConfigured: boolean; teamKeyPresent: boolean; hosted: boolean }>
+): PreviewAsksOpenTo | undefined {
+  if (source === undefined) return undefined;
+  const value = PREVIEW_ASKS_OPEN_TO_VALUES.find((candidate) => candidate === source);
+  if (value === undefined) throw new TypeError("PREVIEW_ASKS_OPEN_TO_INVALID");
+  if (!context.previewConfigured) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITHOUT_PREVIEW");
+  if (context.teamKeyPresent) throw new TypeError("PREVIEW_ASKS_OPEN_TO_WITH_TEAM");
+  if (!context.hosted) throw new TypeError("PREVIEW_ASKS_OPEN_TO_NOT_HOSTED");
+  return value;
+}
+/**
+ * The team rule, or, with asks open, any signed-in account. A session without a user id is refused either way on the
+ * preview; off the preview there is no rule. Runs already in the system follow the same choice through
+ * PREVIEW_TEAM_RUNS_SQL or PREVIEW_ACCOUNT_RUNS_SQL.
+ */
+export function previewAskAdmits(
+  config: PreviewProviderTestConfig | undefined, teamUserIds: readonly string[] | undefined,
+  asksOpen: true | undefined, userId: string | undefined
+): boolean {
+  if (config === undefined) return true;
+  if (asksOpen === true) return userId !== undefined;
+  return previewTeamAdmits(config, teamUserIds, userId);
+}
+/**
  * Step 1 — THE ONE READ BEHIND THE TEAM RULE FOR RUNS ALREADY IN THE SYSTEM, shared by the
  * API's waker (`#previewTeamRuns`) and the runner's start-up gate so both apply the same rule.
  * $1 = run ids (uuid[]), $2 = team identity user ids (uuid[]). Returns the ids of the runs a
@@ -233,6 +275,29 @@ export const PREVIEW_TEAM_RUNS_SQL = `SELECT run.run_id::text AS run_id
         AND (account.owner_ref = latest.owner_ref
           OR (latest.owner_ref IS NULL AND run.asker_id = 'owner:' || account.owner_ref::text))
        WHERE run.run_id = ANY($1::uuid[])` as const;
+/**
+ * The same read with asks open (PREVIEW_ASKS_OPEN_TO), for the same three callers. $1 = run ids (uuid[]). Returns the
+ * ids of the runs ANY account owns, by the owner rule above without the team list: a legacy asker's run has no account,
+ * so it is still recorded FAILED, as a session without a user id is still refused at the routes. An `owner:` asker id
+ * is read as a uuid only in the exact lower-case form `'owner:' || owner_ref::text` writes, so the answer equals the
+ * rule above's and the account is found through its unique owner_ref index.
+ */
+export const PREVIEW_ACCOUNT_RUNS_SQL = `SELECT run.run_id::text AS run_id
+       FROM core.run AS run
+       LEFT JOIN LATERAL (
+         SELECT event.owner_ref
+         FROM core.run_ownership_event AS event
+         WHERE event.run_id = run.run_id
+         ORDER BY event.at_seq DESC
+         LIMIT 1
+       ) AS latest ON true
+       WHERE run.run_id = ANY($1::uuid[])
+         AND EXISTS (
+           SELECT 1
+           FROM identity."user" AS account
+           WHERE account.owner_ref = COALESCE(latest.owner_ref, CASE
+             WHEN run.asker_id ~ '^owner:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+             THEN substr(run.asker_id, 7)::uuid END))` as const;
 export function previewPlanTierRosters<T extends Readonly<{ free: readonly string[]; premium: readonly string[] }>>(
   config: PreviewProviderTestConfig | undefined, defaults: T
 ): Readonly<{ free: readonly string[]; premium: readonly string[] }> {
@@ -919,19 +984,32 @@ function effortOnMenu(present: boolean, value: unknown, reviewed: PreviewModelRo
  */
 function deepInfraBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number): boolean {
   if (reviewed.provider !== "deepinfra") return false;
+  return openAiBodyAccepted(body, reviewed, outputBound, "max_tokens");
+}
+/**
+ * The Amazon Bedrock (OpenAI Chat Completions) body its gate accepts for a row of its own, as the gate's
+ * BedrockProfile.body_valid does: the same members as a DeepInfra body, with the answer limit under
+ * `max_completion_tokens`. The row has no sampling and no JSON mode, so neither may appear.
+ */
+function bedrockBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number): boolean {
+  if (reviewed.provider !== "bedrock") return false;
+  return openAiBodyAccepted(body, reviewed, outputBound, "max_completion_tokens");
+}
+function openAiBodyAccepted(body: Record<string, unknown>, reviewed: PreviewModelRow, outputBound: number,
+  limitMember: PreviewOutputTokensMember): boolean {
   const hasResponseFormat = Object.hasOwn(body, "response_format");
   const responseFormat = body.response_format;
   if (hasResponseFormat && (!reviewed.jsonObject || !isPlainObject(responseFormat)
     || Object.keys(responseFormat).length !== 1 || !Object.hasOwn(responseFormat, "type") || responseFormat.type !== "json_object")) return false;
   const sampling = Object.entries(reviewed.sampling ?? {});
   const hasEffort = Object.hasOwn(body, "reasoning_effort");
-  const required = ["model", "max_tokens", "messages", ...(hasEffort ? ["reasoning_effort"] : []),
+  const required = ["model", limitMember, "messages", ...(hasEffort ? ["reasoning_effort"] : []),
     ...sampling.map(([key]) => key)];
   return Object.keys(body).length === required.length + (hasResponseFormat ? 1 : 0)
     && required.every(key => Object.hasOwn(body, key))
     && effortOnMenu(hasEffort, body.reasoning_effort, reviewed)
     && sampling.every(([key, value]) => typeof body[key] === "number" && body[key] === value)
-    && Number.isSafeInteger(body.max_tokens) && Number(body.max_tokens) >= 1 && Number(body.max_tokens) <= outputBound
+    && Number.isSafeInteger(body[limitMember]) && Number(body[limitMember]) >= 1 && Number(body[limitMember]) <= outputBound
     && Array.isArray(body.messages);
 }
 /** A text block of exactly `keys`, whose text is not only whitespace. */
@@ -1010,7 +1088,7 @@ function carriesKeyHeader(headers: RequestInit["headers"]): boolean {
 /**
  * Contract A §2/§3, PR B: the one fetch the preview's provider calls and probes go through. It
  * routes by the EXACT call URL to that provider's gate (DeepInfra chat completions to the DeepInfra
- * gate, Anthropic Messages to the Anthropic gate), so a call can only ever reach its own provider's
+ * gate, Anthropic Messages to the Anthropic gate, Amazon Bedrock chat completions to the Bedrock gate), so a call can only ever reach its own provider's
  * socket. It sends only a body that gate accepts for that body's reviewed row of THAT provider
  * (exact keys, the row's effort and JSON switches and its reviewed sampling, at most 256 KiB for a standard call and 1 MiB
  * for a final writer (LG-B), with 1 <= max_tokens <= that tier's bound), never a key header, and reserves at that row's price (an Anthropic body carrying the one cache
@@ -1029,7 +1107,8 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     if (url === PERPLEXITY_SEARCH_URL) return previewGuardedSearch(byProvider, init);
     if (url === PREVIEW_ANTHROPIC_COUNT_TOKENS_URL) return previewGuardedCount(byProvider, init);
     const provider: PreviewProviderName | undefined = url === `${PREVIEW_DEEPINFRA_BASE_URL}/chat/completions` ? "deepinfra"
-      : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic" : undefined;
+      : url === PREVIEW_ANTHROPIC_MESSAGES_URL ? "anthropic"
+      : url === PREVIEW_BEDROCK_CHAT_COMPLETIONS_URL ? "bedrock" : undefined;
     if (provider === undefined || init?.method !== "POST" || typeof init.body !== "string"
       || Buffer.byteLength(init.body, "utf8") > PREVIEW_CALL_TIER_LIMITS.FINAL_WRITER.requestBodyMaxBytes
       || carriesKeyHeader(init.headers)) refused();
@@ -1038,9 +1117,10 @@ export function createPreviewGuardedFetch(ports: PreviewBudgetPort | PreviewBudg
     const reviewed: PreviewModelRow = previewModelRow(decoded.model) ?? refused();
     // LG-B deviation 2: a body over a standard call's caps is a final writer's (only the call policy can make one).
     const bodyBytes = Buffer.byteLength(init!.body as string, "utf8");
-    const tier = previewCallTierOfBody(reviewed, bodyBytes, decoded.max_tokens);
+    const tier = previewCallTierOfBody(reviewed, bodyBytes, decoded[provider === "bedrock" ? "max_completion_tokens" : "max_tokens"]);
     const outputBound = previewTierOutputBound(reviewed, tier);
     if (!(provider === "deepinfra" ? deepInfraBodyAccepted(decoded, reviewed, outputBound)
+      : provider === "bedrock" ? bedrockBodyAccepted(decoded, reviewed, outputBound)
       : anthropicBodyAccepted(decoded, reviewed, outputBound))) refused();
     const port = byProvider[provider];
     if (port === undefined) {
@@ -1311,7 +1391,7 @@ export function createPreviewBudgetRpcPort(
 }
 /**
  * PR B: one RPC port per gate this config names (DeepInfra on `budget_socket`, Anthropic on
- * `anthropic_budget_socket` when set; Perplexity plan W2-1: the web search gate on `perplexity_budget_socket` when set).
+ * `anthropic_budget_socket` and Amazon Bedrock on `bedrock_budget_socket` when set; Perplexity plan W2-1: the web search gate on `perplexity_budget_socket` when set).
  * The guarded fetch routes each call to its own gate's port.
  */
 export function createPreviewBudgetRpcPorts(config: PreviewGateSettings, options: PreviewBudgetRpcOptions = {}): PreviewBudgetPorts {

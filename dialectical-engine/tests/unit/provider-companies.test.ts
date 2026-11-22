@@ -34,11 +34,11 @@ const at = (baseUrl: string, providerRef = "test:target"): ProviderDiscoveryTarg
   Object.freeze({ providerRef, maker: "Maker", baseUrl, model: "test-model" });
 
 describe("providerCompaniesOfTargets (addition D24)", () => {
-  it("the preview's five reviewed models, through their refs, reach Anthropic and DeepInfra", () => {
+  it("the preview's six reviewed models, through their refs, reach Amazon, Anthropic and DeepInfra", () => {
     const targets = reviewedTargets(PREVIEW_REVIEWED_PROVIDER_REFS);
     expect(new Set(targets.map((target) => target.model))).toEqual(new Set(PREVIEW_MODEL_ROWS.map((row) => row.model)));
-    expect(new Set(targets.map((target) => target.model)).size).toBe(5);
-    expect(providerCompaniesOfTargets(targets)).toEqual(["anthropic", "deepinfra"]);
+    expect(new Set(targets.map((target) => target.model)).size).toBe(6);
+    expect(providerCompaniesOfTargets(targets)).toEqual(["amazon", "anthropic", "deepinfra"]);
     expect(Object.isFrozen(providerCompaniesOfTargets(targets))).toBe(true);
   });
 
@@ -57,17 +57,6 @@ describe("providerCompaniesOfTargets (addition D24)", () => {
     );
     expect(new URL(parsed[0]!.baseUrl).hostname).toBe("api.deepinfra.com.");
     expect(providerCompaniesOfTargets(parsed)).toEqual(["deepinfra"]);
-  });
-
-  it("GPT on Amazon Bedrock in Stockholm (owner, 18 November 2026) reaches Amazon, through either Bedrock endpoint", () => {
-    expect(providerCompaniesOfTargets([at("https://bedrock-mantle.eu-north-1.api.aws/openai/v1")])).toEqual(["amazon"]);
-    expect(providerCompaniesOfTargets([at("https://bedrock-runtime.eu-north-1.amazonaws.com/openai/v1")])).toEqual(["amazon"]);
-    expect(providerCompaniesOfTargets([at("https://Bedrock-Mantle.EU-North-1.api.aws./v1")])).toEqual(["amazon"]);
-    expect(providerCompaniesOfTargets([
-      at("https://bedrock-mantle.eu-north-1.api.aws/openai/v1"), at(PREVIEW_ANTHROPIC_BASE_URL), at(PREVIEW_DEEPINFRA_BASE_URL)
-    ])).toEqual(["amazon", "anthropic", "deepinfra"]);
-    // Another region is not the reviewed one: it shows as its own host until the owner names it.
-    expect(providerCompaniesOfTargets([at("https://bedrock-runtime.us-east-1.amazonaws.com/v1")])).toEqual(["host:bedrock-runtime.us-east-1.amazonaws.com"]);
   });
 
   it("a loopback or private relay (local mode only) names no outside company", () => {
@@ -99,7 +88,7 @@ describe("providerCompaniesOfTargets (addition D24)", () => {
     const catalogue = pages.match(/const REVIEWED_PROVIDER_COMPANIES[^=]*= Object\.freeze\(\[([\s\S]*?)\]\s*as const\)/u)?.[1];
     expect(catalogue).toBeDefined();
     const keys = [...(catalogue ?? "").matchAll(/\["([a-z]+)",/gu)].map((match) => match[1]);
-    expect(keys).toEqual(["anthropic", "amazon", "deepinfra"]);
+    expect(keys).toEqual(["anthropic", "deepinfra", "amazon"]);
     for (const company of new Set(Object.values(PROVIDER_COMPANY_HOSTS))) expect(keys, company).toContain(company);
   });
 });
@@ -122,6 +111,6 @@ describe("web search is not a debater", () => {
     const reviewed = reviewedTargets(PREVIEW_REVIEWED_PROVIDER_REFS);
     const searchTarget = Object.freeze({ ...reviewed[0]!, baseUrl: "https://api.perplexity.ai" });
     expect(() => assertPreviewTargetSet([searchTarget, ...reviewed.slice(1)])).toThrowError("PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID");
-    expect(providerCompaniesOfTargets(reviewed)).toEqual(["anthropic", "deepinfra"]);
+    expect(providerCompaniesOfTargets(reviewed)).toEqual(["amazon", "anthropic", "deepinfra"]);
   });
 });

@@ -1204,8 +1204,8 @@ printf '%s\n' "$new" | grep -Eqx '[a-z0-9]([a-z0-9-]{0,70}[a-z0-9])?' && printf 
 downloads), then install the folder from the store with the network off, and build what the
 release needs (the contract and the website; the website build stamps `RELEASE_KEY`). The build
 line first runs the legal release check (`pnpm run legal:release-check`, §14.7): while the Terms
-of Service or the Privacy Policy is not up to date in every language, or the archive lacks a
-current text, it lists what is missing and the build does not run. That is fixed in the
+of Service or the Privacy Policy is not up to date in every language the release offers, or the
+archive lacks a current text of one of them, it lists what is missing and the build does not run. That is fixed in the
 repository and a new commit reviewed, never on this server:
 
 ```sh
@@ -2602,6 +2602,8 @@ The paid-vendor probe spends at most `max_tokens: 512` per target per staleness 
 
 `PROVIDER_DISCOVERY_TARGET_PRICE_INVALID` is raised while the targets are parsed, before `PROVIDER_TARGET_PRICE_REQUIRED` or `PROVIDER_TARGET_PRICE_ZERO` can be: a target whose price is malformed never reaches the other two.
 
+The API has one more start-up refusal, for the test server's setup only and never on this host: `PREVIEW_PROVIDER_ORIGIN_INVALID`. It means `PREVIEW_PROVIDER_TEST_CONFIG_JSON` is set and `PUBLIC_APP_URL` is neither `https://v3-preview.dezbatere.ro` nor, in hosted mode, `https://dezbatere.ro`. The test server's launcher refuses the same case first, with its own named code (`PREVIEW_ORIGIN_NOT_LISTED` or `PREVIEW_MAIN_ORIGIN_NOT_HOSTED`), so this code shows only when the API is started without the launcher (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 10).
+
 ### The credential-file contract
 
 The file holds the `authorization` header **value** verbatim — the scheme word, a space and the
@@ -3849,7 +3851,7 @@ People there can sign up and use Free; only paying is refused. To open one:
    only; deleting its entry opens it for them too.)
 3. Publish as in §14.4. The new version replaces the old one; a sealed version is never edited.
 
-Tennessee (`US-TN`, reason `TERMS_EXCLUDED`) is not a tax region: the Terms exclude it. Keep its entry while they do.
+Tennessee (`US-TN`) and Mississippi (`US-MS`), reason `TERMS_EXCLUDED`, are not tax regions: the Terms exclude them. Keep their entries while they do.
 
 The publish refuses a region id the code does not know, and a region entry with `signup` or `blocked`: a region
 never closes sign-up.
@@ -3931,10 +3933,12 @@ true:
 
 **The Terms archive.** Every published Terms and Privacy version is kept, by its fingerprint, under
 `apps/ui/legal/archive/` (one folder per language). A change to either text is made in English first; before a
-release, every language is translated from the current English text and recorded in
-`apps/ui/legal/translated-from.json`, and `pnpm run generate:legal:archive` adds the file for each current text.
-`pnpm run legal:release-check`, which step 2 of an upgrade runs before the build, refuses a release until both are
-done and names each language that lags.
+release, every language the release offers (`RELEASE_LEGAL_LOCALES` in `apps/ui/scripts/generate-legal-data.mjs`:
+English, French, which Canada reads at sign-up, and Romanian) is translated from the current English text and recorded
+in `apps/ui/legal/translated-from.json`, and `pnpm run generate:legal:archive` adds the file for each current text of
+those languages. `pnpm run legal:release-check`, which step 2 of an upgrade runs before the build, refuses a release
+until both are done and names each of those languages that lags. The other languages' texts stay in the repository
+and are neither checked nor archived.
 Never delete or edit a file there: each is a version someone accepted, and the confirmation email attaches the
 version the person accepted from there, even after the Terms change. The site lists them at `/terms/versions` and
 `/privacy/versions`, as both documents promise, and shows each one at its own address.
@@ -4270,10 +4274,14 @@ same day it arrives. It works out the refund itself: the price times the share o
 not used, so a person who used none gets the whole price back. It records the
 withdrawal as of the moment the statement arrived (a statement sent in time counts even if you run the command after
 the 14 days), ends the plan, queues the refund, and emails the person at once that their withdrawal was received
-(M8_RECEIVED, "We've received your withdrawal", dated when the statement arrived). The confirmation that the money
-went back (M8) follows once the refund is done; when nothing is due back, M8 goes at once instead and is the only
-email. A withdrawal made in Settings sends the same emails. When the 14th day is a Saturday or a Sunday, the person
-still has until the end of the next Monday; the command counts it the same way.
+(M8_RECEIVED, "We've received your withdrawal"). That email repeats the statement: the date and time it arrived, in
+the person's own time zone with the offset named (UTC when their country has several zones), the plan and the day it
+started, and their name as the billing details hold it. The confirmation that the money went back (M8) follows once
+the refund is done; when nothing is due back, the acknowledgement says so and is the only email. A withdrawal made
+in Settings sends the same emails. When the 14th day is a Saturday, a Sunday or a Romanian
+public holiday (Labour Code art. 139(1), with Orthodox Good Friday, Easter and Rusalii), the person still has until the
+end of the next working day, whatever country they live in; the command counts it the same way. When Parliament adds a
+public holiday, it is added in `packages/billing-core/src/romanian-public-holidays.ts`.
 
 First find the person's owner reference from the account address. Send the address on stdin to
 `pnpm billing:withdraw --owner-of-email`; it prints `owner_ref: <uuid>` or `owner_ref: none`.
@@ -4294,11 +4302,31 @@ values at the prompt:
 read -r OWNER_REF && read -r RECEIVED_AT && systemd-run --pipe --wait --collect --uid=debateai-api --gid=debateai-api --property=EnvironmentFile=/etc/debateai/api.env --working-directory=/opt/debateai/dialectical-engine /usr/bin/pnpm billing:withdraw --owner "$OWNER_REF" --received "$RECEIVED_AT"
 ```
 
-If it prints `WITHDRAWAL_DEBATE_RUNNING`, nothing was written: the statement arrived less than an hour ago, more than
-a day of the 14 is left, and a debate the person started before it may still be using credit. Run the same command
-again later with the same arrival time. Once the arrival is an hour old, or inside the last day of the 14, the command
-records it at once. A debate whose runner has stopped does not hold it up for long: its claim lapses, and a debate
-counts as possibly writing its story only for an hour after its last charge.
+The command records the withdrawal at once, also while a debate the person started is still running, and so does
+Settings: the credit used is what had been charged for the calls sent before the statement, and anything the debate
+sends after it is not the person's to pay.
+
+**If the plan is paused by a card dispute.** While a plan is paused (`SUSPENDED`), Settings still shows "Withdraw from
+contract here" for the whole 14 days, but its panel tells the person to withdraw by email, because neither Settings
+nor the command records a withdrawal for a paused plan (the command prints `NOT_SUBSCRIBED` and writes nothing). When
+such a statement arrives, reply to the person at once that you have received it, with the date and time it arrived,
+and keep that arrival time. The refund is due within 14 days of that arrival, and a card dispute often takes several
+weeks, so work out what is due at once, as described below, without waiting for the outcome. Do not refund it in
+NETOPIA's admin while the dispute is open: if the dispute is then lost, the person gets the money twice. If the dispute
+is still open a few days before those 14 days end, ask NETOPIA how to make the refund.
+
+Once the dispute is decided, record it with `pnpm billing:dispute` (**Disputes (chargebacks)**, above) and go by what
+it prints:
+
+- `RESUMED`: the dispute was won before the paid month ended, and the plan is active again. Run the command above
+  with `--received` set to that arrival time, and it settles the withdrawal as usual (a statement sent in time counts
+  however late you run it).
+- `RESOLVED_AFTER_END`: the dispute was won after the paid month ended, so the plan has ended and is not resumed, and
+  the command above prints `NOT_SUBSCRIBED`. Settle the withdrawal by hand, as described below for a deleted account.
+- `STILL_DISPUTED`: another payment of the plan is still disputed, and the plan stays paused. Wait for that outcome
+  too.
+- `ENDED_DISPUTE` (lost), or the site ended the plan by itself on a lost dispute (NETOPIA's status 10): the bank has
+  given the disputed payment back. Settle anything still due by hand, as described below for a deleted account.
 
 **If the person has scheduled their account deletion.** Scheduling a deletion only stops the renewal. The plan stays
 live until the deletion runs (at the earliest seven full days after it was scheduled, unless they cancel it), and so

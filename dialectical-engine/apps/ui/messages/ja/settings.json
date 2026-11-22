@@ -83,6 +83,7 @@
   "settings.sessions.current": "現在のセッション",
   "settings.sessions.other": "他のセッション",
   "settings.sessions.lastSeen": "最終利用日時：{date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "セッション{sessionId}を無効化",
   "settings.sessions.revoke": "無効化",
   "settings.sessions.revokeAll": "すべてのセッションを無効化",

@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { availablePaymentMarks, PAYMENT_MARK_NAMES, PAYMENT_MARKS_SETTING } from "../../apps/ui/lib/billing/paymentMarks.js";
+import {
+  availablePaymentMarks, NETOPIA_LOGO_ID_FORM, NETOPIA_LOGO_SETTING, netopiaLogoAddress, netopiaLogoOnDark, PAYMENT_MARK_NAMES, PAYMENT_MARKS_SETTING
+} from "../../apps/ui/lib/billing/paymentMarks.js";
 
 const NONE = { netopia: false, visa: false, mastercard: false };
 const marks = (value: string) => availablePaymentMarks({ PAYMENT_MARKS_AVAILABLE: value });
@@ -36,5 +38,52 @@ describe("P21, N25b NETOPIA's, Visa's and Mastercard's marks appear only when th
   it("the website and the test site's tools know the same three marks", async () => {
     const environment = await import("../../deploy/" + "preview-auth-dev/v1/environment.mjs");
     expect(environment.PAYMENT_MARK_NAMES).toEqual(PAYMENT_MARK_NAMES);
+  });
+});
+
+describe("NETOPIA's hosted logo: the NETOPIA_LOGO_ID setting gives one image address on NETOPIA's server", () => {
+  // Made-up shop ids: the real one is never in the repository.
+  const GOOD = ["1", "123456", "000000000001", "999999999999"];
+  const BAD = ["", "12a", " 123", "123 ", "-1", "1.5", "1234567890123", "１２３", "123\n", "0x12"];
+
+  it("is absent until the setting is there, and then NETOPIA's black-on-light picture for that id", () => {
+    expect(NETOPIA_LOGO_SETTING).toBe("NETOPIA_LOGO_ID");
+    expect(netopiaLogoAddress({})).toBeNull();
+    expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: "123456" })).toBe("https://mny.ro/np-black-0.svg?id=123456");
+    for (const id of GOOD) expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: id }), id).toBe(`https://mny.ro/np-black-0.svg?id=${id}`);
+  });
+
+  it("has a white-on-dark version of the same picture, at the same host and with the same id", () => {
+    expect(netopiaLogoOnDark("https://mny.ro/np-black-0.svg?id=123456")).toBe("https://mny.ro/np-white-0.svg?id=123456");
+    for (const id of GOOD) {
+      const onLight = netopiaLogoAddress({ NETOPIA_LOGO_ID: id })!;
+      const onDark = netopiaLogoOnDark(onLight);
+      expect(onDark, id).toBe(`https://mny.ro/np-white-0.svg?id=${id}`);
+      // The content policy allows one outside image host, so both versions must come from it.
+      expect(new URL(onDark).origin, id).toBe(new URL(onLight).origin);
+    }
+  });
+
+  it("gives no address for any value that is not 1 to 12 digits", () => {
+    for (const id of BAD) expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: id }), JSON.stringify(id)).toBeNull();
+  });
+
+  it("the website's start, the test site's tools and this reader hold the same form", async () => {
+    const environment = await import("../../deploy/" + "preview-auth-dev/v1/environment.mjs") as { isNetopiaLogoId: (value: unknown) => boolean };
+    for (const id of [...GOOD, ...BAD]) expect(environment.isNetopiaLogoId(id), JSON.stringify(id)).toBe(NETOPIA_LOGO_ID_FORM.test(id));
+    expect(environment.isNetopiaLogoId(undefined)).toBe(false);
+    expect(environment.isNetopiaLogoId(123456)).toBe(false);
+    const server = readFileSync(new URL("../../apps/ui/server.mjs", import.meta.url), "utf8");
+    expect(NETOPIA_LOGO_ID_FORM.source).toBe("^[0-9]{1,12}$");
+    expect(server).toContain(`!/${NETOPIA_LOGO_ID_FORM.source}/.test(netopiaLogoId)) throw refuse("NETOPIA_LOGO_ID_INVALID");`);
+    expect(server).toContain("const netopiaLogoId = process.env.NETOPIA_LOGO_ID;");
+    // Before the release key is read, so a start without a key (the integration smoke) still names this refusal.
+    expect(server.indexOf('throw refuse("NETOPIA_LOGO_ID_INVALID")')).toBeLessThan(server.indexOf("parseWebsiteReleaseKey(process.env.RELEASE_KEY"));
+  });
+
+  it("the page's image policy lets exactly that address's host in", async () => {
+    const policy = await import("../../apps/ui/" + "content-security-policy.mjs") as { FALLBACK_CONTENT_SECURITY_POLICY: string };
+    const origin = new URL(netopiaLogoAddress({ NETOPIA_LOGO_ID: "123456" })!).origin;
+    expect(policy.FALLBACK_CONTENT_SECURITY_POLICY.split("; ")).toContain(`img-src 'self' data: ${origin}`);
   });
 });

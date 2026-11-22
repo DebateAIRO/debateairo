@@ -132,7 +132,7 @@ const NOTICE_TEMPLATES = Object.freeze({ LIMIT_CHANGED: "TEAM_LIMIT_CHANGED", PA
 export type TeamLimitNoticeInputs = Readonly<{
   repository: Pick<PostgresTeamLimitRepository, "completeNotice" | "noticeUser"> & Readonly<{ claimNotices(limit: number): ReturnType<PostgresTeamLimitRepository["claimNotices"]> | ReturnType<PostgresInternalAllowanceRepository["claimNotices"]> | ReturnType<PostgresPublicReviewRepository["claimNotices"]> | ReturnType<PostgresPublicFlagRepository["claimNotices"]> }>;
   mail: TemplatedMailChannel;
-  /** Opens a live account's address; the same reader the threat reports use for a named account. */
+  /** Opens a live account's address (main.ts: accountEmailReader on the X27 cross-account target). */
   readEmail(userId: string): Promise<string | null>;
   everyMs?: number;
 }>;

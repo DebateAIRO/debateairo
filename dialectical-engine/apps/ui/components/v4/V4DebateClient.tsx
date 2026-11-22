@@ -1537,7 +1537,6 @@ function V4Debate({
   const moment = report.momentAllowed ? viewMoment : null;
 
   // ── Layout ──────────────────────────────────────────────────────────────────────────────────────────────────────
-  const classicHref = `/debate/${encodeURIComponent(runId)}`;
   // R2REG-5: links carry only a level the person chose (none chosen: /v4 still offers its one-time choice); the report
   // link is made above, with the ready moments. Task 75c: the debate's own level is no choice for the next question, so the ask
   // page's link carries none (step 1 offers the account's level, as before).
@@ -1551,10 +1550,9 @@ function V4Debate({
   const header = (
     <V4Header
       catalog={catalog}
-      // wait-f23 / ask-f6 / journey-f19 with the owner's answer 12 B (5 Nov): "Open in the classic view" is in the account
-      // menu only, once, on every screen of the map's step (waiting, paused and failed too); no body screen draws one. No
-      // level is handed (the 5 Nov ruling: no header shows or carries one).
-      classicHref={classicHref}
+      // No classic-view link: on the main site every debate is a V4 one, so the account menu does not offer the older
+      // workspace (the menu can still draw one for a caller that hands it an address). No level is handed either: no
+      // header shows or carries one.
       after={served !== null ? report.headerStrip : null}
     >
       {/* W3-4: "Write my report" is always there once the answer is served (the owner's money rule keeps it possible).

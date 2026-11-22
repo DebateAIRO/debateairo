@@ -21,20 +21,25 @@ import { t } from "@/lib/i18n/translate";
 import { dailyLimitMessageCatalog, legalGateMessageCatalog } from "@/lib/v3/requestFailure";
 import { composerRoomCatalog } from "@/lib/billing/roomCatalog";
 import { formatMoney, pricedTax, type PricedTax } from "@/lib/billing/format";
-import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
+import { availablePaymentMarks, netopiaLogoAddress } from "@/lib/billing/paymentMarks";
 import type { SiteFooterBilling } from "@/lib/billing/footerBilling";
 
 export const dynamic = "force-dynamic";
 
-type LandingPlans = Readonly<{ lowestPaidPrice: string | null; tax: PricedTax; footer: SiteFooterBilling }>;
+type LandingPlans = Readonly<{
+  lowestPaidPrice: string | null; tax: PricedTax; footer: SiteFooterBilling; testModeNote: string | null;
+}>;
 
 /**
  * The landing's one plans read: the lowest paid price for the price line (with the connection country's tax, Terms
  * §12; with no priced place, no price at all), and whether billing is on for the footer. Only the route's 404 means
- * off (local mode, or hosted before the switch), exactly as billingIsOn() decides.
+ * off (local mode, or hosted before the switch), exactly as billingIsOn() decides. The same answer says whether card
+ * payments run on NETOPIA's sandbox: then the price line carries the test-mode note, which goes away by itself once
+ * the server is switched to live payments.
  */
 async function landingPlans(locale: string, headerStore: Headers): Promise<LandingPlans> {
-  const footer = (billingOn: boolean): SiteFooterBilling => Object.freeze({ billingOn, marks: availablePaymentMarks() });
+  const footer = (billingOn: boolean): SiteFooterBilling =>
+    Object.freeze({ billingOn, marks: availablePaymentMarks(), netopiaLogo: netopiaLogoAddress() });
   try {
     const answer = await createServerContractClient(
       fetch, undefined, headerStore.get("user-agent") ?? undefined, readTrustedClientIp(headerStore)
@@ -46,14 +51,16 @@ async function landingPlans(locale: string, headerStore: Headers): Promise<Landi
       // Spec 2026-10-05 §2.16.1: in the currency the visitor's connection pays in.
       .flatMap((plan) => plan.total_price ?? [])
       .sort((left, right) => Number(left) - Number(right))[0];
+    const testModeNote = answer.environment === "sandbox"
+      ? t(await loadNamespace(locale, "billing"), "billing.testMode.notice") : null;
     return Object.freeze({
       lowestPaidPrice: lowest === undefined ? null : formatMoney(locale, lowest, answer.currency),
-      tax: paid.length === 0 ? "UNPRICED" : tax, footer: footer(true)
+      tax: paid.length === 0 ? "UNPRICED" : tax, footer: footer(true), testModeNote
     });
   } catch (failure) {
     return Object.freeze({
       lowestPaidPrice: null, tax: "UNPRICED",
-      footer: footer(!(failure instanceof ContractHttpError && failure.status === 404))
+      footer: footer(!(failure instanceof ContractHttpError && failure.status === 404)), testModeNote: null
     });
   }
 }
@@ -82,6 +89,7 @@ export default async function HomePage({
     const plans = await landingPlans(locale, await headers());
     return <><LandingPage
       catalog={catalog} lowestPaidPrice={plans.lowestPaidPrice} tax={plans.tax} footerBilling={plans.footer}
+      testModeNote={plans.testModeNote}
     /><SupportWidget /></>;
   }
   const requestedTab = (await searchParams).tab;

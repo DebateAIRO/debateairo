@@ -32,7 +32,8 @@ export function CardChangeFlow({
   returnedChargeRef = null,
   client = contractClient,
   navigate = leaveFor,
-  goToPayment = leaveForPayment
+  goToPayment = leaveForPayment,
+  testMode = false
 }: Readonly<{
   catalog?: MessageCatalog;
   locale: LocaleCode;
@@ -42,6 +43,8 @@ export function CardChangeFlow({
   client?: CardChangeClient;
   navigate?: (href: string) => void;
   goToPayment?: (url: string) => void;
+  /** True while the server's card payments run on NETOPIA's sandbox (the page reads it from the plans list); none by default. */
+  testMode?: boolean;
 }>) {
   const [stored, setStored] = useState<Stored | null>(null);
   const [details, setDetails] = useState<BillingDetails | null>(null);
@@ -193,6 +196,8 @@ export function CardChangeFlow({
               )} />
           </div>
           <p className="billingNote">{t(catalog, "billing.card.noHoldNote")}</p>
+          {/* The check also leaves for NETOPIA's page, so the same note stands before it. */}
+          {testMode ? <p className="billingNote" role="note">{t(catalog, "billing.testMode.notice")}</p> : null}
           {total !== null && currency !== null ? (
             <>
               <label className="billingConsent">

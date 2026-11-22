@@ -1,4 +1,5 @@
 import type { FastifyReply } from "fastify";
+import type { AuthenticatedSession } from "../sessions.js";
 
 /**
  * A refusal a billing route answers with `{error: code, message: code}` (plus `charge_ref` for CHECKOUT_PENDING);
@@ -15,7 +16,7 @@ export type BillingRefusalCode =
   /** Payment region blocks (spec 2026-10-20 §8): the billing address is in a region closed for payment (403). */
   | "REGION_PAYMENT_UNAVAILABLE"
   /**
-   * The billing address is in a region the Terms exclude (403): Tennessee (Terms §2, Annex A.2), read from the region
+   * The billing address is in a region the Terms exclude (403): Tennessee or Mississippi (Terms §2, Annex A.2), read from the region
    * rule's reason TERMS_EXCLUDED (the owner's choice of 3 November 2026).
    */
   | "REGION_TERMS_EXCLUDED"
@@ -45,6 +46,11 @@ export type BillingRefusalCode =
   | "DOWNGRADE_NOT_LOWER"
   /** P12b (P2 review fix round 1, finding 1): the renewal charge for the next period is already written (409). */
   | "DOWNGRADE_NOT_AVAILABLE_NOW"
+  /**
+   * The lower plan's price is not the one the confirmation showed (the plan prices changed while the page was open);
+   * nothing is written (409).
+   */
+  | "DOWNGRADE_PRICE_CHANGED"
   /** P12c: the upgrade target is not dearer than the plan in force, or than the price this subscriber pays (422). */
   | "UPGRADE_NOT_HIGHER"
   /** P12c: an earlier upgrade has no outcome yet, or another process holds the subscription's lease (409). */
@@ -54,17 +60,13 @@ export type BillingRefusalCode =
   /** P12c: the renewal of this period is due, postponed or already charging; upgrade in the new period (409). */
   | "UPGRADE_NOT_AVAILABLE_NOW"
   /**
-   * P12d: the withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
-   * Saturday or Sunday moves to the Monday, W6), or a tax country outside `withdrawalCountries` (409).
+   * The withdrawal right is not open: past the 14 calendar days from the first activation (a last day on a
+   * Saturday, a Sunday or a Romanian public holiday moves to the next working day), or a tax country outside
+   * `withdrawalCountries` (409).
    */
   | "WITHDRAWAL_WINDOW_CLOSED"
   /** P12d: no live WITHDRAW_SUBSCRIPTION step-up grant for this session (403); nothing was written. */
   | "STEP_UP_REQUIRED"
-  /**
-   * NV-45: a debate the person started before the withdrawal may still be using credit, and more than a day of the
-   * window is left; nothing was written and the grant was not spent (409).
-   */
-  | "WITHDRAWAL_DEBATE_RUNNING"
   /** P12e (A2): a renewal's charge may have reached NETOPIA; the card can change once its outcome is recorded. */
   | "CARD_CHANGE_NOT_AVAILABLE_NOW"
   /** P13 (A25): the emailed cancel link's token is unknown, already spent or past its 24 hours (404). */
@@ -77,7 +79,12 @@ export type BillingRefusalCode =
   /**
    * P15: an account erasure is pending (the person stays signed in for the 7-day grace): no new money is taken (409).
    */
-  | "ACCOUNT_ERASURE_PENDING";
+  | "ACCOUNT_ERASURE_PENDING"
+  /**
+   * On the hosted preview while payments are real: the account may not ask questions there, so it may not buy or upgrade
+   * a plan either; it would pay and then be refused every question. Nothing was written (403).
+   */
+  | "PREVIEW_TEAM_ONLY";
 
 export type BillingRefusalStatus = 403 | 404 | 409 | 422 | 503;
 
@@ -92,6 +99,18 @@ export class BillingRefusal extends Error {
 /** The house 404 every billing route answers while its dependency is absent. */
 export function billingNotFound(reply: FastifyReply): FastifyReply {
   return reply.status(404).send({ error: "NOT_FOUND", message: "NOT_FOUND" });
+}
+
+/**
+ * Who may buy or upgrade a plan, when a rule applies: buildApi hands one over only on the hosted preview while payments
+ * are real, where it is the same rule as who may ask. Absent, everyone may, as before.
+ */
+export type BillingBuyerAdmits = (session: AuthenticatedSession) => boolean;
+
+/** The buyer rule's refusal, answered before any budget, check or payment page: nothing is spent or written. */
+export function refuseBuyer(reply: FastifyReply): FastifyReply {
+  const code: BillingRefusalCode = "PREVIEW_TEAM_ONLY";
+  return reply.status(403).send({ error: code, message: code });
 }
 
 /**

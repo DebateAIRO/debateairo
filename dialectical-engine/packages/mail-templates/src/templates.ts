@@ -14,7 +14,7 @@ export const MAIL_TEMPLATE_IDS = Object.freeze([
   "M1", "M2_INVOICE_LINK", "M2_INVOICE_ATTACHED", "M3", "M4", "M5A", "M5B", "M5C",
   "M6", "M7", "M8", "M8_RECEIVED", "M9", "M10", "M10_ENDED", "M11", "M11_DUPLICATE", "M12", "O1", "O2", "O2_WITHDRAWAL",
   "O2_REFUND_DUE", "O2_REFUND_REMINDER", "O3", "O4",
-  "DATA_EXPORT", "THREAT_REPORT_WAITING", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
+  "DATA_EXPORT", "TEAM_LIMIT_CHANGED", "TEAM_LIMIT_PARTNER_CHANGED", "TEAM_ALLOWANCE_CHANGED", "TEAM_ALLOWANCE_YOURS", "PUBLIC_REVIEW_CHANGED", "PUBLIC_FLAG_HIDDEN", "PUBLIC_FLAG_WAITING",
   "MODERATION_MAIL_FAILED",
   "MODERATION_DEBATE_HIDDEN", "MODERATION_CONTRIBUTION_REMOVED", "MODERATION_REPORT_REMOVED",
   "MODERATION_STATEMENT_DEBATE_HIDDEN", "MODERATION_STATEMENT_DEBATE_DECIDED", "MODERATION_STATEMENT_CONTRIBUTION_REMOVED", "MODERATION_STATEMENT_REPORT_REMOVED",
@@ -30,7 +30,8 @@ export type MailTemplateId = (typeof MAIL_TEMPLATE_IDS)[number];
 /**
  * How a param is checked and shown. plan: a plan id shown by its catalogue name. amount: a decimal
  * "24.20" shown in the email's currency (`params.currency`: USD, EUR or RON; USD when absent) in the locale. date: an ISO date or instant shown as a long date (UTC).
- * datetime: the same date plus 24-hour UTC time. url: https
+ * datetime: the same date plus 24-hour time, in UTC; or, when the email names a zone (`params.timeZone`, an IANA zone),
+ * in that zone with its offset in brackets, "20 November 2026, 00:30 (GMT+2)". url: https
  * only, rendered as a link. count: a small whole number. text: one short line. block: the owner summary's
  * preformatted lines. flag: "true" or "false"; it only chooses a sentence and is never printed.
  */
@@ -266,19 +267,27 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
     params: { plan: "plan", refundAmount: "amount" },
     optional: { ownerSettled: "flag" }
   }),
-  // W9 (P2-I11): Directive 2011/83/EU art. 11(3)'s acknowledgement of receipt on a durable medium, queued in the
-  // withdrawal's own transaction (Settings and the owner's command alike). It says only what has happened: received
-  // on {withdrawalDate} and the plan ended; then either the refund on its way (refundAmount present; M8 says
-  // "refunded" once the money moved) or, without an amount, the owner's check (a refund was already made). A
-  // withdrawal with nothing due back sends no M8_RECEIVED: its M8, queued in the same transaction, is the acknowledgement.
+  // The acknowledgement of a withdrawal on a durable medium (OUG 34/2014 art. 11^1(7); Directive 2011/83/EU art.
+  // 11(3)), queued in the withdrawal's own transaction for every withdrawal, Settings and the owner's command alike. It
+  // repeats the statement: the date and time it was made ({withdrawalDate}, printed in the buyer's zone, which the
+  // sender names in `timeZone`), the plan and the day it started ({startDate}), and the buyer's name ({buyerName},
+  // looked up when the email is sent, never kept in the queue). Then what happens to the money: the refund on its way
+  // (a nonzero refundAmount; M8 says "refunded" once the money moved), nothing due back (0.00: this is then the only
+  // email), or, without an amount, the owner's check (a refund was already made). startDate and buyerName are optional,
+  // so a job queued without them, or a profile with no name, still reads whole.
   M8_RECEIVED: define({
     catalogue: "mail", subject: "mail.M8_RECEIVED.subject",
     paragraphs: [
       "mail.M8_RECEIVED.received",
-      { ifParam: "refundAmount", test: "present", then: "mail.M8_RECEIVED.refunding", otherwise: "mail.M8_RECEIVED.ownerReview" }
+      { ifParam: "startDate", test: "present", then: "mail.M8_RECEIVED.statement", otherwise: null },
+      { ifParam: "buyerName", test: "present", then: "mail.M8_RECEIVED.name", otherwise: null },
+      {
+        ifParam: "refundAmount", test: "nonzero", then: "mail.M8_RECEIVED.refunding",
+        otherwise: { ifParam: "refundAmount", test: "present", then: "mail.M8_RECEIVED.nothingDue", otherwise: "mail.M8_RECEIVED.ownerReview" }
+      }
     ],
-    params: { plan: "plan", withdrawalDate: "date" },
-    optional: { refundAmount: "amount" }
+    params: { plan: "plan", withdrawalDate: "datetime" },
+    optional: { startDate: "date", buyerName: "text", refundAmount: "amount" }
   }),
   M9: define({
     catalogue: "mail", subject: "mail.M9.subject",
@@ -474,10 +483,6 @@ export const MAIL_TEMPLATES: Readonly<Record<MailTemplateId, MailTemplateDefinit
   PUBLIC_FLAG_ANSWER_AUTO_NOT_FOUND: flagAnswer("autoNotFound"),
   PUBLIC_FLAG_ANSWER_NO_BREACH: flagAnswer("noBreach", true),
   PUBLIC_FLAG_ANSWER_ACTED: flagAnswer("acted", true),
-  THREAT_REPORT_WAITING: define({
-    catalogue: "owner", subject: "owner.threatReport.subject",
-    paragraphs: ["owner.threatReport.waiting", "owner.threatReport.open"], params: {}
-  }),
   // Decision 24: mail is not a private channel, so neither names an amount or a person.
   TEAM_LIMIT_CHANGED: define({
     catalogue: "owner", subject: "owner.teamLimit.changedSubject",

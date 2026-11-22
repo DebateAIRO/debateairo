@@ -48,13 +48,13 @@ describe("Privacy Policy 3.8 says what it keeps beside the analytics it does not
     expect(analyticsParagraph(code)).toBe(pinned);
   });
 
-  it.each(LOCALES.map(({ code }) => [code]))("%s: the clause is there, the website carries it, and the version is still 3.8", async (code) => {
+  it.each(LOCALES.map(({ code }) => [code]))("%s: the clause is there, the website carries it, and the text is the launch 1.0", async (code) => {
     const paragraph = analyticsParagraph(code);
     // The old paragraph held no bracket at all; the clause's example is the only one.
     expect(paragraph.match(/[(（]/gu), `${code}: one bracketed example`).toHaveLength(1);
     expect(paragraph, `${code}: still the paragraph on analytics, bold mark included`).toMatch(/\*\*[^*]+\*\*/u);
     expect(await generatedParagraph(code), `${code}: the generated data`).toBe(paragraph.replaceAll("**", ""));
-    expect(markdown(code), `${code}: still version 3.12`).toMatch(/v3\.12 /u);
+    expect(markdown(code), `${code}: now version 1.0, the launch text`).toMatch(/v1\.0 /u);
   });
 
   it("every one of the 35 languages", () => {

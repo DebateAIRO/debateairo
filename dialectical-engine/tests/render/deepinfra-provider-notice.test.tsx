@@ -8,9 +8,9 @@ import { DEEPINFRA_PARTNER_PROVIDER, DEEPINFRA_PROVIDER, providerRegister } from
 /**
  * DeepInfra serves the private preview's open-weight models, so the AI Provider Register lists it whenever the API's
  * declared targets reach `api.deepinfra.com` (company `deepinfra`, side-by-side spec §13 addition D24, owner
- * 2026-10-22: listed automatically), and when the API gives no answer (the whole reviewed catalogue). It names the
- * company, its checked facts and the four model families it serves, without versions (owner, 18 November 2026). A
- * company list without DeepInfra does not name a company that receives nothing.
+ * 2026-10-22: providers only, not the models, listed automatically), and when the API gives no answer (the whole
+ * reviewed catalogue). It names the company and its checked facts, never a model. A company list without DeepInfra
+ * does not name a company that receives nothing.
  *
  * 16 November 2026 (docs/legal/2026-11-16-deepinfra-perplexity-facts.md): the row carries what DeepInfra's Terms and
  * trust centre say for every account (United States only, nothing stored, no training, standard contractual clauses),
@@ -54,8 +54,7 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
     });
     // The partner model is a panel member and one of the AIs that suggest what to look into; it writes no verdict story.
     expect(partner?.purposes).toEqual(["arguments", "judging", "suggestPaths"]);
-    // Named by family only, like every row (owner, 18 November 2026).
-    expect(partner?.models).toBe("Qwen");
+    expect(partner?.models).toBe("Qwen3.8-Flash (Alibaba)");
     const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={providerRegister(["deepinfra"])} />);
     const section = html.slice(html.indexOf('id="legal-provider-deepinfra-partner"'), html.indexOf('id="legal-provider-perplexity"'));
     expect(section).toContain(en["legal.providers.deepinfraPartnerName"].replace("'", "&#x27;"));
@@ -63,13 +62,11 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
     expect(section).not.toContain(`<td>${en["legal.providers.no"]}</td>`);
     expect(section).not.toContain(`<td>${en["legal.providers.yes"]}</td>`);
     expect(section).toContain(en["legal.providers.notChecked"]);
-    // The row names the family it receives, and no version or variant.
-    expect(section).toContain("<bdi>Qwen</bdi>");
-    for (const version of ["Qwen3", "-Flash", "Alibaba"]) expect(section, version).not.toContain(version);
+    expect(section).not.toContain("Qwen");
   });
 
   for (const [locale, catalog] of [["English", en], ["Romanian", ro]] as const) {
-    it(`renders the named provider in ${locale} using existing page styles and labels, and its model families without versions`, () => {
+    it(`renders the named provider in ${locale} using existing page styles and labels, and no model`, () => {
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={catalog} entries={providerRegister(["deepinfra"])} />);
       expect(html).toContain('id="legal-provider-deepinfra"');
       expect(html).toContain("Deep Infra Inc.");
@@ -77,20 +74,21 @@ describe("the DeepInfra serving provider is disclosed when the API's targets rea
       expect(html).toContain("2026-11-17");
       expect(html).toContain(catalog["legal.providers.retentionDeepInfra"]);
       expect(html).toContain('id="legal-provider-deepinfra-partner"');
-      expect(html).toContain("<bdi>GLM, DeepSeek, MiMo, Qwen</bdi>");
-      for (const model of ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "-Flash", "-Pro", "Z.AI"]) expect(html, model).not.toContain(model);
+      for (const model of ["GLM-5.3-Flash", "DeepSeek-V4.1-Flash", "MiMo-V2.6-Pro", "Qwen3.8-Flash", "Z.AI"]) expect(html, model).not.toContain(model);
     });
   }
 });
 
 describe("with no answer from the API, the page lists every reviewed company", () => {
-  it("lists DeepInfra and its partner just before Perplexity and the support chat's model, with families and no version", () => {
+  it("lists DeepInfra and its partner, then Amazon, just before Perplexity and the support chat's model, and no model", () => {
     for (const companies of [null, []]) {
       const register = providerRegister(companies);
       expect(register.at(-1)?.key).toBe("support");
       expect(register.at(-2)?.key).toBe("perplexity");
-      expect(register.at(-3)?.key).toBe("deepinfra-partner");
-      expect(register.at(-4)?.key).toBe("deepinfra");
+      // Amazon Bedrock's checked row follows DeepInfra's two.
+      expect(register.at(-3)?.key).toBe("amazon");
+      expect(register.at(-4)?.key).toBe("deepinfra-partner");
+      expect(register.at(-5)?.key).toBe("deepinfra");
       const html = renderToStaticMarkup(<LegalProvidersBody legalCatalog={en} entries={register} />);
       expect(html).toContain('id="legal-provider-deepinfra"');
       expect(html).toContain("Deep Infra Inc.");

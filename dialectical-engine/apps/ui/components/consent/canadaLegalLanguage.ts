@@ -1,4 +1,4 @@
-import type { CatalogLocaleCode } from "@/lib/i18n/locales";
+import type { CatalogLocaleCode } from "../../lib/i18n/locales.js";
 
 /**
  * Canada at sign-up (owner ruling, 2 November 2026). Quebec's French-language law says a standard contract is
@@ -24,6 +24,9 @@ const SWITCH_NAMES: Readonly<Record<CanadaLegalLocale, string>> = Object.freeze(
   en: "Continue in English",
   fr: "Lire en français"
 });
+
+/** Every language the documents can be shown in while Region says Canada: the ones the switch can lead to. */
+export const CANADA_LEGAL_LOCALES: readonly CanadaLegalLocale[] = Object.freeze(Object.keys(SWITCH_NAMES) as CanadaLegalLocale[]);
 
 export function canadaLegalSwitch(current: CanadaLegalLocale, choose: (next: CanadaLegalLocale) => void): LegalLanguageSwitch {
   const next: CanadaLegalLocale = current === "fr" ? "en" : "fr";

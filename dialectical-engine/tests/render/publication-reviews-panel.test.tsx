@@ -313,7 +313,8 @@ describe("publication reviews staff surface", () => {
     const english = renderToStaticMarkup(englishPage);
     expect(english).toContain(enStaff["staff.reviews.heading"]);
     expect((englishPage as any).props.children.props.children.props.publicCatalog).toBe(enPublic);
-    expect((englishPage as any).props.children.props.children.props.locale).toBe("fr");
+    // French is a catalogue language the site does not offer, so the page reads its cookie as English.
+    expect((englishPage as any).props.children.props.children.props.locale).toBe("en");
   });
 
   it("staff.json en and ro hold the same keys", () => {

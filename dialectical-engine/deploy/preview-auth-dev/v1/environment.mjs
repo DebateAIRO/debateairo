@@ -1,7 +1,9 @@
 import { setGlobalProxyFromEnv } from 'node:http';
 import { refuse, withPrivateBytes } from './custody.mjs';
-import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY, PREVIEW_SOCKET } from './turnstile-custody.mjs';
+import { PREVIEW_SOCKET } from './turnstile-custody.mjs';
 import { PREVIEW_EGRESS_PROXY_URL } from './egress-proxy.mjs';
+import { namedRefusal, refuseNamed } from './startup-refusals.mjs';
+import { publicSiteOf } from './public-origins.mjs';
 const STAFF=['STAFF_ACCESS_POLICY_VERSION','STAFF_WEBAUTHN_ORIGIN','STAFF_WEBAUTHN_RP_ID','STAFF_INDEPENDENT_ALERT_CONFIG_PATH','STAFF_ALERT_OPERATOR_MODULE_PATH','STAFF_ALERT_OPERATOR_MODULE_SHA256',
  'INTERNAL_ALLOWANCE_POLICY_VERSION','INTERNAL_ALLOWANCE_CURRENCY','INTERNAL_ALLOWANCE_MAXIMUM_GRANT_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_DAY_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_WEEK_MICROS','INTERNAL_ALLOWANCE_MAXIMUM_LIFETIME_MS','INTERNAL_ALLOWANCE_FINISH_ALLOWANCE_BP','INTERNAL_ALLOWANCE_POLICY_SOURCE_REF'];
 /**
@@ -28,8 +30,8 @@ const LEGACY_CONFIG_KEYS='budget_socket,deployment,free_model_ids,requested_thin
 const ROSTER_CONFIG_KEYS='budget_socket,deployment,free_model_ids,premium_model_ids,requested_thinking_level,scope_id';
 // Addition D14 (owner 2026-10-22): the gate part alone, the line-up living in the settings version (previewLineUpPolicy).
 const SOCKETS_ONLY_CONFIG_KEYS='budget_socket,deployment,requested_thinking_level,scope_id';
-// PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value); Perplexity plan W2-1: and the web search gate's.
-const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket','perplexity_budget_socket']);
+// PR B: the roster form may also name the Anthropic gate's socket (the API's parser checks its value); Perplexity plan W2-1: and the web search gate's; and the Amazon Bedrock gate's.
+const OPTIONAL_SOCKET_KEYS=Object.freeze(['anthropic_budget_socket','bedrock_budget_socket','perplexity_budget_socket']);
 // Spec 2026-10-12 §4.2: the owner's thinking-level table is optional on both forms (the API's parser checks its contents).
 const OPTIONAL_TABLE_KEYS=Object.freeze(['thinking_levels']);
 /**
@@ -87,6 +89,39 @@ const NETOPIA_KEYS=['NETOPIA_API_BASE_URL','NETOPIA_POS_SIGNATURE','NETOPIA_API_
 const INVOICING_KEYS=['QUADERNO_API_KEY_PATH','QUADERNO_API_BASE_URL','SMARTBILL_CREDENTIALS_PATH','SMARTBILL_API_BASE_URL','SMARTBILL_SERIES','OWNER_REPORT_EMAIL_PATH'];
 const SPOOL_KEY='BILLING_NOTICE_SPOOL_PATH';
 /**
+ * Real payments: the owner's one line PREVIEW_LIVE_PAYMENTS=real-money in the API's file, and nothing else, lets this kit
+ * take them. With it the billing group must be NETOPIA's live base, one live Quaderno account, SmartBill's real address
+ * and the key files at their own live paths in the same API-owned folder (the owner's address file stays shared). The
+ * paths differ from the sandbox ones, so a sandbox key never sits behind a live address and going back to the sandbox
+ * needs no key typed again. The egress proxy must run in its live form too (start-check-payments.mjs).
+ */
+export const PREVIEW_LIVE_PAYMENTS_VALUE='real-money';
+export const PREVIEW_NETOPIA_LIVE_BASE='https://secure.netopia-payments.com/api';
+/** A Quaderno LIVE account's API address: one DNS label before quadernoapp.com, so a sandbox address never matches. */
+export const PREVIEW_QUADERNO_LIVE_BASE=/^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.quadernoapp\.com\/api$/;
+export const PREVIEW_SMARTBILL_LIVE_BASE='https://ws.smartbill.ro/SBORO/api';
+export const PREVIEW_HOSTED_LIVE_FIXED_VALUES=Object.freeze({
+ NETOPIA_API_KEY_PATH:'/etc/debateai-v3-preview/billing/live-netopia-api-key',
+ NETOPIA_IPN_KEYS_PATH:'/etc/debateai-v3-preview/billing/live-netopia-ipn-keys.pem',
+ QUADERNO_API_KEY_PATH:'/etc/debateai-v3-preview/billing/live-quaderno-api-key',
+ SMARTBILL_CREDENTIALS_PATH:'/etc/debateai-v3-preview/billing/live-smartbill-credentials',
+ OWNER_REPORT_EMAIL_PATH:PREVIEW_HOSTED_FIXED_VALUES.OWNER_REPORT_EMAIL_PATH
+});
+const LIVE_KEY='PREVIEW_LIVE_PAYMENTS';
+/**
+ * The live rules, each refusal named (startup-refusals.mjs) and never carrying a value: the exact value, all ten billing
+ * keys (live is never the provider-only mode), the three live addresses, then the live key paths.
+ */
+function assertLivePaymentValues(configured) {
+ const live=PREVIEW_HOSTED_LIVE_FIXED_VALUES;
+ if(configured[LIVE_KEY]!==PREVIEW_LIVE_PAYMENTS_VALUE)refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:value');
+ if([...NETOPIA_KEYS,...INVOICING_KEYS].some(key=>configured[key]===undefined))refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:incomplete');
+ if(configured.NETOPIA_API_BASE_URL!==PREVIEW_NETOPIA_LIVE_BASE)refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:netopia-base');
+ if(!PREVIEW_QUADERNO_LIVE_BASE.test(configured.QUADERNO_API_BASE_URL))refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:quaderno-base');
+ if(configured.SMARTBILL_API_BASE_URL!==PREVIEW_SMARTBILL_LIVE_BASE)refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:smartbill-base');
+ if(Object.keys(live).some(key=>configured[key]!==live[key]))refuseNamed('PREVIEW_LIVE_PAYMENTS_REFUSED:paths');
+}
+/**
  * Owner ruling 2026-10-13: moving the billing clock for renewal tests stays refused on the preview (the owner is still
  * deciding). A host that ever ran with it must never go live (deploy/vps/README.md §14.8).
  */
@@ -95,9 +130,10 @@ const REFUSED_ON_PREVIEW=['BILLING_STAGE_CLOCK_OFFSET_DAYS'];
  * The hosted API's extra rules: the country files and the Turnstile relay at their fixed values (the API refuses to
  * start without them in hosted mode); NETOPIA's four settings all or none, and Quaderno's, SmartBill's and the owner's
  * six all or none and only beside NETOPIA's (none: hosted, billing off; NETOPIA alone: the provider-only mode; all
- * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. The billing notice
- * spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed folder. The restore
- * fence path (NV-07), when set, only at its fixed path.
+ * ten: billing on, once the register says so); and every value a sandbox form at its fixed path. With the owner's live
+ * line the live rules replace those billing rules (assertLivePaymentValues); every other rule holds either way. The
+ * billing notice spool is optional, only beside NETOPIA's four (it keeps NETOPIA's messages), and only at its fixed
+ * folder. The restore fence path (NV-07), when set, only at its fixed path.
  */
 function assertHostedApiValues(configured) {
  const fixed=PREVIEW_HOSTED_FIXED_VALUES;
@@ -105,23 +141,27 @@ function assertHostedApiValues(configured) {
   ||configured.TURNSTILE_SOCKET_PATH!==PREVIEW_SOCKET)refuse();
  const present=keys=>keys.filter(key=>configured[key]!==undefined).length;
  const netopia=present(NETOPIA_KEYS),invoicing=present(INVOICING_KEYS);
+ if(configured[LIVE_KEY]!==undefined)assertLivePaymentValues(configured);
+ else{
  if(![0,NETOPIA_KEYS.length].includes(netopia)||![0,INVOICING_KEYS.length].includes(invoicing)||(invoicing>0&&netopia===0))refuse();
  if(netopia>0&&(!PREVIEW_NETOPIA_SANDBOX_BASES.includes(configured.NETOPIA_API_BASE_URL)
   ||configured.NETOPIA_API_KEY_PATH!==fixed.NETOPIA_API_KEY_PATH||configured.NETOPIA_IPN_KEYS_PATH!==fixed.NETOPIA_IPN_KEYS_PATH))refuse();
  if(invoicing>0&&(!PREVIEW_QUADERNO_SANDBOX_BASE.test(configured.QUADERNO_API_BASE_URL)||configured.SMARTBILL_API_BASE_URL!==fixed.SMARTBILL_API_BASE_URL
   ||['QUADERNO_API_KEY_PATH','SMARTBILL_CREDENTIALS_PATH','OWNER_REPORT_EMAIL_PATH'].some(key=>configured[key]!==fixed[key])))refuse();
+ }
  if(configured[SPOOL_KEY]!==undefined&&(netopia===0||configured[SPOOL_KEY]!==fixed[SPOOL_KEY]))refuse();
  if(configured.RESTORE_FENCE_PATH!==undefined&&configured.RESTORE_FENCE_PATH!==fixed.RESTORE_FENCE_PATH)refuse();
 }
 /** No billing setting in local mode: billing exists only in hosted mode (apps/api/src/billing/connectors.ts billingModeOf). */
-const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY];
+const BILLING_ONLY_KEYS=[...NETOPIA_KEYS,...INVOICING_KEYS,SPOOL_KEY,LIVE_KEY];
 /** What the hosted API's fetch does: https through the loopback egress proxy, loopback itself direct. */
 export const PREVIEW_HOSTED_PROXY_ENVIRONMENT=Object.freeze({HTTPS_PROXY:PREVIEW_EGRESS_PROXY_URL,NO_PROXY:'localhost,127.0.0.1,[::1]'});
 /**
  * Hosted only, before the API's main is imported: every https request of the process's global fetch (NETOPIA's,
  * Quaderno's) and of the https module goes through the egress proxy (egress-proxy.mjs), which lets only NETOPIA's and
- * Quaderno's sandboxes through. Plain-http requests (the spending gates' Unix sockets) and loopback stay direct. The
- * values are given to Node directly, never put into the process environment the API reads. Returns Node's restore.
+ * Quaderno's sandboxes through (in its live form, only the live payment hosts). Plain-http requests (the spending
+ * gates' Unix sockets) and loopback stay direct. The values are given to Node directly, never put into the process
+ * environment the API reads. Returns Node's restore.
  */
 export function installHostedEgress(deploymentMode,setProxy=setGlobalProxyFromEnv) {
  if(deploymentMode==='local')return ()=>{};
@@ -146,10 +186,13 @@ export function isPaymentMarksList(value) {
  const names=value.split(',');
  return names.every(name=>PAYMENT_MARK_NAMES.includes(name))&&new Set(names).size===names.length;
 }
+/** The website's NETOPIA logo id form (apps/ui/lib/billing/paymentMarks.ts NETOPIA_LOGO_ID_FORM; a unit test pins the two equal), for the test site's tools: 1 to 12 digits. */
+export function isNetopiaLogoId(value) { return typeof value==='string'&&/^[0-9]{1,12}$/.test(value); }
 // RELEASE_KEY: the website refuses to start without its release key (side-by-side spec §1, §7; apps/ui/release-edge.mjs).
 // PAYMENT_MARKS_AVAILABLE: the website's payment marks list (deploy/vps/README.md §14.7); a release before T+1 refuses it, so it goes only into the ui file of a release that lists it here.
 // DIALECTICAL_UI_API_PROOF_PATH: the UI-to-API proof (NV-03); a release before NV-03 refuses it, so it goes only into the ui file of a release that lists it here (SB5c).
-const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE','DIALECTICAL_UI_API_PROOF_PATH'];
+// NETOPIA_LOGO_ID: the shop id of NETOPIA's hosted logo; the website refuses another form at start (NETOPIA_LOGO_ID_INVALID); a release before this code refuses the name, so it goes only into the ui file of a release that lists it here.
+const UI=['NODE_ENV','PUBLIC_APP_URL','PORT','DIALECTICAL_UI_HOST','DIALECTICAL_API_BASE','DIALECTICAL_UI_TRUSTED_PROXIES','DIALECTICAL_UI_EDGE_SECRET_PATH','NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON','TURNSTILE_SITE_KEY','RELEASE_KEY','PAYMENT_MARKS_AVAILABLE','DIALECTICAL_UI_API_PROOF_PATH','NETOPIA_LOGO_ID'];
 /**
  * Side-by-side spec §1 (O1): a preview process starts only as its plan's release. Its RELEASE_KEY must be exactly
  * r<plan register pin>-<first 12 hex of the plan's source revision>, so an env file of another release (another
@@ -161,6 +204,19 @@ function assertReleaseKey(service,configured,publication,approved) {
  if(typeof approved?.sourceRevision!=='string'||!/^[0-9a-f]{40}$/.test(approved.sourceRevision)||typeof publication?.registerVersion!=='string'
   ||!RELEASE_KEY_PATTERN.test(configured.RELEASE_KEY??'')||configured.RELEASE_KEY!==expectedReleaseKey(publication,approved.sourceRevision))refuse();
  if(service==='runner'&&['RUNNER_WORKER_ID','HATCHET_WORKER_NAME'].some(key=>typeof configured[key]!=='string'||!configured[key].endsWith(`-${configured.RELEASE_KEY}`)))refuse();
+}
+/**
+ * The public name the API answers as: exactly one listed origin (public-origins.mjs), the main site's only in hosted
+ * mode, where the spending gates and the per-person limits are in the path; and with staff passkeys (policy 2), the
+ * staff origin and relying party are that same name. It runs before the API's own parser, which refuses some of these
+ * too but without a name, so the journal says which setting is wrong. Returns the listed site.
+ */
+function apiPublicSite(configured) {
+ const site=publicSiteOf(configured.PUBLIC_APP_URL);
+ if(!site)refuseNamed('PREVIEW_ORIGIN_NOT_LISTED');
+ if(site.hostedOnly&&configured.DEBATEAI_DEPLOYMENT_MODE!=='hosted')refuseNamed('PREVIEW_MAIN_ORIGIN_NOT_HOSTED');
+ if(configured.STAFF_ACCESS_POLICY_VERSION==='2'&&(configured.STAFF_WEBAUTHN_ORIGIN!==site.origin||configured.STAFF_WEBAUTHN_RP_ID!==site.hostname))refuseNamed('PREVIEW_STAFF_ORIGIN_MISMATCH');
+ return site;
 }
 export function parseEnvironmentText(text) {
  try{
@@ -184,13 +240,17 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   assertReleaseKey(service,configured,publication,approved);
   const environment={...configured,PATH:'/usr/local/bin:/usr/bin:/bin'};
   if(service==='ui'){
-   if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
+   // The website answers as one listed public name (public-origins.mjs), with that name's Turnstile site key.
+   const site=publicSiteOf(configured.PUBLIC_APP_URL);
+   if(!site)refuseNamed('PREVIEW_ORIGIN_NOT_LISTED');
+   if(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==site.turnstileSiteKey)refuseNamed('PREVIEW_ORIGIN_SITE_KEY_MISMATCH');
+   if(configured.PORT!==approved.uiPort||configured.DIALECTICAL_UI_HOST!=='127.0.0.1'
     ||configured.DIALECTICAL_API_BASE!==`http://127.0.0.1:${approved.apiPort}`
-    ||!isReviewedModelRosterFlag(configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==runtime?.builtModelRosterFlag
-    ||(configured.TURNSTILE_SITE_KEY!==undefined&&configured.TURNSTILE_SITE_KEY!==PREVIEW_SITE_KEY))refuse();
+    ||!isReviewedModelRosterFlag(configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)||configured.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON!==runtime?.builtModelRosterFlag)refuse();
    return {environment:Object.freeze(environment),selectedRegisterVersion:null,deploymentMode:'local'};
   }
   if(REFUSED_ON_PREVIEW.some(key=>configured[key]!==undefined))refuse();
+  const site=service==='api'?apiPublicSite(configured):undefined;
   const normalized=service==='api'?runtime.parseApiEnvironment(configured):runtime.parseRunnerEnvironment(configured);
   // Local, or hosted (owner rulings 2026-10-13) only on the preview's own configuration (the spending gates and the team);
   // any of its three forms (addition D14: the gate part, PREVIEW_GATE_SETTINGS, is present for each).
@@ -198,17 +258,23 @@ export function narrowEnvironment(service,configured,runtime,publication,approve
   if(!['local','hosted'].includes(mode)||normalized.DEPLOYMENT_MODE!==mode||String(normalized.REGISTER_VERSION)!==publication.registerVersion
     ||(mode==='hosted'&&normalized.PREVIEW_GATE_SETTINGS===undefined))refuse();
   if(service==='api'){
-   if(configured.PUBLIC_APP_URL!==PREVIEW_ORIGIN||configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
+   if(configured.API_HOST!=='127.0.0.1'||configured.API_PORT!==approved.apiPort
     ||configured.MAIL_SENDMAIL_PATH!==approved.mailExecutable||configured.MAIL_FROM!==approved.mailFrom
     ||(configured.TURNSTILE_SOCKET_PATH!==undefined&&configured.TURNSTILE_SOCKET_PATH!==PREVIEW_SOCKET))refuse();
-   if(normalized.STAFF_ACCESS.policyVersion===2&&(normalized.STAFF_ACCESS.origin!==PREVIEW_ORIGIN||normalized.STAFF_ACCESS.rpId!=='v3-preview.dezbatere.ro'))refuse();
+   // The same rule on the parser's own reading of the staff settings.
+   if(normalized.STAFF_ACCESS.policyVersion===2&&(normalized.STAFF_ACCESS.origin!==site.origin||normalized.STAFF_ACCESS.rpId!==site.hostname))refuseNamed('PREVIEW_STAFF_ORIGIN_MISMATCH');
    // Social configuration is admitted by the final product's parser only when its whole pair is present.
    if((configured.SOCIAL_SOCKET_PATH===undefined)!==(configured.SOCIAL_PROVIDERS_JSON===undefined))refuse();
    if(mode==='hosted')assertHostedApiValues(configured);
    else if(BILLING_ONLY_KEYS.some(key=>configured[key]!==undefined))refuse();
   }
-  return {environment:Object.freeze(environment),selectedRegisterVersion:String(normalized.REGISTER_VERSION),deploymentMode:normalized.DEPLOYMENT_MODE};
- }catch{refuse('PREVIEW_ENVIRONMENT_REFUSED');}
+  return {environment:Object.freeze(environment),selectedRegisterVersion:String(normalized.REGISTER_VERSION),deploymentMode:normalized.DEPLOYMENT_MODE,...(service==='api'?{livePayments:configured[LIVE_KEY]!==undefined}:{})};
+ }catch(error){
+  // One message for every refusal, as before. A refusal of a closed, named form (startup-refusals.mjs) keeps its name in
+  // the cause, so the launcher can say which owner setting is wrong; it never carries a value.
+  const code=namedRefusal(error);
+  throw new TypeError('PREVIEW_ENVIRONMENT_REFUSED',code===undefined?undefined:{cause:code});
+ }
 }
 export async function readEnvironmentFile(path,custody) {
  return withPrivateBytes(path,{...custody,maxBytes:32768},raw=>parseEnvironmentText(new TextDecoder('utf8',{fatal:true}).decode(raw)));

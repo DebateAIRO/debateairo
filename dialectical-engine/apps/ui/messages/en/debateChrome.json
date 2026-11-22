@@ -29,7 +29,7 @@
   "debateChrome.privateDebate": "Private debate",
   "debateChrome.privateDebateDeleted": "Private debate deleted",
   "debateChrome.privateDebateDeletionProcessing": "Private debate deletion is processing",
-  "debateChrome.privateDebateDeletedDetail": "This debate is a tombstone. Its encrypted private content is permanently unreadable.",
+  "debateChrome.privateDebateDeletedDetail": "This debate is a tombstone. Its encrypted private content can no longer be read here. Our backups may still hold it (Privacy Policy, section 7).",
   "debateChrome.privateDebateDeletionProcessingDetail": "Private content is no longer available while durable key cleanup finishes.",
   "debateChrome.tree.building": "Building the argument tree…",
   "debateChrome.tree.notProduced": "No argument tree was produced for this debate.",

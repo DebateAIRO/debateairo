@@ -13,8 +13,6 @@ import { StaffAlertError, type StaffAlertIntentProducer, type StaffTargetInvitat
 import type { StaffWebAuthnService } from './webauthn.js';
 import { PublicationReviewRefusal } from '@debateai/serve';
 import type { PublicationReviewIntent, PublicationReviewStaffService } from '../publication-review/staff.js';
-import { registerThreatReportRoutes, ThreatReportHttpError, type ThreatReportStaffService } from './threat-reports.js';
-import { TypedDomainError } from '@debateai/kernel';
 import { canonicalTeamAllowanceActionBinding, isTeamAllowanceIntent, readTeamAllowanceState, registerTeamAllowanceRoutes, TeamAllowanceHttpError, type TeamAllowanceState } from './team-allowances.js';
 import { canonicalPublicFlagBinding, isPublicFlagIntent, publicFlagQueueOf, type PublicFlagIntent, type PublicFlagStaffService } from '../public-flag.js';
 import { canonicalPublicReviewBinding, isPublicReviewIntent, PublicReviewHttpError, registerPublicReviewRoutes, type PublicReviewIntent, type PublicReviewStaffService } from './public-review.js';
@@ -39,10 +37,6 @@ export const staffAuthorizationPolicyInventory = Object.freeze([
     // The strict mode selects TEAM_DISABLE or EMERGENCY_DISABLE inside the handler.
     { route: 'POST /v1/admin/team/{staffId}/disable', auth: 'staff', resource: 'staff-team', action: 'disable' },
     { route: 'GET /v1/admin/audit', auth: 'staff', staffCapability: 'AUDIT_READ', resource: 'staff-audit', action: 'list' },
-    { route: 'GET /v1/admin/threat-reports', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'list' },
-    { route: 'GET /v1/admin/threat-reports/summary', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'summary' },
-    { route: 'GET /v1/admin/threat-reports/{reportRef}', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'read' },
-    { route: 'POST /v1/admin/threat-reports/{reportRef}/decision', auth: 'staff', staffCapability: 'THREAT_REPORT', resource: 'staff-threat-report', action: 'decide' },
     { route: 'GET /v1/admin/publication-reviews', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'list' },
     { route: 'GET /v1/admin/publication-reviews/{reviewRef}', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'read' },
     { route: 'POST /v1/admin/publication-reviews/{reviewRef}/approve', auth: 'staff', staffCapability: 'PUBLICATION_REVIEW', resource: 'staff-publication-review', action: 'approve' },
@@ -77,7 +71,6 @@ export interface StaffHttpApplication {
     targetInvitationTransport?: StaffTargetInvitationTransport;
     funding?: StaffInternalFundingApplication;
     publicationReviews?: PublicationReviewStaffService;
-    threatReports?: ThreatReportStaffService;
     teamLimit?: TeamLimitStaffService;
     publicReview?: PublicReviewStaffService;
     publicFlags?: PublicFlagStaffService;
@@ -120,13 +113,6 @@ const reason = (wire: z.infer<typeof contract.ReasonSchema>): Reason => ({ code:
 const receipt = (value: SecurityReceipt) => ({ operation_id: value.operationId, outcome: value.outcome, recorded_at: value.recordedAt.toISOString() });
 /** Fixed field order + sorted sets make the proof independent of browser object/key ordering. */
 export function canonicalStaffActionBinding(intent: Exclude<contract.StaffActionIntent, PublicationReviewIntent | TeamLimitIntent | PublicReviewIntent | PublicFlagIntent>, auth: StaffAuthentication): ActionBinding {
-    if (intent.action === 'THREAT_REPORT_DECIDE') {
-        const action = `THREAT_REPORT_${intent.decision}` as const;
-        const body = { action, target_id: intent.target_report_ref, decision: intent.decision,
-            expected_revision: intent.expected_revision, operation_id: intent.operation_id };
-        return { action, targetId: intent.target_report_ref, expectedRevision: intent.expected_revision,
-            operationId: intent.operation_id, bodySha256: createHash('sha256').update(JSON.stringify(body)).digest('hex') };
-    }
     if (intent.action === 'CREDENTIAL_REGISTER') {
         const body = { action: intent.action, target_id: auth.context.userId, expected_revision: auth.context.grantRevision, operation_id: intent.operation_id };
         return { action: intent.action, targetId: auth.context.userId, expectedRevision: auth.context.grantRevision,
@@ -164,7 +150,6 @@ function capability(intent: contract.FundedStaffActionIntent): StaffCapability |
     if (intent.action === 'TEAM_LIMIT_PARTNER_GRANT' || intent.action === 'TEAM_LIMIT_PARTNER_REVOKE') return 'TEAM_GRANT';
     if (intent.action === 'ALLOWANCE_CONFIGURE' || intent.action === 'ALLOWANCE_REVOKE' || isTeamAllowanceIntent(intent)) return 'ALLOWANCE_WRITE';
     if (intent.action === 'PUBLICATION_REVIEW_APPROVE' || intent.action === 'PUBLICATION_REVIEW_REFUSE') return 'PUBLICATION_REVIEW';
-    if (intent.action === 'THREAT_REPORT_DECIDE') return 'THREAT_REPORT';
     return intent.action === 'CREDENTIAL_REGISTER' ? null : intent.action;
 }
 export function registerStaffRoutes(api: FastifyInstance, application: StaffHttpApplication | undefined, routePolicy: RoutePolicy, transport: StaffRouteTransport): void {
@@ -256,14 +241,8 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
                 catch (error) {
                     if (error instanceof StaffHttpRefusal)
                         return reply.code(error.status).send({ error: error.code });
-                    if (error instanceof ThreatReportHttpError || error instanceof TeamLimitHttpError || error instanceof TeamAllowanceHttpError || error instanceof PublicReviewHttpError)
+                    if (error instanceof TeamLimitHttpError || error instanceof TeamAllowanceHttpError || error instanceof PublicReviewHttpError)
                         return reply.code(error.status).send({ error: error.code });
-                    if (error instanceof TypedDomainError && error.code.startsWith('THREAT_REPORT_')) {
-                        const status = error.code === 'THREAT_REPORT_NOT_FOUND' ? 404
-                            : error.code === 'THREAT_REPORT_OWN' ? 403
-                            : error.code === 'THREAT_REPORT_ALREADY_DECIDED' ? 409 : 403;
-                        return reply.code(status).send({ error: error.code });
-                    }
                     if (error instanceof PublicationReviewRefusal) {
                         const status = error.code === 'PUBLICATION_REVIEW_NOT_FOUND' ? 404
                             : error.code === 'PUBLICATION_REVIEW_OWN_DEBATE' || error.code === 'PUBLICATION_REVIEW_SAME_REVIEWER' ? 403
@@ -368,7 +347,6 @@ export function registerStaffRoutes(api: FastifyInstance, application: StaffHttp
         await application!.access.requireCapability(authentication, 'AUDIT_READ');
         return project(contract.StaffAuditPageSchema, await application!.repository.readAuditPage({ context: authentication.context, ordinaryTokenHash: authentication.baseSession.tokenHash, limit: query.limit, ...(query.cursor === undefined ? {} : { cursor: query.cursor }) }));
     });
-    registerThreatReportRoutes(route, application?.threatReports, application?.access, auth, actionAuthority);
     // Decision 35: the Report button's queue. The same two accounts; a dismissal takes a passkey and waits while team tools are locked.
     route('GET', '/v1/admin/public-reports', async (request, reply) => {
         reply.header('Cache-Control', 'no-store');

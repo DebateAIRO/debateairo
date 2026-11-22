@@ -148,6 +148,11 @@
   text-wrap: pretty;
   overflow-wrap: anywhere;
 }
+/* A paragraph's lead-in ("Delivery.", "Cancelling."), bold as the draft marks it, so a reader finds it by eye. */
+.legalSection p strong {
+  font-weight: 700;
+  color: var(--ink);
+}
 .legalSection ul {
   display: flex;
   flex-direction: column;
@@ -367,6 +372,14 @@
   border-top: 1px solid var(--line);
 }
 .siteFooterCopyright { font-size: 11px; color: var(--muted); }
+/* "Made with (heart) in Romania (flag)": the sentence stays on one line, so the heart and the flag keep
+   their place between its words in every language. */
+.siteFooterMadeIn { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.siteFooterMadeIn svg { display: inline-block; vertical-align: -1px; }
+.siteFooterMadeInHeart { width: 11px; height: 11px; color: var(--accent); }
+/* The hairline gives the flag an edge where a band is close to the page colour: blue on the dark theme,
+   yellow on the light one. */
+.siteFooterMadeInFlag { width: 16px; height: 11px; border-radius: 2px; box-shadow: 0 0 0 1px var(--line-strong); }
 .siteFooterLang { margin-inline-start: auto; }
 /* The switcher opens UP from the footer; the header copy opens down. */
 .siteFooterLang .languageSwitcherPanel {
@@ -400,7 +413,9 @@
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
-.siteFooterAnpc img { display: block; width: auto; height: 44px; }
+/* ANPC's order sets 250 x 50 pixels for the pictogram on the home page: the box is exactly that at every width, and the
+   artwork keeps its proportions inside it. 250px and the chip fit the narrowest phone's footer. */
+.siteFooterAnpc img { display: block; width: 250px; height: 50px; object-fit: contain; }
 
 /* ---------- 15b in-app footer: one line ---------- */
 
@@ -416,14 +431,32 @@
   background: var(--surface-2);
   font-family: var(--font-sans);
 }
-.siteFooterLine .siteFooterCopyright { font-size: 10.5px; }
+.siteFooterLine .siteFooterCopyright,
+.siteFooterLine .siteFooterMadeIn { font-size: 10.5px; }
+/* On the one line the made-in sentence only uses room the links leave over. It sits in a slot one text line
+   tall that takes the free space; a sentence wider than the slot wraps under it, out of sight. So in no
+   language and at no width does it push a link or the SAL badge to a second row. The slot's end padding is
+   the gap before the links, and the equal negative margin keeps an empty slot from adding a second gap. */
+.siteFooterLine .siteFooterMadeIn {
+  display: flex;
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  min-width: 0;
+  height: 15px;
+  line-height: 15px;
+  overflow: hidden;
+  padding-inline-end: 18px;
+  margin-inline-end: -18px;
+}
+.siteFooterLine .siteFooterMadeIn::before { content: ""; height: 100%; }
 .siteFooterLine nav { margin-inline-start: auto; }
 /* Design Document v2: the footer line's language switcher follows the links; the nav before it takes the free room. */
 .siteFooterLine .siteFooterLang { margin-inline-start: 0; }
 .siteFooterLineLinks { display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; }
 .siteFooterLine .siteFooterLink { font-size: 10.5px; font-weight: 600; }
 .siteFooterLine .siteFooterAnpc { padding: 2px 4px; border-radius: 6px; }
-.siteFooterLine .siteFooterAnpc img { height: 22px; }
+/* The one line keeps the small badge; `width: auto` undoes the full footer's 250px box. */
+.siteFooterLine .siteFooterAnpc img { width: auto; height: 22px; }
 
 /* 15b on the debate canvas: the canvas is exactly one viewport tall, so it gives
    the footer its line instead of pushing the footer below the fold. The line is the
@@ -493,19 +526,36 @@
   .legalTable td { padding: 2px 0; border: 0; }
 
   .siteFooterFull { padding: 26px 24px 36px; }
+  /* A phone shows the whole footer, stacked: the company's facts, the PRODUCT column with Pricing, and every legal
+     link. Every footer link is a 44px tap target; the company block's links sit inside its lines. */
   .siteFooterColumns { grid-template-columns: minmax(0, 1fr); gap: 20px; }
-  .siteFooterColumn:not(:has(.siteFooterLegalGrid)),
-  .siteFooterCompany > :not(.siteFooterBrand) { display: none; }
+  .siteFooterColumn ul:not(.siteFooterLegalGrid) { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; margin-top: 4px; }
   .siteFooterColumn ul.siteFooterLegalGrid { gap: 0 16px; margin-top: 4px; }
-  .siteFooterLegalGrid .siteFooterLink {
+  .siteFooterColumn .siteFooterLink {
     display: flex;
     align-items: center;
     min-height: 44px;
     font-size: 13px;
   }
+  .siteFooterCompany .siteFooterLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+  }
   .siteFooterConsumer { flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 20px; }
-  .siteFooterConsumer .siteFooterAnpc img { height: 40px; }
-  .siteFooterBase { margin-top: 20px; padding-top: 14px; }
+  .siteFooterBase { flex-wrap: wrap; gap: 8px 14px; margin-top: 20px; padding-top: 14px; }
+  /* On a phone the made-in sentence takes the row under the copyright, whole; it breaks only if a
+     language's sentence is wider than the screen. */
+  .siteFooterMadeIn { flex-basis: 100%; white-space: normal; }
+  .siteFooterLine .siteFooterMadeIn {
+    display: block;
+    flex: 0 0 100%;
+    height: auto;
+    overflow: visible;
+    padding-inline-end: 0;
+    margin-inline-end: 0;
+  }
 
   .siteFooterLine { padding: 10px 16px; gap: 8px 18px; }
   .siteFooterLine nav { margin-inline-start: 0; }
@@ -522,6 +572,48 @@
 
 /* ---------- Paid plans (P21, R3-4): the card marks, the DB-IP credit, one archived text ---------- */
 .siteFooterMarks { display: flex; gap: 10px; align-items: center; max-width: 1180px; margin: 22px auto 0; }
-.siteFooterMarks img { width: auto; height: 24px; }
+/* Each mark file on a white chip in both themes, as ANPC's badge: a dark wordmark would vanish on the dark footer.
+   content-box keeps the artwork itself 24px tall, as it was before the chip; the padding and border sit outside it. */
+.siteFooterMarks > img { box-sizing: content-box; width: auto; height: 24px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+/* NETOPIA's hosted logo: one picture of NETOPIA's mark and the Visa and Mastercard marks on a clear background, in two
+   versions. The light theme shows the one with blue wordmarks on a white chip, as ANPC's badge. NETOPIA's box is at
+   most 250 x 50: 245 x 44 here, 223 x 40 on a phone. */
+.siteFooterNetopia {
+  display: flex;
+  flex: none;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  /* A high-contrast mode would replace the white with the system colour and hide the dark artwork. */
+  forced-color-adjust: none;
+}
+.siteFooterNetopia:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.siteFooterNetopia img { position: relative; display: block; width: 245px; max-width: 100%; height: auto; aspect-ratio: 418 / 75; object-fit: contain; }
+/* Only an image that did not load draws ::after: its alt text on the white chip, instead of a broken-image icon. */
+.siteFooterNetopia img::after {
+  content: attr(alt);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  background: #fff;
+  color: #1a1a1a;
+  font: 600 12px/1.25 var(--font-sans);
+}
+@media (max-width: 760px) {
+  .siteFooterNetopia img { width: 223px; }
+}
+/* The dark theme shows the version with white wordmarks straight on the page, with no chip, as NETOPIA's own logo
+   script does on a dark background. Paper is white, and a high-contrast mode can paint a light page under the dark
+   theme, so print and that mode keep the blue version on its white chip. */
+.siteFooterNetopia .siteFooterNetopiaOnDark { display: none; }
+@media screen and (forced-colors: none) {
+  html[data-mode="chamber"] .siteFooterNetopia { padding: 5px 0; border: 0; background: transparent; }
+  html[data-mode="chamber"] .siteFooterNetopia .siteFooterNetopiaOnLight { display: none; }
+  html[data-mode="chamber"] .siteFooterNetopia .siteFooterNetopiaOnDark { display: block; }
+}
 .siteFooterBase .siteFooterCredit { font-size: 11px; color: var(--muted); }
 .legalArchiveText { margin-top: 18px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }

@@ -691,10 +691,11 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
   it("chains the MFA recovery control user index 0182 after 0181 as an outside-transaction step (NV-15, NV-16)", async () => {
     const plan = await loadMigrationPlan();
     const names = plan.forwardChain.map((entry) => entry.name);
-    // The chain head: the one index NV-15's account-level failure count and NV-16's per-destination start count both
-    // read by user_id, built concurrently after the three notice due indexes on the same shared loader.
-    expect(names.slice(-2)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
-    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    // The one index NV-15's account-level failure count and NV-16's per-destination start count both read by user_id,
+    // built concurrently after the three notice due indexes on the same shared loader. Found by name: later steps follow it.
+    const at = names.indexOf("0182_mfa_recovery_control_user_started.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0181_mfa_recovery_notice_due.sql", "0182_mfa_recovery_control_user_started.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
     const securityFixes = plan.forwardChain[names.indexOf("0178_security_fixes_run3.sql")]!;
     expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: true,
       concurrentIndex: { schema: "identity", table: "mfa_recovery_control", name: "mfa_recovery_control_user_started" } });
@@ -721,7 +722,128 @@ describe("F10: NETOPIA's migration is the forward step 0111 after dev's 0110 (PR
       "previous.manifestSha256", "renumber"
     ]) expect(section.slice(0, section.indexOf("\n## ", 1)), needle).toContain(needle);
     expect(readme.replace(/\s+/gu, " ")).toContain(
-      "the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, and the MFA recovery control user index (0182, below) the seventy-second");
+      "the three recovery notice due indexes (0179, 0180 and 0181, below) the sixty-ninth to seventy-first, the MFA recovery control user index (0182, below) the seventy-second");
+  });
+
+  it("chains the staff re-key permit 0184 after 0183 as an expand step that keeps 0130's verifier, and documents it", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one table and nine functions, applied inside the step's own transaction like every step but the index builds.
+    // Found by name: the reader of the release switches (0185) follows it.
+    const at = names.indexOf("0184_staff_rekey_permit.sql");
+    expect(names.slice(at - 1, at + 1)).toEqual(["0183_unfinished_signup_expiry.sql", "0184_staff_rekey_permit.sql"]);
+    const [previous, step] = plan.forwardChain.slice(at - 1, at + 1) as [ChainStep, ChainStep];
+    expect(previous.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(JSON.parse((await bytesOf("lineage/staff-rekey-permit-forward0184.json")).toString("utf8"))).toEqual({
+      version: "staff-rekey-permit-forward0184-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: {
+        name: "0183_unfinished_signup_expiry.sql",
+        manifestSha256: sha256(await bytesOf("lineage/unfinished-signup-expiry-forward0183.json")),
+        verifierSha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql"))
+      },
+      migration: { name: "0184_staff_rekey_permit.sql", sha256: sha256(await bytesOf("0184_staff_rekey_permit.sql")) },
+      verifier: { path: "lineage/verify-effective-capabilities-130.sql", sha256: sha256(await bytesOf("lineage/verify-effective-capabilities-130.sql")) }
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/staff-rekey-permit-forward0184.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.previousVerifierSha256).toBe(previous.verifierSha256);
+    expect(step.verifierSql).toBe((await bytesOf("lineage/verify-effective-capabilities-130.sql")).toString("utf8"));
+    expect(step.n1).toEqual({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false, concurrentIndex: null });
+    // Its checks are its postcondition (the table and the nine functions, each whole); no supplemental verifier, no amendment.
+    expect(step.replayVerifierSql).toBeUndefined();
+    expect(step.amendsPostconditionsOf).toBeUndefined();
+    // The loader digests every function and table the SQL creates, and nothing the SQL does not create.
+    const loader = await readFile(new URL("migration-forward0184.ts", DB_SOURCE), "utf8");
+    const listed = (name: string): string[] => [...loader.slice(loader.indexOf(`const ${name}`), loader.indexOf("];", loader.indexOf(`const ${name}`)))
+      .matchAll(/'([a-z_]+\.[a-z_0-9]+)(?:\([^()]*\))?'/gu)].map((match) => match[1]!);
+    const created = (pattern: RegExp): string[] => [...step.sql.matchAll(pattern)].map((match) => match[1]!);
+    expect(listed("FUNCTIONS").sort()).toEqual(created(/^CREATE OR REPLACE FUNCTION ([a-z_]+\.[a-z_0-9]+)\(/gmu).sort());
+    expect(listed("TABLES")).toEqual(created(/^CREATE TABLE IF NOT EXISTS ([a-z_]+\.[a-z_0-9]+) \(/gmu));
+    expect(listed("TABLES")).toEqual(["staff.rekey_permit"]);
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The staff re-key permit (0184)"));
+    expect(section.startsWith("## The staff re-key permit (0184)")).toBe(true);
+    for (const needle of ["0183", "0184_staff_rekey_permit.sql", "staff-rekey-permit-forward0184.json", "packages/db/src/migration-forward0184.ts",
+      "MIGRATION_FORWARD0184_", "`STEPS`", "-- n1: expand", "-- n1: keeps-verifier", "verify-effective-capabilities-130.sql", "replayVerifierSql",
+      "previous.manifestSha256", "migration.sha256", "renumber", "staff.rekey_permit", "staff.arm_rekey", "staff.step_up_prerequisite_v2",
+      "staff.begin_owned_webauthn_v2", "staff.read_owned_webauthn_challenge_v2", "staff.complete_owned_webauthn_registration_v2",
+      "staff.rekey_key_present", "staff.rekey_permit_current", "staff.rekey_challenge_current", "identity.staff_insert_rekey_webauthn_key"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third, and the staff re-key permit (0184, below) the seventy-fourth");
+  });
+
+  it("chains a sign-up not finished within 24 hours being deleted (0183) after 0182 with 0182's manifest and effective verifier, expand, amending no step", async () => {
+    const plan = await loadMigrationPlan();
+    const step = atStep(plan.forwardChain, "0183");
+    const previous = atStep(plan.forwardChain, "0182");
+    const manifest = JSON.parse((await bytesOf("lineage/unfinished-signup-expiry-forward0183.json")).toString("utf8"));
+    expect(step?.name).toBe("0183_unfinished_signup_expiry.sql");
+    expect(previous?.name).toBe("0182_mfa_recovery_control_user_started.sql");
+    expect(manifest.previous).toEqual({
+      name: previous?.name,
+      manifestSha256: sha256(await bytesOf("lineage/mfa-recovery-control-user-started-forward0182.json")),
+      verifierSha256: previous?.verifierSha256
+    });
+    expect(manifest.migration.sha256).toBe(sha256(await bytesOf("0183_unfinished_signup_expiry.sql")));
+    expect(step?.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step?.verifierSha256).toBe(previous?.verifierSha256);
+    expect(step?.n1).toMatchObject({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false });
+    expect(step?.replayVerifierSql).toBeUndefined();
+    expect(step?.amendsPostconditionsOf ?? []).toEqual([]);
+  });
+
+  it("documents a sign-up not finished within 24 hours being deleted (0183) as the seventy-third chain step", async () => {
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.split("## A sign-up not finished within 24 hours is deleted (0183)")[1]?.split("\n## ")[0] ?? "";
+    for (const needle of ["0182", "0183_unfinished_signup_expiry.sql", "unfinished-signup-expiry-forward0183.json", "verify-effective-capabilities-130.sql",
+      "packages/db/src/migration-forward0183.ts", "`STEPS`", "`-- n1: expand`", "`-- n1: keeps-verifier`", "`identity.expire_unfinished_signup(uuid)`",
+      "`debateai_rls_all_accounts`", "tests/integration/unfinished-signup-expiry-database.test.ts", "renumber"])
+      expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toMatch(listedAfter("the MFA recovery control user index (0182, below) the seventy-second",
+      "a sign-up not finished within 24 hours being deleted (0183, below) the seventy-third"));
+  });
+
+  it("chains the reader of the release switches 0185 after 0184 as an expand step that keeps the verifier (the month keeps its numbers)", async () => {
+    const plan = await loadMigrationPlan();
+    const names = plan.forwardChain.map((entry) => entry.name);
+    // The chain head: one definer, so the API and the runner can tell which plan numbers a person's month started with.
+    expect(names.slice(-2)).toEqual(["0184_staff_rekey_permit.sql", "0185_release_history.sql"]);
+    const [previous, step] = plan.forwardChain.slice(-2) as [ChainStep, ChainStep];
+    expect(step.n1).toMatchObject({ expand: true, drained: false, keepsVerifier: true, outsideTransaction: false });
+    // One function and its owner and grants; no table, no earlier function, nothing of billing.
+    const statements = step.sql.split("\n").filter((line) => line.trim() !== "" && !line.startsWith("--")).join("\n");
+    expect(statements.match(/^(?:CREATE|ALTER|REVOKE|GRANT|DROP|INSERT|UPDATE|DELETE)\b.*$/gmu)).toEqual([
+      "CREATE OR REPLACE FUNCTION core.read_release_history()",
+      "ALTER FUNCTION core.read_release_history() OWNER TO debateai_release_owner;",
+      "REVOKE ALL ON FUNCTION core.read_release_history() FROM PUBLIC;",
+      "GRANT EXECUTE ON FUNCTION core.read_release_history() TO debateai_runtime;"
+    ]);
+    expect(statements).not.toMatch(/\bbilling\./u);
+    expect(JSON.parse((await bytesOf("lineage/release-history-forward0185.json")).toString("utf8"))).toEqual({
+      version: "release-history-forward0185-v1",
+      baseRecipeSha256: plan.recipeSha256,
+      previous: { name: previous.name, manifestSha256: sha256(await bytesOf("lineage/staff-rekey-permit-forward0184.json")), verifierSha256: previous.verifierSha256 },
+      migration: { name: step.name, sha256: sha256(await bytesOf(step.name)) },
+      verifier: { path: previous.verifierPath, sha256: previous.verifierSha256 },
+      amendsPostconditionsOf: []
+    });
+    expect(step.manifestSha256).toBe(sha256(await bytesOf("lineage/release-history-forward0185.json")));
+    expect(step.previousName).toBe(previous.name);
+    expect(step.previousManifestSha256).toBe(previous.manifestSha256);
+    expect(step.verifierPath).toBe("lineage/verify-effective-capabilities-130.sql");
+    expect(step.replayVerifierSql).toBeUndefined();
+    const readme = (await bytesOf("lineage/README.md")).toString("utf8");
+    const section = readme.slice(readme.indexOf("## The reader of the release switches (0185)"));
+    expect(section.startsWith("## The reader of the release switches (0185)")).toBe(true);
+    for (const needle of ["0185_release_history.sql", "release-history-forward0185.json", "packages/db/src/migration-forward0185.ts",
+      "MIGRATION_FORWARD0185_", "core.read_release_history()", "debateai_release_owner", "packages/register/src/billing-plans-in-force.ts",
+      "-- n1: expand", "-- n1: keeps-verifier", "replayVerifierSql", "previous.manifestSha256", "renumber"
+    ]) expect(section, needle).toContain(needle);
+    expect(readme.replace(/\s+/gu, " ")).toContain(
+      "the staff re-key permit (0184, below) the seventy-fourth, and the reader of the release switches (0185, below) the seventy-fifth");
   });
 
   it("refuses a changed 0111, 0113, 0114, 0117, 0118, 0119, 0120, 0121, 0122, 0123, 0124, 0126, 0128 or 0178, a manifest bound to the wrong previous step, and an undeclared file, before any database", async () => {

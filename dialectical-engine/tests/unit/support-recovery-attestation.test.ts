@@ -102,6 +102,9 @@ const S05_R2_OWNER_REVIEW = Object.freeze({"reviewedBy": "OWNER", "reviewerSessi
 const S05_KEYS = new Set(["account-access.en", "account-access.ro", "ai-transparency.ro", "budget-tier-choice.ro",
   "debate-topic-and-description.ro", "debate-workspace-menus.ro", "getting-started-debate.ro", "guide-how-it-works.ro",
   "risk-tier-choice.ro", "support-cases.ro", "support-status-limits.en", "support-status-limits.ro", "unsupported-capabilities.ro"]);
+// cookie-copy (18 November 2026): the owner signed the corrected privacy-consent pair (13 cookies and 8 storage items,
+// the product named Dialectical Engine, the notice showing again), docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md.
+const COOKIE_COPY_OWNER_REVIEW = Object.freeze({"reviewedBy":"OWNER","reviewerSession":"2a26c595-52ab-425b-a334-89327d58f125 (Claude Code desktop, cookie-copy session; the owner answered the help-article question on 2026-11-18)","reviewedOn":"2026-11-18","evidence":"docs/missions/cookie-copy/OWNER-SIGNOFF-support-kb.md","ratifiedBy":"V","ratifiedOn":"2026-11-18"});
 const S02_IDS = new Set(["privacy-consent", "settings-help-menus", "app-navigation", "account-settings"]);
 
 const QUALITY_REVIEW = Object.freeze({
@@ -143,6 +146,17 @@ const R22_UNPUBLISH_CHAT_REVIEW = Object.freeze({
   ratifiedOn: "",
 });
 const R22_CHAT_IDS = new Set(["publish-a-debate", "delete-a-private-debate", "public-answer-disclosure"]);
+// The navigation article and its chat texts changed after the owner read them: the landing no longer links to a
+// sample transcript, and its button says Ask a question. Until the owner reads the new text, its records are SOL.
+const APP_NAVIGATION_EVIDENCE = "docs/missions/synthesis-flag/OWNER-SIGNOFF-S05-support-kb.md";
+const APP_NAVIGATION_CHAT_REVIEW = Object.freeze({
+  reviewedBy: "SOL",
+  reviewerSession: "release-wording-2026-11-19 (the landing's Transcripts link was removed and Start a round became Ask a question; no separate editor read it and the owner has not read this chat text)",
+  reviewedOn: "2026-11-19",
+  evidence: APP_NAVIGATION_EVIDENCE,
+  ratifiedBy: "",
+  ratifiedOn: "",
+});
 
 const GUIDE_IDS = new Set([
   "app-navigation",
@@ -157,8 +171,8 @@ const EXPECTED = [
   ["account-settings", "ro", "f887ccbfcc05fb99a095a451e6b2b872cdc3d85135a3e3eadd0496d80d10b21c", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958", "5b8a424ec1749c7578a92aa44165d41f4d100a743375395dd201ad4a82ba8958"],
   ["ai-transparency", "en", "b2d3c4dc1ee4d40d46a30861aede89faf2bf092e2800e6b978cdf0c66acc6388", "a84af8cfaea76ce84a29bd9f8d8fffbcd37457c61ffdca349af0dfaf18f1ae9e", "a116a35102a2208d4713e6df95e77148543f90cc5128e7374c869c4a2d2e32bd"],
   ["ai-transparency", "ro", "bcaa2f47d9ba78227bff74e32e4391b4a8e0020fd842ed7751068dfa81e56bf9", "e3dca4aa8b108fefec0add59ca8b216539a08d6352f558ffa869cf5772563a19", "914d0ea1afddcef9bae62c8741f3916d7c100337edca74fa8dbd32d4e1875604"],
-  ["app-navigation", "en", "19b071be3dcc43e9d0cdba3558a29d9ba78d573764aa915173e753fcf01b12a9", "62d5b79e6070a88f9a7c54e50a6781b7f73e484902a7e5c38878e79d2d9081d3", "5f72d0d447cb61481951585f2bc42d3a0c5450ab504c1c8204a0c1a78505360a"],
-  ["app-navigation", "ro", "38e7a627bc14a056935abb6cde12b76bd26237f7f317fca0f2cdf8e515f1ccdc", "26c2daccbcb5b797a3cb9dba4871a51086ec799d320540492aeb8d103e1497f9", "ce9355e41bd2e02b7197e69b09391bc44c4e3f5dfd57859ae54aca289df630c1"],
+  ["app-navigation", "en", "5abaed35b884dad5f2e6347b97e47bc00852c2703becf4b431d62e8feaf99482", "b01d868a22a45b301634464e927371f41dd3856ebe6f943d3c39df9e34ca5c30", "5f72d0d447cb61481951585f2bc42d3a0c5450ab504c1c8204a0c1a78505360a"],
+  ["app-navigation", "ro", "5eb00657e74fc590e0356cebbe24b0edad965ef7b8c8887896bc3d45bc2b9f75", "1b38d0bba1e67870e7fcb1862b6cc3dc7731f4ffc338f897115e78b14c9b906e", "ce9355e41bd2e02b7197e69b09391bc44c4e3f5dfd57859ae54aca289df630c1"],
   ["browse-public-debates", "en", "8059a2e46af231765a80f61854752aa5a9ec49e60c95dc715eb3e82a39618fad", "c5c6d262a33abda6c4cf76024cfaa5f42c2b51f2e3242ae3ed3d3bf157ba1034", "c5294a4cae6fc88b300ec64634fbbb2531e7eef783bed814f387834804f21bb6"],
   ["browse-public-debates", "ro", "0fb2aa501c0980af4afb52520c10e51ca0814266bd2258b1f727fa52d16e0241", "87cb63222b2a74f1c75e4d25c28e69e35de0673049d4be055f7de201459e0897", "37bd679ea02946cbdcf7948c7d1345376592335f4e8bde3b2e78adf339e0f40d"],
   ["budget-tier-choice", "en", "a49d563ef7bfec75ed179a70adb54c25947aa9cbe4db557698eacc84d1d3c683", "e6d5adf85f44c3fd1aaa2c70d095f6f2474723a5b72393d4a006f0206fa64104", "cb920483c56311f42b1adf89c581320a4a5344dcc90028fa458ad6028867d601"],
@@ -175,8 +189,8 @@ const EXPECTED = [
   ["getting-started-debate", "ro", "1edec9fe3ae21b3f1f4ea59e6be3e4124be7b5332bf5b29e1e2d31977cd4deca", "33a8fc6a0bd1dd38de5e0bdea12600a422f00d7d0d4819c7bc182554e0d9d734", "a5d2d9f051896716213aabe9f48c97257778ded6cb054dec0d7b32d615549c4a"],
   ["guide-how-it-works", "en", "05316f05e559cd866948ab7f464a681d6875fe8aad5143e956eeb20077bc46c5", "758085d81051393bd3520c43c84a23689a652c5dc6b15e0154a46a1fcf7cd528", "c1ed3a89b00d46ac7f1710280ef768f9d66adec20d20aaa18815596e6a5c2265"],
   ["guide-how-it-works", "ro", "c396a00502bb96aaf7e981d20482a4068ba14f4d796fb1f8079162d3aa5b0568", "f34118491cc1fdfd73f1a810c00e6acd298928a51cb906710179ec8e644599b7", "cbf7d875d34bbb3a6a9ae338cb47a622340ddb3de3f6c1278336b1515d52a872"],
-  ["privacy-consent", "en", "0fef2fa6fc9b8ac75ad7134d4b5f746b0be230a4292c9d983b24dfa00f42951f", "8ba452e770941a43e53f7131cb1513f34ee787755d71a8b1900e171e5fbe269e", "3fe7da1ecfe2848622b10234fac52d5283a30a4473a0adada8eb9e6555b24824"],
-  ["privacy-consent", "ro", "a25a5f56268e7bdda4d1cbc0264e53cb332acfe592acc7260e6c1ff16f4d7eb6", "e64bb25be8385d23793bf41fb6e5c9d439ae56e47b9568fc9fba0d13bd407b33", "d90423906e3d6502ae6585462f2a8e4fca9608c6c2bc99fba4be6e4c74ea0c4c"],
+  ["privacy-consent", "en", "4b7a40ee59a03bfb6aed19b3a959b4db8048d75aec19d3f3908f5e8ef0eea885", "152d4326ff7a99043e38bdacbdc74c63ab3d04179a75f59f751e5eadaf51d9d0", "c629bac06d9aa1472debd1ee0b442f2c7bb71f07872fd79ce2e27bd2f8c71f91"],
+  ["privacy-consent", "ro", "e56f0e678f2d1d55b04d2d8f7a1e51849212009db8f634c9d465e52018a97127", "71a638afab059c57c52ea80e3a0dac381daac063dd0039c425ff434bd0f2cc33", "7b510da9840b2dbc9161ea095ccd4a0bd9d2cc7c2a68477084aec18f6708c2d3"],
   ["product-identity", "en", "3841870d3e2310a8fbee6325e59b4c25e92437b644b6a311910ade1e304ef4aa", "797d3ca04d545f868a633dd67d7f52a9758ddb86fa26aaf87d3d87ee5ff32d64", "0f08312a2f6fcd13a67f7694dfefe1ac084bbda210df900eda65ec589cc4c032"],
   ["product-identity", "ro", "d05337815983d83f075964b6db5063dfbff40721a720013aaeeff19c98262391", "5ca60396146b9390d5f2848c703a221d75e0f3e2c88740cc44d1abde6c77ae40", "d2102ff844843efc368e4458e7928fbb6ccd64675cb3c8d4b1657ff015acf812"],
   ["public-answer-disclosure", "en", "61d56f01ff035362e1f914c60421fe1c782a3056ade12614b149f05ee76a13af", "60a27bba95e78ac17fc1216c033643bbe1d72f65165b52c11e648dbdc269edf5", "97aacd2bedecdd8d85d11d40e5d50f19133b40f208c19fe5596a275310ed2449"],
@@ -226,8 +240,10 @@ describe("production Support recovery attestation", () => {
         articleSha256,
         modelProjectionSha256,
         fallbackSha256,
-        ...(id === "unpublish-a-debate" ? R22_UNPUBLISH_CHAT_REVIEW : R22_CHAT_IDS.has(id) ? R22_CHAT_REVIEW : ["support-cases","settings-help-menus","app-navigation","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
+        ...(id === "unpublish-a-debate" ? R22_UNPUBLISH_CHAT_REVIEW : id === "app-navigation" ? APP_NAVIGATION_CHAT_REVIEW : R22_CHAT_IDS.has(id) ? R22_CHAT_REVIEW : ["support-cases","settings-help-menus","ai-transparency"].includes(id) ? S05_R2_OWNER_REVIEW : ["account-access","account-settings"].includes(id) ? ACCOUNT_FLOW_REVIEW : S05_KEYS.has(`${id}.${lang}`)
           ? S05_OWNER_REVIEW
+          : id === "privacy-consent"
+          ? COOKIE_COPY_OWNER_REVIEW
           : S02_IDS.has(id)
           ? S02_OWNER_REVIEW
           : id === "ai-transparency"
@@ -252,7 +268,7 @@ describe("production Support recovery attestation", () => {
       },
       recovery: {
         componentFileSha256:
-          "5e1db1d1e7c89bb805a90db24f4c036ae8be0df18a59263cf0964cc69d133c58",
+          "ecb9b0efe926e5d0ae624c7b0322ee827f3b4364082f6ee851e2cfda0227eac1",
         components: expectedRows,
       },
     });
@@ -268,6 +284,19 @@ describe("production Support recovery attestation", () => {
         reviewerSession: "r22-report-button-2026-11-01 (the Report link became the Report button, decision 35 of 2026-11-01; the owner has not read this text)",
         reviewedOn: "2026-11-01",
         evidence: R22_SIGNOFF,
+      });
+    }
+    // The owner read app-navigation before the landing changed. Its records must not claim that reading for this text.
+    for (const lang of ["en", "ro"] as const) {
+      const record = corpus.reviewManifest.articles.find((article) => article.id === "app-navigation" && article.lang === lang);
+      expect(record).toEqual({
+        id: "app-navigation",
+        lang,
+        sha256: sha256(readFileSync(join(corpusDirectory, `app-navigation.${lang}.md`))),
+        reviewedBy: "SOL",
+        reviewerSession: "release-wording-2026-11-19 (the landing's Transcripts link was removed and Start a round became Ask a question; the owner has not read this text)",
+        reviewedOn: "2026-11-19",
+        evidence: APP_NAVIGATION_EVIDENCE,
       });
     }
     for (const id of R22_CHAT_IDS) {
@@ -297,7 +326,8 @@ describe("production Support recovery attestation", () => {
       previewReviewedCount: 21,
       ownerRatifiedCount: 2,
       recoveryReviewedCount: 23,
-      recoveryOwnerRatifiedCount: 6,
+      // app-navigation's chat texts are SOL until the owner reads them, so one owner-ratified pair fewer.
+      recoveryOwnerRatifiedCount: 5,
     });
 
     for (const [index, expected] of EXPECTED.entries()) {

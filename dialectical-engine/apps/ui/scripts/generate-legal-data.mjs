@@ -19,7 +19,9 @@
  * markdown tables (rendered as lists, cells joined with an em dash) and `- ` bullet lists.
  * Emphasis, links and autolinks are reduced to their visible text; escaped and HTML-entity
  * brackets become plain brackets, because the drafts use square brackets to mark what counsel
- * still has to fill in and the product renders those marks verbatim.
+ * still has to fill in and the product renders those marks verbatim. A paragraph that opens with a
+ * bold run ("**Delivery.** …") also carries that run as `lead`, so the page can draw it bold; its
+ * `text` is the same either way.
  *
  * `tests/unit/legal-documents-data.test.ts` pins that the committed modules equal this script's
  * output, so edit the draft and regenerate — never the module.
@@ -36,10 +38,11 @@
  *     translated from. After translating a language, record it with
  *       node apps/ui/scripts/generate-legal-data.mjs --translated --locale fr --document privacy
  *     which refuses a translation whose version or structure is not the current English text's;
- *   - `pnpm run generate:legal:archive` (this script with `--archive`) copies every current text
- *     into the archive, and `pnpm run legal:release-check` (legal-release-check.mjs), which the
- *     release step runs, refuses a release while any language lags the English text, a current
- *     text is not archived, or a changed text still carries an archived version number.
+ *   - `pnpm run generate:legal:archive` (this script with `--archive`) copies the current text of
+ *     every language this release offers (RELEASE_LEGAL_LOCALES) into the archive, and
+ *     `pnpm run legal:release-check` (legal-release-check.mjs), which the release step runs, refuses
+ *     a release while one of those languages lags the English text, a current text of one of them is
+ *     not archived, or a changed text still carries an archived version number.
  */
 
 import { createHash } from "node:crypto";
@@ -51,6 +54,17 @@ import { buildConsentManifestEntries } from "./legal-consent-manifest.mjs";
 import { assertLegalLocale } from "./legal-locale-check.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
+
+/**
+ * The languages whose Terms of Service and Privacy Policy this release offers: the release check holds only these to
+ * the current English text, and the archive step copies only their current texts. English and Romanian are the
+ * interface languages offered. French is here too because sign-up shows a person who picks Canada the French Terms and
+ * Privacy Policy first and records their acceptance in French (apps/ui/components/consent/canadaLegalLanguage.ts).
+ * The other languages' drafts stay in the repository and carry the same version number, but they are neither checked
+ * nor archived until a release offers them again. The site keeps the same list as LEGAL_TEXT_LOCALE_CODES
+ * (apps/ui/lib/legal/legalTextLocales.ts) and shows legal texts only in those languages; a unit test holds the two equal.
+ */
+export const RELEASE_LEGAL_LOCALES = Object.freeze(["en", "fr", "ro"]);
 
 /** The section accents, cycled in this order — the six tokens the design's policy modal uses. */
 const ACCENT_CYCLE = ["--ok-dot", "--gold", "--reasoning", "--con", "--ink", "--muted"];
@@ -72,11 +86,11 @@ const DOCUMENTS = {
   privacy: {
     key: "privacy",
     manifestKind: "PRIVACY",
-    reacceptanceFrom: "3.2",
+    reacceptanceFrom: "1.0",
     draft: "privacy-policy.md",
     module: "privacyPolicy.ts",
     englishOutput: "apps/ui/lib/privacyPolicy.ts",
-    versionAnchor: "Version 3.12",
+    versionAnchor: "Version 1.0",
     numberedSections: 14,
     annexLetter: "B",
     annexParts: 6,
@@ -89,11 +103,11 @@ const DOCUMENTS = {
   terms: {
     key: "terms",
     manifestKind: "TERMS",
-    reacceptanceFrom: "2.1",
+    reacceptanceFrom: "1.0",
     draft: "terms-of-service.md",
     module: "termsOfService.ts",
     englishOutput: "apps/ui/lib/termsOfService.ts",
-    versionAnchor: "Version 2.18",
+    versionAnchor: "Version 1.0",
     numberedSections: 19,
     annexLetter: "A",
     annexParts: 6,
@@ -332,9 +346,22 @@ export function parseBlocks(lines) {
       index += 1;
       continue;
     }
-    blocks.push({ kind: "p", text: inlineText(paragraph.join(" ")) });
+    blocks.push(paragraphBlock(paragraph.join(" ")));
   }
   return blocks;
+}
+
+/**
+ * One paragraph block. When the draft opens the paragraph with a bold run, the block also carries
+ * that run's visible text as `lead`, so the page can draw the paragraph's lead-in bold; `text` is the
+ * whole paragraph either way. A lead that is not exactly the start of `text` is left out, so the words
+ * on the page can never differ from `text`. The key is absent, not empty, when there is no lead.
+ */
+function paragraphBlock(raw) {
+  const text = inlineText(raw);
+  const bold = /^\s*\*\*(.+?)\*\*/.exec(raw);
+  const lead = bold === null ? "" : inlineText(bold[1]);
+  return lead.length > 0 && text.startsWith(lead) ? { kind: "p", lead, text } : { kind: "p", text };
 }
 
 /**
@@ -513,7 +540,11 @@ export function buildLegalDocument(markdown, key) {
 const str = (value) => JSON.stringify(value);
 
 function renderBlock(block) {
-  if (block.kind === "p") return `      { kind: "p", text: ${str(block.text)} }`;
+  if (block.kind === "p") {
+    return block.lead === undefined
+      ? `      { kind: "p", text: ${str(block.text)} }`
+      : `      { kind: "p", lead: ${str(block.lead)}, text: ${str(block.text)} }`;
+  }
   const items = block.items.map((item) => `        ${str(item)}`).join(",\n");
   if (block.table === undefined) return `      {\n        kind: "list",\n        items: [\n${items}\n        ]\n      }`;
   const rows = block.table.rows.map((row) => `            ${str(row)}`).join(",\n");
@@ -607,16 +638,18 @@ const ARCHIVE_SHA256 = /^[0-9a-f]{64}$/;
 
 /**
  * The committed archive index (`archiveHistory`, the `archive` member of the manifest already on
- * disk; `{}` on the very first run), plus every current draft when `archiveCurrent` is set (the
- * release step's `--archive`). An ordinary run adds nothing, so an English edit made while its
- * translations lag creates no archive entry. An entry is never dropped. A history entry of an
+ * disk; `{}` on the very first run), plus the current draft of each language in `archiveLocales`
+ * when `archiveCurrent` is set (the release step's `--archive`, which names the languages the
+ * release offers). An ordinary run adds nothing, so an English edit made while its translations
+ * lag creates no archive entry, and a language left out of `archiveLocales` gets none either, so an
+ * untranslated text is never frozen under a number. An entry is never dropped. A history entry of an
  * unknown kind or locale, a malformed hash or version, a path that is not its own, or a hash that
  * the current draft carries with another version refuses the whole run
  * (LEGAL_MANIFEST_ARCHIVE_INVALID), so a damaged index is never silently rewritten. Archiving a
  * current text under a version the archive already holds for another text of that language refuses
  * it too (LEGAL_MANIFEST_ARCHIVE_VERSION_REUSED).
  */
-function mergeArchive(archiveHistory, currentByKind, archiveCurrent) {
+function mergeArchive(archiveHistory, currentByKind, archiveCurrent, archiveLocales) {
   if (archiveHistory === null || typeof archiveHistory !== "object" || Array.isArray(archiveHistory)) {
     throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
   }
@@ -643,7 +676,7 @@ function mergeArchive(archiveHistory, currentByKind, archiveCurrent) {
     for (const [locale, pair] of Object.entries(byLocale)) {
       const known = archive[kind][locale]?.[pair.sha256];
       if (known !== undefined && known.version !== pair.version) throw new Error("LEGAL_MANIFEST_ARCHIVE_INVALID");
-      if (!archiveCurrent) continue;
+      if (!archiveCurrent || !archiveLocales.has(locale)) continue;
       // A changed text archived under a number the archive already gives another text would make one version name
       // two texts for good, since nothing is ever removed from the archive: the text needs its new number first.
       const sameNumber = Object.entries(archive[kind][locale] ?? {})
@@ -696,8 +729,10 @@ function configuredReacceptanceFloors() {
  * Every locale x both documents -> { version, sha256 }, plus each document's re-acceptance floor,
  * plus the checkout consent pairs of the locales that have them (`consentEntries`, the shape
  * `buildConsentManifestEntries` returns: locale -> { CONSENT_RENEWAL, CONSENT_IMMEDIATE_START }),
- * plus the archive index (`archiveHistory` carried forward; every current draft added only when
- * `options.archiveCurrent` is set, as the release step's `--archive` does).
+ * plus the archive index (`archiveHistory` carried forward; the current drafts of the languages in
+ * `options.archiveLocales`, every language when it is left out, added only when
+ * `options.archiveCurrent` is set, as the release step's `--archive` does with
+ * RELEASE_LEGAL_LOCALES).
  * `readDraft(locale, kind)` returns the draft's text; a missing or invalid draft throws, so the
  * manifest is either whole or not written. A kind with no entry at all is left out of `documents`
  * (the package reads it as empty). Keys are sorted, so the output is deterministic. `floors`
@@ -709,7 +744,7 @@ export function buildLegalManifest(
   consentEntries = {},
   archiveHistory = {},
   floors = configuredReacceptanceFloors(),
-  { archiveCurrent = false } = {}
+  { archiveCurrent = false, archiveLocales = LOCALES.map(({ code }) => code) } = {}
 ) {
   const documents = {};
   const reacceptance = {};
@@ -726,7 +761,12 @@ export function buildLegalManifest(
     assertReacceptanceFloor(floor, byLocale);
     documents[config.manifestKind] = byLocale;
   }
-  const archive = mergeArchive(archiveHistory, { PRIVACY: documents.PRIVACY, TERMS: documents.TERMS }, archiveCurrent);
+  const archive = mergeArchive(
+    archiveHistory,
+    { PRIVACY: documents.PRIVACY, TERMS: documents.TERMS },
+    archiveCurrent,
+    new Set(archiveLocales)
+  );
   const localeCodes = new Set(LOCALES.map(({ code }) => code));
   for (const [locale, entries] of Object.entries(consentEntries)) {
     if (!localeCodes.has(locale) || entries === null || typeof entries !== "object") {
@@ -949,13 +989,19 @@ function updateTranslations(options) {
   } else {
     process.stdout.write(`${LEGAL_TRANSLATIONS_PATH}: up to date\n`);
   }
-  // Lagging is allowed while work goes on; it is said here so nobody is surprised at release.
+  // Lagging is allowed while work goes on; it is said here so nobody is surprised at release. Only the languages the
+  // release offers must be brought up to date (legal-release-check.mjs), so the others are named apart.
   for (const key of ["privacy", "terms"]) {
     const kind = DOCUMENTS[key].manifestKind;
     const englishSha256 = legalDraftSha256(readDraftFile("en", kind));
     const lagging = translatedLocales().filter((locale) => !legalTranslationFollows(record, kind, locale, englishSha256));
-    if (lagging.length > 0) {
-      process.stdout.write(`${key}: ${lagging.length} translation(s) follow an older English text (${lagging.join(", ")}); bring them up to date before release\n`);
+    const offered = lagging.filter((locale) => RELEASE_LEGAL_LOCALES.includes(locale));
+    const notOffered = lagging.filter((locale) => !RELEASE_LEGAL_LOCALES.includes(locale));
+    if (offered.length > 0) {
+      process.stdout.write(`${key}: ${offered.length} translation(s) follow an older English text (${offered.join(", ")}); bring them up to date before release\n`);
+    }
+    if (notOffered.length > 0) {
+      process.stdout.write(`${key}: ${notOffered.length} translation(s) this release does not offer follow an older English text (${notOffered.join(", ")}); they are neither checked nor archived until a release offers them\n`);
     }
   }
   return problems;
@@ -1036,7 +1082,10 @@ function main(argv) {
       messagesRoot: resolve(REPO_ROOT, "apps/ui/messages"),
       locales: LOCALES.map(({ code }) => code)
     });
-    manifest = buildLegalManifest(readDraftFile, consentEntries, archiveHistory, undefined, { archiveCurrent: options.archive });
+    manifest = buildLegalManifest(readDraftFile, consentEntries, archiveHistory, undefined, {
+      archiveCurrent: options.archive,
+      archiveLocales: RELEASE_LEGAL_LOCALES
+    });
   } catch (error) {
     stale += 1;
     const code = error instanceof Error ? error.message : String(error);
@@ -1048,9 +1097,10 @@ function main(argv) {
   let manifestText = null;
   if (manifest !== null) {
     if (options.archive) {
-      // The release step: copy each current draft into the archive under the hash of its bytes. `wx`
-      // never overwrites: a file already there is left as it is, and the check below proves its bytes.
-      for (const code of LOCALES.map(({ code: locale }) => locale)) {
+      // The release step: copy the current draft of each language the release offers into the archive
+      // under the hash of its bytes, the same languages the index above lists. `wx` never overwrites: a
+      // file already there is left as it is, and the check below proves its bytes.
+      for (const code of RELEASE_LEGAL_LOCALES) {
         for (const key of ["privacy", "terms"]) {
           const bytes = readFileSync(resolve(REPO_ROOT, sourceFor(code, DOCUMENTS[key])));
           const target = legalArchivePath(code, createHash("sha256").update(bytes).digest("hex"));

@@ -1,6 +1,6 @@
 // tests/architecture/ci-security-gates.test.ts
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { basename, dirname, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { describe, expect, it } from "vitest";
 const gitRoot = resolve(import.meta.dirname, "../../..");
@@ -41,20 +41,27 @@ describe("CI security gates (F-03)", () => {
     const wf = read(".github/workflows/security.yml");
     for (const needle of [`node-version: ${declaredNodeFloor()}`, "gitleaks", "github/codeql-action/analyze"]) expect(wf).toContain(needle);
     expect(executableGateCommands(wf)).toEqual([
-      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck",
-      "pnpm run test:ci-gate", "pnpm audit --audit-level=moderate",
-      // job auth-integration (2026-10-09); the registration suite has its own workflow (see below)
+      // job verify-static
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run typecheck", "pnpm audit --audit-level=moderate",
+      // job verify-tests, once per part
+      "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-gate",
+      // job auth-integration-tests (2026-10-09), once per part; the registration suite has its own workflow (see below)
       "pnpm install --frozen-lockfile", "pnpm run generate:contract", "pnpm run test:ci-integration"
     ]);
   });
-  // 2026-11-01: side by side halves verify's test step, but test runs in parallel have frozen a 16 GB Mac and the
-  // integration suites' timing bounds need the machine to themselves. So it is one setting on one CI step, off elsewhere.
-  it("runs test files side by side only in verify's gate step", () => {
+  // 2026-11-01: side by side halves verify's test step, but test runs in parallel have frozen a 16 GB Mac. So it is a
+  // setting on CI steps only, off everywhere else. The auth-integration step has it too: each of its files starts a
+  // PostgreSQL of its own, and one at a time they made the slowest required check. The registration suite's timing
+  // bounds need the machine to themselves, so its workflow never sets it.
+  it("runs test files side by side only in the two test steps of the security workflow", () => {
     const wf = read(".github/workflows/security.yml");
-    const setting = 'env: { CI_TEST_FILES_SIDE_BY_SIDE: "1" }';
-    const verify = wf.slice(wf.indexOf("\n  verify:\n"), wf.indexOf("\n  auth-integration:\n"));
-    expect(wf.split("CI_TEST_FILES_SIDE_BY_SIDE")).toHaveLength(2);
+    const setting = 'env:\n          CI_TEST_FILES_SIDE_BY_SIDE: "1"\n          CI_TEST_PART: "${{ matrix.part }}/4"\n          CI_CHANGED_SINCE: ' +
+      "${{ github.event_name == 'pull_request' && github.base_ref == 'dev' && github.event.pull_request.base.sha || '' }}";
+    const verify = wf.slice(wf.indexOf("\n  verify-tests:\n"), wf.indexOf("\n  verify:\n"));
+    const integration = wf.slice(wf.indexOf("\n  auth-integration-tests:\n"), wf.indexOf("\n  auth-integration:\n"));
+    expect(wf.split("CI_TEST_FILES_SIDE_BY_SIDE")).toHaveLength(3);
     expect(verify).toContain(`- run: node tools/source-map-hotfix.mjs tests # pnpm run test:ci-gate\n        ${setting}\n`);
+    expect(`${integration}\n`).toContain(`- run: node tools/source-map-hotfix.mjs integration # pnpm run test:ci-integration\n        ${setting}\n`);
     expect(read(".github/workflows/registration-integration.yml")).not.toContain("CI_TEST_FILES_SIDE_BY_SIDE");
     expect(read("dialectical-engine/vitest.config.ts")).toContain('fileParallelism: process.env.CI_TEST_FILES_SIDE_BY_SIDE === "1",');
   });
@@ -62,7 +69,7 @@ describe("CI security gates (F-03)", () => {
   // rules, and `verify` never ran tests/integration. A separate job runs the curated list through the same gate.
   it("runs the curated auth/security integration suites in their own job, through the known-red gate", async () => {
     const wf = read(".github/workflows/security.yml");
-    const job = wf.slice(wf.indexOf("\n  auth-integration:\n"), wf.indexOf("\n  secrets:\n"));
+    const job = wf.slice(wf.indexOf("\n  auth-integration-tests:\n"), wf.indexOf("\n  auth-integration:\n"));
     expect(wf).toMatch(/^  pull_request: \{ branches: \[main, dev\] \}$/m);
     expect(wf).not.toContain("registration-integration:");
     expect(job).toContain("runs-on: ubuntu-latest");
@@ -85,6 +92,53 @@ describe("CI security gates (F-03)", () => {
       expect(targets, name).toContain(`tests/integration/${name}.test.ts`);
     }
   });
+  // The two required checks are named `verify` and `auth-integration`. Each runs its tests as parts on several
+  // machines, so three things must hold or a pull request could merge with tests that ran nowhere: the parts in the
+  // matrix are exactly 1..N for the N the test step divides by; the job with the required name waits for the parts;
+  // and it runs whatever happened to them (a skipped job counts as passed for a required check) and passes only on
+  // their success.
+  it("splits each required check into parts that cover every file, behind a last job that keeps the required name", () => {
+    const wf = read(".github/workflows/security.yml");
+    const jobNames = [...wf.matchAll(/^  ([\w-]+):$/gm)].map((match) => match[1]);
+    const body = (name: string): string => {
+      const start = wf.indexOf(`\n  ${name}:\n`);
+      const next = jobNames[jobNames.indexOf(name) + 1];
+      expect(start, name).toBeGreaterThanOrEqual(0);
+      return wf.slice(start, next === undefined ? wf.length : wf.indexOf(`\n  ${next}:\n`));
+    };
+    for (const [required, parts, others] of [["verify", "verify-tests", ["verify-static"]], ["auth-integration", "auth-integration-tests", []]] as const) {
+      expect(jobNames.filter((name) => name === required), required).toHaveLength(1);
+      const tests = body(parts);
+      const matrix = /^    strategy: \{ fail-fast: false, matrix: \{ part: \[([\d, ]+)\] \} \}$/m.exec(tests)?.[1]?.split(", ").map(Number);
+      const divisor = Number(/CI_TEST_PART: "\$\{\{ matrix\.part \}\}\/(\d+)"/.exec(tests)?.[1]);
+      expect(divisor, parts).toBeGreaterThanOrEqual(2);
+      expect(matrix, parts).toEqual(Array.from({ length: divisor }, (_, index) => index + 1));
+      expect(tests.split('CI_TEST_PART: "')).toHaveLength(2);
+      const last = body(required);
+      expect(last).toContain(`\n    needs: [${[...others, parts].join(", ")}]\n    if: always()\n`);
+      for (const needed of [...others, parts]) expect(last).toContain(`\${{ needs.${needed}.result }}`);
+      const script = last.slice(last.indexOf("        run: |\n") + "        run: |\n".length).split("\n");
+      const lastLine = script.filter((line, index) => script.slice(0, index + 1).every((earlier) => earlier.startsWith("          "))).at(-1);
+      expect(lastLine?.trim()).toBe(
+        others.length === 0 ? '[ "$TEST_PARTS" = "success" ]' : '[ "$STATIC_CHECKS" = "success" ] && [ "$TEST_PARTS" = "success" ]'
+      );
+    }
+  });
+  // A text-only pull request (legal texts, documents) runs only the tests that can notice it. That is safe only while
+  // the whole suite still runs somewhere: the setting must be empty on a push, so dev runs everything after the merge,
+  // and it applies to pull requests into dev alone. Both test steps need the base commit in their checkout to compare.
+  it("narrows the tests only for a pull request into dev, and never on a push", () => {
+    const wf = read(".github/workflows/security.yml");
+    const setting = "CI_CHANGED_SINCE: ${{ github.event_name == 'pull_request' && github.base_ref == 'dev' && github.event.pull_request.base.sha || '' }}";
+    expect(wf.split("          CI_CHANGED_SINCE: ")).toHaveLength(3);
+    expect(wf.split(`          ${setting}\n`)).toHaveLength(3);
+    for (const [from, to] of [["verify-tests", "verify"], ["auth-integration-tests", "auth-integration"]] as const) {
+      const job = wf.slice(wf.indexOf(`\n  ${from}:\n`), wf.indexOf(`\n  ${to}:\n`));
+      expect(job, from).toContain(setting);
+      expect(job, from).toContain("# v4.4.0\n        with: { fetch-depth: 0 }\n");
+    }
+    for (const workflow of workflowFiles().filter((name) => !name.endsWith("/security.yml"))) expect(read(workflow), workflow).not.toContain("CI_CHANGED_SINCE");
+  });
   // 2026-10-09: the registration/verification-mail suite alone takes ~34 minutes, so it is NOT run on every pull request.
   // Its own workflow runs it when a path that can change its outcome changes, nightly against dev, and by hand.
   it("runs the long registration suite only on relevant changes, nightly against dev and by hand", () => {
@@ -102,9 +156,31 @@ describe("CI security gates (F-03)", () => {
     const paths = [...pullRequest.matchAll(/^      - "([^"]+)"$/gm)].map((match) => match[1]);
     for (const path of ["dialectical-engine/migrations/**", "dialectical-engine/packages/db/**", "dialectical-engine/apps/api/src/registration*",
       "dialectical-engine/apps/api/src/sessions.ts", "dialectical-engine/apps/api/src/turnstile.ts",
-      "dialectical-engine/tests/integration/registration-database.test.ts", "dialectical-engine/tests/support/**",
+      "dialectical-engine/tests/integration/registration-database.test.ts",
       "dialectical-engine/tests/ci-integration-registration.txt", "dialectical-engine/tools/ci-known-red.mjs",
       ".github/workflows/registration-integration.yml"]) expect(paths, path).toContain(path);
+    // The suite's helpers are listed one by one, never as the whole folder: tests/support holds the helpers of every
+    // other suite, and a new one there used to start this 50-minute run. The list must hold every helper the suite
+    // loads, directly or through another helper, and the master-key list its guard reads.
+    expect(paths).not.toContain("dialectical-engine/tests/support/**");
+    const product = resolve(gitRoot, "dialectical-engine");
+    const loaded = new Set<string>();
+    const pending = ["tests/integration/registration-database.test.ts"];
+    while (pending.length > 0) {
+      const file = pending.pop()!;
+      if (loaded.has(file)) continue;
+      loaded.add(file);
+      for (const match of read(`dialectical-engine/${file}`).matchAll(/\b(?:from|import)\s*\(?\s*"(\.{1,2}\/[^"]+)"/gu)) {
+        const target = relative(product, resolve(product, dirname(file), match[1]!)).split(sep).join("/").replace(/\.js$/u, ".ts");
+        if (target.startsWith("tests/support/") && existsSync(resolve(product, target))) pending.push(target);
+      }
+    }
+    const helpers = [...loaded].filter((file) => file.startsWith("tests/support/")).sort();
+    expect(helpers).toContain("tests/support/testDatabase.ts");
+    expect(helpers).toContain("tests/support/master-key-guard.ts");
+    for (const helper of [...helpers, "tests/support/master-key-files.txt"]) expect(paths, helper).toContain(`dialectical-engine/${helper}`);
+    expect(paths.filter((path) => path!.startsWith("dialectical-engine/tests/support/")).sort())
+      .toEqual([...helpers, "tests/support/master-key-files.txt"].map((helper) => `dialectical-engine/${helper}`).sort());
     // Every listed path names something that exists, so a rename cannot silently stop the trigger.
     const scripts = JSON.parse(read("dialectical-engine/package.json")).scripts as Record<string, string>;
     expect(scripts["test:ci-integration-registration"]).toBe("node tools/ci-known-red.mjs @tests/ci-integration-registration.txt");

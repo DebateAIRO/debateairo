@@ -110,10 +110,10 @@ describe("the seven legal pages share one navigation", () => {
     const links = [...(nav?.querySelectorAll("a") ?? [])];
     expect(links.map((link) => link.getAttribute("href"))).toEqual(LEGAL_PAGES.map(({ href }) => href));
     expect(texts(links)).toEqual([
-      "Legal notice",
+      "Company details and contact",
       "Terms of service",
       "Terms versions",
-      "Privacy policy",
+      "Privacy policy (GDPR)",
       "Cookie policy",
       "Model providers",
       "US health data privacy"
@@ -343,42 +343,41 @@ describe("the text pages render the same documents as the sign-up modals", () =>
     const view = render(<LegalDocumentBody document={TERMS_OF_SERVICE} />);
     expect(texts(view.querySelectorAll(".legalSection h2"))).toEqual(TERMS_OF_SERVICE.sections.map(({ title }) => title));
   });
+
+  it("the footer's delivery link lands on the Terms section that holds the delivery rules", () => {
+    const view = render(<LegalDocumentBody document={TERMS_OF_SERVICE} />);
+    expect(view.querySelector("#legal-section-12")?.textContent).toContain("Delivery.");
+  });
 });
 
 describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
-  it("names the current and previous versions, linking each to its text", () => {
+  // Version 1.0 is the first published text (owner's decisions of 19 and 20 November 2026: the pre-launch drafts, Terms
+  // 2.x and 1.1, were never offered to the public and are not kept), so the page lists it alone and says no earlier
+  // version exists.
+  it("names the current version, linked to its text, and says no earlier version has been published", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
-    expect(rows[1]?.querySelector("a")?.getAttribute("href")).toBe(TERMS_VERSIONS[1]?.href);
-    expect(view.querySelector(".legalVersionsNone")).toBeNull();
+    expect(rows[0]?.querySelector(".legalVersionTag")?.textContent).toBe(legalEnglish["legal.versions.current"]);
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.0"]);
+    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
   });
 
-  it("has a row for every version from 2.0 to the current one, newest first, so a skipped number shows up here", () => {
-    const current = minor(TERMS_VERSIONS[0]?.version ?? "2.0");
+  it("has a row for every version from 1.0 to the current one, newest first, so a skipped number shows up here", () => {
+    const current = minor(TERMS_VERSIONS[0]?.version ?? "1.0");
     expect(TERMS_VERSIONS.map(({ version }) => version))
-      .toEqual(Array.from({ length: current + 1 }, (_, index) => `2.${current - index}`));
+      .toEqual(Array.from({ length: current + 1 }, (_, index) => `1.${current - index}`));
   });
 
   it("has a row for every version the Terms' own change history names", () => {
     const history = source("apps/ui/legal/en/terms-of-service.md");
     const named = new Set([...history.matchAll(/Version (\d+\.\d+) replaced version (\d+\.\d+)/g)].flatMap(([, newer, older]) => [newer, older]));
-    expect(named.size).toBeGreaterThan(0);
     const listed = TERMS_VERSIONS.map(({ version }) => version);
     for (const version of named) expect(listed, `Terms ${version}`).toContain(version);
-  });
-
-  it("shows 2.7, which was never published on its own, without a link to a text", () => {
-    const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
-    const row = [...view.querySelectorAll(".legalVersionRow")]
-      .find((item) => item.querySelector(".legalVersionNo")?.textContent === "2.7");
-    expect(row).toBeDefined();
-    expect(row?.querySelector("a")).toBeNull();
-    expect(row?.textContent).toContain(legalEnglish["legal.versions.unpublished.note"]);
   });
 
   it("shows no effective date, and no unfilled [placeholder], on any row in any language (no dates until go-live)", () => {
@@ -524,6 +523,21 @@ describe("the cookie policy describes the cookies the product really sets", () =
     expect(view.textContent).toContain(effect);
     for (const phrase of ["block or delete", "browser settings"]) expect(refuse?.toLowerCase(), phrase).toContain(phrase);
     for (const phrase of ["stops working", "signing in", "language", "display"]) expect(effect?.toLowerCase(), phrase).toContain(phrase);
+    // With site data blocked, `debateai.consent` cannot be kept, so the notice opens again (Privacy Policy §13 says the same).
+    expect(effect?.toLowerCase(), "the notice comes back").toContain("cookie notice");
+  });
+
+  it("makes only claims the inventory bears out: export link sent on download, no third-party cookies", () => {
+    // `debateai.exportPending` is a /cookies row whose "Sent to" is the server (ExportDownloadClient posts its token
+    // to download the export), so the storage intro may not say the items are never sent.
+    const exportRow = LEGAL_INVENTORY.find((item) => item.name === "debateai.exportPending");
+    expect(exportRow?.recipientKey).toBe("legal.cookies.recipient.server");
+    expect(english["legal.cookies.storageIntro"]).toMatch(/export-link item is sent to Dialectical Engine/);
+    // `__Host-debateai-social-apple` is SameSite=None (Apple's form_post callback), so the page cannot promise
+    // "no cross-site cookies"; every cookie is still first-party, which is what the meta line now says.
+    expect(english["legal.cookies.meta"]).not.toMatch(/cross-site/i);
+    expect(english["legal.cookies.meta"]).toMatch(/first-party/i);
+    expect(english["legal.cookies.meta"]).toMatch(/third-party/i);
   });
 
   it("renders both tables with no switch or checkbox, and a control that reopens the card", () => {
@@ -561,15 +575,15 @@ describe("the model providers page lists the companies the API's targets reach (
   });
 
   it("renders one register entry per provider, the support chat's model last", () => {
-    // No answer from the API: every reviewed company (Anthropic, Amazon and DeepInfra), not the hosted cloud rows.
-    // DeepInfra is followed by the company it forwards one model to (16 November 2026: that company receives debate text).
+    // No answer from the API: every reviewed company (Anthropic, DeepInfra and Amazon), not the hosted cloud rows. DeepInfra is
+    // followed by the company it forwards one model to (16 November 2026: that company receives debate text).
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const headings = texts(view.querySelectorAll(".legalProviderEntry h2"));
-    expect(headings).toEqual(["Anthropic", "Amazon Web Services", "DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Perplexity", "Support chat model"]);
+    expect(headings).toEqual(["Anthropic", "DeepInfra", legalEnglish["legal.providers.deepinfraPartnerName"], "Amazon (OpenAI models)", "Perplexity", "Support chat model"]);
     expect(PROVIDER_REGISTER.at(-1)?.key).toBe("support");
   });
 
-  it("names Claude Haiku as the support chat's model, with Anthropic's checked facts and no brackets", () => {
+  it("names Claude Haiku 5.5 as the support chat's model, with Anthropic's checked facts and no brackets", () => {
     // Owner, 12 October 2026: the support chat runs on Claude Haiku 5.5 on Anthropic's API.
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={PROVIDER_REGISTER} />);
     const support = [...view.querySelectorAll(".legalProviderEntry")].at(-1);
@@ -577,9 +591,8 @@ describe("the model providers page lists the companies the API's targets reach (
     const cells = Object.fromEntries([...(support?.querySelectorAll("tbody tr") ?? [])].map((row) => [
       row.querySelector("th")?.textContent, row.querySelector("td")?.textContent?.trim()
     ]));
-    // Owner, 18 November 2026: the models line names the family, without version.
+    // Addition D24: no models line; the support chat's model is named by its row heading's job, not a model name.
     expect(cells).toEqual({
-      "Models": "Claude Haiku",
       "Company": "Anthropic Ireland, Limited",
       "Home country": "Ireland",
       "What it receives, and why": "What you type in the support chat — to answer you",
@@ -605,10 +618,9 @@ describe("the model providers page lists the companies the API's targets reach (
     const view = render(<LegalProvidersBody legalCatalog={legalEnglish} entries={WITH_UNCHECKED} />);
     const entries = [...view.querySelectorAll(".legalProviderEntry")];
     expect(entries).toHaveLength(WITH_UNCHECKED.length);
-    for (const [index, entry] of entries.entries()) {
-      // Owner, 18 November 2026: a row that serves models names them first; web search and an unchecked host do not.
+    for (const entry of entries) {
+      // Addition D24 (owner 2026-10-22): providers only, so no models line.
       expect(texts(entry.querySelectorAll("tbody th"))).toEqual([
-        ...(WITH_UNCHECKED[index]!.models === "" ? [] : ["Models"]),
         "Company",
         "Home country",
         "What it receives, and why",
@@ -673,31 +685,27 @@ describe("the model providers page lists the companies the API's targets reach (
     ["no answer from the API (the whole reviewed catalogue)", null],
     ["targets on DeepInfra only", ["deepinfra"]],
     ["targets on Anthropic and DeepInfra", ["anthropic", "deepinfra"]],
-    ["targets on Amazon, Anthropic and DeepInfra", ["amazon", "anthropic", "deepinfra"]],
     ["a target on a host no catalogue row knows", ["host:api.acme.example"]]
-  ] as const)("names Anthropic's Claude Haiku for both checks on exactly one row: %s", (_build, companies) => {
+  ] as const)("names Anthropic's Claude Haiku 5.5 for both checks on exactly one row: %s", (_build, companies) => {
     const register = providerRegister(companies);
     for (const purpose of ["synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions"] as const) {
       const rows = register.filter((entry) => entry.purposes.includes(purpose));
       expect(rows.map((entry) => entry.key), purpose).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ models: "Claude Haiku", entity: "Anthropic Ireland, Limited" });
+      expect(rows[0]).toMatchObject({ models: "Claude Haiku 5.5", entity: "Anthropic Ireland, Limited" });
     }
   });
 
   it("claims nothing unverified: a cloud provider's contract facts stay bracketed until someone checks the row", () => {
-    const uncheckedRows = [...WITH_UNCHECKED, ...PROVIDER_REGISTER].filter(({ checkedOn }) => checkedOn === null)
-      .filter((entry, index, all) => all.findIndex(({ key }) => key === entry.key) === index);
-    // DeepInfra's partner for one model (a company DeepInfra does not name), a host no catalogue row knows, and Amazon:
-    // its EEA contracting company and the region the owner chose are known (18 November 2026), its contract facts are
-    // not checked yet.
-    expect(uncheckedRows.map(({ key }) => key)).toEqual(["deepinfra-partner", "host:api.acme.example", "amazon"]);
+    const uncheckedRows = WITH_UNCHECKED.filter(({ checkedOn }) => checkedOn === null);
+    // DeepInfra's partner for one model (a company DeepInfra does not name) and a host no catalogue row knows.
+    expect(uncheckedRows.map(({ key }) => key)).toEqual(["deepinfra-partner", "host:api.acme.example"]);
     for (const entry of uncheckedRows) {
-      expect(isUnverified(entry.entity), entry.key).toBe(entry.key !== "amazon");
+      expect(isUnverified(entry.entity)).toBe(true);
       expect(isUnverified(entry.contact)).toBe(true);
       expect(entry.training).toBe("unconfirmed");
       expect(entry.zeroRetention).toBe("unconfirmed");
       expect(entry.retentionKey).toBe("legal.providers.unconfirmed");
-      expect(entry.locationKey).toBe(entry.key === "amazon" ? "legal.providers.locationAwsStockholm" : "legal.providers.unconfirmed");
+      expect(entry.locationKey).toBe("legal.providers.unconfirmed");
       expect(entry.basisKey).toBe("legal.providers.unconfirmed");
     }
     // A row is filled and dated in the same change: no checked row keeps a bracketed contract fact.
@@ -715,8 +723,8 @@ describe("the model providers page lists the companies the API's targets reach (
       const unchecked = register.some(({ checkedOn }) => checkedOn === null);
       expect(view.textContent.includes("[not checked yet]")).toBe(unchecked);
     }
-    // Perplexity's row is checked against its terms; DeepInfra's unnamed partner and Amazon are left.
-    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["amazon", "deepinfra-partner"]);
+    // Perplexity's row is checked against its terms; only DeepInfra's unnamed partner is left.
+    expect(PROVIDER_REGISTER.filter(({ checkedOn }) => checkedOn === null).map(({ key }) => key)).toEqual(["deepinfra-partner"]);
   });
 
   it("shows every register label in every locale's catalogue", () => {
@@ -737,21 +745,24 @@ describe("the US consumer health data page", () => {
 });
 
 describe("the footers (15a full, 15b one line)", () => {
-  it("the one-line footer carries the seven legal links, cookie preferences and ANPC's SAL badge", () => {
+  it("the one-line footer carries the seven legal links, cookie preferences, the report link and ANPC's SAL badge", () => {
     const requests: Array<HTMLElement | null> = [];
     const unsubscribe = subscribeToPreferenceRequests((opener) => requests.push(opener));
     try {
       const view = render(<SiteFooter variant="line" />);
       const footer = view.querySelector("footer.siteFooterLine");
       expect(footer).not.toBeNull();
-      expect([...(footer?.querySelectorAll("a") ?? [])].map((link) => link.getAttribute("href")))
+      const links = [...(footer?.querySelectorAll("a") ?? [])];
+      expect(links.filter((link) => !link.hasAttribute("data-report-problem")).map((link) => link.getAttribute("href")))
         .toEqual([...LEGAL_PAGES.map(({ href }) => href), "https://reclamatiisal.anpc.ro/"]);
+      // While the site is in Beta: one "Report a problem" link, before cookie preferences.
+      expect(links.filter((link) => link.hasAttribute("data-report-problem")).map((link) => link.textContent)).toEqual(["Report a problem"]);
       const button = footer?.querySelector("button");
       expect(button?.textContent).toBe(chromeEnglish["chrome.footer.cookiePreferences"]);
       act(() => button?.click());
       expect(requests).toEqual([button]);
       expect(footer?.textContent).toContain(`© ${new Date().getFullYear()} ${COMPANY.legalName}`);
-      expect(footer?.querySelector("a[href='/legal']")?.textContent).toBe("Legal notice");
+      expect(footer?.querySelector("a[href='/legal']")?.textContent).toBe("Company details and contact");
     } finally {
       unsubscribe();
     }
@@ -768,9 +779,67 @@ describe("the footers (15a full, 15b one line)", () => {
     expect(footer?.querySelector(".languageSwitcher")).not.toBeNull();
   });
 
+  it("the full footer's company block states the seller's facts from COMPANY, as /legal does, and no other town", () => {
+    const view = render(<SiteFooter variant="full" />);
+    const company = view.querySelector("footer.siteFooterFull .siteFooterCompany");
+    const text = company?.textContent ?? "";
+    expect(text).toContain(COMPANY.legalName);
+    expect(text).toContain(`Registered office: ${COMPANY.registeredOffice}`);
+    expect(text).toContain(`CUI ${COMPANY.cui} · Trade Register no. ${COMPANY.tradeRegisterNo}`);
+    expect(COMPANY.cui).toBe("45935221");
+    expect(COMPANY.tradeRegisterNo).toBe("J2022000426271");
+    expect(company?.querySelector('a[href="tel:+40748793490"]')?.textContent).toBe(COMPANY.phone);
+    expect(company?.querySelector('a[href="mailto:support@dezbatere.ro"]')?.textContent).toBe(COMPANY.emails.general);
+    expect(company?.querySelector('a[href="mailto:privacy@dezbatere.ro"]')?.textContent).toBe(COMPANY.emails.privacy);
+    expect(text).not.toMatch(/Bucharest|București/u);
+    // The town line is gone from every catalogue: nothing draws it any more.
+    for (const locale of readdirSync(resolve("apps/ui/messages"))) {
+      const chrome = JSON.parse(source(`apps/ui/messages/${locale}/chrome.json`)) as Record<string, string>;
+      expect(chrome["chrome.footer.location"], locale).toBeUndefined();
+    }
+  });
+
+  it("on a phone the full footer shows everything: the company's facts, the PRODUCT column with Pricing, every legal link, as 44px targets", () => {
+    const css = source("apps/ui/app/legal.css");
+    // Every 760px block, each from its opening brace to the matching close.
+    const phoneBlocks: string[] = [];
+    for (let at = css.indexOf("@media (max-width: 760px) {"); at >= 0; at = css.indexOf("@media (max-width: 760px) {", at + 1)) {
+      let depth = 0;
+      for (let index = css.indexOf("{", at); index < css.length; index += 1) {
+        if (css[index] === "{") depth += 1;
+        if (css[index] === "}") depth -= 1;
+        if (depth === 0) { phoneBlocks.push(css.slice(at, index + 1)); break; }
+      }
+    }
+    expect(phoneBlocks.length).toBeGreaterThan(0);
+    for (const block of phoneBlocks) {
+      // Nothing of the footer's company block or columns is hidden there.
+      for (const rule of block.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+        if (/display:\s*none/.test(rule[2]!)) expect(rule[1], rule[1]).not.toMatch(/siteFooterCompany|siteFooterColumn/);
+      }
+    }
+    const phone = phoneBlocks.join("\n");
+    expect(phone).toMatch(/\.siteFooterColumn \.siteFooterLink \{[^}]*display: flex;[^}]*min-height: 44px;/);
+    expect(phone).toMatch(/\.siteFooterCompany \.siteFooterLink \{[^}]*display: inline-flex;[^}]*min-height: 44px;/);
+    expect(phone).toMatch(/\.siteFooterColumn ul:not\(\.siteFooterLegalGrid\) \{ display: grid; grid-template-columns: 1fr 1fr;/);
+  });
+
+  it("names the /legal link for what the page holds, and labels the privacy policy as the GDPR text, in English and Romanian", () => {
+    const ro = JSON.parse(source("apps/ui/messages/ro/chrome.json")) as Record<string, string>;
+    expect(chromeEnglish["chrome.legal.notice"]).toBe("Company details and contact");
+    expect(ro["chrome.legal.notice"]).toBe("Datele firmei și contact");
+    expect(chromeEnglish["chrome.legal.notice"]).toContain("contact");
+    expect(ro["chrome.legal.notice"]).toContain("contact");
+    expect(chromeEnglish["chrome.legal.privacy"]).toBe("Privacy policy (GDPR)");
+    expect(ro["chrome.legal.privacy"]).toBe("Politica de confidențialitate (GDPR)");
+    expect(ro["chrome.footer.office"]).toBe("Sediul social: {office}");
+    expect(ro["chrome.footer.codes"]).toBe("CUI {cui} · Nr. Reg. Com. {register}");
+  });
+
   it("the layout renders the one-line footer on every page and CSS hides it under a full footer", () => {
     const layout = source("apps/ui/app/layout.tsx");
-    expect(layout).toMatch(/\{children\}<\/AuthCatalogProvider>\s*<\/main>\s*<CookieConsent \/>\s*<SiteFooter variant="line" \/>/);
+    expect(layout).toMatch(/\{children\}<\/AuthCatalogProvider>\s*<\/main>\s*<CookieConsent \/>\s*<SiteFooter variant="line" billing=\{await lineBilling\} \/>/);
+    expect(layout).toContain("const lineBilling = lineFooterBilling();");
     const css = source("apps/ui/app/legal.css");
     expect(css).toMatch(/\.appShell:has\(\.siteFooterFull\) > \.siteFooterLine\s*\{\s*display: none;/);
   });

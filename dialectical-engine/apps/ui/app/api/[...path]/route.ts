@@ -6,6 +6,8 @@ import {
   AGE_REFUSAL_COOKIE_VALUE
 } from "@debateai/contract";
 import { installedUiApiProof, normalizeClientIp, TRUSTED_CLIENT_IP_HEADER, UI_API_PROOF_HEADER } from "../../../trusted-client-ip.mjs";
+import { requestFirstVisitLocale } from "../../../lib/i18n/acceptLanguage.js";
+import { isLocale } from "../../../lib/i18n/locales.js";
 
 type ProxyContext = Readonly<{
   params: Promise<Readonly<{ path: string[] }>>;
@@ -78,12 +80,23 @@ const PASSWORD_RESET_COOKIE_NAME = "__Host-debateai-password-reset";
 const PASSWORD_RESET_CSRF_COOKIE_NAME = "__Host-debateai-password-reset-csrf";
 const MFA_RECOVERY_COOKIE_NAME = "__Host-debateai-mfa-recovery";
 const MFA_RECOVERY_CSRF_COOKIE_NAME = "__Host-debateai-mfa-recovery-csrf";
+/** Social sign-in (apps/api/src/social-auth.ts): five-minute flow and continuation cookies; only the Apple flow cookie is SameSite=None (Apple's form_post callback). */
+const SOCIAL_FLOW_COOKIE_NAME = "__Host-debateai-social-flow";
+const SOCIAL_APPLE_FLOW_COOKIE_NAME = "__Host-debateai-social-apple";
+const SOCIAL_BROWSER_COOKIE_NAME = "__Host-debateai-social-browser";
+const SOCIAL_COOKIE_MAX_AGE_SECONDS = 300;
+const SOCIAL_COOKIE_NAMES = [SOCIAL_FLOW_COOKIE_NAME, SOCIAL_APPLE_FLOW_COOKIE_NAME, SOCIAL_BROWSER_COOKIE_NAME] as const;
 const AUTH_COOKIE_NAMES = [SESSION_COOKIE_NAME, CSRF_COOKIE_NAME, STAFF_COOKIE_NAME, STAFF_CSRF_COOKIE_NAME, PASSWORD_RESET_COOKIE_NAME, PASSWORD_RESET_CSRF_COOKIE_NAME, MFA_RECOVERY_COOKIE_NAME, MFA_RECOVERY_CSRF_COOKIE_NAME] as const;
 const STAFF_ABSOLUTE_MAX_AGE_SECONDS = 28800;
 const SESSION_IDLE_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
-/** C03.1 (R-09): the dropdown's language cookie, forwarded so the API resolves the mail language (R-06). */
+/**
+ * The language list's cookie, forwarded so the API writes its mails in the language the reader's pages are in. Only an
+ * offered interface language travels. Without one (no cookie, or an older cookie naming a language the site no longer
+ * offers) the pages follow the browser's Accept-Language (middleware.ts), so the proxy forwards that language as the
+ * cookie, and a reader who sees Romanian pages gets Romanian mails; when that is English nothing is added, and the API
+ * falls back to English.
+ */
 const LOCALE_COOKIE_NAME = "debateai.locale";
-const LOCALE_COOKIE_PATTERN = /^[A-Za-z]{2}(-[A-Za-z]{2})?$/;
 /** The API's support capability grammar (apps/api/src/support/session.ts CAPABILITY_PATTERN). */
 const SUPPORT_SESSION_TOKEN_HEADER = "x-support-session-token";
 /** DL1-F5c/DL3-F4: the case bearer, which used to travel in the path. */
@@ -145,7 +158,7 @@ function createUpstreamHeaders(request: Request): Headers {
       && (new URL(request.url).pathname !== NETOPIA_NOTIFY_UI_PATH || value.length > VERIFICATION_TOKEN_MAX_LENGTH)) continue;
     headers.set(name, value);
   }
-  const cookie = filteredSessionCookies(request.headers.get("cookie"));
+  const cookie = filteredSessionCookies(request.headers.get("cookie"), request.headers.get("accept-language"));
   if (cookie !== null) headers.set("cookie", cookie);
   const clientIp = behindOwnEdge() ? normalizeClientIp(request.headers.get(TRUSTED_CLIENT_IP_HEADER)) : null;
   if (clientIp !== null) {
@@ -157,11 +170,12 @@ function createUpstreamHeaders(request: Request): Headers {
   return headers;
 }
 
-function filteredSessionCookies(raw: string | null): string | null {
-  if (raw === null || /[\r\n\0]/.test(raw)) return null;
+function filteredSessionCookies(raw: string | null, acceptLanguage: string | null): string | null {
+  if (raw !== null && /[\r\n\0]/.test(raw)) return null;
   const selected = new Map<string, string>();
+  const social = new Map<string, string | null>();
   let localeSeen = false;
-  for (const member of raw.split(";")) {
+  for (const member of (raw ?? "").split(";")) {
     const index = member.indexOf("=");
     if (index < 1) {
       if ([...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME].some((name) => member.trim() === name)) return null;
@@ -170,9 +184,10 @@ function filteredSessionCookies(raw: string | null): string | null {
     const name = member.slice(0, index).trim();
     const rawValue = member.slice(index + 1);
     const value = name === STAFF_COOKIE_NAME || name === STAFF_CSRF_COOKIE_NAME ? rawValue : rawValue.trim();
-    // C03.1 (R-09): the first occurrence decides; a second one, or a malformed value, is dropped and never refuses the request.
+    // The first occurrence decides; a second one, a malformed value or a language the site does not offer is dropped and
+    // never refuses the request.
     if (name === LOCALE_COOKIE_NAME) {
-      if (!localeSeen && LOCALE_COOKIE_PATTERN.test(value)) selected.set(name, value);
+      if (!localeSeen && isLocale(value)) selected.set(name, value);
       localeSeen = true;
       continue;
     }
@@ -182,12 +197,22 @@ function filteredSessionCookies(raw: string | null): string | null {
       selected.set(name, value);
       continue;
     }
+    // Social sign-in: forwarded as the API's exactCookie reads it (one occurrence, 43 characters);
+    // a malformed or repeated one is left out on its own and never refuses the request.
+    if (SOCIAL_COOKIE_NAMES.some((allowed) => allowed === name)) {
+      social.set(name, social.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value) ? null : value);
+      continue;
+    }
     if (!AUTH_COOKIE_NAMES.some((allowed) => allowed === name)) continue;
     if (selected.has(name) || !/^[A-Za-z0-9_-]{43}$/.test(value)) return null;
     selected.set(name, value);
   }
-  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME].flatMap((name) => {
-    const value = selected.get(name);
+  // The middleware asks the same question for the pages: the browser's language is added only when no copy of the
+  // locale cookie names an offered language, so a second copy never makes the mails differ from the pages.
+  const browserLocale = requestFirstVisitLocale(raw, acceptLanguage);
+  if (browserLocale !== null) selected.set(LOCALE_COOKIE_NAME, browserLocale);
+  const pairs = [...AUTH_COOKIE_NAMES, AGE_REFUSAL_COOKIE_NAME, LOCALE_COOKIE_NAME, ...SOCIAL_COOKIE_NAMES].flatMap((name) => {
+    const value = selected.get(name) ?? social.get(name) ?? undefined;
     return value === undefined ? [] : [`${name}=${value}`];
   });
   return pairs.length === 0 ? null : pairs.join("; ");
@@ -224,6 +249,18 @@ function lawfulSetCookie(value: string): boolean {
     const seconds=Number(match[1]),reset=name===PASSWORD_RESET_COOKIE_NAME||name===PASSWORD_RESET_CSRF_COOKIE_NAME;
     const expected=["Path=/",`Max-Age=${seconds}`,...(name===PASSWORD_RESET_COOKIE_NAME||name===MFA_RECOVERY_COOKIE_NAME?["HttpOnly"]:[]),"Secure","SameSite=Strict"];
     return (cookieValue===""?seconds===0:/^[A-Za-z0-9_-]{43}$/.test(cookieValue)&&seconds>0&&seconds<=(reset?1800:299))&&attributes.length===expected.length&&attributes.every((attribute,index)=>attribute===expected[index]);
+  }
+  if (name === SOCIAL_FLOW_COOKIE_NAME || name === SOCIAL_APPLE_FLOW_COOKIE_NAME || name === SOCIAL_BROWSER_COOKIE_NAME) {
+    // Exactly the API's socialCookie / clearedSocialCookie shapes.
+    if (value.split(";", 1)[0] !== pair) return false;
+    const cookieValue = pair.slice(pairSeparator + 1);
+    const attributes = members.slice(1);
+    const age = attributes[1]?.match(/^Max-Age=(0|[1-9][0-9]{0,2})$/u);
+    if (age === undefined || age === null) return false;
+    const seconds = Number(age[1]);
+    const expected = ["Path=/", `Max-Age=${seconds}`, "HttpOnly", "Secure", `SameSite=${name === SOCIAL_APPLE_FLOW_COOKIE_NAME ? "None" : "Lax"}`];
+    return (cookieValue === "" ? seconds === 0 : /^[A-Za-z0-9_-]{43}$/.test(cookieValue) && seconds > 0 && seconds <= SOCIAL_COOKIE_MAX_AGE_SECONDS)
+      && attributes.length === expected.length && attributes.every((attribute, index) => attribute === expected[index]);
   }
   if (name !== SESSION_COOKIE_NAME && name !== CSRF_COOKIE_NAME) return false;
   const cookieValue = pair.slice(pairSeparator + 1);
@@ -324,7 +361,7 @@ function upstreamSignal(request: Request, path: readonly string[]): AbortSignal 
   const streaming = (request.headers.get("accept") ?? "").includes("text/event-stream")
     || path[path.length - 1] === "events";
   const ceiling = request.method === "POST" && RUN_PUBLISH_PATH.test(path.join("/"))
-    ? PUBLISH_UPSTREAM_TIMEOUT_MS : previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")},process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON)
+    ? PUBLISH_UPSTREAM_TIMEOUT_MS : previewAskProxyCeiling({method:request.method,path,origin:request.headers.get("origin")},process.env.NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON,process.env.PUBLIC_APP_URL)
       ?? (request.method === "POST" && ASK_PATH.test(path.join("/")) ? ASK_UPSTREAM_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS);
   return streaming
     ? request.signal

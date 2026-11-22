@@ -87,7 +87,11 @@ const VULNERABLE: Record<string, (version: string) => boolean> = {
   // 2026-10-22: GHSA-2464-fhr4-w9xw (critical: unauthenticated remote code execution in the Image Optimization API when
   // SVG files are used) and GHSA-p3m5-59mp-jv5r (high: App Router Server Actions denial of service), next <=15.5.27;
   // 15.5.28 was published 2026-10-14, so it clears the 7-day cooldown on its own.
-  next: (v) => v.startsWith("15.") && compare(v, "15.5.28") < 0,
+  // 2026-11-20: GHSA-7qx7-33qx-rqx2 (an SVG gets past the image optimizer's refusal), GHSA-f3mh-rxg3-f5g2 (an HttpOnly
+  // cookie shown through an internal response header on Edge runtime routes) and GHSA-pc58-hwjq-p385 (one visitor's
+  // response reaching another in a self-hosted app that forwards fetched responses), all moderate, next <=15.5.28;
+  // 15.5.29 was published 2026-11-03, so it clears the 7-day cooldown on its own.
+  next: (v) => v.startsWith("15.") && compare(v, "15.5.29") < 0,
   // 2026-10-21: GHSA-587h-7wmj-h5pm / GHSA-698v-4r3x-3vcv / GHSA-r825-w8mm-5pxw (vite >=8.2.0 <=8.2.3, its
   // launch-editor), test tooling only (vitest); 8.2.4 was published 2026-10-06.
   vite: (v) => v.startsWith("8.2.") && compare(v, "8.2.4") < 0,

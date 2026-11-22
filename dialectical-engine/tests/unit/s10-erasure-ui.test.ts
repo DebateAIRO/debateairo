@@ -110,8 +110,9 @@ describe("S10 self-service erasure UI", () => {
       expect(control).toContain("deletePrivateDebate(runId, grant.token)");
       expect(control).toContain('t(catalog, "public.publication.deleteExplanation")');
       expect(publicEnglish["public.publication.deleteExplanation"]).toBe(
-        "Deleting destroys the private content keys and makes encrypted debate content permanently unreadable. " +
-        "This cannot be undone. Claimed legacy plaintext is retained and will not be reported as cleaned."
+        "Deleting destroys the private content keys and makes encrypted debate content unreadable in the live service. " +
+        "Our backups are not deleted with it, and some of them hold the keys (Privacy Policy, section 7). " +
+        "You cannot undo this. Claimed legacy plaintext is retained and will not be reported as cleaned."
       );
       expect(control).toContain('status === "CLEANED"');
       expect(debate).toContain('privateDeletionStatus!==null');

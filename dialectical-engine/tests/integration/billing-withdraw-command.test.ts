@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { Pool as AccountPool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { BillingJobQueries, BillingRepository, EntitlementRepository, migrate, type Pool } from "@debateai/db";
-import { foldSubscription, microsToDecimal } from "@debateai/billing-core";
+import { consumerCalendarDay, foldSubscription, microsToDecimal } from "@debateai/billing-core";
 import { renderMail } from "@debateai/mail-templates";
 import { startTestDatabase, type TestDatabase } from "../support/testDatabase.js";
+import { createEncryptedStoryRun, provisionStoryEncryptedOwner, releaseStoryEncryptedOwner, type StoryEncryptedOwner } from "../support/storyEncryptedOwner.js";
 import { testHttpIdentity } from "../support/httpSession.js";
 import { testBillingPlans, testBillingPolicy } from "../support/billingFixtures.js";
 import {
@@ -142,11 +144,16 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
       .toMatchObject({ planId: "FREE", cause: "ENDED_WITHDRAWAL" });
     expect(await withdrawalRequests(seeded.initialChargeId)).toEqual([[seeded.providerPaymentId, expected]]);
     expect(await m8Of(seeded.subscriptionId)).toEqual([]);
-    // W9 (P2-I11): the acknowledgement goes at once, dated when the statement arrived, never "refunded".
-    expect((await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
+    // The acknowledgement goes at once, dated when the statement arrived, in the buyer's zone, never "refunded"; it
+    // names the day the plan started in the buyer's calendar, and the name only when it is sent.
+    const acknowledged = (await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload);
+    expect(acknowledged).toEqual([expect.objectContaining({
       template: "M8_RECEIVED", recipient: "CUSTOMER", "param.plan": "PLUS",
-      "param.withdrawalDate": receivedAt.toISOString(), "param.refundAmount": microsToDecimal(expected)
+      "param.withdrawalDate": receivedAt.toISOString(), "param.refundAmount": microsToDecimal(expected),
+      "param.timeZone": "Europe/Bucharest", "param.startDate": consumerCalendarDay(seeded.periodStart, "RO"),
+      "resolve.buyer_name": true
     })]);
+    expect(renderedText(acknowledged[0]!)).toMatch(/We have received your withdrawal statement of .+, \d{2}:\d{2} \(GMT\+[23]\)\./u);
     expect(await emailOf("O2_WITHDRAWAL", seeded.subscriptionId)).toEqual([]);
     await refundThroughOwner(seeded.initialChargeId, new Date(receivedAt.getTime() + 14 * DAY));
     expect((await m8Of(seeded.subscriptionId))[0]?.payload)
@@ -226,11 +233,12 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
   it("refuses a statement that arrived after the window closed or is dated ahead, and settles nothing not handed over", async () => {
     const now = new Date();
     const seeded = await seedNetopiaSubscription(database.pool, {
-      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 20 * DAY), taxCountry: "DE"
+      ownerRef: randomUUID(), planId: "PLUS", activatedAt: new Date(now.getTime() - 23 * DAY), taxCountry: "DE"
     });
-    // Day 19 after the activation: past the 14 calendar days (R2 Q-6) in any time zone.
+    // Day 21 after the activation: past the 14 calendar days and the longest run of days off that can follow them
+    // (Good Friday to a Tuesday 1 May moves the last day by five), in any time zone.
     await expect(recordOwnerWithdrawal(stores(), {
-      ownerRef: seeded.ownerRef, receivedAt: new Date(seeded.periodStart.getTime() + 19 * DAY)
+      ownerRef: seeded.ownerRef, receivedAt: new Date(seeded.periodStart.getTime() + 21 * DAY)
     })).rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
     await expect(recordOwnerWithdrawal(stores(), { ownerRef: seeded.ownerRef, receivedAt: new Date(now.getTime() + 60_000) }))
       .rejects.toThrow("BILLING_WITHDRAW_RECEIVED_IN_FUTURE");
@@ -258,7 +266,8 @@ describe("P14c a withdrawal the person sent by email, carried out by the owner's
     // the 14-day deadline counted from when the statement arrived.
     const acknowledged = (await emailOf("M8_RECEIVED", seeded.subscriptionId)).map((row) => row.payload);
     expect(acknowledged).toEqual([expect.objectContaining({
-      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.withdrawalDate": receivedAt.toISOString()
+      template: "M8_RECEIVED", recipient: "CUSTOMER", "param.withdrawalDate": receivedAt.toISOString(),
+      "param.timeZone": "Europe/Bucharest", "resolve.buyer_name": true
     })]);
     expect(acknowledged[0]).not.toHaveProperty("param.refundAmount");
     expect((await emailOf("O2_WITHDRAWAL", seeded.subscriptionId)).map((row) => row.payload)).toEqual([expect.objectContaining({
@@ -538,4 +547,81 @@ describe("W6 Settings and the owner's command: the refund after an upgrade, the 
       .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
     await expect((await viaCommand(saturday, tuesdayMidnight, 0)).run()).rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
   }, 20_000);
+
+  it("keeps a window whose 14th day is a Romanian public holiday open to the next working day, in Settings and by the command", async () => {
+    // Romania, activated Friday 27 March 2026: the 14th day is Good Friday, 10 April, followed by Saturday, Easter
+    // Sunday and Easter Monday, so the window closes at Tuesday 14 April's midnight, Bucharest summer time (21:00 UTC).
+    const goodFriday = (ownerRef: string) => seedNetopiaSubscription(database.pool, {
+      ownerRef, planId: "PLUS", activatedAt: new Date("2026-03-27T09:00:00.000Z"), taxCountry: "RO"
+    });
+    const tuesdayEvening = new Date("2026-04-14T20:59:00.000Z");
+    const wednesdayMidnight = new Date("2026-04-14T21:00:00.000Z");
+    const refund = (await (await viaSettings("w5-easter-tuesday", goodFriday, tuesdayEvening, 0)).run()).refundMicros;
+    expect(refund).toBe(24_200_000);
+    expect(await (await viaCommand(goodFriday, tuesdayEvening, 0)).run())
+      .toEqual({ kind: "REFUNDING", refundMicros: refund, currency: "USD" });
+    await expect((await viaSettings("w5-easter-wednesday", goodFriday, wednesdayMidnight, 0)).run())
+      .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
+    await expect((await viaCommand(goodFriday, wednesdayMidnight, 0)).run())
+      .rejects.toMatchObject({ code: "WITHDRAWAL_WINDOW_CLOSED" });
+  }, 20_000);
+});
+
+describe("the owner's command for an account whose erasure has finished, with the credit used read from the real rows", () => {
+  const USED_MICROS = 2_000_000;
+  const owners: StoryEncryptedOwner[] = [];
+  /** One pool per account: a pool carries one account's content cipher. */
+  const accountPools: AccountPool[] = [];
+  afterAll(async () => {
+    for (const owner of owners) await releaseStoryEncryptedOwner(owner);
+    for (const pool of accountPools) await pool.end();
+  });
+
+  /** An account on Plus for three days (24.20 paid, 6.60 of credit) with one debate that used 2.00 of the credit an hour ago. */
+  async function paidAccountWithOneDebate() {
+    const pool = new AccountPool({ connectionString: database.connectionString, max: 2 });
+    accountPools.push(pool);
+    const who = await provisionStoryEncryptedOwner(pool);
+    owners.push(who);
+    const run = await createEncryptedStoryRun(pool, who, "a question");
+    const seeded = await seedNetopiaSubscription(database.pool, {
+      ownerRef: who.ownerRef, planId: "PLUS", activatedAt: new Date(Date.now() - 3 * DAY), taxCountry: "RO"
+    });
+    const entitlementEventId = (await database.pool.query<{ event_id: string }>(
+      "SELECT event_id FROM billing.entitlement_event WHERE owner_ref=$1 AND plan_id='PLUS' ORDER BY effective_at DESC LIMIT 1", [who.ownerRef])).rows[0]!.event_id;
+    // The usage row admission writes, and one charge of the debate.
+    await database.pool.query(
+      "INSERT INTO billing.run_charge_scope (run_id,owner_ref,plan_id,entitlement_event_id,admitted_at) VALUES ($1,$2,'PLUS',$3,now() - interval '2 hours')",
+      [run, who.ownerRef, entitlementEventId]);
+    await database.pool.query(`INSERT INTO ledger.model_spend(spend_id,spend_source,run_id,spend_phase,provider_ref,charged_on,charge_micros,input_tokens,output_tokens,recorded_at)
+      VALUES(gen_random_uuid(),'RUN',$1,'BODY','fake-provider',(now() AT TIME ZONE 'UTC')::date,$2,1,1,now() - interval '1 hour')`, [run, USED_MICROS]);
+    return { who, seeded };
+  }
+
+  it("refuses the withdrawal before the stop sweep has run, where the credit used would read as none and the whole price would go back", async () => {
+    // The account that stays: the command reads the 2.00 used and gives back 24.20 × 4.60 ÷ 6.60, floored to cents.
+    const stays = await paidAccountWithOneDebate();
+    expect(stays.seeded.totalMicros).toBe(24_200_000);
+    expect(await recordOwnerWithdrawal(stores(), { ownerRef: stays.who.ownerRef, receivedAt: new Date() }))
+      .toEqual({ kind: "REFUNDING", refundMicros: 16_860_000, currency: "USD" });
+
+    // The account that is erased: its statement arrived while it existed, and the owner runs the command after the
+    // account row went (the erasure's last step) and before billing's stop sweep ended the plan.
+    const erased = await paidAccountWithOneDebate();
+    const receivedAt = new Date();
+    const spend = stores().ownerSpend;
+    const periodStart = (await rows().subscriptionForOwner(erased.who.ownerRef))!.currentPeriodStart!;
+    expect((await spend.readWithdrawalSpend(erased.who.ownerRef, periodStart, receivedAt)).spentMicros).toBe(USED_MICROS);
+    await database.pool.query('DELETE FROM identity."user" WHERE user_id=$1', [erased.who.userId]);
+    expect(await rows().ownerErasureCommitted(erased.who.ownerRef)).toBe(true);
+    expect(foldSubscription(await rows().subscriptionEvents(erased.seeded.subscriptionId)).status).toBe("ACTIVE");
+    // Why it must be refused: the usage row no longer names the account, so its credit used cannot be found.
+    expect((await spend.readWithdrawalSpend(erased.who.ownerRef, periodStart, receivedAt)).spentMicros).toBe(0);
+
+    await expect(recordOwnerWithdrawal(stores(), { ownerRef: erased.who.ownerRef, receivedAt }))
+      .rejects.toMatchObject({ code: "NOT_SUBSCRIBED" });
+    // Nothing was written: the plan is as it was for the sweep to end, and no refund was asked for.
+    expect((await rows().subscriptionEvents(erased.seeded.subscriptionId)).map((event) => event.kind)).not.toContain("WITHDRAWN");
+    expect(await withdrawalRequests(erased.seeded.initialChargeId)).toEqual([]);
+  }, 60_000);
 });

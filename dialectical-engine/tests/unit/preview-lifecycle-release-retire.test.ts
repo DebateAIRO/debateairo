@@ -27,12 +27,14 @@ type Options = Partial<{
 }>;
 const START = Date.parse('2026-10-22T08:00:00.000Z');
 const MINUTE = 60_000;
-/** A fake server: the release table, systemd, the journal and the two gates, all behind `deps`. */
+/** A fake server: the release table, systemd, the journal and the layout's gates, all behind `deps`. */
 function harness(options: Options = {}) {
   const o = { state: 'DRAINING', frontPairStopped: false, retireRequested: false, apiActive: false, runnerActive: true, mainStatus: '0',
     journals: [retiredJournal()], gates: { deepinfra: ['active', 'active'], anthropic: ['active', 'active'] } as Record<string, [string, string]>,
     openWork: 0, writeFails: null, stopFails: false, noticeFails: false, activateFails: [] as string[], requestedAgoMs: 26 * MINUTE as number | null,
     apiShow: null as string | null, journalStepMs: 0, timerLoad: {} as Record<string, string>, failVerbs: [] as string[], writeUnitFails: false, ...options };
+  // The layout's third gate (Amazon Bedrock) stays active unless a test says otherwise.
+  o.gates = { bedrock: ['active', 'active'], ...o.gates };
   const table = { state: o.state, frontPairStopped: o.frontPairStopped, retireRequested: o.retireRequested };
   const events: [string, string | null][] = [], systemctl: string[][] = [], shown: string[][] = [], journal: string[][] = [], gateCalls: string[][] = [], slept: number[] = [];
   const written: [string, string][] = [];
@@ -312,7 +314,7 @@ describe('the 25-minute check (side-by-side spec §4)', () => {
     expect(outcome).toEqual({ event: 'PREVIEW_RELEASE_FORCED_STOP', label: 'old-v1', releaseKey: KEY, openWork: 2, gatesReactivated: ['deepinfra'], gatesReactivationFailed: [], gatesUnknown: [] });
     expect(h.systemctl).toEqual([['stop', RUNNER], ['start', '--no-block', 'debateai-preview-notice@release-forced-old_v1.service']]);
     expect(h.slept).toEqual([5000]);
-    expect(h.gateCalls).toEqual([['deepinfra', 'status'], ['anthropic', 'status'], ['deepinfra', 'status'], ['anthropic', 'status'], ['deepinfra', 'activate']]);
+    expect(h.gateCalls).toEqual([['deepinfra', 'status'], ['anthropic', 'status'], ['bedrock', 'status'], ['deepinfra', 'status'], ['anthropic', 'status'], ['bedrock', 'status'], ['deepinfra', 'activate']]);
     const deepinfra = GATES.find((gate: any) => gate.name === 'deepinfra');
     expect(deepinfra).toEqual({ name: 'deepinfra', folder: '/opt/debateai-v3-preview/operator/deepinfra-budget-v3', privateDir: '/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3', go: '/etc/debateai-v3-preview/provider-deepinfra-go-v3.json' });
     expect(Object.isFrozen(GATES)).toBe(true);

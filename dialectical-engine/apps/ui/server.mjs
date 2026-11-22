@@ -26,6 +26,28 @@ function refuse(code) {
   return error;
 }
 
+/**
+ * A page answers in the language the visitor picked or, with no choice, in the one the browser prefers
+ * (middleware.ts), so it says it varies with Accept-Language. Next replaces any Vary set before a page renders with its
+ * own list, so the name is added as the headers go out. Only rendered pages and their navigation data (HTML and React
+ * Server Component answers) get it here: /_next/static files and /api answers do not depend on the browser's language
+ * and do not vary. A file in public/ keeps the Vary the middleware gave it.
+ */
+function varyPagesByLanguage(response) {
+  const writeHead = response.writeHead;
+  response.writeHead = function writeHeadVaryingByLanguage(...args) {
+    if (/^text\/(?:html|x-component)\b/iu.test(String(this.getHeader("content-type") ?? ""))) {
+      const vary = this.getHeader("vary");
+      const names = (Array.isArray(vary) ? vary.join(",") : String(vary ?? "")).split(",")
+        .map((name) => name.trim()).filter((name) => name !== "");
+      if (!names.some((name) => name === "*" || name.toLowerCase() === "accept-language")) {
+        this.setHeader("vary", [...names, "Accept-Language"].join(", "));
+      }
+    }
+    return writeHead.apply(this, args);
+  };
+}
+
 const development = process.argv.includes("--dev");
 // This Node process is the ruled network edge. A reverse proxy in front of it
 // is trusted only when named exactly (R2 / C2): DIALECTICAL_UI_TRUSTED_PROXIES
@@ -52,6 +74,11 @@ installUiApiProof(uiApiProof);
 for (const key of ["XMONEY_SDK_ORIGIN"]) {
   if (process.env[key] !== undefined) console.warn(JSON.stringify({ event: "ui.setting.retired", key }));
 }
+// NETOPIA's hosted logo: the shop id NETOPIA shows the merchant, 1 to 12 digits (lib/billing/paymentMarks.ts
+// NETOPIA_LOGO_ID_FORM; this file can import only .mjs files, so the form is written out again). Any other value refuses
+// to start, so a typo never ships a broken image address. The code is named, never the value.
+const netopiaLogoId = process.env.NETOPIA_LOGO_ID;
+if (netopiaLogoId !== undefined && !/^[0-9]{1,12}$/.test(netopiaLogoId)) throw refuse("NETOPIA_LOGO_ID_INVALID");
 // L3-F6: the API proxy route vouches for the stamped client address only when THIS
 // front door is in front of it. A bare `next start` never sets the marker, so a
 // client-supplied `x-debateai-client-ip` is dropped there instead of being forwarded.
@@ -92,6 +119,7 @@ const server = createServer((request, response) => {
   // when the pair is healthy, which /readyz checks), so a headerless API shows as missing (C12 review).
   const ownRelease = releaseHeaderFor(releaseKey, request.url);
   if (ownRelease !== null) response.setHeader("x-debateai-release", ownRelease);
+  varyPagesByLanguage(response);
   // Spec §6: the health check Caddy polls (with or without the edge secret) is answered here, never by Next, and
   // the website's /readyz proves the UI-to-API proof with its API (NV-03).
   if (readiness(request, response)) return;

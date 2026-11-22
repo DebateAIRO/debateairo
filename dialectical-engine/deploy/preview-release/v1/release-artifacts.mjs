@@ -7,7 +7,9 @@
 // produced, runs the reviewed checks before writing, and never overwrites a file.
 //
 //   release-artifacts.mjs source-manifest --repository <clean git clone> --root <release root> --role api|ui|runner --out <file>
-//   release-artifacts.mjs build-env --release-key <key> [--models glm-only|multi-model|all-models]
+//   release-artifacts.mjs build-env --release-key <key> [--models glm-only|multi-model|all-models] [--origin <listed public origin>]
+//       (--origin names the public name ui.env answers as, one of public-origins.mjs; default the test name. The website
+//        reads neither PUBLIC_APP_URL nor TURNSTILE_SITE_KEY when it is built, so one build serves either name)
 //   release-artifacts.mjs ui-build --source <ui source manifest> --release-key <key> [--models glm-only|multi-model|all-models] --out <file>
 //       (--models picks the website's public model list; default glm-only, the legacy GLM-only list)
 //       (--release-key names the release the website is built for, r<site version>-<first 12 hex of the UI source's
@@ -49,6 +51,14 @@
 //       (side-by-side spec §5: the database steps the newer release adds, each with both n1 header lines, and the newer
 //        release's own chain; root installs it as /etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older label>.json and
 //        pins it with prestart.mjs accept-ahead, so the older release can restart beside the newer database)
+//   release-artifacts.mjs site-inputs --operation report|compose --from <the live settings version's verify plan> --site '<JSON object>'
+//       [--change '<input names>'] [--limits '<plan ids>'] [--out <artifacts folder>/site-inputs.json]
+//       (the site's numbers for an upload, site-inputs.mjs: --site is the owner's server file as one JSON object, compared
+//        input by input with the hosted inputs of --from. report prints the lines only (which input, plan and member
+//        differs, and whether a number went up or down; never an amount). compose also needs --out, and writes the new
+//        version's hosted inputs there: the live version's, with exactly the inputs --change names taken from the file. It
+//        refuses unless --change names every input that differs and no other, and --limits names every plan whose limits
+//        change, up or down, for the people already on it, and no other)
 //
 // It reads only root-owned 0644 JSON files (so never an env file or a secret: those are 0640/0600)
 // and writes only new root-owned 0644 compact JSON files below the fixed artifacts folder.
@@ -64,10 +74,12 @@ import { PREVIEW_ENV_ROOT, PREVIEW_SLOTS, labelOfSourceRoot, parsePublicArtifact
 import { validateNativeAttestation } from '../../preview-auth-dev/v1/native-attestation.mjs';
 import { validatePublication } from '../../preview-auth-dev/v1/runtime-receipt.mjs';
 import { PREVIEW_ORIGIN, PREVIEW_SITE_KEY } from '../../preview-auth-dev/v1/turnstile-custody.mjs';
+import { publicSiteOf } from '../../preview-auth-dev/v1/public-origins.mjs';
 import { PREVIEW_MODEL_ROSTER_FLAGS, RELEASE_KEY_PATTERN } from '../../preview-auth-dev/v1/environment.mjs';
 import { runBounded } from '../../preview-lifecycle/v1/common.mjs';
 import { addedMigrations, n1Headers } from '../../preview-lifecycle/v1/migration-steps.mjs';
 import { DATABASE_AHEAD_MAX_BYTES, DATABASE_AHEAD_MAX_STEPS, DATABASE_AHEAD_SCHEMA, validateDatabaseAheadFile } from '../../preview-auth-dev/v1/database-ahead.mjs';
+import { SiteInputsRefusal, compareSiteInputs, composeSiteInputs } from './site-inputs.mjs';
 
 /** The fixed server folders the reviewed launchers already require (launch-plan.mjs: ROOT, the artifact file pattern, prepareLaunch's plan path). */
 export const LAYOUT = Object.freeze({
@@ -89,9 +101,12 @@ const DEFAULT_MODEL_ROSTER = 'glm-only';
 export const RELEASE_KEY_NOT_GIVEN = 'RELEASE_KEY_NOT_GIVEN';
 const publicBuildValues = (flag, releaseKey) => Object.freeze({ NODE_ENV: 'production', PUBLIC_APP_URL: PREVIEW_ORIGIN, NEXT_PUBLIC_PREVIEW_FREE_MODEL_IDS_JSON: flag, TURNSTILE_SITE_KEY: PREVIEW_SITE_KEY, RELEASE_KEY: releaseKey });
 /**
- * Public values the website is BUILT with. Each one is the exact value the reviewed runtime gate
- * (environment.mjs narrowEnvironment, service ui) demands from ui.env, imported from the same
+ * Public values the website is BUILT with. Each one is a value the reviewed runtime gate
+ * (environment.mjs narrowEnvironment, service ui) admits from ui.env, imported from the same
  * constants, so the build and the running site cannot disagree. Nothing here is read from ui.env.
+ * PUBLIC_APP_URL and TURNSTILE_SITE_KEY are the test name's: the website reads neither when it is
+ * built (the site key is read per request, the public name only by the ask proxy at run time), so
+ * the same build serves the other listed name too; build-env --origin gives that name's values.
  * The model list is one of the reviewed lists, picked by stage name (`--models`); the build records
  * which one (ui-build.mjs), and the UI launcher demands that ui.env names the same list.
  * RELEASE_KEY is the release the build is for (side-by-side spec §1, §7): the website bakes its code part in and
@@ -147,13 +162,14 @@ const ROLES = ['api', 'ui', 'runner'];
 const ACTOR_ENV = ['PATH', 'LANG', 'LC_ALL', 'TZ'];
 const COMMANDS = Object.freeze({
   'source-manifest': { required: ['--repository', '--root', '--role', '--out'], optional: [] },
-  'build-env': { required: ['--release-key'], optional: ['--models'] },
+  'build-env': { required: ['--release-key'], optional: ['--models', '--origin'] },
   'ui-build': { required: ['--source', '--release-key', '--out'], optional: ['--models'] },
   verify: { required: ['--source'], optional: ['--ui-build'] },
   'operator-digest': { required: ['--source'], optional: [] },
   'launch-plan': { required: ['--service', '--slot', '--from', '--root', '--source-manifest', '--native-attestation', '--out'], optional: ['--ui-build', '--publication'] },
   'native-plan': { required: ['--operation', '--from', '--source-manifest', '--out'], optional: ['--proposal', '--approved-delta-sha256', '--publication', '--checker', '--deepseek-enabled-on-gate', '--role-rotation', '--call-concurrency', '--debate-shape', '--question-language', '--length-guidance', '--engine-version', '--line-up', '--answer-seats', '--hosted-billing'] },
-  'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] }
+  'database-ahead': { required: ['--older-source-manifest', '--newer-source-manifest', '--out'], optional: [] },
+  'site-inputs': { required: ['--operation', '--from', '--site'], optional: ['--change', '--limits', '--out'] }
 });
 
 export class Refusal extends Error {
@@ -285,9 +301,16 @@ async function sourceManifestCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], manifest, { layout });
 }
 
-/** The public build values (for one reviewed model list and one release key) and their sha256, for comparing with ui.env without printing it. */
-export function buildEnvironmentReport(releaseKey, models = DEFAULT_MODEL_ROSTER) {
-  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(uiPublicBuildValues(releaseKey, models)).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
+/**
+ * The public build values (for one reviewed model list and one release key) and their sha256, for comparing with ui.env
+ * without printing it. <origin> is the listed public name ui.env answers as (public-origins.mjs; default the test name):
+ * its origin and site key replace the build's, and any other text refuses.
+ */
+export function buildEnvironmentReport(releaseKey, models = DEFAULT_MODEL_ROSTER, origin = PREVIEW_ORIGIN) {
+  const site = publicSiteOf(origin);
+  if (!site) refuse('ARGUMENTS_REFUSED', ['--origin']);
+  const values = { ...uiPublicBuildValues(releaseKey, models), PUBLIC_APP_URL: site.origin, TURNSTILE_SITE_KEY: site.turnstileSiteKey };
+  return { schema: 'preview-release-ui-build-values-v1', values: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, { value, sha256: sha256(value) }])) };
 }
 
 async function uiBuildCommand(options, { layout, deps }) {
@@ -767,18 +790,61 @@ async function databaseAheadCommand(options, { layout, deps }) {
   return writeArtifact(options['--out'], file, { layout, maxBytes: DATABASE_AHEAD_MAX_BYTES, name: `database-ahead-${olderLabel}.json` });
 }
 
+/** The record `site-inputs --operation compose` writes: what was compared, what the owner named, and the hosted inputs chosen. */
+export const SITE_INPUTS_SCHEMA = 'preview-site-inputs-v1';
+
+/**
+ * The site's numbers for an upload (site-inputs.mjs; release guide SB3). `--from` is the verify plan of the live settings
+ * version, so its hosted inputs are the ones that version sealed; `--site` is the owner's server file, as one JSON
+ * object. `report` reads and prints lines, never an amount. `compose` writes the new version's hosted inputs to `--out`
+ * (the plan that follows carries the same values in the same folder) and prints only names and the file's hash.
+ */
+async function siteInputsCommand(options, { layout, deps }) {
+  const operation = options['--operation'];
+  if (!['report', 'compose'].includes(operation)) refuse('ARGUMENTS_REFUSED', ['--operation']);
+  const composing = operation === 'compose';
+  if (composing !== (options['--out'] !== undefined)) refuse('ARGUMENTS_REFUSED', ['--out']);
+  // The two lists are the owner's decision for a compose; a report decides nothing.
+  for (const flag of ['--change', '--limits']) if (!composing && options[flag] !== undefined) refuse('ARGUMENTS_REFUSED', [flag]);
+  let site;
+  try { site = strictJson(Buffer.from(options['--site'], 'utf8')); } catch { refuse('ARGUMENTS_REFUSED', ['--site']); }
+  if (composing) await assertOutputFree(options['--out'], { layout, name: 'site-inputs.json' });
+  const from = await readJson(options['--from'], { layout, flag: '--from', maxBytes: MAX_PLAN_BYTES, artifact: false });
+  if (!plainObject(from.value) || from.value.operation !== 'verify' || !Object.hasOwn(from.value, 'hostedBilling')) refuse('FROM_PLAN_INVALID');
+  try { validatePublication(from.value.approval?.publication); } catch { refuse('NATIVE_APPROVAL_REQUIRED'); }
+  const guarded = work => { try { return work(); } catch (error) { return error instanceof SiteInputsRefusal ? refuse(error.code, error.fields) : refuse('SITE_INPUTS_REFUSED'); } };
+  if (!composing) {
+    const { lines, differing, limitPlans } = guarded(() => compareSiteInputs(from.value.hostedBilling, site));
+    return { event: 'PREVIEW_SITE_INPUTS', operation, lines, differing, limitPlans };
+  }
+  // Lazy, as in native-plan: native-operator.mjs loads tsx and pg, which exist only in an installed release root.
+  const nativeOperator = () => import('../../preview-auth-dev/v1/native-operator.mjs');
+  try { (deps.validateNativePlan ?? (await nativeOperator()).validateNativePlan)(from.value); } catch { refuse('FROM_PLAN_INVALID'); }
+  const composed = guarded(() => composeSiteInputs(from.value.hostedBilling, site, { change: options['--change'], limits: options['--limits'] }));
+  // The mix of the two sides must itself be lawful hosted inputs (a per-debate ceiling from the file above the live day's refuses here).
+  let hostedBilling;
+  try { hostedBilling = (deps.validateHostedBillingChoice ?? (await nativeOperator()).validateHostedBillingChoice)(composed.hostedBilling); } catch { refuse('SITE_INPUTS_REFUSED', ['--site']); }
+  const { change, limits, lines } = composed;
+  const written = await writeArtifact(options['--out'], {
+    schema: SITE_INPUTS_SCHEMA, from: { path: from.path, sha256: from.sha256 }, baseRegisterVersion: from.value.approval.publication.registerVersion,
+    change, limits, lines, hostedBilling
+  }, { layout, maxBytes: MAX_PLAN_BYTES, name: 'site-inputs.json' });
+  return { ...written, change, limits };
+}
+
 /** Parse, then run one subcommand. `layout`/`deps` exist for the unit tests' throwaway roots. */
 export async function runCommand(argv, { layout = LAYOUT, deps = {} } = {}) {
   const { command, options } = parseArguments(argv);
   const context = { layout, deps };
   switch (command) {
     case 'source-manifest': return sourceManifestCommand(options, context);
-    case 'build-env': return buildEnvironmentReport(options['--release-key'], options['--models']);
+    case 'build-env': return buildEnvironmentReport(options['--release-key'], options['--models'], options['--origin']);
     case 'ui-build': return uiBuildCommand(options, context);
     case 'verify': return verifyCommand(options, context);
     case 'operator-digest': return operatorDigestCommand(options, context);
     case 'launch-plan': return launchPlanCommand(options, context);
     case 'database-ahead': return databaseAheadCommand(options, context);
+    case 'site-inputs': return siteInputsCommand(options, context);
     default: return nativePlanCommand(options, context);
   }
 }

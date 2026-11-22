@@ -3,8 +3,8 @@
  * automatically"): which serving COMPANIES the API's declared provider targets reach, so the "AI providers" legal page
  * lists exactly the companies that receive text, and a company added with an upload appears there by itself.
  *
- * Plain words: every declared target names a base URL; its host says which company serves it. The two reviewed
- * connections' hosts (`PREVIEW_DEEPINFRA_BASE_URL`, `PREVIEW_ANTHROPIC_BASE_URL`) map to the company keys the website's
+ * Plain words: every declared target names a base URL; its host says which company serves it. The reviewed
+ * connections' hosts (`PREVIEW_DEEPINFRA_BASE_URL`, `PREVIEW_ANTHROPIC_BASE_URL`, `PREVIEW_BEDROCK_BASE_URL`) map to the company keys the website's
  * reviewed catalogue knows (`apps/ui/lib/legal/pages.ts`). A loopback or private host (local mode only; hosted refuses
  * them, `assertHostedProviderTargets`) sends nothing to an outside company and is left out. Any other public host is
  * `host:<hostname>` (ruling R20): the page still shows it, as an unchecked row headed by its host name, so a company
@@ -12,16 +12,12 @@
  */
 import { isRefusedHostedProviderHost, type ProviderDiscoveryTarget } from "./index.js";
 
-/**
- * Addition D24: the reviewed connections' hosts and the company each one is (lower case, no trailing dot). GPT runs on
- * Amazon Bedrock in AWS's Stockholm region, eu-north-1 (owner, 18 November 2026): its OpenAI-compatible endpoint
- * (`bedrock-mantle`) and its runtime endpoint are both Amazon's.
- */
+/** Addition D24: the reviewed connections' hosts and the company each one is (lower case, no trailing dot). */
 export const PROVIDER_COMPANY_HOSTS: Readonly<Record<string, "amazon" | "anthropic" | "deepinfra">> = Object.freeze({
   "api.anthropic.com": "anthropic",
   "api.deepinfra.com": "deepinfra",
-  "bedrock-mantle.eu-north-1.api.aws": "amazon",
-  "bedrock-runtime.eu-north-1.amazonaws.com": "amazon"
+  // Amazon Bedrock serves OpenAI's model itself; OpenAI does not receive the text, so the company is Amazon.
+  "bedrock-runtime.us-east-1.amazonaws.com": "amazon"
 });
 
 /** The prefix of a company the table does not know, followed by its host name (ruling R20). */

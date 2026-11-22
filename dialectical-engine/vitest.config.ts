@@ -21,7 +21,7 @@ export default defineConfig({
       "tests/**/*.test.tsx",
       "acceptance/**/*.test.ts"
     ],
-    // One file at a time, except verify's test step on CI (.github/workflows/security.yml).
+    // One file at a time, except the two test steps of .github/workflows/security.yml on CI (verify, auth-integration).
     fileParallelism: process.env.CI_TEST_FILES_SIDE_BY_SIDE === "1",
     hookTimeout: 120_000,
     testTimeout: 120_000,

@@ -49,17 +49,17 @@ describe("each row's own maximum and the tier limits", () => {
   it("the rows carry the vendors' maxima; the fast storytellers ask them, the slow ones keep 16,384", () => {
     expect(Object.fromEntries(PREVIEW_MODEL_ROWS.map((r) => [r.model, [r.outputBound, r.finalWriterOutputBound, r.storytellerTokenCeiling]])))
       .toEqual({ [GLM]: [32768, 131072, 16384], [DEEPSEEK]: [32768, 131072, 131072], [MIMO]: [32768, 65536, 16384],
-        [QWEN]: [32768, 131072, 16384], [HAIKU]: [32768, 128000, 128000] });
+        [QWEN]: [32768, 131072, 16384], [HAIKU]: [32768, 128000, 128000], "us.openai.gpt-6-luna": [32768, 128000, 16384] });
     // A slow storyteller's length retry stays held to today's 32,768; a fast one's to its own maximum.
-    expect(PREVIEW_MODEL_ROWS.map((r) => previewStorytellerOutputCap(r))).toEqual([32768, 131072, 32768, 32768, 128000]);
+    expect(PREVIEW_MODEL_ROWS.map((r) => previewStorytellerOutputCap(r))).toEqual([32768, 131072, 32768, 32768, 128000, 32768]);
     expect(PREVIEW_MODEL_ROWS.map((r) => [previewTierOutputBound(r, "STANDARD"), previewTierOutputBound(r, "FINAL_WRITER")]))
       .toEqual(PREVIEW_MODEL_ROWS.map((r) => [r.outputBound, r.finalWriterOutputBound]));
   });
 
   it("final writers get 1 MiB and $0.75 ($1.00 on Haiku's gate); every other call keeps 256 KiB and $0.25", () => {
     expect(PREVIEW_CALL_TIER_LIMITS).toEqual({
-      STANDARD: { requestBodyMaxBytes: 256 * 1024, perCallCapUsd: { deepinfra: "0.25", anthropic: "0.25" } },
-      FINAL_WRITER: { requestBodyMaxBytes: MIB, perCallCapUsd: { deepinfra: "0.75", anthropic: "1.00" } } });
+      STANDARD: { requestBodyMaxBytes: 256 * 1024, perCallCapUsd: { deepinfra: "0.25", anthropic: "0.25", bedrock: "0.25" } },
+      FINAL_WRITER: { requestBodyMaxBytes: MIB, perCallCapUsd: { deepinfra: "0.75", anthropic: "1.00", bedrock: "0.75" } } });
     expect(PREVIEW_REQUEST_BODY_MAX_BYTES).toBe(PREVIEW_CALL_TIER_LIMITS.STANDARD.requestBodyMaxBytes);
   });
 

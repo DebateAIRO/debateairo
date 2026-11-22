@@ -207,6 +207,8 @@ describe("POST /v1/asks/paths/lists", () => {
 
   it.each([
     ["the line in crisis", {}, { question_line: CRISIS, reading_level: "plain" }],
+    // The ask's cap on the check (crisisCheckTexts): a line that spells past it (ﷺ is 18 letters) is answered as a crisis would be.
+    ["the line in compatibility forms that spell past the crisis check's cap", {}, { question_line: "\u{FDFA}".repeat(1_000), reading_level: "plain" }],
     ["the original line of a rewrite in crisis", {}, { question_line: Q, reading_level: "plain",
       question_language_choice: { check_ref: "b2ZmZXI.c2lnbmVk", choice: "USE_REWRITE", original_question_line: CRISIS } }],
     ["before the sensitive-data consent", { consent: "required" as const }, LISTS_BODY],

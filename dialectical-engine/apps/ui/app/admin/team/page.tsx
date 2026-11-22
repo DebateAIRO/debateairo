@@ -1,5 +1,4 @@
 import { cookies } from "next/headers";
-import { ThreatReportsLink } from "../../../components/ThreatReportsLink";
 import { StaffAccessPanel } from "../../../components/StaffAccessPanel";
 import { TeamLimitPanel } from "../../../components/TeamLimitPanel";
 import { TeamAllowancePanel } from "../../../components/TeamAllowancePanel";
@@ -10,5 +9,5 @@ import staffRomanian from "../../../messages/ro/staff.json";
 export default async function TeamPage() {
     const requested = (await cookies()).get(LOCALE_COOKIE)?.value;
     const locale = isLocale(requested) ? requested : "en";
-    return <div className="screen scroll setScreen"><div className="setBody"><ThreatReportsLink catalog={locale === "ro" ? staffRomanian : staffEnglish}/><TeamLimitPanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/><TeamAllowancePanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/><PublicReviewPanel catalog={locale === "ro" ? staffRomanian : staffEnglish}/><StaffAccessPanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/></div></div>;
+    return <div className="screen scroll setScreen"><div className="setBody"><TeamLimitPanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/><TeamAllowancePanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/><PublicReviewPanel catalog={locale === "ro" ? staffRomanian : staffEnglish}/><StaffAccessPanel locale={locale} catalog={locale === "ro" ? staffRomanian : staffEnglish}/></div></div>;
 }

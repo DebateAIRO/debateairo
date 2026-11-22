@@ -1,0 +1,54 @@
+{
+  "schema": "preview-model-rows-v2",
+  "about": "The reviewed Amazon Bedrock model row of the preview spending gate. The gate (packages/providers/ops/preview_budget_helper.py, BedrockProfile) and the app (packages/providers/src/preview-models.ts) must both equal this file; a price change is a reviewed change to both sides and to this file. The row's id is the United States inference profile's, so every request stays inside the United States. settlement_steps are Amazon's list prices for that profile in USD per million tokens (the model card in the Bedrock user guide, read 2026-11-20): what a reply is charged, at the step its prompt_tokens fall in, plain input, cache writes and cache reads each at their own price. Amazon's prompt cache is on by default and may write any part of a prompt without the request asking, so a call RESERVES every input token at a hold price that no input token can cost more than: the row's input price is the lower step's cache-write price rounded up to a whole nano-USD per token, and reservation.upper_* are the upper step's cache-write and output prices. A request whose utf-8 bytes + overhead_bytes are at most step_tokens reserves at the row's prices (its prompt cannot reach the upper step); above that, at the upper ones, which are also the ceiling the gate's activate check and /remaining use for every slot. efforts is the reviewed thinking-level menu: a request carries reasoning_effort exactly one of these words (the menu holds no \"default\"), and its first entry is the level the app sends by default. The answer limit travels as max_completion_tokens. A menu change is a reviewed row change on both sides and in this file.",
+  "provider": "bedrock",
+  "reservation": {
+    "formula": "((request utf-8 bytes + overhead_bytes) * input price + output_bound * output price) / 1000000",
+    "overhead_bytes": 2048,
+    "step_tokens": 272000,
+    "step_rule": "request bytes + overhead_bytes <= step_tokens: the row's prices; above: the upper step's hold prices (the ceiling)",
+    "upper_input_usd_per_m": "0.275",
+    "upper_output_usd_per_m": "0.825",
+    "worst_case_request_bytes": 262144,
+    "per_call_cap_usd": "0.25"
+  },
+  "settlement_steps": [
+    {
+      "prompt_tokens_up_to": 272000,
+      "input_usd_per_m": "0.11",
+      "cache_write_usd_per_m": "0.1375",
+      "cache_read_usd_per_m": "0.011",
+      "output_usd_per_m": "0.55"
+    },
+    {
+      "prompt_tokens_up_to": null,
+      "input_usd_per_m": "0.22",
+      "cache_write_usd_per_m": "0.275",
+      "cache_read_usd_per_m": "0.022",
+      "output_usd_per_m": "0.825"
+    }
+  ],
+  "rows": [
+    {
+      "model": "us.openai.gpt-6-luna",
+      "maker": "OpenAI",
+      "input_usd_per_m": "0.138",
+      "output_usd_per_m": "0.55",
+      "input_nano_usd_per_token": 138,
+      "output_nano_usd_per_token": 550,
+      "output_bound": 32768,
+      "efforts": ["high", "medium", "low", "none"],
+      "json_object": false,
+      "worst_case_reservation_usd": "0.054480896",
+      "ceiling_reservation_usd": "0.099686400"
+    }
+  ],
+  "final_writer": {
+    "about": "A final writer may send up to request_bytes with max_completion_tokens up to output_bound (the model's documented maximum output). A full-size request is above step_tokens, so it reserves at the upper step's hold prices (worst_case_reservation_usd), under per_call_cap_usd.",
+    "request_bytes": 1048576,
+    "per_call_cap_usd": "0.75",
+    "rows": [
+      { "model": "us.openai.gpt-6-luna", "output_bound": 128000, "worst_case_reservation_usd": "0.394521600" }
+    ]
+  }
+}

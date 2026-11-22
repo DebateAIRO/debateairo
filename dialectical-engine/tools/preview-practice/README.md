@@ -42,7 +42,7 @@ Four modes:
   picks the angles, each AI lists points from its own angle, then merge, up to two "what is missing?" rounds and
   choose). The first AI changes from question to question. It is not a pass/fail test of the release: it collects the
   data the owners compare with their own method.
-- **language**: the question-language practice (no debate, under $0.05). Nine fixed questions are each read the way the
+- **language**: the question-language practice (no debate, a few small calls). Nine fixed questions are each read the way the
   site will read them before a debate, and the report says which language each would be locked to. See "The question
   language".
 
@@ -462,7 +462,7 @@ node_modules/.bin/tsx tools/preview-practice/practice.ts judge-order --transcrip
   --settings "$S" --gate-status-deepinfra "$D" --gate-status-anthropic "$A"
 ```
 
-It spends real money: one judge call per recorded vote (about half a cent to a cent each), two with `--control`, which
+It spends real money: one small judge call per recorded vote, two with `--control`, which
 also asks the same prompt unchanged so a flip can be told from an AI that simply answers differently each time, plus
 the repairs and retries a call may need (a reply in the wrong form is asked once more, a busy AI is tried again). Spend
 stays inside the owner's test budget in force that day, and the paid run waits for the owner's go. `--dry` answers from
@@ -753,7 +753,7 @@ With the new shape on, the site fixes the language of each question before the d
   were no fast AI: its language must come from its alphabet. The fast AI is still asked, so its reading is written
   down.
 - It writes `language.jsonl` (one line per question, never the question's text), `report.json` and `report.md`.
-- It costs under $0.05 and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
+- It makes a few small calls (the report gives what it spent) and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
   170 seconds to plan a question's angles.
 
 | Id | Site | Must lock | Offer the rewrite |
@@ -931,34 +931,33 @@ also-raised claims are sent whole (LG-C part 2, Task 15).
 
 ## Money and time (rough)
 
-- formats, default (5 models x 9 jobs x 2 samples): 90 jobs, about $0.10 to $0.30. The models go at the same time, so
+- formats, default (5 models x 9 jobs x 2 samples): 90 jobs (the run's report gives what it spent). The models go at the same time, so
   it takes about as long as the slowest model's 18 jobs: about 15 to 50 minutes (GLM, Qwen and MiMo take 30 to 170
   seconds a call), plus up to `--busy-wait-minutes` (default 30) when a model is busy. With `--sequential`, about 1
   to 2 hours, plus the same.
-- openings, all 12 questions and all four arms: about 350 calls. Cost: roughly $0.5 to $1 in all, a planning
-  estimate, not yet measured (the first real run's report gives the real figure). The tighter pot is Haiku's: the test
+- openings, all 12 questions and all four arms: about 350 calls; the first real run's report gives what it
+  spent. The tighter pot is Haiku's: the test
   budget a day (the owner's figures, not in this repository) is much smaller for Haiku than for DeepInfra, so check Haiku's share in the first run's report before
   running again the same day. `report.md` shows each gate's spend by the gate's own count ("spent by the gate's count"
   on its line under "Gates"), and Haiku is the only AI on the Anthropic gate, so the `anthropic` line is Haiku's share. The steps of one arm go one after another, so it takes several hours (the slow models
   take 30 to 170 seconds a call). That is why S-6 runs it in two halves (see there). `--dry` spends nothing.
-- debate, depth 1: up to about 230 calls, about $0.15 to $0.70, about 1 to 2 hours one call at a time. Depth 2: about
-  350 calls, up to about 3 hours. Calls at the same time (`--call-concurrency`, or the register's setting) cost the
-  same and should take less time; the report's "Calls at once" part shows how much the calls overlapped. The start-of-debate estimate needs much more room left in the pots than is actually spent (about
-  $4 DeepInfra and $0.90 Anthropic left for depth 1), so run early in the Bucharest day.
-- debate in the new shape (`--shape-policy`), depth 1: about $0.30 (spec 2026-10-12), with fewer calls than today's
-  shape, plus one fast language check by Haiku on the Anthropic gate (about $0.00013). Its start-of-debate estimate may
+- debate, depth 1: up to about 230 calls (the run's report gives what it spent), about 1 to 2 hours one call at a
+  time. Depth 2: about 350 calls, up to about 3 hours. Calls at the same time (`--call-concurrency`, or the register's setting) cost the
+  same and should take less time; the report's "Calls at once" part shows how much the calls overlapped. The start-of-debate estimate needs much more room left in the pots than is actually spent (on
+  both gates, for depth 1; S-8, "Room the estimate needs"), so run early in the Bucharest day.
+- debate in the new shape (`--shape-policy`), depth 1: fewer calls than today's shape (the run's report gives what
+  it spent), plus one fast language check by Haiku on the Anthropic gate. Its start-of-debate estimate may
   need more room than today's shape (the map's merge and choose steps are each counted in full on both gates): read
   the first new-shape run's admission figures (S-8, "Room the estimate needs").
-- language: under $0.05, about 5 to 20 minutes.
+- language: a few small calls (the run's report gives what it spent), about 5 to 20 minutes.
 - openings arm Q alone (the clarifying call, plan Task 91c): 12 small Haiku calls on the Anthropic gate only (a second
   one only for a reply the step could not read), one question at a time, so a few minutes at most; its money is
   `report.json` `clarify.costUsd` and the `anthropic` gate line. `--dry` calls nothing.
 - the whole-debate comparison (S-8): eight depth-1 debates over at least five days, after day 1's language mode and
-  `lang-ro-en-mix` debate, about $1.9 to $4.3 in all with
-  day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
-- the start-step Plus debate (`--start-step premium:5`) now searches the web as the site does for a Plus run (V4 Task
-  91f): up to about $1.34 more at the code's limits, about $0.25 likely (the searches' fees on the search gate and the
-  web readers' calls); a Free start never searches.
+  `lang-ro-en-mix` debate, with day 1's formats; keep room in the day's test budget for a pair run again.
+- the start-step Plus debate (`--start-step premium:5`) now searches the web as the site does for a Plus run: it
+  costs more than a Free start, within the code's limits (the searches' fees on the search gate and the web readers'
+  calls; the run's report gives the figure); a Free start never searches.
 - hosted preview: the same calls and cost; the debate is also held to the register's per-debate ceiling (the owner's
   value) and its story to the story ceiling, as on the server.
 
@@ -1436,7 +1435,7 @@ The tool does not count the testing day's budget itself: before a `--levels` run
 and keep the day's total under the owner's limits. The run can be stopped at any time with Ctrl-C (the report is
 still written).
 
-Step A (spec 2026-10-12 §6, a few cents): does each level really work? One job, one question, every level once. Same
+Step A (spec 2026-10-12 §6, a few small calls): does each level really work? One job, one question, every level once. Same
 `D` and `P` as in S-5, fresh status files from S-3:
 
 ```sh
@@ -1526,7 +1525,7 @@ upload right after the proof. Same `D` and `P` as in S-5.
 
        PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts formats --settings "$P/settings.env" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --models claude-haiku-5-5,deepseek-ai/DeepSeek-V4.1-Flash,XiaomiMiMo/MiMo-V2.6-Pro --lanes SYNTHESIZER,EVALUATOR,STORYTELLER,STORY_CHECKER --samples 1 --sequential --out "$P/lg-b-formats"
 
-4. The storyteller A/B (B-1 measured before the server's table changes; about $0.50): MiMo with thinking on and off,
+4. The storyteller A/B (B-1 measured before the server's table changes): MiMo with thinking on and off,
    Haiku at high and medium, two samples each, each run sending only its own level (S-6b). Then the side-by-side page
    for the owner (`--side-by-side`, S-6b):
 
@@ -1612,7 +1611,7 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
    A third try goes into `"$P/language-report-3"`, and so on.
 3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
    question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
-   rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
+   rewrite used. It spends and takes about as long as one new-shape debate (1 to 2 hours).
 4. Day 2: run the first pair on `ro-euro`, today's shape first. Both debates must PASS:
    - today's shape is the release's practice debate, because the upload ships with the row absent, so the site keeps
      today's shape, and with a new register version carrying this code's three prompt fingerprints (P2b OWNER STEP
@@ -1632,13 +1631,12 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 
 Money and time, within the owners' daily test budget:
 
-- **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
-  plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs
-  $0.10 to $0.30. The whole comparison is about $1.9 to $4.3 (four debates in each shape and day 1's formats),
-  spread over at least five days. The language mode costs under $0.05 and the `lang-ro-en-mix` debate about $0.30, on
-  day 1 after formats. A pair run again adds about $0.45 to $1, so keep room for reruns (up to about $6 in all).
-- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends: about $4
-  DeepInfra and $0.90 Anthropic for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
+- **Cost per debate.** Each run's report gives what it spent ("spent by the gate's count" on each gate's line in
+  `report.md`). A new-shape debate also makes one fast language check by Haiku, on the Anthropic gate. The whole
+  comparison (four debates in each shape and day 1's formats) is spread over at least five days. The language mode
+  and the `lang-ro-en-mix` debate run on day 1 after formats. Keep room in the day's test budget for a pair run again.
+- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends, on both gates,
+  for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
   Then the report's first reason starts with `ADMISSION_REFUSED:`, and nothing but the AIs' health checks was spent.
   - The new shape's estimate may need more room (the map's merge and choose steps are each counted in full on both
     gates). Read the first new-shape run's admission figures before you plan the next day: whether it was admitted,

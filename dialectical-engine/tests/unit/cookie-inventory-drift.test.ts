@@ -72,9 +72,10 @@ type WrittenScan = { written: Set<string>; unresolved: string[] };
  * `document.cookie` — `${CONST}=` builders, literal `"set-cookie", "name=` pairs, and the names
  * `lawfulSetCookie` compares against, read from that function's body only; (4) the key of every
  * `.setItem(` call, whatever its receiver. A key that resolves to no string is `unresolved`.
+ * Constants resolve from `constantSources` (default: the scanned sources themselves).
  */
-function scanWritten(sources: ReadonlyMap<string, string>): WrittenScan {
-  const constants = stringConstants(sources);
+function scanWritten(sources: ReadonlyMap<string, string>, constantSources: ReadonlyMap<string, string> = sources): WrittenScan {
+  const constants = stringConstants(constantSources);
   const resolve = (token: string): string | undefined => {
     const trimmed = token.trim();
     const literal = /^["'`]([^"'`$]+)["'`]$/.exec(trimmed);
@@ -138,6 +139,20 @@ describe("the storage inventory of record equals what the product writes (SPEC-v
   it("every write site's key resolves to a string", () => {
     expect(scan.unresolved).toEqual([]);
   });
+
+  it("every cookie the API sets is one the UI's /api proxy passes to the browser", () => {
+    // The browser reaches the API only through apps/ui/app/api/[...path]/route.ts; a cookie the API
+    // writes that lawfulSetCookie does not name is stripped there and never reaches the browser.
+    const sources = scannedSources(process.cwd());
+    const constants = stringConstants(sources);
+    const api = new Map([...sources].filter(([path]) => path.startsWith("apps/api/src/")));
+    const apiWritten = [...scanWritten(api, sources).written];
+    const route = sources.get("apps/ui/app/api/[...path]/route.ts") ?? "";
+    const body = /function lawfulSetCookie\b[\s\S]*?\n}\n/.exec(route)?.[0] ?? "";
+    const passed = new Set([...body.matchAll(/\b[A-Z][A-Z0-9_]*\b/g)].flatMap((token) => constants.get(token[0]) ?? []));
+    expect(apiWritten.length).toBeGreaterThan(0);
+    expect(apiWritten.filter((name) => !passed.has(name)).sort()).toEqual([]);
+  });
   it("counts concrete MFA CSRF and both social flow producers without unrelated identifiers", () => {
     const sources=new Map([["apps/api/a.ts", 'const SOCIAL_FLOW_COOKIE="__Host-flow", UNUSED="__Host-unused"; const SOCIAL_APPLE_FLOW_COOKIE="__Host-apple";const n="__Host-mfa",csrfName=`${n}-csrf`;const socialCookie=(name:string,value:string)=>`${name}=${value}`;reply.header("set-cookie",[`${n}=v`,`${csrfName}=c`,socialCookie(provider===\'apple\'?SOCIAL_APPLE_FLOW_COOKIE:SOCIAL_FLOW_COOKIE,value)]);']]);
     expect([...scanWritten(sources).written].sort()).toEqual(["__Host-apple","__Host-flow","__Host-mfa","__Host-mfa-csrf"]);
@@ -189,5 +204,52 @@ describe("the storage inventory of record equals what the product writes (SPEC-v
       ""
     ].join("\n");
     expect([...scanWritten(new Map([["apps/ui/route.ts", route]])).written]).toEqual(["__Host-s"]);
+  });
+});
+
+/**
+ * The counts in the cookie notice and in the /cookies storage intro are prose, not data, so nothing
+ * above keeps them true: the notice said "four cookies and four items" long after the inventory had
+ * grown to 13 and 8. Every locale writes its counts as digits, and this reads them back against
+ * `LEGAL_COOKIES` and `LEGAL_BROWSER_STORAGE`; a new row with no copy change turns this red.
+ */
+describe("the counts the copy states equal the inventory of record, in every locale", () => {
+  const messagesDir = join(process.cwd(), "apps/ui/messages");
+  const locales = readdirSync(messagesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  const catalog = (locale: string, file: string): Record<string, string> =>
+    JSON.parse(readFileSync(join(messagesDir, locale, file), "utf8")) as Record<string, string>;
+  const englishLegal = catalog("en", "legal.json");
+  const kindOf = (kindKey: string) => englishLegal[kindKey];
+  const local = LEGAL_BROWSER_STORAGE.filter(({ kindKey }) => kindOf(kindKey) === "Local storage").length;
+  const session = LEGAL_BROWSER_STORAGE.filter(({ kindKey }) => kindOf(kindKey) === "Session storage").length;
+  /** The whole numbers a sentence states, in the order it states them. */
+  const numbersIn = (text: string) => (text.match(/\d+/g) ?? []).map(Number);
+
+  it("sorts every browser-storage row into local or session storage", () => {
+    expect(locales).toHaveLength(35);
+    expect(local + session).toBe(LEGAL_BROWSER_STORAGE.length);
+    expect(local).toBeGreaterThan(0);
+    expect(session).toBeGreaterThan(0);
+  });
+
+  it.each(locales)("%s: the cookie notice states the cookie and storage counts", (locale) => {
+    expect(numbersIn(catalog(locale, "consent.json")["consent.bar.body"]!).sort((a, b) => a - b)).toEqual(
+      [LEGAL_COOKIES.length, LEGAL_BROWSER_STORAGE.length].sort((a, b) => a - b)
+    );
+  });
+
+  it.each(locales)("%s: the /cookies storage intro states the storage, local and session counts", (locale) => {
+    expect(numbersIn(catalog(locale, "legal.json")["legal.cookies.storageIntro"]!).sort((a, b) => a - b)).toEqual(
+      [LEGAL_BROWSER_STORAGE.length, local, session].sort((a, b) => a - b)
+    );
+  });
+
+  it.each(locales)("%s: the What-we-store card states the total", (locale) => {
+    expect(numbersIn(catalog(locale, "consent.json")["consent.preferences.lede"]!)).toEqual([
+      LEGAL_COOKIES.length + LEGAL_BROWSER_STORAGE.length
+    ]);
   });
 });

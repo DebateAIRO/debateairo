@@ -1,12 +1,12 @@
 import type { PostgresThreatReportRepository } from "@debateai/db";
 import { gatedInterval, type ReleaseGate } from "../release-loops.js";
 
-/** The coordinator invokes this while the account is PREPARED and before it destroys the user DEK. */
-export function threatReportEmailHold(repository: Pick<PostgresThreatReportRepository, "holdEmails">) {
-  return async ({ erasureId, email }: Readonly<{ erasureId: string; userId: string; email: string }>): Promise<void> => {
-    await repository.holdEmails(erasureId, email);
-  };
-}
+/**
+ * The staff threat reports were removed (2026-11-19), but a database may still hold reports kept before 0171, so their
+ * retention sweep stays until the migration that drops the schema. The email hold that ran before an account's key
+ * was destroyed is gone: it only kept the asker's address readable for the removed staff screen. Erasing the account
+ * still unlinks its reports (0128's account_user_id is ON DELETE SET NULL), and this sweep erases them when due.
+ */
 
 /** The shortest retention period is 30 days; an hourly sweep adds under 0.2% lag. */
 const THREAT_REPORT_ERASURE_EVERY_MS = 3_600_000;

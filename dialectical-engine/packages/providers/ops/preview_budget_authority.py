@@ -322,11 +322,16 @@ GATE_PATHS = {
                    '/etc/debateai-v3-preview/provider-perplexity-go-v1.json'),
     'google': ('/var/lib/debateai-v3-preview/provider-google-authority-v1',
                '/etc/debateai-v3-preview/provider-google-go-v1.json'),
+    # Amazon Bedrock, for OpenAI's GPT-6 Luna (deploy/preview-gate/v3/README-bedrock.md).
+    'bedrock': ('/var/lib/debateai-v3-preview/provider-bedrock-authority-v1',
+                '/etc/debateai-v3-preview/provider-bedrock-go-v1.json'),
 }
 # The retired gates' state (v1, v2) and v2's GO: hidden from every probe too.
 RETIRED_GATE_PATHS = ('/var/lib/debateai-v3-preview/provider-test-authority',
                       '/var/lib/debateai-v3-preview/provider-team-authority-v2',
                       '/etc/debateai-v3-preview/provider-team-go-v2.json')
+# The halt a refused key leaves (a profile's key_refused): the key is wrong, deleted, lacks a permission or has expired.
+KEY_REFUSED_HALT = 'provider_key_refused'
 PROBE_UNIT_PREFIX = 'debateai-preview-probe-'  # + provider + '.service': the probe's transient unit.
 # TEST-NET-1 (RFC 5737): reserved for documentation, never routed. Inside the fence an empty
 # datagram to it is refused at once; outside it leaves the process, which proves there is no fence.
@@ -1692,6 +1697,15 @@ def execute_request(private, go_path, input, *, peer_uid, slots, dispatch=None, 
                 if on_settled is not None:  # The probe still prints what it measured.
                     on_settled({'changes': changes, 'halt_reason': None, 'response': response, 'row': row, **outcome})
                 raise ChargeBookedMax('PROVIDER_CHARGE_BOOKED_MAX')
+        # A profile may say that the vendor refused the key itself (its optional key_refused, judged on the RAW reply:
+        # Amazon Bedrock's 401 and 403). The call halts exactly as before; only the halt's name says what root must fix.
+        if halt_reason == 'uncertain_charge':
+            key_refused = getattr(profile, 'key_refused', None)
+            try:
+                if key_refused is not None and key_refused(status, raw_response) is True:
+                    halt_reason = KEY_REFUSED_HALT
+            except BaseException:
+                pass  # A hook that fails changes nothing: the halt keeps its name.
         outcome = settle_or_halt(private, entry_id, day, changes, halt_reason, budget, now, slots)
         log_event({**event, 'model': row.model, 'status': changes['state'], 'halt_reason': halt_reason,
                    'guard_charge_usd': charge, 'elapsed_seconds': elapsed, **outcome})
@@ -1884,7 +1898,9 @@ def probe_summary(observed, profile):
             'reply_model': observed['changes'].get('reply_model'),
             'usage': {name: accounting.get(name) for name in ('prompt_tokens', 'completion_tokens', 'total_tokens',
                                                              'reasoning_tokens', 'billed_output_tokens', 'cached_tokens',
-                                                             'usage_valid')},
+                                                             'usage_valid')}
+                     # A profile whose accounting counts cache writes on their own (Amazon Bedrock) shows them too.
+                     | ({'cache_write_tokens': accounting['cache_write_tokens']} if 'cache_write_tokens' in accounting else {}),
             'guard_charge_usd': accounting.get('guard_charge_usd'),
             'provider_estimated_cost_usd': accounting.get('provider_estimated_cost_usd'),
             'entry_state': observed['changes'].get('state'), 'halt_reason': observed['halt_reason'],

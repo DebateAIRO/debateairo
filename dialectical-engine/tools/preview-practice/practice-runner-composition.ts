@@ -177,7 +177,7 @@ export async function composePracticeRunner(input: Readonly<{
   /** The two gate ports (the forwarded sockets, watched). */
   budgetPorts: PreviewBudgetPorts;
   /** Each gate's read-only `/remaining` (the forwarded sockets): the call scheduler's gate slots, read once. */
-  remaining: Readonly<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>;
+  remaining: Readonly<Partial<Record<PreviewProviderName, () => Promise<PreviewGateRemaining>>>>;
   /** The claim renewals' own pool (main.ts: RUNNER_DATABASE_POOLS.keepAlive), distinct from `pool`. */
   keepAlivePool: Pool;
   /** The practice's --call-concurrency: used as it is, instead of the register's row. Absent: the register's row (main.ts). */
@@ -263,7 +263,11 @@ export async function composePracticeRunner(input: Readonly<{
   const runnerCallScheduler = callStats.observeScheduler(createCallScheduler({ policy: callPolicy }));
   await applyPreviewGateCapacities({
     scheduler: runnerCallScheduler,
-    gates: previewGateNames(previewGate).map((gate) => ({ gate, remaining: input.remaining[gate] })),
+    // A gate the practice was given no reader for (it forwards the DeepInfra and Anthropic gates only) is not read.
+    gates: previewGateNames(previewGate).flatMap((gate) => {
+      const remaining = input.remaining[gate];
+      return remaining === undefined ? [] : [{ gate, remaining }];
+    }),
     log: (line) => { callStats.gateCapacityLog(line); console.warn(line); }
   });
   const previewBusy = callStats.observeBusy(createPreviewBusyCoordinator());

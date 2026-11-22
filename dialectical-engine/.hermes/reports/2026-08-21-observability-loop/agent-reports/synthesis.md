@@ -29,7 +29,7 @@
    undercut his own E5-b choice. Resolving those honestly meant contradicting the seat
    whose evidence I most trusted, on the strength of that same evidence.
 6. The numbers were the hardest discipline. Grok and Codex both named plausible figures
-   (20 evt/s, €50/month, 30-day windows) and every one is ungrounded by their own
+   (20 evt/s, a monthly spend cap, 30-day windows) and every one is ungrounded by their own
    admission. Writing "DECIDE-V" instead of averaging three guesses is correct but it
    hands V three incompatible proposals; I answered that by recommending Codex's QUICK-FIX
    *shape* on a structural argument (it is the only one that permits adding the RED test

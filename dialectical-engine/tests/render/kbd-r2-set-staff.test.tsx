@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-// Keyboard audit 2026-11-12, wave 2 (SET-12 to SET-17): the team page's panels, the threat reports page and the staff
-// invitation, followed by a keyboard user with the site's focus guard running.
+// Keyboard audit 2026-11-12, wave 2 (SET-12 to SET-17): the team page's panels and the staff invitation (SET-16, the
+// threat reports page, went with the threat reports on 2026-11-19), followed by a keyboard user with the site's focus guard running.
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import staff from "../../apps/ui/messages/en/staff.json";
@@ -8,7 +8,6 @@ import { StaffAccessPanel } from "../../apps/ui/components/StaffAccessPanel.js";
 import { StaffInvitationPanel } from "../../apps/ui/components/StaffInvitationPanel.js";
 import { TeamLimitPanel } from "../../apps/ui/components/TeamLimitPanel.js";
 import { TeamAllowancePanel } from "../../apps/ui/components/TeamAllowancePanel.js";
-import { ThreatReportsPanel } from "../../apps/ui/components/ThreatReportsPanel.js";
 import { createStaffApiClient } from "../../apps/ui/lib/staffApi.js";
 import { button, expectFocusOn, expectParkedOn, guardWait, keyboardOn, mountPage, nextTabStop, press, typeInto, unmountPage } from "./kbd-r2-set-harness.js";
 import { submitByKeyboard } from "./kbd-guard-harness.js";
@@ -213,58 +212,5 @@ describe("SET-14, SET-15 the team allowance panel", () => {
     expectFocusOn(confirm);
     await press(button(S["staff.teamAllowance.cancel"]!));
     expectFocusOn(button(S["staff.teamAllowance.takeBack"]!, row));
-  });
-});
-
-// --------------------------------------------------------------------------------------------------------------- SET-16
-const OLD = "11111111-1111-4111-8111-111111111111", NEW = "22222222-2222-4222-8222-222222222222";
-function reportsClient() {
-  let decision: "UNREAD" | "REPORTED" | "NOT_REPORTED" = "UNREAD";
-  const row = (ref: string, kept: string) => ({ report_ref: ref, kept_at: kept, decision: ref === OLD ? decision : "UNREAD", decided_at: ref === OLD && decision !== "UNREAD" ? "2026-10-21T10:00:00.000Z" : null });
-  return {
-    list: vi.fn(async () => ({ reports: [row(OLD, "2026-10-20T08:00:00.000Z"), row(NEW, "2026-10-20T09:00:00.000Z")].filter(item => item.decision !== "NOT_REPORTED") })),
-    read: vi.fn(async (ref: string) => ({ ...row(ref, "2026-10-20T08:00:00.000Z"), question: "A kept question", account: { email: "kept@example.com", user_id: "33333333-3333-4333-8333-333333333333" } })),
-    decide: vi.fn(async (_ref: string, next: "REPORTED" | "NOT_REPORTED") => { decision = next; }),
-    cancel: vi.fn()
-  };
-}
-const openLink = (ref: string) => document.querySelector<HTMLAnchorElement>(`[data-report-ref="${ref}"] a`)!;
-const sectionTitle = (key: string) => [...document.querySelectorAll("h2")].find((node) => node.textContent === S[key]);
-
-describe("SET-16 the threat reports page", () => {
-  beforeEach(() => { history.replaceState(null, "", "/admin/threat-reports"); });
-
-  it("Open puts focus on the report's heading; Back to the list puts it on the row just read", async () => {
-    await mountPage(<ThreatReportsPanel client={reportsClient() as never} />);
-    expect(document.activeElement).toBe(document.body);
-    await press(openLink(OLD));
-    expectFocusOn(sectionTitle("staff.threatReports.itemTitle"));
-    await press(button(S["staff.threatReports.backList"]!));
-    expectFocusOn(openLink(OLD));
-  });
-
-  it("a decision puts focus on the notice that says it was recorded", async () => {
-    await mountPage(<ThreatReportsPanel client={reportsClient() as never} />);
-    await press(openLink(OLD));
-    await press(button(S["staff.threatReports.notReported"]!));
-    expect(document.querySelector(`[data-report-ref="${OLD}"]`)).toBeNull();
-    expectFocusOn(document.querySelector(".staffNotice[role=status]"));
-  });
-
-  it("the browser's Back to the list puts focus on the row just read", async () => {
-    await mountPage(<ThreatReportsPanel client={reportsClient() as never} />);
-    await press(openLink(NEW));
-    history.replaceState(null, "", "/admin/threat-reports");
-    keyboardOn(sectionTitle("staff.threatReports.itemTitle")!);
-    await act(async () => { window.dispatchEvent(new PopStateEvent("popstate")); });
-    await guardWait();
-    expectFocusOn(openLink(NEW));
-  });
-
-  it("a page opened straight on a report takes no focus", async () => {
-    history.replaceState(null, "", `/admin/threat-reports?report=${OLD}`);
-    await mountPage(<ThreatReportsPanel client={reportsClient() as never} />);
-    expect(sectionTitle("staff.threatReports.itemTitle")).toBeDefined();
-    expect(document.activeElement).toBe(document.body);
   });
 });

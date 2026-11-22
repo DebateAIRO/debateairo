@@ -16,12 +16,12 @@ import {
   BillingWithdrawRequestSchema,
   BillingWithdrawResponseSchema
 } from "@debateai/contract";
-import { microsToDecimal } from "@debateai/billing-core";
+import { decimalToMicros, microsToDecimal } from "@debateai/billing-core";
 import { clientIpNetworkScope } from "../client-ip.js";
 import { mailLocaleOfCookieHeader } from "../mail-locale.js";
 import { readCardDetails, startCardChange } from "./card-change.js";
 import type { BillingAdmission, BillingRequestSource, BillingRoutePolicy } from "./index.js";
-import { answerRefusal as answer, billingNotFound as notFound } from "./refusal.js";
+import { answerRefusal as answer, billingNotFound as notFound, refuseBuyer, type BillingBuyerAdmits } from "./refusal.js";
 import { failureCode } from "./renewal.js";
 import { cancelForOwner, revokeCancelForOwner, scheduleDowngrade } from "./subscription-actions.js";
 import { refuse } from "./subscription-core.js";
@@ -67,14 +67,16 @@ function mailLocaleOf(request: FastifyRequest): string {
  * P12/P13. `deps` is undefined in local mode and while billing is off; every route is still registered (the
  * inventory and the s7 matrix need it) and answers the closed 404. `policy` is B7a's `BillingRouteDeps.policy`;
  * `admit` and `source` are the two values P8a's `installBillingRoutes` resolves from `deps.admission` and
- * `deps.source` (R-3), so these routes charge the same budgets as the rest of the billing module.
+ * `deps.source` (R-3), so these routes charge the same budgets as the rest of the billing module. `buyerAdmits` is
+ * the checkout's buyer rule (`BillingRouteDeps.buyerAdmits`); the upgrade, which also takes money, follows it too.
  */
 export function installSubscriptionRoutes(
   api: FastifyInstance,
   deps: SubscriptionRouteDeps | undefined,
   policy: BillingRoutePolicy,
   admit: BillingAdmission,
-  source: BillingRequestSource
+  source: BillingRequestSource,
+  buyerAdmits?: BillingBuyerAdmits
 ): void {
   api.get("/v1/billing/subscription", policy("GET /v1/billing/subscription"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
@@ -99,7 +101,9 @@ export function installSubscriptionRoutes(
     // Every downgrade prices the lower plan at the tax service: the same sealed per-owner budget as a quote.
     if (!admit.gate(reply, "billingQuote", "POST /v1/billing/subscription/downgrade", ownerRef)) return reply;
     return answer(reply, async () => {
-      await scheduleDowngrade(deps, ownerRef, parsed.data.plan_id);
+      await scheduleDowngrade(deps, ownerRef, parsed.data.plan_id, {
+        netMicros: decimalToMicros(parsed.data.net_price), currency: parsed.data.currency
+      });
       return reply.status(204).send();
     });
   });
@@ -142,6 +146,7 @@ export function installSubscriptionRoutes(
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;
     if (authenticated === undefined) return reply.status(409).send({ error: "COOKIE_SESSION_REQUIRED" });
+    if (buyerAdmits !== undefined && !buyerAdmits(authenticated)) return refuseBuyer(reply);
     const parsed = BillingUpgradeRequestSchema.safeParse(request.body);
     if (!parsed.success) return malformed(reply);
     const from = source(request);
@@ -151,7 +156,7 @@ export function installSubscriptionRoutes(
       agreement: parsed.data.renewal_terms
     }))));
   });
-  // OUG 34/2014 art. 11^1 (owner ruling 2026-11-04): the signed-in session withdraws; the body is empty, no step-up.
+  // OUG 34/2014 art. 11^1: the signed-in session withdraws; the body is empty and no step-up is asked.
   api.post("/v1/billing/subscription/withdraw", policy("POST /v1/billing/subscription/withdraw"), async (request, reply) => {
     if (deps === undefined) return notFound(reply);
     const authenticated = request.authenticatedSession;

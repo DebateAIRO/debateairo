@@ -45,7 +45,7 @@ function latestRow(locale: string) {
 
 /**
  * One ACTIVE PLUS subscription paid by one INITIAL charge (RO, so withdrawal is open). `paid` adds one succeeded
- * payment, so a withdrawal is due a refund (M8_RECEIVED); without it nothing is due back (M8).
+ * payment, so a withdrawal is due a refund; without it nothing is due back. Either way M8_RECEIVED acknowledges it.
  */
 function world(paid: boolean) {
   const jobs: Enqueued[] = [];
@@ -71,6 +71,7 @@ function world(paid: boolean) {
     customerByOwner: async () => ({ customerId: CUSTOMER }),
     appendSubscriptionEvent: async () => undefined,
     consumeWithdrawalGrant: async () => true,
+    ownerErasureCommitted: async () => false,
     withTransaction: async (fn: (c: PoolClient) => Promise<unknown>) => fn(client),
     enqueue: async (_client: PoolClient, job: Enqueued) => { jobs.push(job); return randomUUID(); }
   };
@@ -102,14 +103,17 @@ async function cancelMail(mailLocale?: string): Promise<Enqueued | undefined> {
   return w.jobs.find((job) => job.payload.template === "M7");
 }
 
-/** M8 (nothing due back) or M8_RECEIVED (a refund is due, from one succeeded payment), through recordWithdrawal. */
+/** M8_RECEIVED, the acknowledgement every withdrawal queues (a refund due or nothing due back), through recordWithdrawal. */
 async function withdrawalMail(input: Readonly<{ paid: boolean; mailLocale?: string }>): Promise<Enqueued | undefined> {
   const w = world(input.paid);
   await recordWithdrawal(w.deps as never, {
     ownerRef: OWNER, withdrewAt: WITHDREW, source: "SETTINGS", authorize: async () => undefined,
     ...(input.mailLocale === undefined ? {} : { mailLocale: input.mailLocale })
   });
-  return w.jobs.find((job) => job.payload.template === "M8" || job.payload.template === "M8_RECEIVED");
+  // One customer email, the acknowledgement: M8 follows only once a refund is done.
+  const mails = w.jobs.filter((job) => job.payload.template === "M8" || job.payload.template === "M8_RECEIVED");
+  expect(mails).toHaveLength(1);
+  return mails[0];
 }
 
 /** M9: the cancel link, sent at once by CancelLinkService.request. */
@@ -251,9 +255,10 @@ describe("S01-C13 the user-action rows carry the request's language", () => {
     expect(jobs.find((job) => job.payload.template === "M7")?.payload.locale).toBe("ro");
   });
 
-  it("M8 (withdraw, nothing due back) carries the withdraw request's language", async () => {
+  it("M8_RECEIVED (withdraw, nothing due back) carries the withdraw request's language, and no M8 is queued", async () => {
     const job = await withdrawalMail({ paid: false, mailLocale: "ro" });
-    expect(job?.payload.template).toBe("M8");
+    expect(job?.payload.template).toBe("M8_RECEIVED");
+    expect(job?.payload["param.refundAmount"]).toBe("0.00");
     expect(job?.payload.locale).toBe("ro");
   });
 
@@ -319,7 +324,7 @@ describe("S01-C13 the subscriber's routes read the dropdown cookie (R-09, R-06)"
     expect(jobs.find((job) => job.payload.template === "M7")?.payload.locale).toBe("en");
   });
 
-  it("Settings withdraw sends the cookie's language to M8", async () => {
+  it("Settings withdraw sends the cookie's language to M8_RECEIVED", async () => {
     const { api, jobs } = await routes(false);
     const response = await api.inject({
       method: "POST", url: "/v1/billing/subscription/withdraw",
@@ -327,7 +332,8 @@ describe("S01-C13 the subscriber's routes read the dropdown cookie (R-09, R-06)"
       payload: {}
     });
     expect(response.statusCode).toBe(200);
-    expect(jobs.find((job) => job.payload.template === "M8")?.payload.locale).toBe("ja");
+    expect(jobs.find((job) => job.payload.template === "M8_RECEIVED")?.payload.locale).toBe("ja");
+    expect(jobs.find((job) => job.payload.template === "M8")).toBeUndefined();
   });
 
   it("the cancel link sends the cookie's language to M9, and the cancel-by-token answer passes it to M7", async () => {

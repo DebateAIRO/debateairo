@@ -13,6 +13,7 @@ import {
   legalTranslationFollows,
   parseLegalTranslations,
   recordLegalTranslation,
+  RELEASE_LEGAL_LOCALES,
   renderLegalManifest,
   type LegalArchiveIndex,
   type LegalManifest,
@@ -22,10 +23,11 @@ import { legalReleaseProblems } from "../../apps/ui/scripts/legal-release-check.
 import { LOCALES } from "../../apps/ui/lib/i18n/locales.js";
 
 /**
- * English first: a change to the legal wording is made in English only while work goes on. The other 34 languages and
- * the archive copies are brought up to date once, before a release, and the release check refuses a release until they
- * are. These cases pin both halves: an English-only edit builds, parses and archives nothing; the release check names
- * every language that lags the English text and every current text the archive does not hold yet.
+ * English first: a change to the legal wording is made in English only while work goes on. The languages a release
+ * offers (RELEASE_LEGAL_LOCALES) and their archive copies are brought up to date once, before the release, and the
+ * release check refuses a release until they are. These cases pin both halves: an English-only edit builds, parses and
+ * archives nothing; the release check names every offered language that lags the English text and every current text
+ * of those languages the archive does not hold yet.
  */
 
 type Kind = "TERMS" | "PRIVACY";
@@ -38,6 +40,19 @@ const repoDraft = (locale: string, kind: Kind): string =>
 const committedArchive = (): LegalArchiveIndex =>
   (JSON.parse(readFileSync(resolve(process.cwd(), LEGAL_MANIFEST_OUTPUT), "utf8")) as { archive: LegalArchiveIndex }).archive;
 const sha = (text: string): string => createHash("sha256").update(text, "utf8").digest("hex");
+
+/**
+ * The drafts the release check's cases below read. They need every translation to have the English structure, and
+ * the repository's translations that lag the English text do not have it yet. So each lagging language reads as the
+ * French text, a translation that follows the English one: a repository in which every language has caught up.
+ */
+const TRANSLATIONS_RECORD = parseLegalTranslations(JSON.parse(readFileSync(resolve(process.cwd(), LEGAL_TRANSLATIONS_PATH), "utf8")));
+const follows = (locale: string, kind: Kind): boolean =>
+  locale === "en" || legalTranslationFollows(TRANSLATIONS_RECORD, kind, locale, sha(repoDraft("en", kind)));
+const releaseDraft = (locale: string, kind: Kind): string => {
+  expect(follows("fr", kind), `${kind}: French follows the English text`).toBe(true);
+  return repoDraft(follows(locale, kind) ? locale : "fr", kind);
+};
 
 /** An English-only edit that also changes the structure: one new paragraph at the end of section 6. */
 const NEW_PARAGRAPH = "A paragraph that exists only in English so far.";
@@ -89,7 +104,7 @@ describe("English first: an English-only edit moves nothing else", () => {
   it("builds the manifest from an English-only edit, changes only the English pair, and archives nothing", () => {
     const history = committedArchive();
     const manifest = buildLegalManifest(withEnglishEdit, {}, history);
-    expect(manifest.documents.PRIVACY.en).toEqual({ version: "3.12", sha256: sha(editedEnglish()) });
+    expect(manifest.documents.PRIVACY.en).toEqual({ version: "1.0", sha256: sha(editedEnglish()) });
     for (const code of TRANSLATED) expect(manifest.documents.PRIVACY[code], code).toEqual(currentDocument("PRIVACY", code));
     for (const code of CODES) expect(manifest.documents.TERMS[code], code).toEqual(currentDocument("TERMS", code));
     // No archive copy is listed for the edited text: the archive is written at release.
@@ -100,7 +115,7 @@ describe("English first: an English-only edit moves nothing else", () => {
   it("is read by the package although the archive does not hold the English text yet", () => {
     const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(withEnglishEdit, {}, committedArchive()))) as LegalManifest;
     const parsed = parseLegalManifest(manifest);
-    expect(parsed.documents.PRIVACY.get("en")).toEqual({ version: "3.12", sha256: sha(editedEnglish()) });
+    expect(parsed.documents.PRIVACY.get("en")).toEqual({ version: "1.0", sha256: sha(editedEnglish()) });
     expect(parsed.archive.PRIVACY.get("en")?.get(sha(editedEnglish()))).toBeUndefined();
   });
 
@@ -117,14 +132,45 @@ describe("English first: an English-only edit moves nothing else", () => {
   it("lists the current texts in the archive only when the release step asks for it", () => {
     const manifest = buildLegalManifest(withEnglishEdit, {}, {}, undefined, { archiveCurrent: true });
     expect(manifest.archive.PRIVACY.en?.[sha(editedEnglish())]).toEqual({
-      version: "3.12", path: legalArchivePath("en", sha(editedEnglish()))
+      version: "1.0", path: legalArchivePath("en", sha(editedEnglish()))
     });
   });
 
   it("refuses to archive a changed text under a version the archive already holds for another text", () => {
-    // The committed archive holds the English text this edit changed, as 3.12; nothing is ever removed from it.
-    expect(() => buildLegalManifest(withEnglishEdit, {}, committedArchive(), undefined, { archiveCurrent: true }))
+    // Once the release step has archived the current texts, the archive holds the English text this edit changes, under
+    // the same number; nothing is ever removed from it.
+    const released = buildLegalManifest(repoDraft, {}, committedArchive(), undefined, { archiveCurrent: true }).archive;
+    expect(released.PRIVACY.en?.[sha(repoDraft("en", "PRIVACY"))]?.version).toBe(currentDocument("PRIVACY", "en")!.version);
+    expect(() => buildLegalManifest(withEnglishEdit, {}, released, undefined, { archiveCurrent: true }))
       .toThrow("LEGAL_MANIFEST_ARCHIVE_VERSION_REUSED");
+  });
+
+  it("archives the current texts of the languages it is given, and of every language when it is given none", () => {
+    const offered = buildLegalManifest(repoDraft, {}, {}, undefined, { archiveCurrent: true, archiveLocales: RELEASE_LEGAL_LOCALES });
+    for (const kind of ["PRIVACY", "TERMS"] as const) {
+      expect(Object.keys(offered.archive[kind]).sort(), kind).toEqual([...RELEASE_LEGAL_LOCALES].sort());
+      for (const locale of RELEASE_LEGAL_LOCALES) {
+        expect(offered.archive[kind][locale], `${locale}/${kind}`).toEqual({
+          [sha(repoDraft(locale, kind))]: { version: currentDocument(kind, locale)!.version, path: legalArchivePath(locale, sha(repoDraft(locale, kind))) }
+        });
+      }
+      // Every language still gets its current pair in the manifest; only the archive leaves the others out.
+      expect(Object.keys(offered.documents[kind]).sort(), kind).toEqual(CODES);
+    }
+    const every = buildLegalManifest(repoDraft, {}, {}, undefined, { archiveCurrent: true });
+    for (const kind of ["PRIVACY", "TERMS"] as const) expect(Object.keys(every.archive[kind]).sort(), kind).toEqual(CODES);
+  });
+
+  it("the release step archives, and the release check holds to the English text, English, French and Romanian", () => {
+    // English and Romanian are the languages offered; Canada reads and accepts the French texts at sign-up.
+    expect(RELEASE_LEGAL_LOCALES).toEqual(["en", "fr", "ro"]);
+    for (const locale of RELEASE_LEGAL_LOCALES) expect(CODES, locale).toContain(locale);
+    const generator = readFileSync(resolve(process.cwd(), "apps/ui/scripts/generate-legal-data.mjs"), "utf8");
+    expect(generator).toContain("archiveLocales: RELEASE_LEGAL_LOCALES");
+    expect(generator).toContain("for (const code of RELEASE_LEGAL_LOCALES) {");
+    const check = readFileSync(resolve(process.cwd(), "apps/ui/scripts/legal-release-check.mjs"), "utf8");
+    expect(check).toContain("locales: RELEASE_LEGAL_LOCALES");
+    expect(check).toContain("Every language this release offers");
   });
 });
 
@@ -173,31 +219,74 @@ describe("which English text each translation follows", () => {
 });
 
 describe("the release check", () => {
+  /** releaseDraft, with the English Privacy Policy edited. */
+  const releaseWithEnglishEdit = (locale: string, kind: Kind): string =>
+    locale === "en" && kind === "PRIVACY" ? editedEnglish() : releaseDraft(locale, kind);
+
   it("is satisfied when every language follows the current English text and the archive holds every current text", () => {
-    const { root, archive } = archiveRoot(everyCurrentText(repoDraft));
-    const manifest = buildLegalManifest(repoDraft, {}, archive);
-    expect(legalReleaseProblems(root, { readDraft: repoDraft, manifest, translations: followingEnglish(repoDraft) })).toEqual([]);
+    const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
+    const manifest = buildLegalManifest(releaseDraft, {}, archive);
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: followingEnglish(releaseDraft) })).toEqual([]);
   });
 
   it("names the languages that lag the English text, the current texts the archive lacks, and a version that names two texts", () => {
     // The archive and the record of translations as they stood at the last release; then English moved on.
-    const { root, archive } = archiveRoot(everyCurrentText(repoDraft));
-    const manifest = buildLegalManifest(withEnglishEdit, {}, archive);
-    const problems = legalReleaseProblems(root, { readDraft: withEnglishEdit, manifest, translations: followingEnglish(repoDraft) });
+    const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
+    const manifest = buildLegalManifest(releaseWithEnglishEdit, {}, archive);
+    const problems = legalReleaseProblems(root, { readDraft: releaseWithEnglishEdit, manifest, translations: followingEnglish(releaseDraft) });
     expect(problems).toEqual([
-      `Privacy Policy: these 34 languages lag the English text (version 3.12, sha256 ${sha(editedEnglish()).slice(0, 12)}): ${TRANSLATED.join(", ")}. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document privacy`,
+      `Privacy Policy: these 34 languages lag the English text (version 1.0, sha256 ${sha(editedEnglish()).slice(0, 12)}): ${TRANSLATED.join(", ")}. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document privacy`,
       "Privacy Policy: the archive does not hold the current text of en. Run pnpm run generate:legal:archive and commit what it writes.",
-      "Privacy Policy: in en the archive already holds a different text as version 3.12. A changed text needs a new version number."
+      "Privacy Policy: in en the archive already holds a different text as version 1.0. A changed text needs a new version number."
     ]);
   });
 
   it("names one lagging language and leaves the others alone", () => {
-    const { root, archive } = archiveRoot(everyCurrentText(repoDraft));
-    const manifest = buildLegalManifest(repoDraft, {}, archive);
-    const ledger = followingEnglish(repoDraft);
-    const lagging = parseLegalTranslations({ ...ledger, TERMS: { ...ledger.TERMS, de: { version: "2.17", sha256: "1".repeat(64) } } });
-    expect(legalReleaseProblems(root, { readDraft: repoDraft, manifest, translations: lagging })).toEqual([
-      `Terms of Service: this language lags the English text (version 2.18, sha256 ${currentDocument("TERMS", "en")!.sha256.slice(0, 12)}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+    const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
+    const manifest = buildLegalManifest(releaseDraft, {}, archive);
+    const ledger = followingEnglish(releaseDraft);
+    const lagging = parseLegalTranslations({ ...ledger, TERMS: { ...ledger.TERMS, de: { version: "0.9", sha256: "1".repeat(64) } } });
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging })).toEqual([
+      `Terms of Service: this language lags the English text (version 1.0, sha256 ${sha(releaseDraft("en", "TERMS")).slice(0, 12)}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+    ]);
+  });
+
+  it("checks only the languages it is given: a lagging language outside them is not reported, one inside is", () => {
+    const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
+    const manifest = buildLegalManifest(releaseDraft, {}, archive);
+    const ledger = followingEnglish(releaseDraft);
+    const old = { version: "0.9", sha256: "1".repeat(64) };
+    const lagging = parseLegalTranslations({ ...ledger, TERMS: { ...ledger.TERMS, de: old, ro: old } });
+    const terms = sha(releaseDraft("en", "TERMS")).slice(0, 12);
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging, locales: RELEASE_LEGAL_LOCALES })).toEqual([
+      `Terms of Service: this language lags the English text (version 1.0, sha256 ${terms}): ro. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+    ]);
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging, locales: ["de", "en"] })).toEqual([
+      `Terms of Service: this language lags the English text (version 1.0, sha256 ${terms}): de. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+    ]);
+    // Every language when none is named: both lag.
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: lagging })).toEqual([
+      `Terms of Service: these 2 languages lag the English text (version 1.0, sha256 ${terms}): de, ro. Translate each from the current English text, then record it with: node apps/ui/scripts/generate-legal-data.mjs --translated --locale <code> --document terms`
+    ]);
+  });
+
+  it("asks the archive for the current texts of the languages it is given only, and always for English's", () => {
+    const offered = (["PRIVACY", "TERMS"] as const).flatMap((kind) =>
+      RELEASE_LEGAL_LOCALES.map((locale) => ({ kind, locale, markdown: releaseDraft(locale, kind) })));
+    const { root, archive } = archiveRoot(offered);
+    const manifest = buildLegalManifest(releaseDraft, {}, archive);
+    const translations = followingEnglish(releaseDraft);
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations, locales: RELEASE_LEGAL_LOCALES })).toEqual([]);
+    const others = CODES.filter((code) => !RELEASE_LEGAL_LOCALES.includes(code));
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations })).toEqual([
+      `Privacy Policy: the archive does not hold the current text of ${others.join(", ")}. Run pnpm run generate:legal:archive and commit what it writes.`,
+      `Terms of Service: the archive does not hold the current text of ${others.join(", ")}. Run pnpm run generate:legal:archive and commit what it writes.`
+    ]);
+    // English is the text every other follows: it is checked even when the list leaves it out.
+    const { root: bare, archive: none } = archiveRoot([]);
+    expect(legalReleaseProblems(bare, { readDraft: releaseDraft, manifest: buildLegalManifest(releaseDraft, {}, none), translations, locales: ["ro"] })).toEqual([
+      "Privacy Policy: the archive does not hold the current text of en, ro. Run pnpm run generate:legal:archive and commit what it writes.",
+      "Terms of Service: the archive does not hold the current text of en, ro. Run pnpm run generate:legal:archive and commit what it writes."
     ]);
   });
 
@@ -215,11 +304,11 @@ describe("the release check", () => {
   });
 
   it("reports an archive file that is missing or altered", () => {
-    const { root, archive } = archiveRoot(everyCurrentText(repoDraft));
-    const french = currentDocument("TERMS", "fr")!.sha256;
+    const { root, archive } = archiveRoot(everyCurrentText(releaseDraft));
+    const french = sha(releaseDraft("fr", "TERMS"));
     writeFileSync(join(root, legalArchivePath("fr", french)), "not the archived text", "utf8");
-    const manifest = buildLegalManifest(repoDraft, {}, archive);
-    expect(legalReleaseProblems(root, { readDraft: repoDraft, manifest, translations: followingEnglish(repoDraft) })).toEqual([
+    const manifest = buildLegalManifest(releaseDraft, {}, archive);
+    expect(legalReleaseProblems(root, { readDraft: releaseDraft, manifest, translations: followingEnglish(releaseDraft) })).toEqual([
       `The archive and its index disagree: ${legalArchivePath("fr", french)}: HASH MISMATCH`
     ]);
   });

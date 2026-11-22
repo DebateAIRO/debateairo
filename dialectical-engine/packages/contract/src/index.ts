@@ -5,13 +5,8 @@ export * from "./mfa-recovery.js";
 import { socialAuthContractSchemas } from './social-auth.js';
 export * from './social-auth.js';
 import { staffContractInventory, fundedStaffContractInventory } from "./staff-access.js";
-import { ThreatReportSchema as StaffThreatReportSchema } from "./staff-access.js";
 export * from "./staff-access.js";
 import { z } from "zod";
-/** A kept question from an unsigned ask has no account to identify (S04-R18). */
-export const ThreatReportSchema = StaffThreatReportSchema.extend({
-  account: StaffThreatReportSchema.shape.account.nullable()
-}).strict();
 import { QuestionLanguageChoiceSchema, QuestionLanguageOfferSchema, SiteLanguageSchema, type QuestionLanguageOffer } from "./question-language.js";
 export * from "./question-language.js";
 // V4 start step, Task 9: the step before Start's ids, limits and wire shapes.
@@ -728,11 +723,15 @@ export type BillingPlansPlace = z.infer<typeof BillingPlansPlaceSchema>;
  * (spec 2026-10-05 §2.16.1). Credit is never shown in dollars: "4" reads "4× the Plus allowance". Terms §12: `tax` is
  * the place's tax and each plan's `total_price` its price in `currency` with that tax; both are present exactly when
  * `place.status` is PRICED, so a net price is never offered as the price.
+ * `environment` is the payment system this server's card payments go to, the same value the checkout answers: the
+ * pages show their test-mode note while it is "sandbox", and drop it by themselves once the server is switched to
+ * live. Optional, so an answer without it (an older server, a test's hand-made answer) shows no note.
  */
 export const BillingPlansResponseSchema = z.object({
   currency: BillingCurrencySchema,
   place: BillingPlansPlaceSchema,
   tax: BillingPlansTaxSchema.nullable(),
+  environment: z.enum(["sandbox", "live"]).optional(),
   plans: z.array(z.object({
     plan_id: PlanIdSchema,
     net_prices: BillingPricesSchema,
@@ -870,6 +869,12 @@ export const BillingSubscriptionResponseSchema = z.object({
     withdrawal_open_until: z.iso.datetime().nullable(),
     /** The window's last day in the consumer's own calendar (the UI's "withdraw until {date}"); null with no window. */
     withdrawal_last_day: z.iso.date().nullable(),
+    /**
+     * The day the plan started (its first activation) in the consumer's own calendar (UTC for a country with several
+     * zones, the mainland's for Portugal and Spain): the withdrawal statement names the contract by its plan and this
+     * day. Null when it is not known.
+     */
+    started_on: z.iso.date().nullable(),
     can_upgrade: z.boolean(),
     can_change_card: z.boolean(),
     /** C-15: Settings offers "Undo cancellation" only when the revoke route would accept it. */
@@ -878,8 +883,14 @@ export const BillingSubscriptionResponseSchema = z.object({
 }).strict();
 export type BillingSubscriptionResponse = z.infer<typeof BillingSubscriptionResponseSchema>;
 
-/** A downgrade target is a paid plan below Max; Free is reached by cancelling. */
-export const BillingDowngradeRequestSchema = z.object({ plan_id: z.enum(["PLUS", "PRO"]) }).strict();
+/**
+ * A downgrade target is a paid plan below Max; Free is reached by cancelling. `net_price` and `currency` are the lower
+ * plan's monthly price before tax exactly as the confirmation showed it: the server schedules the downgrade only at
+ * that price, so the price recorded for the next renewals is the one the person agreed to.
+ */
+export const BillingDowngradeRequestSchema = z.object({
+  plan_id: z.enum(["PLUS", "PRO"]), net_price: BillingDecimalMoneySchema, currency: BillingCurrencySchema
+}).strict();
 
 export const BillingInvoicesResponseSchema = z.object({
   invoices: z.array(z.object({

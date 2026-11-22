@@ -173,7 +173,7 @@ describe("public debate navigation keyboard accessibility", () => {
 
     expect(document.querySelector('.sectionHead[aria-label="Debate library"]') === null).toBe(true);
     expect(document.querySelector(".tabEmptyHint") === null).toBe(true);
-    expect(hero?.textContent).toContain("Find the weakest joint in your own argument.");
+    expect(hero?.textContent).toContain("See what holds up, and what is still open.");
     expect(toggle?.tagName, "mode control native element").toBe("BUTTON");
     expect((toggle as HTMLButtonElement | null)?.tabIndex, "mode control keyboard tab order").toBe(0);
     expect(toggle?.hasAttribute("disabled"), "mode control native disabled state").toBe(false);

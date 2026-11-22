@@ -18,9 +18,14 @@ export type LegalTable = Readonly<{ head: readonly string[]; rows: readonly (rea
 /**
  * One block of a section, in document order: a paragraph, or a bulleted list. A markdown table
  * arrives as a list whose items are the row cells joined with an em dash, plus `table`.
+ *
+ * `lead` is the paragraph's opening bold run as plain text ("Delivery.", "Cancelling."), present
+ * only when the draft opens the paragraph with one. It is always the start of `text`, which stays
+ * the whole paragraph, so a reader gets the same words with or without it; it only lets the page
+ * draw those words bold, as the draft marks them, so a reader can find the paragraph by eye.
  */
 export type LegalBlock =
-  | Readonly<{ kind: "p"; text: string }>
+  | Readonly<{ kind: "p"; text: string; lead?: string }>
   | Readonly<{ kind: "list"; items: readonly string[]; table?: LegalTable }>;
 
 /**

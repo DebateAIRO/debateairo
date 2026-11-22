@@ -4,7 +4,7 @@ import {
   BillingPlansQuerySchema, BillingPlansResponseSchema, BillingQuoteRequestSchema, BillingQuoteResponseSchema, BillingUsageResponseSchema,
   type BillingCurrency
 } from "@debateai/contract";
-import { allowanceVsPlus, microsToDecimal } from "@debateai/billing-core";
+import { allowanceVsPlus, microsToDecimal, type PaymentEnvironment } from "@debateai/billing-core";
 import type { GeoLookup } from "@debateai/geo";
 import { planNetPrice, priceCurrencyFor, type BillingPlans, type PlanId } from "@debateai/register";
 import { clientIpNetworkScope } from "../client-ip.js";
@@ -16,7 +16,7 @@ import type { DisplayedTaxPort } from "./displayed-tax.js";
 import type { NetopiaNoticeIntakePort } from "./netopia-intake.js";
 import { pricingPlace } from "./place.js";
 import type { QuoteResult, QuoteServicePort } from "./quote.js";
-import { answerRefusal, BillingRefusal, billingNotFound } from "./refusal.js";
+import { answerRefusal, BillingRefusal, billingNotFound, refuseBuyer, type BillingBuyerAdmits } from "./refusal.js";
 import { installSubscriptionRoutes, SUBSCRIPTION_ROUTE_PATHS } from "./subscription-routes.js";
 import type { SubscriptionRouteDeps } from "./subscription-deps.js";
 
@@ -95,6 +95,11 @@ export type BillingRouteDeps = Readonly<{
   geo?: GeoLookup;
   /** Terms §12: the connection country's tax on the plans list; absent, the list carries no total and the page shows no price. */
   displayedTax?: DisplayedTaxPort;
+  /**
+   * Which NETOPIA system the card payments go to (it follows NETOPIA_API_BASE_URL). The plans list names it, so the
+   * pages show their test-mode note only while payments run on the sandbox; absent, the list names none.
+   */
+  paymentEnvironment?: PaymentEnvironment;
   legal?: BillingLegalGate;
   /** P8b. */
   quotes?: QuoteServicePort;
@@ -108,6 +113,12 @@ export type BillingRouteDeps = Readonly<{
    * refuses 503 AGE_CHECK_UNAVAILABLE (this guard fails closed).
    */
   ageConfirmation?: BillingAgeConfirmation;
+  /**
+   * Who may buy or upgrade a plan. Only `buildApi` supplies it, and only on the hosted preview while payments are real:
+   * there it is the rule for who may ask, so nobody pays for questions they would then be refused. Absent, anyone
+   * signed in may, as before.
+   */
+  buyerAdmits?: BillingBuyerAdmits;
   /** P12/P13: present only when hosted with billing on; absent, the subscriber's routes answer 404. */
   subscription?: SubscriptionRouteDeps;
 }>;
@@ -119,7 +130,7 @@ export type BillingRouteDeps = Readonly<{
  * (B7a's type; P8a adds `admission` and `source`, which `buildApi` supplies.)
  * (P8c adds ageConfirmation, the age gate's reader, which buildApi binds.)
  */
-export type BillingRouteOptions = Omit<BillingRouteDeps, "policy" | "admission" | "source" | "ageConfirmation">;
+export type BillingRouteOptions = Omit<BillingRouteDeps, "policy" | "admission" | "source" | "ageConfirmation" | "buyerAdmits">;
 
 /** The house 404 and the refusal envelope (B7a, P8a) are defined once, in ./refusal.ts, and exported here. */
 export { answerRefusal, billingNotFound };
@@ -259,6 +270,9 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
       tax: tax === null ? null : {
         country: tax.country, tax_name: tax.taxName, tax_rate_bp: tax.taxRateBasisPoints, tax_status: tax.status
       },
+      // Read at every request from the running server, so switching the server to live payments removes the pages'
+      // test-mode note with no new release of the website.
+      ...(deps.paymentEnvironment === undefined ? {} : { environment: deps.paymentEnvironment }),
       plans: plans.plans.map((plan) => {
         const total = tax?.totalMicros.get(plan.planId);
         return {
@@ -304,6 +318,7 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
     if (checkout === undefined || legal === undefined) return billingNotFound(reply);
     const authenticated = request.authenticatedSession;
     if (authenticated === undefined) return reply.status(401).send({ error: "SESSION_REQUIRED" });
+    if (deps.buyerAdmits !== undefined && !deps.buyerAdmits(authenticated)) return refuseBuyer(reply);
     if (!admit.gate(reply, "billingCheckout", "POST /v1/billing/checkout", authenticated.ownerRef)) return reply;
     const parsed = BillingCheckoutRequestSchema.safeParse(request.body);
     if (!parsed.success) return reply.status(400).send({ error: "MALFORMED_REQUEST", message: "MALFORMED_REQUEST" });
@@ -372,5 +387,5 @@ export function installBillingRoutes(api: FastifyInstance, deps: BillingRouteDep
   });
 
   // P12b onward: the subscriber's own routes, in BILLING_ROUTE_PATHS order after the notice route.
-  installSubscriptionRoutes(api, deps.subscription, deps.policy, admit, source);
+  installSubscriptionRoutes(api, deps.subscription, deps.policy, admit, source, deps.buyerAdmits);
 }

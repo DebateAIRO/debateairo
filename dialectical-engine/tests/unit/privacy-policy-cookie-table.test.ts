@@ -156,38 +156,8 @@ describe("Privacy Policy §13 — the twenty-one actual stored items in every lo
     }
   });
 
-  it("the English 3.8 summary names the 3.8 changes and none of origin/dev's 3.5 to 3.7 changes", () => {
-    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
-    const summary = line.split("Version 3.8 replaced version 3.7:")[1]?.split("Version 3.7 replaced")[0] ?? "";
-    expect(summary, "the version 3.8 summary follows the version line").not.toBe("");
-    // origin/dev's 3.5 (card payments), 3.6 (Italy) and 3.7 (Perplexity) come after it on the line; 3.8 is synthesis-flag's.
-    for (const phrase of ["card", "payment provider", "debateai.locale", "queue", "Perplexity", "Italy"]) {
-      expect(summary, `the 3.8 summary names the earlier change "${phrase}"`).not.toContain(phrase);
-    }
-    for (const keyword of ["question", "synthesis", "approval", "support chat", "section 7", "section 10"]) {
-      expect(summary, `the 3.8 summary does not name the 3.8 change "${keyword}"`).toContain(keyword);
-    }
-  });
-
-  it("the English 3.6 summary names the 3.6 change and no 3.5-only change", () => {
-    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
-    const summary = line.split("Version 3.6 replaced version 3.5:")[1] ?? "";
-    expect(summary, "the version 3.6 summary follows the version line").not.toBe("");
-    for (const phrase of ["card", "section 7", "payment provider"]) {
-      expect(summary, `the 3.6 summary still names the 3.5 change "${phrase}"`).not.toContain(phrase);
-    }
-    for (const keyword of ["section 2", "IP country", "Region", "Italy"]) {
-      expect(summary, `the 3.6 summary does not name the 3.6 change "${keyword}"`).toContain(keyword);
-    }
-  });
-
-  it("the English 3.7 summary names the Perplexity change, before the 3.6 summary", () => {
-    const line = /^This policy was last updated on .*$/m.exec(readFileSync(join(LEGAL_DIR, "en", "privacy-policy.md"), "utf8"))?.[0] ?? "";
-    const latest = line.split("Version 3.7 replaced version 3.6:")[1]?.split("Version 3.6 replaced")[0] ?? "";
-    for (const keyword of ["section 5", "Perplexity"]) {
-      expect(latest, `the 3.7 summary does not name the 3.7 change "${keyword}"`).toContain(keyword);
-    }
-  });
+  // The 3.6, 3.7 and 3.8 change-history summaries were checked here until launch renumbered the policy 1.0 and section 14
+  // lost its history (owner's decision of 20 November 2026, tests/unit/legal-reset-10.test.ts).
 
   it("every other locale's §13 keeps the English block shape, the literal Do Not Track, and no English paragraph", () => {
     const english = blocks(section13("en"));

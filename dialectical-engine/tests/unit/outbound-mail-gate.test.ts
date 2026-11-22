@@ -52,7 +52,7 @@ const alerts = (events: readonly OutboundMailGateEvent[]) => events.flatMap((eve
 
 describe("the outbound mail gate", () => {
   it("classes every purpose: the reserve covers resets, recovery, security notices, billing and alerts to staff", () => {
-    const security: MailPurpose[] = ["billing", "email-change-notice", "account-erasure-notice", "consumer-recovery", "consumer-security-notice", "password-reset", "email-recovery", "owner-notice", "threat-report-alert", "team-notice", "moderation-notice"];
+    const security: MailPurpose[] = ["billing", "email-change-notice", "account-erasure-notice", "consumer-recovery", "consumer-security-notice", "password-reset", "email-recovery", "owner-notice", "team-notice", "moderation-notice"];
     const standard: MailPurpose[] = ["verification", "recovery-email-confirmation", "email-change-confirmation", "email-change-unavailable", "data-export"];
     for (const purpose of security) expect(mailPurposeClass(purpose)).toBe("security");
     for (const purpose of standard) expect(mailPurposeClass(purpose)).toBe("standard");
@@ -351,7 +351,6 @@ describe("every account-mail sender asks the gate, with its purpose, before any 
   });
 
   it.each([
-    ["THREAT_REPORT_WAITING", {}, "threat-report-alert"],
     ["TEAM_LIMIT_CHANGED", {}, "team-notice"],
     ["PUBLIC_FLAG_WAITING", {}, "team-notice"],
     ["PUBLIC_FLAG_ANSWER_RECEIPT", { happened: "2026-11-01T10:00:00.000Z", itemUrl: "https://dezbatere.ro/public/debate/x" }, "moderation-notice"],

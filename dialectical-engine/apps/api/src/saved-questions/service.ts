@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CRISIS_SUPPORT_OFFERED, SAVED_QUESTION_LIMITS, SENSITIVE_DATA_CONSENT_REQUIRED, START_PATHS_STALE, SavedQuestionCreateSchema,
-  SavedQuestionDocSchema, SavedQuestionSaveSchema, detectCrisis, savedQuestionDocFits, savedQuestionOwnWords, savedQuestionTitleOf,
+  SavedQuestionDocSchema, SavedQuestionSaveSchema, crisisCheckOverlong, detectCrisis, savedQuestionDocFits, savedQuestionOwnWords, savedQuestionTitleOf,
   startListNosOfMenu, type SavedQuestionDoc, type SavedQuestionList, type SavedQuestionRead, type SavedQuestionRefusal,
   type SavedQuestionWritten
 } from "@debateai/contract";
@@ -132,8 +132,10 @@ export function createSavedQuestionService(deps: SavedQuestionServiceDeps): Save
     const raw = (body as Readonly<{ doc: SavedQuestionDoc }>).doc;
     const parsed = shape.data.doc;
     if (savedQuestionDocFits(raw) !== "FITS") return refused("SAVED_QUESTION_TOO_LARGE");
-    // Each text is bounded by its schema's cap, which keeps the check quick (as on POST /v1/asks); only the person's own words.
-    if (savedQuestionOwnWords(parsed).some((text) => detectCrisis(text).crisis)) return refused(CRISIS_SUPPORT_OFFERED);
+    // Only the person's own words. Each text is held to the check's cap for one text (a text that spells past it is answered as
+    // a crisis would be, never checked in part). There is no cap on all of them together: a saved page keeps every rewrite and
+    // Undo step, so a long ordinary page is larger than one Start, and the page's own size limit above already bounds the work.
+    if (savedQuestionOwnWords(parsed).some((text) => crisisCheckOverlong(text) || detectCrisis(text).crisis)) return refused(CRISIS_SUPPORT_OFFERED);
     if (!await gate.consentGiven()) return refused(SENSITIVE_DATA_CONSENT_REQUIRED);
     if (!gate.teamAdmits) return refused(PREVIEW_TEAM_ONLY);
     const binding = deps.key === undefined ? null : await gate.bindingOf();

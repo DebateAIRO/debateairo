@@ -122,13 +122,16 @@ describe("PDF download route helpers (spec §10)", () => {
 
   it("reads the interface locale from the locale cookie, the way Next's cookie store does, and defaults to English", () => {
     expect(interfaceLocaleFromCookieHeader(null)).toBe("en");
-    expect(interfaceLocaleFromCookieHeader("debateai.locale=de")).toBe("de");
+    // German is a catalogue language the site does not offer for the interface: the page shows English.
+    expect(interfaceLocaleFromCookieHeader("debateai.locale=de")).toBe("en");
     expect(interfaceLocaleFromCookieHeader(`__Host-debateai-session=${SESSION}; debateai.locale=ro`)).toBe("ro");
+    expect(interfaceLocaleFromCookieHeader("debateai.locale=en-GB")).toBe("en-GB");
     expect(interfaceLocaleFromCookieHeader("debateai.locale=xx")).toBe("en");
     expect(interfaceLocaleFromCookieHeader("debateai.locale=")).toBe("en");
     expect(interfaceLocaleFromCookieHeader("other=fr")).toBe("en");
     // Next's cookie store keeps the last of two same-named cookies; the debate page reads it there.
-    expect(interfaceLocaleFromCookieHeader("debateai.locale=fr; debateai.locale=it")).toBe("it");
+    expect(interfaceLocaleFromCookieHeader("debateai.locale=en; debateai.locale=ro")).toBe("ro");
+    expect(interfaceLocaleFromCookieHeader("debateai.locale=fr; debateai.locale=it")).toBe("en");
   });
 
   it("names the file with an ASCII fallback slug of the question and the date", () => {
@@ -470,10 +473,10 @@ describe("GET /debate/{id}/report", () => {
     expect(await response.text()).toBe(words("en", "public.report.error.signIn"));
   });
 
-  it("answers the 401 in German for a German interface cookie", async () => {
+  it("answers the 401 in English for a cookie naming a language the site does not offer", async () => {
     const response = await GET(request("debateai.locale=de"), params);
     expect(response.status).toBe(401);
-    expect(await response.text()).toBe(words("de", "public.report.error.signIn"));
+    expect(await response.text()).toBe(words("en", "public.report.error.signIn"));
   });
 
   it("answers 401 to a malformed session cookie", async () => {

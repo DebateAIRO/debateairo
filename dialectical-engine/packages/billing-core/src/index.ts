@@ -2,6 +2,8 @@
 // R-1: the manifest lists @debateai/kernel only; register and budget are imported as types.
 export { allowanceVsPlus, computeWindows, personWindowsFor, type TimeWindow } from "./windows.js";
 export { BillingPersonAllowanceSource, type EntitlementPort, type EntitlementWindowBasis } from "./allowance-source.js";
+// A month keeps the plan numbers it started with; a higher one reaches it at once.
+export { monthCreditInForce, personWindowsInForce, type PlansInForcePort } from "./plans-in-force.js";
 
 export { FundingAwarePersonAllowanceSource, type FundingEntitlementPort, type FundingAllowancePort } from "./internal-allowance-source.js";
 // P2 (paid plans): money rules, calendar, the subscription fold and the connector ports.
@@ -65,6 +67,13 @@ export {
 // P6a (paid plans, RULINGS-R3 R3-4): the mirror of the legal notice's company facts for the API and the mail.
 export { SELLER_COMPANY, isUnverifiedCompanyFact, type SellerCompany, type SellerVatStatus } from "./company.js";
 
-// P12b (paid plans, R2 Q-6): the 14 calendar days of the withdrawal right, in the consumer's own calendar; W6
-// (P2-I9): a last day on a Saturday or Sunday moves to the next Monday.
-export { withdrawalDeadline, withdrawalRefundDeadline, type WithdrawalDeadline } from "./withdrawal-deadline.js";
+// The 14 calendar days of the withdrawal right, in the consumer's own calendar; a last day on a Saturday, a Sunday or
+// a Romanian public holiday moves to the next working day.
+export {
+  consumerCalendarDay,
+  consumerTimeZone,
+  withdrawalDeadline,
+  withdrawalRefundDeadline,
+  type WithdrawalDeadline
+} from "./withdrawal-deadline.js";
+export { isRomanianPublicHoliday, orthodoxEasterSunday, romanianPublicHolidays } from "./romanian-public-holidays.js";

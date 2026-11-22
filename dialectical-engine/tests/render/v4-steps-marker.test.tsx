@@ -15,8 +15,8 @@ import { CATALOG, digPart, harness, mountMap, page, resetHarness, seededAnswer, 
  *   journey-f18  one rail on every page: "Your question · What we'll look into · The map · Your report"; on a phone, small
  *                dots in the pinned top, next to the breadcrumb.
  *   read-f25     the same small four-step marker on every screen, the current step marked; dig pages show all four steps.
- *   ask-f6       "classic view" at most once on a V4 page (with journey-f19 and the owner's answer 12 B, 5 Nov: the header's
- *                account menu only, on every screen of the map's step).
+ *   ask-f6       "classic view" at most once on a V4 page; the map's pages now offer none at all, the header's account
+ *                menu included (every debate on the main site is a V4 one).
  */
 const seen = vi.hoisted(() => ({ headerLinks: [] as Array<string | null> }));
 vi.mock("@/components/AuthGate", async () => (await import("./v4-debate-harness.js")).authGateMock);
@@ -149,20 +149,20 @@ describe("the screens before the map (waiting, paused, failed)", () => {
     expect(marker.querySelector("a")).toBeNull();
   });
 
-  // The owner's answers of 5 Nov (question 12 B) move it to the account menu only: the page's own wiring (V4DebateClient,
-  // Task 76j) hands it to the header and not to this screen.
-  it("ask-f6: a debate that did not finish offers the classic view once, in the header's menu, and not on its screen too", async () => {
+  // The page hands its header no classic address (null, the header's "none"), and its screens draw no classic link.
+  it("ask-f6: a debate that did not finish offers no classic view, in the header's menu or on its screen", async () => {
     const runId = crypto.randomUUID();
     harness.run = run(runId, "FAILED");
     await mountMap(1600, runId);
-    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(seen.headerLinks.at(-1)).toBeNull();
     expect(classicLinks()).toHaveLength(0);
     expect(page().querySelector(".v4StepsTop nav.v4Steps-line")).not.toBeNull();
   });
 
-  it("the map's header carries it (into the account menu) once nothing else on the page does", async () => {
+  it("the map's header is handed no classic view, and nothing else on the page draws one", async () => {
     const runId = await mountMap(1600);
-    expect(seen.headerLinks.at(-1)).toBe(`/debate/${runId}`);
+    expect(seen.headerLinks.at(-1)).toBeNull();
+    expect(page().querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
     expect(classicLinks()).toHaveLength(0);
   });
 });

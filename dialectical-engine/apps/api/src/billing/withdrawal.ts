@@ -1,10 +1,10 @@
 import type { PoolClient } from "pg";
 import { TypedDomainError } from "@debateai/kernel";
 import {
-  microsToDecimal, withdrawalRefundDeadline, withdrawalRefundMicros, type PriceCurrency
+  consumerCalendarDay, consumerTimeZone, microsToDecimal, monthCreditInForce, withdrawalRefundDeadline,
+  withdrawalRefundMicros, type PriceCurrency
 } from "@debateai/billing-core";
 import type { ChargeEventRow, ChargeRow } from "@debateai/db";
-import { planById } from "@debateai/register";
 import type { AuthenticatedSession } from "../sessions.js";
 import { enqueueEmail } from "./email-job.js";
 import { isThisPaymentSystem } from "./outbox.js";
@@ -15,8 +15,8 @@ import { initialTaxCountry, withdrawalOpenUntil } from "./subscription-view.js";
 
 /** What a withdrawal needs: the route's composition, or the owner's command (P14c) over its operator pool. */
 export type WithdrawalDeps = Pick<SubscriptionRouteDeps,
-  | "billing" | "jobs" | "entitlements" | "plans" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock" | "kick"
-  | "paymentEnvironment">;
+  | "billing" | "jobs" | "entitlements" | "plans" | "plansInForce" | "policy" | "ownerSpend" | "refunds" | "audit" | "clock"
+  | "kick" | "paymentEnvironment">;
 
 export type WithdrawalRequest = Readonly<{
   ownerRef: string;
@@ -52,49 +52,38 @@ const stillHeld = (paid: ReadonlyArray<PaidTransaction>): number =>
 const REFUND_SAVEPOINT = "billing_withdrawal_refunds";
 
 /**
- * NV-45: a withdrawal waits for a debate that may still be using credit only while the window closes more than this
- * after it, so the person can always try again in time; inside the last day it is recorded at once.
- */
-export const WITHDRAWAL_WAIT_MARGIN_MS = 24 * 60 * 60 * 1000;
-
-/**
- * NV-45: a statement older than this never waits: every call sent before it has been answered. This assumes every
- * call deadline is under an hour: story bounds are capped at 900 s by their schema (`story-policy.ts`), but the
- * synthesizer and evaluator bounds have only a floor (`algorithm-policy.ts`; the shipped debate rows are 60-180 s). A
- * deadline sealed above an hour would under-deduct, in the person's favour.
- */
-export const WITHDRAWAL_WAIT_STATEMENT_AGE_MS = 60 * 60 * 1000;
-
-/**
- * Spec §2.5.6 withdraw. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
- * refund intents (P9b's RefundDesk: REFUND_REQUESTED + one PAYMENT_REFUND job per payment, split newest first) —
- * and only then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last
- * refund (RefundDesk's WITHDRAWAL follow-up), or goes now when nothing is due back. W9 (P2-I11): the same transaction
- * queues the acknowledgement of receipt (Directive 2011/83/EU art. 11(3)) for every withdrawal it records: M8_RECEIVED
- * ("we received your withdrawal on …; we're refunding {amount}", or the owner's check), or, when nothing is due back,
- * M8 itself, which then says everything at once.
+ * Records a withdrawal. The decision and every record commit together — WITHDRAWN, the FREE entitlement and the
+ * refund intents (RefundDesk: REFUND_REQUESTED and one PAYMENT_REFUND job per payment, split newest first) — and only
+ * then does money move, through the outbox this function kicks; M8 ("we refunded …") follows the last refund
+ * (RefundDesk's WITHDRAWAL follow-up). The same transaction queues the acknowledgement on a durable medium (OUG
+ * 34/2014 art. 11^1(7); Directive 2011/83/EU art. 11(3)) for every withdrawal it records, M8_RECEIVED: the statement's
+ * date and time in the buyer's own zone with the offset named, the plan and the day it started, the buyer's name (read
+ * when the email is sent, never queued), then the refund on its way, nothing due back (it is then the only email), or
+ * the owner's check.
  *
- * The refund (owner's decision of 16 November 2026, one rule for every country the site serves): what the payments
- * made up to `withdrewAt` still hold, added up, times the share of the plan credit not used, floored to cents once
- * (`withdrawalRefundMicros`). The days gone by do not count: nothing used gives the whole price back, and the whole
- * credit used gives nothing back. The credit is the one in force at `withdrewAt` (A6's override after an upgrade) and
- * the credit used is what was spent from the period start to it ("withdrawal after an upgrade: the paid total is the
- * sum of all successful charges since the first activation"); both are read before the lock, so a plan or period that
- * changed meanwhile is refused and nothing is written. The credit used counts calls by when they were sent (NV-45).
- * NV-45: while more than a day of the window is left and the statement is under an hour old, it waits for
- * the person's debates that may still be using credit (`WITHDRAWAL_DEBATE_RUNNING`, before the lock: nothing is
- * written and the grant is not spent). C1 (P2-W6): a payment whose SUCCEEDED is after `withdrewAt` (an
- * upgrade paid after the emailed statement arrived, before the owner ran the command) takes no share: it goes back
- * whole, what it still holds, on top of that amount. The refund is still split newest first, so such a payment is the
- * first to go back.
+ * The refund, one rule for every country the site serves: what the payments made up to `withdrewAt` still hold, added
+ * up, times the share of the plan credit not used, floored to cents once (`withdrawalRefundMicros`). The days gone by
+ * do not count: nothing used gives the whole price back, and the whole credit used gives nothing back. The credit is
+ * the one in force at `withdrewAt`: the upgrade's override after an upgrade; else the plan's credit as the month
+ * started with it, or a higher one an upload brought before `withdrewAt`, never the credit of a settings version that
+ * went live after it (`monthCreditInForce`). The credit used is what was spent
+ * from the period start to it, so after an upgrade the paid total is every successful charge since the first
+ * activation; both are read before the lock, so a plan or period that changed meanwhile is refused and nothing is
+ * written. The credit used counts calls by when they were sent, and only those charged by the time it is read. A
+ * debate still running never holds a withdrawal up: once the person confirms, the law counts the statement as made
+ * (OUG 34/2014 art. 11^1(7)-(8)), so it is recorded at once and settled with what has been charged; a call sent before
+ * it and charged later is not counted, in the person's favour, and calls sent after it were never theirs to pay. A
+ * payment whose SUCCEEDED is after `withdrewAt` (an upgrade paid after the emailed statement arrived, before the owner
+ * ran the command) takes no share: it goes back whole, what it still holds, on top of that amount. The refund is still
+ * split newest first, so such a payment is the first to go back.
  *
- * D6a F20(c): when a refund made in NETOPIA's admin touched any paid payment (`providerRefunded`, whose
- * refunded amount is only an upper bound), or when a transaction already holds a refund request
- * (`REFUND_TRANSACTION_ALREADY_REFUNDED`), the refund due cannot be taken from our rows: the withdrawal is recorded
- * (the plan ends now) with `refund_by_owner`, and no intent and no M8 are written. The owner settles it with
- * `pnpm billing:withdraw --owner <ref> --refund <amount> --dashboard <amount>` (P14c); P16b's summary lists it until
- * then. W9 (P2-I11): the owner is emailed at once (O2_WITHDRAWAL, reason WITHDRAWAL_BY_OWNER, with the refund's 14-day
- * deadline counted from `withdrewAt`), in the same transaction, so the deadline never waits for the quarterly O1.
+ * When a refund made in NETOPIA's admin touched any paid payment (`providerRefunded`, whose refunded amount is only an
+ * upper bound), or when a transaction already holds a refund request (`REFUND_TRANSACTION_ALREADY_REFUNDED`), the
+ * refund due cannot be taken from our rows: the withdrawal is recorded (the plan ends now) with `refund_by_owner`, and
+ * no intent and no M8 are written. The owner settles it with `pnpm billing:withdraw --owner <ref> --refund <amount>
+ * --dashboard <amount>`; the owner summary lists it until then. The owner is also emailed at once (O2_WITHDRAWAL,
+ * reason WITHDRAWAL_BY_OWNER, with the refund's 14-day deadline counted from `withdrewAt`), in the same transaction, so
+ * the deadline never waits for the quarterly O1.
  */
 export async function recordWithdrawal(deps: WithdrawalDeps, request: WithdrawalRequest): Promise<WithdrawalOutcome> {
   const now = deps.clock();
@@ -114,18 +103,18 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
   if (closesAt === null) {
     refuse(409, "WITHDRAWAL_WINDOW_CLOSED");
   }
-  // NV-45: the credit used is read by when each call was SENT. While the window has more than a day left and the
-  // statement is fresh, a debate that may still be using credit makes the person try again later; otherwise the
-  // withdrawal is recorded at once with what has been charged (never turned away for lack of time).
-  const { spentMicros, liveRuns } = await deps.ownerSpend.readWithdrawalSpend(ownerRef, before.currentPeriodStart, withdrewAt);
-  const mayWait = closesAt.getTime() - withdrewAt.getTime() > WITHDRAWAL_WAIT_MARGIN_MS
-    && now.getTime() - withdrewAt.getTime() < WITHDRAWAL_WAIT_STATEMENT_AGE_MS;
-  if (liveRuns > 0 && mayWait) refuse(409, "WITHDRAWAL_DEBATE_RUNNING");
+  // The credit used is read by when each call was SENT, as charged by now; a running debate does not hold it up.
+  const { spentMicros } = await deps.ownerSpend.readWithdrawalSpend(ownerRef, before.currentPeriodStart, withdrewAt);
   const entitlement = await deps.entitlements.current(ownerRef, withdrewAt);
   // The plan whose credit was in force when the person withdrew (an upgrade since then is not theirs to pay back).
   const creditPlanId = entitlement.planId === "FREE" ? before.planId : entitlement.planId;
   const periodStart = before.currentPeriodStart;
   const activatedAt = before.activatedAt;
+  // The plan's credit for this month: the one the month started with, or a higher one an upload brought since, up to
+  // the day the person withdrew. A credit lowered or raised after that day changes nothing here.
+  const planCreditMicros = monthCreditInForce(
+    deps.plansInForce === undefined ? [deps.plans] : await deps.plansInForce.between(periodStart, withdrewAt), creditPlanId
+  );
   const decided = await deps.billing.withTransaction(async (client) => {
     const locked = await lockedSubscription(deps, client, ownerRef);
     if (locked === null || locked.state.subscriptionId !== before.subscriptionId || locked.state.status !== "ACTIVE"
@@ -133,6 +122,11 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       || locked.state.planId !== before.planId || locked.state.currentPeriodStart?.getTime() !== periodStart.getTime()) {
       refuse(409, "NOT_SUBSCRIBED");
     }
+    // The credit used above is found through the account's usage rows, and those stop naming the account in the
+    // transaction that erases it (0177): read after that, it is zero and the whole price would go back. The plan ends
+    // with the erasure; the stop sweep only writes that down a few minutes later (W7), so the answer here is already
+    // the one given after it. Asked after the credit was read: an account still there now was there for that read.
+    if (await deps.billing.ownerErasureCommitted(ownerRef, client)) refuse(409, "NOT_SUBSCRIBED");
     await request.authorize(client);
     const { state } = locked;
     const charges: Array<ChargeRow & { events: ChargeEventRow[] }> = [];
@@ -148,7 +142,7 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
     const madeAfter = paid.filter((row) => row.succeededAt.getTime() > withdrewAt.getTime());
     const refundMicros = withdrawalRefundMicros({
       paidMicros: stillHeld(statedOver), creditSpentMicros: spentMicros,
-      monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planById(deps.plans, creditPlanId).monthlyCreditMicros
+      monthlyCreditMicros: entitlement.monthCreditOverrideMicros ?? planCreditMicros
     }) + stillHeld(madeAfter);
     let byOwner = paid.some((row) => row.providerRefunded);
     let allocations: RefundAllocation[] = [];
@@ -175,30 +169,30 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
       ownerRef, planId: "FREE", periodAnchorAt: now, cause: "ENDED_WITHDRAWAL", effectiveAt: now,
       subscriptionId: state.subscriptionId, paidThrough: null, monthCreditOverrideMicros: null
     });
-    // Nothing to refund: nothing will move, so M8 goes now, and it is the acknowledgement too. Otherwise the person is
-    // told at once only what has happened (W9, M8_RECEIVED: the refund on its way, or the owner's check), and
-    // RefundDesk queues M8 after the last refund; a withdrawal handed to the owner gets its M8 when the owner settles
-    // it (P14c).
+    // The person is told at once what has happened (M8_RECEIVED). RefundDesk queues M8 after the last refund; with
+    // nothing due back no refund moves, so the acknowledgement is the only email; a withdrawal handed to the owner gets
+    // its M8 when the owner settles it with the command.
     const customer = await deps.billing.customerByOwner(ownerRef, client);
     const withdrawalDate = withdrewAt.toISOString();
     if (customer !== null) {
-      const recipient = { kind: "CUSTOMER", customerId: customer.customerId } as const;
       // S01-C13 (R-17): the withdraw request's language, when the request carries one.
       const language = request.mailLocale === undefined ? {} : { locale: request.mailLocale };
-      await enqueueEmail(deps.billing, client, !byOwner && allocations.length === 0
-        ? {
-          template: "M8", recipient, dedupeRef: state.subscriptionId,
-          params: { plan: state.planId, refundAmount: microsToDecimal(refundMicros), currency: state.currency }, notBefore: now,
-          ...language
-        }
-        : {
-          template: "M8_RECEIVED", recipient, dedupeRef: state.subscriptionId,
-          params: byOwner
-            ? { plan: state.planId, withdrawalDate }
-            : { plan: state.planId, withdrawalDate, refundAmount: microsToDecimal(refundMicros), currency: state.currency },
-          notBefore: now,
-          ...language
-        });
+      // The statement as the buyer made it: its instant in their own zone (UTC where their country has several), and
+      // the day the plan started in their own calendar.
+      const statement = {
+        plan: state.planId, withdrawalDate, timeZone: consumerTimeZone(taxCountry),
+        ...(taxCountry === null ? {} : { startDate: consumerCalendarDay(activatedAt, taxCountry) })
+      };
+      await enqueueEmail(deps.billing, client, {
+        template: "M8_RECEIVED", recipient: { kind: "CUSTOMER", customerId: customer.customerId },
+        dedupeRef: state.subscriptionId,
+        // "0.00" when nothing is due back; no amount when the owner settles the refund.
+        params: byOwner
+          ? statement
+          : { ...statement, refundAmount: microsToDecimal(refundMicros), currency: state.currency },
+        notBefore: now, resolve: { buyerName: true },
+        ...language
+      });
     }
     if (byOwner) {
       // W9 (P2-I11): the owner's own alert, never left to the quarterly O1 (English only, no customer data).
@@ -223,8 +217,8 @@ export async function recordWithdrawal(deps: WithdrawalDeps, request: Withdrawal
 
 /**
  * The Settings route: now, for the signed-in session alone. OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a,
- * recital 37; owner ruling 2026-11-04): a person already signed in withdraws without identifying again, so no
- * password, authenticator code or step-up grant is asked; the page's "Confirmați retragerea" is the confirmation.
+ * recital 37): a person already signed in withdraws without identifying again, so no password, authenticator code or
+ * step-up grant is asked; the page's "Confirmați retragerea" is the confirmation.
  */
 export async function withdraw(deps: WithdrawalDeps, input: Readonly<{
   authenticated: AuthenticatedSession; mailLocale?: string;

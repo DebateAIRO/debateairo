@@ -6,6 +6,7 @@ import { contractClient } from "@/lib/api";
 import { formatLongDate, formatMoney, planName } from "@/lib/billing/format";
 import type { PaidPlanId } from "@/lib/billing/plans";
 import { catalogLocale, type LocaleCode } from "@/lib/i18n/locales";
+import { COMPANY } from "@/lib/legal/pages";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 import { ChargeStatusPoller } from "./ChargeStatusPoller";
@@ -13,7 +14,7 @@ import { ChargeStatusPoller } from "./ChargeStatusPoller";
 export type SubscriptionClient = Pick<ContractClient,
   | "getBillingSubscription" | "getBillingInvoices" | "quoteSubscriptionUpgrade" | "upgradeSubscription"
   | "downgradeSubscription" | "cancelSubscription" | "revokeSubscriptionCancel" | "withdrawSubscription"
-  | "getBillingCharge" | "getBillingPlans"
+  | "getBillingCharge" | "getBillingPlans" | "getBillingCardDetails" | "readAccountEmail"
 >;
 type Subscription = NonNullable<Awaited<ReturnType<ContractClient["getBillingSubscription"]>>["subscription"]>;
 type Invoice = Awaited<ReturnType<ContractClient["getBillingInvoices"]>>["invoices"][number];
@@ -61,7 +62,7 @@ const UPGRADE_REFUSALS: Readonly<Record<string, FailureWords>> = Object.freeze({
   ADMISSION_RATE_LIMITED: RATE_LIMITED,
   UPGRADE_PENDING: Object.freeze({ key: "billing.subscription.upgradeInProgress", reload: true }),
   PAYMENT_PROVIDER_UNAVAILABLE: Object.freeze({ key: "billing.checkout.formUnavailable", reload: false }),
-  // The stored billing address is in a region the Terms exclude (Tennessee): the quote refuses before any money moves.
+  // The stored billing address is in a region the Terms exclude (Tennessee, Mississippi): the quote refuses before any money moves.
   REGION_TERMS_EXCLUDED: Object.freeze({ key: "billing.checkout.regionTermsExcluded", reload: false })
 });
 
@@ -91,6 +92,8 @@ function quoteFailureWords(failure: unknown): FailureWords {
  * P12's DOWNGRADE_NOT_LOWER: the plan changed elsewhere, so say so and show the plan the server has now.
  * DOWNGRADE_NOT_AVAILABLE_NOW: the renewal charge is already written at the current plan, so nothing was scheduled;
  * the plan is unchanged, so the card is not read again.
+ * DOWNGRADE_PRICE_CHANGED: the lower plan no longer costs what the confirmation showed, so nothing was scheduled; the
+ * card is read again, and choosing the plan again shows its price now.
  */
 function downgradeFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
@@ -98,6 +101,9 @@ function downgradeFailureWords(failure: unknown): FailureWords {
   if (code === "ADMISSION_RATE_LIMITED") return RATE_LIMITED;
   if (code === "DOWNGRADE_NOT_AVAILABLE_NOW") {
     return Object.freeze({ key: "billing.subscription.downgradeNotAvailableNow", reload: false });
+  }
+  if (code === "DOWNGRADE_PRICE_CHANGED") {
+    return Object.freeze({ key: "billing.subscription.downgradePriceChanged", reload: true });
   }
   return code === "DOWNGRADE_NOT_LOWER"
     ? Object.freeze({ key: "billing.subscription.downgradeNotLower", reload: true })
@@ -118,6 +124,28 @@ function revokeFailureWords(failure: unknown): FailureWords {
 /** Ruling Q-7: the confirm needs the lower plan's price; without the plans list it offers no confirm at all. */
 const PLANS_UNAVAILABLE: FailureWords = Object.freeze({ key: "billing.pricing.unavailable", reload: false });
 
+/**
+ * What the withdrawal statement shows the buyer to confirm (OUG 34/2014 art. 11^1(4)): the payer's name on the billing
+ * details, and the account's address, where the acknowledgement goes. Each is null until read, and stays null when its
+ * read fails: the statement then reads without the name, and says the confirmation goes to the account's address.
+ */
+type StatementFacts = Readonly<{ name: string | null; email: string | null }>;
+const NO_FACTS: StatementFacts = Object.freeze({ name: null, email: null });
+
+async function readStatementFacts(client: SubscriptionClient): Promise<StatementFacts> {
+  // Each read is started inside its own promise, so a client that throws at once fails only its own fact.
+  const [card, account] = await Promise.allSettled([
+    Promise.resolve().then(() => client.getBillingCardDetails()),
+    Promise.resolve().then(() => client.readAccountEmail())
+  ]);
+  const parts = card.status === "fulfilled" ? [card.value.first_name, card.value.last_name] : [];
+  const name = parts.filter((part): part is string => part !== null && part.trim() !== "").join(" ").trim();
+  return Object.freeze({
+    name: name === "" ? null : name,
+    email: account.status === "fulfilled" ? account.value.email : null
+  });
+}
+
 class PlanPriceUnavailable extends Error {
   constructor() {
     super("DOWNGRADE_PRICE_UNAVAILABLE");
@@ -137,8 +165,6 @@ function withdrawDoneText(catalog: MessageCatalog, locale: LocaleCode, refund: s
 function withdrawFailureWords(failure: unknown): FailureWords {
   const code = refusalOf(failure);
   if (code === "WITHDRAWAL_WINDOW_CLOSED") return Object.freeze({ key: "billing.subscription.withdrawWindowClosed", reload: true });
-  // NV-45 (409): a debate may still be using credit and more than a day of the window is left; nothing was written.
-  if (code === "WITHDRAWAL_DEBATE_RUNNING") return Object.freeze({ key: "billing.subscription.withdrawDebateRunning", reload: false });
   // A timeout after P12d queued the refund: the refund may be under way, so say so and read the state again.
   if (outcomeUnknown(failure)) return STILL_CONFIRMING;
   // Any other answer (NOT_SUBSCRIBED: withdrawn or ended meanwhile): read the state again, blame nobody.
@@ -151,6 +177,7 @@ export function SubscriptionControls({
   client = contractClient,
   now = () => new Date(),
   renewalConsent = null,
+  testMode = false,
   goToPayment = (url: string): void => { window.location.assign(url); }
 }: Readonly<{
   catalog?: MessageCatalog;
@@ -159,6 +186,8 @@ export function SubscriptionControls({
   now?: () => Date;
   /** Spec §2.18: the card-saving sentence's manifest pair in this locale; null: the upgrade offers no payment. */
   renewalConsent?: Readonly<{ version: string; sha256: string }> | null;
+  /** Card payments run on the payment sandbox: the upgrade shows the test-mode note before the payment page, as the checkout does. */
+  testMode?: boolean;
   /** Spec §2.10: NETOPIA's page for the upgrade is reached by a top-level navigation. */
   goToPayment?: (url: string) => void;
 }>) {
@@ -175,6 +204,7 @@ export function SubscriptionControls({
     planId: DowngradeTarget; netPrice: string; currency: BillingCurrency;
   }> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [statementFacts, setStatementFacts] = useState<StatementFacts>(NO_FACTS);
   // `linksHome`: W10 (P2-M20) the updated-Terms sentence is a plain link to the signed-in home page, whose accept
   // screen L4 shows (a full page load, never a client-side move). Every other sentence is plain text.
   const [message, setMessageState] = useState<Readonly<{ text: string; linksHome: boolean }> | null>(null);
@@ -240,9 +270,12 @@ export function SubscriptionControls({
   if (loaded !== "READY") return null;
   const live = subscription !== null && LIVE_STATUSES.has(subscription.status) ? subscription : null;
   const date = (iso: string | null): string => (iso === null ? "" : formatLongDate(locale, iso));
-  // The button follows the closing instant; the sentence names the last day in the person's calendar (P12b).
-  const withdrawOpen = live !== null && live.status === "ACTIVE" && live.withdrawal_open_until !== null
-    && live.withdrawal_last_day !== null && new Date(live.withdrawal_open_until).getTime() > now().getTime();
+  // The button follows the closing instant; the sentence names the last day in the person's calendar. A plan paused by
+  // a payment dispute keeps the link for the whole window: its panel gives the e-mail route, because the server
+  // records a withdrawal only for an ACTIVE plan.
+  const withdrawOpen = live !== null && (live.status === "ACTIVE" || live.status === "SUSPENDED")
+    && live.withdrawal_open_until !== null && live.withdrawal_last_day !== null
+    && new Date(live.withdrawal_open_until).getTime() > now().getTime();
   const currentRank = live === null ? -1 : rankOf(live.plan_id);
   const nextRenewal = live === null ? null : live.renews_on ?? live.current_period_end;
   const nowMs = now().getTime();
@@ -259,10 +292,19 @@ export function SubscriptionControls({
   const nextRenewalText = nextRenewal === null ? "" : Date.parse(nextRenewal) <= nowMs ? today : date(nextRenewal);
 
   /**
-   * OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a, recital 37; owner ruling 2026-11-04): the button opens the
-   * statement and "Confirmați retragerea" sends it. A signed-in person, social sign-in included, is not asked to
-   * identify again: no password and no authenticator code.
+   * OUG 34/2014 art. 11^1 (Directive 2023/2673 art. 11a, recital 37): the button opens the statement and "Confirmați
+   * retragerea" sends it. A signed-in person, social sign-in included, is not asked to identify again: no password and
+   * no authenticator code.
    */
+  function openWithdrawal(): void {
+    setPanel("WITHDRAW");
+    // A paused plan's panel gives the e-mail route and sends no statement, so it reads nothing.
+    if (paused) return;
+    // The statement's facts are read when it opens; the Confirm button never waits for them.
+    setStatementFacts(NO_FACTS);
+    void readStatementFacts(client).then(setStatementFacts);
+  }
+
   function withdraw(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     void run(async () => {
@@ -292,10 +334,12 @@ export function SubscriptionControls({
     }, (failure) => (failure instanceof PlanPriceUnavailable ? PLANS_UNAVAILABLE : ACTION_FAILED));
   }
 
-  function confirmDowngrade(planId: DowngradeTarget): void {
+  /** Sends the price the confirmation showed with the choice: the server schedules the downgrade only at that price. */
+  function confirmDowngrade(shown: Readonly<{ planId: DowngradeTarget; netPrice: string; currency: BillingCurrency }>): void {
+    const { planId } = shown;
     setDowngrade(null);
     void run(async () => {
-      await client.downgradeSubscription(planId);
+      await client.downgradeSubscription(planId, { netPrice: shown.netPrice, currency: shown.currency });
       setPanel("NONE");
       // A7: the lower plan's total is now the announced one (renewal_total), so the sentence names it.
       const fresh = await reload();
@@ -388,12 +432,14 @@ export function SubscriptionControls({
           ) : null}
           {downgrade !== null ? (
             <div className="subPanel">
-              {/* Ruling Q-7: the lower plan's net price from GET /v1/billing/plans, "+ tax", from the renewal date. */}
+              {/* Ruling Q-7: the lower plan's price from GET /v1/billing/plans, from the renewal date. That answer prices
+                  tax only for the visitor's connection, not for the subscription's billing address, so the sentence
+                  calls this figure the price before tax; the total with tax (renewal_total) shows once it is scheduled. */}
               <p className="setCardNote">{t(catalog, "billing.subscription.downgradeConfirm", {
                 plan: planName(catalog, downgrade.planId), price: formatMoney(locale, downgrade.netPrice, downgrade.currency), date: nextRenewalText
               })}</p>
               <div className="setCardRow">
-                <button type="button" className="setBtn" disabled={busy} onClick={() => confirmDowngrade(downgrade.planId)}>
+                <button type="button" className="setBtn" disabled={busy} onClick={() => confirmDowngrade(downgrade)}>
                   {t(catalog, "billing.subscription.downgradeYes", { plan: planName(catalog, downgrade.planId) })}
                 </button>
                 <button type="button" className="setBtn" onClick={() => { setDowngrade(null); setPanel("NONE"); }}>
@@ -416,6 +462,7 @@ export function SubscriptionControls({
                   onChange={(event) => setUpgradeAgreed(event.target.checked)} />
                 <span>{t(catalog, "billing.consent.renewal", { total: formatMoney(locale, upgrade.quote.recurring_total, upgrade.quote.currency) })}</span>
               </label>
+              {testMode ? <p className="billingNote" role="note">{t(catalog, "billing.testMode.notice")}</p> : null}
               <div className="setCardRow">
                 <button type="button" className="setBtn subBtnPrimary" disabled={busy || !upgradeAgreed || renewalConsent === null}
                   onClick={() => { void run(async () => {
@@ -477,17 +524,44 @@ export function SubscriptionControls({
               </div>
             </div>
           ) : null}
-          {/* Design Document v2 (19c): the withdrawal is its own block above a rule: the link, then until when and what
-              comes back. The confirmation opens under them. */}
+          {/* The withdrawal is its own block above a rule: the link, then until when and what comes back. The
+              confirmation opens under them; for a plan paused by a dispute, the e-mail route opens there instead. */}
           {withdrawOpen || panel === "WITHDRAW" ? (
             <div className="subBlock" data-subscription-withdraw>
               {withdrawOpen ? (
-                <button type="button" className="subLink" disabled={busy} onClick={() => setPanel("WITHDRAW")}>
+                <button type="button" className="subLink" disabled={busy} onClick={openWithdrawal}>
                   {t(catalog, "billing.subscription.withdraw")}
                 </button>
               ) : null}
               <p className="subHint">{t(catalog, "billing.subscription.withdrawHint", { date: date(live.withdrawal_last_day) })}</p>
-              {panel === "WITHDRAW" ? (
+              {panel === "WITHDRAW" && paused ? (
+                <>
+                  <p className="setCardNote" data-withdraw-while-paused>
+                    {t(catalog, "billing.subscription.withdrawWhilePaused", { email: COMPANY.emails.general })}
+                  </p>
+                  {/* The model form the sentence names is printed on /withdraw. */}
+                  <a className="subHint" href="/withdraw">{t(catalog, "billing.checkout.withdrawalLink")}</a>
+                </>
+              ) : null}
+              {panel === "WITHDRAW" && !paused ? (
+                <div className="subStatement" data-withdraw-statement>
+                  <h3 className="setCardTitle">{t(catalog, "billing.subscription.withdrawStatementTitle")}</h3>
+                  <p className="setStatus">{t(catalog, "billing.subscription.withdrawStatementText")}</p>
+                  {statementFacts.name !== null
+                    ? <p className="setStatus">{t(catalog, "billing.subscription.withdrawStatementName", { name: statementFacts.name })}</p>
+                    : null}
+                  <p className="setStatus">{live.started_on === null
+                    ? t(catalog, "billing.subscription.plan", { plan: planName(catalog, live.plan_id) })
+                    : t(catalog, "billing.subscription.withdrawStatementContract", {
+                      plan: planName(catalog, live.plan_id), date: date(live.started_on)
+                    })}</p>
+                  <p className="setStatus">{statementFacts.email !== null
+                    ? t(catalog, "billing.subscription.withdrawStatementEmail", { email: statementFacts.email })
+                    : t(catalog, "billing.subscription.withdrawStatementEmailAccount")}</p>
+                  <p className="subHint">{t(catalog, "billing.subscription.withdrawStatementChangeEmail")}</p>
+                </div>
+              ) : null}
+              {panel === "WITHDRAW" && !paused ? (
                 <form onSubmit={withdraw}>
                   <div className="setCardRow">
                     <button type="submit" className="setBtn" disabled={busy}>{t(catalog, "billing.subscription.withdrawConfirm")}</button>

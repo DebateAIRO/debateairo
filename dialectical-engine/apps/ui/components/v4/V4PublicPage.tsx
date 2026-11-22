@@ -51,7 +51,7 @@ const FOLD_QUERY = "(max-width: 1439px)";
 
 type V4PublicPageProps = Readonly<{
   debate: PublicDebate;
-  /** The V4 catalogue (English, owner N10). */
+  /** The reader's V4 catalogue (Romanian has its own; every other language reads English). */
   catalog: MessageCatalog;
   /** The interface's `public` catalogue (what the strongest point on each side is read with; none of its words reach the page). */
   publicCatalog: MessageCatalog;

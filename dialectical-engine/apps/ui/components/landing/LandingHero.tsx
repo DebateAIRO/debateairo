@@ -1,5 +1,6 @@
 import type { JSX } from "react";
 import { AiNotice } from "../AiNotice";
+import { BetaNote } from "../BetaNotice";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
 export function LandingHero({ catalog }: { catalog: MessageCatalog }): JSX.Element {
@@ -29,13 +30,12 @@ export function LandingHero({ catalog }: { catalog: MessageCatalog }): JSX.Eleme
             →
           </span>
         </a>
-        <a className="lpCtaGhost" href="#transcripts">
-          {t(catalog, "home.readTranscript")}
-        </a>
       </div>
       <div className="lpAiDisclosure">
         <AiNotice catalog={catalog} variant="pill" body={<><strong>{t(catalog, "home.aiGeneratedLead")}</strong> {t(catalog, "home.aiGeneratedHero")}</>} />
       </div>
+      {/* A visitor learns before signing up that the site is in Beta, and where to write about a problem. */}
+      <BetaNote className="lpBetaNote" />
       <ul aria-label={t(catalog, "home.practiceFacts")} className="lpStatBar">
         <li>{t(catalog, "home.fourTurns")}</li>
         <li aria-hidden="true" className="lpStatRule" />

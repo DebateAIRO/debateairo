@@ -66,7 +66,7 @@ test("every public and protected entry point reaches the dedicated auth routes",
   // L4: the settings page is never covered by the accept screen.
   // B10c: the page also serves the billing catalogue, for the usage bars.
   // N19 (spec 2026-10-05 §2.18): and the card-saving sentence's manifest pair, for the upgrade's agreement.
-  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\}\s+renewalConsent=\{currentDocument\("CONSENT_RENEWAL", locale\)\} \/>/);
+  assert.match(settingsPage, /<SettingsPageClient catalog=\{catalog\} locale=\{locale\} newDebateCatalog=\{newDebateCatalog\} billingCatalog=\{billingCatalog\}\s+renewalConsent=\{currentDocument\("CONSENT_RENEWAL", locale\)\} testMode=\{billing\.testMode\} \/>/);
   assert.match(settingsClient, /<AuthGate catalog=\{newDebateCatalog\} legalGate=\{false\}>/);
   assert.match(home, /href="\/login"/);
   assert.match(home, /href="\/sign-up"/);

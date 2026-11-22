@@ -10,6 +10,7 @@ import { LegalDocumentsProvider } from "@/components/consent/LegalDocumentsProvi
 import { SupportConversationGuard } from "@/components/support/SupportConversationGuard";
 import { ConsentCatalogProvider } from "@/components/consent/useConsentCatalog";
 import { cookies } from "next/headers";
+import { lineFooterBilling } from "@/lib/billing/footerBilling";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { getLocale, isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
@@ -37,9 +38,14 @@ import { SkipLink } from "@/components/SkipLink";
  * it (display: swap). It is its own loader so it can skip the preload: next/font keeps the family's real name in its
  * @font-face rules (it hashes only class names), so the italic rules join the same "Instrument Sans" family the variable
  * names, and italic text keeps its true italic. Bricolage Grotesque has no italic.
+ *
+ * The two preloaded faces preload their Latin Extended part too: Romanian's ă, ș and ț are there, not in the basic Latin
+ * part, so a Romanian page would otherwise draw them late, in the fallback face, on a first visit. next/font serves every
+ * part either way (`subsets` only chooses which files are preloaded), so the italic face, which preloads nothing, is left as
+ * it is.
  */
 const display = Bricolage_Grotesque({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   axes: ["opsz"],
   style: ["normal"],
   variable: "--font-bricolage",
@@ -47,7 +53,7 @@ const display = Bricolage_Grotesque({
 });
 
 const sans = Instrument_Sans({
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"],
   style: ["normal"],
   variable: "--font-instrument",
   display: "swap"
@@ -79,6 +85,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const locale = await requestLocale();
   const localeDefinition = getLocale(locale);
+  // Started first, so the one-line footer's plans read (at most one a minute) runs beside the catalogue loads.
+  const lineBilling = lineFooterBilling();
   const [chrome, debateViews, support, home, consentNamespace, legalNamespace, privacy, terms, auth] = await Promise.all([
     loadNamespace(locale, "chrome"),
     loadNamespace(locale, "debateViews"),
@@ -143,7 +151,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <AuthCatalogProvider catalog={auth}>{children}</AuthCatalogProvider>
                 </main>
                 <CookieConsent />
-                <SiteFooter variant="line" />
+                <SiteFooter variant="line" billing={await lineBilling} />
                 <SupportConversationGuard />
                 <DocumentTitle brand="Dialectical Engine" />
                 {/* Keyboard audit, 12 Nov: a control switched off or removed under focus never drops focus to the page. */}

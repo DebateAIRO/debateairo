@@ -24,8 +24,8 @@ import { TEST_DEVELOPMENT_PROVIDER_PANEL } from "../support/developmentProviderP
  * WITHOUT the row answers exactly as before (20 samples, the maximum while short).
  */
 
-/** The preview's run maximum: per-run $3.00 × 1.2 plus story $0.05 × 1.2. */
-const PREVIEW_MAXIMUM = 3_660_000;
+/** A made-up run maximum, above every starting figure and every sample here; the tests use it only by name. */
+const PREVIEW_MAXIMUM = 4_400_000;
 const PRICE: ProviderTargetPrice = Object.freeze({ inputMicrosPerMillionTokens: 100_000, outputMicrosPerMillionTokens: 0 });
 const PRICES = new Map<string, ProviderTargetPrice>([["provider:cheap", PRICE]]);
 const POLICY = costEstimateStartPolicyFromValue(

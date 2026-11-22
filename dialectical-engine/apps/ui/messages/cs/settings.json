@@ -83,6 +83,7 @@
   "settings.sessions.current": "Aktuální relace",
   "settings.sessions.other": "Jiná relace",
   "settings.sessions.lastSeen": "Naposledy aktivní {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Odvolat relaci {sessionId}",
   "settings.sessions.revoke": "Odvolat",
   "settings.sessions.revokeAll": "Odvolat všechny relace",

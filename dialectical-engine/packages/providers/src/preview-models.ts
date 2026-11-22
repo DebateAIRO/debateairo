@@ -12,7 +12,8 @@
  * Multi-model preview, PR B: the rows are kept per provider (`PREVIEW_MODEL_ROWS_BY_PROVIDER`), one
  * root gate per provider; each provider's rows have their own parity file
  * (tests/unit/fixtures/preview-model-rows.json for DeepInfra, preview-model-rows-anthropic.json for
- * Anthropic). A later provider is one more key there and one more parity file.
+ * Anthropic, preview-model-rows-bedrock.json for Amazon Bedrock). A later provider is one more key there and one more
+ * parity file.
  *
  * Reviewed sampling (2026-10-12): a DeepInfra row may carry its own `sampling` settings, which every request for that
  * row sends and both the app's guarded fetch and the gate require exactly. Qwen and (since the owner's approval of
@@ -21,7 +22,7 @@
  * No imports on purpose: index.ts, preview-test.ts and provider-probe.ts all read these rows.
  */
 /** The providers the preview has a reviewed root gate for. */
-export type PreviewProviderName = "deepinfra" | "anthropic";
+export type PreviewProviderName = "deepinfra" | "anthropic" | "bedrock";
 
 /**
  * The sampling members a reviewed row may set, in the order a request body carries them (the gate's
@@ -156,6 +157,14 @@ export const PREVIEW_ANTHROPIC_COUNT_TOKENS_URL = "https://api.anthropic.com/v1/
 /** Claude Haiku 5.5's window (1M tokens). */
 export const PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS = 1_000_000 as const;
 /**
+ * Amazon Bedrock's OpenAI-compatible connection in the Region us-east-1 (the adapter adds `/chat/completions`). The one
+ * reviewed row is called through the United States inference profile, which this Region serves.
+ */
+export const PREVIEW_BEDROCK_BASE_URL = "https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1" as const;
+export const PREVIEW_BEDROCK_CHAT_COMPLETIONS_URL = "https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1/chat/completions" as const;
+/** GPT-6 Luna's window, as Amazon's model card gives it. */
+export const PREVIEW_BEDROCK_CONTEXT_WINDOW_TOKENS = 1_050_000 as const;
+/**
  * A STANDARD call's request body cap (contract A §2). Owner ruling 2026-10-10 (evening): a HARD cap of 256 KiB,
  * because a story request at the "high" story size reaches about 236 KiB (the largest ordinary request seen was about
  * 51 KB). LG-B (L29): every call but the four final writers keeps it (the gateway refuses a larger body before anything
@@ -173,9 +182,9 @@ export const PREVIEW_REQUEST_BODY_MAX_BYTES = 256 * 1024;
 export type PreviewCallTier = "STANDARD" | "FINAL_WRITER";
 export const PREVIEW_CALL_TIER_LIMITS = Object.freeze({
   STANDARD: Object.freeze({ requestBodyMaxBytes: PREVIEW_REQUEST_BODY_MAX_BYTES,
-    perCallCapUsd: Object.freeze({ deepinfra: "0.25", anthropic: "0.25" }) }),
+    perCallCapUsd: Object.freeze({ deepinfra: "0.25", anthropic: "0.25", bedrock: "0.25" }) }),
   FINAL_WRITER: Object.freeze({ requestBodyMaxBytes: 1024 * 1024,
-    perCallCapUsd: Object.freeze({ deepinfra: "0.75", anthropic: "1.00" }) })
+    perCallCapUsd: Object.freeze({ deepinfra: "0.75", anthropic: "1.00", bedrock: "0.75" }) })
 });
 /**
  * Owner ruling 2026-10-10: every reviewed row's STANDARD answer cap (`outputBound`: a standard call's max_tokens ceiling
@@ -206,7 +215,9 @@ const PROVIDER_CONNECTIONS = Object.freeze({
   deepinfra: Object.freeze({ provider: "deepinfra", baseUrl: PREVIEW_DEEPINFRA_BASE_URL,
     adapterKind: "openai-compatible-http", contextWindowTokens: PREVIEW_CONTEXT_WINDOW_TOKENS }),
   anthropic: Object.freeze({ provider: "anthropic", baseUrl: PREVIEW_ANTHROPIC_BASE_URL,
-    adapterKind: "anthropic-messages-http", contextWindowTokens: PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS })
+    adapterKind: "anthropic-messages-http", contextWindowTokens: PREVIEW_ANTHROPIC_CONTEXT_WINDOW_TOKENS }),
+  bedrock: Object.freeze({ provider: "bedrock", baseUrl: PREVIEW_BEDROCK_BASE_URL,
+    adapterKind: "openai-compatible-http", contextWindowTokens: PREVIEW_BEDROCK_CONTEXT_WINDOW_TOKENS })
 } as const);
 function row(provider: PreviewProviderName, input: RowInput): PreviewModelRow {
   // USD per million with two or three decimals ("0.15", "0.113") is a whole nano-USD per token.
@@ -338,6 +349,21 @@ export const PREVIEW_MODEL_ROWS_BY_PROVIDER: Readonly<Record<PreviewProviderName
       effortsByStrength: ["high", "medium", "low"], jsonObject: false,
       cacheWriteInputUsdPerM: "0.125",
       upperStep: { aboveChargedInputTokens: 100_000, inputUsdPerM: "0.50", outputUsdPerM: "2.50", cacheWriteInputUsdPerM: "0.625" } })
+  ]),
+  // Amazon Bedrock, OpenAI's GPT-6 Luna through the United States inference profile (the id's `us.` prefix), so every
+  // request stays inside the United States. Amazon's prompt cache is on by default and may write any part of a prompt
+  // at a price above the plain input price, so the row's input price is the HOLD price: the lower step's cache-write
+  // price, rounded up to a whole nano-USD per token. The estimate, every hold and the quota use it (never below what a
+  // prompt token can cost); the gate settles each reply at Amazon's real prices (its BedrockProfile.settlement_steps).
+  // A call whose bytes + 2048 pass the lower step's token limit holds at the upper step's prices.
+  // Thinking levels: OpenAI documents none, low, medium (its default), high, xhigh and max; the menu is the four words
+  // the app knows. The answer limit is sent as `max_completion_tokens` (previewOutputTokensMember).
+  bedrock: Object.freeze([
+    row("bedrock", { model: "us.openai.gpt-6-luna", maker: "OpenAI", inputUsdPerM: "0.138", outputUsdPerM: "0.55",
+      // Its speed has not been measured on this connection yet, so its storyteller keeps the slow rows' allowance.
+      outputBound: PREVIEW_ANSWER_CAP_TOKENS, storytellerTokenCeiling: PREVIEW_SLOW_STORY_TOKENS, finalWriterOutputBound: 128 * 1000,
+      efforts: ["high", "medium", "low", "none"], effortsByStrength: ["high", "medium", "low", "none"], jsonObject: false,
+      upperStep: { aboveChargedInputTokens: 272_000, inputUsdPerM: "0.275", outputUsdPerM: "0.825" } })
   ])
 });
 /**
@@ -445,7 +471,8 @@ export const PREVIEW_PROVIDER_REF_MODELS: Readonly<Record<string, string>> = Obj
   "preview:deepseek-v4-1-flash": "deepseek-ai/DeepSeek-V4.1-Flash",
   "preview:mimo-v2-6-pro": "XiaomiMiMo/MiMo-V2.6-Pro",
   "preview:qwen-3-8-flash": "Qwen/Qwen3.8-Flash",
-  "preview:claude-haiku-5-5": "claude-haiku-5-5"
+  "preview:claude-haiku-5-5": "claude-haiku-5-5",
+  "preview:gpt-6-luna": "us.openai.gpt-6-luna"
 });
 /** The reviewed provider set, in register order. */
 export const PREVIEW_REVIEWED_PROVIDER_REFS = Object.freeze(Object.keys(PREVIEW_PROVIDER_REF_MODELS));
@@ -563,6 +590,17 @@ export function previewModelRowForEndpoint(baseUrl: string, model: string): Prev
  */
 export function previewSamplingMembers(baseUrl: string, model: string): PreviewSampling {
   return previewModelRowForEndpoint(baseUrl, model)?.sampling ?? Object.freeze({});
+}
+
+/**
+ * The body member that carries a request's answer limit on an OpenAI-compatible connection: `max_completion_tokens` for
+ * a reviewed Amazon Bedrock row (OpenAI's reasoning models refuse the older `max_tokens`; the new member bounds visible
+ * and reasoning tokens together), `max_tokens` for every other target, whose body stays byte for byte what it was.
+ * Row-driven like the sampling members: it follows the endpoint and model, on the preview or off it.
+ */
+export type PreviewOutputTokensMember = "max_tokens" | "max_completion_tokens";
+export function previewOutputTokensMember(baseUrl: string, model: string): PreviewOutputTokensMember {
+  return previewModelRowForEndpoint(baseUrl, model)?.provider === "bedrock" ? "max_completion_tokens" : "max_tokens";
 }
 
 /** The two-maker rule (contract A §6/§7): with two or more makers in the union, each roster names two or more. */

@@ -90,7 +90,9 @@ test("every locale translates the footer and navigation labels", () => {
   // 13 -> 20: the paid-plans footer (P21, R3-4): pricing, cancel, withdraw, the card marks' group and names, DB-IP.
   // 20 -> 21: NETOPIA's mark beside the card marks (N25b, spec §2.18), its brand name untranslated.
   // 21 -> 22: the CONSUMER PROTECTION head above ANPC's SAL badge (design 15a/15c).
-  assert.equal(added.length, 22);
+  // 22 -> 24: the made-in sentence, and the plain form of it a screen reader hears.
+  // 24 -> 28: the registered office, the company codes, phone and e-mail, and the delivery link; the town line goes.
+  assert.equal(added.length, 28);
   for (const locale of locales.filter((code) => code !== "en")) {
     const chrome = JSON.parse(source(`messages/${locale}/chrome.json`));
     for (const key of added) {

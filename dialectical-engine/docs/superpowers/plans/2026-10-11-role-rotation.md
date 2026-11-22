@@ -1015,7 +1015,7 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
     expect([...deepinfra!.modelIds].sort()).toEqual([DEEPSEEK, GLM].sort());
   });
 
-  it("re-pins the depth 1-3 room table; every combination still fits DeepInfra's $10.00 / 2,000 and Anthropic's $2.00 / 600", () => {
+  it("re-pins the depth 1-3 room table; every combination still fits made-up room for each gate (the real pots live only on the server)", () => {
     const usd = (nano: bigint) => Math.round(Number(nano) / 1e7) / 100;
     const table = [1, 2, 3].map((depth) => {
       const five = needs(ALL_FIVE, depth, true);
@@ -1032,9 +1032,9 @@ describe("a rotated debate: each role on every gate, at that gate's dearest pane
       [[2.71, 272], [6.66, 890], [8.15, 1155], [1.85, 426]]
     ]);
     for (const [free, premium, fiveDeepinfra, fiveAnthropic] of table) {
-      for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(10); expect(calls).toBeLessThanOrEqual(2000); }
-      expect(fiveAnthropic![0]).toBeLessThanOrEqual(2);
-      expect(fiveAnthropic![1]).toBeLessThanOrEqual(600);
+      for (const [dollars, calls] of [free!, premium!, fiveDeepinfra!]) { expect(dollars).toBeLessThanOrEqual(11); expect(calls).toBeLessThanOrEqual(1320); }
+      expect(fiveAnthropic![0]).toBeLessThanOrEqual(3.3);
+      expect(fiveAnthropic![1]).toBeLessThanOrEqual(440);
     }
   });
 

@@ -97,14 +97,14 @@ Google LLC is listed as active under the EU–US Data Privacy Framework, coverin
 (https://www.dataprivacyframework.gov/list, searched 2026-11-17). The Google row's transfer basis can
 be filled from this when a build offers a Google model; today no row for Google is shown.
 
-## Amazon Bedrock, for OpenAI's GPT Luna (not wired yet)
+## Amazon Bedrock, for OpenAI's GPT Luna (the gate and the Register entry are built)
 
 Read in full on 2026-11-17: the AWS Service Terms (last updated 5 November 2026), sections 1.14, 1.23,
 1.24 and 50; the AWS Data Processing Addendum and its Supplementary Addendum; the OpenAI Services
 Agreement - Amazon Bedrock (version June 2026); the Bedrock pages on data protection, data retention
 and abuse detection; the model cards of GPT-5.6 Luna and GPT-6 Luna; the AWS sub-processor list; the
-EU–US Data Privacy Framework list. No row is on the page yet: a build that sends text to Bedrock adds
-one from the table below.
+EU–US Data Privacy Framework list. The Register entry was added with the gate (see the end of this
+section), from the table below.
 
 ### Two contracts, both accepted without a signature
 
@@ -150,3 +150,20 @@ feature that let a person chat freely with the model would come close.
 
 Also to know: Amazon writes to the email address of the AWS account when its abuse detection finds
 something, and "may suspend your access" if nobody answers. That address has to be one somebody reads.
+
+### How the build calls the model (20 November 2026)
+
+The Amazon Bedrock gate (`deploy/preview-gate/v3/README-bedrock.md`) settles the three settings above this way:
+
+1. The route is the United States one: the model id `us.openai.gpt-6-luna`, called from the Region `us-east-1`. The
+   gate and the app refuse any other id, the worldwide route's included. The model card, read again that day: in-Region
+   is "Not supported" in every European Region and there is no `eu.` route; from a European Region only the worldwide
+   route can be called. So the row says "United States".
+2. Nothing in the build touches the retention mode: it stays what the account has (`default`).
+3. The gate calls the Chat Completions API, not the Responses API. Chat Completions has no stored answers, so the
+   `store` setting does not exist there and nothing is kept for fetching again. The data retention page ties `store`
+   to the Responses API throughout. The 30-day abuse copy of flagged requests applies either way.
+
+The Register entry (`AMAZON_BEDROCK_PROVIDER` in `apps/ui/lib/legal/pages.ts`) carries the wording the owner approved on
+20 November 2026; the page shows it once the API's targets reach Bedrock's address. The paragraphs of the Privacy Policy
+and the Terms that name Amazon, approved the same day, follow in their own change.

@@ -62,7 +62,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
     // Once the manifest sets a floor, a local account with no record is below it like any other.
     const floored = new RepositoryLegalAcceptanceApplication({
       acceptances: fakeAcceptances({}).repository as never, recordsKey: randomBytes(32),
-      owedWithoutRecord: false, clock: () => NOW, floorOf: () => "2.0"
+      owedWithoutRecord: false, clock: () => NOW, floorOf: () => "1.0"
     });
     await expect(floored.status(IDENTITY.authenticated.ownerRef, "de")).resolves.toEqual([
       { kind: "TERMS", ...currentDocument("TERMS", "de")! },
@@ -75,7 +75,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
     // A valid manifest's floor never exceeds the current version (final review I-2; parseLegalManifest
     // refuses it): the owner raises the floor TO the current Terms, and a person whose last acceptance is
     // an older version owes them.
-    const { repository } = fakeAcceptances({ TERMS: "1.9", PRIVACY_SHOWN: "3.0" });
+    const { repository } = fakeAcceptances({ TERMS: "0.9", PRIVACY_SHOWN: "0.9" });
     const revised = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW
     });
@@ -105,7 +105,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
     // An account with no record at all (created before the record existed) is below every floor.
     const none = new RepositoryLegalAcceptanceApplication({
       acceptances: fakeAcceptances({}).repository as never, recordsKey: randomBytes(32),
-      owedWithoutRecord: true, clock: () => NOW, floorOf: () => "2.0"
+      owedWithoutRecord: true, clock: () => NOW, floorOf: () => "1.0"
     });
     await expect(none.status(IDENTITY.authenticated.ownerRef, "de")).resolves.toEqual([
       { kind: "TERMS", ...currentDocument("TERMS", "de")! },
@@ -118,7 +118,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
     const { repository, recorded } = fakeAcceptances({});
     // The fake holds no rows yet, so under this floor both documents are owed.
     const legal = new RepositoryLegalAcceptanceApplication({
-      acceptances: repository as never, recordsKey, owedWithoutRecord: true, clock: () => NOW, floorOf: () => "2.0"
+      acceptances: repository as never, recordsKey, owedWithoutRecord: true, clock: () => NOW, floorOf: () => "1.0"
     });
     const source = { ip: "81.196.1.2", userAgent: "test/1" };
     await expect(legal.accept({
@@ -146,7 +146,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
   it("writes nothing when nothing is owed: the route is idempotent and cannot grow the table", async () => {
     // legal.acceptance is append-only for the life of the account, so a free signed-in account
     // posting the current pairs over and over must not add a row per request.
-    const { repository, recorded } = fakeAcceptances({ TERMS: "2.1", PRIVACY_SHOWN: "3.2" });
+    const { repository, recorded } = fakeAcceptances({ TERMS: "1.0", PRIVACY_SHOWN: "3.2" });
     const legal = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW
     });
@@ -161,7 +161,7 @@ describe("re-acceptance (paid plans L4, spec §2.3.2)", () => {
   it("records only the documents owed when some are posted that are not", async () => {
     // The floor sits AT the current Terms (a valid manifest, final review I-2), the last Terms acceptance
     // below it; the Privacy Policy has no floor and a record, so it is not owed.
-    const { repository, recorded } = fakeAcceptances({ TERMS: "1.9", PRIVACY_SHOWN: "3.0" });
+    const { repository, recorded } = fakeAcceptances({ TERMS: "0.9", PRIVACY_SHOWN: "0.9" });
     const floors = { TERMS: currentDocument("TERMS", "ro")!.version, PRIVACY: null } as const;
     const legal = new RepositoryLegalAcceptanceApplication({
       acceptances: repository as never, recordsKey: randomBytes(32), owedWithoutRecord: true, clock: () => NOW,

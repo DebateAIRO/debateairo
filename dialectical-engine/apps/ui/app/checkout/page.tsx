@@ -5,9 +5,9 @@ import { CheckoutFlow, type CheckoutConsents } from "@/components/billing/Checko
 import { SiteFooter } from "@/components/SiteFooter";
 import { ageConfirmationHref } from "@/lib/ageConfirmation";
 import { billingPageFooter } from "@/lib/billing/footerBilling";
-import { availablePaymentMarks } from "@/lib/billing/paymentMarks";
+import { availablePaymentMarks, netopiaLogoAddress } from "@/lib/billing/paymentMarks";
 import { isPaidPlanId } from "@/lib/billing/plans";
-import { ageConfirmationOwed, billingIsOn, sessionConfirmed } from "@/lib/billing/serverBilling";
+import { ageConfirmationOwed, billingState, sessionConfirmed } from "@/lib/billing/serverBilling";
 import { isLocale, LOCALE_COOKIE, type LocaleCode } from "@/lib/i18n/locales";
 import { loadNamespace } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n/translate";
@@ -35,7 +35,8 @@ export default async function CheckoutPage({
   const requestedPlan = (await searchParams).plan;
   const planId = isPaidPlanId(requestedPlan) ? requestedPlan : null;
   // Like /pricing: billing off (or local mode) is "not found" for everyone, signed in or not, before any redirect.
-  if (!(await billingIsOn())) notFound();
+  const billing = await billingState();
+  if (!billing.on) notFound();
   const sessionToken = readSessionCookie(cookieStore);
   // An unknown or absent plan comes back to plain /checkout, so sign-in and the age gate lead to the same
   // "That plan doesn't exist" sentence the signed-in path shows, never to a plan the person did not pick.
@@ -67,6 +68,8 @@ export default async function CheckoutPage({
           catalog={billingCatalog}
           consents={consentPairs(locale)}
           paymentMarks={availablePaymentMarks()}
+          netopiaLogo={netopiaLogoAddress()}
+          testMode={billing.testMode}
         />
       </div>
       <SiteFooter variant="full" billing={billingPageFooter()} />

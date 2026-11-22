@@ -83,6 +83,7 @@
   "settings.sessions.current": "Dabartinis seansas",
   "settings.sessions.other": "Kitas seansas",
   "settings.sessions.lastSeen": "Paskutinį kartą naudota {date}",
+  "settings.sessions.signInCode": "Sign-in code: {code}. It tells this sign-in apart from your others; it is not a password.",
   "settings.sessions.revokeLabel": "Panaikinti seansą {sessionId}",
   "settings.sessions.revoke": "Panaikinti",
   "settings.sessions.revokeAll": "Panaikinti visus seansus",

@@ -238,8 +238,9 @@ describe("Task 91f: every other practice debate needs no search gate", () => {
     const args = parsePracticeArgs(plus[0]!.slice(plus[0]!.indexOf("practice.ts ") + "practice.ts ".length).trim().split(/\s+/u)
       .map((word) => word.replace(/^"(.*)"$/u, "$1")));
     expect(args.flags.get("--start-step")).toBe("premium:5");
-    // Money and time: the Plus practice debate now searches (the planning figures the brief allows).
-    expect(readme).toMatch(/start-step Plus debate[^\n]*searches the web[^\n]*\n?[^\n]*about \$1\.34 more[^\n]*\n?[^\n]*about \$0\.25 likely/u);
+    // Money and time: the Plus practice debate now searches, so it costs more than a Free start; the README names no
+    // amount, because what a debate costs stays out of the repository.
+    expect(readme).toMatch(/start-step Plus debate[^\n]*searches the web[^\n]*\n?[^\n]*costs more than a Free start[^\n]*\n?[^\n]*a Free start never searches/u);
     // Review of Task 91f: settings with no search gate refuse the Plus run (the coordinator's ruling), and the README says so.
     expect(readme).toContain("`PRACTICE_SEARCH_GATE_REQUIRED`");
     expect(readme).not.toContain("the paths are SWITCHED_OFF in the report's web table");

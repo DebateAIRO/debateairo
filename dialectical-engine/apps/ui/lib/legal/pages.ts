@@ -173,12 +173,16 @@ export function inventoryCopy(legal: MessageCatalog): MessageCatalog {
  * Privacy 3.12 (V4 start step, owner 3 Nov 2026): `clarifyQuestions` and `suggestPaths` are the two calls made when
  * the person presses Next, before a debate starts.
  */
-export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "reportCheck" | "clarifyQuestions" | "suggestPaths" | "support";
+export type ProviderPurpose = "arguments" | "judging" | "story" | "search" | "synthesisCheck" | "questionCheck" | "reportCheck" | "clarifyQuestions" | "suggestPaths" | "support" | "payments";
 
-export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support"]);
+/** Privacy 3.15: `payments` is the payment provider's one job (NETOPIA_PROVIDER), the only row that is not an AI provider. */
+export const PROVIDER_PURPOSES: readonly ProviderPurpose[] = Object.freeze(["arguments", "judging", "story", "search", "synthesisCheck", "questionCheck", "reportCheck", "clarifyQuestions", "suggestPaths", "support", "payments"]);
 
-/** A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. */
-export type ContractFlag = "yes" | "no" | "unconfirmed";
+/**
+ * A yes/no fact from the provider's contract, or "unconfirmed" until someone has read that contract. "notApplicable"
+ * (Privacy 3.15) is for a fact about AI that does not apply to a row that is not an AI provider (NETOPIA_PROVIDER).
+ */
+export type ContractFlag = "yes" | "no" | "unconfirmed" | "notApplicable";
 
 /**
  * One row of the AI Provider Register, which the Privacy Policy (§5) makes part of the policy and
@@ -195,11 +199,7 @@ export type ProviderRegisterEntry = Readonly<{
   /** The row heading: a brand name, or null when `nameKey` names the row. */
   provider: string | null;
   nameKey: string | null;
-  /**
-   * The model families this company serves us, without version numbers or variants (owner, 18 November 2026: the
-   * page names the models we use, by family, so a model upgrade never changes the page). Empty for a row that serves
-   * no model (web search, an unchecked company): the page then shows no models line.
-   */
+  /** The models this company serves us: a reviewed fact the page no longer shows (addition D24: providers, not models). */
   models: string;
   /** A message key when the value is prose, or null when the models fact is a brand name. */
   modelsKey: string | null;
@@ -287,7 +287,7 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "support",
   provider: null,
   nameKey: "legal.providers.supportName",
-  models: "Claude Haiku",
+  models: "Claude Haiku 5.5",
   modelsKey: null,
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
@@ -303,20 +303,25 @@ export const SUPPORT_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The four open-weight model families DeepInfra serves (owner, 18 November 2026: MiMo, Qwen, DeepSeek and GLM come
- * from DeepInfra), named by family only, without version numbers or variants. Facts checked against the vendors'
- * published terms: see `docs/legal/2026-10-10-preview-provider-facts.md`.
+ * The four open-weight models DeepInfra serves on the private preview, each made by another company (named in
+ * brackets). Kept as the DeepInfra row's `models` fact; the page no longer shows models (addition D24, owner
+ * 2026-10-22: providers only, not the models). Facts checked against the vendors' published terms: see
+ * `docs/legal/2026-10-10-preview-provider-facts.md`.
  */
-const DEEPINFRA_MODEL_FAMILIES: readonly string[] = Object.freeze(["GLM", "DeepSeek", "MiMo", "Qwen"]);
+const PREVIEW_DEEPINFRA_MODELS: ReadonlyArray<readonly [id: string, label: string]> = Object.freeze([
+  ["zai-org/GLM-5.3-Flash", "GLM-5.3-Flash (Z.AI)"],
+  ["deepseek-ai/DeepSeek-V4.1-Flash", "DeepSeek-V4.1-Flash (DeepSeek)"],
+  ["XiaomiMiMo/MiMo-V2.6-Pro", "MiMo-V2.6-Pro (Xiaomi)"],
+  ["Qwen/Qwen3.8-Flash", "Qwen3.8-Flash (Alibaba)"]
+] as const);
 
 /**
- * The one DeepInfra model family DeepInfra does not run itself, named by family only like the rest. Its model page
- * carries a "Partner" tag ("This model is served by a partner. Your requests are forwarded to them. Their privacy
- * policy applies"), and DeepInfra's trust centre names it among the partner models (read 16 November 2026:
- * `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`). The other three have no tag and run on DeepInfra's own
- * servers. It stays in `DEEPINFRA_MODEL_FAMILIES` too: DeepInfra receives its requests before it forwards them.
+ * The one DeepInfra model DeepInfra does not run itself. Its model page carries a "Partner" tag ("This model is
+ * served by a partner. Your requests are forwarded to them. Their privacy policy applies"), and DeepInfra's trust
+ * centre names it among the partner models (read 16 November 2026: `docs/legal/2026-11-16-deepinfra-perplexity-facts.md`).
+ * The other three have no tag and run on DeepInfra's own servers.
  */
-const DEEPINFRA_PARTNER_MODEL_FAMILIES: readonly string[] = Object.freeze(["Qwen"]);
+const DEEPINFRA_PARTNER_MODEL_IDS: ReadonlySet<string> = new Set(["Qwen/Qwen3.8-Flash"]);
 
 /**
  * Serving company for the private preview's open-weight models, the main recipient of debate text. Listed whenever
@@ -339,7 +344,7 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "deepinfra",
   provider: "DeepInfra",
-  models: DEEPINFRA_MODEL_FAMILIES.join(", "),
+  models: PREVIEW_DEEPINFRA_MODELS.map(([, label]) => label).join(", "),
   entity: "Deep Infra Inc.",
   // Privacy 3.12: its models are among the several companies' AIs that write the lists of what to look into when
   // the person presses Next, before a debate starts.
@@ -356,7 +361,7 @@ export const DEEPINFRA_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_FAMILIES`). DeepInfra names
+ * The company DeepInfra forwards its partner model's requests to (`DEEPINFRA_PARTNER_MODEL_IDS`). DeepInfra names
  * neither the company nor its terms, so the row is headed by what we know and every fact stays "[to confirm]": it
  * receives debate text, and a legal page discloses rather than hides (ruling R20; the 10 October 2026 facts note:
  * "that company receives debate text and needs its own row on the page"). Its jobs are the partner model's: a panel
@@ -369,7 +374,7 @@ export const DEEPINFRA_PARTNER_PROVIDER: ProviderRegisterEntry = Object.freeze({
   key: "deepinfra-partner",
   provider: null,
   nameKey: "legal.providers.deepinfraPartnerName",
-  models: DEEPINFRA_PARTNER_MODEL_FAMILIES.join(", "),
+  models: PREVIEW_DEEPINFRA_MODELS.filter(([id]) => DEEPINFRA_PARTNER_MODEL_IDS.has(id)).map(([, label]) => label).join(", "),
   entity: "[…]",
   homeCountryKey: "legal.providers.unconfirmed",
   purposes: Object.freeze<ProviderPurpose[]>(["arguments", "judging", "suggestPaths"]),
@@ -391,7 +396,7 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "claude",
   provider: "Anthropic",
-  models: "Claude Haiku",
+  models: "Claude Haiku 5.5",
   entity: "Anthropic Ireland, Limited",
   homeCountryKey: "legal.providers.ireland",
   // One of the five launch models (owner, 12 October 2026): role rotation gives it every debate job.
@@ -411,22 +416,34 @@ export const ANTHROPIC_PREVIEW_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
- * Amazon Bedrock, through which the product runs GPT (owner, 18 November 2026), in AWS's Stockholm region,
- * eu-north-1 (owner, same day). Listed whenever the API's declared targets reach a Stockholm Bedrock host (company
- * `amazon`, `PROVIDER_COMPANY_HOSTS`), and when the API gives no answer. An AWS customer in the EEA contracts with
- * Amazon Web Services EMEA SARL in Luxembourg (AWS Customer Agreement). Nobody has checked Bedrock's terms for this
- * use yet, so its jobs, retention, zero data retention, training, transfer basis and privacy contact stay
- * "[to confirm]" and it has no `checkedOn` date.
+ * Amazon Bedrock, for OpenAI's GPT-6 Luna (`docs/legal/2026-11-17-provider-contract-facts.md`, read 17 November 2026;
+ * the model card and the data pages read again on 20 November 2026). A customer in Romania contracts with Amazon Web
+ * Services EMEA SARL, Luxembourg. The gate calls the model through Amazon's United States route only, so it is processed
+ * in the United States. OpenAI does not receive the text, and neither company may train on it (Bedrock's terms).
+ * Amazon keeps nothing but the requests its abuse filter flags, for up to 30 days; zero data retention exists only on
+ * request, which we have not made. Amazon Web Services, Inc. is certified under the EU–US Data Privacy Framework, and
+ * the data processing addendum carries the standard contractual clauses. The wording of the row is the owner's
+ * (approved 20 November 2026). Listed when the API's declared targets reach Bedrock's address (company `amazon`).
  */
-export const AMAZON_PROVIDER: ProviderRegisterEntry = Object.freeze({
+export const AMAZON_BEDROCK_PROVIDER: ProviderRegisterEntry = Object.freeze({
   ...UNCHECKED_CLOUD,
   key: "amazon",
-  provider: "Amazon Web Services",
-  models: "GPT",
+  // The owner's heading: the company, and whose models it serves us. The page names no model.
+  provider: "Amazon (OpenAI models)",
+  models: "GPT-6 Luna (OpenAI)",
   entity: "Amazon Web Services EMEA SARL",
   homeCountryKey: "legal.providers.luxembourg",
-  locationKey: "legal.providers.locationAwsStockholm",
-  basisKey: "legal.providers.unconfirmed"
+  // A line-up model like DeepInfra's: role rotation gives it every debate job, and it is among the AIs that write the
+  // lists of what to look into before a debate starts.
+  purposes: Object.freeze<ProviderPurpose[]>([...UNCHECKED_CLOUD.purposes, "suggestPaths"]),
+  purposesConfirmed: true,
+  locationKey: "legal.providers.unitedStates",
+  retentionKey: "legal.providers.retentionAmazon",
+  zeroRetention: "no",
+  training: "no",
+  basisKey: "legal.providers.basisAmazon",
+  contact: "aws-EU-privacy@amazon.com",
+  checkedOn: "2026-11-20"
 });
 
 /**
@@ -492,16 +509,44 @@ export const PERPLEXITY_PROVIDER: ProviderRegisterEntry = Object.freeze({
 });
 
 /**
+ * Privacy 3.15: the Register also lists the payment provider, NETOPIA Payments, the one row
+ * that is not an AI provider. Only what the repo supports is filled in. What it receives with each payment is
+ * `buildHostedStartBody` / `buildSavedCardChargeBody` (packages/payments-netopia/src/requests.ts), the same list as
+ * Privacy Policy §5. The legal entity is not recorded in the code: "NETOPIA Financial Services S.A." in Romania is
+ * the name Privacy Policy §5 gives, still to be confirmed against the contract, as is NETOPIA's role.
+ * Romania is in the EU, so no transfer basis is needed. Where it processes, how long it keeps data and the privacy
+ * contact are unknown, so they stay "[to confirm]", and the row has no checked date. Zero data retention and training
+ * are facts about AI providers: "not applicable". Listed on every answer, after the AI rows (`legalRegister`).
+ */
+export const NETOPIA_PROVIDER: ProviderRegisterEntry = Object.freeze({
+  key: "netopia",
+  provider: "NETOPIA Payments",
+  nameKey: null,
+  models: "",
+  modelsKey: null,
+  entity: "NETOPIA Financial Services S.A.",
+  homeCountryKey: "legal.providers.romania",
+  purposes: Object.freeze<ProviderPurpose[]>(["payments"]),
+  purposesConfirmed: true,
+  locationKey: "legal.providers.unconfirmed",
+  retentionKey: "legal.providers.unconfirmed",
+  zeroRetention: "notApplicable",
+  training: "notApplicable",
+  basisKey: "legal.providers.euBasis",
+  contact: "[…]",
+  checkedOn: null
+});
+
+/**
  * Addition D24 (owner's answer to Q-L6, 2026-10-22: providers only, not the models, listed automatically): the
  * reviewed catalogue, keyed by the company keys the API answers on `GET /v1/public/ai-providers`
  * (`providerCompaniesOfTargets`, `PROVIDER_COMPANY_HOSTS` in `@debateai/providers`), in the order the page shows
- * them. A person checks each row's facts; only the choice of rows is automatic. Amazon (GPT on Bedrock, owner
- * 18 November 2026) is in the catalogue before its facts are checked, so it is named rather than shown as a bare host.
+ * them. A person checks each row's facts; only the choice of rows is automatic.
  */
 const REVIEWED_PROVIDER_COMPANIES = Object.freeze([
   ["anthropic", ANTHROPIC_PREVIEW_PROVIDER],
-  ["amazon", AMAZON_PROVIDER],
-  ["deepinfra", DEEPINFRA_PROVIDER]
+  ["deepinfra", DEEPINFRA_PROVIDER],
+  ["amazon", AMAZON_BEDROCK_PROVIDER]
 ] as const);
 const REVIEWED_COMPANY_KEYS: ReadonlySet<string> = new Set(REVIEWED_PROVIDER_COMPANIES.map(([company]) => company));
 /** The prefix the API gives a public host no catalogue row knows yet (ruling R20). */
@@ -530,12 +575,12 @@ function uncheckedCompanyEntry(company: string): ProviderRegisterEntry {
 /**
  * The AI Provider Register, in the order `/providers` shows it (addition D24, owner 2026-10-22: "providers only,
  * not the models, listed automatically"). `companies` is the API's answer (`readAiProviderCompanies`): the
- * companies its declared provider targets reach. Each reviewed company it names gets its row, Anthropic, Amazon,
- * then DeepInfra, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
+ * companies its declared provider targets reach. Each reviewed company it names gets its checked row, Anthropic
+ * then DeepInfra then Amazon, and DeepInfra's row is followed by the unchecked row of the partner company it forwards one model
  * to (`DEEPINFRA_PARTNER_PROVIDER`); each other company (`host:<hostname>`) one unchecked row headed by its host name, sorted; the
  * support chat's model always last. No answer (`null`) or an empty list lists the whole reviewed catalogue: a legal
- * page discloses rather than hides. Each row names its model families without versions (owner, 18 November 2026),
- * so a model upgrade never changes the page, and the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
+ * page discloses rather than hides. No row names a model, so a model or line-up change never changes the page, and
+ * the hosted cloud rows (`MODEL_PROVIDERS`: OpenAI, xAI, Google, the own-servers Qwen) never show, since no
  * declared target reaches them. Perplexity (`PERPLEXITY_PROVIDER`) is always listed, just before the support chat's
  * model, and never twice. Never throws.
  */
@@ -561,6 +606,14 @@ export function providerRegister(companies: readonly string[] | null): readonly 
   return Object.freeze([...reviewed, ...unchecked, PERPLEXITY_PROVIDER, support]);
 }
 
+/**
+ * What `/providers` shows (Privacy 3.15): the AI Provider Register (`providerRegister`), then the payment provider,
+ * which is not an AI provider and is listed on every answer. Never throws.
+ */
+export function legalRegister(companies: readonly string[] | null): readonly ProviderRegisterEntry[] {
+  return Object.freeze([...providerRegister(companies), NETOPIA_PROVIDER]);
+}
+
 export type TermsVersion = Readonly<{
   version: string;
   noteKey: string;
@@ -570,47 +623,10 @@ export type TermsVersion = Readonly<{
 }>;
 
 /**
- * Every version of the terms, newest first, one row per number from 2.0 up. Each earlier row links to the exact text
- * that was current before the next revision. The rows carry no effective date until go-live: the drafts' own
- * "Effective …" lines are not in order (2.8 and 2.9 say 12 October, after 2.6's 24 October), so the page states none.
- * 2.7 has no text: the synthesis-flag merge (#225) took the Terms from 2.6 straight to 2.8, and the charts clause first
- * numbered 2.7 became 2.9, but the change history in the Terms names a 2.7, so its row says why there is nothing to read.
+ * Every version of the terms, newest first. Version 1.0 is the first published text (owner's decision of 19 November
+ * 2026: the pre-launch drafts numbered 2.0–2.19 were never offered to the public, so launch starts the count again and
+ * keeps no archive of them). When the terms change, the version they replace gets a row that links to its archived text.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "2.18", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
-  { version: "2.17", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/63e8f9c271ed42c5466568999f4a35418b5011d8f31309dabb199f8927a30203" },
-  { version: "2.16", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/4048b2baf320179495c37630e666afd191f236889c217c166636a7243f5ffb70" },
-  { version: "2.15", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/765a7826b1045fabe77783e3a9bbe95a8f6dec9a48ff071e9c4a844a8317d925" },
-  { version: "2.14", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/94474fdb20bed511a590b6bc1c07750ed4e67b1c3dfb328d31638daaf233f6a7" },
-  { version: "2.13", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/9cad1a62f77eee42c46facba8a3c2e04c44afba940688ae5e06d3bf586808cfc" },
-  { version: "2.12", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/95dd058c6751ae2a8a65f32144fb51a4baab91568d8970423efa32e8f867564b" },
-  { version: "2.11", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/58ae2f6196b823ec4e1316e1289861fe54b6c3663913fd9617aa0cfdde4b5bdd" },
-  { version: "2.10", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/bf864a74b185aadeabf37e7a4593830d66cab343388f64b88a01a38348dcd339" },
-  { version: "2.9", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/de0b1e1adaff7690436ef4fe09132b0998d33d2f206ec29be9127142c935e56f" },
-  { version: "2.8", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/160400ea25aee99085d012f1008af3ca2841148ae3349401a2ac5152278f6fb4" },
-  { version: "2.7", noteKey: "legal.versions.unpublished.note", current: false, href: null },
-  { version: "2.6", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/27e7229ee49faffd2cdf5eb609acc1b4ad5ea95c4e5c36bd057867de492b33ab" },
-  { version: "2.5", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/e6fe4e6897c5c4aa03214da2e79954c8903fe8fe2d3c2785a000357618d3b195" },
-  { version: "2.4", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/3f238233a301a4e98945d8164e1f5b7d0934d68f01adcdf421f8602e11ca2ef6" },
-  { version: "2.3", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/0535525218bb7c975ea4f8459bc2011a494efed363bee79d6382805ad5981f6c" },
-  { version: "2.2", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/fcffb706c7ab2dcbfa09594dd5b0686e274cc5ba3e3a4377573f5b771c07a660" },
-  { version: "2.1", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/34bab40dea5ccdcaba5dc167106e8b6d9bdc08c676f82a2c84e68fd9809c8b0c" },
-  { version: "2.0", noteKey: "legal.archive.meta", current: false,
-    href: "/terms/versions/0d1bc079eb2d5b054c1cfc7c0430f234ca5391bd6e6824ecc8958a294f6eaa0e" }
+  { version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }
 ]);

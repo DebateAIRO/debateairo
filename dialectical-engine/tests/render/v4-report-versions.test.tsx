@@ -660,7 +660,7 @@ describe("the report page's address and states", () => {
     expect(buttonOf(node, "Try again")).not.toBeNull();
   });
 
-  it("f10: a failed debate offers Ask a new question (after map-f30's way back); the classic view is in the account menu only", async () => {
+  it("f10: a failed debate offers Ask a new question (after map-f30's way back); no classic view anywhere, the account menu included", async () => {
     const runId = crypto.randomUUID();
     harness.run = { run_ref: runId, question_line: "Q?", state: "FAILED", terminal_reason: "RUNNER_FAILED", hold_until: null } as RunProjection;
     const node = await mountReport(runId);
@@ -673,9 +673,9 @@ describe("the report page's address and states", () => {
     // The level ruling (links since 9 Nov): neither carries a level; the debate keeps its own, and a new question picks its own.
     expect(links[0]!.getAttribute("href")).toBe(`/v4/debate/${runId}`);
     expect(links[1]!.getAttribute("href")).toBe("/v4");
-    // Owner 5 Nov, question 12 B (journey-f19, "nowhere else"): the small link under it went; the account menu has it.
+    // The small link under it went, and the account menu is handed no classic view either: every debate is a V4 one.
     expect(node.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
-    expect(node.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe(`/debate/${runId}`);
+    expect(node.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe("none");
   });
 });
 
@@ -688,7 +688,7 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     }));
   afterEach(() => { vi.unstubAllGlobals(); fetches.length = 0; });
 
-  it("is one row: Back to the map and Share, with no level menu (5 Nov ruling); no quota share, and the classic view is in the account menu only", async () => {
+  it("is one row: Back to the map and Share, with no level menu (5 Nov ruling); no quota share, and no classic view anywhere", async () => {
     answerFetch(200);
     const runId = crypto.randomUUID();
     reports.load = vi.fn(async () => noInvestigation(runId));
@@ -715,10 +715,10 @@ describe("the report's own header (f12) and its PDF (f5, f11)", () => {
     expect(row.querySelector(".v4RepLevel")).toBeNull();
     expect(text(row)).not.toContain(CATALOG["v4.readingLevel.background"]);
     expect(node.textContent).not.toMatch(/allowance|quota|% used/u);
-    // Owner 5 Nov, question 12 B (journey-f19, "nowhere else"): no foot link; the account menu holds the classic view.
+    // No foot link, and the account menu is handed no classic view either: every debate is a V4 one.
     expect(node.querySelector(`a[href="/debate/${runId}"]`)).toBeNull();
     expect(node.querySelector(".v4RepFoot")).toBeNull();
-    expect(row.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe(`/debate/${runId}`);
+    expect(row.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe("none");
     // report-f5: before a report, Share offers Print and Copy link, never the old V3 PDF.
     const items = await shareMenu(node);
     expect(Object.keys(items)).toEqual(["print", "copy"]);

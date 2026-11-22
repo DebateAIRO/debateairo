@@ -191,6 +191,18 @@ describe('sameChecks', () => {
     expect(bad(sameChecks([older, marks('visa, mastercard')]))).toEqual(['UI_PAYMENT_MARKS_AVAILABLE:new-v1']);
   });
 
+  it('checks each release\'s NETOPIA logo id: absent or 1 to 12 digits, right after its payment marks list', () => {
+    const older = release('old-v1', 'A', OLD_KEY), newer = release('new-v1', 'B', NEW_KEY);
+    const results = sameChecks([older, newer]);
+    expect(bad(results)).toEqual([]);
+    const checks = results.map(result => result.check);
+    for (const label of ['old-v1', 'new-v1']) expect(checks.indexOf(`UI_NETOPIA_LOGO_ID:${label}`)).toBe(checks.indexOf(`UI_PAYMENT_MARKS_AVAILABLE:${label}`) + 1);
+    // A release may add (or change) the id on purpose: no cross-release check.
+    const logo = (value: string) => ({ ...newer, ui: { ...newer.ui, NETOPIA_LOGO_ID: value } });
+    expect(bad(sameChecks([older, logo('123')]))).toEqual([]);
+    for (const value of ['12a', '1234567890123', ' 1', '']) expect(bad(sameChecks([older, logo(value)])), JSON.stringify(value)).toEqual(['UI_NETOPIA_LOGO_ID:new-v1']);
+  });
+
   it('NV-07: two releases on one host name one restore fence file, or the newer names one the older does not know', () => {
     const older = release('old-v1', 'A', OLD_KEY), newer = release('new-v1', 'B', NEW_KEY);
     const fence = (base: typeof older, path: string) => ({ ...base, api: { ...base.api, RESTORE_FENCE_PATH: path } });

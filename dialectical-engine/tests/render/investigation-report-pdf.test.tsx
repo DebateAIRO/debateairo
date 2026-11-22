@@ -1,6 +1,7 @@
 import { inflateSync } from "node:zlib";
-import { beforeAll, describe, expect, it } from "vitest";
-import { ContractHttpError, InvestigationReportVersionSchema, type Answer, type InvestigationReports } from "@debateai/contract";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { ContractHttpError, InvestigationReportVersionSchema, type Answer, type InvestigationReports, type Session } from "@debateai/contract";
+import { GET, HEAD } from "../../apps/ui/app/v4/debate/[id]/report/pdf/route.js";
 import { AI_GENERATED_HEADER, AI_GENERATED_HEADER_VALUE } from "../../apps/ui/lib/aiDisclosure.js";
 import { loadNamespace } from "../../apps/ui/lib/i18n/server.js";
 import { buildInvestigationReportPdfModel, type FinishedInvestigationReport } from "../../apps/ui/lib/report/investigationReportModel.js";
@@ -244,11 +245,20 @@ describe("GET and HEAD /v4/debate/{id}/report/pdf", () => {
     investigation_id: "22222222-2222-4222-8222-222222222222", root_run_id: ROOT, state: "CLOSED", digs: 0,
     versions: [versionWith({ answer: "Old answer.", path: "Old path.", note: "Old." }, { report_version: 1 }),
       versionWith({ answer: "Newest answer.", path: "New path.", note: "New." })], current: 2, ...over });
+  /** The session as GET /v1/session answers it: one `asker_id` per owner name, whichever session asks. */
+  const ownerSession = (owner: string): Session => ({
+    asker_id: `owner:00000000-0000-4000-8000-${Buffer.from(owner).toString("hex").padStart(12, "0").slice(-12)}`,
+    session_id: "00000000-0000-4000-8000-000000000001",
+    caller_scope: "ASKER",
+    ownership_provenance: "server_session",
+    provisional_identity_model: false
+  });
   const reader = (over: Partial<InvestigationReportReader> = {}, tag = "en"): InvestigationReportReader => ({
     readAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "NOT_FOUND"); },
     readRunAnswer: async (id: string) => answerOf(id, id === ROOT ? "Should the city build a pier?\n\nAdded line." : "A dig's own question"),
     readRun: async () => ({ argument_language: { tag } }) as never,
     readInvestigation: async () => reports(),
+    readSession: async () => ownerSession("A"),
     ...over
   });
   const load = (locale: string, namespace: "public" | "compose") => loadNamespace(locale as never, namespace);
@@ -305,5 +315,157 @@ describe("GET and HEAD /v4/debate/{id}/report/pdf", () => {
     expect(head.headers.get("content-type")).toBe("application/pdf");
     expect(head.headers.get(AI_GENERATED_HEADER)).toBe(AI_GENERATED_HEADER_VALUE);
     expect(made).toBe(false);
+  });
+
+  // A request another site started gets the same fixed refusal as the debate's own report: before the session is looked at and
+  // before any read, so it tells that site nothing about sign-in, ownership or readiness.
+  it("refuses a request another site started with one fixed 403, before the session or any read, for GET and HEAD", async () => {
+    const answers = new Set<string>();
+    const notFound = async (): Promise<Answer> => { throw new ContractHttpError("NOT_FOUND", 404, "NOT_FOUND"); };
+    const visitors: Array<[string, string | null, InvestigationReportReader]> = [
+      ["owner of a ready report", session, reader()],
+      ["not the owner", session, reader({ readRunAnswer: notFound })],
+      ["no session", null, reader()]
+    ];
+    for (const fetchSite of ["cross-site", "same-site", "", "Same-Origin", "same-origin, cross-site"]) {
+      for (const [name, sessionCookie, visitor] of visitors) {
+        const label = `${JSON.stringify(fetchSite)}, ${name}`;
+        const client = vi.fn(() => visitor);
+        const render = vi.fn(async () => Buffer.from("%PDF-"));
+        const response = await handleInvestigationReportRequest(input({ sessionCookie, client, render, fetchSite, interfaceLocale: "de" }));
+        expect(response.status, label).toBe(403);
+        expect(response.headers.get("content-disposition"), label).toBeNull();
+        const body = await response.text();
+        expect(body, label).toBe((await loadNamespace("de", "public"))["public.report.error.notAvailable"]);
+        expect(client, label).not.toHaveBeenCalled();
+        expect(render, label).not.toHaveBeenCalled();
+        answers.add(JSON.stringify([response.status, [...response.headers.entries()], body]));
+      }
+    }
+    expect(answers.size).toBe(1);
+    const headClient = vi.fn(() => reader());
+    const head = await handleInvestigationReportHeadRequest(input({ client: headClient, fetchSite: "cross-site" }));
+    expect(head.status).toBe(403);
+    expect(head.body).toBeNull();
+    expect(headClient).not.toHaveBeenCalled();
+  });
+
+  it("still serves the owner from the app's own page, a typed address, and a browser that sends no Fetch Metadata", async () => {
+    for (const fetchSite of ["same-origin", "none", null, undefined]) {
+      const response = await handleInvestigationReportRequest(input({
+        render: async () => Buffer.from("%PDF-"), ...(fetchSite === undefined ? {} : { fetchSite })
+      }));
+      expect(response.status, String(fetchSite)).toBe(200);
+      expect(response.headers.get("content-type"), String(fetchSite)).toBe("application/pdf");
+    }
+  });
+
+  describe("the route itself", () => {
+    const params = { params: Promise.resolve({ id: ROOT }) };
+    afterEach(() => {
+      delete process.env.DIALECTICAL_API_BASE;
+      vi.unstubAllGlobals();
+    });
+    const routeRequest = (fetchSite: string, method = "GET") => new Request(`http://localhost/v4/debate/${ROOT}/report/pdf`, {
+      method,
+      headers: { cookie: `__Host-debateai-session=${session}; debateai.locale=en`, "sec-fetch-site": fetchSite, "user-agent": "xs-probe/1" }
+    });
+
+    it("passes the browser's Sec-Fetch-Site on: a cross-site or same-site request makes no API call", async () => {
+      process.env.DIALECTICAL_API_BASE = "http://api.internal:8000";
+      const seen: string[] = [];
+      vi.stubGlobal("fetch", async (url: URL | string) => {
+        seen.push(new URL(String(url)).pathname);
+        return Response.json({ error: "NOT_FOUND" }, { status: 404 });
+      });
+      for (const fetchSite of ["cross-site", "same-site"]) {
+        const response = await GET(routeRequest(fetchSite), params);
+        expect(response.status, fetchSite).toBe(403);
+        expect(await response.text(), fetchSite).toBe((await loadNamespace("en", "public"))["public.report.error.notAvailable"]);
+      }
+      expect((await HEAD(routeRequest("cross-site", "HEAD"), params)).status).toBe(403);
+      expect(seen).toEqual([]);
+      // The app's own page still reaches the API.
+      await GET(routeRequest("same-origin"), params);
+      expect(seen.length).toBeGreaterThan(0);
+    });
+  });
+
+  // The render gate counts owners, as the debate's own report does: the owner the API names for the session, never the cookie,
+  // so one account holds one render place however many sessions or browsers it uses.
+  describe("the render gate counts owners, not sessions", () => {
+    /** A render that only finishes when the test says so. */
+    function heldRenders() {
+      const held: Array<() => void> = [];
+      let started = 0;
+      const render = async (): Promise<Buffer> => {
+        started += 1;
+        return new Promise<Buffer>((resolveRender) => { held.push(() => resolveRender(Buffer.from("%PDF-"))); });
+      };
+      const startedCount = async (count: number) => {
+        for (let tries = 0; tries < 200 && started < count; tries += 1) await new Promise((resolveTick) => setTimeout(resolveTick, 5));
+        expect(started).toBe(count);
+      };
+      return { render, startedCount, finishNext: () => held.shift()!(), started: () => started };
+    }
+    const sessionOf = (name: string): string => name.repeat(43).slice(0, 43);
+
+    it("refuses a second session of the same owner while the first is made (429), and still serves another owner", async () => {
+      const renders = heldRenders();
+      const gate = new ReportRenderGate({ concurrent: 2, waiting: 2, waitMs: 1000, retryAfterSeconds: 7 });
+      const as = (name: string, owner: string) => handleInvestigationReportRequest(input({
+        sessionCookie: sessionOf(name), gate, render: renders.render, client: () => reader({ readSession: async () => ownerSession(owner) })
+      }));
+      const first = as("a", "A");
+      await renders.startedCount(1);
+      const second = await as("b", "A");
+      expect(second.status).toBe(429);
+      expect(second.headers.get("retry-after")).toBe("7");
+      const other = as("c", "B");
+      await renders.startedCount(2);
+      renders.finishNext();
+      renders.finishNext();
+      expect((await first).status).toBe(200);
+      expect((await other).status).toBe(200);
+    });
+
+    it("reads the owner once, after the report is known to be ready; a debate that is not the caller's never asks for it", async () => {
+      const readSession = vi.fn(async () => ownerSession("A"));
+      const served = await handleInvestigationReportRequest(input({ client: () => reader({ readSession }), render: async () => Buffer.from("%PDF-") }));
+      expect(served.status).toBe(200);
+      expect(readSession).toHaveBeenCalledTimes(1);
+      const unread = vi.fn(async () => ownerSession("A"));
+      const foreign = await handleInvestigationReportRequest(input({
+        client: () => reader({ readSession: unread, readRunAnswer: async () => { throw new ContractHttpError("NOT_FOUND", 404, "NOT_FOUND"); } })
+      }));
+      expect(foreign.status).toBe(404);
+      expect(unread).not.toHaveBeenCalled();
+      // HEAD never needs the owner.
+      const headRead = vi.fn(async () => ownerSession("A"));
+      expect((await handleInvestigationReportHeadRequest(input({ client: () => reader({ readSession: headRead }) }))).status).toBe(200);
+      expect(headRead).not.toHaveBeenCalled();
+    });
+
+    it("answers 401 when the API will not name the session's owner, and 502 with a fixed tag on any other failure; nothing is made", async () => {
+      const render = vi.fn(async () => Buffer.from("%PDF-"));
+      const refused = await handleInvestigationReportRequest(input({
+        render, client: () => reader({ readSession: async () => { throw new ContractHttpError("SESSION_REQUIRED", 401, "SESSION_REQUIRED"); } })
+      }));
+      expect([refused.status, await refused.text()]).toEqual([401, "Sign in to download this report."]);
+      const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      let failed: Response;
+      let calls: unknown[][];
+      try {
+        failed = await handleInvestigationReportRequest(input({
+          render, client: () => reader({ readSession: async () => { throw new ContractHttpError("SERVER_FAILURE", 500, "secret upstream detail"); } })
+        }));
+      } finally {
+        calls = [...logged.mock.calls];
+        logged.mockRestore();
+      }
+      expect(failed.status).toBe(502);
+      expect(JSON.stringify(calls)).not.toContain("secret upstream detail");
+      expect(render).not.toHaveBeenCalled();
+    });
   });
 });

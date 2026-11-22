@@ -22,7 +22,15 @@ on:
       - "dialectical-engine/apps/api/src/sessions.ts"
       - "dialectical-engine/apps/api/src/turnstile.ts"
       - "dialectical-engine/tests/integration/registration-database.test.ts"
-      - "dialectical-engine/tests/support/**"
+      # Only the helper files the suite loads, directly or through another helper. tests/support holds over a hundred
+      # helpers for other suites; a change to one of those cannot change this suite's outcome.
+      # tests/architecture/ci-security-gates.test.ts fails when the suite loads a helper that is not listed here.
+      - "dialectical-engine/tests/support/httpSession.ts"
+      - "dialectical-engine/tests/support/master-key-files.txt"
+      - "dialectical-engine/tests/support/master-key-guard.ts"
+      - "dialectical-engine/tests/support/rls-logins.ts"
+      - "dialectical-engine/tests/support/testDatabase.ts"
+      - "dialectical-engine/tests/support/turnstileFixtures.ts"
       - "dialectical-engine/tests/ci-integration-registration.txt"
       - "dialectical-engine/tests/ci-flaky.txt"
       - "dialectical-engine/tools/ci-known-red.mjs"

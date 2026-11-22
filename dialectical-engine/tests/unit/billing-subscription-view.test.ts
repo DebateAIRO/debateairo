@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { withdrawalDeadline, type SubscriptionState } from "@debateai/billing-core";
+import { consumerCalendarDay, consumerTimeZone, withdrawalDeadline, type SubscriptionState } from "@debateai/billing-core";
 import { PlanIdSchema, SubscribedPlanIdSchema } from "@debateai/contract";
 import { renewalLeadMs } from "../../apps/api/src/billing/renewal-rules.js";
 import { subscriptionView, withdrawalOpenUntil } from "../../apps/api/src/billing/subscription-view.js";
@@ -37,9 +37,69 @@ describe("P12b the subscription as the person sees it", () => {
       current_period_end: "2026-11-01T09:00:00.000Z", renews_on: "2026-11-01T09:00:00.000Z",
       renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
       // Romania: the 14 days run 2–15 October, Bucharest time; the window closes at the next local midnight.
-      withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15",
+      withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15", started_on: "2026-10-01",
       can_upgrade: true, can_change_card: true, can_revoke_cancel: false
     });
+  });
+
+  it("names the day the plan started in the buyer's calendar, and prints the time in the buyer's zone", () => {
+    // 22:30 UTC on 1 October is already 2 October in Bucharest, and still 1 October in Lisbon.
+    const late = new Date("2026-10-01T22:30:00.000Z");
+    expect(view({ activatedAt: late }, "RO").started_on).toBe("2026-10-02");
+    expect(view({ activatedAt: late }, "PT").started_on).toBe("2026-10-01");
+    expect(consumerCalendarDay(late, "RO")).toBe("2026-10-02");
+    // A country with several zones is read in UTC, the zone its acknowledgement prints the time in, as its invoice is
+    // dated: 18:30 in New York on 1 October, and 15:00 there on 10 December, stay on their own day.
+    expect(consumerCalendarDay(late, "US")).toBe("2026-10-01");
+    expect(view({ activatedAt: new Date("2026-12-10T20:00:00.000Z") }, "US").started_on).toBe("2026-12-10");
+    // A served country with one zone outside Europe is read in it: 21:00 in Tokyo on 10 December, 16:00 in Chisinau
+    // on 11 December, and 01:00 in Seoul on 11 December (still 10 December in UTC).
+    expect(consumerCalendarDay(new Date("2026-12-10T12:00:00.000Z"), "JP")).toBe("2026-12-10");
+    expect(consumerCalendarDay(new Date("2026-12-11T14:00:00.000Z"), "MD")).toBe("2026-12-11");
+    expect(consumerCalendarDay(new Date("2026-12-10T16:00:00.000Z"), "KR")).toBe("2026-12-11");
+    // No activation or no tax country: unknown, so the statement names the plan alone.
+    expect(view({ activatedAt: null }).started_on).toBeNull();
+    expect(view({}, null).started_on).toBeNull();
+    // The zone the acknowledgement prints the time in: the country's own, or UTC where it has several.
+    expect(consumerTimeZone("RO")).toBe("Europe/Bucharest");
+    expect(consumerTimeZone("DE")).toBe("Europe/Berlin");
+    expect(consumerTimeZone("JP")).toBe("Asia/Tokyo");
+    expect(consumerTimeZone("SG")).toBe("Asia/Singapore");
+    expect(consumerTimeZone("MD")).toBe("Europe/Chisinau");
+    expect(consumerTimeZone("KR")).toBe("Asia/Seoul");
+    for (const country of ["ES", "PT", "US", "CA", "AU", "NZ", null]) {
+      expect(consumerTimeZone(country), String(country)).toBe("UTC");
+    }
+  });
+
+  it("prints a served country's own zone exactly when the Unicode zone data gives that country one clock", () => {
+    // The zones CLDR lists for a country (Intl Locale Info, in the Node version the project pins).
+    const regionZones = (country: string): readonly string[] =>
+      (new Intl.Locale(`und-${country}`) as Intl.Locale & { getTimeZones(): string[] | undefined }).getTimeZones() ?? [];
+    // A zone's UTC offset at noon UTC on every day of 2026: two zones share a clock when these agree.
+    const clock = (zone: string): string => Array.from({ length: 365 }, (_, day) => new Intl.DateTimeFormat("en-US", {
+      timeZone: zone, timeZoneName: "longOffset"
+    }).formatToParts(new Date(Date.UTC(2026, 0, 1 + day, 12))).find((part) => part.type === "timeZoneName")?.value)
+      .join(",");
+    const dayIn = (at: Date, zone: string): string => new Intl.DateTimeFormat("en-CA", { timeZone: zone }).format(at);
+    // Spain and Portugal name the start day on the mainland, where their 14 days are counted.
+    const mainland: Readonly<Record<string, string>> = { ES: "Europe/Madrid", PT: "Europe/Lisbon" };
+    const hours = Array.from({ length: 24 }, (_, hour) => new Date(Date.UTC(2026, 11, 10, hour, 30)));
+    // Every country the site serves, so a country that joins it is checked here too.
+    for (const country of testBillingPolicy.withdrawalCountries) {
+      const clocks = new Set(regionZones(country).map(clock));
+      expect(clocks.size, country).toBeGreaterThan(0);
+      const printed = consumerTimeZone(country);
+      if (clocks.size === 1) {
+        expect(printed, country).not.toBe("UTC");
+        expect(clock(printed), country).toBe([...clocks][0]);
+      } else {
+        expect(printed, country).toBe("UTC");
+      }
+      // The start day is read in the zone the time is printed in, at every hour of a day.
+      const dayZone = mainland[country] ?? printed;
+      for (const at of hours) expect(consumerCalendarDay(at, country), `${country} ${at.toISOString()}`).toBe(dayIn(at, dayZone));
+    }
   });
 
   it("shows no renewal once a cancel is requested, and the postponed date while a notice runs", () => {
@@ -69,6 +129,21 @@ describe("P12b the subscription as the person sees it", () => {
     expect(open({}, "BR", NOW)).toBeNull();
     expect(open({}, null, NOW)).toBeNull();
     expect(open({ status: "PAST_DUE" }, "RO", NOW)).toBeNull();
+  });
+
+  it("keeps the window of a plan paused by a payment dispute, so Settings still shows the withdrawal and its e-mail route", () => {
+    // The right lasts the whole 14 days, a dispute or not. Recording stays ACTIVE-only (`recordWithdrawal`), so only
+    // the view opens; the page tells a paused buyer to withdraw by e-mail.
+    expect(view({ status: "SUSPENDED" })).toMatchObject({
+      status: "SUSPENDED", withdrawal_open_until: "2026-10-15T21:00:00.000Z", withdrawal_last_day: "2026-10-15"
+    });
+    expect(withdrawalOpenUntil({
+      state: state({ status: "SUSPENDED" }), taxCountry: "RO", policy: testBillingPolicy,
+      now: new Date("2026-10-15T21:00:00.000Z"), paymentEnvironment: "sandbox"
+    })).toBeNull();
+    for (const status of ["PAST_DUE", "ENDED", "WITHDRAWN"] as const) {
+      expect(view({ status }), status).toMatchObject({ withdrawal_open_until: null, withdrawal_last_day: null });
+    }
   });
 
   it("opens the 14 days for every country the site serves, the United States and Japan among them (owner's decision of 16 November 2026)", () => {
@@ -134,6 +209,54 @@ describe("P12b the subscription as the person sees it", () => {
     expect(view({ activatedAt: saturday }, "RO", new Date("2026-10-18T12:00:00.000Z"))).toMatchObject({
       withdrawal_open_until: "2026-10-19T21:00:00.000Z", withdrawal_last_day: "2026-10-19"
     });
+  });
+
+  it("moves a last day on a Romanian public holiday, as on a weekend, to the end of the next working day", () => {
+    const deadline = (activatedAt: string, taxCountry = "RO") =>
+      withdrawalDeadline({ activatedAt: new Date(activatedAt), taxCountry, withdrawalDays: 14 });
+    // Activated Friday 11 December 2026: the 14th day is Friday 25 December (Christmas), then Saturday 26 December
+    // (a holiday too) and Sunday 27: the window stays open until the end of Monday 28 December, Bucharest time.
+    expect(deadline("2026-12-11T10:00:00.000Z"))
+      .toEqual({ lastDay: "2026-12-28", closesAt: new Date("2026-12-28T22:00:00.000Z") });
+    // Activated Tuesday 17 November 2026: the 14th day is Tuesday 1 December, a holiday, so the last day is 2 December.
+    expect(deadline("2026-11-17T10:00:00.000Z"))
+      .toEqual({ lastDay: "2026-12-02", closesAt: new Date("2026-12-02T22:00:00.000Z") });
+    // A day later the 14th day is 2 December itself, a working day: nothing moves.
+    expect(deadline("2026-11-18T10:00:00.000Z"))
+      .toEqual({ lastDay: "2026-12-02", closesAt: new Date("2026-12-02T22:00:00.000Z") });
+    // Friday 1 January 2027, Saturday 2 January (a holiday and a weekend day), Sunday 3: Monday 4 January.
+    expect(deadline("2026-12-18T10:00:00.000Z"))
+      .toEqual({ lastDay: "2027-01-04", closesAt: new Date("2027-01-04T22:00:00.000Z") });
+    // Wednesday 6 and Thursday 7 January 2027 are holidays: Friday 8 January.
+    expect(deadline("2026-12-23T10:00:00.000Z"))
+      .toEqual({ lastDay: "2027-01-08", closesAt: new Date("2027-01-08T22:00:00.000Z") });
+    // Good Friday 30 April 2027, Labour Day on the Saturday, Easter Sunday 2 May and Easter Monday 3 May: Tuesday 4
+    // May, closing at Bucharest's midnight in summer time (UTC+3).
+    expect(deadline("2027-04-16T10:00:00.000Z"))
+      .toEqual({ lastDay: "2027-05-04", closesAt: new Date("2027-05-04T21:00:00.000Z") });
+    // A 14th day on that Saturday or that Sunday rolls past the weekend onto Easter Monday, and on to Tuesday.
+    for (const activatedAt of ["2027-04-17T10:00:00.000Z", "2027-04-18T10:00:00.000Z"]) {
+      expect(deadline(activatedAt), activatedAt)
+        .toEqual({ lastDay: "2027-05-04", closesAt: new Date("2027-05-04T21:00:00.000Z") });
+    }
+    // Rusalii Monday 21 June 2027 (the 50th day of Easter): the last day is Tuesday 22 June.
+    expect(deadline("2027-06-07T10:00:00.000Z"))
+      .toEqual({ lastDay: "2027-06-22", closesAt: new Date("2027-06-22T21:00:00.000Z") });
+    // The local date decides: 22:30 UTC on 10 December is already 11 December in Bucharest.
+    expect(deadline("2026-12-10T22:30:00.000Z").lastDay).toBe("2026-12-28");
+    // The same rule for every buyer: Germany's window also runs to Monday 28 December, closing at Berlin's midnight.
+    expect(deadline("2026-12-11T10:00:00.000Z", "DE"))
+      .toEqual({ lastDay: "2026-12-28", closesAt: new Date("2026-12-28T23:00:00.000Z") });
+    // Settings shows the Monday and keeps the window open through it.
+    const open = (now: string) => withdrawalOpenUntil({
+      state: state({ activatedAt: new Date("2026-12-11T10:00:00.000Z") }), taxCountry: "RO", policy: testBillingPolicy,
+      now: new Date(now), paymentEnvironment: "sandbox"
+    });
+    expect(open("2026-12-26T12:00:00.000Z")).toEqual(new Date("2026-12-28T22:00:00.000Z"));
+    expect(open("2026-12-28T21:59:59.999Z")).toEqual(new Date("2026-12-28T22:00:00.000Z"));
+    expect(open("2026-12-28T22:00:00.000Z")).toBeNull();
+    expect(view({ activatedAt: new Date("2026-12-11T10:00:00.000Z") }, "RO", new Date("2026-12-26T12:00:00.000Z")))
+      .toMatchObject({ withdrawal_open_until: "2026-12-28T22:00:00.000Z", withdrawal_last_day: "2026-12-28" });
   });
 
   it("counts from the consumer's local date, and never closes before any zone of a two-zone country", () => {

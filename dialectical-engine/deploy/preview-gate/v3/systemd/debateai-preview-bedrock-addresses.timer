@@ -1,0 +1,10 @@
+# Install as /etc/systemd/system/debateai-preview-bedrock-addresses.timer (root:root 0644).
+# Wanted by debateai-preview.target through debateai-preview.target.d/50-bedrock-gate.conf,
+# so it runs whenever the preview is up (README-bedrock.md starts it the first time).
+[Unit]
+Description=DebateAI preview: hourly check of the Amazon Bedrock gate's allow-list
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+RandomizedDelaySec=5min

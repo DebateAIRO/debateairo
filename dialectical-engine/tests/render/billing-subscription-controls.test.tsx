@@ -17,8 +17,9 @@ function subscription(overrides: Record<string, unknown> = {}) {
   return {
     plan_id: "PLUS", status: "ACTIVE", cancel_requested: false, current_period_end: "2026-10-29T10:00:00.000Z",
     renews_on: "2026-10-29T10:00:00.000Z", renewal_total: "24.20", currency: "USD", scheduled_downgrade_plan_id: null,
-    // A Romanian window: it closes at midnight in Bucharest (UTC+3 in October), the end of October 13 there.
-    withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13",
+    // A Romanian window: it closes at midnight in Bucharest (UTC+3 in October), the end of October 13 there, 14 days
+    // after the plan started on 29 September.
+    withdrawal_open_until: "2026-10-13T21:00:00.000Z", withdrawal_last_day: "2026-10-13", started_on: "2026-09-29",
     can_upgrade: true, can_change_card: true, can_revoke_cancel: false, ...overrides
   };
 }
@@ -54,7 +55,13 @@ beforeEach(() => {
     quoteSubscriptionUpgrade: vi.fn(), upgradeSubscription: vi.fn(), downgradeSubscription: vi.fn(async () => undefined),
     cancelSubscription: vi.fn(async () => undefined), revokeSubscriptionCancel: vi.fn(async () => undefined),
     withdrawSubscription: vi.fn(), getBillingCharge: vi.fn(),
-    getBillingPlans: vi.fn(async () => PLANS)
+    getBillingPlans: vi.fn(async () => PLANS),
+    // The withdrawal statement's facts: the payer's name and the address the confirmation goes to.
+    getBillingCardDetails: vi.fn(async () => ({
+      country: "RO", region: "Cluj", first_name: "Ana", last_name: "Popescu", phone: "+40712345678", street: "Strada 1",
+      city: "Cluj-Napoca", postal_code: "400114"
+    })),
+    readAccountEmail: vi.fn(async () => ({ email: "ana@example.test", recovery_email: null, pending: null }))
   };
 });
 afterEach(() => {
@@ -155,6 +162,59 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).not.toContain("We refunded");
   });
 
+  it("shows the withdrawal statement before the confirmation: the name, the plan and its start, and the confirmation's address", async () => {
+    // OUG 34/2014 art. 11^1(4): the buyer gives or confirms the name, the contract and where the confirmation goes.
+    client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
+    await render();
+    expect(client.getBillingCardDetails).not.toHaveBeenCalled();
+    expect(client.readAccountEmail).not.toHaveBeenCalled();
+    await click("Withdraw from contract here");
+    expect(client.getBillingCardDetails).toHaveBeenCalledTimes(1);
+    expect(client.readAccountEmail).toHaveBeenCalledTimes(1);
+    const panel = container.querySelector("[data-withdraw-statement]")!;
+    expect([...panel.querySelectorAll("h3, p")].map((line) => line.textContent)).toEqual([
+      "Your withdrawal statement",
+      "I withdraw from my contract for this plan.",
+      "Name: Ana Popescu",
+      "Contract: the Plus plan, started on 29 September 2026",
+      "We will send the confirmation to: ana@example.test",
+      "To use another address, change it under Email on this page first."
+    ]);
+    // The statement sits above the button that sends it.
+    const confirm = button("Confirm withdrawal")!;
+    expect(panel.compareDocumentPosition(confirm) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click("Confirm withdrawal");
+    expect(client.withdrawSubscription).toHaveBeenCalledTimes(1);
+  });
+
+  it("still confirms the withdrawal when the name and the address cannot be read, and never waits for them", async () => {
+    client.getBillingCardDetails.mockRejectedValue(new ContractHttpError("SERVER_FAILURE", 503, "x"));
+    client.readAccountEmail.mockRejectedValue(new ContractHttpError("NETWORK_FAILURE", 0, "x"));
+    client.withdrawSubscription.mockResolvedValue({ refund: "18.00", currency: "USD" });
+    await render();
+    await click("Withdraw from contract here");
+    const panel = container.querySelector("[data-withdraw-statement]")!;
+    expect(panel.textContent).not.toContain("Name:");
+    expect(panel.textContent).toContain("Contract: the Plus plan, started on 29 September 2026");
+    expect(panel.textContent).toContain("We will send the confirmation to the email address of your account.");
+    expect(button("Confirm withdrawal")!.disabled).toBe(false);
+    // A failed read is not a failed withdrawal: no "try again" before anything was sent.
+    expect(text()).not.toContain("That didn't work.");
+    await click("Confirm withdrawal");
+    expect(client.withdrawSubscription).toHaveBeenCalledTimes(1);
+    expect(text()).toContain("We've received your withdrawal. We're refunding $18.00 to your card and will email you when it's done.");
+    // Reads that never answer do not hold the button either.
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.getBillingCardDetails.mockReturnValue(new Promise(() => undefined));
+    client.readAccountEmail.mockReturnValue(new Promise(() => undefined));
+    await render();
+    await click("Withdraw from contract here");
+    expect(container.querySelector("[data-withdraw-statement]")?.textContent)
+      .toContain("We will send the confirmation to the email address of your account.");
+    expect(button("Confirm withdrawal")!.disabled).toBe(false);
+  });
+
   it("sends nothing until the confirmation is pressed", async () => {
     await render();
     await click("Withdraw from contract here");
@@ -221,6 +281,32 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(goToPayment.mock.calls).toEqual([[page]]);
   });
 
+  it("shows the test-mode note in the upgrade step only while card payments run on the sandbox", async () => {
+    const quote = {
+      quote_ref: "77777777-7777-4777-8777-777777777777", plan_id: "PRO", net: "30.00", tax: "6.30", total: "36.30", currency: "USD", tax_name: "TVA",
+      tax_rate_basis_points: 2100, tax_country: "RO", recurring_total: "60.50",
+      renews_on: "2026-10-29T10:00:00.000Z", expires_at: "2026-10-03T12:30:00.000Z"
+    };
+    client.quoteSubscriptionUpgrade.mockResolvedValue(quote);
+    const note = (billingEnglish as Record<string, string>)["billing.testMode.notice"]!;
+    // The upgrade leaves for the payment page, as the checkout does, so the same note stands before its Pay button.
+    await act(async () => {
+      root.render(<SubscriptionControls catalog={billingEnglish} locale="en" client={client as unknown as SubscriptionClient} now={() => NOW}
+        renewalConsent={CONSENT} goToPayment={goToPayment} testMode />);
+    });
+    await settle();
+    expect(text()).not.toContain(note);
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(container.querySelector('p.billingNote[role="note"]')?.textContent).toBe(note);
+    act(() => root.unmount());
+    root = createRoot(container);
+    await render();
+    await click("Change plan");
+    await click("Upgrade to Pro");
+    expect(text()).not.toContain(note);
+  });
+
   it("drops an upgrade quote whose start failed, so choosing the upgrade again pays a fresh price (N19b)", async () => {
     const used = "55555555-5555-4555-8555-555555555555";
     const fresh = "66666666-6666-4666-8666-666666666666";
@@ -265,15 +351,16 @@ describe("P20 SubscriptionControls (S1)", () => {
     await click("Change plan");
     expect(button("Move to Pro at renewal")).toBeDefined();
     await click("Move to Plus at renewal");
-    // The price is P8a's public net price, "+ tax", from the renewal date; nothing has changed yet.
+    // The price is P8a's public net price, named as the price before tax, from the renewal date; nothing has changed yet.
     expect(client.getBillingPlans).toHaveBeenCalledTimes(1);
     expect(client.downgradeSubscription).not.toHaveBeenCalled();
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 29 October 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? From 29 October 2026, it costs $20.00 a month before tax. This page shows the exact amount, with tax, once the change is scheduled.");
     client.getBillingSubscription.mockResolvedValue({
       subscription: subscription({ plan_id: "MAX", scheduled_downgrade_plan_id: "PLUS" })
     });
     await click("Yes, move to Plus");
-    expect(client.downgradeSubscription).toHaveBeenCalledWith("PLUS");
+    // The confirm sends the price it showed, so the server schedules the downgrade only at that price.
+    expect(client.downgradeSubscription).toHaveBeenCalledWith("PLUS", { netPrice: PLANS.plans[1]!.net_prices.USD, currency: "USD" });
     const paragraphs = [...container.querySelectorAll("p")].map((paragraph) => paragraph.textContent);
     expect(paragraphs).toContain("Done. You'll move to Plus on 29 October 2026, for $24.20 a month, tax included.");
     expect(paragraphs).toContain("You'll move to Plus on 29 October 2026.");
@@ -293,8 +380,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain(`DBAI 0044 · 1 October 2026 · ${formatMoney("en", "1210.00", "RON")}`);
     await click("Change plan");
     await click("Move to Pro at renewal");
-    expect(text()).toContain(`Move to Pro at your next renewal? It costs ${formatMoney("en", "250.00", "RON")} a month + tax,`
-      + " from 29 October 2026.");
+    expect(text()).toContain(`Move to Pro at your next renewal? From 29 October 2026, it costs ${formatMoney("en", "250.00", "RON")} a month`
+      + " before tax.");
     expect(text()).not.toContain("€");
     expect(text()).not.toContain("$");
   });
@@ -386,6 +473,25 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(client.revokeSubscriptionCancel).not.toHaveBeenCalled();
   });
 
+  it("keeps the withdrawal link on a plan paused by a payment dispute, and gives the e-mail route in place of the confirmation", async () => {
+    // The right lasts the whole 14 days. The server records a withdrawal only for an ACTIVE plan, so the panel sends a
+    // paused buyer to the e-mail route, which counts from the moment the e-mail arrives.
+    client.getBillingSubscription.mockResolvedValue({
+      subscription: subscription({ status: "SUSPENDED", renews_on: null, renewal_total: null, can_upgrade: false, can_change_card: false })
+    });
+    await render();
+    await click("Withdraw from contract here");
+    expect(text()).toContain("A payment dispute is open on your plan, so you can't withdraw on this page until it is decided. "
+      + "You can withdraw now by email: send the model form, or any clear statement that you withdraw, to support@dezbatere.ro. "
+      + "It counts from the moment it reaches us, and we confirm it by email.");
+    // The model form the sentence names is on /withdraw.
+    expect(container.querySelector('[data-subscription-withdraw] a[href="/withdraw"]')?.textContent)
+      .toBe("How to withdraw, and the model withdrawal form");
+    expect(button("Confirm withdrawal")).toBeUndefined();
+    expect(container.querySelector("[data-withdraw-statement]")).toBeNull();
+    expect(client.withdrawSubscription).not.toHaveBeenCalled();
+  });
+
   it("during an outage at renewal (ruling Q-1) promises no past date, and a downgrade or a cancel names today", async () => {
     // NOW is October 3; the period ended on October 2 and the renewal is being retried quietly (up to 72 h).
     client.getBillingSubscription.mockResolvedValue({
@@ -398,7 +504,7 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain("We're processing your renewal. Your plan stays active meanwhile.");
     await click("Change plan");
     await click("Move to Plus at renewal");
-    expect(text()).toContain("Move to Plus at your next renewal? It costs $20.00 a month + tax, from 3 October 2026.");
+    expect(text()).toContain("Move to Plus at your next renewal? From 3 October 2026, it costs $20.00 a month before tax.");
     await click("Keep my plan");
     await click("Cancel");
     expect(text()).toContain("Cancel your plan? You keep it until 3 October 2026.");
@@ -477,8 +583,8 @@ describe("P20 SubscriptionControls (S1)", () => {
     for (const [failure, sentence] of [
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "UPGRADE_NOT_AVAILABLE_NOW"), "Your plan is about to renew, so an upgrade can't start right now."],
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "ACCOUNT_ERASURE_PENDING"), "Your account is scheduled for deletion."],
-      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee).
-      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee, so we can't take payment for this address."]
+      // A subscriber whose stored billing address is in a region the Terms exclude (Tennessee or Mississippi).
+      [new ContractHttpError("FORBIDDEN", 403, "x", "REGION_TERMS_EXCLUDED"), "We don't offer Dialectical Engine in Tennessee or Mississippi, so we can't take payment for this address."]
     ] as const) {
       act(() => root.unmount());
       root = createRoot(container);
@@ -515,6 +621,21 @@ describe("P20 SubscriptionControls (S1)", () => {
     expect(text()).toContain("Your plan is renewing right now, so a change can't be scheduled yet. You can change it as soon as the renewal has gone through.");
     expect(text()).not.toContain("That didn't work. Please try again.");
     expect(client.getBillingSubscription.mock.calls.length).toBe(readsBeforeRenewing);
+    // DOWNGRADE_PRICE_CHANGED: the plan's price changed between the confirmation and the click, so nothing was
+    // scheduled; say so, read the card again, and let the person choose again at the price now shown.
+    act(() => root.unmount());
+    root = createRoot(container);
+    client.downgradeSubscription.mockRejectedValueOnce(new ContractHttpError("SERVER_FAILURE", 409, "x", "DOWNGRADE_PRICE_CHANGED"));
+    await render();
+    await click("Change plan");
+    await click("Move to Pro at renewal");
+    const readsBeforeChanged = client.getBillingSubscription.mock.calls.length;
+    await click("Yes, move to Pro");
+    expect(client.downgradeSubscription).toHaveBeenLastCalledWith("PRO", { netPrice: PLANS.plans[2]!.net_prices.USD, currency: "USD" });
+    expect(text()).toContain("That plan's price changed while this page was open, so nothing was scheduled. Choose it again to see the current price.");
+    expect(text()).not.toContain("That didn't work. Please try again.");
+    expect(client.getBillingSubscription.mock.calls.length).toBeGreaterThan(readsBeforeChanged);
+    expect(button("Yes, move to Pro")).toBeUndefined();
   });
 
   it("asks for the updated Terms first when D6b's routes answer LEGAL_REACCEPTANCE_REQUIRED, never 'try again'", async () => {
@@ -624,8 +745,6 @@ describe("P20 SubscriptionControls (S1)", () => {
     for (const [failure, sentence] of [
       // Everyone served has the 14 days (owner's decision of 16 November 2026): the sentence names no place where they do not apply.
       [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_WINDOW_CLOSED"), "The 14-day withdrawal period has ended. You can still cancel at any time."],
-      // NV-45: a debate may still be using credit and more than a day of the window is left; nothing was written.
-      [new ContractHttpError("SERVER_FAILURE", 409, "x", "WITHDRAWAL_DEBATE_RUNNING"), "A debate you started may still be using credit, so we can't tell yet how much you used. Please try again later. You still have more than a day to withdraw."],
       [new ContractHttpError("NETWORK_FAILURE", 0, "x"), "We're still confirming this with the payment provider."]
     ] as const) {
       act(() => root.unmount());

@@ -90,7 +90,7 @@ describe("privacy policy modal — rendered", () => {
     const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
 
     expect(dialog.querySelector(".policyEyebrow")!.textContent).toBe(
-      "PRIVACY POLICY · v3.12 · EFFECTIVE 4 NOVEMBER 2026"
+      "PRIVACY POLICY · v1.0 · EFFECTIVE 22 NOVEMBER 2026"
     );
     expect(dialog.querySelector(".policyTitle")!.textContent).toBe("What we store, and why");
     expect(dialog.querySelector(".policyLede")!.textContent).toBe(
@@ -212,11 +212,14 @@ describe("privacy policy modal — rendered", () => {
     // 59 until Switzerland's part (Annex B.5, one paragraph) left on 14 November 2026.
     // 58 until section 7's drafting note on support and backup retention left on 15 November 2026.
     // 58 again since section 5 gained its paragraph on DeepInfra on 16 November 2026.
-    expect(expectedParagraphs).toBe(58);
+    // 59 since section 5 gained its paragraph on Amazon (Privacy 3.16).
+    expect(expectedParagraphs).toBe(59);
     // R22 item 15: section 2's and section 7's "Page settings and visits" rows add two. R22 decisions 35 and 36: the report's rows and the sealed original's row add three.
     // Privacy 3.12 (plan Task 83c): section 2's and section 7's "Questions not started yet" rows add two.
     // 0157 (Privacy 3.11, amended in place): three table rows more.
-    expect(expectedBullets).toBe(91);
+    // Privacy 3.14: section 4's product-news row left (we send no marketing email).
+    // Privacy 3.15: section 7 gains the unfinished sign-up row, and its acceptance row becomes two.
+    expect(expectedBullets).toBe(92);
     expect(dialog.querySelectorAll(".policyText").length).toBe(expectedParagraphs);
     expect(dialog.querySelectorAll(".policyItem").length).toBe(expectedBullets);
 
@@ -240,7 +243,7 @@ describe("privacy policy modal — rendered", () => {
 
     const scrollRegion = dialog.querySelector(".policyBody")!;
     const last = scrollRegion.lastElementChild!;
-    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v3.12");
+    expect(last.textContent).toBe("END OF POLICY · GDPR (EU) 2016/679 · v1.0");
 
     // The honesty rule: this repository generates no policy PDF, so no control claims one.
     const pdf = [...dialog.querySelectorAll("*")].filter(

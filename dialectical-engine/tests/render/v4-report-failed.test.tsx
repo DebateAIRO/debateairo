@@ -82,10 +82,10 @@ describe("the report page of a debate that did not finish (map-f30)", () => {
     expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([`/v4/debate/${runId}`]);
     expect(headerBack()).toEqual({ text: CATALOG["v4.report.backToQuestion"], href: `/v4/debate/${runId}` });
     expect(links(CATALOG["v4.report.backToMap"]!)).toEqual([]);
-    // report-f10 (t4 report track): Ask a new question; the classic view only in the account menu.
+    // report-f10 (t4 report track): Ask a new question; no classic view, on the page or in the account menu.
     expect(links(CATALOG["v4.debate.askNew"]!)).toEqual(["/v4"]);
     expect(links(CATALOG["v4.common.classicView"]!)).toEqual([]);
-    expect(host!.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe(`/debate/${runId}`);
+    expect(host!.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe("none");
   });
 
   it("a debate still running keeps 'Back to the map'", async () => {
@@ -96,9 +96,9 @@ describe("the report page of a debate that did not finish (map-f30)", () => {
     expect(links(CATALOG["v4.report.backToMap"]!)).toEqual([`/v4/debate/${runId}`]);
     expect(headerBack()?.text).toBe(CATALOG["v4.report.backToMap"]);
     expect(links(CATALOG["v4.report.backToQuestion"]!)).toEqual([]);
-    // Question 12 B: no foot link under the line any more; the account menu holds the classic view.
+    // No foot link under the line, and no classic view in the account menu either.
     expect(links(CATALOG["v4.common.classicView"]!)).toEqual([]);
     expect(host!.querySelector(".v4RepFoot")).toBeNull();
-    expect(host!.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe(`/debate/${runId}`);
+    expect(host!.querySelector(".v4HdrAccount")!.getAttribute("data-classic")).toBe("none");
   });
 });

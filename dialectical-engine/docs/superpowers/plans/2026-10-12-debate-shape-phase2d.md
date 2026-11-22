@@ -76,7 +76,7 @@ Tasks 1–3:
 - Task 2 rewritten for `--register-next`: without it, `--shape-policy` publishes the practice's own version as planned; with it, practice.ts hands the policy to `composePracticeNextRegisterVersion` (new optional `debateShape`, passed to `buildPreviewSourceRowsV2`'s existing argument) and nothing more is published; Step 5(c) keeps today's block, the five pinned strings and both progress messages, and only widens the `const settings` expression; old Steps 5(d)/5(e) deleted (done in today's code); `shapeRowChange` names the row's change in either path; a guard refuses a policy the version does not carry; a unit case for the flag combination; `answer-writer-v3-register-12` in Step 6 (pre-flight PF-D1; controller ruling D-REGNEXT).
 - Task 2: `PRACTICE_CODE_HASH_ROW_KEYS` holds `conformanceContractHash` too; the expected key order and the hash test follow (pre-flight PF-D7).
 - Task 2 Step 5(a): one value import from `@debateai/register` replaces today's type-only line (pre-flight PF-D8).
-- Task 2: what a shape debate does from this task on (one Haiku fast check, about $0.00013; site "en" before Task 7b); the red-first message; no `noUnusedLocals` (pre-flight PF-D10).
+- Task 2: what a shape debate does from this task on (one small Haiku fast check; site "en" before Task 7b); the red-first message; no `noUnusedLocals` (pre-flight PF-D10).
 
 Task 4 and Task 5:
 - Task 4: a shape run whose map answers were not argued (`mapAnswersArgued` false) is NOT_PROVEN `SHAPE_NOT_EXERCISED:MAP_ANSWERS_NOT_ARGUED`, its opening `TODAYS_OPENING`; tests, verdict doc and commit say so (pre-flight PF-D11; controller ruling D-NOTARGUED).
@@ -95,7 +95,7 @@ Task 7 (README and S-8):
 - The pinned sentence sits on one line (pre-flight PF-D16).
 - S-8 keeps one working folder in the home folder from day 1, with a dated copy of `$P/compare` each day (pre-flight PF-D17).
 - S-8 checks that the story retells the answers note (pre-flight PF-D18).
-- Cost about $1.9 to $4.3 (up to about $6 with reruns), plus the fast check's $0.00013 a shape debate; the shape's room read from the first run's admission figures; the time names the call setting, the same for both arms; the exit-30 row names `SHAPE_NOT_EXERCISED` (and the blank line that split the exit table goes); one line lists the owners' separate switch-on steps; the C-TWO clause on `alsoRaised` (pre-flight PF-D19, PF-D10; pre-flight check 2026-10-14).
+- Cost: what each run's report says it spent, with room kept for reruns, plus the fast check on each shape debate; the shape's room read from the first run's admission figures; the time names the call setting, the same for both arms; the exit-30 row names `SHAPE_NOT_EXERCISED` (and the blank line that split the exit table goes); one line lists the owners' separate switch-on steps; the C-TWO clause on `alsoRaised` (pre-flight PF-D19, PF-D10; pre-flight check 2026-10-14).
 - The reasons list gains `MAP_ANSWERS_NOT_ARGUED` and `NO_MAP_STORED`; Step 4 expects 26 tests (pre-flight PF-D11, PF-D12, PF-D9).
 
 Task 7b (the question language):
@@ -753,7 +753,7 @@ The tool gained `--register-next` after this plan was first written: it publishe
 - without `--register-next`, `--shape-policy` publishes the practice's own version, as planned;
 - with `--register-next`, the policy is handed to `composePracticeNextRegisterVersion`, which passes it to the preview publish kit's own source build (`buildPreviewSourceRowsV2`'s existing `debateShape` argument). The code's next version then carries the row, through the server's own publisher path, and nothing more is published. A second version on top would have undone every row the code's next version changed.
 
-What a `--shape-policy` debate does from this task on (pre-flight PF-D10): one fast language check by Haiku through the Anthropic gate during the ask (about $0.00013; not a ledger `MODEL_CALL` row). Before Task 7b the ask carries no `site_language`, so the site is "en", an always-ask site: a Romanian question is locked FAST "ro" (or `FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE` on a mix, ruling L-POPUP-FIRST). A register without a `questionLanguagePolicy` row uses the code's start values.
+What a `--shape-policy` debate does from this task on (pre-flight PF-D10): one fast language check by Haiku through the Anthropic gate during the ask (one small call; not a ledger `MODEL_CALL` row). Before Task 7b the ask carries no `site_language`, so the site is "en", an always-ask site: a Romanian question is locked FAST "ro" (or `FAST_MIX_NO_OFFER:NO_SITE_LANGUAGE` on a mix, ruling L-POPUP-FIRST). A register without a `questionLanguagePolicy` row uses the code's start values.
 
 **Files:**
 - Modify: `tools/preview-practice/practice-register-import.ts` (append; `composePracticeNextRegisterVersion` gains an optional `debateShape`)
@@ -2367,13 +2367,12 @@ cp -Rp "$P/compare" "$HOME/debate-shape-s8-compare-$(date +%Y-%m-%d)"
 
 Money and time, within the owners' daily test budget:
 
-- **Cost per debate.** A depth-1 debate costs roughly $0.15 to $0.70 in today's shape and about $0.30 in the new shape,
-  plus one fast language check by Haiku per new-shape debate (about $0.00013, on the Anthropic gate). Formats costs
-  $0.10 to $0.30. The whole comparison is about $1.9 to $4.3 (four debates in each shape and day 1's formats),
-  spread over at least four days. A pair run again adds about $0.45 to $1, so keep room for reruns (up to about $6 in
-  all).
-- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends: about $4
-  DeepInfra and $0.90 Anthropic for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
+- **Cost per debate.** Each run's report gives what it spent ("spent by the gate's count" on each gate's line in
+  `report.md`). A new-shape debate also makes one fast language check by Haiku, on the Anthropic gate. The whole
+  comparison (four debates in each shape and day 1's formats) is spread over at least four days. Keep room in the
+  day's test budget for a pair run again.
+- **Room the estimate needs.** The start-of-debate estimate needs more room left than a debate spends, on both gates,
+  for depth 1 in today's shape. So the second debate of a day may be refused at the ask.
   Then the report's first reason starts with `ADMISSION_REFUSED:`, and nothing but the AIs' health checks was spent.
   - The new shape's estimate may need more room (the map's merge and choose steps are each counted in full on both
     gates). Read the first new-shape run's admission figures before you plan the next day: whether it was admitted,
@@ -2381,7 +2380,7 @@ Money and time, within the owners' daily test budget:
   - Run that debate first thing the next Bucharest day, into the same folder.
   - Note in your own log that the pair was split over two days.
 - **Daily stop.** After every run, read the "spent by the gate's count" on each gate's line in `report.md`. Stop for
-  the day once the day's runs add up to $4.50 DeepInfra or $0.90 Anthropic. Haiku is the only AI on the Anthropic gate,
+  the day once the day's runs come close to the testing day's limit on either gate (the owner's figures). Haiku is the only AI on the Anthropic gate,
   so its line is Haiku's share.
 - **Time.** Both debates of a pair run with the same call setting: the same `--call-concurrency` value on both
   commands, or none on either. The commands below give none, so they use the register's own setting, which on today's
@@ -2465,12 +2464,12 @@ The whole bullet then reads, rewrapped only where an insertion lengthened a line
 (e) In "## Money and time (rough)", after the **debate** bullet, add:
 
 ```markdown
-- debate in the new shape (`--shape-policy`), depth 1: about $0.30 (spec 2026-10-12), with fewer calls than today's
-  shape, plus one fast language check by Haiku on the Anthropic gate (about $0.00013). Its start-of-debate estimate may
+- debate in the new shape (`--shape-policy`), depth 1: fewer calls than today's shape (the run's report gives what
+  it spent), plus one fast language check by Haiku on the Anthropic gate. Its start-of-debate estimate may
   need more room than today's shape (the map's merge and choose steps are each counted in full on both gates): read
   the first new-shape run's admission figures (S-8, "Room the estimate needs").
-- the whole-debate comparison (S-8): eight depth-1 debates over at least four days, about $1.9 to $4.3 in all with
-  day 1's formats; a pair run again adds about $0.45 to $1, so allow up to about $6 for reruns.
+- the whole-debate comparison (S-8): eight depth-1 debates over at least four days, with day 1's formats; keep room
+  in the day's test budget for a pair run again.
 ```
 
 (f) In "## Files", add these two bullets right after the bullet that names `practice-debate.ts` (pre-flight check 2026-10-14: no bullet starts with it; it is the bullet that starts `` - `practice-lanes.ts`, `practice-formats.ts` `` and ends `` `--transcript` file. ``):
@@ -3837,7 +3836,7 @@ with:
 (a) In "## What this is, in plain words", change "Three modes:" (README:20) to "Four modes:" (pre-flight PF-D28), and add a bullet after **openings**:
 
 ```markdown
-- **language**: the question-language practice (no debate, under <amount>). Nine fixed questions are each read the way the
+- **language**: the question-language practice (no debate, a few small calls). Nine fixed questions are each read the way the
   site will read them before a debate, and the report says which language each would be locked to. See "The question
   language".
 ```
@@ -3865,7 +3864,7 @@ With the new shape on, the site fixes the language of each question before the d
   were no fast AI: its language must come from its alphabet. The fast AI is still asked, so its reading is written
   down.
 - It writes `language.jsonl` (one line per question, never the question's text), `report.json` and `report.md`.
-- It costs under $0.05 and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
+- It makes a few small calls (the report gives what it spent) and takes about 5 to 20 minutes: the questions go one at a time, and the slower AIs take 30 to
   170 seconds to plan a question's angles.
 
 | Id | Site | Must lock | Offer the rewrite |
@@ -3946,13 +3945,13 @@ echo "exit: $?"
    uploaded. NOT_PROVEN: run it again later the same day.
 3. Then, the same day, one full practice debate on `lang-ro-en-mix` in the new shape (the command at the end of "The
    question language"). It must PASS, and its "Question language" paragraph must say the offer was made and the
-   rewrite used. It costs about $0.30 and takes 1 to 2 hours, like one new-shape debate.
+   rewrite used. It spends and takes about as long as one new-shape debate (1 to 2 hours).
 ```
 
 Then:
 - in item 4 (the old item 2), change "Then run the first pair on `ro-euro`" to "Day 2: run the first pair on `ro-euro`";
 - in the "**One pair a day after that:**" table, change the days 2, 3, 4 to 3, 4, 5;
-- in S-8's **Cost per debate** bullet, change "spread over at least four days" to "spread over at least five days" and add the sentence "The language mode costs under <amount> and the `lang-ro-en-mix` debate about $0.30, on day 1 after formats.";
+- in S-8's **Cost per debate** bullet, change "spread over at least four days" to "spread over at least five days" and add the sentence "The language mode and the `lang-ro-en-mix` debate run on day 1 after formats.";
 - in "## Money and time (rough)", change Task 7's "eight depth-1 debates over at least four days" to "eight depth-1 debates over at least five days, after day 1's language mode and `lang-ro-en-mix` debate".
 
 (d) In "Optional flags", at the end of the plain `- debate:` bullet (README ~445, after its `--register-next` sentences), add: `` `--site-language <code>`, `--language-choice use|keep` (default `keep`; see "The question language"; debate only, with a debate-shape row). `` Right after that bullet, add:
@@ -3962,7 +3961,7 @@ Then:
   `questionLanguagePolicy` row, if any). Nothing else.
 ```
 
-(e) In "## Money and time (rough)", add: `- language: under $0.05, about 5 to 20 minutes.` (pre-flight PF-D28)
+(e) In "## Money and time (rough)", add: `- language: a few small calls (the run's report gives what it spent), about 5 to 20 minutes.` (pre-flight PF-D28)
 
 (f) In "## Files", add after the `practice-shape.ts` bullet:
 
@@ -4571,7 +4570,7 @@ Expected: every one PASS. A red one is reported with its file and case; fix only
 | The start-values file is exactly the start values (`mapStepBounds` written, no `enabled`) | Task 1 (the file and its test) |
 | A row switched off (`enabled: false`) is no row | Task 1 (refused in a `--shape-policy` file); Task 2 (`debateShapeInForce` on the register's row) |
 | P2L as a precondition; P2d runs last | Global Constraints ("Order"); Task 0 Step 3b |
-| Language mode: eld, the fast check always asked, one `MAP:angles` per case, the lock as the decider computes it, `language.jsonl` + report in the outside-the-repository folder, under $0.05 | Task 7b (`runPracticeLanguage`, `practiceLanguageOutcome`, `runPracticeLanguageMode`; unit tests; the integration case counts nine fast checks and pins every lock's source) |
+| Language mode: eld, the fast check always asked, one `MAP:angles` per case, the lock as the decider computes it, `language.jsonl` + report in the outside-the-repository folder, a few small calls | Task 7b (`runPracticeLanguage`, `practiceLanguageOutcome`, `runPracticeLanguageMode`; unit tests; the integration case counts nine fast checks and pins every lock's source) |
 | The nine language cases: P2L's table word for word, then the P2L final review's I3 (`lang-zh-short`, the fast check off) and I1 (`lang-ku-arab`, Sorani on the Arabic site) (pre-flight PF-D25, controller ruling D-CASES) | Task 7b (`PRACTICE_LANGUAGE_CASES`; a test pins every field, and the two added questions' letter counts) |
 | Pass bar: no wrong lock, every real mix offered; rewrites judged by the owners from report.md; planner never counted | Task 7b (`practiceLanguageVerdict` on FAIL / NOT_PROVEN / PASS; report.md shows question and rewrite side by side; the planner test) |
 | CR-3: the planner's disagreement is operator-only, never a condition mark | Task 0 Step 3b (not in `CONDITION_MARKS`); Task 7b (read through `readMapResultForRun` into the practice report only; no mark expected or counted) |

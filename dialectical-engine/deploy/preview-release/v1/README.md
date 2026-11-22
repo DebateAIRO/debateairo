@@ -87,6 +87,7 @@ writing, so they take a few minutes each. `ui-build` refuses a folder that alrea
 | `native-plan --operation verify --from <the publish plan> --publication <what the native operator printed for publish> --source-manifest <manifest> --out <file>` | step 3: the verify plan for the NEW publication (same id, base and snapshot as the publish plan) |
 | `launch-plan … --publication <what the native operator printed for publish>` | launch plans that carry the new publication instead of the old plan's; the `--native-attestation` proof must already name it |
 | `database-ahead --older-source-manifest <old candidate api manifest> --newer-source-manifest <new candidate api manifest> --out <artifacts folder>/database-ahead-<older label>.json` | the database steps the newer release adds (each with both `n1` header lines) and its whole forward chain, for the older release's native verify (side-by-side spec §5); root installs it as `/etc/debateai-v3-preview/auth-dev-v1/database-ahead-<older label>.json` and pins it with `prestart.mjs accept-ahead`; no new step: `DATABASE_AHEAD_NOT_NEEDED`, nothing written |
+| `site-inputs --operation report\|compose --from <the live settings version's verify plan> --site '<JSON object>' [--change '<input names>'] [--limits '<plan ids>'] [--out <artifacts folder>/site-inputs.json]` | the site's numbers for an upload (SB3): compares the owner's server file (`--site`, as one JSON object) with the hosted inputs of `--from`, input by input, plan by plan. `report` prints `{event,operation,lines,differing,limitPlans}` and takes neither list: each line says `SAME`, or `DIFFERENT` with the member and `higher`, `lower` or `changed` (or `NOTE` with advice); never an amount. `compose` needs `--out`; it writes the new version's hosted inputs there (the live ones, with exactly the inputs `--change` names taken from the file) and prints `{path,sha256,bytes,change,limits}`. It refuses, naming the inputs or plans in `fields`, unless `--change` is exactly the inputs that differ (`SITE_CHANGE_NOT_NAMED`, `SITE_CHANGE_NAMED_BUT_SAME`) and `--limits` exactly the plans whose limits change, up or down, for the people already on them (`SITE_LIMITS_NOT_NAMED`, `SITE_LIMITS_NAMED_BUT_SAME`). `billing` must be the same on both sides (`SITE_BILLING_SWITCH_DIFFERS`); both must list the same plans (`SITE_PLAN_LIST_DIFFERS`); a side that is not the six hosted inputs, or a mix the native operator's check refuses, is `SITE_INPUTS_REFUSED` |
 
 ## Operator sequence for one release
 
@@ -536,18 +537,32 @@ thinking-levels redeploy was done before, because the file's hash changed again.
 gates against THIS release's gate files (in the candidate API folder `$CAPI` named in step 0 of
 the operator sequence; the gate README installs the same two files from the same place). An old
 gate file with its old GO would agree with each other, so each gate's two installed files and the
-two hashes in its GO must all equal this release's files. The first line must print
-`release gate files found`, each gate's line must say `match this release`, and each `state` line
-must say `active`:
+two hashes in its GO must all equal this release's files. GATES2 below checks this; run it as a
+script (`set -euo pipefail` first, then the upload's names file, whose `$CAPI` is the candidate API
+folder; `deploy/preview-auth-dev/v1/MAIN-SITE.md`, "How to run a server step"). Each gate's line must
+say `gate code this release; state active`, and the last line `GATES2_DONE`:
 
 ```sh
-NEW=$CAPI/dialectical-engine/packages/providers/ops; test -f "$NEW/preview_budget_authority.py" && test -f "$NEW/preview_budget_helper.py" && echo "release gate files found"
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# GATES2: the DeepInfra and the Anthropic gates run this release's gate code (their two files, and the two hashes in each GO) and are active. Read-only.
+NEW=$CAPI/dialectical-engine/packages/providers/ops
+[ -f "$NEW/preview_budget_authority.py" ] && [ -f "$NEW/preview_budget_helper.py" ] || { echo "GATES2_NOT_DONE: this release's gate files are not in $NEW"; exit 1; }
 NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
-same() { [ -n "$NB" ] && [ -n "$NH" ] && [ "$(sha256sum "$1/preview_budget_authority.py" | cut -d' ' -f1)" = "$NB" ] && [ "$(sha256sum "$1/preview_budget_helper.py" | cut -d' ' -f1)" = "$NH" ] && [ "$(jq -r .bridge_sha256 "$2")" = "$NB" ] && [ "$(jq -r .helper_sha256 "$2")" = "$NH" ]; }
-if same /opt/debateai-v3-preview/operator/deepinfra-budget-v3 /etc/debateai-v3-preview/provider-deepinfra-go-v3.json; then echo "deepinfra gate files and GO match this release"; else echo "deepinfra does NOT match this release: stop"; fi
-echo "deepinfra state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/deepinfra-budget-v3/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-deepinfra-authority-v3 | jq -r .state)"
-if same /opt/debateai-v3-preview/operator/anthropic-budget-v1 /etc/debateai-v3-preview/provider-anthropic-go-v1.json; then echo "anthropic gate files and GO match this release"; else echo "anthropic does NOT match this release: stop"; fi
-echo "anthropic state $(/usr/bin/python3 -I /opt/debateai-v3-preview/operator/anthropic-budget-v1/preview_budget_authority.py status --private /var/lib/debateai-v3-preview/provider-anthropic-authority-v1 | jq -r .state)"
+dg() { { sha256sum "$1" 2>/dev/null || true; } | cut -d' ' -f1; }
+gv() { jq -r "$1 // empty" "$2" 2>/dev/null || true; }
+NOT=''
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1; do
+  IFS=: read -r NAME FOLDER STATE GOFILE <<<"$G"
+  F=/opt/debateai-v3-preview/operator/$FOLDER; GO=/etc/debateai-v3-preview/$GOFILE.json
+  if [ "$(dg "$F/preview_budget_authority.py")" = "$NB" ] && [ "$(dg "$F/preview_budget_helper.py")" = "$NH" ] && [ "$(gv .bridge_sha256 "$GO")" = "$NB" ] && [ "$(gv .helper_sha256 "$GO")" = "$NH" ]; then CODE='this release'; else CODE='NOT this release'; fi
+  ST=$( { /usr/bin/python3 -I "$F/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" 2>/dev/null || true; } | jq -r '.state // empty' 2>/dev/null || true)
+  echo "$NAME: gate code $CODE; state ${ST:-unread}"
+  [ "$CODE" = 'this release' ] && [ "$ST" = active ] || NOT="$NOT $NAME"
+done
+[ -z "$NOT" ] || { echo "GATES2_NOT_DONE: not on this release's gate code, or not active:$NOT"; exit 1; }
+echo GATES2_DONE
+exit 0
 ```
 
 Anything else means stop: do not publish the row until both gates run the new code.
@@ -650,8 +665,9 @@ What the repository adds for it (each in `deploy/preview-auth-dev/v1/README.md`)
   signed-in page.
 - Sign-up refuses the special-use email endings (`.test`, `.example`, `.invalid`, `.localhost`).
 - Billing emails, and the owner's reports, go only to the addresses allowed in
-  `/etc/debateai-v3-preview/auth-dev-v1/mail-recipient.json`. Buy only from accounts on those
-  addresses, and give the owner-report file one of them.
+  `/etc/debateai-v3-preview/auth-dev-v1/mail-recipient.json` while the mail plan is v1 or v2 `allow-list`
+  (with v2 `open`, each goes to its own address: `deploy/preview-auth-dev/v1/MAIN-SITE.md` part 4). Buy only
+  from accounts on those addresses, and give the owner-report file one of them.
 - Moving the billing clock (`BILLING_STAGE_CLOCK_OFFSET_DAYS`) stays refused (the owner is still
   deciding), so a renewal cannot be tested on this host yet.
 
@@ -662,6 +678,8 @@ billing on and a credit of the code's made-up row refuses too (`hosted-billing-p
 **The owner's inputs.** Decide them before step H6. Amounts are micro-dollars: $1 is `1000000`. Since R22 they live only in a
 root-owned file on the server, `/etc/debateai-v3-preview/hosted-billing-v1.json` (mode `0600`), never in this repository. It is
 the JSON object the table below describes, with `billing` set to anything: the steps set it. Every `HB` line below reads it.
+On the template layout an upload publishes a number from this file only where SB3's `NEWNUM` names it ("The site's
+numbers" under SB3 of "Side-by-side release (from T+1)"); every other number stays the live version's.
 
 | Input | Where it goes | Its value |
 |---|---|---|
@@ -1078,7 +1096,9 @@ switched.
 Then run the two SAME checks of `deploy/preview-auth-dev/v1/README.md` "Operator checks before the
 first start" (the preview configuration and team; the mode and register version): both must print
 `SAME`. The launchers refuse anything outside the rules, with `PREVIEW_API_STARTUP_REFUSED` and nothing
-more: a live NETOPIA base, a key file elsewhere, three of NETOPIA's four settings, or the moved clock.
+more: a live NETOPIA base (unless the API file also carries the payments line `PREVIEW_LIVE_PAYMENTS=real-money`,
+whose own rules refuse by name: `deploy/preview-auth-dev/v1/MAIN-SITE.md` part 7), a key file elsewhere, three of
+NETOPIA's four settings, or the moved clock.
 
 **Do not run the runner's prepare-only launcher here** (`launch-runner.mjs --plan`, no `--start`). It
 refuses a database proof (native attestation) older than 180 seconds (`native-attestation.mjs`). The
@@ -1189,14 +1209,20 @@ As in `deploy/vps/README.md` §14.9 step 1, without the clock move. On an accoun
 allow-listed: open the pricing page, choose Plus, pick the United States as the country, answer the
 "Do you live in …" question with yes, give a state, press **Subscribe and pay**, and on NETOPIA's
 sandbox page pay with the test card 9900 0048 1022 5098 (any future expiry, CVV 111). Expect: back on
-the site, the plan active within seconds; the confirmation (M1, with the Terms attached) and the
-receipt (M2) at that allow-listed inbox; Settings shows the saved card; the invoice in Quaderno's
+the site, the plan active within seconds; the confirmation (M1) and the receipt (M2) at that
+allow-listed inbox. M1 attaches the Terms the account accepted when the archive holds that text: an
+account that accepted Terms 1.0 (every account made since the launch texts went live) gets the file;
+an account made before them gets M1 without a file, saying where the current Terms are online, and the
+API's journal shows `billing.mail.attachment_missing` with `MAIL_TERMS_NOT_ARCHIVED` (expected, not a
+fault); Settings shows the saved card; the invoice in Quaderno's
 sandbox. Then, on a second allow-listed account (the first already has Plus), the 3-D Secure test card
 9900 0091 8421 4768: write down how the bank's check looked. A Romanian buyer's purchase goes to the
 dummy SmartBill and fails harmlessly: do not pay as one here. Renewals need the moved billing clock,
 which stays refused. `mail-recipient.json` allows four addresses (stored as SHA-256 hashes). Two of
 them are verification-forward aliases, and mail to those arrives in the forward target's inbox
-(`verificationForwardTarget`, the one address the file holds in plain text).
+(`verificationForwardTarget`, the one address the file holds in plain text). The allow-list holds while the
+mail plan is v1 or v2 `allow-list`; with v2 `open` each mail goes to its own address
+(`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 4).
 
 ### H9. The billing notice spool (optional, from the release that carries PR #192)
 
@@ -1941,10 +1967,11 @@ jq -r '["billingPolicy","costEnvelopePolicy","admissionPolicy","storyCostEnvelop
 
 ### A10. Gate files
 
-Run the check of "Publishing the call-concurrency row", Step 0 above (the `same` lines). Both gates must print
-`match this release`, and both `state` lines `active`. If A2 listed a changed gate file, stop: that gate is
-redeployed first, as `deploy/preview-gate/v3/README.md` says, with the owner's yes. In R19 nothing had changed, so
-there was nothing to install.
+Run GATES2 ("Publishing the call-concurrency row", Step 0 above). Both gates' lines must say
+`gate code this release; state active`, and the last line `GATES2_DONE`. If A2 listed a changed gate file, stop: that
+gate is redeployed first, as `deploy/preview-gate/v3/README.md` says, with the owner's yes. In R19 nothing had changed,
+so there was nothing to install. From the upload that brings the Amazon gate on, GATES4 checks all four gates instead
+("The Amazon Bedrock gate: the upload that brings it").
 
 ### The practice (on the Mac; owner rule: before every upload)
 
@@ -1963,7 +1990,7 @@ PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRA
   - repaired slips, a story served with reservation, slow AIs and one unbilled "too busy" are warnings.
 - **The match.** The changed rows the practice prints (and `register.codeNext` in `report.json`) must equal A8's
   `addedKeys` and `changedKeys`, except `nodeRuntimeVersion`: the server measures its source reference again.
-- R19's practice: PASS_WITH_WARNINGS, 33 minutes, $0.24 DeepInfra and $0.06 Anthropic, and the rows matched.
+- R19's practice: PASS_WITH_WARNINGS, 33 minutes, and the rows matched.
 
 ### B0. Preflight again, right before the downtime
 
@@ -2436,7 +2463,9 @@ already carries the call-concurrency row, so the per-debate lane limits can chan
 prices, the daily budget, funding) is refused and needs an upload. So are billing on or off, the room-read budget, the
 band, the runner's per-model limit (`perModelPerRunner`), the provider set, and anything that would need an env change.
 The check refuses such a version (`SETTINGS_SITE_MEMBER_DIFFERS`, `SETTINGS_NEEDS_ENV_CHANGE`) even when nothing else
-changed: a site rule changes with a new site version in a new release (side by side, with its practice).
+changed: a site rule changes with a new site version in a new release (side by side, with its practice). The site's
+numbers (plan prices and limits, the day's ceiling, the room-read budget, the abuse limits) change at that upload's
+SB3, from the owner's file, where its `NEWNUM` names them.
 
 **When.** Only on the template layout, once a release with Phase 2 is current (T+1 and later: `release-check.mjs status`
 works, and `settings-version.mjs status` answers). Before that, a register change is a publication plus the re-pin of
@@ -2538,7 +2567,9 @@ the base by the kit, so the script reads them from the active version's plans (S
 (`HB`, billing on), the checker or the answer seats (`DS` for the live DeepSeek checker, or `SEATS`), and role rotation
 off (`ROT`). Left as read, a plan never switches the checker back to GLM, billing off, or rotation on by accident. `HB`
 may change `perRunCeilingMicros` only; its `dailyCeilingMicros` and `askRoomReads` are site rules (the script and the
-check refuse a change). The JSON options have the shape the kit's section above gives (`--call-concurrency`,
+check refuse a change). A per-debate ceiling changed here leaves the owner's file
+(`/etc/debateai-v3-preview/hosted-billing-v1.json`) behind the live value: the next upload's SB3 says so, and its SB3c
+writes the live value into the file. The JSON options have the shape the kit's section above gives (`--call-concurrency`,
 `--length-guidance`, `--debate-shape`, `--answer-seats`); `--question-language` is added the same way. `SEATS` replaces
 the DeepSeek checker (one way to set the checker): set `DS=''` with it. For a new line-up, make its file first ("The line-up file" below). The native operator reads only
 this release's own plan file, so the plan is put in place for the one run and the verify plan goes back at once (a
@@ -2813,7 +2844,8 @@ silent skip.
   without the settings operator: its own site version). SB3 plans from it, as SV1 does: from the old release's verify
   plan while that is its site version, else from the kept `settings-v<version>` plans, with the hosted inputs, the
   checker or answer seats and rotation read from them, so the new site version keeps every activated debate setting.
-  SB9 and DR5 publish only a proposal based on it.
+  A hosted input comes from the owner's file instead only where SB3's `NEWNUM` names it ("The site's numbers" under
+  SB3). SB9 and DR5 publish only a proposal based on it.
 - **Never activate while an upload is between SB3 and SB13** (or DR6). SB13 and DR6 (and DR2, before the drained
   path's downtime starts) read the active version again and stop, nothing changed, when it is not the one SB3 planned
   from: switching would undo that activation.
@@ -3021,7 +3053,7 @@ echo "the new release passes its own site version $V"
   that release is current, and its intro keeps saying "This list is kept up to date automatically. It always shows the
   companies we currently send data to." (owner, 2026-10-23).
 - **A new AI company: tell people first, and note it in the Register (only an upload that adds one).** The Privacy
-  Policy (version 3.6) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
+  Policy (its sections 14 and 5) makes two promises the owner keeps (2026-10-23), so before that upload's switch:
   1. **Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email
      and in the product, and given time to object. So the owner tells the users which company is added and what it will
      receive, by email and in the product, and the switch (SB13; on the drained path, the downtime at DR2) waits until
@@ -3038,6 +3070,16 @@ echo "the new release passes its own site version $V"
   No legal text changes for this step, and no Privacy Policy version. The yes before the switch names both (SB6; the
   drained path's yes before DR2). An upload that adds no new company skips this step: so does every activation (a
   line-up or model change) and a new model of a company the page already names.
+- **A company listed before it receives anything.** A company is added when it starts receiving data. An upload can
+  list a company on the page while no line-up seats any of its models: its gate is installed, and no debate uses it
+  (the upload that brings the Amazon gate, "The Amazon Bedrock gate: the upload that brings it"). When only the owner's
+  and the team's accounts exist at such an upload, it owes no §14 notice: the company receives nothing at it. Its yes
+  says so instead (that no notice is owed, and why), and the company's dated Register row is in the release as above.
+  The notice is then owed before the activation that first seats one of its models, when any account outside the team
+  exists by then, and that activation waits until the time to object has passed. When accounts outside the team exist
+  already at such an upload, ask before its yes. An account outside the team is an account of anyone other than the
+  owner and the team: the owner's own test sign-ups (MAIN-SITE.md 4.3) do not count; a friend's or NETOPIA's tester's
+  do. When unsure, ask.
 - **A company leaves the targets one release later.** The page shows only what the API it is served by can reach, but
   after a switch the old release's runner keeps finishing its own debates for up to 6 hours, still sending text to the
   companies it used. So take a company's targets out only in an upload after the release that stopped using it (by an
@@ -3049,6 +3091,359 @@ echo "the new release passes its own site version $V"
   maximum depth (a build with the flag set offers the preview's shallower ceiling) and the ask proxy's time limit for the
   preview's ask (1,260 s); the providers page no longer reads it. The UI start-up check still demands that
   `ui.env` and the build name the same list.
+
+## The Amazon Bedrock gate: the upload that brings it
+
+**In plain words.** From this release on the site can use OpenAI's GPT-6 Luna, which Amazon serves through its own
+spending gate (`deploy/preview-gate/v3/README-bedrock.md`). The upload that first carries this code has three pieces of
+server work, and a fourth piece comes later, on a day of its own. None of the three makes anyone's debate use Luna, and
+none sends Amazon anything: Luna joins the debates only at piece 4, by a settings activation, after the owner's probe
+has passed and, when anyone outside the team has an account by then, after the Privacy Policy notice ("What Amazon
+receives, and the notice", below).
+
+In the order the upload meets them:
+
+| When | What | Its check |
+|---|---|---|
+| before SB2, on the Mac | Luna's address in the practice's copy of `settings.env` | LUNAROW |
+| after SB2 (in any case after SB1), before SB3 | piece 1: the DeepInfra, Anthropic and Perplexity gates on this release's gate code, and their units | step 3a's six `1` lines, then GATES4 |
+| right after piece 1, before SB3 | piece 2: the Amazon gate installed and `active`, without its key | GATES4 |
+| SB4 | the gate files reviewed (`GRR`) and the changed operator files reviewed (`LIFE=yes`) | SB4 |
+| right after the env files (SB5; on the drained path, DR1) | piece 3: the gate's socket and Luna's address in the new release's two files | BEDROCK_ENV |
+| right before the owner's yes (SB6; on the drained path, the yes before DR2) | everything the switch and the new services will ask of the gates | GATEREADY |
+| any day after the upload, on its own | piece 4: the notice when it is owed, the gate's watchers, the key and the probe, Luna in the line-up | the probe |
+
+Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload's window from SB3 to the end of the
+switch (SB13; on the drained path, DR6), where only the brakes may run (`deploy/preview-auth-dev/v1/MAIN-SITE.md`,
+"The order rules"). Piece 2 installs the Amazon gate's units and its address drop-in: those are the one exception to
+MAIN-SITE.md part 2's "install no new drop-in".
+
+Why the upload cannot skip them:
+- **The gate code changed for every gate.** The two gate files hold the Amazon profile, and each gate's GO binds their
+  hashes. GATES4 prints `NOT this release` for the three older gates until they are redeployed. The change only widens
+  (it adds a model and a gate): the older gates on the new code still serve the running release as before. So it is
+  deployed after SB2 and before SB3 (pieces 1 and 2).
+- **The release tools count three gates.** This release's `common.mjs` lists the Amazon gate beside the DeepInfra and
+  Anthropic ones (the Perplexity gate is not on the tools' list; piece 1 moves it to the new code all the same, and
+  MAIN-SITE.md's ASKS_OPEN asks for it). Once the new tools are in place (SB10, or DR5 on the drained path, when
+  `LIFE=yes`), the release check, a settings activation and the switch ask that the Amazon gate is installed, runs this
+  release's gate code and is `active` (`SWITCH_PRECONDITION_FAILED` naming `gates`,
+  `SETTINGS_GATE_HELPER_DIFFERS:bedrock` or `GATE_FILES_UNREADABLE` otherwise). A gate with no key is `active` too; it
+  simply cannot make a call. So the key and the probe never hold an upload back, but the gate's folder, GO and service
+  do.
+- **The register this release publishes names Luna's address.** A register version made by this code lists the seven
+  reviewed model references, `preview:gpt-6-luna` last. The API and the runner refuse to start when their own list of
+  model addresses is not exactly the register's (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`). So the new release's env
+  files get Luna's row and the gate's socket in this upload (piece 3), whether or not Luna is ever used. The practice
+  (SB2) runs this code's next register too, so it refuses the same way until its own copy of the settings has the row
+  (LUNAROW).
+
+This was written from the code and the other gates' steps. It has not been rehearsed on the server: run the Mac check
+("Before an upload: the Mac check") on the commit first, and stop and ask at the first line that does not say what
+this section expects.
+
+**Before SB2, on the Mac: Luna's address in the practice's settings (LUNAROW).** S-2 copies `settings.env` from the
+running release's runner file, which lists six model addresses. The practice runs this code's next register, which
+lists seven, so it stops with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH` before the debate starts (nothing is spent).
+LUNAROW adds Luna's row, printed by this commit's own code (the row BEDROCK_ENV adds on the server), to the copy in
+`$P` only; the server's files do not change. Save the block on the Mac, outside the project folder
+(`rm -f ~/luna-row.sh; nano ~/luna-row.sh`, paste, Ctrl-O, Enter, Ctrl-X). Run it in S-6's second terminal, where you
+set `P` to S-5's folder (S-5's own terminal is busy with its `ssh -N`): after S-5's `scp`, and before S-6's `formats`.
+Run `bash ~/luna-row.sh <the full path of the dialectical-engine folder> "$P/settings.env"`.
+
+```bash
+#!/usr/bin/env bash
+# LUNAROW: Luna's model address, printed by this commit's own code, added last to the practice's copy of settings.env on the Mac. Nothing on the server changes; no value is printed.
+set -euo pipefail
+REPO=$(cd "${1:?usage: bash luna-row.sh <the dialectical-engine folder> <the settings.env of the practice>}" && pwd)
+F=${2:?usage: bash luna-row.sh <the dialectical-engine folder> <the settings.env of the practice>}
+KT=PROVIDER_DISCOVERY_TARGETS_JSON
+nd() { echo "LUNAROW_NOT_DONE: $1"; exit 1; }
+[ -f "$F" ] || nd "$F is not a file (S-5 copies settings.env into the folder P)"
+[ "$(grep -c "^$KT=" "$F" || true)" = 1 ] || nd "$KT is not in $F exactly once: ask"
+ROW=$(zsh -lic "cd '$REPO' && node --import ./node_modules/tsx/dist/loader.mjs --input-type=module -e 'import { previewTargetJsonRow } from \"./packages/providers/src/preview-models.ts\"; console.log(JSON.stringify(previewTargetJsonRow(\"preview:gpt-6-luna\")));'" | tail -n 1) || nd "this commit's code did not print Luna's row (are the packages installed?)"
+[ "$(jq -r '[.provider_ref, .model] | join(" ")' <<<"$ROW" 2>/dev/null || true)" = "preview:gpt-6-luna us.openai.gpt-6-luna" ] || nd "the row the code printed is not Luna's: ask"
+T=$(sed -n "s/^$KT=//p" "$F" | jq -ce --argjson row "$ROW" 'if any(.[]; .provider_ref == $row.provider_ref) then . else . + [$row] end | select(.[-1] == $row)') || nd "$F holds another row for Luna, or Luna's row is not last: ask"
+[ -e "$F.before-luna" ] || cp -p "$F" "$F.before-luna"
+cp -p "$F" "$F.luna"
+T="$T" awk -v kt="$KT" 'index($0, kt "=") == 1 { print kt "=" ENVIRON["T"]; next } { print }' "$F" > "$F.luna"
+diff <(grep -v "^$KT=" "$F.before-luna") <(grep -v "^$KT=" "$F.luna") > /dev/null || nd "another line of $F would change ($F.luna is only a draft): ask"
+mv "$F.luna" "$F"
+N=$(sed -n "s/^$KT=//p" "$F" | jq 'length'); W=$(sed -n "s/^$KT=//p" "$F" | jq -r 'if .[-1].provider_ref == "preview:gpt-6-luna" then "last" else "NOT last" end')
+echo "settings.env: $N model addresses, Luna's row $W"
+echo LUNAROW_DONE
+```
+
+What to expect: `settings.env: 7 model addresses, Luna's row last`, then `LUNAROW_DONE`. A second run changes nothing;
+the copy before is `$P/settings.env.before-luna`. Then the practice runs as before. Its line `practising on this code's
+next version` lists the rows the next version changes and adds; they must match SB3's delta (the hosted-base recipe's
+"match"), and this release's delta adds Luna to the register's models. Luna itself sits out of the practice debate: no
+line-up seats it, and the practice reaches only the DeepInfra and Anthropic gates. A new S-2 copy (for a second
+practice), or S-5's `scp` run again, brings the server's six-row `settings.env` back: run LUNAROW again after it.
+
+**Before piece 1, have ready:**
+- the two figures for the Amazon gate's GO (`README-bedrock.md`, install step 5): its daily pot and its daily number of
+  calls. They are typed on the server only. Install step 5's first block prints, on the screen only, the range of pots
+  `activate` accepts: from the smallest pot that carries four calls in flight (below it, `CONCURRENCY_EXCEEDS_BUDGET`)
+  to what the other gates' pots leave under the caps file's team total, at most its per-GO cap (above it,
+  `TEAM_TOTAL_BUDGET_EXCEEDED`). When it prints `NO ROOM`, another gate's pot is lowered first, still before SB3
+  (`deploy/preview-gate/v3/README.md`, "Change the daily budget or another limit");
+- the yes for pieces 1 and 2, and a quiet hour.
+
+The AWS console work (`README-bedrock.md`, install step 0: Luna's subscription and quota, the key, a budget alert, an
+AWS account e-mail address somebody reads) belongs to piece 4. The upload does not wait for it.
+
+**Piece 1, after SB2 and before SB3: the three older gates on this release's gate code, and their units.** Pieces 1
+and 2 need the owner's yes and a quiet hour: each gate's `status` shows `in_flight` 0. Open one root shell (`sudo -i`)
+and keep it for both pieces. Paste each block into it in turn: a later block reads a value, such as `R`, that an
+earlier block set. (These blocks are not scripts of MAIN-SITE.md's form.)
+1. For the DeepInfra, Anthropic and Perplexity gates, one after the other: `deploy/preview-gate/v3/README.md`, "Redeploy
+   (2026-10-12)", steps 1 to 6, each with its own folder, GO, service and README:
+
+   | Gate | `G` | `GO` | service | install step 1 of |
+   |---|---|---|---|---|
+   | DeepInfra | `/opt/debateai-v3-preview/operator/deepinfra-budget-v3` | `/etc/debateai-v3-preview/provider-deepinfra-go-v3.json` | `debateai-preview-provider-budget.service` | `README.md` |
+   | Anthropic | `/opt/debateai-v3-preview/operator/anthropic-budget-v1` | `/etc/debateai-v3-preview/provider-anthropic-go-v1.json` | `debateai-preview-anthropic-budget.service` | `README-anthropic.md` |
+   | Perplexity | `/opt/debateai-v3-preview/operator/perplexity-budget-v1` | `/etc/debateai-v3-preview/provider-perplexity-go-v1.json` | `debateai-preview-perplexity-budget.service` | `README-perplexity.md` |
+
+   Step 3 installs the gate files and `gate_watch.py` with install step 1 of the gate's own README. Its `R` is this
+   upload's release folder: `. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine` (in that order: the names
+   file sets an `R` of its own), and its `R ok` line must print. Step 4 writes the GO again changing only its two hashes
+   (`ONLY_HASHES_CHANGED`); step 6's `activate` must show `"state": "active"`.
+2. `README-bedrock.md`, install step 3a: the six older units are installed again from this release, so that they hide
+   the Amazon gate's folder. Read its differences first (step 3a's first block). Its second block restarts the three
+   gates once more. That is harmless: they stay `active`. Its last lines must print `1` six times. GATES4 does not read
+   the units, so these six lines are piece 1's check of them.
+3. `/opt/debateai-v3-preview/operator/preview-key-v1/preview_key.py` becomes this release's copy (`README-bedrock.md`,
+   install step 1 installs it, in piece 2).
+
+Piece 1 changes no limit, so the running release's runner keeps the number of calls at once it read from each gate at
+its own start: do not restart it for this. The gate README's paragraph right after its step 6 ("Restart the runner
+only after BOTH gates are `active`") does not apply here: a runner reads each gate only at its own start, and piece 1
+changes nothing it read. The new release's runner reads every gate at its start (SB11; on the drained path, DR6).
+
+**Piece 2, right after piece 1 and before SB3: the Amazon gate, without its key.** `README-bedrock.md`, install steps 1
+to 3, 3a (done in piece 1), 5, 6 and 7: the folder, the addresses, the state folder, the GO with the owner's figures
+(after step 5's first block, which prints the range of pots that fit), `init` and `activate`, the units and the start.
+Install step 0 (the AWS console), step 4 (the key) and step 8 (the probe) wait for piece 4 ("Why the key waits for
+piece 4", below).
+
+Then GATES4, run as a script (`set -euo pipefail` first, as MAIN-SITE.md says under "How to run a server step"):
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# GATES4: each of the four spending gates runs this release's gate code (its two files, and the two hashes in its GO) and is active. Read-only.
+NEW=$CAPI/dialectical-engine/packages/providers/ops
+[ -f "$NEW/preview_budget_authority.py" ] && [ -f "$NEW/preview_budget_helper.py" ] || { echo "GATES4_NOT_DONE: this release's gate files are not in $NEW (SB1 and A2 first)"; exit 1; }
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+dg() { { sha256sum "$1" 2>/dev/null || true; } | cut -d' ' -f1; }
+gv() { jq -r "$1 // empty" "$2" 2>/dev/null || true; }
+NOT=''
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1 perplexity:perplexity-budget-v1:provider-perplexity-authority-v1:provider-perplexity-go-v1 bedrock:bedrock-budget-v1:provider-bedrock-authority-v1:provider-bedrock-go-v1; do
+  IFS=: read -r NAME FOLDER STATE GOFILE <<<"$G"
+  F=/opt/debateai-v3-preview/operator/$FOLDER; GO=/etc/debateai-v3-preview/$GOFILE.json
+  if [ "$(dg "$F/preview_budget_authority.py")" = "$NB" ] && [ "$(dg "$F/preview_budget_helper.py")" = "$NH" ] && [ "$(gv .bridge_sha256 "$GO")" = "$NB" ] && [ "$(gv .helper_sha256 "$GO")" = "$NH" ]; then CODE='this release'; else CODE='NOT this release'; fi
+  ST=$( { /usr/bin/python3 -I "$F/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" 2>/dev/null || true; } | jq -r '.state // empty' 2>/dev/null || true)
+  echo "$NAME: gate code $CODE; state ${ST:-unread}"
+  [ "$CODE" = 'this release' ] && [ "$ST" = active ] || NOT="$NOT $NAME"
+done
+[ -z "$NOT" ] || { echo "GATES4_NOT_DONE: not on this release's gate code, or not active:$NOT"; exit 1; }
+echo GATES4_DONE
+exit 0
+```
+
+What to expect: four lines `<gate>: gate code this release; state active` (deepinfra, anthropic, perplexity, bedrock),
+then `GATES4_DONE`. `GATES4_NOT_DONE` names the gates that are not there yet: `NOT this release` on an older gate means
+its redeploy (piece 1, item 1) is not finished; on `bedrock`, piece 2's install steps 1, 5 and 6. A state other than
+`active` (or `unread`: the folder or the state folder is missing) means that gate's `activate` (piece 1, step 6; piece
+2, install step 6). Go on to SB3 only after `GATES4_DONE`.
+
+**At SB4.** SB4 runs the running release's tools, which know only the DeepInfra and Anthropic gates. After piece 1
+their folders and GOs differ from what the last switch recorded, so `GATE_ROWS_N1` prints
+`changed since the switch: review <sha256>`: the owner reviews the gate files (GATES4 said they are this release's) and
+gives that digest as `GRR`. `LIFECYCLE_FILES` prints `changed: …` too, and among the files are
+`deploy/preview-lifecycle/v1/common.mjs` (the tools' list of gates now holds the Amazon gate) and `alert.mjs` (the
+Amazon gate's halt and address e-mails): the owner reviews that change and sets `LIFE=yes`. No check of SB4 reads the
+Perplexity or the Amazon gate's folder: GATES4 is their review.
+
+**Piece 3, right after the env files are written (SB5, or DR1 on the drained path): the gate's socket and Luna's
+address in the new release's files.** In `api-$LABEL.env` and `runner-$LABEL.env` alike. The old release's files stay
+as they are (a release older than this code refuses a key it does not know). Luna's row is printed by the new
+release's own code, so it is exactly the reviewed row; no value is typed by hand and none is printed here.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# BEDROCK_ENV: bedrock_budget_socket and Luna's target row in api- and runner-<LABEL>.env. Nothing else changes; no value is printed.
+KC=PREVIEW_PROVIDER_TEST_CONFIG_JSON; KT=PROVIDER_DISCOVERY_TARGETS_JSON; SOCK=/run/debateai-v3-preview/bedrock-budget-v1.sock
+ROW=$( cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs --input-type=module -e 'import { previewTargetJsonRow } from "./packages/providers/src/preview-models.ts"; console.log(JSON.stringify(previewTargetJsonRow("preview:gpt-6-luna")));' ) || { echo "BEDROCK_ENV_NOT_DONE: the release's code did not print Luna's row"; exit 1; }
+[ "$(jq -r '[.provider_ref, .model] | join(" ")' <<<"$ROW")" = "preview:gpt-6-luna us.openai.gpt-6-luna" ] || { echo "BEDROCK_ENV_NOT_DONE: the row is not Luna's"; exit 1; }
+for SVC in api runner; do
+  F=$E/$SVC-$LABEL.env; D=$S/$SVC-$LABEL.env.before-bedrock
+  for K in $KC $KT; do [ "$(grep -c "^$K=" "$F")" = 1 ] || { echo "BEDROCK_ENV_NOT_DONE: $K is not in $SVC-$LABEL.env exactly once"; exit 1; }; done
+  [ -e "$D" ] || { cp -p "$F" "$D"; chmod 0600 "$D"; }
+  MODE=$(stat -c '%a %U:%G' "$F")
+  C=$(sed -n "s/^$KC=//p" "$F" | jq -ce --arg s "$SOCK" 'if has("bedrock_budget_socket") then . else . + {bedrock_budget_socket: $s} end | select(.bedrock_budget_socket == $s)') || { echo "BEDROCK_ENV_NOT_DONE: $SVC-$LABEL.env names another Amazon socket: ask"; exit 1; }
+  T=$(sed -n "s/^$KT=//p" "$F" | jq -ce --argjson row "$ROW" 'if any(.[]; .provider_ref == $row.provider_ref) then . else . + [$row] end | select(.[-1] == $row)') || { echo "BEDROCK_ENV_NOT_DONE: $SVC-$LABEL.env holds another row for Luna, or not last: ask"; exit 1; }
+  cp -p "$F" "$F.bedrock"
+  C="$C" T="$T" awk -v kc="$KC" -v kt="$KT" 'index($0, kc "=") == 1 { print kc "=" ENVIRON["C"]; next } index($0, kt "=") == 1 { print kt "=" ENVIRON["T"]; next } { print }' "$F" > "$F.bedrock"
+  diff <(grep -v -e "^$KC=" -e "^$KT=" "$D") <(grep -v -e "^$KC=" -e "^$KT=" "$F.bedrock") > /dev/null || { echo "BEDROCK_ENV_NOT_DONE: another line of $SVC-$LABEL.env would change ($F.bedrock is only a draft)"; exit 1; }
+  [ "$(stat -c '%a %U:%G' "$F.bedrock")" = "$MODE" ] || { echo "BEDROCK_ENV_NOT_DONE: the draft's mode or owner differs ($F.bedrock)"; exit 1; }
+  mv "$F.bedrock" "$F"
+  echo "$SVC-$LABEL.env: $(sed -n "s/^$KT=//p" "$F" | jq 'length') model addresses, the Amazon socket $(sed -n "s/^$KC=//p" "$F" | jq -r 'if .bedrock_budget_socket then "named" else "MISSING" end')"
+done
+[ "$(sed -n "s/^$KC=//p" "$E/api-$LABEL.env")" = "$(sed -n "s/^$KC=//p" "$E/runner-$LABEL.env")" ] && [ "$(sed -n "s/^$KT=//p" "$E/api-$LABEL.env" | jq -cS .)" = "$(sed -n "s/^$KT=//p" "$E/runner-$LABEL.env" | jq -cS .)" ] || { echo "BEDROCK_ENV_NOT_DONE: the API's and the runner's values differ (the copies before: $S/*-$LABEL.env.before-bedrock)"; exit 1; }
+echo BEDROCK_ENV_DONE
+```
+
+What to expect: each of the two lines says `7 model addresses, the Amazon socket named`, then `BEDROCK_ENV_DONE`. Run
+it once; a second run changes nothing. The way back for this piece is the copy it kept
+(`$S/<service>-$LABEL.env.before-bedrock`), before anything of the new release has started.
+
+**Right before the owner's yes (SB6; on the drained path, the yes before DR2): GATEREADY.** It only reads. It asks
+what the switch (SB13 or DR6) and the new runner and API will ask at their start, while the site is still up, so a
+missing piece stops the upload before the downtime instead of at DR6, after the migrations.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# GATEREADY: before the downtime, what the switch and the new runner and API will ask of the gates and of the two env files. Read-only; prints no value.
+NEW=$CAPI/dialectical-engine/packages/providers/ops; SOCK=/run/debateai-v3-preview/bedrock-budget-v1.sock
+KC=PREVIEW_PROVIDER_TEST_CONFIG_JSON; KT=PROVIDER_DISCOVERY_TARGETS_JSON
+[ -f "$NEW/preview_budget_authority.py" ] && [ -f "$NEW/preview_budget_helper.py" ] || { echo "GATEREADY_NOT_DONE: this release's gate files are not in $NEW: ask"; exit 1; }
+NB=$(sha256sum "$NEW/preview_budget_authority.py" | cut -d' ' -f1); NH=$(sha256sum "$NEW/preview_budget_helper.py" | cut -d' ' -f1)
+dg() { { sha256sum "$1" 2>/dev/null || true; } | cut -d' ' -f1; }
+gv() { jq -r "$1 // empty" "$2" 2>/dev/null || true; }
+MISS=''; miss() { echo "MISSING ($1): $2"; case "$MISS," in *", $1,"*) ;; *) MISS="$MISS, $1";; esac; }
+for G in deepinfra:deepinfra-budget-v3:provider-deepinfra-authority-v3:provider-deepinfra-go-v3:1 anthropic:anthropic-budget-v1:provider-anthropic-authority-v1:provider-anthropic-go-v1:1 perplexity:perplexity-budget-v1:provider-perplexity-authority-v1:provider-perplexity-go-v1:1 bedrock:bedrock-budget-v1:provider-bedrock-authority-v1:provider-bedrock-go-v1:2; do
+  IFS=: read -r NAME FOLDER STATE GOFILE PIECE <<<"$G"
+  F=/opt/debateai-v3-preview/operator/$FOLDER; GO=/etc/debateai-v3-preview/$GOFILE.json
+  if [ "$(dg "$F/preview_budget_authority.py")" = "$NB" ] && [ "$(dg "$F/preview_budget_helper.py")" = "$NH" ] && [ "$(gv .bridge_sha256 "$GO")" = "$NB" ] && [ "$(gv .helper_sha256 "$GO")" = "$NH" ]; then CODE='this release'; else CODE='NOT this release'; fi
+  SJ=$(/usr/bin/python3 -I "$F/preview_budget_authority.py" status --private "/var/lib/debateai-v3-preview/$STATE" 2>/dev/null || true)
+  ST=$(jq -r '.state // empty' <<<"$SJ" 2>/dev/null || true); WO=$(jq -r 'if type == "object" and has("window_open") then (.window_open | tostring) else empty end' <<<"$SJ" 2>/dev/null || true)
+  echo "$NAME gate: code $CODE; state ${ST:-unread}; window open ${WO:-unread}"
+  [ "$CODE" = 'this release' ] || miss "piece $PIECE" "the $NAME gate does not run this release's gate code"
+  [ "$ST" = active ] && [ "$WO" = true ] || miss "piece $PIECE" "the $NAME gate is not active with its window open (its status says why)"
+done
+[ "$(systemctl is-active debateai-preview-bedrock-budget || true)" = active ] || miss "piece 2" "the Amazon gate's service is not running"
+for SVC in api runner; do
+  EF=$E/$SVC-$LABEL.env
+  if [ ! -f "$EF" ]; then miss "piece 3" "$SVC-$LABEL.env does not exist yet (DR1 or SB5 first, then BEDROCK_ENV)"; continue; fi
+  if [ "$(grep -c "^$KT=" "$EF" || true)" != 1 ] || [ "$(grep -c "^$KC=" "$EF" || true)" != 1 ]; then miss ask "$SVC-$LABEL.env does not hold its two lines $KT and $KC exactly once each"; continue; fi
+  T=$(sed -n "s/^$KT=//p" "$EF")
+  N=$(jq 'length' <<<"$T" 2>/dev/null || echo unread)
+  L=$(jq -r 'if any(.[]; .provider_ref == "preview:gpt-6-luna") then "there" else "MISSING" end' <<<"$T" 2>/dev/null || echo unread)
+  K=$(sed -n "s/^$KC=//p" "$EF" | jq -r --arg s "$SOCK" 'if .bedrock_budget_socket == $s then "named" elif has("bedrock_budget_socket") then "OTHER" else "MISSING" end' 2>/dev/null || echo unread)
+  CHK=$(cd "$CAPI/dialectical-engine" && /usr/bin/env -i PATH=/usr/bin:/bin T="$T" /opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node --import ./node_modules/tsx/dist/loader.mjs --input-type=module -e 'import { PREVIEW_REVIEWED_PROVIDER_REFS, previewModelRowForRef } from "./packages/providers/src/preview-models.ts"; import { assertDeploymentProviderTargets, assertPricedProviderTargets, parseProviderDiscoveryTargets } from "./packages/providers/src/index.ts"; import { assertPreviewTargetSet } from "./packages/providers/src/preview-test.ts"; const configured = PREVIEW_REVIEWED_PROVIDER_REFS.map((providerRef) => ({ providerRef, maker: previewModelRowForRef(providerRef).maker, adapterKind: previewModelRowForRef(providerRef).adapterKind })); try { const targets = parseProviderDiscoveryTargets(process.env.T, configured); assertDeploymentProviderTargets(targets, { mode: "hosted", nodeEnv: "production" }); assertPricedProviderTargets(targets, "hosted"); assertPreviewTargetSet(targets); console.log(`accepted ${targets.length}`); } catch (error) { console.log(`refused ${error instanceof Error ? error.message : "UNREAD"}`); }' 2>/dev/null) || CHK='not run'
+  echo "$SVC-$LABEL.env: $N model addresses; Luna's address $L; the Amazon socket $K; this release's start check of the addresses: $CHK"
+  if [ "$L" != there ] || [ "$K" != named ]; then miss "piece 3" "$SVC-$LABEL.env lacks Luna's address or the Amazon socket (BEDROCK_ENV)"
+  else case "$CHK" in "accepted "*) ;; *) miss ask "the new $SVC would refuse these addresses at its start ($CHK)";; esac; fi
+done
+if [ -f "$E/api-$LABEL.env" ] && [ -f "$E/runner-$LABEL.env" ]; then
+  [ "$(sed -n "s/^$KC=//p" "$E/api-$LABEL.env")" = "$(sed -n "s/^$KC=//p" "$E/runner-$LABEL.env")" ] && [ "$(sed -n "s/^$KT=//p" "$E/api-$LABEL.env" | jq -cS . 2>/dev/null || true)" = "$(sed -n "s/^$KT=//p" "$E/runner-$LABEL.env" | jq -cS . 2>/dev/null || true)" ] || miss ask "the API's and the runner's files differ in these two lines"
+fi
+[ -z "$MISS" ] || { echo "GATEREADY_NOT_DONE: not ready for the downtime: ${MISS#, } (the MISSING lines above); nothing changed and the site is up: no yes, no downtime"; exit 1; }
+echo GATEREADY_DONE
+exit 0
+```
+
+What to expect: four gate lines `<gate> gate: code this release; state active; window open true`, two lines
+`<service>-<LABEL>.env: 7 model addresses; Luna's address there; the Amazon socket named; this release's start check
+of the addresses: accepted 7`, then `GATEREADY_DONE`. On `GATEREADY_NOT_DONE` the last line names what is missing, and
+each `MISSING` line above it says which gate or file. Nothing has changed and the site is up. GATEREADY runs inside the
+window from SB3 to the switch, where pieces 1 and 2 never run, so what you may do depends on the name:
+- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.
+- `piece 1` or `piece 2` (a gate not on this release's code, not `active` with its window open, or the Amazon gate's
+  service not running): no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and ask. A gate
+  that halted by itself, for example, needs its halt reason read before anyone opens it again. "The way back" below
+  says what stopping here means.
+- `ask` (anything else, for example a model address the new code would refuse): no yes; stop and ask.
+
+Give the yes only after `GATEREADY_DONE`.
+
+**What GATEREADY checks, and what only DR5 and DR6 can show.** Before DR5 every `lc` command runs the running release's
+tools, which know only the DeepInfra and Anthropic gates. So GATEREADY asks the same questions as this release's tools,
+with plain commands and with this release's own code: each gate's two files and its GO's two hashes against this
+release's (the switch's `SETTINGS_GATE_HELPER_DIFFERS`), each gate's `state` from its own `status` (the switch's
+`SWITCH_PRECONDITION_FAILED` naming `gates`, and `GATE_FILES_UNREADABLE` when a folder or GO is missing), and the
+runner's own start check of the model addresses, run by this release's code (`PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`
+and the reviewed rows). It asks for the Perplexity gate too, which this release's tools do not list. Three things it
+cannot check; DR5 and DR6 do:
+- The register version DR5 publishes is the one the new services compare the addresses with. GATEREADY compares them
+  with the seven models this code publishes, which SB3's delta showed.
+- The switch's live check asks each gate, as the new API's user, which models it serves. It needs the new release
+  pinned (DR5) and its tools in place. It needs no answer from the Amazon gate while no line-up seats Luna.
+- The new runner and API start only at DR6.
+
+**What Amazon receives, and the notice.** The website's own file (`ui-$LABEL.env`) does not change: its build list is
+only the page's fallback, and the page reads the live line-up from the API. The AI providers page lists Amazon Web
+Services from this upload on (from the switch), with its checked Register row, because the API reaches its address. The
+Privacy Policy and the Terms of this release (version 1.0) already name Amazon; they go live with this upload. Amazon
+receives nothing before piece 4: no line-up seats Luna, and without the key the gate refuses the API's checks of Luna
+before anything is sent.
+- **No Privacy Policy §14 notice is owed at this upload**: Amazon receives nothing until Luna is switched on, and only
+  the owner's and the team's accounts exist. The owner's yes before the switch (SB6; on the drained path, the yes before
+  DR2) says so ("The providers page", "A company listed before it receives anything", which also says what counts as
+  an account outside the team). If someone outside the team already has an account at the upload, ask before that yes.
+- **Before piece 4 the notice is owed when any account outside the team exists by then**: by e-mail and in the
+  product, naming Amazon and what it will receive. The rest of piece 4, the key included, waits until the time to
+  object has passed.
+
+**Why the key waits for piece 4.** Once the key and Luna's row are both in, the API checks Luna through the gate at
+every ask: it probes every declared model whose last check is old, not only the line-up's. The first real Amazon call
+would then come from someone's ask, before the owner's own probe, and with the halt watcher not yet started, so a halt
+would e-mail nobody. Without the key the gate refuses that check before anything is set aside: nothing is sent, nothing
+is charged, the gate does not halt, and Luna is simply left out. Debates run on the other models exactly as before, and
+visitors see nothing. So the key goes in on piece 4's day, right before the owner's first probe. On that day it also
+comes after the notice's time to object, when the notice is owed, and after the halt watcher and the address timer have
+started: from the key on, every ask makes a paid check of Luna, so the activation follows the next day.
+
+**Until piece 4: what the unused Amazon gate does.**
+- **It closes itself after 31 days.** Piece 2's `activate` opens its window for 31 days (`open_days`). With no key no
+  call reaches it, so its `state` stays `active` and `window_open` turns `false`. The release tools ask only for
+  `active`, so later uploads go on; but MAIN-SITE.md's ASKS_OPEN (6.1, 8.1) refuses while any gate's window is closed.
+  Then run the Amazon gate's `stop`, then its `activate` (MAIN-SITE.md 6.5): `activate` alone refuses a gate whose
+  state is still `active`. Once the key is in, the first call after the 31 days halts the gate
+  (`open_window_expired`), and its `activate` opens it again.
+- **After a reboot it is not running.** Its unit has no `[Install]`, and the boot drop-in that starts it with the site
+  comes only at "Switch it on". Its `state` on disk stays `active`, so the tools and ASKS_OPEN are satisfied, and Luna's
+  checks at ask time fail at once (Luna is left out). `systemctl start debateai-preview-bedrock-budget` starts it;
+  "Switch it on" step 2 does.
+
+**Piece 4, any day after the upload: Luna in the line-up.** Not part of the upload, and never during one.
+`README-bedrock.md`, "Switch it on", carries each step. In this order:
+1. When any account outside the team exists: the Privacy Policy §14 notice sent, by e-mail and in the product, and its
+   time to object passed ("What Amazon receives, and the notice", above). Nothing below starts before that.
+2. "Switch it on", step 2: the gate running, start at boot and the two watchers. It needs no key. Its first block sets
+   `R` from the newest upload's names file and must print `R ok`; its last lines must show `1` (the boot drop-in in
+   place) and the two watchers' `"status": "ok"`.
+3. At a quiet hour, in one sitting ("Switch it on", step 3): the AWS console (install step 0), if not done yet; the key
+   at the hidden prompt (install step 4, which first checks that the older units still hide the Amazon folder); and
+   right after it the probe, twice (install step 8). Every field must show its "Good" value. The day after, the
+   gate's `today_spend_usd` of the probe's day against the AWS Billing page.
+4. The runner restarted, when it could not read the gate at its start ("Switch it on", step 4).
+5. The activation ("Switch it on", step 6; the Privacy Policy and the Terms that name Amazon are live on the site from
+   this upload on): "The line-up, the thinking levels and the answer seats" above, with a line-up file that adds
+   `us.openai.gpt-6-luna` to `free_model_ids` and `premium_model_ids` (the owner's choice). SV4 refuses
+   while the Amazon gate does not switch Luna on (`SETTINGS_GATE_MODEL_DISABLED:bedrock:us.openai.gpt-6-luna`), does
+   not answer (`SETTINGS_GATE_UNANSWERED:bedrock`), or runs other gate code than the release's
+   (`SETTINGS_GATE_HELPER_DIFFERS:bedrock`).
+
+**The way back.** Taking Luna out of the debates is an activation without it (SV6, or a new line-up); no upload. The
+gate itself can stay installed and unused: `stop` makes sure it spends nothing.
+- **The upload stops after piece 1 or 2, before the downtime** (a `_NOT_DONE` before DR2, or no yes). The running
+  release keeps serving: the older gates' new code serves it as before. But its own settings activations (SV4, SV6) are
+  refused with `SETTINGS_GATE_HELPER_DIFFERS`, because they compare the gates' code with the running release's own
+  gate files. That lasts until this release is uploaded, or until each older gate's files and GO go back
+  (`deploy/preview-gate/v3/README.md`, "Redeploy (2026-10-12)", "To go back"). The Amazon gate can stay, stopped.
+- **rbD-A (before DR4)**: the old release starts as it was, from its own env files; its settings activations are refused
+  as above.
+- **rbD-B (from DR4 on)**: the database goes back, and the old release starts from its own env files, which never got
+  the new key or Luna's row. Its brakes work (each gate's `stop`). But DR5 swapped the shared operator folder, and
+  rbD-B does not put it back: the tools in place are this release's and list the Amazon gate, and the gates run this
+  release's code. So every settings activation on the old release is refused (`SETTINGS_GATE_HELPER_DIFFERS`) until a
+  later upload brings this code again. If one is needed before that, ask.
 
 ## Transition release T (one last drained upload)
 
@@ -3078,8 +3473,8 @@ product change: a problem in T is fixed forward.
 root with `bash -s`, `set -euo pipefail` first and the names file second (TA0 and TA1 make it), every guard written
 `… || { echo "<STEP>_NOT_DONE: …"; exit 1; }`, the last line `<STEP>_DONE`, and nothing more after a `_NOT_DONE`
 (read the way back and decide with the owner). The scripts print no env value other than `REGISTER_VERSION`,
-`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. Every
-trap of that section still holds:
+`RELEASE_KEY`, `DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` and `NETOPIA_LOGO_ID` (not
+secret) and ports. Every trap of that section still holds:
 - `nat` always exits 0: its line is captured and tested (`OUT=$(nat "$F"); [ "$OUT" = "exit 0" ] || …`), never chained;
 - a pin writes `pinnedAt`, so a lock is compared without the pin times, or not re-pinned at all;
 - the build roster is `all-models`;
@@ -4253,9 +4648,9 @@ check says `DRAINED_PATH` (a migration that is not `n1: expand`) takes "Drained 
 
 **How each step runs.** As in the transition: one script per step, `set -euo pipefail`, the names file (SB1 makes it),
 `<STEP>_NOT_DONE` guards, `<STEP>_DONE` last, no env value printed except `REGISTER_VERSION`, `RELEASE_KEY`,
-`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` (not secret) and ports. The traps of the
-transition hold, and so do the three house rules of "A normal release on a hosted base" (one-line option values, a
-service's own ready sign, nothing that only a first start creates). Two more:
+`DEBATEAI_DEPLOYMENT_MODE`, `MAIL_SENDMAIL_PATH`, `PAYMENT_MARKS_AVAILABLE` and `NETOPIA_LOGO_ID` (not secret) and
+ports. The traps of the transition hold, and so do the three house rules of "A normal release on a hosted base"
+(one-line option values, a service's own ready sign, nothing that only a first start creates). Two more:
 - **One switch command at a time.** Each `release-switch.mjs` command takes
   `/etc/debateai-v3-preview/lifecycle/release-switch.lock`; another one meanwhile refuses `RELEASE_SWITCH_BUSY`. A lock
   left by an ssh drop names its path and how to clear it (WB4).
@@ -4279,11 +4674,14 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB1 | names file (the old release read from the release table), archive `$S`, copies | up | nothing to undo |
 | A2–A7, SB1b | staging, as in the hosted-base recipe; SB1b instead of A5 | up | nothing to undo |
 | SB2 | the practice (owner rule), at a quiet hour | up | none |
-| SB3 | register plan and proposal, in the new release's own native-plan file | up | nothing to undo |
+| SB3 | register plan and proposal, in the new release's own native-plan file; the site's numbers are the live ones, or the owner's file's where `NEWNUM` names them | up | nothing to undo (SB3b sets the plan aside) |
+| SB3b | only to run SB3 again: its plan, proposal and numbers record moved into `$S` | up | nothing to undo |
+| SB3c | only when the owner's numbers file must take numbers back from a settings version | up | the file before is in `$S` |
 | SB4 | the release check (read-only) | up | nothing to undo |
 | SB5 | the three env files; the database-ahead file | up | nothing to undo (unused files) |
 | SB5b | only when the payment marks list changes: the list in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB5c | only the first upload with NV-03 (or after going back to a release without it): the UI-to-API proof in the new release's api and ui files | up | nothing to undo (unused files; the ones before are in `$S`) |
+| SB5d | only when NETOPIA's logo id is first set or changes (or after going back to a release without it): the line in the new release's ui file | up | nothing to undo (an unused file; the one before is in `$S`) |
 | SB6 | the owner's fresh yes | up | – |
 | MT1, PM2, MT2 | only the first upload that lists the marks: Caddy's rule (see "Payment marks: the files and Caddy's rule") | up (one Caddy restart, about a second) | PM2 puts the old Caddyfile back itself |
 | SB7 | the online backup | up | nothing to undo |
@@ -4294,6 +4692,7 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 | SB12 | the new API and website, not ready | up | WB1 |
 | SB13 | the switch | up | WB2 |
 | SB13b | the team member's test debate runs on the new release (read-only) | up | WB2 |
+| LOGOCHECK | only in an upload whose SB5d ran: NETOPIA's logo on the new release (read-only) | up | – |
 | SB13c | on the Mac: the PR that makes `tests/n1-baseline.json` name the new release | up | – (the next upload needs it) |
 | SB14 | later: the old release retired; its receipt | up | WB2 (its runner restarts in database-ahead mode) |
 | SB14b | only after a reboot or a runner crash during the drain: the runners start again | up | – |
@@ -4368,7 +4767,7 @@ ONP=$E/native-plan-$OLABEL.json
 LOCK=/etc/debateai-v3-preview/lifecycle/release-lock.json
 C=/etc/debateai-v3-preview/public/Caddyfile
 EDGE=/etc/debateai-v3-preview/ui-edge.caddy.secret
-HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
+HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json 2>/dev/null || true)"
 GD=/opt/debateai-v3-preview/operator/deepinfra-budget-v3
 PD=/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3
 GAN=/opt/debateai-v3-preview/operator/anthropic-budget-v1
@@ -4438,7 +4837,9 @@ HB_ON="$(jq -c '.billing="on"' /etc/debateai-v3-preview/hosted-billing-v1.json)"
 PRACTICE_ACK=spends-real-money PRACTICE_DEEPINFRA_SOCKET="$D/deepinfra.sock" PRACTICE_ANTHROPIC_SOCKET="$D/anthropic.sock" node_modules/.bin/tsx tools/preview-practice/practice.ts debate --settings "$P/settings.env" --register-export "$P/register-export.json" --gate-status-deepinfra "$P/deepinfra-status.json" --gate-status-anthropic "$P/anthropic-status.json" --depth 1 --question en-nuclear --register-next --hosted-billing "$HB_ON" --checker deepseek --deepseek-enabled-on-gate yes --transcript --out "$P/debate-report"
 ```
 
-The pass bar and the row match are the hosted-base recipe's.
+The pass bar and the row match are the hosted-base recipe's. On the upload that brings the Amazon gate, LUNAROW adds
+Luna's address to `$P/settings.env` first, or the practice stops with `PROVIDER_DISCOVERY_TARGET_SET_MISMATCH`; pieces
+1 and 2 come after SB2 and before SB3 ("The Amazon Bedrock gate: the upload that brings it").
 
 ### SB3. The register plan and its proposal, in the new release's own native-plan file
 
@@ -4450,25 +4851,47 @@ set -euo pipefail
 . /root/preview-archive/rNN-names.sh
 # SB3: the plan (billing-on inputs, the live checker) and the native operator's proposal, in the new release's own native-plan file.
 LINEUP=''                                                 # the first upload with the line-up row (T+1) only: "$ART/line-up.json"; else empty
+NEWNUM=''                                                 # the numbers this upload takes from hosted-billing-v1.json, on purpose: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between; empty = the live numbers stay
+LIMITS=''                                                 # only with billingPlans in NEWNUM: the plans whose limits change, up or down (read "What a change does to the people who already have a plan" below first), e.g. 'PLUS PRO'; else empty
 REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}
-[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON"; exit 1; }
+[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: HB_ON is not the billing-on JSON (hosted-billing-v1.json does not read as JSON: put its last good copy back)"; exit 1; }
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
 [ ! -e "$NP" ] || { echo "SB3_NOT_DONE: $NP exists (look first)"; exit 1; }
-[ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] || { echo "SB3_NOT_DONE: an earlier plan or proposal exists (look first)"; exit 1; }
+[ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] && [ ! -e "$ART/site-inputs.json" ] || { echo "SB3_NOT_DONE: an earlier plan, proposal or numbers record exists (look first; SB3b sets them aside)"; exit 1; }
 # The base is the active settings version (kit v3): the old release's own verify plan while that is its site version,
 # else the verify plan SV2 kept for the activated version; the choices a plan does not carry from its base come with it.
 if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; CP=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-publish.json; fi
 [ "$(jq -r .approval.publication.registerVersion "$FROM")" = "$AV" ] && [ "$(jq -r .approval.snapshotSha256 "$CP")" = "$(jq -r .approval.publication.snapshotSha256 "$FROM")" ] || { echo "SB3_NOT_DONE: no kept verify and publish plan names the active settings version $AV ($FROM): ask"; exit 1; }
-HB=$(jq -c .hostedBilling "$FROM")
-[ "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB")" = "$(jq -cS '{billing,dailyCeilingMicros,askRoomReads}' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: the active version's site inputs differ from HB_ON: ask"; exit 1; }
+# The numbers: the live version's, with exactly the inputs NEWNUM names taken from the file. Each line names an input, a
+# plan and a member and says SAME, or DIFFERENT with higher or lower; no amount is printed. Nothing is written on a stop.
+# Who holds a plan named in LIMITS: any open subscription whose history names it (a scheduled change counts for both plans).
+if [ -n "$LIMITS" ]; then
+  HOLD=$(psqlq "SELECT DISTINCT e.plan_id FROM billing.subscription_event e JOIN billing.subscription_latest_v s ON s.subscription_id = e.subscription_id WHERE s.kind NOT IN ('ENDED','WITHDRAWN','ERASURE_STOPPED')") || { echo "SB3_NOT_DONE: the open subscriptions could not be read (nothing was written): ask"; exit 1; }
+  for P in $LIMITS; do if [ "$P" = FREE ]; then echo "FREE: HELD by everyone without a paid plan"; elif grep -qxF "$P" <<<"$HOLD"; then echo "$P: HELD by at least one open subscription"; else echo "$P: nobody holds it now"; fi; done
+fi
+TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs
+[ -f "$TOOL" ] || { echo "SB3_NOT_DONE: $TOOL is missing: the new release is not staged (A2 to A7 first)"; exit 1; }
+if grep -qF "'site-inputs':" "$TOOL"; then
+  SI=$(rel site-inputs --operation report --from "$FROM" --site "$HB_ON") || { echo "SB3_NOT_DONE: the numbers could not be compared (the reason line above; nothing was written). SITE_INPUTS_REFUSED with --site: hosted-billing-v1.json does not have the six inputs. SITE_PLAN_LIST_DIFFERS: it lists other plans than the live version. INPUT_REFUSED, FROM_PLAN_INVALID or NATIVE_APPROVAL_REQUIRED: the live version's plan $FROM is not readable as a published hosted verify plan. Ask"; exit 1; }
+  jq -r '.lines[]' <<<"$SI"
+  rel site-inputs --operation compose --from "$FROM" --site "$HB_ON" ${NEWNUM:+--change "$NEWNUM"} ${LIMITS:+--limits "$LIMITS"} --out "$ART/site-inputs.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers are not as NEWNUM and LIMITS name them (the reason line above names the inputs or plans; nothing was written). ARGUMENTS_REFUSED with --change or --limits: that list is misspelled (exact names, one space between, none twice). SITE_CHANGE_NOT_NAMED: the file differs from the live numbers there: name the input in NEWNUM to publish the file's value, or keep the live value with SB3c. SITE_CHANGE_NAMED_BUT_SAME: take it out of NEWNUM. SITE_LIMITS_NOT_NAMED: that plan's limits change, up or down, for the people already on it: read what that does to them under this step first, then name the plan in LIMITS. SITE_LIMITS_NAMED_BUT_SAME: take it out of LIMITS. SITE_INPUTS_REFUSED: the mix is not allowed (a per-debate ceiling above the day's). SITE_BILLING_SWITCH_DIFFERS, FROM_PLAN_INVALID or anything else: ask"; exit 1; }
+  HB=$(jq -c .hostedBilling "$ART/site-inputs.json") && NAMED=$(jq -c .change "$ART/site-inputs.json") && jq -r --argjson seen "$(jq -c .lines <<<"$SI")" '(.lines - $seen)[]' "$ART/site-inputs.json" || { echo "SB3_NOT_DONE: $ART/site-inputs.json is unreadable (SB3b sets it aside): ask"; exit 1; }
+else
+  # A release older than the site-inputs command cannot publish changed numbers: the file must be the live numbers, whole.
+  HB=$(jq -c .hostedBilling "$FROM"); NAMED='[]'
+  [ -z "$NEWNUM$LIMITS" ] && [ "$(jq -cS 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; norm' <<<"$HB")" = "$(jq -cS 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; norm' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: this release's tool has no site-inputs command, so this upload cannot publish changed numbers, and hosted-billing-v1.json must be the live numbers: empty NEWNUM and LIMITS, and SB3c to put the live numbers back in the file (or upload a newer commit)"; exit 1; }
+fi
 SEATS=$(jq -c '.answerSeats // empty' "$CP"); ROT=$(jq -r '.roleRotation // empty' "$CP"); DS=$(jq -r 'if .answerSeats == null and .checkerChoice.checker == "deepseek" then "yes" else empty end' "$CP")
-echo "active settings version $AV; per-debate inputs $(jq -c '{perRunCeilingMicros}' <<<"$HB"); checker $([ -n "$DS" ] && echo deepseek || echo "${SEATS:-glm}"); rotation ${ROT:-on}"
+echo "active settings version $AV; numbers taken from the file: ${NEWNUM:-none}; plans named in LIMITS: ${LIMITS:-none}; checker $([ -n "$DS" ] && echo deepseek || echo "${SEATS:-glm}"); rotation ${ROT:-on}"
 rel native-plan --operation plan --from "$FROM" --source-manifest "$ART/candidate-api-source.json" ${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB" ${LINEUP:+--line-up "$LINEUP"} --out "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: the release tool refused the plan"; exit 1; }
 [ "$(jq -r .operation "$ART/native-plan-plan.json")" = plan ] && [ "$(jq -r '.hostedBilling.billing // "none"' "$ART/native-plan-plan.json")" = on ] && [ "$(jq -r .sourceRoot "$ART/native-plan-plan.json")" = "$CAPI" ] || { echo "SB3_NOT_DONE: the plan is not this release's billing-on plan"; exit 1; }
 put "$ART/native-plan-plan.json" || { echo "SB3_NOT_DONE: put of the plan failed"; exit 1; }
 OUT=$(nat "$ART/register-proposal.json"); echo "nat: $OUT"
-[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "SB3_NOT_DONE: the native operator refused the plan (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB1: ask)"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 2000 "$ART/register-proposal.json"; echo; echo "SB3_NOT_DONE: the native operator refused the plan (PREVIEW_REGISTER_BASE_NOT_ACTIVE: settings were activated since SB1; with numbers named in NEWNUM also: the file's plans or limits are not lawful ones, for example a price that is not whole cents or a day share above the week's: check the file, then SB3b): ask"; exit 1; }
 [ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the proposal is not based on the active settings version $AV, or the old plan moved"; exit 1; }
+# The proposal is made from the database's own rows. Member by member, the numbers it changes there must be exactly
+# the inputs NEWNUM names: no more (the plan's numbers were not the database's) and no fewer (a change did not take).
+jq -e --argjson n "$NAMED" 'def pair(k): ([.delta[] | select(.rowKey == k)][0]) as $d | if $d == null then null else [($d.oldValueJsonText // "null" | fromjson), ($d.newValueJsonText | fromjson)] end; def moved(k; f): pair(k) as $v | ($v != null and (($v[0] | f) != ($v[1] | f))); {perRunCeilingMicros: moved("costEnvelopePolicy"; .per_run_ceiling_micros?), dailyCeilingMicros: moved("costEnvelopePolicy"; .daily_ceiling_micros?), askRoomReads: moved("admissionPolicy"; .ask_room_reads?), billingPlans: moved("billingPlans"; .), abuseLimits: moved("abuseLimits"; .)} | [to_entries[] | select(.value) | .key] | sort == ($n | sort)' "$ART/register-proposal.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names ($NAMED): the live plan's numbers are not the database's, or a named change did not take: ask (SB3b sets this plan aside)"; exit 1; }
 sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"
 jq -c '{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256}' "$ART/register-proposal.json"
 echo SB3_DONE
@@ -4479,13 +4902,219 @@ is the old release's own site version, the plan starts from the old release's ve
 activation of another version, from that version's kept plans (`/opt/debateai-v3-preview/artifacts/settings-v<version>/`,
 SV2 of "Changing debate settings without an upload"). The hosted inputs, the checker or the answer seats and role
 rotation are read from the same plans (a plan does not take them from its base), so the upload's site version keeps
-every activated debate setting; their site part must still equal `HB_ON`. `LINEUP` stays empty, except once: the first
+every activated debate setting. `LINEUP` stays empty, except once: the first
 upload with the line-up row (T+1) sets it to the file its first step printed ("The first upload with this change
 (T+1)" in "Changing debate settings without an upload"); from then on the line-up row comes with the active version.
 
-The owner reads the delta exactly as A9 says; the yes in SB6 names its `deltaSha256`. Gate files: A10's check. A changed
+**The site's numbers (`NEWNUM`, `LIMITS`).** The numbers live in the owner's file on the server,
+`/etc/debateai-v3-preview/hosted-billing-v1.json`: the per-debate ceiling, the day's ceiling, the room-read budget, the
+plans (prices and limits) and the abuse limits. The live settings version holds the numbers the site runs on. SB3
+compares the two, input by input, and prints one line each: `SAME`, or `DIFFERENT` with what moved (`higher`, `lower`,
+`changed`). It never prints an amount, so the output can be pasted anywhere.
+
+- **Nothing changes (most uploads).** Leave `NEWNUM` and `LIMITS` empty. Every line must say `SAME`. The new version gets
+  the live numbers.
+- **A number changes on purpose.** Edit a copy of the file, check the copy, put it in place ("Editing the owner's file"
+  below), then name each changed input in `NEWNUM`, for example `NEWNUM='billingPlans'` or
+  `NEWNUM='dailyCeilingMicros abuseLimits'`. The new version gets the file's value for the named inputs and the live
+  value for every other one. Do this before SB2: the practice runs with the file's numbers, so the file must already
+  hold what SB3 will publish. **If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**: the
+  practice is the only start of the new code on those numbers before the real one, and on the drained path the real
+  one is DR6, with the site down.
+- **The list must match what differs.** An input that differs and is not named stops the step
+  (`SITE_CHANGE_NOT_NAMED`): a number is never published by accident, and never left out without a word. An input that
+  is named and does not differ stops it too (`SITE_CHANGE_NAMED_BUT_SAME`). Nothing was written; fix the list or the
+  file and run SB3 again.
+- **The file is behind the live numbers.** This happens after a per-debate ceiling was changed by activation (SV1): the
+  file still holds the old value, and SB3 says `DIFFERENT perRunCeilingMicros`. Do not name it (that would publish the
+  old value again). Run SB3c with `KEEP='perRunCeilingMicros'`: it writes the live value into the file. Best before
+  SB2, for the same reason as above.
+- **Billing on or off never changes here.** Both sides must say on.
+
+**What a change does to the people who already have a plan.** The lines say it per plan. Read this before naming a
+plan's prices or limits; the tool cannot know who holds which plan.
+
+*Prices* (`prices` lines, and `currency_by_country`):
+- A subscriber's renewals keep charging the price recorded for that subscriber when they bought (Terms section 12),
+  after a rise and after a cut alike. No command moves an existing subscriber to a new price yet; that needs its own
+  tool, with the 30 days' notice the Terms promise.
+- A first purchase is charged, and then renewed, at the price the person was shown. Shown before the switch and paid
+  after it: still the old price.
+- **An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan
+  is renewed at depends on the release that showed it. A release that saves an upgrade's monthly price with its quote
+  renews at that price. An older release does not: the plan is then renewed at the new price, after the short renewal
+  notice instead of the Terms' 30 days. So **an upload whose old release is such an older one must not change a
+  plan's prices**: no `prices` line may print. That includes the first upload that carries the fix, because the
+  quotes still open at the switch were made by the old release. The old release saves that price when this line,
+  run with the upload's names file, prints 1 or more; a 0, or an error, means an older one:
+  `grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`.
+- A plan change by an existing subscriber uses the new list. After a rise, a move to a lower plan is recorded at that
+  plan's new price, which can be more than they pay today. The page shows the amount, but a downgrade panel left open
+  across the switch still shows the old one. After a cut, an upgrade is
+  refused while the higher plan's new price is not above what the person pays today.
+- A subscription keeps the currency it was bought in.
+
+*Limits* (`limits` lines: the month's credit, the day and week caps, the finish room, the closing reserve, Free's fixed
+gauges). Each person's month keeps the numbers it started with. A paid month starts at the first payment and at each
+renewal date; a Free month starts on the account's own day of the month. The numbers below are made up.
+- **A lower limit** reaches each person when their own next month starts, never before. A day cap of 11 that this
+  upload makes 5: someone whose month began before the switch keeps 11 until that month ends. No day already used is
+  counted again, nobody is stopped in a month they already started, and no running debate pauses. Someone who buys the
+  plan after the switch has 5 from their first day.
+- **A higher limit** reaches everyone on the plan at the switch. The days before it keep the number they had.
+- **A higher limit cannot be taken back inside a month.** After a way back (WB2), or a later upload that publishes the
+  lower number again, everyone whose month saw the higher number keeps it until their own next month starts. A wrongly
+  high number therefore stays for those people for up to about a month.
+- **A cap added or taken away.** A day or week cap added where the plan had none is a lower limit: it starts with each
+  person's own next month, and its line says `lower`. One taken away is a higher limit, and its line says `higher`.
+- **A refund** on cancelling or withdrawing is measured against the credit the person's month had on that day: the one
+  it started with, or a higher one published since. A credit lowered later never makes a refund smaller; a raised one
+  makes it larger for everyone already on the plan (the same use is a smaller share of a larger credit).
+- **The closing reserve.** A raised reserve does not make new questions stop earlier in a month already started. Final
+  answers are paid from the site's reserve of the day, so in such a month a final answer may take the month past its
+  credit by the difference. A lower reserve reaches everyone at once.
+- **Free's fixed gauges, and any member the tool does not read,** are read from the live version for everyone: they
+  reach everybody at the switch. Their lines say `changed`, as the closing reserve's does: the tool gives these no up
+  or down, and every such line ends "at the switch".
+- **Someone who changed plan this month** has a month credit stored at that moment. It stays as it is until their next
+  month, after a raise too.
+- **Accounts that exist at the switch**, the owner's and test accounts included, keep their numbers like everyone
+  else: after an upload that lowers a limit they still have the larger one until their own next month, at most about
+  31 days.
+- **During a side-by-side switch**, a debate still running on the old release is measured by the same rule when that
+  release carries it. A release from before the rule measures the debates it still finishes against its own numbers.
+- **The Terms ask two things the product does not do by itself.** Section 12 promises notice before limits get
+  tighter, and section 14 lists lower limits among the changes people accept at their next sign-in. The product sends
+  no notice and has no acceptance step for limits.
+
+So: **a plan whose limits change, up or down, is named in `LIMITS`.** The step
+stops (`SITE_LIMITS_NOT_NAMED`) until the plan is named there, for example `LIMITS='PLUS'`. Each `limits` line ends with
+when each kind of change on it reaches the people already on the plan. Naming a plan whose limit goes **lower**, or
+whose line says `changed`, is the owner's statement that the people on that plan were told first (Terms section 12),
+or that nobody holds it; a paid plan named only because the smallest paid reserve moved is one of these. Naming a plan
+whose limit goes **higher** is the owner's statement that the number was checked twice, because it cannot be taken
+back for a month. A plan with both needs both statements. For
+each plan named there SB3 prints `HELD` or `nobody holds it now`, read from the subscriptions that are open (test
+purchases count; Free is held by everyone without a paid plan). The reading errs to one side only: `HELD` is printed
+when an open subscription names the plan anywhere in its history, so also for a plan someone was on earlier and
+has since left, or is only scheduled to move to; `nobody holds it now` means no open subscription ever named it. It is
+a reading at SB3: people can still buy until the switch (on the drained path, until DR2), so a `nobody` that matters
+is read again right before the yes. It prints no count, and it does not stop the step: the decision stays the
+owner's.
+`LIMITS` must name exactly those plans (`SITE_LIMITS_NAMED_BUT_SAME` otherwise). The closing reserve works across
+plans: every paid plan's closing is admitted against the smallest paid reserve, so when that smallest one moves, every
+paid plan must be named.
+
+Raising the Plus credit alone lowers the size the pricing page shows for the other plans ("N times Plus"); the tool
+prints a line for each.
+
+*The site-wide numbers.* The day's ceiling, the room-read budget and the abuse limits reach everyone at the switch. A
+lower day's ceiling makes everyone wait until the next day (UTC) once it is reached, people with credit left included.
+The per-debate ceiling follows each debate: debates asked after the switch get the new one, debates already admitted
+keep theirs. `cancel_links_per_day` in the abuse limits bounds the cancel page that works without signing in, which the
+Terms promise: keep it comfortably above what one person needs.
+
+A `NOTE` line is advice, not a stop: a plan whose credit is no longer above the plan before it (an upgrade would add
+nothing), or a plan whose smallest window fell below the per-debate ceiling (one debate may use more than a day of
+it).
+
+**Editing the owner's file.** A file that no longer reads as JSON makes every step print jq's error instead of its
+numbers, so never edit it in place. Copy it, edit the copy, check the copy, and only then put it in place (root, one
+line at a time; the first line prints `COPY_READS` when the copy is JSON with the six inputs):
+
+```sh
+cp -p /etc/debateai-v3-preview/hosted-billing-v1.json /root/hosted-billing-v1.edit.json    # then edit /root/hosted-billing-v1.edit.json
+jq -e 'type == "object" and (keys | join(",")) == "abuseLimits,askRoomReads,billing,billingPlans,dailyCeilingMicros,perRunCeilingMicros"' /root/hosted-billing-v1.edit.json > /dev/null && echo COPY_READS
+cp -p /etc/debateai-v3-preview/hosted-billing-v1.json "/root/preview-archive/hosted-billing-v1.before-edit-$(date -u +%Y%m%dT%H%M%SZ).json"
+install -o root -g root -m 0600 /root/hosted-billing-v1.edit.json /etc/debateai-v3-preview/hosted-billing-v1.json.new && mv /etc/debateai-v3-preview/hosted-billing-v1.json.new /etc/debateai-v3-preview/hosted-billing-v1.json
+```
+
+SB3 keeps a record of what was compared and named in `$ART/site-inputs.json`. After the proposal is made it checks the
+proposal itself, which comes from the database's own rows: the numbers that change there (each ceiling, the room-read
+budget, the plans, the abuse limits) must be exactly the inputs `NEWNUM` names. So the delta the owner approves
+carries no number change nobody named, and no named change is missing from it.
+
+**A release older than this step.** When the new release's own tool has no `site-inputs` command, SB3 cannot publish
+changed numbers. It then needs `NEWNUM` and `LIMITS` empty and the file equal to the live numbers, whole; SB3c makes
+the file equal.
+
+The owner reads the delta as A9 says; the yes in SB6 names its `deltaSha256`. With `NEWNUM` not empty, use this line
+instead of A9's first one: it prints every row as A9 does, but for the four number rows only the names of the members
+that differ, never a value (SB3's lines above say which way each moved). It may be used for every upload: A9's own
+line prints the ceilings row whole whenever the new code moves another member of it. A9's watch list then names `costEnvelopePolicy`
+(a ceiling) or `admissionPolicy` (the room-read budget) when `NEWNUM` names them: that is the owner decision A9 asks for.
+
+```sh
+jq -r '["abuseLimits","admissionPolicy","billingPlans","costEnvelopePolicy"] as $own | .delta[] | "\(.change) \(.rowKey) (\(.reason))" + (if (.rowKey as $k | $own | index($k)) then "\n  members that differ (values not printed): " + ((.oldValueJsonText // "{}" | fromjson) as $o | (.newValueJsonText | fromjson) as $n | [$o + $n | keys[] | select($o[.] != $n[.])] | join(" ")) else "\n  old: \(.oldValueJsonText)\n  new: \(.newValueJsonText)" end)' "$ART/register-proposal.json"
+```
+
+Gate files: A10's check. A changed
 gate file follows spec §9's rule for gate rows: a change that only widens (adds a model, raises a bound) is deployed now,
 before SB4, as the gate README says; one that narrows waits until the old release has retired.
+
+### SB3b. SB3 once more (its plan, proposal and numbers record set aside)
+
+Only before SB6's yes, and never after SB8 or SB9 (on the drained path: before the yes before DR2, and never after
+DR4 or DR5): nothing may have been applied or published from this plan. Use it
+when SB3 stopped after it wrote a file, or when the numbers to publish changed after SB3. The files move into `$S`;
+nothing is deleted. Then run SB3 again; its new proposal has a new `deltaSha256`. After SB8 or SB9 it stops and says
+ask, also when SB9 itself refused and asked for a new plan: what was applied or published is read first, by hand.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB3b: SB3's plan, proposal and numbers record moved into S, so SB3 can run again. Nothing live changes.
+for F in native-plan-apply-and-plan.json native-apply-and-plan.json native-plan-publish.json register-published.json; do [ ! -e "$ART/$F" ] || { echo "SB3B_NOT_DONE: $ART/$F exists: SB8 or SB9 ran from this plan already: ask"; exit 1; }; done
+[ ! -e "$NP" ] || cmp -s "$ART/native-plan-plan.json" "$NP" || { echo "SB3B_NOT_DONE: $NP is not SB3's plan (look first)"; exit 1; }
+D=$S/sb3-$(date -u +%Y%m%dT%H%M%SZ)
+[ ! -e "$D" ] || { echo "SB3B_NOT_DONE: $D exists (this step ran a second ago: look first)"; exit 1; }
+install -d -o root -g root -m 0700 "$D"
+for F in "$NP" "$ART/native-plan-plan.json" "$ART/register-proposal.json" "$ART/site-inputs.json" "$S/plan-proposal.sha256"; do [ ! -e "$F" ] || mv "$F" "$D/" || { echo "SB3B_NOT_DONE: $F did not move into $D (look first)"; exit 1; }; done
+echo "set aside in $D: $(ls "$D" | tr '\n' ' ')"
+echo SB3B_DONE
+```
+
+### SB3c. Numbers written back into the owner's file (prints no value)
+
+The owner's file is never changed by an upload, so it can drift from the live numbers. This step writes the inputs
+named in `KEEP` into the file, from the live settings version (or from an older version's kept verify plan, `SRC`).
+The file as it was goes into `$S` first. Use it:
+- to keep a live number the file is behind on (`SITE_CHANGE_NOT_NAMED` for an input that was not meant to change);
+- to undo an edit of the file (best before SB2: the practice runs with the file's numbers). It needs a file that still
+  reads as JSON; one that does not is put back from its copy by hand ("Editing the owner's file" under SB3);
+- as the first half of the way back from published numbers, once the old release is gone ("The way back, side by
+  side": the numbers).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB3c: the inputs KEEP names, written into hosted-billing-v1.json from the live version's plan (or from SRC). The file before goes into S.
+KEEP=''                                                   # the inputs to write: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between
+SRC=''                                                    # empty = the live settings version; else the kept verify plan of the version whose numbers come back: the path that upload's own record names, jq -r .from.path <its artifacts folder>/site-inputs.json
+F=/etc/debateai-v3-preview/hosted-billing-v1.json
+printf '%s\n' "$KEEP" | grep -qxE '(perRunCeilingMicros|dailyCeilingMicros|askRoomReads|billingPlans|abuseLimits)( (perRunCeilingMicros|dailyCeilingMicros|askRoomReads|billingPlans|abuseLimits))*' || { echo "SB3C_NOT_DONE: KEEP is not input names with one space between"; exit 1; }
+[ ! -L "$F" ] && [ "$(stat -c '%a %U %h' "$F")" = "600 root 1" ] || { echo "SB3C_NOT_DONE: $F is not root's own 0600 file: ask"; exit 1; }
+if [ -z "$SRC" ]; then AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*}; OSITE=${OSITE#r}; if [ "$AV" = "$OSITE" ]; then SRC=$S/native-plan.before.json; else SRC=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; fi
+  [ "$(jq -r .approval.publication.registerVersion "$SRC")" = "$AV" ] && [ "$(activev)" = "$AV" ] || { echo "SB3C_NOT_DONE: $SRC is not the plan of the live settings version (settings were activated since SB1?): ask"; exit 1; }
+fi
+[ "$(jq -r '.operation + " " + (.hostedBilling | keys | join(","))' "$SRC")" = "verify abuseLimits,askRoomReads,billing,billingPlans,dailyCeilingMicros,perRunCeilingMicros" ] || { echo "SB3C_NOT_DONE: $SRC is not a verify plan with the six hosted inputs"; exit 1; }
+umask 077
+TS=$(date -u +%Y%m%dT%H%M%SZ); B=$S/hosted-billing.before-sb3c-$TS.json; N=$S/hosted-billing.new-sb3c-$TS.json
+[ ! -e "$B" ] && [ ! -e "$N" ] || { echo "SB3C_NOT_DONE: $B or $N exists (this step ran a second ago: look first; nothing changed)"; exit 1; }
+cp -p "$F" "$B" && cmp -s "$F" "$B" || { echo "SB3C_NOT_DONE: the copy of the file failed (nothing changed)"; exit 1; }
+jq -s --arg keep "$KEEP" '.[0] as $file | .[1].hostedBilling as $n | reduce ($keep | split(" ")[]) as $k ($file; .[$k] = $n[$k])' "$F" "$SRC" > "$N" || { echo "SB3C_NOT_DONE: the new file could not be made (nothing changed; its draft is $N)"; exit 1; }
+[ "$(jq -r 'keys | join(",")' "$N")" = "abuseLimits,askRoomReads,billing,billingPlans,dailyCeilingMicros,perRunCeilingMicros" ] || { echo "SB3C_NOT_DONE: the file does not have exactly the six inputs (nothing changed; its draft is $N): ask"; exit 1; }
+install -o root -g root -m 0600 "$N" "$F.new" && mv "$F.new" "$F" && cmp -s "$N" "$F" || { echo "SB3C_NOT_DONE: the new file is not in place: compare $F with $B"; exit 1; }
+umask 022
+for K in perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits; do
+  if [ "$(jq -cS --arg k "$K" 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; .hostedBilling[$k] | norm' "$SRC")" = "$(jq -cS --arg k "$K" 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; .[$k] | norm' "$F")" ]; then echo "SAME $K"; else echo "DIFFERENT $K"; fi
+done
+echo "written from settings version $(jq -r .approval.publication.registerVersion "$SRC") ($SRC). The file before: $B; the file now: $N (both hold numbers: root only). The names file reads the file each time a step starts."
+echo SB3C_DONE
+```
+
+Each input in `KEEP` must now say `SAME`. An input that still says `DIFFERENT` is one the file keeps as its own: name
+it in SB3's `NEWNUM` to publish it, or write it back here too.
 
 ### SB4. The release check (read-only)
 
@@ -4502,8 +5131,8 @@ after a side-by-side upload) is not in `REV`: merge it into dev, take a `REV` af
 
 Two checks may need the owner first, and then a second run with their answer filled in at the top:
 - `GATE_ROWS_N1` fails with `no snapshot of the switch: review <sha256>` (the first upload after T: T was seeded, never
-  switched to) or `changed since the switch: review <sha256>`. The owner checks the gate files (A10's check) and gives
-  the printed digest as `GRR`.
+  switched to) or `changed since the switch: review <sha256>`. The owner checks the gate files (GATES2, A10's check; on
+  the upload that brings the Amazon gate, GATES4) and gives the printed digest as `GRR`.
 - `LIFECYCLE_FILES` fails with `changed: <files>` when the new release changed the shared operator folder
   (`deploy/preview-lifecycle`, `deploy/preview-auth-dev`, `deploy/preview-release`). The owner reviews those files; with
   `LIFE=yes` the check passes (`changed (reviewed)`) and SB10 swaps the folder.
@@ -4578,7 +5207,8 @@ its own file as it is.
 
 PM1 comes first: every listed mark's file must be in `/etc/debateai-v3-preview/public/payment-marks/` (a listed mark
 without its file shows a broken image). An empty value is refused by the test site's settings reader (every
-`<name>=` line needs a value): to show no marks, leave the line out and skip this step. SB5b runs after SB5 and before
+`<name>=` line needs a value): to show no marks, leave the line out and skip this step. With NETOPIA's logo id set
+(SB5d), the website draws none of these marks: skip this step. SB5b runs after SB5 and before
 SB10, whose launch plans start the website from this file; it stops once `ui-launch.json` exists. At T+1 `lc` is still
 T's installed tools, whose SAME checks do not know the list yet, so the script checks the list's form itself: one to
 three of the names, lower-case, no spaces, each once.
@@ -4682,6 +5312,52 @@ echo "api-$LABEL.env and ui-$LABEL.env: the UI-to-API proof lines"
 echo SB5C_DONE
 ```
 
+### SB5d. NETOPIA's logo id, in the new release's ui file (only when it is first set or changes)
+
+NETOPIA asks for its logo on the site. The website shows NETOPIA's hosted picture when its setting `NETOPIA_LOGO_ID`
+holds the shop id NETOPIA shows you (1 to 12 digits; it is public, since it ends up in the page as part of the picture's
+address, `https://mny.ro/np-black-0.svg?id=<id>`; the dark theme shows NETOPIA's version for a dark background,
+`np-white-0.svg`, with the same id). The visitor's browser loads the picture from NETOPIA's server, and
+the website's content policy lets images come from `https://mny.ro` and from no other outside host, so nothing is
+copied to the server and Caddy does not change. The picture already holds the Visa and Mastercard marks, so while the
+line is there the website draws none of the files of "Payment marks: the files and Caddy's rule": skip PM1, SB5b, MT1,
+PM2 and MT2. It shows only while billing is on, in the full footer and on the checkout's card step; the one-line footer
+never shows it.
+
+Each release derives its `ui-<label>.env` from the old release's file (SB5, or DR1 on the drained path), so once a
+release's file holds the line every later release carries it. SB5d runs the first time, when the id changes, and in the
+first upload after going back to a release whose ui file has no line. A release before this code refuses the name (its
+website starter lets through only the settings it lists, and stops with `PREVIEW_UI_STARTUP_REFUSED`), so the line
+never goes into `ui.env` or an older release's file; that matters on the way back too, which starts the old release
+from its own file as it is. A website of this code refuses to start on an id of another form, and its journal then
+says `PREVIEW_UI_STARTUP_REFUSED NETOPIA_LOGO_ID_INVALID`. SB5d runs after SB5 (or DR1) and before SB10 (or DR5),
+whose launch plans start the website from this file; it stops once `ui-launch.json` exists. `lc` is still the old
+release's tools here, whose SAME checks may not know the id yet, so the script checks its form itself. After the
+switch, LOGOCHECK (after SB13b) reads that the site shows the logo.
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# SB5d: NETOPIA_LOGO_ID in the new release's own ui file (only when it is first set or changes; never a release before this code).
+ID='<the shop id NETOPIA shows you, digits only>'
+U=$E/ui-$LABEL.env
+printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "SB5D_NOT_DONE: ID is not 1 to 12 digits (nothing changed)"; exit 1; }
+[ -f "$U" ] && [ "$(stat -c '%a %U' "$U")" = "640 root" ] || { echo "SB5D_NOT_DONE: $U is not root's 0640 file (SB5 or DR1 first)"; exit 1; }
+[ ! -e "$ART/ui-launch.json" ] || { echo "SB5D_NOT_DONE: $ART/ui-launch.json exists: the launch plans are made already (nothing changed): ask"; exit 1; }
+grep -q "'NETOPIA_LOGO_ID'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" || { echo "SB5D_NOT_DONE: this release's website does not know NETOPIA_LOGO_ID (a release before this code would refuse to start; nothing changed)"; exit 1; }
+[ ! -e "$S/ui-$LABEL.env.before-logo" ] || { echo "SB5D_NOT_DONE: $S/ui-$LABEL.env.before-logo exists: SB5d ran for this release before (look first)"; exit 1; }
+cp -p "$U" "$S/ui-$LABEL.env.before-logo"
+( umask 077; awk '!/^NETOPIA_LOGO_ID=/' "$U" > "$U.new"; printf 'NETOPIA_LOGO_ID=%s\n' "$ID" >> "$U.new" )
+chown --reference="$U" "$U.new"
+chmod --reference="$U" "$U.new"
+mv "$U.new" "$U"
+[ "$(grep -c '^NETOPIA_LOGO_ID=' "$U")" = 1 ] && grep -qxF "NETOPIA_LOGO_ID=$ID" "$U" || { echo "SB5D_NOT_DONE: the line is not in $U exactly once (the file before is $S/ui-$LABEL.env.before-logo): ask"; exit 1; }
+diff <(awk '!/^NETOPIA_LOGO_ID=/' "$S/ui-$LABEL.env.before-logo") <(awk '!/^NETOPIA_LOGO_ID=/' "$U") >/dev/null && [ "$(stat -c '%a %U:%G' "$U")" = "$(stat -c '%a %U:%G' "$S/ui-$LABEL.env.before-logo")" ] || { echo "SB5D_NOT_DONE: another line, the mode or the owner of $U changed (the file before is $S/ui-$LABEL.env.before-logo): ask"; exit 1; }
+lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" || { echo "SB5D_NOT_DONE: a SAME check is BAD (above; the file before is $S/ui-$LABEL.env.before-logo)"; exit 1; }
+echo "ui-$LABEL.env: NETOPIA_LOGO_ID=$ID"
+echo SB5D_DONE
+```
+
 ### SB6. The owner's fresh yes
 
 Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
@@ -4689,11 +5365,18 @@ Right before SB7, fresh in the live chat; SB7 to SB13 run on it. It names:
 - the online backup;
 - the migrations by number (or "no migrations");
 - the publish of register V with its delta hash;
+- only when SB3's `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and for each
+  one whose limit goes lower or is said to have changed either that nobody holds it or the date the people on it were
+  told, and for each one whose limit goes higher that the number was checked twice;
 - the new commit and its release key;
 - the switch;
 - only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the
   product, on which date) and its time to object has passed, and that the company's dated Register row (§5) is in this
   release ("The providers page");
+- only when this upload lists a company that no line-up seats yet (the upload that brings the Amazon gate): that no
+  §14 notice is owed now, and why, and that its dated Register row is in this release ("The providers page", "A
+  company listed before it receives anything"; when someone outside the team already has an account, ask before this
+  yes);
 - the Caddy payment-marks rule (PM2), when this upload adds it.
 
 For example: "Yes, upload r21 to the test site side by side: take the online backup, apply migrations 0126 and 0127,
@@ -5026,6 +5709,52 @@ else echo "the old runner has stopped (retired, or check SB14)"; fi
 echo SB13B_DONE
 ```
 
+### LOGOCHECK. NETOPIA's logo on the new release (read-only)
+
+Only in an upload whose SB5d ran, right after SB13b (on the drained path too). It changes nothing. It reads the new
+website directly on its own port (`$UIP`: no site password, and with no session cookie the home page is the landing
+page) and checks that the line from SB5d is in the release's ui file, that the page's content policy lets the logo
+load, and, while billing is on (the home page links `/pricing` only then), that the home page shows NETOPIA's two
+pictures exactly once each (the light theme's `np-black-0.svg` and the dark theme's `np-white-0.svg`, the same shop id)
+and none of the old mark files. With billing off it says so and does not stop: the logo shows by itself once billing is
+on. Last, it asks NETOPIA's server for both pictures and prints the headers that matter of each answer: each must be a
+200 with an SVG, with no cookie and no redirect (the Privacy Policy and the Cookie Policy assume neither). Re-run it now
+and then: NETOPIA can change the pictures at any time.
+
+Then look by eye, with the site password, in a private window: the home page's footer in the light and the dark theme
+(blue wordmarks on a white chip in the light theme, white wordmarks with no chip in the dark theme; a click opens
+netopia-payments.com in a new tab), a legal page, a phone width, and the
+checkout's card step (sign in, pick a plan, look at the logo under the button, and do not press the button).
+
+```sh
+set -euo pipefail
+. /root/preview-archive/rNN-names.sh
+# LOGOCHECK: read-only. NETOPIA's logo on the new release: the ui file's line, the page's policy, the home page, NETOPIA's answer.
+ID='<the shop id you gave SB5d>'
+LOGO="https://mny.ro/np-black-0.svg?id=$ID"
+DARK=${LOGO/np-black-0/np-white-0}
+printf '%s\n' "$ID" | grep -qxE '[0-9]{1,12}' || { echo "LOGOCHECK_NOT_DONE: ID is not 1 to 12 digits"; exit 1; }
+grep -qxF "NETOPIA_LOGO_ID=$ID" "$E/ui-$LABEL.env" || { echo "LOGOCHECK_NOT_DONE: ui-$LABEL.env does not hold the line NETOPIA_LOGO_ID=$ID (SB5d)"; exit 1; }
+P=$(curl -s -m 15 -o /dev/null -D - "http://127.0.0.1:$UIP/" | tr -d '\r' | grep -i '^content-security-policy:' || true)
+grep -qF "img-src 'self' data: https://mny.ro;" <<<"$P" || { echo "LOGOCHECK_NOT_DONE: the home page's policy does not let the logo load: ask"; exit 1; }
+H=$(curl -s -m 15 "http://127.0.0.1:$UIP/" || true)
+if grep -qF 'href="/pricing"' <<<"$H"; then
+  [ "$(grep -oF "src=\"$LOGO\"" <<<"$H" | grep -c .)" = 1 ] && [ "$(grep -oF "src=\"$DARK\"" <<<"$H" | grep -c .)" = 1 ] || { echo "LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once in each theme's picture: ask"; exit 1; }
+  ! grep -qF 'src="/payment-marks/' <<<"$H" || { echo "LOGOCHECK_NOT_DONE: the home page still draws the old mark files: ask"; exit 1; }
+  echo "home page: billing on, NETOPIA's logo once for the light theme and once for the dark"
+else
+  echo "home page: billing is off, so no logo (it shows by itself once billing is on)"
+fi
+for A in "$LOGO" "$DARK"; do
+  echo "NETOPIA's answer for $A:"
+  R=$(curl -sI -m 15 "$A" | tr -d '\r' | tr 'A-Z' 'a-z' || true)
+  grep -E '^(http/|content-type:|content-length:|cache-control:|set-cookie:|location:)' <<<"$R" || true
+  grep -qE '^http/[0-9.]+ 200' <<<"$R" && grep -qx 'content-type: image/svg+xml' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG for $A: ask"; exit 1; }
+  ! grep -qE '^(set-cookie|location):' <<<"$R" || { echo "LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected for $A (the Privacy Policy and the Cookie Policy assume neither): ask"; exit 1; }
+done
+echo LOGOCHECK_DONE
+```
+
 ### SB13c. The N-1 baseline names the live release (on the Mac)
 
 After SB13b the live release is `REV` (`LABEL`, in the names file). The N-1 compatibility job
@@ -5181,6 +5910,25 @@ that reverts by itself (`SWITCH_REVERTED`) puts back the version that was active
 site version it activates nothing. WB1 and WB4 activate nothing (WB4 never writes the switch). Afterwards
 `lc settings-version.mjs status` prints the pointer.
 
+**The numbers (SB3's `NEWNUM`).** After a drained upload there is no WB2: see "The numbers on the drained path" in
+"Drained upload on the template layout". A way back that makes the old release current again (WB2) also brings the
+numbers before back, and nothing is typed: the plans, the day's ceiling, the room-read budget and the abuse limits are sealed
+in the old release's own site version, and the per-debate ceiling comes with the settings version WB2 activates.
+Purchases made while the new numbers were live keep the price they were bought at. **When the upload had raised a
+plan's limits, WB2 does not take the raise back from the people whose month saw it**: they keep the higher number
+until their own next month starts, as "What a change does to the people who already have a plan" (under SB3) says; a
+month that starts after WB2 has the old number. When the upload had lowered a limit, WB2 brings the higher number back
+for everyone at once. Both hold only when the old release carries that rule. An old release from before it measures
+everyone against its own numbers at once, a lowering included; the owner's yes for WB2 names which of the two it is.
+The old release carries the rule when this line, run with the upload's names file, prints 1 or more; a 0, or an
+error, means an older one: `grep -c createBillingPlansInForce "$OCAPI/dialectical-engine/apps/api/src/main.ts"`.
+Once the old release
+is retired there is no switch back: put the numbers before into the owner's file with SB3c (`KEEP` = the inputs that
+upload named; `SRC` = the plan that upload compared with, which its record names:
+`jq -r .from.path <its artifacts folder>/site-inputs.json`), then publish them with the next upload, named in its
+`NEWNUM` like any other change, and with the plans in `LIMITS` whose limits change. The owner's file itself is
+never changed by an upload or by a way back; only the owner and SB3c write it.
+
 If SB10 swapped the operator folder, moving it back (`mv /opt/debateai-v3-preview/operator/lifecycle-v1
 "$S/operator-lifecycle-v1.<new label>"`, then `mv "$S/operator-lifecycle-v1.before" /opt/debateai-v3-preview/operator/lifecycle-v1`)
 is the owner's call after WB1 or WB2: the old release ran with the new tools since SB10. After SB8 the online backup is a
@@ -5292,14 +6040,23 @@ could not run beside the new database (spec §5's escape hatch). Then the upload
 template layout: a quiet moment, the old release stopped with nothing open, a cold copy, the migrations, and a switch
 with the old pair already stopped. SB1 to SB4 stand as they are (the names, the staging, the practice, the plan); SB5's
 database-ahead file is not made. To change the payment marks on this path, run SB5b right after DR1. To add the
-UI-to-API proof on this path, run SB5c right after DR1. The first time
-the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule") go after DR1 and SB5b, before DR2.
+UI-to-API proof on this path, run SB5c right after DR1. To set or change NETOPIA's logo id on this path, run SB5d
+right after DR1. The first time the marks are listed, MT1, PM2 and MT2 ("Payment marks: the files and Caddy's rule")
+go after DR1 and SB5b, before DR2. On the upload that brings the Amazon gate, run BEDROCK_ENV (piece 3) right after DR1
+too, and GATEREADY right before the yes before DR2 ("The Amazon Bedrock gate: the upload that brings it", which also
+says what runs between SB2 and SB3, and at SB4).
 
 **The owner's yes, fresh in the live chat right before DR2.** It names the downtime, the cold copy, the migrations by
 number (and which one is not expand-only), the publish with its delta hash, and the new commit with its release key.
 When this upload adds the Caddy payment-marks rule, the yes before DR2 names PM2 too, and comes before MT1.
 When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated
-Register row (§5), as in SB6.
+Register row (§5), as in SB6. When it only lists a company that no line-up seats yet (the upload that brings the
+Amazon gate), the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE. When
+someone outside the team already has an account then, ask before that yes ("The providers page").
+When SB3's `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those
+plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the
+people on it were told, and for each one whose limit goes higher that the number was checked twice, as in SB6. On this path SB3b (SB3
+once more) is for before that yes, and never after DR4 or DR5.
 
 | Step | What | The site | The way back from here |
 |---|---|---|---|
@@ -5310,6 +6067,14 @@ Register row (§5), as in SB6.
 | DR4 | migrations | down | **only the cold copy: rbD-B** |
 | DR5 | publish, verify plan, first proof, launch plans, pins, drop-ins, stage | down | rbD-B |
 | DR6 | the new runner, API and website; the switch with the old pair stopped; the old release marked retired (the downtime ends) | up | rbD-B |
+
+**Once real payments are on** (`PREVIEW_LIVE_PAYMENTS` in the API file: `deploy/preview-auth-dev/v1/MAIN-SITE.md` part
+7), two more rules hold. While they are on, keep the site password on from DR2 until SB13b has passed, so nobody can
+pay while the upload may still be undone: if the site is open, put the password back before the upload starts
+(MAIN-SITE.md PWON, 8.4). And if real payments were on at any time since DR3, even if they are closed again now, run
+MAIN-SITE.md's LIVEAFTER (7.12) before you choose rbD-B: rbD-B puts back DR3's cold copy, so it would lose every real
+payment, NETOPIA notice, invoice and credit note written since then, while the cards stay charged and the documents
+stay issued. If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B: fix forward, and ask.
 
 #### DR1. The three env files
 
@@ -5512,8 +6277,8 @@ systemctl start debateai-preview-backup.timer || { echo "DR6_NOT_DONE: the backu
 echo DR6_DONE
 ```
 
-Then SB13b (the team member's test debate) and, later, SB15 as usual. The old release has no retirement receipt (it
-never retired by itself); its `RETIRED` row says `DRAINED`.
+Then SB13b (the team member's test debate), LOGOCHECK when this upload ran SB5d, and, later, SB15 as usual. The old
+release has no retirement receipt (it never retired by itself); its `RETIRED` row says `DRAINED`.
 
 The switch accepts the old runner stopped only on this path (`--old-pair-stopped`). After `SWITCH_OUTCOME_UNKNOWN` (its
 `next` names `switch --finish … --old-pair-stopped`), or `BACKSTOP`/`TARGET` in `bad`, run WB4 with `bash -s -- drained`:
@@ -5544,6 +6309,18 @@ for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-runner@$OLABEL" --
 echo RBD_A_DONE
 ```
 
+**The numbers on the drained path (SB3's `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to
+it (no WB2) once the upload is done. Numbers published by a drained upload come back in one of two ways only: rbD-B,
+which puts back DR3's cold copy and with it the old numbers, and loses everything written since DR3 (sign-ups, debates,
+payments); or SB3c (`KEEP` = the inputs the upload named; `SRC` = the plan it compared with, which its record names:
+`jq -r .from.path <that upload's artifacts folder>/site-inputs.json`) and then the next upload, with those inputs
+named in its `NEWNUM`. The second way loses nothing and takes one more upload. The folder is the one of the upload
+that published the numbers, not `$ART` of a later upload's names file: SB3c's last line names the settings version it
+wrote from, which must be the one before the change. For a plan's limits the two ways differ. rbD-B brings the old
+numbers back for everyone at once: the record of the switch goes with the copy. The second way is an upload like any
+other, so a limit it lowers again reaches each person from their own next month, and the people whose month saw the
+higher number keep it until then.
+
 **rbD-B: from DR4 on.** The new release stops (its runner only with nothing open), the cold copy's data and config
 folders come back (the current ones moved aside, never deleted), the lock goes back to its copy from SB1 (the new
 release's entry leaves it; the old one's is byte for byte the same), the new release's instance drop-ins move into
@@ -5554,6 +6331,9 @@ sessions and marks the restore fence (H11) before any API starts. Everything wri
 with it. Sign-outs, password changes and other revocations since then would come back with it, so the script revokes
 every restored session first. When the release it starts carries NV-07, the public library stays empty until the owner
 releases the hold: H11 step 4.
+
+**If real payments were on at any time since DR3** (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 7), run its
+LIVEAFTER (7.12) first, and never run rbD-B unless it ends with `LIVEAFTER_DONE`.
 
 ```sh
 set -euo pipefail
@@ -5657,6 +6437,11 @@ echo MT2_DONE
 ```
 
 ### Payment marks: the files and Caddy's rule
+
+**NETOPIA's hosted logo replaces these files.** When the new release's ui file has `NETOPIA_LOGO_ID` (SB5d), the
+footer and the checkout show NETOPIA's own picture, loaded by the visitor's browser from NETOPIA's server; it already
+holds the Visa and Mastercard marks, and the website then draws none of the three files. With it, PM1, SB5b, MT1, PM2
+and MT2 are not needed. The three files and the steps below stay for a site without the logo id.
 
 **In plain words.** The website's footer and checkout show the NETOPIA, Visa and Mastercard marks at
 `/payment-marks/netopia.svg`, `/payment-marks/visa.svg` and `/payment-marks/mastercard.svg` (`deploy/vps/README.md`

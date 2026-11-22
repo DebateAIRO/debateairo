@@ -2274,13 +2274,17 @@ describe("F5: a debate's own readers, its public copies, its flags and the owner
     "staff.record_team_practice(jsonb,uuid,jsonb,jsonb,jsonb)", "staff.revoke_internal_allowance(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.revoke_team_limit_partner(jsonb,uuid,jsonb,uuid,uuid,jsonb,jsonb)", "staff.set_team_limit(jsonb,uuid,jsonb,jsonb,jsonb)",
     "staff.step_up_prerequisite(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)",
+    // 0184's entry point beside it, gated as it is: the account's password and authenticator step, and for a staff member an operator's permit too.
+    "staff.step_up_prerequisite_v2(uuid,uuid,text,uuid,bigint,uuid,text,text,text,jsonb,jsonb,text,text,uuid,text)",
     // 0178's four, each gated as its older twin is: the mailed verification token, the social flow's proof and state, and the step-up grant's token.
     "identity.consume_verification_set_password(text,timestamp with time zone,jsonb,text)",
     "identity.create_social_account_v2(jsonb,jsonb)", "identity.finish_social_callback_v2(jsonb,jsonb)",
     "identity.request_email_change_bounded(uuid,uuid,text,uuid,bytea,jsonb,text,text,timestamp with time zone,jsonb,integer,bigint)",
   ] as const;
   const PUBLIC = [
-    "core.latest_provider_probes(text[])", "core.read_current_release()", "core.read_release_state(text)", "core.resolve_run_ref(uuid)",
+    "core.latest_provider_probes(text[])", "core.read_current_release()",
+    // 0185: the switches the site made (release keys and instants), no account's data.
+    "core.read_release_history()", "core.read_release_state(text)", "core.resolve_run_ref(uuid)",
     "core.run_is_published(uuid,uuid)", "identity.outbound_mail_today()", "identity.public_author_name_gone(uuid)", "identity.public_review_held(uuid)",
     "identity.read_public_debate_reports(uuid)", "identity.read_public_debate_updates(uuid)", "identity.read_public_dig_parent(uuid,uuid)",
     "identity.read_public_flag_target(uuid)", "identity.read_public_review_overlay(uuid)", "identity.read_public_tree_of_run(uuid)",

@@ -39,6 +39,7 @@ const PLANS: readonly PreviewFinalWriterPlan[] = ["free", "paid"];
 const CONFIG = parsePreviewProviderTestConfig(JSON.stringify({ deployment: "v3-preview", requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/deepinfra-budget-v3.sock", scope_id: "v4-one-rule-fixture",
   anthropic_budget_socket: "/run/debateai-v3-preview/anthropic-budget-v1.sock",
+  bedrock_budget_socket: "/run/debateai-v3-preview/bedrock-budget-v1.sock",
   free_model_ids: [GLM, HAIKU], premium_model_ids: PREVIEW_MODEL_ROWS.map((r) => r.model) }))!;
 const OFFERED = parsePreviewGateRemaining({ state: "active", window_open: true, remaining_usd: "2.00", remaining_calls: 10,
   max_concurrent_calls: 2, largest_reservation_usd: "0.24704", enabled_models: [HAIKU],

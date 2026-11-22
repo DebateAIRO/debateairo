@@ -43,6 +43,15 @@ function renderMail(input: AccountMailRequest, from: string): string {
   catch { throw new MailDeliveryError("MAIL_INPUT_INVALID"); }
 }
 
+/**
+ * An account mail exactly as the senders below write it, for the test server's mail program
+ * (deploy/preview-auth-dev/v1/mail-handoff.mjs). The program renders a mail again from the fields the mail carries and
+ * lets it through only when the bytes are equal, so its check follows this composition and never a frozen copy.
+ */
+export function renderAccountMailMessage(input: AccountMailRequest, from: string): string {
+  return renderMail(input, from);
+}
+
 export interface VerificationMail {
   readonly attemptId: string;
   readonly recipient: string;
@@ -419,7 +428,6 @@ const TEMPLATED_MAIL_PURPOSE: Readonly<Record<MailTemplateId, MailPurpose>> = Ob
   O1: "owner-notice", O2: "owner-notice", O2_WITHDRAWAL: "owner-notice", O2_REFUND_DUE: "owner-notice",
   O2_REFUND_REMINDER: "owner-notice", O3: "owner-notice", O4: "owner-notice",
   DATA_EXPORT: "data-export",
-  THREAT_REPORT_WAITING: "threat-report-alert",
   TEAM_LIMIT_CHANGED: "team-notice", TEAM_LIMIT_PARTNER_CHANGED: "team-notice", TEAM_ALLOWANCE_CHANGED: "team-notice",
   TEAM_ALLOWANCE_YOURS: "team-notice", PUBLIC_REVIEW_CHANGED: "team-notice", PUBLIC_FLAG_HIDDEN: "team-notice", PUBLIC_FLAG_WAITING: "team-notice",
   MODERATION_MAIL_FAILED: "team-notice",

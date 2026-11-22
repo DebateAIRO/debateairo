@@ -4,9 +4,10 @@
 // ui-<label>.env. Each one is a copy of a live file in which only the values that must differ per release change:
 // the site version and release key, the ports of the release's slot, the runner's worker identity and the API's mail
 // helper inside the release's own folder. Every other line is copied byte for byte, so both releases keep using the
-// same spending gates, scope, team and secrets. The SAME check reads the files back and says, check by check, that
-// two releases share what they must share and never share what they must not, and that each release's website's
-// payment marks list, when it has one, is a list of netopia, visa and mastercard.
+// same spending gates, scope, team, who may start debates (PREVIEW_ASKS_OPEN_TO) and secrets. The SAME check reads
+// the files back and says, check by check, that two releases share what they must share and never share what they
+// must not, and that each release's website's payment marks list, when it has one, is a list of netopia, visa and
+// mastercard, and its NETOPIA logo id, when it has one, is 1 to 12 digits.
 //
 //   release-env.mjs derive --service api|ui|runner --from <file> --label <label> --slot A|B --release-key <key>
 //       <file>: /etc/debateai-v3-preview/auth-dev-v1/<service>.env or <service>-<older label>.env (root-owned, 0640).
@@ -25,7 +26,7 @@
 import { lstat } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { withPrivateBytes } from '../../preview-auth-dev/v1/custody.mjs';
-import { RELEASE_KEY_PATTERN, isPaymentMarksList, parseEnvironmentText, readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
+import { PREVIEW_NETOPIA_LIVE_BASE, PREVIEW_NETOPIA_SANDBOX_BASES, RELEASE_KEY_PATTERN, isNetopiaLogoId, isPaymentMarksList, parseEnvironmentText, readEnvironmentFile } from '../../preview-auth-dev/v1/environment.mjs';
 import { PREVIEW_SLOTS } from '../../preview-auth-dev/v1/launch-plan.mjs';
 import { LAYOUT, RELEASE_LABEL, atomicWrite, canonicalJson, envPathFor, logLine } from './common.mjs';
 
@@ -102,17 +103,60 @@ function configField(environment, field) {
 const WITHIN_API_RUNNER = Object.freeze([['PREVIEW_PROVIDER_TEST_CONFIG_JSON', false], ['PREVIEW_TEAM_USER_IDS_JSON', false], ['DEBATEAI_DEPLOYMENT_MODE', false], ['REGISTER_VERSION', true], ['RELEASE_KEY', true]]);
 const ACROSS_CONFIG = Object.freeze(['budget_socket', 'anthropic_budget_socket', 'scope_id']);
 const ACROSS_SAME = Object.freeze(['DEBATEAI_DEPLOYMENT_MODE', 'HATCHET_WORKFLOW_NAME', 'PREVIEW_TEAM_USER_IDS_JSON']);
+/**
+ * Who may start debates (PREVIEW_ASKS_OPEN_TO, read by the API's and the runner's parsePreviewAsksOpenTo): both must read it
+ * alike within a release, and two releases side by side must too, so an ask one release admits the other never fails.
+ * Each file is also held to the parser's own rules, so `same` names a file the launcher would refuse before any restart:
+ * absent, or exactly one of the two values, with the preview configuration, no team list and hosted mode.
+ */
+const ASKS_OPEN_KEY = 'PREVIEW_ASKS_OPEN_TO';
+const ASKS_OPEN_VALUES = Object.freeze(['everyone', 'everyone-with-test-payments']);
+export function asksOpenValid(environment) {
+  const value = environment[ASKS_OPEN_KEY];
+  return value === undefined || (ASKS_OPEN_VALUES.includes(value) && environment.PREVIEW_PROVIDER_TEST_CONFIG_JSON !== undefined
+    && environment.PREVIEW_TEAM_USER_IDS_JSON === undefined && environment.DEBATEAI_DEPLOYMENT_MODE === 'hosted');
+}
+function asksOpenChecks(releases) {
+  const out = [];
+  for (const { label, api, runner } of releases) out.push(result(`SAME_API_RUNNER_${ASKS_OPEN_KEY}:${label}`, allSame([api[ASKS_OPEN_KEY], runner[ASKS_OPEN_KEY]], false)),
+    result(`VALID_${ASKS_OPEN_KEY}:${label}`, asksOpenValid(api) && asksOpenValid(runner)));
+  if (releases.length === 2) out.push(result(`SAME_${ASKS_OPEN_KEY}`, allSame(releases.flatMap(release => [release.api[ASKS_OPEN_KEY], release.runner[ASKS_OPEN_KEY]]), false)));
+  return out;
+}
 const ACROSS_DIFFERENT = Object.freeze([['RELEASE_KEY', 'api'], ['RUNNER_WORKER_ID', 'runner'], ['HATCHET_WORKER_NAME', 'runner'], ['API_PORT', 'api'], ['PORT', 'ui']]);
 
 /**
- * Side-by-side spec §10, the SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
+ * The payment system an API file names, as comparable text: NETOPIA's sandbox (either sandbox base), its live base, or
+ * none, together with the owner's live payments line (or none). Any other base is unreadable and equals nothing.
+ */
+function paymentSystemOf(api) {
+  const base = api.NETOPIA_API_BASE_URL;
+  const system = base === undefined ? 'none' : PREVIEW_NETOPIA_SANDBOX_BASES.includes(base) ? 'sandbox' : base === PREVIEW_NETOPIA_LIVE_BASE ? 'live' : null;
+  return system === null ? Symbol('unreadable') : `${system}|${api.PREVIEW_LIVE_PAYMENTS ?? 'none'}`;
+}
+/**
+ * Across two releases only, SAME_API_PAYMENT_SYSTEM: both API files name the same payment system and the same live
+ * payments line (or neither). Two APIs of different systems on one database would each end the other's billing jobs
+ * as another payment system's (DEAD OTHER_PAYMENT_SYSTEM), a refund's credit note among them. Runner and website files
+ * carry no payment setting and are never compared.
+ */
+function paymentSystemChecks(releases) {
+  if (releases.length !== 2) return [];
+  return [result('SAME_API_PAYMENT_SYSTEM', allSame(releases.map(release => paymentSystemOf(release.api)), true))];
+}
+
+/**
+ * The SAME checks. Within each release (`<check>:<label>`): its API and runner agree on the
  * preview configuration, the team, the deployment mode, the site version and the release key; its website names the
- * API's release key; its ports and API address are its slot's; and its payment marks list, when it has one, is a list
- * of netopia, visa and mastercard (environment.mjs isPaymentMarksList; never compared across releases, since a release
- * may change it on purpose). Across releases (two only): every API and runner file names the same spending gates and
+ * API's release key; its ports and API address are its slot's; its payment marks list, when it has one, is a list
+ * of netopia, visa and mastercard (environment.mjs isPaymentMarksList); and its NETOPIA logo id, when it has one, is 1 to
+ * 12 digits (isNetopiaLogoId). Neither is compared across releases, since a release may change them on purpose.
+ * Across releases (two only): every API and runner file names the same spending gates and
  * scope, deployment mode, workflow and team, and every API file that names a restore fence names the same one
- * (SAME_API_RESTORE_FENCE_PATH, NV-07); the release keys, runner identities and ports all differ. Returns every
- * check, OK or not, in a fixed order.
+ * (SAME_API_RESTORE_FENCE_PATH); the release keys, runner identities and ports all differ. Last, who may
+ * start debates (asksOpenChecks). Returns every check, OK or not, in a fixed order.
+ * The public name (PUBLIC_APP_URL) is held to one value too: a release's website and API name the same one
+ * (SAME_UI_API_PUBLIC_APP_URL:<label>), and two releases name the same one (SAME_PUBLIC_APP_URL).
  */
 export function sameChecks(releases) {
   if (!Array.isArray(releases) || releases.length < 1 || releases.length > 2
@@ -125,8 +169,15 @@ export function sameChecks(releases) {
     const { uiPort, apiPort } = PREVIEW_SLOTS[slot];
     out.push(result(`SLOT_API_PORT:${label}`, api.API_PORT === apiPort), result(`SLOT_PORT:${label}`, ui.PORT === uiPort),
       result(`SLOT_DIALECTICAL_API_BASE:${label}`, ui.DIALECTICAL_API_BASE === `http://127.0.0.1:${apiPort}`),
-      result(`UI_PAYMENT_MARKS_AVAILABLE:${label}`, ui.PAYMENT_MARKS_AVAILABLE === undefined || isPaymentMarksList(ui.PAYMENT_MARKS_AVAILABLE)));
+      result(`UI_PAYMENT_MARKS_AVAILABLE:${label}`, ui.PAYMENT_MARKS_AVAILABLE === undefined || isPaymentMarksList(ui.PAYMENT_MARKS_AVAILABLE)),
+      result(`UI_NETOPIA_LOGO_ID:${label}`, ui.NETOPIA_LOGO_ID === undefined || isNetopiaLogoId(ui.NETOPIA_LOGO_ID)));
   }
+
+  // The public name (PUBLIC_APP_URL): a release's website and API answer as the same one, and two live releases too,
+  // since the server answers as one name at a time. The launchers check that each is a listed name (public-origins.mjs).
+  for (const { label, api, ui } of releases) out.push(result(`SAME_UI_API_PUBLIC_APP_URL:${label}`, allSame([ui.PUBLIC_APP_URL, api.PUBLIC_APP_URL], false)));
+  if (releases.length === 2) out.push(result('SAME_PUBLIC_APP_URL', allSame(releases.flatMap(release => [release.api.PUBLIC_APP_URL, release.ui.PUBLIC_APP_URL]), false)));
+
   if (releases.length === 2) {
     const backends = releases.flatMap(release => [release.api, release.runner]);
     for (const field of ACROSS_CONFIG) out.push(result(`SAME_${field.toUpperCase()}`, allSame(backends.map(environment => configField(environment, field)), false)));
@@ -136,6 +187,8 @@ export function sameChecks(releases) {
     out.push(result('SAME_API_RESTORE_FENCE_PATH', allSame(releases.map(release => release.api.RESTORE_FENCE_PATH).filter(value => value !== undefined), false)));
     for (const [key, service] of ACROSS_DIFFERENT) out.push(result(`DIFFERENT_${key}`, allDifferent(releases.map(release => release[service][key]))));
   }
+  out.push(...paymentSystemChecks(releases));
+  out.push(...asksOpenChecks(releases));
   return Object.freeze(out);
 }
 

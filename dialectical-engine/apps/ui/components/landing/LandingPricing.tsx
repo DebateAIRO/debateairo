@@ -15,8 +15,13 @@ export function LandingPricing({
   catalog,
   lowestPaidPrice,
   tax = "UNPRICED",
-  billingOn = lowestPaidPrice !== null
-}: { catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; billingOn?: boolean }): JSX.Element {
+  billingOn = lowestPaidPrice !== null,
+  testModeNote = null
+}: {
+  catalog: MessageCatalog; lowestPaidPrice: string | null; tax?: PricedTax; billingOn?: boolean;
+  /** The billing catalogue's test-mode note, translated by the page, while card payments run on NETOPIA's sandbox. */
+  testModeNote?: string | null;
+}): JSX.Element {
   return (
     <section
       id="start"
@@ -53,6 +58,7 @@ export function LandingPricing({
           </>
         )}
       </p>
+      {billingOn && testModeNote !== null ? <p className="lpPricing" role="note">{testModeNote}</p> : null}
       <footer id="ai-transparency" className="lpAiTransparency">
         <AiNotice catalog={catalog} variant="block" body={t(catalog, "home.aiLandingBlock")} />
       </footer>

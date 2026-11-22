@@ -11,6 +11,16 @@
 //   - vitest did not produce a report          -> exit 1 (a broken invocation is never green)
 //   - an unparseable allowlist entry or report -> exit 2
 //
+// One run can be split over several machines: with CI_TEST_PART=<index>/<count> in the environment the tool asks
+// vitest for the test files its targets name, sorts them, and runs every <count>-th one starting at the <index>-th
+// (see partFiles). The parts 1..<count> together run every file exactly once, and each part judges its own failures
+// against the same lists.
+//
+// A text-only pull request runs fewer tests: with CI_CHANGED_SINCE=<base commit> in the environment the tool reads
+// what changed since that commit and, when it is only legal texts or documentation, runs the test files that can
+// notice it (tools/ci-fast-path.mjs). The whole suite then runs on dev after the merge. Any doubt (no such commit, a
+// file of another kind) runs everything.
+//
 // V-4 (ruled 2026-09-21, follow-up included): the list may only SHRINK, so a listed test that has
 // started passing must fail the gate until its entry is deleted. The owner's wording was "three
 // consecutive default-branch runs"; the coordinator ruled the same intent without cross-run state.
@@ -26,6 +36,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { classifyChange, selectTests } from "./ci-fast-path.mjs";
 
 const PRODUCT_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const ALLOWLIST_PATH = resolve(PRODUCT_ROOT, "tests/ci-known-red.txt");
@@ -272,6 +283,82 @@ function sweep(targets, reportPath) {
   }
 }
 
+/**
+ * `CI_TEST_PART` as `{ index, count }`, `null` when it is unset, or `{ invalid }` when it is anything but
+ * `<index>/<count>` with 1 <= index <= count <= 99. A typo must stop the run: read loosely, it would run the whole
+ * suite on every machine, or nothing on one of them.
+ */
+export function parsePart(value) {
+  if (value === undefined || value === "") return null;
+  const match = /^([1-9]\d?)\/([1-9]\d?)$/.exec(value);
+  if (match === null || Number(match[1]) > Number(match[2])) return { invalid: value };
+  return { index: Number(match[1]), count: Number(match[2]) };
+}
+
+/**
+ * The files of one part: `files` without duplicates, sorted, every `count`-th one starting at the `index`-th.
+ * The order the files arrive in does not matter, so every machine cuts the same list the same way, and the parts
+ * 1..count hold each file exactly once.
+ */
+export function partFiles(files, { index, count }) {
+  return [...new Set(files)].sort().filter((_, position) => position % count === index - 1);
+}
+
+/**
+ * The explicit test-file targets vitest's own listing does not hold. A split run hands vitest the listing, so a
+ * listed file vitest would not collect (its include globs do not cover it) would otherwise vanish from every part.
+ */
+export function unlistedTargets(targets, listed) {
+  const known = new Set(listed);
+  return targets.filter((target) => TEST_FILE_PATTERN.test(target) && !known.has(target));
+}
+
+/** The test files vitest collects for `targets`, product-relative, or a `problem` string. Nothing is run. */
+function listTestFiles(targets) {
+  const run = spawnSync("pnpm", ["exec", "vitest", "list", ...targets, "--filesOnly", "--json"], {
+    cwd: PRODUCT_ROOT,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "inherit"]
+  });
+  if (run.error) return { problem: `could not start vitest list: ${run.error.message}` };
+  if (run.status !== 0) return { problem: `vitest list exited ${run.status}` };
+  try {
+    const entries = JSON.parse(run.stdout);
+    if (!Array.isArray(entries) || entries.some((entry) => typeof entry?.file !== "string")) throw new Error("not a list of files");
+    return { files: entries.map((entry) => relative(PRODUCT_ROOT, entry.file).split(sep).join("/")) };
+  } catch (error) {
+    return { problem: `could not read vitest's list of test files: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/** The files changed between `base` and the checked-out commit, as repository paths, or a `problem` string. */
+function changedSince(base) {
+  if (!/^[0-9a-f]{40}$/.test(base)) return { problem: "CI_CHANGED_SINCE is not a full commit id" };
+  const run = spawnSync("git", ["diff", "--name-only", "--no-renames", base, "HEAD"], {
+    cwd: PRODUCT_ROOT,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "ignore"]
+  });
+  if (run.error) return { problem: `could not start git: ${run.error.message}` };
+  if (run.status !== 0) return { problem: `git could not compare with ${base} (exit ${run.status})` };
+  return { files: run.stdout.split("\n").filter((line) => line !== "") };
+}
+
+/** The text-only change this run may narrow itself to (classifyChange's verdict), or `null` for the whole suite. */
+function fastPathFromEnvironment() {
+  const base = process.env.CI_CHANGED_SINCE;
+  if (base === undefined || base === "") return null;
+  const change = changedSince(base);
+  const verdict = change.problem !== undefined ? { fast: false, reason: change.problem } : classifyChange(change.files);
+  if (!verdict.fast) {
+    console.log(`CI_GATE_FAST_PATH off: ${verdict.reason}; running every test file`);
+    return null;
+  }
+  return verdict;
+}
+
 function main(args) {
   const { targets: dirs, invalid: invalidTargets, excluded } = expandTargets(args);
   if (invalidTargets.length > 0) {
@@ -281,6 +368,11 @@ function main(args) {
   }
   if (dirs.length === 0) {
     console.error("usage: node tools/ci-known-red.mjs <test dir | @list file> [<test dir | @list file>…]");
+    return 2;
+  }
+  const part = parsePart(process.env.CI_TEST_PART);
+  if (part !== null && part.invalid !== undefined) {
+    console.error(`CI_TEST_PART must be <index>/<count> with 1 <= index <= count <= 99, got "${part.invalid}"`);
     return 2;
   }
   if (!existsSync(ALLOWLIST_PATH)) {
@@ -304,10 +396,46 @@ function main(args) {
   const notRun = exclusionReport(excluded);
   for (const line of notRun) console.log(line);
 
+  // What this run hands to vitest: the targets as given; or the files they name, cut down to the ones that can
+  // notice a text-only change, and then to this machine's part.
+  const fastPath = fastPathFromEnvironment();
+  let runTargets = dirs;
+  if (part !== null || fastPath !== null) {
+    const listing = listTestFiles(dirs);
+    if (listing.problem !== undefined) {
+      console.error(`${listing.problem}; refusing to report a green gate`);
+      return 1;
+    }
+    const unlisted = unlistedTargets(dirs, listing.files);
+    if (unlisted.length > 0) {
+      console.error(`listed test files vitest does not collect (${unlisted.length}) — refusing to report a green gate:`);
+      for (const path of unlisted) console.error(`  ${path}`);
+      return 1;
+    }
+    let files = [...new Set(listing.files)].sort();
+    if (fastPath !== null) {
+      const selected = selectTests(files, fastPath, (file) => readFileSync(resolve(PRODUCT_ROOT, file), "utf8"));
+      console.log(`CI_GATE_FAST_PATH on: only ${fastPath.legal ? "legal texts and " : ""}documents changed; running the ${selected.length} of ${files.length} test files that can notice it. Every test runs on dev after the merge.`);
+      files = selected;
+    }
+    runTargets = part === null ? files : partFiles(files, part);
+    if (part !== null) console.log(`CI_GATE_PART ${part.index}/${part.count} files=${runTargets.length} of ${files.length}`);
+    if (runTargets.length === 0) {
+      if (fastPath === null) {
+        console.error("this part holds no test file; refusing to report a green gate");
+        return 1;
+      }
+      // A text-only change may leave a part, or a whole list, with nothing that can notice it.
+      console.log("CI_GATE_SCOPE files=0 tests=0");
+      console.log("no test file here can notice this text-only change; nothing to run");
+      return 0;
+    }
+  }
+
   const scratch = mkdtempSync(join(tmpdir(), "ci-known-red-"));
   const reportPath = join(scratch, "vitest.json");
   try {
-    const first = sweep(dirs, reportPath);
+    const first = sweep(runTargets, reportPath);
     if (first.problem !== undefined) {
       console.error(`${first.problem}; refusing to report a green gate`);
       return first.unparseable === true ? 2 : 1;
@@ -318,7 +446,7 @@ function main(args) {
     const decision = decide({ failed, allowlist, ran, flaky });
     // How much actually ran, so a log can never show a green gate over a sweep that collected nothing.
     console.log(`CI_GATE_SCOPE files=${Array.isArray(report?.testResults) ? report.testResults.length : 0} tests=${ran.length}`);
-    const missing = missingTargets(dirs, report, PRODUCT_ROOT);
+    const missing = missingTargets(runTargets, report, PRODUCT_ROOT);
     if (missing.length > 0) {
       console.error(`listed test files vitest did not run (${missing.length}) — refusing to report a green gate:`);
       for (const path of missing) console.error(`  ${path}`);

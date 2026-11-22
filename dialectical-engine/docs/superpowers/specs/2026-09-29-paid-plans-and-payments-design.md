@@ -26,10 +26,10 @@ xMoney, so the card number never touches our servers. Before they pay, they see 
 country's tax, worked out by a tax service called Quaderno. From then on our server charges the saved card once a month
 and emails an invoice. Each plan gives a monthly amount of AI credit, with a daily and a weekly slice so it cannot all
 be used up in one day. Before each debate, the engine estimates its cost and chooses models that fit what is left. A
-debate that is already running may go 10% over to finish, and we pay that extra. When there is no room left, the
-question waits and starts by itself at the next reset, or the person can upgrade straight away. Every country has two
-switches: whether people there may sign up, and whether they may pay. Nothing changes on the live site until you
-switch billing on. People who run the code on their own computer never see billing at all.
+debate that is already running may go a little over (the leeway, §1.2) to finish, and we pay that extra. When there
+is no room left, the question waits and starts by itself at the next reset, or the person can upgrade straight away.
+Every country has two switches: whether people there may sign up, and whether they may pay. Nothing changes on the
+live site until you switch billing on. People who run the code on their own computer never see billing at all.
 
 ### 1.2 The plans
 
@@ -37,8 +37,8 @@ switch billing on. People who run the code on their own computer never see billi
 |---|---|---|---|---|---|
 | **Free** | $0 | <amount> | — | — | 2 debaters, the cheapest models, fixed settings |
 | **Plus** | <amount> | <amount> | <amount> (<amount>) | <amount> (<amount>) | everything: 3 debaters, all settings, the best models |
-| **Pro** | $50 | $20 | $4 | $10 | everything |
-| **Max** | $200 | <amount> | $30 | $75 | everything |
+| **Pro** | $50 | <amount> | <amount> | <amount> | everything |
+| **Max** | $200 | <amount> | <amount> | <amount> | everything |
 
 - **AI credit** means what the AI companies charge us for that person's debates, including the verdict story, at the
   prices we configure. The help chat is free.
@@ -53,9 +53,8 @@ switch billing on. People who run the code on their own computer never see billi
   multiple, the way other AI products do: "Pro: 4× the Plus allowance", "Max: 30×".
 - **All prices and credits are settings, not code.** Changing them means publishing a new version of the site's
   settings. The same applies to the list of countries.
-- **Free, measured honestly.** Nobody has measured a real debate's cost yet. The first estimate says a small debate
-  on cheap models costs about $0.19, so Free covers roughly one small debate a month. We will check this after the
-  first paid test debates (§1.8).
+- **Free, measured honestly.** Nobody has measured a real debate's cost yet. How many small debates on cheap models
+  Free covers will be checked after the first paid test debates (§1.8).
 
 ### 1.3 What a person sees and does
 
@@ -94,7 +93,7 @@ If their country does not allow sign-up, the form says so in plain words before 
 
 | What they do | What happens |
 |---|---|
-| **Upgrade** | Takes effect immediately. They pay the price difference for the days left in the month, and they get the new plan's extra credit for those days too. Example: Plus→Max with 1 of 30 days left adds about $4.83 of credit for about $6. Credit already spent this month still counts. From the next month, they get the full new credit. |
+| **Upgrade** | Takes effect immediately. They pay the price difference for the days left in the month, and they get the new plan's extra credit for those days too. Example: Plus→Max with 1 of 30 days left adds <amount> of credit for 1/30 of the price difference. Credit already spent this month still counts. From the next month, they get the full new credit. |
 | **Downgrade** | Takes effect at the next renewal. |
 | **Change the card** | On a separate card page they enter the new card. The bank shows a $1.00 hold that is released at once and never charged. The page says so in plain words. |
 | **Cancel** | One click in Settings → Subscription, or on a `/cancel` page that works without signing in (we email them a link). They keep the plan until the paid month ends. There are no further charges. |
@@ -207,7 +206,7 @@ Israel). It leaves the Terms (section 2, Annex A.7), the Privacy Policy (Annex B
 are not touched.
 
 **Amendment 2026-11-14 (V, owner decision):** Switzerland and Liechtenstein are closed for now: no sign-up and no
-payment (`NOT_OFFERED`, like the UK). They are one VAT territory; with the company's worldwide turnover above CHF
+payment (`NOT_OFFERED`, like the UK). They are one VAT territory; once the company's worldwide turnover reaches CHF
 100,000 a year, Swiss VAT is due from the first paid sale there, and registering needs a Swiss tax representative.
 They reopen once one is appointed. The Terms' section 2 no longer lists them, the Swiss sections (Terms Annex A.5,
 Privacy Policy Annex B.5) are removed and the later sections renumbered (Moldova A.5/B.5, Asia-Pacific A.6/B.6).
@@ -242,28 +241,8 @@ manifest, so its new wording is a new consent version in every language.
 
 ### 1.6 The money check
 
-Your own calculation: 1,000 people on Plus bring $20,000 a month. The API credit is $5,000 and the fixed costs are
-$12,000, so $3,000 is left. With the running costs of this design:
+The owner's own cost check is kept with the business papers, outside this repository.
 
-| Line | Monthly |
-|---|---|
-| 1,000 × Plus | $20,000 |
-| API credit, if everyone uses all of it | −$5,000 |
-| The 10% leeway, in the worst case (everyone overshoots every month) | up to −$500 |
-| Card fees (xMoney publishes no price list; 1.5–2.5% is typical) | about −$300 to −$500 |
-| Quaderno (plan for 1,000 charges a month) | −$99 |
-| SmartBill (API plan; only Romanian invoices use it) | about −$10 |
-| Your fixed costs | −$12,000 |
-| **Left** | **about $1,900–2,100**, before unused credit is counted |
-
-- **Unused credit raises the margin.** Most people do not spend their whole allowance.
-- **Free users cost up to <amount> each.** 10,000 Free users would cost up to <amount>,000 a month.
-- **Per plan, what is left after the full credit and about 2% card fees:**
-  - Plus: about $14.35
-  - Pro: about $28.75
-  - Max: about $45.75, or about $30.75 if the full 10% leeway is used every month.
-- **Quaderno's price depends on volume:** about $99 a month at 1,000 charges, $149 at 2,500 and $249 at 5,000. The
-  $49 plan covers only 250 charges.
 - **Taxes are not income.** We collect them and pass them on.
 
 ### 1.7 What you need to do (nothing blocks the build)
@@ -363,7 +342,7 @@ Paths are relative to `dialectical-engine/`. Line numbers are at `origin/dev` 24
 - **Ceilings.** The per-run and daily ceilings come from one deployment-wide policy (`CostEnvelopeGuard`,
   `packages/budget/src/model-spend.ts:326-569`; values `packages/register/src/cost-envelope-policy.ts:297-313`):
   - per run: <amount>
-  - per day: $2
+  - per day: <amount>
   - reserve: 30%
   - overrun: 20%
   - These are provisional values.
@@ -476,7 +455,7 @@ Paths are relative to `dialectical-engine/`. Line numbers are at `origin/dev` 24
   - Login is HTTP Basic with the API key. A sandbox exists. There is no Node SDK.
   - All target countries are covered except Brazil. It does not do Romanian e-Factura.
 - **SmartBill:**
-  - The API needs the Platinum plan (€8.94 a month, 700 documents included, then €0.017 each).
+  - The API needs SmartBill's Platinum plan.
   - Invoices in any currency at the BNR rate, with automatic e-Factura sending.
   - The limit is 3 calls a second; going over blocks access for 10 minutes.
   - The exact endpoints are confirmed in plan task P2-SB-0.
@@ -1199,7 +1178,7 @@ interface InvoiceIssuer {
 **Pure (unit)**
 
 - `computeWindows`: every month length, a day-31 anchor, a leap year, week blocks, and the last partial week.
-- Room per window at 94.99, 95, 99.99, 100, 109.99, 110 and 110.01%.
+- Room per window at 94.99, 95, 99.99 and 100%, and just under, at and just over the leeway's edge.
 - The upgrade proration and the withdrawal formula, both edges.
 - The country decisions for every group in §1.5, and the policy refinements.
 - The xMoney checksum and notice decryption against published or recorded test vectors (the sandbox recording is

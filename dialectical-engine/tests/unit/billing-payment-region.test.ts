@@ -309,9 +309,10 @@ describe("a Tennessee billing address is refused payment, consumer or company, w
     ]) {
       for (const mustFit of [true, false]) expect(decide(location, mustFit), JSON.stringify(location)).toEqual(excluded);
     }
-    // Its neighbours either side of the ZIP range stay open: 369 is Alabama, 386 Mississippi.
+    // Its neighbour below the ZIP range stays open (369 is Alabama); the one above, 386, is Mississippi, closed by the
+    // Terms too, under its own region id.
     expect(decide(at("US", "36925", null))).toEqual({ kind: "ALLOW" });
-    expect(decide(at("US", "38601", null))).toEqual({ kind: "ALLOW" });
+    expect(decide(at("US", "38601", null))).toEqual(refuse("US-MS", "REGION_TERMS_EXCLUDED"));
   });
 
   it("names the Terms exclusion first when the address also names a region closed for tax", () => {
@@ -363,5 +364,52 @@ describe("a Tennessee billing address is refused payment, consumer or company, w
     expect(insertQuote).not.toHaveBeenCalled();
     expect(taxQuote).not.toHaveBeenCalled();
     expect(audit).toEqual([tennesseeRefused]);
+  });
+});
+
+/**
+ * Mississippi (Terms §2 and Annex A.2, the owner's decision of 18 November 2026: "We do not offer Dialectical Engine to
+ * people who live in Mississippi"). The same treatment as Tennessee: refused by ZIP (386-397) or typed state, for every
+ * buyer, with REGION_TERMS_EXCLUDED, and open again under a register version without the US-MS entry.
+ */
+describe("a Mississippi billing address is refused payment, consumer or company, wherever money is taken", () => {
+  const jackson = storedLocation({ region: "MS", postalCode: "39201", city: "Jackson" });
+  const mississippiRefused = { event: "billing.region.refused", code: "REGION_TERMS_EXCLUDED", country: "US", region: "US-MS" };
+  const excluded = refuse("US-MS", "REGION_TERMS_EXCLUDED");
+
+  it("decidePaymentRegion refuses US-MS by ZIP (386-397) or by typed state, consumer and company alike", () => {
+    for (const location of [
+      at("US", "38601", null), at("US", "39201", null), at("US", "39759", null), at("US", "39201-0001", null),
+      at("US", null, "MS"), at("US", null, "Mississippi"), at("US", "75201", "mississippi"),
+      at("US", "39201", "TX"), at("US", "39201", null, COMPANY)
+    ]) {
+      for (const mustFit of [true, false]) expect(decide(location, mustFit), JSON.stringify(location)).toEqual(excluded);
+    }
+    // Its neighbour above the ZIP range stays open: 398 is Georgia.
+    expect(decide(at("US", "39813", null))).toEqual({ kind: "ALLOW" });
+  });
+
+  it("lets Mississippi pay again under a register version without the US-MS entry", () => {
+    const { "US-MS": _mississippi, ...withoutMississippi } = testClosedRegionsPolicy.regions;
+    const reopened: CountryPolicy = Object.freeze({ ...testClosedRegionsPolicy, regions: Object.freeze(withoutMississippi) });
+    expect(decide(at("US", "39201", "MS"), true, reopened)).toEqual({ kind: "ALLOW" });
+  });
+
+  it("the SUBSCRIBE quote: 403, no tax asked, no quote stored, one region audit line", async () => {
+    for (const fields of [{ postalCode: "39201", region: "MS" }, { postalCode: "38601", region: null }, { postalCode: null, region: "Mississippi" }]) {
+      const { service, input, taxCalls, inserted, audit } = quoteHarness("US");
+      await expect(service.create(input(fields)), JSON.stringify(fields))
+        .rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
+      expect(taxCalls).toEqual([]);
+      expect(inserted).toEqual([]);
+      expect(audit).toEqual([mississippiRefused, { event: "billing.quote.refused", code: "REGION_TERMS_EXCLUDED" }]);
+    }
+  });
+
+  it("checkout start re-checks a stored Mississippi quote: 403, nothing written", async () => {
+    const { start, written, audit } = checkoutHarness(jackson);
+    await expect(start()).rejects.toMatchObject({ status: 403, code: "REGION_TERMS_EXCLUDED" });
+    expect(written).not.toHaveBeenCalled();
+    expect(audit).toEqual([mississippiRefused]);
   });
 });

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { TypedDomainError } from "@debateai/kernel";
 import { THINKING_LEVEL_TOKEN } from "./index.js";
-import { PREVIEW_MAX_OUTPUT_BOUND, previewModelRow, previewSamplingMembers } from "./preview-models.js";
+import { PREVIEW_MAX_OUTPUT_BOUND, previewModelRow, previewOutputTokensMember, previewSamplingMembers } from "./preview-models.js";
 import type { ProviderDiscoveryTarget } from "./index.js";
 import { PROVIDER_GATE_UNAVAILABLE, PreviewUnbilledRefusal, waitBeforePreviewUnbilledResend } from "./preview-test.js";
 import {
@@ -273,7 +273,7 @@ export async function observeProviderTarget(input: Readonly<{
         headers,
         body: JSON.stringify({
           model: input.target.model,
-          max_tokens: input.tokenCeiling ?? PROBE_DEFAULT_TOKEN_CEILING,
+          [previewOutputTokensMember(input.target.baseUrl, input.target.model)]: input.tokenCeiling ?? PROBE_DEFAULT_TOKEN_CEILING,
           ...(input.thinkingLevel===undefined?{}:{[input.target.thinkingParameter!]:input.thinkingLevel}),
           // Reviewed sampling (2026-10-12): the probe asks as the debate calls do (none for any other target).
           ...previewSamplingMembers(input.target.baseUrl, input.target.model),

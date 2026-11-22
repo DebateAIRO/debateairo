@@ -5,12 +5,14 @@ const mocks = vi.hoisted(() => ({
   session: null as string | null,
   locale: "en",
   billingOn: true,
+  testMode: false,
   ageOwed: false,
   sessionLive: true,
   sessionCheckedWith: [] as string[],
   ageAskedWith: [] as string[],
   consentMissingFor: null as string | null,
   marks: { netopia: false, visa: false, mastercard: false },
+  netopiaLogo: null as string | null,
   flowProps: [] as Record<string, unknown>[],
   pollerProps: [] as Record<string, unknown>[]
 }));
@@ -32,11 +34,17 @@ vi.mock("next/headers", async () => {
 });
 vi.mock("@/lib/billing/serverBilling", () => ({
   billingIsOn: async () => mocks.billingOn,
+  billingState: async () => ({ on: mocks.billingOn, testMode: mocks.testMode }),
   sessionConfirmed: async (sessionToken: string) => { mocks.sessionCheckedWith.push(sessionToken); return mocks.sessionLive; },
   ageConfirmationOwed: async (sessionToken: string) => { mocks.ageAskedWith.push(sessionToken); return mocks.ageOwed; }
 }));
-// The owner's artwork is read from the disk on the server (N25b); the flow and the footer get the same answer.
-vi.mock("@/lib/billing/paymentMarks", () => ({ availablePaymentMarks: () => mocks.marks }));
+// The marks and NETOPIA's hosted logo are read from the server's settings; the flow and the footer get the same answer.
+// The two settings readers are stand-ins; the footer's pure helper for the dark-background logo stays the real one.
+vi.mock("@/lib/billing/paymentMarks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/billing/paymentMarks")>()),
+  availablePaymentMarks: () => mocks.marks,
+  netopiaLogoAddress: () => mocks.netopiaLogo
+}));
 vi.mock("@/components/billing/CheckoutFlow", () => ({
   CheckoutFlow: (props: Record<string, unknown>) => { mocks.flowProps.push(props); return null; }
 }));
@@ -57,12 +65,14 @@ beforeEach(() => {
   mocks.session = null;
   mocks.locale = "en";
   mocks.billingOn = true;
+  mocks.testMode = false;
   mocks.ageOwed = false;
   mocks.sessionLive = true;
   mocks.sessionCheckedWith = [];
   mocks.ageAskedWith = [];
   mocks.consentMissingFor = null;
   mocks.marks = { netopia: false, visa: false, mastercard: false };
+  mocks.netopiaLogo = null;
   mocks.flowProps = [];
   mocks.pollerProps = [];
   resetRedirects();
@@ -87,15 +97,15 @@ describe("P19 /checkout and /checkout/return", () => {
 
   it("hands the flow the plan and the consent pairs of the reader's locale, and nothing of a card form", async () => {
     mocks.session = "t".repeat(43);
-    mocks.locale = "de";
+    mocks.locale = "ro";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
     expect(mocks.flowProps).toHaveLength(1);
     expect(mocks.flowProps[0]).toMatchObject({
       planId: "PLUS",
-      locale: "de",
+      locale: "ro",
       consents: {
-        renewal: { version: "CONSENT_RENEWAL@de", sha256: "c".repeat(64) },
-        immediateStart: { version: "CONSENT_IMMEDIATE_START@de", sha256: "c".repeat(64) }
+        renewal: { version: "CONSENT_RENEWAL@ro", sha256: "c".repeat(64) },
+        immediateStart: { version: "CONSENT_IMMEDIATE_START@ro", sha256: "c".repeat(64) }
       }
     });
     // The country comes from the connection through P8b's first quote, never from the browser's language.
@@ -112,6 +122,29 @@ describe("P19 /checkout and /checkout/return", () => {
     expect(html).toContain('src="/payment-marks/netopia.svg"');
     expect(html).toContain('src="/payment-marks/mastercard.svg"');
     expect(html).not.toContain('src="/payment-marks/visa.svg"');
+  });
+
+  it("hands the flow NETOPIA's hosted logo when its setting is set, and the footer under the flow shows it instead of the marks", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.marks = { netopia: true, visa: true, mastercard: true };
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[0]?.netopiaLogo).toBeNull();
+    // A made-up shop id: the real one is never in the repository.
+    mocks.netopiaLogo = "https://mny.ro/np-black-0.svg?id=123456";
+    const html = renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[1]?.netopiaLogo).toBe("https://mny.ro/np-black-0.svg?id=123456");
+    expect(html).toContain('src="https://mny.ro/np-black-0.svg?id=123456"');
+    expect(html).toContain('src="https://mny.ro/np-white-0.svg?id=123456"');
+    expect(html).not.toContain('src="/payment-marks/');
+  });
+
+  it("tells the flow payments are test-only exactly while the plans list names NETOPIA's sandbox", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.testMode = true;
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    mocks.testMode = false;
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps.map((props) => props.testMode)).toEqual([true, false]);
   });
 
   it("is not found while billing is off, for the checkout and its return page alike", async () => {
@@ -135,10 +168,23 @@ describe("P19 /checkout and /checkout/return", () => {
 
   it("never sends another locale's consent pair: without the reader's own pair the flow gets none (P8c would refuse it)", async () => {
     mocks.session = "t".repeat(43);
-    mocks.locale = "de";
-    mocks.consentMissingFor = "de";
+    mocks.locale = "ro";
+    mocks.consentMissingFor = "ro";
     renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
-    expect(mocks.flowProps[0]).toMatchObject({ locale: "de", consents: null });
+    expect(mocks.flowProps[0]).toMatchObject({ locale: "ro", consents: null });
+  });
+
+  it("reads a cookie naming a language the site does not offer as English, consent pairs included", async () => {
+    mocks.session = "t".repeat(43);
+    mocks.locale = "de";
+    renderToStaticMarkup(await CheckoutPage({ searchParams: Promise.resolve({ plan: "PLUS" }) }));
+    expect(mocks.flowProps[0]).toMatchObject({
+      locale: "en",
+      consents: {
+        renewal: { version: "CONSENT_RENEWAL@en", sha256: "c".repeat(64) },
+        immediateStart: { version: "CONSENT_IMMEDIATE_START@en", sha256: "c".repeat(64) }
+      }
+    });
   });
 
   it("sends an expired or revoked session to sign in, from the checkout and its return page alike (spec §2.10)", async () => {

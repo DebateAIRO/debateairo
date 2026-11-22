@@ -5,8 +5,9 @@
 // parser (with the platform refused, so nothing runs): a flag or a subcommand the tool does not know fails here, not on
 // the server. Only the new sections are read; the R19 recipe above them stays as it ran.
 import { describe, expect, it } from 'vitest';
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -72,7 +73,7 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 /** The steps, in the order the guide runs them. */
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
-  'SB1', 'SB1B', 'SB3', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'SB14', 'SB14B', 'SB15',
+  'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
   'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
@@ -487,6 +488,97 @@ describe('the preview release guide: transition T, side by side, the way back, t
     expect(drained).toContain('To change the payment marks on this path, run SB5b right after DR1.');
   });
 
+  it('SB5d adds NETOPIA\'s logo id only to a release whose website knows it, before its launch plans, in the id\'s form', () => {
+    const sb5d = scriptOf('SB5D').lines;
+    expect(sideBySide.indexOf('\n### SB5d. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB5c. '));
+    expect(sideBySide.indexOf('\n### SB5d. ')).toBeLessThan(sideBySide.indexOf('\n### SB6. '));
+    const at = (needle: string) => { const found = sb5d.findIndex(line => line.includes(needle) && line.includes('SB5D_NOT_DONE')); expect(found, needle).toBeGreaterThan(-1); return found; };
+    // The website of a release starts from its own UI folder: that folder's environment.mjs must admit the setting.
+    const knows = at('grep -q "\'NETOPIA_LOGO_ID\'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs"');
+    expect(read('deploy/preview-auth-dev/v1/environment.mjs')).toContain("'NETOPIA_LOGO_ID'");
+    const plans = at('[ ! -e "$ART/ui-launch.json" ]');
+    const form = at("grep -qxE '[0-9]{1,12}'");
+    const before = at('[ ! -e "$S/ui-$LABEL.env.before-logo" ]');
+    const edit = sb5d.findIndex(line => line.startsWith('cp -p "$U" "$S/ui-$LABEL.env.before-logo"'));
+    const moved = sb5d.findIndex(line => line.startsWith('mv "$U.new" "$U"'));
+    const same = sb5d.findIndex(line => line.startsWith('lc release-env.mjs same --labels "$OLABEL,$LABEL" --slots "$OSLOT,$SLOT" ||'));
+    for (const guard of [knows, plans, form, before]) expect(guard).toBeLessThan(edit);
+    expect(edit).toBeLessThan(moved);
+    expect(moved).toBeLessThan(same);
+    // Only the new release's own ui file: never the live one an older release reads.
+    for (const line of sb5d.filter(code)) expect(line, line).not.toMatch(/\$E\/ui\.env\b/);
+    // The id's form, run by bash: what the website and the test site's check (UI_NETOPIA_LOGO_ID) accept, and nothing else.
+    const id = (value: string) => {
+      try { return execFileSync('bash', ['-c', ['set -euo pipefail', `ID='${value}'`, sb5d[form], 'echo ID_OK'].join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); }
+    };
+    for (const good of ['1', '123456', '000000000001']) expect(id(good), good).toBe('ID_OK');
+    for (const bad of ['', '12a', '1234567890123', ' 1', '1 ', '-1', '１２']) expect(id(bad), bad).toMatch(/^SB5D_NOT_DONE: /);
+    // The drained path edits after DR1; the marks' steps are skipped while the logo id is set.
+    expect(drained.replace(/\s+/g, ' ')).toContain("To set or change NETOPIA's logo id on this path, run SB5d right after DR1.");
+    expect(sectionOf(guide, PAYMENT_MARKS).replace(/\s+/g, ' ')).toContain('With it, PM1, SB5b, MT1, PM2 and MT2 are not needed.');
+    expect(sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB5b. '))!).replace(/\s+/g, ' '))
+      .toContain('With NETOPIA\'s logo id set (SB5d), the website draws none of these marks: skip this step.');
+    const table = sideBySide.split('\n');
+    expect(table.findIndex(line => line.startsWith('| SB5d |'))).toBe(table.findIndex(line => line.startsWith('| SB5c |')) + 1);
+  });
+
+  it('LOGOCHECK only reads, after SB13b: the ui file\'s line, the page\'s policy, each theme\'s logo once while billing is on, NETOPIA\'s two answers', async () => {
+    const check = scriptOf('LOGOCHECK').lines;
+    expect(sideBySide.indexOf('\n### LOGOCHECK. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB13b. '));
+    expect(sideBySide.indexOf('\n### LOGOCHECK. ')).toBeLessThan(sideBySide.indexOf('\n### SB13c. '));
+    const table = sideBySide.split('\n');
+    expect(table.findIndex(line => line.startsWith('| LOGOCHECK |'))).toBe(table.findIndex(line => line.startsWith('| SB13b |')) + 1);
+    expect(drained.replace(/\s+/g, ' ')).toContain('Then SB13b (the team member\'s test debate), LOGOCHECK when this upload ran SB5d, and, later, SB15 as usual.');
+    // It changes nothing: no file is written, moved or copied, no service or tool runs.
+    for (const line of check.filter(code)) {
+      expect(line, line).not.toMatch(/(^|[\s;&|(])(cp|mv|install|chown|chmod|systemctl|lc|rel|pre|cslots|tee)\s/);
+      expect(line.replace(/2?>\s*\/dev\/null/g, ''), line).not.toMatch(/[^<2&]>{1,2}\s*["$\/\w]/);
+    }
+    // The address it looks for is the website's own (paymentMarks.ts netopiaLogoAddress), and the policy line is the CSP's.
+    const { netopiaLogoAddress, netopiaLogoOnDark } = await import('../../apps/ui/lib/billing/paymentMarks.js');
+    expect(check).toContain('LOGO="https://mny.ro/np-black-0.svg?id=$ID"');
+    expect(netopiaLogoAddress({ NETOPIA_LOGO_ID: '42' })).toBe('https://mny.ro/np-black-0.svg?id=42');
+    // The dark theme's picture is the website's own swap of the light one (SiteFooter.tsx draws both).
+    expect(check).toContain('DARK=${LOGO/np-black-0/np-white-0}');
+    expect(netopiaLogoOnDark(netopiaLogoAddress({ NETOPIA_LOGO_ID: '42' })!)).toBe('https://mny.ro/np-white-0.svg?id=42');
+    expect(check).toContain('for A in "$LOGO" "$DARK"; do');
+    const { FALLBACK_CONTENT_SECURITY_POLICY } = await import('../../apps/ui/' + 'content-security-policy.mjs') as { FALLBACK_CONTENT_SECURITY_POLICY: string };
+    expect(check.join('\n')).toContain('grep -qF "img-src \'self\' data: https://mny.ro;" <<<"$P"');
+    expect(FALLBACK_CONTENT_SECURITY_POLICY).toContain("img-src 'self' data: https://mny.ro;");
+    // Billing is read from the home page's own /pricing link, which shows only while billing is on.
+    expect(check).toContain('if grep -qF \'href="/pricing"\' <<<"$H"; then');
+    // The home page and NETOPIA's answer, run by bash with curl answered from files: what passes and what stops.
+    const dir = mkdtempSync(join(tmpdir(), 'guide-logocheck-'));
+    try {
+      writeFileSync(join(dir, 'headers.txt'), "HTTP/1.1 200 OK\r\ncontent-security-policy: default-src 'self'; img-src 'self' data: https://mny.ro; font-src 'self'\r\n\r\n");
+      const run = (home: string, answer: string, ui = 'PORT=3200\nNETOPIA_LOGO_ID=42\n', dark = answer) => {
+        writeFileSync(join(dir, 'ui-rX.env'), ui);
+        writeFileSync(join(dir, 'home.html'), home);
+        writeFileSync(join(dir, 'answer.txt'), answer);
+        writeFileSync(join(dir, 'dark.txt'), dark);
+        // curl answered from files: each picture's headers (-sI), the home page's headers (-D -), or the home page.
+        const curl = `curl() { case "$*" in *-sI*np-white-0*) cat '${dir}/dark.txt';; *-sI*) cat '${dir}/answer.txt';; *-D*) cat '${dir}/headers.txt';; *) cat '${dir}/home.html';; esac; }`;
+        const body = check.slice(2).filter(line => !line.startsWith('ID='));
+        try { return execFileSync('bash', ['-c', ['set -euo pipefail', `E='${dir}'; LABEL=rX; UIP=3200; ID='42'`, curl, ...body].join('\n')], { encoding: 'utf8' }).trim().split('\n').at(-1); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim().split('\n').at(-1); }
+      };
+      const OK = 'HTTP/2 200\r\ncontent-type: image/svg+xml\r\ncontent-length: 8592\r\ncache-control: public, max-age=3600\r\n\r\n';
+      const light = '<img src="https://mny.ro/np-black-0.svg?id=42" alt="NETOPIA Payments, Visa, Mastercard"/>';
+      const logo = `${light}<img src="https://mny.ro/np-white-0.svg?id=42" alt="NETOPIA Payments, Visa, Mastercard"/>`;
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK)).toBe('LOGOCHECK_DONE');
+      // The dark theme's picture missing from the page, or NETOPIA answering it badly, stops it too.
+      expect(run(`<a href="/pricing">Pricing</a>${light}`, OK)).toMatch(/^LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK, undefined, 'HTTP/2 404\r\ncontent-type: text/html\r\n\r\n')).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG for https:\/\/mny\.ro\/np-white-0\.svg\?id=42/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK, undefined, `${OK.trimEnd()}\r\nlocation: https://example.invalid/\r\n\r\n`)).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected for https:\/\/mny\.ro\/np-white-0/);
+      // Billing off: no logo is expected, and the check still ends.
+      expect(run('<a href="/legal">Legal</a>', OK)).toBe('LOGOCHECK_DONE');
+      expect(run('<a href="/pricing">Pricing</a>', OK)).toMatch(/^LOGOCHECK_NOT_DONE: billing is on but the home page does not show the logo exactly once/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}<img src="/payment-marks/visa.svg"/>`, OK)).toMatch(/^LOGOCHECK_NOT_DONE: the home page still draws the old mark files/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, 'HTTP/2 404\r\ncontent-type: text/html\r\n\r\n')).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server did not answer 200 with an SVG/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, `${OK.trimEnd()}\r\nset-cookie: a=b\r\n\r\n`)).toMatch(/^LOGOCHECK_NOT_DONE: NETOPIA's server set a cookie or redirected/);
+      expect(run(`<a href="/pricing">Pricing</a>${logo}`, OK, 'PORT=3200\n')).toMatch(/^LOGOCHECK_NOT_DONE: ui-rX\.env does not hold the line/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   it('SB5c adds the proof lines only to a release that knows them, before its launch plans, with matching copies', () => {
     const sb5c = scriptOf('SB5C').lines;
     expect(sideBySide.indexOf('\n### SB5c. ')).toBeGreaterThan(sideBySide.indexOf('\n### SB5b. '));
@@ -721,7 +813,9 @@ const VARS: Readonly<Record<string, string>> = Object.freeze({
   CC: '{"perDebate":12,"perModelPerDebate":3,"perModelPerRunner":{"default":50}}',
   LG: '{"kind":"LENGTH_GUIDANCE_POLICY"}', SHAPE: 'off',
   // S18 fix round 1: the choices a plan does not take from its base, read from the active version's publish plan.
-  DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off'
+  DS: 'yes', SEATS: '{"writer":"preview:claude-haiku-5-5","checker":"preview:fixture-b"}', ROT: 'off',
+  // SB3's two lists: the inputs the upload takes from the owner's file, and the plans whose limits change, up or down.
+  NEWNUM: 'billingPlans dailyCeilingMicros', LIMITS: 'PLUS PRO'
 });
 
 type Invocation = Readonly<{ tool: string; script: string; argv: readonly string[]; line: string }>;
@@ -999,7 +1093,7 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     // Owner 2026-10-23 (OA2): Privacy Policy 3.5 §14 and §5 stay, so an upload that adds a new AI company tells people
     // first and notes the change in the Register, before its switch; every other upload skips the step.
     for (const text of ['**A new AI company: tell people first, and note it in the Register (only an upload that adds one).**',
-      'The Privacy Policy (version 3.6) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
+      'The Privacy Policy (its sections 14 and 5) makes two promises the owner keeps (2026-10-23), so before that upload\'s switch:',
       '**Privacy Policy §14: tell people before.** Before a new recipient starts receiving data, people are told by email and in the product, and given time to object.',
       'the switch (SB13; on the drained path, the downtime at DR2) waits until the notice has gone out and that time has passed.',
       'There is no tool for this in the release kit: the owner sends the notice.',
@@ -1018,6 +1112,20 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(sb6).toContain('- only when this upload adds a new AI company: that the Privacy Policy §14 notice went out (by email and in the product, on which date) and its time to object has passed, and that the company\'s dated Register row (§5) is in this release ("The providers page");');
     expect(sb6.indexOf('a new AI company')).toBeLessThan(sb6.indexOf('- the Caddy payment-marks rule (PM2), when this upload adds it.'));
     expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When this upload adds a new AI company, the yes before DR2 also names the Privacy Policy §14 notice and the dated Register row (§5), as in SB6.');
+    // A company the page lists while no line-up seats its models (the Amazon gate's upload) receives nothing yet: no
+    // notice at that upload while only the team's accounts exist, and the notice before the activation that seats it.
+    for (const text of ['**A company listed before it receives anything.** A company is added when it starts receiving data.',
+      'When only the owner\'s and the team\'s accounts exist at such an upload, it owes no §14 notice: the company receives nothing at it.',
+      'The notice is then owed before the activation that first seats one of its models, when any account outside the team exists by then, and that activation waits until the time to object has passed.',
+      'When accounts outside the team exist already at such an upload, ask before its yes.',
+      'An account outside the team is an account of anyone other than the owner and the team: the owner\'s own test sign-ups (MAIN-SITE.md 4.3) do not count; a friend\'s or NETOPIA\'s tester\'s do.']) expect(providers, text).toContain(text);
+    // Every yes that says no notice is owed also says to ask when someone outside the team already has an account.
+    expect(sb6).toContain('when someone outside the team already has an account, ask before this yes');
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('When someone outside the team already has an account then, ask before that yes ("The providers page").');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ')).toContain('If someone outside the team already has an account, ask before the yes.');
+    expect(providers.indexOf('A company listed before it receives anything')).toBeLessThan(providers.indexOf('A company leaves the targets one release later.'));
+    expect(sb6).toContain('- only when this upload lists a company that no line-up seats yet (the upload that brings the Amazon gate): that no §14 notice is owed now, and why,');
+    expect(sectionOf(guide, DRAINED).replace(/\s+/g, ' ')).toContain('the yes before DR2 says instead that no notice is owed, and why, and comes after GATEREADY_DONE.');
     // The page's old promise and the step that said no notice goes out stay gone.
     for (const gone of ['Advance notice first', 'We tell you before a new provider receives any data', 'No notice goes out first'])
       expect(guide.replace(/\s+/g, ' '), gone).not.toContain(gone);
@@ -1052,7 +1160,9 @@ describe('settings activation: the guide (side-by-side spec §13)', async () => 
     expect(from).toBeGreaterThan(-1);
     expect(plan).toBeGreaterThan(from);
     expect(sb3[plan]).toContain('${DS:+--checker deepseek --deepseek-enabled-on-gate yes} ${SEATS:+--answer-seats "$SEATS"} ${ROT:+--role-rotation "$ROT"} --hosted-billing "$HB"');
-    expect(sb3).toContain('HB=$(jq -c .hostedBilling "$FROM")');
+    // The hosted inputs are the active version's, except where the owner's file is named (the site-inputs tests below).
+    expect(sb3.some(line => line.startsWith('  HB=$(jq -c .hostedBilling "$ART/site-inputs.json") && NAMED=$(jq -c .change "$ART/site-inputs.json") && '))).toBe(true);
+    expect(sb3).toContain('  HB=$(jq -c .hostedBilling "$FROM"); NAMED=\'[]\'');
     expect(sb3.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ] && cmp -s "$S/native-plan.before.json" "$ONP"');
     expect(scriptOf('SB9').lines.join('\n')).toContain('[ "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" = "$AV" ]');
     expect(scriptOf('SB9').lines.join('\n')).toContain('PREVIEW_REGISTER_BASE_NOT_ACTIVE');
@@ -1223,4 +1333,601 @@ describe('NV-07: the restore fence in the guides', () => {
     // psqlq is the names file's definition byte for byte.
     expect(guide).toContain(text.split('\n').find(line => line.trimStart().startsWith('psqlq() {'))!.trimStart());
   });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// SB3's numbers: the owner's server file against the live settings version (site-inputs.mjs). The tool's own rules are
+// tested in preview-site-inputs.test.ts and preview-release-artifacts.test.ts; here the guide's lines around them. Every
+// number is made up (a multiple of eleven).
+
+describe('SB3 publishes a changed number only where the owner names it, and prints no amount', async () => {
+  const sb1 = scriptOf('SB1').lines, sb3 = scriptOf('SB3').lines, sb3b = scriptOf('SB3B').lines, sb3c = scriptOf('SB3C').lines;
+  const section = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB3. '))!);
+  const flat = section.replace(/\s+/g, ' ');
+  const jq = spawnSync('jq', ['--version']).status === 0;
+  const bash = (script: string[]) => { try { return execFileSync('bash', ['-c', script.join('\n')], { encoding: 'utf8' }).trim(); } catch (error) { return String((error as { stdout?: string }).stdout ?? '').trim(); } };
+  const INPUTS = ['perRunCeilingMicros', 'dailyCeilingMicros', 'askRoomReads', 'billingPlans', 'abuseLimits'];
+  const numbers = (patch: Record<string, unknown> = {}) => ({ billing: 'on', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 66, windowMs: 66_000, capacity: 65_536 },
+    billingPlans: { kind: 'BILLING_PLANS', plans: [{ plan_id: 'FREE', monthly_credit_micros: 440_000 }, { plan_id: 'PLUS', monthly_credit_micros: 7_700_000 }] }, abuseLimits: { kind: 'ABUSE_LIMITS', clarify_per_hour: 11 }, ...patch });
+  const check = sb3.findIndex(line => line.startsWith('jq -e --argjson n "$NAMED" '));
+  const NORM = 'def norm: if type == "number" then . + 0 elif type == "array" then map(norm) elif type == "object" then map_values(norm) else . end; ';
+
+  it('CI has jq (the lines below are run, not only read)', () => {
+    if (process.env.CI) expect(jq).toBe(true);
+  });
+
+  it('the two lists are empty unless the owner fills them in, and both reach the tool', () => {
+    expect(sb3.find(line => line.startsWith('NEWNUM='))).toMatch(/^NEWNUM=''\s+# the numbers this upload takes from hosted-billing-v1\.json, on purpose: any of perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits, one space between; empty = the live numbers stay$/);
+    expect(sb3.find(line => line.startsWith('LIMITS='))).toMatch(/^LIMITS=''\s+# only with billingPlans in NEWNUM: /);
+    const tool = sb3.indexOf('TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs');
+    const detect = sb3.indexOf('if grep -qF "\'site-inputs\':" "$TOOL"; then');
+    const report = sb3.findIndex(line => line.startsWith('  SI=$(rel site-inputs --operation report --from "$FROM" --site "$HB_ON") || { echo "SB3_NOT_DONE: '));
+    const compose = sb3.findIndex(line => line.startsWith('  rel site-inputs --operation compose --from "$FROM" --site "$HB_ON" ${NEWNUM:+--change "$NEWNUM"} ${LIMITS:+--limits "$LIMITS"} --out "$ART/site-inputs.json" > /dev/null || { echo "SB3_NOT_DONE: '));
+    const plan = sb3.findIndex(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '));
+    expect(tool).toBeGreaterThan(sb3.findIndex(line => line.startsWith('if [ "$AV" = "$OSITE" ]; then FROM=')));
+    // A release that is not staged yet stops; it is never taken for an older tool.
+    expect(sb3[tool + 1]).toMatch(/^\[ -f "\$TOOL" \] \|\| \{ echo "SB3_NOT_DONE: /);
+    expect(detect).toBe(tool + 2);
+    expect(report).toBe(detect + 1);
+    // The lines are printed before anything is decided, so a stop still shows what differs.
+    expect(sb3[report + 1]).toBe('  jq -r \'.lines[]\' <<<"$SI"');
+    expect(compose).toBe(report + 2);
+    expect(plan).toBeGreaterThan(compose);
+    // Each refusal the tool can give is explained on a stop line, with what to do.
+    for (const code of ['SITE_INPUTS_REFUSED', 'SITE_PLAN_LIST_DIFFERS', 'INPUT_REFUSED', 'FROM_PLAN_INVALID', 'NATIVE_APPROVAL_REQUIRED']) expect(sb3[report], code).toContain(code);
+    for (const code of ['ARGUMENTS_REFUSED', 'SITE_CHANGE_NOT_NAMED', 'SITE_CHANGE_NAMED_BUT_SAME', 'SITE_LIMITS_NOT_NAMED', 'SITE_LIMITS_NAMED_BUT_SAME', 'SITE_INPUTS_REFUSED', 'SITE_BILLING_SWITCH_DIFFERS']) expect(sb3[compose], code).toContain(code);
+    expect(sb3[compose]).toContain('nothing was written');
+    // Nothing of the step exists yet when the numbers are compared: a stop leaves no file behind.
+    expect(compose).toBeLessThan(sb3.findIndex(line => line.startsWith('put "$ART/native-plan-plan.json"')));
+    expect(sb3.findIndex(line => line.includes('[ ! -e "$ART/site-inputs.json" ]') && line.includes('SB3_NOT_DONE'))).toBeLessThan(detect);
+    // The words SB3 looks for are the tool's own: a change of spelling there would send every upload down the old path.
+    expect(read('deploy/preview-release/v1/release-artifacts.mjs')).toContain("\n  'site-inputs': { required: ");
+    // A file that does not read as JSON must not stop the way back: the names line gives an empty value, and SB3 stops on it.
+    expect(sb1).toContain('HB_ON="$(jq -c \'.billing="on"\' /etc/debateai-v3-preview/hosted-billing-v1.json 2>/dev/null || true)"');
+    expect(sb3.some(line => line.startsWith('[ "$(jq -r .billing <<<"$HB_ON")" = on ] || { echo "SB3_NOT_DONE: '))).toBe(true);
+  });
+
+  it('for a plan named in LIMITS, SB3 says whether an open subscription holds it, and prints no count', () => {
+    const read = sb3.findIndex(line => line.startsWith('  HOLD=$(psqlq "SELECT DISTINCT e.plan_id FROM billing.subscription_event e JOIN billing.subscription_latest_v s ON s.subscription_id = e.subscription_id WHERE s.kind NOT IN (\'ENDED\',\'WITHDRAWN\',\'ERASURE_STOPPED\')") || { echo "SB3_NOT_DONE: '));
+    expect(sb3[read - 1]).toBe('if [ -n "$LIMITS" ]; then');
+    expect(sb3[read + 2]).toBe('fi');
+    // Before the tool is asked, so the lines are there when the step then stops, and nothing is written yet.
+    expect(read).toBeLessThan(sb3.indexOf('TOOL=$CAPI/dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs'));
+    const lines = (limits: string, held: string[], fail = false) => bash(['set -euo pipefail', `LIMITS='${limits}'`,
+      `psqlq() { ${fail ? 'return 1' : `printf '%s\\n' ${held.map(plan => `'${plan}'`).join(' ') || "''"}`}; }`, ...sb3.slice(read - 1, read + 3), 'echo READ']).split('\n');
+    expect(lines('PLUS PRO FREE', ['PLUS', 'MAX'])).toEqual(['PLUS: HELD by at least one open subscription', 'PRO: nobody holds it now', 'FREE: HELD by everyone without a paid plan', 'READ']);
+    expect(lines('MAX', [])).toEqual(['MAX: nobody holds it now', 'READ']);
+    // Nothing named: the database is not read at all.
+    expect(lines('', [], true)).toEqual(['READ']);
+    // A read that fails stops the step by name.
+    expect(lines('PLUS', [], true)[0]).toMatch(/^SB3_NOT_DONE: the open subscriptions could not be read/);
+  });
+
+  it('no line of SB3, SB3b or SB3c prints a number of the file or of the plan', () => {
+    for (const [step, lines] of [['SB3', sb3], ['SB3B', sb3b], ['SB3C', sb3c]] as const) {
+      for (const line of lines.filter(code)) {
+        // The hosted inputs are only ever handed to a tool or compared; they never reach echo, printf or a bare jq print.
+        for (const echoed of line.matchAll(/echo "((?:[^"\\]|\\.)*)"/g)) expect(echoed[1], `${step}: ${line}`).not.toMatch(/\$\{?(HB|HB_ON|NUM|SI)\b|hostedBilling/);
+        if (/^\s*jq /.test(line) && !/>\s*("\$N"|\/dev\/null)/.test(line)) expect(line, `${step}: ${line}`).toMatch(/^\s*jq -r '\.lines\[\]' <<<"\$SI"$|^jq -c '\{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256\}' /);
+      }
+    }
+    // The one other print reads the record's lines, which hold names only (preview-site-inputs.test.ts).
+    expect(sb3.filter(line => /jq -r /.test(line) && line.includes('site-inputs.json')).map(line => /jq -r [^|]*'([^']*)' "\$ART\/site-inputs\.json"/.exec(line)?.[1])).toEqual(['(.lines - $seen)[]']);
+    expect(sb3.join('\n')).not.toContain("jq -c '{perRunCeilingMicros}'");
+  });
+
+  it('a release older than the site-inputs command publishes no changed number: the file must be the live numbers, whole', () => {
+    const start = sb3.indexOf('else'), end = sb3.indexOf('fi', start);
+    expect(start).toBeGreaterThan(-1);
+    const branch = sb3.slice(start + 1, end).filter(code);
+    expect(branch).toHaveLength(2);
+    expect(branch[1]!.startsWith(`  [ -z "$NEWNUM$LIMITS" ] && [ "$(jq -cS '${NORM}norm' <<<"$HB")" = "$(jq -cS '${NORM}norm' <<<"$HB_ON")" ] || { echo "SB3_NOT_DONE: this release's tool has no site-inputs command`)).toBe(true);
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-'));
+    try {
+      const run = (file: string, lists: string[] = ['', '']) => {
+        writeFileSync(join(dir, 'from.json'), JSON.stringify({ operation: 'verify', hostedBilling: numbers() }));
+        return bash(['set -euo pipefail', `FROM='${dir}/from.json'; HB_ON='${file}'; NEWNUM='${lists[0]}'; LIMITS='${lists[1]}'`, ...branch, 'echo "OLD_TOOL_OK $NAMED"']);
+      };
+      const text = (value: unknown) => JSON.stringify(value);
+      // The same numbers, typed in another key order, and with a number spelled another way (jq 1.7 keeps a spelling).
+      expect(run(text(Object.fromEntries(Object.entries(numbers()).reverse())))).toBe('OLD_TOOL_OK []');
+      expect(run(text(numbers()).replace('11000000', '1.1e7').replace('3300000', '3300000.0'))).toBe('OLD_TOOL_OK []');
+      for (const input of INPUTS) expect(run(text(numbers({ [input]: input.endsWith('Micros') ? 2_200_000 : { changed: 11 } }))), input).toMatch(/^SB3_NOT_DONE: /);
+      expect(run(text(numbers()), ['billingPlans', ''])).toMatch(/^SB3_NOT_DONE: /);
+      expect(run(text(numbers()), ['', 'PLUS'])).toMatch(/^SB3_NOT_DONE: /);
+      // An unreadable file (the names line gave nothing) stops too.
+      expect(run('')).toMatch(/^SB3_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the proposal must change exactly the numbers named, member by member', () => {
+    expect(check).toBeGreaterThan(sb3.findIndex(line => line.startsWith('OUT=$(nat "$ART/register-proposal.json")')));
+    expect(check).toBeLessThan(sb3.findIndex(line => line.startsWith('sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"')));
+    expect(sb3[check]).toContain('SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names');
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-rows-'));
+    try {
+      const cost = { per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000, band: { close_basis_points: 9900 } };
+      const admission = { ask_room_reads: { key: 'owner', limit: 66, window_ms: 66_000, capacity: 65_536 }, sign_in: { limit: 11 } };
+      const entry = (rowKey: string, before: unknown, after: unknown, sourceRef = false) => ({ rowKey, change: before === null ? 'added' : 'changed',
+        oldValueJsonText: before === null ? null : JSON.stringify(before), newValueJsonText: JSON.stringify(after), oldSourceRef: before === null ? null : 'x', newSourceRef: sourceRef ? 'y' : 'x' });
+      const verdict = (named: string[], delta: unknown[]) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta }));
+        return bash(['set -euo pipefail', `ART='${dir}'; NAMED='${JSON.stringify(named)}'`, sb3[check]!, 'echo NUMBERS_OK']);
+      };
+      const code = [entry('nodeRuntimeVersion', { v: 'v26' }, { v: 'v26' }, true), entry('judgeContractHash', { sha256: 'a' }, { sha256: 'b' })];
+      expect(verdict([], code)).toBe('NUMBERS_OK');
+      // Each input alone, named: passes; the same delta with nothing named, or with another input named, stops.
+      const one: Record<string, unknown> = {
+        perRunCeilingMicros: entry('costEnvelopePolicy', cost, { ...cost, per_run_ceiling_micros: 2_200_000 }),
+        dailyCeilingMicros: entry('costEnvelopePolicy', cost, { ...cost, daily_ceiling_micros: 22_000_000 }),
+        askRoomReads: entry('admissionPolicy', admission, { ...admission, ask_room_reads: { ...admission.ask_room_reads, limit: 77 } }),
+        billingPlans: entry('billingPlans', numbers().billingPlans, { kind: 'BILLING_PLANS', plans: [] }),
+        abuseLimits: entry('abuseLimits', numbers().abuseLimits, { kind: 'ABUSE_LIMITS', clarify_per_hour: 22 })
+      };
+      for (const input of INPUTS) {
+        expect(verdict([input], [...code, one[input]]), input).toBe('NUMBERS_OK');
+        expect(verdict([], [...code, one[input]]), input).toMatch(/^SB3_NOT_DONE: /);
+        expect(verdict([INPUTS[(INPUTS.indexOf(input) + 1) % INPUTS.length]!], [...code, one[input]]), input).toMatch(/^SB3_NOT_DONE: /);
+        // Named, and the proposal does not change it: the change did not take.
+        expect(verdict([input], code), input).toMatch(/^SB3_NOT_DONE: /);
+      }
+      // A code-owned member of the ceilings row or of the admission row may move with nothing named, and beside a named number.
+      const band = entry('costEnvelopePolicy', cost, { ...cost, band: { close_basis_points: 9800 } }), scope = entry('admissionPolicy', admission, { ...admission, sign_in: { limit: 22 } });
+      expect(verdict([], [...code, band, scope])).toBe('NUMBERS_OK');
+      expect(verdict(['costEnvelopePolicy'], [...code, band])).toMatch(/^SB3_NOT_DONE: /);
+      // Both ceilings moved and only one is named: stops. Both named: passes.
+      const both = entry('costEnvelopePolicy', cost, { ...cost, per_run_ceiling_micros: 2_200_000, daily_ceiling_micros: 22_000_000 });
+      expect(verdict(['perRunCeilingMicros'], [...code, both])).toMatch(/^SB3_NOT_DONE: /);
+      expect(verdict(['dailyCeilingMicros', 'perRunCeilingMicros'], [...code, both])).toBe('NUMBERS_OK');
+      // Only a source reference moved: no number changed. A row added whole counts as its numbers changing.
+      expect(verdict([], [...code, entry('billingPlans', numbers().billingPlans, numbers().billingPlans, true)])).toBe('NUMBERS_OK');
+      expect(verdict(['abuseLimits'], [...code, entry('abuseLimits', null, numbers().abuseLimits)])).toBe('NUMBERS_OK');
+      expect(verdict([], [...code, entry('abuseLimits', null, numbers().abuseLimits)])).toMatch(/^SB3_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  // The whole path once, with the real pieces: the tool's choice, the register kit's own delta over a base sealed from
+  // the live numbers, and the guide's check line on that delta.
+  const kit = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v3.ts');
+  const kitV2 = await import('../../deploy/' + 'preview-auth-dev/v1/publish-register-v2.ts');
+  const registerModule = await import('@debateai/register');
+  const owned = await import('../../packages/register/src/staff-access-policy.js');
+  const operator = await import('../../deploy/' + 'preview-auth-dev/v1/native-operator.mjs');
+  const siteInputs = await import('../../deploy/' + 'preview-release/v1/site-inputs.mjs');
+  const { TEST_OWNER_LIMIT_ROWS } = await import('../support/hostedRegisterRows.js');
+
+  it('end to end: what the tool chooses is what the register kit changes, and the check line agrees', async () => {
+    if (!jq) return;
+    const live = { billing: 'on', perRunCeilingMicros: 3_300_000, dailyCeilingMicros: 11_000_000, askRoomReads: { limit: 60, windowMs: 60_000, capacity: 65_536 }, ...TEST_OWNER_LIMIT_ROWS };
+    const runtime = (observedAt: string) => ({ nodeVersion: 'v26.8.2', pnpmVersion: '11.20.0', sourceRevision: 'c'.repeat(40), sourceTree: 'd'.repeat(40), operatorSha256: 'e'.repeat(64), observedAt });
+    const bootstrap = await registerModule.loadBootstrapRegister();
+    const sorted = (rows: any[]) => [...rows].sort((a, b) => a.rowKey.localeCompare(b.rowKey, 'en'));
+    const local = sorted([...await kitV2.buildPreviewSourceRowsV2(bootstrap, runtime('2026-10-12T09:00:00.000Z')),
+      ...[owned.STAFF_ACCESS_POLICY_REGISTER_ROW, owned.INTERNAL_ALLOWANCE_POLICY_REGISTER_ROW].map((row: any) => ({ rowKey: row.rowKey, valueJsonText: registerModule.canonicalRegisterJson(row.valueAst), sourceRef: row.sourceRef }))]);
+    /** A version sealed with `hosted` over `base`: its rows are what the database then holds. */
+    const seal = async (hosted: unknown, base: any[], observedAt: string) => kit.composePreviewSnapshotV3({ sourceRows: await kit.buildPreviewSourceRowsV3(bootstrap, runtime(observedAt), hosted),
+      baseRows: base, baseRegisterVersion: '12', baseSnapshotSha256: registerModule.computeRegisterSnapshotSha256(base) });
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-e2e-'));
+    try {
+      const verdict = (named: readonly string[], delta: unknown) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta }));
+        return bash(['set -euo pipefail', `ART='${dir}'; NAMED='${JSON.stringify(named)}'`, sb3[check]!, 'echo NUMBERS_OK']);
+      };
+      const database = sorted([...(await seal(live, local, '2026-10-13T12:00:00.000Z')).rows]);
+      /** SB3 for one owner's file: the tool's choice, then the kit's proposal over the database's rows. */
+      const upload = async (file: any, lists: { change?: string; limits?: string } = {}, rows = database) => {
+        const chosen = siteInputs.composeSiteInputs(live, file, lists);
+        const proposal = await seal(operator.validateHostedBillingChoice(chosen.hostedBilling), rows, '2026-10-20T12:00:00.000Z');
+        return { chosen, proposal, verdict: verdict(chosen.change, proposal.delta) };
+      };
+      // Nothing named, nothing different: only code rows move (the runtime row's time), and the check passes.
+      const same = await upload(JSON.parse(JSON.stringify(live)));
+      expect(same.proposal.changedKeys).toEqual(['nodeRuntimeVersion']);
+      expect(same.verdict).toBe('NUMBERS_OK');
+      // A higher day's ceiling, more Plus credit and a higher abuse limit, all three named; Plus is named too, since a
+      // raised limit cannot be taken back for a month.
+      const file = JSON.parse(JSON.stringify(live));
+      file.dailyCeilingMicros += 11_000_000;
+      file.billingPlans.plans[1].monthly_credit_micros += 1_100_000;
+      file.abuseLimits.flag_per_site_day += 11;
+      await expect(upload(file, { change: 'abuseLimits billingPlans dailyCeilingMicros' })).rejects.toMatchObject({ code: 'SITE_LIMITS_NOT_NAMED', fields: ['PLUS'] });
+      const changed = await upload(file, { change: 'abuseLimits billingPlans dailyCeilingMicros', limits: 'PLUS' });
+      expect([...changed.proposal.changedKeys].sort()).toEqual(['abuseLimits', 'billingPlans', 'costEnvelopePolicy', 'nodeRuntimeVersion']);
+      expect(changed.verdict).toBe('NUMBERS_OK');
+      // The very same proposal against another list of names stops.
+      expect(verdict([], changed.proposal.delta)).toMatch(/^SB3_NOT_DONE: /);
+      expect(verdict(['billingPlans', 'dailyCeilingMicros'], changed.proposal.delta)).toMatch(/^SB3_NOT_DONE: /);
+      expect(verdict(['abuseLimits', 'billingPlans', 'dailyCeilingMicros', 'perRunCeilingMicros'], changed.proposal.delta)).toMatch(/^SB3_NOT_DONE: /);
+      // The kept plan says the live numbers, but the database's version was sealed with another per-debate ceiling:
+      // the tool sees nothing to name, the kit's delta moves that ceiling, and the check stops the step.
+      const drifted = sorted([...(await seal({ ...live, perRunCeilingMicros: 2_200_000 }, local, '2026-10-13T12:00:00.000Z')).rows]);
+      const stale = await upload(JSON.parse(JSON.stringify(live)), {}, drifted);
+      expect(stale.chosen.change).toEqual([]);
+      expect(stale.proposal.changedKeys).toContain('costEnvelopePolicy');
+      expect(stale.verdict).toMatch(/^SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names \(\[\]\)/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the delta line for a number change names the members that differ and prints none of their values', () => {
+    const block = blocksOf(section).find(candidate => candidate.lines.some(line => line.includes('members that differ (values not printed)')))!;
+    expect(block.lines).toHaveLength(1);
+    expect(flat).toContain('With `NEWNUM` not empty, use this line instead of A9\'s first one');
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-delta-'));
+    try {
+      const row = (rowKey: string, before: unknown, after: unknown, reason = 'owner-hosted-billing-input') => ({ rowKey, change: before === null ? 'added' : 'changed', reason,
+        oldValueJsonText: before === null ? null : JSON.stringify(before), newValueJsonText: JSON.stringify(after) });
+      writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta: [
+        row('billingPlans', numbers().billingPlans, { kind: 'BILLING_PLANS', plans: [{ plan_id: 'FREE', monthly_credit_micros: 550_000 }] }),
+        row('costEnvelopePolicy', { per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 11_000_000, currency: 'USD' }, { per_run_ceiling_micros: 3_300_000, daily_ceiling_micros: 22_000_000, currency: 'USD' }),
+        row('abuseLimits', null, { kind: 'ABUSE_LIMITS', clarify_per_hour: 11 }),
+        row('judgeContractHash', { sha256: '77777' }, { sha256: '88888' }, 'reviewed-current-source-facet')
+      ] }));
+      const printed = bash(['set -euo pipefail', `ART='${dir}'`, ...block.lines]).split('\n');
+      expect(printed).toEqual([
+        'changed billingPlans (owner-hosted-billing-input)', '  members that differ (values not printed): plans',
+        'changed costEnvelopePolicy (owner-hosted-billing-input)', '  members that differ (values not printed): daily_ceiling_micros',
+        'added abuseLimits (owner-hosted-billing-input)', '  members that differ (values not printed): clarify_per_hour kind',
+        'changed judgeContractHash (reviewed-current-source-facet)', '  old: {"sha256":"77777"}', '  new: {"sha256":"88888"}'
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB3b sets SB3\'s files aside only while nothing was applied or published from them', () => {
+    const guard = sb3b.findIndex(line => line.startsWith('for F in native-plan-apply-and-plan.json native-apply-and-plan.json native-plan-publish.json register-published.json; do [ ! -e "$ART/$F" ] || { echo "SB3B_NOT_DONE: '));
+    const move = sb3b.findIndex(line => line.startsWith('for F in "$NP" "$ART/native-plan-plan.json" "$ART/register-proposal.json" "$ART/site-inputs.json" "$S/plan-proposal.sha256"; do [ ! -e "$F" ] || mv "$F" "$D/" || { echo "SB3B_NOT_DONE: '));
+    expect(guard).toBeGreaterThan(-1);
+    expect(move).toBeGreaterThan(guard);
+    // Moved into a new folder of the upload's own archive; nothing is deleted, and a second run in the same second stops.
+    const folder = sb3b.indexOf('D=$S/sb3-$(date -u +%Y%m%dT%H%M%SZ)');
+    expect(sb3b[folder + 1]).toMatch(/^\[ ! -e "\$D" \] \|\| \{ echo "SB3B_NOT_DONE: /);
+    expect(sb3b.join('\n')).not.toMatch(/\brm\b/);
+    // Every file SB3 refuses to find again is among the ones SB3b moves.
+    for (const file of ['"$NP"', '"$ART/native-plan-plan.json"', '"$ART/register-proposal.json"', '"$ART/site-inputs.json"']) expect(sb3.some(line => line.includes(`[ ! -e ${file} ]`) && line.includes('SB3_NOT_DONE')), file).toBe(true);
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3b-'));
+    try {
+      const art = join(dir, 'art'), archive = join(dir, 's');
+      const run = (extra: string[] = []) => {
+        for (const folderPath of [art, archive]) execFileSync('mkdir', ['-p', folderPath]);
+        for (const name of ['native-plan-plan.json', 'register-proposal.json', 'site-inputs.json', ...extra]) writeFileSync(join(art, name), '{"p":1}');
+        writeFileSync(join(dir, 'np.json'), '{"p":1}'); writeFileSync(join(archive, 'plan-proposal.sha256'), 'x');
+        return bash(['set -euo pipefail', `ART='${art}'; S='${archive}'; NP='${dir}/np.json'`, 'install() { mkdir -p "${@: -1}"; }', ...sb3b.slice(2)]).split('\n');
+      };
+      expect(run().at(-1)).toBe('SB3B_DONE');
+      for (const moved of [join(dir, 'np.json'), join(art, 'native-plan-plan.json'), join(art, 'site-inputs.json')]) expect(existsSync(moved), moved).toBe(false);
+      // After SB8 or SB9 wrote from the plan, nothing moves.
+      expect(run(['native-plan-publish.json'])[0]).toMatch(/^SB3B_NOT_DONE: .*native-plan-publish\.json exists/);
+      expect(readFileSync(join(art, 'native-plan-plan.json'), 'utf8')).toBe('{"p":1}');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB3c writes only the named inputs into the owner\'s file, keeps the file before, and prints names only', () => {
+    expect(sb3c.find(line => line.startsWith('KEEP='))).toMatch(/^KEEP=''\s+# the inputs to write: /);
+    const names = sb3c.findIndex(line => line.startsWith('printf \'%s\\n\' "$KEEP" | grep -qxE '));
+    const free = sb3c.findIndex(line => line.startsWith('[ ! -e "$B" ] && [ ! -e "$N" ] || { echo "SB3C_NOT_DONE: '));
+    const copyLine = sb3c.findIndex(line => line.startsWith('cp -p "$F" "$B" && cmp -s "$F" "$B" || { echo "SB3C_NOT_DONE: '));
+    const write = sb3c.findIndex(line => line.startsWith('jq -s --arg keep "$KEEP" '));
+    const keys = sb3c.findIndex(line => line.startsWith('[ "$(jq -r \'keys | join(",")\' "$N")" = '));
+    const place = sb3c.findIndex(line => line.startsWith('install -o root -g root -m 0600 "$N" "$F.new" && mv "$F.new" "$F" && cmp -s "$N" "$F" || { echo "SB3C_NOT_DONE: '));
+    const loop = sb3c.indexOf('for K in perRunCeilingMicros dailyCeilingMicros askRoomReads billingPlans abuseLimits; do');
+    expect(names).toBeGreaterThan(-1);
+    expect(free).toBeGreaterThan(sb3c.indexOf('umask 077'));
+    // The copy of the file before is never written over: a second run in the same second stops first.
+    expect([copyLine, write, keys, place, loop]).toEqual([free + 1, free + 2, free + 3, free + 4, free + 6]);
+    expect(sb3c).toContain('[ ! -L "$F" ] && [ "$(stat -c \'%a %U %h\' "$F")" = "600 root 1" ] || { echo "SB3C_NOT_DONE: $F is not root\'s own 0600 file: ask"; exit 1; }');
+    // The live version by default, read as SB3 reads it, and only while it is still the live one.
+    expect(sb3c.join('\n')).toContain('[ "$(jq -r .approval.publication.registerVersion "$SRC")" = "$AV" ] && [ "$(activev)" = "$AV" ] || { echo "SB3C_NOT_DONE: ');
+    // The last line says which settings version the numbers came from (a version, never an amount).
+    expect(sb3c.at(-2)).toMatch(/^echo "written from settings version \$\(jq -r \.approval\.publication\.registerVersion "\$SRC"\) /);
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3c-'));
+    try {
+      const file = numbers({ billing: 'anything', perRunCeilingMicros: 2_200_000, abuseLimits: { kind: 'ABUSE_LIMITS', clarify_per_hour: 22 }, dailyCeilingMicros: 22_000_000 });
+      const run = (keep: string, fileText = JSON.stringify(file)) => {
+        writeFileSync(join(dir, 'file.json'), fileText);
+        writeFileSync(join(dir, 'plan.json'), JSON.stringify({ operation: 'verify', hostedBilling: numbers() }));
+        const out = bash(['set -euo pipefail', `F='${dir}/file.json'; N='${dir}/new.json'; SRC='${dir}/plan.json'; KEEP='${keep}'`, sb3c[names]!, sb3c[write]!, sb3c[keys]!, 'mv "$N" "$F"', ...sb3c.slice(loop, loop + 3), 'echo WRITTEN']);
+        return { out: out.split('\n'), now: JSON.parse(readFileSync(join(dir, 'file.json'), 'utf8')) };
+      };
+      const kept = run('perRunCeilingMicros abuseLimits');
+      // The two named inputs are the live ones now; the day's ceiling stays the file's own, and so does its billing word.
+      expect(kept.now).toEqual({ ...file, perRunCeilingMicros: 3_300_000, abuseLimits: numbers().abuseLimits });
+      expect(kept.out).toEqual(['SAME perRunCeilingMicros', 'DIFFERENT dailyCeilingMicros', 'SAME askRoomReads', 'SAME billingPlans', 'SAME abuseLimits', 'WRITTEN']);
+      expect(run(INPUTS.join(' ')).now).toEqual({ ...numbers(), billing: 'anything' });
+      // A number the file spells another way is still the same number.
+      expect(run('abuseLimits', JSON.stringify({ ...numbers(), dailyCeilingMicros: 0 }).replace('"dailyCeilingMicros":0', '"dailyCeilingMicros":1.1e7')).out).toContain('SAME dailyCeilingMicros');
+      // A list with two spaces, a tab, a comma or an unknown name stops before anything is written.
+      for (const bad of ['perRunCeilingMicros  abuseLimits', ' abuseLimits', 'abuseLimits,askRoomReads', 'billing', '', 'abuseLimits\tbillingPlans']) {
+        const stopped = run(bad);
+        expect(stopped.out, bad).toEqual(['SB3C_NOT_DONE: KEEP is not input names with one space between']);
+        expect(stopped.now, bad).toEqual(file);
+      }
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('the text says what the owner does, what reaches the people who already have a plan, and how to go back', () => {
+    for (const text of [
+      '**Nothing changes (most uploads).** Leave `NEWNUM` and `LIMITS` empty.',
+      'It never prints an amount',
+      'A subscriber\'s renewals keep charging the price recorded for that subscriber when they bought (Terms section 12), after a rise and after a cut alike.',
+      '**An upgrade shown before the switch and paid after it.** The person pays the amount they were shown. What the plan is renewed at depends on the release that showed it.',
+      '**an upload whose old release is such an older one must not change a plan\'s prices**: no `prices` line may print.',
+      'The reading errs to one side only: `HELD` is printed when an open subscription names the plan anywhere in its history',
+      '**If the file changes after SB2, by hand or by SB3c, run SB2 again before SB3**',
+      'For each plan named there SB3 prints `HELD` or `nobody holds it now`',
+      'Each person\'s month keeps the numbers it started with.',
+      '**A lower limit** reaches each person when their own next month starts, never before.',
+      'No day already used is counted again, nobody is stopped in a month they already started, and no running debate pauses.',
+      '**A higher limit** reaches everyone on the plan at the switch.',
+      '**A higher limit cannot be taken back inside a month.**',
+      'A credit lowered later never makes a refund smaller',
+      'A raised reserve does not make new questions stop earlier in a month already started.',
+      'The product sends no notice and has no acceptance step for limits.',
+      '**a plan whose limits change, up or down, is named in `LIMITS`.**',
+      'Naming a plan whose limit goes **lower**, or whose line says `changed`, is the owner\'s statement that the people on that plan were told first (Terms section 12), or that nobody holds it',
+      'a paid plan named only because the smallest paid reserve moved is one of these',
+      'Naming a plan whose limit goes **higher** is the owner\'s statement that the number was checked twice, because it cannot be taken back for a month.',
+      'A day or week cap added where the plan had none is a lower limit',
+      'every such line ends "at the switch"',
+      'when that smallest one moves, every paid plan must be named',
+      'Do not name it (that would publish the old value again). Run SB3c with `KEEP=\'perRunCeilingMicros\'`',
+      '**Editing the owner\'s file.**',
+      '**A release older than this step.**'
+    ]) expect(flat, text).toContain(text);
+    const back = sectionOf(guide, WAY_BACK).replace(/\s+/g, ' ');
+    expect(back).toContain('A way back that makes the old release current again (WB2) also brings the numbers before back');
+    expect(back).toContain('**When the upload had raised a plan\'s limits, WB2 does not take the raise back from the people whose month saw it**');
+    expect(back).toContain('When the upload had lowered a limit, WB2 brings the higher number back for everyone at once.');
+    // The line that tells whether the old release keeps a month on its own numbers looks for a name the API's composition really has.
+    expect(back).toContain('`grep -c createBillingPlansInForce "$OCAPI/dialectical-engine/apps/api/src/main.ts"`');
+    expect(read('apps/api/src/main.ts')).toContain('createBillingPlansInForce({');
+    // The guide no longer says a lower limit reaches a month already started, or that a way back lowers a raise again.
+    for (const gone of ['hit everyone', 'counted again over the days already used', 'WB2 lowers them again', 'do not lower a plan\'s limits while anyone holds']) {
+      expect(flat, gone).not.toContain(gone);
+      expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' '), gone).not.toContain(gone);
+    }
+    expect(back).toContain('put the numbers before into the owner\'s file with SB3c');
+    // The yes names a number change and, for a named plan, that nobody holds it or when its people were told.
+    expect(sectionOf(guide, '### SB6. The owner\'s fresh yes').replace(/\s+/g, ' ')).toContain('only when SB3\'s `NEWNUM` is not empty: the inputs it names; and, with plans in `LIMITS`, those plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the people on it were told, and for each one whose limit goes higher that the number was checked twice');
+    // The line that tells whether the old release saves an upgrade's shown price looks for a name the upgrade code really has.
+    expect(flat).toContain('`grep -c monthlyQuoteIdOf "$OCAPI/dialectical-engine/apps/api/src/billing/upgrade.ts"`');
+    expect(read('apps/api/src/billing/upgrade.ts')).toContain('export function monthlyQuoteIdOf(');
+    // The drained path never runs SB6: its own yes names the same, and its numbers have their own way back (no WB2 after DR6).
+    const drainedFlat = drained.replace(/\s+/g, ' ');
+    expect(drainedFlat).toContain('When SB3\'s `NEWNUM` is not empty, the yes before DR2 names the inputs it names; and, with plans in `LIMITS`, those plans, and for each one whose limit goes lower or is said to have changed either that nobody holds it or the date the people on it were told, and for each one whose limit goes higher that the number was checked twice, as in SB6.');
+    // The runbook the owner follows on upload day says the same two statements for its own yes before DR2.
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md').replace(/\s+/g, ' ')).toContain('your yes before DR2 names the inputs in it, and for each plan in `LIMITS`: when its limit goes lower or is said to have changed, either that nobody holds it or the date its people were told; when its limit goes higher, that you checked the number twice.');
+    expect(drainedFlat).toContain('**The numbers on the drained path (SB3\'s `NEWNUM`).** DR6 marks the old release retired, so there is no switch back to it (no WB2) once the upload is done.');
+    // Both places that send the reader there quote the paragraph's own first words.
+    expect(back).toContain('After a drained upload there is no WB2: see "The numbers on the drained path"');
+    expect(read('deploy/preview-auth-dev/v1/MAIN-SITE.md')).toContain('The release guide says both under "The numbers on the drained path".');
+    // The order table names the two new steps between SB3 and SB4.
+    expect(sideBySide).toMatch(/\n\| SB3 \|[^\n]*\n\| SB3b \|[^\n]*\n\| SB3c \|[^\n]*\n\| SB4 \|/);
+  });
+
+  it('the file is edited as a checked copy, never in place', () => {
+    const block = blocksOf(section).find(candidate => candidate.lines.some(line => line.includes('COPY_READS')))!;
+    expect(block.lines).toHaveLength(4);
+    expect(block.lines[3]).toBe('install -o root -g root -m 0600 /root/hosted-billing-v1.edit.json /etc/debateai-v3-preview/hosted-billing-v1.json.new && mv /etc/debateai-v3-preview/hosted-billing-v1.json.new /etc/debateai-v3-preview/hosted-billing-v1.json');
+    if (!jq) return;
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-edit-'));
+    try {
+      const reads = (text: string) => { writeFileSync(join(dir, 'edit.json'), text); return bash(['set -uo pipefail', block.lines[1]!.replaceAll('/root/hosted-billing-v1.edit.json', join(dir, 'edit.json'))]); };
+      expect(reads(JSON.stringify(numbers()))).toBe('COPY_READS');
+      // A trailing comma, a missing input and an extra one all fail the check.
+      expect(reads(JSON.stringify(numbers()).replace(/\}$/, ',}'))).toBe('');
+      const { abuseLimits: _dropped, ...five } = numbers();
+      expect(reads(JSON.stringify(five))).toBe('');
+      expect(reads(JSON.stringify({ ...numbers(), extra: 11 }))).toBe('');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
+
+describe('the upload that brings the Amazon gate: its steps come where the upload meets them, and stop before the downtime', async () => {
+  const ROOT = resolve(import.meta.dirname, '../..');
+  const bedrock = sectionOf(guide, '## The Amazon Bedrock gate: the upload that brings it');
+  const flat = bedrock.replace(/\s+/g, ' ');
+  const whole = blocksOf(guide);
+  /** The one block of the whole guide whose lines name `step` as `# <step>: …`. */
+  const named = (step: string) => {
+    const found = whole.filter(block => block.lines.some(line => line.startsWith(`# ${step}: `)));
+    expect(found, step).toHaveLength(1);
+    return [...found[0]!.lines];
+  };
+  const NODE = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node';
+  const { PREVIEW_REVIEWED_PROVIDER_REFS, previewTargetJsonRow } = await import('../../packages/providers/src/preview-models.js');
+  const ROWS = PREVIEW_REVIEWED_PROVIDER_REFS.map(ref => previewTargetJsonRow(ref));
+  const OPS = join(ROOT, 'packages/providers/ops');
+  const sha = (path: string) => createHash('sha256').update(readFileSync(path)).digest('hex');
+  const GATES = [
+    ['deepinfra', 'deepinfra-budget-v3', 'provider-deepinfra-authority-v3', 'provider-deepinfra-go-v3'],
+    ['anthropic', 'anthropic-budget-v1', 'provider-anthropic-authority-v1', 'provider-anthropic-go-v1'],
+    ['perplexity', 'perplexity-budget-v1', 'provider-perplexity-authority-v1', 'provider-perplexity-go-v1'],
+    ['bedrock', 'bedrock-budget-v1', 'provider-bedrock-authority-v1', 'provider-bedrock-go-v1']
+  ] as const;
+  const SOCKETS = { budget_socket: '/run/debateai-v3-preview/budget-v3.sock', deployment: 'preview', requested_thinking_level: 'high', scope_id: 'preview-deepinfra-v3-20261010', anthropic_budget_socket: '/run/debateai-v3-preview/anthropic-budget-v1.sock' };
+  type State = 'all right' | 'one gate on old code' | 'the Amazon gate missing' | 'six addresses' | 'the Amazon window closed' | 'a row the code refuses';
+
+  /** A made-up server in a new folder: the four gates, their GOs and states, the Amazon service and the two env files. */
+  function server(state: State) {
+    const dir = mkdtempSync(join(tmpdir(), 'guide-bedrock-'));
+    mkdirSync(join(dir, 'capi'));
+    symlinkSync(ROOT, join(dir, 'capi', 'dialectical-engine'));
+    mkdirSync(join(dir, 'etc', 'auth-dev-v1'), { recursive: true });
+    mkdirSync(join(dir, 'S'));
+    for (const [name, folder, privateDir, go] of GATES) {
+      if (state === 'the Amazon gate missing' && name === 'bedrock') continue;
+      mkdirSync(join(dir, 'operator', folder), { recursive: true });
+      mkdirSync(join(dir, 'var', privateDir), { recursive: true });
+      for (const file of ['preview_budget_authority.py', 'preview_budget_helper.py']) copyFileSync(join(OPS, file), join(dir, 'operator', folder, file));
+      // An older gate's files and GO agree with each other, never with the release.
+      if (state === 'one gate on old code' && name === 'anthropic') writeFileSync(join(dir, 'operator', folder, 'preview_budget_helper.py'), `${readFileSync(join(OPS, 'preview_budget_helper.py'), 'utf8')}\n# an older copy\n`);
+      writeFileSync(join(dir, 'etc', `${go}.json`), JSON.stringify({ provider: name, bridge_sha256: sha(join(dir, 'operator', folder, 'preview_budget_authority.py')), helper_sha256: sha(join(dir, 'operator', folder, 'preview_budget_helper.py')) }));
+      writeFileSync(join(dir, 'var', privateDir, 'state.json'), JSON.stringify({ state: 'active', window_open: !(state === 'the Amazon window closed' && name === 'bedrock') }));
+    }
+    writeFileSync(join(dir, 'service'), state === 'the Amazon gate missing' ? 'inactive' : 'active');
+    // The two env files as BEDROCK_ENV leaves them, or as DR1 leaves them (six addresses, no Amazon socket).
+    const six = state === 'six addresses';
+    const rows = six ? ROWS.slice(0, 6) : state === 'a row the code refuses' ? ROWS.map((row, index) => index === 2 ? { ...row, context_window_tokens: 1000 } : row) : ROWS;
+    const config = six ? SOCKETS : { ...SOCKETS, bedrock_budget_socket: '/run/debateai-v3-preview/bedrock-budget-v1.sock' };
+    for (const service of ['api', 'runner']) writeFileSync(join(dir, 'etc', 'auth-dev-v1', `${service}-rX.env`), `REGISTER_VERSION=20\nPREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(config)}\nPROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(rows)}\nNODE_ENV=production\n`, { mode: 0o600 });
+    return dir;
+  }
+  /** A server step run by bash on that made-up server: its own lines after the names file, the paths moved into it, python, systemctl and stat answered from it. */
+  function step(dir: string, lines: readonly string[]) {
+    const body = lines.slice(2).map(line => line
+      .replaceAll('/opt/debateai-v3-preview/operator/', `${dir}/operator/`).replaceAll('/var/lib/debateai-v3-preview/', `${dir}/var/`)
+      .replaceAll('/etc/debateai-v3-preview/', `${dir}/etc/`).replaceAll('/usr/bin/python3 -I', 'stubpy').replaceAll(NODE, process.execPath));
+    const setup = ['set -euo pipefail', `E='${dir}/etc/auth-dev-v1'; LABEL=rX; CAPI='${dir}/capi'; S='${dir}/S'`,
+      'stubpy() { [ -f "$1" ] && cat "$4/state.json"; }',
+      `systemctl() { if [ "$(cat '${dir}/service')" = active ]; then echo active; else echo inactive; return 3; fi; }`,
+      "stat() { echo '600 root:root'; }"];
+    const out = spawnSync('bash', ['-c', [...setup, ...body].join('\n')], { encoding: 'utf8' });
+    return out.stdout.trim().split('\n');
+  }
+
+  it('the section and the drained path say when each step runs, and nothing of it runs from SB3 to the switch', () => {
+    const rows = bedrock.split('\n').filter(line => line.startsWith('| ') && !line.startsWith('| When') && !line.startsWith('|---'));
+    expect(rows.map(row => row.split('|')[1]!.trim())).toEqual([
+      'before SB2, on the Mac', 'after SB2 (in any case after SB1), before SB3', 'right after piece 1, before SB3', 'SB4',
+      'right after the env files (SB5; on the drained path, DR1)', 'right before the owner\'s yes (SB6; on the drained path, the yes before DR2)',
+      'any day after the upload, on its own'
+    ]);
+    // GATES4 reads each gate's code and state, never its unit: piece 1's units are checked by step 3a's own lines.
+    expect(rows.map(row => row.split('|')[3]!.trim())).toEqual(['LUNAROW', 'step 3a\'s six `1` lines, then GATES4', 'GATES4', 'SB4', 'BEDROCK_ENV', 'GATEREADY', 'the probe']);
+    expect(named('GATES4').join('\n')).not.toContain('InaccessiblePaths');
+    for (const text of ['Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload\'s window from SB3 to the end of the switch',
+      'those are the one exception to MAIN-SITE.md part 2\'s "install no new drop-in"', 'deployed after SB2 and before SB3 (pieces 1 and 2)',
+      // The upload needs nothing from the AWS console; the running runner keeps what it read at its start.
+      'The AWS console work (`README-bedrock.md`, install step 0: Luna\'s subscription and quota, the key, a budget alert, an AWS account e-mail address somebody reads) belongs to piece 4. The upload does not wait for it.',
+      'Install step 0 (the AWS console), step 4 (the key) and step 8 (the probe) wait for piece 4',
+      'The gate README\'s paragraph right after its step 6 ("Restart the runner only after BOTH gates are `active`") does not apply here',
+      '`deploy/preview-lifecycle/v1/common.mjs` (the tools\' list of gates now holds the Amazon gate) and `alert.mjs`',
+      '**No Privacy Policy §14 notice is owed at this upload**', '**Before piece 4 the notice is owed when any account outside the team exists by then**',
+      'So the key goes in on piece 4\'s day, right before the owner\'s first probe.', '**It closes itself after 31 days.**', '**After a reboot it is not running.**',
+      'every settings activation on the old release is refused (`SETTINGS_GATE_HELPER_DIFFERS`) until a later upload brings this code again.'])
+      expect(flat, text).toContain(text);
+    for (const gone of ['Piece 1, before SB4', 'Piece 2, before SB4', 'its older tools read two gates', 'are a separate change', 'The release tools count four gates'])
+      expect(flat, gone).not.toContain(gone);
+    // Piece 4: the notice when it is owed, then the watchers, then the key and the probe, then the activation. From the
+    // key on every ask makes a paid check of Luna, so the key never waits through the notice's time to object unwatched.
+    // S-5's terminal keeps its ssh -N running, so LUNAROW runs in S-6's second terminal, where P is set again; an scp of
+    // S-5 brings the server's settings back.
+    const practice = read('tools/preview-practice/README.md').replace(/\s+/g, ' ');
+    expect(practice).toContain('Leave the `ssh -N` running in its own terminal.');
+    expect(practice).toContain('In a second terminal, from the worktree\'s `dialectical-engine` folder (set `D` and `P` to the same folders as in S-5)');
+    for (const text of ['Run it in S-6\'s second terminal, where you set `P` to S-5\'s folder (S-5\'s own terminal is busy with its `ssh -N`): after S-5\'s `scp`, and before S-6\'s `formats`.',
+      'or S-5\'s `scp` run again, brings the server\'s six-row `settings.env` back: run LUNAROW again after it.'])
+      expect(flat, text).toContain(text);
+    expect(flat).not.toContain('in the Terminal where S-5 set `P`');
+    // GATEREADY runs inside the window from SB3 to the switch: only piece 3 is done there; a gate is never redeployed,
+    // restarted or activated then.
+    for (const text of ['- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.',
+      'no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and ask.'])
+      expect(flat, text).toContain(text);
+    for (const gone of ['Do that piece, run GATEREADY again', 'its activate; a gate still active needs its stop first'])
+      expect(flat, gone).not.toContain(gone);
+    const piece4 = flat.slice(flat.indexOf('**Piece 4, any day after the upload: Luna in the line-up.**'), flat.indexOf('**The way back.**'));
+    const order = ['1. When any account outside the team exists', '2. "Switch it on", step 2', 'the key at the hidden prompt', '5. The activation'].map(text => piece4.indexOf(text));
+    expect(Math.min(...order), piece4).toBeGreaterThan(0);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(drained.replace(/\s+/g, ' ')).toContain('On the upload that brings the Amazon gate, run BEDROCK_ENV (piece 3) right after DR1 too, and GATEREADY right before the yes before DR2');
+  });
+
+  it('LUNAROW, GATES2, GATES4, BEDROCK_ENV and GATEREADY are scripts of the runbook\'s form, and parse', () => {
+    for (const name of ['GATES2', 'GATES4', 'BEDROCK_ENV', 'GATEREADY']) {
+      const lines = named(name);
+      expect(lines[0], name).toBe('set -euo pipefail');
+      expect(lines[1], name).toBe(NAMES_LINE);
+      expect(lines.filter(line => line !== 'exit 0').at(-1), name).toBe(`echo ${name}_DONE`);
+      for (const line of lines) {
+        for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${name}: ${line}`).toBe(name);
+        if (line.includes('_NOT_DONE')) expect(line, `${name}: ${line}`).toMatch(/exit 1/);
+      }
+      expect(spawnSync('bash', ['-n'], { input: lines.join('\n') }).status, name).toBe(0);
+    }
+    const luna = named('LUNAROW');
+    expect(luna.slice(0, 3)).toEqual(['#!/usr/bin/env bash', expect.stringMatching(/^# LUNAROW: /), 'set -euo pipefail']);
+    expect(luna.at(-1)).toBe('echo LUNAROW_DONE');
+    expect(spawnSync('bash', ['-n'], { input: luna.join('\n') }).status).toBe(0);
+    // The practice's row and the server's are printed by the same call of the release's own code.
+    expect(luna.join('\n')).toContain('previewTargetJsonRow(\\"preview:gpt-6-luna\\")');
+    expect(named('BEDROCK_ENV').join('\n')).toContain('previewTargetJsonRow("preview:gpt-6-luna")');
+    // GATES4 and GATEREADY ask for the gates of this release's tools, and for the Perplexity gate the tools do not list.
+    for (const name of ['GATES4', 'GATEREADY']) for (const [, folder, privateDir, go] of GATES) for (const part of [folder, privateDir, go]) expect(named(name).join('\n'), `${name} ${part}`).toContain(part);
+  });
+
+  it('GATES4 and GATEREADY say which piece is missing in each state the server can be in, before the downtime', () => {
+    const last = (lines: string[]) => lines.at(-1);
+    const cases: ReadonlyArray<readonly [State, string, RegExp]> = [
+      ['all right', 'GATES4_DONE', /^GATEREADY_DONE$/],
+      ['one gate on old code', 'GATES4_NOT_DONE: not on this release\'s gate code, or not active: anthropic', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 1 \(/],
+      ['the Amazon gate missing', 'GATES4_NOT_DONE: not on this release\'s gate code, or not active: bedrock', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 2 \(/],
+      ['the Amazon window closed', 'GATES4_DONE', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 2 \(/],
+      ['six addresses', 'GATES4_DONE', /^GATEREADY_NOT_DONE: not ready for the downtime: piece 3 \(/],
+      ['a row the code refuses', 'GATES4_DONE', /^GATEREADY_NOT_DONE: not ready for the downtime: ask \(/]
+    ];
+    for (const [state, gates4, ready] of cases) {
+      const dir = server(state);
+      try {
+        expect(last(step(dir, named('GATES4'))), state).toBe(gates4);
+        const out = step(dir, named('GATEREADY'));
+        expect(last(out), `${state}: ${out.join('\n')}`).toMatch(ready);
+        if (state === 'all right') {
+          expect(out).toContain('bedrock gate: code this release; state active; window open true');
+          expect(out).toContain('api-rX.env: 7 model addresses; Luna\'s address there; the Amazon socket named; this release\'s start check of the addresses: accepted 7');
+          expect(last(step(dir, named('GATES2')))).toBe('GATES2_DONE');
+        }
+        if (state === 'one gate on old code') {
+          expect(out).toContain('MISSING (piece 1): the anthropic gate does not run this release\'s gate code');
+          expect(last(step(dir, named('GATES2')))).toBe('GATES2_NOT_DONE: not on this release\'s gate code, or not active: anthropic');
+        }
+        if (state === 'the Amazon gate missing') expect(out).toContain('MISSING (piece 2): the Amazon gate\'s service is not running');
+        if (state === 'the Amazon window closed') expect(out).toContain('MISSING (piece 2): the bedrock gate is not active with its window open (its status says why)');
+        if (state === 'a row the code refuses') expect(out.join('\n')).toContain('the new api would refuse these addresses at its start (refused PREVIEW_PROVIDER_TEST_CONFIGURATION_INVALID)');
+        if (state === 'six addresses') {
+          // DR1's files, then piece 3: BEDROCK_ENV adds the socket and Luna's row, and GATEREADY passes.
+          expect(out).toContain('api-rX.env: 6 model addresses; Luna\'s address MISSING; the Amazon socket MISSING; this release\'s start check of the addresses: refused PROVIDER_DISCOVERY_TARGET_SET_MISMATCH');
+          const env = step(dir, named('BEDROCK_ENV'));
+          expect(env.slice(-3)).toEqual(['api-rX.env: 7 model addresses, the Amazon socket named', 'runner-rX.env: 7 model addresses, the Amazon socket named', 'BEDROCK_ENV_DONE']);
+          expect(last(step(dir, named('GATEREADY')))).toBe('GATEREADY_DONE');
+          expect(last(step(dir, named('BEDROCK_ENV')))).toBe('BEDROCK_ENV_DONE');
+        }
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    }
+  }, 120_000);
+
+  it('LUNAROW adds the release\'s own row for Luna, last, to the practice\'s copy of the settings, once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'guide-lunarow-'));
+    try {
+      // zsh is the Mac's login shell (node comes from it there); here bash stands in, with this test's node first on PATH.
+      const lines = named('LUNAROW');
+      writeFileSync(join(dir, 'luna-row.sh'), [...lines.slice(0, 3), 'zsh() { shift; bash -c "$1"; }', ...lines.slice(3)].join('\n'));
+      const env = { ...process.env, PATH: `${resolve(process.execPath, '..')}:${process.env.PATH ?? ''}` };
+      const run = (file: string) => spawnSync('bash', [join(dir, 'luna-row.sh'), ROOT, file], { encoding: 'utf8', env }).stdout.trim().split('\n');
+      const settings = join(dir, 'settings.env');
+      // S-2's copy ends without a newline.
+      const before = `PREVIEW_PROVIDER_TEST_CONFIG_JSON=${JSON.stringify(SOCKETS)}\nPROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify(ROWS.slice(0, 6))}\nREGISTER_VERSION=20\nDEBATEAI_DEPLOYMENT_MODE=hosted`;
+      writeFileSync(settings, before, { mode: 0o600 });
+      expect(run(settings).slice(-2)).toEqual(['settings.env: 7 model addresses, Luna\'s row last', 'LUNAROW_DONE']);
+      const targets = (text: string) => JSON.parse(/^PROVIDER_DISCOVERY_TARGETS_JSON=(.*)$/m.exec(text)![1]!);
+      expect(targets(readFileSync(settings, 'utf8'))).toEqual(ROWS);
+      expect(readFileSync(`${settings}.before-luna`, 'utf8')).toBe(before);
+      expect(readFileSync(settings, 'utf8').replace(/^PROVIDER_DISCOVERY_TARGETS_JSON=.*$/m, '')).toBe(`${before.replace(/^PROVIDER_DISCOVERY_TARGETS_JSON=.*$/m, '')}\n`);
+      // A second run changes nothing.
+      const once = readFileSync(settings, 'utf8');
+      expect(run(settings).at(-1)).toBe('LUNAROW_DONE');
+      expect(readFileSync(settings, 'utf8')).toBe(once);
+      // Luna's row anywhere but last, or the line twice: it stops and changes nothing.
+      const moved = join(dir, 'moved.env');
+      writeFileSync(moved, `PROVIDER_DISCOVERY_TARGETS_JSON=${JSON.stringify([ROWS[6], ...ROWS.slice(0, 6)])}\n`);
+      expect(run(moved).at(-1)).toMatch(/^LUNAROW_NOT_DONE: .* holds another row for Luna, or Luna's row is not last: ask$/);
+      writeFileSync(moved, 'PROVIDER_DISCOVERY_TARGETS_JSON=[]\nPROVIDER_DISCOVERY_TARGETS_JSON=[]\n');
+      expect(run(moved).at(-1)).toMatch(/^LUNAROW_NOT_DONE: PROVIDER_DISCOVERY_TARGETS_JSON is not in .* exactly once: ask$/);
+      expect(existsSync(`${moved}.before-luna`)).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 60_000);
 });

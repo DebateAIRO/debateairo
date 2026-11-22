@@ -1067,7 +1067,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Start a debate",
       "New debate",
-      "Start a round"
+      "Ask a question"
     ],
     "sign-in": [
       "Account"
@@ -2247,7 +2247,7 @@ export const SUPPORT_UI_LABEL_ALIASES = {
     "start-debate": [
       "Începeți o dezbatere",
       "Dezbatere nouă",
-      "Începeți o rundă"
+      "Puneți o întrebare"
     ],
     "sign-in": [
       "Cont"
@@ -4312,6 +4312,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "التحدث إلى شخص"
     ],
     [
+      "Ask a question",
+      "بدء جولة"
+    ],
+    [
       "Create account",
       "إنشاء حساب"
     ],
@@ -4338,10 +4342,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "قائمة انتظار التقييم"
-    ],
-    [
-      "Start a round",
-      "بدء جولة"
     ],
     [
       "What we store",
@@ -4518,6 +4518,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Разговор с човек"
     ],
     [
+      "Ask a question",
+      "Започнете кръг"
+    ],
+    [
       "Create account",
       "Създайте профил"
     ],
@@ -4544,10 +4548,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Опашка за оценяване"
-    ],
-    [
-      "Start a round",
-      "Започнете кръг"
     ],
     [
       "What we store",
@@ -4724,6 +4724,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Promluvit si s člověkem"
     ],
     [
+      "Ask a question",
+      "Začněte kolo"
+    ],
+    [
       "Create account",
       "Vytvořit účet"
     ],
@@ -4750,10 +4754,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Fronta hodnocení"
-    ],
-    [
-      "Start a round",
-      "Začněte kolo"
     ],
     [
       "What we store",
@@ -4926,6 +4926,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Tal med et menneske"
     ],
     [
+      "Ask a question",
+      "Start en runde"
+    ],
+    [
       "Create account",
       "Opret konto"
     ],
@@ -4952,10 +4956,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Kø til bedømmelse"
-    ],
-    [
-      "Start a round",
-      "Start en runde"
     ],
     [
       "What we store",
@@ -5124,6 +5124,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Mit einem Menschen sprechen"
     ],
     [
+      "Ask a question",
+      "Runde beginnen"
+    ],
+    [
       "Create account",
       "Konto erstellen"
     ],
@@ -5150,10 +5154,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Bewertungswarteschlange"
-    ],
-    [
-      "Start a round",
-      "Runde beginnen"
     ],
     [
       "What we store",
@@ -5322,6 +5322,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Συνομιλία με άνθρωπο"
     ],
     [
+      "Ask a question",
+      "Έναρξη γύρου"
+    ],
+    [
       "Create account",
       "Δημιουργία λογαριασμού"
     ],
@@ -5348,10 +5352,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Ουρά βαθμολόγησης"
-    ],
-    [
-      "Start a round",
-      "Έναρξη γύρου"
     ],
     [
       "What we store",
@@ -5525,6 +5525,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Hablar con una persona"
     ],
     [
+      "Ask a question",
+      "Iniciar una ronda"
+    ],
+    [
       "Create account",
       "Crear cuenta"
     ],
@@ -5551,10 +5555,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Cola de puntuación"
-    ],
-    [
-      "Start a round",
-      "Iniciar una ronda"
     ],
     [
       "What we store",
@@ -5727,6 +5727,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Rääkige inimesega"
     ],
     [
+      "Ask a question",
+      "Alustage vooru"
+    ],
+    [
       "Create account",
       "Looge konto"
     ],
@@ -5753,10 +5757,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Hindamisjärjekord"
-    ],
-    [
-      "Start a round",
-      "Alustage vooru"
     ],
     [
       "What we store",
@@ -5929,6 +5929,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Keskustele henkilön kanssa"
     ],
     [
+      "Ask a question",
+      "Aloita kierros"
+    ],
+    [
       "Create account",
       "Luo tili"
     ],
@@ -5955,10 +5959,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Pisteytysjono"
-    ],
-    [
-      "Start a round",
-      "Aloita kierros"
     ],
     [
       "What we store",
@@ -6131,6 +6131,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Parler à une personne"
     ],
     [
+      "Ask a question",
+      "Lancer une manche"
+    ],
+    [
       "Create account",
       "Créer un compte"
     ],
@@ -6157,10 +6161,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "File d’attente de notation"
-    ],
-    [
-      "Start a round",
-      "Lancer une manche"
     ],
     [
       "What we store",
@@ -6329,6 +6329,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Labhair le duine"
     ],
     [
+      "Ask a question",
+      "Tosaigh babhta"
+    ],
+    [
       "Create account",
       "Cruthaigh cuntas"
     ],
@@ -6355,10 +6359,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Scuaine scórála"
-    ],
-    [
-      "Start a round",
-      "Tosaigh babhta"
     ],
     [
       "What we store",
@@ -6535,6 +6535,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "שיחה עם נציג אנושי"
     ],
     [
+      "Ask a question",
+      "התחלת סבב"
+    ],
+    [
       "Create account",
       "יצירת חשבון"
     ],
@@ -6561,10 +6565,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "תור מתן הציונים"
-    ],
-    [
-      "Start a round",
-      "התחלת סבב"
     ],
     [
       "What we store",
@@ -6741,6 +6741,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "किसी व्यक्ति से बात करें"
     ],
     [
+      "Ask a question",
+      "दौर शुरू करें"
+    ],
+    [
       "Create account",
       "खाता बनाएँ"
     ],
@@ -6767,10 +6771,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "अंकन कतार"
-    ],
-    [
-      "Start a round",
-      "दौर शुरू करें"
     ],
     [
       "What we store",
@@ -6947,6 +6947,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Razgovor s osobom"
     ],
     [
+      "Ask a question",
+      "Započnite rundu"
+    ],
+    [
       "Create account",
       "Izradite račun"
     ],
@@ -6973,10 +6977,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Red za bodovanje"
-    ],
-    [
-      "Start a round",
-      "Započnite rundu"
     ],
     [
       "What we store",
@@ -7149,6 +7149,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Beszélgetés munkatárssal"
     ],
     [
+      "Ask a question",
+      "Forduló indítása"
+    ],
+    [
       "Create account",
       "Fiók létrehozása"
     ],
@@ -7175,10 +7179,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Pontozási várólista"
-    ],
-    [
-      "Start a round",
-      "Forduló indítása"
     ],
     [
       "What we store",
@@ -7355,6 +7355,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Bicara dengan petugas"
     ],
     [
+      "Ask a question",
+      "Mulai ronde"
+    ],
+    [
       "Create account",
       "Buat akun"
     ],
@@ -7381,10 +7385,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Antrean penilaian"
-    ],
-    [
-      "Start a round",
-      "Mulai ronde"
     ],
     [
       "What we store",
@@ -7557,6 +7557,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Parla con una persona"
     ],
     [
+      "Ask a question",
+      "Inizia un round"
+    ],
+    [
       "Create account",
       "Crea account"
     ],
@@ -7583,10 +7587,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Coda di valutazione"
-    ],
-    [
-      "Start a round",
-      "Inizia un round"
     ],
     [
       "What we store",
@@ -7747,6 +7747,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "担当者と話す"
     ],
     [
+      "Ask a question",
+      "ラウンドを開始"
+    ],
+    [
       "Create account",
       "アカウントを作成"
     ],
@@ -7773,10 +7777,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "採点キュー"
-    ],
-    [
-      "Start a round",
-      "ラウンドを開始"
     ],
     [
       "What we store",
@@ -7953,6 +7953,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "상담원과 대화하기"
     ],
     [
+      "Ask a question",
+      "라운드 시작"
+    ],
+    [
       "Create account",
       "계정 만들기"
     ],
@@ -7979,10 +7983,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "채점 대기열"
-    ],
-    [
-      "Start a round",
-      "라운드 시작"
     ],
     [
       "What we store",
@@ -8159,6 +8159,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Kalbėtis su žmogumi"
     ],
     [
+      "Ask a question",
+      "Pradėti raundą"
+    ],
+    [
       "Create account",
       "Sukurti paskyrą"
     ],
@@ -8185,10 +8189,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Vertinimo eilė"
-    ],
-    [
-      "Start a round",
-      "Pradėti raundą"
     ],
     [
       "What we store",
@@ -8361,6 +8361,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Runāt ar cilvēku"
     ],
     [
+      "Ask a question",
+      "Sākt raundu"
+    ],
+    [
       "Create account",
       "Izveidot kontu"
     ],
@@ -8387,10 +8391,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Vērtēšanas rinda"
-    ],
-    [
-      "Start a round",
-      "Sākt raundu"
     ],
     [
       "What we store",
@@ -8563,6 +8563,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Tkellem ma’ persuna"
     ],
     [
+      "Ask a question",
+      "Ibda rawnd"
+    ],
+    [
       "Create account",
       "Oħloq kont"
     ],
@@ -8589,10 +8593,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Kju tal-punteġġi"
-    ],
-    [
-      "Start a round",
-      "Ibda rawnd"
     ],
     [
       "What we store",
@@ -8761,6 +8761,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Met een medewerker praten"
     ],
     [
+      "Ask a question",
+      "Ronde starten"
+    ],
+    [
       "Create account",
       "Account aanmaken"
     ],
@@ -8787,10 +8791,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Scorewachtrij"
-    ],
-    [
-      "Start a round",
-      "Ronde starten"
     ],
     [
       "What we store",
@@ -8955,6 +8955,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Porozmawiaj z człowiekiem"
     ],
     [
+      "Ask a question",
+      "Rozpocznij rundę"
+    ],
+    [
       "Create account",
       "Utwórz konto"
     ],
@@ -8981,10 +8985,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Kolejka oceniania"
-    ],
-    [
-      "Start a round",
-      "Rozpocznij rundę"
     ],
     [
       "What we store",
@@ -9157,6 +9157,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Falar com uma pessoa"
     ],
     [
+      "Ask a question",
+      "Iniciar uma ronda"
+    ],
+    [
       "Create account",
       "Criar conta"
     ],
@@ -9183,10 +9187,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Fila de pontuação"
-    ],
-    [
-      "Start a round",
-      "Iniciar uma ronda"
     ],
     [
       "What we store",
@@ -9360,6 +9360,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Поговорить с человеком"
     ],
     [
+      "Ask a question",
+      "Начать раунд"
+    ],
+    [
       "Create account",
       "Создать учётную запись"
     ],
@@ -9386,10 +9390,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Очередь оценки"
-    ],
-    [
-      "Start a round",
-      "Начать раунд"
     ],
     [
       "What we store",
@@ -9566,6 +9566,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Porozprávať sa s človekom"
     ],
     [
+      "Ask a question",
+      "Začať kolo"
+    ],
+    [
       "Create account",
       "Vytvoriť účet"
     ],
@@ -9592,10 +9596,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Front hodnotenia"
-    ],
-    [
-      "Start a round",
-      "Začať kolo"
     ],
     [
       "What we store",
@@ -9764,6 +9764,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Pogovori se z osebo"
     ],
     [
+      "Ask a question",
+      "Začni krog"
+    ],
+    [
       "Create account",
       "Ustvari račun"
     ],
@@ -9790,10 +9794,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Čakalna vrsta za ocenjevanje"
-    ],
-    [
-      "Start a round",
-      "Začni krog"
     ],
     [
       "What we store",
@@ -9966,6 +9966,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Prata med en person"
     ],
     [
+      "Ask a question",
+      "Starta en omgång"
+    ],
+    [
       "Create account",
       "Skapa konto"
     ],
@@ -9992,10 +9996,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Poängsättningskö"
-    ],
-    [
-      "Start a round",
-      "Starta en omgång"
     ],
     [
       "What we store",
@@ -10164,6 +10164,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Bir yetkiliyle görüş"
     ],
     [
+      "Ask a question",
+      "Tur başlat"
+    ],
+    [
       "Create account",
       "Hesap oluştur"
     ],
@@ -10190,10 +10194,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Puanlama kuyruğu"
-    ],
-    [
-      "Start a round",
-      "Tur başlat"
     ],
     [
       "What we store",
@@ -10366,6 +10366,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Поговорити з людиною"
     ],
     [
+      "Ask a question",
+      "Почати раунд"
+    ],
+    [
       "Create account",
       "Створити обліковий запис"
     ],
@@ -10392,10 +10396,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Черга оцінювання"
-    ],
-    [
-      "Start a round",
-      "Почати раунд"
     ],
     [
       "What we store",
@@ -10572,6 +10572,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "Trò chuyện với nhân viên hỗ trợ"
     ],
     [
+      "Ask a question",
+      "Bắt đầu một vòng"
+    ],
+    [
       "Create account",
       "Tạo tài khoản"
     ],
@@ -10598,10 +10602,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "Hàng đợi chấm điểm"
-    ],
-    [
-      "Start a round",
-      "Bắt đầu một vòng"
     ],
     [
       "What we store",
@@ -10778,6 +10778,10 @@ export const SUPPORT_CONTROL_NAMES = {
       "与人工客服交谈"
     ],
     [
+      "Ask a question",
+      "开始一轮"
+    ],
+    [
       "Create account",
       "创建账户"
     ],
@@ -10804,10 +10808,6 @@ export const SUPPORT_CONTROL_NAMES = {
     [
       "Scoring queue",
       "评分队列"
-    ],
-    [
-      "Start a round",
-      "开始一轮"
     ],
     [
       "What we store",
@@ -11125,7 +11125,7 @@ export const SUPPORT_CAPABILITY_KEY_NAMES = {
     "billing-pricing": "Tarifs",
     "billing-card-change": "Mettre à jour la carte",
     "billing-cancel": "Résilier une formule",
-    "billing-withdraw": "Se rétracter d’une formule",
+    "billing-withdraw": "Se rétracter du contrat",
     "legal-privacy-versions": "Toutes les versions de cette politique"
   },
   "ga": {

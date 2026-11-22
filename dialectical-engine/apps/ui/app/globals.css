@@ -1643,6 +1643,51 @@ html:has(.supportWidget[data-widget-state="collapsed"]):has(.v4UndoHost) { scrol
   text-align: center;
 }
 
+/* The site is in Beta: a small mark beside the site's name, and one quiet sentence where a person starts. The sentence
+   is grey and small so it never competes with the page's own first line; its link starts a mail to our support address. */
+.betaBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--muted-border);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.betaNote {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Written with the sentence's class and the element so it also wins over the home page's own link rule (`.lpRoot a`). */
+.betaNote a.betaNoteLink {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.betaNote a.betaNoteLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* On the public home page it follows the hero's AI line. */
+.lpBetaNote { margin-top: 18px; }
+
 .newVersionNotePage {
   margin: 48px auto;
   max-width: 560px;
@@ -10543,25 +10588,6 @@ a:focus-visible {
   color: var(--ink);
 }
 
-/* S04 threat reports staff console; colors follow Terracotta and Chamber tokens. */
-.threatReportsLinkRow { max-width: 720px; margin: 0 auto 18px; }
-.threatReportsLink { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-.threatReportsCount { display: inline-flex; align-items: center; border: 1px solid var(--dispute-border); border-radius: var(--r-pill); background: var(--dispute-bg); color: var(--dispute-text); padding: 2px 8px; font-size: 10px; font-weight: 700; }
-.staffAccess .staffBadge[data-state="unread"] { color: var(--dispute-text); background: var(--dispute-bg); border-color: var(--dispute-border); }
-.staffAccess .staffBadge[data-state="unread"]::before { background: var(--dispute); }
-.threatReportsBackTop { display: inline-block; text-decoration: none; margin: 0 0 18px; }
-.threatReportsList { list-style: none; margin: 16px 0 0; padding: 0; }
-.threatReportsRow { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 5px 16px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
-.threatReportsKeptAt { font-family: var(--font-mono); font-size: 11.5px; color: var(--ink); }
-.threatReportsQuestion { margin: 16px 0 0; padding: 18px; border: 1px solid var(--line-strong); border-radius: var(--r-btn); background: var(--surface-2); color: var(--ink); font-family: var(--font-display); font-size: 17px; font-weight: 500; line-height: 1.5; overflow-wrap: anywhere; }
-.threatReportsFacts { display: grid; gap: 9px; margin: 16px 0 0; }
-.threatReportsFacts > div { display: grid; grid-template-columns: 140px minmax(0, 1fr); align-items: baseline; gap: 12px; }
-.threatReportsFacts dt { color: var(--text-2); font-size: 11px; }
-.threatReportsFacts dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 12px; color: var(--ink); }
-.threatReportsDecideHint { margin-top: 18px; }
-.threatReportsBackList { margin-top: 18px; }
-@media (max-width: 560px) { .threatReportsRow { grid-template-columns: minmax(0, 1fr) auto; } .threatReportsRow .setBtn { grid-column: 1 / -1; justify-self: start; } }
-
 /* ============================================================
    Phone layout — 2026-09-30 responsiveness pass.
    Placed after every layout rule (only the delimited consent-ui blocks,
@@ -10870,7 +10896,7 @@ a:focus-visible {
 
 /* === consent-ui S01 === */
 /* Slice S01 — the cookie notice: the bar (10a) and the storage card (10b), a
-   read-only list of the eight items Dialectical Engine stores (mission cookie-compliance,
+   read-only list of every item Dialectical Engine stores (mission cookie-compliance,
    DONE.md artboards S01-01..S01-18). The ONE delimited block this slice may
    append, at the very end of the file (S01-R25). Every colour here is a
    var(--token) reference; the tokens it uses live in the two token blocks at
@@ -11532,6 +11558,10 @@ a:focus-visible {
   line-height: 1.65;
   color: var(--text-2);
   text-wrap: pretty;
+}
+/* A paragraph's lead-in, bold as on the legal pages. */
+.policyText strong {
+  font-weight: 700;
 }
 
 .policyItems {

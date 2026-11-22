@@ -21,7 +21,8 @@ describe("each row's thinking menu, strongest first", () => {
   it("holds exactly the menu's levels in the makers' order of strength", () => {
     expect(Object.fromEntries(PREVIEW_MODEL_ROWS.map((row) => [row.model, row.effortsByStrength]))).toEqual({
       [GLM]: ["high", "low"], [DEEPSEEK]: ["high", "low", "none"], [MIMO]: ["default", "none"],
-      [QWEN]: ["default", "medium", "low", "none"], [HAIKU]: ["high", "medium", "low"]
+      [QWEN]: ["default", "medium", "low", "none"], [HAIKU]: ["high", "medium", "low"],
+      "us.openai.gpt-6-luna": ["high", "medium", "low", "none"]
     });
     for (const row of PREVIEW_MODEL_ROWS) expect([...row.effortsByStrength].sort()).toEqual([...row.efforts].sort());
   });

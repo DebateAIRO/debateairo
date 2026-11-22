@@ -41,6 +41,7 @@ GATES = {
     'anthropic': ('/var/lib/debateai-v3-preview/provider-anthropic-authority-v1', '/etc/debateai-v3-preview/provider-anthropic-go-v1.json'),
     'perplexity': (PRIVATE, GO),
     'google': ('/var/lib/debateai-v3-preview/provider-google-authority-v1', '/etc/debateai-v3-preview/provider-google-go-v1.json'),
+    'bedrock': ('/var/lib/debateai-v3-preview/provider-bedrock-authority-v1', '/etc/debateai-v3-preview/provider-bedrock-go-v1.json'),
     'team-v2': ('/var/lib/debateai-v3-preview/provider-team-authority-v2', '/etc/debateai-v3-preview/provider-team-go-v2.json'),
 }
 

@@ -273,10 +273,10 @@ Existing acceptance relays prove local CLI transports, not a production listener
 - **OBS-CODEX-R91:** Diagnosis phase shall run read-only, no network/web, no subagents, no project-global ambient credentials, no interactive shell, and no session resume. Mutation requires a separate policy-approved executor with a new capability. This prevents an injected incident from escalating its own privileges.
 - **OBS-CODEX-R92:** Run first on V’s machine under an OS supervisor with a human-owned kill switch. Moving to dezbatere.ro requires a separately approved CLI authentication, least-privilege service account, process supervision, encrypted spool, and cost/telemetry proof; availability is **UNVERIFIED**. This prevents copying workstation assumptions to production.
 - **OBS-CODEX-R93:** Idle model cost shall be zero calls; active cost shall be measured per trace/fix attempt. Missing cost or token telemetry counts against conservative fixed per-job budgets and blocks mutation when monthly accounting cannot be proven. Codex’s current relay returns `usage: null` (`acceptance/model-shim.ts:130-139`). This prevents unknown usage from bypassing caps.
-- **OBS-CODEX-R94:** Hard caps before V rules otherwise: 20 diagnoses/day, 5 patch attempts/day, 2 concurrent diagnoses, 1 concurrent mutation, and €50 equivalent incremental monthly model spend. Any unmeasurable monetary usage consumes one conservative daily slot; crossing any cap switches to queue-and-report only. This prevents runaway spend.
+- **OBS-CODEX-R94:** Hard caps before V rules otherwise: 20 diagnoses/day, 5 patch attempts/day, 2 concurrent diagnoses, 1 concurrent mutation, and a monthly cap on incremental model spend, set by V. Any unmeasurable monetary usage consumes one conservative daily slot; crossing any cap switches to queue-and-report only. This prevents runaway spend.
 - **OBS-CODEX-R95:** If V lifts DR-179, an API worker may replace CLI transport only after equivalent identity, usage/cost, data residency/privacy, tool isolation, rate limit, and kill-switch gates; lifting API-key hold does not expand fix authority. This prevents transport change from becoming a governance bypass.
 
-**Recommendation — confidence MEDIUM-HIGH:** deterministic resident daemon + event-spawned Codex CLI workers on V’s machine, with €50/month and activity caps. **Strongest counter-argument:** process startup adds latency and a subscription may not expose monetary cost; short-lived isolation and token/job caps are safer than a persistent context.
+**Recommendation — confidence MEDIUM-HIGH:** deterministic resident daemon + event-spawned Codex CLI workers on V’s machine, with a monthly spend cap and activity caps. **Strongest counter-argument:** process startup adds latency and a subscription may not expose monetary cost; short-lived isolation and token/job caps are safer than a persistent context.
 
 ### D3. Objective fix-magnitude taxonomy
 
@@ -363,7 +363,7 @@ Existing acceptance relays prove local CLI transports, not a production listener
 
 ### E3. Listener runtime, model, budget
 
-- **OBS-CODEX-R146:** Options: permanent conversational CLI session; deterministic daemon + event-spawned Codex CLI worker on V’s machine; always-on server API agent after DR-179. **Pick daemon + fresh `gpt-5.6-sol` Codex CLI workers on V’s machine**, initially report-only, with 20 diagnoses/day, 5 patch attempts/day, 2 diagnosis/1 mutation concurrency, and €50/month incremental cap; server move requires new approval. Confidence MEDIUM-HIGH. Strongest counter-argument: CLI startup latency and unavailable cost telemetry; fixed job/token slots compensate until accounting is proven.
+- **OBS-CODEX-R146:** Options: permanent conversational CLI session; deterministic daemon + event-spawned Codex CLI worker on V’s machine; always-on server API agent after DR-179. **Pick daemon + fresh `gpt-5.6-sol` Codex CLI workers on V’s machine**, initially report-only, with 20 diagnoses/day, 5 patch attempts/day, 2 diagnosis/1 mutation concurrency, and a monthly incremental spend cap; server move requires new approval. Confidence MEDIUM-HIGH. Strongest counter-argument: CLI startup latency and unavailable cost telemetry; fixed job/token slots compensate until accounting is proven.
 
 ### E4. Error-data retention under DR-188
 
@@ -400,7 +400,7 @@ Existing acceptance relays prove local CLI transports, not a production listener
 |---|---|---|---|
 | E1 | Conservative QUICK / looser QUICK / none | R96 conservative exact threshold | Objective RED/GREEN + semantic deny + tiny scope bounds wrong-fix blast radius. |
 | E2 | Direct commit / per-fix auto-PR / batch PR | Per-fix auto-merged protected PR | Preserves no-human-approval while retaining checks, audit, and revert unit. |
-| E3 | Persistent CLI / event-spawned CLI / API server | Deterministic daemon + fresh Codex CLI on V machine; €50/month and R94 caps | Lawful under DR-179, zero idle calls, isolated incidents. |
+| E3 | Persistent CLI / event-spawned CLI / API server | Deterministic daemon + fresh Codex CLI on V machine; a monthly spend cap and R94 caps | Lawful under DR-179, zero idle calls, isolated incidents. |
 | E4 | Indefinite hot / automatic deletion / V-gated tiering | No deletion now; later 90d hot +365d cold + key destruction/minimal audit | Complies with DR-188 and crypto-shredding without silently erasing evidence. |
 | E5 | Full exclusion / boundary metadata / internal instrumentation | Boundary metadata only | Observes zone-caused availability without entering zone or exposing payloads. |
 | E6a | Merge deploys / merge only | Merge only | Deployment is a separate high-blast-radius authority. |

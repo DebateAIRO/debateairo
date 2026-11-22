@@ -6,16 +6,19 @@
  *   pnpm billing:withdraw --owner <owner ref> --refund <amount through RefundDesk, e.g. 12.10> [--dashboard <amount
  *     the owner refunded in NETOPIA's admin for this withdrawal, e.g. 5.00>]
  *
- * The first (R2 Q-9) records the withdrawal as of the instant the statement arrived — now, unless `--received` names
- * an earlier arrival — through P12d's `recordWithdrawal`; the second settles one P12d handed to the owner, and M8
- * names the sum of both amounts. On the host it runs under `systemd-run` with the API's EnvironmentFile and
+ * The first records the withdrawal as of the instant the statement arrived — now, unless `--received` names an earlier
+ * arrival — through `recordWithdrawal`, which queues the acknowledgement (M8_RECEIVED) at once; when nothing is due
+ * back, that is the only email. The second settles one `recordWithdrawal` handed to the owner, and M8 names the sum of
+ * both amounts. On the host it runs under `systemd-run` with the API's EnvironmentFile and
  * writes as the API's own principal; it never calls NETOPIA (the API's outbox moves the money). It prints one plain
  * line; a refusal is ONE code on stderr (`BILLING_WITHDRAW_USAGE` exits 2, the others exit 1).
  */
 import { pathToFileURL } from "node:url";
 import { exhaustive, TypedDomainError } from "@debateai/kernel";
 import { PostgresModelSpendStore } from "@debateai/budget";
-import { decimalToMicros, foldSubscription, microsToDecimal, type PriceCurrency } from "@debateai/billing-core";
+import {
+  decimalToMicros, foldSubscription, microsToDecimal, type PlansInForcePort, type PriceCurrency
+} from "@debateai/billing-core";
 import { createEmailBlindIndex, loadSecretKey, normalizeEmailForBlindIndex } from "@debateai/crypto";
 import {
   BillingJobQueries,
@@ -27,6 +30,7 @@ import {
   type Pool
 } from "@debateai/db";
 import {
+  createBillingPlansInForce,
   loadBillingWithdrawEnvironment,
   readBillingPlans,
   readBillingPolicy,
@@ -127,6 +131,8 @@ const notHere = async (): Promise<never> => {
  */
 export function withdrawStoresFor(pool: Pool, input: Readonly<{
   policy: BillingPolicy; plans: BillingPlans; audit: BillingAudit; clock: () => Date;
+  /** The plans the site served over a span, so a withdrawal dated before an upload is measured by that day's credit. */
+  plansInForce?: PlansInForcePort;
   /** The API's NETOPIA environment (spec §2.5.4), from its NETOPIA_API_BASE_URL. */
   paymentEnvironment: "sandbox" | "live";
 }>): WithdrawStores {
@@ -134,6 +140,7 @@ export function withdrawStoresFor(pool: Pool, input: Readonly<{
   const jobs = new BillingJobQueries(pool);
   return Object.freeze({
     billing, jobs, entitlements: new EntitlementRepository(pool), plans: input.plans, policy: input.policy,
+    ...(input.plansInForce === undefined ? {} : { plansInForce: input.plansInForce }),
     ownerSpend: new PostgresModelSpendStore(pool),
     refunds: new RefundDesk({
       repository: billing, jobs, policy: input.policy, audit: input.audit, clock: input.clock,
@@ -240,7 +247,8 @@ export function renderWithdrawResult(result: WithdrawResult, input: WithdrawArgu
       return `The withdrawal of ${owner} is recorded: the plan has ended and ${microsToDecimal(result.refundMicros)} ${result.currency}`
         + " goes back to the card. M8 follows once the refund is done.\n";
     case "NOTHING_DUE":
-      return `The withdrawal of ${owner} is recorded: the plan has ended and nothing was due back. M8 is queued.\n`;
+      return `The withdrawal of ${owner} is recorded: the plan has ended and nothing was due back. M8_RECEIVED is queued`
+        + " and is the only email.\n";
     case "OWNER_REVIEW":
       return `The withdrawal of ${owner} is recorded and the plan has ended, but a refund made in NETOPIA's admin`
         + " touched a payment, so nothing was refunded. Check NETOPIA's admin: refund there what this command cannot take"
@@ -394,7 +402,8 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       const plans = await readBillingPlans(pool, environment.REGISTER_VERSION);
       if (policy === null || plans === null) throw new TypeError("BILLING_WITHDRAW_REGISTER_UNRESOLVED");
       const stores = withdrawStoresFor(pool, {
-        policy, plans, audit: consoleBillingAudit, clock: () => new Date(), paymentEnvironment
+        policy, plans, audit: consoleBillingAudit, clock: () => new Date(), paymentEnvironment,
+        plansInForce: createBillingPlansInForce({ pool, ownVersion: environment.REGISTER_VERSION, ownPlans: plans })
       });
       return Object.freeze({ run: (input: WithdrawArguments) => runWithdrawCommand(stores, input), close: () => pool.end() });
     } catch (error) {

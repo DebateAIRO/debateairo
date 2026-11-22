@@ -85,12 +85,12 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
         const entry = currentDocument(kind, code);
         expect(entry, `${code}/${kind}`).not.toBeNull();
         expect(entry!.sha256).toBe(createHash("sha256").update(draftBytes(code, kind)).digest("hex"));
-        expect(entry!.version).toBe(kind === "TERMS" ? "2.18" : "3.12");
+        expect(entry!.version).toBe("1.0");
       }
     }
     expect(legalManifestLocales("TERMS")).toEqual([...CODES].sort());
-    expect(reacceptanceFloor("TERMS")).toBe("2.1");
-    expect(reacceptanceFloor("PRIVACY")).toBe("3.2");
+    expect(reacceptanceFloor("TERMS")).toBe("1.0");
+    expect(reacceptanceFloor("PRIVACY")).toBe("1.0");
   });
 
   // V's ruling: the sensitive-data consent is withdrawn by closing the account, not by email.
@@ -106,7 +106,9 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     }
     const english = readDraft("en", "PRIVACY");
     expect(english).toContain("You can withdraw it at any time by closing your account from Settings.");
-    expect(english).toContain("withdraw the sensitive-data consent by closing your account from Settings");
+    // Privacy 3.14: the marketing clause that came first left (we send no marketing email), so the cell now opens with this one.
+    expect(english).toContain("| Withdraw the sensitive-data consent by closing your account from Settings");
+    expect(english.split("\n").find((line) => line.startsWith("|") && line.includes("Art. 7(3)"))).not.toMatch(/marketing/iu);
   });
 
   it("names the actual document language in locales that previously said English", () => {
@@ -131,8 +133,8 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
   });
 
   it("requires re-acceptance for the revised documents and orders versions numerically", () => {
-    expect(reacceptanceFloor("TERMS")).toBe("2.1");
-    expect(reacceptanceFloor("PRIVACY")).toBe("3.2");
+    expect(reacceptanceFloor("TERMS")).toBe("1.0");
+    expect(reacceptanceFloor("PRIVACY")).toBe("1.0");
     for (const kind of ["CONSENT_RENEWAL", "CONSENT_IMMEDIATE_START"] as const) {
       expect(reacceptanceFloor(kind), kind).toBeNull();
     }
@@ -153,7 +155,7 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
   it("refuses a re-acceptance floor above any locale's current version, in the package and in the generator", () => {
     const terms = currentDocument("TERMS", "en")!.version;
     const privacy = currentDocument("PRIVACY", "en")!.version;
-    expect([terms, privacy]).toEqual(["2.18", "3.12"]);
+    expect([terms, privacy]).toEqual(["1.0", "1.0"]);
     const manifest = JSON.parse(renderLegalManifest(buildLegalManifest(readDraft, {}, committedArchive()))) as {
       reacceptance: Record<string, unknown>;
       documents: Record<string, Record<string, { version: string; sha256: string }>>;
@@ -162,31 +164,31 @@ describe("the legal document manifest (paid plans L2, spec §2.3.2)", () => {
     const withFloors = (floors: Record<string, unknown>) => ({
       ...structuredClone(manifest), reacceptance: { ...manifest.reacceptance, ...floors }
     });
-    for (const floors of [{ TERMS: "2.19" }, { TERMS: "3.0" }, { PRIVACY: "3.13" }, { TERMS: "2.1", PRIVACY: "4.0" }]) {
+    for (const floors of [{ TERMS: "1.2" }, { TERMS: "3.0" }, { PRIVACY: "1.1" }, { TERMS: "2.1", PRIVACY: "4.0" }]) {
       expect(() => parseLegalManifest(withFloors(floors)), JSON.stringify(floors)).toThrow("LEGAL_MANIFEST_INVALID");
     }
-    for (const floors of [{ TERMS: "2.1" }, { TERMS: "2.2", PRIVACY: "3.3" }, { TERMS: "1.9", PRIVACY: "3.2" }, { PRIVACY: "2.10" }, { TERMS: "2.9", PRIVACY: "3.8" }]) {
+    for (const floors of [{ TERMS: "1.0" }, { TERMS: "0.2", PRIVACY: "0.3" }, { TERMS: "0.9", PRIVACY: "1.0" }, { PRIVACY: "0.10" }, { TERMS: "0.10", PRIVACY: "0.8" }]) {
       expect(parseLegalManifest(withFloors(floors)).reacceptance, JSON.stringify(floors)).toMatchObject(floors);
     }
     // Every locale's current pair must have reached the floor, not only English.
-    const lagging = withFloors({ TERMS: "2.1" });
+    const lagging = withFloors({ TERMS: "1.0" });
     const deSha = lagging.documents.TERMS!.de!.sha256;
-    lagging.documents.TERMS!.de!.version = "1.9";
+    lagging.documents.TERMS!.de!.version = "0.9";
     // The archive entry follows when German's current text is archived (it is not between an edit and the release step).
-    const deArchived = lagging.archive.TERMS!.de![deSha];
-    if (deArchived !== undefined) deArchived.version = "1.9";
+    const deArchived = lagging.archive.TERMS?.de?.[deSha];
+    if (deArchived !== undefined) deArchived.version = "0.9";
     expect(() => parseLegalManifest(lagging)).toThrow("LEGAL_MANIFEST_INVALID");
-    expect(parseLegalManifest({ ...lagging, reacceptance: { ...lagging.reacceptance, TERMS: "1.9" } })
-      .documents.TERMS.get("de")?.version).toBe("1.9");
+    expect(parseLegalManifest({ ...lagging, reacceptance: { ...lagging.reacceptance, TERMS: "0.9" } })
+      .documents.TERMS.get("de")?.version).toBe("0.9");
 
     // The generator refuses the same configuration before it writes anything, by a code alone.
-    for (const floors of [{ TERMS: "2.19", PRIVACY: null }, { TERMS: null, PRIVACY: "3.13" }, { TERMS: "v2", PRIVACY: null }]) {
+    for (const floors of [{ TERMS: "1.2", PRIVACY: null }, { TERMS: null, PRIVACY: "1.1" }, { TERMS: "v2", PRIVACY: null }]) {
       expect(() => buildLegalManifest(readDraft, {}, committedArchive(), floors), JSON.stringify(floors))
         .toThrow(/^LEGAL_MANIFEST_REACCEPTANCE_FLOOR_INVALID$/u);
     }
-    const raised = buildLegalManifest(readDraft, {}, committedArchive(), { TERMS: "2.1", PRIVACY: "3.2" });
-    expect(raised.reacceptance).toEqual({ PRIVACY: "3.2", TERMS: "2.1" });
-    expect(parseLegalManifest(JSON.parse(renderLegalManifest(raised))).reacceptance.TERMS).toBe("2.1");
+    const raised = buildLegalManifest(readDraft, {}, committedArchive(), { TERMS: "1.0", PRIVACY: "1.0" });
+    expect(raised.reacceptance).toEqual({ PRIVACY: "1.0", TERMS: "1.0" });
+    expect(parseLegalManifest(JSON.parse(renderLegalManifest(raised))).reacceptance.TERMS).toBe("1.0");
   });
 
   it("stamps each generated module with the same version and hash as the manifest", () => {
@@ -269,10 +271,9 @@ describe("the checkout consent sentences in the manifest (paid plans L2, R-27)",
 describe("the archive of every published Terms and Privacy text (paid plans L2, ruling Q-3)", () => {
   // English first: the current texts are archived by the release step, not at every edit, so a current text may not be
   // archived yet while work goes on (an English edit whose translations lag). The release check refuses a release
-  // until every current text is (tests/unit/legal-english-first.test.ts). What the archive does hold is exact.
-  // Closing Taiwan (owner's decision of 12 November 2026) took its name out of every language at once, so until the
-  // release step archives the new texts no language's current text is archived; the loop then checks nothing, and
-  // the next test still checks every file the archive holds.
+  // until the current text of every language the release offers is (tests/unit/legal-english-first.test.ts); the
+  // other languages' current texts are not archived. What the archive does hold is exact: the loop checks each current
+  // text the archive holds, and the next test checks every file the archive holds.
   it("keeps a current draft's exact bytes under its sha256 once archived, and the manifest maps the hash to that file", () => {
     expect(LEGAL_ARCHIVE_ROOT).toBe("apps/ui/legal/archive");
     let archived = 0;
@@ -314,24 +315,24 @@ describe("the archive of every published Terms and Privacy text (paid plans L2, 
   it("carries an older version forward when the draft moves on, lists it after the current one, and refuses a contradiction", () => {
     const current = currentDocument("TERMS", "en")!;
     const older = "1".repeat(64);
-    const history: LegalArchiveIndex = { TERMS: { en: { [older]: { version: "1.9", path: legalArchivePath("en", older) } } } };
+    const history: LegalArchiveIndex = { TERMS: { en: { [older]: { version: "0.9", path: legalArchivePath("en", older) } } } };
     // The release step's run (`--archive`), which lists the current texts too.
     const manifest = buildLegalManifest(readDraft, {}, history, undefined, { archiveCurrent: true });
     expect(manifest.archive.TERMS.en).toEqual({
-      [older]: { version: "1.9", path: legalArchivePath("en", older) },
+      [older]: { version: "0.9", path: legalArchivePath("en", older) },
       [current.sha256]: { version: current.version, path: legalArchivePath("en", current.sha256) }
     });
     const parsed = parseLegalManifest(JSON.parse(renderLegalManifest(manifest)));
-    expect(legalArchive("TERMS", "en", parsed).map((entry) => entry.version)).toEqual([current.version, "1.9"]);
+    expect(legalArchive("TERMS", "en", parsed).map((entry) => entry.version)).toEqual([current.version, "0.9"]);
     expect(legalArchive("TERMS", "de", parsed)).toHaveLength(1);
     for (const refused of [
-      { TERMS: { en: { [older]: { version: "1.9", path: legalArchivePath("de", older) } } } },
+      { TERMS: { en: { [older]: { version: "0.9", path: legalArchivePath("de", older) } } } },
       { TERMS: { en: { [older]: { version: "v1", path: legalArchivePath("en", older) } } } },
-      { TERMS: { en: { ["1".repeat(63)]: { version: "1.9", path: legalArchivePath("en", "1".repeat(63)) } } } },
-      { TERMS: { xx: { [older]: { version: "1.9", path: legalArchivePath("xx", older) } } } },
+      { TERMS: { en: { ["1".repeat(63)]: { version: "0.9", path: legalArchivePath("en", "1".repeat(63)) } } } },
+      { TERMS: { xx: { [older]: { version: "0.9", path: legalArchivePath("xx", older) } } } },
       { CONSENT_RENEWAL: { en: {} } },
       // The current text's hash can only ever carry the current text's version.
-      { TERMS: { en: { [current.sha256]: { version: "1.0", path: legalArchivePath("en", current.sha256) } } } }
+      { TERMS: { en: { [current.sha256]: { version: "0.8", path: legalArchivePath("en", current.sha256) } } } }
     ]) {
       expect(() => buildLegalManifest(readDraft, {}, refused as never), JSON.stringify(refused))
         .toThrow("LEGAL_MANIFEST_ARCHIVE_INVALID");
@@ -399,9 +400,13 @@ describe("the /terms/versions list and the archive agree (paid plans L2, rulings
   });
 
   it("lists every archived Terms version exactly once, newest first, and links nothing the archive never held", () => {
+    const current = currentDocument("TERMS", "en")!.version;
     const archivedVersions = [...new Set(legalArchive("TERMS", "en").map((entry) => entry.version))];
     expect(archivedVersions.length).toBeGreaterThan(0);
-    expect(TERMS_VERSIONS.filter((row) => row.href !== null).map((row) => row.version)).toEqual(archivedVersions);
+    // English first: the version in force joins the archive at the release step (pnpm run generate:legal:archive), so
+    // its row links to /terms whether or not the archive holds it yet; every earlier linked row is an archived version.
+    expect(TERMS_VERSIONS.filter((row) => row.href !== null && !row.current).map((row) => row.version))
+      .toEqual(archivedVersions.filter((version) => version !== current));
   });
 
   it("gives a row no link only for a version the archive never held and the Terms' change history names", () => {

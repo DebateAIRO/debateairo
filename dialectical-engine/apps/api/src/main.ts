@@ -51,6 +51,7 @@ import { continuedRunWake, runHandoverOf } from "./month-pause.js";
 // V4 start step, Task 57f: Continue on a failed debate, and the room for the rest.
 import { continueRoomOf } from "./run-continue.js";
 import { PostgresOutboundMailStore } from "../../../packages/db/src/outbound-mail.js";
+import { PostgresUnfinishedSignupExpiryRepository } from "../../../packages/db/src/unfinished-signup-expiry.js";
 import { ConsumerWebAuthnService } from "./consumer-webauthn.js";
 import { PostgresConsumerAuthRepository } from "@debateai/db";
 import { routeLeaseBodyQueries } from "@debateai/db";
@@ -78,7 +79,6 @@ import {
   assertPublicationSecretDomains,
   configureCustodyGroup,
   ContentCipher,
-  type CryptoEnvelope,
   decrypt,
   openRecord,
   FilePublicationKeyStore,
@@ -104,6 +104,7 @@ import {
   assertBillingReady,
   assertHostedCostEnvelopesSealed,
   assertHostedSupportAdmissionSealed,
+  createBillingPlansInForce,
   readBillingPlans,
   readBillingPolicy,
   readBillingEnvironmentGroup,
@@ -178,11 +179,13 @@ import { createProviderOnlyJobs } from "./billing/provider-only-jobs.js";
 import { createBillingRuntime } from "./billing/runtime.js";
 import {
   assertLiveInvoicersAreLive,
+  assertPreviewLivePayments,
   assertStageInvoicersAreSandboxes,
   billingClock
 } from "./billing/stage-clock.js";
 import { TimeShiftedCardPayments } from "./billing/time-shifted-payments.js";
 import { createRetentionPurge } from "./retention-purge.js";
+import { createUnfinishedSignupExpiry, UNFINISHED_SIGNUP_EXPIRY_EVERY_MS } from "./unfinished-signup-expiry.js";
 import {
   assertNoRecordsDatedAhead, assertOtherSystemRecordsClosed, assertProviderOnlyNotifySealed, billingCustodyPaths,
   billingModeOf, incompleteNetopiaKey, loadBillingConnectors, loadNetopiaConnectors, type BillingConnectors, type BillingMode, type NetopiaConnectors
@@ -199,10 +202,9 @@ import { createPublicationReviewStaffService } from "./publication-review/staff.
 import { createPublicationContentCheck } from "./publication-check/check.js";
 import { composeQuestionCheck } from "./question-check/compose.js";
 import { readQuestionSubjects } from "./question-check/subjects.js";
-import { startThreatReportAlerts } from "./staff/threat-report-alert.js";
 import { startTeamLimitNotices } from "./staff/team-limit.js";
-import { startThreatReportErasure, threatReportEmailHold } from "./staff/threat-report-closure.js";
-import { threatReportEmailReader } from "./staff/threat-reports.js";
+import { startThreatReportErasure } from "./staff/threat-report-closure.js";
+import { accountEmailReader } from "./staff/account-email.js";
 import { PublicationReviewRefusal, PublicationReviewRepository, SynthesisCheckRepository, originVersionOf, readSynthesisTexts, synthesisTextOf, verdictOfRecord } from "@debateai/serve";
 import { ownerSession, readOwnerAnswer } from "./owner-read.js";
 import { SynthesisCheckWorker } from "./synthesis-check/worker.js";
@@ -234,6 +236,7 @@ import {
 } from "./account-erasure.js";
 import { runErasureReconcileChain } from "./erasure-reconcile-chain.js";
 import { installBootCustody } from "./boot-custody.js";
+import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine } from "./preview-asks-open.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, settingsVersionPassed, siteCapBootLine } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
@@ -246,6 +249,7 @@ import {
   type ProviderDiscoveryProbeStore
 } from "./provider-discovery.js";
 import { riskSignalFailureIdentity } from "./risk-signal-identity.js";
+import { previewMainOriginAdmitted } from "./preview-origin.js";
 import { createUnattributedEntriesReporter } from "./run-key-store-report.js";
 import { createSupportKeyPort } from "./support/keys.js";
 import { createSupportAnswerService } from "./support/answer.js";
@@ -273,7 +277,8 @@ for (const key of loadRetiredBillingSettings()) console.warn(JSON.stringify({ ev
 // composed over it by the admission loader (./admission-settings.ts).
 const previewGate = environment.PREVIEW_GATE_SETTINGS;
 if (previewGate !== undefined && environment.PUBLIC_APP_URL !== "https://v3-preview.dezbatere.ro") {
-  throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
+  // The preview setup may also answer as the main site, which is always hosted (./preview-origin.ts).
+  if (!previewMainOriginAdmitted(environment)) throw new TypeError("PREVIEW_PROVIDER_ORIGIN_INVALID");
 }
 // V-9(c) / V-28: a hosted deployment may not admit an ask — nor probe a paid
 // vendor, which is itself a model call — until the per-run and daily cost
@@ -672,14 +677,21 @@ const askRoomReadiness = environment.DEPLOYMENT_MODE === "hosted" && siteCostEnv
       // was issued with, never the pointer, and a new ask reads the pointer only to know whether funding is switched on.
       // So a selection made by another release (another version or content, switched on or off) needs no restart here.
       // The team's funding tools are the staff runtime's (createStaffRuntime: one api.funding.selection_differs line).
+      // A person's month keeps the plan numbers it started with (billing-core plans-in-force.ts): every reader of a
+      // person's limits in this process, the refund and the upgrade credit included, asks this one reader.
+      const plansInForce = billingPlans === null ? undefined
+        : createBillingPlansInForce({ pool, ownVersion: environment.REGISTER_VERSION, ownPlans: billingPlans });
       const fundedAllowance = entitlements === null || billingPlans === null ? undefined
-        : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints});
+        : new FundingAwarePersonAllowanceSource({allowances:new PostgresInternalAllowanceRepository(pool),entitlements,plans:billingPlans,closeBasisPoints:band.closeBasisPoints,...(plansInForce === undefined ? {} : { plansInForce })});
       // Since C17 the `?? new BillingPersonAllowanceSource(...)` fallback is unreachable (billing on → always
       // funding-aware); kept until its wiring pins are retired with it.
       const personAllowance = entitlements === null || billingPlans === null
         ? NO_PERSON_ALLOWANCE
-        : fundedAllowance ?? new BillingPersonAllowanceSource({ entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints });
-      return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans });
+        : fundedAllowance ?? new BillingPersonAllowanceSource({
+          entitlements, plans: billingPlans, closeBasisPoints: band.closeBasisPoints,
+          ...(plansInForce === undefined ? {} : { plansInForce })
+        });
+      return Object.freeze({ runPolicy: siteCostEnvelopePolicy, band, spend, entitlements, fundedAllowance, personAllowance, billingPlans, plansInForce });
     })
   : undefined;
 // V-30(1): the support chat's model is configuration, on the SAME mode decision
@@ -992,6 +1004,14 @@ const providerOnlyJobs = providerOnlyConnectors === null ? undefined : createPro
   // B3a: the spool's replay every 10 minutes, as the billing runtime's.
   ...(billingNoticeSpool === undefined || providerOnlyIntake === undefined ? {} : { notices: providerOnlyIntake })
 });
+// The hosted preview takes real payments only with the owner's switch, and the switch only with NETOPIA's live system
+// and the site version's billing on (the preview launcher checks the same, with the addresses and the egress proxy).
+boot.runSync("preview-live-payments", () => assertPreviewLivePayments({
+  preview: previewGate !== undefined,
+  paymentEnvironment: (billingConnectors ?? providerOnlyConnectors)?.paymentEnvironment ?? null,
+  billingOn: billingMode === "ON",
+  flag: environment.PREVIEW_LIVE_PAYMENTS ?? null
+}));
 // A live boot refuses while rows of another payment system (NETOPIA's sandbox, or the previous card processor) are
 // open: the live renewal pass never renews them, so they would stay ACTIVE for ever. The runbook's switch-on step
 // closes them first.
@@ -1010,11 +1030,23 @@ if (billingConnectors?.paymentEnvironment === "live") {
 // NETOPIA plans are open, so a sandbox API never runs over live customers' plans and cards.
 if (billingConnectors?.paymentEnvironment === "sandbox") {
   await boot.run("billing-live-records-on-sandbox", async () => {
+    const live = new BillingRepository(pool);
     assertOtherSystemRecordsClosed({
-      subscriptions: await new BillingRepository(pool).openNetopiaSubscriptionCount("live"), charges: 0, jobs: 0
+      subscriptions: await live.openNetopiaSubscriptionCount("live"),
+      // The hosted preview's way back from real payments also waits for the live charges' open work (a payment not yet
+      // final, a refund not yet recorded, their jobs: the credit note among them), which a sandbox API would leave undone.
+      ...(previewGate === undefined ? { charges: 0, jobs: 0 } : await live.openNetopiaChargeWork("live"))
     });
   });
 }
+// PREVIEW_ASKS_OPEN_TO: asks open to strangers only with the room built and on the payment system the value names
+// (./preview-asks-open.ts). A refusal names its code; once open, one content-free line says which opening runs.
+boot.runSync("preview-asks-open", () => assertPreviewAsksOpenBoot({
+  asksOpen: environment.PREVIEW_ASKS_OPEN, roomComposed: askRoom !== undefined,
+  paymentEnvironment: billingConnectors?.paymentEnvironment ?? null
+}));
+const previewAsksOpenLine = previewAsksOpenBootLine(environment.PREVIEW_ASKS_OPEN);
+if (previewAsksOpenLine !== null) console.warn(previewAsksOpenLine);
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
 // ledger (A-I2) because the construction refuses a store path that is not one
@@ -1186,21 +1218,18 @@ const staffAccess = environment.STAFF_ACCESS.policyVersion === 2
 const staffAlerts = environment.STAFF_ACCESS.policyVersion === 2
   ? await boot.run("staff-activation", () => createStaffRuntime({environment:environment.STAFF_ACCESS as Extract<typeof environment.STAFF_ACCESS,{policyVersion:2}>,registerVersion:environment.REGISTER_VERSION,publicAppUrl:environment.PUBLIC_APP_URL,pool,mappingPool:crossAccountPool(pool, "X14"),keys:dekStore,deploymentMode:environment.DEPLOYMENT_MODE,billingPlans:askRoomComposition?.billingPlans??null,providerTargets:declaredProviderTargets,log:code=>console.error('[STAFF_ALERT_FAILURE]',code)})) : undefined;
 if (staffAlerts !== undefined) boot.hold({end:()=>staffAlerts.close()});
-const threatReportRepository = new PostgresThreatReportRepository(pool);
-// Row-level security (X27, merge onto synthesis-flag S04): a staff request reads the reported account's address, another
+// Row-level security (X27, merge onto synthesis-flag S04): the staff notice loops read another account's address, another
 // account's identity row, so the reader runs on the cross-account target.
-const readThreatReportRecipientEmail = threatReportEmailReader(crossAccountPool(pool, "X27"), dekStore);
+const readAccountEmail = accountEmailReader(crossAccountPool(pool, "X27"), dekStore);
 // Decision 24: 0142's definers only, and the notices open the named account's address through the same reader.
 const teamLimitRepository = new PostgresTeamLimitRepository(pool);
 const publicReviewRepository = new PostgresPublicReviewRepository(pool);
 const publicFlagRepository = new PostgresPublicFlagRepository(pool);
-const readThreatReportStaffEmail = threatReportEmailReader(pool, dekStore, "staff");
 const staffHttp = staffAccess === undefined || staffAlerts === undefined ? undefined : {
   access: staffAccess, sessions, repository: new PostgresStaffRepository(crossAccountPool(pool, "X14")),
   webauthn: new StaffWebAuthnService(new PostgresStaffRepository(crossAccountPool(pool, "X14")), {publicAppUrl: environment.PUBLIC_APP_URL}),
   intents: staffAlerts.intents, readiness: staffAlerts.readiness,
   targetInvitationTransport: staffAlerts.targetInvitationTransport,
-  threatReports: { repository: threatReportRepository, readRecipientEmail: readThreatReportRecipientEmail },
   teamLimit: { repository: teamLimitRepository },
   publicFlags: { repository: publicFlagRepository, withKey: async <T,>(publicationRef: string, runId: string, use: (cipher: PreparedPublicationCipher) => T): Promise<T> => {
     if (publications === undefined) throw new Error("STAFF_UNAVAILABLE");
@@ -1271,6 +1300,8 @@ const application = new PostgresAskApplication(pool, dispatcher, {
   ...admissionSettingsOfVersion(siteAdmission),
   // Step 1: the preview's team; keyed on the env's gate part (ruling R25).
   ...(previewGate === undefined ? {} : { previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  // PREVIEW_ASKS_OPEN_TO: any signed-in account may ask instead of the team; the waker then starts any account's runs.
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   strangerSampleRate: environment.STRANGER_SAMPLE_RATE,
   // Side-by-side spec §1: every run this API admits carries its own checked release key.
   releaseKey: environment.RELEASE_KEY,
@@ -1391,25 +1422,11 @@ const accountErasureRepository = new PostgresAccountErasureRepository(
 const accountErasure = new AccountErasureCoordinator(
   accountErasureRepository,dekStore,runKeyStore,publicationCipher,
   new PostgresSupportShredRepository(supportPool),{
-    readEmailCiphertext: async userId => (await pool.query<{ email_ciphertext: CryptoEnvelope }>(
-      'SELECT email_ciphertext FROM identity."user" WHERE user_id=$1', [userId]
-    )).rows[0]?.email_ciphertext ?? null,
-    beforeKeyDestruction: threatReportEmailHold(threatReportRepository),
     // V4 start step, Task 39e (owner answer S4 A): closing the account destroys every question key it finds by the owner_ref, then the
     // account key (Task 39d's step); the same store the service and the export use.
     savedQuestionKeys
   }
 );
-const threatReportAlertsTimer = startThreatReportAlerts({
-  repository: threatReportRepository,
-  mail: new TemplatedMailSender({
-    executable: environment.MAIL_SENDMAIL_PATH,
-    from: environment.MAIL_FROM,
-    timeoutMs: authPolicy.channel.transportTimeoutMs,
-    gate: outboundMailGate
-  }),
-  readRecipientEmail: readThreatReportStaffEmail
-}, releaseWatcher);
 const teamLimitNoticesTimer = startTeamLimitNotices({
   repository: teamLimitRepository,
   mail: new TemplatedMailSender({
@@ -1418,7 +1435,7 @@ const teamLimitNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // Decision 32: the Owner's and the member's notices about an allowance, through the same loop and mail.
 const allowanceNoticesTimer = startTeamLimitNotices({
@@ -1429,7 +1446,7 @@ const allowanceNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // Decision 33: both accounts hear of every review step, content-free, through the same loop.
 const publicReviewNoticesTimer = startTeamLimitNotices({
@@ -1440,7 +1457,7 @@ const publicReviewNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // Decision 35: both accounts hear that a debate was hidden automatically or a report waits, content-free.
 const publicFlagNoticesTimer = startTeamLimitNotices({
@@ -1451,7 +1468,7 @@ const publicFlagNoticesTimer = startTeamLimitNotices({
     timeoutMs: authPolicy.channel.transportTimeoutMs,
     gate: outboundMailGate
   }),
-  readEmail: readThreatReportRecipientEmail
+  readEmail: readAccountEmail
 }, releaseWatcher);
 // 0157: every person a review step affects gets a statement of reasons (DSA Art 17). It replaces 0156's content-free notice: this release no longer
 // claims 0156's queue, so nobody gets both from it; twelve months on, the typed facts and the quote go.
@@ -1477,7 +1494,9 @@ const moderationNoticesTimer = gatedInterval(releaseWatcher, createSingleFlightE
   await publicFlagMailRepository.settleStuck();
   await moderationStatementRepository.deleteWordsDue();
 }, () => console.error("[MODERATION_STATEMENT_PENDING]")), 30_000);
-const threatReportErasureTimer = startThreatReportErasure({ repository: threatReportRepository }, releaseWatcher);
+// The staff threat reports were removed (2026-11-19); reports a database may still hold from before 0171 are still erased when due,
+// until the migration that drops the schema. The sweep runs on the system login (the cross-account marker holds it since 0171).
+const threatReportErasureTimer = startThreatReportErasure({ repository: new PostgresThreatReportRepository(pool) }, releaseWatcher);
 const privateErasure = new PrivateRunErasureCoordinator(
   new PostgresPrivateRunErasureRepository(erasurePool,auditContextHasher),
   runKeyStore,publicationCipher
@@ -1563,6 +1582,16 @@ const triggerAskClarifyReservationSweep=createSingleFlightErasureReconciler(
   ()=>console.error("[ASK_CLARIFY_RESERVATION_SWEEP_PENDING]")
 );
 const askClarifyReservationSweepTimer=gatedInterval(releaseWatcher,triggerAskClarifyReservationSweep,ASK_CLARIFY_RESERVATION_SWEEP_EVERY_MS);
+// 0183: a sign-up not finished within 24 hours is deleted, so it no longer holds its address and its name for good. Every ten minutes, and once each
+// time this release becomes current (below). Outside any request, so `pool` sends it to the API's system login, which holds the cross-account marker
+// 0183's four functions are granted to; the pass then destroys each deleted account's key file. Never the erasure login: every release counts that
+// role's functions exactly at boot, so a function added there would stop the release before from restarting beside the step.
+const unfinishedSignupExpiry = createUnfinishedSignupExpiry({ repository: new PostgresUnfinishedSignupExpiryRepository(pool), users: dekStore, log: (line) => console.error(line) });
+const triggerUnfinishedSignupExpiry=createSingleFlightErasureReconciler(
+  async ()=>{ await unfinishedSignupExpiry.run(); },
+  ()=>console.error("[UNFINISHED_SIGNUP_EXPIRY_PENDING]")
+);
+const unfinishedSignupExpiryTimer=gatedInterval(releaseWatcher,triggerUnfinishedSignupExpiry,UNFINISHED_SIGNUP_EXPIRY_EVERY_MS);
 /**
  * Budget spec 2026-09-28 §2.7 (B7b) — THE WAKER. Single-flight like every timer
  * here; once right after listen (a raised site limit arrives as a restart, and
@@ -1891,6 +1920,7 @@ const billingRuntime = billingConnectors === null
     return createBillingRuntime({
       cancelLinksPerDay: abuseLimits.cancelLinksPerDay,
       pool: crossAccountPool(pool, "X11"), connectors: runtimeConnectors, policy: billingPolicy, plans: billingPlans, countryPolicy,
+      ...(askRoomReadiness?.plansInForce === undefined ? {} : { plansInForce: askRoomReadiness.plansInForce }),
       geo: geoLookup, legal, dekStore,
       // P17 (spec §2.5.10): the EMAIL jobs send through the same sendmail path, sender and timeout as the mail above.
       mail: {
@@ -2049,6 +2079,7 @@ const api = buildApi({
   // Addition D16 / ruling R25: keyed on the env's gate part; the configuration is the site version's composed one (its
   // line-up over the gate part). `admissionView` below carries the active version's: the room read's class counts it (SA6).
   ...(previewGate === undefined ? {} : { previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
   application,
   stories: ownerStories,
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of
@@ -2286,7 +2317,6 @@ const supportSweepTimer = gatedInterval(releaseWatcher, () => {
 api.addHook("onClose", async () => clearInterval(supportSweepTimer));
 api.addHook("onClose",async () => clearInterval(erasureReconcileTimer));
 api.addHook("onClose",async () => clearInterval(restoreFenceTimer));
-api.addHook("onClose",async () => clearInterval(threatReportAlertsTimer));
 api.addHook("onClose",async () => clearInterval(teamLimitNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicReviewNoticesTimer));
 api.addHook("onClose",async () => clearInterval(publicFlagNoticesTimer));
@@ -2300,6 +2330,7 @@ api.addHook("onClose",async () => providerOnlyJobs?.stop());
 api.addHook("onClose",async () => clearInterval(authenticationRiskCleanupTimer));
 api.addHook("onClose",async () => clearInterval(retentionPurgeTimer));
 api.addHook("onClose",async () => clearInterval(askClarifyReservationSweepTimer));
+api.addHook("onClose",async () => clearInterval(unfinishedSignupExpiryTimer));
 api.addHook("onClose",async () => askWaker?.stop());
 api.addHook("onClose",async () => carryOnLoop?.stop());
 api.addHook("onClose",async () => staffAlerts?.close());
@@ -2451,6 +2482,7 @@ endBecameCurrent = releaseWatcher.onBecameCurrent(() => {
   triggerAuthenticationRiskCleanup();
   triggerRetentionPurge();
   triggerAskClarifyReservationSweep();
+  triggerUnfinishedSignupExpiry();
   billingRuntime?.start({ when: () => releaseWatcher.ownIsCurrent() });
   providerOnlyJobs?.start({ when: () => releaseWatcher.ownIsCurrent() });
   // N9 (spec 2026-10-05 §2.7.4 step 2): the trusted keys were read at this start, so every quarantined NETOPIA message

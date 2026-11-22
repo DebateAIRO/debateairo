@@ -45,7 +45,7 @@ const EXPECTED_SITES: Readonly<Record<string, readonly string[]>> = Object.freez
 /**
  * How many sites each id has (PLAN S4.3): X11 the NETOPIA intake's repository and jobs plus the billing runtime's pool;
  * X14 the three PostgresStaffRepository constructions and, since the security review (0171), the staff runtime's alert mapping pool; X18h the key store's owner lookup; X21 the gate's two reads; since
- * the merge onto synthesis-flag, X27 the staff threat report's recipient address reader and X28 the staff publication
+ * the merge onto synthesis-flag, X27 the staff notice loops' account address reader (once the staff threat report's) and X28 the staff publication
  * review's repository and its two readers; since the merge with the security fixes of audit run 3, X10 the public read's
  * run release key (readPublicDebate's #runReleaseKey: the author's run, read on the shared lease's connection, NV-31);
  * since upload check Task 9, X29 the report press's seal under the public
@@ -183,10 +183,12 @@ describe("row-level security S01 C4: the apps/api cross-account sites and the T1
     expect(counts).toEqual(EXPECTED_SITE_COUNTS);
   });
 
-  it("S4.3 (merge onto synthesis-flag) X27 is the staff threat report's recipient address reader and X28 the staff publication review's repository and both its readers, each the whole reader", async () => {
+  it("S4.3 (merge onto synthesis-flag) X27 is the staff notice loops' account address reader and X28 the staff publication review's repository and both its readers, each the whole reader", async () => {
     const main = await parse(MAIN);
-    const x27 = callsOf(main, "threatReportEmailReader").map((call) => call.arguments.map((argument) => argument.getText()));
-    expect(x27).toEqual([['crossAccountPool(pool, "X27")', "dekStore"], ["pool", "dekStore", '"staff"']]);
+    const x27 = callsOf(main, "accountEmailReader").map((call) => call.arguments.map((argument) => argument.getText()));
+    expect(x27).toEqual([['crossAccountPool(pool, "X27")', "dekStore"]]);
+    // 2026-11-19: the threat-report reader, its staff variant and its alert loop are gone.
+    expect(callsOf(main, "threatReportEmailReader")).toEqual([]);
     const service = callsOf(main, "createPublicationReviewStaffService");
     expect(service).toHaveLength(1);
     const options = service[0]!.arguments[0] as ts.ObjectLiteralExpression;

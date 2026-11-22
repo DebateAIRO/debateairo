@@ -1,6 +1,7 @@
 /**
  * The reviewed preview model ids (every provider) and the maker of each. This mirrors
- * packages/providers/src/preview-models.ts (contract A §1; PR B adds Anthropic's Claude Haiku);
+ * packages/providers/src/preview-models.ts (contract A §1; PR B adds Anthropic's Claude Haiku; then OpenAI's
+ * GPT-6 Luna, served by Amazon Bedrock);
  * the UI keeps its own copy so the browser bundle does not import the provider package. Change
  * both together: tests/unit/preview-anthropic-gate.test.ts checks they agree.
  */
@@ -9,7 +10,8 @@ export const PREVIEW_MODEL_MAKERS: Readonly<Record<string, string>> = Object.fre
   "deepseek-ai/DeepSeek-V4.1-Flash": "DeepSeek",
   "XiaomiMiMo/MiMo-V2.6-Pro": "Xiaomi",
   "Qwen/Qwen3.8-Flash": "Alibaba",
-  "claude-haiku-5-5": "Anthropic"
+  "claude-haiku-5-5": "Anthropic",
+  "us.openai.gpt-6-luna": "OpenAI"
 });
 const LEGACY_PREVIEW_MODEL = "zai-org/GLM-5.3-Flash";
 
