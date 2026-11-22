@@ -44,6 +44,7 @@ export type MailPurpose =
   | "owner-notice"
   | "team-notice"
   | "moderation-notice"
+  | "breach-notice"
   | "owner-limit-alert";
 export type MailPurposeClass = "standard" | "security" | "unmetered";
 
@@ -68,6 +69,11 @@ const PURPOSE_CLASS: Readonly<Record<MailPurpose, MailPurposeClass>> = Object.fr
   // V4 0156/0157 (class awaiting the owner's confirmation): the DSA statements of reasons and the answers to people who report
   // are legal duties with a deadline, so they use the reserve and a sign-up flood cannot hold them back.
   "moderation-notice": "security",
+  // The notice to the people after a personal data breach (docs/operations/breach-runbook.md part 6; the owner's command
+  // `pnpm breach:notify`). A legal duty with a deadline of 72 hours in several regions, so it may use the whole of the day's
+  // limit and a flood of sign-ups cannot hold it back. It is still counted: a notice to every account can use up the day,
+  // and the command says so before it sends and can be told to leave room for other mail (class awaiting the owner's confirmation).
+  "breach-notice": "security",
   "owner-limit-alert": "unmetered"
 });
 

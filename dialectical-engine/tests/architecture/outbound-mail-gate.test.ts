@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import ts from "typescript-classic";
 import { describe, expect, it } from "vitest";
 import {
+  BreachNoticeMailSender,
   SendmailConsumerAccountSender,
   SendmailEmailChangeMailSender,
   SendmailMailSender,
@@ -134,9 +135,10 @@ describe("every account mail passes the outbound mail gate before the sendmail s
 
   it("the shared transport takes the purpose from every call site, and every sender is built with a gate", () => {
     const channel = readFileSync("apps/api/src/mail-channel.ts", "utf8");
-    // Six call sites plus the definition; each call names a purpose (TypeScript makes the argument required).
-    expect([...channel.matchAll(/\bsendRenderedMail\(/g)]).toHaveLength(7);
-    expect(channel.match(/!isOutboundMailAuthorizer\(options\.gate\)/g) ?? []).toHaveLength(6);
+    // Seven call sites plus the definition; each call names a purpose (TypeScript makes the argument required). The seventh is the
+    // owner's breach-notice sender (docs/operations/breach-runbook.md part 6), which the command builds and main.ts never does.
+    expect([...channel.matchAll(/\bsendRenderedMail\(/g)]).toHaveLength(8);
+    expect(channel.match(/!isOutboundMailAuthorizer\(options\.gate\)/g) ?? []).toHaveLength(7);
     for (const file of ["apps/api/src/password-reset-mail.ts", "apps/api/src/email-mfa-mail.ts"]) {
       expect(readFileSync(file, "utf8")).toMatch(/!isOutboundMailAuthorizer\(options\.gate\)/);
     }
@@ -170,7 +172,7 @@ describe("every account mail passes the outbound mail gate before the sendmail s
       expect(() => new Sender(base as never)).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
       expect(() => new Sender({ ...base, gate: {} } as never)).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
     }
-    for (const Sender of [SendmailSecurityNotificationSender, TemplatedMailSender]) {
+    for (const Sender of [SendmailSecurityNotificationSender, TemplatedMailSender, BreachNoticeMailSender]) {
       expect(() => new Sender({ executable: base.executable, from: base.from, timeoutMs: 1000 } as never)).toThrow("OWN_MAIL_CONFIGURATION_INVALID");
     }
     expect(() => new SendmailPasswordResetSender(base as never)).toThrow("PASSWORD_RESET_MAIL_CONFIGURATION_INVALID");
@@ -180,7 +182,7 @@ describe("every account mail passes the outbound mail gate before the sendmail s
     for (const Sender of [SendmailMailSender, SendmailEmailChangeMailSender, SendmailRecoveryEmailMailSender, SendmailConsumerAccountSender, SendmailPasswordResetSender, SendmailEmailRecoverySender]) {
       expect(() => new Sender({ ...base, gate })).not.toThrow();
     }
-    for (const Sender of [SendmailSecurityNotificationSender, TemplatedMailSender]) {
+    for (const Sender of [SendmailSecurityNotificationSender, TemplatedMailSender, BreachNoticeMailSender]) {
       expect(() => new Sender({ executable: base.executable, from: base.from, timeoutMs: 1000, gate })).not.toThrow();
     }
   });
@@ -205,7 +207,9 @@ describe("no mail code writes an address to a log", () => {
   const MAIL_CODE = [
     "mail-channel.ts", "mail-mime.ts", "mail-attachments.ts", "mail-domain-check.ts", "outbound-mail-gate.ts",
     "password-reset-mail.ts", "email-mfa-mail.ts", "password-reset.ts", "email-mfa-recovery.ts", "registration.ts",
-    "email-change.ts", "recovery-email.ts", "consumer-recovery.ts", "consumer-security-notices.ts", "verification-email.ts"
+    "email-change.ts", "recovery-email.ts", "consumer-recovery.ts", "consumer-security-notices.ts", "verification-email.ts",
+    // The owner's breach-notice command: it opens every chosen account's address, and its plan and log are counts only.
+    "breach-notice/accounts.ts", "breach-notice/cli.ts", "breach-notice/run.ts", "breach-notice/selection.ts", "breach-notice/text.ts"
   ].map((name) => `${API}/${name}`);
 
   it.each(MAIL_CODE)("%s logs codes only", (file) => {

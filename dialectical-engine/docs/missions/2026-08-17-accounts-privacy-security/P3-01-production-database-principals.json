@@ -1179,6 +1179,14 @@
           "condition": "package script billing:renewal-resume"
         },
         {
+          "component": "apps/api:breach-notice-cli",
+          "sourceFile": "apps/api/src/breach-notice/cli.ts",
+          "environmentKey": "DATABASE_URL",
+          "purpose": "BREACH_NOTICE_OPERATOR_COMMAND",
+          "binding": "WIRED",
+          "condition": "package script breach:notify"
+        },
+        {
           "component": "tools/billing:netopia-sandbox",
           "sourceFile": "tools/billing/netopia-sandbox.ts",
           "environmentKey": "API_SYSTEM_DATABASE_URL",

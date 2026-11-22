@@ -52,6 +52,8 @@ to be no breach (EDPB Guidelines 9/2022, paragraph 60).
 - *The tool* is `pnpm breach:register` (`tools/breach-register/`). It opens a record, counts the time limits and says
   what is still missing. It needs nothing but Node, so it also runs as `node tools/breach-register/cli.mjs` on a
   machine where nothing is installed.
+- *The notice command* is `pnpm breach:notify` (`apps/api/src/breach-notice/`). It writes the notice to the accounts
+  you choose (part 6). Unlike the tool it runs on the server, as the site's own user.
 - *Aware* is the moment you are reasonably sure that a security failure touched personal data (EDPB Guidelines 9/2022,
   paragraph 31). Every time limit runs from that moment. Part 1 says how to fix it.
 - *The authority* is the data protection office of a country. Ours is the Romanian ANSPDCP; the other regions have
@@ -329,10 +331,128 @@ who agreed to it beforehand; sign-up does not ask for that today (part 10).
 person would take an effort out of all proportion, and then a public notice takes its place. Write which one you rely
 on, and the proof, in the region's "People" line and under "Why we rated the risk this way".
 
-**How to send it: this is not built yet.** There is no tool that writes to a chosen list of accounts. Email addresses
-are encrypted under each account's key, so a list cannot simply be read out of the database. Until that tool exists
-(part 10), sending a notice to many accounts needs a developer: plan a day for it, inside the 72 hours. A notice on
-the site's pages is the fallback, and is what the law accepts when writing to each person is not possible.
+**How to send it: `pnpm breach:notify`.** The command writes one mail of its own to each account you choose, to the
+address the account has at that moment, in the account's language, with the text you wrote. It runs on the server,
+because only the site can open an account's address: addresses are encrypted under each account's key. Without
+`--confirm` it sends nothing and only prints the plan. The steps below were written from the code and the server's
+guides and have not been run on the server yet: the first practice (part 9) is their test.
+
+**6.1 Write the texts, on your Mac.** Make a folder, and in it one file per language, named by the language's code:
+`en.txt`, `ro.txt`, `ko.txt`, and so on. Each file is plain text in this form:
+
+```text
+Subject: Notice of Data Breach
+
+What Happened?
+On 3 May 2027, between 02:10 and 02:40 Romanian time, someone outside the company read ...
+
+What You Can Do
+Change your password here and wherever else you used it. ...
+
+For More Information
+Write to privacy@dezbatere.ro.
+```
+
+The first line is the subject, then an empty line, then the message. An empty line starts a new paragraph. The mail
+shows the message exactly as you wrote it and adds one closing line with the company's name, its address and
+privacy@dezbatere.ro. The command refuses a file, and says which, when it has no subject line, when a part in
+[square brackets] was left unfilled, when it does not name privacy@dezbatere.ro (a reply to the mail reaches nobody,
+so the text must say where to write), or when it holds a tab or another control character. Put a copy of the folder
+into the record's folder: it is the proof of what was sent.
+
+**6.2 Make the list of accounts, on the server.** As root. It makes a work folder that only the site's own user can
+read, and writes into it one line per account: the account's id, and the country and US state it declared at sign-up
+(`-` where it declared none). No name and no address:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+# BREACHLIST: one line per account (id, declared country, US state) for pnpm breach:notify. Read-only on the database.
+W=/var/lib/debateai-breach-notice
+install -d -o "$AU" -g "$AGRP" -m 0700 "$W" "$W/texts" "$W/out"
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+( umask 077; psqlq "SELECT u.user_id, coalesce(r.country_code, '-'), coalesce(r.us_state, '-') FROM identity.\"user\" u LEFT JOIN identity.registration_region r ON r.user_id = u.user_id WHERE u.state <> 'deleted' ORDER BY 1" > "$W/accounts.txt" ) || { echo "BREACHLIST_NOT_DONE: the database is unreadable: ask"; exit 1; }
+chown "$AU:$AGRP" "$W/accounts.txt"
+echo "accounts on the list: $(wc -l < "$W/accounts.txt")"
+echo BREACHLIST_DONE
+```
+
+The list is a file, and not something the command reads by itself, on purpose: no login of the site may read the
+declared countries, and a command used only on the day of a breach is no reason to change that.
+
+**6.3 Copy the texts to the server**, into `/var/lib/debateai-breach-notice/texts`, the way you copy files to the
+server for an upload, and give them to the site's user. On the server, as root:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+chown -R "$AU:$AGRP" /var/lib/debateai-breach-notice/texts
+```
+
+**6.4 Read the plan.** On the server, as root. This sends nothing:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+W=/var/lib/debateai-breach-notice
+RUNAPI apps/api/src/breach-notice/cli.ts --accounts "$W/accounts.txt" --texts "$W/texts" --out "$W/out" --country KR
+```
+
+Choose the accounts in one of three ways:
+
+| You write | It chooses |
+|---|---|
+| `--all` | every account on the list |
+| `--country KR,JP` and, or, `--us-state NY,CA` | the accounts that declared one of these countries or states. Add `--undeclared` for the accounts that declared no country (made before October 2026); until you know better they count as affected in every region (part 3.2) |
+| `--ids <file>` | the accounts named in a file, one account id per line, when you know exactly which accounts were touched. The file must be on the server, readable by the site's user |
+
+The plan prints the number of accounts chosen, **per declared country**, how many of them it would write to, which text
+each language gets, and how much room is left in today's mail limit. Read it before you go on:
+
+- **The language** of an account is the language of the Terms the person last accepted, and English when there is
+  none: the same rule as the site's other mail that no request of the person's started.
+- **An account whose language has no text is not written to.** The plan says how many those are, per language. Either
+  add the text, or add `--english-fallback` to send them the English one.
+- **The mail limit.** The notice is counted against the day's limit like all other mail, and may use all of it. When
+  the limit is reached no other mail goes out until 00:00 UTC, password resets included, and people who read "change
+  your password" will ask for those. `--leave-room 200` stops the notice while there is still room for 200 more
+  mails. When the notice does not fit into one day, send the regions with the shortest time limit first (South
+  Korea, then the EU) and the rest after 00:00 UTC. The limit itself is in the register (`outboundMailPolicy`;
+  `deploy/vps/README.md`, "Upgrading to the daily mail limit"); raising it needs a new settings version, so it is not a
+  step for the day itself.
+
+**6.5 Send.** The same command with `--confirm`:
+
+```sh
+set -euo pipefail
+. /root/preview-archive/main-site/names.sh
+W=/var/lib/debateai-breach-notice
+RUNAPI apps/api/src/breach-notice/cli.ts --accounts "$W/accounts.txt" --texts "$W/texts" --out "$W/out" --country KR --confirm || echo "the command ended with code $?: read its last lines"
+```
+
+It prints the plan again, sends, and then prints the log. It ends in one of these ways:
+
+- **Everyone chosen was written to** (code 0). An account deleted since the list was made is counted in the log under
+  its own reason; nobody is left there to write to.
+- **`NOT EVERYONE WAS WRITTEN TO`** (code 3): the log's table "Not written to, by reason" says why. Run the **same
+  command again**: it keeps a list of the accounts it reached (`out/sent-accounts.txt`) and writes only to the others.
+  The reasons you can do something about: no text in a language (6.4); today's limit reached (again after 00:00 UTC);
+  and "the mail program failed", which after five failures in a row stops the run. That last one is what you see
+  while the site's mail is still locked to the allow-list (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 4): the lock
+  holds for this mail as for any other, so open mail first.
+- **A line that starts with a code in capitals and nothing sent** (code 1 or 2): the line says what is wrong, for
+  example which text file.
+
+**6.6 Bring the log home.** `out/breach-notice-log.md` says when it was sent, how many were written to per declared
+country, how many were not and why, and each text's subject and file fingerprint. It holds no email address and no
+account id. Copy it into the record's folder, beside the texts. The work folder on the server names accounts by id:
+delete it when the record is closed (`rm -rf /var/lib/debateai-breach-notice`), not before, because the next run needs
+its list of accounts already reached.
+
+**What this command does not do.** It writes to the address a person signs in with, not to a backup address. It does
+not write to a deleted account. And it is email only: where the law does not accept an email (New York, when an email
+address was taken together with its password) or where the mailbox itself may be in someone else's hands, the notice
+shown in the account after sign-in is still missing (part 10), and a notice on the site's pages is the fallback.
 
 **After it**, set each region's line, for example `- People: told 2026-11-24 09:00`, and keep the message's text and
 the number of people it went to in the record's folder (Guidelines 9/2022, paragraph 127).
@@ -415,7 +535,9 @@ Do these once. Each one is something that cannot be done in the 72 hours.
 
    It is numbered `DRILL-…`, apart from the real records. Close it like a real one. The first practice is also the
    test that this runbook works: write down what was unclear, and fix it here.
-5. **Know who translates within a day.** The notice to the people goes out in the language each person uses with us.
+5. **Know who translates within a day.** The notice to the people goes out in the language each person uses with us,
+   as one text file per language (part 6.1); an account whose language has no text gets no mail unless you allow the
+   English one.
    The report for Japan is written in Japanese, for South Korea in Korean, for Quebec in French, for Romania in
    Romanian. Decide now who writes them.
 6. **Look at each authority's form once**, so the day of a breach is not the first time: ANSPDCP's, and the ones
@@ -426,7 +548,9 @@ Do these once. Each one is something that cannot be done in the 72 hours.
 
 Each of these makes a real breach slower to handle. None is needed to keep the register.
 
-- **No tool writes to a chosen list of accounts** (part 6).
+- **No notice can be shown in the account after sign-in.** `pnpm breach:notify` writes by email only (part 6). New
+  York does not accept an email as the notice when an email address was taken together with its password, and an email
+  is the wrong way when the mailbox itself may be in someone else's hands.
 - **No step ends every account's sign-ins at once, or makes every account choose a new password.** Each person can
   do it for their own account; we cannot do it for all.
 - **Sign-up does not ask Canadians for their province**, so Quebec residents cannot be told apart (part 3.2).
