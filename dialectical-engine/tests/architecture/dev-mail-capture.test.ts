@@ -55,7 +55,8 @@ describe("DEV-06 mail capture executable contract", () => {
     const templates = readFileSync("apps/api/src/account-mail-template.mjs", "utf8");
     expect(templates).toContain("[,;");
     expect(mailer).toContain("return singleRecipient(recipient)");
-    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(8);
+    // The seventh call site is the owner's breach-notice sender (docs/operations/breach-runbook.md part 6).
+    expect(mailer.match(/isSingleDeliverableRecipient\(/g) ?? []).toHaveLength(9);
 
     const capture = readFileSync("deploy/dev-auth/sendmail-capture.mjs", "utf8");
     expect(capture).toContain('argv[1] !== "-t"');

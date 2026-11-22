@@ -17,6 +17,7 @@
  * THE LOG is for the breach record's folder: counts, times, the texts' subjects and file hashes. It holds no email
  * address and no account id, so the record keeps nothing that has to be deleted on a schedule.
  */
+import { exhaustive } from "@debateai/kernel";
 import { MailDeliveryError, type BreachNoticeMail, type BreachNoticeMailChannel } from "../mail-channel.js";
 import { comparePlaces, placeOf, type ListedAccount } from "./selection.js";
 import { renderBreachNotice, type BreachNoticeText } from "./text.js";
@@ -263,6 +264,8 @@ function reasonOf(entry: BreachNoticeEntry): string | null {
       return `The mail program failed (${entry.code ?? "MAIL_FAILED"})`;
     case "NOT_TRIED":
       return "Not tried: the run stopped first";
+    default:
+      return exhaustive(entry.outcome);
   }
 }
 
