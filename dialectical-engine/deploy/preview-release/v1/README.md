@@ -1411,7 +1411,7 @@ the file byte for byte except the derived keys (`release-env.mjs` `deriveEnviron
    release's folder (`CAPI`), and any time before SB12 (side by side) or DR6 (drained); `daemon-reload` changes nothing
    in a running instance. On the drained path it comes right after DR1, before SB5c and H11 step 2 (the order is in
    "Drained upload on the template layout"). It is a script like the others: save it and run it as MAIN-SITE.md says
-   under "How to run a server step". It reads the release's names file for `AU`, `AGRP`, `CAPI` and `OLABEL`:
+   under "How to run a server step". It reads the release's names file for `AU`, `AGRP`, `CAPI`, `LABEL` and `OLABEL`:
 
    ```sh
    set -euo pipefail
@@ -1422,6 +1422,7 @@ the file byte for byte except the derived keys (`release-env.mjs` `deriveEnviron
    grep -q RESTORE_FENCE_PATH "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" || { echo "FENCEDIR_NOT_DONE: this release's API does not know RESTORE_FENCE_PATH (not staged yet, or a release before NV-07; nothing changed)"; exit 1; }
    [ -d /etc/systemd/system/debateai-preview-api@.service.d ] || { echo "FENCEDIR_NOT_DONE: the API's template drop-in folder is missing (this is not the template layout): ask"; exit 1; }
    [ ! -e "$FD/fence" ] || { echo "FENCEDIR_NOT_DONE: $FD/fence exists, so the fence is marked (a restore ran): leave it as it is, read H11 step 4 and ask; nothing changed"; exit 1; }
+case "$(systemctl is-active "debateai-preview-api@$LABEL" || true)" in inactive|failed) ;; *) echo "FENCEDIR_NOT_DONE: the new API runs or still tries to start: on the drained path run DR6AGAIN first, then FENCEDIR again; side by side it comes before SB12 (nothing changed)"; exit 1;; esac
    install -d -m 0700 -o "$AU" -g "$AGRP" "$FD"
    install -o root -g root -m 0644 "$CAPI/dialectical-engine/deploy/preview-auth-dev/v1/debateai-preview-api-restore-fence.conf" /etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf
    systemctl daemon-reload
@@ -1434,7 +1435,8 @@ the file byte for byte except the derived keys (`release-env.mjs` `deriveEnviron
    What to expect: `fence folder and write permission in place`, then `FENCEDIR_DONE`. Before its last line the script
    has checked that the folder is `700 <API user> <API group>` and that the API's unit lists
    `-/var/lib/debateai-v3-preview/api/restore-fence` as a write path. Do not create the file: an empty file is the
-   restore marker. A `FENCEDIR_NOT_DONE` before the `install` lines changed nothing; after them, ask. Running it again
+   restore marker. It refuses while the new API runs or still tries to start (after a refused start at DR6: DR6AGAIN
+   first). A `FENCEDIR_NOT_DONE` before the `install` lines changed nothing; after them, ask. Running it again
    is safe: the folder and the drop-in are the same. The way back, before the new API starts: move the drop-in into `$S`
    and run `systemctl daemon-reload` (the empty folder may stay).
 
@@ -1457,7 +1459,7 @@ the file byte for byte except the derived keys (`release-env.mjs` `deriveEnviron
    [ "$(grep -c '^RESTORE_FENCE_PATH=' "$A" || true)" = 0 ] || { echo "H11_NOT_DONE: $A names RESTORE_FENCE_PATH already (derived from a release that carries it: this step is not needed; nothing changed)"; exit 1; }
    [ ! -e "$S/api-$LABEL.env.before-fence" ] || { echo "H11_NOT_DONE: $S/api-$LABEL.env.before-fence exists: step 2 ran for this release before (look first)"; exit 1; }
    cp -p "$A" "$S/api-$LABEL.env.before-fence"
-   ( umask 077; cat "$A" > "$A.new"; printf 'RESTORE_FENCE_PATH=%s\n' "$FENCE" >> "$A.new" )
+   ( umask 077; awk 1 "$A" > "$A.new"; printf 'RESTORE_FENCE_PATH=%s\n' "$FENCE" >> "$A.new" )
    chown --reference="$A" "$A.new"
    chmod --reference="$A" "$A.new"
    mv "$A.new" "$A"
@@ -1525,9 +1527,9 @@ REV='<the 40-character commit of this upload>'
 node tools/upload-check/run.mjs --rev "$REV"
 ```
 
-For an upload with downtime (the drained path), the owner's runbook asks for it on the day before, on `REV`
-(`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 1): there its `ALL PASSED` is a step of the day, and a `NOT PASSED` is
-a reason to stop and ask before the upload.
+For an upload with downtime (the drained path), the owner's runbook asks for it before the upload (the day before, or
+earlier on the upload day), on `REV` (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 1): there its `ALL PASSED` is a
+step of the day, and a `NOT PASSED` is a reason to stop and ask before the upload.
 
 It needs Node v26.8.2 and pnpm 11.20.0 exactly (anything else is refused, `UPLOAD_CHECK_RUNTIME_REFUSED`), the
 internet for one package download, and port 5434 free. It first waits, up to an hour, until no other test run is going
@@ -1608,11 +1610,10 @@ section is that recipe, written so that any later release can follow it.
 - Every guard is written `… || { echo "<STEP>_NOT_DONE: …"; exit 1; }`. A bare test inside an `a && b` list does
   not stop a script under `set -e` (R17's `cmp … && echo X` lines did not stop either).
 - The scripts print no env value other than `REGISTER_VERSION`, `DEBATEAI_DEPLOYMENT_MODE` and `MAIL_SENDMAIL_PATH`.
-- Long steps (A3, A4, A6, A7) may run in the background, as R19 did: save the script in `$S/jobs` (made once with
-  `install -d -o root -g root -m 0700 "$S/jobs"`), start it with `nohup bash "$S/jobs/<step>.sh" > "$S/jobs/<step>.log"
-  2>&1 < /dev/null &`, and read the log with `tail`. This is for the staging only. Never use it for a downtime step:
-  the node tools still end when the ssh window closes. A downtime step runs as MAIN-SITE.md's detached run ("How to
-  run a server step").
+- Long steps (A3, A4, A6, A7) run as MAIN-SITE.md's detached run ("How to run a server step"), like every downtime
+  step: the step goes on by itself when the ssh window closes, and its log keeps what it printed. R19 ran them with
+  `nohup … &`; do not do that any more: the node tools still end when the ssh window closes, and a half-done A3 or A6
+  then refuses to run again on what it left.
 
 **Three house rules (from R22's upload, 2 November 2026).** They hold for every recipe in this guide and for every new
 upload guide. Each one answers a fault the Mac check ("Before an upload: the Mac check" above) cannot see, because it
@@ -3177,7 +3178,7 @@ Why the upload cannot skip them:
   deployed after SB2 and before SB3 (pieces 1 and 2).
 - **The release tools count three gates.** This release's `common.mjs` lists the Amazon gate beside the DeepInfra and
   Anthropic ones (the Perplexity gate is not on the tools' list; piece 1 moves it to the new code all the same, and
-  MAIN-SITE.md's ASKS_OPEN asks for it). Once the new tools are in place (SB10, or DR5 on the drained path, when
+  MAIN-SITE.md's ASKS_OPEN asks for it). Once the new tools are in place (SB10, or SWAP on the drained path, when
   `LIFE=yes`), the release check, a settings activation and the switch ask that the Amazon gate is installed, runs this
   release's gate code and is `active` (`SWITCH_PRECONDITION_FAILED` naming `gates`,
   `SETTINGS_GATE_HELPER_DIFFERS:bedrock` or `GATE_FILES_UNREADABLE` otherwise). A gate with no key is `active` too; it
@@ -3191,8 +3192,8 @@ Why the upload cannot skip them:
   (LUNAROW).
 
 This was written from the code and the other gates' steps. It has not been rehearsed on the server: run the Mac check
-("Before an upload: the Mac check") on `REV` the day before, as MAIN-SITE.md part 1 says, and stop and ask at the first
-line that does not say what this section expects.
+("Before an upload: the Mac check") on `REV` before the upload (the day before, or earlier on the upload day), as
+MAIN-SITE.md part 1 says, and stop and ask at the first line that does not say what this section expects.
 
 **Before SB2, on the Mac: Luna's address in the practice's settings (LUNAROW).** S-2 copies `settings.env` from the
 shared `runner.env` and `api.env`, which no release has read since the transition (each release reads its own
@@ -3240,12 +3241,12 @@ practice), or S-5's `scp` run again, brings the server's six-row `settings.env` 
 - the two figures for the Amazon gate's GO (`README-bedrock.md`, install step 5): its daily pot and its daily number of
   calls. They are typed on the server only. The pot is written with exactly two decimals and at most two digits before
   the point, the calls as a whole number from 1 to 5000 with no comma or space; any other form
-  makes `init` refuse (`ROOT_GO_INVALID`, or `ROOT_GO_REQUIRED` when the number breaks the GO line). POTS, the day
-  before ("The step before Start, switched on in the upload"), prints on the screen only the range of pots `activate`
+  makes `init` refuse (`ROOT_GO_INVALID`, or `ROOT_GO_REQUIRED` when the number breaks the GO line). POTS, before the
+  upload ("The step before Start, switched on in the upload"), prints on the screen only the range of pots `activate`
   accepts: from the smallest pot that carries four calls in flight (below it, `CONCURRENCY_EXCEEDS_BUDGET`) to what the
   other gates' pots leave under the caps file's team total, at most its per-GO cap (above it, `TEAM_TOTAL_BUDGET_EXCEEDED`
   at `activate`, `ROOT_GO_INVALID` at `init`). Install step 5's first block prints the same range again on the day.
-  When POTS prints `NO ROOM`, the owner decides before the day which other gate's pot is lowered, and that is done
+  When POTS prints `NO ROOM`, the owner decides before piece 1 which other gate's pot is lowered, and that is done
   before SB3 (`deploy/preview-gate/v3/README.md`, "Change the daily budget or another limit"; a lowered gate's
   `activate` may refuse `CONCURRENCY_EXCEEDS_BUDGET`, and a pot below what that gate spent today leaves it no room until
   midnight). Amounts stay on your screen, never pasted;
@@ -3297,11 +3298,14 @@ earlier block set. (These blocks are not scripts of MAIN-SITE.md's form.)
 1. For the DeepInfra, Anthropic and Perplexity gates, one after the other: `deploy/preview-gate/v3/README.md`, "Redeploy
    (2026-10-12)", steps 1 to 6, each with its own folder, GO, service and README:
 
-   | Gate | `G` | `GO` | service | install step 1 of |
-   |---|---|---|---|---|
-   | DeepInfra | `/opt/debateai-v3-preview/operator/deepinfra-budget-v3` | `/etc/debateai-v3-preview/provider-deepinfra-go-v3.json` | `debateai-preview-provider-budget.service` | `README.md` |
-   | Anthropic | `/opt/debateai-v3-preview/operator/anthropic-budget-v1` | `/etc/debateai-v3-preview/provider-anthropic-go-v1.json` | `debateai-preview-anthropic-budget.service` | `README-anthropic.md` |
-   | Perplexity | `/opt/debateai-v3-preview/operator/perplexity-budget-v1` | `/etc/debateai-v3-preview/provider-perplexity-go-v1.json` | `debateai-preview-perplexity-budget.service` | `README-perplexity.md` |
+   | Gate | `G` | `GO` | `P` (its state folder, for `stop`, `status` and `activate`) | service | install step 1 of |
+   |---|---|---|---|---|---|
+   | DeepInfra | `/opt/debateai-v3-preview/operator/deepinfra-budget-v3` | `/etc/debateai-v3-preview/provider-deepinfra-go-v3.json` | `/var/lib/debateai-v3-preview/provider-deepinfra-authority-v3` | `debateai-preview-provider-budget.service` | `README.md` |
+   | Anthropic | `/opt/debateai-v3-preview/operator/anthropic-budget-v1` | `/etc/debateai-v3-preview/provider-anthropic-go-v1.json` | `/var/lib/debateai-v3-preview/provider-anthropic-authority-v1` | `debateai-preview-anthropic-budget.service` | `README-anthropic.md` |
+   | Perplexity | `/opt/debateai-v3-preview/operator/perplexity-budget-v1` | `/etc/debateai-v3-preview/provider-perplexity-go-v1.json` | `/var/lib/debateai-v3-preview/provider-perplexity-authority-v1` | `debateai-preview-perplexity-budget.service` | `README-perplexity.md` |
+
+   After a closed window in the middle of a gate's redeploy, set `G`, `GO` and `P` again from this table before any
+   command of that gate.
 
    Step 3 installs the gate files and `gate_watch.py` with install step 1 of the gate's own README. Its `R` is this
    upload's release folder: `. /root/preview-archive/rNN-names.sh; R=$CAPI/dialectical-engine` (in that order: the names
@@ -3314,8 +3318,10 @@ earlier block set. (These blocks are not scripts of MAIN-SITE.md's form.)
    `README-anthropic.md`'s "V4 start step (2026-11): four calls at once and this release's gate code": its step 2 in
    place of step 4 (the GO written again with its two hashes and `max_concurrent_calls` 4, nothing else; its last line
    must show `["claude-haiku-5-5"]`, `4` and `1`), and its step 3 in place of steps 5 and 6 (the restart and `activate`,
-   with the same pass sign as step 6). The day before, POTS ("The step before Start, switched on in the upload") said
-   whether four calls fit the Anthropic gate's pot.
+   with the same pass sign as step 6). Before the upload, POTS ("The step before Start, switched on in the upload")
+   said whether four calls fit the Anthropic gate's pot. When it said `no` and the owner chose two calls at once, the
+   Anthropic gate does step 4 of that section (the two hashes only) in place of `README-anthropic.md`'s step 2, then its
+   step 3.
 2. `README-bedrock.md`, install step 3a: the six older units are installed again from this release, so that they hide
    the Amazon gate's folder. Read its differences first (step 3a's first block). Its second block restarts the three
    gates once more. That is harmless: they stay `active`. Its last lines must print `active` three times, then `1` six
@@ -3606,7 +3612,7 @@ gate itself can stay installed and unused: `stop` makes sure it spends nothing.
 - **rbD-A (before DR4)**: the old release starts as it was, from its own env files; its settings activations are refused
   as above.
 - **rbD-B (from DR4 on)**: the database goes back, and the old release starts from its own env files, which never got
-  the new key or Luna's row. Its brakes work (each gate's `stop`). But DR5 swapped the shared operator folder, and
+  the new key or Luna's row. Its brakes work (each gate's `stop`). But SWAP swapped the shared operator folder, and
   rbD-B does not put it back: the tools in place are this release's and list the Amazon gate, and the gates run this
   release's code. So every settings activation on the old release is refused (`SETTINGS_GATE_HELPER_DIFFERS`) until a
   later upload brings this code again. If one is needed before that, ask.
@@ -3624,9 +3630,9 @@ In the order the upload meets them:
 
 | When | What | Its check |
 |---|---|---|
-| the day before, after SB1 and the staging | SHAPEON: the row with the start step, made from the active row and this release's own start values | `SHAPEON_DONE` |
-| the day before, after the staging | POTS: whether four Anthropic calls at once fit its daily pot, and which Amazon pot fits | `POTS_DONE` |
-| the day before, the practice (SB2) | the debate with the row, then the step itself on Free (and on a paid plan when web search is named) | `PRACTICE_VERDICT PASS` |
+| before the upload (the day before, or earlier on the upload day), after SB1 and the staging | SHAPEON: the row with the start step, made from the active row and this release's own start values | `SHAPEON_DONE` |
+| before the upload, after the staging | POTS: whether four Anthropic calls at once fit its daily pot, and which Amazon pot fits | `POTS_DONE` |
+| before the upload, the practice (SB2) | the debate with the row, then the step itself on Free (and on a paid plan when web search is named) | `PRACTICE_VERDICT PASS` |
 | the upload day, piece 1 | the Anthropic gate at four calls at once (`README-anthropic.md`, "V4 start step (2026-11): four calls at once and this release's gate code", steps 2 and 3) | its last line shows `4` and `1` |
 | SB3 | `STARTSTEP=yes`: the row in the plan, the delta checked | `debate shape: only the start step added` |
 | right after DR6 | STEPCHECK: the row in force, then the settings check of the active version | `STEPCHECK_DONE` |
@@ -3643,7 +3649,7 @@ seat. SHAPEON reads all of it again and stops on any of these, with nothing writ
   fixes it: ask;
 - a scorecard row, or Luna seated: ask.
 
-### SHAPEON. The row with the start step (the day before)
+### SHAPEON. The row with the start step (before the upload)
 
 After SB1 and the staging (A2 to A7 and SB1b), before the practice. It reads the active version's debate shape row,
 adds this release's own start values for `startStep` (printed by the release's code, never typed), and writes two
@@ -3702,7 +3708,16 @@ only the drafts `$S/shape-*.json.new`, which are not used. Never use the practic
 (`practice-start-step.ts`): it starts from the export's newest version, not the active one, gives the premium plan the
 Plus row's sizes, and writes several lines.
 
-### POTS. Do four Anthropic calls fit, and which Amazon pot fits (the day before)
+**A second practice.** S-7 removes the practice folder, and SHAPEON does not run twice. So before S-5 of a second
+practice (after S-3 made the folder again), put SHAPEON's row back into it, in a root shell:
+
+```sh
+. /root/preview-archive/rNN-names.sh
+install -d -o ubuntu -g ubuntu -m 0700 /home/ubuntu/practice
+install -o ubuntu -g ubuntu -m 0600 "$S/shape-on.json" /home/ubuntu/practice/shape-on.json
+```
+
+### POTS. Do four Anthropic calls fit, and which Amazon pot fits (before the upload)
 
 After the staging. It only reads. It runs this release's own gate code from the staged folder (the gate files of
 `$CAPI/dialectical-engine/packages/providers/ops`, root's and written by no one else, which the gate's code checks
@@ -3715,7 +3730,7 @@ are on your screen only, never pasted.
 ```sh
 set -euo pipefail
 . /root/preview-archive/rNN-names.sh
-# POTS: before the day, with this release's gate code: do four Anthropic calls at once fit its daily pot, and which Amazon pot fits. Read-only; amounts on the screen only.
+# POTS: before the upload, with this release's gate code: do four Anthropic calls at once fit its daily pot, and which Amazon pot fits. Read-only; amounts on the screen only.
 OPS=$CAPI/dialectical-engine/packages/providers/ops; GO=/etc/debateai-v3-preview/provider-anthropic-go-v1.json
 [ -f "$OPS/preview_budget_authority.py" ] && [ -f "$OPS/preview_budget_helper.py" ] || { echo "POTS_NOT_DONE: this release's gate files are not in $OPS (the staging first)"; exit 1; }
 [ -r "$GO" ] && [ -r /etc/debateai-v3-preview/provider-budget-caps-v1.json ] || { echo "POTS_NOT_DONE: the Anthropic GO or the caps file cannot be read: ask"; exit 1; }
@@ -3737,17 +3752,20 @@ largest = min(most, total - sum(others.values()))
 print('on your screen only, never pasted:')
 print('\n'.join(f'  {name}: pot {pot}' for name, pot in others.items()))
 print(f'  caps file: team total {total}, one GO at most {most}')
-print(f'  the Amazon pot activate accepts: from {smallest} to {largest}' if smallest <= largest else f'  NO ROOM: the Amazon pot must be at least {smallest}, and only {largest} is left: another gate\'s pot is lowered first (the owner decides before the day)')
+print(f'  the Amazon pot activate accepts: from {smallest} to {largest}' if smallest <= largest else f'  NO ROOM: the Amazon pot must be at least {smallest}, and only {largest} is left: another gate\'s pot is lowered first (the owner decides before piece 1)')
 print(f"four calls at once fit the Anthropic pot: {'yes' if fits else 'no'}")
 PY
 echo POTS_DONE
 ```
 
 What to expect: the Anthropic GO line, the lines for your screen, `four calls at once fit the Anthropic pot: yes`, then
-`POTS_DONE`. With `no`, the owner chooses before the day: raise the Anthropic pot (`deploy/preview-gate/v3/README.md`,
-"Change the daily budget or another limit", figures typed on the server only), or go with two calls at once (the step
-then works, more slowly) and skip `README-anthropic.md`'s step 2 in piece 1. With `NO ROOM`, the owner decides which
-other gate's pot is lowered, before the day. A Python error instead of these lines: ask.
+`POTS_DONE`. With `no`, the owner chooses before piece 1: raise the Anthropic pot (`deploy/preview-gate/v3/README.md`,
+"Change the daily budget or another limit", figures typed on the server only), then run POTS again (a raised pot
+leaves less room for the Amazon pot); or go with two calls at once (the step then works, more slowly). With two calls,
+piece 1 does `README.md`'s "Redeploy (2026-10-12)" step 4 (the two hashes only) in place of `README-anthropic.md`'s
+step 2, then `README-anthropic.md`'s step 3: the GO must still get this release's two hashes, or `activate` refuses.
+With `NO ROOM`, the owner decides which other gate's pot is lowered, before piece 1. A Python error instead of these
+lines: ask.
 
 ### STEPCHECK. The step is in force (right after DR6)
 
@@ -5214,7 +5232,9 @@ echo SB1B_DONE
 ### SB2. The practice (on the Mac; owner rule: before every upload)
 
 As "The practice" of the hosted-base recipe, on exactly `REV`, with the live register exported from the server, at a
-quiet hour (it shares the gates' slots and daily pots with users, and counts toward the cap of 8 debates). Its steps
+quiet hour (it shares the gates' slots and daily pots with users, and counts toward the cap of 8 debates; on the
+upload day itself it spends from the same day's pots as the team member's test debate after the switch, and POTS and
+the gates' own refusals then say whether room is left). Its steps
 are the practice guide's S-0 to S-7, S-3b included (`tools/preview-practice/README.md`): S-3b copies the server's
 hosted billing into the practice folder, and S-5's `scp` brings it to `$P` on the Mac, where these lines run (in S-6's
 second terminal). `formats` first, with the line-up file, as the hosted-base recipe shows; then the debate:
@@ -5278,7 +5298,7 @@ REG0=$(cat "$S/register-before"); AV=$(cat "$S/active-before"); OSITE=${OKEY%%-*
 cmp -s "$S/native-plan.before.json" "$ONP" || { echo "SB3_NOT_DONE: the old release's verify plan moved since SB1"; exit 1; }
 [ ! -e "$NP" ] || { echo "SB3_NOT_DONE: $NP exists (look first)"; exit 1; }
 [ ! -e "$ART/native-plan-plan.json" ] && [ ! -e "$ART/register-proposal.json" ] && [ ! -e "$ART/site-inputs.json" ] || { echo "SB3_NOT_DONE: an earlier plan, proposal or numbers record exists (look first; SB3b sets them aside)"; exit 1; }
-case "$STARTSTEP" in '') SHAPE='';; yes) [ -s "$S/shape-on.json" ] && [ "$(wc -l < "$S/shape-on.json")" -eq 1 ] || { echo "SB3_NOT_DONE: STARTSTEP is yes but $S/shape-on.json is not SHAPEON's one-line row (SHAPEON first)"; exit 1; }; SHAPE=$(cat "$S/shape-on.json");; *) echo "SB3_NOT_DONE: STARTSTEP is yes or empty"; exit 1;; esac
+case "$STARTSTEP" in '') [ ! -e "$S/shape-on.json" ] || { echo "SB3_NOT_DONE: SHAPEON's row exists but STARTSTEP is empty: set STARTSTEP=yes, or move $S/shape-on.json aside first"; exit 1; }; SHAPE='';; yes) [ -s "$S/shape-on.json" ] && [ "$(wc -l < "$S/shape-on.json")" -eq 1 ] || { echo "SB3_NOT_DONE: STARTSTEP is yes but $S/shape-on.json is not SHAPEON's one-line row (SHAPEON first)"; exit 1; }; SHAPE=$(cat "$S/shape-on.json");; *) echo "SB3_NOT_DONE: STARTSTEP is yes or empty"; exit 1;; esac
 # The base is the active settings version (kit v3): the old release's own verify plan while that is its site version,
 # else the verify plan SV2 kept for the activated version; the choices a plan does not carry from its base come with it.
 if [ "$AV" = "$OSITE" ]; then FROM=$S/native-plan.before.json; CP=$OART/native-plan-publish.json; else FROM=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-verify.json; CP=/opt/debateai-v3-preview/artifacts/settings-v$AV/native-plan-publish.json; fi
@@ -5330,12 +5350,13 @@ upload with the line-up row (T+1) sets it to the file its first step printed ("T
 
 **The step before Start (`STARTSTEP`).** Empty on most uploads. On the upload that switches the step before Start on
 (the owner's choice), set it to `yes` after SHAPEON ("The step before Start, switched on in the upload") wrote
-`$S/shape-on.json`: SB3 then hands that one-line row to the plan (`--debate-shape`), and after the proposal it checks
-that the debate shape row in the delta gains the start step and nothing else, printing `debate shape: only the start
-step added` (otherwise `SB3_NOT_DONE`, and SB3b sets the plan aside). What the owner then reads: the delta line lists
-`debateShapePolicy` among `changedKeys`; A9's first line prints its old value against its new one; and A9's watch
-line prints `STOP: debateShapePolicy`. On this upload that row is the owner's decision, not a stop. Any other row on
-the watch line is still a stop.
+`$S/shape-on.json` (SB3 refuses to run with `STARTSTEP` empty while that file exists: set it to `yes`, or move the file
+aside when the step stays off): SB3 then hands that one-line row to the plan (`--debate-shape`), and after the proposal
+it checks that the debate shape row in the delta gains the start step and nothing else, printing `debate shape: only the
+start step added` (otherwise `SB3_NOT_DONE`, and SB3b sets the plan aside). What the owner then reads: the delta line
+lists `debateShapePolicy` among `changedKeys`; A9's first line prints its old value against its new one; and A9's watch
+line prints `STOP: debateShapePolicy`. On this upload that row is the owner's decision, not a stop. Any other row on the
+watch line is still a stop.
 
 **The site's numbers (`NEWNUM`, `LIMITS`).** The numbers live in the owner's file on the server,
 `/etc/debateai-v3-preview/hosted-billing-v1.json`: the per-debate ceiling, the day's ceiling, the room-read budget, the
@@ -6534,7 +6555,7 @@ once more) is for before that yes, and never after DR4 or DR5.
 | DR4 | migrations | down | **only the cold copy: rbD-B** | DR4AGAIN (only the cases DR4 names) |
 | SWAP | only when SB4 said `changed (reviewed)`: the operator tools folder | down | rbD-B | SWAP again |
 | DR5 | publish, verify plan, first proof, launch plans, pins, drop-ins, stage | down | rbD-B | DR5RESUME |
-| DR6 | the new runner, API and website; the switch with the old pair stopped; the old release marked retired (the downtime ends) | up | rbD-B | DR6AGAIN (with LATELINES or FENCEDIR when the journal names them); after the switch wrote: WB4 with `drained`, then DR6TAIL |
+| DR6 | the new runner, API and website; the switch with the old pair stopped; the old release marked retired (the downtime ends) | up | rbD-B | DR6AGAIN first, then LATELINES or FENCEDIR when the journal names them, then DR6; after the switch wrote: WB4 with `drained`, then DR6TAIL |
 | AFTERDR6 | read-only: the state after the switch | up | – | – |
 | AGAINSAME | only for a second attempt with the same names file, after rbD-A or rbD-B | up | nothing to undo (files move into `$S`) | – |
 
@@ -6577,7 +6598,9 @@ fence folder (the new API refuses that, `restore-fence-path`); the publication s
 line: stop, the corpus key, the store and the cleanup login need a reviewed check first); the database folder (no link
 in or around it, no extra tablespace) and the free space DR3 needs; the four functions migration 0178 asks about (the
 three that must share the ledger's owner, and the one whose owner must be a superuser) and that no schema
-`erasure_reconcile` exists; that no database login has a connection limit; that no session has sat idle in a
+`erasure_reconcile` exists; that none of the API's, the runner's and the scheduler's logins has a connection limit
+(other logins, such as Hatchet's, the migrator's and the staff readiness writer's, have theirs on purpose and are not
+read); that no session has sat idle in a
 transaction for a minute; that the Terms and the Privacy Policy of this release name today (Bucharest) as their
 effective day; that Caddy serves the payment marks when the new ui file names them (DR5's own test); and that SB3's
 plan, proposal, ledger, register and active settings version are still the ones SB3 read. It prints names, counts,
@@ -6616,7 +6639,8 @@ echo "publication state $PSTATE (lines: PUBLICATION_ENABLED=true $PE, CORPUS_KEK
 [ "$PSTATE" != B ] || bad publication "state B: the corpus key, the publication store and the cleanup login would start for the first time at DR6: a reviewed check first"
 # The database folder and the space DR3 needs.
 NL=$(find "$PGP/v3-preview" -type l | grep -c . || true); NT=$(psqlq "SELECT count(*) FROM pg_tablespace WHERE spcname NOT IN ('pg_default','pg_global')" || echo unread)
-SIZE=$(du -sm "$PGP/v3-preview" | cut -f1); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+[ -n "$SIZE" ] || { bad space "the data folder's size is unread"; SIZE=0; }
 echo "data folder: $SIZE MB, links in it $NL, extra tablespaces $NT; free $AVAIL MB"
 [ ! -L "$PGP/v3-preview" ] && ! findmnt -n "$PGP/v3-preview" > /dev/null && [ "$NL" = 0 ] && [ "$NT" = 0 ] || bad data-folder "the data folder is a link or a mount point, holds a link, or the cluster has another tablespace: DR3's copy would miss it"
 [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || bad space "not enough free space for DR3's copy"
@@ -6626,9 +6650,9 @@ echo "$OWN" | sed 's/^/owner against the ledger owner: /'
 [ "$(grep -c ' same$' <<<"$OWN" || true)" = 3 ] || bad database-roles "a function 0178 checks is missing, or its owner is not the ledger's owner"
 [ "$(psqlq "SELECT coalesce((SELECT r.rolsuper FROM pg_proc p JOIN pg_roles r ON r.oid = p.proowner WHERE p.oid = to_regprocedure('identity.authenticate_session_t9(text,text,timestamptz,timestamptz)'))::text, 'missing')")" = true ] || bad database-roles "identity.authenticate_session_t9's owner is not a superuser (0178 refuses RESTORE_FENCE_OWNER_NOT_SUPERUSER)"
 [ "$(psqlq "SELECT to_regnamespace('erasure_reconcile') IS NULL")" = t ] || bad database-roles "a schema erasure_reconcile exists already (0178 makes it)"
-CL=$(psqlq "SELECT coalesce(string_agg(rolname, ' ' ORDER BY rolname), '') FROM pg_roles WHERE rolname LIKE 'debateai%' AND rolcanlogin AND rolconnlimit <> -1" || echo unread)
-echo "connection limits: ${CL:-no limit set}"
-[ -z "$CL" ] || bad database-roles "these logins have a connection limit: $CL"
+CL=$(psqlq "SELECT coalesce(string_agg(rolname, ' ' ORDER BY rolname), '') FROM pg_roles WHERE rolcanlogin AND rolconnlimit <> -1 AND (rolname LIKE 'debateai_prod_api%' OR rolname LIKE 'debateai_prod_runner%' OR rolname LIKE 'debateai_prod_scheduler%')" || echo unread)
+echo "connection limits of the API, runner and scheduler logins: ${CL:-no limit set}"
+[ -z "$CL" ] || bad database-roles "these API, runner or scheduler logins have a connection limit: $CL"
 IT=$(psqlq "SELECT count(*)||' '||coalesce(string_agg(DISTINCT coalesce(application_name, ''), ','), '') FROM pg_stat_activity WHERE datname = 'debateai' AND state LIKE 'idle in transaction%' AND state_change < now() - interval '1 minute'" || echo unread)
 echo "sessions idle in a transaction for a minute or more: $IT"
 [ "${IT%% *}" = 0 ] || bad open-transactions "a session sits in an open transaction: close it (DR4 would wait on it)"
@@ -6642,18 +6666,23 @@ sha256sum -c --quiet "$S/plan-proposal.sha256" && cmp -s "$ART/native-plan-plan.
 AP=$(activev 2>/dev/null || true)
 [ "$AP" = "$(cat "$S/active-before")" ] && [ "$AP" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || bad settings "settings were activated since SB3, or the active version is unread"
 [ ! -e "$S/pg18-cold.sha256" ] || bad earlier-attempt "an earlier cold copy is in S (AGAINSAME first)"
+# When the system's own daily upgrade next runs (read only; the yes is not given within the hour before it).
+UP=$(systemctl list-timers apt-daily-upgrade.timer --no-legend 2>/dev/null | awk 'NR == 1 { print $1, $2, $3, $4 }' || true)
+echo "the system's daily upgrade next runs: ${UP:-not scheduled}"
 [ -z "$BAD" ] || { echo "PRECHECK_NOT_DONE:$BAD (the BAD lines above); nothing changed and the site is up: no yes; ask"; exit 1; }
 echo PRECHECK_DONE
 ```
 
 What to expect: the read lines above, `key places at or above the fence folder: 0`, `publication state A` or `C`,
-`connection limits: no limit set`, `sessions idle in a transaction for a minute or more: 0`, three `owner against the
-ledger owner: ... same` lines, and then `PRECHECK_DONE`. On `PRECHECK_NOT_DONE` the last line names each subject that
-is not ready, and a `BAD (<subject>)` line above it says what. Nothing has changed and the site is up: give no yes.
-`proof`, `fence` and `payment-marks` name the step that makes them (SB5c, FENCEDIR or H11 step 2, PM2); before the
-launch plans exist those steps can still run. `legal-date` means the upload day is not the texts' day: stop, a new day
-needs a new commit. `open-transactions` names the program that holds the transaction: close it, then PRECHECK again.
-Every other subject: stop and ask; it is a reviewed step before any upload.
+`connection limits of the API, runner and scheduler logins: no limit set`, `sessions idle in a transaction for a minute
+or more: 0`, three `owner against the ledger owner: ... same` lines, the time the system's daily upgrade next runs, and
+then `PRECHECK_DONE`. Do not give the yes within an hour before that upgrade time: an upgrade during the downtime can
+restart Docker or the database under DR3 to DR6 (DR2 also refuses to start while one runs). On `PRECHECK_NOT_DONE` the
+last line names each subject that is not ready, and a `BAD (<subject>)` line above it says what. Nothing has changed and
+the site is up: give no yes. `proof`, `fence` and `payment-marks` name the step that makes them (SB5c, FENCEDIR or H11
+step 2, PM2); before the launch plans exist those steps can still run. `legal-date` means the upload day is not the
+texts' day: stop, a new day needs a new commit. `open-transactions` names the program that holds the transaction: close
+it, then PRECHECK again. Every other subject: stop and ask; it is a reviewed step before any upload.
 
 #### DR2. The downtime starts: nothing open, the old release stopped
 
@@ -6671,6 +6700,7 @@ set -euo pipefail
 [ "$(gs "$GD" "$PD" | jq -r .in_flight)" = 0 ] && [ "$(gs "$GAN" "$PAN" | jq -r .in_flight)" = 0 ] || { echo "DR2_NOT_DONE: a gate has a call in flight (nothing was stopped)"; exit 1; }
 [ "$(lc release-check.mjs status | jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state')" = CURRENT ] || { echo "DR2_NOT_DONE: the old release is not current (nothing was stopped)"; exit 1; }
 [ ! -e "$S/pg18-cold.sha256" ] || { echo "DR2_NOT_DONE: an earlier cold copy exists in S (nothing was stopped): AGAINSAME first"; exit 1; }
+! pgrep -f '[/]usr/bin/unattended-upgrade' > /dev/null || { echo "DR2_NOT_DONE: an unattended upgrade of the system runs now (nothing was stopped): wait until it has finished, then DR2 again"; exit 1; }
 AVN=$(activev) || { echo "DR2_NOT_DONE: settings-version.mjs status refused (nothing was stopped): ask"; exit 1; }
 [ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "DR2_NOT_DONE: settings were activated since SB3 (active $AVN; nothing was stopped): a new plan from SB3 and a new yes"; exit 1; }
 date -u +%s >> "$S/downtime-start-epoch"; echo "DOWNTIME START $(date -u)"
@@ -6704,12 +6734,13 @@ for U in "runner@$OLABEL" "ui@$OLABEL" "api@$OLABEL" "runner@$LABEL" "ui@$LABEL"
 [ "$(psqlq "SELECT count(*) FROM pg_stat_activity WHERE datname='debateai' AND backend_type='client backend' AND pid<>pg_backend_pid()")" = 0 ] || { echo "DR3_NOT_DONE: database clients connected"; exit 1; }
 [ ! -e "$S/pg18-v3-preview-cold.tgz" ] && [ ! -e "$S/pg18-v3-preview-config.tgz" ] && [ ! -e "$S/pg18-cold.sha256" ] || { echo "DR3_NOT_DONE: an earlier cold copy exists in S: never go on to DR4 with an earlier copy. After a DR3 of this downtime that stopped: DBBACK; before a second attempt: AGAINSAME (look first)"; exit 1; }
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$LEDGER0" ] && [ "$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1")" = "$REG0" ] || { echo "DR3_NOT_DONE: the ledger or the register moved since SB1"; exit 1; }
-SIZE=$(du -sm "$PGP/v3-preview" | cut -f1); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+[ -n "$SIZE" ] || { echo "DR3_NOT_DONE: the data folder's size is unread (nothing was stopped): run DR3 again; then ask"; exit 1; }
 [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || { echo "DR3_NOT_DONE: not enough free space for the copy"; exit 1; }
 CID0=$(docker ps -q --no-trunc --filter label=com.docker.compose.project=debateai-v3-preview --filter label=com.docker.compose.service=hatchet-lite || true)
 IP0=$(docker inspect "$CID0" --format '{{(index .NetworkSettings.Networks "debateai-v3-preview-internal").IPAddress}}' 2>/dev/null || true)
 [ -n "$CID0" ] && [ -n "$IP0" ] || { echo "DR3_NOT_DONE: the Hatchet container or its address is unread"; exit 1; }
-printf '%s\n%s\n' "$(stat -c '%a %U:%G' "$PGP/v3-preview")" "$(stat -c '%a %U:%G' /etc/debateai-v3-preview/postgresql)" > "$S/pg18-modes" || { echo "DR3_NOT_DONE: the two folders' modes could not be recorded (nothing was stopped)"; exit 1; }
+M1=$(stat -c '%a %U:%G' "$PGP/v3-preview") && M2=$(stat -c '%a %U:%G' /etc/debateai-v3-preview/postgresql) && printf '%s\n%s\n' "$M1" "$M2" > "$S/pg18-modes" && [ "$(grep -cxE '[0-7]{3,4} [a-z_][a-z0-9_-]*:[a-z_][a-z0-9_-]*' "$S/pg18-modes")" = 2 ] || { echo "DR3_NOT_DONE: the two folders' modes could not be recorded (nothing was stopped)"; exit 1; }
 systemctl stop debateai-preview-hatchet-gateway debateai-preview-hatchet debateai-preview-postgresql || { echo "DR3_NOT_DONE: a stop failed (look at the three units first); the database side is STOPPED or partly up: DBBACK"; exit 1; }
 for U in postgresql hatchet hatchet-gateway; do [ "$(systemctl is-active debateai-preview-$U || true)" = inactive ] || { echo "DR3_NOT_DONE: $U is not inactive (nothing copied); the database side is STOPPED or partly up: DBBACK"; exit 1; }; done
 umask 077
@@ -6757,9 +6788,12 @@ if [ -e "$S/pg18-cold.sha256" ] && sha256sum -c --quiet "$S/pg18-cold.sha256"; t
 else
   P=$S/cold-partial-$TS
   [ ! -e "$P" ] || { echo "DBBACK_NOT_DONE: $P exists (run it again a second later)"; exit 1; }
-  install -d -o root -g root -m 0700 "$P"
-  for F in pg18-v3-preview-cold.tgz pg18-v3-preview-config.tgz pg18-cold.sha256; do if [ -e "$S/$F" ]; then mv "$S/$F" "$P/" || { echo "DBBACK_NOT_DONE: $S/$F did not move into $P (nothing was started): ask"; exit 1; }; fi; done
-  echo "cold copy: partial, moved into $P (DR3 may run again)"
+  NF=0; for F in pg18-v3-preview-cold.tgz pg18-v3-preview-config.tgz pg18-cold.sha256; do [ ! -e "$S/$F" ] || NF=$((NF + 1)); done
+  if [ "$NF" = 0 ]; then echo "cold copy: no copy yet (DR3 may run again)"; else
+    install -d -o root -g root -m 0700 "$P"
+    for F in pg18-v3-preview-cold.tgz pg18-v3-preview-config.tgz pg18-cold.sha256; do if [ -e "$S/$F" ]; then mv "$S/$F" "$P/" || { echo "DBBACK_NOT_DONE: $S/$F did not move into $P (nothing was started): ask"; exit 1; }; fi; done
+    echo "cold copy: partial, moved into $P (DR3 may run again)"
+  fi
 fi
 if [ "$(systemctl is-active debateai-preview-postgresql || true)" != active ]; then systemctl start debateai-preview-postgresql || { echo "DBBACK_NOT_DONE: PostgreSQL did not start: ask"; exit 1; }; fi
 for i in $(seq 1 30); do /usr/lib/postgresql/18/bin/pg_isready -q -h "$SOCK" -p 5434 && break; sleep 2; done
@@ -6780,9 +6814,9 @@ echo "the database side is up; the site is still DOWN (the app services are stop
 echo DBBACK_DONE
 ```
 
-What to expect: one `cold copy:` line, then the last two lines. Then the owner chooses. With `complete and checked`:
-DR4 (go on), or rbD-A (back; the copy stays unused). With `partial, moved`: DR3 again, or rbD-A. A `DBBACK_NOT_DONE`
-leaves the site down: ask.
+What to expect: one `cold copy:` line, then the last two lines. Then the owner chooses. With `complete and checked`: DR4
+(go on), or rbD-A (back; the copy stays unused). With `partial, moved` or `no copy yet`: DR3 again, or rbD-A. A
+`DBBACK_NOT_DONE` leaves the site down: ask.
 
 #### DR4. The migrations
 
@@ -6843,6 +6877,7 @@ K=0; for M in $(LC_ALL=C sort "$S/new-migrations.txt"); do [ "$(psqlq "SELECT co
 TOPK=$( { printf '%s\n' "${LEDGER0#*|}"; LC_ALL=C sort "$S/new-migrations.txt" | awk -v k="$K" 'NR <= k'; } | LC_ALL=C sort | tail -n 1)
 [ "$(psqlq "SELECT count(*)||'|'||max(name) FROM public.debateai_schema_migration")" = "$(( ${LEDGER0%%|*} + K ))|$TOPK" ] || { echo "DR4AGAIN_NOT_DONE: the ledger is not SB1's plus the first $K of this release's migrations in order: ask (rbD-B)"; exit 1; }
 echo "ledger before: SB1's plus the first $K of $(grep -c . "$S/new-migrations.txt") new migrations"
+[ "$K" -lt "$(grep -c . "$S/new-migrations.txt")" ] || { echo "DR4AGAIN_NOT_DONE: every step is applied already, so only the proposal was refused (as DR4 says): ask"; exit 1; }
 [ "$(psqlq "SELECT count(*) FROM pg_stat_activity WHERE datname='debateai' AND state LIKE 'idle in transaction%'")" = 0 ] || { echo "DR4AGAIN_NOT_DONE: a database session is idle in a transaction: close it first; nothing applied"; exit 1; }
 if [ -e "$ART/native-apply-and-plan.json" ]; then mv "$ART/native-apply-and-plan.json" "$S/native-apply-and-plan.try-$TS.json" || { echo "DR4AGAIN_NOT_DONE: DR4's output did not move into S: ask"; exit 1; }; fi
 OUT=$(nat "$ART/native-apply-and-plan.json"); echo "nat: $OUT"
@@ -6875,10 +6910,11 @@ cmp -s "$ART/native-plan-apply-and-plan.json" "$NP" && [ "$(psqlq "SELECT count(
 if ! grep -q '^changed' "$S/lifecycle-files.txt"; then echo "no tools change in this release (SB4's LIFECYCLE_FILES)"; echo SWAP_DONE; exit 0; fi
 SAME=yes; for D in preview-lifecycle preview-auth-dev preview-release; do diff -r -q "$OP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" > /dev/null 2>&1 || SAME=no; done
 if [ "$SAME" = yes ]; then echo "OPERATOR_FOLDER_ALREADY_THIS_RELEASE (the tools before: $([ -e "$S/operator-lifecycle-v1.before" ] && echo "$S/operator-lifecycle-v1.before" || echo "not in this upload's S"))"; echo SWAP_DONE; exit 0; fi
-[ ! -e "$S/operator-lifecycle-v1.before" ] && [ ! -e "$NEWOP" ] || { echo "SWAP_NOT_DONE: an earlier operator folder swap exists (look first)"; exit 1; }
+[ ! -e "$S/operator-lifecycle-v1.before" ] && [ ! -e "$NEWOP" ] || { echo "SWAP_NOT_DONE: an earlier operator folder swap exists, or $NEWOP is left from a stopped SWAP (look first; a partial $NEWOP moves into $S, then SWAP again)"; exit 1; }
 install -d -o root -g root -m 0755 "$NEWOP"
-git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP" --no-same-owner
-chown -R root:root "$NEWOP"; find "$NEWOP" -type d -exec chmod 0755 {} +; find "$NEWOP" -type f -exec chmod 0644 {} +
+git -C "$ART/source-reference" archive --format=tar "$REV" dialectical-engine/deploy/preview-lifecycle dialectical-engine/deploy/preview-auth-dev dialectical-engine/deploy/preview-release | tar -x -C "$NEWOP" --no-same-owner || { echo "SWAP_NOT_DONE: the new tools folder was not built ($NEWOP is a partial copy; nothing was swapped): move $NEWOP into $S, then SWAP again"; exit 1; }
+chown -R root:root "$NEWOP" || { echo "SWAP_NOT_DONE: the new tools folder was not built ($NEWOP is a partial copy; nothing was swapped): move $NEWOP into $S, then SWAP again"; exit 1; }
+find "$NEWOP" -type d -exec chmod 0755 {} + && find "$NEWOP" -type f -exec chmod 0644 {} + || { echo "SWAP_NOT_DONE: the new tools folder was not built ($NEWOP is a partial copy; nothing was swapped): move $NEWOP into $S, then SWAP again"; exit 1; }
 for D in preview-lifecycle preview-auth-dev preview-release; do diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D" >/dev/null || { echo "SWAP_NOT_DONE: the new operator folder's $D differs from this release's checked API folder ($NEWOP stays for a look; nothing was swapped): ask"; exit 1; }; done
 mv "$OP" "$S/operator-lifecycle-v1.before" || { echo "SWAP_NOT_DONE: the old tools folder did not move (nothing was swapped): ask"; exit 1; }
 mv "$NEWOP" "$OP" || { echo "SWAP_NOT_DONE: the new tools folder did not move into place, so no tools folder is installed now (the old one is $S/operator-lifecycle-v1.before): ask"; exit 1; }
@@ -6918,7 +6954,7 @@ OLDA=$(sed -n 1p "$S/old-plans.txt"); OLDU=$(sed -n 2p "$S/old-plans.txt"); OLDR
 rel native-plan --operation publish --from "$ART/native-plan-plan.json" --proposal "$ART/register-proposal.json" --approved-delta-sha256 "$YES" --source-manifest "$ART/candidate-api-source.json" --out "$ART/native-plan-publish.json" || { echo "DR5_NOT_DONE: the release tool refused the publish plan (nothing published)"; exit 1; }
 put "$ART/native-plan-publish.json" || { echo "DR5_NOT_DONE: put of the publish plan failed (nothing published)"; exit 1; }
 OUT=$(nat "$ART/register-published.json"); echo "nat: $OUT"
-[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"; echo; echo "DR5_NOT_DONE: the publish was refused (the operator's line above says why; nothing was published): ask (the way back is rbD-B)"; exit 1; }
+[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json" || true; echo; NEWEST=$(psqlq "SELECT register_version FROM register.register_version ORDER BY register_version DESC LIMIT 1" || echo unread); if [ "$NEWEST" = "$REG0" ]; then echo "DR5_NOT_DONE: the publish was refused (the operator's line above says why); nothing was published (the newest register is still $REG0): ask (the way back is rbD-B)"; else echo "DR5_NOT_DONE: the operator refused, and the newest register is $NEWEST: something WAS published: ask (rbD-B)"; fi; exit 1; }
 V=$(jq -r .publication.registerVersion "$ART/register-published.json"); echo "new REGISTER_VERSION=$V"
 [ "$V" = "$VK" ] || { echo "DR5_NOT_DONE: the published version is not the one $KEY names"; exit 1; }
 printf '%s\n' "$V" > "$S/new-register-version"
@@ -7032,17 +7068,17 @@ for SVC in runner api ui; do case "$(systemctl is-active "debateai-preview-$SVC@
 T0=$(date +%s)
 systemctl start "debateai-preview-runner@$LABEL" || echo "systemctl start of the new runner returned non-zero"
 for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-runner@$LABEL" --since "@$T0" -o cat --no-pager | grep -cE 'PREVIEW_RUNNER_(STARTED|STARTUP_REFUSED|STOPPED_ON_FAILURE)|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; sleep 3; done
-[ "$(journalctl -u "debateai-preview-runner@$LABEL" --since "@$T0" -o cat --no-pager | grep '^PREVIEW_RUNNER_STARTED ' | grep "\"releaseKey\":\"$KEY\"" | grep -c '"startupDispatched":0[,}]' || true)" -ge 1 ] || { journalctl -u "debateai-preview-runner@$LABEL" --since "@$T0" -o cat --no-pager | grep -E 'STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE' | cut -c1-300 || true; echo "DR6_NOT_DONE: no PREVIEW_RUNNER_STARTED naming $KEY with nothing re-sent (the lines above; MAIN-SITE.md's stage table): once the cause is fixed DR6AGAIN, then DR6; else the way back is rbD-B"; exit 1; }
+[ "$(journalctl -u "debateai-preview-runner@$LABEL" --since "@$T0" -o cat --no-pager | grep '^PREVIEW_RUNNER_STARTED ' | grep "\"releaseKey\":\"$KEY\"" | grep -c '"startupDispatched":0[,}]' || true)" -ge 1 ] || { journalctl -u "debateai-preview-runner@$LABEL" --since "@$T0" -o cat --no-pager | grep -E 'STARTUP_REFUSED|PRESTART_REFUSED|STOPPED_ON_FAILURE' | cut -c1-300 || true; echo "DR6_NOT_DONE: no PREVIEW_RUNNER_STARTED naming $KEY with nothing re-sent (the lines above; MAIN-SITE.md's stage table): DR6AGAIN first, then fix the cause, then DR6; else the way back is rbD-B"; exit 1; }
 GU=$(journalctl -u "debateai-preview-runner@$LABEL" --since "@$T0" -o cat --no-pager | grep -o 'GATE_CAPACITY_UNREAD","gate":"[a-z]*"' | sed 's/.*"gate":"//; s/"$//' | sort -u | tr '\n' ' ' || true)
 echo "gates the new runner could not read at its start: ${GU:-none}"
 T1=$(date +%s)
 systemctl start "debateai-preview-api@$LABEL" || echo "systemctl start of the new API returned non-zero"
 for i in $(seq 1 80); do [ "$(journalctl -u "debateai-preview-api@$LABEL" --since "@$T1" -o cat --no-pager | grep -cE 'PREVIEW_API_STARTED|PREVIEW_API_STARTUP_REFUSED|PREVIEW_LIFECYCLE_PRESTART_REFUSED' || true)" -gt 0 ] && break; [ "$(systemctl is-active "debateai-preview-api@$LABEL" || true)" = failed ] && break; sleep 3; done
-[ "$(journalctl -u "debateai-preview-api@$LABEL" --since "@$T1" -o cat --no-pager | grep 'PREVIEW_API_STARTED' | grep -c "\"releaseKey\":\"$KEY\"" || true)" -ge 1 ] || { journalctl -u "debateai-preview-api@$LABEL" --since "@$T1" -o cat --no-pager | grep -E 'PRESTART_REFUSED|STARTUP_REFUSED|api.boot.failed|PREVIEW_MAIL_' | cut -c1-300 || true; echo "DR6_NOT_DONE: the new API did not start on $KEY (the lines above; MAIN-SITE.md's stage table): once the cause is fixed (LATELINES, FENCEDIR, or as the table says) DR6AGAIN, then DR6; else the way back is rbD-B"; exit 1; }
+[ "$(journalctl -u "debateai-preview-api@$LABEL" --since "@$T1" -o cat --no-pager | grep 'PREVIEW_API_STARTED' | grep -c "\"releaseKey\":\"$KEY\"" || true)" -ge 1 ] || { journalctl -u "debateai-preview-api@$LABEL" --since "@$T1" -o cat --no-pager | grep -E 'PRESTART_REFUSED|STARTUP_REFUSED|api.boot.failed|PREVIEW_MAIL_' | cut -c1-300 || true; echo "DR6_NOT_DONE: the new API did not start on $KEY (the lines above; MAIN-SITE.md's stage table): DR6AGAIN first, then the fix (LATELINES, FENCEDIR, or as the table says), then DR6; else the way back is rbD-B"; exit 1; }
 systemctl start "debateai-preview-ui@$LABEL" || echo "systemctl start of the new website returned non-zero"
 RC=000; RB=''; for i in $(seq 1 60); do RZ=$(readyz "$UIP"); RC=${RZ##*$'\n'}; RB=${RZ%$'\n'*}; [ "$RC" = 503 ] && [ "$(jq -c '[.releaseKey, .reasons]' <<<"$RB" 2>/dev/null)" = "[\"$KEY\",[\"NOT_CURRENT\"]]" ] && break; sleep 2; done
 echo "new website /readyz on $UIP: $RC $(jq -c '{releaseKey, reasons}' <<<"$RB" 2>/dev/null || echo '(no JSON)')"
-[ "$RC" = 503 ] || { journalctl -u "debateai-preview-ui@$LABEL" --since "@$T1" -o cat --no-pager | grep -E 'PRESTART_REFUSED|STARTUP_REFUSED' | cut -c1-300 || true; echo "DR6_NOT_DONE: the new website is not up and waiting (the lines above; MAIN-SITE.md's stage table): once the cause is fixed DR6AGAIN, then DR6; else the way back is rbD-B"; exit 1; }
+[ "$RC" = 503 ] || { journalctl -u "debateai-preview-ui@$LABEL" --since "@$T1" -o cat --no-pager | grep -E 'PRESTART_REFUSED|STARTUP_REFUSED' | cut -c1-300 || true; echo "DR6_NOT_DONE: the new website is not up and waiting (the lines above; MAIN-SITE.md's stage table): DR6AGAIN first, then fix the cause, then DR6; else the way back is rbD-B"; exit 1; }
 AVN=$(activev) || { echo "DR6_NOT_DONE: settings-version.mjs status refused (nothing changed): ask"; exit 1; }
 [ "$AVN" = "$(cat "$S/active-before")" ] && [ "$AVN" = "$(jq -r .baseRegisterVersion "$ART/register-proposal.json")" ] || { echo "DR6_NOT_DONE: settings were activated since SB3 (active $AVN): the site is DOWN since DR2 and nothing was switched; ask now: the way back is rbD-B (DR4's migrations ran)"; exit 1; }
 ACT=${KEY%%-*}; ACT=${ACT#r}                              # the settings version the switch activates: this release's own site version (SB13)
@@ -7051,7 +7087,7 @@ echo "$SW"
 case "$SC" in
   0) ;;
   2) echo "DR6_NOT_DONE: the switch is done, but a check after it failed: bad $(jq -c .bad <<<"$SW" 2>/dev/null || echo '(unread)') (BACKSTOP or TARGET: WB4 with bash -s -- drained, then DR6TAIL; anything else: ask)"; exit 1;;
-  *) echo "DR6_NOT_DONE: the switch refused (reason above; after SWITCH_OUTCOME_UNKNOWN: WB4 with bash -s -- drained, then DR6TAIL; a refusal before its write: fix what it names, then DR6AGAIN and DR6 again, and ask when it names a gate; otherwise the way back is rbD-B)"; exit 1;;
+  *) echo "DR6_NOT_DONE: the switch refused (reason above; after SWITCH_OUTCOME_UNKNOWN: WB4 with bash -s -- drained, then DR6TAIL; a refusal before its write: DR6AGAIN, then fix what it names, then DR6 again, and ask when it names a gate; otherwise the way back is rbD-B)"; exit 1;;
 esac
 [ "$(jq -r '[.event, .toKey, .fromKey, (.bad | length)] | map(tostring) | join(" ")' <<<"$SW")" = "PREVIEW_RELEASE_SWITCHED $KEY $OKEY 0" ] || { echo "DR6_NOT_DONE: the switch line is not this switch with nothing in bad: ask (the switch wrote: WB4 with bash -s -- drained, then DR6TAIL)"; exit 1; }
 MR=$(lc release-retire.mjs mark-retired --label "$OLABEL" 2>&1) || { echo "$MR"; echo "DR6_NOT_DONE: the old release could not be marked retired (reason above): ask; the rest of this step is DR6TAIL"; exit 1; }
@@ -7081,11 +7117,13 @@ list), never between SB3 and DR6.
 **When DR6 stops.** Read why first, without changing anything: the three new units' journals (the line below), and the
 stage each refusal names, in MAIN-SITE.md's stage table (part 2, beside DR6). The repair then depends on where it
 stopped:
-- **A start was refused, before the switch** (the release table still names the old release current): fix the cause
-  the table names (LATELINES for a missing proof or fence line; FENCEDIR for the fence folder), then DR6AGAIN, then DR6
-  again. A cause the table does not name: ask; the way back is rbD-B.
-- **The switch refused before its write** (its line names why): fix what it names, then DR6AGAIN and DR6 again. When it
-  names a gate, ask: a gate's `activate` is not a brake.
+- **A start was refused, before the switch** (the release table still names the old release current): DR6AGAIN
+  first. After a refused start the new API and website keep trying to start by themselves for about two minutes;
+  DR6AGAIN stops them and clears their count of starts. Then fix the cause the table names (LATELINES for a missing
+  proof or fence line; FENCEDIR for the fence folder), then DR6 again. A cause the table does not name: ask; the way
+  back is rbD-B.
+- **The switch refused before its write** (its line names why): DR6AGAIN, then fix what it names, then DR6 again. When
+  it names a gate, ask: a gate's `activate` is not a brake.
 - **The switch wrote, but its outcome is unknown or `bad` names `BACKSTOP` or `TARGET`**: the switch accepts the old
   runner stopped only on this path (`--old-pair-stopped`). Read WB4's first two lines (which release is current); then
   run WB4 with `bash -s -- drained`: its finish passes the same flag, so the stopped old runner is expected there too.
@@ -7140,7 +7178,8 @@ RU=debateai-preview-runner@$LABEL
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "AFTERDR6_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = CURRENT ] || { echo "AFTERDR6_NOT_DONE: $LABEL is not the current release: ask"; exit 1; }
 BAD=''
-NI=$(journalctl -u "debateai-preview-api@$LABEL" -o cat --no-pager | grep -c '"event":"api.restore_fence","outcome":"INITIALISED"' || true); NR=$(journalctl -u "debateai-preview-api@$LABEL" -o cat --no-pager | grep -c '"event":"api.restore_fence","outcome":"RESTORE_REVOKED"' || true)
+T0=$(tail -n 1 "$S/downtime-start-epoch")
+NI=$(journalctl -u "debateai-preview-api@$LABEL" --since "@$T0" -o cat --no-pager | grep -c '"event":"api.restore_fence","outcome":"INITIALISED"' || true); NR=$(journalctl -u "debateai-preview-api@$LABEL" --since "@$T0" -o cat --no-pager | grep -c '"event":"api.restore_fence","outcome":"RESTORE_REVOKED"' || true)
 echo "restore fence: INITIALISED $NI, RESTORE_REVOKED $NR"
 if [ -e "$S/api-$LABEL.env.before-fence" ] && [ "$NI" != 1 ]; then BAD="$BAD restore-fence"; fi
 [ "$NR" = 0 ] || BAD="$BAD restore-fence"
@@ -7174,7 +7213,8 @@ Only when DR6's new API or website refused for a missing proof or fence line (MA
 before the yes. After DR5 the launch plans exist, so SB5c and H11 step 2 refuse to run; a launch plan holds the env
 file's path, owner and mode, not its lines, so a line can still go in. LATELINES adds each missing line once, with
 SB5c's and H11 step 2's own lines, keeps the file before as `$S/<file>.before-lateline-<time>`, leaves a line that is
-there as it is, and makes no proof copy (a missing or differing copy: ask). Then DR6AGAIN and DR6 again.
+there as it is, and makes no proof copy (a missing or differing copy: ask). Run DR6AGAIN before it: it refuses while
+the new API or website still runs or tries to start. Then DR6 again.
 
 ```sh
 set -euo pipefail
@@ -7183,7 +7223,7 @@ set -euo pipefail
 A=$E/api-$LABEL.env; U=$E/ui-$LABEL.env; PRF=/etc/debateai-v3-preview/ui-api-proof; FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; TS=$(date -u +%Y%m%dT%H%M%SZ)
 ST=$(lc release-check.mjs status 2>&1) || { echo "$ST"; echo "LATELINES_NOT_DONE: release-check.mjs status refused, or its bad list names a draining runner stopped with open work (run its next command, then this step again)"; exit 1; }
 [ "$(jq -r --arg o "$OLABEL" '.releases[] | select(.label == $o) | .state' <<<"$ST")" = CURRENT ] && [ "$(jq -r --arg l "$LABEL" '.releases[] | select(.label == $l) | .state' <<<"$ST")" = STAGED ] || { echo "LATELINES_NOT_DONE: $OLABEL is not CURRENT or $LABEL is not STAGED (after a switch that wrote: WB4 with bash -s -- drained, then DR6TAIL): ask"; exit 1; }
-for SVC in api ui; do case "$(systemctl is-active "debateai-preview-$SVC@$LABEL" || true)" in inactive|failed) ;; *) echo "LATELINES_NOT_DONE: the new $SVC runs (DR6AGAIN stops it): ask"; exit 1;; esac; done
+for SVC in api ui; do case "$(systemctl is-active "debateai-preview-$SVC@$LABEL" || true)" in inactive|failed) ;; *) echo "LATELINES_NOT_DONE: the new $SVC runs or still tries to start: run DR6AGAIN first, then LATELINES again"; exit 1;; esac; done
 [ -s "$ART/api-launch.json" ] && [ -s "$ART/ui-launch.json" ] || { echo "LATELINES_NOT_DONE: the launch plans are missing (DR5 is not done: DR5RESUME)"; exit 1; }
 grep -q "'DIALECTICAL_UI_API_PROOF_PATH'" "$CUI/dialectical-engine/deploy/preview-auth-dev/v1/environment.mjs" && grep -q 'UI_API_PROOF_PATH: z\.' "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" && grep -q RESTORE_FENCE_PATH "$CAPI/dialectical-engine/packages/register/src/runtime-environment.ts" || { echo "LATELINES_NOT_DONE: this release does not know the proof or fence settings: ask"; exit 1; }
 UU=$(systemctl show -p User --value "debateai-preview-ui@$OLABEL")
@@ -7196,7 +7236,7 @@ addline() {
   [ "$(grep -c "^$K=" "$F" || true)" = 0 ] || { echo "LATELINES_NOT_DONE: ${F##*/} names $K with another value: ask"; exit 1; }
   [ ! -e "$B" ] || { echo "LATELINES_NOT_DONE: $B exists (run it again a second later)"; exit 1; }
   cp -p "$F" "$B"
-  ( umask 077; cat "$F" > "$F.new"; printf '%s=%s\n' "$K" "$V" >> "$F.new" )
+  ( umask 077; awk 1 "$F" > "$F.new"; printf '%s=%s\n' "$K" "$V" >> "$F.new" )
   chown --reference="$F" "$F.new"
   chmod --reference="$F" "$F.new"
   mv "$F.new" "$F"
@@ -7211,15 +7251,17 @@ echo LATELINES_DONE
 ```
 
 What to expect: one line per setting (`there already` or `added`), the SAME checks, then `LATELINES_DONE`. Then
-DR6AGAIN, then DR6.
+DR6.
 
 #### DR6AGAIN. DR6 made runnable again, before the switch wrote
 
-DR6 refuses to run while any of the new runner, API and website runs, and systemd refuses a fourth start of a unit
-within 15 minutes. So after a stopped DR6 whose switch did not write, and after the cause is fixed, DR6AGAIN stops the
-new website and API, stops the new runner only when nothing is open (as rbD-B does), and clears systemd's count of
-failed starts for the three. It refuses when the release table names the new release current: then the switch wrote,
-and the way on is WB4 with `drained`, then DR6TAIL, never DR6 again.
+DR6 refuses to run while any of the new runner, API and website runs. After a refused start the new API and website try
+to start again by themselves (every 30 seconds), and systemd refuses a fifth start of a unit within 15 minutes. So after
+a stopped DR6 whose switch did not write, DR6AGAIN runs first: it stops the new website and API, stops the new runner
+only when nothing is open (as rbD-B does), and clears systemd's count of failed starts for the three. Then the cause is
+fixed (LATELINES or FENCEDIR when MAIN-SITE.md's stage table names them), then DR6 runs again. It refuses when the
+release table names the new release current: then the switch wrote, and the way on is WB4 with `drained`, then DR6TAIL,
+never DR6 again.
 
 ```sh
 set -euo pipefail
@@ -7237,12 +7279,12 @@ esac
 for U in runner api ui; do case "$(systemctl is-active "debateai-preview-$U@$LABEL" || true)" in inactive|failed) ;; *) echo "DR6AGAIN_NOT_DONE: the new $U is still running: ask"; exit 1;; esac; done
 systemctl reset-failed "debateai-preview-runner@$LABEL" "debateai-preview-api@$LABEL" "debateai-preview-ui@$LABEL" || true
 for U in runner api ui; do echo "$U@$LABEL: $(systemctl show -p ActiveState --value "debateai-preview-$U@$LABEL"), restarts $(systemctl show -p NRestarts --value "debateai-preview-$U@$LABEL")"; done
-echo "now run DR6 again (the old release stays CURRENT; the site stays down)"
+echo "now fix the cause (LATELINES or FENCEDIR when the stage table names them), then run DR6 again (the old release stays CURRENT; the site stays down)"
 echo DR6AGAIN_DONE
 ```
 
-What to expect: three lines `<unit>: inactive, restarts 0` (or `failed`), the line that says to run DR6 again, then
-`DR6AGAIN_DONE`. Then DR6.
+What to expect: three lines `<unit>: inactive, restarts 0` (or `failed`), the line that says what comes next, then
+`DR6AGAIN_DONE`. Then the fix, when there is one, and DR6.
 
 #### The ways back from the drained path
 
@@ -7301,13 +7343,13 @@ sessions and marks the restore fence (H11) before any API starts. Everything wri
 with it. Sign-outs, password changes and other revocations since then would come back with it, so the script revokes
 every restored session first. When the release it starts carries NV-07, the public library stays empty until the owner
 releases the hold: H11 step 4. It reads the two database folders' mode and owner from `$S/pg18-modes`, which DR3 wrote
-before its copy, so a second run after a cut-off restore still compares with the right ones.
+before its copy, so it compares the restored folders with their modes before the downtime.
 
 **If real payments were on at any time since DR3** (`deploy/preview-auth-dev/v1/MAIN-SITE.md` part 7), run its
 LIVEAFTER (7.12) first, and never run rbD-B unless it ends with `LIVEAFTER_DONE`.
 
-**If rbD-B stopped** after any line that says the database is STOPPED, ask before running it again: the data or config
-folder may be half restored. Then GATES4 (above). rbD-B leaves the operator tools folder as SWAP made it.
+**If rbD-B stopped**: ask. After an rbD-B that ended with `RBD_B_DONE`, run GATES4 (above). rbD-B leaves the operator
+tools folder as SWAP made it.
 
 ```sh
 set -euo pipefail
@@ -7405,7 +7447,8 @@ for U in runner ui api; do case "$(systemctl is-active "debateai-preview-$U@$LAB
 for SVC in api ui runner; do [ ! -e "$UD/debateai-preview-$SVC@$LABEL.service.d" ] || { echo "AGAINSAME_NOT_DONE: the new release's $SVC drop-in folder is in place (rbD-B moves it): ask"; exit 1; }; done
 for U in ui api; do [ "$(systemctl is-active "debateai-preview-$U@$OLABEL" || true)" = active ] || { echo "AGAINSAME_NOT_DONE: the old $U is not running (the site is not up): ask"; exit 1; }; done
 sha256sum -c --quiet "$S/plan-proposal.sha256" || { echo "AGAINSAME_NOT_DONE: SB3's plan or proposal changed: SB3b, then SB3 again, then a new yes: ask"; exit 1; }
-SIZE=$(du -sm "$PGP/v3-preview" | cut -f1); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true); AVAIL=$(df --output=avail -BM / | tail -1 | tr -dc 0-9)
+[ -n "$SIZE" ] || { echo "AGAINSAME_NOT_DONE: the data folder's size is unread (nothing moved): run it again; then ask"; exit 1; }
 [ "$AVAIL" -gt $((SIZE * 2 + 2048)) ] || { echo "AGAINSAME_NOT_DONE: not enough free space for a second cold copy (nothing moved): ask"; exit 1; }
 [ ! -e "$D" ] || { echo "AGAINSAME_NOT_DONE: $D exists (run it again a second later)"; exit 1; }
 install -d -o root -g root -m 0700 "$D"

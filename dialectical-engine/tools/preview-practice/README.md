@@ -118,7 +118,9 @@ What changes in the steps:
 
 **An upload that switches the step before Start on.** The release guide's SB2 then practises with the same start-step
 row that SB3 publishes. That row file is SHAPEON's `$P/shape-on.json`: SHAPEON puts a copy into the server's practice
-folder, S-5's `scp` brings it to `$P`, and S-7 removes the server copy. It holds the same bytes SB3 publishes. S-6's
+folder, S-5's `scp` brings it to `$P`, and S-7 removes the server copy. It holds the same bytes SB3 publishes. For
+a second practice, put the copy back first: after S-3, run again the `install` line of the release guide's SHAPEON
+that copies `$S/shape-on.json` into `/home/ubuntu/practice/` (SHAPEON itself refuses to run twice), then S-5. S-6's
 own start-step shape file (`$P/start-step-shape.json`) is for the practice's throwaway register only, never for this.
 SB2's commands for that practice (the debate with the row, then the two start-step runs) are in the release guide;
 the commands in this guide stay as they are. The calls before Start then run on the real DeepInfra and Anthropic gates

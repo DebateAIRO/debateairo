@@ -278,8 +278,8 @@ only: never paste them into a chat, an issue or a pull request. It prints each o
 figures, and the range of pots `activate` accepts for this gate: from the smallest pot that carries four calls in
 flight, one of them a final writer (below it, `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`), to what the other pots
 leave under the team total (above it, `activate` refuses `TEAM_TOTAL_BUDGET_EXCEEDED`), at most the per-GO cap (above
-it, `init` refuses `ROOT_GO_INVALID`). In an upload, the release guide's POTS step prints the same range the day
-before, from the staged release, so a `NO ROOM` is known before the sitting. `-B` keeps Python from writing a
+it, `init` refuses `ROOT_GO_INVALID`). In an upload, the release guide's POTS step prints the same range before the
+sitting, from the staged release, so a `NO ROOM` is known in time. `-B` keeps Python from writing a
 compiled copy into the gate's folder.
 
 ```sh
@@ -301,7 +301,7 @@ PY
 
 A gate that is not installed shows pot `0`. Choose the daily pot inside the printed range. `NO ROOM`: first lower
 another gate's pot, as README.md "Change the daily budget or another limit" shows (the same steps for every gate, each
-with its own GO and folder: a new GO, then `stop` and `activate`); in an upload, the owner decides it before the day,
+with its own GO and folder: a new GO, then `stop` and `activate`); in an upload, the owner decides it before the sitting,
 and it runs before SB3. A lowered gate has a smallest pot of its own (below it, its `activate` refuses
 `CONCURRENCY_EXCEEDS_BUDGET` and that gate stays halted), and a pot lowered below what that gate has already spent
 today leaves it no room until midnight. Then run this block again. A Python error instead of these lines
@@ -319,17 +319,18 @@ What to expect: three lines, each ending `SAME`. A `DIFFERENT`: stop before step
 into this gate's state for good, and a gate whose scope or accounts differ from the app's answers the app with a
 refusal while every check on the day still passes.
 
-Then the GO. The two figures are typed here only. The last line prints the GO with them: on your screen only, never
-pasted.
+Then the GO. The two figures are typed here only. The block writes the GO under a temporary name first and installs
+it only when it is whole JSON with this gate's provider and both figures in place; otherwise it prints
+`GO_NOT_WRITTEN: ...` and installs nothing. On success the last line prints the GO with the two figures: on your
+screen only, never pasted.
 
 ```sh
 G=/opt/debateai-v3-preview/operator/bedrock-budget-v1
 BR=$(sha256sum $G/preview_budget_authority.py | cut -d' ' -f1); HE=$(sha256sum $G/preview_budget_helper.py | cut -d' ' -f1)
 DAILY_BUDGET=<the owner's figure>; DAILY_CALLS=<the owner's figure>
 umask 077
-jq -n --arg b "$BR" --arg h "$HE" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"bedrock",enabled_models:["us.openai.gpt-6-luna"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:4,max_final_writer_calls:1,open_days:31}' > /root/preview-archive/provider-bedrock-go-v1.json
-install -o root -g root -m 0600 /root/preview-archive/provider-bedrock-go-v1.json /etc/debateai-v3-preview/provider-bedrock-go-v1.json
-jq -c . /etc/debateai-v3-preview/provider-bedrock-go-v1.json
+jq -n --arg b "$BR" --arg h "$HE" --arg d "$DAILY_BUDGET" --argjson c "$DAILY_CALLS" '{schema:"preview-provider-budget-go-v3",allow_paid_calls:true,bridge_sha256:$b,helper_sha256:$h,provider:"bedrock",enabled_models:["us.openai.gpt-6-luna"],scope_id:"preview-deepinfra-v3-20261010",target_host:"vps-a156d797",allowed_peer_uids:[994,992],daily_budget_usd:$d,max_paid_posts_per_day:$c,max_concurrent_calls:4,max_final_writer_calls:1,open_days:31}' > /root/preview-archive/provider-bedrock-go-v1.json.new
+if jq -e '.provider=="bedrock" and (.daily_budget_usd|type=="string") and (.max_paid_posts_per_day|type=="number")' /root/preview-archive/provider-bedrock-go-v1.json.new >/dev/null 2>&1; then mv /root/preview-archive/provider-bedrock-go-v1.json.new /root/preview-archive/provider-bedrock-go-v1.json && install -o root -g root -m 0600 /root/preview-archive/provider-bedrock-go-v1.json /etc/debateai-v3-preview/provider-bedrock-go-v1.json && jq -c . /etc/debateai-v3-preview/provider-bedrock-go-v1.json; else echo 'GO_NOT_WRITTEN: the GO did not come out whole (type the two figures again: the calls a whole number with no comma or space); nothing was installed'; false; fi
 ```
 
 **6. init, then activate.** Only after the three older gates run this release's code ("New code for every gate").
@@ -344,8 +345,8 @@ What to expect: `init` prints `"state": "initialized"` and `"provider": "bedrock
 `"provider": "bedrock"`, `"state": "active"`, `"window_open": true` and `daily_budget_usd` the figure you wrote (on
 your screen only, never pasted). A refusal is one line with `"status": "refused"` and a code, for example
 `ROOT_CAPS_REQUIRED` or `ROOT_CAPS_INVALID` (the caps file), `ROOT_GO_INVALID` (a GO field or a file hash; also a pot
-not written with exactly two decimals, or above the per-GO cap), `ROOT_GO_REQUIRED` (the GO file is empty: a calls
-figure with a comma or a space made step 5's `jq` fail; type step 5's GO block again), `CONCURRENCY_EXCEEDS_BUDGET`
+not written with exactly two decimals, or above the per-GO cap), `ROOT_GO_REQUIRED` (no GO file: step 5's GO block
+did not install one; run it again), `CONCURRENCY_EXCEEDS_BUDGET`
 (the pot cannot carry four calls in flight, one of them a final writer: it is below the range step 5's first block
 printed), `HELPER_CUSTODY_INVALID`, `ACTIVATION_REFUSED` (for example a `target_host` that is not this server's name),
 or `TEAM_TOTAL_BUDGET_EXCEEDED` (all pots together are above the team total: lower another gate's pot first, as step 5

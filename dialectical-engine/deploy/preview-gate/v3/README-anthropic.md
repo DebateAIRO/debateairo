@@ -626,14 +626,21 @@ jq -c '{max_concurrent_calls,max_final_writer_calls}' "$GO"
 umask 077
 jq --arg b "$(sha256sum "$G/preview_budget_authority.py" | cut -d' ' -f1)" --arg h "$(sha256sum "$G/preview_budget_helper.py" | cut -d' ' -f1)" '.max_concurrent_calls=4 | .bridge_sha256=$b | .helper_sha256=$h' "$GO" > "$GO.new"
 diff <(jq -S . "$GO") <(jq -S . "$GO.new") || true
-jq -e '.max_concurrent_calls==2 and .max_final_writer_calls==1' "$GO" >/dev/null && cmp <(jq -S 'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)' "$GO") <(jq -S 'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,max_concurrent_calls,max_final_writer_calls}' "$GO" || { echo "GO_NOT_REPLACED: stop here"; false; }
+if jq -e '.max_concurrent_calls==2 and .max_final_writer_calls==1' "$GO" >/dev/null; then cmp <(jq -S 'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)' "$GO") <(jq -S 'del(.max_concurrent_calls,.bridge_sha256,.helper_sha256)' "$GO.new") && echo ONLY_NAMED_FIELDS_CHANGED && install -o root -g root -m 0600 "$GO.new" "$GO" && rm "$GO.new" && jq -c '{enabled_models,max_concurrent_calls,max_final_writer_calls}' "$GO" && echo 'GO_REPLACED: go on with step 3' || { echo 'GO_NOT_REPLACED: more than the named fields would change: stop and ask'; false; }; elif jq -e '.max_concurrent_calls==4 and .max_final_writer_calls==1' "$GO" >/dev/null; then echo "ALREADY_FOUR: GO not replaced; do README.md's Redeploy step 4 (the two hashes only) instead, then step 3"; else echo "GO_NOT_REPLACED: today's counts are not 2 and 1: stop and ask"; false; fi
 ```
 
-The first printed line shows today's counts. It should be `{"max_concurrent_calls":2,"max_final_writer_calls":1}`;
-the last line must then show `["claude-haiku-5-5"]`, `4` and `1`. If the first line already shows `4` and `1`, the
-edit was done on an earlier day: the block prints `GO_NOT_REPLACED: stop here` and changes nothing. Then do README.md's
-"Redeploy (2026-10-12)" step 4 instead (the two hashes only) and go on with step 3 below. Any other counts: stop and
-ask (the gate is stopped; its way back is README.md's "To go back").
+The first printed line shows today's counts. Its last line says what to do next:
+- `GO_REPLACED: go on with step 3`: today's counts were 2 and 1; the line above it must show `["claude-haiku-5-5"]`,
+  `4` and `1`.
+- `ALREADY_FOUR: ...`: the edit was done on an earlier day, and the GO is left as it was. Do README.md's "Redeploy
+  (2026-10-12)" step 4 instead (the two hashes only), then step 3 below.
+- `GO_NOT_REPLACED: ...`: other counts, or more than the named fields would change. Nothing was installed: stop and
+  ask (the gate is stopped; its way back is README.md's "To go back").
+
+**Two calls at once instead.** When the owner has decided to keep two calls at once (for example because the release
+guide's POTS step said four calls do not fit the pot), do README.md's "Redeploy (2026-10-12)" step 4 (the two hashes
+only) in place of step 2 above, then step 3 below. Never skip step 2 with nothing in its place: the GO would still name
+the old code's hashes, and `activate` refuses it. The step before Start then works with its calls waiting in line.
 
 **3. Restart and activate** (in place of the redeploy's steps 5 and 6).
 `systemctl restart debateai-preview-anthropic-budget.service`, then `activate` (install step 6's command, or "Daily
@@ -641,8 +648,8 @@ operations"). Its own output must show `"provider": "anthropic"`, `"state": "act
 shows the day's pot and spend too: on your screen only, never pasted); a line with `"status": "refused"` means stop,
 whatever `status` shows afterwards. `activate` checks that the calls in flight, each setting aside the largest worst
 case it may hold, fit in the pot: 3 x $0.24704 (standard calls) + 1 x $0.97664 (the final writer) = $1.71776. The pot
-itself is the owner's figure on the server and is never written here. The release guide's POTS step reads, the day
-before, whether four calls fit this pot, so a refusal here is not expected.
+itself is the owner's figure on the server and is never written here. The release guide's POTS step reads, before the
+sitting, whether four calls fit this pot, so a refusal here is not expected.
 
 If `activate` refuses `CONCURRENCY_EXCEEDS_BUDGET`, the gate stays halted, and the running site refuses every question
 that needs it. Run the way back below at once: its `stop` only adds a history line on a halted gate; then the block

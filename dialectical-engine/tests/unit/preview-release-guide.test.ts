@@ -313,7 +313,15 @@ describe('the preview release guide: transition T, side by side, the way back, t
 
   it('the stale-lock line\'s pgrep cannot match its own shell (final fix wave S7)', () => {
     const lines = allBlocks.flatMap(block => block.lines).filter(line => code(line) && line.includes('pgrep'));
-    expect(lines).toEqual(["pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock \"/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)\""]);
+    // DR2's look for a running system upgrade is the one other pgrep, in the same bracket form, and it names the upgrade
+    // program's own path, so the always-running shutdown helper (/usr/share/unattended-upgrades/...) does not match.
+    const upgrade = scriptOf('DR2').lines.find(line => line.includes('pgrep'))!;
+    expect(upgrade).toBe("! pgrep -f '[/]usr/bin/unattended-upgrade' > /dev/null || { echo \"DR2_NOT_DONE: an unattended upgrade of the system runs now (nothing was stopped): wait until it has finished, then DR2 again\"; exit 1; }");
+    const upgradePattern = new RegExp(/'([^']+)'/.exec(upgrade)![1]!);
+    expect(upgradePattern.test('/usr/bin/python3 /usr/bin/unattended-upgrade')).toBe(true);
+    expect(upgradePattern.test('/usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal')).toBe(false);
+    expect(upgradePattern.test(`bash -c ${upgrade}`)).toBe(false);
+    expect(lines.filter(line => line !== upgrade)).toEqual(["pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock \"/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)\""]);
     // pgrep -f matches its pattern (an extended regex) against every process's whole command line: the bracket form
     // finds a running switch, but not the shell that runs this line (`bash -c "<line>"`); the plain name found both.
     const switchProcess = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/release-switch.mjs switch --finish --to a-v1 --from b-v1';
@@ -1986,9 +1994,10 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
       expect(flat, text).toContain(text);
     // The order table names the repair of each downtime step.
     const rows = drained.split('\n').filter(line => /^\| (DR[2-6]|SWAP) \|/.test(line)).map(line => line.split('|')[5]!.trim());
-    expect(rows).toEqual(['–', 'DBBACK', 'DR4AGAIN (only the cases DR4 names)', 'SWAP again', 'DR5RESUME', 'DR6AGAIN (with LATELINES or FENCEDIR when the journal names them); after the switch wrote: WB4 with `drained`, then DR6TAIL']);
-    // The staging's background jobs are never a way to run a downtime step.
-    expect(guide.replace(/\s+/g, ' ')).toContain('This is for the staging only. Never use it for a downtime step: the node tools still end when the ssh window closes.');
+    expect(rows).toEqual(['–', 'DBBACK', 'DR4AGAIN (only the cases DR4 names)', 'SWAP again', 'DR5RESUME', 'DR6AGAIN first, then LATELINES or FENCEDIR when the journal names them, then DR6; after the switch wrote: WB4 with `drained`, then DR6TAIL']);
+    // The long staging steps run as the detached run too: a background job ends with the ssh window.
+    expect(guide.replace(/\s+/g, ' ')).toContain('Long steps (A3, A4, A6, A7) run as MAIN-SITE.md\'s detached run ("How to run a server step"), like every downtime step');
+    expect(guide).not.toContain('nohup bash "$S/jobs/');
   });
 
   it('PRECHECK only reads, and asks for each thing DR2 to DR6 and the way back need', () => {
@@ -2017,6 +2026,27 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
       expect(run('AUDIT_KEY_STORE_PATH=/var/lib/debateai-v3-preview/api/\n')).toEqual(['OVERLAP AUDIT_KEY_STORE_PATH', 'overlaps 1']);
       expect(run('RECORDS_KEY_PATH=/var/lib/debateai-v3-preview/api/records.key\nUSER_DEK_STORE_PATH=/var/lib/debateai-v3-preview/api/restore-fence\n')).toEqual(['OVERLAP USER_DEK_STORE_PATH', 'OVERLAP RECORDS_KEY_PATH', 'overlaps 2']);
     } finally { rmSync(dir, { recursive: true, force: true }); }
+    // The connection limits: only the API's, the runner's and the scheduler's logins are read. The Hatchet login, the
+    // migrator and the staff readiness writer keep their limits on purpose and never stop PRECHECK; a limited API login does.
+    const limit = lines.findIndex(line => line.startsWith('CL=$(psqlq '));
+    expect(lines[limit]).toContain('rolcanlogin AND rolconnlimit <> -1 AND (');
+    const patterns = [...lines[limit]!.matchAll(/rolname LIKE '([^']+)'/g)].map(match => new RegExp(`^${match[1]!.replaceAll('_', '.').replaceAll('%', '.*')}$`));
+    expect(patterns).toHaveLength(3);
+    const limits = (roles: Array<[string, number]>) => {
+      const picked = roles.filter(([name, connlimit]) => connlimit !== -1 && patterns.some(pattern => pattern.test(name))).map(([name]) => name).sort().join(' ');
+      return bash(['set -euo pipefail', `psqlq() { printf '%s\n' '${picked}'; }`, "BAD=''; bad() { echo \"BAD ($1): $2\"; BAD=\"$BAD $1\"; }", ...lines.slice(limit, limit + 3), 'echo "BAD=$BAD"']).split('\n');
+    };
+    const server: Array<[string, number]> = [['debateai_prod_hatchet', 50], ['debateai_prod_migrator', 3], ['debateai_staff_readiness_writer', 2],
+      ['debateai_prod_api_runtime', -1], ['debateai_prod_api_system', -1], ['debateai_prod_runner_runtime', -1]];
+    expect(limits(server)).toEqual(['connection limits of the API, runner and scheduler logins: no limit set', 'BAD=']);
+    expect(limits([...server.filter(([name]) => name !== 'debateai_prod_api_system'), ['debateai_prod_api_system', 12]]).at(-1)).toBe('BAD= database-roles');
+    expect(limits([...server.filter(([name]) => name !== 'debateai_prod_runner_runtime'), ['debateai_prod_runner_runtime', 4]]).at(-1)).toBe('BAD= database-roles');
+    // When the system's own daily upgrade next runs: read and printed, never a stop; the text says when not to give the yes.
+    expect(text).toContain("systemctl list-timers apt-daily-upgrade.timer --no-legend 2>/dev/null | awk 'NR == 1 { print $1, $2, $3, $4 }' || true");
+    expect(sectionOf(guide, '#### PRECHECK. Everything that can be read with the site up, right before the yes').replace(/\s+/g, ' ')).toContain('Do not give the yes within an hour before that upgrade time');
+    // The data folder's size: a failed du is a BAD line, never a silent end.
+    expect(text).toContain('SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true)');
+    expect(text).toContain('[ -n "$SIZE" ] || { bad space "the data folder\'s size is unread"; SIZE=0; }');
     // It comes right after DR1 in the guide and before DR2.
     expect(drained.indexOf('\n#### PRECHECK. ')).toBeGreaterThan(drained.indexOf('\n#### DR1. '));
     expect(drained.indexOf('\n#### PRECHECK. ')).toBeLessThan(drained.indexOf('\n#### DR2. '));
@@ -2027,10 +2057,19 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     const copy = at(dr2, '[ ! -e "$S/pg18-cold.sha256" ] || { echo "DR2_NOT_DONE: an earlier cold copy exists in S (nothing was stopped): AGAINSAME first"');
     expect(copy).toBeLessThan(dr2.findIndex(line => line.startsWith('AVN=$(activev) || ')));
     expect(copy).toBeLessThan(dr2.findIndex(line => line.startsWith('date -u +%s >> "$S/downtime-start-epoch"')));
+    expect(at(dr2, "pgrep -f '[/]usr/bin/unattended-upgrade'")).toBeLessThan(dr2.findIndex(line => line.startsWith('date -u +%s >> "$S/downtime-start-epoch"')));
+    // No step stops or starts the system's own timers: a running upgrade is waited for, never interrupted.
+    for (const block of allBlocks) for (const line of block.lines.filter(code)) expect(line, line).not.toMatch(/systemctl (stop|start|disable|enable|mask) [^|;]*apt-daily/);
     const dr3 = scriptOf('DR3').lines;
-    const modes = at(dr3, '> "$S/pg18-modes"');
+    expect(dr3).toContain('[ -n "$SIZE" ] || { echo "DR3_NOT_DONE: the data folder\'s size is unread (nothing was stopped): run DR3 again; then ask"; exit 1; }');
+    // The modes are recorded only when both stat calls answered, in the form rbD-B compares.
+    const record = dr3.find(line => line.includes('> "$S/pg18-modes"'))!;
+    const modes = (stat: string) => bash(['set -euo pipefail', `S=$(mktemp -d); PGP=/x; stat() { ${stat}; }`, record, 'cat "$S/pg18-modes"']);
+    expect(modes("echo '700 postgres:postgres'")).toBe('700 postgres:postgres\n700 postgres:postgres');
+    expect(modes('return 1')).toMatch(/^DR3_NOT_DONE: the two folders' modes could not be recorded/);
+    expect(modes('echo')).toMatch(/^DR3_NOT_DONE: the two folders' modes could not be recorded/);
     const stop = dr3.findIndex(line => line.startsWith('systemctl stop debateai-preview-hatchet-gateway debateai-preview-hatchet debateai-preview-postgresql'));
-    expect(modes).toBeLessThan(stop);
+    expect(at(dr3, '> "$S/pg18-modes"')).toBeLessThan(stop);
     for (const line of dr3.slice(stop)) if (line.includes('DR3_NOT_DONE')) expect(line, line).toMatch(/: DBBACK"; exit 1;/);
     expect(dr3.find(line => line.includes('an earlier cold copy exists in S'))).toContain('AGAINSAME');
   });
@@ -2040,6 +2079,7 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     const text = lines.join('\n');
     expect(text).toContain('if [ -e "$S/pg18-cold.sha256" ] && sha256sum -c --quiet "$S/pg18-cold.sha256"; then');
     expect(text).toContain('P=$S/cold-partial-$TS');
+    expect(text).toContain('echo "cold copy: no copy yet (DR3 may run again)"');
     for (const unit of ['postgresql', 'hatchet', 'hatchet-gateway']) expect(text, unit).toContain(`if [ "$(systemctl is-active debateai-preview-${unit} || true)" != active ]; then`);
     // It never stops anything, never runs DR3's tar, and moves only the three files of the copy.
     expect(text).not.toMatch(/systemctl stop|tar -C/);
@@ -2064,6 +2104,8 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     expect(lines.filter(code).some(line => /mv "\$ART\/native-plan-apply-and-plan\.json"/.test(line))).toBe(false);
     expect(at(lines, 'mv "$ART/native-apply-and-plan.json" "$S/native-apply-and-plan.try-$TS.json"')).toBeLessThan(lines.findIndex(line => line.startsWith('OUT=$(nat ')));
     expect(at(lines, 'cmp -s "$ART/native-plan-apply-and-plan.json" "$NP"')).toBeLessThan(lines.findIndex(line => line.startsWith('OUT=$(nat ')));
+    // All applied and only the proposal refused: DR4 says ask, and so does DR4AGAIN.
+    expect(at(lines, 'every step is applied already, so only the proposal was refused (as DR4 says): ask')).toBeLessThan(lines.findIndex(line => line.startsWith('OUT=$(nat ')));
     const prefix = [lines.find(line => line.startsWith('K=0; for M in '))!, lines.find(line => line.startsWith('TOPK=$('))!, lines.find(line => line.includes('the first $K of this release\'s migrations in order'))!];
     const dir = mkdtempSync(join(tmpdir(), 'guide-dr4again-'));
     try {
@@ -2091,13 +2133,24 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
       'diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D"']) expect(at(lines, needle), needle).toBeLessThan(move);
     // The lines that build and swap the folder are SB10's own.
     const sb10 = scriptOf('SB10').lines.join('\n');
-    for (const line of lines.filter(line => line.startsWith('git -C "$ART/source-reference" archive') || line.startsWith('chown -R root:root "$NEWOP"'))) expect(sb10, line).toContain(line);
+    const built = lines.filter(line => line.startsWith('git -C "$ART/source-reference" archive') || line.startsWith('chown -R root:root "$NEWOP"') || line.startsWith('find "$NEWOP"'));
+    expect(built).toHaveLength(3);
+    for (const line of built) {
+      for (const part of line.split(' || {')[0]!.split(' && ')) expect(sb10, part).toContain(part);
+      // A failed build line stops by name, with what to do: under pipefail it would otherwise end the script without a word.
+      expect(line, line).toContain('|| { echo "SWAP_NOT_DONE: the new tools folder was not built ($NEWOP is a partial copy; nothing was swapped): move $NEWOP into $S, then SWAP again"; exit 1; }');
+    }
     // DR5 refuses before it writes anything when DR4 or SWAP is not done.
     const dr5 = scriptOf('DR5').lines;
     const loop = dr5.findIndex(line => line.startsWith('for F in native-plan-publish.json register-published.json native-plan-verify.json'));
     expect(at(dr5, 'DR5_NOT_DONE: DR4 is not done (the ledger is not the old one plus this release\'s migrations)')).toBeLessThan(loop);
     expect(at(dr5, 'DR5_NOT_DONE: the operator folder is not this release\'s (SWAP first; nothing changed)')).toBeLessThan(loop);
     expect(drained.replace(/\s+/g, ' ')).not.toContain('run it by hand from SB10 first');
+    // A refused publish says "nothing was published" only when the newest register is still SB1's.
+    const refused = dr5.find(line => line.startsWith('[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"'))!;
+    const publish = (newest: string) => bash(['set -euo pipefail', `ART=$(mktemp -d); REG0=23; OUT='exit 1'; psqlq() { echo ${newest}; }`, refused, 'echo PUBLISHED_ON']).split('\n').at(-1);
+    expect(publish('23')).toBe('DR5_NOT_DONE: the publish was refused (the operator\'s line above says why); nothing was published (the newest register is still 23): ask (the way back is rbD-B)');
+    expect(publish('24')).toBe('DR5_NOT_DONE: the operator refused, and the newest register is 24: something WAS published: ask (rbD-B)');
   });
 
   it('DR5RESUME goes on only while nothing is pinned, and never moves DR4\'s plan file', () => {
@@ -2125,6 +2178,16 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     const state = at(late, '= CURRENT ] && [ "$(jq -r --arg l "$LABEL"');
     for (const [index, line] of late.entries()) if (code(line) && /^\s*(cp|mv|addline) /.test(line)) expect(index, line).toBeGreaterThan(state);
     expect(late).toContain('lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { echo "LATELINES_NOT_DONE: a SAME check is BAD (above; the files before are in S): ask"; exit 1; }');
+    expect(late.join('\n')).toContain('the new $SVC runs or still tries to start: run DR6AGAIN first, then LATELINES again');
+    // The new line starts on a line of its own, even when the file's last line has no newline.
+    expect(late.join('\n')).toContain('awk 1 "$F" > "$F.new"; printf \'%s=%s\\n\' "$K" "$V" >> "$F.new"');
+    // The repair order everywhere: DR6AGAIN first, then the fix, then DR6.
+    for (const line of dr6.filter(line => line.includes('DR6_NOT_DONE') && line.includes('DR6AGAIN'))) expect(line, line).toMatch(/DR6AGAIN(, then| first)/);
+    expect(flat).not.toMatch(/then DR6AGAIN(,| and) (then )?DR6/);
+    const fencedir = sectionOf(guide, '### H11. The restore fence (from the release that carries NV-07)').split('\n').map(line => line.replace(/^ {3}/, ''));
+    const guardLine = fencedir.findIndex(line => line.includes('FENCEDIR_NOT_DONE: the new API runs or still tries to start'));
+    expect(guardLine).toBeGreaterThan(-1);
+    expect(guardLine).toBeLessThan(fencedir.findIndex(line => line.startsWith('install -d -m 0700 -o "$AU" -g "$AGRP" "$FD"')));
     // DR6AGAIN stops nothing when the switch wrote, and clears the start counts after its stops.
     const again = scriptOf('DR6AGAIN').lines;
     const guard = at(again, 'when the switch wrote, WB4 with bash -s -- drained, then DR6TAIL');
@@ -2138,6 +2201,7 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
   });
 
   it('AFTERDR6 only reads; rbD-A and rbD-B keep their order and gain what a second run needs; AGAINSAME only moves, after its guards', () => {
+    expect(scriptOf('AFTERDR6').lines.join('\n')).toContain('journalctl -u "debateai-preview-api@$LABEL" --since "@$T0" -o cat --no-pager | grep -c \'"event":"api.restore_fence","outcome":"INITIALISED"\'');
     for (const line of scriptOf('AFTERDR6').lines.filter(code)) {
       expect(line, line).not.toMatch(READ_ONLY_WRITES);
       if (/(^|[\s;(])lc /.test(line)) expect(line).toMatch(/lc release-check\.mjs status/);
@@ -2150,7 +2214,7 @@ describe('the drained path: PRECHECK before the yes, a repair block for each sto
     expect(rbb.find(line => line.startsWith('if [ -s "$S/pg18-modes" ]; then MODE0=$(sed -n 1p "$S/pg18-modes")'))).toBeDefined();
     const again = scriptOf('AGAINSAME').lines;
     const made = again.findIndex(line => line.startsWith('install -d -o root -g root -m 0700 "$D"'));
-    for (const needle of ['= CURRENT ] && [ "$(jq -r --arg l "$LABEL"', 'cmp -s "$S/release-lock.before.json" "$LOCK"', 'sha256sum -c --quiet "$S/plan-proposal.sha256"', '$((SIZE * 2 + 2048))'])
+    for (const needle of ['= CURRENT ] && [ "$(jq -r --arg l "$LABEL"', 'cmp -s "$S/release-lock.before.json" "$LOCK"', 'sha256sum -c --quiet "$S/plan-proposal.sha256"', '[ -n "$SIZE" ] || { echo "AGAINSAME_NOT_DONE', '$((SIZE * 2 + 2048))'])
       expect(at(again, needle), needle).toBeLessThan(made);
     for (const line of again.filter(code)) expect(line, line).not.toMatch(/(^|[\s;&|(])(cp|tar|rel|nat|lc release-switch)\s|systemctl (start|stop)/);
     expect(at(again, 'put "$ART/native-plan-plan.json"')).toBeGreaterThan(made);
@@ -2287,7 +2351,8 @@ describe('the step before Start, switched on in the upload: SHAPEON, POTS, STEPC
         return bash(['set -euo pipefail', `S='${dir}'; STARTSTEP='${startstep}'`, choose, 'echo "SHAPE=${SHAPE:-none}"']);
       };
       const on = `${JSON.stringify({ ...BASE, startStep: START_VALUES })}\n`;
-      expect(pick('', on)).toBe('SHAPE=none');
+      expect(pick('', null)).toBe('SHAPE=none');
+      expect(pick('', on)).toBe(`SB3_NOT_DONE: SHAPEON's row exists but STARTSTEP is empty: set STARTSTEP=yes, or move ${dir}/shape-on.json aside first`);
       expect(pick('yes', on)).toBe(`SHAPE=${on.trim()}`);
       expect(pick('yes', null)).toMatch(/^SB3_NOT_DONE: STARTSTEP is yes but /);
       expect(pick('yes', `${on}${on}`)).toMatch(/^SB3_NOT_DONE: STARTSTEP is yes but /);

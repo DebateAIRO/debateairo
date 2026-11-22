@@ -688,8 +688,8 @@ the catch-all `local all all reject`. Without it, the first rule that matches th
 REKEYCHECK (MAIN-SITE.md 5.7) says `NOT READY`.
 
 STAFFHBA adds that one line, right above the `local all all reject` line, and reloads the database's settings. It
-runs with the site up: a reload, no restart. Run it on the day before an upload, so that the upload's cold copy of the
-database folder holds it. Like install step 7c, it keeps a copy of the file first, in `/root/preview-archive/`.
+runs with the site up: a reload, no restart. Run it before an upload's downtime (the day before, or earlier on the
+upload day), so that the upload's cold copy of the database folder holds it. Like install step 7c, it keeps a copy of the file first, in `/root/preview-archive/`.
 
 It refuses, and changes nothing, when: the file already has a `local` line for this login; the first rule that matches
 the login is not the `local all all reject` line (for example the line is in force already, or a broader rule comes
