@@ -897,8 +897,8 @@ person picks, then presses **Start investigating** (Începeți investigația). T
 carries the step: SHAPEON (1.8) built its row from the live row with only the start values added, and SB3 publishes
 it. What that means today:
 - At SB3, and when you read the delta (step 6), `debateShapePolicy` is among the changed rows, and A9's watch line
-  prints `STOP: debateShapePolicy`. That line is expected this once: the change is your choice. Any other watch-list
-  row is a stop.
+  names it. That is expected this once: the change is your choice. This release's own code moves two more watched
+  rows, `admissionPolicy` and `billingPolicy`; step 6 says what each must show.
 - In piece 1 the Anthropic gate goes from two calls at once to four (POTS said in the preparation whether its pot carries
   them).
 - After DR6 come three proofs: STEPCHECK, a team member's test debate through the step, and STEPPROOF (steps 24 to
@@ -1000,8 +1000,15 @@ the number twice.
 
 **6. The delta, read by you.** In a root shell, paste as one block: first `. /root/preview-archive/rNN-names.sh` (its
 own first line: the lines below read `$ART`), then A9's two lines (the release guide's "A9. The owner reads the
-delta"). They print each changed row, old against new, then the watch line. On this upload the watch line must be `STOP: debateShapePolicy` and nothing else: that row
-is the step before Start, your choice, and no stop this once. Any other watch-list row is a stop: SB3b sets the plan
+delta"). They print each changed row, old against new, then the watch line. On this upload the watch line must be
+`STOP: admissionPolicy billingPolicy debateShapePolicy` and nothing else. SB3 has already said, in its three
+`watched row …` lines, how each of them changes, with names and counts only:
+- `admissionPolicy`: members added only (the request budgets of this release's new pages), none removed, none changed;
+- `billingPolicy`: `changed [withdrawal_countries: +7 -0]` and nothing else: the 14-day withdrawal right now covers
+  seven more countries the site serves;
+- `debateShapePolicy`: `members added [startStep]` and nothing else: the step before Start, your choice.
+
+A fourth row on the watch line, a removed member, or another changed member is a stop: SB3b sets the plan
 aside; ask. Note the `deltaSha256`: your yes names it, and DR5's `YES` is that hash in full.
 
 **7. SB4, twice.** On this upload SB4 stops twice, and both stops are expected.
