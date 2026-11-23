@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 const website = await import('../../tools/' + 'upload-check/website-build.mjs');
@@ -11,6 +11,7 @@ const engine = resolve(import.meta.dirname, '../..');
 const repo = resolve(engine, '..');
 // The folder that holds pnpm on this Mac, as the checker is given it.
 const pnpmDir = dirname(execFileSync('sh', ['-c', 'command -v pnpm'], { encoding: 'utf8' }).trim());
+const read = (path: string) => readFileSync(join(engine, path), 'utf8');
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const scratch = () => { const root = realpathSync(mkdtempSync(join(tmpdir(), 'upload-check-website-'))); roots.push(root); return root; };
@@ -66,6 +67,97 @@ describe('check 2: the release install and the website build', () => {
     expect(result.status, result.lines.join('\n')).toBe('passed');
     expect(result.lines).toContain('website build: built with the release tool\'s own environment');
   }, 60_000);
+
+  // The server's ui-build reads the release root's source inventory before and after the build (source-manifest.mjs,
+  // scanInventory) and refuses any difference (PREVIEW_SOURCE_INVENTORY_REFUSED), as when Next rewrote
+  // apps/ui/next-env.d.ts. The Mac check reads the same inventory before and after its build. <script> is what the fake
+  // build does besides leaving Next's build id file, run in dialectical-engine/ as pnpm runs.
+  function fakeBuildThat(script: string) {
+    const { root, fakePnpmDir } = fakeBuild({ writesBuildId: true });
+    const engineRoot = join(root, 'dialectical-engine');
+    for (const folder of ['apps/ui', 'apps/ui/node_modules/next', 'packages/contract/generated', 'node_modules/.pnpm']) mkdirSync(join(engineRoot, folder), { recursive: true });
+    writeFileSync(join(engineRoot, 'apps/ui/next-env.d.ts'), '/// <reference types="next" />\n');
+    chmodSync(join(engineRoot, 'apps/ui/next-env.d.ts'), 0o644);
+    writeFileSync(join(engineRoot, 'apps/ui/package.json'), '{}\n');
+    writeFileSync(join(engineRoot, 'packages/contract/generated/openapi.json'), '{}\n');
+    writeFileSync(join(fakePnpmDir, 'pnpm'), `#!/bin/sh\nmkdir -p apps/ui/.next && echo fake > apps/ui/.next/BUILD_ID\n${script}\n`, { mode: 0o755 });
+    return { root, fakePnpmDir };
+  }
+  const buildThat = async (script: string) => {
+    const { root, fakePnpmDir } = fakeBuildThat(script);
+    return website.buildWebsiteIn({ root, node: process.execPath, pnpmDir: fakePnpmDir });
+  };
+  const refusedFor = (lines: readonly string[]) => {
+    expect(lines).toContain('UPLOAD_CHECK_WEBSITE_BUILD_CHANGED_SOURCE');
+    return lines.filter(line => /^ {2}(added|removed|changed): /.test(line));
+  };
+
+  it('a build that rewrote a committed file is refused, and the file is named', async () => {
+    const result = await buildThat("printf 'rewritten\\n' > apps/ui/next-env.d.ts");
+    expect(result.status).toBe('refused');
+    expect(result.lines[0]).toMatch(/^website build: the build added, removed or changed 1 file\(s\) outside \.next, node_modules and the generated contract, which the server's release tool refuses$/);
+    expect(refusedFor(result.lines)).toEqual(['  changed: dialectical-engine/apps/ui/next-env.d.ts']);
+  }, 60_000);
+
+  it('a build that adds a file outside .next, removes one, or changes only a mode is refused, as the server refuses it', async () => {
+    const added = await buildThat('echo x > apps/ui/tsconfig.tsbuildinfo');
+    expect(added.status).toBe('refused');
+    expect(refusedFor(added.lines)).toEqual(['  added: dialectical-engine/apps/ui/tsconfig.tsbuildinfo']);
+    const mode = await buildThat('chmod 600 apps/ui/next-env.d.ts');
+    expect(mode.status).toBe('refused');
+    expect(refusedFor(mode.lines)).toEqual(['  changed: dialectical-engine/apps/ui/next-env.d.ts']);
+    const removed = await buildThat('rm apps/ui/package.json');
+    expect(refusedFor(removed.lines)).toEqual(['  removed: dialectical-engine/apps/ui/package.json']);
+    // A link is an entry of its own (the server refuses any link outside node_modules), and so is a new node_modules folder.
+    const linked = await buildThat('ln -s next-env.d.ts apps/ui/env-link.d.ts && mkdir -p packages/contract/node_modules');
+    expect(refusedFor(linked.lines)).toEqual(['  added: dialectical-engine/apps/ui/env-link.d.ts', '  added: dialectical-engine/packages/contract/node_modules']);
+  }, 60_000);
+
+  it('a build that writes only into .next, node_modules and the generated contract passes, and says how many entries it compared', async () => {
+    const result = await buildThat('echo x > apps/ui/.next/cache.json && echo x > apps/ui/node_modules/next/cache.json && echo x > node_modules/.pnpm/lock.yaml && echo y > packages/contract/generated/openapi.json');
+    expect(result.status, result.lines.join('\n')).toBe('passed');
+    // release-artifacts.mjs, next-env.d.ts and package.json, and the two node_modules folders.
+    expect(result.lines).toContain('release folder: the build changed none of the 5 entries the source inventory reads');
+  }, 60_000);
+
+  it('the inventory reads files with their mode, links by their target, and each node_modules folder as one entry', () => {
+    const { root } = fakeBuildThat('');
+    const engineRoot = join(root, 'dialectical-engine');
+    symlinkSync('next-env.d.ts', join(engineRoot, 'apps/ui/env-link.d.ts'));
+    mkdirSync(join(engineRoot, 'apps/ui/.next'), { recursive: true });
+    writeFileSync(join(engineRoot, 'apps/ui/.next/BUILD_ID'), 'x\n');
+    // The check's own log beside dialectical-engine/ is not part of it.
+    writeFileSync(join(root, 'website-build.log'), 'log\n');
+    const inventory: Map<string, string> = website.inventoryOf(root);
+    expect([...inventory.keys()].sort()).toEqual([
+      'dialectical-engine/apps/ui/env-link.d.ts', 'dialectical-engine/apps/ui/next-env.d.ts', 'dialectical-engine/apps/ui/node_modules',
+      'dialectical-engine/apps/ui/package.json', 'dialectical-engine/deploy/preview-release/v1/release-artifacts.mjs', 'dialectical-engine/node_modules'
+    ]);
+    expect(inventory.get('dialectical-engine/apps/ui/env-link.d.ts')).toBe('link next-env.d.ts');
+    expect(inventory.get('dialectical-engine/apps/ui/next-env.d.ts')).toMatch(/^file [0-9a-f]{64} mode 644$/);
+    expect(inventory.get('dialectical-engine/node_modules')).toBe('dependency root');
+    // The folders it leaves out are the ones the server's source inventory leaves out for the website's release root.
+    const manifest = read('deploy/preview-auth-dev/v1/source-manifest.mjs');
+    expect(manifest).toContain("const generatedPaths=role=>[CONTRACT_OUTPUT_PATH.slice(0,-1),...(role==='ui'?['dialectical-engine/apps/ui/.next']:[])];");
+    expect(manifest).toContain("const CONTRACT_OUTPUT_PATH=CONTRACT_PATH+'generated/';");
+    expect(manifest).toContain("if(!dependencies&&!complete&&(name==='node_modules'||excludedDirectories.includes(rel))){");
+  });
+
+  it('reads no folder and no folder mode, and the two guides say that the server alone refuses such a folder', () => {
+    const { root } = fakeBuildThat('');
+    const before: Map<string, string> = website.inventoryOf(root);
+    // A new empty folder, and one writable by group and others: the Mac's inventory does not change.
+    mkdirSync(join(root, 'dialectical-engine/apps/ui/empty'));
+    mkdirSync(join(root, 'dialectical-engine/apps/ui/open'));
+    chmodSync(join(root, 'dialectical-engine/apps/ui/open'), 0o777);
+    expect([...website.inventoryOf(root).entries()]).toEqual([...before.entries()]);
+    // The server walks every folder and refuses one writable by group or others, so the guides say it is seen only there.
+    expect(read('deploy/preview-auth-dev/v1/source-manifest.mjs')).toContain("if(!stat.isDirectory()||stat.isSymbolicLink()||stat.uid!==uid||(stat.mode&0o022)!==0)refuse('PREVIEW_SOURCE_CUSTODY_REFUSED');");
+    const flat = (path: string) => read(path).replace(/\s+/g, ' ');
+    expect(flat('tools/upload-check/README.md')).toContain('This check reads no folder\'s mode, so a build that leaves such a folder outside `apps/ui/.next` is seen only on the server.');
+    expect(flat('deploy/preview-release/v1/README.md')).toContain('and a folder (an empty one too) that the build left writable by group or others: only the server reads folder modes (`PREVIEW_SOURCE_CUSTODY_REFUSED`)');
+    expect(read('tools/upload-check/website-build.mjs')).toContain('owned by another user (PREVIEW_SOURCE_CUSTODY_REFUSED)');
+  });
 
   it('a failed online fill is refused, not thrown', async () => {
     const { result, root } = await website.checkWebsiteBuild({
