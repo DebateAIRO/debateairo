@@ -93,13 +93,60 @@ function normalizeSameOriginApiPath(apiBase: string): string {
   return normalized;
 }
 
+/** The readable cookie the API sets beside the HttpOnly session cookie. */
+const CSRF_COOKIE_NAME = "__Host-debateai-csrf";
+
 /**
- * True when this browser holds no session. The session cookie is HttpOnly, but the API always sets and clears the
- * readable CSRF cookie together with it, with the same lifetime, so a browser without the CSRF cookie has no session
- * either. False without a document (a server render), where nothing about the browser's cookies is known.
+ * True when this browser holds no session it can use. The session cookie is HttpOnly, but the API always sets and
+ * clears the readable CSRF cookie together with it, with the same lifetime, and the website removes the readable one
+ * when the API says the session it names has ended (`forgetEndedSession`). So a browser without the CSRF cookie has no
+ * usable session. False without a document (a server render), where nothing about the browser's cookies is known.
  */
 export function holdsNoSession(): boolean {
-  return typeof document !== "undefined" && readBrowserCsrfCookie("__Host-debateai-csrf") === null;
+  return typeof document !== "undefined" && readBrowserCsrfCookie(CSRF_COOKIE_NAME) === null;
+}
+
+/**
+ * The readable session cookie's value as a request is sent, for `forgetEndedSession` to compare with once the answer is
+ * in. Null when the browser holds none, or without a document.
+ */
+export function heldSessionCookie(): string | null {
+  return readBrowserCsrfCookie(CSRF_COOKIE_NAME);
+}
+
+/**
+ * The API answers 401 SESSION_REQUIRED when the session cookie the browser sent names no session it still accepts: the
+ * session expired, was ended from another device or by a password reset, or the account can no longer sign in. The API
+ * clears no cookie then, so both stay in the browser, and every later page would send its reads and get the same 401.
+ * Each such 401 makes the browser forget the site password it sent at the edge, so each page asked for it again.
+ *
+ * After that answer the website removes the readable cookie itself: `holdsNoSession` is then true, and the session reads
+ * are answered here until the person signs in again. Only when the cookie still holds the value it held as the request
+ * was sent (`heldBefore`): a sign-in in another tab meanwhile set a new one, which stays. Answers under /v1/admin/ do
+ * not count: there the API gives the same answer when its second look at the session after the work fails, a database
+ * failure included, while the session is still good. Any other answer, or one that is not the API's JSON (the edge's
+ * own request for the site password), changes nothing.
+ */
+export async function forgetEndedSession(path: string, response: Response, heldBefore: string | null): Promise<void> {
+  if (heldBefore === null || response.status !== 401 || path.startsWith("/v1/admin/")) return;
+  let code: unknown = null;
+  try {
+    const body: unknown = await response.clone().json();
+    code = typeof body === "object" && body !== null ? (body as { error?: unknown }).error : null;
+  } catch {
+    return;
+  }
+  if (code !== "SESSION_REQUIRED" || heldSessionCookie() !== heldBefore) return;
+  document.cookie = `${CSRF_COOKIE_NAME}=; Path=/; Max-Age=0; Secure; SameSite=Lax`;
+}
+
+/**
+ * True when this browser holds no team sign-in. The team cookie is HttpOnly, but the API sets the readable team CSRF
+ * cookie in the same response, with the same lifetime, and clears neither on its own: they end together. Without it
+ * every team-only read is refused (401). False without a document (a server render).
+ */
+export function holdsNoStaffSession(): boolean {
+  return typeof document !== "undefined" && readBrowserCsrfCookie("__Host-debateai-staff-csrf") === null;
 }
 
 /**
@@ -119,6 +166,31 @@ export function holdsNoPasswordReset(): boolean {
  */
 export function holdsNoMfaRecovery(): boolean {
   return typeof document !== "undefined" && readBrowserCsrfCookie("__Host-debateai-mfa-recovery-csrf") === null;
+}
+
+/**
+ * The fetch the password reset and authenticator recovery pages send their requests through. Their status reads are
+ * answered by the server only for a browser that holds that reset (or recovery); without one the API can only refuse
+ * them (401), and that refusal makes the browser forget the site password. A browser that holds neither readable cookie
+ * gets the API's own refusal from here, without a request, so the page shows what it would have shown. Every other
+ * request goes out as before. `fetchImplementation` is looked up at each request when not given.
+ */
+export function createRecoveryFetch(apiBase: string = API_BASE, fetchImplementation?: typeof fetch): typeof fetch {
+  const base = normalizeSameOriginApiPath(apiBase);
+  const statusReads: ReadonlyMap<string, Readonly<{ holdsNone: () => boolean; refusal: string }>> = new Map([
+    [`${base}/v1/auth/password-reset/status`, { holdsNone: holdsNoPasswordReset, refusal: "PASSWORD_RESET_INVALID" }],
+    [`${base}/v1/auth/mfa-recovery/status`, { holdsNone: holdsNoMfaRecovery, refusal: "MFA_RECOVERY_INVALID" }]
+  ]);
+  return ((input, init) => {
+    const read = typeof input === "string" && (init?.method ?? "GET").toUpperCase() === "GET" ? statusReads.get(input) : undefined;
+    if (read !== undefined && read.holdsNone()) {
+      return Promise.resolve(new Response(JSON.stringify({ error: read.refusal }), {
+        status: 401,
+        headers: { "content-type": "application/json" }
+      }));
+    }
+    return (fetchImplementation ?? fetch)(input, init);
+  }) as typeof fetch;
 }
 
 /**
@@ -157,9 +229,12 @@ export function createSameOriginFetch(
     if ((init?.method ?? "GET").toUpperCase() === "GET" && SESSION_ONLY_READS.has(contractUrl.pathname) && holdsNoSession()) {
       return Promise.resolve(sessionRequiredResponse());
     }
+    const heldBefore = heldSessionCookie();
     return fetchImplementation(`${sameOriginApiPath}${contractUrl.pathname}${contractUrl.search}`, init)
-      .then((response) => {
+      .then(async (response) => {
         noteReleaseHeader(response.headers.get("x-debateai-release"));
+        // Before the caller sees the refusal, so whatever it does next already finds no session here.
+        await forgetEndedSession(contractUrl.pathname, response, heldBefore);
         return response;
       });
   }) as typeof fetch;

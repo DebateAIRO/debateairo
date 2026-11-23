@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { ContractHttpError, type ContractClient, type DataExportStatus } from "@debateai/contract";
-import { contractClient } from "@/lib/api";
+import { contractClient, holdsNoSession } from "@/lib/api";
 import { useSelectedAuthCatalog } from "@/components/AuthShell";
 import { SecurityConfirmation } from "@/components/auth/SecurityConfirmation";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
@@ -61,13 +61,25 @@ export function DataExportCard({ catalog, locale, client = contractClient }: {
 
   useEffect(() => {
     let active = true;
-    const refresh = () => client.readDataExportStatus().then(
-      (next) => { if (active) { setStatus(next); setStatusUnavailable(false); } },
-      () => { if (active) setStatusUnavailable(true); }
-    );
-    void refresh();
-    const timer = window.setInterval(() => { void refresh(); }, 5_000);
-    return () => { active = false; window.clearInterval(timer); };
+    let stopped = false;
+    let timer: number | undefined;
+    const stop = () => { stopped = true; window.clearInterval(timer); };
+    const refresh = () => {
+      // Signed out in another tab, or a session the server has ended: the read could only be refused, and each refusal
+      // makes the browser forget the site password. The card stops asking and says the status cannot be read.
+      if (holdsNoSession()) { stop(); setStatusUnavailable(true); return; }
+      void client.readDataExportStatus().then(
+        (next) => { if (active) { setStatus(next); setStatusUnavailable(false); } },
+        (failure: unknown) => {
+          if (!active) return;
+          setStatusUnavailable(true);
+          if (failure instanceof ContractHttpError && failure.status === 401) stop();
+        }
+      );
+    };
+    refresh();
+    if (!stopped) timer = window.setInterval(refresh, 5_000);
+    return () => { active = false; stop(); };
   }, [client]);
 
   async function beginConfirmation(fromLink = false): Promise<void> {

@@ -7,8 +7,11 @@ import { loadNamespace } from "@/lib/i18n/server";
 import { safeReturnPath } from "@/lib/returnPath";
 import { publicTurnstileConfig } from "@/lib/turnstile";
 import { NONCE_REQUEST_HEADER } from "../../content-security-policy.mjs";
-import { createServerContractClient, readSessionCookie, readTrustedClientIp } from "@/lib/serverApi";
+import { createServerContractClient, readSessionCookie, readTrustedClientIp, sessionCookieValue } from "@/lib/serverApi";
 import { t } from "@/lib/i18n/translate";
+
+/** The readable cookie the API sets beside the HttpOnly session cookie, of the same form. */
+const CSRF_COOKIE = "__Host-debateai-csrf";
 
 /**
  * Paid plans G3a, sign-in: like sign-up, an address where the service is not offered gets the
@@ -37,7 +40,9 @@ export default async function LoginPage({
   const locale = isLocale(requestedLocale) ? requestedLocale : "en";
   const catalog = await loadNamespace(locale, "auth");
   let sessionConfirmed = false;
-  if (token !== null) {
+  // Without its readable cookie a session is of no use in this browser: its pages treat it as signed out and send the
+  // person here (lib/api.ts holdsNoSession). Sending them back would go round in a loop, so the form shows instead.
+  if (token !== null && sessionCookieValue(cookieStore.get(CSRF_COOKIE)?.value) !== null) {
     const userAgent = (await headers()).get("user-agent") ?? undefined;
     const clientIp = readTrustedClientIp(await headers());
     try {

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createContractClient } from "@debateai/contract";
 import { AccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
 import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
+import { CSRF_COOKIE } from "../support/sessionCookie.js";
 
 const G = "g".repeat(43);
 const CANCELLATION_REF = "55555555-5555-4555-8555-555555555555";
@@ -41,6 +42,8 @@ beforeEach(() => {
     FormData: dom.window.FormData,
     IS_REACT_ACT_ENVIRONMENT: true
   });
+  // Settings is only shown to a signed-in person: this browser holds a session's cookies.
+  document.cookie = `${CSRF_COOKIE}; Path=/; Secure; SameSite=Lax`;
 });
 
 afterEach(async () => {

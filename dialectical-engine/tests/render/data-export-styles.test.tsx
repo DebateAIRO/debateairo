@@ -3,13 +3,16 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, expect, it, onTestFinished, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, onTestFinished, vi } from "vitest";
 import { holdSessionCookies } from "../support/sessionCookie.js";
 import { DataExportCard } from "../../apps/ui/components/DataExportCard.js";
 import { ExportDownloadClient } from "../../apps/ui/components/ExportDownloadClient.js";
 import { AccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
 import { ContractHttpError } from "@debateai/contract";
 import settings from "../../apps/ui/messages/en/settings.json" with { type: "json" };
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 let root: Root | null = null; let host: HTMLDivElement | null = null;
 const source = (path: string) => readFileSync(resolve(process.cwd(), `apps/ui/${path}`), "utf8");

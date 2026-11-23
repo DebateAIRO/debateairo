@@ -16,6 +16,12 @@ export const PASSWORD_RESET_CSRF_COOKIE = `__Host-debateai-password-reset-csrf=$
 export const MFA_RECOVERY_CSRF_COOKIE = `__Host-debateai-mfa-recovery-csrf=${"m".repeat(43)}`;
 
 /**
+ * The readable CSRF cookie the API's team sign-in sets beside the HttpOnly team cookie, in the same response and with the
+ * same lifetime. A browser that has it has done the team sign-in; a browser without it has not. Made-up value.
+ */
+export const STAFF_CSRF_COOKIE = `__Host-debateai-staff-csrf=${"s".repeat(43)}`;
+
+/**
  * Makes this jsdom browser hold the given readable cookies: `document.cookie` reads them beside whatever the page itself
  * wrote. jsdom refuses to store a `__Host-` cookie on its plain-http page, so the getter is stood in instead.
  * `vi.restoreAllMocks()`, or the returned `drop()`, takes them away again (the cookies cleared or expired).

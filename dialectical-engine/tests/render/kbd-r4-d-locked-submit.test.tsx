@@ -15,6 +15,10 @@ import settings from "../../apps/ui/messages/en/settings.json";
 import { SecurityConfirmation } from "../../apps/ui/components/auth/SecurityConfirmation.js";
 import { ChangeEmailScreen } from "../../apps/ui/components/EmailSettings.js";
 import { AccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 let root: Root | null = null;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); });

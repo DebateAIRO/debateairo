@@ -38,6 +38,10 @@ vi.mock("@/lib/billing/serverBilling", () => ({
 
 import CardChangePage from "../../apps/ui/app/settings/card/page.js";
 import { readRedirects, resetRedirects } from "./stubs/next-navigation.js";
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let container: HTMLDivElement;

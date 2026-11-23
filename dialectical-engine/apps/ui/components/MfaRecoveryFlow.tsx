@@ -5,13 +5,13 @@ import { AuthShell } from "@/components/AuthShell";
 import { focusIsLost } from "@/lib/focusGuard";
 import { useFormAnnouncer } from "@/components/auth/InlineFieldMessage";
 import { useAlertRegion, useDeadlineWarning, useStepFocus } from "@/components/auth/timedStep";
-import { API_BASE, holdsNoMfaRecovery } from "@/lib/api";
+import { API_BASE, createRecoveryFetch, holdsNoMfaRecovery } from "@/lib/api";
 import { setRecoveryAcknowledgementPending } from "@/lib/authNavigationGuard";
 import { totpQrMatrix } from "@/lib/totpQr";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { dateLocale as sharedDateLocale, t, type MessageCatalog } from "@/lib/i18n/translate";
 import english from "@/messages/en/mfa-recovery.json";
-const browserClient = createMfaRecoveryClient(fetch, API_BASE);
+const browserClient = createMfaRecoveryClient(createRecoveryFetch(API_BASE), API_BASE);
 // Owner ruling 2026-10-09: "waiting" follows Continue on the ready screen; the finish_* phases come from the emailed finish link.
 // Review 2026-10-09: "already_waiting" stops a second recovery at the email link (I1); "finish_closed" is a finish link that no
 // longer works (M1) — cancelled, finished, expired or voided by an account change, which the server does not tell apart.
@@ -59,7 +59,8 @@ export function MfaRecoveryFlow({ catalog = english, locale = "en", client = bro
       if (entries.length === 1 && /^[A-Za-z0-9_-]{43}$/.test(entries[0]![1])) { const [name, value] = entries[0]!; if (name === "token") { link.current = value; setPhase("email_link"); } else if (name === "cancel") { cancellation.current = value; setPhase("cancel_link"); } else if (name === "finish") { finishing.current = value; setPhase("finish_link"); void perform(loadFinish); } else setPhase("expired"); } else setPhase("expired");
     } else if (link.current === null && cancellation.current === null && finishing.current === null && !holdsNoMfaRecovery()) {
       // Only a browser that holds a recovery asks for its step: without one the API could only answer 401, which makes
-      // the browser forget the site password. Check recovery state still asks the server whenever it is pressed.
+      // the browser forget the site password. Check recovery state asks the server only when a recovery is held
+      // (createRecoveryFetch).
       void client.status().then(state => { if (mounted.current) apply(state); }).catch(() => {});
     }
     return () => { mounted.current = false; queueMicrotask(() => { if (!mounted.current) { link.current = null; cancellation.current = null; finishing.current = null; setRecoveryAcknowledgementPending(false); } }); };

@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ContractHttpError, PublicReviewPageSchema, type PublicReviewPage } from "@debateai/contract";
 import { PublicReviewPanel } from "../../apps/ui/components/PublicReviewPanel.js";
 import { publicationRefOf, type PublicReviewClient } from "../../apps/ui/lib/publicReviewApi.js";
+import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/sessionCookie.js";
+
+// The team panels read once the team sign-in is done: each test starts in a browser that holds its cookies.
+beforeEach(() => holdReadableCookies(CSRF_COOKIE, STAFF_CSRF_COOKIE).drop);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 /** Decision 33: the team page's panel. Made-up debate. The refusals themselves: public-review-http.test.ts and the database's. */

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { holdsNoSession } from "../api.js";
 
 /*
  * Owner's screen review, 3 Nov 2026 (wait-f19): how a waiting page asks the server for news. It checks at once, then
@@ -65,6 +66,7 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const runNowRef = useRef<(() => void) | null>(null);
+  const heldSession = useRef(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -73,11 +75,17 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
     let inFlight = false;
     let failed = false;
     let timer: number | undefined;
+    // Once the browser has held a session while this page checks, a check that fails when it holds none any more (signed
+    // out in another tab, or a session the server has ended) could only be refused again, and each refusal makes the
+    // browser forget the site password: the checks wait until a session is held again, or [Try now]. A visitor who never
+    // held one (a public page) is checked for as before.
+    if (!holdsNoSession()) heldSession.current = true;
+    const sessionGone = (): boolean => failed && heldSession.current && holdsNoSession();
 
     const schedule = (): void => {
       window.clearTimeout(timer);
       timer = undefined;
-      if (!active || done || inFlight) return;
+      if (!active || done || inFlight || sessionGone()) return;
       const base = failed ? afterFailureMs : everyMs;
       timer = window.setTimeout(() => void run(), tabHidden() ? Math.max(base, hiddenEveryMs) : base);
     };
@@ -108,10 +116,10 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
     // Shown again: check at once. Hidden: the next check comes the rare way.
     const onVisibility = (): void => {
       if (tabHidden()) schedule();
-      else void run();
+      else if (!sessionGone()) void run();
     };
     const onOnline = (): void => {
-      void run();
+      if (!sessionGone()) void run();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onOnline);

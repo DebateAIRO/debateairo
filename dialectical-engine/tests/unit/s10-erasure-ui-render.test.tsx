@@ -7,6 +7,10 @@ import { ContractHttpError } from "@debateai/contract";
 import { PublicationControl as AppPublicationControl } from "../../apps/ui/components/PublicationControl.js";
 import { AccountErasureControls as AppAccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
 import settingsEnglish from "../../apps/ui/messages/en/settings.json" with { type: "json" };
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 const RUN_ID="11111111-1111-4111-8111-111111111111";
 const CANCELLATION_REF="55555555-5555-4555-8555-555555555555";

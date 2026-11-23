@@ -5,7 +5,7 @@ import {
   ContractHttpError,
   type ContractClient
 } from "@debateai/contract";
-import { contractClient } from "@/lib/api";
+import { contractClient, holdsNoSession } from "@/lib/api";
 import type { LocaleCode } from "@/lib/i18n/locales";
 import { formatDate, t, type MessageCatalog } from "@/lib/i18n/translate";
 import {SecurityConfirmation,type SecurityConfirmationClient} from '@/components/auth/SecurityConfirmation';
@@ -120,16 +120,35 @@ export function AccountErasureControls({
 
   useEffect(() => {
     let active = true;
+    let stopped = false;
+    let timer: number | undefined;
+    let processing = false;
+    const stop = () => { stopped = true; window.clearInterval(timer); };
     const unavailable = t(catalog, "settings.erasure.statusUnavailable");
     // A good read clears only this poll's own "unavailable" line. A confirmation or an error from
     // the reader's last action stays until they act again, so a screen reader has time to read it.
-    const refresh=()=>client.readAccountErasure().then(
-      (current) => { if (active) { setStatus(current); setMessage((shown) => (shown === unavailable ? null : shown)); } },
-      () => { if (active) setMessage(unavailable); }
-    );
-    void refresh();
-    const timer=window.setInterval(()=>{ void refresh(); },5_000);
-    return () => { active = false; window.clearInterval(timer); };
+    const refresh = () => {
+      // Signed out in another tab, or a session the server has ended: the read could only be refused, and each refusal
+      // makes the browser forget the site password, so the poll stops. Not while a deletion is processing: the account
+      // is suspended then, so every other read is refused and the website may already have dropped its readable
+      // session cookie, but the API still answers this one read for the session that scheduled the deletion.
+      if (holdsNoSession() && !processing) { stop(); setMessage(unavailable); return; }
+      void client.readAccountErasure().then(
+        (current) => {
+          if (!active) return;
+          processing = current.status === "PROCESSING";
+          setStatus(current); setMessage((shown) => (shown === unavailable ? null : shown));
+        },
+        (failure: unknown) => {
+          if (!active) return;
+          setMessage(unavailable);
+          if (failure instanceof ContractHttpError && failure.status === 401) stop();
+        }
+      );
+    };
+    refresh();
+    if (!stopped) timer=window.setInterval(()=>{ void refresh(); },5_000);
+    return () => { active = false; stop(); };
   }, [catalog, client]);
 
   async function schedule(event: FormEvent<HTMLFormElement>): Promise<void> {

@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ContractClient } from "@debateai/contract";
-import { contractClient } from "@/lib/api";
+import { ContractHttpError, type ContractClient } from "@debateai/contract";
+import { contractClient, holdsNoSession } from "@/lib/api";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 import billingEnglish from "@/messages/en/billing.json";
 
@@ -83,7 +83,15 @@ export function ChargeStatusPoller({
     let active = true;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const startedAt = Date.now();
+    // The page can no longer read the charge: it stops watching and says what it says after the two minutes.
+    const stopWatching = () => {
+      setState("TIMED_OUT");
+      settled.current?.("TIMED_OUT");
+    };
     const poll = async (): Promise<void> => {
+      // Signed out in another tab, or a session the server has ended: the read could only be refused, and each refusal
+      // makes the browser forget the site password.
+      if (holdsNoSession()) { stopWatching(); return; }
       try {
         const answer = await client.getBillingCharge(chargeRef);
         if (!active) return;
@@ -99,12 +107,12 @@ export function ChargeStatusPoller({
           settled.current?.("FAILED");
           return;
         }
-      } catch {
+      } catch (failure) {
         if (!active) return;
+        if (failure instanceof ContractHttpError && failure.status === 401) { stopWatching(); return; }
       }
       if (Date.now() - startedAt >= POLL_FOR_MS) {
-        setState("TIMED_OUT");
-        settled.current?.("TIMED_OUT");
+        stopWatching();
         return;
       }
       timer = setTimeout(() => { void poll(); }, POLL_EVERY_MS);
