@@ -2,10 +2,10 @@
 
 <!-- legal-chrome
 summaryTitle: In short
-eyebrow: PRIVACY POLICY · v1.0 · EFFECTIVE 23 NOVEMBER 2026
+eyebrow: PRIVACY POLICY · v1.1 · EFFECTIVE 25 NOVEMBER 2026
 title: What we store, and why
 lede: Your rights and our obligations under the GDPR (EU) 2016/679, in plain language. Fourteen sections and Annex B — scroll to the end.
-endMarker: END OF POLICY · GDPR (EU) 2016/679 · v1.0
+endMarker: END OF POLICY · GDPR (EU) 2016/679 · v1.1
 bodyLabel: Privacy Policy text
 annexTitle: Annex B — Regional privacy terms
 jumps:
@@ -19,7 +19,7 @@ jumps:
 13 COOKIES
 -->
 
-**Version 1.0 · Effective 23 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
+**Version 1.1 · Effective 25 November 2026 · Previous versions at dezbatere.ro/privacy/versions · Controller: DMS Merchandise Shop S.R.L., Piatra Neamț**
 
 **In short.** We collect what an account needs and what you type into your debates. What you write to the support assistant goes to its AI model so it can answer you, and we keep none of it. Your questions go to the AI providers listed in our Register, mainly DeepInfra, in the United States. The terms of DeepInfra, Anthropic and Amazon do not allow them to train models on what you write. The web search provider receives only the short search phrases the models write (section 5). Our hosting provider stores your account and your debates in London, in the United Kingdom; section 5 says where else your data goes. On the Free plan debates are public when finished, after an AI check; on a paid plan they are private unless you publish them. Deleting your account destroys the keys to your private data in the live service, but it does not delete our backups, and some of them hold those keys (section 7); public debates stay public, and your pseudonym is removed from them. You can reach us at privacy@dezbatere.ro, and people named in a debate can write to us without an account.
 
@@ -261,7 +261,7 @@ To refuse these items, block or delete cookies and site data for this site in yo
 
 When we change this policy we post the new version with a summary of what changed and a new effective date, and keep the previous versions at dezbatere.ro/privacy/versions. For a change that adds a new purpose or a new recipient we tell you before the new processing starts, by email and in the product, and give you time to object. Where a new purpose depends on your consent — for example if we ever wanted to use content to improve models — we ask for that consent separately and specifically; we never treat acceptance of updated Terms as consent to new processing. For clarifications that change nothing about what we do, we simply post the new version.
 
-This policy was last updated on 23 November 2026.
+This policy was last updated on 25 November 2026. Version 1.1 replaced version 1.0: it no longer says that DeepInfra passes one model's requests to a partner company it does not name, because no model a debate uses is served that way any more (the summary and sections 4 and 5).
 
 ## Annex B — Regional privacy terms
 

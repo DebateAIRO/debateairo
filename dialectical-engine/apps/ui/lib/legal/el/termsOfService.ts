@@ -377,12 +377,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "1.0",
-  sha256: "b81df29caaa2d4d81a576605dfd28d8037d1f2b90d8d68dcb05c3ee6cb0556a8",
-  eyebrow: "ΟΡΟΙ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ · v1.0 · ΙΣΧΥΟΥΝ ΑΠΟ 23 ΝΟΕΜΒΡΙΟΥ 2026",
+  version: "1.1",
+  sha256: "8361fb8c1d61aa5472e0dd03bfeba7fd6c01a99ae0d76644c540035e3982bf85",
+  eyebrow: "ΟΡΟΙ ΠΑΡΟΧΗΣ ΥΠΗΡΕΣΙΩΝ · v1.1 · ΙΣΧΥΟΥΝ ΑΠΟ 25 ΝΟΕΜΒΡΙΟΥ 2026",
   title: "Τι αποδέχεστε",
   lede: "Η σύμβαση μεταξύ εσάς και της DMS Merchandise Shop S.R.L., σε απλή γλώσσα. Δεκαεννέα ενότητες και Παράρτημα Α — μετακινηθείτε έως το τέλος.",
-  endMarker: "ΤΕΛΟΣ ΤΩΝ ΟΡΩΝ · v1.0",
+  endMarker: "ΤΕΛΟΣ ΤΩΝ ΟΡΩΝ · v1.1",
   contact: "support@dezbatere.ro",
   bodyLabel: "Κείμενο των Όρων Παροχής Υπηρεσιών",
   sectionIdPrefix: "terms-section-",

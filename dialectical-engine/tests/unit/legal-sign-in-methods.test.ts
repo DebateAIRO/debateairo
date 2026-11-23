@@ -75,9 +75,12 @@ describe("sign-in methods, in the English legal texts", () => {
     for (const text of [terms, privacy]) expect(text).not.toContain("Facebook");
   });
 
-  it("neither 1.0 text carries a change history: both already say how you sign in", () => {
-    // Launch starts both texts at 1.0, the first published texts (owner's decisions of 19 and 20 November 2026).
-    for (const text of [terms, privacy]) expect([...text.matchAll(/(Version|version) \d+\.\d+ replaced/gu)]).toEqual([]);
+  it("the only change history is 1.1's, and it is not about signing in: both texts said how you sign in at launch", () => {
+    for (const text of [terms, privacy]) {
+      expect([...text.matchAll(/(Version|version) \d+\.\d+ replaced/gu)].map((match) => match[0])).toEqual(["Version 1.1 replaced"]);
+      const summary = text.slice(text.indexOf("Version 1.1 replaced"));
+      expect(summary.slice(0, summary.indexOf("\n"))).not.toMatch(/sign in|sign-in|passkey|phone/iu);
+    }
   });
 
   it("says the recovery email address is optional, and that Settings shows the whole phone number only after you confirm it is you", () => {

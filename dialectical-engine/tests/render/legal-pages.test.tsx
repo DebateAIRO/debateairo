@@ -21,6 +21,7 @@ import {
   providerRegister,
   TERMS_VERSIONS
 } from "../../apps/ui/lib/legal/pages.js";
+import { archivedLegalText } from "../../apps/ui/lib/legal/archive.js";
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import { LegalPageLayout } from "../../apps/ui/components/legal/LegalPageLayout.js";
@@ -353,18 +354,23 @@ describe("the text pages render the same documents as the sign-up modals", () =>
 describe("the terms versions page lists only versions that exist", () => {
   const minor = (version: string): number => Number(version.split(".")[1]);
 
-  // Version 1.0 is the first published text (owner's decisions of 19 and 20 November 2026: the pre-launch drafts, Terms
-  // 2.x and 1.1, were never offered to the public and are not kept), so the page lists it alone and says no earlier
-  // version exists.
-  it("names the current version, linked to its text, and says no earlier version has been published", () => {
+  // Version 1.0 is the first published text: the pre-launch drafts were never offered to the public and are not kept.
+  // Version 1.1 replaced it, so the page lists 1.1, in force, and 1.0, linked to its archived text.
+  it("names the current version, linked to its text, and the version it replaced, linked to its archived text", () => {
     expect(TERMS_OF_SERVICE.eyebrow).toContain(`v${TERMS_VERSIONS[0]?.version}`);
     const view = render(<LegalVersionsBody legalCatalog={legalEnglish} />);
     const rows = view.querySelectorAll(".legalVersionRow");
     expect(rows).toHaveLength(TERMS_VERSIONS.length);
     expect(rows[0]?.querySelector("a")?.getAttribute("href")).toBe("/terms");
     expect(rows[0]?.querySelector(".legalVersionTag")?.textContent).toBe(legalEnglish["legal.versions.current"]);
-    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.0"]);
-    expect(view.querySelector(".legalVersionsNone")?.textContent).toBe(legalEnglish["legal.versions.none"]);
+    expect(TERMS_VERSIONS.map(({ version }) => version)).toEqual(["1.1", "1.0"]);
+    const older = rows[1]?.querySelector("a")?.getAttribute("href") ?? "";
+    expect(rows[1]?.querySelector(".legalVersionTag")).toBeNull();
+    expect(rows[1]?.textContent).toContain(legalEnglish["legal.archive.meta"]);
+    const archived = archivedLegalText("TERMS", older.replace("/terms/versions/", ""), "en");
+    expect(archived?.version, older).toBe("1.0");
+    expect(archived?.text).toMatch(/^\*\*Version 1\.0 · Effective /mu);
+    expect(view.querySelector(".legalVersionsNone")).toBeNull();
   });
 
   it("has a row for every version from 1.0 to the current one, newest first, so a skipped number shows up here", () => {

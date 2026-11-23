@@ -133,7 +133,7 @@ describe("terms of service modal — rendered", () => {
     await render(<TermsOfServiceModal open mode="consent" onClose={vi.fn()} />);
 
     expect(dialog().querySelector(".policyEyebrow")!.textContent).toBe(
-      "TERMS OF SERVICE · v1.0 · EFFECTIVE 23 NOVEMBER 2026"
+      "TERMS OF SERVICE · v1.1 · EFFECTIVE 25 NOVEMBER 2026"
     );
     expect(dialog().querySelector(".policyTitle")!.textContent).toBe("What you agree to");
     expect(dialog().querySelector(".policyLede")!.textContent).toBe(
@@ -152,7 +152,7 @@ describe("terms of service modal — rendered", () => {
     expect(contacts.length).toBeGreaterThanOrEqual(1);
 
     const last = dialog().querySelector(".policyBody")!.lastElementChild!;
-    expect(last.textContent).toBe("END OF TERMS · v1.0");
+    expect(last.textContent).toBe("END OF TERMS · v1.1");
 
     const pdf = [...dialog().querySelectorAll("*")].filter(
       (element) => element.textContent?.trim() === "Download PDF"
@@ -221,7 +221,8 @@ describe("terms of service modal — rendered", () => {
     // 120 since Terms 1.0 dropped section 14's thirteen change-history entries (owner's decision of 19 November 2026).
     // 122 since section 8 gained its paragraph on Amazon and section 14 its first history entry (Terms 1.1).
     // 121 since launch renumbered the text 1.0 and section 14's history entry left (owner's decision of 20 November 2026).
-    expect(dialog().querySelectorAll(".policyText").length).toBe(121);
+    // 122 since Terms 1.1 added section 14's change summary (the partner company of DeepInfra no longer named).
+    expect(dialog().querySelectorAll(".policyText").length).toBe(122);
     expect(dialog().querySelectorAll(".policyItem").length).toBe(14);
   });
 

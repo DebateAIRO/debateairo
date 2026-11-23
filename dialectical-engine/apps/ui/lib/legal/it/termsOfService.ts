@@ -377,12 +377,12 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
 
 export const TERMS_OF_SERVICE: LegalDocument = {
   key: "terms",
-  version: "1.0",
-  sha256: "f85c0b4a45585636d2b808f3543fd9f493c790b8679341c19b4c922faa78dd45",
-  eyebrow: "CONDIZIONI DI SERVIZIO · v1.0 · IN VIGORE DAL 23 NOVEMBRE 2026",
+  version: "1.1",
+  sha256: "54fccce317fc01f50263f473184518d3744ac7c09d98708671c49891148b79f1",
+  eyebrow: "CONDIZIONI DI SERVIZIO · v1.1 · IN VIGORE DAL 25 NOVEMBRE 2026",
   title: "Ciò che accetti",
   lede: "Il contratto tra te e DMS Merchandise Shop S.R.L., in un linguaggio chiaro. Diciannove sezioni e Allegato A — scorri fino alla fine.",
-  endMarker: "FINE DELLE CONDIZIONI · v1.0",
+  endMarker: "FINE DELLE CONDIZIONI · v1.1",
   contact: "support@dezbatere.ro",
   bodyLabel: "Testo delle Condizioni di servizio",
   sectionIdPrefix: "terms-section-",

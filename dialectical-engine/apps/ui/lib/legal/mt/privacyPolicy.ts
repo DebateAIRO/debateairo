@@ -493,12 +493,12 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
-  version: "1.0",
-  sha256: "dda73375782e69dc1f02038cb5ef45811816537478d98ea46327b0e3c9d7d261",
-  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v1.0 · EFFETTIVA 23 TA’ NOVEMBRU 2026",
+  version: "1.1",
+  sha256: "d136fe4efd5b6ab697b10a34f88fa8b20f9c28bf65f28a4fc623a63ffae0b1ae",
+  eyebrow: "POLITIKA DWAR IL-PRIVATEZZA · v1.1 · EFFETTIVA 25 TA’ NOVEMBRU 2026",
   title: "X’naħżnu, u għaliex",
   lede: "Id-drittijiet tiegħek u l-obbligi tagħna skont il-GDPR (EU) 2016/679, b’lingwaġġ ċar. Erbatax-il taqsima u l-Anness B — niżżel sal-aħħar.",
-  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v1.0",
+  endMarker: "TMIEM IL-POLITIKA · GDPR (EU) 2016/679 · v1.1",
   contact: "privacy@dezbatere.ro",
   bodyLabel: "Test tal-Politika dwar il-Privatezza",
   sectionIdPrefix: "policy-section-",

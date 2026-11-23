@@ -93,7 +93,11 @@ describe("the Provider Register follows the mark", () => {
 
   it("the English Privacy Policy and Terms name no partner of DeepInfra and no company left unconfirmed for training", () => {
     for (const file of ["privacy-policy.md", "terms-of-service.md"]) {
-      const text = readFileSync(resolve(process.cwd(), "apps/ui/legal/en", file), "utf8");
+      const whole = readFileSync(resolve(process.cwd(), "apps/ui/legal/en", file), "utf8");
+      // Section 14's change summary says what 1.1 no longer says; the rest of the text says nothing about a partner.
+      const summary = /^.*Version 1\.1 replaced version 1\.0: it no longer says that DeepInfra passes one model's requests to a partner company it does not name.*$/mu;
+      expect(whole, file).toMatch(summary);
+      const text = whole.replace(summary, "");
       expect(text, file).not.toMatch(/partner/iu);
       expect(text, file).not.toContain("which it does not name");
       expect(text, file).not.toContain("for which company we have not confirmed");

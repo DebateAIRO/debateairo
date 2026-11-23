@@ -591,10 +591,12 @@ export type TermsVersion = Readonly<{
 }>;
 
 /**
- * Every version of the terms, newest first. Version 1.0 is the first published text (owner's decision of 19 November
- * 2026: the pre-launch drafts numbered 2.0–2.19 were never offered to the public, so launch starts the count again and
- * keeps no archive of them). When the terms change, the version they replace gets a row that links to its archived text.
+ * Every version of the terms, newest first. Version 1.0 is the first published text: the pre-launch drafts numbered
+ * 2.0–2.19 were never offered to the public, so the count starts again at launch and keeps no archive of them. When the
+ * terms change, the version they replace gets a row that links to its archived English text, by that text's sha256.
  */
 export const TERMS_VERSIONS: readonly TermsVersion[] = Object.freeze([
-  { version: "1.0", noteKey: "legal.versions.v2.note", current: true, href: "/terms" }
+  { version: "1.1", noteKey: "legal.versions.v2.note", current: true, href: "/terms" },
+  { version: "1.0", noteKey: "legal.archive.meta", current: false,
+    href: "/terms/versions/737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2" }
 ]);
