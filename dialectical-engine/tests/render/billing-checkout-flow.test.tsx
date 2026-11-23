@@ -6,6 +6,10 @@ import { BUCHAREST_SECTORS, ContractHttpError, ROMANIA_COUNTIES } from "@debatea
 import { CheckoutFlow, type CheckoutClient } from "../../apps/ui/components/billing/CheckoutFlow.js";
 import { formatMoney } from "../../apps/ui/lib/billing/format.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 /**
  * Locked: natively disabled, or aria-disabled — a locked control that stays in the Tab order so a

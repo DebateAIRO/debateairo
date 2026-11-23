@@ -13,6 +13,10 @@ import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import billingEnglish from "../../apps/ui/messages/en/billing.json" with { type: "json" };
 import newDebateEnglish from "../../apps/ui/messages/en/newDebate.json" with { type: "json" };
 import { button, expectFocusOn, expectParkedOn, mountPage, nextTabStop, press, settle, typeInto, unmountPage } from "./kbd-r2-set-harness.js";
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 const EN = billingEnglish as Readonly<Record<string, string>>;
 afterEach(unmountPage);

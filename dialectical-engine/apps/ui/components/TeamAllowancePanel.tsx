@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { ContractHttpError, type TeamAllowancePage } from "@debateai/contract";
 import { createTeamAllowanceClient, type TeamAllowanceClient, type TeamAllowanceGift } from "../lib/teamAllowanceApi.js";
 import { dollarsToMicros, formatDollars } from "../lib/teamLimitApi.js";
+import { holdsNoStaffSession } from "../lib/api.js";
 import { formatDate, t, type MessageCatalog } from "../lib/i18n/translate.js";
 import type { LocaleCode } from "../lib/i18n/locales.js";
 import staffEnglish from "../messages/en/staff.json";
@@ -75,7 +76,9 @@ export function TeamAllowancePanel({ client, catalog = staffEnglish, locale = "e
       else void load();
     };
     window.addEventListener("debateai:staff-authority-changed", authorityChanged);
-    void load();
+    // Before the team sign-in this browser holds no team cookie, and the read could only be refused (401), which makes the
+    // browser forget the site password. The panel loads when the team sign-in says so (debateai:staff-authority-changed).
+    if (!holdsNoStaffSession()) void load();
     return () => {
       reads.current++;
       authority.current++;

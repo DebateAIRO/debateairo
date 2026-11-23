@@ -2,7 +2,7 @@
 import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ContractHttpError } from "@debateai/contract";
 import { StaffAccessPanel } from "../../apps/ui/components/StaffAccessPanel.js";
 import { PublicDebateOverview } from "../../apps/ui/components/PublicDebateOverview.js";
@@ -12,6 +12,10 @@ import enStaff from "../../apps/ui/messages/en/staff.json";
 import roStaff from "../../apps/ui/messages/ro/staff.json";
 import enPublic from "../../apps/ui/messages/en/public.json";
 import roPublic from "../../apps/ui/messages/ro/public.json";
+import { CSRF_COOKIE, holdReadableCookies, STAFF_CSRF_COOKIE } from "../support/sessionCookie.js";
+
+// The team panels read once the team sign-in is done: each test starts in a browser that holds its cookies.
+beforeEach(() => holdReadableCookies(CSRF_COOKIE, STAFF_CSRF_COOKIE).drop);
 
 const routerReplace = vi.hoisted(() => vi.fn());
 let cookieLocale: string | undefined;

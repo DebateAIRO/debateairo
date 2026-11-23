@@ -48,6 +48,10 @@ import { SUPPORT_CONVERSATION_STORAGE_KEY } from "../../apps/ui/components/suppo
 import { PRIVACY_POLICY } from "../../apps/ui/lib/privacyPolicy.js";
 import { TERMS_OF_SERVICE } from "../../apps/ui/lib/termsOfService.js";
 import newDebateEnglish from "../../apps/ui/messages/en/newDebate.json" with { type: "json" };
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 const METRIC_KEYS = ["scrollTop", "clientHeight", "scrollHeight"] as const;
 let metrics: Record<(typeof METRIC_KEYS)[number], number> = { scrollTop: 0, clientHeight: 200, scrollHeight: 500 };

@@ -6,7 +6,7 @@ import { flushSync } from "react-dom";
 import { redactSupportText } from "@debateai/kernel";
 import type { SupportAction } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
-import { holdsNoSession } from "../../lib/api.js";
+import { forgetEndedSession, heldSessionCookie, holdsNoSession } from "../../lib/api.js";
 import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
@@ -215,9 +215,12 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
   async isSignedIn() {
     // No session in this browser: signed out, without sending a read the API could only refuse.
     if (holdsNoSession()) return false;
+    const heldBefore = heldSessionCookie();
     const response = await fetch("/api/v1/session",{
       method: "GET",cache: "no-store",credentials: "same-origin"
     });
+    // A session the server has ended: the next read is answered here, as for a browser that holds none.
+    await forgetEndedSession("/v1/session",response,heldBefore);
     if (response.status === 401) return false;
     if (!response.ok) throw new Error("SUPPORT_IDENTITY_UNKNOWN");
     return true;

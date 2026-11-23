@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ContractHttpError, type ContractClient } from "@debateai/contract";
-import { contractClient } from "@/lib/api";
+import { contractClient, holdsNoSession } from "@/lib/api";
 import { clearPendingExport, readExportLinkOutcome, readPendingExport, rememberExportLinkOutcome, stashPendingExport } from "@/lib/dataExportPending";
 import { t, type MessageCatalog } from "@/lib/i18n/translate";
 
@@ -45,6 +45,12 @@ export function ExportDownloadClient({ catalog, client = contractClient }: { cat
           const outcome = readExportLinkOutcome();
           setView(outcome === "downloaded" ? "reopenFromEmail" : outcome ?? "noLink");
         }
+        return;
+      }
+      // No session in this browser: the download could only be refused (401), which makes the browser forget the site
+      // password just before the sign-in page loads. The link is kept in this tab, so sign-in comes back here with it.
+      if (holdsNoSession()) {
+        window.location.assign("/login?next=/export");
         return;
       }
       void client.downloadDataExport(token).then((download) => {

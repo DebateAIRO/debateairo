@@ -9,6 +9,10 @@ import { ContractHttpError } from "@debateai/contract";
 import { AccountErasureControls } from "../../apps/ui/components/AccountErasureControls.js";
 import { DataExportCard } from "../../apps/ui/components/DataExportCard.js";
 import settings from "../../apps/ui/messages/en/settings.json" with { type: "json" };
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 const methods = { methods: [], recovery_codes_remaining: 0, available_step_up_methods: ["password_totp"], step_up_providers: [] };
 const grant = (action: string) => ({ status: "step_up_complete", csrf_token: "c".repeat(43), step_up_grant: { action, token: "g".repeat(43), expires_at: new Date(Date.now() + 300_000).toISOString() } });

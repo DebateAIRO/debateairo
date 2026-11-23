@@ -13,6 +13,10 @@ import {
 import {AuthCatalogProvider} from "../../apps/ui/components/AuthShell.js";
 import { LOCALE_COOKIE, type LocaleCode } from "../../apps/ui/lib/i18n/locales.js";
 import { loadNamespace } from "../../apps/ui/lib/i18n/server.js";
+import { holdSessionCookies } from "../support/sessionCookie.js";
+
+// These pages are only shown to a signed-in person: each test starts in a browser that holds a session's cookies.
+beforeEach(() => holdSessionCookies().drop);
 
 // FIX-VRULINGS: V's two rulings.
 // 1. The account-deletion phrase the reader types is the locale's

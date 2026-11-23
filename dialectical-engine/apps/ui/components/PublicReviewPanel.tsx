@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { ContractHttpError, ModerationGroundSchema, ModerationSourceSchema, type ModerationGround, type ModerationSource, type PublicFlagQueue, type PublicReviewList, type PublicReviewPage } from "@debateai/contract";
 import { createPublicReviewClient, NO_GROUND, publicationRefOf, type PublicReviewClient, type PublicReviewGround, type PublicReviewStepInput } from "../lib/publicReviewApi.js";
 import { t, type MessageCatalog } from "../lib/i18n/translate.js";
+import { holdsNoStaffSession } from "../lib/api.js";
 import { focusIsLost } from "../lib/focusGuard.js";
 import staffEnglish from "../messages/en/staff.json";
 import "./StaffAccessPanel.css";
@@ -94,7 +95,9 @@ export function PublicReviewPanel({ client, catalog = staffEnglish }: Readonly<{
       setMessage({ text: failureLine(catalog, failure), good: false });
     }
   }, [api, catalog]);
-  useEffect(() => { void load(null); return () => { reads.current++; api.cancel(); }; }, [api, load]);
+  // Before the team sign-in this browser holds no team cookie: the reads could only be refused (401), which makes the
+  // browser forget the site password, and the section would stay away as it does after that refusal.
+  useEffect(() => { if (!holdsNoStaffSession()) void load(null); return () => { reads.current++; api.cancel(); }; }, [api, load]);
   // Keyboard audit 2026-11-12: a step's confirm box opens away from the step that asked (at the top of the debate, or at
   // the end of the queue), so focus goes to the box's line; Cancel gives it back to the step; a finished step lands on
   // its notice. `focusNext` names the target, picked once the render that shows it is done.

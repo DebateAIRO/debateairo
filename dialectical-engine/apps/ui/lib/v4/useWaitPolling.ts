@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { holdsNoSession } from "../api.js";
 
 /*
- * Owner's screen review, 3 Nov 2026 (wait-f19): how a waiting page asks the server for news. It checks at once, then
+ * How a waiting page asks the server for news. It checks at once, then
  * every `everyMs` while the tab is shown, and only rarely while the tab is hidden; it checks again at once when the tab
  * is shown again or the connection comes back, and when the person presses [Try now]. After a failed check it waits
  * longer before the next one and says so (`reconnecting`), until a check answers. One check is in flight at a time, and
@@ -34,6 +35,14 @@ export type WaitPollingOptions = Readonly<{
   enabled?: boolean;
   /** A change starts the checks afresh, at once (another question, or a retry the page asks for). */
   restartKey?: string | number;
+  /**
+   * True on a page whose check the API answers only for a signed-in browser, and which tries a refused check again (the
+   * check throws). After a failed check, once the browser holds no session (a sign-out in another tab, or a session the
+   * server has ended), the next check could only be refused again, and each refusal makes the browser forget the site
+   * password: the automatic checks then wait until a session is held again (shown again, back online) or [Try now].
+   * False (the default): every failed check is tried again, as a public page's read, which needs no session, must be.
+   */
+  needsSession?: boolean;
 }>;
 
 export type WaitPolling = Readonly<{
@@ -55,7 +64,8 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
     hiddenEveryMs = WAIT_HIDDEN_EVERY_MS,
     afterFailureMs = WAIT_AFTER_FAILURE_MS,
     enabled = true,
-    restartKey = 0
+    restartKey = 0,
+    needsSession = false
   } = options;
   // The newest check, so a page may pass a fresh closure on every render without restarting the loop.
   const checkRef = useRef(check);
@@ -73,11 +83,14 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
     let inFlight = false;
     let failed = false;
     let timer: number | undefined;
+    // Only on a page that needs a session (see `needsSession`): a public page's failed check is a lost connection or a
+    // server failure, never a refusal, so it is tried again whatever the browser holds.
+    const sessionGone = (): boolean => needsSession && failed && holdsNoSession();
 
     const schedule = (): void => {
       window.clearTimeout(timer);
       timer = undefined;
-      if (!active || done || inFlight) return;
+      if (!active || done || inFlight || sessionGone()) return;
       const base = failed ? afterFailureMs : everyMs;
       timer = window.setTimeout(() => void run(), tabHidden() ? Math.max(base, hiddenEveryMs) : base);
     };
@@ -108,10 +121,10 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
     // Shown again: check at once. Hidden: the next check comes the rare way.
     const onVisibility = (): void => {
       if (tabHidden()) schedule();
-      else void run();
+      else if (!sessionGone()) void run();
     };
     const onOnline = (): void => {
-      void run();
+      if (!sessionGone()) void run();
     };
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("online", onOnline);
@@ -126,7 +139,7 @@ export function useWaitPolling(check: WaitCheck, options: WaitPollingOptions): W
       window.removeEventListener("online", onOnline);
       runNowRef.current = null;
     };
-  }, [enabled, everyMs, hiddenEveryMs, afterFailureMs, restartKey]);
+  }, [enabled, everyMs, hiddenEveryMs, afterFailureMs, restartKey, needsSession]);
 
   const tryNow = useCallback(() => runNowRef.current?.(), []);
   return { checkedAt, reconnecting, tryNow };
