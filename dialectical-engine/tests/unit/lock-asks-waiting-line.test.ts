@@ -2,7 +2,8 @@
 // over runs without passing POST /v1/asks, so they follow the same rule. With asks open the rule is "any account": a
 // stranger's waiting run starts and their stalled start is re-sent, while a run no account owns (a legacy asker's) is
 // still recorded FAILED, as the routes still refuse a session without a user id. The team list is never read, and an
-// empty team is not "unset".
+// empty team is not "unset". Under everyone-with-listed-buyers the API file keeps a team line, which names only who may
+// buy: the waker still starts a stranger's run and never reads that line.
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,12 +13,16 @@ import { WorkItemRepository } from "@debateai/battery";
 import type { WaitingRun } from "@debateai/db";
 import { PREVIEW_ACCOUNT_RUNS_SQL, PREVIEW_TEAM_RUNS_SQL, parsePreviewProviderTestConfig } from "@debateai/providers";
 import type { AskWaitingLinePort, WaitingStart } from "../../apps/api/src/ask-room.js";
+import { parsedPreviewApiEnvironment, previewApiOptionsOf } from "../support/previewAsksComposition.js";
 import { TEST_RELEASE_KEY } from "../support/releaseKey.js";
 
-const PREVIEW = parsePreviewProviderTestConfig(JSON.stringify({
+const PREVIEW_JSON = JSON.stringify({
   deployment: "v3-preview", free_model_ids: ["zai-org/GLM-5.3-Flash"], requested_thinking_level: "high",
   budget_socket: "/run/debateai-v3-preview/provider-budget.sock", scope_id: "fixture"
-}))!;
+});
+const PREVIEW = parsePreviewProviderTestConfig(PREVIEW_JSON)!;
+/** The one account the team line lists under everyone-with-listed-buyers: never the stranger whose run waits. */
+const LISTED_BUYER = "0b7c6f1e-2d3a-4b5c-8d9e-0f1a2b3c4d5e";
 const STRANGER_OWNER = "44444444-4444-4444-8444-444444444444";
 const TX = Object.freeze({ marker: "the start's own transaction" }) as unknown as PoolClient;
 
@@ -32,6 +37,8 @@ function waitingRun(owner: Readonly<{ ownerRef: string } | { legacyAskerId: stri
 
 function arrange(input: Readonly<{
   open: boolean; line: ReadonlyArray<WaitingRun>; stalled: ReadonlyArray<string>;
+  /** The preview members as main.ts hands them to the application from an API file under everyone-with-listed-buyers. */
+  listed?: true;
   /** The runs the database says an account owns (PREVIEW_ACCOUNT_RUNS_SQL's answer). */
   accountOwned?: ReadonlySet<string>;
 }>) {
@@ -52,8 +59,14 @@ function arrange(input: Readonly<{
     }
   };
   // An empty team, as the parser demands beside an open setting; with the setting absent that is today's "unset" team.
+  // Under the listed buyers' value, the API file's team line and the open flag (the application gets no value).
+  const listed = input.listed === true ? previewApiOptionsOf(PREVIEW, parsedPreviewApiEnvironment(PREVIEW_JSON, {
+    PREVIEW_ASKS_OPEN_TO: "everyone-with-listed-buyers", PREVIEW_TEAM_USER_IDS_JSON: JSON.stringify([LISTED_BUYER]) })) : undefined;
   const settings: RunCreationSettings = {
-    previewProviderTestConfig: PREVIEW, previewTeamUserIds: [], ...(input.open ? { previewAsksOpen: true as const } : {}),
+    ...(listed === undefined
+      ? { previewProviderTestConfig: PREVIEW, previewTeamUserIds: [], ...(input.open ? { previewAsksOpen: true as const } : {}) }
+      : { previewProviderTestConfig: listed.previewProviderTestConfig, previewTeamUserIds: listed.previewTeamUserIds,
+        ...(listed.previewAsksOpen === undefined ? {} : { previewAsksOpen: listed.previewAsksOpen }) }),
     strangerSampleRate: 0, releaseKey: TEST_RELEASE_KEY, registerVersion: 1, batteryVersion: "preview-open", settlementWatchHandle: "preview-open",
     resolveDiscoveredPanel: async () => [], resolveEnvelopeBasis: async () => ({}),
     resolveRisk: (effectiveRiskTier, tierSource, tierProvenanceRef) => ({ effectiveRiskTier, tierSource: tierSource as never, tierProvenanceRef }),
@@ -112,6 +125,22 @@ describe("the waker and the stalled-start re-send with asks open", () => {
     expect(tried).toEqual([stranger.runId]);
     expect(dispatched).toEqual([stranger.runId, strangerStalled]);
     expect(recorded).toEqual([failedAsOutsider(legacy.runId), failedAsOutsider(legacyStalled)]);
+    expect(teamReads).toEqual([]);
+  });
+
+  it("listed buyers: a stranger's waiting run starts and their stalled start is re-sent; the team line in the file is never read", async () => {
+    const waiting = waitingRun({ ownerRef: STRANGER_OWNER });
+    const legacy = waitingRun({ legacyAskerId: "legacy:b" });
+    const stalled = randomUUID();
+    const { application, tried, dispatched, recorded, accountReads, teamReads } = arrange({
+      open: true, listed: true, line: [waiting, legacy], stalled: [stalled], accountOwned: new Set([waiting.runId, stalled])
+    });
+    await expect(application.wakeWaitingRuns()).resolves.toEqual({ waiting: 2, started: 1, skipped: 0, failed: 1, stopped: false, redispatched: 1 });
+    expect(tried).toEqual([waiting.runId]);
+    expect(dispatched).toEqual([waiting.runId, stalled]);
+    // A run no account owns is still recorded FAILED, as under the other open values.
+    expect(recorded).toEqual([failedAsOutsider(legacy.runId)]);
+    expect(accountReads).toEqual([[[waiting.runId, legacy.runId]], [[stalled]]]);
     expect(teamReads).toEqual([]);
   });
 

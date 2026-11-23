@@ -68,7 +68,9 @@ function mailLocaleOf(request: FastifyRequest): string {
  * inventory and the s7 matrix need it) and answers the closed 404. `policy` is B7a's `BillingRouteDeps.policy`;
  * `admit` and `source` are the two values P8a's `installBillingRoutes` resolves from `deps.admission` and
  * `deps.source` (R-3), so these routes charge the same budgets as the rest of the billing module. `buyerAdmits` is
- * the checkout's buyer rule (`BillingRouteDeps.buyerAdmits`); the upgrade, which also takes money, follows it too.
+ * the checkout's buyer rule (`BillingRouteDeps.buyerAdmits`); the upgrade, which also takes money, follows it too. The
+ * upgrade's price request does not, and neither does the card change: it buys nothing new, only keeps a plan the person
+ * was let buy, and refusing it would end that plan only when a renewal happens to fail.
  */
 export function installSubscriptionRoutes(
   api: FastifyInstance,

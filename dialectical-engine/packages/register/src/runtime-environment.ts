@@ -506,11 +506,15 @@ const hatchetShape = {
 
 const apiEnvironmentShape = {
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
-    /** Step 1: the preview's team (identity user ids); parsed with the preview configuration below. */
+    /**
+     * The preview's team (identity user ids): who may ask, and who may buy unless the buyer rule lets any account
+     * (previewBuyerAdmits); under PREVIEW_ASKS_OPEN_TO's "everyone-with-listed-buyers" only who may buy. Parsed with the
+     * preview configuration below.
+     */
     PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
     /**
-     * Who may start debates instead of the team: absent (the team rule), "everyone" or "everyone-with-test-payments".
-     * A string here so the shared parser (parsePreviewAsksOpenTo) names every refusal.
+     * Who may start debates instead of the team: absent (the team rule), "everyone", "everyone-with-test-payments" or
+     * "everyone-with-listed-buyers". A string here so the shared parser (parsePreviewAsksOpenTo) names every refusal.
      */
     PREVIEW_ASKS_OPEN_TO: z.string().max(32).optional(),
     KEK_PATH: kekPath,
@@ -1120,9 +1124,10 @@ export function loadRunnerEnvironment() {
 const runnerEnvironmentShape = {
     PREVIEW_PROVIDER_TEST_CONFIG_JSON: z.string().min(1).max(8192).optional(),
     /**
-     * Step 1 (GAP-RUNNER, 2026-10-09): the same team list as the API's key, so the runner's
-     * start-up can refuse work no team member owns before it hands any job to the job system.
-     * Same rules as the API's (parsed with the preview configuration below).
+     * The same team list as the API's key, so the runner's start-up can refuse work no team
+     * member owns before it hands any job to the job system. Same rules as the API's (parsed with
+     * the preview configuration below); with asks open the start-up gate does not read it, and under
+     * "everyone-with-listed-buyers" it is here only so both files keep one list.
      */
     PREVIEW_TEAM_USER_IDS_JSON: z.string().max(4096).optional(),
     /** The API's same setting, parsed by the same rules, so the runner's start gate agrees with the API's routes. */

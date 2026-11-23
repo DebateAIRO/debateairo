@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Kérjük, először fogadja el a frissített Feltételeket, majd térjen vissza erre az oldalra.",
   "billing.checkout.pageOutdated": "Ez az oldal elavult. Kérjük, töltse be újra.",
   "billing.checkout.erasurePending": "A fiókja törlésre van ütemezve. Az előfizetéshez vagy a csomag módosításához vonja vissza a törlést a Beállításokban.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Túl sok próbálkozás az elmúlt órában. Kérjük, próbálja újra később.",
   "billing.checkout.genericError": "Valami hiba történt. Kérjük, próbálja újra.",
   "billing.checkout.formUnavailable": "A fizetési oldalt nem sikerült megnyitni. Kérjük, próbálja újra egy perc múlva.",

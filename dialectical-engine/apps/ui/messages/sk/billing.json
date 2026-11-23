@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Najprv prijmite aktualizované Podmienky a potom sa vráťte na túto stránku.",
   "billing.checkout.pageOutdated": "Táto stránka je zastaraná. Načítajte ju znova.",
   "billing.checkout.erasurePending": "Váš účet je naplánovaný na odstránenie. Ak si chcete predplatiť alebo zmeniť program, zrušte odstránenie v Nastaveniach.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Príliš veľa pokusov za poslednú hodinu. Skúste to neskôr.",
   "billing.checkout.genericError": "Niečo sa pokazilo. Skúste to znova.",
   "billing.checkout.formUnavailable": "Platobnú stránku sa nepodarilo otvoriť. Skúste to prosím znova o minútu.",

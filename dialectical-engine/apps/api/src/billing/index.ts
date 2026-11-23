@@ -114,9 +114,9 @@ export type BillingRouteDeps = Readonly<{
    */
   ageConfirmation?: BillingAgeConfirmation;
   /**
-   * Who may buy or upgrade a plan. Only `buildApi` supplies it, and only on the hosted preview while payments are real:
-   * there it is the rule for who may ask, so nobody pays for questions they would then be refused. Absent, anyone
-   * signed in may, as before.
+   * Who may buy or upgrade a plan. Only `buildApi` supplies it, and only on the hosted preview: while payments are real
+   * it is the rule for who may ask, so nobody pays for questions they would then be refused; on the sandbox it is the
+   * team list, except in the friends' test. The price request carries no rule. Absent, anyone signed in may, as before.
    */
   buyerAdmits?: BillingBuyerAdmits;
   /** P12/P13: present only when hosted with billing on; absent, the subscriber's routes answer 404. */

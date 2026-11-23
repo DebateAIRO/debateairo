@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Hyväksy ensin päivitetyt ehdot ja palaa sitten tälle sivulle.",
   "billing.checkout.pageOutdated": "Tämä sivu on vanhentunut. Lataa se uudelleen.",
   "billing.checkout.erasurePending": "Tilisi on ajastettu poistettavaksi. Peru poisto Asetuksissa, jos haluat tilata tai muuttaa tilaustasi.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Liian monta yritystä viimeisen tunnin aikana. Yritä myöhemmin uudelleen.",
   "billing.checkout.genericError": "Jokin meni vikaan. Yritä uudelleen.",
   "billing.checkout.formUnavailable": "Maksusivua ei voitu avata. Yritä uudelleen minuutin kuluttua.",

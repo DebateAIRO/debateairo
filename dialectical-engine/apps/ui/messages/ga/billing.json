@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Glac leis na Téarmaí nuashonraithe ar dtús, agus ansin fill ar an leathanach seo.",
   "billing.checkout.pageOutdated": "Tá an leathanach seo as dáta. Athlódáil é.",
   "billing.checkout.erasurePending": "Tá do chuntas sceidealaithe le scriosadh. Cuir an scriosadh ar ceal sna Socruithe chun liostáil nó do phlean a athrú.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "An iomarca iarrachtaí san uair an chloig seo caite. Bain triail eile as ar ball.",
   "billing.checkout.genericError": "Chuaigh rud éigin mícheart. Bain triail eile as.",
   "billing.checkout.formUnavailable": "Níorbh fhéidir an leathanach íocaíochta a oscailt. Bain triail eile as i gceann nóiméid.",

@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Bitte akzeptieren Sie zuerst die aktualisierten Bedingungen und kehren Sie dann zu dieser Seite zurück.",
   "billing.checkout.pageOutdated": "Diese Seite ist veraltet. Bitte laden Sie sie neu.",
   "billing.checkout.erasurePending": "Ihr Konto ist zur Löschung vorgemerkt. Brechen Sie die Löschung in den Einstellungen ab, um ein Abonnement abzuschließen oder Ihren Tarif zu ändern.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Zu viele Versuche in der letzten Stunde. Bitte versuchen Sie es später erneut.",
   "billing.checkout.genericError": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
   "billing.checkout.formUnavailable": "Die Zahlungsseite konnte nicht geöffnet werden. Bitte versuchen Sie es in einer Minute erneut.",

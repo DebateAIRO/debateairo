@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "まず更新された規約に同意してから、このページに戻ってください。",
   "billing.checkout.pageOutdated": "このページは古くなっています。再読み込みしてください。",
   "billing.checkout.erasurePending": "アカウントの削除が予定されています。登録やプランの変更を行うには、設定で削除を取り消してください。",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "この1時間の試行回数が多すぎます。しばらくしてからもう一度お試しください。",
   "billing.checkout.genericError": "問題が発生しました。もう一度お試しください。",
   "billing.checkout.formUnavailable": "お支払いページを開けませんでした。1 分ほどしてからもう一度お試しください。",

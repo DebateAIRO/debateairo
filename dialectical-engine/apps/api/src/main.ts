@@ -236,7 +236,7 @@ import {
 } from "./account-erasure.js";
 import { runErasureReconcileChain } from "./erasure-reconcile-chain.js";
 import { installBootCustody } from "./boot-custody.js";
-import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine } from "./preview-asks-open.js";
+import { assertPreviewAsksOpenBoot, previewAsksOpenBootLine, previewListedBuyersBootLine } from "./preview-asks-open.js";
 import { installStartupResourceOwner } from "./startup-resource-owner.js";
 import { PostgresAskAdmissionGate, PostgresReleaseStateReader, ReleaseWatcher, settingsVersionPassed, siteCapBootLine } from "./release-state.js";
 import { gatedInterval, gatedTrigger } from "./release-loops.js";
@@ -1047,6 +1047,9 @@ boot.runSync("preview-asks-open", () => assertPreviewAsksOpenBoot({
 }));
 const previewAsksOpenLine = previewAsksOpenBootLine(environment.PREVIEW_ASKS_OPEN);
 if (previewAsksOpenLine !== null) console.warn(previewAsksOpenLine);
+// With the listed buyers' value, how many accounts may buy: a count, never an id.
+const previewListedBuyersLine = previewListedBuyersBootLine(environment.PREVIEW_ASKS_OPEN, environment.PREVIEW_TEAM_USER_IDS);
+if (previewListedBuyersLine !== null) console.warn(previewListedBuyersLine);
 // V-3: over the RING, so a record still wrapped by the previous key opens for
 // the length of a changeover. Writes stay under the current key. Under the
 // ledger (A-I2) because the construction refuses a store path that is not one
@@ -2080,6 +2083,8 @@ const api = buildApi({
   // line-up over the gate part). `admissionView` below carries the active version's: the room read's class counts it (SA6).
   ...(previewGate === undefined ? {} : { previewProviderTestConfig: siteAdmission.previewConfig!, previewTeamUserIds: environment.PREVIEW_TEAM_USER_IDS ?? [] }),
   ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpen: true as const }),
+  // The value itself, read by the buyer rule only: it says whether anyone beyond the team line may buy.
+  ...(previewGate === undefined || environment.PREVIEW_ASKS_OPEN === undefined ? {} : { previewAsksOpenTo: environment.PREVIEW_ASKS_OPEN }),
   application,
   stories: ownerStories,
   // Engine money rule, Task M5 (spec 2026-09-26 §14.4.5): the owner's read of

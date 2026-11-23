@@ -395,6 +395,25 @@ describe("N19 CheckoutFlow on NETOPIA's page", () => {
     expect(goToPayment).not.toHaveBeenCalled();
   });
 
+  // The preview's buyer rule: the price request is open to every signed-in account, so an account not invited to buy
+  // reads the whole order page, and only the last button answers 403 PREVIEW_TEAM_ONLY, with nothing charged.
+  it("an account not invited to buy sees the whole order page with its price, and the invited-accounts sentence only after the last button", async () => {
+    const SENTENCE = "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.";
+    client.createBillingQuote.mockResolvedValue(quote());
+    client.startBillingCheckout.mockRejectedValueOnce(new ContractHttpError("FORBIDDEN", 403, "x", "PREVIEW_TEAM_ONLY"));
+    await render();
+    const eur = (decimal: string): string => formatMoney("en", decimal, "EUR");
+    expect(text()).toContain(`Plus — ${eur("20.00")} + ${eur("3.80")} MwSt. (19%, Germany) = ${eur("23.80")} per month.`);
+    expect(text()).toContain(EN["billing.consent.renewal"]!.replace("{total}", eur("23.80")));
+    expect(text()).not.toContain(SENTENCE);
+    await consentAndContinue();
+    expect(client.startBillingCheckout).toHaveBeenCalledTimes(1);
+    const alert = [...container.querySelectorAll('[role="alert"]')].map((node) => node.textContent);
+    expect(alert).toContain(SENTENCE);
+    expect(text()).not.toContain(EN["billing.checkout.genericError"]);
+    expect(goToPayment).not.toHaveBeenCalled();
+  });
+
   // NETOPIA's check of the public main site (the owner's choice of 24 October 2026): billing on, every country closed,
   // so every quote answers 403 COUNTRY_PAYMENT_UNAVAILABLE (tests/integration/billing-every-country-closed.test.ts).
   it("billing on with every country closed: the checkout shows the country sentence when the quote answers COUNTRY_PAYMENT_UNAVAILABLE, and never reaches a payment page", async () => {

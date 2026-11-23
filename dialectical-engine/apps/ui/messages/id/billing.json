@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Harap terima Ketentuan yang diperbarui terlebih dahulu, lalu kembali ke halaman ini.",
   "billing.checkout.pageOutdated": "Halaman ini sudah usang. Harap muat ulang.",
   "billing.checkout.erasurePending": "Akun Anda dijadwalkan untuk dihapus. Batalkan penghapusan di Pengaturan untuk berlangganan atau mengubah paket Anda.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Terlalu banyak percobaan dalam satu jam terakhir. Silakan coba lagi nanti.",
   "billing.checkout.genericError": "Terjadi kesalahan. Silakan coba lagi.",
   "billing.checkout.formUnavailable": "Halaman pembayaran tidak dapat dibuka. Silakan coba lagi dalam satu menit.",

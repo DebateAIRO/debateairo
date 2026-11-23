@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Vui lòng chấp nhận Điều khoản đã cập nhật trước, rồi quay lại trang này.",
   "billing.checkout.pageOutdated": "Trang này đã cũ. Vui lòng tải lại.",
   "billing.checkout.erasurePending": "Tài khoản của bạn đã được lên lịch xóa. Hãy hủy việc xóa trong Cài đặt để đăng ký hoặc đổi gói.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Quá nhiều lần thử trong một giờ qua. Vui lòng thử lại sau.",
   "billing.checkout.genericError": "Đã xảy ra lỗi. Vui lòng thử lại.",
   "billing.checkout.formUnavailable": "Không thể mở trang thanh toán. Vui lòng thử lại sau một phút.",

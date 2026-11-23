@@ -114,6 +114,7 @@
   "billing.checkout.reacceptRequired": "Palun nõustuge esmalt uuendatud tingimustega ja tulge siis sellele lehele tagasi.",
   "billing.checkout.pageOutdated": "See leht on aegunud. Laadige see uuesti.",
   "billing.checkout.erasurePending": "Teie konto kustutamine on ajastatud. Tellimiseks või paketi muutmiseks tühistage kustutamine seadetes.",
+  "billing.checkout.invitedBuyersOnly": "Buying a plan is open only to invited accounts for now. You can keep using the Free plan.",
   "billing.checkout.rateLimited": "Viimase tunni jooksul on liiga palju katseid. Proovige hiljem uuesti.",
   "billing.checkout.genericError": "Midagi läks valesti. Proovige uuesti.",
   "billing.checkout.formUnavailable": "Makselehte ei õnnestunud avada. Proovige minuti pärast uuesti.",

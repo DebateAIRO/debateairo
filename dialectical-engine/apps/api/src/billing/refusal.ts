@@ -81,8 +81,9 @@ export type BillingRefusalCode =
    */
   | "ACCOUNT_ERASURE_PENDING"
   /**
-   * On the hosted preview while payments are real: the account may not ask questions there, so it may not buy or upgrade
-   * a plan either; it would pay and then be refused every question. Nothing was written (403).
+   * On the hosted preview, the buyer rule refused a checkout or an upgrade: while payments are real the account may not
+   * ask questions there, so it would pay and then be refused every question; on the sandbox the account is not on the
+   * team list. Nothing was written (403).
    */
   | "PREVIEW_TEAM_ONLY";
 
@@ -102,8 +103,8 @@ export function billingNotFound(reply: FastifyReply): FastifyReply {
 }
 
 /**
- * Who may buy or upgrade a plan, when a rule applies: buildApi hands one over only on the hosted preview while payments
- * are real, where it is the same rule as who may ask. Absent, everyone may, as before.
+ * Who may buy or upgrade a plan, when a rule applies: buildApi hands one over only on the hosted preview
+ * (previewBuyerAdmits in @debateai/providers). Absent, everyone signed in may, as before.
  */
 export type BillingBuyerAdmits = (session: AuthenticatedSession) => boolean;
 
