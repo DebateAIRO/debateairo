@@ -266,10 +266,12 @@ describe('the addresses the window opens', () => {
 describe('the probes and the scripts', () => {
   it('no step asks for the password at / any more, only at /login, which the window never opens', () => {
     const ROOT_PROBE = /"https:\/\/\$HOST\/"|https:\/\/dezbatere\.ro\/\)|"https:\/\/\$H\/"/u;
-    // PWOFF2's robots check reads a header of the open site, so it keeps / on purpose.
+    // The robots checks of PWOFF2 and OPENCHECK read a header of the open site, so they keep / on purpose.
     expect(runbook.split('\n').filter(line => ROOT_PROBE.test(line))).toEqual([
+      `[ "$(curl -sI "https://$HOST/" | tr -d '\\r' | grep -ci '^x-robots-tag: noindex, nofollow$' || true)" = 1 ] || bad "/ does not send the robots header exactly once"`,
       `[ "$(curl -sI "https://$HOST/" | tr -d '\\r' | grep -ci '^x-robots-tag: noindex, nofollow$' || true)" = 1 ] || BAD="$BAD noindex"`
     ]);
+    expect(script('OPENCHECK')).toContain('bad "/ does not send the robots header exactly once"');
     expect(PWON.match(/"https:\/\/\$H\/login"/gu)).toHaveLength(2);
   });
 
@@ -435,7 +437,7 @@ describe("the names file's start helpers, and the steps that stop the website", 
   });
 
   /** The steps that restart only the API, with the website running. */
-  const API_ONLY = ['MAIL_ALLOW', 'MAIL_OPEN', 'MAIL_CLOSE', 'STAFFOFF', 'STAFFON', 'STAFFMAIN', 'ASKS_OPEN', 'ASKS_CLOSE', 'PAY_SWITCH', 'PAY_BACK'];
+  const API_ONLY = ['MAIL_ALLOW', 'MAIL_OPEN', 'MAIL_CLOSE', 'STAFFOFF', 'STAFFON', 'STAFFMAIN', 'ASKS_OPEN', 'ASKS_CLOSE', 'BUYERS', 'PAY_SWITCH', 'PAY_BACK'];
 
   it('every step that restarts only the API refuses an older names file before it changes anything, and its last line is true when the API refuses or the website does not answer', () => {
     // Exactly these steps call apiup.

@@ -5192,6 +5192,17 @@ release's prestart verifies with `--database-ahead` and its proof names the file
 
 After SB8 the online backup is a last resort only (spec §11): going back is the switch the other way, never a restore.
 
+**While MAIN-SITE.md's 6b is open** (`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers` in the API and runner files:
+the site open before real payments, and only the accounts on the team line may buy). SB5's `derive` copies the value
+and the team line, which is then the list of buyers, into the new release's files byte for byte, and its SAME checks
+hold both releases to the same value (`SAME_PREVIEW_ASKS_OPEN_TO`) and the same list (`SAME_PREVIEW_TEAM_USER_IDS_JSON`).
+Never change the list (MAIN-SITE.md's BUYERS) from SB3 to the end of the upload. The value can be set only when every
+release that may run, or be gone back to, carries it: an older API refuses it at start (`PREVIEW_ASKS_OPEN_TO_INVALID`)
+and lets any signed-in account buy on NETOPIA's sandbox. So 6b opens only after the upload that brings it is over
+and you have decided not to go back to the release before (WB2 is still possible after SB14), and before any way
+back to a release older than that one (WB2 included) come MAIN-SITE.md's PWON, then ASKS_CLOSE. After SB13b, edit
+the first line of MAIN-SITE.md's names file, then run its OPENCHECK.
+
 ### SB1. Names, the archive `$S` and the copies the way back needs
 
 The old release is the release table's CURRENT one, read through `release-check.mjs status`, never typed; the new
@@ -6761,6 +6772,15 @@ pay while the upload may still be undone: if the site is open, put the password 
 MAIN-SITE.md's LIVEAFTER (7.12) before you choose rbD-B: rbD-B puts back DR3's cold copy, so it would lose every real
 payment, NETOPIA notice, invoice and credit note written since then, while the cards stay charged and the documents
 stay issued. If LIVEAFTER does not end with `LIVEAFTER_DONE`, never run rbD-B: fix forward, and ask.
+
+**While MAIN-SITE.md's 6b is open** (`PREVIEW_ASKS_OPEN_TO=everyone-with-listed-buyers`: the site open before real
+payments, buying only for the accounts on the team line), DR1's `derive` copies the value and the team line into the
+new release's files, and its SAME checks hold both releases to the same value and the same list; never change the list
+(MAIN-SITE.md's BUYERS) from SB3 on. Run MAIN-SITE.md's PWON before DR2: the site is down from DR2 to DR6 anyway, and
+rbD-B would lose everything strangers write after DR3. rbD-B to a release older than the one that brought 6b needs
+MAIN-SITE.md's ASKS_CLOSE first (an older API refuses the value, and lets any signed-in account buy on NETOPIA's
+sandbox). After SB13b, edit the first line of MAIN-SITE.md's names file, run its PWOFF1, the hand edit and PWOFF2
+again, then its OPENCHECK.
 
 #### DR1. The three env files
 
