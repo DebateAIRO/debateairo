@@ -77,7 +77,7 @@ const RENEWAL_NOTICE_RULE = Object.freeze({ leastBusinessDays: 7 });
  */
 const INVOICE_ISSUER_SPLIT = Object.freeze({ RO: "SMARTBILL" as const, "*": "QUADERNO" as const });
 
-const billingPolicyValueSchema = z.object({
+const billingPolicyShape = z.object({
   kind: z.literal("BILLING_POLICY"),
   enabled: z.boolean(),
   // at most 3 retries, so attempts stay 1..4 (A2), the range 0084's billing.charge.attempt CHECK allows
@@ -90,7 +90,15 @@ const billingPolicyValueSchema = z.object({
   tax_code: z.enum(["saas", "eservice"]),
   invoice_issuer_rules: z.record(z.string(), z.enum(["QUADERNO", "SMARTBILL"])),
   withdrawal_countries: z.array(z.string().regex(ISO2)).min(1)
-}).strict().superRefine((value, ctx) => {
+}).strict();
+type BillingPolicyValue = z.infer<typeof billingPolicyShape>;
+
+/**
+ * The row's rules. `servedCountries` asks for every country the site serves on the withdrawal list (SERVED_WITHDRAWAL).
+ * That list grows when the site starts to serve a country, so a version sealed before a country joined holds a
+ * shorter, still lawful list: the reader of such an earlier version asks for the law's countries only.
+ */
+const billingPolicyRules = (servedCountries: boolean) => (value: BillingPolicyValue, ctx: z.RefinementCtx): void => {
   const refuse = (path: string, message: string): void => { ctx.addIssue({ code: "custom", path: [path], message }); };
   if (value.dunning_retry_days.some((day, index) => index > 0 && day <= value.dunning_retry_days[index - 1]!)) {
     refuse("dunning_retry_days", "retry days rise strictly");
@@ -117,10 +125,12 @@ const billingPolicyValueSchema = z.object({
   if (WITHDRAWAL_LAW.countries.some((country) => !value.withdrawal_countries.includes(country))) {
     refuse("withdrawal_countries", "every EU/EEA country and the UK keeps its withdrawal right");
   }
-  if (SERVED_WITHDRAWAL.some((country) => !value.withdrawal_countries.includes(country))) {
+  if (servedCountries && SERVED_WITHDRAWAL.some((country) => !value.withdrawal_countries.includes(country))) {
     refuse("withdrawal_countries", "every country the site serves keeps the 14-day withdrawal right");
   }
-});
+};
+const billingPolicyValueSchema = billingPolicyShape.superRefine(billingPolicyRules(true));
+const earlierBillingPolicyValueSchema = billingPolicyShape.superRefine(billingPolicyRules(false));
 
 /** Billing OFF. The owner switches it on by publishing a new version of this row (§1.7 step 7). */
 export const BILLING_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
@@ -148,8 +158,8 @@ export const BILLING_POLICY_DEPLOYMENT_REGISTER_ROW = Object.freeze({
   })
 });
 
-export function billingPolicyFromValue(value: unknown, sourceRef: string): BillingPolicy {
-  const parsed = billingPolicyValueSchema.safeParse(value);
+function billingPolicyOf(schema: typeof billingPolicyValueSchema, value: unknown, sourceRef: string): BillingPolicy {
+  const parsed = schema.safeParse(value);
   if (!parsed.success || typeof sourceRef !== "string" || sourceRef.trim() === "") {
     throw new TypedDomainError("BILLING_POLICY_INVALID", "The sealed billing policy row is malformed");
   }
@@ -167,6 +177,20 @@ export function billingPolicyFromValue(value: unknown, sourceRef: string): Billi
     withdrawalCountries: Object.freeze([...data.withdrawal_countries]),
     sourceRef
   });
+}
+
+/** The row a version of this code seals or runs with: every rule, the countries the site serves included. */
+export function billingPolicyFromValue(value: unknown, sourceRef: string): BillingPolicy {
+  return billingPolicyOf(billingPolicyValueSchema, value, sourceRef);
+}
+
+/**
+ * The row of a version an earlier release sealed, read when a new version is composed on it: every rule but the list
+ * of countries served beyond the law, which that release's own list may not have held yet. Never the reader for a row
+ * this code seals or serves with.
+ */
+export function earlierBillingPolicyFromValue(value: unknown, sourceRef: string): BillingPolicy {
+  return billingPolicyOf(earlierBillingPolicyValueSchema, value, sourceRef);
 }
 
 /** The row in force, or `null` when the version sealed none: billing is then off. */

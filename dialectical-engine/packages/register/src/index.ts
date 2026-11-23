@@ -1238,6 +1238,7 @@ export {
   BILLING_POLICY_ROW_KEY,
   assertBillingReady,
   billingPolicyFromValue,
+  earlierBillingPolicyFromValue,
   readBillingPolicy,
   type BillingPolicy,
   type BillingReadinessEnvelope

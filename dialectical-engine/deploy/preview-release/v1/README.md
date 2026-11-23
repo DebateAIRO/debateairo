@@ -5334,6 +5334,8 @@ OUT=$(nat "$ART/register-proposal.json"); echo "nat: $OUT"
 # the inputs NEWNUM names: no more (the plan's numbers were not the database's) and no fewer (a change did not take).
 jq -e --argjson n "$NAMED" 'def pair(k): ([.delta[] | select(.rowKey == k)][0]) as $d | if $d == null then null else [($d.oldValueJsonText // "null" | fromjson), ($d.newValueJsonText | fromjson)] end; def moved(k; f): pair(k) as $v | ($v != null and (($v[0] | f) != ($v[1] | f))); {perRunCeilingMicros: moved("costEnvelopePolicy"; .per_run_ceiling_micros?), dailyCeilingMicros: moved("costEnvelopePolicy"; .daily_ceiling_micros?), askRoomReads: moved("admissionPolicy"; .ask_room_reads?), billingPlans: moved("billingPlans"; .), abuseLimits: moved("abuseLimits"; .)} | [to_entries[] | select(.value) | .key] | sort == ($n | sort)' "$ART/register-proposal.json" > /dev/null || { echo "SB3_NOT_DONE: the numbers the proposal changes are not exactly the inputs NEWNUM names ($NAMED): the live plan's numbers are not the database's, or a named change did not take: ask (SB3b sets this plan aside)"; exit 1; }
 if [ -n "$SHAPE" ]; then jq -e --argjson s "$(jq -c .startStep <<<"$SHAPE")" '[.delta[] | select(.rowKey == "debateShapePolicy")] | length == 1 and (.[0] | (.oldValueJsonText | fromjson) as $o | (.newValueJsonText | fromjson) as $n | ($n | del(.startStep) | if ($o | has("mapStepBounds")) then . else del(.mapStepBounds) end) == $o and $n.startStep == $s)' "$ART/register-proposal.json" > /dev/null || { echo "SB3_NOT_DONE: the debate shape row changes more than the start step: ask (SB3b sets this plan aside)"; exit 1; }; echo "debate shape: only the start step added"; fi
+# Every changed row of A9's watch list, in words: member names and counts only, never a value.
+jq -r '["billingPolicy","costEnvelopePolicy","admissionPolicy","storyCostEnvelopePolicy","evaluatorRoleRef","storyCheckerRoleRef","answerRoleRotationPolicy","callConcurrencyPolicy","debateShapePolicy","lengthGuidancePolicy","engineVersionPolicy"] as $w | .delta[] | select(.rowKey as $k | $w | index($k)) | (.oldValueJsonText // "null" | fromjson) as $o | (.newValueJsonText // "null" | fromjson) as $n | "watched row \(.rowKey) (\(.change)): " + (if ($o | type) == "object" and ($n | type) == "object" then "members added [" + ((($n | keys) - ($o | keys)) | join(",")) + "], removed [" + ((($o | keys) - ($n | keys)) | join(",")) + "], changed [" + ([$o | keys[] | select(. as $k | ($n | has($k)) and $n[$k] != $o[$k])] | map(. as $k | if ($o[$k] | type) == "array" and ($n[$k] | type) == "array" then "\($k): +\(($n[$k] - $o[$k]) | length) -\(($o[$k] - $n[$k]) | length)" else $k end) | join(", ")) + "]" else "the whole value" end)' "$ART/register-proposal.json" || { echo "SB3_NOT_DONE: the watched rows could not be read from the proposal: ask (SB3b sets this plan aside)"; exit 1; }
 sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"
 jq -c '{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256}' "$ART/register-proposal.json"
 echo SB3_DONE
@@ -5355,8 +5357,27 @@ aside when the step stays off): SB3 then hands that one-line row to the plan (`-
 it checks that the debate shape row in the delta gains the start step and nothing else, printing `debate shape: only the
 start step added` (otherwise `SB3_NOT_DONE`, and SB3b sets the plan aside). What the owner then reads: the delta line
 lists `debateShapePolicy` among `changedKeys`; A9's first line prints its old value against its new one; and A9's watch
-line prints `STOP: debateShapePolicy`. On this upload that row is the owner's decision, not a stop. Any other row on the
-watch line is still a stop.
+line names it. On this upload that row is the owner's decision, not a stop.
+
+**The watched rows, in words.** Before its last lines SB3 prints one line for each changed row of A9's watch list:
+`watched row <name> (<change>): members added […], removed […], changed […]`, with member names and counts only. A
+release's own code may move a watched row too, and these lines say how. On the upload from the release of 2 November
+2026 to this code, expect three lines and no other:
+- `watched row admissionPolicy (changed)`: members added only (the request budgets of this release's new pages),
+  `removed []`, and `changed []` unless `NEWNUM` names `askRoomReads`;
+- `watched row billingPolicy (changed): members added [], removed [], changed [withdrawal_countries: +7 -0]`: the
+  14-day withdrawal right now covers seven more countries the site serves; nothing else in the row moves;
+- `watched row debateShapePolicy (changed): members added [startStep], removed [], changed []`: the owner's choice.
+
+A9's watch line then prints `STOP: admissionPolicy billingPolicy debateShapePolicy`. Those three, changed in exactly
+that way, are expected on this upload. A fourth row on the watch line, a `removed` member, or a `changed` member other
+than the ones above is a stop: SB3b sets the plan aside; ask.
+
+The practice (SB2) prints the rows the next version changes and adds, in its line `practising on this code's next
+version`. On this upload: changed `admissionPolicy`, `billingPolicy`, `configuredProviderSet`,
+`costEstimateStartPolicy`, `countryPolicy`, `debateShapePolicy`, `engineContractHash`, `providerFamilyMap`,
+`serveContractHash`, `taxAuthorities`; added `outboundMailPolicy`. SB3's `changedKeys` and `addedKeys` must be the
+same rows, plus `nodeRuntimeVersion` among the changed ones (its source reference only).
 
 **The site's numbers (`NEWNUM`, `LIMITS`).** The numbers live in the owner's file on the server,
 `/etc/debateai-v3-preview/hosted-billing-v1.json`: the per-debate ceiling, the day's ceiling, the room-read budget, the

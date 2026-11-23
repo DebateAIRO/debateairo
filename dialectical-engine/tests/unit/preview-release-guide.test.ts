@@ -1419,7 +1419,8 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       for (const line of lines.filter(code)) {
         // The hosted inputs are only ever handed to a tool or compared; they never reach echo, printf or a bare jq print.
         for (const echoed of line.matchAll(/echo "((?:[^"\\]|\\.)*)"/g)) expect(echoed[1], `${step}: ${line}`).not.toMatch(/\$\{?(HB|HB_ON|NUM|SI)\b|hostedBilling/);
-        if (/^\s*jq /.test(line) && !/>\s*("\$N"|\/dev\/null)/.test(line)) expect(line, `${step}: ${line}`).toMatch(/^\s*jq -r '\.lines\[\]' <<<"\$SI"$|^jq -c '\{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256\}' /);
+        // The watched-rows line prints member names and counts only; its own test below hands it changed numbers and finds none printed.
+        if (/^\s*jq /.test(line) && !/>\s*("\$N"|\/dev\/null)/.test(line)) expect(line, `${step}: ${line}`).toMatch(/^\s*jq -r '\.lines\[\]' <<<"\$SI"$|^jq -c '\{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256\}' |^jq -r '\["billingPolicy","costEnvelopePolicy","admissionPolicy",[^|]*\] as \$w \| \.delta\[\] \| .*"watched row /);
       }
     }
     // The one other print reads the record's lines, which hold names only (preview-site-inputs.test.ts).
@@ -2371,6 +2372,44 @@ describe('the step before Start, switched on in the upload: SHAPEON, POTS, STEPC
       expect(delta(BASE, { ...BASE, enabled: false, startStep: START_VALUES })[0]).toMatch(/^SB3_NOT_DONE: /);
       expect(delta(BASE, null)[0]).toMatch(/^SB3_NOT_DONE: /);
       expect(delta(BASE, { ...BASE, startStep: { widths: { ...START_VALUES.widths, free: { options: [1], default: 1 } } } })[0]).toMatch(/^SB3_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB3 says in words how each watched row changes, with member names and counts and never a value', () => {
+    const sb3 = scriptOf('SB3').lines;
+    const at = sb3.findIndex(line => line.startsWith('jq -r \'["billingPolicy","costEnvelopePolicy","admissionPolicy",') && line.includes('watched row'));
+    expect(at).toBeGreaterThan(sb3.findIndex(line => line.startsWith('if [ -n "$SHAPE" ]; then jq -e --argjson s ')));
+    expect(at).toBeLessThan(sb3.findIndex(line => line.startsWith('sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"')));
+    // The line reads the same watch list as A9's second line.
+    const a9 = guide.split('\n').find(line => line.startsWith('jq -r \'["billingPolicy","costEnvelopePolicy"') && line.includes('WATCH_LIST_ABSENT'))!;
+    expect(sb3[at]!.slice(0, sb3[at]!.indexOf(' as $w'))).toBe(a9.slice(0, a9.indexOf(' as $w')));
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-watch-'));
+    try {
+      const row = (rowKey: string, change: string, oldValue: unknown, newValue: unknown) => ({ rowKey, change, oldValueJsonText: oldValue === null ? null : JSON.stringify(oldValue), newValueJsonText: JSON.stringify(newValue) });
+      const run = (delta: unknown[]) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta }));
+        return bash(['set -euo pipefail', `ART='${dir}'`, sb3[at]!, 'echo WATCH_READ']).split('\n');
+      };
+      expect(run([
+        row('admissionPolicy', 'changed', { asks: { limit: 5 }, kind: 'A' }, { asks: { limit: 5 }, kind: 'A', start_step_calls: { limit: 7 } }),
+        row('billingPolicy', 'changed', { enabled: true, withdrawal_countries: ['AT', 'US'], withdrawal_days: 14 }, { enabled: true, withdrawal_countries: ['AT', 'US', 'CA', 'AU'], withdrawal_days: 14 }),
+        row('countryPolicy', 'changed', { countries: ['AT'] }, { countries: ['AT', 'CA'] }),
+        row('debateShapePolicy', 'changed', BASE, { ...BASE, startStep: START_VALUES }),
+        row('engineVersionPolicy', 'added', null, { kind: 'E' })
+      ])).toEqual([
+        'watched row admissionPolicy (changed): members added [start_step_calls], removed [], changed []',
+        'watched row billingPolicy (changed): members added [], removed [], changed [withdrawal_countries: +2 -0]',
+        'watched row debateShapePolicy (changed): members added [startStep], removed [], changed []',
+        'watched row engineVersionPolicy (added): the whole value',
+        'WATCH_READ'
+      ]);
+      // A changed number shows by its member's name only; a dropped member and a dropped country show too.
+      const out = run([row('costEnvelopePolicy', 'changed', { daily_ceiling_micros: 11_000_000, kept: 1, gone: 2 }, { daily_ceiling_micros: 12_000_000, kept: 1 }),
+        row('billingPolicy', 'changed', { withdrawal_countries: ['AT', 'US'] }, { withdrawal_countries: ['AT', 'CA'] })]);
+      expect(out).toEqual(['watched row costEnvelopePolicy (changed): members added [], removed [gone], changed [daily_ceiling_micros]',
+        'watched row billingPolicy (changed): members added [], removed [], changed [withdrawal_countries: +1 -1]', 'WATCH_READ']);
+      expect(out.join(' ')).not.toMatch(/11000000|12000000/);
+      expect(run([row('nodeRuntimeVersion', 'changed', {}, {})])).toEqual(['WATCH_READ']);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
