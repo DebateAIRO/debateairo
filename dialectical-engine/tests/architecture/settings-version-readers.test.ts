@@ -37,6 +37,8 @@ const REGISTER_VERSION_READERS: readonly ReaderEntry[] = Object.freeze([
   { file: "apps/api/src/billing/refund-done-cli.ts", kinds: ["site version"], use: "billing policy at the site version" },
   { file: "apps/api/src/billing/tax-summary-cli.ts", kinds: ["site version"], use: "tax authorities at the site version" },
   { file: "apps/api/src/billing/withdraw-cli.ts", kinds: ["site version"], use: "billing policy and plans at the site version" },
+  { file: "apps/api/src/breach-notice/cli.ts", kinds: ["site version"],
+    use: "the breach-notice command reads the daily mail limit and the mail program's time limit at the site version, as main.ts does" },
   { file: "apps/api/src/main.ts", kinds: ["site version"],
     use: "the API boot's site reads (auth, admission, billing, tax, …) and the site version handed to the per-version loader and pointer reader" },
   { file: "apps/api/src/settings-check.ts", kinds: ["site version"],

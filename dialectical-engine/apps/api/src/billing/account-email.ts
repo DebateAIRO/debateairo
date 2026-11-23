@@ -58,8 +58,11 @@ export class DekBillingRecipientReader implements BillingRecipientReader {
   }
 }
 
-/** The address under the person's DEK, with the AAD registration wrote it under; every buffer is zeroed. */
-async function openAccountEmail(users: ReadableUserDekStore, userId: string, envelope: CryptoEnvelope): Promise<string> {
+/**
+ * The address under the person's DEK, with the AAD registration wrote it under; every buffer is zeroed. Also read by the
+ * owner's breach-notice command (apps/api/src/breach-notice/accounts.ts), so the address has one way of being opened.
+ */
+export async function openAccountEmail(users: ReadableUserDekStore, userId: string, envelope: CryptoEnvelope): Promise<string> {
   let dek: Buffer | undefined;
   let plaintext: Buffer | undefined;
   try {

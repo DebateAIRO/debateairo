@@ -8,6 +8,7 @@ import {
   parseBillingRefundDoneEnvironment,
   parseBillingRenewalResumeEnvironment,
   parseBillingWithdrawEnvironment,
+  parseBreachNoticeEnvironment,
   parseKeyRotationEnvironment,
   parseLivenessEnvironment,
   parseMigrationEnvironment,
@@ -291,7 +292,9 @@ describe("row-level security S01: the API system database URLs", () => {
     const apiFile = {
       DATABASE_URL: runtimeUrl, REGISTER_VERSION: "7", NODE_ENV: "test",
       NETOPIA_API_BASE_URL: "https://secure-sandbox.netopia-payments.com", PUBLIC_APP_URL: "https://dezbatere.ro",
-      BLIND_INDEX_KEY_PATH: "/etc/debateai/blind-index.key"
+      BLIND_INDEX_KEY_PATH: "/etc/debateai/blind-index.key",
+      KEK_PATH: "/etc/debateai/kek.key", USER_DEK_STORE_PATH: "/var/lib/debateai/user-deks",
+      MAIL_SENDMAIL_PATH: "/usr/sbin/sendmail", MAIL_FROM: "noreply@dezbatere.ro"
     };
     const parsers = [
       ["operator", parseBillingOperatorEnvironment],
@@ -300,7 +303,9 @@ describe("row-level security S01: the API system database URLs", () => {
       ["refund-done", parseBillingRefundDoneEnvironment],
       ["renewal-resume", parseBillingRenewalResumeEnvironment],
       // The owner-of-email lookup (synthesis-flag S05), routed the same way at the merge onto that dev.
-      ["owner-lookup", parseBillingOwnerLookupEnvironment]
+      ["owner-lookup", parseBillingOwnerLookupEnvironment],
+      // The owner's breach-notice command (docs/operations/breach-runbook.md part 6): any account's address, so the same login.
+      ["breach-notice", parseBreachNoticeEnvironment]
     ] as const;
     for (const [name, parse] of parsers) {
       expect(parse({ ...apiFile, API_SYSTEM_DATABASE_URL: systemUrl }).DATABASE_URL, name).toBe(systemUrl);

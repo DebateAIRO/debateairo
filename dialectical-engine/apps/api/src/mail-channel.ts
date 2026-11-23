@@ -8,7 +8,7 @@ function accountCopyOf(display: MailDisplay | undefined): (key: string) => strin
   return (key) => copyOf(locale, key);
 }
 import { randomUUID } from "node:crypto";
-import { MailTemplateError, MAIL_TEMPLATES, copyOf, mailAttachmentFactsOf, mailLocaleOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
+import { MailTemplateError, MAIL_LOCALES, MAIL_TEMPLATES, copyOf, mailAttachmentFactsOf, mailLocaleOf, renderMail as renderTemplatedMail, type MailTemplateId } from "@debateai/mail-templates";
 import { buildTemplatedMessage, type MailAttachment } from "./mail-mime.js";
 import { isMailAddress } from "@debateai/kernel";
 import { SELLER_COMPANY } from "@debateai/billing-core";
@@ -504,5 +504,91 @@ export class MemoryTemplatedMailSender implements TemplatedMailChannel {
   async sendTemplated(mail: TemplatedMail): Promise<void> {
     const raw = composeTemplatedMessage(this.from, mail, "memory0000000000");
     this.messages.push(Object.freeze({ mail, raw }));
+  }
+}
+
+/**
+ * One personal-data-breach notice (docs/operations/breach-runbook.md part 6): the owner's own text for one language,
+ * already rendered (apps/api/src/breach-notice/text.ts), to one account's address. It is written by the same serializer
+ * as every templated mail (mail-mime.ts buildTemplatedMessage), so the hosted site's mail program takes it as one, under
+ * the mail plan and its allow-list lock like any other mail.
+ */
+export interface BreachNoticeMail {
+  readonly to: string;
+  /** The catalogue code of the text's language, e.g. ro; named in the header block. */
+  readonly language: string;
+  readonly subject: string;
+  readonly text: string;
+  readonly html: string;
+  /** A uuid v4, one per mail. */
+  readonly messageId: string;
+}
+
+export interface BreachNoticeMailChannel {
+  /** "SUPPRESSED": the address is on the blocked list, so nothing was sent and nothing was counted. */
+  sendBreachNotice(mail: BreachNoticeMail): Promise<"SENT" | "SUPPRESSED">;
+}
+
+const BREACH_NOTICE_PART_MAX = 200_000;
+
+function composeBreachNoticeMessage(from: string, mail: BreachNoticeMail, boundary: string): string {
+  const part = (value: unknown, max: number): boolean => typeof value === "string" && value !== "" && value.length <= max;
+  if (!isSingleDeliverableRecipient(mail.to) || !TEMPLATED_MESSAGE_ID.test(mail.messageId)
+    || !(MAIL_LOCALES as readonly string[]).includes(mail.language)
+    || !part(mail.subject, 200) || /[\u0000-\u001f\u007f]/.test(mail.subject)
+    || !part(mail.text, BREACH_NOTICE_PART_MAX) || !part(mail.html, BREACH_NOTICE_PART_MAX)) {
+    throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  }
+  try {
+    return buildTemplatedMessage({
+      from, to: mail.to, messageId: mail.messageId, subject: mail.subject, text: mail.text, html: mail.html, attachments: [], boundary,
+      contentLanguage: mail.language
+    });
+  } catch {
+    throw new MailDeliveryError("MAIL_INPUT_INVALID");
+  }
+}
+
+/** The owner's breach-notice command builds this one sender; the running API builds none. */
+export class BreachNoticeMailSender implements BreachNoticeMailChannel {
+  constructor(private readonly options: {
+    readonly executable: string;
+    readonly from: string;
+    readonly timeoutMs: number;
+    readonly gate: OutboundMailAuthorizer;
+  }) {
+    if (!/^noreply@[A-Za-z0-9.-]+$/.test(options.from)
+      || !isOutboundMailAuthorizer(options.gate)
+      || options.executable.trim() === ""
+      || !Number.isInteger(options.timeoutMs) || options.timeoutMs <= 0) {
+      throw new TypeError("OWN_MAIL_CONFIGURATION_INVALID");
+    }
+  }
+
+  async sendBreachNotice(mail: BreachNoticeMail): Promise<"SENT" | "SUPPRESSED"> {
+    const message = composeBreachNoticeMessage(this.options.from, mail, randomUUID().replaceAll("-", ""));
+    // The gate's own answer is kept, so the command can tell a mail that went from an address that is blocked.
+    let admitted = false;
+    const gate: OutboundMailAuthorizer = {
+      authorize: async (request) => {
+        admitted = await this.options.gate.authorize(request);
+        return admitted;
+      }
+    };
+    await sendRenderedMail(message, { ...this.options, gate }, { recipient: mail.to, purpose: "breach-notice" });
+    return admitted ? "SENT" : "SUPPRESSED";
+  }
+}
+
+/** Tests: renders exactly what the mail program would receive, and keeps it. */
+export class MemoryBreachNoticeMailSender implements BreachNoticeMailChannel {
+  readonly messages: Array<Readonly<{ mail: BreachNoticeMail; raw: string }>> = [];
+
+  constructor(private readonly from: string = "noreply@debateai.test") {}
+
+  async sendBreachNotice(mail: BreachNoticeMail): Promise<"SENT" | "SUPPRESSED"> {
+    const raw = composeBreachNoticeMessage(this.from, mail, "memory0000000000");
+    this.messages.push(Object.freeze({ mail, raw }));
+    return "SENT";
   }
 }

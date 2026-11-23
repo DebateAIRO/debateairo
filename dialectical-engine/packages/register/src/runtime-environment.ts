@@ -479,6 +479,29 @@ export function loadBillingRefundDoneEnvironment() {
 }
 
 /**
+ * The owner's breach-notice command (`pnpm breach:notify`, apps/api/src/breach-notice/cli.ts; docs/operations/breach-runbook.md
+ * part 6). It runs on the host under `systemd-run` with the API's EnvironmentFile and reads from it only what writing to
+ * accounts needs: the API's system login (an address may be any account's, so it connects as the billing commands do), the
+ * register version (the daily mail limit and the mail program's time limit), the keys that open an account's address and
+ * the blocked-address digest, and the mail program with its sender. The production floors hold here too.
+ */
+export function parseBreachNoticeEnvironment(source: EnvironmentSource) {
+  return withBillingOperatorSystemUrl(withProductionFloors(parseEnvironmentSource({
+    ...billingOperatorShape,
+    KEK_PATH: kekPath,
+    KEK_PREVIOUS_PATH: z.string().min(1).optional(),
+    USER_DEK_STORE_PATH: z.string().min(1),
+    BLIND_INDEX_KEY_PATH: z.string().min(1),
+    MAIL_SENDMAIL_PATH: z.string().min(1),
+    MAIL_FROM: z.string().regex(/^noreply@[A-Za-z0-9.-]+$/)
+  }, source)));
+}
+
+export function loadBreachNoticeEnvironment() {
+  return parseBreachNoticeEnvironment(process.env);
+}
+
+/**
  * B1 part 2 (NETOPIA answers 2026-10-21, Q22): `pnpm billing:renewal-resume` reads `NETOPIA_API_BASE_URL` from the API's
  * EnvironmentFile, the NETOPIA environment whose held renewals it releases (never another system's). Required. C6: it
  * also reads the OWNER-RUN sandbox's optional `BILLING_STAGE_CLOCK_OFFSET_DAYS`, so its marker is dated on the API's

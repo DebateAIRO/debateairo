@@ -528,6 +528,12 @@ describe("P3-01 production database-principal manifest", () => {
         // the API under systemd-run and appends only billing.charge_event rows (REQUESTED CHARGE_RESUMED), which that
         // principal already writes; no privilege is added.
         { component: "apps/api:billing-renewal-resume-cli", environmentKey: "DATABASE_URL", purpose: "BILLING_RENEWAL_RESUME_OPERATOR_COMMAND", binding: "WIRED", condition: "package script billing:renewal-resume" },
+        // The owner's breach-notice command (`pnpm breach:notify`, docs/operations/breach-runbook.md part 6) runs as the API,
+        // with the API's own EnvironmentFile, under systemd-run. It reads identity."user" and legal.acceptance across accounts
+        // on the system login, as the API's own background jobs do, and counts each mail through 0170's functions; it reads
+        // the declared countries from a file a root step writes, because no API login may read identity.registration_region.
+        // No privilege is added.
+        { component: "apps/api:breach-notice-cli", environmentKey: "DATABASE_URL", purpose: "BREACH_NOTICE_OPERATOR_COMMAND", binding: "WIRED", condition: "package script breach:notify" },
         // NETOPIA spec 2026-10-05 §2.20.3 (N22): the owner's NETOPIA recording (`pnpm billing:netopia-sandbox`) runs as the
         // API, with the API's own EnvironmentFile, under systemd-run; it inserts only billing.tool_order and reads
         // billing.card_token, card_token_revocation, payment_notice and payment_notice_raw, all granted by 0111 to

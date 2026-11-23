@@ -139,3 +139,5 @@ tests/integration/moderation-final-outcome-0176.test.ts
 tests/integration/erased-owner-unlinked-0177.test.ts
 # A sign-up not finished within 24 hours is deleted (0183): only the system login may run the four functions, the delete asks again under the account's locks, a live (resent) link keeps the account, and the key file stays owed until destroyed.
 tests/integration/unfinished-signup-expiry-database.test.ts
+# The breach-notice command (docs/operations/breach-runbook.md part 6): its two reads on the API's system login, that no API login reads the declared countries, and the runbook's own BREACHLIST step run as written.
+tests/integration/breach-notice-accounts.test.ts
