@@ -147,3 +147,7 @@ a273d069b8eadfecc62bab6caecbb2bca3e64654:dialectical-engine/tests/unit/public-re
 # OKEY. A release key is a public label, not a credential, and this one names no release. Classified by reading it, as
 # .gitleaks.toml describes.
 79dc23f4e2b133508c8fda9e788dc3c48ed0fe2d:dialectical-engine/tests/unit/preview-release-guide.test.ts:generic-api-key:2239
+# The release guide's test: generic-api-key matched a made-up release key (a settings version number, a dash and the
+# hex digits 0 to 9, a, b in order) that a test hands to guide block A6 as its names-file value KEY. A release key is a
+# public label, not a credential, and this one names no release. Classified by reading it, as .gitleaks.toml describes.
+57014d6c0300887027bf4affc4e34b6ddd3b32de:dialectical-engine/tests/unit/preview-release-guide.test.ts:generic-api-key:2593
