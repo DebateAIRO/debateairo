@@ -6,6 +6,7 @@ import { flushSync } from "react-dom";
 import { redactSupportText } from "@debateai/kernel";
 import type { SupportAction } from "@debateai/support-kb/catalog";
 import { resolveSupportActions } from "@debateai/support-kb/navigation";
+import { holdsNoSession } from "../../lib/api.js";
 import { requestPreferences } from "../../lib/consent.js";
 import { BrandMark } from "../TopBar.js";
 import { ModeToggle } from "../ModeToggle.js";
@@ -212,6 +213,8 @@ export const supportAssistantClient: SupportAssistantClient = Object.freeze({
    * the proxy while the API restarts, is not an answer: it rejects, and the panel treats the identity as unknown.
    */
   async isSignedIn() {
+    // No session in this browser: signed out, without sending a read the API could only refuse.
+    if (holdsNoSession()) return false;
     const response = await fetch("/api/v1/session",{
       method: "GET",cache: "no-store",credentials: "same-origin"
     });

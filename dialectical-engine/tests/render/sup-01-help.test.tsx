@@ -26,6 +26,7 @@ vi.mock("@/lib/i18n/I18nProvider",() => ({
   }
 }));
 
+import { holdSessionCookies } from "../support/sessionCookie.js";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { Assistant,supportAssistantClient,type SupportAssistantClient } from "../../apps/ui/components/support/Assistant.js";
 import { subscribeToPreferenceRequests } from "../../apps/ui/lib/consent.js";
@@ -168,13 +169,33 @@ describe("SUP-01 /help assistant",() => {
     await expect(supportAssistantClient.sendMessage("Question","en")).rejects.toThrow("SUPPORT_RESPONSE_INVALID");
   });
   it("accepts the canonical signed-in action returned with a grounded answer",async () => {
-    const fetch = vi.fn(async (path: string) => path === "/api/v1/session" ? json({}) : json({
-      outcome: "ANSWER_GROUNDED",text: "Open the debate composer",sources: [],
-      actions: [{ id: "start-debate",label: "Start a debate",href: "/new" }]
-    }));
+    // Signed in: the browser holds the session's cookies, so the identity read goes to the server.
+    const cookies = holdSessionCookies();
+    try {
+      const fetch = vi.fn(async (path: string) => path === "/api/v1/session" ? json({}) : json({
+        outcome: "ANSWER_GROUNDED",text: "Open the debate composer",sources: [],
+        actions: [{ id: "start-debate",label: "Start a debate",href: "/new" }]
+      }));
+      vi.stubGlobal("fetch",fetch);
+      await expect(supportAssistantClient.sendMessage("Question","en")).resolves.toMatchObject({
+        actions: [{ id: "start-debate",label: "Start a debate",href: "/new" }]
+      });
+    } finally {
+      cookies.drop();
+    }
+  });
+  it("answers signed out without a request when the browser holds no session, and asks the server when it does",async () => {
+    const fetch = vi.fn(async () => json({ error: "SESSION_REQUIRED" },401));
     vi.stubGlobal("fetch",fetch);
-    await expect(supportAssistantClient.sendMessage("Question","en")).resolves.toMatchObject({
-      actions: [{ id: "start-debate",label: "Start a debate",href: "/new" }]
-    });
+    await expect(supportAssistantClient.isSignedIn!()).resolves.toBe(false);
+    expect(fetch, "no session cookies: nothing sent").not.toHaveBeenCalled();
+    const cookies = holdSessionCookies();
+    try {
+      await expect(supportAssistantClient.isSignedIn!()).resolves.toBe(false);
+      expect(fetch, "a session the server no longer accepts: one read").toHaveBeenCalledTimes(1);
+      expect(fetch).toHaveBeenCalledWith("/api/v1/session",expect.objectContaining({ method: "GET" }));
+    } finally {
+      cookies.drop();
+    }
   });
 });

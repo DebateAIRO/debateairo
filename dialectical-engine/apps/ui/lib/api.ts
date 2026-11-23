@@ -94,6 +94,29 @@ function normalizeSameOriginApiPath(apiBase: string): string {
 }
 
 /**
+ * True when this browser holds no session. The session cookie is HttpOnly, but the API always sets and clears the
+ * readable CSRF cookie together with it, with the same lifetime, so a browser without the CSRF cookie has no session
+ * either. False without a document (a server render), where nothing about the browser's cookies is known.
+ */
+export function holdsNoSession(): boolean {
+  return typeof document !== "undefined" && readBrowserCsrfCookie("__Host-debateai-csrf") === null;
+}
+
+/**
+ * Reads the API can only refuse without a session. A browser holding none answers them itself with the API's own
+ * refusal: every 401 a page receives makes the browser forget the site password it sent at the edge, so a refused
+ * read on a signed-out page would ask for that password again.
+ */
+const SESSION_ONLY_READS: ReadonlySet<string> = new Set(["/v1/session", "/v1/asks/room"]);
+
+function sessionRequiredResponse(): Response {
+  return new Response(JSON.stringify({ error: "SESSION_REQUIRED" }), {
+    status: 401,
+    headers: { "content-type": "application/json" }
+  });
+}
+
+/**
  * Rewrites contract-client URLs onto the same-origin proxy path. Rev-3
  * advisory A4: a Request input would silently drop method, headers, and body
  * under rewriting, so it is refused loudly instead of forwarded wrong.
@@ -112,6 +135,9 @@ export function createSameOriginFetch(
       );
     }
     const contractUrl = new URL(String(input));
+    if ((init?.method ?? "GET").toUpperCase() === "GET" && SESSION_ONLY_READS.has(contractUrl.pathname) && holdsNoSession()) {
+      return Promise.resolve(sessionRequiredResponse());
+    }
     return fetchImplementation(`${sameOriginApiPath}${contractUrl.pathname}${contractUrl.search}`, init)
       .then((response) => {
         noteReleaseHeader(response.headers.get("x-debateai-release"));

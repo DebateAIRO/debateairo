@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LegalAcceptGate } from "@/components/billing/LegalAcceptGate";
 import { ageConfirmationHref, ageConfirmationRequired } from "@/lib/ageConfirmation";
+import { ContractHttpError } from "@debateai/contract";
 import { contractClient, validateSession } from "@/lib/api";
 import { focusIsLost } from "@/lib/focusGuard";
 import type { MessageCatalog } from "@/lib/i18n/translate";
@@ -13,6 +14,9 @@ import type { MessageCatalog } from "@/lib/i18n/translate";
  * the session beside it:
  *  - CHECKING until the session read answers; IN once it did and the one-time age check is not owed (owed: off to that
  *    check with the way back, exactly as AuthGate does); OUT when there is no session (or it could not be read);
+ *  - beside OUT the page is told whether the API itself said there is no session (its 401). A session read that merely
+ *    failed (the API restarting, the network) is OUT too, but the person may well be signed in, so the page keeps
+ *    reading what a signed-in page reads;
  *  - for a signed-in person who owes the Terms or Privacy acceptance (paid plans L4), the page hides — kept, so nothing
  *    typed is lost — while the accept screen shows, and comes back once accepted. A failed status read lets the page
  *    through (ruling Q-10, as LegalAcceptGate does).
@@ -31,9 +35,11 @@ export function V4AskGate({ catalog, locale, children }: Readonly<{
   /** newDebate.* (the accept screen's own words, as AuthGate passes them). */
   catalog: MessageCatalog;
   locale: string;
-  children: (session: V4Session) => ReactNode;
+  /** `refused`: the session read was answered "no session" by the API (only ever true with OUT). */
+  children: (session: V4Session, refused: boolean) => ReactNode;
 }>) {
   const [session, setSession] = useState<V4Session>("CHECKING");
+  const [refused, setRefused] = useState(false);
   const [legal, setLegal] = useState<"UNKNOWN" | "CLEAR" | "OWED">("UNKNOWN");
   const page = useRef<HTMLDivElement>(null);
   // Keyboard audit 2026-11-12 (V4A-14): what had focus in the page as it hid. Once accepted, the accept screen and its
@@ -52,7 +58,11 @@ export function V4AskGate({ catalog, locale, children }: Readonly<{
         }
         if (active) setSession("IN");
       },
-      () => { if (active) setSession("OUT"); }
+      (error: unknown) => {
+        if (!active) return;
+        setRefused(error instanceof ContractHttpError && error.status === 401);
+        setSession("OUT");
+      }
     );
     return () => { active = false; };
   }, []);
@@ -88,7 +98,7 @@ export function V4AskGate({ catalog, locale, children }: Readonly<{
 
   return (
     <>
-      <div ref={page} className="v4AskGate" hidden={legal === "OWED"}>{children(session)}</div>
+      <div ref={page} className="v4AskGate" hidden={legal === "OWED"}>{children(session, refused)}</div>
       {legal === "OWED" ? (
         <LegalAcceptGate catalog={catalog}>
           <AcceptCleared onCleared={() => setLegal("CLEAR")} />

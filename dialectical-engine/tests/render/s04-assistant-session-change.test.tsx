@@ -27,6 +27,7 @@ const fetchRoute = vi.hoisted(() => {
   return state;
 });
 
+import { holdSessionCookies } from "../support/sessionCookie.js";
 import { Assistant, supportAssistantClient } from "../../apps/ui/components/support/Assistant.js";
 import { SupportConversationGuard } from "../../apps/ui/components/support/SupportConversationGuard.js";
 import {
@@ -406,6 +407,8 @@ function denyStorage(name: "sessionStorage" | "localStorage"): void {
 describe("S04-C3 the help panel and the layout guard follow a session change", () => {
   beforeEach(() => {
     vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+    // The browser holds a session's cookies, so the identity reads go to the server, whose answer each case sets.
+    holdSessionCookies();
     lifecycle = "awake";
     window.sessionStorage.clear();
     // A page load starts a fresh module, so a fresh reset generation; in one test file the module is shared, so

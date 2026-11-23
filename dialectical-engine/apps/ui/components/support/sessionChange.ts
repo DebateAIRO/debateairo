@@ -1,4 +1,4 @@
-import { contractClient } from "../../lib/api.js";
+import { contractClient, holdsNoSession } from "../../lib/api.js";
 import { clearPendingExport } from "../../lib/dataExportPending.js";
 import {
   browserSupportConversationStorage,
@@ -123,6 +123,8 @@ export function onConversationWake(listener: WakeListener): () => void {
  * "no proof the session is older" (D-S04-20).
  */
 export async function readWakeFacts(): Promise<WakeFacts> {
+  // No session in this browser: signed out, without sending a read the API could only refuse.
+  if (holdsNoSession()) return SIGNED_OUT;
   const response = await fetch("/api/v1/session", {
     method: "GET", cache: "no-store", credentials: "same-origin"
   });

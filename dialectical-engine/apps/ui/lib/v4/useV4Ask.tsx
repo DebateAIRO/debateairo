@@ -139,6 +139,12 @@ export function useV4Ask(input: Readonly<{
    * (publicDigRefusalWords). Absent: false.
    */
   publicReportWaits?: boolean;
+  /**
+   * Absent or true, the room is read as always. False when the page knows the visitor is signed out: the room is not read
+   * (the API could only refuse it) and the plan counts as one that could not be read, so the Free notice shows as it does
+   * after two refused reads.
+   */
+  roomReads?: boolean;
 }>): Readonly<{
   /**
    * W3-4: a dig sends its `parent` (the debate it digs, its places, mode and picks); a new question sends none.
@@ -248,7 +254,8 @@ export function useV4Ask(input: Readonly<{
     dig_mode: effectiveDigMode(mode, planTier),
     ...(digPicks > 0 ? { dig_picks: digPicks } : {})
   };
-  const [room, setRoom, refreshRoom, roomRead] = useAskRoom(contractClient, roomQuery);
+  const roomReads = input.roomReads !== false;
+  const [room, setRoom, refreshRoom, roomRead] = useAskRoom(contractClient, roomQuery, { enabled: roomReads });
   // Task 70b (ask-f2): a read that answered makes the plan known; while it is still unknown, a failed read is tried once
   // more, and only that second failure makes it FAILED. A later failed read never forgets a plan once known.
   const planRetried = React.useRef(false);
@@ -257,12 +264,18 @@ export function useV4Ask(input: Readonly<{
       setPlanState("KNOWN");
       return;
     }
-    if (roomRead !== "FAILED" || planState !== "LOADING" || planRetried.current) return;
+    if (roomRead !== "FAILED" || planState !== "LOADING") return;
+    // No room reads (a signed-out visitor): nothing to try again, the plan is one that could not be read.
+    if (!roomReads) {
+      setPlanState("FAILED");
+      return;
+    }
+    if (planRetried.current) return;
     planRetried.current = true;
     void refreshRoom().then((value) => {
       if (value === null) setPlanState((now) => (now === "LOADING" ? "FAILED" : now));
     });
-  }, [roomRead, planState, refreshRoom]);
+  }, [roomRead, planState, refreshRoom, roomReads]);
 
   /** Ruling R51: a read from another version is authoritative — its switches apply as they are (they may turn off). */
   const adoptSettingsRead = React.useCallback((read: AskRoom) => {

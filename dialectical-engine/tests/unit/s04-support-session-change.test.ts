@@ -7,6 +7,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { holdSessionCookies } from "../support/sessionCookie.js";
 /**
  * `apps/ui/lib/api.ts` binds `fetch` when the module loads, so the route table is installed before the modules
  * load (vi.hoisted) and the real `contractClient` — schema parse included — answers through it.
@@ -525,12 +526,20 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
       if (url === "/api/v1/auth/sessions") return json(sessionList);
       throw new Error(`UNEXPECTED_FETCH:${url}`);
     };
+    // A browser holding a session's cookies asks the server, which decides.
+    const cookies = holdSessionCookies();
     expect(await readWakeFacts()).toEqual({ signedIn: true, currentSessionStartedAtMs: 1_790_768_573_000 });
     expect(calls).toEqual(["/api/v1/session", "/api/v1/auth/sessions"]);
+    // Its cookies, but a session the server no longer accepts: one refused read.
     signedIn = false;
     calls.length = 0;
     expect(await readWakeFacts()).toEqual({ signedIn: false, currentSessionStartedAtMs: null });
     expect(calls, "no session list while signed out").toEqual(["/api/v1/session"]);
+    // No session cookies at all: signed out without asking, since the API could only refuse.
+    cookies.drop();
+    calls.length = 0;
+    expect(await readWakeFacts()).toEqual({ signedIn: false, currentSessionStartedAtMs: null });
+    expect(calls, "nothing sent without a session").toEqual([]);
   });
 
   it("U16 facts that cannot be read are unknown: nothing is decided on them, the copy stays, and the gate reads again when the server answers", async () => {
@@ -545,6 +554,8 @@ describe("S04-C1 the session-change signal (S1.5-S1.7)", () => {
       if (url === "/api/v1/session") return status === 0 ? Promise.reject(new TypeError("Failed to fetch")) : json({}, status);
       throw new Error(`UNEXPECTED_FETCH:${url}`);
     };
+    // The server's answer only counts for a browser that holds a session's cookies (one without them asks nothing: U15).
+    holdSessionCookies();
     expect(await readWakeFacts(), "401").toEqual({ signedIn: false, currentSessionStartedAtMs: null });
     for (const failing of [500, 502, 503, 504, 403]) {
       status = failing;

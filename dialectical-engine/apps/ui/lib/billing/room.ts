@@ -48,15 +48,24 @@ export type AskRoomRead = "LOADING" | "READ" | "FAILED";
 /**
  * The room for `query`, re-read whenever the query changes; `refresh` re-reads on demand. The fourth item says how the
  * latest read went (a failed read is `null` like no read, so the room alone cannot say).
+ * `enabled` false (a page that knows the visitor is signed out) reads nothing: the API could only refuse, and each refusal
+ * makes the browser ask for the site password again. The room is then what a refused read leaves: `null`, FAILED.
  */
 export function useAskRoom(
   client: Pick<ContractClient, "getAskRoom"> | undefined,
-  query: AskRoomQuery
+  query: AskRoomQuery,
+  options: Readonly<{ enabled?: boolean }> = {}
 ): readonly [AskRoom | null, (room: AskRoom | null) => void, () => Promise<AskRoom | null>, AskRoomRead] {
+  const enabled = options.enabled !== false;
   const [room, setRoom] = useState<AskRoom | null>(null);
-  const [read, setRead] = useState<AskRoomRead>("LOADING");
+  const [read, setRead] = useState<AskRoomRead>(enabled ? "LOADING" : "FAILED");
   const key = JSON.stringify(query);
   useEffect(() => {
+    if (!enabled) {
+      setRoom(null);
+      setRead("FAILED");
+      return;
+    }
     let active = true;
     void readAskRoom(client, JSON.parse(key) as AskRoomQuery).then((value) => {
       if (!active) return;
@@ -64,12 +73,13 @@ export function useAskRoom(
       setRead(value === null ? "FAILED" : "READ");
     });
     return () => { active = false; };
-  }, [client, key]);
+  }, [client, key, enabled]);
   const refresh = useCallback(async () => {
+    if (!enabled) return null;
     const value = await readAskRoom(client, JSON.parse(key) as AskRoomQuery);
     setRoom(value);
     setRead(value === null ? "FAILED" : "READ");
     return value;
-  }, [client, key]);
+  }, [client, key, enabled]);
   return [room, setRoom, refresh, read] as const;
 }
