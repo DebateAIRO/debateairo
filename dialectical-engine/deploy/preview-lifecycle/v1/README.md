@@ -619,7 +619,8 @@ unit files before installing; nothing else names them.
 
       Expect a `local` row for `debateai_prod_staff_recovery` with `scram-sha-256` (and a database
       column that covers `debateai`) on a lower line number than any `reject` row that would match
-      it. If it is missing, stop: adding it is a reviewed pg_hba change, not part of this install.
+      it. If it is missing, stop: adding it is a reviewed pg_hba change, not part of this install
+      (STAFFHBA, "The staff recovery login's line in pg_hba.conf" below).
 
       The fallback **refuses to start** once a–e pass: each start first tries the dedicated-user
       path (a check that writes nothing), and if that works the run ends at once with
@@ -676,6 +677,66 @@ unit files before installing; nothing else names them.
    systemctl enable debateai-preview.target
    systemctl enable --now debateai-preview-backup.timer
    ```
+
+## The staff recovery login's line in pg_hba.conf (STAFFHBA)
+
+The staff recovery login (`debateai_prod_staff_recovery`) signs in on the database's local socket with a password:
+the team unlock's fallback (install step 7f) and the staff re-key tool (`rekey-staff-key.mjs`, MAIN-SITE.md 5.7) both
+connect that way. The database lets it in only if `pg_hba.conf` has the line
+`local  debateai  debateai_prod_staff_recovery  scram-sha-256` (as in `deploy/postgres/pg_hba.conf.template`) above
+the catch-all `local all all reject`. Without it, the first rule that matches the login is that `reject`, and
+REKEYCHECK (MAIN-SITE.md 5.7) says `NOT READY`.
+
+STAFFHBA adds that one line, right above the `local all all reject` line, and reloads the database's settings. It
+runs with the site up: a reload, no restart. Run it before an upload's downtime (the day before, or earlier on the
+upload day), so that the upload's cold copy of the database folder holds it. Like install step 7c, it keeps a copy of the file first, in `/root/preview-archive/`.
+
+It refuses, and changes nothing, when: the file already has a `local` line for this login; the first rule that matches
+the login is not the `local all all reject` line (for example the line is in force already, or a broader rule comes
+first); the file has no single `local all all reject` line; PostgreSQL already reports an error in the file; the login
+does not exist. After the edit and before the reload it checks that exactly that one line was added and that
+PostgreSQL reads the new file without an error; if not, it puts the copy back and stops before the reload. After the
+reload it asks the database once as that login, with no password: the database must ask for one (psql's
+`no password supplied`), not refuse the connection. It prints no secret.
+
+As root (`sudo -i`); paste the whole block:
+
+```sh
+set -euo pipefail
+# STAFFHBA: the staff recovery login's line in pg_hba.conf (local socket, database debateai, scram-sha-256), right above the catch-all reject line, then a reload.
+psqlq() { runuser -u postgres -- /usr/lib/postgresql/18/bin/psql -h /run/debateai-v3-preview/postgresql -p 5434 -d debateai -XAt -c "$1"; }
+LINE='local  debateai  debateai_prod_staff_recovery  scram-sha-256'
+HBA=$(psqlq 'SHOW hba_file') || { echo "STAFFHBA_NOT_DONE: the database is unreadable: ask; nothing changed"; exit 1; }
+FIRST="SELECT COALESCE((SELECT file_name || ' ' || line_number || ' ' || auth_method FROM pg_hba_file_rules WHERE error IS NULL AND type = 'local' AND database && ARRAY['all', 'debateai'] AND user_name && ARRAY['all', 'debateai_prod_staff_recovery'] ORDER BY rule_number LIMIT 1), 'none')"
+STAMP=$(date -u +%Y%m%dT%H%M%SZ); COPY="/root/preview-archive/pg_hba.conf.before-staffhba-$STAMP"
+[ -f "$HBA" ] && [ ! -L "$HBA" ] || { echo "STAFFHBA_NOT_DONE: the database's pg_hba.conf ($HBA) is not a plain file: ask; nothing changed"; exit 1; }
+[ -d /root/preview-archive ] && [ ! -e "$COPY" ] || { echo "STAFFHBA_NOT_DONE: /root/preview-archive is missing, or $COPY exists already: ask; nothing changed"; exit 1; }
+[ "$(psqlq "SELECT count(*) FROM pg_roles WHERE rolname = 'debateai_prod_staff_recovery'" || true)" = 1 ] || { echo "STAFFHBA_NOT_DONE: the database has no login debateai_prod_staff_recovery: ask; nothing changed"; exit 1; }
+[ "$(psqlq 'SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL' || true)" = 0 ] || { echo "STAFFHBA_NOT_DONE: PostgreSQL already reports an error in pg_hba.conf (pg_hba_file_rules): ask; nothing changed"; exit 1; }
+if grep -Eq '^[[:space:]]*local[[:space:]]+[^[:space:]]+[[:space:]]+debateai_prod_staff_recovery([[:space:]]|$)' "$HBA"; then echo "STAFFHBA_NOT_DONE: pg_hba.conf already has a local line for debateai_prod_staff_recovery: ask; nothing changed"; exit 1; fi
+RN=$(grep -nE '^[[:space:]]*local[[:space:]]+all[[:space:]]+all[[:space:]]+reject[[:space:]]*$' "$HBA" | cut -d: -f1 || true)
+[ -n "$RN" ] && [ "$(printf '%s\n' "$RN" | wc -l)" -eq 1 ] || { echo "STAFFHBA_NOT_DONE: pg_hba.conf does not have exactly one 'local all all reject' line: ask; nothing changed"; exit 1; }
+NOW=$(psqlq "$FIRST" || true)
+[ "$NOW" = "$HBA $RN reject" ] || { echo "STAFFHBA_NOT_DONE: the first rule that matches the login is not the 'local all all reject' line $RN (it is: ${NOW:-unreadable}): ask; nothing changed"; exit 1; }
+cp -p "$HBA" "$COPY"
+sed -i "${RN}i $LINE" "$HBA"
+[ "$(sed -n "${RN}p" "$HBA")" = "$LINE" ] && diff -q <(sed "${RN}d" "$HBA") "$COPY" >/dev/null && [ "$(stat -c '%a %U:%G' "$HBA")" = "$(stat -c '%a %U:%G' "$COPY")" ] || { cp -p "$COPY" "$HBA"; echo "STAFFHBA_NOT_DONE: the edit did not add exactly the one line with the file's own mode and owner: the copy is back in place, nothing was reloaded: ask"; exit 1; }
+[ "$(psqlq 'SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL' || true)" = 0 ] && [ "$(psqlq "$FIRST" || true)" = "$HBA $RN scram-sha-256" ] || { cp -p "$COPY" "$HBA"; echo "STAFFHBA_NOT_DONE: PostgreSQL does not read the new file as expected: the copy is back in place, nothing was reloaded: ask"; exit 1; }
+[ "$(psqlq 'SELECT pg_reload_conf()' || true)" = t ] || { echo "STAFFHBA_NOT_DONE: the reload was refused; the new file is in place but may not be in force: ask (the way back is below)"; exit 1; }
+OUT=''; for TRY in 1 2 3 4 5; do sleep 1; OUT=$(runuser -u postgres -- /usr/bin/env -i PGPASSFILE=/dev/null /usr/lib/postgresql/18/bin/psql -w -h /run/debateai-v3-preview/postgresql -p 5434 -U debateai_prod_staff_recovery -d debateai -XAtc 'SELECT 1' 2>&1 || true); case "$OUT" in *'no password supplied'*) break ;; esac; done
+case "$OUT" in *'no password supplied'*) ;; *) echo "STAFFHBA_NOT_DONE: after the reload the database still does not ask this login for a password (psql said: $(printf '%s' "$OUT" | tail -n 1)): ask (the way back is below)"; exit 1 ;; esac
+echo "pg_hba.conf line $RN: $LINE (the reject line follows it); the copy from before: $COPY"
+echo STAFFHBA_DONE
+```
+
+Expect the line naming the new line and the copy, then `STAFFHBA_DONE`. REKEYCHECK (MAIN-SITE.md 5.7) then finds
+`scram-sha-256` for the login. `stat -c '%a %U:%G'` of the file stays what it was (usually `640 postgres:postgres`).
+
+The way back: put the copy back over the file and reload, as root. `cp -p` the copy that the last line named over
+the path `SHOW hba_file` prints, then run
+`runuser -u postgres -- /usr/lib/postgresql/18/bin/psql --host=/run/debateai-v3-preview/postgresql --port=5434 -d debateai -XAtc 'SELECT pg_reload_conf()'`
+(it prints `t`). REKEYCHECK then says `NOT READY` for this login again; nothing else changes. Never edit the file by
+hand for this.
 
 ## Pinning a NEW release
 

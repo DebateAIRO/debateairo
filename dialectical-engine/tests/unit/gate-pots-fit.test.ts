@@ -318,6 +318,30 @@ describe("Task 42: the guard asks each gate once, with its pot", () => {
     expect(minted).toHaveLength(15);
   });
 
+  it("a paid roster that seats the Amazon gate's model asks that gate once on its own socket; without the socket it is UNANSWERED", async () => {
+    const LUNA = "us.openai.gpt-6-luna";
+    const lineUp = Object.freeze({ free_model_ids: FREE_ROSTER, premium_model_ids: Object.freeze([...PREMIUM_ROSTER, LUNA]) });
+    const site = (gate: PreviewGateSettings): AdmissionSiteContext => ({ preview: { gate, envLineUp: null },
+      declaredProviderTargets: [...TARGETS, { providerRef: "preview:gpt-6-luna", model: LUNA }] }) as unknown as AdmissionSiteContext;
+    const withAmazon: PreviewGateSettings = parsePreviewEnvironmentConfig(JSON.stringify({ budget_socket: `${SOCKETS}/deepinfra-budget-v3.sock`,
+      deployment: "v3-preview", requested_thinking_level: "high", scope_id: "made-up-scope", anthropic_budget_socket: `${SOCKETS}/anthropic-budget-v1.sock`,
+      bedrock_budget_socket: `${SOCKETS}/bedrock-budget-v1.sock`, perplexity_budget_socket: `${SOCKETS}/perplexity-budget-v1.sock` }))!.gate;
+    const asked: string[] = [];
+    const readRemaining = vi.fn(async (gate: string, socket: string, scopeId: string) => {
+      asked.push(`${gate} ${socket} ${scopeId}`);
+      return fits();
+    });
+    expect(await readGatePotFindings({ loaded: loadedVersion().settings, site: site(withAmazon), lineUp, environment: environmentWith(withAmazon), readRemaining }))
+      .toEqual({ refusals: [], warnings: [] });
+    expect(asked).toEqual([`deepinfra ${SOCKETS}/deepinfra-budget-v3.sock made-up-scope`, `anthropic ${SOCKETS}/anthropic-budget-v1.sock made-up-scope`,
+      `bedrock ${SOCKETS}/bedrock-budget-v1.sock made-up-scope`, `perplexity ${SOCKETS}/perplexity-budget-v1.sock made-up-scope`]);
+    // The same line-up where the settings name no Amazon socket: that gate cannot be asked, so one debate is not known to fit.
+    asked.length = 0;
+    expect(await readGatePotFindings({ loaded: loadedVersion().settings, site: site(GATE), lineUp, environment: environmentWith(GATE), readRemaining }))
+      .toEqual({ refusals: ["GATE_POT_UNANSWERED:bedrock"], warnings: [] });
+    expect(asked.map((line) => line.split(" ")[0])).toEqual(["deepinfra", "anthropic", "perplexity"]);
+  });
+
   it("weighs every case against the answers: a small pot names each choice over it on its gate, today's spending is a note", async () => {
     const { settings } = loadedVersion();
     const answers: Readonly<Record<string, PreviewGateRemaining>> = { deepinfra: fits({ remainingNanoUsd: 0n }), anthropic: fits({ dailyPotNanoUsd: POT_SMALL }),

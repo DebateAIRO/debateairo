@@ -2,7 +2,7 @@
 
 <!-- legal-chrome
 summaryTitle: 简要说明
-eyebrow: 隐私政策 · v1.0 · 生效日期 2026 年 11 月 22 日
+eyebrow: 隐私政策 · v1.0 · 生效日期 2026 年 11 月 23 日
 title: 我们存储哪些内容及其原因
 lede: 以通俗语言说明您依据 GDPR (EU) 2016/679 享有的权利及我们承担的义务。共十四节及附件 B — 请滚动至末尾。
 endMarker: 政策结束 · GDPR (EU) 2016/679 · v1.0
@@ -19,7 +19,7 @@ jumps:
 13 COOKIE
 -->
 
-**Version 1.0 · Effective 2026 年 11 月 22 日 · 历史版本见 dezbatere.ro/privacy/versions · 控制者：DMS Merchandise Shop S.R.L.，Piatra Neamț**
+**Version 1.0 · Effective 2026 年 11 月 23 日 · 历史版本见 dezbatere.ro/privacy/versions · 控制者：DMS Merchandise Shop S.R.L.，Piatra Neamț**
 
 **In short.** 我们收集账户运行所需的信息以及您在辩论中输入的内容。您写给支持助手的内容会发送给其 AI 模型，以便它能够答复您，而我们不保留其中任何内容。您的问题会发送给本公司《名录》中所列的 AI 提供商，主要是位于美国的 DeepInfra。DeepInfra、Anthropic 和 Perplexity 的条款不允许它们使用您所写的内容训练模型；第 5 节说明我们尚未确认这一点的是哪家公司。我们的托管提供商将您的账户和辩论存储在英国伦敦；第 5 节说明您的数据还会发往何处。免费套餐上的辩论在结束后经 AI 检测即会公开；付费套餐上的辩论除非您发布，否则为私密内容。删除账户会销毁我们服务器上您私密数据的密钥，但我们的独立备份存储中的加密副本不会被自动删除（第 7 节）；公开辩论仍保持公开，并会从中移除您的化名。您可通过 privacy@dezbatere.ro 联系我们；辩论中被提及的人士无需账户也可写信给我们。
 

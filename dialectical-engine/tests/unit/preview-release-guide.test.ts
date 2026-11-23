@@ -74,7 +74,8 @@ const code = (line: string) => !line.trimStart().startsWith('#');
 const STEPS = Object.freeze([
   'TA0', 'TA1', 'TA8', 'TA_UNITS', 'TA_CADDY', 'TA_ENV', 'TA_OP', 'TB0', 'TB1', 'TB2', 'TB3', 'TB4', 'TB5', 'TB6', 'TB7', 'TB8', 'TB9', 'RBA_T', 'RBB_T',
   'SB1', 'SB1B', 'SB3', 'SB3B', 'SB3C', 'SB4', 'SB5', 'SB5B', 'SB5C', 'SB5D', 'SB7', 'SB8', 'SB9', 'SB10', 'SB11', 'SB12', 'SB13', 'SB13B', 'LOGOCHECK', 'SB14', 'SB14B', 'SB15',
-  'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'DR2', 'DR3', 'DR4', 'DR5', 'DR6', 'RBD_A', 'RBD_B', 'MT1', 'MT2', 'PM1', 'PM2'
+  'WB1', 'WB2', 'WB3', 'WB4', 'DR1', 'PRECHECK', 'DR2', 'DR3', 'DBBACK', 'DR4', 'DR4AGAIN', 'SWAP', 'DR5', 'DR5RESUME', 'DR6', 'DR6TAIL',
+  'AFTERDR6', 'LATELINES', 'DR6AGAIN', 'RBD_A', 'RBD_B', 'AGAINSAME', 'MT1', 'MT2', 'PM1', 'PM2'
 ]);
 /** The scripts that make the names file (they cannot read it yet). */
 const MAKES_NAMES = Object.freeze(['TA0', 'TA1', 'SB1']);
@@ -312,7 +313,15 @@ describe('the preview release guide: transition T, side by side, the way back, t
 
   it('the stale-lock line\'s pgrep cannot match its own shell (final fix wave S7)', () => {
     const lines = allBlocks.flatMap(block => block.lines).filter(line => code(line) && line.includes('pgrep'));
-    expect(lines).toEqual(["pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock \"/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)\""]);
+    // DR2's look for a running system upgrade is the one other pgrep, in the same bracket form, and it names the upgrade
+    // program's own path, so the always-running shutdown helper (/usr/share/unattended-upgrades/...) does not match.
+    const upgrade = scriptOf('DR2').lines.find(line => line.includes('pgrep'))!;
+    expect(upgrade).toBe("! pgrep -f '[/]usr/bin/unattended-upgrade' > /dev/null || { echo \"DR2_NOT_DONE: an unattended upgrade of the system runs now (nothing was stopped): wait until it has finished, then DR2 again\"; exit 1; }");
+    const upgradePattern = new RegExp(/'([^']+)'/.exec(upgrade)![1]!);
+    expect(upgradePattern.test('/usr/bin/python3 /usr/bin/unattended-upgrade')).toBe(true);
+    expect(upgradePattern.test('/usr/bin/python3 /usr/share/unattended-upgrades/unattended-upgrade-shutdown --wait-for-signal')).toBe(false);
+    expect(upgradePattern.test(`bash -c ${upgrade}`)).toBe(false);
+    expect(lines.filter(line => line !== upgrade)).toEqual(["pgrep -f '[r]elease-switch.mjs' || mv /etc/debateai-v3-preview/lifecycle/release-switch.lock \"/root/preview-archive/release-switch.lock.stale-$(date -u +%Y%m%dT%H%M%SZ)\""]);
     // pgrep -f matches its pattern (an extended regex) against every process's whole command line: the bracket form
     // finds a running switch, but not the shell that runs this line (`bash -c "<line>"`); the plain name found both.
     const switchProcess = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node /opt/debateai-v3-preview/operator/lifecycle-v1/dialectical-engine/deploy/preview-lifecycle/v1/release-switch.mjs switch --finish --to a-v1 --from b-v1';
@@ -1265,7 +1274,9 @@ describe('NV-07: the restore fence in the guides', () => {
     const h11 = sectionOf(guide, H11);
     // H11's blocks sit inside its numbered steps (three spaces in), as H9's do.
     const blocks = blocksOf(h11.split('\n').map(line => line.replace(/^ {3}/, '')).join('\n'));
-    expect(blocks[0]!.lines[0]).toBe(NAMES_LINE);
+    // Step 1 is FENCEDIR, a script of the runbook's form; step 2 is still the one block that ends H11_DONE.
+    expect(blocks[0]!.lines.slice(0, 2)).toEqual(['set -euo pipefail', NAMES_LINE]);
+    expect(blocks[0]!.lines.at(-1)).toBe('echo FENCEDIR_DONE');
     for (const needle of ['install -d -m 0700 -o "$AU" -g "$AGRP" "$FD"', '/etc/systemd/system/debateai-preview-api@.service.d/zzzzzzzzzz-fence-restore.conf']) {
       expect(blocks[0]!.lines.join('\n'), needle).toContain(needle);
     }
@@ -1408,7 +1419,8 @@ describe('SB3 publishes a changed number only where the owner names it, and prin
       for (const line of lines.filter(code)) {
         // The hosted inputs are only ever handed to a tool or compared; they never reach echo, printf or a bare jq print.
         for (const echoed of line.matchAll(/echo "((?:[^"\\]|\\.)*)"/g)) expect(echoed[1], `${step}: ${line}`).not.toMatch(/\$\{?(HB|HB_ON|NUM|SI)\b|hostedBilling/);
-        if (/^\s*jq /.test(line) && !/>\s*("\$N"|\/dev\/null)/.test(line)) expect(line, `${step}: ${line}`).toMatch(/^\s*jq -r '\.lines\[\]' <<<"\$SI"$|^jq -c '\{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256\}' /);
+        // The watched-rows line prints member names and counts only; its own test below hands it changed numbers and finds none printed.
+        if (/^\s*jq /.test(line) && !/>\s*("\$N"|\/dev\/null)/.test(line)) expect(line, `${step}: ${line}`).toMatch(/^\s*jq -r '\.lines\[\]' <<<"\$SI"$|^jq -c '\{baseRegisterVersion,addedKeys,changedKeys,removedKeys,deltaSha256\}' |^jq -r '\["billingPolicy","costEnvelopePolicy","admissionPolicy",[^|]*\] as \$w \| \.delta\[\] \| .*"watched row /);
       }
     }
     // The one other print reads the record's lines, which hold names only (preview-site-inputs.test.ts).
@@ -1797,10 +1809,11 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       'any day after the upload, on its own'
     ]);
     // GATES4 reads each gate's code and state, never its unit: piece 1's units are checked by step 3a's own lines.
-    expect(rows.map(row => row.split('|')[3]!.trim())).toEqual(['LUNAROW', 'step 3a\'s six `1` lines, then GATES4', 'GATES4', 'SB4', 'BEDROCK_ENV', 'GATEREADY', 'the probe']);
+    expect(rows.map(row => row.split('|')[3]!.trim())).toEqual(['LUNAROW', 'step 3a\'s three `active` and six `1` lines, then GATES4', 'GATES4', 'SB4', 'BEDROCK_ENV', 'GATEREADY', 'the probe']);
     expect(named('GATES4').join('\n')).not.toContain('InaccessiblePaths');
     for (const text of ['Pieces 1 and 2 restart gates and run `activate`, so they never run inside an upload\'s window from SB3 to the end of the switch',
-      'those are the one exception to MAIN-SITE.md part 2\'s "install no new drop-in"', 'deployed after SB2 and before SB3 (pieces 1 and 2)',
+      'install no new drop-in (two exceptions: the Amazon gate\'s units and address drop-in, piece 2; the restore fence\'s drop-in, FENCEDIR)',
+      'deployed after SB2 and before SB3 (pieces 1 and 2)',
       // The upload needs nothing from the AWS console; the running runner keeps what it read at its start.
       'The AWS console work (`README-bedrock.md`, install step 0: Luna\'s subscription and quota, the key, a budget alert, an AWS account e-mail address somebody reads) belongs to piece 4. The upload does not wait for it.',
       'Install step 0 (the AWS console), step 4 (the key) and step 8 (the probe) wait for piece 4',
@@ -1828,6 +1841,10 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
     for (const text of ['- `piece 3` (BEDROCK_ENV not run, or not done): run BEDROCK_ENV, then GATEREADY again.',
       'no yes and no downtime. Do not redeploy, restart or `activate` a gate now: stop and ask.'])
       expect(flat, text).toContain(text);
+    // The one exception, which changes no gate: the Amazon gate's service after a reboot, in the same words in both places.
+    const reboot = '`MISSING (piece 2): the Amazon gate\'s service is not running` after a reboot (`systemctl show -p Result,NRestarts debateai-preview-bedrock-budget` shows `success` and `0`): run `systemctl start debateai-preview-bedrock-budget`, then GATEREADY again; any other case, stop and ask.';
+    expect(flat.split(reboot).length - 1, reboot).toBe(2);
+    expect(flat).toContain('Give the yes only after `GATEREADY_DONE` and `GATELIVE_DONE`.');
     for (const gone of ['Do that piece, run GATEREADY again', 'its activate; a gate still active needs its stop first'])
       expect(flat, gone).not.toContain(gone);
     const piece4 = flat.slice(flat.indexOf('**Piece 4, any day after the upload: Luna in the line-up.**'), flat.indexOf('**The way back.**'));
@@ -1837,8 +1854,8 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
     expect(drained.replace(/\s+/g, ' ')).toContain('On the upload that brings the Amazon gate, run BEDROCK_ENV (piece 3) right after DR1 too, and GATEREADY right before the yes before DR2');
   });
 
-  it('LUNAROW, GATES2, GATES4, BEDROCK_ENV and GATEREADY are scripts of the runbook\'s form, and parse', () => {
-    for (const name of ['GATES2', 'GATES4', 'BEDROCK_ENV', 'GATEREADY']) {
+  it('LUNAROW, GATES2, GATES4, GATESBEFORE, BEDROCK_ENV, GATEREADY and GATELIVE are scripts of the runbook\'s form, and parse', () => {
+    for (const name of ['GATES2', 'GATES4', 'GATESBEFORE', 'BEDROCK_ENV', 'GATEREADY', 'GATELIVE']) {
       const lines = named(name);
       expect(lines[0], name).toBe('set -euo pipefail');
       expect(lines[1], name).toBe(NAMES_LINE);
@@ -1858,6 +1875,36 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
     expect(named('BEDROCK_ENV').join('\n')).toContain('previewTargetJsonRow("preview:gpt-6-luna")');
     // GATES4 and GATEREADY ask for the gates of this release's tools, and for the Perplexity gate the tools do not list.
     for (const name of ['GATES4', 'GATEREADY']) for (const [, folder, privateDir, go] of GATES) for (const part of [folder, privateDir, go]) expect(named(name).join('\n'), `${name} ${part}`).toContain(part);
+  });
+
+  it('GATESBEFORE reads the three older gates before piece 1 and changes nothing; GATELIVE asks every gate the new api file names, through the release\'s own reader', async () => {
+    const before = named('GATESBEFORE'), live = named('GATELIVE');
+    expect(flat.indexOf('# GATESBEFORE: ')).toBeLessThan(flat.indexOf('**Piece 1, after SB2 and before SB3'));
+    expect(flat.indexOf('# GATELIVE: ')).toBeGreaterThan(flat.indexOf('# GATEREADY: '));
+    // GATESBEFORE runs each gate's own start checks as its unit does (the release's unit files name the same commands).
+    for (const [unit, check] of [['debateai-preview-provider-budget.service', 'deepinfra_addresses.py" check --dropin /etc/systemd/system/debateai-preview-provider-budget.service.d/50-deepinfra-addresses.conf'],
+      ['debateai-preview-provider-budget.service', 'deepinfra_models.py" check --go /etc/debateai-v3-preview/provider-deepinfra-go-v3.json'], ['debateai-preview-anthropic-budget.service', 'anthropic_addresses.py" check'],
+      ['debateai-preview-perplexity-budget.service', 'perplexity_addresses.py" check --dropin /etc/systemd/system/debateai-preview-perplexity-budget.service.d/50-perplexity-addresses.conf']] as const) {
+      expect(before.join('\n'), check).toContain(check);
+      expect(readFileSync(join(ROOT, 'deploy/preview-gate/v3/systemd', unit), 'utf8'), unit).toContain(check.replace('" ', ' '));
+    }
+    // Both read only: nothing is copied, moved, written, stopped, started or activated.
+    for (const lines of [before, live]) for (const line of lines.filter(code)) {
+      expect(line, line).not.toMatch(/(^|[\s;&|(])(cp|mv|install|chown|chmod|tee)\s|systemctl (start|stop|restart|reset-failed)|\b(activate|stop) --private/);
+      expect(line.replace(/2?>\s*\/dev\/null/g, ''), line).not.toMatch(/[^<2&]>{1,2}\s*["$\/\w]/);
+    }
+    // GATELIVE asks with the release's own reader and socket map, which the staged folder loads without any package.
+    const reader = await import('../../deploy/' + 'preview-lifecycle/v1/settings-version.mjs');
+    expect(typeof reader.readRemaining).toBe('function');
+    // The module is named in the environment, not as an argument: as process.argv[1] it would run the tool's own main().
+    expect(live.join('\n')).toContain('const { gateSockets, readRemaining } = await import(pathToFileURL(process.env.SV).href); const gates = ["deepinfra", "anthropic", "perplexity", "bedrock"]');
+    expect(live.join('\n')).not.toContain('process.argv[1]');
+    const config = { ...SOCKETS, perplexity_budget_socket: '/run/debateai-v3-preview/perplexity-budget-v1.sock', bedrock_budget_socket: '/run/debateai-v3-preview/bedrock-budget-v1.sock' };
+    const mapped = reader.gateSockets(JSON.stringify(config), ['deepinfra', 'anthropic', 'perplexity', 'bedrock'].map(name => ({ name })));
+    expect(mapped).toEqual({ scopeId: SOCKETS.scope_id, sockets: { deepinfra: SOCKETS.budget_socket, anthropic: SOCKETS.anthropic_budget_socket, perplexity: config.perplexity_budget_socket, bedrock: config.bedrock_budget_socket } });
+    // It prints no money member of the answer, and it stops unless all four gates were read.
+    expect(live.join('\n')).not.toMatch(/remaining_usd|daily_pot|largest_reservation|today_spend/);
+    expect(live.join('\n')).toContain('[ "$(grep -cE \'^(deepinfra|anthropic|perplexity|bedrock) \' <<<"$OUT" || true)" = 4 ] || {');
   });
 
   it('GATES4 and GATEREADY say which piece is missing in each state the server can be in, before the downtime', () => {
@@ -1930,4 +1977,474 @@ describe('the upload that brings the Amazon gate: its steps come where the uploa
       expect(existsSync(`${moved}.before-luna`)).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }, 60_000);
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// The drained path's checks before the yes, its repair blocks and its ways back: each block's guards come before what it
+// changes, a repair never moves what a later step compares, and the pieces that decide are run by bash on made-up files.
+describe('the drained path: PRECHECK before the yes, a repair block for each stop, and the ways back', () => {
+  const bash = (script: string[]) => { const out = spawnSync('bash', ['-c', script.join('\n')], { encoding: 'utf8' }); return `${out.stdout}`.trim(); };
+  const at = (lines: readonly string[], needle: string) => { const found = lines.findIndex(line => line.includes(needle)); expect(found, needle).toBeGreaterThan(-1); return found; };
+  const READ_ONLY_WRITES = /(^|[\s;&|(])(cp|mv|install|chown|chmod|tee|put|nat|rel|pre)\s|systemctl (start|stop|restart|reset-failed|daemon-reload)/;
+
+  it('the order before the yes, and how the downtime steps run, are written down', () => {
+    const flat = drained.replace(/\s+/g, ' ');
+    for (const text of ['FENCEDIR (H11 step 1: the fence folder and its drop-in), SB5c (the proof copies and lines), H11 step 2 (the fence line)',
+      'PRECHECK (below), GATEREADY and GATELIVE', 'run as MAIN-SITE.md\'s detached run ("How to run a server step")',
+      'Never paste a downtime step a second time without reading its log first.', 'It comes after `PRECHECK_DONE`, `GATEREADY_DONE` (on the upload that brings the Amazon gate) and `GATELIVE_DONE`'])
+      expect(flat, text).toContain(text);
+    // The order table names the repair of each downtime step.
+    const rows = drained.split('\n').filter(line => /^\| (DR[2-6]|SWAP) \|/.test(line)).map(line => line.split('|')[5]!.trim());
+    expect(rows).toEqual(['–', 'DBBACK', 'DR4AGAIN (only the cases DR4 names)', 'SWAP again', 'DR5RESUME', 'DR6AGAIN first, then LATELINES or FENCEDIR when the journal names them, then DR6; after the switch wrote: WB4 with `drained`, then DR6TAIL']);
+    // The long staging steps run as the detached run too: a background job ends with the ssh window.
+    expect(guide.replace(/\s+/g, ' ')).toContain('Long steps (A3, A4, A6, A7) run as MAIN-SITE.md\'s detached run ("How to run a server step"), like every downtime step');
+    expect(guide).not.toContain('nohup bash "$S/jobs/');
+  });
+
+  it('PRECHECK only reads, and asks for each thing DR2 to DR6 and the way back need', () => {
+    const lines = scriptOf('PRECHECK').lines;
+    for (const line of lines.filter(code)) {
+      expect(line, line).not.toMatch(READ_ONLY_WRITES);
+      expect(line.replace(/2?>\s*\/dev\/null/g, ''), line).not.toMatch(/[^<2&-]>{1,2}\s*["$\/\w]/);
+    }
+    const text = lines.join('\n');
+    for (const needle of ["grep -qxF \"UI_API_PROOF_PATH=$PRF/api/proof.secret\" \"$A\"", "grep -qxF \"DIALECTICAL_UI_API_PROOF_PATH=$PRF/ui.secret\" \"$U\"",
+      "grep -qxF \"RESTORE_FENCE_PATH=$FENCE\" \"$A\"", 'echo "OVERLAP $K"', "grep -c '^PUBLICATION_ENABLED=true$' \"$A\"",
+      "to_regprocedure('core.claim_run_key_provision_cleanup(integer)')", "to_regprocedure('identity.authenticate_session_t9(text,text,timestamptz,timestamptz)')",
+      "to_regnamespace('erasure_reconcile') IS NULL", 'rolconnlimit <> -1', "state LIKE 'idle in transaction%'", "LC_ALL=C TZ=Europe/Bucharest date +'%-d %B %Y'",
+      'pg_tablespace', 'findmnt -n', '[ ! -e "$S/pg18-cold.sha256" ]', 'sha256sum -c --quiet "$S/plan-proposal.sha256"']) expect(text, needle).toContain(needle);
+    // DR5's own marks test, word for word, so a stop comes before the yes.
+    expect(text).toContain(scriptOf('DR5').lines.find(line => line.startsWith("if grep -q '^PAYMENT_MARKS_AVAILABLE='"))!.split(' || { echo ')[0]!);
+    // The day line reads the texts' own form.
+    expect(read('apps/ui/legal/en/terms-of-service.md')).toMatch(/\*\*Version [0-9.]+ · Effective [0-9]{1,2} [A-Z][a-z]+ 20[0-9]{2} · /);
+    // The key places: a store at or above the fence folder, or a key file directly in a folder above it, is named; one beside it is not.
+    const key = lines.filter(line => line.startsWith('for K in ') && line.includes('OVERLAP'));
+    expect(key).toHaveLength(2);
+    const dir = mkdtempSync(join(tmpdir(), 'guide-precheck-'));
+    try {
+      const run = (env: string) => { writeFileSync(join(dir, 'api.env'), env); return bash(['set -euo pipefail', `A='${dir}/api.env'; FENCE=/var/lib/debateai-v3-preview/api/restore-fence/fence; NO=0`, ...key, 'echo "overlaps $NO"']).split('\n'); };
+      expect(run('USER_DEK_STORE_PATH=/var/lib/debateai-v3-preview/api/user-deks\nKEK_PATH=/etc/debateai-v3-preview/keys/kek\n')).toEqual(['overlaps 0']);
+      expect(run('AUDIT_KEY_STORE_PATH=/var/lib/debateai-v3-preview/api/\n')).toEqual(['OVERLAP AUDIT_KEY_STORE_PATH', 'overlaps 1']);
+      expect(run('RECORDS_KEY_PATH=/var/lib/debateai-v3-preview/api/records.key\nUSER_DEK_STORE_PATH=/var/lib/debateai-v3-preview/api/restore-fence\n')).toEqual(['OVERLAP USER_DEK_STORE_PATH', 'OVERLAP RECORDS_KEY_PATH', 'overlaps 2']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+    // The connection limits: only the API's, the runner's and the scheduler's logins are read. The Hatchet login, the
+    // migrator and the staff readiness writer keep their limits on purpose and never stop PRECHECK; a limited API login does.
+    const limit = lines.findIndex(line => line.startsWith('CL=$(psqlq '));
+    expect(lines[limit]).toContain('rolcanlogin AND rolconnlimit <> -1 AND (');
+    const patterns = [...lines[limit]!.matchAll(/rolname LIKE '([^']+)'/g)].map(match => new RegExp(`^${match[1]!.replaceAll('_', '.').replaceAll('%', '.*')}$`));
+    expect(patterns).toHaveLength(3);
+    const limits = (roles: Array<[string, number]>) => {
+      const picked = roles.filter(([name, connlimit]) => connlimit !== -1 && patterns.some(pattern => pattern.test(name))).map(([name]) => name).sort().join(' ');
+      return bash(['set -euo pipefail', `psqlq() { printf '%s\n' '${picked}'; }`, "BAD=''; bad() { echo \"BAD ($1): $2\"; BAD=\"$BAD $1\"; }", ...lines.slice(limit, limit + 3), 'echo "BAD=$BAD"']).split('\n');
+    };
+    const server: Array<[string, number]> = [['debateai_prod_hatchet', 50], ['debateai_prod_migrator', 3], ['debateai_staff_readiness_writer', 2],
+      ['debateai_prod_api_runtime', -1], ['debateai_prod_api_system', -1], ['debateai_prod_runner_runtime', -1]];
+    expect(limits(server)).toEqual(['connection limits of the API, runner and scheduler logins: no limit set', 'BAD=']);
+    expect(limits([...server.filter(([name]) => name !== 'debateai_prod_api_system'), ['debateai_prod_api_system', 12]]).at(-1)).toBe('BAD= database-roles');
+    expect(limits([...server.filter(([name]) => name !== 'debateai_prod_runner_runtime'), ['debateai_prod_runner_runtime', 4]]).at(-1)).toBe('BAD= database-roles');
+    // When the system's own daily upgrade next runs: read and printed, never a stop; the text says when not to give the yes.
+    expect(text).toContain("systemctl list-timers apt-daily-upgrade.timer --no-legend 2>/dev/null | awk 'NR == 1 { print $1, $2, $3, $4 }' || true");
+    expect(sectionOf(guide, '#### PRECHECK. Everything that can be read with the site up, right before the yes').replace(/\s+/g, ' ')).toContain('Do not give the yes within an hour before that upgrade time');
+    // The data folder's size: a failed du is a BAD line, never a silent end.
+    expect(text).toContain('SIZE=$(du -sm "$PGP/v3-preview" 2>/dev/null | cut -f1 || true)');
+    expect(text).toContain('[ -n "$SIZE" ] || { bad space "the data folder\'s size is unread"; SIZE=0; }');
+    // It comes right after DR1 in the guide and before DR2.
+    expect(drained.indexOf('\n#### PRECHECK. ')).toBeGreaterThan(drained.indexOf('\n#### DR1. '));
+    expect(drained.indexOf('\n#### PRECHECK. ')).toBeLessThan(drained.indexOf('\n#### DR2. '));
+  });
+
+  it('DR2 refuses an earlier cold copy before it stops anything; DR3 records the folders\' modes before its stop and names DBBACK after it', () => {
+    const dr2 = scriptOf('DR2').lines;
+    const copy = at(dr2, '[ ! -e "$S/pg18-cold.sha256" ] || { echo "DR2_NOT_DONE: an earlier cold copy exists in S (nothing was stopped): AGAINSAME first"');
+    expect(copy).toBeLessThan(dr2.findIndex(line => line.startsWith('AVN=$(activev) || ')));
+    expect(copy).toBeLessThan(dr2.findIndex(line => line.startsWith('date -u +%s >> "$S/downtime-start-epoch"')));
+    expect(at(dr2, "pgrep -f '[/]usr/bin/unattended-upgrade'")).toBeLessThan(dr2.findIndex(line => line.startsWith('date -u +%s >> "$S/downtime-start-epoch"')));
+    // No step stops or starts the system's own timers: a running upgrade is waited for, never interrupted.
+    for (const block of allBlocks) for (const line of block.lines.filter(code)) expect(line, line).not.toMatch(/systemctl (stop|start|disable|enable|mask) [^|;]*apt-daily/);
+    const dr3 = scriptOf('DR3').lines;
+    expect(dr3).toContain('[ -n "$SIZE" ] || { echo "DR3_NOT_DONE: the data folder\'s size is unread (nothing was stopped): run DR3 again; then ask"; exit 1; }');
+    // The modes are recorded only when both stat calls answered, in the form rbD-B compares.
+    const record = dr3.find(line => line.includes('> "$S/pg18-modes"'))!;
+    const modes = (stat: string) => bash(['set -euo pipefail', `S=$(mktemp -d); PGP=/x; stat() { ${stat}; }`, record, 'cat "$S/pg18-modes"']);
+    expect(modes("echo '700 postgres:postgres'")).toBe('700 postgres:postgres\n700 postgres:postgres');
+    expect(modes('return 1')).toMatch(/^DR3_NOT_DONE: the two folders' modes could not be recorded/);
+    expect(modes('echo')).toMatch(/^DR3_NOT_DONE: the two folders' modes could not be recorded/);
+    const stop = dr3.findIndex(line => line.startsWith('systemctl stop debateai-preview-hatchet-gateway debateai-preview-hatchet debateai-preview-postgresql'));
+    expect(at(dr3, '> "$S/pg18-modes"')).toBeLessThan(stop);
+    for (const line of dr3.slice(stop)) if (line.includes('DR3_NOT_DONE')) expect(line, line).toMatch(/: DBBACK"; exit 1;/);
+    expect(dr3.find(line => line.includes('an earlier cold copy exists in S'))).toContain('AGAINSAME');
+  });
+
+  it('DBBACK keeps a checked copy, moves a partial one aside, and starts only what is not running', () => {
+    const lines = scriptOf('DBBACK').lines;
+    const text = lines.join('\n');
+    expect(text).toContain('if [ -e "$S/pg18-cold.sha256" ] && sha256sum -c --quiet "$S/pg18-cold.sha256"; then');
+    expect(text).toContain('P=$S/cold-partial-$TS');
+    expect(text).toContain('echo "cold copy: no copy yet (DR3 may run again)"');
+    for (const unit of ['postgresql', 'hatchet', 'hatchet-gateway']) expect(text, unit).toContain(`if [ "$(systemctl is-active debateai-preview-${unit} || true)" != active ]; then`);
+    // It never stops anything, never runs DR3's tar, and moves only the three files of the copy.
+    expect(text).not.toMatch(/systemctl stop|tar -C/);
+    for (const line of lines.filter(code)) if (/(^|[\s;])mv /.test(line)) expect(line).toContain('mv "$S/$F" "$P/"');
+    // The witness's PASS comes before the gateway's start.
+    expect(at(lines, 'gateway-route-witness.mjs check')).toBeLessThan(at(lines, 'systemctl start debateai-preview-hatchet-gateway.service'));
+  });
+
+  it('DR4 checks the database side, the copy\'s age and open transactions first, and its refusal says how to read the ledger line', () => {
+    const lines = scriptOf('DR4').lines;
+    const apply = lines.findIndex(line => line.startsWith('rel native-plan --operation apply-and-plan'));
+    for (const needle of ['for U in postgresql hatchet hatchet-gateway; do', 'stat -c %Y "$S/pg18-cold.sha256"', "state LIKE 'idle in transaction%'"]) expect(at(lines, needle), needle).toBeLessThan(apply);
+    const sanity = lines.findIndex(line => line.startsWith('[ "$(jq -r .operation "$ART/native-plan-apply-and-plan.json")" = apply-and-plan ]'));
+    expect(sanity).toBe(apply + 1);
+    expect(lines[sanity + 1]).toMatch(/^put "\$ART\/native-plan-apply-and-plan.json"/);
+    const refusal = lines.find(line => line.startsWith('[ "$OUT" = "exit 0" ] ||'))!;
+    for (const word of ['equal = nothing applied (rbD-A, or DR4AGAIN)', '[MIGRATION_LOCK_RETRY]', 'else rbD-B', 'only the proposal refused: ask']) expect(refusal, word).toContain(word);
+  });
+
+  it('DR4AGAIN never moves DR4\'s plan file, and goes on only when the ledger is SB1\'s plus the first new steps in order', () => {
+    const lines = scriptOf('DR4AGAIN').lines;
+    expect(lines.filter(code).some(line => /mv "\$ART\/native-plan-apply-and-plan\.json"/.test(line))).toBe(false);
+    expect(at(lines, 'mv "$ART/native-apply-and-plan.json" "$S/native-apply-and-plan.try-$TS.json"')).toBeLessThan(lines.findIndex(line => line.startsWith('OUT=$(nat ')));
+    expect(at(lines, 'cmp -s "$ART/native-plan-apply-and-plan.json" "$NP"')).toBeLessThan(lines.findIndex(line => line.startsWith('OUT=$(nat ')));
+    // All applied and only the proposal refused: DR4 says ask, and so does DR4AGAIN.
+    expect(at(lines, 'every step is applied already, so only the proposal was refused (as DR4 says): ask')).toBeLessThan(lines.findIndex(line => line.startsWith('OUT=$(nat ')));
+    const prefix = [lines.find(line => line.startsWith('K=0; for M in '))!, lines.find(line => line.startsWith('TOPK=$('))!, lines.find(line => line.includes('the first $K of this release\'s migrations in order'))!];
+    const dir = mkdtempSync(join(tmpdir(), 'guide-dr4again-'));
+    try {
+      const OLD = ['0151_a.sql', '0152_b.sql', '0153_c.sql'], NEW = ['0154_d.sql', '0155_e.sql', '0156_f.sql'];
+      const run = (ledger: string[]) => {
+        writeFileSync(join(dir, 'ledger'), `${ledger.join('\n')}\n`); writeFileSync(join(dir, 'new-migrations.txt'), `${NEW.join('\n')}\n`);
+        return bash(['set -euo pipefail', `S='${dir}'; LEDGER0='${OLD.length}|${OLD.at(-1)}'`,
+          `psqlq() { case "$1" in *"WHERE name = '"*) N=$(printf '%s' "$1" | sed -n "s/.*name = '\\(.*\\)'.*/\\1/p"); if grep -qxF "$N" "$S/ledger"; then echo 1; else echo 0; fi;; *"max(name)"*) echo "$(grep -c . "$S/ledger")|$(LC_ALL=C sort "$S/ledger" | tail -n 1)";; esac; }`,
+          ...prefix, 'echo "PREFIX_OK $K"']);
+      };
+      expect(run(OLD)).toBe('PREFIX_OK 0');
+      expect(run([...OLD, ...NEW.slice(0, 2)])).toBe('PREFIX_OK 2');
+      expect(run([...OLD, ...NEW])).toBe('PREFIX_OK 3');
+      // A gap, or a step this release does not name: no second run.
+      expect(run([...OLD, NEW[1]!])).toMatch(/^DR4AGAIN_NOT_DONE: the ledger is not SB1's plus the first 0 /);
+      expect(run([...OLD, NEW[0]!, '0199_z.sql'])).toMatch(/^DR4AGAIN_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SWAP checks DR4 and an earlier swap before it moves the tools folder, and does nothing when the folder already is this release\'s', () => {
+    const lines = scriptOf('SWAP').lines;
+    const move = lines.findIndex(line => line.startsWith('mv "$OP" "$S/operator-lifecycle-v1.before"'));
+    expect(move).toBeGreaterThan(-1);
+    for (const needle of ['DR4 is not done', 'no tools change in this release', 'OPERATOR_FOLDER_ALREADY_THIS_RELEASE', '[ ! -e "$S/operator-lifecycle-v1.before" ] && [ ! -e "$NEWOP" ]',
+      'diff -r "$NEWOP/dialectical-engine/deploy/$D" "$CAPI/dialectical-engine/deploy/$D"']) expect(at(lines, needle), needle).toBeLessThan(move);
+    // The lines that build and swap the folder are SB10's own.
+    const sb10 = scriptOf('SB10').lines.join('\n');
+    const built = lines.filter(line => line.startsWith('git -C "$ART/source-reference" archive') || line.startsWith('chown -R root:root "$NEWOP"') || line.startsWith('find "$NEWOP"'));
+    expect(built).toHaveLength(3);
+    for (const line of built) {
+      for (const part of line.split(' || {')[0]!.split(' && ')) expect(sb10, part).toContain(part);
+      // A failed build line stops by name, with what to do: under pipefail it would otherwise end the script without a word.
+      expect(line, line).toContain('|| { echo "SWAP_NOT_DONE: the new tools folder was not built ($NEWOP is a partial copy; nothing was swapped): move $NEWOP into $S, then SWAP again"; exit 1; }');
+    }
+    // DR5 refuses before it writes anything when DR4 or SWAP is not done.
+    const dr5 = scriptOf('DR5').lines;
+    const loop = dr5.findIndex(line => line.startsWith('for F in native-plan-publish.json register-published.json native-plan-verify.json'));
+    expect(at(dr5, 'DR5_NOT_DONE: DR4 is not done (the ledger is not the old one plus this release\'s migrations)')).toBeLessThan(loop);
+    expect(at(dr5, 'DR5_NOT_DONE: the operator folder is not this release\'s (SWAP first; nothing changed)')).toBeLessThan(loop);
+    expect(drained.replace(/\s+/g, ' ')).not.toContain('run it by hand from SB10 first');
+    // A refused publish says "nothing was published" only when the newest register is still SB1's.
+    const refused = dr5.find(line => line.startsWith('[ "$OUT" = "exit 0" ] || { head -c 800 "$ART/register-published.json"'))!;
+    const publish = (newest: string) => bash(['set -euo pipefail', `ART=$(mktemp -d); REG0=23; OUT='exit 1'; psqlq() { echo ${newest}; }`, refused, 'echo PUBLISHED_ON']).split('\n').at(-1);
+    expect(publish('23')).toBe('DR5_NOT_DONE: the publish was refused (the operator\'s line above says why); nothing was published (the newest register is still 23): ask (the way back is rbD-B)');
+    expect(publish('24')).toBe('DR5_NOT_DONE: the operator refused, and the newest register is 24: something WAS published: ask (rbD-B)');
+  });
+
+  it('DR5RESUME goes on only while nothing is pinned, and never moves DR4\'s plan file', () => {
+    const lines = scriptOf('DR5RESUME').lines;
+    const pinned = at(lines, "'.releases | has($l)' \"$LOCK\")\" = false ]");
+    for (const [index, line] of lines.entries()) if (code(line) && /^(\s*)(mv|put|rel|install|OUT=\$\(nat|PIN=|SG=)/.test(line)) expect(index, line).toBeGreaterThan(pinned);
+    expect(lines.filter(code).some(line => /mv "\$ART\/native-plan-apply-and-plan\.json"/.test(line))).toBe(false);
+    // Nothing published: the publish plan moves aside and DR4's plan goes back, so DR5's own first guard passes again.
+    expect(lines.join('\n')).toContain('  mv "$ART/native-plan-publish.json" "$DT/" || {');
+    expect(lines.join('\n')).toContain('  put "$ART/native-plan-apply-and-plan.json" || {');
+    // Published: from the verify plan on, DR5's own command lines.
+    const dr5 = scriptOf('DR5').lines.join('\n');
+    for (const line of lines.filter(line => /^(rel |  PIN=\$\(pre pin|  pre dropin|SG=\$\(lc release-switch)/.test(line))) expect(dr5, line).toContain(line.split(' || {')[0]!);
+  });
+
+  it('DR6 says how to read a stop; LATELINES, DR6AGAIN and DR6TAIL each refuse in the state that is not theirs', () => {
+    const dr6 = scriptOf('DR6').lines;
+    expect(at(dr6, 'GATE_CAPACITY_UNREAD')).toBeLessThan(dr6.findIndex(line => line.startsWith('T1=$(date +%s)')));
+    expect(dr6.find(line => line.startsWith('for i in $(seq 1 80); do') && line.includes('debateai-preview-api@$LABEL'))).toContain('= failed ] && break;');
+    expect(at(dr6, 'new website /readyz on $UIP')).toBeLessThan(dr6.findIndex(line => line.startsWith('[ "$RC" = 503 ] ||')));
+    const flat = drained.replace(/\s+/g, ' ');
+    expect(flat).toContain("MAIN-SITE.md's stage table");
+    // LATELINES adds lines only while the old release is CURRENT and the new one STAGED, with its stopped units.
+    const late = scriptOf('LATELINES').lines;
+    const state = at(late, '= CURRENT ] && [ "$(jq -r --arg l "$LABEL"');
+    for (const [index, line] of late.entries()) if (code(line) && /^\s*(cp|mv|addline) /.test(line)) expect(index, line).toBeGreaterThan(state);
+    expect(late).toContain('lc release-env.mjs same --labels "$LABEL" --slots "$SLOT" || { echo "LATELINES_NOT_DONE: a SAME check is BAD (above; the files before are in S): ask"; exit 1; }');
+    expect(late.join('\n')).toContain('the new $SVC runs or still tries to start: run DR6AGAIN first, then LATELINES again');
+    // The new line starts on a line of its own, even when the file's last line has no newline.
+    expect(late.join('\n')).toContain('awk 1 "$F" > "$F.new"; printf \'%s=%s\\n\' "$K" "$V" >> "$F.new"');
+    // The repair order everywhere: DR6AGAIN first, then the fix, then DR6.
+    for (const line of dr6.filter(line => line.includes('DR6_NOT_DONE') && line.includes('DR6AGAIN'))) expect(line, line).toMatch(/DR6AGAIN(, then| first)/);
+    expect(flat).not.toMatch(/then DR6AGAIN(,| and) (then )?DR6/);
+    const fencedir = sectionOf(guide, '### H11. The restore fence (from the release that carries NV-07)').split('\n').map(line => line.replace(/^ {3}/, ''));
+    const guardLine = fencedir.findIndex(line => line.includes('FENCEDIR_NOT_DONE: the new API runs or still tries to start'));
+    expect(guardLine).toBeGreaterThan(-1);
+    expect(guardLine).toBeLessThan(fencedir.findIndex(line => line.startsWith('install -d -m 0700 -o "$AU" -g "$AGRP" "$FD"')));
+    // DR6AGAIN stops nothing when the switch wrote, and clears the start counts after its stops.
+    const again = scriptOf('DR6AGAIN').lines;
+    const guard = at(again, 'when the switch wrote, WB4 with bash -s -- drained, then DR6TAIL');
+    expect(guard).toBeLessThan(again.findIndex(line => line.startsWith('systemctl stop ')));
+    expect(at(again, 'systemctl reset-failed')).toBeGreaterThan(again.findIndex(line => line.includes('systemctl stop "debateai-preview-runner@$LABEL"')));
+    // DR6TAIL is DR6's own tail, run only once the new release is current.
+    const tail = scriptOf('DR6TAIL').lines;
+    expect(at(tail, '= CURRENT ] || { echo "DR6TAIL_NOT_DONE')).toBeLessThan(at(tail, 'lc release-retire.mjs mark-retired --label "$OLABEL"'));
+    for (const needle of ['echo "DOWNTIME END $(date -u) ($(( $(date +%s) - $(tail -n 1 "$S/downtime-start-epoch") )) s)"', 'systemctl start debateai-preview-backup.timer'])
+      expect(dr6.join('\n'), needle).toContain(needle), expect(tail.join('\n'), needle).toContain(needle);
+  });
+
+  it('AFTERDR6 only reads; rbD-A and rbD-B keep their order and gain what a second run needs; AGAINSAME only moves, after its guards', () => {
+    expect(scriptOf('AFTERDR6').lines.join('\n')).toContain('journalctl -u "debateai-preview-api@$LABEL" --since "@$T0" -o cat --no-pager | grep -c \'"event":"api.restore_fence","outcome":"INITIALISED"\'');
+    for (const line of scriptOf('AFTERDR6').lines.filter(code)) {
+      expect(line, line).not.toMatch(READ_ONLY_WRITES);
+      if (/(^|[\s;(])lc /.test(line)) expect(line).toMatch(/lc release-check\.mjs status/);
+    }
+    const rba = scriptOf('RBD_A').lines;
+    expect(at(rba, 'the old runner never stopped (DR2 stopped before its runner step): nothing to start')).toBeLessThan(rba.findIndex(line => line.startsWith('[ "$(gs "$GD" "$PD" | jq -r .state)" = active ]')));
+    expect(rba.join('\n')).toContain('the old API is running already');
+    const rbb = scriptOf('RBD_B').lines;
+    expect(rbb).toContain('install -d -o root -g root -m 0700 "$S/systemd-new-$TS"');
+    expect(rbb.find(line => line.startsWith('if [ -s "$S/pg18-modes" ]; then MODE0=$(sed -n 1p "$S/pg18-modes")'))).toBeDefined();
+    const again = scriptOf('AGAINSAME').lines;
+    const made = again.findIndex(line => line.startsWith('install -d -o root -g root -m 0700 "$D"'));
+    for (const needle of ['= CURRENT ] && [ "$(jq -r --arg l "$LABEL"', 'cmp -s "$S/release-lock.before.json" "$LOCK"', 'sha256sum -c --quiet "$S/plan-proposal.sha256"', '[ -n "$SIZE" ] || { echo "AGAINSAME_NOT_DONE', '$((SIZE * 2 + 2048))'])
+      expect(at(again, needle), needle).toBeLessThan(made);
+    for (const line of again.filter(code)) expect(line, line).not.toMatch(/(^|[\s;&|(])(cp|tar|rel|nat|lc release-switch)\s|systemctl (start|stop)/);
+    expect(at(again, 'put "$ART/native-plan-plan.json"')).toBeGreaterThan(made);
+    // Every file a downtime step refuses to find again is among the ones AGAINSAME moves.
+    const moved = again.join('\n');
+    for (const file of ['pg18-cold.sha256', 'pg18-v3-preview-cold.tgz', 'native-plan-apply-and-plan.json native-apply-and-plan.json native-plan-publish.json register-published.json native-plan-verify.json native-first-verify.json api-launch.json ui-launch.json runner-launch.json', '"$S"/systemd-new*'])
+      expect(moved, file).toContain(file);
+  });
+
+  it('SB4 on the drained path names every other BAD check, so its one expected stop of the day is read right', () => {
+    const sb4 = scriptOf('SB4').lines;
+    const from = sb4.findIndex(line => line.startsWith('case "$(jq -r .verdict <<<"$OUT")" in')), to = sb4.indexOf('esac', from);
+    const verdict = (checks: Array<[string, boolean]>, name = 'DRAINED_PATH') => bash(['set -euo pipefail',
+      `OUT='${JSON.stringify({ event: 'PREVIEW_RELEASE_CHECK', verdict: name, checks: checks.map(([check, ok]) => ({ name: check, ok, detail: '' })) })}'`, ...sb4.slice(from, to + 1), 'echo PASSED_ON']);
+    expect(verdict([['N1_HEADERS', false], ['CURRENT_PINNED', true]])).toBe('SB4_NOT_DONE: DRAINED_PATH (expected on a drained upload): no other check is BAD: use "Drained upload on the template layout"');
+    expect(verdict([['N1_HEADERS', false], ['GATE_ROWS_N1', false], ['LIFECYCLE_FILES', false]])).toMatch(/^SB4_NOT_DONE: DRAINED_PATH, and BAD too: GATE_ROWS_N1 LIFECYCLE_FILES: on the first run /);
+    expect(verdict([['N1_HEADERS', true]], 'SIDE_BY_SIDE')).toBe('PASSED_ON');
+  });
+});
+
+describe('the step before Start, switched on in the upload: SHAPEON, POTS, STEPCHECK, STEPPROOF, and SB2 and SB3 with the row', async () => {
+  const START = '## The step before Start, switched on in the upload';
+  const ROOT = resolve(import.meta.dirname, '../..');
+  const NODE = '/opt/debateai-toolchain/node-v26.8.2-linux-x64/bin/node';
+  const section = sectionOf(guide, START);
+  const named = (step: string) => {
+    const found = blocksOf(section).filter(block => block.lines.some(line => line.startsWith(`# ${step}: `)));
+    expect(found, step).toHaveLength(1);
+    return [...found[0]!.lines];
+  };
+  const bash = (script: string[]) => { const out = spawnSync('bash', ['-c', script.join('\n')], { encoding: 'utf8' }); return `${out.stdout}`.trim(); };
+  const shape = await import('../../packages/register/src/debate-shape-policy.js');
+  const BASE = shape.debateShapePolicyStartValues();
+  const START_VALUES = shape.debateShapeStartStepStartValues();
+
+  it('sits between the Amazon section and the transition (the step list above is unchanged), and its four steps are scripts of the runbook\'s form', async () => {
+    expect(guide.indexOf(`\n${START}\n`)).toBeGreaterThan(guide.indexOf('\n## The Amazon Bedrock gate: the upload that brings it\n'));
+    expect(guide.indexOf(`\n${START}\n`)).toBeLessThan(guide.indexOf(`\n${TRANSITION}\n`));
+    for (const name of ['SHAPEON', 'POTS', 'STEPCHECK', 'STEPPROOF']) {
+      const lines = named(name);
+      expect(lines.slice(0, 2), name).toEqual(['set -euo pipefail', NAMES_LINE]);
+      expect(lines.at(-1), name).toBe(`echo ${name}_DONE`);
+      for (const line of lines) {
+        for (const match of line.matchAll(/([A-Z][A-Z0-9_]*)_NOT_DONE/g)) expect(match[1], `${name}: ${line}`).toBe(name);
+        if (line.includes('_NOT_DONE')) expect(line, `${name}: ${line}`).toMatch(/exit 1/);
+      }
+      expect(spawnSync('bash', ['-n'], { input: lines.join('\n') }).status, name).toBe(0);
+    }
+    // STEPCHECK's and STEPPROOF's tool calls are the tools' real command lines.
+    const wrong: string[] = [];
+    for (const call of invocations(blocksOf(section))) { const reason = await parserReason(call); if (reason !== 'ACTOR_REFUSED') wrong.push(`${call.script}: ${reason}: ${call.line.trim()}`); }
+    expect(wrong).toEqual([]);
+    expect(named('STEPCHECK').join('\n')).toContain('lc settings-version.mjs check "$LABEL" "$ACT"');
+    // STEPPROOF reads the start paths the step records (migration 0159's table and columns).
+    expect(named('STEPPROOF').join('\n')).toContain("SELECT source||' width '||width||' paths '||path_count FROM core.start_path_set WHERE run_id = '$RID'");
+    expect(read('migrations/0159_start_paths.sql')).toMatch(/CREATE TABLE IF NOT EXISTS core\.start_path_set \(\n  run_id uuid PRIMARY KEY,\n  source text NOT NULL[^\n]*'MENU'/);
+  });
+
+  it('POTS runs the staged gate code with -I -B and calls only what that code has; it prints no amount outside its screen-only lines', () => {
+    const lines = named('POTS');
+    expect(lines.join('\n')).toContain('/usr/bin/python3 -I -B - "$OPS" "$GO" <<\'PY\' || {');
+    const gate = readFileSync(join(ROOT, 'packages/providers/ops/preview_budget_authority.py'), 'utf8');
+    for (const name of ['load_helper', 'in_flight_worst_case', 'profile_of', 'final_writer_slots', 'read_caps', 'other_gate_budget']) {
+      expect(lines.join('\n'), name).toContain(`gate.${name}(`);
+      expect(gate, name).toContain(`def ${name}(`);
+    }
+    for (const name of ['GATE_PATHS = {', 'CAPS_OWNER_UID = ']) expect(gate, name).toContain(name);
+    expect(lines.join('\n')).toContain("print('on your screen only, never pasted:')");
+    expect(lines.join('\n')).toContain('four calls at once fit the Anthropic pot:');
+  });
+
+  it('SHAPEON adds only startStep, with the release\'s own start values, and refuses every row that would leave the step off', () => {
+    const lines = named('SHAPEON');
+    const lineUp = { kind: 'PREVIEW_LINE_UP_POLICY', free_model_ids: ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash'], premium_model_ids: ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash', 'claude-haiku-5-5'] };
+    const good = { debateShapePolicy: BASE, engineVersionPolicy: { kind: 'ENGINE_VERSION_POLICY' }, lengthGuidancePolicy: { kind: 'LENGTH_GUIDANCE_POLICY' }, previewLineUpPolicy: lineUp } as Record<string, unknown>;
+    const run = (rows: Record<string, unknown>) => {
+      const dir = mkdtempSync(join(tmpdir(), 'guide-shapeon-'));
+      try {
+        for (const folder of ['S', 'rows', 'oart', 'capi']) mkdirSync(join(dir, folder));
+        symlinkSync(ROOT, join(dir, 'capi', 'dialectical-engine'));
+        writeFileSync(join(dir, 'S', 'active-before'), '23\n');
+        writeFileSync(join(dir, 'S', 'native-plan.before.json'), `${JSON.stringify({ operation: 'verify', pad: 'x'.repeat(3400) })}\n`);
+        writeFileSync(join(dir, 'oart', 'native-plan-publish.json'), JSON.stringify({ answerSeats: null, checkerChoice: { checker: 'deepseek' } }));
+        for (const [key, value] of Object.entries(rows)) writeFileSync(join(dir, 'rows', `${key}.json`), JSON.stringify(value));
+        const body = lines.slice(2).map(line => line.replaceAll(NODE, process.execPath));
+        const out = spawnSync('bash', ['-c', ['set -euo pipefail', `S='${dir}/S'; OART='${dir}/oart'; CAPI='${dir}/capi'; R='${dir}/rows'; OKEY=r23-0123456789ab`,
+          'activev() { echo 23; }', 'install() { echo "install $*" >> "$S/installs"; }',
+          `psqlq() { case "$1" in *gpt-6-luna*) cat "$R"/*.json | grep -c gpt-6-luna || true;; *) K=$(printf '%s' "$1" | sed -n "s/.*row_key = '\\([A-Za-z]*\\)'.*/\\1/p"); if [ -f "$R/$K.json" ]; then cat "$R/$K.json"; fi;; esac; }`,
+          ...body].join('\n')], { encoding: 'utf8' });
+        const read = (name: string) => existsSync(join(dir, 'S', name)) ? readFileSync(join(dir, 'S', name), 'utf8') : null;
+        return { last: out.stdout.trim().split('\n').at(-1), on: read('shape-on.json'), base: read('shape-base.json'), installs: read('installs') };
+      } finally { rmSync(dir, { recursive: true, force: true }); }
+    };
+    const done = run(good);
+    expect(done.last).toBe('SHAPEON_DONE');
+    // One line each; the new row is the active one plus the release's own start values, and nothing else.
+    expect(done.base!.split('\n')).toHaveLength(2);
+    expect(JSON.parse(done.base!)).toEqual(BASE);
+    expect(JSON.parse(done.on!)).toEqual({ ...BASE, startStep: START_VALUES });
+    expect(shape.parseDebateShapePolicy(JSON.parse(done.on!)).startStep).toEqual(START_VALUES);
+    expect(done.installs).toContain('/home/ubuntu/practice/shape-on.json');
+    // Each row that would leave the step off stops it, and nothing is written.
+    for (const [rows, reason] of [
+      [{ ...good, debateShapePolicy: { ...BASE, enabled: false } }, /the debate shape row is absent or off/],
+      [{ ...good, debateShapePolicy: undefined }, /the debate shape row is absent or off/],
+      [{ ...good, debateShapePolicy: { ...BASE, startStep: START_VALUES } }, /carries startStep already/],
+      [{ ...good, engineVersionPolicy: undefined }, /ENGINE_OFF/],
+      [{ ...good, engineVersionPolicy: { kind: 'ENGINE_VERSION_POLICY', enabled: false } }, /ENGINE_OFF/],
+      [{ ...good, lengthGuidancePolicy: undefined }, /no length row/],
+      [{ ...good, modelScorecard: { kind: 'MODEL_SCORECARD' } }, /a scorecard row/],
+      [{ ...good, previewLineUpPolicy: { ...lineUp, free_model_ids: ['zai-org/GLM-5.3-Flash', 'zai-org/GLM-5.3-Flash'] } }, /ONE_MAKER/],
+      [{ ...good, previewLineUpPolicy: { ...lineUp, premium_model_ids: [...lineUp.premium_model_ids, 'us.openai.gpt-6-luna'] } }, /Luna/]
+    ] as const) {
+      const stopped = run(Object.fromEntries(Object.entries(rows).filter(([, value]) => value !== undefined)));
+      expect(stopped.last, String(reason)).toMatch(/^SHAPEON_NOT_DONE: /);
+      expect(stopped.last, String(reason)).toMatch(reason);
+      expect(stopped.on, String(reason)).toBeNull();
+    }
+  }, 120_000);
+
+  it('SB3 hands the row to the plan only with STARTSTEP=yes, and its delta may add the start step and nothing else', () => {
+    const sb3 = scriptOf('SB3').lines;
+    expect(sb3.find(line => line.startsWith('STARTSTEP='))).toMatch(/^STARTSTEP=''\s+# yes: this upload switches the step before Start on \(SHAPEON ran first\); else empty$/);
+    const plan = sb3.find(line => line.startsWith('rel native-plan --operation plan --from "$FROM" '))!;
+    expect(plan).toContain('--source-manifest "$ART/candidate-api-source.json" ${SHAPE:+--debate-shape "$SHAPE"} ${DS:+--checker deepseek');
+    const choose = sb3.find(line => line.startsWith('case "$STARTSTEP" in'))!;
+    const check = sb3.findIndex(line => line.startsWith('if [ -n "$SHAPE" ]; then jq -e --argjson s '));
+    expect(check).toBeGreaterThan(sb3.findIndex(line => line.startsWith('jq -e --argjson n "$NAMED" ')));
+    expect(check).toBeLessThan(sb3.findIndex(line => line.startsWith('sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"')));
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-shape-'));
+    try {
+      const pick = (startstep: string, file: string | null) => {
+        if (file === null) rmSync(join(dir, 'shape-on.json'), { force: true }); else writeFileSync(join(dir, 'shape-on.json'), file);
+        return bash(['set -euo pipefail', `S='${dir}'; STARTSTEP='${startstep}'`, choose, 'echo "SHAPE=${SHAPE:-none}"']);
+      };
+      const on = `${JSON.stringify({ ...BASE, startStep: START_VALUES })}\n`;
+      expect(pick('', null)).toBe('SHAPE=none');
+      expect(pick('', on)).toBe(`SB3_NOT_DONE: SHAPEON's row exists but STARTSTEP is empty: set STARTSTEP=yes, or move ${dir}/shape-on.json aside first`);
+      expect(pick('yes', on)).toBe(`SHAPE=${on.trim()}`);
+      expect(pick('yes', null)).toMatch(/^SB3_NOT_DONE: STARTSTEP is yes but /);
+      expect(pick('yes', `${on}${on}`)).toMatch(/^SB3_NOT_DONE: STARTSTEP is yes but /);
+      expect(pick('maybe', on)).toBe('SB3_NOT_DONE: STARTSTEP is yes or empty');
+      const delta = (oldRow: unknown, newRow: unknown, shapeRow: unknown = { ...BASE, startStep: START_VALUES }) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta: [{ rowKey: 'nodeRuntimeVersion', oldValueJsonText: '{}', newValueJsonText: '{}' },
+          ...(newRow === null ? [] : [{ rowKey: 'debateShapePolicy', oldValueJsonText: JSON.stringify(oldRow), newValueJsonText: JSON.stringify(newRow) }])] }));
+        return bash(['set -euo pipefail', `ART='${dir}'; SHAPE='${JSON.stringify(shapeRow)}'`, sb3[check]!, 'echo SHAPE_CHECKED']).split('\n');
+      };
+      expect(delta(BASE, { ...BASE, startStep: START_VALUES })).toEqual(['debate shape: only the start step added', 'SHAPE_CHECKED']);
+      // A row written without mapStepBounds reads with the default one: that is no change.
+      const { mapStepBounds: _bounds, ...withoutBounds } = BASE as Record<string, unknown>;
+      expect(delta(withoutBounds, { ...BASE, startStep: START_VALUES })).toEqual(['debate shape: only the start step added', 'SHAPE_CHECKED']);
+      const changedPlan = { ...BASE, plans: { ...BASE.plans, free: { ...BASE.plans.free, answers: BASE.plans.free.answers + 1 } }, startStep: START_VALUES };
+      expect(delta(BASE, changedPlan)[0]).toMatch(/^SB3_NOT_DONE: the debate shape row changes more than the start step/);
+      expect(delta(BASE, { ...BASE, enabled: false, startStep: START_VALUES })[0]).toMatch(/^SB3_NOT_DONE: /);
+      expect(delta(BASE, null)[0]).toMatch(/^SB3_NOT_DONE: /);
+      expect(delta(BASE, { ...BASE, startStep: { widths: { ...START_VALUES.widths, free: { options: [1], default: 1 } } } })[0]).toMatch(/^SB3_NOT_DONE: /);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB3 says in words how each watched row changes, with member names and counts and never a value', () => {
+    const sb3 = scriptOf('SB3').lines;
+    const at = sb3.findIndex(line => line.startsWith('jq -r \'["billingPolicy","costEnvelopePolicy","admissionPolicy",') && line.includes('watched row'));
+    expect(at).toBeGreaterThan(sb3.findIndex(line => line.startsWith('if [ -n "$SHAPE" ]; then jq -e --argjson s ')));
+    expect(at).toBeLessThan(sb3.findIndex(line => line.startsWith('sha256sum "$ART/native-plan-plan.json" "$ART/register-proposal.json" > "$S/plan-proposal.sha256"')));
+    // The line reads the same watch list as A9's second line.
+    const a9 = guide.split('\n').find(line => line.startsWith('jq -r \'["billingPolicy","costEnvelopePolicy"') && line.includes('WATCH_LIST_ABSENT'))!;
+    expect(sb3[at]!.slice(0, sb3[at]!.indexOf(' as $w'))).toBe(a9.slice(0, a9.indexOf(' as $w')));
+    const dir = mkdtempSync(join(tmpdir(), 'guide-sb3-watch-'));
+    try {
+      const row = (rowKey: string, change: string, oldValue: unknown, newValue: unknown) => ({ rowKey, change, oldValueJsonText: oldValue === null ? null : JSON.stringify(oldValue), newValueJsonText: JSON.stringify(newValue) });
+      const run = (delta: unknown[]) => {
+        writeFileSync(join(dir, 'register-proposal.json'), JSON.stringify({ delta }));
+        return bash(['set -euo pipefail', `ART='${dir}'`, sb3[at]!, 'echo WATCH_READ']).split('\n');
+      };
+      expect(run([
+        row('admissionPolicy', 'changed', { asks: { limit: 5 }, kind: 'A' }, { asks: { limit: 5 }, kind: 'A', start_step_calls: { limit: 7 } }),
+        row('billingPolicy', 'changed', { enabled: true, withdrawal_countries: ['AT', 'US'], withdrawal_days: 14 }, { enabled: true, withdrawal_countries: ['AT', 'US', 'CA', 'AU'], withdrawal_days: 14 }),
+        row('countryPolicy', 'changed', { countries: ['AT'] }, { countries: ['AT', 'CA'] }),
+        row('debateShapePolicy', 'changed', BASE, { ...BASE, startStep: START_VALUES }),
+        row('engineVersionPolicy', 'added', null, { kind: 'E' })
+      ])).toEqual([
+        'watched row admissionPolicy (changed): members added [start_step_calls], removed [], changed []',
+        'watched row billingPolicy (changed): members added [], removed [], changed [withdrawal_countries: +2 -0]',
+        'watched row debateShapePolicy (changed): members added [startStep], removed [], changed []',
+        'watched row engineVersionPolicy (added): the whole value',
+        'WATCH_READ'
+      ]);
+      // A changed number shows by its member's name only; a dropped member and a dropped country show too.
+      const out = run([row('costEnvelopePolicy', 'changed', { daily_ceiling_micros: 11_000_000, kept: 1, gone: 2 }, { daily_ceiling_micros: 12_000_000, kept: 1 }),
+        row('billingPolicy', 'changed', { withdrawal_countries: ['AT', 'US'] }, { withdrawal_countries: ['AT', 'CA'] })]);
+      expect(out).toEqual(['watched row costEnvelopePolicy (changed): members added [], removed [gone], changed [daily_ceiling_micros]',
+        'watched row billingPolicy (changed): members added [], removed [], changed [withdrawal_countries: +1 -1]', 'WATCH_READ']);
+      expect(out.join(' ')).not.toMatch(/11000000|12000000/);
+      expect(run([row('nodeRuntimeVersion', 'changed', {}, {})])).toEqual(['WATCH_READ']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it('SB2 and the hosted-base practice read the hosted billing from the practice folder, give formats the line-up, and practise with SHAPEON\'s row', async () => {
+    const sb2 = sectionOf(guide, sideBySide.split('\n').find(line => line.startsWith('### SB2. '))!);
+    const practice = sectionOf(guide, '### The practice (on the Mac; owner rule: before every upload)');
+    for (const text of [sb2, practice]) {
+      expect(text).toContain('HB_ON="$(jq -c \'.billing="on"\' "$P/hosted-billing.json")"');
+      expect(text).not.toContain('/etc/debateai-v3-preview/hosted-billing-v1.json');
+    }
+    // Three runs with the row: the debate whose rows must match SB3's, then the step on Free, then on a paid plan.
+    const runs = blocksOf(sb2).flatMap(block => block.lines).filter(line => line.includes('practice.ts debate') && line.includes('--shape-policy "$P/shape-on.json"'));
+    expect(runs).toHaveLength(3);
+    expect(runs.filter(line => line.includes('--start-step free:3 --digs 0')).length).toBe(1);
+    expect(runs.filter(line => line.includes('--start-step premium:5 --digs 0') && line.includes('PRACTICE_PERPLEXITY_SOCKET="$D/perplexity.sock"')).length).toBe(1);
+    expect(sb2).not.toContain('start-step-shape.json"');
+    // formats gets the line-up as a file, written from the export's newest version, kind left out.
+    const formats = blocksOf(practice).flatMap(block => block.lines).find(line => line.includes('practice.ts formats'))!;
+    expect(formats).toContain('--line-up "$P/line-up.json"');
+    const write = blocksOf(practice).flatMap(block => block.lines).find(line => line.startsWith('jq -ce \'.versions[-1].register_version as $v'))!;
+    const { parsePracticeLineUpText } = await import('../../tools/preview-practice/practice-settings.js');
+    const dir = mkdtempSync(join(tmpdir(), 'guide-lineup-'));
+    try {
+      const lineUp = { free_model_ids: ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash'], premium_model_ids: ['zai-org/GLM-5.3-Flash', 'deepseek-ai/DeepSeek-V4.1-Flash', 'claude-haiku-5-5'],
+        thinking_levels: { 'deepseek-ai/DeepSeek-V4.1-Flash': { level: 'low' } } };
+      const exportOf = (newest: string) => JSON.stringify({ schema: 'x', versions: [{ register_version: '22' }, { register_version: newest }],
+        rows: [{ register_version: '22', row_key: 'previewLineUpPolicy', value_json: JSON.stringify({ kind: 'PREVIEW_LINE_UP_POLICY', ...lineUp, free_model_ids: ['old'] }) },
+          { register_version: '23', row_key: 'previewLineUpPolicy', value_json: JSON.stringify({ kind: 'PREVIEW_LINE_UP_POLICY', ...lineUp }) }] });
+      writeFileSync(join(dir, 'register-export.json'), exportOf('23'));
+      expect(bash([`P='${dir}'`, write])).toBe('LINE_UP_FILE_WRITTEN');
+      expect(JSON.parse(readFileSync(join(dir, 'line-up.json'), 'utf8'))).toEqual({ lineUp });
+      expect(parsePracticeLineUpText(readFileSync(join(dir, 'line-up.json'), 'utf8')).free_model_ids).toEqual(lineUp.free_model_ids);
+      // No line-up row in the newest version: nothing is printed.
+      writeFileSync(join(dir, 'register-export.json'), exportOf('24'));
+      expect(bash([`P='${dir}'`, write])).toBe('');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
 });

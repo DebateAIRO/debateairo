@@ -152,6 +152,20 @@ describe('publish kit v3: composing from the current version', () => {
     expect(f.v12).toEqual(before);
   });
 
+  it('composes on a base an earlier release sealed, whose withdrawal list is the law\'s countries and the US only', async () => {
+    const f = await fixture();
+    const code = BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value.withdrawal_countries;
+    const earlier = code.filter(country => !['CA', 'AU', 'NZ', 'SG', 'JP', 'MD', 'KR'].includes(country));
+    const baseWith = (countries: readonly string[]) => f.v12.map(row => row.rowKey === 'billingPolicy'
+      ? { ...row, valueJsonText: canonical({ ...JSON.parse(row.valueJsonText), enabled: true, withdrawal_countries: countries }) } : row);
+    const source = [...await buildPreviewSourceRowsV3(f.bootstrap, runtime, ON)] as Row[];
+    const plan = compose(source, baseWith(earlier));
+    expect(plan.changedKeys).toContain('billingPolicy');
+    expect(JSON.parse(plan.delta.find(row => row.rowKey === 'billingPolicy')!.newValueJsonText).withdrawal_countries).toEqual([...code]);
+    // A base below the law's own list is no lawful row of any release, and the source row keeps every rule.
+    expect(() => compose(source, baseWith(earlier.filter(country => country !== 'NO')))).toThrow(expect.objectContaining({ code: 'BILLING_POLICY_INVALID' }));
+  });
+
   it('a first provider-only publication (billing off) changes only the ceilings and the room-read budget', async () => {
     const f = await fixture();
     const plan = compose([...await buildPreviewSourceRowsV3(f.bootstrap, runtime, OFF)] as Row[], f.v12);

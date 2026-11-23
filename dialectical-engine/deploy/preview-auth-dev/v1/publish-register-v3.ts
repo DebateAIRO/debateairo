@@ -48,7 +48,7 @@ import {
   buildConfiguredProviderSetSealedRow, buildConfiguredProviderSetDeploymentRow,
   costEnvelopePolicyFromValue, costEnvelopeBand, COST_ENVELOPE_POLICY_ROW_KEY,
   admissionPolicyFromValue, assertAskRoomAdmissionSealed, assertHostedSupportAdmissionSealed, ADMISSION_POLICY_ROW_KEY,
-  billingPolicyFromValue, billingPlansFromValue, billingPlansAreMadeUp, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
+  billingPolicyFromValue, earlierBillingPolicyFromValue, billingPlansFromValue, billingPlansAreMadeUp, assertBillingReady, BILLING_POLICY_ROW_KEY, BILLING_PLANS_ROW_KEY,
   abuseLimitsFromValue, ABUSE_LIMITS_ROW_KEY,
   BILLING_POLICY_DEPLOYMENT_REGISTER_ROW, countryPolicyFromValue, COUNTRY_POLICY_ROW_KEY, readStoryPolicy,
   callConcurrencyPolicyFromValue, CALL_CONCURRENCY_POLICY_ROW_KEY,
@@ -263,15 +263,17 @@ function assertProviderRows(rows:ReadonlyMap<string,RegisterPublicationRow>, sid
 
 /**
  * The billing switch on either side: the strict row, parsed by the register's own reader. The source is the code-owned
- * row (enabled false) or that row switched on, its withdrawal list unchanged; the base may be either (a version this kit
- * published) or any lawful billing-off row.
+ * row (enabled false) or that row switched on, its withdrawal list unchanged; the base may be either (a version a kit
+ * published) or any lawful billing-off row. The base is read as an earlier version's row: the release that sealed it
+ * may have served fewer countries, so its withdrawal list may be shorter than this code's, never below the law's.
  */
 function assertBillingRows(source:ReadonlyMap<string,RegisterPublicationRow>, base:ReadonlyMap<string,RegisterPublicationRow>) {
-  const read=(row:RegisterPublicationRow|undefined)=>row===undefined?fail('billing-policy-missing'):billingPolicyFromValue(JSON.parse(row.valueJsonText),row.sourceRef);
-  const own=read(source.get(BILLING_POLICY_ROW_KEY)),code=BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value;
+  const missing=():never=>fail('billing-policy-missing');
+  const sourceRow=source.get(BILLING_POLICY_ROW_KEY)??missing(),baseRow=base.get(BILLING_POLICY_ROW_KEY)??missing();
+  const own=billingPolicyFromValue(JSON.parse(sourceRow.valueJsonText),sourceRow.sourceRef),code=BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value;
   const expected=canonicalValue({...code,enabled:own.enabled});
-  if(source.get(BILLING_POLICY_ROW_KEY)!.valueJsonText!==expected)fail('billing-policy-source');
-  read(base.get(BILLING_POLICY_ROW_KEY));
+  if(sourceRow.valueJsonText!==expected)fail('billing-policy-source');
+  earlierBillingPolicyFromValue(JSON.parse(baseRow.valueJsonText),baseRow.sourceRef);
 }
 
 /**

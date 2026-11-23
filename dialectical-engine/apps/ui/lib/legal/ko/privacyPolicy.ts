@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "본 방침을 변경할 때 당사는 변경 사항의 요약과 새 시행일을 포함한 새 버전을 게시하고 이전 버전을 dezbatere.ro/privacy/versions에 보관합니다. 새로운 목적 또는 새로운 수령자를 추가하는 변경의 경우 새 처리를 시작하기 전에 이메일과 제품 내에서 귀하에게 알리고 이의를 제기할 시간을 드립니다. 새로운 목적이 귀하의 동의에 의존하는 경우, 예를 들어 향후 콘텐츠를 모델 개선에 사용하려는 경우 그 동의를 별도로 구체적으로 요청하며, 업데이트된 이용약관의 수락을 새로운 처리에 대한 동의로 간주하지 않습니다. 당사의 처리에 아무런 변화가 없는 설명의 명확화는 새 버전만 게시합니다." },
-      { kind: "p", text: "이 방침은 2026년 11월 22일에 마지막으로 업데이트되었습니다." }
+      { kind: "p", text: "이 방침은 2026년 11월 23일에 마지막으로 업데이트되었습니다." }
     ]
   },
   {
@@ -495,8 +495,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "e7153f08715cb966c558fd904eaf0f5e5f5b53352cef4b8e4f8c50b5aeb9f076",
-  eyebrow: "개인정보 처리방침 · v1.0 · 시행일 2026년 11월 22일",
+  sha256: "02755c0ec4d6271b582462bd9c8d2d499195f65d32a0064d1046b4304986bacd",
+  eyebrow: "개인정보 처리방침 · v1.0 · 시행일 2026년 11월 23일",
   title: "당사가 저장하는 정보와 그 이유",
   lede: "GDPR (EU) 2016/679에 따른 귀하의 권리와 당사의 의무를 알기 쉽게 설명합니다. 총 14개 조항과 부속서 B — 끝까지 스크롤하십시오.",
   endMarker: "방침 끝 · GDPR (EU) 2016/679 · v1.0",

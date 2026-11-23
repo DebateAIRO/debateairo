@@ -9,6 +9,7 @@ import {
   assertBillingReady,
   billingPlansFromValue,
   billingPolicyFromValue,
+  earlierBillingPolicyFromValue,
   loadBootstrapRegister,
   planById,
   planCapMicros,
@@ -323,6 +324,20 @@ describe("billingPolicy v1 keeps billing switched off", () => {
     const row = policyRow();
     mutate(row);
     expect(() => policyOf(row)).toThrowError(expect.objectContaining({ code: "BILLING_POLICY_INVALID" }));
+  });
+
+  it("reads an earlier version's row with the law's countries and the US only, which the row of this code no longer may be", () => {
+    const served = ["CA", "AU", "NZ", "SG", "JP", "MD", "KR"];
+    const code = BILLING_POLICY_DEPLOYMENT_REGISTER_ROW.value;
+    const earlier = { ...code, enabled: true, withdrawal_countries: code.withdrawal_countries.filter((country) => !served.includes(country)) };
+    expect(earlier.withdrawal_countries).toContain("US");
+    expect(() => policyOf(earlier)).toThrow(expect.objectContaining({ code: "BILLING_POLICY_INVALID" }));
+    expect(earlierBillingPolicyFromValue(earlier, "b4 test").withdrawalCountries).toEqual(earlier.withdrawal_countries);
+    // The law's own countries stay asked for, and so does every other rule of the row.
+    const belowTheLaw = { ...earlier, withdrawal_countries: earlier.withdrawal_countries.filter((country) => country !== "NO") };
+    expect(() => earlierBillingPolicyFromValue(belowTheLaw, "b4 test")).toThrow(expect.objectContaining({ code: "BILLING_POLICY_INVALID" }));
+    expect(() => earlierBillingPolicyFromValue({ ...earlier, withdrawal_days: 7 }, "b4 test")).toThrow(expect.objectContaining({ code: "BILLING_POLICY_INVALID" }));
+    expect(() => earlierBillingPolicyFromValue({ ...earlier, extra: 1 }, "b4 test")).toThrow(expect.objectContaining({ code: "BILLING_POLICY_INVALID" }));
   });
 
   it("reads null when the version sealed no policy row: billing is off", async () => {

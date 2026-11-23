@@ -430,7 +430,7 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
     accent: "--reasoning",
     blocks: [
       { kind: "p", text: "本ポリシーを変更する際、当社は変更内容の要約および新しい発効日とともに新版を掲載し、旧版を dezbatere.ro/privacy/versions に保存します。新たな目的または新たな受領者を追加する変更については、新しい処理を開始する前にメールおよび製品内でお客様へ通知し、異議を申し立てる時間を設けます。新たな目的がお客様の同意に依存する場合（例えば、将来コンテンツをモデルの改善に使用しようとする場合）、当社はその同意を別個かつ明確に求め、更新された利用規約への承諾を新たな処理への同意として扱うことは決してありません。当社の取扱いを何ら変更しない明確化については、単に新版を掲載します。" },
-      { kind: "p", text: "本ポリシーの最終更新日は 2026年11月22日 です。" }
+      { kind: "p", text: "本ポリシーの最終更新日は 2026年11月23日 です。" }
     ]
   },
   {
@@ -495,8 +495,8 @@ export const POLICY_SECTIONS: readonly LegalSection[] = [
 export const PRIVACY_POLICY: LegalDocument = {
   key: "privacy",
   version: "1.0",
-  sha256: "54ffd6e24ef74c2b9c3f6f8f18deb2942f5926b6dd0238228213e63fa4a0fedd",
-  eyebrow: "プライバシーポリシー · v1.0 · 発効日 2026年11月22日",
+  sha256: "22bbc4499a21ad7cb1b2689e0c8714d34d17be6b77f01f29f4e21dbe8b0a215e",
+  eyebrow: "プライバシーポリシー · v1.0 · 発効日 2026年11月23日",
   title: "当社が保存する情報とその理由",
   lede: "GDPR (EU) 2016/679に基づくお客様の権利と当社の義務を、わかりやすく説明します。全14節および附属書Bです。末尾までスクロールしてください。",
   endMarker: "ポリシー終了 · GDPR (EU) 2016/679 · v1.0",

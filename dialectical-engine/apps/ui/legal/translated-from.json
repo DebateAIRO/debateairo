@@ -38,7 +38,7 @@
     },
     "fr": {
       "version": "1.0",
-      "sha256": "36dadf57172bbc2452dcd363e3aa416c38a97816e3fae3ff1a284cc7d3948d3e"
+      "sha256": "d02ca4bac99f4a3a84a0f6e00726717e67f9290f61739d15f4ebd2ef27137bcf"
     },
     "ga": {
       "version": "3.12",
@@ -70,11 +70,11 @@
     },
     "ja": {
       "version": "1.0",
-      "sha256": "36dadf57172bbc2452dcd363e3aa416c38a97816e3fae3ff1a284cc7d3948d3e"
+      "sha256": "d02ca4bac99f4a3a84a0f6e00726717e67f9290f61739d15f4ebd2ef27137bcf"
     },
     "ko": {
       "version": "1.0",
-      "sha256": "36dadf57172bbc2452dcd363e3aa416c38a97816e3fae3ff1a284cc7d3948d3e"
+      "sha256": "d02ca4bac99f4a3a84a0f6e00726717e67f9290f61739d15f4ebd2ef27137bcf"
     },
     "lt": {
       "version": "3.12",
@@ -102,7 +102,7 @@
     },
     "ro": {
       "version": "1.0",
-      "sha256": "36dadf57172bbc2452dcd363e3aa416c38a97816e3fae3ff1a284cc7d3948d3e"
+      "sha256": "d02ca4bac99f4a3a84a0f6e00726717e67f9290f61739d15f4ebd2ef27137bcf"
     },
     "ru": {
       "version": "3.12",
@@ -176,7 +176,7 @@
     },
     "fr": {
       "version": "1.0",
-      "sha256": "5d093d87aebf71a055a835ca3f6550e36e3995a1b74877f7d918e303c02d6f0b"
+      "sha256": "737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2"
     },
     "ga": {
       "version": "2.18",
@@ -208,11 +208,11 @@
     },
     "ja": {
       "version": "1.0",
-      "sha256": "5d093d87aebf71a055a835ca3f6550e36e3995a1b74877f7d918e303c02d6f0b"
+      "sha256": "737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2"
     },
     "ko": {
       "version": "1.0",
-      "sha256": "5d093d87aebf71a055a835ca3f6550e36e3995a1b74877f7d918e303c02d6f0b"
+      "sha256": "737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2"
     },
     "lt": {
       "version": "2.18",
@@ -240,7 +240,7 @@
     },
     "ro": {
       "version": "1.0",
-      "sha256": "5d093d87aebf71a055a835ca3f6550e36e3995a1b74877f7d918e303c02d6f0b"
+      "sha256": "737971b09f371ef4c0266610b58c563df067caf3a4ddf52ae55204aa689610d2"
     },
     "ru": {
       "version": "2.18",
