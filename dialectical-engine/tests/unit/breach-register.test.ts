@@ -257,6 +257,15 @@ describe("close", () => {
     expect(readFileSync(recordPath("BR-2026-001"), "utf8")).toContain("- Status: open");
   });
 
+  it("does not take a hint for an answer when one comment is wrapped around another", () => {
+    open();
+    const text = readFileSync(recordPath("BR-2026-001"), "utf8");
+    writeFileSync(recordPath("BR-2026-001"), text.replace("## What happened\n", "## What happened\n\n<!-<!-- inner -->- outer -->\n"));
+    const { record } = readRecord(readFileSync(recordPath("BR-2026-001"), "utf8"));
+    expect(record.written.get("What happened")).toBe("");
+    expect(close().text).toContain("the section \"What happened\" is empty");
+  });
+
   it("refuses while a region's number of people is unknown", () => {
     open();
     completeRecord("BR-2026-001", "told 2026-11-23 10:00");

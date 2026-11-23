@@ -91,9 +91,18 @@ export function newRecordText({ id, title, awareAt, openedAt, practice }) {
   return `${lines.join("\n")}`;
 }
 
-/** Text with the hints taken out. */
+/**
+ * Text with the hints taken out. Taking one comment out can join the pieces around it into a new one
+ * ("<!-<!-- x -->- y -->"), so it repeats until nothing changes: what is left holds no whole comment.
+ */
 function withoutComments(text) {
-  return text.replace(/<!--[\s\S]*?-->/gu, "");
+  let before;
+  let after = text;
+  do {
+    before = after;
+    after = before.replace(/<!--[\s\S]*?-->/gu, "");
+  } while (after !== before);
+  return after;
 }
 
 /** "- Name: value" lines of a block, as a map from the name to the value. A name written twice keeps the first. */
